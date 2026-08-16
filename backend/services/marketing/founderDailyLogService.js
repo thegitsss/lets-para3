@@ -119,12 +119,6 @@ function isLogStale(log = null, now = new Date()) {
   return new Date(now).getTime() - new Date(log.generatedAt).getTime() > 15 * 60 * 1000;
 }
 
-function channelLabel(channelKey = "") {
-  if (channelKey === "linkedin_company") return "LinkedIn company";
-  if (channelKey === "facebook_page") return "Facebook page";
-  return titleize(channelKey || "channel");
-}
-
 function buildAction({
   key = "",
   label = "",
@@ -303,117 +297,6 @@ async function buildLinkedInReadyPost(channel = {}, cycle = null) {
   };
 }
 
-async function buildFacebookReadyPost(channel = {}, cycle = null) {
-  const { packet, brief } = await loadPacketContext(channel.packetId || null);
-  if (!packet) {
-    return {
-      channelKey: "facebook_page",
-      channelLabel: "Facebook page",
-      packetId: null,
-      cycleId: cycle?._id || cycle?.id || null,
-      title: "",
-      summary: "No Facebook page draft is available for today yet.",
-      status: "Not available today",
-      approvalState: "",
-      publishReadiness: "not_available",
-      canPostNow: false,
-      blocker: "No Facebook page packet is available for today's founder review.",
-      primaryAction: buildAction({
-        key: "open-marketing-queue-facebook",
-        label: "Open full marketing queue",
-        description: "Open the queue and inspect the latest channel packets.",
-        actionType: "open_marketing_queue",
-        enabled: true,
-        priority: 90,
-      }),
-      secondaryAction: null,
-    };
-  }
-
-  const title = brief?.title || packet.packetSummary || "Facebook page draft";
-  const summary = packet.packetSummary || brief?.briefSummary || "Facebook page packet is available.";
-
-  if (packet.approvalState === "pending_review") {
-    return {
-      channelKey: "facebook_page",
-      channelLabel: "Facebook page",
-      packetId: packet._id,
-      cycleId: cycle?._id || cycle?.id || brief?.cycleId || null,
-      title,
-      summary: compactText(summary, 1000),
-      status: "Ready to review",
-      approvalState: packet.approvalState || "",
-      publishReadiness: "blocked",
-      canPostNow: false,
-      blocker: "The Facebook packet still needs Samantha's approval.",
-      primaryAction: buildAction({
-        key: "review-facebook-draft",
-        label: "Review Draft",
-        description: "Open the Facebook packet detail for founder review.",
-        actionType: "open_packet",
-        channelKey: "facebook_page",
-        packetId: packet._id,
-        cycleId: cycle?._id || cycle?.id || null,
-        enabled: true,
-        priority: 40,
-      }),
-      secondaryAction: buildAction({
-        key: "approve-facebook-packet",
-        label: "Approve Pending Packet",
-        description: "Approve the pending Facebook packet directly from the founder layer.",
-        actionType: "approve_packet",
-        channelKey: "facebook_page",
-        packetId: packet._id,
-        cycleId: cycle?._id || cycle?.id || null,
-        enabled: true,
-        priority: 45,
-      }),
-    };
-  }
-
-  const blocker =
-    packet.approvalState === "approved"
-      ? "Facebook Page posting remains blocked because publish execution is not implemented in this phase."
-      : "The Facebook page packet is not yet available for posting.";
-
-  return {
-    channelKey: "facebook_page",
-    channelLabel: "Facebook page",
-    packetId: packet._id,
-    cycleId: cycle?._id || cycle?.id || brief?.cycleId || null,
-    title,
-    summary: compactText(summary, 1000),
-    status: packet.approvalState === "approved" ? "Blocked" : "Awaiting approval",
-    approvalState: packet.approvalState || "",
-    publishReadiness: "blocked",
-    canPostNow: false,
-    blocker,
-    primaryAction: buildAction({
-      key: "post-facebook-blocked",
-      label: "Post to Facebook",
-      description: "Facebook Page posting is not implemented yet in this phase.",
-      actionType: "noop",
-      channelKey: "facebook_page",
-      packetId: packet._id,
-      cycleId: cycle?._id || cycle?.id || null,
-      enabled: false,
-      disabledReason: blocker,
-      priority: 95,
-    }),
-    secondaryAction: buildAction({
-      key: "open-facebook-packet",
-      label: "Open Packet",
-      description: "Open the Facebook packet detail.",
-      actionType: "open_packet",
-      channelKey: "facebook_page",
-      packetId: packet._id,
-      cycleId: cycle?._id || cycle?.id || null,
-      enabled: true,
-      priority: 55,
-    }),
-  };
-}
-
 async function buildReadyPosts({ cycles = [] } = {}) {
   const preferredCycle =
     (cycles || []).find((cycle) => localDateKey(cycle.createdAt || cycle.updatedAt || new Date()) === localDateKey(new Date())) ||
@@ -422,32 +305,18 @@ async function buildReadyPosts({ cycles = [] } = {}) {
     null;
 
   const linkedInChannel = preferredCycle?.channels?.linkedin_company || {};
-  const facebookChannel = preferredCycle?.channels?.facebook_page || {};
-
-  const [linkedIn, facebook] = await Promise.all([
-    buildLinkedInReadyPost(linkedInChannel, preferredCycle),
-    buildFacebookReadyPost(facebookChannel, preferredCycle),
-  ]);
-
-  return [linkedIn, facebook];
+  const linkedIn = await buildLinkedInReadyPost(linkedInChannel, preferredCycle);
+  return [linkedIn];
 }
 
-function buildQuickActions({ readyPosts = [], overview = {} } = {}) {
+function buildQuickActions({ readyPosts = [] } = {}) {
   const actions = [];
   const linkedIn = readyPosts.find((item) => item.channelKey === "linkedin_company");
-  const facebook = readyPosts.find((item) => item.channelKey === "facebook_page");
 
   if (linkedIn?.status === "Ready to post" && linkedIn.primaryAction) {
     actions.push({ ...linkedIn.primaryAction, description: "Publish the approved LinkedIn company post manually now." });
   } else if (linkedIn?.status === "Ready to review" && linkedIn.primaryAction) {
     actions.push({ ...linkedIn.primaryAction, description: "Review the LinkedIn company packet before approving it." });
-  }
-
-  if (facebook?.status === "Ready to review" && facebook.primaryAction) {
-    actions.push({ ...facebook.primaryAction, description: "Review the Facebook page packet before approving it." });
-  }
-  if (facebook?.primaryAction?.label === "Post to Facebook") {
-    actions.push(facebook.primaryAction);
   }
 
   const approveCandidate = readyPosts.find((post) => post.secondaryAction?.actionType === "approve_packet");
@@ -542,10 +411,6 @@ function buildBlockers({ readyPosts = [], publishingOverview = {} } = {}) {
     .forEach((post) => {
       items.push(`${post.channelLabel}: ${post.blocker}`);
     });
-  const facebook = readyPosts.find((post) => post.channelKey === "facebook_page");
-  if (facebook && facebook.status !== "Ready to review" && facebook.status !== "Ready to post") {
-    items.push("No Facebook-ready post exists yet.");
-  }
   const linkedIn = (publishingOverview.channelReadiness || []).find((entry) => entry.channelKey === "linkedin_company");
   if (linkedIn?.status !== "connected_validated") {
     items.push(linkedIn?.note || "LinkedIn company publishing remains blocked until connection is completed.");
@@ -620,7 +485,7 @@ async function buildFounderDailyLogPayload({ now = new Date(), prepResult = null
   ]);
 
   const readyPosts = await buildReadyPosts({ cycles: publishingOverview.latestCycles || [] });
-  const quickActions = buildQuickActions({ readyPosts, overview, publishingOverview });
+  const quickActions = buildQuickActions({ readyPosts });
   const whatChanged = await buildWhatChanged({ now, jrBriefing, createdCycle: prepResult?.marketingPublishing || null });
   const needsFounder = buildNeedsFounder({ readyPosts, overview, publishingOverview });
   const blockers = buildBlockers({ readyPosts, publishingOverview });
@@ -652,7 +517,7 @@ async function buildFounderDailyLogPayload({ now = new Date(), prepResult = null
   };
 }
 
-async function prepareFounderDailyLog({ now = new Date(), force = false, allowScheduledCycleCheck = false } = {}) {
+async function prepareFounderDailyLog({ now = new Date(), allowScheduledCycleCheck = false } = {}) {
   const dateKey = localDateKey(now, FOUNDER_DAILY_LOG_TIMEZONE);
   let prepResult = null;
 
@@ -675,7 +540,7 @@ async function prepareFounderDailyLog({ now = new Date(), force = false, allowSc
         generatedAt: new Date(now),
       },
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
   ).lean();
 
   return { log, refreshed: true, prepResult };
@@ -687,7 +552,7 @@ async function getFounderDailyLog({ now = new Date(), refreshIfStale = true } = 
   if (existing && (!refreshIfStale || !isLogStale(existing, now))) {
     return { log: existing, refreshed: false };
   }
-  return prepareFounderDailyLog({ now, force: true, allowScheduledCycleCheck: false });
+  return prepareFounderDailyLog({ now, allowScheduledCycleCheck: false });
 }
 
 async function prepareFounderDailyLogIfDue({ now = new Date(), schedulerState = {} } = {}) {
@@ -711,7 +576,7 @@ async function prepareFounderDailyLogIfDue({ now = new Date(), schedulerState = 
         generatedAt: new Date(now),
       },
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
   ).lean();
   return { prepared: true, reason: "prepared", log };
 }

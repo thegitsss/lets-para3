@@ -57,8 +57,13 @@ document.addEventListener("DOMContentLoaded", () => {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const newPassword = document.getElementById("newPassword").value.trim();
-    const confirmPassword = document.getElementById("confirmPassword").value.trim();
+    const newPassword = document.getElementById("newPassword").value;
+    const confirmPassword = document.getElementById("confirmPassword").value;
+
+    if (newPassword.length < 15 || newPassword.length > 128) {
+      message.textContent = "Use a password between 15 and 128 characters.";
+      return;
+    }
 
     if (newPassword !== confirmPassword) {
       message.textContent = "Passwords do not match.";

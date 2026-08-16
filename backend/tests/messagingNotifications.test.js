@@ -72,6 +72,36 @@ beforeEach(async () => {
 });
 
 describe("Messaging + notifications", () => {
+  test("Retired case-summary probes do not return placeholder content", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Summary",
+      email: "attorney-summary@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Summary",
+      email: "paralegal-summary@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await seedFundedCase({ attorney, paralegal });
+
+    const response = await request(app)
+      .post(`/api/messages/${caseDoc._id}/summary`)
+      .set("Cookie", authCookieFor(attorney))
+      .send({});
+
+    expect(response.status).toBe(404);
+    expect(response.text).not.toMatch(/placeholder/i);
+  });
+
   test("Paralegal sends message to attorney and notification email is sent", async () => {
     // Description: Paralegal sends a message on a funded case.
     // Input values: text="Draft is ready for review".

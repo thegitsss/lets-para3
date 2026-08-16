@@ -1,6 +1,8 @@
 // backend/utils/verifyToken.js
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { findActiveSession } = require("../services/authSessionService");
+const { serializeLegalAcceptance } = require("./legalDocuments");
 
 const DEACTIVATED_ACCOUNT_MSG = "This account has been deactivated.";
 
@@ -57,6 +59,8 @@ const ALGORITHMS = ALGS.length ? ALGS : ["RS256", "HS256"];
 function getToken(req) {
   if (req?.cookies?.token) return req.cookies.token;
   if (req?.cookies?.[COOKIE_NAME]) return req.cookies[COOKIE_NAME];
+  const authorization = String(req?.headers?.authorization || "");
+  if (authorization.startsWith("Bearer ")) return authorization.slice(7).trim();
   return null;
 }
 
@@ -124,7 +128,30 @@ function shapeUser(payload) {
 
   const orgId = payload.orgId || payload["https://paraconnect.app/orgId"] || undefined;
 
-  return { id, role, email, scopes, orgId, status, approved };
+  return {
+    id,
+    role,
+    email,
+    scopes,
+    orgId,
+    status,
+    approved,
+    authVersion: Number(payload.av || 0),
+    sessionId: String(payload.sid || ""),
+  };
+}
+
+function isLegalAcceptanceExemptRequest(req) {
+  const requestPath = String(req?.originalUrl || req?.url || "").split("?")[0];
+  return (
+    requestPath === "/api/account/legal-acceptance" ||
+    requestPath === "/api/auth/me" ||
+    requestPath === "/api/auth/logout"
+  );
+}
+
+function isLegalAcceptanceEnforced(env = process.env) {
+  return env.NODE_ENV === "production" || String(env.REQUIRE_LEGAL_ACCEPTANCE || "").toLowerCase() === "true";
 }
 
 // -------------------------------
@@ -154,12 +181,28 @@ function makeVerifier(required = true) {
 
     try {
       const currentUser = await User.findById(user.id)
-        .select("_id role email status disabled deleted")
+        .select("_id role email status disabled deleted termsAccepted termsVersion termsAcceptedAt privacyVersion privacyAcknowledgedAt +authVersion")
         .lean();
       if (!currentUser || currentUser.deleted || currentUser.disabled) {
         if (!required) return next();
         return res.status(403).json({ error: DEACTIVATED_ACCOUNT_MSG, msg: DEACTIVATED_ACCOUNT_MSG });
       }
+      if (Number(currentUser.authVersion || 0) !== user.authVersion) {
+        if (!required) return next();
+        return res.status(403).json({ msg: "Session expired" });
+      }
+      const requireManagedSession = process.env.NODE_ENV === "production" || process.env.REQUIRE_AUTH_SESSION === "true";
+      if (user.sessionId) {
+        const activeSession = await findActiveSession(user.sessionId, currentUser._id);
+        if (!activeSession) {
+          if (!required) return next();
+          return res.status(403).json({ msg: "Session expired" });
+        }
+      } else if (requireManagedSession) {
+        if (!required) return next();
+        return res.status(403).json({ msg: "Session expired" });
+      }
+      const legalAcceptance = serializeLegalAcceptance(currentUser);
       req.user = {
         _id: String(currentUser._id),
         id: String(currentUser._id),
@@ -169,7 +212,22 @@ function makeVerifier(required = true) {
         approved: String(currentUser.status || "").toLowerCase() === "approved",
         scopes: user.scopes,
         orgId: user.orgId,
+        legalAcceptanceRequired: legalAcceptance.required,
       };
+      req.authSessionId = user.sessionId;
+      if (
+        required &&
+        isLegalAcceptanceEnforced() &&
+        req.user.approved &&
+        legalAcceptance.required &&
+        !isLegalAcceptanceExemptRequest(req)
+      ) {
+        return res.status(428).json({
+          error: "Updated legal documents must be accepted before continuing.",
+          code: "LEGAL_ACCEPTANCE_REQUIRED",
+          legalAcceptance,
+        });
+      }
     } catch (err) {
       return next(err);
     }
@@ -183,5 +241,7 @@ function verifyToken(req, res, next) {
   return makeVerifier(true)(req, res, next);
 }
 verifyToken.optional = makeVerifier(false);
+verifyToken.isLegalAcceptanceExemptRequest = isLegalAcceptanceExemptRequest;
+verifyToken.isLegalAcceptanceEnforced = isLegalAcceptanceEnforced;
 
 module.exports = verifyToken;

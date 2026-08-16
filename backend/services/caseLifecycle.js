@@ -1,14 +1,14 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("services:caseLifecycle");
 // backend/services/caseLifecycle.js
 // Utilities for case archives (ZIP generation + scheduled S3 purges).
 
 const { PassThrough } = require("stream");
 const fs = require("fs");
 const path = require("path");
-const archiver = require("archiver");
-const puppeteer = require("puppeteer");
 const {
-  S3Client,
   GetObjectCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
 } = require("@aws-sdk/client-s3");
@@ -17,57 +17,20 @@ const Case = require("../models/Case");
 const CaseFile = require("../models/CaseFile");
 const Message = require("../models/Message");
 const { decryptMessagePayload, decryptCaseFilePayload } = require("../utils/dataEncryption");
+const { assertObjectMalwareSafe } = require("../utils/fileSecurity");
+const { createS3Client } = require("../utils/s3Client");
+const { launchPuppeteer } = require("../utils/puppeteerBrowser");
 
 const BUCKET = process.env.S3_BUCKET || "";
-const REGION = process.env.S3_REGION || process.env.AWS_REGION || "us-east-1";
-const CREDENTIALS =
-  process.env.S3_ACCESS_KEY && process.env.S3_SECRET_KEY
-    ? {
-        accessKeyId: process.env.S3_ACCESS_KEY,
-        secretAccessKey: process.env.S3_SECRET_KEY,
-      }
-    : undefined;
-
-const s3 = new S3Client({ region: REGION, credentials: CREDENTIALS });
-const PURGE_INTERVAL_MS = Math.max(30_000, Number(process.env.CASE_PURGE_INTERVAL_MS || 60_000));
+const s3 = createS3Client();
 const PURGE_BATCH_LIMIT = Math.max(1, Math.min(10, Number(process.env.CASE_PURGE_BATCH_LIMIT || 3)));
-let purgeWorkerStarted = false;
+let archiverFactoryPromise = null;
 
-function resolvePuppeteerExecutablePath() {
-  const envPath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || "";
-  if (envPath && fs.existsSync(envPath)) return envPath;
-
-  try {
-    const bundled = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
-    if (bundled && fs.existsSync(bundled)) return bundled;
-  } catch {}
-
-  const platform = process.platform;
-  const candidates = [];
-  if (platform === "darwin") {
-    candidates.push(
-      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-      "/Applications/Chromium.app/Contents/MacOS/Chromium"
-    );
-  } else if (platform === "win32") {
-    const programFiles = process.env.PROGRAMFILES || "C:\\\\Program Files";
-    const programFilesX86 = process.env["PROGRAMFILES(X86)"] || "C:\\\\Program Files (x86)";
-    candidates.push(
-      path.join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
-      path.join(programFilesX86, "Google", "Chrome", "Application", "chrome.exe"),
-      path.join(programFiles, "Chromium", "Application", "chrome.exe"),
-      path.join(programFilesX86, "Chromium", "Application", "chrome.exe")
-    );
-  } else {
-    candidates.push(
-      "/usr/bin/google-chrome",
-      "/usr/bin/google-chrome-stable",
-      "/usr/bin/chromium",
-      "/usr/bin/chromium-browser"
-    );
+async function loadArchiverFactory() {
+  if (!archiverFactoryPromise) {
+    archiverFactoryPromise = import("archiver").then((module) => module.default || module);
   }
-
-  return candidates.find((candidate) => fs.existsSync(candidate)) || "";
+  return archiverFactoryPromise;
 }
 
 function normalizeKey(key) {
@@ -99,12 +62,6 @@ function safeFilename(input, { fallback = "file" } = {}) {
   return value.length > 120 ? value.slice(0, 120) : value;
 }
 
-function formatDate(value) {
-  if (!value) return "N/A";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "N/A";
-  return date.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
-}
 
 function formatDateOnly(value) {
   if (!value) return "N/A";
@@ -230,7 +187,7 @@ const EXPORT_COLORS = {
 const EXPORT_FONT_NAME = "CormorantGaramondLight";
 const EXPORT_FONT_PATH = path.resolve(__dirname, "..", "assets", "fonts", "CormorantGaramond-Light.ttf");
 const EXPORT_FONT_AVAILABLE = fs.existsSync(EXPORT_FONT_PATH);
-const RECEIPT_LOGO_PATH = path.resolve(__dirname, "..", "..", "frontend", "mountain-favicon.png");
+const RECEIPT_LOGO_PATH = path.resolve(__dirname, "..", "..", "frontend", "Cleanfav.png");
 const RECEIPT_LOGO_AVAILABLE = fs.existsSync(RECEIPT_LOGO_PATH);
 const EXPORT_CACHE = {
   fontDataUri: null,
@@ -254,7 +211,7 @@ function toDataUri(filePath, mimeType) {
     const data = fs.readFileSync(filePath);
     return `data:${mimeType};base64,${data.toString("base64")}`;
   } catch (err) {
-    console.warn("[caseLifecycle] Unable to load asset", filePath, err?.message || err);
+    runtimeLogger.warn("[caseLifecycle] Unable to load asset", filePath, err?.message || err);
     return "";
   }
 }
@@ -264,7 +221,7 @@ function getFontDataUri() {
     return EXPORT_CACHE.fontDataUri;
   }
   if (!EXPORT_FONT_AVAILABLE) {
-    console.warn("[caseLifecycle] Export font not found:", EXPORT_FONT_PATH);
+    runtimeLogger.warn("[caseLifecycle] Export font not found:", EXPORT_FONT_PATH);
     EXPORT_CACHE.fontDataUri = "";
     return EXPORT_CACHE.fontDataUri;
   }
@@ -277,7 +234,7 @@ function getReceiptLogoDataUri() {
     return EXPORT_CACHE.receiptLogoDataUri;
   }
   if (!RECEIPT_LOGO_AVAILABLE) {
-    console.warn("[caseLifecycle] Receipt logo not found:", RECEIPT_LOGO_PATH);
+    runtimeLogger.warn("[caseLifecycle] Receipt logo not found:", RECEIPT_LOGO_PATH);
     EXPORT_CACHE.receiptLogoDataUri = "";
     return EXPORT_CACHE.receiptLogoDataUri;
   }
@@ -321,11 +278,11 @@ function buildCaseExportHtml(caseData, messages) {
   const amountDisplay = formatAmountDollars(amountCents);
 
   const metadataRows = [
-    ["Title", caseData.title || "Case"],
+    ["Matter title", caseData.title || "Untitled Matter"],
     ["Attorney", attorneyName],
     ["Paralegal", paralegalName],
     ["Completed", formatDateOnly(caseData.completedAt)],
-    ["Payment", `$${amountDisplay}`],
+    ["Matter amount", `$${amountDisplay}`],
   ]
     .map(
       ([label, value]) => `<div>${escapeHtml(label)}: ${escapeHtml(value)}</div>`
@@ -551,7 +508,7 @@ function buildCaseExportHtml(caseData, messages) {
       Let<span style="color:${EXPORT_COLORS.accent};">&#8217;</span>s-ParaConnect
     </footer>
     <div class="page">
-      <h2>Case Details</h2>
+      <h2>Matter Details</h2>
       <div class="case-details">
         ${metadataRows}
       </div>
@@ -577,7 +534,7 @@ function buildReceiptHtml(payload = {}) {
   const partyLabel = payload.partyLabel || "Billed to";
   const partyName = payload.partyName || "N/A";
   const attorneyName = payload.attorneyName || "";
-  const caseTitle = payload.caseTitle || "Case";
+  const caseTitle = payload.caseTitle || "Untitled Matter";
   const paymentMethod = payload.paymentMethod || "On file";
   const paymentStatus = payload.paymentStatus || "Paid";
   const totalLabel = payload.totalLabel || "Total";
@@ -588,7 +545,7 @@ function buildReceiptHtml(payload = {}) {
     ["Date issued", issuedAt],
     [partyLabel, partyName],
     ...(attorneyName ? [["Attorney", attorneyName]] : []),
-    ["Case title", caseTitle],
+    ["Matter title", caseTitle],
   ]
     .map(
       ([label, value]) =>
@@ -768,11 +725,9 @@ function buildReceiptHtml(payload = {}) {
 }
 
 async function renderHtmlToPdf(html, options = {}) {
-  const executablePath = resolvePuppeteerExecutablePath() || undefined;
-  const browser = await puppeteer.launch({
+  const browser = await launchPuppeteer({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    executablePath,
   });
   try {
     const page = await browser.newPage();
@@ -842,14 +797,14 @@ function getReceiptKey(caseId, kind) {
 async function appendS3Object(archive, key, name) {
   if (!key || !name || !BUCKET) return;
   const normalized = normalizeKey(key);
-  try {
-    const res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: normalized }));
-    if (res?.Body) {
-      archive.append(res.Body, { name });
-    }
-  } catch (err) {
-    console.warn("[caseLifecycle] Missing S3 object", normalized, err?.message || err);
+  await assertObjectMalwareSafe({ s3, bucket: BUCKET, key: normalized });
+  const res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: normalized }));
+  if (!res?.Body) {
+    const error = new Error(`Archive source is unavailable: ${normalized}`);
+    error.code = "ARCHIVE_SOURCE_MISSING";
+    throw error;
   }
+  archive.append(res.Body, { name });
 }
 
 async function generateArchiveZip(caseDoc) {
@@ -857,33 +812,12 @@ async function generateArchiveZip(caseDoc) {
     throw new Error("S3 bucket is not configured");
   }
   if (!caseDoc || !caseDoc._id) {
-    throw new Error("Case document required");
+    throw new Error("Matter document required");
   }
 
   const caseData = typeof caseDoc.toObject === "function" ? caseDoc.toObject({ depopulate: false }) : caseDoc;
   const caseId = String(caseData._id);
   const archiveKey = `cases/${caseId}/archive-v2.zip`;
-  const archive = archiver("zip", { zlib: { level: 9 } });
-  const stream = new PassThrough();
-  const upload = new Upload({
-    client: s3,
-    params: {
-      Bucket: BUCKET,
-      Key: archiveKey,
-      Body: stream,
-      ContentType: "application/zip",
-      ACL: "private",
-    },
-  });
-
-  archive.pipe(stream);
-
-  const pipelinePromise = new Promise((resolve, reject) => {
-    stream.on("close", resolve);
-    stream.on("error", reject);
-    archive.on("error", reject);
-  });
-
   const messages = await Message.find({ caseId })
     .select("senderId senderRole text content createdAt fileName fileKey transcript")
     .populate("senderId", "firstName lastName role")
@@ -909,9 +843,8 @@ async function generateArchiveZip(caseDoc) {
     return aTime - bTime;
   });
   const exportPdf = await buildCaseExportPdfBuffer(caseData, sortedMessages);
-  archive.append(exportPdf, { name: "Case_Summary.pdf" });
 
-  // Documents
+  // Establish the exact clean, existing source set before starting a multipart archive upload.
   const documentEntries = [];
   if (Array.isArray(caseData.files)) {
     for (const file of caseData.files) {
@@ -940,29 +873,75 @@ async function generateArchiveZip(caseDoc) {
       });
     }
   }
-  if (documentEntries.length) {
-    const seenNames = new Map();
-    const seenKeys = new Set();
-    for (const entry of documentEntries) {
-      if (!entry?.key || seenKeys.has(entry.key)) continue;
-      if (isReceiptKey(entry.key) || isReceiptName(entry.name)) continue;
-      seenKeys.add(entry.key);
-      const baseName = safeFilename(entry.name || `document-${Date.now()}`);
-      const uniqueName = ensureUniqueFilename(baseName, seenNames);
-      const path = `Documents/${uniqueName}`;
-      // eslint-disable-next-line no-await-in-loop
-      await appendS3Object(archive, entry.key, path);
-    }
+  const preEngagementDocuments = [
+    caseData?.preEngagement?.confidentialityDocument,
+    caseData?.preEngagement?.paralegalConfidentialityDocument,
+  ];
+  for (const document of preEngagementDocuments) {
+    if (!document?.key) continue;
+    documentEntries.push({
+      key: document.key,
+      name: document.name || `confidentiality-document-${Date.now()}`,
+    });
+  }
+  const archiveDocuments = [];
+  const seenNames = new Map();
+  const seenKeys = new Set();
+  for (const entry of documentEntries) {
+    if (!entry?.key || seenKeys.has(entry.key)) continue;
+    if (isReceiptKey(entry.key) || isReceiptName(entry.name)) continue;
+    const normalizedKey = normalizeKey(entry.key);
+    seenKeys.add(entry.key);
+    // eslint-disable-next-line no-await-in-loop
+    await assertObjectMalwareSafe({ s3, bucket: BUCKET, key: normalizedKey });
+    // eslint-disable-next-line no-await-in-loop
+    await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: normalizedKey }));
+    const baseName = safeFilename(entry.name || `document-${Date.now()}`);
+    archiveDocuments.push({
+      key: normalizedKey,
+      path: `Documents/${ensureUniqueFilename(baseName, seenNames)}`,
+    });
   }
 
-  archive.finalize();
-  await Promise.all([upload.done(), pipelinePromise]);
-
-  return {
-    key: archiveKey,
-    readyAt: new Date(),
-    size: archive.pointer(),
-  };
+  const archiver = await loadArchiverFactory();
+  const archive = archiver("zip", { zlib: { level: 9 } });
+  const stream = new PassThrough();
+  const upload = new Upload({
+    client: s3,
+    params: {
+      Bucket: BUCKET,
+      Key: archiveKey,
+      Body: stream,
+      ContentType: "application/zip",
+      ACL: "private",
+    },
+  });
+  archive.pipe(stream);
+  const pipelinePromise = new Promise((resolve, reject) => {
+    stream.on("close", resolve);
+    stream.on("error", reject);
+    archive.on("error", reject);
+  });
+  const uploadPromise = upload.done();
+  try {
+    archive.append(exportPdf, { name: "Case_Summary.pdf" });
+    for (const document of archiveDocuments) {
+      // eslint-disable-next-line no-await-in-loop
+      await appendS3Object(archive, document.key, document.path);
+    }
+    archive.finalize();
+    await Promise.all([uploadPromise, pipelinePromise]);
+    return {
+      key: archiveKey,
+      readyAt: new Date(),
+      size: archive.pointer(),
+    };
+  } catch (error) {
+    archive.abort();
+    stream.destroy(error);
+    await Promise.allSettled([upload.abort(), uploadPromise, pipelinePromise]);
+    throw error;
+  }
 }
 
 async function deleteCaseFolder(caseId) {
@@ -1006,7 +985,7 @@ async function purgeExpiredCases(limit = PURGE_BATCH_LIMIT) {
       // eslint-disable-next-line no-await-in-loop
       await deleteCaseFolder(caseId);
     } catch (err) {
-      console.error("[caseLifecycle] purge delete error", caseId, err?.message || err);
+      runtimeLogger.error("[caseLifecycle] purge delete error", caseId, err?.message || err);
       continue;
     }
 
@@ -1023,21 +1002,6 @@ async function purgeExpiredCases(limit = PURGE_BATCH_LIMIT) {
   }
 }
 
-function startPurgeWorker() {
-  if (purgeWorkerStarted) return;
-  if (process.env.DISABLE_CASE_PURGER === "true") return;
-  purgeWorkerStarted = true;
-  if (!BUCKET) {
-    console.warn("[caseLifecycle] S3 bucket not configured; purge worker disabled.");
-    return;
-  }
-  setInterval(() => {
-    purgeExpiredCases().catch((err) => {
-      console.error("[caseLifecycle] purge worker error", err);
-    });
-  }, PURGE_INTERVAL_MS);
-}
-
 module.exports = {
   generateArchiveZip,
   buildReceiptPdfBuffer,
@@ -1045,5 +1009,4 @@ module.exports = {
   getReceiptKey,
   deleteCaseFolder,
   purgeExpiredCases,
-  startPurgeWorker,
 };

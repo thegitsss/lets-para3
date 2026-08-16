@@ -1,6 +1,5 @@
 const express = require("express");
 const cookieParser = require("cookie-parser");
-const csrf = require("csurf");
 const jwt = require("jsonwebtoken");
 const request = require("supertest");
 
@@ -14,6 +13,9 @@ const IncidentRelease = require("../models/IncidentRelease");
 const IncidentApproval = require("../models/IncidentApproval");
 const IncidentArtifact = require("../models/IncidentArtifact");
 const IncidentNotification = require("../models/IncidentNotification");
+const AuthSession = require("../models/AuthSession");
+const { applyCurrentLegalAcceptance } = require("../utils/legalDocuments");
+const { csrfCookieName, csrfTokenMiddleware, respondToCsrfError } = require("../utils/csrf");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 function loadIncidentAdminRouter() {
@@ -27,23 +29,13 @@ function buildIncidentAdminApp({ withCsrfHarness = false } = {}) {
   instance.use(cookieParser());
   instance.use(express.json({ limit: "1mb" }));
   if (withCsrfHarness) {
-    const csrfProtection = csrf({
-      cookie: {
-        httpOnly: true,
-        sameSite: "strict",
-        secure: process.env.NODE_ENV === "production",
-      },
-    });
-    instance.get("/api/csrf", csrfProtection, (req, res) => {
+    instance.get("/api/csrf", csrfTokenMiddleware, (req, res) => {
       res.json({ csrfToken: req.csrfToken() });
     });
-    instance.use(csrfProtection);
   }
   instance.use("/api/admin/incidents", loadIncidentAdminRouter());
   instance.use((err, _req, res, _next) => {
-    if (withCsrfHarness && err?.code === "EBADCSRFTOKEN") {
-      return res.status(403).json({ error: "Invalid CSRF token" });
-    }
+    if (respondToCsrfError(err, res)) return;
     console.error(err);
     res.status(500).json({ error: err?.message || "Server error" });
   });
@@ -57,19 +49,21 @@ const ADMIN_APPROVER_FALLBACK_ENV = process.env.INCIDENT_ALLOW_ADMIN_APPROVER_FA
 const NODE_ENV_BACKUP = process.env.NODE_ENV;
 const ENABLE_CSRF_BACKUP = process.env.ENABLE_CSRF;
 
-function authCookieFor(user) {
+function authCookieFor(user, { sessionId = "" } = {}) {
   const payload = {
     id: user._id.toString(),
     role: user.role,
     email: user.email,
     status: user.status,
+    av: Number(user.authVersion || 0),
+    ...(sessionId ? { sid: sessionId } : {}),
   };
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "2h" });
   return `token=${token}`;
 }
 
 async function createAdmin() {
-  return User.create({
+  const admin = new User({
     firstName: "Admin",
     lastName: "Owner",
     email: "incident-admin@lets-paraconnect.test",
@@ -78,6 +72,8 @@ async function createAdmin() {
     status: "approved",
     state: "CA",
   });
+  applyCurrentLegalAcceptance(admin, { source: "signup" });
+  return admin.save();
 }
 
 async function seedIncidentGraph() {
@@ -98,7 +94,7 @@ async function seedIncidentGraph() {
       confidence: "high",
       clusterKey: "hire-button-case-detail",
       suspectedRoutes: ["/cases/:id"],
-      suspectedFiles: ["frontend/assets/scripts/views/case-detail.js"],
+      suspectedFiles: ["frontend/assets/scripts/case-detail.js"],
     },
     context: {
       surface: "attorney",
@@ -138,7 +134,7 @@ async function seedIncidentGraph() {
     rootCauseSummary: "Click handler detached after a recent frontend refactor.",
     rootCauseConfidence: "high",
     reproductionStatus: "reproduced",
-    suspectedFiles: ["frontend/assets/scripts/views/case-detail.js"],
+    suspectedFiles: ["frontend/assets/scripts/case-detail.js"],
     suspectedRoutes: ["/cases/:id"],
     recommendedAction: "patch",
   });
@@ -152,7 +148,7 @@ async function seedIncidentGraph() {
     baseCommitSha: "abc123def456",
     gitBranch: "incident/inc-20260319-000001",
     patchSummary: "Re-bound the hire action listener after DOM refresh.",
-    filesTouched: ["frontend/assets/scripts/views/case-detail.js"],
+    filesTouched: ["frontend/assets/scripts/case-detail.js"],
   });
 
   const verification = await IncidentVerification.create({
@@ -613,10 +609,25 @@ describe("Incident admin read routes", () => {
     const { incident, approval } = await seedAwaitingApprovalIncident();
     process.env.NODE_ENV = "production";
     process.env.INCIDENT_ALLOW_ADMIN_APPROVER_FALLBACK = "true";
+    const sessionId = `incident-admin-production-${admin._id}`;
+    await AuthSession.create({
+      userId: admin._id,
+      sessionId,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    });
+    const authCookie = authCookieFor(admin, { sessionId });
+    const csrfApp = buildIncidentAdminApp({ withCsrfHarness: true });
+    const csrfRes = await request(csrfApp).get("/api/csrf").set("Cookie", authCookie);
+    const csrfToken = csrfRes.body.csrfToken;
+    const cookiePrefix = `${csrfCookieName()}=`;
+    const csrfCookie = (csrfRes.headers["set-cookie"] || []).find((cookie) =>
+      cookie.startsWith(cookiePrefix)
+    );
 
-    const res = await request(app)
+    const res = await request(csrfApp)
       .post(`/api/admin/incidents/${incident.publicId}/approvals/${approval._id}/decision`)
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", [authCookie, csrfCookie].filter(Boolean))
+      .set("x-csrf-token", csrfToken)
       .send({ decision: "approve", note: "Should still be denied in production runtime." });
 
     expect(res.status).toBe(403);
@@ -678,15 +689,16 @@ describe("Incident admin read routes", () => {
     const admin = await createAdmin();
     const { incident, approval } = await seedAwaitingApprovalIncident();
     process.env.INCIDENT_FOUNDER_APPROVER_EMAILS = admin.email;
+    const authCookie = authCookieFor(admin);
 
-    const csrfRes = await request(csrfApp).get("/api/csrf");
+    const csrfRes = await request(csrfApp).get("/api/csrf").set("Cookie", authCookie);
     expect(csrfRes.status).toBe(200);
     const csrfToken = csrfRes.body.csrfToken;
     const csrfCookie = (csrfRes.headers["set-cookie"] || []).find((cookie) => cookie.startsWith("_csrf="));
 
     const res = await request(csrfApp)
       .post(`/api/admin/incidents/${incident.publicId}/approvals/${approval._id}/decision`)
-      .set("Cookie", [authCookieFor(admin), csrfCookie].filter(Boolean))
+      .set("Cookie", [authCookie, csrfCookie].filter(Boolean))
       .set("x-csrf-token", csrfToken)
       .send({ decision: "approve", note: "Approved with valid CSRF token." });
 
@@ -701,14 +713,15 @@ describe("Incident admin read routes", () => {
     const csrfApp = buildIncidentAdminApp({ withCsrfHarness: true });
     const admin = await createAdmin();
     const { incident, approval } = await seedAwaitingApprovalIncident();
+    const authCookie = authCookieFor(admin);
 
-    const csrfRes = await request(csrfApp).get("/api/csrf");
+    const csrfRes = await request(csrfApp).get("/api/csrf").set("Cookie", authCookie);
     expect(csrfRes.status).toBe(200);
     const csrfCookie = (csrfRes.headers["set-cookie"] || []).find((cookie) => cookie.startsWith("_csrf="));
 
     const res = await request(csrfApp)
       .post(`/api/admin/incidents/${incident.publicId}/approvals/${approval._id}/decision`)
-      .set("Cookie", [authCookieFor(admin), csrfCookie].filter(Boolean))
+      .set("Cookie", [authCookie, csrfCookie].filter(Boolean))
       .set("x-csrf-token", csrfRes.body.csrfToken)
       .send({ decision: "approve", note: "CSRF token should not bypass founder approver checks." });
 

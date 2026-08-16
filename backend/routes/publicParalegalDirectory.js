@@ -1,15 +1,29 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
+const mongoose = require("mongoose");
 
 const User = require("../models/User");
 const verifyToken = require("../utils/verifyToken");
+const { createS3Client } = require("../utils/s3Client");
 const { getBlockedUserIds } = require("../utils/blocks");
 const { applyPublicParalegalFilter } = require("../utils/paralegalProfile");
+const {
+  PROFILE_SOURCE_SELECT,
+  PROFILE_SOURCE_FIELDS,
+  projectCanonicalProfile,
+} = require("../services/objectSystem/profileAuthorityContract");
+const { projectPresentation } = require("../services/objectSystem/presentationContract");
+const {
+  buildPublicProfilePhotoUrl,
+  resolveProfilePhotoKey,
+  streamProfilePhoto,
+} = require("../services/profilePhotoDelivery");
 
 const router = express.Router();
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const escapeRegex = (str = "") => String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const s3 = createS3Client();
 
 const US_STATE_ABBR = {
   Alabama: "AL",
@@ -68,19 +82,36 @@ const US_STATE_NAME_BY_ABBR = Object.fromEntries(
 );
 
 const PUBLIC_PAR_FIELDS =
-  "_id firstName lastName avatarURL profileImage location state specialties practiceAreas bestFor yearsExperience linkedInURL education bio about availability approvedAt createdAt";
+  `${PROFILE_SOURCE_SELECT} bestFor linkedInURL education approvedAt createdAt`;
 
 function serializeParalegal(userDoc) {
   if (!userDoc) return null;
   const src = userDoc.toObject ? userDoc.toObject() : userDoc;
+  let presentation;
+  try {
+    const profileSource = Object.fromEntries(PROFILE_SOURCE_FIELDS
+      .filter((field) => !field.includes(".") && Object.prototype.hasOwnProperty.call(src, field))
+      .map((field) => [field, src[field]]));
+    if (src.preferences) profileSource.preferences = { hideProfile: src.preferences.hideProfile };
+    presentation = projectPresentation(projectCanonicalProfile({
+      source: profileSource,
+      tier: "public",
+      authorizationEvidence: { authorized: true, boundary: "public", publicVisibilityVerified: true },
+      expectedSourceUpdatedAt: new Date(src.updatedAt).toISOString(),
+    }), { kind: "card" });
+  } catch {
+    return null;
+  }
+  const photoUrl = buildPublicProfilePhotoUrl(src);
   return {
     _id: String(src._id),
     id: String(src._id),
     firstName: src.firstName || "",
     lastName: src.lastName || "",
     name: `${src.firstName || ""} ${src.lastName || ""}`.trim(),
-    avatarURL: src.avatarURL || "",
-    profileImage: src.profileImage || "",
+    avatarURL: photoUrl,
+    profileImage: photoUrl,
+    photoUrl,
     location: src.location || src.state || "",
     state: src.state || "",
     specialties: Array.isArray(src.specialties) ? src.specialties : [],
@@ -94,8 +125,102 @@ function serializeParalegal(userDoc) {
     availability: src.availability || "",
     approvedAt: src.approvedAt || null,
     createdAt: src.createdAt || null,
+    presentation,
   };
 }
+
+router.get(
+  "/:profileId/photo",
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Profile photo unavailable." },
+  }),
+  asyncHandler(async (req, res) => {
+    const profileId = String(req.params.profileId || "");
+    if (!mongoose.isValidObjectId(profileId) || !process.env.S3_BUCKET) {
+      res.set("Cache-Control", "no-store");
+      return res.status(404).json({ error: "Profile photo unavailable." });
+    }
+
+    const filter = {
+      _id: profileId,
+      role: "paralegal",
+      status: "approved",
+      disabled: { $ne: true },
+      deleted: { $ne: true },
+      "preferences.hideProfile": { $ne: true },
+    };
+    applyPublicParalegalFilter(filter);
+    const profile = await User.findOne(filter)
+      .select(
+        "_id profileImage avatarURL profilePhotoStatus pendingProfileImage " +
+        "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
+      )
+      .lean();
+    const key = resolveProfilePhotoKey(profile, {
+      bucket: process.env.S3_BUCKET,
+      region: process.env.S3_REGION,
+      variant: "approved",
+    });
+    if (!profile || !key) {
+      res.set("Cache-Control", "no-store");
+      return res.status(404).json({ error: "Profile photo unavailable." });
+    }
+
+    const served = await streamProfilePhoto({
+      req,
+      res,
+      s3,
+      bucket: process.env.S3_BUCKET,
+      key,
+    });
+    if (!served && !res.headersSent) {
+      res.set("Cache-Control", "no-store");
+      return res.status(404).json({ error: "Profile photo unavailable." });
+    }
+    return undefined;
+  })
+);
+
+router.get(
+  "/:profileId",
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 90,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many profile requests. Please slow down." },
+  }),
+  verifyToken.optional,
+  asyncHandler(async (req, res) => {
+    const profileId = String(req.params.profileId || "");
+    if (!mongoose.isValidObjectId(profileId)) {
+      return res.status(404).json({ error: "Paralegal not found" });
+    }
+    const filter = {
+      _id: profileId,
+      role: "paralegal",
+      status: "approved",
+      disabled: { $ne: true },
+      deleted: { $ne: true },
+      "preferences.hideProfile": { $ne: true },
+    };
+    applyPublicParalegalFilter(filter);
+    if (String(req.user?.role || "").toLowerCase() === "attorney") {
+      const blockedIds = await getBlockedUserIds(req.user.id);
+      if (blockedIds.some((id) => String(id) === profileId)) {
+        return res.status(403).json({ error: "This profile is unavailable." });
+      }
+    }
+    const profile = await User.findOne(filter).select(PUBLIC_PAR_FIELDS).lean();
+    const serialized = serializeParalegal(profile);
+    if (!serialized) return res.status(404).json({ error: "Paralegal not found" });
+    return res.json(serialized);
+  })
+);
 
 function buildStateTokens(value = "") {
   const raw = String(value || "").trim();
@@ -154,7 +279,12 @@ router.get(
     const minYears = parseInt(req.query.minYears, 10);
     const sortKey = typeof req.query.sort === "string" ? req.query.sort.trim().toLowerCase() : "recent";
 
-    const filter = { role: "paralegal", status: "approved" };
+    const filter = {
+      role: "paralegal",
+      status: "approved",
+      disabled: { $ne: true },
+      deleted: { $ne: true },
+    };
     filter["preferences.hideProfile"] = { $ne: true };
     applyPublicParalegalFilter(filter);
 
@@ -225,7 +355,7 @@ router.get(
     ]);
 
     res.json({
-      items: docs.map(serializeParalegal),
+      items: docs.map(serializeParalegal).filter(Boolean),
       page,
       limit,
       total,

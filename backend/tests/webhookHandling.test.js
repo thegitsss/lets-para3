@@ -99,10 +99,11 @@ describe("Webhook handling", () => {
       data: {
         object: {
           id: "pi_123",
-          amount: 100000,
+          amount: 122000,
           currency: "usd",
           livemode: false,
           metadata: { caseId: String(caseDoc._id) },
+          transfer_group: `case_${caseDoc._id}`,
         },
       },
     };
@@ -182,9 +183,10 @@ describe("Webhook handling", () => {
       data: {
         object: {
           id: "pi_dedupe",
-          amount: 50000,
+          amount: 61000,
           currency: "usd",
           metadata: { caseId: String(caseDoc._id) },
+          transfer_group: `case_${caseDoc._id}`,
         },
       },
     };
@@ -292,10 +294,11 @@ describe("Webhook handling", () => {
       data: {
         object: {
           id: "pi_processing_failure",
-          amount: 1000,
+          amount: 1220,
           currency: "usd",
           livemode: false,
           metadata: { caseId: String(caseDoc._id) },
+          transfer_group: `case_${caseDoc._id}`,
         },
       },
     };
@@ -309,13 +312,26 @@ describe("Webhook handling", () => {
       .set("Content-Type", "application/json")
       .send(Buffer.from(JSON.stringify({})));
 
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ received: true, handled: false });
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ received: false, handled: false });
 
     const webhookRecord = await WebhookEvent.findOne({ eventId: "evt_processing_failure" }).lean();
     expect(webhookRecord.status).toBe("failed");
     expect(webhookRecord.lastError).toMatch(/audit write failed/i);
 
     saveSpy.mockRestore();
+
+    const retry = await request(app)
+      .post("/api/payments/webhook")
+      .set("Stripe-Signature", "test-signature")
+      .set("Content-Type", "application/json")
+      .send(Buffer.from(JSON.stringify({})));
+
+    expect(retry.status).toBe(200);
+    expect(retry.body).toEqual({ received: true });
+
+    const processedRecord = await WebhookEvent.findOne({ eventId: "evt_processing_failure" }).lean();
+    expect(processedRecord.status).toBe("processed");
+    expect(processedRecord.attempts).toBe(2);
   });
 });

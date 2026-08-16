@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const mongoose = require("mongoose");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 process.env.STRIPE_SECRET_KEY =
   process.env.STRIPE_SECRET_KEY || "sk_test_support_retention_fixture";
@@ -18,23 +18,16 @@ const {
 } = require("../services/support/conversationService");
 
 describe("support conversation retention and active-memory reset", () => {
-  let mongo;
-
   beforeAll(async () => {
-    mongo = await MongoMemoryServer.create();
-    await mongoose.connect(mongo.getUri());
+    await connect();
   });
 
-  afterEach(async () => {
-    await Promise.all([
-      SupportConversation.deleteMany({}),
-      SupportMessage.deleteMany({}),
-    ]);
+  beforeEach(async () => {
+    await clearDatabase();
   });
 
   afterAll(async () => {
-    await mongoose.disconnect();
-    await mongo.stop();
+    await closeDatabase();
   });
 
   test("removes expired conversations and their messages but retains current history", async () => {

@@ -163,7 +163,7 @@ function getClosedCaseBlockMeta(caseDoc) {
     return {
       sourceType: "closed_case",
       sourceDisputeId: "",
-      label: "Completed case",
+      label: "Completed Matter",
     };
   }
   return null;
@@ -205,7 +205,7 @@ function getCaseBlockEligibility(caseDoc, requester = {}) {
   ) {
     return {
       eligible: false,
-      reason: "Blocking is only available from a finalized case outcome, not from an active workspace.",
+      reason: "Blocking is only available from a finalized Matter outcome, not from an active workspace.",
       counterpartyId: "",
       counterpartyRole: "",
       sourceType: "",

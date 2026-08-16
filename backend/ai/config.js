@@ -1,16 +1,24 @@
 const { createLogger } = require("../utils/logger");
 
 const logger = createLogger("ai:config");
+const OPENAI_TIMEOUT_MS = 30_000;
+const OPENAI_MAX_RETRIES = 2;
 
 const AI_MODELS = {
   support: process.env.OPENAI_SUPPORT_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-terra",
-  marketing: process.env.OPENAI_MARKETING_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-terra",
-  sales: process.env.OPENAI_SALES_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-terra",
 };
 
 let OpenAI = null;
 let openAIClient = null;
 let initError = null;
+
+function buildOpenAIClientOptions(apiKey) {
+  return {
+    apiKey,
+    timeout: OPENAI_TIMEOUT_MS,
+    maxRetries: OPENAI_MAX_RETRIES,
+  };
+}
 
 try {
   OpenAI = require("openai");
@@ -22,7 +30,7 @@ try {
 
 if (!initError && process.env.OPENAI_API_KEY) {
   try {
-    openAIClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    openAIClient = new OpenAI(buildOpenAIClientOptions(process.env.OPENAI_API_KEY));
   } catch (err) {
     initError = err;
     logger.warn("OpenAI client initialization failed; AI features will use fallback behavior.", err?.message || err);
@@ -158,6 +166,9 @@ async function createStructuredResponse({
 
 module.exports = {
   AI_MODELS,
+  OPENAI_MAX_RETRIES,
+  OPENAI_TIMEOUT_MS,
+  buildOpenAIClientOptions,
   createJsonChatCompletion,
   createStructuredResponse,
   getAiStatus,

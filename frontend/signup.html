@@ -16,9 +16,11 @@
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="preload" as="image" href="hero-mountain.jpg" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>
+  <link href="assets/styles/auth-matter-field.css?v=20260730" rel="stylesheet" />
+  <link href="assets/styles/auth-google.css?v=20260730" rel="stylesheet" />
+  <script src="assets/scripts/auth-matter-field.js?v=20260730" defer></script>
+  <script async defer src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>
 
     <style>
     .gold{color:var(--gold);}
@@ -45,20 +47,23 @@
       overflow-x: hidden;
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
-      background: url('hero-mountain.jpg') no-repeat center center fixed;
-      background-size: cover;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(180, 151, 90, 0.13), transparent 34%),
+        linear-gradient(180deg, #fff 0%, #f6f3eb 100%);
     }
 
     .overlay {
       display: flex;
-      height: 100vh;
+      min-height: 100vh;
+      min-height: 100dvh;
       width: 100vw;
-      backdrop-filter: blur(5px);
-      background-color: rgba(0, 0, 0, 0.2);
+      background-color: transparent;
     }
 
     .left-panel {
       width: 50%;
+      min-height: 100vh;
+      min-height: 100dvh;
       background-color: rgba(255, 255, 255, 0.95);
       padding: 60px;
       display: flex;
@@ -268,6 +273,86 @@
       background: transparent;
       border: 0;
       cursor: pointer;
+      min-height: 32px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .password-guidance {
+      margin: -6px 2px 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 180ms ease, visibility 180ms ease;
+    }
+
+    .password-guidance.is-visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .password-strength-rail {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+      margin-bottom: 8px;
+    }
+
+    .password-strength-rail span {
+      height: 2px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(39, 57, 77, 0.12);
+    }
+
+    .password-strength-rail span::after {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--gold);
+      content: "";
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 260ms ease, background-color 260ms ease;
+    }
+
+    .password-strength-rail span.is-active::after {
+      transform: scaleX(1);
+    }
+
+    .password-strength-rail.is-complete span::after {
+      background: #648773;
+    }
+
+    .password-guidance__meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .password-strength-label,
+    .password-hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.72rem;
+      line-height: 1.35;
+    }
+
+    .password-strength-label {
+      color: var(--navy);
+      font-weight: 400;
+      transition: color 180ms ease;
+    }
+
+    .password-strength-label.is-complete {
+      color: #3f6653;
+    }
+
+    .caps-lock-note {
+      margin: 6px 0 0;
+      color: #8a6622;
+      font-size: 0.72rem;
     }
 
     .step-panel {
@@ -291,27 +376,28 @@
     }
 
     .btn {
-      background-color: transparent;
-      color: var(--navy);
-      border: 0.02px solid transparent;
+      min-height: 46px;
+      border: 1px solid var(--navy);
+      border-radius: 8px;
+      background-color: var(--navy);
+      color: #fff;
       padding: 0.75rem 1rem;
       display: block;
       margin: 1.2rem auto 0;
-      width: auto;
+      width: 100%;
       text-align: center;
       font-size: 0.95rem;
       font-family: Sarabun;
-      font-weight: 200;
-      transition: background-color 0.4s ease, transform 0.3s ease, border-color 0.3s ease;
+      font-weight: 500;
+      transition: background-color 0.16s ease, border-color 0.16s ease;
       cursor: pointer;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.01em;
     }
 
     .btn:hover {
-      background-color: #ffffff;
-      color: #1a2230;
-      border-color: #1a2230;
-      transform: scale(1.01);
+      background-color: #1d2b3b;
+      color: #fff;
+      border-color: #1d2b3b;
     }
 
     .btn:focus-visible {
@@ -360,7 +446,7 @@
       overflow: hidden;
     }
 
-    .prelaunch-note {
+    .account-pricing-note {
       color: var(--muted);
       margin-bottom: 1.25rem;
       line-height: 1.5;
@@ -368,6 +454,7 @@
 
     .name-row {
       display: flex;
+      flex-direction: column;
       gap: 16px;
     }
 
@@ -428,7 +515,9 @@
 
       .left-panel {
         width: 100%;
-        padding: 40px 24px;
+        min-height: 100vh;
+        min-height: 100dvh;
+        padding: 88px 24px 48px;
       }
 
       .name-row {
@@ -451,7 +540,7 @@
       background: white;
       color: #333;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     }
 
     input[type="file"]::file-selector-button:hover {
@@ -471,46 +560,66 @@
 <body class="signup-page" data-public-page="true">
   <a class="skip-link" href="#main">Skip to main content</a>
   <a href="index.html" class="brand-fixed">Let<span class="accent-apostrophe">’</span>s-ParaConnect</a>
-  <div class="overlay" id="main" role="main" tabindex="-1">
+  <main class="overlay" id="main" tabindex="-1">
+    <canvas class="auth-matter-field" data-auth-matter-field aria-hidden="true"></canvas>
     <div class="left-panel">
       <div class="form-container fade-in">
-        <p class="prelaunch-note">
-          All signups and accounts are free. No payments, no subscriptions.
+        <p class="account-pricing-note">
+          Creating an account is free. No subscription is required.
         </p>
         <h1>Create your account</h1>
 
-        <div class="seg" role="tablist" aria-label="Choose role">
-          <button id="btnA" role="tab" aria-selected="true" aria-pressed="true" data-role="attorney">Attorney</button>
-          <button id="btnP" role="tab" aria-selected="false" aria-pressed="false" data-role="paralegal">Paralegal</button>
+        <div class="seg" role="group" aria-label="Choose account role">
+          <button id="btnA" type="button" aria-pressed="true" data-role="attorney">Attorney</button>
+          <button id="btnP" type="button" aria-pressed="false" data-role="paralegal">Paralegal</button>
         </div>
+
+        <a id="googleSignupButton" class="google-auth-button" href="/api/auth/google?intent=signup&amp;role=attorney">
+          <svg viewBox="0 0 18 18" aria-hidden="true">
+            <path fill="#4285F4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.482h4.844a4.14 4.14 0 0 1-1.797 2.715v2.258h2.909c1.702-1.567 2.684-3.876 2.684-6.614Z"/>
+            <path fill="#34A853" d="M9 18c2.43 0 4.468-.806 5.956-2.181l-2.909-2.258c-.806.54-1.835.859-3.047.859-2.344 0-4.329-1.585-5.039-3.714H.953v2.332A9 9 0 0 0 9 18Z"/>
+            <path fill="#FBBC05" d="M3.961 10.706A5.41 5.41 0 0 1 3.679 9c0-.592.102-1.168.282-1.706V4.962H.953A9 9 0 0 0 0 9c0 1.452.347 2.827.953 4.038l3.008-2.332Z"/>
+            <path fill="#EA4335" d="M9 3.58c1.321 0 2.507.454 3.441 1.346l2.581-2.581C13.464.892 11.425 0 9 0A9 9 0 0 0 .953 4.962l3.008 2.332C4.671 5.165 6.656 3.58 9 3.58Z"/>
+          </svg>
+          <span>Continue with Google</span>
+        </a>
+        <div class="auth-divider"><span>or</span></div>
 
         <form id="signupForm" novalidate>
           <div id="stepOnePanel" class="step-panel">
             <div class="name-row">
               <div class="field-col">
-                <input id="firstName" type="text" autocomplete="given-name" placeholder="First name" required />
-              </div>
-              <div class="field-col">
-                <input id="lastName" type="text" autocomplete="family-name" placeholder="Last name" required />
+                <input id="fullName" type="text" autocomplete="name" placeholder="Full name" aria-label="Full name" required />
               </div>
             </div>
 
+            <label class="sr-only" for="email">Email address</label>
             <input id="email" type="email" autocomplete="email" placeholder="Email" required />
 
             <div class="pw-wrap">
-              <input id="password" type="password" autocomplete="new-password" placeholder="Password" required />
-              <button id="togglePw" class="pw-toggle" aria-controls="password">Show</button>
+              <label class="sr-only" for="password">Password</label>
+              <input id="password" type="password" autocomplete="new-password" placeholder="Password" minlength="15" maxlength="128" required />
+              <button id="togglePw" class="pw-toggle" type="button" aria-controls="password" aria-pressed="false">Show</button>
             </div>
-            <input id="passwordConfirm" type="password" autocomplete="new-password" placeholder="Confirm password" required />
+            <div id="passwordGuidance" class="password-guidance" aria-live="polite" aria-hidden="true">
+              <div id="passwordStrengthRail" class="password-strength-rail" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <div class="password-guidance__meta">
+                <p id="passwordStrengthLabel" class="password-strength-label"></p>
+                <p class="password-hint">15+ characters; passphrases welcome</p>
+              </div>
+              <div id="capsLockNote" class="caps-lock-note" hidden>Caps Lock is on</div>
+            </div>
 
-            <button id="nextStepBtn" class="btn" type="button">Next →</button>
+            <button id="nextStepBtn" class="btn" type="button">Continue</button>
             <div class="extra-links">
               <p>Already have an account? <a href="login.html">Log in</a></p>
             </div>
           </div>
 
           <div id="stepTwoPanel" class="step-panel hidden-step">
-            <p class="step-note">We require this information to complete verification before approval.</p>
+            <p class="step-note">We require this information to review your application before approval.</p>
             <div id="signupStateWrap">
               <label for="signupState"><span class="sr-only">State</span></label>
               <select id="signupState" name="state" class="select-field" required>
@@ -572,9 +681,9 @@
 
             <label class="terms-label" style="margin-top:16px;display:flex;align-items:flex-start;gap:8px;font-size:0.9rem;font-weight:200;color:var(--muted);">
               <input type="checkbox" id="termsAccept" required>
-              <span>I have read and agree to the
-                <a href="terms.html" target="_blank" style="color:var(--gold);text-decoration:none;">Terms of Use</a> and
-                <a href="privacy.html" target="_blank" style="color:var(--gold);text-decoration:none;">Privacy Policy</a>.
+              <span>I agree to the
+                <a href="terms.html" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none;">Terms of Service</a> and acknowledge that I have read the
+                <a href="privacy.html" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none;">Privacy Policy</a>.
               </span>
             </label>
             <div id="attorneyConfirmWrap" style="display:none;margin-top:10px;">
@@ -595,6 +704,7 @@
               <div
                 class="cf-turnstile"
                 data-sitekey="0x4AAAAAACND61mi1ZgPWRsA"
+                data-action="signup"
                 data-appearance="execute"
                 data-callback="onTurnstileSignupSuccess"
                 data-error-callback="onTurnstileSignupError"
@@ -603,7 +713,7 @@
             </div>
 
             <p id="paralegalAdmissionNotice" class="role-note" style="display:none;margin-top:16px;font-size:0.9rem;font-weight:200;color:var(--muted);">
-              Let’s-ParaConnect is a highly curated professional platform. Not all paralegal applications are approved. Learn more about our
+              Let’s-ParaConnect is an approval-based professional platform. Not all paralegal applications are approved. Learn more about our
               <a href="/paralegal-admission.html" style="color:var(--gold);text-decoration:none;">Paralegal Admission Requirements</a>.
             </p>
             <button id="submitBtn" class="btn" type="submit">Create Account</button>
@@ -616,15 +726,9 @@
         </form>
       </div>
     </div>
-  </div>
+  </main>
 
   <script>
-    const API_BASE = location.origin + '/api';
-    fetch('/api/csrf', { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => window.__CSRF__ = d.csrfToken)
-      .catch(() => {});
-
     function getTurnstileToken(formEl) {
       const input = formEl?.querySelector('input[name="cf-turnstile-response"]');
       return input?.value?.trim() || "";
@@ -640,6 +744,7 @@
 
     const btnA = document.getElementById('btnA');
     const btnP = document.getElementById('btnP');
+    const googleSignupButton = document.getElementById('googleSignupButton');
     const form = document.getElementById('signupForm');
     const msg = document.getElementById('msg');
     const submitBtn = document.getElementById('submitBtn');
@@ -652,22 +757,77 @@
     const attorneyPricingError = document.getElementById('attorneyPricingError');
     const togglePw = document.getElementById('togglePw');
     const pw = document.getElementById('password');
-    const pwConfirm = document.getElementById('passwordConfirm');
+    const passwordGuidance = document.getElementById('passwordGuidance');
+    const passwordStrengthRail = document.getElementById('passwordStrengthRail');
+    const passwordStrengthSegments = Array.from(passwordStrengthRail?.children || []);
+    const passwordStrengthLabel = document.getElementById('passwordStrengthLabel');
+    const capsLockNote = document.getElementById('capsLockNote');
     const stepOnePanel = document.getElementById('stepOnePanel');
     const stepTwoPanel = document.getElementById('stepTwoPanel');
     const nextStepBtn = document.getElementById('nextStepBtn');
-    const prelaunchNote = document.querySelector('.prelaunch-note');
+    const accountPricingNote = document.querySelector('.account-pricing-note');
     let msgFadeTimer = null;
     const emailEl = document.getElementById('email');
-    const firstNameEl = document.getElementById('firstName');
-    const lastNameEl = document.getElementById('lastName');
+    const fullNameEl = document.getElementById('fullName');
     const termsCheckbox = document.getElementById('termsAccept');
     const stateWrap = document.getElementById('signupStateWrap');
     const stateSelect = document.getElementById('signupState');
     const phoneEl = document.getElementById('phoneNumber');
-    emailEl.value = localStorage.getItem('lastEmail') || '';
+    emailEl.value = sessionStorage.getItem('lastEmail') || '';
 
-    let role = 'attorney';
+    const getPasswordRules = (value) => ({
+      started: value.length >= 8,
+      strongLength: value.length >= 15,
+      maxLength: value.length <= 128,
+    });
+
+    const isPasswordValid = (value) => {
+      const rules = getPasswordRules(value);
+      return rules.strongLength && rules.maxLength;
+    };
+
+    const getNameParts = () => {
+      const parts = (fullNameEl?.value || '').trim().split(/\s+/).filter(Boolean);
+      return {
+        firstName: parts[0] || '',
+        lastName: parts.slice(1).join(' '),
+      };
+    };
+
+    const syncPasswordGuidance = () => {
+      if (!pw || !passwordGuidance) return;
+      const rules = getPasswordRules(pw.value);
+      const score = Number(rules.started) + Number(rules.strongLength) + Number(rules.strongLength && rules.maxLength);
+      const complete = score === 3;
+      const shouldShow = document.activeElement === pw || pw.value.length > 0;
+      passwordGuidance.classList.toggle('is-visible', shouldShow);
+      passwordGuidance.setAttribute('aria-hidden', String(!shouldShow));
+      passwordStrengthSegments.forEach((segment, index) => {
+        segment.classList.toggle('is-active', index < score);
+      });
+      passwordStrengthRail?.classList.toggle('is-complete', complete);
+      passwordStrengthLabel?.classList.toggle('is-complete', complete);
+      if (passwordStrengthLabel) {
+        passwordStrengthLabel.textContent = complete
+          ? 'Password ready'
+          : rules.strongLength && !rules.maxLength
+            ? 'Use no more than 128 characters'
+            : 'Use 15 or more characters';
+      }
+    };
+
+    pw?.addEventListener('focus', syncPasswordGuidance);
+    pw?.addEventListener('input', syncPasswordGuidance);
+    pw?.addEventListener('blur', syncPasswordGuidance);
+    pw?.addEventListener('keyup', (event) => {
+      if (capsLockNote) capsLockNote.hidden = !event.getModifierState('CapsLock');
+    });
+    syncPasswordGuidance();
+
+    const requestedRole = new URLSearchParams(window.location.search).get('role');
+    let role = requestedRole === 'paralegal' ? 'paralegal' : 'attorney';
+    let googleSignupProfile = null;
+    let googleSignupActive = false;
     let currentStep = 1;
     let submitLocked = false;
 
@@ -693,11 +853,11 @@
       if (step === 1) {
         stepOnePanel.classList.remove('hidden-step');
         stepTwoPanel.classList.add('hidden-step');
-        if (prelaunchNote) prelaunchNote.style.display = '';
+        if (accountPricingNote) accountPricingNote.style.display = '';
       } else {
         stepOnePanel.classList.add('hidden-step');
         stepTwoPanel.classList.remove('hidden-step');
-        if (prelaunchNote) prelaunchNote.style.display = 'none';
+        if (accountPricingNote) accountPricingNote.style.display = 'none';
         updateSubmitState();
       }
     }
@@ -724,23 +884,26 @@
       };
 
       if (resumeInput) {
-        resumeInput.onchange = () => updateHint(resumeInput, resumeHint, resumeLabel, 'Resume');
+        resumeInput.addEventListener('change', () => updateHint(resumeInput, resumeHint, resumeLabel, 'Resume'));
         updateHint(resumeInput, resumeHint, resumeLabel, 'Resume');
       }
       if (certInput) {
-        certInput.onchange = () => updateHint(certInput, certHint, certLabel, 'Certificate / License');
+        certInput.addEventListener('change', () => updateHint(certInput, certHint, certLabel, 'Certificate / License'));
         updateHint(certInput, certHint, certLabel, 'Certificate / License');
       }
     }
 
     function validateStepOne() {
-      const firstName = firstNameEl.value.trim();
-      const lastName = lastNameEl.value.trim();
+      const { firstName, lastName } = getNameParts();
       const email = emailEl.value.trim();
       const password = pw.value;
-      const passwordConfirm = pwConfirm?.value || '';
-      if (!firstName || !lastName || !email || !password || !passwordConfirm) {
+      if (!firstName || !email || !password) {
         say('Please complete your basic account information.', 'err');
+        return false;
+      }
+      if (!lastName) {
+        say('Enter your first and last name.', 'err');
+        fullNameEl?.focus();
         return false;
       }
       if (!isValidEmail(email)) {
@@ -751,12 +914,8 @@
         say('Please use a .com email address (.con is a typo).', 'err');
         return false;
       }
-      if (password.length < 8) {
-        say('Use 8+ characters with letters and numbers.', 'err');
-        return false;
-      }
-      if (password !== passwordConfirm) {
-        say('Passwords do not match.', 'err');
+      if (!isPasswordValid(password)) {
+        say('Use a unique password or passphrase with 15–128 characters.', 'err');
         return false;
       }
       return true;
@@ -764,6 +923,9 @@
 
     function setRole(r) {
       role = r;
+      if (googleSignupButton) {
+        googleSignupButton.href = `/api/auth/google?intent=signup&role=${encodeURIComponent(r)}`;
+      }
       if (admissionNotice) admissionNotice.style.display = r === 'paralegal' ? '' : 'none';
       if (attorneyPricingNotice) attorneyPricingNotice.style.display = r === 'attorney' ? '' : 'none';
       if (attorneyPricingWrap) attorneyPricingWrap.style.display = r === 'attorney' ? '' : 'none';
@@ -776,7 +938,6 @@
       [btnA, btnP].forEach(b => {
         const on = b.dataset.role === r;
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
-        b.setAttribute('aria-selected', on ? 'true' : 'false');
       });
       roleFieldWrap.innerHTML = r === 'attorney'
         ? `<label for="bar"><span class="sr-only">Bar Number</span></label>
@@ -841,7 +1002,7 @@
                </select>
              </div>
            </div>
-           <p class="field-note" style="margin-top:4px;margin-bottom:12px;">Your bar number is used only for verification and is never shared.</p>
+           <p class="field-note" style="margin-top:4px;margin-bottom:12px;">Your bar number is used to review your application and is not shown on your public profile.</p>
            <label for="attorneyLinkedIn">
              <span class="sr-only">LinkedIn</span>
            </label>
@@ -852,7 +1013,7 @@
         : `<div class="name-row" style="gap:12px; align-items:flex-start;">
              <div class="field-col">
                <div class="upload-wrapper">
-                 <input id="resumeUpload" type="file" accept=".pdf,.doc,.docx" class="upload-input" aria-label="Resume" required />
+                 <input id="resumeUpload" type="file" accept=".pdf,application/pdf" class="upload-input" aria-label="Resume" required />
                  <label for="resumeUpload" class="upload-placeholder">Resume</label>
                </div>
                <div class="file-hint" id="resumeFileHint"></div>
@@ -872,7 +1033,7 @@
            <label for="paralegalLinkedIn"><span class="sr-only">LinkedIn</span></label>
            <input id="paralegalLinkedIn" type="url" autocomplete="url" placeholder="https://www.linkedin.com/in/username" />
            <div class="upload-wrapper">
-             <input id="certUpload" type="file" accept=".pdf,.doc,.docx" class="upload-input" aria-label="Certification document" />
+             <input id="certUpload" type="file" accept=".pdf,application/pdf" class="upload-input" aria-label="Certification document" />
              <label for="certUpload" class="upload-placeholder">Certificate / License</label>
            </div>
            <div class="file-hint" id="certFileHint"></div>`;
@@ -908,10 +1069,14 @@
       if (form) {
         form.reset();
       }
-      if (emailEl) emailEl.value = localStorage.getItem('lastEmail') || '';
+      if (emailEl) emailEl.value = sessionStorage.getItem('lastEmail') || '';
+      applyGoogleSignupProfile();
       if (pw) pw.type = 'password';
-      if (pwConfirm) pwConfirm.type = 'password';
-      if (togglePw) togglePw.textContent = 'Show';
+      if (togglePw) {
+        togglePw.textContent = 'Show';
+        togglePw.setAttribute('aria-pressed', 'false');
+      }
+      syncPasswordGuidance();
       const tokenInput = form?.querySelector('input[name="cf-turnstile-response"]');
       if (tokenInput) tokenInput.value = '';
       if (window.turnstile?.reset) {
@@ -939,8 +1104,8 @@
       e.preventDefault();
       const show = pw.type === 'password';
       pw.type = show ? 'text' : 'password';
-      if (pwConfirm) pwConfirm.type = show ? 'text' : 'password';
       togglePw.textContent = show ? 'Hide' : 'Show';
+      togglePw.setAttribute('aria-pressed', String(show));
     });
 
     nextStepBtn?.addEventListener('click', () => {
@@ -991,6 +1156,63 @@
       msg.className = `msg ${cls}`.trim();
       msg.classList.add('show');
     }
+
+    function applyGoogleSignupProfile() {
+      if (!googleSignupProfile) return;
+      const fullName = [googleSignupProfile.firstName, googleSignupProfile.lastName]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      if (fullNameEl && fullName) fullNameEl.value = fullName;
+      if (emailEl) {
+        emailEl.value = googleSignupProfile.email || '';
+        emailEl.readOnly = true;
+        emailEl.classList.add('google-verified-email');
+        emailEl.setAttribute('aria-description', 'Verified by Google');
+      }
+    }
+
+    async function loadGoogleSignupProfile() {
+      const params = new URLSearchParams(window.location.search);
+      const errorCode = params.get('google_error');
+      if (errorCode) {
+        const messages = {
+          invalid_state: 'Google signup expired. Please try again.',
+          cancelled: 'Google signup was cancelled.',
+          oauth_failed: 'Google could not verify your account. Please try again.',
+          identity_invalid: 'Google did not return a verified identity.',
+          unavailable: 'Google signup is temporarily unavailable.',
+        };
+        say(messages[errorCode] || 'Google signup could not be completed.', 'err');
+        return;
+      }
+      if (params.get('google') !== '1') return;
+
+      try {
+        const response = await fetch('/api/auth/google/signup-profile', {
+          credentials: 'include',
+          headers: { Accept: 'application/json' },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.profile?.email) {
+          throw new Error(payload?.msg || 'Google signup session expired. Please try again.');
+        }
+        googleSignupProfile = payload.profile;
+        googleSignupActive = true;
+        applyGoogleSignupProfile();
+        say('Google verified your name and email. Complete the remaining information.', 'ok');
+      } catch (err) {
+        googleSignupActive = false;
+        if (emailEl) {
+          emailEl.readOnly = false;
+          emailEl.classList.remove('google-verified-email');
+          emailEl.removeAttribute('aria-description');
+        }
+        say(err.message || 'Google signup session expired. Please try again.', 'err');
+      }
+    }
+
+    loadGoogleSignupProfile();
 
     function isValidEmail(email) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((email || '').trim());
@@ -1102,26 +1324,25 @@
       e.preventDefault();
       say('');
 
-      const firstName = firstNameEl.value.trim();
-      const lastName = lastNameEl.value.trim();
+      const { firstName, lastName } = getNameParts();
       const email = emailEl.value.trim().toLowerCase();
       const password = pw.value;
-      const passwordConfirm = pwConfirm?.value || '';
       const phoneNumber = (phoneEl?.value || '').trim();
       const signupState = (stateSelect?.value || '').trim();
       const timezone = getBrowserTimezone();
 
       const termsAccepted = termsCheckbox?.checked;
       if (!termsAccepted) {
-        alert('You must agree to the Terms of Use and Privacy Policy before creating an account.');
+        say('You must agree to the Terms of Service and acknowledge the Privacy Policy before creating an account.', 'err');
+        termsCheckbox?.focus();
         return;
       }
 
-      if (!firstName || !lastName || !email || !password || !passwordConfirm) { say('Please fill all required fields.', 'err'); return; }
+      if (!firstName || !email || !password) { say('Please fill all required fields.', 'err'); return; }
+      if (!lastName) { say('Enter your first and last name.', 'err'); fullNameEl?.focus(); return; }
       if (!isValidEmail(email)) { say('Enter a valid email address.', 'err'); return; }
       if (isTypoEmailDomain(email)) { say('Please use a .com email address (.con is a typo).', 'err'); return; }
-      if (password.length < 8) { say('Use 8+ characters with letters and numbers.', 'err'); return; }
-      if (password !== passwordConfirm) { say('Passwords do not match.', 'err'); return; }
+      if (!isPasswordValid(password)) { say('Use a unique password or passphrase with 15–128 characters.', 'err'); return; }
 
       let attorneyBar = '';
       let attorneyLinkedIn = '';
@@ -1150,7 +1371,7 @@
         }
         if (!pricingAcknowledged) {
           setAttorneyPricingValidation(true);
-          say('Please acknowledge the $400 minimum case requirement.', 'err');
+          say('Please acknowledge the $400 minimum Matter requirement.', 'err');
           document.getElementById('attorneyPricingAck')?.focus();
           return;
         }
@@ -1200,6 +1421,8 @@
         formData.append('role', role);
         formData.append('state', stateToSubmit);
         formData.append('termsAccepted', 'true');
+        formData.append('privacyAcknowledged', 'true');
+        if (googleSignupActive) formData.append('googleSignupIntent', 'true');
         if (phoneNumber) formData.append('phoneNumber', phoneNumber);
         if (timezone) formData.append('timezone', timezone);
 
@@ -1219,28 +1442,27 @@
 
         formData.append('turnstileToken', turnstileToken);
 
-        const headers = {};
-        if (window.__CSRF__) headers['X-CSRF-Token'] = window.__CSRF__;
-
-        const res = await fetch(`${API_BASE}/auth/register`, {
+        const { secureFetch } = await import('./assets/scripts/auth.js');
+        const res = await secureFetch('/api/auth/register', {
           method: 'POST',
-          credentials: 'include',
-          headers,
-          body: formData
+          body: formData,
+          noRedirect: true
         });
 
         let data = {};
         try { data = await res.json(); } catch {}
 
         if (!res.ok) {
-          if (res.status === 409) throw new Error('That email is already registered.');
+          if (res.status === 409) {
+            throw new Error(data?.msg || 'That account is already registered.');
+          }
           if (res.status === 429) throw new Error('Too many attempts. Please wait and try again.');
           throw new Error(data?.error || data?.msg || data?.message || 'Could not create account.');
         }
 
-        localStorage.setItem('lastEmail', email);
+        sessionStorage.setItem('lastEmail', email);
         sessionStorage.setItem('signupToast', 'Your application has been submitted for approval.');
-        sayPersistent("Application submitted. We'll email you once it's approved.", 'ok');
+        sayPersistent("Application submitted. We’ll email you when the review is complete.", 'ok');
         shouldRestoreButton = false;
         submitLocked = true;
         if (submitBtn) {
@@ -1260,5 +1482,6 @@
       }
     });
   </script>
+  <script type="module" src="assets/scripts/web-vitals-rum.js"></script>
 </body>
 </html>

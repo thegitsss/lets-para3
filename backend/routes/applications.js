@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:applications");
 const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();
@@ -15,39 +17,37 @@ const {
   isAttorneyPaymentMethodRequired,
 } = require("../services/attorneyWorkflowPolicy");
 const { evaluateApplicationEligibility } = require("../services/paralegalWorkflowPolicy");
-const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
+const { createDevOnlyEmailSet } = require("../utils/devOnlyEmailSet");
+const { buildAuthenticatedProfilePhotoUrl } = require("../services/profilePhotoDelivery");
+const { protectMutations } = require("../utils/csrf");
+const {
+  markApplicationNeedsReconciliation,
+  markApplicationSynced,
+  syncApplicationMirror,
+  syncApplicantsCount,
+} = require("../services/applicationService");
+const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = createDevOnlyEmailSet([
   "samanthasider+attorney@gmail.com",
   "samanthasider+56@gmail.com",
   "game4funwithme1+1@gmail.com",
   "game4funwithme1@gmail.com",
 ]);
 const PROFILE_PHOTO_REQUIRED_MESSAGE = "Complete your profile before applying.";
-const REAPPLY_BYPASS_EMAILS = new Set(["samanthasider+0@gmail.com"]);
-const ACTIVE_APPLICATION_FILTER = { status: { $nin: ["accepted", "rejected"] } };
+const REAPPLY_BYPASS_EMAILS = createDevOnlyEmailSet(["samanthasider+0@gmail.com"]);
 const authenticatedGuards = [auth, requireApproved];
 const INVITE_STATUSES = new Set(["pending", "accepted", "declined", "expired"]);
 
-const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-const noop = (_req, _res, next) => next();
-const csrf = require("csurf");
-const csrfMiddleware = csrf({
-  cookie: {
-    httpOnly: true,
-    sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
-  },
-});
-const protectMutations = (req, res, next) => {
-  const requireCsrf = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-  if (!requireCsrf) return noop(req, res, next);
-  const method = String(req.method || "").toUpperCase();
-  if (SAFE_METHODS.has(method)) return next();
-  return csrfMiddleware(req, res, next);
-};
+function presentProfilePerson(person) {
+  if (!person || typeof person !== "object") return person || null;
+  const source = typeof person.toObject === "function" ? person.toObject() : person;
+  const hasPhoto = Boolean(source.profileImage || source.avatarURL);
+  const photoUrl = hasPhoto ? buildAuthenticatedProfilePhotoUrl(source) : "";
+  return { ...source, profileImage: photoUrl, avatarURL: photoUrl };
+}
 
 const mutatingGuards = [...authenticatedGuards, protectMutations];
 
-function sanitizeMessage(value, { min = 0, max = 2000 } = {}) {
+function sanitizeMessage(value, { max = 2000 } = {}) {
   if (typeof value !== "string") return "";
   const stripped = value.replace(/<[^>]*>/g, "").replace(/[\u0000-\u001F\u007F]/g, "").trim();
   if (!stripped) return "";
@@ -82,7 +82,7 @@ async function ensureStripeOnboardedUser(userDoc) {
     await userDoc.save();
     return userDoc.stripeOnboarded;
   } catch (err) {
-    console.warn("[applications] stripe onboarding status check failed", err?.message || err);
+    runtimeLogger.warn("[applications] stripe onboarding status check failed", err?.message || err);
   }
   return false;
 }
@@ -97,19 +97,9 @@ async function attorneyHasPaymentMethod(attorneyId) {
     const customer = await stripe.customers.retrieve(attorney.stripeCustomerId);
     return Boolean(customer?.invoice_settings?.default_payment_method);
   } catch (err) {
-    console.warn("[applications] Unable to verify attorney payment method", err?.message || err);
+    runtimeLogger.warn("[applications] Unable to verify attorney payment method", err?.message || err);
     return false;
   }
-}
-
-async function syncApplicantsCount(jobId) {
-  if (!mongoose.isValidObjectId(jobId)) return 0;
-  const count = await Application.countDocuments({
-    jobId,
-    ...ACTIVE_APPLICATION_FILTER,
-  });
-  await Job.findByIdAndUpdate(jobId, { $set: { applicantsCount: count } });
-  return count;
 }
 
 async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
@@ -122,7 +112,7 @@ async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
     ...(ownershipFilters.length ? { $or: ownershipFilters } : {}),
     "applicants.0": { $exists: true },
   })
-    .select("title practiceArea totalAmount lockedTotalAmount currency applicants createdAt")
+    .select("title practiceArea totalAmount lockedTotalAmount currency applicants createdAt jobId")
     .populate("applicants.paralegalId", "firstName lastName email role profileImage avatarURL")
     .lean();
 
@@ -133,7 +123,7 @@ async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
       : caseDoc.totalAmount;
     const budget = typeof amountCents === "number" ? Math.round(amountCents / 100) : null;
     const caseId = String(caseDoc._id || "");
-    const jobTitle = caseDoc.title || "Case";
+    const jobTitle = caseDoc.title || "Untitled Matter";
     const practiceArea = caseDoc.practiceArea || "";
     const fallbackDate = caseDoc.createdAt || null;
     (caseDoc.applicants || []).forEach((applicant) => {
@@ -150,12 +140,12 @@ async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
         applicant.starredBy.some((id) => String(id) === attorneyKey);
       entries.push({
         id: `case:${caseId}:${paralegalId || "unknown"}`,
-        jobId: null,
+        jobId: caseDoc.jobId || null,
         jobTitle,
         practiceArea,
         budget,
         caseId,
-        paralegal,
+        paralegal: presentProfilePerson(paralegal),
         coverLetter: applicant?.note || applicant?.coverLetter || "",
         starred,
         createdAt: applicant?.appliedAt || fallbackDate,
@@ -168,7 +158,7 @@ async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
 
 async function createApplicationForJob(jobId, user, coverLetter) {
   if (!mongoose.isValidObjectId(jobId)) {
-    const err = new Error("Invalid job id");
+    const err = new Error("Invalid Matter posting ID");
     err.status = 400;
     throw err;
   }
@@ -178,14 +168,14 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     throw err;
   }
   if (!user || String(user.role).toLowerCase() !== "paralegal") {
-    const err = new Error("Only paralegals may apply to jobs");
+    const err = new Error("Only paralegals may apply to Matter postings");
     err.status = 403;
     throw err;
   }
 
   const job = await Job.findById(jobId);
   if (!job) {
-    const err = new Error("Job not found");
+    const err = new Error("Matter posting not found");
     err.status = 404;
     throw err;
   }
@@ -206,7 +196,7 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     throw err;
   }
   if (job.status !== "open") {
-    const err = new Error("Applications are closed for this job");
+    const err = new Error("Applications are closed for this Matter");
     err.status = 400;
     throw err;
   }
@@ -218,12 +208,12 @@ async function createApplicationForJob(jobId, user, coverLetter) {
       "status archived paralegal paralegalId totalAmount lockedTotalAmount amountLockedAt title attorney attorneyId relistRequestedAt payoutFinalizedAt"
     );
     if (!caseDoc) {
-      const err = new Error("Case not found");
+      const err = new Error("Matter not found");
       err.status = 404;
       throw err;
     }
     if (caseDoc.archived) {
-      const err = new Error("This case is not accepting applications");
+      const err = new Error("This Matter is not accepting applications");
       err.status = 400;
       throw err;
     }
@@ -235,20 +225,22 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     const statusKey = String(caseDoc.status || "").toLowerCase();
     const relisted = statusKey === "paused" && caseDoc.relistRequestedAt && caseDoc.payoutFinalizedAt;
     if (statusKey !== "open" && !relisted) {
-      const err = new Error("Applications are closed for this case");
+      const err = new Error("Applications are closed for this Matter");
       err.status = 400;
       throw err;
     }
   }
 
-  const existingCount = await Application.countDocuments({ jobId, paralegalId: user._id });
-  if (existingCount && !allowReapply) {
-    const err = new Error("You have already applied to this job");
+  const existingApplication = await Application.findOne({ jobId, paralegalId: user._id });
+  const existingIsActive =
+    existingApplication && String(existingApplication.status || "").toLowerCase() !== "withdrawn";
+  if (existingIsActive && !allowReapply) {
+    const err = new Error("You have already applied to this Matter");
     err.status = 400;
     throw err;
   }
 
-  const note = sanitizeMessage(coverLetter, { min: 20, max: 2000 });
+  const note = sanitizeMessage(coverLetter, { max: 2000 });
   if (note.length < 20) {
     const err = new Error("Cover letter must be at least 20 characters.");
     err.status = 400;
@@ -268,19 +260,19 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     err.status = 403;
     throw err;
   }
-  const stripeBypassEmails = new Set(["samanthasider+11@gmail.com", "samanthasider+56@gmail.com"]);
+  const stripeBypassEmails = createDevOnlyEmailSet(["samanthasider+11@gmail.com", "samanthasider+56@gmail.com"]);
   const applicantEmail = String(applicant.email || user?.email || "").toLowerCase().trim();
   const bypassStripe = stripeBypassEmails.has(applicantEmail);
   if (!bypassStripe) {
     if (!applicant.stripeAccountId) {
-      const err = new Error("Connect Stripe before applying to jobs.");
+      const err = new Error("Connect Stripe before applying to Matters.");
       err.status = 403;
       throw err;
     }
     if (!applicant.stripeOnboarded || !applicant.stripePayoutsEnabled) {
       const refreshed = await ensureStripeOnboardedUser(applicant);
       if (!refreshed) {
-        const err = new Error("Complete Stripe onboarding before applying to jobs.");
+        const err = new Error("Complete Stripe onboarding before applying to Matters.");
         err.status = 403;
         throw err;
       }
@@ -297,7 +289,7 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     paralegalAssigned: Boolean(caseDoc?.paralegal || caseDoc?.paralegalId),
     relistRequestedAt: caseDoc?.relistRequestedAt,
     payoutFinalizedAt: caseDoc?.payoutFinalizedAt,
-    duplicateApplication: Boolean(existingCount && !allowReapply),
+    duplicateApplication: Boolean(existingIsActive && !allowReapply),
     profilePhotoReady: Boolean(applicant.profileImage || applicant.avatarURL),
     payoutSetupReady:
       bypassStripe || Boolean(applicant.stripeAccountId && applicant.stripeOnboarded && applicant.stripePayoutsEnabled),
@@ -309,35 +301,62 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     throw err;
   }
 
-  if (allowReapply && existingCount) {
-    await Application.deleteMany({ jobId, paralegalId: user._id });
-    await syncApplicantsCount(jobId);
-  }
-
   let application = null;
   try {
-    application = await Application.create({
-      jobId,
-      paralegalId: user._id,
-      coverLetter: note,
-      resumeURL: applicant.resumeURL || "",
-      linkedInURL: applicant.linkedInURL || "",
-      profileSnapshot: shapeParalegalSnapshot(applicant),
-    });
+    if (existingApplication) {
+      const previousStatus = String(existingApplication.status || "submitted");
+      existingApplication.coverLetter = note;
+      existingApplication.resumeURL = applicant.resumeURL || "";
+      existingApplication.linkedInURL = applicant.linkedInURL || "";
+      existingApplication.profileSnapshot = shapeParalegalSnapshot(applicant);
+      existingApplication.status = "submitted";
+      existingApplication.withdrawnAt = null;
+      existingApplication.syncStatus = "pending";
+      existingApplication.syncedAt = null;
+      existingApplication.syncError = "";
+      existingApplication.statusHistory.push({
+        from: previousStatus,
+        to: "submitted",
+        reason: "reapplied",
+        actorId: user._id,
+        at: new Date(),
+      });
+      application = await existingApplication.save();
+    } else {
+      application = await Application.create({
+        jobId,
+        paralegalId: user._id,
+        coverLetter: note,
+        resumeURL: applicant.resumeURL || "",
+        linkedInURL: applicant.linkedInURL || "",
+        profileSnapshot: shapeParalegalSnapshot(applicant),
+        statusHistory: [{ to: "submitted", reason: "applied", actorId: user._id }],
+      });
+    }
   } catch (err) {
     if (err?.code === 11000) {
-      const duplicate = new Error("You have already applied to this job");
+      const duplicate = new Error("You have already applied to this Matter");
       duplicate.status = 400;
       throw duplicate;
     }
     throw err;
   }
-  await syncApplicantsCount(jobId);
   const lockedNow = !!caseDoc && caseDoc.lockedTotalAmount == null;
+  let budgetLockError = null;
   if (caseDoc && lockedNow) {
-    caseDoc.lockedTotalAmount = caseDoc.totalAmount;
-    caseDoc.amountLockedAt = caseDoc.amountLockedAt || new Date();
-    await caseDoc.save();
+    try {
+      await Case.updateOne(
+        { _id: caseDoc._id, lockedTotalAmount: null },
+        { $set: { lockedTotalAmount: caseDoc.totalAmount, amountLockedAt: new Date() } }
+      );
+    } catch (err) {
+      budgetLockError = err;
+      runtimeLogger.error("[applications] budget lock synchronization deferred", application._id, err?.message || err);
+    }
+  }
+  await syncApplicationMirror({ application, caseId: caseDoc?._id || null });
+  if (budgetLockError) {
+    await markApplicationNeedsReconciliation(application._id, budgetLockError);
   }
 
   // Notify the attorney who posted the job
@@ -350,7 +369,7 @@ async function createApplicationForJob(jobId, user, coverLetter) {
       const paralegalName =
         `${applicant.firstName || ""} ${applicant.lastName || ""}`.trim() || "Paralegal";
       if (lockedNow) {
-        const caseTitle = caseDoc?.title || job.title || "Case";
+        const caseTitle = caseDoc?.title || job.title || "Untitled Matter";
         const caseLink = caseDoc?._id ? `case-detail.html?caseId=${encodeURIComponent(caseDoc._id)}` : "";
         await require("../utils/notifyUser").notifyUser(
           attorneyId,
@@ -363,17 +382,22 @@ async function createApplicationForJob(jobId, user, coverLetter) {
           { actorUserId: user._id }
         );
       }
-      await require("../utils/notifyUser").notifyUser(attorneyId, "application_submitted", {
-        jobId: job._id,
-        caseId: job.caseId || null,
-        title: job.title || "Job application",
-        caseTitle: job.title || "Job application",
-        paralegalName,
-        paralegalId: user._id,
-      });
+      await require("../utils/notifyUser").notifyUser(
+        attorneyId,
+        "application_submitted",
+        {
+          jobId: job._id,
+          caseId: caseDoc?._id || job.caseId || null,
+          title: caseDoc?.title || job.title || "Matter application",
+          caseTitle: caseDoc?.title || job.title || "Matter application",
+          paralegalName,
+          paralegalId: user._id,
+        },
+        { actorUserId: user._id }
+      );
     }
   } catch (err) {
-    console.warn("[applications] Failed to notify attorney of application", err?.message || err);
+    runtimeLogger.warn("[applications] Failed to notify attorney of application", err?.message || err);
   }
 
   return application;
@@ -382,7 +406,10 @@ async function createApplicationForJob(jobId, user, coverLetter) {
 // GET /applications/my — paralegal views jobs they've applied to
 router.get("/my", ...authenticatedGuards, requireRole("paralegal"), async (req, res) => {
   try {
-    const apps = await Application.find({ paralegalId: req.user._id })
+    const apps = await Application.find({
+      paralegalId: req.user._id,
+      status: { $ne: "withdrawn" },
+    })
       .populate({
         path: "jobId",
         populate: {
@@ -431,6 +458,12 @@ router.get("/my", ...authenticatedGuards, requireRole("paralegal"), async (req, 
         ["requested", "submitted", "changes_requested"].includes(String(pre.status || "").toLowerCase());
       return {
         ...app,
+        profileSnapshot: {
+          ...(app.profileSnapshot || {}),
+          profileImage: app.profileSnapshot?.profileImage
+            ? buildAuthenticatedProfilePhotoUrl(viewerId)
+            : "",
+        },
         caseId: caseId || null,
         casePaymentReleased: caseDoc?.paymentReleased === true,
         caseEscrowStatus: caseDoc?.escrowStatus || null,
@@ -496,10 +529,15 @@ router.get("/my", ...authenticatedGuards, requireRole("paralegal"), async (req, 
           ["requested", "submitted", "changes_requested"].includes(String(pre.status || "").toLowerCase());
         const amountCents = Number.isFinite(caseDoc?.lockedTotalAmount) ? caseDoc.lockedTotalAmount : caseDoc?.totalAmount;
         const budget = typeof amountCents === "number" ? Math.round(amountCents / 100) : null;
+        const embeddedStatus = String(applicantEntry?.status || "pending").toLowerCase();
         return {
           id: "",
           _id: "",
-          status: String(applicantEntry?.status || "pending").toLowerCase(),
+          // Embedded Case applicants retain the legacy `pending` value for
+          // compatibility. Expose the canonical Application state so the same
+          // user action does not render as Pending or Submitted based only on
+          // whether the Matter has a Job mirror.
+          status: embeddedStatus === "pending" ? "submitted" : embeddedStatus,
           createdAt: applicantEntry?.appliedAt || relatedInvite?.respondedAt || relatedInvite?.invitedAt || caseDoc?.createdAt || null,
           updatedAt: caseDoc?.updatedAt || null,
           coverLetter: applicantEntry?.note || "Accepted invitation",
@@ -511,7 +549,7 @@ router.get("/my", ...authenticatedGuards, requireRole("paralegal"), async (req, 
             _id: caseDoc?.jobId ? String(caseDoc.jobId) : caseId,
             id: caseDoc?.jobId ? String(caseDoc.jobId) : caseId,
             caseId,
-            title: caseDoc?.title || "Case",
+            title: caseDoc?.title || "Untitled Matter",
             practiceArea: caseDoc?.practiceArea || "",
             description: caseDoc?.details || caseDoc?.briefSummary || "",
             budget,
@@ -545,7 +583,7 @@ router.get("/my", ...authenticatedGuards, requireRole("paralegal"), async (req, 
       .filter(Boolean);
     res.json([...payload, ...inviteEntries]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -567,6 +605,9 @@ router.post(
       if (!application) {
         return res.status(404).json({ error: "Application not found." });
       }
+      if (String(application.status || "").toLowerCase() === "withdrawn") {
+        return res.json({ success: true, alreadyRevoked: true });
+      }
       let caseDoc = null;
       if (application.jobId && mongoose.isValidObjectId(application.jobId)) {
         const job = await Job.findById(application.jobId).select("caseId");
@@ -581,21 +622,57 @@ router.post(
         return res.status(400).json({ error: "Accepted applications cannot be revoked after funding." });
       }
 
-      const jobId = application.jobId;
-      await application.deleteOne();
-      if (caseDoc && Array.isArray(caseDoc.applicants)) {
-        await Case.updateOne(
-          { _id: caseDoc._id },
-          { $pull: { applicants: { paralegalId: req.user._id } } }
-        );
+      const previousStatus = String(application.status || "submitted");
+      const withdrawnAt = new Date();
+      const revokedApplication = await Application.findOneAndUpdate(
+        {
+          _id: application._id,
+          paralegalId: req.user._id,
+          status: { $ne: "withdrawn" },
+        },
+        {
+          $set: {
+            status: "withdrawn",
+            withdrawnAt,
+            syncStatus: "pending",
+            syncedAt: null,
+            syncError: "",
+          },
+          $push: {
+            statusHistory: {
+              $each: [{
+                from: previousStatus,
+                to: "withdrawn",
+                reason: "revoked_by_paralegal",
+                actorId: req.user._id,
+                at: withdrawnAt,
+              }],
+              $slice: -50,
+            },
+          },
+        },
+        { returnDocument: "after" }
+      );
+      if (!revokedApplication) {
+        return res.json({ success: true, alreadyRevoked: true });
       }
-      if (jobId) {
-        await syncApplicantsCount(jobId);
+      try {
+        if (caseDoc) {
+          await Case.updateOne(
+            { _id: caseDoc._id },
+            { $pull: { applicants: { paralegalId: req.user._id } } }
+          );
+        }
+        await syncApplicantsCount(revokedApplication.jobId);
+        await markApplicationSynced(revokedApplication._id);
+      } catch (syncErr) {
+        await markApplicationNeedsReconciliation(revokedApplication._id, syncErr);
+        runtimeLogger.error("[applications] revoke mirror synchronization deferred", revokedApplication._id, syncErr);
       }
 
       return res.json({ success: true });
     } catch (err) {
-      console.error("[applications] revoke error", err);
+      runtimeLogger.error("[applications] revoke error", err);
       return res.status(500).json({ error: "Unable to revoke application." });
     }
   }
@@ -605,7 +682,7 @@ router.post(
 router.get("/for-job/:jobId", ...authenticatedGuards, requireRole("admin", "attorney"), async (req, res) => {
   try {
     const job = await Job.findById(req.params.jobId);
-    if (!job) return res.status(404).json({ error: "Job not found" });
+    if (!job) return res.status(404).json({ error: "Matter posting not found" });
 
     const isOwner = job.attorneyId && String(job.attorneyId) === String(req.user._id);
     if (req.user.role !== "admin" && !isOwner) {
@@ -614,18 +691,29 @@ router.get("/for-job/:jobId", ...authenticatedGuards, requireRole("admin", "atto
 
     const blockedIds =
       req.user.role === "attorney" ? await getBlockedUserIds(req.user._id || req.user.id) : [];
-    const appFilter = { jobId: req.params.jobId };
+    const appFilter = { jobId: req.params.jobId, status: { $ne: "withdrawn" } };
     if (blockedIds.length) {
       appFilter.paralegalId = { $nin: blockedIds };
     }
     const apps = await Application.find(appFilter).populate(
       "paralegalId",
-      "firstName lastName email role"
+      "firstName lastName email role profileImage avatarURL"
     );
 
-    res.json(apps);
+    res.json(apps.map((application) => {
+      const item = application.toObject();
+      const paralegal = presentProfilePerson(item.paralegalId);
+      return {
+        ...item,
+        paralegalId: paralegal,
+        profileSnapshot: {
+          ...(item.profileSnapshot || {}),
+          profileImage: paralegal?.profileImage || "",
+        },
+      };
+    }));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -639,7 +727,7 @@ router.get("/my-postings", ...authenticatedGuards, requireRole("attorney"), asyn
     if (!jobs.length && !caseApps.length) return res.json([]);
     const jobIds = jobs.map((j) => j._id);
     const jobById = new Map(jobs.map((j) => [String(j._id), j]));
-    const appFilter = { jobId: { $in: jobIds }, status: { $nin: ["accepted", "rejected"] } };
+    const appFilter = { jobId: { $in: jobIds } };
     if (blockedIds.length) {
       appFilter.paralegalId = { $nin: blockedIds };
     }
@@ -647,7 +735,9 @@ router.get("/my-postings", ...authenticatedGuards, requireRole("attorney"), asyn
       .populate("paralegalId", "firstName lastName email role profileImage avatarURL")
       .sort({ createdAt: -1 })
       .lean();
-    const shaped = apps.map((app) => {
+    const shaped = apps.filter((app) =>
+      !["accepted", "rejected", "withdrawn"].includes(String(app.status || "").toLowerCase())
+    ).map((app) => {
       const job = jobById.get(String(app.jobId?._id || app.jobId)) || {};
       const starred =
         Array.isArray(app.starredBy) &&
@@ -655,24 +745,45 @@ router.get("/my-postings", ...authenticatedGuards, requireRole("attorney"), asyn
       return {
         id: String(app._id),
         jobId: app.jobId?._id || app.jobId || null,
-        jobTitle: job.title || "Job",
+        jobTitle: job.title || "Untitled Matter",
         practiceArea: job.practiceArea || "",
         budget: job.budget || null,
         caseId: job.caseId ? String(job.caseId._id || job.caseId) : null,
-        paralegal: app.paralegalId || null,
+        paralegal: presentProfilePerson(app.paralegalId),
         coverLetter: app.coverLetter || "",
         starred,
         createdAt: app.createdAt,
       };
     });
-    const combined = [...caseApps, ...shaped].sort((a, b) => {
+    const applicationKey = (entry) => {
+      const paralegal = entry?.paralegal || {};
+      const paralegalId = String(paralegal?._id || paralegal?.id || entry?.paralegalId || "");
+      const contextId = String(entry?.caseId || entry?.jobId || "");
+      return contextId && paralegalId ? `${contextId}:${paralegalId}` : String(entry?.id || "");
+    };
+    const canonicalKeys = new Set(
+      apps.map((app) => {
+        const job = jobById.get(String(app.jobId?._id || app.jobId)) || {};
+        const paralegal = app?.paralegalId || {};
+        const paralegalId = String(paralegal?._id || paralegal?.id || app?.paralegalId || "");
+        const contextId = String(job.caseId || app.jobId || "");
+        return contextId && paralegalId ? `${contextId}:${paralegalId}` : "";
+      }).filter(Boolean)
+    );
+    const combinedByKey = new Map(
+      caseApps
+        .filter((entry) => !canonicalKeys.has(applicationKey(entry)))
+        .map((entry) => [applicationKey(entry), entry])
+    );
+    shaped.forEach((entry) => combinedByKey.set(applicationKey(entry), entry));
+    const combined = [...combinedByKey.values()].sort((a, b) => {
       const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
       const bTime = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
       return bTime - aTime;
     });
     res.json(combined);
   } catch (err) {
-    console.error("[applications] my-postings error", err);
+    runtimeLogger.error("[applications] my-postings error", err);
     res.status(500).json({ error: "Unable to load applications." });
   }
 });

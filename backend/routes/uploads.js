@@ -1,16 +1,14 @@
+const { createLogger: createRuntimeLogger, logPromiseFailure } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:uploads");
 // backend/routes/uploads.js
 const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
-const fs = require("fs/promises");
 const mongoose = require("mongoose");
 const multer = require("multer");
-const os = require("os");
-const path = require("path");
-const util = require("util");
-const { execFile } = require("child_process");
-const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
+const { PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const { createS3Client } = require("../utils/s3Client");
 const verifyToken = require("../utils/verifyToken");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const { requireApproved, requireRole, requireCaseAccess, sameId } = require("../utils/authz");
@@ -26,43 +24,46 @@ const sendEmail = require("../utils/email");
 const { normalizeCaseStatus, canUseWorkspace } = require("../utils/caseState");
 const {
   decryptCaseFilePayload,
+  buildCaseFileKeyQuery,
   buildCaseFileNameQuery,
 } = require("../utils/dataEncryption");
 const { applyPublicParalegalFilter } = require("../utils/paralegalProfile");
 const { isWorkspacePresenceActive } = require("../utils/workspacePresence");
-
-const execFileAsync = util.promisify(execFile);
-const ENABLE_DOC_PREVIEW_CONVERSION = process.env.ENABLE_DOC_PREVIEW_CONVERSION === "true";
-
-// ----------------------------------------
-// CSRF (enabled in production or when ENABLE_CSRF=true)
-// ----------------------------------------
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
-}
+const { csrfProtection } = require("../utils/csrf");
+const {
+  ALLOWED_MATTER_MIME_TYPES,
+  getObjectMalwareScan,
+  isExtensionAllowedForMime,
+  malwareScanRequired,
+  normalizeExtension,
+  normalizeMimeType,
+  validateMatterFileBuffer,
+} = require("../utils/fileSecurity");
+const {
+  MAX_PROFILE_PHOTO_BYTES,
+  buildAuthenticatedProfilePhotoUrl,
+  buildPublicProfilePhotoUrl,
+  hasPhotoReference,
+  resolveProfilePhotoKey,
+  streamProfilePhoto,
+} = require("../services/profilePhotoDelivery");
+const {
+  activatePersonalStorageDeletion,
+  cancelPersonalStorageDeletion,
+  collectUserPersonalStorageKeys,
+  normalizeOwnedPersonalKey,
+  stagePersonalStorageDeletion,
+} = require("../services/personalStorageDeletion");
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // ----------------------------------------
 // S3 client
 // ----------------------------------------
-const s3 = new S3Client({
-  region: process.env.S3_REGION,
-  credentials:
-    process.env.S3_ACCESS_KEY && process.env.S3_SECRET_KEY
-      ? {
-          accessKeyId: process.env.S3_ACCESS_KEY,
-          secretAccessKey: process.env.S3_SECRET_KEY,
-        }
-      : undefined, // falls back to env/role
-});
+const s3 = createS3Client();
 const BUCKET = process.env.S3_BUCKET;
 if (!BUCKET) {
-  console.warn("[uploads] S3_BUCKET not set; presign routes will fail.");
+  runtimeLogger.warn("[uploads] S3_BUCKET not set; presign routes will fail.");
 }
 
 // ----------------------------------------
@@ -95,56 +96,6 @@ function normalizeKeyPath(key) {
   return String(key || "").replace(/^\/+/, "");
 }
 
-const DOC_PREVIEW_EXTS = new Set(["doc", "docx"]);
-const DOC_PREVIEW_MIMES = new Set([
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
-
-function getFileExtension(name) {
-  const trimmed = String(name || "").trim();
-  if (!trimmed) return "";
-  const parts = trimmed.split(".");
-  if (parts.length < 2) return "";
-  return parts.pop().toLowerCase();
-}
-
-function shouldConvertToPdf({ mimeType, filename } = {}) {
-  const ext = getFileExtension(filename);
-  const mime = String(mimeType || "").toLowerCase();
-  return DOC_PREVIEW_EXTS.has(ext) || DOC_PREVIEW_MIMES.has(mime);
-}
-
-function replaceKeyExtension(key, ext) {
-  const keyString = String(key || "");
-  const lastSlash = keyString.lastIndexOf("/");
-  const lastDot = keyString.lastIndexOf(".");
-  if (lastDot > lastSlash) {
-    return `${keyString.slice(0, lastDot)}${ext}`;
-  }
-  return `${keyString}${ext}`;
-}
-
-async function convertDocToPdfBuffer(buffer, originalName) {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "lpc-doc-"));
-  const ext = getFileExtension(originalName) || "docx";
-  const base = safeSegment(originalName.replace(/\.[^/.]+$/, "")) || "document";
-  const inputFile = `${base}.${ext}`;
-  const inputPath = path.join(tempDir, inputFile);
-  try {
-    await fs.writeFile(inputPath, buffer);
-    await execFileAsync(
-      "soffice",
-      ["--headless", "--convert-to", "pdf", "--outdir", tempDir, inputPath],
-      { timeout: 30000 }
-    );
-    const outputPath = path.join(tempDir, `${base}.pdf`);
-    return await fs.readFile(outputPath);
-  } finally {
-    await fs.rm(tempDir, { recursive: true, force: true });
-  }
-}
-
 function isS3NotFound(err) {
   const code = err?.name || err?.Code || err?.code;
   if (code === "NoSuchKey" || code === "NotFound") return true;
@@ -166,39 +117,169 @@ async function ensureObjectExists(key) {
   }
 }
 
-function extractKeyFromUrl(value) {
-  const raw = String(value || "").trim();
-  if (!raw || raw.startsWith("data:") || raw.startsWith("blob:")) return "";
-  try {
-    const parsed = /^https?:\/\//i.test(raw)
-      ? new URL(raw)
-      : new URL(raw, "https://lets-paraconnect.local");
-    const pathname = String(parsed.pathname || "").replace(/\/+$/, "");
-    if (
-      pathname === "/api/uploads/view" ||
-      pathname === "/api/uploads/download" ||
-      pathname === "/api/uploads/signed-get"
-    ) {
-      const fromQuery = normalizeKeyPath(parsed.searchParams.get("key") || "");
-      if (fromQuery) return fromQuery;
+async function refreshCaseFileSecurity(record, key, { persist = true, enforce = true } = {}) {
+  const scan = await getObjectMalwareScan({ s3, bucket: BUCKET, key });
+  const now = new Date();
+  if (persist && record?._id) {
+    const update = {
+      securityStatus: scan.status,
+      securityScanResult: scan.result,
+      securityCheckedAt: now,
+    };
+    if (["clean", "blocked", "error"].includes(scan.status)) update.securityScannedAt = now;
+    await CaseFile.updateOne({ _id: record._id }, { $set: update }).catch((err) => {
+      runtimeLogger.error("[uploads] file security state update failed", err?.message || err);
+    });
+  }
+  if (enforce && !scan.safe) {
+    const error = new Error(
+      scan.status === "blocked"
+        ? "This file is unavailable because it did not pass security scanning."
+        : scan.status === "error"
+          ? "This file is unavailable because security scanning could not complete."
+          : "This file is still undergoing security scanning. Try again shortly."
+    );
+    error.code = scan.status === "blocked"
+      ? "FILE_SECURITY_BLOCKED"
+      : scan.status === "error"
+        ? "FILE_SCAN_ERROR"
+        : "FILE_SCAN_PENDING";
+    error.statusCode = scan.status === "blocked" ? 422 : scan.status === "error" ? 503 : 423;
+    throw error;
+  }
+  return scan;
+}
+
+async function findCaseFileForObject(caseId, key) {
+  if (!caseId || !key) return null;
+  const normalized = normalizeKeyPath(key);
+  const direct = await CaseFile.findOne(buildCaseFileKeyQuery({ caseId, storageKey: normalized }));
+  if (direct) {
+    const plain = decryptCaseFilePayload(direct);
+    if (normalizeKeyPath(plain.storageKey) === normalized) return direct;
+  }
+  const files = await CaseFile.find({ caseId }).select("previewKey storageKey");
+  return files.find((file) => {
+    const plain = decryptCaseFilePayload(file);
+    return normalizeKeyPath(plain.previewKey) === normalized;
+  }) || null;
+}
+
+async function enforceMatterObjectSecurity(key, explicitCaseId) {
+  const normalized = normalizeKeyPath(key);
+  if (!normalized.startsWith("cases/")) return;
+  const isDocument = normalized.includes("/documents/");
+  const isPreEngagementDocument = normalized.includes("/pre-engagement/");
+  if (!isDocument && !isPreEngagementDocument) return;
+  const caseId = explicitCaseId || extractCaseIdFromKey(normalized);
+  if (isPreEngagementDocument) {
+    await refreshCaseFileSecurity(null, normalized, { persist: false });
+    return;
+  }
+  const record = await findCaseFileForObject(caseId, normalized);
+  if (!record) {
+    const error = new Error("This file is not attached to the Matter.");
+    error.code = "FILE_METADATA_MISSING";
+    error.statusCode = 404;
+    throw error;
+  }
+  const plain = decryptCaseFilePayload(record);
+  const originalKey = normalizeKeyPath(plain.storageKey);
+  const previewKey = normalizeKeyPath(plain.previewKey);
+  await refreshCaseFileSecurity(record, originalKey);
+  if (normalized !== originalKey) {
+    if (!previewKey || normalized !== previewKey) {
+      const error = new Error("This file is not attached to the Matter.");
+      error.code = "FILE_METADATA_MISSING";
+      error.statusCode = 404;
+      throw error;
     }
-    let key = normalizeKeyPath(pathname);
-    // Handle path-style URLs such as /<bucket>/<key>.
-    const bucket = String(BUCKET || "").trim().replace(/^\/+|\/+$/g, "");
-    if (bucket && key.toLowerCase().startsWith(`${bucket.toLowerCase()}/`)) {
-      key = key.slice(bucket.length + 1);
-    }
-    return key;
-  } catch {
-    return normalizeKeyPath(raw.split("?")[0] || "");
+    await refreshCaseFileSecurity(record, previewKey, { persist: false });
   }
 }
 
-function isOwnerProfilePhotoKey(key, ownerId) {
+const SCANNED_PERSONAL_PREFIXES = [
+  "profile-photos/",
+  "paralegal-resumes/",
+  "paralegal-certificates/",
+  "paralegal-writing-samples/",
+];
+
+async function enforceUploadedObjectSecurity(key, explicitCaseId) {
   const normalized = normalizeKeyPath(key);
-  const ownerSegment = safeSegment(ownerId);
-  if (!normalized || !ownerSegment) return false;
-  return normalized.startsWith(`profile-photos/${ownerSegment}/`);
+  if (normalized.startsWith("cases/")) {
+    await enforceMatterObjectSecurity(normalized, explicitCaseId);
+    return;
+  }
+  if (SCANNED_PERSONAL_PREFIXES.some((prefix) => normalized.startsWith(prefix))) {
+    await refreshCaseFileSecurity(null, normalized, { persist: false });
+  }
+}
+
+async function deleteUploadedObjects(keys = []) {
+  if (!BUCKET) return;
+  const uniqueKeys = [...new Set(keys.map(normalizeKeyPath).filter(Boolean))];
+  await Promise.all(
+    uniqueKeys.map(async (key) => {
+      try {
+        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+      } catch (err) {
+        runtimeLogger.error("[uploads] compensating object delete failed", {
+          key,
+          error: err?.message || String(err),
+        });
+      }
+    })
+  );
+}
+
+async function finalizeStorageTaskTransition(operation, label) {
+  try {
+    await operation();
+  } catch (error) {
+    runtimeLogger.error("[uploads] durable storage cleanup transition deferred", {
+      transition: label,
+      errorCode: String(error?.name || error?.code || "STORAGE_TASK_TRANSITION_FAILED"),
+    });
+  }
+}
+
+async function replacePersonalDocument({ user, field, key, putParams, reason }) {
+  const ownerId = user._id;
+  const oldKey = normalizeOwnedPersonalKey(user[field], ownerId);
+  const oldTaskIds = await stagePersonalStorageDeletion({
+    ownerId,
+    keys: oldKey ? [oldKey] : [],
+    reason,
+  });
+  const newTaskIds = await stagePersonalStorageDeletion({
+    ownerId,
+    keys: [key],
+    reason: `${reason}_upload_compensation`,
+  });
+  try {
+    await s3.send(new PutObjectCommand(putParams));
+    user[field] = key;
+    await user.save();
+  } catch (error) {
+    await finalizeStorageTaskTransition(
+      () => activatePersonalStorageDeletion(newTaskIds),
+      "activate_upload_compensation"
+    );
+    await finalizeStorageTaskTransition(
+      () => cancelPersonalStorageDeletion(oldTaskIds),
+      "cancel_replaced_object_deletion"
+    );
+    throw error;
+  }
+  await finalizeStorageTaskTransition(
+    () => cancelPersonalStorageDeletion(newTaskIds),
+    "cancel_upload_compensation"
+  );
+  await finalizeStorageTaskTransition(
+    () => activatePersonalStorageDeletion(oldTaskIds),
+    "activate_replaced_object_deletion"
+  );
 }
 
 function normalizeFileName(value = "", fallback = "") {
@@ -293,7 +374,13 @@ async function ensureKeyAccess(req, key, explicitCaseId) {
         return false;
       }
       try {
-        const { caseDoc, isAdmin } = await loadCaseForUser(req, caseId);
+        const {
+          caseDoc,
+          isAdmin,
+          isAttorney,
+          isParalegal,
+          isRequestedPreEngagementParalegal,
+        } = await loadCaseForUser(req, caseId);
         if (!caseDoc) return false;
         if (!isAdmin && isCaseClosedForAccess(caseDoc)) return false;
         const preDocKey = normalizeKeyPath(caseDoc?.preEngagement?.confidentialityDocument?.key || "");
@@ -303,13 +390,13 @@ async function ensureKeyAccess(req, key, explicitCaseId) {
         const requestedParalegalId = String(caseDoc?.preEngagement?.requestedParalegalId || "");
         const viewerId = String(req.user?.id || req.user?._id || "");
         const isRequestedPreEngagementDocument =
-          String(req.user?.role || "").toLowerCase() === "paralegal" &&
+          isRequestedPreEngagementParalegal &&
           !!requestedParalegalId &&
           requestedParalegalId === viewerId &&
           ((!!preDocKey && preDocKey === cleaned) ||
             (!!preResponseDocKey && preResponseDocKey === cleaned));
         if (isRequestedPreEngagementDocument) return true;
-        return true;
+        return Boolean(isAttorney || isParalegal);
       } catch {
         return false;
       }
@@ -344,26 +431,12 @@ function sseParams() {
 }
 
 // Allowed content types (expand if needed)
-const ALLOWED = new Set([
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "text/plain",
-  "text/csv",
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-]);
+const ALLOWED = ALLOWED_MATTER_MIME_TYPES;
 const BLOCKED = [/html/i, /javascript/i, /zip/i, /x-msdownload/i, /octet-stream/i];
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_CASE_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_CERT_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
-const MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024;
 const caseFileUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_CASE_FILE_BYTES },
@@ -389,18 +462,7 @@ router.use(requireRole("admin", "attorney", "paralegal"));
 router.post(
   "/presign",
   csrfProtection,
-  async (req, res, next) => {
-    try {
-      const { caseId } = req.body || {};
-      if (!caseId || !isObjId(caseId)) {
-        return res.status(400).json({ msg: "Valid caseId is required" });
-      }
-      return requireCaseAccessInline(req, res, next, "caseId");
-    } catch (e) {
-      return next(e);
-    }
-  },
-  
+  requireCaseAccess("caseId"),
   async (req, res) => {
     try {
       const { contentType, ext, caseId, checksumSha256, contentDisposition, size } = req.body || {};
@@ -411,19 +473,20 @@ router.post(
       const caseDoc = await Case.findById(caseId).select("escrowStatus escrowIntentId status paralegal paralegalId");
       const escrowStatus = String(caseDoc?.escrowStatus || "").toLowerCase();
       if (escrowStatus !== "funded") {
-        return res.status(403).json({ msg: "Work begins once payment is secured." });
+        return res.status(403).json({ msg: "Work begins once Matter funding is confirmed." });
       }
       if (!canUseWorkspace(caseDoc)) {
-        return res.status(403).json({ msg: "Uploads unlock once the case is funded and in progress." });
+        return res.status(403).json({ msg: "Uploads unlock once the Matter is funded and in progress." });
       }
 
       if (!contentType || typeof contentType !== "string") {
         return res.status(400).json({ msg: "contentType required" });
       }
-      if (!ALLOWED.has(contentType)) {
+      const normalizedContentType = normalizeMimeType(contentType);
+      if (!ALLOWED.has(normalizedContentType)) {
         return res.status(400).json({ msg: "Type not allowed" });
       }
-      if (BLOCKED.some((rx) => rx.test(contentType))) {
+      if (BLOCKED.some((rx) => rx.test(normalizedContentType))) {
         return res.status(400).json({ msg: "Type not allowed" });
       }
 
@@ -435,7 +498,10 @@ router.post(
         return res.status(400).json({ msg: "File exceeds maximum allowed size" });
       }
 
-      const fileExt = safeSegment(ext || "bin");
+      const fileExt = normalizeExtension(ext);
+      if (!isExtensionAllowedForMime(fileExt, normalizedContentType)) {
+        return res.status(400).json({ msg: "The file extension does not match its type." });
+      }
       const filename = `${crypto.randomUUID()}.${fileExt}`;
       const key = `${buildCasePrefix(caseId)}documents/${filename}`.replace(/\/+/g, "/");
 
@@ -443,7 +509,7 @@ router.post(
       const putParams = {
         Bucket: BUCKET,
         Key: key,
-        ContentType: contentType,
+        ContentType: normalizedContentType,
         ContentLength: declaredSize,
         ACL: "private",
         ...sseParams(),
@@ -468,16 +534,11 @@ router.post(
       const url = await getSignedUrl(s3, command, { expiresIn });
       res.json({ url, key, expiresAt: Date.now() + expiresIn * 1000 });
     } catch (e) {
-      console.error("[uploads] presign error", e);
+      runtimeLogger.error("[uploads] presign error", e);
       res.status(500).json({ msg: "presign error" });
     }
   }
 );
-
-// Temporary stub for legacy attachment probes
-router.post("/attach", csrfProtection, (_req, res) => {
-  res.json({ ok: true });
-});
 
 /**
  * GET /api/uploads/view?key=<s3key>
@@ -494,8 +555,10 @@ router.get("/view", async (req, res) => {
 
     try {
       await ensureObjectExists(key);
+      await enforceUploadedObjectSecurity(key, req.query.caseId);
     } catch (err) {
       if (err?.code === "NoSuchKey") return res.status(404).json({ msg: "File not found" });
+      if (err?.statusCode) return res.status(err.statusCode).json({ msg: err.message, code: err.code });
       throw err;
     }
 
@@ -503,7 +566,7 @@ router.get("/view", async (req, res) => {
     const url = await getSignedUrl(s3, getCmd, { expiresIn: 60 });
     res.redirect(url);
   } catch (e) {
-    console.error("[uploads] view error", e);
+    runtimeLogger.error("[uploads] view error", e);
     res.status(500).json({ msg: "view error" });
   }
 });
@@ -527,8 +590,10 @@ router.get("/signed-get", async (req, res) => {
 
     try {
       await ensureObjectExists(normalizedKey);
+      await enforceUploadedObjectSecurity(normalizedKey, caseId);
     } catch (err) {
       if (err?.code === "NoSuchKey") return res.status(404).json({ msg: "File not found" });
+      if (err?.statusCode) return res.status(err.statusCode).json({ msg: err.message, code: err.code });
       throw err;
     }
 
@@ -539,7 +604,7 @@ router.get("/signed-get", async (req, res) => {
     const url = await getSignedUrl(s3, get, { expiresIn: ttl });
     res.json({ url });
   } catch (e) {
-    console.error(e);
+    runtimeLogger.error(e);
     res.status(500).json({ msg: "signed-get error" });
   }
 });
@@ -554,8 +619,10 @@ router.get("/download", csrfProtection, async (req, res) => {
 
     try {
       await ensureObjectExists(key);
+      await enforceUploadedObjectSecurity(key, req.query.caseId);
     } catch (err) {
       if (err?.code === "NoSuchKey") return res.status(404).json({ msg: "File not found" });
+      if (err?.statusCode) return res.status(err.statusCode).json({ msg: err.message, code: err.code });
       throw err;
     }
 
@@ -564,7 +631,7 @@ router.get("/download", csrfProtection, async (req, res) => {
     const url = await getSignedUrl(s3, getCmd, { expiresIn });
     res.json({ url, expiresAt: Date.now() + expiresIn * 1000 });
   } catch (e) {
-    console.error("[uploads] download error", e);
+    runtimeLogger.error("[uploads] download error", e);
     res.status(500).json({ msg: "download error" });
   }
 });
@@ -581,6 +648,22 @@ function caseFileMiddleware(req, res, next) {
   });
 }
 
+function validatePdfUpload(file, label) {
+  try {
+    validateMatterFileBuffer({
+      buffer: file?.buffer,
+      mimeType: file?.mimetype,
+      filename: file?.originalname || `${String(label || "document").toLowerCase()}.pdf`,
+    });
+    return null;
+  } catch (error) {
+    return {
+      msg: `${label} must be a valid PDF.`,
+      code: error?.code || "FILE_SIGNATURE_MISMATCH",
+    };
+  }
+}
+
 router.post(
   "/paralegal-certificate",
   requireRole("paralegal"),
@@ -595,9 +678,14 @@ router.post(
     if (req.file.size > MAX_CERT_FILE_BYTES) {
       return res.status(400).json({ msg: "Certificate exceeds maximum allowed size" });
     }
+    const invalidFile = validatePdfUpload(req.file, "Certificate");
+    if (invalidFile) return res.status(400).json(invalidFile);
 
     const ownerId = String(req.user?.id || req.user?._id || "").trim();
     if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
+
+    const user = await User.findById(ownerId);
+    if (!user) return res.status(404).json({ msg: "User not found" });
 
     const key = buildPersonalKey("paralegal-certificates", ownerId);
     const putParams = {
@@ -609,17 +697,18 @@ router.post(
       ACL: "private",
       ...sseParams(),
     };
-    await s3.send(new PutObjectCommand(putParams));
-
-    const user = await User.findById(ownerId);
-    if (!user) return res.status(404).json({ msg: "User not found" });
-    user.certificateURL = key;
-    await user.save();
+    await replacePersonalDocument({
+      user,
+      field: "certificateURL",
+      key,
+      putParams,
+      reason: "certificate_replaced",
+    });
 
     try {
       await logAction(req, "paralegal.certificate.upload", { targetType: "user", targetId: user._id });
     } catch (err) {
-      console.warn("[uploads] certificate upload audit failed", err?.message || err);
+      runtimeLogger.warn("[uploads] certificate upload audit failed", err?.message || err);
     }
 
     return res.json({ success: true, url: key });
@@ -640,9 +729,14 @@ router.post(
     if (req.file.size > MAX_CERT_FILE_BYTES) {
       return res.status(400).json({ msg: "Writing sample exceeds maximum allowed size" });
     }
+    const invalidFile = validatePdfUpload(req.file, "Writing sample");
+    if (invalidFile) return res.status(400).json(invalidFile);
 
     const ownerId = String(req.user?.id || req.user?._id || "").trim();
     if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
+
+    const user = await User.findById(ownerId);
+    if (!user) return res.status(404).json({ msg: "User not found" });
 
     const key = buildPersonalKey("paralegal-writing-samples", ownerId);
     const putParams = {
@@ -654,17 +748,18 @@ router.post(
       ACL: "private",
       ...sseParams(),
     };
-    await s3.send(new PutObjectCommand(putParams));
-
-    const user = await User.findById(ownerId);
-    if (!user) return res.status(404).json({ msg: "User not found" });
-    user.writingSampleURL = key;
-    await user.save();
+    await replacePersonalDocument({
+      user,
+      field: "writingSampleURL",
+      key,
+      putParams,
+      reason: "writing_sample_replaced",
+    });
 
     try {
       await logAction(req, "paralegal.writingSample.upload", { targetType: "user", targetId: user._id });
     } catch (err) {
-      console.warn("[uploads] writing sample upload audit failed", err?.message || err);
+      runtimeLogger.warn("[uploads] writing sample upload audit failed", err?.message || err);
     }
 
     return res.json({ success: true, url: key });
@@ -685,12 +780,18 @@ router.post(
     if (req.file.size > MAX_RESUME_FILE_BYTES) {
       return res.status(400).json({ msg: "Résumé exceeds maximum allowed size" });
     }
+    const invalidFile = validatePdfUpload(req.file, "Résumé");
+    if (invalidFile) return res.status(400).json(invalidFile);
 
     const ownerId = String(req.user?.id || req.user?._id || "").trim();
     if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
 
+    const user = await User.findById(ownerId);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
     const timestamp = Date.now();
-    const key = `paralegal-resumes/${safeSegment(ownerId)}/resume-${timestamp}.pdf`;
+    const nonce = crypto.randomBytes(6).toString("hex");
+    const key = `paralegal-resumes/${safeSegment(ownerId)}/resume-${timestamp}-${nonce}.pdf`;
     const putParams = {
       Bucket: BUCKET,
       Key: key,
@@ -700,23 +801,24 @@ router.post(
       ACL: "private",
       ...sseParams(),
     };
-    await s3.send(new PutObjectCommand(putParams));
-
-    const user = await User.findById(ownerId);
-    if (!user) return res.status(404).json({ msg: "User not found" });
-    user.resumeURL = key;
-    await user.save();
+    await replacePersonalDocument({
+      user,
+      field: "resumeURL",
+      key,
+      putParams,
+      reason: "resume_replaced",
+    });
 
     try {
       await logAction(req, "paralegal.resume.upload", { targetType: "user", targetId: user._id });
     } catch (err) {
-      console.warn("[uploads] resume upload audit failed", err?.message || err);
+      runtimeLogger.warn("[uploads] resume upload audit failed", err?.message || err);
     }
 
     try {
       await notifyUser(user._id, "resume_uploaded", {}, { actorUserId: user._id });
     } catch (err) {
-      console.warn("[uploads] notifyUser resume_uploaded failed", err);
+      runtimeLogger.warn("[uploads] notifyUser resume_uploaded failed", err);
     }
 
     res.set("Cache-Control", "no-store");
@@ -755,71 +857,154 @@ router.post(
         return res.status(400).json({ msg: "Profile photo exceeds maximum allowed size" });
       }
     }
+    try {
+      validateMatterFileBuffer({
+        buffer: photoFile.buffer,
+        mimeType: photoFile.mimetype,
+        filename: photoFile.originalname || (/png/i.test(photoFile.mimetype || "") ? "profile.png" : "profile.jpg"),
+      });
+      if (originalFile) {
+        validateMatterFileBuffer({
+          buffer: originalFile.buffer,
+          mimeType: originalFile.mimetype,
+          filename: originalFile.originalname || (/png/i.test(originalFile.mimetype || "") ? "original.png" : "original.jpg"),
+        });
+      }
+    } catch (error) {
+      return res.status(400).json({
+        msg: "The profile photo contents do not match the selected image type.",
+        code: error?.code || "FILE_SIGNATURE_MISMATCH",
+      });
+    }
 
     const ownerId = String(req.user?.id || req.user?._id || "").trim();
     if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
 
-    const key = `profile-photos/${safeSegment(ownerId)}/profile-${Date.now()}.jpg`;
+    const user = await User.findById(ownerId).select(
+      "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
+    );
+    if (!user) return res.status(404).json({ msg: "User not found" });
+    const role = String(user.role || "").toLowerCase();
+    const editExistingRaw = String(req.body?.editExisting || "").trim().toLowerCase();
+    const editExisting = editExistingRaw === "1" || editExistingRaw === "true" || editExistingRaw === "yes";
+    const hasExistingPhoto = Boolean(user.profileImage || user.avatarURL);
+    const requiresReview = role === "paralegal" && !(editExisting && hasExistingPhoto);
+    const queueAdminReview = role === "attorney";
+
+    const profileExt = /png/i.test(photoFile.mimetype || "") ? "png" : "jpg";
+    const photoTimestamp = Date.now();
+    const photoNonce = crypto.randomBytes(6).toString("hex");
+    const key = `profile-photos/${safeSegment(ownerId)}/profile-${photoTimestamp}-${photoNonce}.${profileExt}`;
     const putParams = {
       Bucket: BUCKET,
       Key: key,
       Body: photoFile.buffer,
       ContentType: photoFile.mimetype || "image/jpeg",
       ContentLength: photoFile.size,
-      ACL: "public-read",
       ...sseParams(),
     };
-    await s3.send(new PutObjectCommand(putParams));
-
-    const publicUrl = `https://${process.env.S3_BUCKET}.s3.${process.env.S3_REGION}.amazonaws.com/${key}`;
-    let originalPublicUrl = "";
+    let originalKey = "";
+    let originalPutParams = null;
     if (originalFile) {
       const originalExt = /png/i.test(originalFile.mimetype || "") ? "png" : "jpg";
-      const originalKey = `profile-photos/${safeSegment(ownerId)}/original-${Date.now()}.${originalExt}`;
-      const originalPutParams = {
+      const originalNonce = crypto.randomBytes(6).toString("hex");
+      originalKey = `profile-photos/${safeSegment(ownerId)}/original-${photoTimestamp}-${originalNonce}.${originalExt}`;
+      originalPutParams = {
         Bucket: BUCKET,
         Key: originalKey,
         Body: originalFile.buffer,
         ContentType: originalFile.mimetype || "image/jpeg",
         ContentLength: originalFile.size,
-        ACL: "public-read",
         ...sseParams(),
       };
-      await s3.send(new PutObjectCommand(originalPutParams));
-      originalPublicUrl = `https://${process.env.S3_BUCKET}.s3.${process.env.S3_REGION}.amazonaws.com/${originalKey}`;
     }
-    const user = await User.findById(ownerId);
-    if (!user) return res.status(404).json({ msg: "User not found" });
-    const role = String(user.role || "").toLowerCase();
-    const editExistingRaw = String(req.body?.editExisting || "").trim().toLowerCase();
-    const editExisting = editExistingRaw === "1" || editExistingRaw === "true" || editExistingRaw === "yes";
-    const hasExistingPhoto = Boolean(user.profileImage || user.avatarURL);
-    // Paralegal edits to an existing approved photo are auto-approved.
-    // Only truly new uploads require admin review.
-    const requiresReview = role === "paralegal" && !(editExisting && hasExistingPhoto);
-    const queueAdminReview = role === "attorney";
-    if (requiresReview) {
-      user.pendingProfileImage = publicUrl;
-      if (originalPublicUrl) {
-        user.pendingProfileImageOriginal = originalPublicUrl;
+    const currentPhotoKeys = collectUserPersonalStorageKeys(user).filter((value) =>
+      value.startsWith(`profile-photos/${ownerId}/`)
+    );
+    const pendingKeys = [
+      resolveProfilePhotoKey(user, {
+        bucket: BUCKET,
+        region: process.env.S3_REGION,
+        variant: "pending",
+      }),
+      resolveProfilePhotoKey(user, {
+        bucket: BUCKET,
+        region: process.env.S3_REGION,
+        variant: "pending-original",
+      }),
+    ].filter(Boolean);
+    const oldTaskIds = await stagePersonalStorageDeletion({
+      ownerId,
+      keys: requiresReview ? pendingKeys : currentPhotoKeys,
+      reason: "profile_photo_replaced",
+    });
+    const newTaskIds = await stagePersonalStorageDeletion({
+      ownerId,
+      keys: [key, originalKey].filter(Boolean),
+      reason: "profile_photo_upload_compensation",
+    });
+    const photoVersion = new Date();
+    const approvedDisplayUrl = role === "paralegal"
+      ? buildPublicProfilePhotoUrl(user, photoVersion)
+      : buildAuthenticatedProfilePhotoUrl(user, { updatedAt: photoVersion });
+    const pendingDisplayUrl = buildAuthenticatedProfilePhotoUrl(user, {
+      variant: "pending",
+      updatedAt: photoVersion,
+    });
+    const approvedOriginalUrl = buildAuthenticatedProfilePhotoUrl(user, {
+      variant: "approved-original",
+      updatedAt: photoVersion,
+    });
+    const pendingOriginalUrl = buildAuthenticatedProfilePhotoUrl(user, {
+      variant: "pending-original",
+      updatedAt: photoVersion,
+    });
+    try {
+      await s3.send(new PutObjectCommand(putParams));
+      if (originalPutParams) await s3.send(new PutObjectCommand(originalPutParams));
+      if (requiresReview) {
+        user.pendingProfileImageKey = key;
+        user.pendingProfileImage = pendingDisplayUrl;
+        user.pendingProfileImageOriginalKey = originalKey;
+        user.pendingProfileImageOriginal = originalKey ? pendingOriginalUrl : "";
+        user.profilePhotoStatus = "pending_review";
+      } else {
+        user.profileImageKey = key;
+        user.profileImage = approvedDisplayUrl;
+        user.avatarURL = approvedDisplayUrl;
+        user.pendingProfileImageKey = queueAdminReview ? key : "";
+        user.pendingProfileImage = queueAdminReview ? pendingDisplayUrl : "";
+        user.pendingProfileImageOriginalKey = queueAdminReview ? originalKey : "";
+        user.pendingProfileImageOriginal = queueAdminReview && originalKey ? pendingOriginalUrl : "";
+        user.profileImageOriginalKey = originalKey;
+        user.profileImageOriginal = originalKey ? approvedOriginalUrl : "";
+        user.profilePhotoStatus = "approved";
       }
-      user.profilePhotoStatus = "pending_review";
-    } else {
-      user.profileImage = publicUrl;
-      user.avatarURL = publicUrl;
-      user.pendingProfileImage = queueAdminReview ? publicUrl : "";
-      user.pendingProfileImageOriginal = queueAdminReview ? originalPublicUrl || "" : "";
-      if (originalPublicUrl) {
-        user.profileImageOriginal = originalPublicUrl;
-      }
-      user.profilePhotoStatus = "approved";
+      await user.save();
+    } catch (error) {
+      await finalizeStorageTaskTransition(
+        () => activatePersonalStorageDeletion(newTaskIds),
+        "activate_profile_upload_compensation"
+      );
+      await finalizeStorageTaskTransition(
+        () => cancelPersonalStorageDeletion(oldTaskIds),
+        "cancel_replaced_profile_deletion"
+      );
+      throw error;
     }
-    await user.save();
+    await finalizeStorageTaskTransition(
+      () => cancelPersonalStorageDeletion(newTaskIds),
+      "cancel_profile_upload_compensation"
+    );
+    await finalizeStorageTaskTransition(
+      () => activatePersonalStorageDeletion(oldTaskIds),
+      "activate_replaced_profile_deletion"
+    );
 
     try {
       await logAction(req, "user.profile_photo.upload", { targetType: "user", targetId: user._id });
     } catch (err) {
-      console.warn("[uploads] profile photo upload audit failed", err?.message || err);
+      runtimeLogger.warn("[uploads] profile photo upload audit failed", err?.message || err);
     }
 
     if (requiresReview) {
@@ -839,18 +1024,18 @@ router.post(
            ${linkHtml}`
         );
       } catch (err) {
-        console.warn("[uploads] admin photo review email failed", err?.message || err);
+        runtimeLogger.warn("[uploads] admin photo review email failed", err?.message || err);
       }
     }
 
     return res.json({
       success: true,
-      url: publicUrl,
+      url: requiresReview ? pendingDisplayUrl : approvedDisplayUrl,
       status: user.profilePhotoStatus || (requiresReview ? "pending_review" : "approved"),
       pending: requiresReview,
-      pendingProfileImage: requiresReview ? publicUrl : "",
+      pendingProfileImage: requiresReview ? pendingDisplayUrl : "",
       pendingProfileImageOriginal: requiresReview ? user.pendingProfileImageOriginal || "" : "",
-      profileImage: requiresReview ? user.profileImage || "" : publicUrl,
+      profileImage: requiresReview ? user.profileImage || "" : approvedDisplayUrl,
       profileImageOriginal: user.profileImageOriginal || "",
     });
   })
@@ -863,71 +1048,27 @@ router.get(
     const ownerId = String(req.user?.id || req.user?._id || "").trim();
     if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
     const user = await User.findById(ownerId).select(
-      "pendingProfileImageOriginal profileImageOriginal pendingProfileImage profileImage avatarURL"
+      "pendingProfileImageOriginal profileImageOriginal pendingProfileImage profileImage avatarURL " +
+      "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
     );
     if (!user) return res.status(404).json({ msg: "User not found" });
-    const candidates = [
-      user.pendingProfileImageOriginal,
-      user.profileImageOriginal,
-      user.pendingProfileImage,
-      user.profileImage,
-      user.avatarURL,
-    ]
-      .map((item) => (typeof item === "string" ? item.trim() : ""))
-      .filter(Boolean);
-    const sourceCandidate = String(req.query?.source || "").trim();
-    if (sourceCandidate) {
-      const sourceKey = extractKeyFromUrl(sourceCandidate);
-      // Accept caller-provided source only when it points to this user's profile-photo prefix.
-      if (sourceKey && isOwnerProfilePhotoKey(sourceKey, ownerId)) {
-        candidates.unshift(sourceKey);
-      }
-    }
-
-    if (!candidates.length) return res.status(404).json({ msg: "Profile photo not found" });
-
-    const urlCandidates = candidates.filter((value) => /^https?:\/\//i.test(String(value || "").trim()));
-    let lastErr = null;
-    for (const candidate of candidates) {
-      const key = normalizeKeyPath(extractKeyFromUrl(candidate) || candidate);
-      if (!key) continue;
-      try {
-        const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
-        const obj = await s3.send(getCmd);
-        if (!obj?.Body) continue;
-        res.set("Content-Type", obj.ContentType || "image/jpeg");
-        if (obj.ContentLength) res.set("Content-Length", String(obj.ContentLength));
-        res.set("Cache-Control", "no-store");
-        obj.Body.pipe(res);
-        return;
-      } catch (err) {
-        lastErr = err;
-      }
-    }
-
-    // Fallback for legacy absolute URLs that may not map to the current bucket/key format.
-    for (const candidateUrl of urlCandidates) {
-      try {
-        const upstream = await fetch(candidateUrl);
-        if (!upstream.ok) continue;
-        const contentType = String(upstream.headers.get("content-type") || "").toLowerCase();
-        if (contentType && !contentType.startsWith("image/")) continue;
-        const buffer = Buffer.from(await upstream.arrayBuffer());
-        if (!buffer.length) continue;
-        res.set("Content-Type", contentType || "image/jpeg");
-        res.set("Content-Length", String(buffer.length));
-        res.set("Cache-Control", "no-store");
-        res.send(buffer);
-        return;
-      } catch (err) {
-        lastErr = err;
-      }
-    }
-
-    if (lastErr) {
-      console.warn("[uploads] profile-photo/original fetch failed", lastErr?.message || lastErr);
-    }
-    return res.status(404).json({ msg: "Profile photo not found" });
+    const variant = hasPhotoReference(user, "pending-original") ? "pending-original" : "approved-original";
+    const key = resolveProfilePhotoKey(user, {
+      bucket: BUCKET,
+      region: process.env.S3_REGION,
+      variant,
+    });
+    if (!key) return res.status(404).json({ msg: "Profile photo not found" });
+    const served = await streamProfilePhoto({
+      req,
+      res,
+      s3,
+      bucket: BUCKET,
+      key,
+      cacheControl: "private, no-store",
+    });
+    if (!served && !res.headersSent) return res.status(404).json({ msg: "Profile photo not found" });
+    return undefined;
   })
 );
 
@@ -939,7 +1080,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const { caseDoc, isAdmin } = await loadCaseForUser(req, req.params.caseId);
     if (isAdmin) {
-      return res.status(403).json({ msg: "Admins can only access the case archive." });
+      return res.status(403).json({ msg: "Administrators can only access the Matter archive." });
     }
     if (!assertWorkspaceReady(caseDoc, res)) return;
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
@@ -949,6 +1090,18 @@ router.post(
     }
 
     const originalName = normalizeFileName(req.file.originalname, `case-file-${Date.now()}`);
+    try {
+      validateMatterFileBuffer({
+        buffer: req.file.buffer,
+        mimeType: req.file.mimetype,
+        filename: originalName,
+      });
+    } catch (err) {
+      if (["FILE_TYPE_NOT_ALLOWED", "FILE_EXTENSION_MISMATCH", "FILE_SIGNATURE_MISMATCH"].includes(err?.code)) {
+        return res.status(400).json({ msg: err.message, code: err.code });
+      }
+      throw err;
+    }
     const safeName = safeSegment(originalName) || `case-file-${Date.now()}`;
     const key = `${buildCasePrefix(caseDoc._id)}documents/${Date.now()}-${safeName}`.replace(/\/+/g, "/");
     const uploadRole = String(req.user?.role || "attorney").toLowerCase();
@@ -965,46 +1118,28 @@ router.post(
     };
     await s3.send(new PutObjectCommand(putParams));
 
-    let previewKey = "";
-    let previewMimeType = "";
-    let previewSize = 0;
-    if (ENABLE_DOC_PREVIEW_CONVERSION && shouldConvertToPdf({ mimeType: req.file.mimetype, filename: originalName })) {
-      try {
-        const pdfBuffer = await convertDocToPdfBuffer(req.file.buffer, originalName);
-        if (pdfBuffer?.length) {
-          previewKey = replaceKeyExtension(key, ".pdf");
-          const previewParams = {
-            Bucket: BUCKET,
-            Key: previewKey,
-            Body: pdfBuffer,
-            ContentType: "application/pdf",
-            ContentLength: pdfBuffer.length,
-            ACL: "private",
-            ...sseParams(),
-          };
-          await s3.send(new PutObjectCommand(previewParams));
-          previewMimeType = "application/pdf";
-          previewSize = pdfBuffer.length;
-        }
-      } catch (err) {
-        console.warn("[uploads] pdf preview conversion failed", err?.message || err);
-      }
+    let entry;
+    try {
+      entry = await CaseFile.create({
+        caseId: caseDoc._id,
+        userId: req.user.id,
+        originalName,
+        storageKey: key,
+        previewKey: "",
+        mimeType: req.file.mimetype || "",
+        previewMimeType: "",
+        size: req.file.size || 0,
+        previewSize: 0,
+        securityStatus: malwareScanRequired() ? "pending" : "not_required",
+        securityScanResult: malwareScanRequired() ? "PENDING" : "NOT_REQUIRED",
+        uploadedByRole: uploadRole,
+        status: defaultStatus,
+        version,
+      });
+    } catch (err) {
+      await deleteUploadedObjects([key]);
+      throw err;
     }
-
-    const entry = await CaseFile.create({
-      caseId: caseDoc._id,
-      userId: req.user.id,
-      originalName,
-      storageKey: key,
-      previewKey,
-      mimeType: req.file.mimetype || "",
-      previewMimeType,
-      size: req.file.size || 0,
-      previewSize,
-      uploadedByRole: uploadRole,
-      status: defaultStatus,
-      version,
-    });
 
     try {
       await logAction(req, "file_uploaded", {
@@ -1013,7 +1148,7 @@ router.post(
         meta: { fileId: entry._id, filename: originalName },
       });
     } catch (err) {
-      console.warn("[uploads] file upload audit failed", err?.message || err);
+      runtimeLogger.warn("[uploads] file upload audit failed", err?.message || err);
     }
 
     try {
@@ -1031,19 +1166,24 @@ router.post(
           "case_file_uploaded",
           {
             caseId,
-            caseTitle: caseDoc.title || "Case",
+            caseTitle: caseDoc.title || "Untitled Matter",
+            fileId: entry._id,
             fileName: originalName,
-            link: `case-detail.html?caseId=${encodeURIComponent(caseId)}#caseFilesSection`,
+            link: `case-detail.html?caseId=${encodeURIComponent(caseId)}&tab=files`,
           },
           { actorUserId: req.user.id }
         );
       }
     } catch (err) {
-      console.warn("[uploads] notifyUser case_file_uploaded failed", err?.message || err);
+      runtimeLogger.warn("[uploads] notifyUser case_file_uploaded failed", err?.message || err);
     }
 
     publishCaseEvent(caseDoc._id, "documents", { at: new Date().toISOString() });
-    res.status(201).json({ file: serializeCaseFile(entry) });
+    res.status(201).json({
+      file: req.query?.presentation === "matter"
+        ? serializeMatterCaseFile(entry)
+        : serializeCaseFile(entry),
+    });
   })
 );
 
@@ -1053,11 +1193,14 @@ router.get(
   asyncHandler(async (req, res) => {
     const { caseDoc, isAdmin } = await loadCaseForUser(req, req.params.caseId);
     if (isAdmin) {
-      return res.status(403).json({ msg: "Admins can only access the case archive." });
+      return res.status(403).json({ msg: "Administrators can only access the Matter archive." });
     }
     if (!assertWorkspaceReady(caseDoc, res)) return;
     const files = await CaseFile.find({ caseId: caseDoc._id }).sort({ createdAt: -1 }).lean();
-    res.json({ files: files.map(serializeCaseFile) });
+    const serializer = req.query?.presentation === "matter"
+      ? serializeMatterCaseFile
+      : serializeCaseFile;
+    res.json({ files: files.map(serializer) });
   })
 );
 
@@ -1068,11 +1211,11 @@ router.delete(
   asyncHandler(async (req, res) => {
     const { caseDoc, isAdmin, isAttorney } = await loadCaseForUser(req, req.params.caseId);
     if (isAdmin) {
-      return res.status(403).json({ msg: "Admins can only access the case archive." });
+      return res.status(403).json({ msg: "Administrators can only access the Matter archive." });
     }
     if (!assertWorkspaceReady(caseDoc, res)) return;
     if (!isAdmin && !isAttorney) {
-      return res.status(403).json({ msg: "Only the case attorney can delete documents." });
+      return res.status(403).json({ msg: "Only the Matter attorney can delete documents." });
     }
     if (!isObjId(req.params.fileId)) {
       return res.status(400).json({ msg: "Invalid file id" });
@@ -1086,14 +1229,14 @@ router.delete(
       try {
         await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(plainRecord.storageKey) }));
       } catch (err) {
-        console.warn("[uploads] delete object failed", err?.message || err);
+        runtimeLogger.warn("[uploads] delete object failed", err?.message || err);
       }
     }
     if (BUCKET && plainRecord.previewKey) {
       try {
         await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(plainRecord.previewKey) }));
       } catch (err) {
-        console.warn("[uploads] delete preview object failed", err?.message || err);
+        runtimeLogger.warn("[uploads] delete preview object failed", err?.message || err);
       }
     }
     await CaseFile.deleteOne({ _id: record._id });
@@ -1104,10 +1247,38 @@ router.delete(
         meta: { fileId: record._id, filename: plainRecord.originalName },
       });
     } catch (err) {
-      console.warn("[uploads] file delete audit failed", err?.message || err);
+      runtimeLogger.warn("[uploads] file delete audit failed", err?.message || err);
     }
     publishCaseEvent(caseDoc._id, "documents", { at: new Date().toISOString() });
     res.json({ ok: true });
+  })
+);
+
+router.get(
+  "/case/:caseId/:fileId/security-status",
+  ensureCaseParticipant(),
+  asyncHandler(async (req, res) => {
+    const { caseDoc, isAdmin } = await loadCaseForUser(req, req.params.caseId);
+    if (isAdmin) {
+      return res.status(403).json({ msg: "Administrators can only access the Matter archive." });
+    }
+    if (!assertWorkspaceReady(caseDoc, res)) return;
+    if (!isObjId(req.params.fileId)) {
+      return res.status(400).json({ msg: "Invalid file id" });
+    }
+    const record = await CaseFile.findOne({ _id: req.params.fileId, caseId: caseDoc._id });
+    if (!record) return res.status(404).json({ msg: "File not found" });
+    if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
+    const plainRecord = decryptCaseFilePayload(record);
+    const scan = await refreshCaseFileSecurity(record, plainRecord.storageKey, { enforce: false });
+    res.set("Cache-Control", "no-store");
+    return res.json({
+      fileId: String(record._id),
+      securityStatus: scan.status,
+      securityScanResult: scan.result,
+      ready: scan.safe,
+      checkedAt: new Date().toISOString(),
+    });
   })
 );
 
@@ -1117,7 +1288,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { caseDoc, isAdmin } = await loadCaseForUser(req, req.params.caseId);
     if (isAdmin) {
-      return res.status(403).json({ msg: "Admins can only access the case archive." });
+      return res.status(403).json({ msg: "Administrators can only access the Matter archive." });
     }
     if (!assertWorkspaceReady(caseDoc, res)) return;
     if (!isObjId(req.params.fileId)) {
@@ -1129,6 +1300,12 @@ router.get(
     }
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
     const plainRecord = decryptCaseFilePayload(record);
+    try {
+      await refreshCaseFileSecurity(record, plainRecord.storageKey);
+    } catch (err) {
+      if (err?.statusCode) return res.status(err.statusCode).json({ msg: err.message, code: err.code });
+      throw err;
+    }
     const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(plainRecord.storageKey) });
     const data = await s3.send(getCmd);
     const filename = plainRecord.originalName || `case-file-${record._id}`;
@@ -1138,7 +1315,7 @@ router.get(
     }
     res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
     data.Body.on("error", (err) => {
-      console.error("[uploads] download stream error", err);
+      runtimeLogger.error("[uploads] download stream error", err);
       res.destroy(err);
     });
     data.Body.pipe(res);
@@ -1147,33 +1324,13 @@ router.get(
         targetType: "case",
         targetId: caseDoc._id,
         meta: { fileId: record._id, filename },
-      }).catch(() => {});
+      }).catch(logPromiseFailure(runtimeLogger, "[uploads] file download audit persistence failed", {
+        caseId: caseDoc._id,
+        fileId: record._id,
+      }));
     });
   })
 );
-
-// ----------------------------------------
-// Inline access helpers
-// ----------------------------------------
-async function hasCaseAccess(req, caseId) {
-  return new Promise((resolve) => {
-    // re-use requireCaseAccess but in a promise style
-    const mw = requireCaseAccess("caseId");
-    const mockReq = Object.assign(Object.create(Object.getPrototypeOf(req)), req, {
-      params: { ...(req.params || {}), caseId },
-    });
-    const mockRes = {
-      status: () => ({ json: () => resolve(false) }),
-      json: () => resolve(false),
-    };
-    mw(mockReq, mockRes, () => resolve(true));
-  });
-}
-
-function requireCaseAccessInline(req, res, next, param) {
-  const mw = requireCaseAccess(param);
-  return mw(req, res, next);
-}
 
 function assertWorkspaceReady(caseDoc, res) {
   const hasParalegal = !!(caseDoc?.paralegal || caseDoc?.paralegalId);
@@ -1184,15 +1341,15 @@ function assertWorkspaceReady(caseDoc, res) {
   const escrowFunded =
     !!caseDoc?.escrowIntentId && String(caseDoc?.escrowStatus || "").toLowerCase() === "funded";
   if (!escrowFunded) {
-    res.status(403).json({ msg: "Work begins once payment is secured." });
+    res.status(403).json({ msg: "Work begins once Matter funding is confirmed." });
     return false;
   }
   if (!canUseWorkspace(caseDoc)) {
     const status = normalizeCaseStatus(caseDoc?.status);
     const closedStatuses = ["completed", "closed", "disputed"];
     const msg = closedStatuses.includes(status)
-      ? "Uploads are closed for this case."
-      : "Uploads unlock once the case is funded and in progress.";
+      ? "Uploads are closed for this Matter."
+      : "Uploads unlock once the Matter is funded and in progress.";
     res.status(403).json({ msg });
     return false;
   }
@@ -1201,7 +1358,7 @@ function assertWorkspaceReady(caseDoc, res) {
 
 async function loadCaseForUser(req, caseId) {
   if (!isObjId(caseId)) {
-    const error = new Error("Invalid case id");
+    const error = new Error("Invalid Matter ID");
     error.statusCode = 400;
     throw error;
   }
@@ -1209,7 +1366,7 @@ async function loadCaseForUser(req, caseId) {
     "_id attorney attorneyId paralegal paralegalId title escrowIntentId escrowStatus status paymentReleased readOnly paralegalAccessRevokedAt preEngagement.requestedParalegalId preEngagement.confidentialityDocument.key preEngagement.paralegalConfidentialityDocument.key"
   );
   if (!doc) {
-    const error = new Error("Case not found");
+    const error = new Error("Matter not found");
     error.statusCode = 404;
     throw error;
   }
@@ -1250,6 +1407,9 @@ function serializeCaseFile(doc) {
     previewMime: plain.previewMimeType || null,
     size: plain.size || 0,
     previewSize: plain.previewSize || 0,
+    securityStatus: plain.securityStatus || (malwareScanRequired() ? "pending" : "not_required"),
+    securityScanResult: plain.securityScanResult || (malwareScanRequired() ? "PENDING" : "NOT_REQUIRED"),
+    securityScannedAt: plain.securityScannedAt || null,
     createdAt: plain.createdAt,
     uploadedAt: plain.createdAt,
     uploadedByRole: plain.uploadedByRole || null,
@@ -1259,6 +1419,34 @@ function serializeCaseFile(doc) {
     revisionRequestedAt: plain.revisionRequestedAt || null,
     approvedAt: plain.approvedAt || null,
     replacedAt: plain.replacedAt || null,
+  };
+}
+
+function serializeMatterCaseFile(doc) {
+  const file = serializeCaseFile(doc);
+  return {
+    id: file.id,
+    caseId: file.caseId,
+    originalName: file.originalName,
+    original: file.originalName,
+    filename: file.originalName,
+    mimeType: file.mimeType,
+    mime: file.mimeType,
+    previewMimeType: file.previewMimeType,
+    previewMime: file.previewMimeType,
+    size: file.size,
+    previewSize: file.previewSize,
+    securityStatus: file.securityStatus,
+    securityScanResult: file.securityScanResult,
+    securityScannedAt: file.securityScannedAt,
+    createdAt: file.createdAt,
+    uploadedAt: file.uploadedAt,
+    uploadedByRole: file.uploadedByRole,
+    status: file.status,
+    version: file.version,
+    revisionRequestedAt: file.revisionRequestedAt,
+    approvedAt: file.approvedAt,
+    replacedAt: file.replacedAt,
   };
 }
 

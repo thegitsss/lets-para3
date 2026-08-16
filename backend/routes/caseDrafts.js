@@ -67,7 +67,7 @@ function toResponse(draft) {
   if (!draft) return null;
   return {
     id: draft._id,
-    title: draft.title || "Untitled Case",
+    title: draft.title || "Untitled Matter",
     practiceArea: draft.practiceArea || "",
     state: draft.state || "",
     compAmount: draft.compAmount || "",
@@ -135,7 +135,7 @@ router.put(
     const draft = await CaseDraft.findOneAndUpdate(
       { _id: draftId, owner: req.user.id },
       { $set: { ...payload, updatedAt: new Date() } },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!draft) {
       return res.status(404).json({ error: "Draft not found" });

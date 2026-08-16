@@ -333,6 +333,8 @@ describe("Permissions / ACL", () => {
       attorneyId: attorney._id,
       paralegal: paralegal._id,
       paralegalId: paralegal._id,
+      escrowIntentId: "pi_assigned_file_acl",
+      escrowStatus: "funded",
       totalAmount: 100000,
       currency: "usd",
     });

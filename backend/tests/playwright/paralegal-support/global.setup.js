@@ -1,6 +1,6 @@
-const fs = require("fs");
 const path = require("path");
 const { chromium, request: playwrightRequest } = require("playwright/test");
+const { writeStorageStateOwnerOnly } = require("../auth-state");
 
 const STORAGE_STATE_PATH = path.join(__dirname, "../.auth/support-paralegal.json");
 
@@ -9,7 +9,7 @@ function truthy(value) {
 }
 
 function resolveBaseURL() {
-  return process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:5050";
+  return process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:5052";
 }
 
 function resolveHarnessHeaders() {
@@ -51,10 +51,14 @@ async function loginAsParalegal({ baseURL, email, password }) {
     page.locator("#loginForm button[type='submit']").click(),
   ]);
   await page.waitForLoadState("domcontentloaded");
-  await page.locator(".support-launcher").waitFor({ state: "attached" });
+  await page.locator("body").waitFor({ state: "visible" });
+  const sessionResponse = await page.request.get("/api/users/me");
+  const sessionPayload = await sessionResponse.json().catch(() => ({}));
+  if (!sessionResponse.ok() || String(sessionPayload?.role || "").toLowerCase() !== "paralegal") {
+    throw new Error(`Support paralegal session verification failed (${sessionResponse.status()}).`);
+  }
 
-  fs.mkdirSync(path.dirname(STORAGE_STATE_PATH), { recursive: true });
-  await context.storageState({ path: STORAGE_STATE_PATH });
+  await writeStorageStateOwnerOnly(context, STORAGE_STATE_PATH);
   await browser.close();
 }
 

@@ -7,6 +7,7 @@ process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_stub";
 
 const User = require("../models/User");
 const Case = require("../models/Case");
+const { csrfProtection, respondToCsrfError } = require("../utils/csrf");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 function authCookieFor(user) {
@@ -109,8 +110,8 @@ describe("Security edge cases", () => {
   });
 
   test("Non-admin cannot access admin routes", async () => {
-    // Description: Attorney attempts admin-only case status update.
-    // Input values: role="attorney" for /api/admin/cases/:id/status.
+    // Description: Attorney attempts an admin-only account suspension.
+    // Input values: role="attorney" for /api/admin/disable/:id.
     // Expected result: 403 Forbidden.
 
     const attorney = await User.create({
@@ -123,22 +124,12 @@ describe("Security edge cases", () => {
       state: "CA",
     });
 
-    const caseDoc = await Case.create({
-      title: "Contract review",
-      details: "Admin ACL test case details.",
-      status: "open",
-      attorney: attorney._id,
-      attorneyId: attorney._id,
-      totalAmount: 100000,
-      currency: "usd",
-    });
-
     const app = buildAdminApp(loadAdminRouter());
 
     const res = await request(app)
-      .patch(`/api/admin/cases/${caseDoc._id}/status`)
+      .post(`/api/admin/disable/${attorney._id}`)
       .set("Cookie", authCookieFor(attorney))
-      .send({ status: "assigned" });
+      .send({ reason: "Unauthorized attempt" });
 
     expect(res.status).toBe(403);
     expect(res.body.error).toMatch(/Forbidden/i);
@@ -169,40 +160,32 @@ describe("Security edge cases", () => {
       currency: "usd",
     });
 
-    const csrf = require("csurf");
-    const csrfProtection = csrf({
-      cookie: { httpOnly: true, sameSite: "strict", secure: true },
-    });
+    const previousCsrfSetting = process.env.ENABLE_CSRF;
+    process.env.ENABLE_CSRF = "true";
+    try {
+      const csrfApp = express();
+      csrfApp.use(cookieParser());
+      csrfApp.use(express.json({ limit: "1mb" }));
+      csrfApp.patch("/api/cases/:caseId/archive", csrfProtection, (_req, res) => {
+        res.json({ ok: true });
+      });
+      csrfApp.use((err, _req, res, _next) => {
+        if (respondToCsrfError(err, res)) return;
+        res.status(500).json({ error: "Server error" });
+      });
 
-    const csrfApp = express();
-    csrfApp.set("trust proxy", 1);
-    csrfApp.use(cookieParser());
-    csrfApp.use(express.json({ limit: "1mb" }));
-    csrfApp.get("/api/csrf", csrfProtection, (req, res) => {
-      res.json({ csrfToken: req.csrfToken() });
-    });
-    csrfApp.use(csrfProtection);
-    csrfApp.use("/api/cases", loadCasesRouter());
-    csrfApp.use((err, _req, res, _next) => {
-      if (err?.code === "EBADCSRFTOKEN") {
-        return res.status(403).json({ error: "Invalid CSRF token" });
-      }
-      console.error(err);
-      res.status(500).json({ msg: "Server error", error: err?.message || "Unknown error" });
-    });
+      const res = await request(csrfApp)
+        .patch(`/api/cases/${caseDoc._id}/archive`)
+        .set("Cookie", authCookieFor(attorney))
+        .send({ archived: true });
 
-    const tokenRes = await request(csrfApp)
-      .get("/api/csrf")
-      .set("X-Forwarded-Proto", "https");
-    const csrfCookie = (tokenRes.headers["set-cookie"] || []).find((c) => c.startsWith("_csrf="));
-
-    const res = await request(csrfApp)
-      .patch(`/api/cases/${caseDoc._id}/archive`)
-      .set("X-Forwarded-Proto", "https")
-      .set("Cookie", [authCookieFor(attorney), csrfCookie].filter(Boolean))
-      .send({ archived: true });
-
-    expect(res.status).toBe(403);
-    expect(res.body.error).toMatch(/CSRF/i);
+      expect(res.status).toBe(403);
+      expect(res.body).toEqual({
+        error: "Invalid CSRF token",
+        code: "CSRF_INVALID",
+      });
+    } finally {
+      process.env.ENABLE_CSRF = previousCsrfSetting;
+    }
   });
 });

@@ -27,7 +27,7 @@ describe("CTO execution service", () => {
         "Backend hire route blocked by guard",
       ],
       filesToInspect: [
-        "frontend/assets/scripts/views/case-detail.js",
+        "frontend/assets/scripts/case-detail.js",
         "frontend/assets/scripts/attorney-tabs.js",
         "backend/routes/cases.js",
       ],
@@ -55,7 +55,7 @@ describe("CTO execution service", () => {
         executionPlan: expect.arrayContaining([expect.stringMatching(/Reproduce the reported issue/i)]),
         patchArtifact: expect.objectContaining({
           likelyFiles: expect.arrayContaining([
-            "frontend/assets/scripts/views/case-detail.js",
+            "frontend/assets/scripts/case-detail.js",
             "frontend/assets/scripts/attorney-tabs.js",
             "backend/routes/cases.js",
           ]),

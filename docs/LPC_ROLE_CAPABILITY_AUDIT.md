@@ -1,5 +1,7 @@
 # LPC Role Capability Audit
 
+> Historical snapshot: this July 7, 2026 source review is superseded and must not be used for launch decisions. Current launch authority is `LAUNCH_CHECKLIST.md`, `docs/RELEASE_GATES.md`, and `docs/LAUNCH_CERTIFICATION_CURRENT.md`; the current generated route detail is in `docs/LPC_ROUTE_SECURITY_INVENTORY.md`.
+
 Date: July 7, 2026
 
 Standard: LPC must function like a premium legal-tech marketplace worth a $145,000-$500,000 build, not an MVP.
@@ -12,8 +14,8 @@ Scope: current source-level walkthrough of admin, attorney, paralegal, and unreg
 - Shared frontend auth guard: `frontend/assets/scripts/auth.js`
 - Admin dashboard and admin routes: `frontend/admin-dashboard.html`, `frontend/assets/scripts/admin-dashboard.js`, `backend/routes/admin.js`, `backend/routes/adminSupport.js`, `backend/routes/adminSales.js`, `backend/routes/adminMarketing.js`, `backend/routes/adminKnowledge.js`, `backend/routes/adminApprovals.js`, `backend/routes/adminEngineering.js`, `backend/routes/aiAdmin.js`
 - Attorney dashboard and workflows: `frontend/dashboard-attorney.html`, `frontend/assets/scripts/attorney-tabs.js`, `frontend/create-case.html`, `backend/routes/attorneyDashboard.js`, `backend/routes/cases.js`, `backend/routes/caseDrafts.js`, `backend/routes/jobs.js`, `backend/routes/applications.js`, `backend/routes/payments.js`
-- Paralegal dashboard and workflows: `frontend/dashboard-paralegal.html`, `frontend/assets/scripts/paralegal-dashboard.js`, `frontend/assets/scripts/browse-jobs.js`, `backend/routes/paralegalDashboard.js`, `backend/routes/paralegals.js`, `backend/routes/stripe.js`, `backend/routes/applications.js`, `backend/routes/cases.js`
-- Public visitor surfaces: `frontend/index.html`, `frontend/signup.html`, `frontend/login.html`, `frontend/browse-paralegals.html`, `frontend/assets/scripts/browse-paralegals.js`, `frontend/assets/scripts/profile-paralegal.js`, `backend/routes/public.js`, `backend/routes/auth.js`, `backend/routes/waitlist.js`
+- Paralegal dashboard and workflows: `frontend/dashboard-paralegal.html`, `frontend/assets/scripts/paralegal-dashboard.js`, `frontend/assets/scripts/views/browse-jobs.js`, `backend/routes/paralegalDashboard.js`, `backend/routes/paralegals.js`, `backend/routes/payments.js`, `backend/routes/applications.js`, `backend/routes/cases.js`
+- Public visitor surfaces at the time of this snapshot included the listed pages and auth/public routes. The unused waitlist route described below was removed before launch certification.
 - Route security tracker/inventory: `docs/LPC_PREMIUM_EXECUTION_TRACKER.md`, `docs/LPC_ROUTE_SECURITY_INVENTORY.md`
 
 ## Cross-Role Baseline
@@ -23,7 +25,7 @@ Current protections that exist:
 - Protected API routes are generally behind token verification and approved-account checks.
 - Frontend protected pages call session checks or role-specific session checks.
 - Main dashboards are role-specific: attorney dashboard API requires attorney, paralegal dashboard API requires paralegal, admin routes require admin.
-- Mutating browser-originated routes were inventoried; current route-security tracker shows 220 mutation routes, 206 verified protected, 14 exempt/exemption-review, and no open Critical/P0 or P1 route-security gaps.
+- The current generated route gate inventories 203 mutations: 196 verified CSRF-protected and seven narrowly documented exemptions, with zero open items.
 - CSRF was added to several previously weak mutating routes in the current hardening pass.
 - Public browse now excludes unavailable paralegals server-side.
 
@@ -227,7 +229,6 @@ Current cross-role concerns:
 - Log in.
 - Request password reset.
 - Submit contact form. Evidence: `backend/routes/public.js` contact route uses CSRF.
-- Join waitlist/public lead capture.
 - See signed-in nav adjustments on some public pages if a session exists.
 
 ### What Visitor Cannot Do Now
@@ -248,7 +249,7 @@ Current cross-role concerns:
 
 ### What Visitor Can Do And Should Not Be Able To Do Without More Guardrails
 
-- Public auth and waitlist/contact flows are necessarily public, but they remain exemption-review items for auth-flow hardening and spam/abuse review.
+- Public auth and contact flows require route-specific abuse controls; refer to the current route inventory for their present protection status.
 - Public paralegal browse/profile exposes marketplace supply. That is expected, but field exposure must stay limited and should be reviewed against privacy expectations.
 - Public AI/chat-style routes appear in the route inventory as protected by auth/CSRF, but AI boundaries and public exposure still require a dedicated AI implementation review.
 
@@ -275,7 +276,7 @@ Current cross-role concerns:
 - Attorney conversion flow has not yet been browser-verified end to end with screenshots.
 - Admin operational control is not yet proven at premium launch standard.
 - Mobile/responsive behavior is not yet verified for critical role workflows.
-- Public/auth exemption-review items need auth-flow hardening review.
+- The current route gate has no auth-flow exemption-review items; public auth abuse controls remain part of ongoing operational monitoring.
 
 ### P2
 

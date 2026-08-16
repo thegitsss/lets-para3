@@ -1,8 +1,37 @@
+const { createLogger: createRuntimeLogger } = require("./logger");
+const runtimeLogger = createRuntimeLogger("utils:notifyUser");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
 const sendEmail = require("./email");
 const emailTemplates = require("../email/templates");
 const { publishNotificationEvent } = require("./notificationEvents");
+const { resolveMessageNotificationPolicy } = require("./messageNotificationPolicy");
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function subjectText(value = "", fallback = "LPC Update") {
+  const normalized = String(value || fallback)
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (normalized || fallback).slice(0, 200);
+}
+
+function escapePayload(payload = {}) {
+  return Object.fromEntries(
+    Object.entries(payload || {}).map(([key, value]) => [
+      key,
+      typeof value === "string" ? escapeHtml(value) : value,
+    ])
+  );
+}
 
 function buildDisplayMessage(type, payload = {}) {
   if (payload.message && typeof payload.message === "string") {
@@ -17,7 +46,6 @@ function buildDisplayMessage(type, payload = {}) {
     payload.userName ||
     "";
   const caseTitle = payload.caseTitle || payload.caseName || "";
-  const caseFragment = caseTitle ? ` to ${caseTitle}` : "";
 
   switch (type) {
     case "message": {
@@ -26,17 +54,17 @@ function buildDisplayMessage(type, payload = {}) {
       return snippet ? `${base}: "${snippet}"` : base;
     }
     case "case_invite":
-      return `${actorName || "An attorney"} invited you${caseFragment || " to a case"}`;
+      return `${actorName || "An attorney"} invited you to ${caseTitle || "a Matter"}`;
     case "case_invite_response": {
       const response = String(payload.response || "").toLowerCase();
       if (response === "accepted") {
-        return `${actorName || "The paralegal"} accepted your invitation${caseFragment || ""}. Confirm hire and fund case to get started.`.trim();
+        return `${actorName || "The paralegal"} accepted your invitation${caseTitle ? ` for ${caseTitle}` : ""}. Confirm the hire and fund the Matter to get started.`.trim();
       }
       const verb = response === "declined" ? "declined" : "accepted";
-      return `${actorName || "The paralegal"} ${verb} your invitation${caseFragment || ""}`.trim();
+      return `${actorName || "The paralegal"} ${verb} your invitation${caseTitle ? ` for ${caseTitle}` : ""}`.trim();
     }
     case "case_update":
-      return payload.summary || `${actorName || "Someone"} updated${caseFragment || " your case"}`;
+      return payload.summary || `${actorName || "Someone"} updated ${caseTitle || "your Matter"}`;
     case "resume_uploaded":
       return "Your resume was uploaded successfully.";
     case "profile_approved":
@@ -46,39 +74,39 @@ function buildDisplayMessage(type, payload = {}) {
     case "profile_photo_rejected":
       return "Your profile photo was rejected. Please upload a new one that meets our photo guidelines, including a plain or neutral background.";
     case "payout_released":
-      return "Your payout is on the way to your bank account. Deposit timing typically ranges from 3–5 business days, depending on your bank.";
+      return "Your payout has been released to Stripe. Check your Stripe account for the current status and estimated arrival; timing depends on your payout schedule and financial institution.";
     case "application_submitted": {
       const paralegal = payload.paralegalName || actorName || "A paralegal";
-      return `${paralegal} applied${caseFragment || ""}`.trim();
+      return `${paralegal} applied to ${caseTitle || "a Matter"}`.trim();
     }
     case "application_accepted":
-      return `Your application for ${caseTitle || "the case"} was accepted.`;
+      return `Your application for ${caseTitle || "the Matter"} was accepted.`;
     case "application_denied":
       return caseTitle
         ? `This role has been filled for ${caseTitle}.`
         : "This role has been filled.";
     case "case_awaiting_funding":
-      return `${payload.caseTitle || "A case"} is awaiting funding`;
+      return `${payload.caseTitle || "A Matter"} is awaiting funding`;
     case "case_work_ready":
-      return `${payload.caseTitle || "A case"} is funded. Work can begin.`;
+      return `${payload.caseTitle || "A Matter"} is funded. Work can begin.`;
     case "pre_engagement_requested":
-      return `${payload.caseTitle || "A case"} requires pre-engagement before hiring can continue.`;
+      return `${payload.caseTitle || "A Matter"} requires pre-engagement before hiring can continue.`;
     case "pre_engagement_submitted":
-      return `${payload.caseTitle || "A case"} has a submitted pre-engagement response ready for review.`;
+      return `${payload.caseTitle || "A Matter"} has a submitted pre-engagement response ready for review.`;
     case "pre_engagement_changes_requested":
-      return `${payload.caseTitle || "A case"} needs updates to your pre-engagement response.`;
+      return `${payload.caseTitle || "A Matter"} needs updates to your pre-engagement response.`;
     case "case_file_uploaded": {
       const fileName = payload.fileName || "a document";
-      return `${actorName || "Someone"} uploaded ${fileName}${caseFragment || ""}`.trim();
+      return `${actorName || "Someone"} uploaded ${fileName}${caseTitle ? ` to ${caseTitle}` : ""}`.trim();
     }
     case "case_budget_locked":
-      return `Case amount locked${caseFragment || ""}.`.trim();
+      return `Matter amount locked${caseTitle ? ` for ${caseTitle}` : ""}.`.trim();
     case "case_deleted":
-      return payload.message || "A case posting was removed by admin.";
+      return payload.message || "A Matter posting was removed by admin.";
     case "account_suspended":
       return payload.message || "Your account has been suspended.";
     case "dispute_opened":
-      return `A review was opened for ${caseTitle || "a case"}.`;
+      return `A review was opened for ${caseTitle || "a Matter"}.`;
     case "admin_review_overdue":
       return payload.message || "Our team is still reviewing this request and will follow up soon.";
     default:
@@ -102,38 +130,27 @@ async function resolveActorSnapshot(actorUserId) {
       actorRole: actor.role || "",
     };
   } catch (err) {
-    console.warn("[notifyUser] actor lookup failed", err?.message || err);
+    runtimeLogger.warn("[notifyUser] actor lookup failed", err?.message || err);
     return { actorUserId, actorFirstName: "", actorProfileImage: "", actorRole: "" };
   }
 }
 
-function emailTemplate(type, payload) {
+function emailTemplate(type, payload = {}) {
+  const safePayload = escapePayload(payload);
   switch (type) {
     case "message":
-      return {
-        subject: "New message on LPC",
-        html: `<p>You received a new message from <strong>${payload.fromName || "a user"}</strong>.</p><p>Log in to view and reply.</p>`
-      };
+      return emailTemplates.newMessage(payload);
     case "case_invite":
-      return {
-        subject: "You've been invited to a case",
-        html: `<p>You have a new case invitation: <strong>${payload.caseTitle || "a case"}</strong>.</p>`
-      };
+      return emailTemplates.caseInvite(payload);
     case "case_update":
-      return {
-        subject: "Case update",
-        html: `<p>The case <strong>${payload.caseTitle || "your case"}</strong> has been updated.</p>`
-      };
+      return emailTemplates.caseUpdate(payload);
     case "resume_uploaded":
       return {
         subject: "Resume updated",
         html: "<p>Your resume has been successfully uploaded.</p>"
       };
     case "profile_approved":
-      return {
-        subject: "Profile approved",
-        html: "<p>Your profile has been approved. You can now access new opportunities on LPC.</p>"
-      };
+      return emailTemplates.profileApproved();
     case "profile_photo_approved":
       return (() => {
         const baseUrl =
@@ -187,43 +204,43 @@ function emailTemplate(type, payload) {
       };
     case "case_invite_response":
       return {
-        subject: "Case invitation update",
+        subject: "Matter invitation update",
         html:
           payload.response === "accepted"
-            ? `<p>${payload.paralegalName || "The invited paralegal"} accepted your invitation${
-                payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>.` : "."
-              }</p><p>Confirm hire and fund the case to get started.</p>`
+            ? `<p>${safePayload.paralegalName || "The invited paralegal"} accepted your invitation${
+                safePayload.caseTitle ? ` for <strong>${safePayload.caseTitle}</strong>.` : "."
+              }</p><p>Confirm the hire and fund the Matter to get started.</p>`
             : payload.response === "filled"
-            ? `<p>The position for <strong>${payload.caseTitle || "this case"}</strong> has been filled.</p>`
-            : `<p>${payload.paralegalName || "The invited paralegal"} declined your invitation${
-                payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>.` : "."
+            ? `<p>The position for <strong>${safePayload.caseTitle || "this Matter"}</strong> has been filled.</p>`
+            : `<p>${safePayload.paralegalName || "The invited paralegal"} declined your invitation${
+                safePayload.caseTitle ? ` for <strong>${safePayload.caseTitle}</strong>.` : "."
               }</p>`
       };
     case "application_submitted":
       return {
         subject: "New application received",
-        html: `<p>${payload.paralegalName || "A paralegal"} applied to ${
-          payload.title || "your job"
+        html: `<p>${safePayload.paralegalName || "A paralegal"} applied to ${
+          safePayload.title || "your Matter"
         }.</p><p>Log in to review the application.</p>`,
       };
     case "application_accepted":
       return {
         subject: "Application accepted",
-        html: `<p>Your application${payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>` : ""} was accepted.</p><p>Log in to view details.</p>`,
+        html: `<p>Your application${safePayload.caseTitle ? ` for <strong>${safePayload.caseTitle}</strong>` : ""} was accepted.</p><p>Log in to view details.</p>`,
       };
     case "application_denied":
       return {
         subject: "Application update",
-        html: `<p>${payload.caseTitle ? `This role has been filled for <strong>${payload.caseTitle}</strong>.` : "This role has been filled."}</p><p>Log in to explore other opportunities.</p>`,
+        html: `<p>${safePayload.caseTitle ? `This role has been filled for <strong>${safePayload.caseTitle}</strong>.` : "This role has been filled."}</p><p>Log in to explore other opportunities.</p>`,
       };
     case "case_awaiting_funding":
       return {
-        subject: `Fund ${payload.caseTitle || "your case"}`,
-        html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is ready for payment.</p><p>Please add payment to continue.</p>`,
+        subject: subjectText(`Fund ${payload.caseTitle || "your Matter"}`),
+        html: `<p>The Matter <strong>${safePayload.caseTitle || "Matter"}</strong> is ready for payment.</p><p>Please add payment to continue.</p>`,
       };
     case "payout_released":
       return emailTemplates.payoutReleased({
-        caseTitle: payload.caseTitle || payload.title || "your case",
+        caseTitle: payload.caseTitle || payload.title || "your Matter",
         amount: payload.amount,
         totalDisplay: payload.totalDisplay,
         feeDisplay: payload.feeDisplay,
@@ -232,50 +249,50 @@ function emailTemplate(type, payload) {
       });
     case "case_work_ready":
       return {
-        subject: `Work can begin on ${payload.caseTitle || "your case"}`,
-        html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is ready to begin.</p><p>Log in to get started.</p>`,
+        subject: subjectText(`Work can begin on ${payload.caseTitle || "your Matter"}`),
+        html: `<p>The Matter <strong>${safePayload.caseTitle || "Matter"}</strong> is ready to begin.</p><p>Log in to get started.</p>`,
       };
     case "pre_engagement_requested":
       return {
-        subject: `Pre-engagement requested${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
-        html: `<p>The attorney requested pre-engagement items for <strong>${payload.caseTitle || "this application"}</strong>.</p><p>Log in to review and respond.</p>`,
+        subject: subjectText(`Pre-engagement requested${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`),
+        html: `<p>The attorney requested pre-engagement items for <strong>${safePayload.caseTitle || "this application"}</strong>.</p><p>Log in to review and respond.</p>`,
       };
     case "pre_engagement_submitted":
       return {
-        subject: `Pre-engagement ready for review${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
-        html: `<p>A submitted pre-engagement response is ready for review on <strong>${payload.caseTitle || "this case"}</strong>.</p><p>Log in to review and continue hiring.</p>`,
+        subject: subjectText(`Pre-engagement ready for review${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`),
+        html: `<p>A submitted pre-engagement response is ready for review on <strong>${safePayload.caseTitle || "this Matter"}</strong>.</p><p>Log in to review and continue hiring.</p>`,
       };
     case "pre_engagement_changes_requested":
       return {
-        subject: `Pre-engagement changes requested${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
-        html: `<p>The attorney requested updates to your pre-engagement response for <strong>${payload.caseTitle || "this application"}</strong>.</p><p>Log in to revise and resubmit.</p>`,
+        subject: subjectText(`Pre-engagement changes requested${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`),
+        html: `<p>The attorney requested updates to your pre-engagement response for <strong>${safePayload.caseTitle || "this application"}</strong>.</p><p>Log in to revise and resubmit.</p>`,
       };
     case "case_file_uploaded":
-      return {
-        subject: `New document on ${payload.caseTitle || "your case"}`,
-        html: `<p>${payload.fileName || "A document"} was uploaded${payload.caseTitle ? ` to <strong>${payload.caseTitle}</strong>` : ""}.</p><p>Log in to view the document.</p>`,
-      };
+      return emailTemplates.documentUploaded({
+        documentName: payload.fileName || "A document",
+        caseTitle: payload.caseTitle || "",
+      });
     case "dispute_resolved": {
-      const title = payload.caseTitle || "the case";
-      const resolution = payload.resolutionLabel || payload.resolution || "Resolution";
+      const title = safePayload.caseTitle || "the Matter";
+      const resolution = safePayload.resolutionLabel || safePayload.resolution || "Resolution";
       const receiptNote =
-        payload.receiptNote || "A receipt is available in your dashboard with full payment details.";
+        safePayload.receiptNote || "A receipt is available in your dashboard with full payment details.";
       return {
-        subject: `Review resolved${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
-        html: `<p>${payload.message || `The review for <strong>${title}</strong> was resolved.`}</p><p>Resolution: ${resolution}.</p><p>${receiptNote}</p>`,
+        subject: subjectText(`Review resolved${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`),
+        html: `<p>${safePayload.message || `The review for <strong>${title}</strong> was resolved.`}</p><p>Resolution: ${resolution}.</p><p>${receiptNote}</p>`,
       };
     }
     case "dispute_opened": {
-      const title = payload.caseTitle || "your case";
+      const title = safePayload.caseTitle || "your Matter";
       return {
-        subject: `Review opened${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
-        html: `<p>A review was opened for <strong>${title}</strong>.</p><p>Log in to review the case details.</p>`,
+        subject: subjectText(`Review opened${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`),
+        html: `<p>A review was opened for <strong>${title}</strong>.</p><p>Log in to review the Matter details.</p>`,
       };
     }
     case "admin_review_overdue": {
-      const title = payload.caseTitle || "your case";
+      const title = safePayload.caseTitle || "your Matter";
       return {
-        subject: `Review update${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
+        subject: subjectText(`Review update${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`),
         html: `<p>Our team is still reviewing <strong>${title}</strong>.</p><p>We will follow up as soon as the review is complete. Thank you for your patience.</p>`,
       };
     }
@@ -288,7 +305,7 @@ function emailTemplate(type, payload) {
     case "case_deleted":
       return emailTemplates.caseDeleted({
         recipientName: payload.recipientName || payload.userName || "",
-        caseTitle: payload.caseTitle || "your case",
+        caseTitle: payload.caseTitle || "your Matter",
         reason: payload.reason || "",
         message: payload.customNote || "",
       });
@@ -309,7 +326,7 @@ function shouldWrapNotificationEmail(html = "") {
 }
 
 function wrapNotificationEmail(subject, bodyHtml) {
-  const title = subject || "LPC Notification";
+  const title = escapeHtml(subjectText(subject, "LPC Notification"));
   return `
   <div style="margin:0;padding:24px 12px;background:#f5f6f8;">
     <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e6e8ee;border-radius:14px;overflow:hidden;">
@@ -333,12 +350,13 @@ function wrapNotificationEmail(subject, bodyHtml) {
 async function safeSendEmail(to, subject, html) {
   if (!to || !subject) return;
   try {
+    const safeSubject = subjectText(subject);
     const finalHtml = shouldWrapNotificationEmail(html)
-      ? wrapNotificationEmail(subject, html)
+      ? wrapNotificationEmail(safeSubject, html)
       : html;
-    await sendEmail(to, subject, finalHtml);
+    await sendEmail(to, safeSubject, finalHtml);
   } catch (err) {
-    console.error("[notifyUser] Email failed:", err);
+    runtimeLogger.error("[notifyUser] Email failed:", err);
   }
 }
 
@@ -359,11 +377,7 @@ const CASE_EMAIL_TYPES = new Set([
   "dispute_resolved",
 ]);
 
-const MESSAGE_EMAIL_SUPPRESS_MINUTES = Number(process.env.MESSAGE_EMAIL_SUPPRESS_MINUTES || 120);
-const MESSAGE_EMAIL_SUPPRESS_MS =
-  Number.isFinite(MESSAGE_EMAIL_SUPPRESS_MINUTES) && MESSAGE_EMAIL_SUPPRESS_MINUTES > 0
-    ? MESSAGE_EMAIL_SUPPRESS_MINUTES * 60 * 1000
-    : 120 * 60 * 1000;
+const MESSAGE_EMAIL_SUPPRESS_MS = resolveMessageNotificationPolicy().suppressMs;
 
 function normalizePrefs(user) {
   const prefs = user?.notificationPrefs;

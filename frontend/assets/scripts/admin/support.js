@@ -1,4 +1,7 @@
 import { secureFetch } from "../auth.js";
+import { reportAsyncFailure } from "../utils/promise-errors.js";
+
+const reportFailure = reportAsyncFailure("admin-support");
 
 const FILTERABLE_STATUSES = ["open", "in_review", "waiting_on_user", "resolved", "all"];
 const DEFAULT_STATUS_FILTER = "open";
@@ -64,13 +67,6 @@ function statusLabel(status = "") {
   return titleize(normalized || "open");
 }
 
-function badgeToneForStatus(status = "") {
-  const normalized = String(status || "").trim().toLowerCase();
-  if (normalized === "resolved" || normalized === "closed") return "healthy";
-  if (normalized === "waiting_on_user" || normalized === "waiting_on_info") return "priority";
-  if (normalized === "in_review") return "needs-review";
-  return "active";
-}
 
 function badgeToneForUrgency(urgency = "") {
   const normalized = String(urgency || "").trim().toLowerCase();
@@ -392,7 +388,7 @@ function renderSupportFactsSnapshot(facts = {}) {
   const sections = [
     ["stripeState", "Stripe"],
     ["payoutState", "Payout"],
-    ["caseState", "Case"],
+    ["caseState", "Matter"],
     ["workspaceState", "Workspace"],
     ["messagingState", "Messaging"],
   ];
@@ -567,8 +563,8 @@ function buildReplyAssistDrafts(ticket = {}) {
     ["case_workflow", "messaging", "case_posting"].includes(category)
   ) {
     drafts.push({
-      label: "Ask which case",
-      text: "Thanks — can you tell me which case this is for so I can review the right workspace?",
+      label: "Ask which Matter",
+      text: "Thanks — can you tell me which Matter this is for so I can review the right workspace?",
     });
   } else if (supportFacts.stripeState?.accountId) {
     drafts.push({
@@ -1042,12 +1038,12 @@ function bindTicketList() {
   };
 
   list.addEventListener("click", (event) => {
-    handleSelect(event.target).catch(() => {});
+    handleSelect(event.target).catch(reportFailure);
   });
   list.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    handleSelect(event.target).catch(() => {});
+    handleSelect(event.target).catch(reportFailure);
   });
 }
 
@@ -1087,19 +1083,19 @@ function bindControls() {
   if (refreshBtn && refreshBtn.dataset.bound !== "true") {
     refreshBtn.dataset.bound = "true";
     refreshBtn.addEventListener("click", () => {
-      loadSupportOps(true).catch(() => {});
+      loadSupportOps(true).catch(reportFailure);
     });
   }
   if (faqBtn && faqBtn.dataset.bound !== "true") {
     faqBtn.dataset.bound = "true";
     faqBtn.addEventListener("click", () => {
-      generateFaqCandidates().catch(() => {});
+      generateFaqCandidates().catch(reportFailure);
     });
   }
   if (insightBtn && insightBtn.dataset.bound !== "true") {
     insightBtn.dataset.bound = "true";
     insightBtn.addEventListener("click", () => {
-      refreshSupportInsights().catch(() => {});
+      refreshSupportInsights().catch(reportFailure);
     });
   }
 
@@ -1132,7 +1128,7 @@ function bindSectionVisibility() {
 
   const observer = new MutationObserver(() => {
     if (section.classList.contains("visible")) {
-      loadSupportOps().catch(() => {});
+      loadSupportOps().catch(reportFailure);
     }
   });
   observer.observe(section, {
@@ -1145,7 +1141,7 @@ function bindSectionVisibility() {
     link.dataset.boundSupportOps = "true";
     link.addEventListener("click", () => {
       window.setTimeout(() => {
-        loadSupportOps().catch(() => {});
+        loadSupportOps().catch(reportFailure);
       }, 0);
     });
   });
@@ -1172,5 +1168,5 @@ window.openSupportTicketInAdmin = async (ticketId) => {
 };
 
 if (document.getElementById("section-support-ops")?.classList.contains("visible")) {
-  loadSupportOps().catch(() => {});
+  loadSupportOps().catch(reportFailure);
 }

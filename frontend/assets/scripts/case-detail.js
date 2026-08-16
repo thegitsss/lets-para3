@@ -4,6 +4,27 @@ const caseList = document.getElementById("caseList");
 const caseListStatus = document.getElementById("caseListStatus");
 const caseTitle = document.getElementById("caseTitle");
 const caseStatusLine = document.getElementById("caseStatusLine");
+const caseContextLine = document.getElementById("caseContextLine");
+const caseAttentionLine = document.getElementById("caseAttentionLine");
+const caseNextAction = document.getElementById("caseNextAction");
+const matterTabs = [...document.querySelectorAll("[data-matter-tab]")];
+const matterPanels = [...document.querySelectorAll("[data-matter-panel]")];
+const matterTabLive = document.getElementById("matterTabLive");
+const matterMessagesSkipLink = document.getElementById("matterMessagesSkipLink");
+const matterApplicationList = document.getElementById("matterApplicationList");
+const matterApplicationsState = document.getElementById("matterApplicationsState");
+const matterApplicationsAction = document.getElementById("matterApplicationsAction");
+const matterActivityList = document.getElementById("matterActivityList");
+const matterActivityState = document.getElementById("matterActivityState");
+const matterFinancialStatus = document.getElementById("matterFinancialStatus");
+const matterFinancialList = document.getElementById("matterFinancialList");
+const matterFinancialNote = document.getElementById("matterFinancialNote");
+const matterReceiptAction = document.getElementById("matterReceiptAction");
+const matterFilesStatus = document.getElementById("matterFilesStatus");
+const matterAddFilesButton = document.getElementById("matterAddFilesButton");
+const caseJurisdiction = document.getElementById("caseJurisdiction");
+const caseDeadlineSummary = document.getElementById("caseDeadlineSummary");
+const caseTaskProgress = document.getElementById("caseTaskProgress");
 const caseParticipants = document.getElementById("caseParticipants");
 const messageList = document.getElementById("caseMessageList");
 const messageScroll = document.querySelector(".message-scroll");
@@ -50,28 +71,41 @@ const backButton = document.querySelector("[data-back-button]");
 const profileToggle = document.querySelector("[data-profile-toggle]");
 const profileMenu = document.querySelector("[data-profile-menu]");
 const accountSettingsBtn = document.querySelector("[data-account-settings]");
-const logoutTrigger = document.querySelector("[data-logout]");
 const caseNavToggles = document.querySelectorAll("[data-case-nav-toggle]");
 const caseNavDropdowns = document.querySelectorAll("[data-case-nav-dropdown]");
 const caseNavLists = document.querySelectorAll("[data-case-nav-list]");
 const caseNavStatuses = document.querySelectorAll("[data-case-nav-status]");
 
-const ATTACHMENT_DB = "lpc_case_attachments";
-const ATTACHMENT_STORE = "attachments";
 const MESSAGE_POLL_INTERVAL = 3000;
 const WORKSPACE_PRESENCE_HEARTBEAT_MS = 20000;
+const ADMIN_REVIEW_STATUS_MESSAGE =
+  "Workspace paused — admin review requested. Check this Matter for status updates.";
 const CASE_STATES = {
   DRAFT: "draft",
   OPEN: "open",
   APPLIED: "applied",
   FUNDED_IN_PROGRESS: "funded_in_progress",
 };
+const MATTER_TAB_IDS = Object.freeze([
+  "overview",
+  "applications",
+  "work",
+  "files",
+  "messages",
+  "activity",
+  "financials",
+]);
 const FUNDED_WORKSPACE_STATUSES = new Set([
   "in progress",
   "in_progress",
 ]);
-let attachmentDbPromise = null;
 let dragDepth = 0;
+
+// Attachment selections are intentionally tab-memory only. Retire the former
+// persistent draft store so legal-work files do not remain on a shared device.
+try {
+  window.indexedDB?.deleteDatabase?.("lpc_case_attachments");
+} catch (_) {}
 
 const state = {
   cases: [],
@@ -91,6 +125,7 @@ const state = {
   pendingRealtime: { messages: false, documents: false, tasks: false },
   caseEventSource: null,
   caseStreamActive: false,
+  caseStreamReconnectTimer: null,
   messagePollTimer: null,
   messagePolling: false,
   threadResetAt: null,
@@ -98,6 +133,7 @@ const state = {
   completing: false,
   disputing: false,
   workspaceEnabled: false,
+  workspaceReadable: false,
   activeCase: null,
   forceScrollToBottom: false,
   completionOverlayActive: false,
@@ -111,10 +147,17 @@ const state = {
   relisting: false,
   workspacePresenceCaseId: "",
   workspacePresenceTimer: null,
+  workspacePresenceLastWarningAt: 0,
+  activeMatterTab: "overview",
+  availableMatterTabs: new Set(["overview"]),
+  loadedMatterSections: new Set(),
+  matterSectionSequence: 0,
+  caseLoadSequence: 0,
+  productivitySummary: {},
 };
 
 let taskUpdateInFlight = false;
-let releaseFundsAnimationTimer = null;
+let releasePaymentAnimationTimer = null;
 let taskLockWatcherBound = false;
 
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
@@ -135,26 +178,79 @@ function escapeHTML(value = "") {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-const weekdayFormatter = new Intl.DateTimeFormat(undefined, {
-  weekday: "long",
-});
 const sharedDocumentsTwoColumnMedia = window.matchMedia("(max-width: 1200px) and (min-width: 901px)");
 
-const PAYMENT_METHOD_UPDATE_MESSAGE = "Payment method needs to be updated before funds can be released.";
+const PAYMENT_METHOD_UPDATE_MESSAGE = "Payment method needs to be updated before the payment can be released.";
 const POPUP_ANIMATION_MS = 180;
+const popupFocusState = new WeakMap();
+
+function getPopupFocusableElements(overlay) {
+  if (!overlay) return [];
+  return Array.from(
+    overlay.querySelectorAll(
+      'button:not([disabled]), a[href]:not([aria-disabled="true"]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((node) => !node.hidden && node.getAttribute("aria-hidden") !== "true");
+}
+
+function bindPopupEscape(overlay, onEscape) {
+  if (!overlay || typeof onEscape !== "function") return;
+  const handler = (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    onEscape();
+  };
+  document.addEventListener("keydown", handler);
+  overlay.__lpcEscapeCleanup = () => document.removeEventListener("keydown", handler);
+}
 
 function mountPopupOverlay(overlay) {
   if (!overlay) return;
+  const priorFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const trapFocus = (event) => {
+    if (event.key !== "Tab") return;
+    const focusable = getPopupFocusableElements(overlay);
+    if (!focusable.length) {
+      event.preventDefault();
+      overlay.querySelector('[role="dialog"]')?.focus();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+  popupFocusState.set(overlay, { priorFocus, trapFocus });
+  document.addEventListener("keydown", trapFocus);
   requestAnimationFrame(() => {
-    if (overlay.isConnected) overlay.classList.add("is-visible");
+    if (!overlay.isConnected) return;
+    overlay.classList.add("is-visible");
+    const dialog = overlay.querySelector('[role="dialog"]');
+    if (dialog && !dialog.hasAttribute("tabindex")) dialog.tabIndex = -1;
+    const preferred = overlay.querySelector("[data-popup-initial]") || getPopupFocusableElements(overlay)[0] || dialog;
+    preferred?.focus({ preventScroll: true });
   });
 }
 
 function dismissPopupOverlay(overlay) {
   if (!overlay || !overlay.isConnected) return;
+  overlay.__lpcEscapeCleanup?.();
+  delete overlay.__lpcEscapeCleanup;
+  const focusState = popupFocusState.get(overlay);
+  if (focusState?.trapFocus) document.removeEventListener("keydown", focusState.trapFocus);
+  popupFocusState.delete(overlay);
   overlay.classList.remove("is-visible");
   window.setTimeout(() => {
     if (overlay.isConnected) overlay.remove();
+    if (focusState?.priorFocus?.isConnected) {
+      focusState.priorFocus.focus({ preventScroll: true });
+    }
   }, POPUP_ANIMATION_MS);
 }
 
@@ -166,8 +262,8 @@ async function sendWorkspacePresenceHeartbeat(caseId) {
       body: { caseId },
       noRedirect: true,
     });
-  } catch {
-    /* noop */
+  } catch (error) {
+    reportWorkspacePresenceFailure("heartbeat", error);
   }
 }
 
@@ -179,9 +275,16 @@ async function clearWorkspacePresence(caseId) {
       body: { caseId },
       noRedirect: true,
     });
-  } catch {
-    /* noop */
+  } catch (error) {
+    reportWorkspacePresenceFailure("clear", error);
   }
+}
+
+function reportWorkspacePresenceFailure(operation, error) {
+  const now = Date.now();
+  if (now - Number(state.workspacePresenceLastWarningAt || 0) < 60_000) return;
+  state.workspacePresenceLastWarningAt = now;
+  console.warn(`[matter-workspace] presence ${operation} failed`, error);
 }
 
 function stopWorkspacePresence(options = {}) {
@@ -238,6 +341,10 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return dateFormatter.format(date);
+}
+
+function formatMatterDeadline(value) {
+  return window.LPCBusinessDate?.format(value) || formatDate(value);
 }
 
 function formatDateTime(value) {
@@ -322,62 +429,6 @@ function syncSharedDocumentsHeightLimit() {
   caseSharedDocuments.style.setProperty("--case-documents-visible-height", `${Math.ceil(height)}px`);
 }
 
-function openAttachmentDB() {
-  if (attachmentDbPromise) return attachmentDbPromise;
-  if (!("indexedDB" in window)) {
-    attachmentDbPromise = Promise.resolve(null);
-    return attachmentDbPromise;
-  }
-  attachmentDbPromise = new Promise((resolve) => {
-    const request = indexedDB.open(ATTACHMENT_DB, 1);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(ATTACHMENT_STORE)) {
-        const store = db.createObjectStore(ATTACHMENT_STORE, { keyPath: "id" });
-        store.createIndex("caseId", "caseId", { unique: false });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => resolve(null);
-  });
-  return attachmentDbPromise;
-}
-
-async function saveAttachmentRecord(record) {
-  const db = await openAttachmentDB();
-  if (!db) return;
-  await new Promise((resolve, reject) => {
-    const tx = db.transaction(ATTACHMENT_STORE, "readwrite");
-    tx.objectStore(ATTACHMENT_STORE).put(record);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-async function removeAttachmentRecord(id) {
-  const db = await openAttachmentDB();
-  if (!db) return;
-  await new Promise((resolve, reject) => {
-    const tx = db.transaction(ATTACHMENT_STORE, "readwrite");
-    tx.objectStore(ATTACHMENT_STORE).delete(id);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-async function listAttachmentRecords(caseId) {
-  const db = await openAttachmentDB();
-  if (!db) return [];
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(ATTACHMENT_STORE, "readonly");
-    const store = tx.objectStore(ATTACHMENT_STORE);
-    const index = store.index("caseId");
-    const request = index.getAll(caseId);
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-  });
-}
-
 function getCaseId(item) {
   if (!item) return "";
   return String(item?.id || item?._id || item?.caseId || "");
@@ -451,6 +502,42 @@ function normalizeDocuments(payload) {
   if (Array.isArray(payload?.documents)) return payload.documents;
   if (Array.isArray(payload?.items)) return payload.items;
   return [];
+}
+
+function getFileSecurityPresentation(documentData = {}) {
+  const status = String(documentData.securityStatus || "not_required").toLowerCase();
+  if (status === "clean" || status === "not_required") {
+    return { status, ready: true, label: "Security checked", detail: "Available to open and download." };
+  }
+  if (status === "blocked") {
+    return { status, ready: false, label: "Blocked", detail: "This file did not pass security scanning." };
+  }
+  if (status === "error") {
+    return { status, ready: false, label: "Scan needs attention", detail: "Security scanning could not complete. Try again later." };
+  }
+  return { status: "pending", ready: false, label: "Security scan in progress", detail: "Refresh this section for the current scan status." };
+}
+
+function applyFileSecurityUpdate(caseId, fileId, update = {}) {
+  const documents = state.caseDocumentsById.get(String(caseId || "")) || [];
+  const file = documents.find((item) => String(item?.id || item?._id || "") === String(fileId || ""));
+  if (!file) return null;
+  Object.assign(file, update);
+  return file;
+}
+
+async function refreshFileSecurityStatus(caseId, fileId) {
+  const data = await fetchJSON(
+    `/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(fileId)}/security-status`,
+    { cache: "no-store", noRedirect: true }
+  );
+  const file = applyFileSecurityUpdate(caseId, fileId, {
+    securityStatus: data?.securityStatus,
+    securityScanResult: data?.securityScanResult,
+    securityCheckedAt: data?.checkedAt,
+  });
+  if (file) refreshThreadFromCache(caseId);
+  return data;
 }
 
 function getDocumentCaseId(documentData) {
@@ -539,7 +626,7 @@ function normalizeCaseStatus(value) {
 
 function isEscrowFunded(caseData) {
   const escrowStatus = String(caseData?.escrowStatus || "").toLowerCase();
-  return !!caseData?.escrowIntentId && escrowStatus === "funded";
+  return escrowStatus === "funded";
 }
 
 function hasAssignedParalegal(caseData) {
@@ -777,98 +864,6 @@ function ensureCompleteModalStyles() {
   document.head.appendChild(style);
 }
 
-function ensureParalegalCompletionOverlayStyles() {
-  if (document.getElementById("paralegal-completion-overlay-styles")) return;
-  const style = document.createElement("style");
-  style.id = "paralegal-completion-overlay-styles";
-  style.textContent = `
-    .case-completion-overlay{
-      position:fixed;
-      inset:0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      z-index:2400;
-      padding:24px;
-      opacity:0;
-      transition:opacity .2s ease;
-    }
-    .case-completion-overlay::before{
-      content:"";
-      position:absolute;
-      inset:0;
-      background:rgba(10, 15, 25, 0.6);
-    }
-    .case-completion-modal{
-      width:min(420px,92vw);
-      background:#ffffff;
-      border-radius:18px;
-      overflow:hidden;
-      box-shadow:0 24px 60px rgba(15,23,42,.35);
-      text-align:center;
-      position:relative;
-      z-index:1;
-      opacity:0;
-      transform:translateY(6px);
-      transition:opacity .2s ease, transform .2s ease;
-    }
-    .case-completion-overlay.is-visible{
-      opacity:1;
-    }
-    .case-completion-overlay.is-visible .case-completion-modal{
-      opacity:1;
-      transform:translateY(0) scale(1);
-    }
-    .case-completion-hero{
-      height:150px;
-      background-image:url("hero-mountain.jpg");
-      background-size:cover;
-      background-position:center;
-    }
-    .case-completion-content{
-      padding:22px 26px 26px;
-    }
-    .case-completion-title{
-      margin:0 0 8px;
-      font-family:var(--font-serif);
-      font-size:1.6rem;
-      color:#102c50;
-      font-weight:500;
-    }
-    .case-completion-body{
-      margin:0 0 18px;
-      color:var(--app-muted);
-      font-size:.98rem;
-      line-height:1.5;
-    }
-    .case-completion-actions{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      justify-content:center;
-    }
-    .case-completion-btn{
-      border:1px solid transparent;
-      background:var(--app-accent);
-      color:#ffffff;
-      padding:10px 20px;
-      border-radius:999px;
-      font-weight:300;
-      cursor:pointer;
-      transition:transform .2s ease, box-shadow .2s ease, background .2s ease;
-      box-shadow:0 12px 24px rgba(182, 164, 122, 0.35);
-    }
-    .case-completion-btn:hover{
-      transform:translateY(-1px);
-    }
-    .case-completion-timer{
-      margin:12px 0 0;
-      color:var(--app-muted);
-      font-size:.85rem;
-    }
-  `;
-  document.head.appendChild(style);
-}
 
 function ensureDocumentPreviewStyles() {
   if (document.getElementById("document-preview-styles")) return;
@@ -941,7 +936,6 @@ function openDocumentPreview({
   if (viewUrl) {
     openBtn.href = viewUrl;
   } else {
-    openBtn.href = "#";
     openBtn.setAttribute("aria-disabled", "true");
   }
   actions.appendChild(openBtn);
@@ -981,11 +975,11 @@ function openCompleteConfirmModal() {
     overlay.className = "case-complete-overlay";
     overlay.innerHTML = `
       <div class="case-complete-modal" role="dialog" aria-modal="true" aria-labelledby="caseCompleteTitle">
-        <div class="case-complete-title" id="caseCompleteTitle">Complete &amp; Release Funds</div>
-        <p>Confirming will release case funds to the paralegal, lock messaging and file uploads, and archive the case. You can view the case and its contents in your Archive.</p>
+        <div class="case-complete-title" id="caseCompleteTitle">Complete &amp; Release Payment</div>
+        <p>Confirming will release the Matter payment, lock messaging and file uploads, and archive the Matter. You can continue to view its contents in your Archive.</p>
         <div class="case-complete-actions">
-          <button class="case-action-btn secondary" type="button" data-complete-cancel>Cancel</button>
-          <button class="case-action-btn" type="button" data-complete-confirm>Complete &amp; Release Funds</button>
+          <button class="case-action-btn secondary" type="button" data-complete-cancel data-popup-initial>Cancel</button>
+          <button class="case-action-btn" type="button" data-complete-confirm>Complete &amp; Release Payment</button>
         </div>
       </div>
     `;
@@ -998,13 +992,7 @@ function openCompleteConfirmModal() {
     });
     overlay.querySelector("[data-complete-cancel]")?.addEventListener("click", () => close(false));
     overlay.querySelector("[data-complete-confirm]")?.addEventListener("click", () => close(true));
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key === "Escape") close(false);
-      },
-      { once: true }
-    );
+    bindPopupEscape(overlay, () => close(false));
     document.body.appendChild(overlay);
     mountPopupOverlay(overlay);
   });
@@ -1060,7 +1048,7 @@ function openDisputeConfirmModal({ showAmount = false } = {}) {
           <textarea data-dispute-message placeholder="Provide details (optional)"></textarea>
         </label>
         <div class="case-dispute-actions">
-          <button class="case-action-btn secondary" type="button" data-dispute-cancel>Cancel</button>
+          <button class="case-action-btn secondary" type="button" data-dispute-cancel data-popup-initial>Cancel</button>
           <button class="case-action-btn" type="button" data-dispute-confirm>Flag dispute</button>
         </div>
         <p class="case-dispute-footer">Confirming will pause this workspace for both parties until the dispute is reviewed and resolved.</p>
@@ -1081,13 +1069,7 @@ function openDisputeConfirmModal({ showAmount = false } = {}) {
     });
     overlay.querySelector("[data-dispute-cancel]")?.addEventListener("click", () => close(false));
     overlay.querySelector("[data-dispute-confirm]")?.addEventListener("click", () => close(true));
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key === "Escape") close(false);
-      },
-      { once: true }
-    );
+    bindPopupEscape(overlay, () => close(false));
     document.body.appendChild(overlay);
     mountPopupOverlay(overlay);
   });
@@ -1115,22 +1097,22 @@ function ensureWithdrawalModalStyles() {
   document.head.appendChild(style);
 }
 
-function openWithdrawalConfirmModal({ completedCount = 0, totalTasks = 0 } = {}) {
+function openWithdrawalConfirmModal({ completedCount = 0 } = {}) {
   return new Promise((resolve) => {
     ensureWithdrawalModalStyles();
     const overlay = document.createElement("div");
     overlay.className = "case-withdraw-overlay";
     const bodyCopy =
       completedCount === 0
-        ? "Withdrawing will pause the case. No payout will be issued because no tasks were completed."
-        : "Withdrawing will close this case for you. The attorney will then decide whether to issue a partial payout based on completed work.";
+        ? "Withdrawing will pause the Matter. No payout will be issued because no tasks were completed."
+        : "Withdrawing will close this Matter for you. The attorney will then decide whether to issue a partial payout based on completed work.";
     overlay.innerHTML = `
       <div class="case-withdraw-modal" role="dialog" aria-modal="true" aria-labelledby="caseWithdrawTitle">
-        <div class="case-withdraw-title" id="caseWithdrawTitle">Withdraw from Case</div>
+        <div class="case-withdraw-title" id="caseWithdrawTitle">Withdraw from Matter</div>
         <p>${bodyCopy}</p>
         <div class="case-withdraw-actions">
-          <button class="case-action-btn secondary" type="button" data-withdraw-cancel>Cancel</button>
-          <button class="case-action-btn" type="button" data-withdraw-confirm>Withdraw from Case</button>
+          <button class="case-action-btn secondary" type="button" data-withdraw-cancel data-popup-initial>Cancel</button>
+          <button class="case-action-btn" type="button" data-withdraw-confirm>Withdraw from Matter</button>
         </div>
         <div class="case-withdraw-footnote">Payout decisions are at the sole discretion of the attorney.</div>
       </div>
@@ -1144,13 +1126,7 @@ function openWithdrawalConfirmModal({ completedCount = 0, totalTasks = 0 } = {})
     });
     overlay.querySelector("[data-withdraw-cancel]")?.addEventListener("click", () => close(false));
     overlay.querySelector("[data-withdraw-confirm]")?.addEventListener("click", () => close(true));
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key === "Escape") close(false);
-      },
-      { once: true }
-    );
+    bindPopupEscape(overlay, () => close(false));
     document.body.appendChild(overlay);
     mountPopupOverlay(overlay);
   });
@@ -1241,236 +1217,6 @@ function ensureWithdrawalNoticeModalStyles() {
   document.head.appendChild(style);
 }
 
-function showWithdrawalNoticeModal({ title = "Case Paused", message = "", caseData = null } = {}) {
-  const existingOverlay = document.getElementById("withdrawalNoticeOverlay");
-  const existingModal = document.getElementById("withdrawalNoticeModal");
-  if (existingOverlay || existingModal) {
-    existingOverlay?.remove();
-    existingModal?.remove();
-  }
-  ensureWithdrawalNoticeModalStyles();
-  const overlay = document.createElement("div");
-  overlay.id = "withdrawalNoticeOverlay";
-  overlay.className = "tour-overlay";
-  const modal = document.createElement("div");
-  modal.id = "withdrawalNoticeModal";
-  modal.className = "tour-modal";
-  modal.setAttribute("role", "dialog");
-  modal.setAttribute("aria-modal", "true");
-  let step = 1;
-  let selection = "";
-  let submitting = false;
-  const caseId = caseData?.id || caseData?._id || state.activeCaseId || "";
-  const currency = String(caseData?.currency || "USD").toUpperCase();
-  const baseAmountCents = Number(caseData?.lockedTotalAmount ?? caseData?.totalAmount ?? 0);
-  const remainingCents = Number.isFinite(resolveRemainingAmount(caseData))
-    ? resolveRemainingAmount(caseData)
-    : baseAmountCents;
-  const capCentsRaw =
-    Number.isFinite(baseAmountCents) && baseAmountCents > 0 ? Math.round(baseAmountCents * 0.7) : 0;
-  const maxCents = Math.max(
-    0,
-    Math.min(Number.isFinite(remainingCents) ? remainingCents : baseAmountCents, capCentsRaw || 0)
-  );
-
-  const renderStepOne = () => {
-    modal.innerHTML = `
-      <button type="button" class="tour-close" aria-label="Close withdrawal notice">×</button>
-      <div class="tour-hero" role="presentation"></div>
-      <div class="tour-content">
-        <div class="tour-title">${escapeHTML(title)}</div>
-        <p class="tour-text">${escapeHTML(message || "The case has been paused.")}</p>
-        <div class="tour-actions">
-          <button type="button" class="tour-btn primary" data-withdrawal-next>Next</button>
-        </div>
-      </div>
-    `;
-  };
-
-  const renderStepTwo = () => {
-    const maxLabel = formatCurrency(maxCents / 100, currency);
-    const capCopy = maxCents > 0
-      ? `Max available: ${maxLabel} (70% cap of the total case amount).`
-      : "Max available: 70% cap of the total case amount.";
-    modal.innerHTML = `
-      <button type="button" class="tour-close" aria-label="Close withdrawal notice">×</button>
-      <div class="tour-hero" role="presentation"></div>
-      <div class="tour-content">
-        <div class="tour-title">Choose Next Step</div>
-        <p class="tour-text">Please choose how you'd like to proceed.</p>
-        <div class="withdrawal-decision">
-          <div class="decision-card" data-decision="partial">
-            <div class="decision-title">Release a partial payout</div>
-            <div class="decision-input" data-decision-input>
-              <div class="decision-input-field">
-                <span class="decision-prefix" aria-hidden="true">$</span>
-                <input type="text" inputmode="decimal" placeholder="0.00" data-payout-input />
-              </div>
-              <div class="decision-caption">${escapeHTML(capCopy)}</div>
-              <div class="decision-note">
-                <span class="decision-note-icon" aria-hidden="true">?</span>
-                <span>All payments are in USD.</span>
-              </div>
-              <div class="decision-error" data-decision-error></div>
-            </div>
-          </div>
-          <div class="decision-card decision-deny" data-decision="deny">
-            <div class="decision-title">Close without release</div>
-            <div class="decision-text">We'll start a 24-hour window for the paralegal to dispute. If no dispute is filed, the case will relist automatically.</div>
-          </div>
-        </div>
-        <div class="tour-actions">
-          <button type="button" class="tour-btn primary" data-withdrawal-submit disabled>Submit</button>
-        </div>
-      </div>
-    `;
-  };
-
-  const close = () => {
-    overlay.classList.remove("is-active");
-    modal.classList.remove("is-active");
-    overlay.remove();
-    modal.remove();
-  };
-
-  const submitPartial = async (amountCents, statusNode) => {
-    if (submitting) return;
-    submitting = true;
-    if (statusNode) showMsg(statusNode, "Finalizing partial payout...");
-    try {
-      await fetchCSRF().catch(() => "");
-      await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/partial-payout`, {
-        method: "POST",
-        body: { amountCents },
-        noRedirect: true,
-      });
-      if (statusNode) showMsg(statusNode, "Partial payout finalized. Case relisted.");
-      await loadCase(caseId);
-      close();
-      const payoutLabel = formatCurrency(amountCents / 100, currency);
-      showCaseActionAcknowledgement({
-        title: "Partial Payout Submitted",
-        message: `A partial payout of ${payoutLabel} was submitted. The case will be relisted automatically.`,
-      });
-    } catch (err) {
-      if (statusNode) showMsg(statusNode, err.message || "Unable to finalize partial payout.");
-    } finally {
-      submitting = false;
-    }
-  };
-
-  const submitReject = async (statusNode) => {
-    if (submitting) return;
-    submitting = true;
-    if (statusNode) showMsg(statusNode, "Closing without release...");
-    try {
-      await fetchCSRF().catch(() => "");
-      await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/reject-payout`, {
-        method: "POST",
-        noRedirect: true,
-      });
-      if (statusNode) {
-        showMsg(
-          statusNode,
-          "Closing without release starts a 24-hour window for the paralegal to dispute. If no dispute is filed, the case will relist automatically."
-        );
-      }
-      await loadCase(caseId);
-      close();
-    } catch (err) {
-      if (statusNode) showMsg(statusNode, err.message || "Unable to close without release.");
-    } finally {
-      submitting = false;
-    }
-  };
-
-  const bindStepOne = () => {
-    modal.querySelector(".tour-close")?.addEventListener("click", close);
-    modal.querySelector("[data-withdrawal-next]")?.addEventListener("click", () => {
-      step = 2;
-      renderStepTwo();
-      bindStepTwo();
-    });
-  };
-
-  const bindStepTwo = () => {
-    const cards = Array.from(modal.querySelectorAll("[data-decision]"));
-    const submitBtn = modal.querySelector("[data-withdrawal-submit]");
-    const input = modal.querySelector("[data-payout-input]");
-    const inputWrap = modal.querySelector("[data-decision-input]");
-    const errorEl = modal.querySelector("[data-decision-error]");
-
-    const updateSubmitState = () => {
-      let valid = false;
-      if (selection === "partial") {
-        const amountCents = parseCurrencyInput(input?.value || "");
-        if (Number.isFinite(amountCents) && amountCents > 0 && amountCents <= maxCents) {
-          valid = true;
-          if (errorEl) errorEl.textContent = "";
-        } else if (errorEl) {
-          errorEl.textContent =
-            !Number.isFinite(amountCents) || amountCents <= 0
-              ? "Enter a valid amount."
-              : "Amount exceeds the 70% cap.";
-        }
-      } else if (selection === "deny") {
-        valid = true;
-        if (errorEl) errorEl.textContent = "";
-      }
-      if (submitBtn) submitBtn.disabled = !valid || submitting;
-    };
-
-    const setSelection = (next) => {
-      selection = next;
-      cards.forEach((card) => {
-        card.classList.toggle("selected", card.dataset.decision === selection);
-      });
-      if (inputWrap) {
-        inputWrap.classList.toggle("is-active", selection === "partial");
-      }
-      updateSubmitState();
-    };
-
-    cards.forEach((card) => {
-      card.addEventListener("click", () => setSelection(card.dataset.decision || ""));
-    });
-    input?.addEventListener("input", () => {
-      const cleaned = sanitizeCurrencyInput(input.value);
-      if (cleaned !== input.value) {
-        input.value = cleaned;
-      }
-      updateSubmitState();
-    });
-    modal.querySelector(".tour-close")?.addEventListener("click", close);
-    submitBtn?.addEventListener("click", async () => {
-      if (!selection || submitting) return;
-      const statusNode = resolveCaseActionStatusNode();
-      if (selection === "partial") {
-        const amountCents = parseCurrencyInput(input?.value || "");
-        if (!Number.isFinite(amountCents) || amountCents <= 0 || amountCents > maxCents) {
-          updateSubmitState();
-          return;
-        }
-        await submitPartial(amountCents, statusNode);
-        return;
-      }
-      await submitReject(statusNode);
-    });
-    updateSubmitState();
-  };
-
-  renderStepOne();
-  document.body.appendChild(overlay);
-  document.body.appendChild(modal);
-
-  overlay.addEventListener("click", close);
-  bindStepOne();
-
-  requestAnimationFrame(() => {
-    overlay.classList.add("is-active");
-    modal.classList.add("is-active");
-  });
-}
 
 function showCaseActionAcknowledgement({ title = "Update saved", message = "" } = {}) {
   ensureWithdrawalNoticeModalStyles();
@@ -1491,27 +1237,44 @@ function showCaseActionAcknowledgement({ title = "Update saved", message = "" } 
       </div>
     </div>
   `;
+  const priorFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const handleKeydown = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = getPopupFocusableElements(modal);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
   const close = () => {
+    document.removeEventListener("keydown", handleKeydown);
     overlay.classList.remove("is-active");
     modal.classList.remove("is-active");
     overlay.remove();
     modal.remove();
+    if (priorFocus?.isConnected) priorFocus.focus({ preventScroll: true });
   };
   overlay.addEventListener("click", close);
   modal.querySelector(".tour-close")?.addEventListener("click", close);
   modal.querySelector("[data-ack-close]")?.addEventListener("click", close);
-  document.addEventListener(
-    "keydown",
-    (event) => {
-      if (event.key === "Escape") close();
-    },
-    { once: true }
-  );
+  document.addEventListener("keydown", handleKeydown);
   document.body.appendChild(overlay);
   document.body.appendChild(modal);
   requestAnimationFrame(() => {
     overlay.classList.add("is-active");
     modal.classList.add("is-active");
+    modal.querySelector("[data-ack-close]")?.focus({ preventScroll: true });
   });
 }
 
@@ -1702,7 +1465,7 @@ function openPartialPayoutModal({ maxCents = 0, currency = "USD", paralegalName 
         <div class="case-payout-divider" role="presentation"></div>
         <div class="case-payout-body" data-payout-body>
           <p class="case-payout-copy">
-            Enter the amount to release to the withdrawn paralegal. This will finalize the case closure on your side.
+            Enter the amount to release to the withdrawn paralegal. This will finalize the Matter closure on your side.
           </p>
           <div class="line-item-card">
             <div class="line-item-details">
@@ -1714,9 +1477,9 @@ function openPartialPayoutModal({ maxCents = 0, currency = "USD", paralegalName 
             <div class="line-item-amount">
               <span class="money-input">
                 <span class="prefix" aria-hidden="true">$</span>
-                <input type="text" inputmode="decimal" class="amount" placeholder="${maxPlaceholder}" data-payout-input />
+                <input type="text" inputmode="decimal" class="amount" placeholder="${maxPlaceholder}" aria-label="Partial release amount" aria-describedby="casePayoutHint casePayoutError" data-payout-input />
               </span>
-              <div class="case-payout-hint">${escapeHTML(capCopy)}</div>
+              <div class="case-payout-hint" id="casePayoutHint">${escapeHTML(capCopy)}</div>
             </div>
           </div>
           <div class="case-payout-divider" role="presentation"></div>
@@ -1725,7 +1488,7 @@ function openPartialPayoutModal({ maxCents = 0, currency = "USD", paralegalName 
             <span class="summary-value" data-payout-summary>—</span>
           </div>
         </div>
-        <div class="case-payout-error" data-payout-error></div>
+        <div class="case-payout-error" id="casePayoutError" role="alert" data-payout-error></div>
         <div class="case-payout-footer" data-payout-footer>
           <div class="case-payout-actions" data-payout-actions>
             <button class="case-action-btn secondary" type="button" data-payout-cancel>Cancel</button>
@@ -1743,8 +1506,6 @@ function openPartialPayoutModal({ maxCents = 0, currency = "USD", paralegalName 
     const titleEl = overlay.querySelector("[data-payout-title]");
     const bodyEl = overlay.querySelector("[data-payout-body]");
     const footerEl = overlay.querySelector("[data-payout-footer]");
-    const actionsEl = overlay.querySelector("[data-payout-actions]");
-    const defaultTitle = titleEl?.textContent || "Enter Partial Release";
     const swapContent = (nextBodyHtml, nextFooterHtml, onDone) => {
       const duration = 180;
       if (bodyEl) bodyEl.classList.add("is-fading");
@@ -1850,7 +1611,7 @@ function openPartialPayoutModal({ maxCents = 0, currency = "USD", paralegalName 
       isProcessing = false;
       if (modal) modal.classList.remove("is-processing");
       const safeName = escapeHTML(paralegalName || "the paralegal");
-      const safeRelist = escapeHTML(relistCopy || "The case has been automatically relisted.");
+      const safeRelist = escapeHTML(relistCopy || "The Matter has been automatically relisted.");
       const receiptLink = receiptUrl
         ? `<a class="case-action-btn secondary" href="${receiptUrl}" target="_blank" rel="noopener">View / Download Receipt</a>`
         : "";
@@ -1905,13 +1666,9 @@ function openPartialPayoutModal({ maxCents = 0, currency = "USD", paralegalName 
         closeModal: () => close({ completed: true }),
       });
     });
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key === "Escape" && !isProcessing) close({ cancelled: true, reason: "escape" });
-      },
-      { once: true }
-    );
+    bindPopupEscape(overlay, () => {
+      if (!isProcessing) close({ cancelled: true, reason: "escape" });
+    });
     if (input) {
       input.addEventListener("input", () => {
         const cleaned = sanitizeCurrencyInput(input.value);
@@ -1957,7 +1714,7 @@ function ensureRejectPayoutModalStyles() {
 }
 
 const CLOSE_WITHOUT_RELEASE_COPY =
-  "This will initiate a 24-hour pause. Because the paralegal submitted deliverables, they may request payment during this period. After 24 hours, the case will automatically relist.";
+  "This will initiate a 24-hour pause. Because the paralegal submitted deliverables, they may request payment during this period. After 24 hours, the Matter will automatically relist.";
 
 function openRejectPayoutConfirmModal() {
   return new Promise((resolve) => {
@@ -1968,7 +1725,7 @@ function openRejectPayoutConfirmModal() {
       <div class="case-reject-modal" role="dialog" aria-modal="true" aria-labelledby="caseRejectTitle">
         <div class="case-reject-title" id="caseRejectTitle">${CLOSE_WITHOUT_RELEASE_COPY}</div>
         <div class="case-reject-actions">
-          <button class="case-action-btn secondary" type="button" data-reject-cancel>Cancel</button>
+          <button class="case-action-btn secondary" type="button" data-reject-cancel data-popup-initial>Cancel</button>
           <button class="case-action-btn" type="button" data-reject-confirm>Confirm</button>
         </div>
       </div>
@@ -1982,13 +1739,7 @@ function openRejectPayoutConfirmModal() {
     });
     overlay.querySelector("[data-reject-cancel]")?.addEventListener("click", () => close(false));
     overlay.querySelector("[data-reject-confirm]")?.addEventListener("click", () => close(true));
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key === "Escape") close(false);
-      },
-      { once: true }
-    );
+    bindPopupEscape(overlay, () => close(false));
     document.body.appendChild(overlay);
     mountPopupOverlay(overlay);
   });
@@ -2163,7 +1914,7 @@ function openParalegalFlagMenu(caseData) {
     const options = [];
     if (canWithdraw) {
       options.push(
-        `<button type="button" class="case-action-btn" data-flag-action="withdraw">Withdraw from Case</button>`
+        `<button type="button" class="case-action-btn" data-flag-action="withdraw">Withdraw from Matter</button>`
       );
     }
     if (canDispute) {
@@ -2176,11 +1927,11 @@ function openParalegalFlagMenu(caseData) {
       : "";
     overlay.innerHTML = `
       <div class="case-flag-modal" role="dialog" aria-modal="true" aria-labelledby="caseFlagTitle">
-        <div class="case-flag-title" id="caseFlagTitle">Case Actions</div>
+        <div class="case-flag-title" id="caseFlagTitle">Matter Actions</div>
         ${emptyCopy}
         <div class="case-flag-actions">
           ${options.join("")}
-          <button type="button" class="case-action-btn secondary" data-flag-action="cancel">Cancel</button>
+          <button type="button" class="case-action-btn secondary" data-flag-action="cancel" data-popup-initial>Cancel</button>
         </div>
       </div>
     `;
@@ -2197,13 +1948,7 @@ function openParalegalFlagMenu(caseData) {
       const action = btn.dataset.flagAction || "cancel";
       close(action);
     });
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key === "Escape") close("cancel");
-      },
-      { once: true }
-    );
+    bindPopupEscape(overlay, () => close("cancel"));
     document.body.appendChild(overlay);
     mountPopupOverlay(overlay);
   });
@@ -2227,7 +1972,6 @@ function getAttorneyWithdrawalActionState(caseData) {
   }
   const completedCount = countCompletedTasks(caseData);
   const totalTasks = getCaseTasks(caseData).length;
-  const holdActive = isDisputeWindowActive(caseData);
   const payoutFinalized = !!caseData?.payoutFinalizedAt;
   const adminReviewHold = !!caseData?.disputeDeadlineAt && !payoutFinalized;
   const partialCents = Number(caseData?.partialPayoutAmount || 0);
@@ -2247,7 +1991,7 @@ function getAttorneyWithdrawalActionState(caseData) {
   let disableRelist = false;
 
   if (statusKey === "disputed" || caseData?.pausedReason === "dispute") {
-    bannerText = "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours.";
+    bannerText = ADMIN_REVIEW_STATUS_MESSAGE;
     disablePartial = true;
     disableReject = true;
     disableRelist = true;
@@ -2255,19 +1999,19 @@ function getAttorneyWithdrawalActionState(caseData) {
     const payoutLabel = formatCurrency(partialCents / 100, currency);
     bannerText = `Withdrawal finalized. Payout: ${payoutLabel}. Remaining balance: ${remainingLabel}.`;
     statusText = caseData?.relistRequestedAt
-      ? "Case relisted and ready for hiring."
-      : "Relist the case to invite new applicants.";
+      ? "Matter relisted and ready for hiring."
+      : "Relist the Matter to invite new applicants.";
   } else if (adminReviewHold) {
     bannerText =
-      "Closing without release starts a 24-hour window for the paralegal to dispute. If no dispute is filed, the case will relist automatically.";
+      "Closing without release starts a 24-hour window for the paralegal to dispute. If no dispute is filed, the Matter will relist automatically.";
     disablePartial = true;
     disableReject = true;
   } else if (completedCount === 0) {
     bannerText = "Paralegal withdrew before any tasks were completed. No payout will be issued.";
-    statusText = "Case relisted and ready for hiring.";
+    statusText = "Matter relisted and ready for hiring.";
   } else if (completedCount > 0 && completedCount < totalTasks) {
     bannerText =
-      "Paralegal withdrew. Please choose a partial payout or close without release. Case will automatically relist once decision is finalized.";
+      "Paralegal withdrew. Please choose a partial payout or close without release. The Matter will automatically relist once the decision is finalized.";
     showPartial = true;
     showReject = true;
   } else {
@@ -2317,7 +2061,7 @@ function openAttorneyFlagMenu(caseData, actionState) {
       options.push(
         `<button type="button" class="case-action-btn secondary" data-flag-action="relist" ${
           state.disableRelist ? "disabled" : ""
-        }>Relist Case</button>`
+        }>Relist Matter</button>`
       );
     }
     if (canDispute) {
@@ -2330,7 +2074,7 @@ function openAttorneyFlagMenu(caseData, actionState) {
     const emptyCopy = !options.length
       ? `<p class="case-flag-muted">No actions are available right now.</p>`
       : "";
-    const title = state.eligible ? "Paralegal Withdrawal" : "Case Actions";
+    const title = state.eligible ? "Paralegal Withdrawal" : "Matter Actions";
     overlay.innerHTML = `
       <div class="case-flag-modal" role="dialog" aria-modal="true" aria-labelledby="caseFlagTitle">
         <div class="case-flag-title" id="caseFlagTitle">${title}</div>
@@ -2338,7 +2082,7 @@ function openAttorneyFlagMenu(caseData, actionState) {
         ${emptyCopy}
         <div class="case-flag-actions">
           ${options.join("")}
-          <button type="button" class="case-action-btn secondary" data-flag-action="cancel">Cancel</button>
+          <button type="button" class="case-action-btn secondary" data-flag-action="cancel" data-popup-initial>Cancel</button>
         </div>
       </div>
     `;
@@ -2355,13 +2099,7 @@ function openAttorneyFlagMenu(caseData, actionState) {
       const action = btn.dataset.flagAction || "cancel";
       close(action);
     });
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key === "Escape") close("cancel");
-      },
-      { once: true }
-    );
+    bindPopupEscape(overlay, () => close("cancel"));
     document.body.appendChild(overlay);
     mountPopupOverlay(overlay);
   });
@@ -2482,48 +2220,38 @@ function isSelectableCase(caseData) {
 
 function workspaceLockCopy(caseState, caseData) {
   if (caseState === CASE_STATES.DRAFT) {
-    return "Draft cases stay in the planning view.";
+    return "Draft Matters stay in the planning view.";
   }
   if (caseState === CASE_STATES.APPLIED) {
-    return "Workspace unlocks once your application is accepted and the case is funded.";
+    return "Workspace unlocks once your application is accepted and the Matter is funded.";
   }
   if (caseState === CASE_STATES.OPEN) {
-    return "Workspace unlocks once the case is funded and in progress.";
+    return "Workspace unlocks once the Matter is funded and in progress.";
   }
   const normalized = normalizeCaseStatus(caseData?.status);
   if (["completed", "closed"].includes(normalized)) {
     if (caseData?.paymentReleased) {
-      return "Payment released. Workspace is closed for this case.";
+      return "Payment released. This Matter workspace is closed.";
     }
-    return "Workspace is closed for this case.";
+    return "This Matter workspace is closed.";
   }
   if (normalized === "disputed") {
-    return "Case is locked. Workspace is paused until an admin resolves it.";
+    return "This Matter is locked. The workspace is paused until an admin resolves it.";
   }
   if (normalized === "paused") {
     if (caseData?.pausedReason === "paralegal_withdrew") {
-      return "Case is paused after a withdrawal. Workspace will reopen once the next paralegal is hired.";
+      return "This Matter is paused after a withdrawal. The workspace will reopen once the next paralegal is hired.";
     }
-    return "Case is paused. Workspace is currently locked.";
+    return "This Matter is paused. The workspace is currently locked.";
   }
-  return "Workspace unlocks once the case is funded and in progress.";
+  return "Workspace unlocks once the Matter is funded and in progress.";
 }
 
 function isWithdrawalPause(caseData) {
   return normalizeCaseStatus(caseData?.status) === "paused" && caseData?.pausedReason === "paralegal_withdrew";
 }
 
-function shouldRedirectFromWorkspace(caseState) {
-  return (
-    caseState === CASE_STATES.DRAFT ||
-    caseState === CASE_STATES.OPEN ||
-    caseState === CASE_STATES.APPLIED
-  );
-}
 
-function redirectFromWorkspace() {
-  handleBackNavigation();
-}
 
 function isCompletedCase(caseData) {
   const status = normalizeCaseStatus(caseData?.status);
@@ -2558,9 +2286,6 @@ function clearCompletionOverlay() {
   state.completionOverlayCaseId = "";
 }
 
-function getParalegalDashboardRedirect(caseData) {
-  return getWorkspaceRedirect(caseData) || "dashboard-paralegal.html";
-}
 
 function getParalegalCompletionRedirect(caseData) {
   const caseId = caseData?.id || caseData?.caseId || caseData?._id || "";
@@ -2570,11 +2295,11 @@ function getParalegalCompletionRedirect(caseData) {
 
 function setParalegalCompletionToast(caseData) {
   try {
-    const title = "Case Completed";
+    const title = "Matter Completed";
     const caseTitle = String(caseData?.title || caseData?.jobTitle || "").trim();
     const message = caseTitle
-      ? `“${caseTitle}” has been marked complete and moved to Completed Cases.`
-      : "Your case has been marked complete and moved to Completed Cases.";
+      ? `“${caseTitle}” has been marked complete and moved to Completed Matters.`
+      : "Your Matter has been marked complete and moved to Completed Matters.";
     sessionStorage.setItem(
       "lpc-case-completed-toast",
       JSON.stringify({ title, message })
@@ -2683,15 +2408,15 @@ function renderWorkspaceLocked(message) {
 }
 
 async function loadCases() {
-  showMsg(caseListStatus, "Loading cases...");
-  setCaseNavStatus("Loading cases...");
+  showMsg(caseListStatus, "Loading Matters...");
+  setCaseNavStatus("Loading Matters...");
   const data = await fetchWithFallback(["/api/cases/my?limit=200", "/api/cases/my", "/api/cases"]);
   const allCases = normalizeCaseList(data);
   state.caseOptions = allCases.filter((item) => isSelectableCase(item));
   state.cases = state.caseOptions;
   if (!state.caseOptions.length) {
     showMsg(caseListStatus, "");
-    setCaseNavStatus("No active cases.");
+    setCaseNavStatus("No active Matters.");
   } else {
     showMsg(caseListStatus, "");
     setCaseNavStatus("");
@@ -2727,14 +2452,14 @@ function renderCaseList() {
 
   if (!filtered.length) {
     const empty = document.createElement("li");
-    empty.textContent = search ? "No matching cases." : "";
+    empty.textContent = search ? "No matching Matters." : "";
     caseList.appendChild(empty);
     return;
   }
 
   filtered.forEach((item) => {
     const caseId = String(getCaseId(item));
-    const title = item?.title || "Case";
+    const title = item?.title || "Matter";
     const status = formatCaseStatus(item?.status, item);
     const preview = item?.briefSummary || item?.details || "";
 
@@ -2778,10 +2503,10 @@ function renderCaseList() {
   });
 }
 
-function setActiveCase(caseId) {
+function setActiveCase(caseId, { historyMode = "replace", tab = "" } = {}) {
   const previousCaseId = String(state.activeCaseId || "");
   state.activeCaseId = caseId;
-  syncActiveCaseUrl(caseId);
+  syncActiveCaseUrl(caseId, { historyMode, tab });
   if (previousCaseId && previousCaseId !== String(caseId || "")) {
     stopWorkspacePresence({ caseId: previousCaseId });
   }
@@ -2793,31 +2518,41 @@ function setActiveCase(caseId) {
   updateCaseSelectSelection();
 }
 
-function syncActiveCaseUrl(caseId) {
-  if (typeof window === "undefined" || !window.history?.replaceState) return;
+function syncActiveCaseUrl(caseId, { historyMode = "replace", tab = "" } = {}) {
+  if (typeof window === "undefined" || historyMode === "none" || !window.history?.[`${historyMode}State`]) return;
   try {
     const url = new URL(window.location.href);
+    const previousCaseId = String(url.searchParams.get("caseId") || "");
+    if (previousCaseId && previousCaseId !== String(caseId || "")) {
+      ["applicantId", "fileId", "messageId", "panel", "profileId"].forEach((key) => {
+        url.searchParams.delete(key);
+      });
+    }
     if (caseId) {
       url.searchParams.set("caseId", String(caseId));
     } else {
       url.searchParams.delete("caseId");
     }
-    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    const requestedTab = MATTER_TAB_IDS.includes(tab) ? tab : getRequestedMatterTab();
+    url.searchParams.set("tab", requestedTab);
+    url.hash = "";
+    window.history[`${historyMode}State`]({ caseId, tab: requestedTab }, "", `${url.pathname}${url.search}`);
   } catch (_) {}
 }
 
 function renderParticipants(data) {
   if (!caseParticipants) return;
   emptyNode(caseParticipants);
+  const overview = data?.matterExperience?.overview || null;
   const attorney = data?.attorney || null;
   const paralegal = data?.paralegal || null;
   const participants = [];
 
-  if (attorney) {
-    participants.push({ label: "Attorney", value: formatPerson(attorney), id: normalizeUserId(attorney) });
+  if (overview?.attorney) {
+    participants.push({ label: "Attorney", value: String(overview.attorney), id: normalizeUserId(attorney) });
   }
-  if (paralegal) {
-    participants.push({ label: "Paralegal", value: formatPerson(paralegal), id: normalizeUserId(paralegal) });
+  if (overview?.paralegal) {
+    participants.push({ label: "Paralegal", value: String(overview.paralegal), id: normalizeUserId(paralegal) });
   }
 
   if (!participants.length) {
@@ -3117,28 +2852,45 @@ async function syncThemeFromSession() {
     if (theme && typeof window.applyThemePreference === "function") {
       window.applyThemePreference(theme);
     }
-  } catch (_) {
-    /* noop */
+  } catch (error) {
+    console.warn("[matter-workspace] theme hydration failed", error);
   }
 }
 
+function applyResolvedRoleVisibility(roleValue) {
+  if (typeof applyRoleVisibility !== "function") return false;
+  const role = String(roleValue || "").toLowerCase();
+  if (!role) return false;
+  applyRoleVisibility(role);
+  document.querySelectorAll(".sidebar nav[data-visible]").forEach((nav) => {
+    nav.hidden = nav.getAttribute("data-visible") !== role;
+  });
+  document.body.classList.toggle("role-attorney", role === "attorney");
+  document.body.classList.toggle("role-paralegal", role === "paralegal");
+  if (role === "attorney") normalizeAttorneyCaseTheme();
+  return true;
+}
+
 function syncRoleVisibility() {
-  if (typeof applyRoleVisibility !== "function") return;
   try {
     const storedUser = localStorage.getItem("lpc_user");
     const user = storedUser ? JSON.parse(storedUser) : null;
     const role = String(user?.role || "").toLowerCase();
-    if (role) {
-      applyRoleVisibility(role);
-      document.body.classList.toggle("role-attorney", role === "attorney");
-      return;
-    }
+    if (applyResolvedRoleVisibility(role)) return true;
   } catch (_) {}
   const cachedUser = window.getStoredUser?.();
   const cachedRole = String(cachedUser?.role || "").toLowerCase();
-  if (cachedRole) {
-    applyRoleVisibility(cachedRole);
-    document.body.classList.toggle("role-attorney", cachedRole === "attorney");
+  return applyResolvedRoleVisibility(cachedRole);
+}
+
+async function hydrateRoleVisibility() {
+  if (syncRoleVisibility() || typeof window.checkSession !== "function") return;
+  try {
+    const session = await window.checkSession(undefined, { redirectOnFail: false });
+    applyResolvedRoleVisibility(session?.role || session?.user?.role);
+  } catch (error) {
+    console.warn("[matter-workspace] role navigation hydration failed", error);
+    /* Authentication handling owns any redirect; keep role navigation hidden meanwhile. */
   }
 }
 
@@ -3228,12 +2980,7 @@ function formatUploaderName(documentData, caseData = state.activeCase) {
 }
 
 function uploadAttachment(entry, caseId, note) {
-  const endpoints = [
-    `/api/uploads/case/${encodeURIComponent(caseId)}`,
-    `/api/uploads/${encodeURIComponent(caseId)}`,
-    "/api/uploads",
-    `/api/uploads?caseId=${encodeURIComponent(caseId)}`,
-  ];
+  const endpoint = `/api/uploads/case/${encodeURIComponent(caseId)}?presentation=matter`;
   const token = window.__CSRF__ || "";
 
   const sendWithEndpoint = (url) =>
@@ -3266,8 +3013,8 @@ function uploadAttachment(entry, caseId, note) {
           entry.xhr = null;
           entry.error = "";
           renderPendingAttachment();
-          removeAttachmentRecord(entry.id).catch(() => {});
           if (uploadedFile) addOptimisticDocument(uploadedFile, caseId);
+          flashMessageStatus("Upload complete. Security scanning is in progress.", 3500);
           resolve(uploadedFile);
           return;
         }
@@ -3299,16 +3046,7 @@ function uploadAttachment(entry, caseId, note) {
       xhr.send(formData);
     });
 
-  const attempt = async (index) => {
-    if (index >= endpoints.length) {
-      entry.status = "failed";
-      entry.error = "Upload failed. Please retry.";
-      renderPendingAttachment();
-      throw new Error("Upload failed");
-    }
-    try {
-      return await sendWithEndpoint(endpoints[index]);
-    } catch (err) {
+  return sendWithEndpoint(endpoint).catch((err) => {
       if (err.code === "canceled") {
         entry.status = "canceled";
         entry.progress = 0;
@@ -3316,20 +3054,14 @@ function uploadAttachment(entry, caseId, note) {
         renderPendingAttachment();
         throw err;
       }
-      if (err.status === 404 || err.status === 405) {
-        return attempt(index + 1);
-      }
       entry.status = "failed";
       entry.error = err?.message || "Upload failed. Please retry.";
       renderPendingAttachment();
       throw err;
-    }
-  };
-
-  return attempt(0);
+    });
 }
 
-function formatFileSize(bytes) {
+function formatContextFileSize(bytes) {
   const size = Number(bytes);
   if (!Number.isFinite(size) || size <= 0) return "";
   const units = ["B", "KB", "MB", "GB"];
@@ -3488,7 +3220,7 @@ function isSameFile(left, right) {
 
 function addPendingAttachments(files) {
   if (!state.workspaceEnabled) {
-    showMsg(messageStatus, "Uploads unlock once the case is funded and in progress.");
+    showMsg(messageStatus, "Uploads unlock once the Matter is funded and in progress.");
     return;
   }
   const list = Array.from(files || []).filter(Boolean);
@@ -3498,7 +3230,6 @@ function addPendingAttachments(files) {
     if (!exists) {
       const entry = buildAttachmentEntry(file);
       state.pendingAttachments.push(entry);
-      persistAttachment(entry);
     }
   });
   renderPendingAttachment();
@@ -3506,7 +3237,6 @@ function addPendingAttachments(files) {
 
 function removePendingAttachment(id) {
   state.pendingAttachments = state.pendingAttachments.filter((entry) => entry.id !== id);
-  removeAttachmentRecord(id).catch(() => {});
   renderPendingAttachment();
 }
 
@@ -3520,36 +3250,6 @@ function cancelUpload(entry) {
     entry.error = "Upload canceled.";
     renderPendingAttachment();
   }
-}
-
-function persistAttachment(entry) {
-  const caseId = state.activeCaseId;
-  if (!caseId || !entry?.file) return;
-  const record = {
-    id: entry.id,
-    caseId,
-    name: entry.file.name,
-    type: entry.file.type,
-    size: entry.file.size,
-    lastModified: entry.file.lastModified,
-    blob: entry.file,
-  };
-  saveAttachmentRecord(record).catch(() => {});
-}
-
-async function restorePendingAttachments(caseId) {
-  if (!caseId) return;
-  if (state.pendingAttachments.length) return;
-  const records = await listAttachmentRecords(caseId).catch(() => []);
-  if (!records.length) return;
-  state.pendingAttachments = records.map((record) => {
-    const file = new File([record.blob], record.name, {
-      type: record.type || "",
-      lastModified: record.lastModified || Date.now(),
-    });
-    return buildAttachmentEntry(file, record.id);
-  });
-  renderPendingAttachment();
 }
 
 function isFileDrag(event) {
@@ -3580,7 +3280,7 @@ function handleDragOver(event) {
   showDropzone();
 }
 
-function handleDragLeave(event) {
+function handleDragLeave() {
   if (!dropzoneOverlay?.classList.contains("active")) return;
   dragDepth = Math.max(0, dragDepth - 1);
   if (dragDepth === 0) hideDropzone();
@@ -3723,29 +3423,29 @@ function showCompleteLockMessage() {
   caseCompleteStatus.dataset.lockReason = "tasks";
 }
 
-function stopReleaseFundsAnimation() {
-  if (releaseFundsAnimationTimer) {
-    clearInterval(releaseFundsAnimationTimer);
-    releaseFundsAnimationTimer = null;
+function stopReleasePaymentAnimation() {
+  if (releasePaymentAnimationTimer) {
+    clearInterval(releasePaymentAnimationTimer);
+    releasePaymentAnimationTimer = null;
   }
 }
 
-function startReleaseFundsAnimation() {
-  stopReleaseFundsAnimation();
+function startReleasePaymentAnimation() {
+  stopReleasePaymentAnimation();
   const frames = [".", "..", "..."];
   let frame = 0;
   if (caseCompleteStatus) {
     caseCompleteStatus.textContent = "Please do not refresh the page";
   }
   const render = () => {
-    const label = `Releasing funds${frames[frame % frames.length]}`;
+    const label = `Releasing payment${frames[frame % frames.length]}`;
     if (caseCompleteButton && !caseCompleteButton.hidden) {
       caseCompleteButton.textContent = label;
     }
     frame += 1;
   };
   render();
-  releaseFundsAnimationTimer = setInterval(render, 450);
+  releasePaymentAnimationTimer = setInterval(render, 450);
 }
 
 function clearCompleteLockMessage() {
@@ -3966,8 +3666,546 @@ function buildCaseSummaryText(data) {
   return String(data?.briefSummary || "").replace(/\s+/g, " ").trim();
 }
 
+function safeMatterActionHref(value) {
+  const raw = String(value || "").trim();
+  if (!raw || raw.startsWith("//") || raw.includes("\\")) return "";
+  if (raw === "#case-messages") return raw;
+  try {
+    const url = new URL(raw, window.location.origin);
+    if (url.origin !== window.location.origin) return "";
+    const allowedPaths = new Set([
+      "/case-detail.html",
+      "/browse-jobs.html",
+      "/dashboard-attorney.html",
+      "/dashboard-paralegal.html",
+    ]);
+    if (!allowedPaths.has(url.pathname)) return "";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "";
+  }
+}
+
+function getRequestedMatterTab() {
+  try {
+    const url = new URL(window.location.href);
+    const requested = String(url.searchParams.get("tab") || "").toLowerCase();
+    if (MATTER_TAB_IDS.includes(requested)) return requested;
+    if (url.hash === "#case-messages") return "messages";
+    if (url.hash === "#caseFilesSection") return "files";
+  } catch (_) {}
+  return "overview";
+}
+
+function buildMatterTabUrl(tab, caseId = state.activeCaseId) {
+  const safeTab = MATTER_TAB_IDS.includes(tab) ? tab : "overview";
+  const url = new URL(window.location.href);
+  if (caseId) url.searchParams.set("caseId", String(caseId));
+  else url.searchParams.delete("caseId");
+  url.searchParams.set("tab", safeTab);
+  if (safeTab !== "applications") url.searchParams.delete("applicantId");
+  if (safeTab !== "files") url.searchParams.delete("fileId");
+  if (safeTab !== "messages") url.searchParams.delete("messageId");
+  const panelKind = String(url.searchParams.get("panel") || "");
+  const keepsObjectPanel =
+    (panelKind === "application" && safeTab === "applications" && url.searchParams.has("applicantId")) ||
+    (panelKind === "file" && safeTab === "files" && url.searchParams.has("fileId"));
+  const keepsProfilePanel = panelKind === "profile" && url.searchParams.has("profileId");
+  if (!keepsObjectPanel && !keepsProfilePanel) {
+    url.searchParams.delete("panel");
+  }
+  if (!keepsProfilePanel) url.searchParams.delete("profileId");
+  url.hash = "";
+  return `${url.pathname}${url.search}`;
+}
+
+function configureMatterTabs(experience) {
+  const allowed = new Set(
+    (Array.isArray(experience?.sections) ? experience.sections : [])
+      .map((section) => String(section?.id || "").toLowerCase())
+      .filter((id) => MATTER_TAB_IDS.includes(id))
+  );
+  allowed.add("overview");
+  state.availableMatterTabs = allowed;
+  if (matterMessagesSkipLink) matterMessagesSkipLink.hidden = !allowed.has("messages");
+  matterTabs.forEach((tab) => {
+    const id = String(tab.dataset.matterTab || "");
+    const visible = allowed.has(id);
+    tab.hidden = !visible;
+    tab.disabled = !visible;
+    tab.setAttribute("aria-hidden", visible ? "false" : "true");
+  });
+  matterPanels.forEach((panel) => {
+    const id = String(panel.dataset.matterPanel || "");
+    if (!allowed.has(id)) panel.hidden = true;
+  });
+}
+
+function normalizeAvailableMatterTab(tab) {
+  const requested = String(tab || "").toLowerCase();
+  return state.availableMatterTabs.has(requested) ? requested : "overview";
+}
+
+function ensureActiveMatterTabVisible() {
+  const selectedTabButton = matterTabs.find((button) => button.getAttribute("aria-selected") === "true");
+  const tabList = selectedTabButton?.closest('[role="tablist"]');
+  if (!selectedTabButton || !tabList || tabList.scrollWidth <= tabList.clientWidth) return;
+  window.requestAnimationFrame(() => {
+    selectedTabButton.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
+  });
+}
+
+function activateMatterTab(tab, {
+  historyMode = "push",
+  focus = false,
+  announce = true,
+  load = true,
+} = {}) {
+  const next = normalizeAvailableMatterTab(tab);
+  state.activeMatterTab = next;
+  syncProductivityContext();
+  matterTabs.forEach((button) => {
+    const selected = button.dataset.matterTab === next;
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+    button.tabIndex = selected ? 0 : -1;
+    if (selected && focus) button.focus();
+  });
+  ensureActiveMatterTabVisible();
+  matterPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.matterPanel !== next;
+  });
+  if (historyMode !== "none" && window.history?.[`${historyMode}State`]) {
+    window.history[`${historyMode}State`]({ caseId: state.activeCaseId, tab: next }, "", buildMatterTabUrl(next));
+  }
+  if (announce && matterTabLive) {
+    const label = matterTabs.find((button) => button.dataset.matterTab === next)?.textContent?.trim() || next;
+    matterTabLive.textContent = `${label} section selected.`;
+  }
+  if (load) {
+    void ensureMatterSectionData(next).then(() => {
+      syncRequestedContextPanel();
+      revealRequestedMessage({ reportMissing: true });
+    });
+  }
+  return next;
+}
+
+function syncProductivityContext() {
+  const caseId = String(state.activeCaseId || "");
+  if (!/^[a-f0-9]{24}$/i.test(caseId)) {
+    window.LPCProductivityContext = {};
+    return;
+  }
+  window.LPCProductivityContext = Object.freeze({
+    objectType: "matter",
+    objectId: caseId,
+    caseId,
+    currentTab: state.activeMatterTab,
+    availableMatterTabs: [...state.availableMatterTabs],
+    status: String(state.productivitySummary.status || ""),
+    relationship: String(state.productivitySummary.relationship || ""),
+    attention: String(state.productivitySummary.attention || ""),
+    nextAction: String(state.productivitySummary.nextAction || ""),
+  });
+  window.dispatchEvent(new CustomEvent("lpc:productivity-context", { detail: window.LPCProductivityContext }));
+}
+
+function safeMatterExperienceHref(value) {
+  const raw = String(value || "").trim();
+  if (!raw || raw.startsWith("//") || raw.includes("\\")) return "";
+  try {
+    const url = new URL(raw, window.location.origin);
+    if (url.origin !== window.location.origin) return "";
+    const allowed = new Set([
+      "/dashboard-attorney.html",
+      "/dashboard-paralegal.html",
+      "/api/payments/receipt/attorney/" + encodeURIComponent(state.activeCaseId),
+      "/api/payments/receipt/paralegal/" + encodeURIComponent(state.activeCaseId),
+    ]);
+    if (!allowed.has(url.pathname)) return "";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "";
+  }
+}
+
+function humanizeApplicationStatus(value) {
+  const status = String(value || "pending").toLowerCase();
+  const labels = {
+    pending: "Submitted",
+    accepted: "Accepted",
+    rejected: "Not selected",
+    invited: "Invitation pending",
+  };
+  return labels[status] || status.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatMatterMoney(cents, currency = "usd") {
+  const amount = Number(cents);
+  if (!Number.isFinite(amount)) return "-";
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: String(currency || "usd").toUpperCase(),
+    }).format(amount / 100);
+  } catch {
+    return `$${(amount / 100).toFixed(2)}`;
+  }
+}
+
+function renderMatterApplications(experience) {
+  if (!matterApplicationList || !matterApplicationsState || !matterApplicationsAction) return;
+  emptyNode(matterApplicationList);
+  const applicationData = experience?.applications || null;
+  const items = Array.isArray(applicationData?.items) ? applicationData.items : [];
+  if (!items.length) {
+    matterApplicationsState.textContent = "No applications or invitations to show yet.";
+  } else {
+    matterApplicationsState.textContent = "";
+    items.forEach((item) => {
+      const row = document.createElement("li");
+      const copy = document.createElement("div");
+      copy.className = "matter-row-copy";
+      const title = document.createElement("strong");
+      title.textContent = String(item?.name || "Application");
+      const detail = document.createElement("span");
+      const pieces = [humanizeApplicationStatus(item?.status)];
+      if (item?.preEngagementStatus) {
+        pieces.push(`Pre-engagement: ${humanizeApplicationStatus(item.preEngagementStatus)}`);
+      }
+      detail.textContent = pieces.join(" · ");
+      copy.append(title, detail);
+      const date = document.createElement("time");
+      date.className = "matter-row-meta";
+      if (item?.appliedAt) date.dateTime = item.appliedAt;
+      date.textContent = item?.appliedAt ? formatDate(item.appliedAt) : "";
+      row.append(copy, date);
+      const applicantId = String(item?.id || "");
+      if (/^[a-f0-9]{24}$/i.test(applicantId) && window.LPCContextPanel) {
+        const preview = document.createElement("button");
+        preview.type = "button";
+        preview.className = "matter-row-preview";
+        preview.textContent = "Preview";
+        preview.addEventListener("click", () => openApplicationContext(applicantId, { historyMode: "push", returnFocus: preview }));
+        row.append(preview);
+      }
+      matterApplicationList.append(row);
+    });
+  }
+  const actionHref = safeMatterExperienceHref(applicationData?.reviewHref);
+  matterApplicationsAction.hidden = !actionHref;
+  if (actionHref) matterApplicationsAction.href = actionHref;
+  else matterApplicationsAction.removeAttribute("href");
+  matterApplicationsAction.textContent = getCurrentUserRole() === "attorney"
+    ? "Open candidate review"
+    : "Open application workflow";
+}
+
+function humanizePreviewStatus(value) {
+  return String(value || "pending")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatFileSize(bytes) {
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value <= 0) return "";
+  if (value < 1024) return `${value} bytes`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function openApplicationContext(applicantId, options = {}) {
+  if (!window.LPCContextPanel || !state.activeCaseId || !/^[a-f0-9]{24}$/i.test(String(applicantId || ""))) return false;
+  const active = window.LPCContextPanel.current?.();
+  if (active?.kind === "application" && active.id === String(applicantId)) return true;
+  return window.LPCContextPanel.open("application", {
+    id: String(applicantId),
+    label: "application",
+    title: "Application",
+    eyebrow: "Matter Application",
+    params: { caseId: state.activeCaseId },
+    urlParams: { applicantId: String(applicantId) },
+    clearParams: ["applicantId"],
+    ...options,
+  });
+}
+
+function openFileContext(fileId, options = {}) {
+  if (!window.LPCContextPanel || !state.activeCaseId || !/^[a-f0-9]{24}$/i.test(String(fileId || ""))) return false;
+  const active = window.LPCContextPanel.current?.();
+  if (active?.kind === "file" && active.id === String(fileId)) return true;
+  return window.LPCContextPanel.open("file", {
+    id: String(fileId),
+    label: "file details",
+    title: "File",
+    eyebrow: "Matter File",
+    params: { caseId: state.activeCaseId },
+    urlParams: { fileId: String(fileId) },
+    clearParams: ["fileId"],
+    ...options,
+  });
+}
+
+function registerMatterContextPanelAdapters() {
+  if (!window.LPCContextPanel || document.documentElement.dataset.matterPanelAdapters === "true") return;
+  document.documentElement.dataset.matterPanelAdapters = "true";
+  window.LPCContextPanel.register("application", async ({ id, params, signal }) => {
+    const caseId = String(params?.caseId || state.activeCaseId || "");
+    const response = await fetch(
+      `/api/cases/${encodeURIComponent(caseId)}/applications/${encodeURIComponent(id)}/preview`,
+      { credentials: "include", cache: "no-store", headers: { Accept: "application/json" }, signal }
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(payload?.error || "Application unavailable");
+      error.status = response.status;
+      throw error;
+    }
+    const application = payload?.application || {};
+    const profile = application.profile || {};
+    const preEngagement = application.preEngagement || null;
+    return {
+      eyebrow: application.source === "invitation" ? "Matter Invitation" : "Matter Application",
+      title: application.candidateName || "Application",
+      summary: `${application.candidateName || "This candidate"} · ${application.matterTitle || "Matter"}`,
+      facts: [
+        { label: "Status", value: humanizePreviewStatus(application.status) },
+        { label: "Submitted", value: application.submittedAt ? formatDate(application.submittedAt) : "" },
+        { label: "Location", value: profile.location },
+        { label: "Pre-engagement", value: preEngagement?.status ? humanizePreviewStatus(preEngagement.status) : "" },
+      ],
+      sections: [
+        { title: "Cover letter", body: application.coverLetter },
+        { title: "Profile summary", body: profile.bio },
+        { title: "Practice areas", items: profile.practiceAreas },
+        { title: "Specialties and skills", items: [...(profile.specialties || []), ...(profile.skills || [])] },
+      ],
+      actions: [
+        { label: getCurrentUserRole() === "attorney" ? "Open candidate review" : "Open application", href: application.fullReviewHref, primary: true },
+        {
+          label: "Preview Profile",
+          onClick: () => window.LPCContextPanel.openProfile(application.candidateId, { historyMode: "push" }),
+        },
+      ],
+    };
+  });
+  window.LPCContextPanel.register("file", async ({ id, params }) => {
+    const caseId = String(params?.caseId || state.activeCaseId || "");
+    const key = matterSectionKey(caseId, "files");
+    if (!state.loadedMatterSections.has(key)) await loadMatterDocuments(caseId);
+    const documents = state.caseDocumentsById.get(caseId) || [];
+    const file = documents.find((item) => String(item?.id || item?._id || "") === String(id));
+    if (!file) {
+      const error = new Error("File unavailable");
+      error.status = 404;
+      throw error;
+    }
+    const fileName = file.originalName || file.filename || file.name || "File";
+    const security = getFileSecurityPresentation(file);
+    return {
+      eyebrow: "Matter File",
+      title: fileName,
+      summary: "File metadata is shown here. Opening the file uses LPC's existing authorized download flow.",
+      facts: [
+        { label: "Type", value: file.mimeType || file.mime || "File" },
+        { label: "Size", value: formatContextFileSize(file.size) },
+        { label: "Shared", value: file.createdAt ? formatDate(file.createdAt) : "" },
+        { label: "Version", value: file.version ? String(file.version) : "" },
+        { label: "Review status", value: file.status ? humanizePreviewStatus(file.status) : "" },
+        { label: "Security", value: security.label },
+        { label: "Shared by", value: file.uploadedByRole ? humanizePreviewStatus(file.uploadedByRole) : "" },
+      ],
+      actions: security.ready ? [{
+        label: "Open file",
+        primary: true,
+        onClick: () => openMatterDocument(file, caseId),
+      }] : security.status === "pending" ? [{
+        label: "Check scan status",
+        primary: true,
+        onClick: async () => {
+          try {
+            const scan = await refreshFileSecurityStatus(caseId, id);
+            const presentation = getFileSecurityPresentation(scan);
+            showDocumentActionMessage(presentation.ready
+              ? "Security scan complete. Reopen file details to continue."
+              : `${presentation.label}. ${presentation.detail}`);
+          } catch (error) {
+            showDocumentActionMessage(error?.message || "Unable to refresh file security status.");
+          }
+        },
+      }] : [],
+    };
+  });
+}
+
+function syncRequestedContextPanel() {
+  if (!window.LPCContextPanel || !state.activeCaseId) return;
+  const params = new URLSearchParams(window.location.search);
+  const applicantId = String(params.get("applicantId") || "");
+  const fileId = String(params.get("fileId") || "");
+  if (state.activeMatterTab === "applications" && /^[a-f0-9]{24}$/i.test(applicantId)) {
+    openApplicationContext(applicantId, { historyMode: "none" });
+    return;
+  }
+  if (state.activeMatterTab === "files" && /^[a-f0-9]{24}$/i.test(fileId)) {
+    openFileContext(fileId, { historyMode: "none" });
+    return;
+  }
+  const active = window.LPCContextPanel.current?.();
+  if (["application", "file"].includes(active?.kind)) {
+    window.LPCContextPanel.close({ historyMode: "none" });
+  }
+}
+
+function getRequestedMessageId() {
+  if (typeof window === "undefined") return "";
+  const params = new URLSearchParams(window.location.search);
+  const requestedCaseId = String(params.get("caseId") || "");
+  const requestedId = String(params.get("messageId") || "");
+  if (getRequestedMatterTab() !== "messages") return "";
+  if (requestedCaseId && state.activeCaseId && requestedCaseId !== String(state.activeCaseId)) return "";
+  return /^[a-f0-9]{24}$/i.test(requestedId) ? requestedId : "";
+}
+
+function revealRequestedMessage({ reportMissing = false } = {}) {
+  const requestedId = getRequestedMessageId();
+  if (!requestedId || !messageList) return false;
+  messageList.querySelectorAll(".message-card.is-deep-linked").forEach((card) => {
+    card.classList.remove("is-deep-linked");
+  });
+  const target = Array.from(messageList.querySelectorAll("[data-message-id]")).find(
+    (node) => String(node.dataset.messageId || "") === requestedId
+  );
+  if (!target) {
+    if (reportMissing) showMsg(messageStatus, "The referenced message is no longer available.");
+    return false;
+  }
+  target.classList.add("is-deep-linked");
+  target.tabIndex = -1;
+  window.requestAnimationFrame(() => {
+    target.scrollIntoView({ behavior: "auto", block: "center" });
+    target.focus({ preventScroll: true });
+  });
+  if (reportMissing) showMsg(messageStatus, "Referenced message highlighted.");
+  return true;
+}
+
+function renderMatterActivity(experience) {
+  if (!matterActivityList || !matterActivityState) return;
+  emptyNode(matterActivityList);
+  const items = Array.isArray(experience?.activity) ? experience.activity : [];
+  matterActivityState.hidden = items.length > 0;
+  matterActivityState.textContent = items.length ? "" : "No activity to show yet.";
+  items.forEach((item) => {
+    const row = document.createElement("li");
+    const copy = document.createElement("div");
+    copy.className = "matter-row-copy";
+    const label = document.createElement("strong");
+    label.textContent = String(item?.label || "Matter updated");
+    copy.append(label);
+    const date = document.createElement("time");
+    date.className = "matter-row-meta";
+    if (item?.at) date.dateTime = item.at;
+    date.textContent = item?.at ? formatDate(item.at) : "";
+    row.append(copy, date);
+    matterActivityList.append(row);
+  });
+}
+
+function renderMatterFinancials(experience) {
+  if (!matterFinancialStatus || !matterFinancialList || !matterFinancialNote || !matterReceiptAction) return;
+  const financials = experience?.financials || null;
+  emptyNode(matterFinancialList);
+  matterFinancialStatus.textContent = String(financials?.status || "Payment status unavailable");
+  (Array.isArray(financials?.amounts) ? financials.amounts : []).forEach((amount) => {
+    const row = document.createElement("div");
+    const term = document.createElement("dt");
+    const value = document.createElement("dd");
+    term.textContent = String(amount?.label || "Amount");
+    value.textContent = formatMatterMoney(amount?.cents, financials?.currency);
+    row.append(term, value);
+    matterFinancialList.append(row);
+  });
+  matterFinancialNote.textContent = String(financials?.note || "Financial information is not available for this view.");
+  const receiptHref = safeMatterExperienceHref(financials?.receiptHref);
+  matterReceiptAction.hidden = !receiptHref;
+  if (receiptHref) matterReceiptAction.href = receiptHref;
+  else matterReceiptAction.removeAttribute("href");
+}
+
+function renderMatterExperience(data) {
+  const experience = data?.matterExperience || null;
+  configureMatterTabs(experience);
+  renderMatterApplications(experience);
+  renderMatterActivity(experience);
+  renderMatterFinancials(experience);
+  const overview = experience?.overview || {};
+  if (caseJurisdiction) caseJurisdiction.textContent = overview.jurisdiction || "-";
+  if (caseDeadlineSummary) caseDeadlineSummary.textContent = overview.deadline ? formatMatterDeadline(overview.deadline) : "No deadline set";
+  if (caseTaskProgress) {
+    const progress = overview.taskProgress || {};
+    caseTaskProgress.textContent = progress.total
+      ? `${Number(progress.completed) || 0} of ${Number(progress.total) || 0} complete`
+      : "No tasks yet";
+  }
+  const requested = getRequestedMatterTab();
+  const normalized = normalizeAvailableMatterTab(requested);
+  activateMatterTab(normalized, { historyMode: "replace", announce: false, load: false });
+}
+
+function renderMatterContext(data) {
+  const context = data?.matterContext || null;
+  const experienceHeader = data?.matterExperience?.header || null;
+  state.productivitySummary = {
+    status: String(experienceHeader?.status || context?.status?.label || "").trim(),
+    relationship: String(experienceHeader?.relationship || context?.relationship?.label || "").trim(),
+    attention: String(experienceHeader?.attention || context?.attention?.label || "").trim(),
+    nextAction: String(experienceHeader?.primaryAction?.label || context?.nextAction?.label || "").trim(),
+  };
+  const contextParts = [
+    experienceHeader?.practiceArea || context?.practiceArea || data?.practiceArea,
+    experienceHeader?.relationship || context?.relationship?.label,
+    experienceHeader?.deadline ? `Due ${formatMatterDeadline(experienceHeader.deadline)}` : "",
+  ].filter(Boolean);
+  if (caseContextLine) caseContextLine.textContent = contextParts.join(" · ");
+  if (caseAttentionLine) {
+    const attention = String(experienceHeader?.attention || context?.attention?.label || "").trim();
+    caseAttentionLine.textContent = attention;
+    caseAttentionLine.hidden = !attention;
+  }
+  if (caseNextAction) {
+    const actionTab = String(experienceHeader?.primaryAction?.tab || "").toLowerCase();
+    const experienceHref = MATTER_TAB_IDS.includes(actionTab) ? buildMatterTabUrl(actionTab, getCaseId(data)) : "";
+    const href = experienceHref || safeMatterActionHref(context?.nextAction?.href);
+    const label = String(experienceHeader?.primaryAction?.label || context?.nextAction?.label || "").trim();
+    caseNextAction.hidden = !href || !label;
+    if (href) caseNextAction.href = href;
+    else caseNextAction.removeAttribute("href");
+    caseNextAction.textContent = label;
+    caseNextAction.dataset.matterTabTarget = experienceHref ? actionTab : "";
+  }
+  syncProductivityContext();
+}
+
+function renderMatterLoadFailure(message) {
+  state.productivitySummary = {};
+  window.LPCProductivityContext = {};
+  if (caseTitle) caseTitle.textContent = "Matter unavailable";
+  if (caseStatusLine) caseStatusLine.textContent = "This Matter could not be opened.";
+  if (caseContextLine) caseContextLine.textContent = String(message || "It may have moved or your access may have changed.");
+  if (caseAttentionLine) caseAttentionLine.hidden = true;
+  if (caseNextAction) {
+    caseNextAction.hidden = false;
+    caseNextAction.href = getCurrentUserRole() === "paralegal"
+      ? "/dashboard-paralegal.html#cases"
+      : "/dashboard-attorney.html#cases";
+    caseNextAction.textContent = "Return to Matters";
+  }
+}
+
 function renderCaseOverview(data) {
-  const title = data?.title || "Case";
+  const title = data?.title || "Matter";
   const status = formatCaseStatus(data?.status, data);
   const summaryText = buildCaseSummaryText(data);
 
@@ -3999,12 +4237,21 @@ function renderCaseOverview(data) {
   if (caseStatusLine) {
     caseStatusLine.textContent = status ? `Status: ${status}` : "Status: -";
   }
-  if (caseEscrowAmount) caseEscrowAmount.textContent = formatCurrency(escrowAmountRaw, currency);
-  if (caseEscrowStatus) caseEscrowStatus.textContent = escrowStatus || "-";
+  renderMatterContext(data);
+  renderMatterExperience(data);
+  const compensation = data?.matterExperience?.financials?.amounts?.find((item) => item?.code === "compensation");
+  if (caseEscrowAmount) {
+    caseEscrowAmount.textContent = compensation
+      ? formatMatterMoney(compensation.cents, data?.matterExperience?.financials?.currency)
+      : formatCurrency(escrowAmountRaw, currency);
+  }
+  if (caseEscrowStatus) {
+    caseEscrowStatus.textContent = data?.matterExperience?.financials?.status || escrowStatus || "-";
+  }
   if (caseHireDate) caseHireDate.textContent = formatDate(hireDateValue) || "-";
   if (caseMatterType) caseMatterType.textContent = matterType || "-";
-  if (caseSummary) caseSummary.textContent = summaryText || "No case summary yet.";
-  if (messagePanelTitle) messagePanelTitle.textContent = title || "Case conversation";
+  if (caseSummary) caseSummary.textContent = summaryText || "No Matter summary yet.";
+  if (messagePanelTitle) messagePanelTitle.textContent = title || "Matter conversation";
   if (messagePanelSubtitle) messagePanelSubtitle.textContent = subtitleValue;
   if (messagePanelBanner) {
     const opened = formatDate(hireDateValue);
@@ -4017,10 +4264,9 @@ function renderCaseOverview(data) {
       if (["completed", "closed"].includes(normalized) && data?.paymentReleased) {
         messagePanelBanner.textContent = "Payment released. Workspace is now read-only.";
       } else if (normalized === "disputed") {
-        messagePanelBanner.textContent =
-          "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours.";
+        messagePanelBanner.textContent = ADMIN_REVIEW_STATUS_MESSAGE;
       } else if (normalized === "paused") {
-        messagePanelBanner.textContent = "Case is paused. Workspace is locked.";
+        messagePanelBanner.textContent = "Matter is paused. Workspace is locked.";
       } else {
         messagePanelBanner.textContent = opened ? `Opened on ${opened}` : "";
         messagePanelBanner.hidden = !opened;
@@ -4037,7 +4283,7 @@ function renderCaseOverview(data) {
     if (deadlines.length) {
       deadlines.forEach((deadline) => {
         const li = document.createElement("li");
-        const date = formatDate(deadline?.date || deadline);
+        const date = formatMatterDeadline(deadline?.date || deadline);
         li.textContent = date || String(deadline);
         caseDeadlineList.appendChild(li);
       });
@@ -4124,7 +4370,7 @@ function updateCompleteAction(caseData, caseState) {
     caseCompleteSection.hidden = false;
     setCompleteButtonLock(true);
     if (caseCompleteStatus) {
-      caseCompleteStatus.textContent = "Case is paused.";
+      caseCompleteStatus.textContent = "Matter is paused.";
       caseCompleteStatus.classList.add("is-alert");
       caseCompleteStatus.dataset.lockReason = "paused";
     }
@@ -4176,16 +4422,16 @@ function updateDisputeAction(caseData) {
       if (infoParts.length) {
         message = infoParts.join(" ");
       } else if (isDisputed) {
-        message = "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours.";
+        message = ADMIN_REVIEW_STATUS_MESSAGE;
       }
     } else {
       hidden = true;
       if (isDisputed) {
-        message = "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours.";
+        message = ADMIN_REVIEW_STATUS_MESSAGE;
       }
     }
   } else if (isDisputed) {
-    message = "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours.";
+    message = ADMIN_REVIEW_STATUS_MESSAGE;
   }
 
   const canDispute = canOpenDisputeFromCase(caseData);
@@ -4206,7 +4452,7 @@ function updateDisputeAction(caseData) {
 
   const flagLabel =
     role === "paralegal" || (role === "attorney" && (isWithdrawal || isClosed))
-      ? "Case actions"
+      ? "Matter actions"
       : "Flag dispute";
   caseDisputeButton.setAttribute("aria-label", flagLabel);
   const flagLabelNode = caseDisputeButton.querySelector("span");
@@ -4227,20 +4473,20 @@ function updateDisputeAction(caseData) {
         attorneyActionState.disableReject ? " disabled" : ""
       }>close without release</button>`;
       const suffix = attorneyActionState.statusText ? ` ${attorneyActionState.statusText}` : "";
-      caseDisputeStatus.innerHTML = `Paralegal withdrew. Please choose a ${partialLabel} or ${rejectLabel}. Case will relist after the payout is finalized.${suffix}`;
+      caseDisputeStatus.innerHTML = `Paralegal withdrew. Please choose a ${partialLabel} or ${rejectLabel}. The Matter will relist after the payout is finalized.${suffix}`;
       const partialBtn = caseDisputeStatus.querySelector('[data-withdraw-action="partial"]');
       if (partialBtn && !attorneyActionState.disablePartial) {
-        partialBtn.onclick = (event) => {
+        partialBtn.addEventListener("click", (event) => {
           event.preventDefault();
           handlePartialPayout();
-        };
+        });
       }
       const rejectBtn = caseDisputeStatus.querySelector('[data-withdraw-action="reject"]');
       if (rejectBtn && !attorneyActionState.disableReject) {
-        rejectBtn.onclick = (event) => {
+        rejectBtn.addEventListener("click", (event) => {
           event.preventDefault();
           handleRejectPayout();
-        };
+        });
       }
     } else {
       caseDisputeStatus.textContent = message;
@@ -4260,8 +4506,6 @@ function updateWithdrawalSection(caseData) {
   const assignedId = normalizeUserId(caseData?.paralegal || caseData?.paralegalId);
   const isAssignedViewer = viewerId && assignedId && String(viewerId) === String(assignedId);
   const isWithdrawn = isWithdrawnViewer(caseData);
-  const totalTasks = getCaseTasks(caseData).length;
-  const completedCount = countCompletedTasks(caseData);
 
   let showSection = false;
   let showButton = false;
@@ -4287,7 +4531,7 @@ function updateWithdrawalSection(caseData) {
     ) {
       showSection = true;
       showButton = statusKey !== "paused";
-      note = "Withdrawing will close this case for you. You will no longer be able to submit work on this matter.";
+      note = "Withdrawing will close this Matter for you. You will no longer be able to submit work here.";
     }
   }
 
@@ -4339,7 +4583,7 @@ function resolveCaseActionStatusNode() {
 function setCompletionStatusMessage(message) {
   if (!caseCompleteStatus) return;
   if (message === PAYMENT_METHOD_UPDATE_MESSAGE) {
-    caseCompleteStatus.innerHTML = `<a class="case-status-link" href="dashboard-attorney.html#billing">${message}</a>`;
+    caseCompleteStatus.innerHTML = `<a class="case-status-link" href="dashboard-attorney.html#funds">${message}</a>`;
     return;
   }
   caseCompleteStatus.textContent = message || "";
@@ -4348,39 +4592,39 @@ function setCompletionStatusMessage(message) {
 function resolveCompletionIneligibleReason(caseData, caseState) {
   const statusKey = normalizeCaseStatus(caseData?.status);
   if (caseData?.paymentReleased || statusKey === "completed") {
-    return "This case is already completed and payment has been released.";
+    return "This Matter is already completed and payment has been released.";
   }
   if (caseData?.readOnly || statusKey === "closed") {
-    return "This case is closed and read-only.";
+    return "This Matter is closed and read-only.";
   }
   if (statusKey === "disputed" || caseData?.terminationStatus === "disputed") {
-    return "This case is locked and cannot be completed.";
+    return "This Matter is locked and cannot be completed.";
   }
   if (!hasAssignedParalegal(caseData)) {
-    return "Assign a paralegal before completing this case.";
+    return "Assign a paralegal before completing this Matter.";
   }
   if (!isEscrowFunded(caseData)) {
     const fundingStatus = String(caseData?.escrowStatus || "").toLowerCase();
     if (caseData?.escrowIntentId || fundingStatus) {
-      return "Funding isn't in place. Update the payment method if needed, then fund the case before releasing funds.";
+      return "Funding isn't in place. Update the payment method if needed, then fund the Matter before releasing the payment.";
     }
-    return "Funding hasn't been added yet. Fund the case before releasing funds.";
+    return "Funding hasn't been added yet. Fund the Matter before releasing the payment.";
   }
   if (caseState !== CASE_STATES.FUNDED_IN_PROGRESS) {
     const label = formatCaseStatus(caseData?.status, caseData);
     if (label && label !== "In Progress") {
-      return `Case must be In Progress to complete. Current status: ${label}.`;
+      return `The Matter must be In Progress to complete. Current status: ${label}.`;
     }
-    return "Case must be in progress to complete.";
+    return "The Matter must be In Progress to complete.";
   }
-  return "This case is not eligible for completion right now.";
+  return "This Matter is not eligible for completion right now.";
 }
 
 async function handleCompleteCase() {
   if (state.completing) return;
   const caseId = state.activeCaseId;
   if (!caseId) {
-    setCompletionStatusMessage("Select a case before completing.");
+    setCompletionStatusMessage("Select a Matter before completing.");
     return;
   }
   let caseData = state.activeCase || {};
@@ -4431,12 +4675,12 @@ async function handleCompleteCase() {
   }
   state.completing = true;
   let completionSucceeded = false;
-  startReleaseFundsAnimation();
+  startReleasePaymentAnimation();
   try {
     await fetchCSRF().catch(() => "");
     await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/complete`, { method: "POST" });
-    stopReleaseFundsAnimation();
-    const confirmation = "Payment released. Case completed and archived.";
+    stopReleasePaymentAnimation();
+    const confirmation = "Payment released. Matter completed and archived.";
     setCompletionStatusMessage(confirmation);
     showMsg(messageStatus, confirmation);
     completionSucceeded = true;
@@ -4456,14 +4700,14 @@ async function handleCompleteCase() {
     }
     await loadCase(caseId);
   } catch (err) {
-    stopReleaseFundsAnimation();
-    setCompletionStatusMessage(err.message || "Unable to complete this case.");
+    stopReleasePaymentAnimation();
+    setCompletionStatusMessage(err.message || "Unable to complete this Matter.");
   } finally {
-    stopReleaseFundsAnimation();
+    stopReleasePaymentAnimation();
     state.completing = false;
     if (caseCompleteButton && !completionSucceeded) {
       caseCompleteButton.disabled = false;
-      caseCompleteButton.textContent = originalText || "Complete & Release Funds";
+      caseCompleteButton.textContent = originalText || "Complete & Release Payment";
     }
   }
 }
@@ -4473,15 +4717,11 @@ async function handleRequestWithdrawal() {
   const caseId = state.activeCaseId;
   if (!caseId) return;
   const caseData = state.activeCase || {};
-  const tasks = getCaseTasks(caseData);
   const completedCount = countCompletedTasks(caseData);
-  const confirmed = await openWithdrawalConfirmModal({
-    completedCount,
-    totalTasks: tasks.length,
-  });
+  const confirmed = await openWithdrawalConfirmModal({ completedCount });
   if (!confirmed) return;
   state.withdrawing = true;
-  const originalText = caseWithdrawButton?.textContent || "Withdraw from Case";
+  const originalText = caseWithdrawButton?.textContent || "Withdraw from Matter";
   if (caseWithdrawButton) caseWithdrawButton.disabled = true;
   if (caseWithdrawButton) caseWithdrawButton.textContent = "Withdrawing...";
   showMsg(caseWithdrawStatus, "Submitting withdrawal request...");
@@ -4496,8 +4736,8 @@ async function handleRequestWithdrawal() {
           message:
             payload?.message ||
             (completedCount === 0
-              ? "You withdrew from this case. No payout will be issued because no tasks were completed, and the case has been relisted."
-              : "You withdrew from this case. The attorney will now decide whether to issue a partial payout based on completed work."),
+              ? "You withdrew from this Matter. No payout will be issued because no tasks were completed, and the Matter has been relisted."
+              : "You withdrew from this Matter. The attorney will now decide whether to issue a partial payout based on completed work."),
           type: "success",
         })
       );
@@ -4506,13 +4746,13 @@ async function handleRequestWithdrawal() {
       caseWithdrawStatus,
       payload?.message ||
         (completedCount === 0
-          ? "You withdrew from this case. No payout will be issued because no tasks were completed, and the case has been relisted."
-          : "You withdrew from this case. The attorney will now decide whether to issue a partial payout based on completed work.")
+          ? "You withdrew from this Matter. No payout will be issued because no tasks were completed, and the Matter has been relisted."
+          : "You withdrew from this Matter. The attorney will now decide whether to issue a partial payout based on completed work.")
     );
     window.location.href = "dashboard-paralegal.html#cases";
     return;
   } catch (err) {
-    showMsg(caseWithdrawStatus, err.message || "Unable to withdraw from case.");
+    showMsg(caseWithdrawStatus, err.message || "Unable to withdraw from Matter.");
   } finally {
     state.withdrawing = false;
     if (caseWithdrawButton) {
@@ -4553,7 +4793,7 @@ async function handlePartialPayout({ returnToMenu = false, menuCaseData = null, 
     remainingCents = Number(caseData?.lockedTotalAmount ?? caseData?.totalAmount ?? 0);
   }
   if (!Number.isFinite(remainingCents) || remainingCents < 0) {
-    if (statusNode) showMsg(statusNode, "Remaining case amount is unavailable.");
+    if (statusNode) showMsg(statusNode, "Remaining Matter amount is unavailable.");
     return;
   }
   const currency = String(caseData?.currency || "USD").toUpperCase();
@@ -4587,7 +4827,7 @@ async function handlePartialPayout({ returnToMenu = false, menuCaseData = null, 
       method: "POST",
       body: { amountCents },
     });
-    if (statusNode) showMsg(statusNode, "Partial payout finalized. Case relisted.");
+    if (statusNode) showMsg(statusNode, "Partial payout finalized. Matter relisted.");
     await loadCase(caseId);
     const payoutLabel = formatCurrency(amountCents / 100, currency);
     if (typeof result.setSuccess === "function") {
@@ -4597,13 +4837,13 @@ async function handlePartialPayout({ returnToMenu = false, menuCaseData = null, 
         payoutLabel,
         paralegalName: getWithdrawnParalegalName(caseData),
         receiptUrl,
-        relistCopy: "The case has been automatically relisted.",
+        relistCopy: "The Matter has been automatically relisted.",
         pending,
       });
     } else {
       showCaseActionAcknowledgement({
         title: "Partial Payout Submitted",
-        message: `A partial payout of ${payoutLabel} was submitted. The case will be relisted automatically.`,
+        message: `A partial payout of ${payoutLabel} was submitted. The Matter will be relisted automatically.`,
       });
     }
   } catch (err) {
@@ -4632,7 +4872,7 @@ async function handleRejectPayout() {
     if (statusNode) {
       showMsg(
         statusNode,
-        "Closing without release starts a 24-hour window for the paralegal to dispute. If no dispute is filed, the case will relist automatically."
+        "Closing without release starts a 24-hour window for the paralegal to dispute. If no dispute is filed, the Matter will relist automatically."
       );
     }
     await loadCase(caseId);
@@ -4652,14 +4892,14 @@ async function handleRelistCase() {
   const originalText = caseRelistButton?.textContent || "Relist";
   if (caseRelistButton) caseRelistButton.disabled = true;
   if (caseRelistButton) caseRelistButton.textContent = "Relisting...";
-  if (statusNode) showMsg(statusNode, "Relisting case...");
+  if (statusNode) showMsg(statusNode, "Relisting Matter...");
   try {
     await fetchCSRF().catch(() => "");
     await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/relist`, { method: "POST" });
-    if (statusNode) showMsg(statusNode, "Case relisted.");
+    if (statusNode) showMsg(statusNode, "Matter relisted.");
     await loadCase(caseId);
   } catch (err) {
-    if (statusNode) showMsg(statusNode, err.message || "Unable to relist case.");
+    if (statusNode) showMsg(statusNode, err.message || "Unable to relist Matter.");
   } finally {
     state.relisting = false;
     if (caseRelistButton) {
@@ -4730,18 +4970,18 @@ async function handleDisputeCase() {
   showMsg(caseDisputeStatus, "Opening dispute...");
   try {
     await fetchCSRF().catch(() => "");
-    const note = (message || "").trim() || "Dispute flagged from the case workspace.";
+    const note = (message || "").trim() || "Dispute flagged from the Matter workspace.";
     await fetchJSON(`/api/disputes/${encodeURIComponent(caseId)}`, {
       method: "POST",
       body: { message: note, amount },
     });
     showMsg(
       caseDisputeStatus,
-      "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours."
+      ADMIN_REVIEW_STATUS_MESSAGE
     );
     showMsg(
       messageStatus,
-      "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours."
+      ADMIN_REVIEW_STATUS_MESSAGE
     );
     await loadCase(caseId);
   } catch (err) {
@@ -4797,7 +5037,9 @@ function renderThreadItems(messages, documents, caseId) {
       const li = document.createElement("li");
       const empty = document.createElement("div");
       empty.className = "thread-card";
-      empty.textContent = "";
+      empty.textContent = state.workspaceEnabled
+        ? "No messages yet. Start the Matter conversation below."
+        : "No messages to show.";
       li.appendChild(empty);
       fragment.appendChild(li);
 	    } else {
@@ -4868,8 +5110,56 @@ function renderThreadItems(messages, documents, caseId) {
     li.appendChild(empty);
     messageList.appendChild(li);
   }
-  if (shouldScroll) {
+  const revealedRequestedMessage = revealRequestedMessage();
+  if (shouldScroll && !revealedRequestedMessage) {
     requestAnimationFrame(() => scrollMessagesToBottom());
+  }
+}
+
+function openMatterDocument(documentData, caseId) {
+  const security = getFileSecurityPresentation(documentData);
+  if (!security.ready) {
+    showDocumentActionMessage(`${security.label}. ${security.detail}`);
+    const fileId = documentData?.id || documentData?._id || "";
+    if (security.status === "pending" && fileId) {
+      refreshFileSecurityStatus(caseId, fileId)
+        .then((scan) => {
+          const refreshed = getFileSecurityPresentation(scan);
+          showDocumentActionMessage(refreshed.ready
+            ? "Security scan complete. The file is ready to open."
+            : `${refreshed.label}. ${refreshed.detail}`);
+        })
+        .catch((error) => showDocumentActionMessage(error?.message || "Unable to refresh file security status."));
+    }
+    return;
+  }
+  const fileName = documentData?.originalName || documentData?.filename || documentData?.name || "Document";
+  const docId = documentData?.id || documentData?._id || "";
+  const storageKey = documentData?.storageKey || documentData?.key || "";
+  const previewKey = documentData?.previewKey || documentData?.previewStorageKey || "";
+  const mimeType = documentData?.mimeType || documentData?.mime || "";
+  const previewMimeType = documentData?.previewMimeType || documentData?.previewMime || "";
+  const createdAt = documentData?.createdAt || documentData?.uploadedAt || documentData?.created || "";
+  const viewUrl = buildViewUrl({ caseId, storageKey, previewKey });
+  const canPreview = !!viewUrl && isPreviewSupported({ fileName, mimeType: previewMimeType || mimeType });
+  if (canPreview) {
+    openDocumentPreview({
+      fileName,
+      viewUrl,
+      mimeType,
+      caseId,
+      storageKey,
+      uploadedAt: createdAt,
+      uploaderName: formatUploaderName(documentData, state.activeCase),
+    });
+    return;
+  }
+  if (caseId && docId) {
+    window.open(
+      `/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(docId)}/download`,
+      "_blank",
+      "noopener"
+    );
   }
 }
 
@@ -4901,21 +5191,14 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
     const fileName = documentData?.originalName || documentData?.filename || documentData?.name || "Document";
     const docId = documentData?.id || documentData?._id || "";
     const storageKey = documentData?.storageKey || documentData?.key || "";
-    const previewKey = documentData?.previewKey || documentData?.previewStorageKey || "";
     const createdAt = documentData?.createdAt || documentData?.uploadedAt || documentData?.created || "";
     const statusValue = normalizeRole(documentData?.status);
     const mimeType = documentData?.mimeType || documentData?.mime || "";
-    const downloadUrl =
-      caseId && docId ? `/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(docId)}/download` : "";
-    const viewUrl = buildViewUrl({ caseId, storageKey, previewKey });
-    const previewMimeType = documentData?.previewMimeType || documentData?.previewMime || "";
-    const canPreview = isPreviewSupported({
-      fileName,
-      mimeType: previewMimeType || documentData?.mimeType || documentData?.mime || "",
-    });
+    const security = getFileSecurityPresentation(documentData);
 
     const li = document.createElement("li");
     li.className = "case-documents-item";
+    if (docId) li.dataset.fileId = docId;
 
     const meta = document.createElement("div");
     meta.className = "case-documents-meta";
@@ -4923,29 +5206,27 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
     nameNode.textContent = fileName;
     const subNode = document.createElement("span");
     subNode.className = "case-documents-sub";
-    subNode.textContent = createdAt ? `Shared ${formatDate(createdAt)}` : "Shared document";
-    meta.append(nameNode, subNode);
+    const sharedLabel = createdAt ? `Shared ${formatDate(createdAt)}` : "Shared document";
+    subNode.textContent = `${sharedLabel} · ${security.label}`;
+    const securityNode = document.createElement("span");
+    securityNode.className = `case-documents-security is-${security.status}`;
+    securityNode.textContent = security.detail;
+    meta.append(nameNode, subNode, securityNode);
+    li.dataset.securityStatus = security.status;
+    li.classList.toggle("is-security-pending", !security.ready);
     li.setAttribute("role", "button");
     li.setAttribute("tabindex", "0");
-    li.setAttribute("aria-label", `Open ${fileName}`);
+    li.setAttribute(
+      "aria-label",
+      security.ready
+        ? `Open ${fileName}`
+        : `Open details for ${fileName}. ${security.label}. ${security.detail}`
+    );
 
     li.append(meta);
     const openDocument = () => {
-      if (canPreview) {
-        openDocumentPreview({
-          fileName,
-          viewUrl,
-          mimeType,
-          caseId,
-          storageKey,
-          uploadedAt: createdAt,
-          uploaderName: formatUploaderName(documentData, state.activeCase),
-        });
-        return;
-      }
-      if (downloadUrl) {
-        window.open(downloadUrl, "_blank", "noopener");
-      }
+      if (docId && openFileContext(docId, { historyMode: "push", returnFocus: li })) return;
+      openMatterDocument(documentData, caseId);
     };
     li.addEventListener("click", (event) => {
       if (event.target?.closest(".case-documents-actions")) return;
@@ -4967,57 +5248,55 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
       li.classList.add("has-actions");
       const actions = document.createElement("div");
       actions.className = "case-documents-actions";
-      const approveLabel = document.createElement("label");
-      approveLabel.className = "case-documents-approve";
-      const approveInput = document.createElement("input");
-      approveInput.type = "checkbox";
+      const approveButton = document.createElement("button");
+      approveButton.type = "button";
+      approveButton.className = "case-documents-approve";
       const isApproved = statusValue === "approved";
       const isRevision = statusValue === "attorney_revision";
-      approveInput.checked = isApproved;
-      approveInput.disabled = !docId;
+      approveButton.setAttribute("aria-pressed", String(isApproved));
+      approveButton.disabled = !docId || !security.ready;
       const approveText = document.createElement("span");
       approveText.textContent = isApproved ? "Approved" : "Approve";
-      if (isApproved) approveLabel.classList.add("is-approved");
-      approveLabel.append(approveInput, approveText);
-      actions.append(approveLabel);
+      if (isApproved) approveButton.classList.add("is-approved");
+      approveButton.append(approveText);
+      actions.append(approveButton);
 
-      const requestLabel = document.createElement("label");
-      requestLabel.className = "case-documents-request";
-      const requestInput = document.createElement("input");
-      requestInput.type = "checkbox";
-      requestInput.checked = isRevision;
-      requestInput.disabled = !docId;
+      const requestButton = document.createElement("button");
+      requestButton.type = "button";
+      requestButton.className = "case-documents-request";
+      requestButton.setAttribute("aria-pressed", String(isRevision));
+      requestButton.disabled = !docId || !security.ready;
       const requestText = document.createElement("span");
       requestText.textContent = isRevision ? "Revisions requested" : "Request revisions";
-      if (isRevision) requestLabel.classList.add("is-requested");
-      requestLabel.append(requestInput, requestText);
-      actions.append(requestLabel);
+      if (isRevision) requestButton.classList.add("is-requested");
+      requestButton.append(requestText);
+      actions.append(requestButton);
       li.append(actions);
 
       const setActionState = (nextStatus) => {
         const approved = normalizeRole(nextStatus) === "approved";
         const revision = normalizeRole(nextStatus) === "attorney_revision";
-        approveInput.checked = approved;
-        requestInput.checked = revision;
+        approveButton.setAttribute("aria-pressed", String(approved));
+        requestButton.setAttribute("aria-pressed", String(revision));
         approveText.textContent = approved ? "Approved" : "Approve";
         requestText.textContent = revision ? "Revisions requested" : "Request revisions";
-        approveLabel.classList.toggle("is-approved", approved);
-        requestLabel.classList.toggle("is-requested", revision);
-        approveInput.disabled = !docId;
-        requestInput.disabled = !docId;
+        approveButton.classList.toggle("is-approved", approved);
+        requestButton.classList.toggle("is-requested", revision);
+        approveButton.disabled = !docId || !security.ready;
+        requestButton.disabled = !docId || !security.ready;
       };
 
       const setBusy = (busyLabel) => {
-        approveInput.disabled = true;
-        requestInput.disabled = true;
+        approveButton.disabled = true;
+        requestButton.disabled = true;
         if (busyLabel === "approve") approveText.textContent = "Updating...";
         if (busyLabel === "request") requestText.textContent = "Updating...";
       };
 
-      approveInput.addEventListener("change", async () => {
+      approveButton.addEventListener("click", async () => {
         if (!docId) return;
         const previousStatus = documentData.status || "pending_review";
-        const nextStatus = approveInput.checked ? "approved" : "pending_review";
+        const nextStatus = normalizeRole(documentData.status) === "approved" ? "pending_review" : "approved";
         setBusy("approve");
         try {
           await updateCaseFileStatus(caseId, docId, nextStatus);
@@ -5029,10 +5308,10 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
         }
       });
 
-      requestInput.addEventListener("change", async () => {
+      requestButton.addEventListener("click", async () => {
         if (!docId) return;
         const previousStatus = documentData.status || "pending_review";
-        const nextStatus = requestInput.checked ? "attorney_revision" : "pending_review";
+        const nextStatus = normalizeRole(documentData.status) === "attorney_revision" ? "pending_review" : "attorney_revision";
         setBusy("request");
         try {
           await updateCaseFileStatus(caseId, docId, nextStatus);
@@ -5122,6 +5401,10 @@ function buildDocumentCard(documentData, caseId) {
   const createdAt = documentData?.createdAt || documentData?.uploadedAt || documentData?.created || "";
   const uploaderName = formatUploaderName(documentData, state.activeCase);
   const viewUrl = buildViewUrl({ caseId, storageKey });
+  const downloadUrl = caseId && docId
+    ? `/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(docId)}/download`
+    : "";
+  const security = getFileSecurityPresentation(documentData);
 
   const card = document.createElement("article");
   card.className = "thread-card document-card";
@@ -5129,7 +5412,8 @@ function buildDocumentCard(documentData, caseId) {
 
   const header = document.createElement("header");
   header.className = "card-header";
-  const title = document.createElement("a");
+  const title = document.createElement("button");
+  title.type = "button";
   title.className = "document-link";
   const icon = document.createElement("span");
   icon.className = "document-icon";
@@ -5144,22 +5428,38 @@ function buildDocumentCard(documentData, caseId) {
   label.className = "document-label";
   label.textContent = fileName;
   title.append(icon, label);
-  title.href = viewUrl || "#";
-  title.addEventListener("click", (event) => {
-    event.preventDefault();
-    openDocumentPreview({
-      fileName,
-      viewUrl,
-      mimeType,
-      caseId,
-      storageKey,
-      uploadedAt: createdAt,
-      uploaderName,
-    });
+  const actionAvailable = security.ready && Boolean(viewUrl || downloadUrl);
+  if (!actionAvailable) {
+    title.setAttribute("aria-disabled", "true");
+    title.title = security.ready
+      ? "This file is not currently available."
+      : `${security.label}. ${security.detail}`;
+  }
+  title.addEventListener("click", () => {
+    if (!security.ready) {
+      showDocumentActionMessage(`${security.label}. ${security.detail}`);
+    } else if (viewUrl) {
+      openDocumentPreview({
+        fileName,
+        viewUrl,
+        mimeType,
+        caseId,
+        storageKey,
+        uploadedAt: createdAt,
+        uploaderName,
+      });
+    } else if (downloadUrl) {
+      window.open(downloadUrl, "_blank", "noopener");
+    } else {
+      showDocumentActionMessage("This file is not currently available.");
+    }
   });
   const titleWrap = document.createElement("h3");
   titleWrap.appendChild(title);
-  header.append(titleWrap);
+  const status = document.createElement("p");
+  status.className = `document-security-status is-${security.status}`;
+  status.textContent = security.label;
+  header.append(titleWrap, status);
 
   card.append(header);
   return card;
@@ -5175,13 +5475,165 @@ function buildDefinition(term, value) {
   return wrapper;
 }
 
+function matterSectionKey(caseId, section) {
+  return `${String(caseId || "")}:${String(section || "")}`;
+}
+
+function setMatterFilesState(message, { retry = false } = {}) {
+  if (!matterFilesStatus) return;
+  matterFilesStatus.replaceChildren(document.createTextNode(String(message || "")));
+  if (retry) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "case-inline-action";
+    button.dataset.matterRetry = "files";
+    button.textContent = "Retry";
+    matterFilesStatus.append(" ", button);
+  }
+}
+
+function renderMatterMessageState(message, { retry = false } = {}) {
+  if (!messageList) return;
+  emptyNode(messageList);
+  const item = document.createElement("li");
+  const card = document.createElement("div");
+  card.className = "thread-card";
+  card.textContent = String(message || "");
+  if (retry) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "case-inline-action";
+    button.dataset.matterRetry = "messages";
+    button.textContent = "Retry";
+    card.append(" ", button);
+  }
+  item.append(card);
+  messageList.append(item);
+}
+
+async function loadMatterDocuments(caseId, { force = false } = {}) {
+  const key = matterSectionKey(caseId, "files");
+  if (!force && state.loadedMatterSections.has(key)) {
+    const cached = mergeDocuments(
+      state.caseDocumentsById.get(caseId) || [],
+      getOptimisticDocumentsForCase(caseId)
+    );
+    renderSharedDocuments(cached, caseId);
+    setMatterFilesState(cached.length ? `${cached.length} file${cached.length === 1 ? "" : "s"}` : "No files shared yet.");
+    return cached;
+  }
+  setMatterFilesState("Loading files…");
+  const sequence = ++state.matterSectionSequence;
+  try {
+    const documentsData = await fetchJSON(`/api/uploads/case/${encodeURIComponent(caseId)}?presentation=matter`, {
+      cache: "no-store",
+      noRedirect: true,
+    });
+    if (sequence !== state.matterSectionSequence || caseId !== state.activeCaseId) return [];
+    const serverDocuments = normalizeDocuments(documentsData);
+    state.caseDocumentsById.set(caseId, serverDocuments);
+    state.documentSnapshots.set(caseId, getDocumentSnapshot(serverDocuments));
+    state.loadedMatterSections.add(key);
+    const documents = mergeDocuments(serverDocuments, getOptimisticDocumentsForCase(caseId));
+    state.optimisticDocuments = pruneOptimisticDocuments(state.optimisticDocuments, serverDocuments, caseId);
+    renderSharedDocuments(documents, caseId);
+    setMatterFilesState(documents.length ? `${documents.length} file${documents.length === 1 ? "" : "s"}` : "No files shared yet.");
+    return documents;
+  } catch (error) {
+    if (sequence !== state.matterSectionSequence || caseId !== state.activeCaseId) return [];
+    renderSharedDocuments([], caseId, { emptyMessage: "Files could not be loaded." });
+    setMatterFilesState("Unable to load files.", { retry: true });
+    throw error;
+  }
+}
+
+async function loadMatterMessages(caseId, { force = false } = {}) {
+  const key = matterSectionKey(caseId, "messages");
+  if (!force && state.loadedMatterSections.has(key)) {
+    const messages = state.messageCacheByCase.get(caseId) || [];
+    const documents = mergeDocuments(
+      state.caseDocumentsById.get(caseId) || [],
+      getOptimisticDocumentsForCase(caseId)
+    );
+    renderThreadItems(messages, documents, caseId);
+    return messages;
+  }
+  renderMatterMessageState("Loading messages…");
+  const sequence = ++state.matterSectionSequence;
+  try {
+    const messagesPromise = fetchJSON(`/api/messages/${encodeURIComponent(caseId)}`, {
+      cache: "no-store",
+      noRedirect: true,
+    });
+    const documentsKey = matterSectionKey(caseId, "files");
+    const documentsPromise = state.loadedMatterSections.has(documentsKey)
+      ? Promise.resolve(state.caseDocumentsById.get(caseId) || [])
+      : fetchJSON(`/api/uploads/case/${encodeURIComponent(caseId)}?presentation=matter`, {
+          cache: "no-store",
+          noRedirect: true,
+        }).then(normalizeDocuments);
+    const [messagesData, serverDocuments] = await Promise.all([messagesPromise, documentsPromise]);
+    if (sequence !== state.matterSectionSequence || caseId !== state.activeCaseId) return [];
+    const messages = normalizeMessages(messagesData);
+    state.messageCacheByCase.set(caseId, messages);
+    state.messageSnapshots.set(caseId, getMessageSnapshot(messages));
+    state.caseDocumentsById.set(caseId, serverDocuments);
+    state.documentSnapshots.set(caseId, getDocumentSnapshot(serverDocuments));
+    state.loadedMatterSections.add(key);
+    state.loadedMatterSections.add(documentsKey);
+    const documents = mergeDocuments(serverDocuments, getOptimisticDocumentsForCase(caseId));
+    renderSharedDocuments(documents, caseId);
+    renderThreadItems(messages, documents, caseId);
+    markCaseMessagesRead(caseId, messages);
+    if (!getRequestedMessageId() && state.unreadByCase.has(caseId)) {
+      state.unreadByCase.set(caseId, 0);
+      renderCaseList();
+    }
+    return messages;
+  } catch (error) {
+    if (sequence !== state.matterSectionSequence || caseId !== state.activeCaseId) return [];
+    renderMatterMessageState("Messages could not be loaded.", { retry: true });
+    showMsg(messageStatus, error?.message || "Unable to load messages.");
+    throw error;
+  }
+}
+
+async function ensureMatterSectionData(section, { force = false } = {}) {
+  const tab = normalizeAvailableMatterTab(section);
+  const caseId = state.activeCaseId;
+  if (!caseId || !state.activeCase) return;
+  if (!["files", "messages"].includes(tab)) return;
+  if (!state.workspaceReadable) {
+    const workspace = getWorkspaceState(state.activeCase, resolveCaseState(state.activeCase));
+    const message = workspace.reason || "This section is unavailable in the current Matter state.";
+    if (tab === "files") {
+      renderSharedDocuments([], caseId, { emptyMessage: message });
+      setMatterFilesState(message);
+    } else {
+      renderWorkspaceLocked(message);
+    }
+    return;
+  }
+  try {
+    if (tab === "files") await loadMatterDocuments(caseId, { force });
+    if (tab === "messages") await loadMatterMessages(caseId, { force });
+  } catch (error) {
+    console.warn(`[matter-workspace] ${tab} refresh failed`, error);
+  }
+}
+
 async function loadCase(caseId, options = {}) {
   if (!caseId) return;
+  const caseLoadSequence = ++state.caseLoadSequence;
+  state.matterSectionSequence += 1;
+  state.workspaceReadable = false;
   stopMessagePolling();
   stopCaseStream();
-  setActiveCase(caseId);
+  setActiveCase(caseId, {
+    historyMode: options?.historyMode || "replace",
+    tab: options?.tab || "",
+  });
   state.forceScrollToBottom = true;
-  await restorePendingAttachments(caseId);
   const suppressStatus = options?.suppressStatus === true;
   if (!suppressStatus) {
     showMsg(messageStatus, "");
@@ -5190,6 +5642,7 @@ async function loadCase(caseId, options = {}) {
     const caseData = await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}`, {
       noRedirect: true,
     });
+    if (caseLoadSequence !== state.caseLoadSequence || caseId !== state.activeCaseId) return;
     if (getCurrentUserRole() === "paralegal" && isWithdrawnViewer(caseData)) {
       window.location.href = "dashboard-paralegal.html#cases";
       return;
@@ -5201,12 +5654,13 @@ async function loadCase(caseId, options = {}) {
       return;
     }
     const completionRedirect = getCompletionRedirect(caseData);
-    if (completionRedirect) {
+    if (completionRedirect && getCurrentUserRole() !== "attorney") {
       removeWorkspaceActions();
       window.location.href = completionRedirect;
       return;
     }
-    if (!isWorkspaceEligibleCase(caseData) && !shouldAllowCaseDetail(caseData)) {
+    const canShowAttorneyMatterContext = getCurrentUserRole() === "attorney";
+    if (!isWorkspaceEligibleCase(caseData) && !shouldAllowCaseDetail(caseData) && !canShowAttorneyMatterContext) {
       window.location.href = getWorkspaceRedirect(caseData);
       return;
     }
@@ -5216,63 +5670,35 @@ async function loadCase(caseId, options = {}) {
     updateCompleteAction(caseData, caseState);
     maybePromptAttorneyWithdrawalDecision(caseData);
     const workspace = getWorkspaceState(caseData, caseState);
-    const allowReadOnly = !workspace.ready && isWithdrawalPause(caseData);
+    const statusKey = normalizeCaseStatus(caseData?.status);
+    const allowReadOnly = !workspace.ready && (
+      isWithdrawalPause(caseData) ||
+      caseData?.readOnly === true ||
+      caseData?.paymentReleased === true ||
+      ["completed", "closed"].includes(statusKey)
+    );
+    state.workspaceReadable = workspace.ready || allowReadOnly;
     setWorkspaceEnabled(workspace.ready, allowReadOnly ? null : workspace.reason);
-    if (!workspace.ready && !allowReadOnly) {
-      renderWorkspaceLocked(workspace.reason);
-      showMsg(messageStatus, workspace.reason || "");
-      return;
-    }
-
-    let messages = [];
-    let documents = [];
-    let serverDocuments = [];
-    const cachedDocuments = state.caseDocumentsById.get(caseId) || [];
-    const optimisticDocuments = getOptimisticDocumentsForCase(caseId);
     state.taskSnapshots.set(caseId, getTaskSnapshot(caseData));
-
-    try {
-      const messagesData = await fetchJSON(`/api/messages/${encodeURIComponent(caseId)}`, {
-        cache: "no-store",
-        noRedirect: true,
-      });
-      messages = normalizeMessages(messagesData);
-    } catch (err) {
-      showMsg(messageStatus, err.message || "Unable to load messages.");
+    if (!state.workspaceReadable) {
+      removeWorkspaceActions();
+      renderWorkspaceLocked(workspace.reason);
+      renderSharedDocuments([], caseId, { emptyMessage: workspace.reason || "Files are unavailable." });
+      setMatterFilesState(workspace.reason || "Files are unavailable in the current Matter state.");
+      if (matterAddFilesButton) matterAddFilesButton.disabled = true;
+      showMsg(messageStatus, workspace.reason || "");
+    } else {
+      if (matterAddFilesButton) matterAddFilesButton.disabled = !workspace.ready;
+      const streamStarted = startCaseStream(caseId);
+      if (!streamStarted) startMessagePolling();
     }
-
-    state.messageCacheByCase.set(caseId, messages);
-    state.messageSnapshots.set(caseId, getMessageSnapshot(messages));
-    renderThreadItems(messages, optimisticDocuments, caseId);
-
-    try {
-      const documentsData = await fetchJSON(`/api/uploads/case/${encodeURIComponent(caseId)}`, {
-        cache: "no-store",
-        noRedirect: true,
-      });
-      serverDocuments = normalizeDocuments(documentsData);
-      state.caseDocumentsById.set(caseId, serverDocuments);
-    } catch {
-      serverDocuments = cachedDocuments;
+    await ensureMatterSectionData(state.activeMatterTab);
+    syncRequestedContextPanel();
+    if (!revealRequestedMessage({ reportMissing: true }) && !getRequestedMessageId()) {
+      showMsg(messageStatus, "");
     }
-
-    documents = mergeDocuments(serverDocuments, optimisticDocuments);
-    state.optimisticDocuments = pruneOptimisticDocuments(state.optimisticDocuments, serverDocuments, caseId);
-
-    renderSharedDocuments(documents, caseId);
-    renderThreadItems(messages, documents, caseId);
-    markCaseMessagesRead(caseId, messages);
-    state.documentSnapshots.set(caseId, getDocumentSnapshot(serverDocuments));
-    if (state.unreadByCase.has(caseId)) {
-      state.unreadByCase.set(caseId, 0);
-      renderCaseList();
-    }
-    const streamStarted = startCaseStream(caseId);
-    if (!streamStarted) {
-      startMessagePolling();
-    }
-    showMsg(messageStatus, "");
   } catch (err) {
+    if (caseLoadSequence !== state.caseLoadSequence) return;
     if ((err?.status === 403 || err?.status === 404) && getCurrentUserRole() === "paralegal") {
       if (redirectParalegalCompletionFallback(caseId, state.activeCase?.title || "")) {
         return;
@@ -5280,7 +5706,8 @@ async function loadCase(caseId, options = {}) {
       window.location.href = "dashboard-paralegal.html#cases";
       return;
     }
-    showMsg(messageStatus, err.message || "Unable to load case.");
+    renderMatterLoadFailure(err.message);
+    showMsg(messageStatus, err.message || "Unable to load Matter.");
   }
 }
 
@@ -5298,6 +5725,8 @@ function getLatestMessageTimestamp(messages = []) {
 }
 
 async function markCaseMessagesRead(caseId, messages = []) {
+  // Locating one referenced message must not mark unrelated messages read.
+  if (getRequestedMessageId()) return;
   const visibleMessages = filterMessagesForViewer(messages);
   const upTo = getLatestMessageTimestamp(visibleMessages);
   if (!caseId || !upTo) return;
@@ -5400,6 +5829,10 @@ function stopCaseStream() {
     state.caseEventSource.close();
     state.caseEventSource = null;
   }
+  if (state.caseStreamReconnectTimer) {
+    clearTimeout(state.caseStreamReconnectTimer);
+    state.caseStreamReconnectTimer = null;
+  }
   state.caseStreamActive = false;
 }
 
@@ -5419,8 +5852,19 @@ function startCaseStream(caseId) {
   });
 
   source.addEventListener("error", () => {
+    if (state.caseEventSource !== source) return;
     state.caseStreamActive = false;
+    source.close();
+    state.caseEventSource = null;
     if (!state.messagePollTimer) startMessagePolling();
+    if (!document.hidden && !state.caseStreamReconnectTimer) {
+      state.caseStreamReconnectTimer = setTimeout(() => {
+        state.caseStreamReconnectTimer = null;
+        if (state.activeCaseId === caseId && state.workspaceReadable) {
+          startCaseStream(caseId);
+        }
+      }, 5000);
+    }
   });
 
   source.addEventListener("messages", () => handleRefresh({ messages: true }));
@@ -5516,7 +5960,7 @@ async function refreshCaseRealtime(options = null) {
 
     if (fetchDocuments) {
       try {
-        const documentsData = await fetchJSON(`/api/uploads/case/${encodeURIComponent(caseId)}`, {
+        const documentsData = await fetchJSON(`/api/uploads/case/${encodeURIComponent(caseId)}?presentation=matter`, {
           cache: "no-store",
           noRedirect: true,
         });
@@ -5582,7 +6026,7 @@ async function refreshCaseRealtime(options = null) {
       renderThreadItems(threadMessages, mergedDocuments, caseId);
       if (messagesOk) {
         markCaseMessagesRead(caseId, threadMessages);
-        if (state.unreadByCase.has(caseId)) {
+        if (!getRequestedMessageId() && state.unreadByCase.has(caseId)) {
           state.unreadByCase.set(caseId, 0);
           renderCaseList();
         }
@@ -5639,8 +6083,8 @@ async function handleSendMessage(event) {
   showMsg(messageStatus, attachments.length ? "Preparing uploads..." : "");
 
   try {
-    await fetchCSRF().catch(() => "");
     if (attachments.length) {
+      await fetchCSRF(true).catch(() => "");
       const total = attachments.length;
       let current = 0;
       for (const entry of attachments) {
@@ -5671,7 +6115,7 @@ async function handleSendMessage(event) {
       autoResizeMessageInput();
     }
 
-    await loadCase(caseId, { suppressStatus: true });
+    await loadMatterMessages(caseId, { force: true });
     flashMessageStatus("Sent");
   } catch (err) {
     showMsg(messageStatus, err.message || "Unable to send update.");
@@ -5685,13 +6129,13 @@ function handleCaseListClick(event) {
   if (!button) return;
   const caseId = button.dataset.caseId;
   if (!caseId || caseId === state.activeCaseId) return;
-  loadCase(caseId);
+  loadCase(caseId, { historyMode: "push", tab: "overview" });
 }
 
 function handleCaseSelect(event) {
   const selectedId = String(event.target.value || "");
   if (!selectedId || selectedId === state.activeCaseId) return;
-  loadCase(selectedId);
+  loadCase(selectedId, { historyMode: "push", tab: "overview" });
 }
 
 function handleTabClick(event) {
@@ -5701,6 +6145,37 @@ function handleTabClick(event) {
   state.filter = label.includes("unread") ? "unread" : "active";
   caseTabs.forEach((btn) => btn.setAttribute("aria-selected", btn === tab ? "true" : "false"));
   renderCaseList();
+}
+
+function handleMatterTabClick(event) {
+  const tab = event.currentTarget?.dataset?.matterTab;
+  if (!tab) return;
+  activateMatterTab(tab, { historyMode: "push" });
+}
+
+function handleMatterTabKeydown(event) {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  const visibleTabs = matterTabs.filter((tab) => !tab.hidden && !tab.disabled);
+  if (!visibleTabs.length) return;
+  event.preventDefault();
+  const currentIndex = Math.max(0, visibleTabs.indexOf(event.currentTarget));
+  let nextIndex = currentIndex;
+  if (event.key === "Home") nextIndex = 0;
+  if (event.key === "End") nextIndex = visibleTabs.length - 1;
+  if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % visibleTabs.length;
+  if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + visibleTabs.length) % visibleTabs.length;
+  activateMatterTab(visibleTabs[nextIndex].dataset.matterTab, { historyMode: "push", focus: true });
+}
+
+function handleMatterHistoryChange() {
+  const params = new URLSearchParams(window.location.search);
+  const caseId = String(params.get("caseId") || "");
+  const tab = getRequestedMatterTab();
+  if (caseId && caseId !== state.activeCaseId) {
+    void loadCase(caseId, { historyMode: "none", tab });
+    return;
+  }
+  activateMatterTab(tab, { historyMode: "none", focus: false });
 }
 
 function setCaseNavStatus(message) {
@@ -5733,7 +6208,7 @@ function populateCaseSelect() {
     caseSelect.innerHTML = "";
     const emptyOption = document.createElement("option");
     emptyOption.value = "";
-    emptyOption.textContent = "No active cases";
+    emptyOption.textContent = "No active Matters";
     caseSelect.appendChild(emptyOption);
     caseSelect.disabled = true;
     return;
@@ -5749,14 +6224,14 @@ function populateCaseSelect() {
   caseSelect.innerHTML = "";
   const placeholder = document.createElement("option");
   placeholder.value = "";
-  placeholder.textContent = "Select a case";
+  placeholder.textContent = "Select a Matter";
   caseSelect.appendChild(placeholder);
   sorted.forEach((item) => {
     const id = getCaseId(item);
     if (!id) return;
     const option = document.createElement("option");
     option.value = id;
-    option.textContent = item?.title || "Case";
+    option.textContent = item?.title || "Matter";
     caseSelect.appendChild(option);
   });
   updateCaseSelectSelection();
@@ -5797,7 +6272,7 @@ function renderCaseNavList() {
     if (!activeCases.length) return;
     activeCases.forEach((item) => {
       const caseId = getCaseId(item);
-      const title = String(item?.title || item?.name || "Untitled Case");
+      const title = String(item?.title || item?.name || "Untitled Matter");
       const li = document.createElement("li");
       const link = document.createElement("a");
       link.className = "case-nav-link";
@@ -5807,7 +6282,7 @@ function renderCaseNavList() {
       list.appendChild(li);
     });
   });
-  setCaseNavStatus(activeCases.length ? "" : "No active cases.");
+  setCaseNavStatus(activeCases.length ? "" : "No active Matters.");
 }
 
 function initCaseNavDropdowns() {
@@ -5889,15 +6364,6 @@ function initProfileMenu() {
     window.location.href = "profile-settings.html";
   });
 
-  logoutTrigger?.addEventListener("click", (event) => {
-    event.preventDefault();
-    if (typeof window.logoutUser === "function") {
-      window.logoutUser(event);
-    } else {
-      window.location.href = "login.html";
-    }
-  });
-
   document.addEventListener("click", (event) => {
     if (!profileMenu || !profileToggle) return;
     if (profileMenu.contains(event.target) || profileToggle.contains(event.target)) return;
@@ -5929,14 +6395,15 @@ function initTasksHelpPopover() {
 
 function init() {
   syncThemeFromSession();
-  syncRoleVisibility();
+  hydrateRoleVisibility();
   normalizeAttorneyCaseTheme();
-  loadUserHeaderInfo().catch(() => {});
+  loadUserHeaderInfo().catch((error) => console.warn("[matter] header hydration rejected", error));
   initBackButton();
   initProfileMenu();
   ensureCompleteButtonBinding();
   initTasksHelpPopover();
   initCaseNavDropdowns();
+  registerMatterContextPanelAdapters();
   if (messageForm) {
     messageForm.addEventListener("submit", handleSendMessage);
   }
@@ -5961,9 +6428,15 @@ function init() {
     messagePanel.addEventListener("dragleave", handleDragLeave);
     messagePanel.addEventListener("drop", handleDrop);
   }
-  window.addEventListener("resize", syncSharedDocumentsHeightLimit);
+  window.addEventListener("resize", () => {
+    syncSharedDocumentsHeightLimit();
+    ensureActiveMatterTabVisible();
+  });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
+      if (!state.caseStreamActive && state.workspaceReadable && state.activeCaseId) {
+        startCaseStream(state.activeCaseId);
+      }
       refreshCaseRealtime({ messages: true, documents: true, tasks: true });
       syncWorkspacePresence();
       return;
@@ -5993,33 +6466,76 @@ function init() {
   if (caseRelistButton) {
     caseRelistButton.addEventListener("click", handleRelistCase);
   }
+  matterTabs.forEach((tab) => {
+    tab.addEventListener("click", handleMatterTabClick);
+    tab.addEventListener("keydown", handleMatterTabKeydown);
+  });
+  matterMessagesSkipLink?.addEventListener("click", (event) => {
+    if (!state.availableMatterTabs.has("messages")) return;
+    event.preventDefault();
+    activateMatterTab("messages", { historyMode: "push", focus: false });
+    window.requestAnimationFrame(() => caseThread?.focus({ preventScroll: false }));
+  });
+  caseNextAction?.addEventListener("click", (event) => {
+    const tab = String(caseNextAction.dataset.matterTabTarget || "");
+    if (!state.availableMatterTabs.has(tab)) return;
+    event.preventDefault();
+    activateMatterTab(tab, { historyMode: "push", focus: true });
+  });
+  matterAddFilesButton?.addEventListener("click", () => {
+    if (!state.workspaceEnabled || !messageAttachment) return;
+    activateMatterTab("messages", { historyMode: "push" });
+    window.requestAnimationFrame(() => messageAttachment.click());
+  });
+  document.addEventListener("click", (event) => {
+    const retry = event.target.closest("[data-matter-retry]");
+    if (!retry) return;
+    void ensureMatterSectionData(retry.dataset.matterRetry, { force: true });
+  });
+  window.addEventListener("popstate", handleMatterHistoryChange);
   caseTabs.forEach((tab) => tab.addEventListener("click", handleTabClick));
-  if (messageList) {
-    messageList.addEventListener("submit", (event) => {
-      if (event.target?.dataset?.documentCommentForm) {
-        event.preventDefault();
-        showMsg(messageStatus, "Commenting will be available soon.");
-      }
-    });
-  }
-
   const params = new URLSearchParams(window.location.search);
   const fromQuery = params.get("caseId");
+  if (fromQuery) {
+    loadCase(fromQuery);
+    loadCases()
+      .then(loadUnreadCounts)
+      .catch((err) => {
+        showMsg(caseListStatus, err.message || "Unable to load Matter list.");
+      });
+    return;
+  }
   loadCases()
     .then(loadUnreadCounts)
     .then(() => {
       const source = state.caseOptions.length ? state.caseOptions : state.cases;
-      const initial = fromQuery || (source[0] ? getCaseId(source[0]) : "");
+      const initial = source[0] ? getCaseId(source[0]) : "";
       if (initial) {
         loadCase(initial);
         return;
       }
       showMsg(caseListStatus, "");
-      setCaseNavStatus("No active cases.");
+      setCaseNavStatus("No active Matters.");
     })
     .catch((err) => {
-      showMsg(caseListStatus, err.message || "Unable to load cases.");
+      showMsg(caseListStatus, err.message || "Unable to load Matters.");
     });
 }
+
+window.LPCMatterNavigation = Object.freeze({
+  activateTab(tab) {
+    const requested = String(tab || "").toLowerCase();
+    if (!state.activeCaseId || !state.availableMatterTabs.has(requested)) return false;
+    activateMatterTab(requested, { historyMode: "push", focus: true });
+    return true;
+  },
+  current() {
+    return {
+      caseId: state.activeCaseId,
+      tab: state.activeMatterTab,
+      availableTabs: [...state.availableMatterTabs],
+    };
+  },
+});
 
 init();

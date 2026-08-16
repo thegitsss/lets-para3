@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:events");
 // backend/routes/events.js
 const router = require("express").Router();
 const mongoose = require("mongoose");
@@ -6,17 +8,7 @@ const { requireApproved, requireRole } = require("../utils/authz");
 const Event = require("../models/Event");
 const { logAction } = require("../utils/audit");
 const { assertCaseParticipant } = require("../middleware/ensureCaseParticipant");
-
-// ----------------------------------------
-// CSRF (enabled in production or when ENABLE_CSRF=true)
-// ----------------------------------------
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
-}
+const { csrfProtection, respondToCsrfError } = require("../utils/csrf");
 
 // ----------------------------------------
 // Helpers
@@ -297,8 +289,9 @@ router.delete(
 // Route-level error fallback
 // ----------------------------------------
 router.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(500).json({ error: "Server error", detail: err?.message || "Unknown error" });
+  if (respondToCsrfError(err, res)) return;
+  runtimeLogger.error(err);
+  res.status(500).json({ error: "Server error" });
 });
 
 module.exports = router;

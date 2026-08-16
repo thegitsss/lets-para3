@@ -5,7 +5,6 @@ const mongoose = require("mongoose");
 const request = require("supertest");
 
 const User = require("../models/User");
-const AiIssueReport = require("../models/AiIssueReport");
 const Incident = require("../models/Incident");
 const Case = require("../models/Case");
 const ApprovalTask = require("../models/ApprovalTask");
@@ -110,44 +109,8 @@ describe("AI Control Room source hygiene", () => {
     expect(res.body.summary.health.note).toMatch(/INC-20260320-100050/i);
   });
 
-  test("filters QA/dev legacy issue rows and synthetic users from War Room summary data", async () => {
+  test("filters synthetic users from War Room summary data and uses canonical incidents", async () => {
     const admin = await createAdmin();
-
-    await AiIssueReport.create([
-      {
-        role: "attorney",
-        surface: "attorney",
-        page: "attorney dashboard qa",
-        featureLabel: "attorney dashboard qa",
-        issueType: "bug",
-        description: "QA attorney issue: the hire button is not working and I cannot submit.",
-        blockedSeverity: "high",
-        affectsCaseProgress: true,
-        status: "new",
-      },
-      {
-        role: "paralegal",
-        surface: "paralegal",
-        page: "paralegal dashboard qa",
-        featureLabel: "paralegal dashboard qa",
-        issueType: "bug",
-        description: "QA paralegal issue: the application page is broken and the button will not load.",
-        blockedSeverity: "high",
-        affectsCaseProgress: true,
-        status: "reviewed",
-      },
-      {
-        role: "attorney",
-        surface: "attorney",
-        page: "case detail",
-        featureLabel: "hire flow",
-        issueType: "bug",
-        description: "The hire action is blocked after case submission refresh.",
-        blockedSeverity: "high",
-        affectsCaseProgress: true,
-        status: "new",
-      },
-    ]);
 
     await Incident.create([
       {
@@ -983,72 +946,18 @@ describe("AI Control Room source hygiene", () => {
     );
   });
 
-  test("legacy issues route is explicitly marked non-canonical", async () => {
+  test("retired legacy issue collection routes are unavailable", async () => {
     const admin = await createAdmin();
-    await AiIssueReport.create({
-      role: "attorney",
-      surface: "attorney",
-      page: "case detail",
-      featureLabel: "legacy issue queue item",
-      issueType: "bug",
-      description: "Legacy issue queue entry retained for compatibility.",
-      blockedSeverity: "medium",
-      status: "new",
-    });
 
-    const res = await request(app)
+    const listRes = await request(app)
       .get("/api/admin/ai/issues")
       .set("Cookie", authCookieFor(admin));
-
-    expect(res.status).toBe(200);
-    expect(res.headers["x-lpc-legacy-route"]).toBe("true");
-    expect(res.headers["x-lpc-canonical-ops-source"]).toBe("Incident");
-    expect(res.headers.warning).toMatch(/Compatibility-only legacy route/i);
-    expect(res.headers["cache-control"]).toBe("no-store");
-    expect(res.body.meta).toEqual(
-      expect.objectContaining({
-        legacy: true,
-        canonical: false,
-        visibility: "compatibility_only",
-        deprecationStatus: "non_canonical",
-        sourceModel: "AiIssueReport",
-        canonicalOpsSource: "Incident",
-        replacementRoute: "/api/admin/incidents",
-      })
-    );
-  });
-
-  test("legacy issue patch route keeps legacy metadata visible", async () => {
-    const admin = await createAdmin();
-    const issue = await AiIssueReport.create({
-      role: "attorney",
-      surface: "attorney",
-      page: "case detail",
-      featureLabel: "legacy queue issue",
-      issueType: "bug",
-      description: "Legacy issue queue patch retained for compatibility.",
-      blockedSeverity: "medium",
-      status: "new",
-    });
-
-    const res = await request(app)
-      .patch(`/api/admin/ai/issues/${issue._id}`)
+    const patchRes = await request(app)
+      .patch(`/api/admin/ai/issues/${new mongoose.Types.ObjectId()}`)
       .set("Cookie", authCookieFor(admin))
       .send({ status: "reviewed" });
 
-    expect(res.status).toBe(200);
-    expect(res.headers["x-lpc-legacy-route"]).toBe("true");
-    expect(res.headers["x-lpc-canonical-ops-source"]).toBe("Incident");
-    expect(res.headers.warning).toMatch(/Compatibility-only legacy route/i);
-    expect(res.headers["cache-control"]).toBe("no-store");
-    expect(res.body.meta).toEqual(
-      expect.objectContaining({
-        legacy: true,
-        canonical: false,
-        visibility: "compatibility_only",
-        deprecationStatus: "non_canonical",
-      })
-    );
-    expect(res.body.issue.status).toBe("reviewed");
+    expect(listRes.status).toBe(404);
+    expect(patchRes.status).toBe(404);
   });
 });

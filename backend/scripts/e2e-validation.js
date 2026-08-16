@@ -3,22 +3,9 @@ const http = require("http");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const multer = require("multer");
-const puppeteer = require("puppeteer");
+const { clickVisible, launchPuppeteer } = require("./puppeteerBrowser");
 
-function patchElementHandleClick() {
-  const { ElementHandle } = puppeteer;
-  if (!ElementHandle || ElementHandle.prototype.__safeClickPatched) return;
-  const original = ElementHandle.prototype.click;
-  ElementHandle.prototype.click = async function (...args) {
-    try {
-      return await this.evaluate((el) => el.click());
-    } catch {
-      return original.apply(this, args);
-    }
-  };
-  ElementHandle.prototype.__safeClickPatched = true;
-}
-patchElementHandleClick();
+const VALID_PASSWORD = "Correct-Horse-Battery-Staple-9";
 
 function startStubServer() {
   const app = express();
@@ -62,18 +49,11 @@ async function gotoSignup(page, baseUrl) {
   });
 }
 
-async function safeClick(page, selector) {
-  await page.evaluate((sel) => document.querySelector(sel)?.click(), selector);
-}
-
 async function fillStepOne(page, { firstName, lastName, email, password }) {
-  await page.type("#firstName", firstName);
-  await page.type("#lastName", lastName);
+  await page.type("#fullName", `${firstName} ${lastName}`);
   await page.type("#email", email);
   await page.type("#password", password);
-  await page.type("#passwordConfirm", password);
-  await safeClick(page, "#termsAccept");
-  await safeClick(page, "#nextStepBtn");
+  await clickVisible(page, "#nextStepBtn");
   await page.waitForSelector("#stepTwoPanel:not(.hidden-step)");
 }
 
@@ -83,10 +63,11 @@ async function submitAttorneySignup(page, { barNumber, barState, goodStanding = 
     await page.select("#barState", barState);
   }
   if (goodStanding) {
-    await safeClick(page, "#attorneyGoodStanding");
+    await clickVisible(page, "#attorneyGoodStanding");
   }
-  await safeClick(page, "#attorneyPricingAck");
-  await safeClick(page, "#submitBtn");
+  await clickVisible(page, "#termsAccept");
+  await clickVisible(page, "#attorneyPricingAck");
+  await clickVisible(page, "#submitBtn");
   await page.waitForSelector("#msg.show");
   return page.$eval("#msg", (el) => el.textContent.trim());
 }
@@ -95,7 +76,7 @@ async function run() {
   const { server, port } = await startStubServer();
   const baseUrl = `http://localhost:${port}`;
 
-  const browser = await puppeteer.launch({
+  const browser = await launchPuppeteer({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
     protocolTimeout: 120_000,
@@ -131,12 +112,11 @@ async function run() {
       configurePage(page);
       await page.setViewport({ width: 1280, height: 720 });
       await gotoSignup(page, baseUrl);
-      await safeClick(page, "#btnA");
       await fillStepOne(page, {
         firstName: "Test",
         lastName: "Attorney",
         email: "invalidbar@example.com",
-        password: "Password123!",
+        password: VALID_PASSWORD,
       });
       const msg = await submitAttorneySignup(page, {
         barNumber: "CA",
@@ -157,17 +137,17 @@ async function run() {
       configurePage(page);
       await page.setViewport({ width: 1280, height: 720 });
       await gotoSignup(page, baseUrl);
-      await safeClick(page, "#btnA");
       await fillStepOne(page, {
         firstName: "Test",
         lastName: "Attorney",
         email: "pricingack@example.com",
-        password: "Password123!",
+        password: VALID_PASSWORD,
       });
       await page.type("#bar", "CA12345");
       await page.select("#barState", "CA");
-      await safeClick(page, "#attorneyGoodStanding");
-      await safeClick(page, "#submitBtn");
+      await clickVisible(page, "#termsAccept");
+      await clickVisible(page, "#attorneyGoodStanding");
+      await clickVisible(page, "#submitBtn");
       await page.waitForSelector("#msg.show");
       const msg = await page.$eval("#msg", (el) => el.textContent.trim());
       const inlinePricingError = await page.$eval("#attorneyPricingError", (el) => ({
@@ -175,7 +155,7 @@ async function run() {
         shown: el.classList.contains("show"),
       }));
       const pricingInvalid = await page.$eval("#attorneyPricingAck", (el) => el.getAttribute("aria-invalid"));
-      if (!msg.includes("$400 minimum case requirement")) {
+      if (!msg.includes("$400 minimum Matter requirement")) {
         throw new Error(`Expected pricing acknowledgement message, got: ${msg}`);
       }
       if (!inlinePricingError.shown || !inlinePricingError.text.includes("$400 minimum")) {
@@ -196,12 +176,11 @@ async function run() {
       configurePage(page);
       await page.setViewport({ width: 1280, height: 720 });
       await gotoSignup(page, baseUrl);
-      await safeClick(page, "#btnA");
       await fillStepOne(page, {
         firstName: "Test",
         lastName: "Attorney",
         email: "missingstate@example.com",
-        password: "Password123!",
+        password: VALID_PASSWORD,
       });
       const msg = await submitAttorneySignup(page, {
         barNumber: "12345",
@@ -233,12 +212,11 @@ async function run() {
       configurePage(page);
       await page.setViewport({ width: 1280, height: 720 });
       await gotoSignup(page, baseUrl);
-      await safeClick(page, "#btnA");
       await fillStepOne(page, {
         firstName: "Valid",
         lastName: "Attorney",
         email: testCase.email,
-        password: "Password123!",
+        password: VALID_PASSWORD,
       });
       const msg = await submitAttorneySignup(page, {
         barNumber: testCase.bar,

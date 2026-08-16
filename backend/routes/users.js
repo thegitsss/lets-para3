@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger, logPromiseFailure } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:users");
 // backend/routes/users.js
 const router = require("express").Router();
 const paralegalRouter = require("express").Router();
@@ -8,21 +10,29 @@ const requireApprovedUser = require("../middleware/requireApprovedUser");
 const User = require("../models/User");
 const Case = require("../models/Case");
 const Application = require("../models/Application");
-const Task = require("../models/Task");
+const ChecklistTask = require("../models/ChecklistTask");
 const Notification = require("../models/Notification");
 const Job = require("../models/Job");
 const Block = require("../models/Block");
 const WeeklyNote = require("../models/WeeklyNote");
 const { maskProfanity } = require("../utils/badWords");
 const { logAction } = require("../utils/audit");
-const { notifyUser } = require("../utils/notifyUser");
+const { csrfProtection, respondToCsrfError } = require("../utils/csrf");
+const { createS3Client } = require("../utils/s3Client");
 const { cleanMessage } = require("../utils/sanitize");
 const {
   applyPublicParalegalFilter,
   hasRequiredParalegalFieldsForPublic,
 } = require("../utils/paralegalProfile");
-const { ensureApprovedUserAuthReady } = require("../utils/authReady");
+const { buildObjectDeepLink } = require("../services/objectDeepLinks");
 const { normalizeEmail, sendVerificationEmail } = require("../utils/emailVerification");
+const {
+  buildAuthenticatedProfilePhotoUrl,
+  buildPublicProfilePhotoUrl,
+  hasPhotoReference,
+  resolveProfilePhotoKey,
+  streamProfilePhoto,
+} = require("../services/profilePhotoDelivery");
 const {
   ACTIVE_BLOCK_FILTER,
   BLOCKED_MESSAGE,
@@ -31,17 +41,14 @@ const {
   getBlockedUserIds,
   isBlockedBetween,
 } = require("../utils/blocks");
-
-// ----------------------------------------
-// CSRF (enabled in production or when ENABLE_CSRF=true)
-// ----------------------------------------
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
-}
+const { extractPersonalFileKey } = require("../utils/personalFileReference");
+const {
+  activatePersonalStorageDeletion,
+  cancelPersonalStorageDeletion,
+  collectUserPersonalStorageKeys,
+  normalizeOwnedPersonalKey,
+  stagePersonalStorageDeletion,
+} = require("../services/personalStorageDeletion");
 
 // ----------------------------------------
 // Helpers
@@ -49,15 +56,7 @@ if (REQUIRE_CSRF) {
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const isObjId = (id) => mongoose.isValidObjectId(id);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
-const isURL = (v) => {
-  if (!v || typeof v !== "string") return false;
-  try {
-    const u = new URL(v);
-    return ["http:", "https:"].includes(u.protocol);
-  } catch {
-    return false;
-  }
-};
+const { normalizeHttpUrl } = require("../utils/httpUrl");
 const normStr = (s, { len = 4000 } = {}) => String(s || "").replace(/[\u0000-\u001F\u007F]/g, "").slice(0, len);
 const cleanList = (value) => {
   if (!value) return [];
@@ -96,14 +95,17 @@ const cleanLanguages = (value) => {
     .filter(Boolean);
 };
 const resolveParalegalId = (rawId, userId) => (rawId === "me" ? userId : rawId);
+const profilePhotoS3 = createS3Client();
 const hasAttorneyParalegalAccess = async (attorneyId, paralegalId) => {
   if (!isObjId(attorneyId) || !isObjId(paralegalId)) return false;
   const caseMatch = await Case.exists({
-    attorneyId,
-    $or: [
-      { paralegal: paralegalId },
-      { paralegalId },
-      { "applicants.paralegalId": paralegalId },
+    $and: [
+      { $or: [{ attorney: attorneyId }, { attorneyId }] },
+      { $or: [
+        { paralegal: paralegalId },
+        { paralegalId },
+        { "applicants.paralegalId": paralegalId },
+      ] },
     ],
   });
   if (caseMatch) return true;
@@ -118,7 +120,6 @@ const normalizeAvailability = (val) => {
   if (typeof val === "boolean") return val ? "Available Now" : "Unavailable";
   return null;
 };
-const isStorageKey = (value) => typeof value === "string" && /^paralegal-(?:resumes|certificates)\//i.test(value.trim());
 const parseParalegalFilters = (query = {}) => {
   const {
     search = "",
@@ -157,18 +158,16 @@ const parseParalegalFilters = (query = {}) => {
 };
 
 const SAFE_PUBLIC_SELECT =
-  "_id firstName lastName avatarURL profileImage profileImageOriginal pendingProfileImage pendingProfileImageOriginal profilePhotoStatus location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt createdAt languages writingSamples status stateExperience";
+  "_id role firstName lastName avatarURL profileImage profileImageOriginal pendingProfileImage pendingProfileImageOriginal profilePhotoStatus location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt createdAt updatedAt languages writingSamples status stateExperience";
 const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email pendingEmail pendingEmailRequestedAt phoneNumber onboarding pendingHire`;
-const FILE_PUBLIC_BASE =
-  (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
-  (process.env.S3_BUCKET && process.env.S3_REGION
-    ? `https://${process.env.S3_BUCKET}.s3.${process.env.S3_REGION}.amazonaws.com`
-    : "");
-
-function toPublicUrl(val) {
-  if (!val) return "";
-  if (/^https?:\/\//i.test(val)) return val;
-  return FILE_PUBLIC_BASE ? `${FILE_PUBLIC_BASE}/${String(val).replace(/^\/+/, "")}` : val;
+function protectedDocumentKey(value, ownerId, type) {
+  return extractPersonalFileKey(value, {
+    ownerId,
+    type,
+    bucket: process.env.S3_BUCKET,
+    region: process.env.S3_REGION,
+    cdnBase: process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL,
+  });
 }
 
 function serializePublicUser(user, { includeEmail = false, includeStatus = false, includePhotoMeta = false } = {}) {
@@ -176,8 +175,20 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
   const src = user.toObject ? user.toObject() : user;
   const role = String(src.role || "").toLowerCase();
   const isParalegal = role === "paralegal";
-  const profileImage = toPublicUrl(src.profileImage || "");
-  const avatarURL = toPublicUrl(src.avatarURL || profileImage);
+  const hasApprovedPhoto = hasPhotoReference(src, "approved");
+  const hasPendingPhoto = hasPhotoReference(src, "pending");
+  const publicPhotoReady =
+    isParalegal &&
+    String(src.profilePhotoStatus || "").toLowerCase() === "approved" &&
+    !hasPendingPhoto &&
+    src.preferences?.hideProfile !== true &&
+    hasRequiredParalegalFieldsForPublic(src);
+  const profileImage = hasApprovedPhoto
+    ? publicPhotoReady
+      ? buildPublicProfilePhotoUrl(src)
+      : buildAuthenticatedProfilePhotoUrl(src)
+    : "";
+  const avatarURL = profileImage;
   const rawPhotoStatus = String(src.profilePhotoStatus || "").trim();
   const resolvedPhotoStatus = isParalegal
     ? rawPhotoStatus ||
@@ -185,12 +196,14 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
     : avatarURL || profileImage
     ? "approved"
     : "unsubmitted";
-  const certificateURL = toPublicUrl(src.certificateURL || "");
-  const writingSampleURL = toPublicUrl(src.writingSampleURL || "");
-  const resumeURL = toPublicUrl(src.resumeURL || "");
-  const profileImageOriginal = toPublicUrl(src.profileImageOriginal || "");
-  const pendingProfileImageOriginal = isParalegal
-    ? toPublicUrl(src.pendingProfileImageOriginal || "")
+  const certificateURL = protectedDocumentKey(src.certificateURL, src._id, "certificate");
+  const writingSampleURL = protectedDocumentKey(src.writingSampleURL, src._id, "writingSample");
+  const resumeURL = protectedDocumentKey(src.resumeURL, src._id, "resume");
+  const profileImageOriginal = includePhotoMeta && hasPhotoReference(src, "approved-original")
+    ? buildAuthenticatedProfilePhotoUrl(src, { variant: "approved-original" })
+    : "";
+  const pendingProfileImageOriginal = includePhotoMeta && hasPhotoReference(src, "pending-original")
+    ? buildAuthenticatedProfilePhotoUrl(src, { variant: "pending-original" })
     : "";
   const payload = {
     _id: String(src._id),
@@ -214,9 +227,9 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
     certificateURL,
     writingSampleURL,
     resumeURL,
-    certificateKey: src.certificateURL || "",
-    resumeKey: src.resumeURL || "",
-    writingSampleKey: src.writingSampleURL || "",
+    certificateKey: certificateURL,
+    resumeKey: resumeURL,
+    writingSampleKey: writingSampleURL,
     education: Array.isArray(src.education) ? src.education : [],
     experience: Array.isArray(src.experience) ? src.experience : [],
     availability: src.availability || "",
@@ -251,7 +264,9 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
   }
   if (includePhotoMeta) {
     payload.profilePhotoStatus = resolvedPhotoStatus;
-    payload.pendingProfileImage = isParalegal ? toPublicUrl(src.pendingProfileImage || "") : "";
+    payload.pendingProfileImage = hasPhotoReference(src, "pending")
+      ? buildAuthenticatedProfilePhotoUrl(src, { variant: "pending" })
+      : "";
     payload.profileImageOriginal = profileImageOriginal;
     payload.pendingProfileImageOriginal = pendingProfileImageOriginal;
   }
@@ -260,7 +275,6 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
 
 function serializeOnboarding(onboarding = {}) {
   return {
-    paralegalWelcomeDismissed: Boolean(onboarding?.paralegalWelcomeDismissed),
     paralegalTourCompleted: Boolean(onboarding?.paralegalTourCompleted),
     paralegalProfileTourCompleted: Boolean(onboarding?.paralegalProfileTourCompleted),
     attorneyTourCompleted: Boolean(onboarding?.attorneyTourCompleted),
@@ -287,13 +301,7 @@ function hasAttorneyProfileDetails(user = {}) {
 
 function resolveAttorneyProfileCompleted(user = {}) {
   if (user?.onboarding?.attorneyProfileCompleted) return true;
-  if (hasAttorneyProfileDetails(user)) return true;
-  const createdAt = user?.createdAt ? new Date(user.createdAt) : null;
-  const updatedAt = user?.updatedAt ? new Date(user.updatedAt) : null;
-  if (createdAt instanceof Date && updatedAt instanceof Date && !Number.isNaN(createdAt.valueOf()) && !Number.isNaN(updatedAt.valueOf())) {
-    return updatedAt.valueOf() > createdAt.valueOf();
-  }
-  return false;
+  return hasAttorneyProfileDetails(user);
 }
 
 function serializePendingHire(pendingHire = {}) {
@@ -318,9 +326,10 @@ function formatDisplayName(user) {
 async function buildNotifications(userDoc) {
   const ownerId = userDoc._id || userDoc.id;
   const lastSeen = userDoc.notificationsLastViewedAt || null;
-  const taskFilter = { owner: ownerId, deleted: { $ne: true } };
+  const isAttorney = String(userDoc.role).toLowerCase() === "attorney";
+  const taskFilter = { owner: ownerId };
   const caseFilter = {};
-  if (String(userDoc.role).toLowerCase() === "attorney") {
+  if (isAttorney) {
     caseFilter.attorney = ownerId;
   } else if (String(userDoc.role).toLowerCase() === "paralegal") {
     caseFilter.paralegal = ownerId;
@@ -328,10 +337,12 @@ async function buildNotifications(userDoc) {
 
   const [stored, tasks, cases] = await Promise.all([
     Notification.find({ userId: ownerId }).sort({ createdAt: -1 }).limit(12).lean(),
-    Task.find(taskFilter)
-      .sort({ updatedAt: -1 })
-      .limit(8)
-      .select("title notes due createdAt updatedAt caseId done"),
+    isAttorney
+      ? ChecklistTask.find(taskFilter)
+        .sort({ updatedAt: -1 })
+        .limit(8)
+        .select("title notes due createdAt updatedAt caseId done")
+      : Promise.resolve([]),
     Object.keys(caseFilter).length
       ? Case.find(caseFilter).sort({ updatedAt: -1 }).limit(5).select("title status updatedAt _id")
       : Promise.resolve([]),
@@ -380,8 +391,8 @@ async function buildNotifications(userDoc) {
     items.push({
       id: `case-${c._id}`,
       type: "case",
-      title: c.title || "Case update",
-      body: c.status ? `Status updated to ${c.status.replace(/_/g, " ")}` : "Case timeline updated.",
+      title: c.title || "Matter update",
+      body: c.status ? `Status updated to ${c.status.replace(/_/g, " ")}` : "Matter timeline updated.",
       createdAt,
       caseId: String(c._id),
       read: lastSeen ? !(createdAt > lastSeen) : false,
@@ -394,6 +405,96 @@ async function buildNotifications(userDoc) {
 // all routes require auth
 router.use(verifyToken);
 paralegalRouter.use(verifyToken);
+
+router.get(
+  "/profile-photo/:userId",
+  requireApprovedUser,
+  asyncHandler(async (req, res) => {
+    const userId = String(req.params.userId || "");
+    const variant = String(req.query?.variant || "approved").trim().toLowerCase();
+    const allowedVariants = new Set(["approved", "approved-original", "pending", "pending-original"]);
+    if (!isObjId(userId) || !allowedVariants.has(variant) || !process.env.S3_BUCKET) {
+      res.set("Cache-Control", "no-store");
+      return res.status(404).json({ error: "Profile photo unavailable." });
+    }
+
+    const target = await User.findById(userId)
+      .select(
+        "_id role status disabled deleted preferences bio skills practiceAreas resumeURL " +
+        "profilePhotoStatus profileImage avatarURL profileImageOriginal pendingProfileImage pendingProfileImageOriginal updatedAt " +
+        "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
+      )
+      .lean();
+    if (!target || target.disabled === true || target.deleted === true) {
+      res.set("Cache-Control", "no-store");
+      return res.status(404).json({ error: "Profile photo unavailable." });
+    }
+
+    const viewerId = String(req.user?.id || req.user?._id || "");
+    const viewerRole = String(req.user?.role || "").toLowerCase();
+    const isOwner = viewerId === String(target._id);
+    const isAdmin = viewerRole === "admin";
+    const isPrivateVariant = variant !== "approved";
+    if (isPrivateVariant && !isOwner && !isAdmin) {
+      res.set("Cache-Control", "no-store");
+      return res.status(404).json({ error: "Profile photo unavailable." });
+    }
+
+    const targetRole = String(target.role || "").toLowerCase();
+    if (!isOwner && !isAdmin) {
+      if (target.status !== "approved" || variant !== "approved") {
+        res.set("Cache-Control", "no-store");
+        return res.status(404).json({ error: "Profile photo unavailable." });
+      }
+      if (await isBlockedBetween(viewerId, target._id)) {
+        res.set("Cache-Control", "no-store");
+        return res.status(404).json({ error: "Profile photo unavailable." });
+      }
+      if (targetRole === "paralegal") {
+        const isPublicProfile =
+          target.preferences?.hideProfile !== true &&
+          hasRequiredParalegalFieldsForPublic(target);
+        if (isPublicProfile) {
+          return res.redirect(302, buildPublicProfilePhotoUrl(target));
+        }
+        const hasRelationship =
+          viewerRole === "attorney" &&
+          (await hasAttorneyParalegalAccess(viewerId, target._id));
+        if (!hasRelationship) {
+          res.set("Cache-Control", "no-store");
+          return res.status(404).json({ error: "Profile photo unavailable." });
+        }
+      }
+      if (targetRole !== "attorney") {
+        res.set("Cache-Control", "no-store");
+        return res.status(404).json({ error: "Profile photo unavailable." });
+      }
+    }
+
+    const key = resolveProfilePhotoKey(target, {
+      bucket: process.env.S3_BUCKET,
+      region: process.env.S3_REGION,
+      variant,
+    });
+    if (!key) {
+      res.set("Cache-Control", "no-store");
+      return res.status(404).json({ error: "Profile photo unavailable." });
+    }
+    const served = await streamProfilePhoto({
+      req,
+      res,
+      s3: profilePhotoS3,
+      bucket: process.env.S3_BUCKET,
+      key,
+      cacheControl: "private, max-age=3600",
+    });
+    if (!served && !res.headersSent) {
+      res.set("Cache-Control", "no-store");
+      return res.status(404).json({ error: "Profile photo unavailable." });
+    }
+    return undefined;
+  })
+);
 
 /**
  * GET /api/users?status=&role=
@@ -470,7 +571,6 @@ router.patch(
     const body = req.body || {};
     const updates = {};
     const allowed = [
-      "paralegalWelcomeDismissed",
       "paralegalTourCompleted",
       "paralegalProfileTourCompleted",
       "attorneyTourCompleted",
@@ -484,7 +584,11 @@ router.patch(
     if (!Object.keys(updates).length) {
       return res.status(400).json({ error: "No recognized onboarding fields" });
     }
-    const me = await User.findByIdAndUpdate(req.user.id, { $set: updates }, { new: true }).select("onboarding");
+    const me = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updates },
+      { returnDocument: "after" }
+    ).select("onboarding");
     if (!me) return res.status(404).json({ error: "Not found" });
     return res.json({ onboarding: serializeOnboarding(me.onboarding || {}) });
   })
@@ -519,7 +623,11 @@ router.put(
       "pendingHire.message": normStr(body.message || "", { len: 2000 }).trim(),
       "pendingHire.updatedAt": new Date(),
     };
-    const me = await User.findByIdAndUpdate(req.user.id, { $set: updates }, { new: true }).select("pendingHire");
+    const me = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updates },
+      { returnDocument: "after" }
+    ).select("pendingHire");
     if (!me) return res.status(404).json({ error: "Not found" });
     return res.json({ pendingHire: serializePendingHire(me.pendingHire || {}) });
   })
@@ -531,7 +639,11 @@ router.delete(
   requireApprovedUser,
   requireRole("attorney", "admin"),
   asyncHandler(async (req, res) => {
-    const me = await User.findByIdAndUpdate(req.user.id, { $set: { pendingHire: null } }, { new: true }).select(
+    const me = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: { pendingHire: null } },
+      { returnDocument: "after" }
+    ).select(
       "pendingHire"
     );
     if (!me) return res.status(404).json({ error: "Not found" });
@@ -585,7 +697,7 @@ router.put(
     const doc = await WeeklyNote.findOneAndUpdate(
       { userId: req.user.id, weekStart },
       { $set: { notes } },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     );
     return res.json({
       weekStart: weekStart.toISOString().slice(0, 10),
@@ -661,9 +773,9 @@ router.post(
   "/block",
   csrfProtection,
   requireApprovedUser,
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (_req, res) => {
     return res.status(403).json({
-      error: "Blocking can only be created from a finalized case outcome.",
+      error: "Blocking can only be created from a finalized Matter outcome.",
     });
   })
 );
@@ -693,10 +805,13 @@ router.patch(
   csrfProtection,
   requireApprovedUser,
   asyncHandler(async (req, res) => {
-    const me = await User.findById(req.user.id);
+    const me = await User.findById(req.user.id).select(
+      "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
+    );
     if (!me) return res.status(404).json({ error: "Not found" });
 
     const body = req.body || {};
+    const storageKeysToDelete = [];
     const {
       firstName,
       lastName,
@@ -771,7 +886,6 @@ router.patch(
     const availabilityStr = normalizeAvailability(availability);
     if (availabilityStr) me.availability = availabilityStr;
 
-    let allowMissingPhoto = false;
     if (avatarURL !== undefined || profileImage !== undefined) {
       const trimmedAvatar = typeof avatarURL === "string" ? avatarURL.trim() : "";
       const trimmedImage = typeof profileImage === "string" ? profileImage.trim() : "";
@@ -783,12 +897,20 @@ router.patch(
       const wantsClear =
         (avatarURL !== undefined && !trimmedAvatar) || (profileImage !== undefined && !trimmedImage);
       if (wantsClear) {
-        allowMissingPhoto = true;
+        storageKeysToDelete.push(
+          ...collectUserPersonalStorageKeys(me).filter((key) =>
+            key.startsWith(`profile-photos/${me._id}/`)
+          )
+        );
         me.avatarURL = "";
         me.profileImage = null;
+        me.profileImageKey = "";
         me.profileImageOriginal = "";
+        me.profileImageOriginalKey = "";
         me.pendingProfileImage = "";
+        me.pendingProfileImageKey = "";
         me.pendingProfileImageOriginal = "";
+        me.pendingProfileImageOriginalKey = "";
         me.profilePhotoStatus = "unsubmitted";
       }
     }
@@ -796,43 +918,63 @@ router.patch(
       me.timezone = timezone;
     }
 
-    if (me.role === "attorney" && typeof body.linkedInURL === "string") {
-      const trimmed = body.linkedInURL.trim();
-      if (trimmed && !isURL(trimmed)) {
-        return res.status(400).json({ error: "LinkedIn URL must start with http:// or https://" });
-      }
-      me.linkedInURL = trimmed ? normStr(trimmed, { len: 500 }) : null;
+    if (["attorney", "paralegal"].includes(me.role) && (typeof body.linkedInURL === "string" || body.linkedInURL === null)) {
+      const linkedIn = normalizeHttpUrl(body.linkedInURL, {
+        fieldLabel: "LinkedIn URL",
+        requiredHost: "linkedin.com",
+      });
+      if (!linkedIn.ok) return res.status(400).json({ error: linkedIn.error });
+      me.linkedInURL = linkedIn.value || null;
     }
 
     if (me.role === "attorney" && typeof body.firmWebsite === "string") {
-      const trimmed = body.firmWebsite.trim();
-      if (trimmed && !isURL(trimmed)) {
-        return res.status(400).json({ error: "Firm website must start with http:// or https://" });
-      }
-      me.firmWebsite = trimmed ? normStr(trimmed, { len: 500 }) : "";
+      const firmWebsite = normalizeHttpUrl(body.firmWebsite, { fieldLabel: "Firm website" });
+      if (!firmWebsite.ok) return res.status(400).json({ error: firmWebsite.error });
+      me.firmWebsite = firmWebsite.value;
     }
 
     if (me.role === "paralegal") {
       if (resumeURL !== undefined) {
         if (resumeURL === null || String(resumeURL).trim() === "") {
+          const oldKey = normalizeOwnedPersonalKey(me.resumeURL, me._id);
+          if (oldKey) storageKeysToDelete.push(oldKey);
           me.resumeURL = "";
-        } else if (typeof resumeURL === "string" && (isURL(resumeURL) || isStorageKey(resumeURL))) {
-          me.resumeURL = resumeURL.trim();
+        } else {
+          const requested = protectedDocumentKey(resumeURL, me._id, "resume");
+          const current = protectedDocumentKey(me.resumeURL, me._id, "resume");
+          if (!requested || requested !== current) {
+            return res.status(400).json({ error: "Résumés must be saved through the protected document uploader." });
+          }
+          me.resumeURL = current;
         }
       }
       if (certificateURL !== undefined) {
         if (certificateURL === null || String(certificateURL).trim() === "") {
+          const oldKey = normalizeOwnedPersonalKey(me.certificateURL, me._id);
+          if (oldKey) storageKeysToDelete.push(oldKey);
           me.certificateURL = "";
-        } else if (typeof certificateURL === "string" && (isURL(certificateURL) || isStorageKey(certificateURL))) {
-          me.certificateURL = certificateURL.trim();
+        } else {
+          const requested = protectedDocumentKey(certificateURL, me._id, "certificate");
+          const current = protectedDocumentKey(me.certificateURL, me._id, "certificate");
+          if (!requested || requested !== current) {
+            return res.status(400).json({ error: "Certificates must be saved through the protected document uploader." });
+          }
+          me.certificateURL = current;
         }
       }
       if (body.writingSampleURL !== undefined) {
         const writingSampleURL = body.writingSampleURL;
         if (writingSampleURL === null || String(writingSampleURL).trim() === "") {
+          const oldKey = normalizeOwnedPersonalKey(me.writingSampleURL, me._id);
+          if (oldKey) storageKeysToDelete.push(oldKey);
           me.writingSampleURL = "";
-        } else if (typeof writingSampleURL === "string" && (isURL(writingSampleURL) || isStorageKey(writingSampleURL))) {
-          me.writingSampleURL = writingSampleURL.trim();
+        } else {
+          const requested = protectedDocumentKey(writingSampleURL, me._id, "writingSample");
+          const current = protectedDocumentKey(me.writingSampleURL, me._id, "writingSample");
+          if (!requested || requested !== current) {
+            return res.status(400).json({ error: "Writing samples must be saved through the protected document uploader." });
+          }
+          me.writingSampleURL = current;
         }
       }
       if (body.practiceAreas !== undefined) {
@@ -916,18 +1058,37 @@ router.patch(
       };
     }
 
-    await me.save();
+    const storageTaskIds = await stagePersonalStorageDeletion({
+      ownerId: me._id,
+      keys: storageKeysToDelete,
+      reason: "profile_personal_file_cleared",
+    });
+    try {
+      await me.save();
+    } catch (error) {
+      await cancelPersonalStorageDeletion(storageTaskIds).catch(
+        logPromiseFailure(runtimeLogger, "[users] personal storage deletion rollback failed")
+      );
+      throw error;
+    }
+    await activatePersonalStorageDeletion(storageTaskIds).catch((error) => {
+      runtimeLogger.error("[users] personal storage deletion activation deferred", {
+        errorCode: String(error?.name || error?.code || "STORAGE_TASK_TRANSITION_FAILED"),
+      });
+    });
 
     if (pendingEmailChanged && me.pendingEmail) {
       try {
         await sendVerificationEmail({ user: me, email: me.pendingEmail });
       } catch (err) {
-        console.warn("[users] pending email verification send failed", err?.message || err);
+        runtimeLogger.warn("[users] pending email verification send failed", err?.message || err);
       }
     }
     try {
       await logAction(req, "user.me.update", { targetType: "user", targetId: me._id });
-    } catch {}
+    } catch (auditError) {
+      runtimeLogger.error("[users] profile update audit persistence failed", auditError);
+    }
 
     return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true, includePhotoMeta: true }));
   })
@@ -975,7 +1136,7 @@ router.post(
     const me = await User.findByIdAndUpdate(
       req.user.id,
       { $set: { availability: availabilityStr } },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!me) return res.status(404).json({ error: "Not found" });
     try {
@@ -984,7 +1145,9 @@ router.post(
         targetId: me._id,
         meta: { availability: me.availability },
       });
-    } catch {}
+    } catch (auditError) {
+      runtimeLogger.error("[users] availability audit persistence failed", auditError);
+    }
     return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true, includePhotoMeta: true }));
   })
 );
@@ -1004,12 +1167,18 @@ router.post(
     if (typeof req.body?.product === "boolean") updates["emailPref.product"] = req.body.product;
     if (Object.keys(updates).length === 0) return res.status(400).json({ error: "No recognized fields" });
 
-    const me = await User.findByIdAndUpdate(req.user.id, { $set: updates }, { new: true });
+    const me = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updates },
+      { returnDocument: "after" }
+    );
     if (!me) return res.status(404).json({ error: "Not found" });
 
     try {
       await logAction(req, "user.me.emailPref", { targetType: "user", targetId: me._id, meta: updates });
-    } catch {}
+    } catch (auditError) {
+      runtimeLogger.error("[users] email preference audit persistence failed", auditError);
+    }
     return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true, includePhotoMeta: true }));
   })
 );
@@ -1043,12 +1212,11 @@ router.get(
 
 router.get(
   "/attorneys/:attorneyId",
-  verifyToken,
+  requireApprovedUser,
   asyncHandler(async (req, res) => {
     const { attorneyId } = req.params;
-    const jobId = (req.query?.job || "").trim();
-    const caseId = (req.query?.caseId || "").trim();
     const requester = req.user;
+    const requesterRole = String(requester?.role || "").toLowerCase();
 
     if (!requester) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -1056,30 +1224,95 @@ router.get(
     if (!isObjId(attorneyId)) {
       return res.status(400).json({ error: "Invalid attorney id" });
     }
+    if (Object.keys(req.query || {}).length) {
+      return res.status(400).json({ error: "Unsupported attorney profile query parameter." });
+    }
 
-    if (requester.role === "paralegal") {
+    if (requesterRole === "paralegal") {
       const blocked = await isBlockedBetween(requester._id || requester.id, attorneyId);
       if (blocked) {
         return res.status(403).json({ error: BLOCKED_MESSAGE });
       }
     }
 
-    if (requester.role === "admin") {
-      return sendAttorney(attorneyId, res);
+    if (requesterRole === "admin") {
+      return sendAttorney(attorneyId, res, { allowUnapproved: true });
     }
 
-    if (requester.role === "attorney") {
+    if (requesterRole === "attorney") {
       if (String(requester._id || requester.id) !== String(attorneyId)) {
         return res.status(403).json({ error: "Forbidden" });
       }
       return sendAttorney(attorneyId, res);
     }
 
-    if (requester.role === "paralegal") {
+    if (requesterRole === "paralegal") {
       return sendAttorney(attorneyId, res);
     }
 
     return res.status(403).json({ error: "Access denied" });
+  })
+);
+
+/**
+ * GET /api/users/profile-preview/:userId
+ * Strict contextual Profile projection; the full Profile route remains authoritative.
+ */
+router.get(
+  "/profile-preview/:userId",
+  requireApprovedUser,
+  requireRole("attorney", "paralegal"),
+  asyncHandler(async (req, res) => {
+    const userId = String(req.params.userId || "");
+    if (!isObjId(userId)) return res.status(400).json({ error: "Invalid Profile reference" });
+    const requesterRole = String(req.user?.role || "").toLowerCase();
+    const requesterId = String(req.user?.id || req.user?._id || "");
+    const isOwner = requesterId === userId;
+    if (requesterRole === "paralegal" && !isOwner) {
+      return res.status(404).json({ error: "Profile not available" });
+    }
+    const profile = await User.findOne({
+      _id: userId,
+      role: "paralegal",
+      disabled: { $ne: true },
+      deleted: { $ne: true },
+    })
+      .select(
+        "_id firstName lastName bio about practiceAreas specialties skills experience yearsExperience location state availability approvedAt createdAt status preferences profilePhotoStatus resumeURL profileImage avatarURL pendingProfileImage"
+      )
+      .lean();
+    if (!profile) return res.status(404).json({ error: "Profile not available" });
+    if (!isOwner && profile.status !== "approved") {
+      return res.status(404).json({ error: "Profile not available" });
+    }
+    const hasRelationship =
+      requesterRole === "attorney" ? await hasAttorneyParalegalAccess(requesterId, userId) : false;
+    if (!isOwner && profile.preferences?.hideProfile && !hasRelationship) {
+      return res.status(404).json({ error: "Profile not available" });
+    }
+    if (!isOwner && !hasRelationship && !hasRequiredParalegalFieldsForPublic(profile)) {
+      return res.status(404).json({ error: "Profile not available" });
+    }
+    if (requesterRole === "attorney" && (await isBlockedBetween(requesterId, userId))) {
+      return res.status(404).json({ error: "Profile not available" });
+    }
+    const name = `${profile.firstName || ""} ${profile.lastName || ""}`.trim() || "Paralegal";
+    res.set("Cache-Control", "no-store");
+    return res.json({
+      profile: {
+        id: String(profile._id),
+        name,
+        bio: String(profile.bio || profile.about || "").slice(0, 1000),
+        location: String(profile.location || profile.state || "").slice(0, 300),
+        practiceAreas: Array.isArray(profile.practiceAreas) ? profile.practiceAreas.slice(0, 12) : [],
+        specialties: Array.isArray(profile.specialties) ? profile.specialties.slice(0, 12) : [],
+        skills: Array.isArray(profile.skills) ? profile.skills.slice(0, 16) : [],
+        experience: String(profile.experience || "").slice(0, 1000),
+        yearsExperience: Number.isFinite(Number(profile.yearsExperience)) ? Number(profile.yearsExperience) : null,
+        availability: String(profile.availability || "").slice(0, 200),
+        fullHref: buildObjectDeepLink({ type: "profile", profileId: profile._id }),
+      },
+    });
   })
 );
 
@@ -1120,7 +1353,9 @@ router.get(
 
     try {
       await logAction(req, "user.profile.view", { targetType: "user", targetId: u._id });
-    } catch {}
+    } catch (auditError) {
+      runtimeLogger.warn("[users] profile view audit persistence failed", auditError);
+    }
 
     return res.json(serializePublicUser(u, { includePhotoMeta: isOwner }));
   })
@@ -1219,7 +1454,9 @@ paralegalRouter.get(
 
     try {
       await logAction(req, "paralegal.profile.view", { targetType: "user", targetId: profile._id });
-    } catch {}
+    } catch (auditError) {
+      runtimeLogger.warn("[users] paralegal profile view audit persistence failed", auditError);
+    }
 
     return res.json(serializePublicUser(profile, { includeEmail: isOwner, includeStatus: isOwner, includePhotoMeta: isOwner }));
   })
@@ -1278,7 +1515,9 @@ paralegalRouter.post(
     await paralegal.save();
     try {
       await logAction(req, "paralegal.profile.update", { targetType: "user", targetId: paralegal._id });
-    } catch {}
+    } catch (auditError) {
+      runtimeLogger.error("[users] paralegal profile update audit persistence failed", auditError);
+    }
 
     return res.json(serializePublicUser(paralegal, { includeEmail: isSelf, includeStatus: isSelf, includePhotoMeta: isSelf }));
   })
@@ -1302,13 +1541,13 @@ paralegalRouter.post(
     if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid caseId" });
 
     const caseDoc = await Case.findById(caseId).select("title attorney updates");
-    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    if (!caseDoc) return res.status(404).json({ error: "Matter not found" });
     const caseAttorneyId = caseDoc.attorney || caseDoc.attorneyId || null;
     if (caseAttorneyId && (await isBlockedBetween(caseAttorneyId, paralegal._id))) {
       return res.status(403).json({ error: BLOCKED_MESSAGE });
     }
     if (req.user.role !== "admin" && String(caseDoc.attorney) !== String(req.user.id)) {
-      return res.status(403).json({ error: "Only the case owner can send invites" });
+      return res.status(403).json({ error: "Only the Matter owner can send invitations" });
     }
 
     caseDoc.updates = caseDoc.updates || [];
@@ -1329,96 +1568,29 @@ paralegalRouter.post(
         targetId: paralegal._id,
         meta: { caseId: caseDoc._id },
       });
-    } catch {}
+    } catch (auditError) {
+      runtimeLogger.error("[users] paralegal invitation audit persistence failed", auditError);
+    }
 
     res.json({ ok: true, message: "Invite sent" });
   })
 );
 
-/**
- * PATCH /api/users/:userId/approve
- */
-router.patch(
-  "/:userId/approve",
-  requireRole("admin"),
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    const { userId } = req.params;
-    if (!isObjId(userId)) return res.status(400).json({ error: "Invalid user id" });
-
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    const wasApproved = user.status === "approved";
-    user.status = "approved";
-    ensureApprovedUserAuthReady(user);
-    if (!wasApproved && String(user.role || "").toLowerCase() === "paralegal") {
-      user.preferences = {
-        ...(typeof user.preferences?.toObject === "function"
-          ? user.preferences.toObject()
-          : user.preferences || {}),
-        hideProfile: true,
-      };
-    }
-    await user.save();
-    try {
-      await logAction(req, "admin.user.approve", { targetType: "user", targetId: user._id });
-    } catch {}
-
-    if (String(user.role).toLowerCase() === "paralegal") {
-      try {
-        await notifyUser(user._id, "profile_approved", {}, { actorUserId: req.user.id });
-      } catch (err) {
-        console.warn("[users] notifyUser profile_approved failed", err);
-      }
-    }
-
-    res.json({ ok: true, user: user.toJSON() });
-  })
-);
-
-/**
- * PATCH /api/users/:userId/reject
- */
-router.patch(
-  "/:userId/reject",
-  requireRole("admin"),
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    const { userId } = req.params;
-    if (!isObjId(userId)) return res.status(400).json({ error: "Invalid user id" });
-
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    user.status = "denied";
-    await user.save();
-    try {
-      await logAction(req, "admin.user.reject", { targetType: "user", targetId: user._id });
-    } catch {}
-
-    res.json({ ok: true, user: user.toJSON() });
-  })
-);
-
-async function sendAttorney(attorneyId, res) {
+async function sendAttorney(attorneyId, res, { allowUnapproved = false } = {}) {
   const attorney = await User.findById(attorneyId).select(
     [
+      "role",
+      "status",
+      "disabled",
+      "deleted",
       "firstName",
       "lastName",
       "lawFirm",
-      "firmName",
-      "company",
-      "organization",
-      "email",
       "linkedInURL",
       "firmWebsite",
-      "practiceDescription",
-      "practiceOverview",
       "bio",
       "about",
       "languages",
-      "availability",
       "profileImage",
       "avatarURL",
       "experience",
@@ -1427,45 +1599,49 @@ async function sendAttorney(attorneyId, res) {
       "publications",
       "yearsExperience",
       "location",
-      "locationState",
       "state",
-      "title",
     ].join(" ")
   );
   if (!attorney) {
     return res.status(404).json({ error: "Attorney not found" });
+  }
+  if (
+    String(attorney.role || "").toLowerCase() !== "attorney"
+    || attorney.disabled === true
+    || attorney.deleted === true
+    || (!allowUnapproved && String(attorney.status || "").toLowerCase() !== "approved")
+  ) {
+    return res.status(404).json({ error: "Attorney profile not available" });
   }
 
   return res.json({
     id: attorney._id,
     firstName: attorney.firstName || "",
     lastName: attorney.lastName || "",
-    lawFirm: attorney.lawFirm || attorney.firmName || attorney.company || attorney.organization || "",
+    lawFirm: attorney.lawFirm || "",
     name:
       `${attorney.firstName || ""} ${attorney.lastName || ""}`.trim() ||
-      attorney.email ||
       "Attorney",
     linkedInURL: attorney.linkedInURL || "",
     firmWebsite: attorney.firmWebsite || "",
     practiceDescription:
-      attorney.practiceDescription ||
-      attorney.practiceOverview ||
       attorney.bio ||
       attorney.about ||
       "",
     languages: attorney.languages || [],
-    availability: attorney.availability || "Available now",
-    profileImage: attorney.profileImage || attorney.avatarURL || "",
+    profileImage:
+      attorney.profileImage || attorney.avatarURL
+        ? buildAuthenticatedProfilePhotoUrl(attorney)
+        : "",
     experience: attorney.experience || [],
     practiceAreas: attorney.practiceAreas || [],
     specialties: attorney.specialties || [],
+    publications: attorney.publications || [],
     yearsExperience: attorney.yearsExperience || 0,
     location:
       attorney.location ||
-      attorney.locationState ||
       attorney.state ||
       "",
-    title: attorney.title || "Attorney",
   });
 }
 
@@ -1473,8 +1649,9 @@ async function sendAttorney(attorneyId, res) {
 // Route-level error fallback
 // ----------------------------------------
 router.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(500).json({ error: "Server error", detail: err?.message || "Unknown error" });
+  if (respondToCsrfError(err, res)) return;
+  runtimeLogger.error(err);
+  res.status(500).json({ error: "Server error" });
 });
 
 router.paralegalRouter = paralegalRouter;

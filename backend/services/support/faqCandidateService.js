@@ -112,7 +112,7 @@ async function generateFAQCandidates() {
         },
       },
       {
-        new: true,
+        returnDocument: "after",
         upsert: true,
         setDefaultsOnInsert: true,
       }

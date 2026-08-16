@@ -1,6 +1,7 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:attorneyDashboard");
 const express = require("express");
 const router = express.Router();
-const mongoose = require("mongoose");
 
 const auth = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
@@ -17,7 +18,7 @@ try {
 }
 
 /**
- * Helper: compute escrow total for this attorney (best-effort)
+ * Helper: compute the attorney's active funded total (best-effort)
  */
 async function getEscrowTotal(attorneyId) {
   if (!Payment) return 0;
@@ -30,7 +31,7 @@ async function getEscrowTotal(attorneyId) {
 
     return payments.reduce((sum, p) => sum + (p.amount || 0), 0);
   } catch (err) {
-    console.error("Error computing escrowTotal:", err);
+    runtimeLogger.error("Error computing escrowTotal:", err);
     return 0;
   }
 }
@@ -142,7 +143,7 @@ router.get("/", auth, requireApproved, requireRole(["attorney"]), async (req, re
       pendingApplications: pendingAppsSummary,
     });
   } catch (err) {
-    console.error("Attorney dashboard error:", err);
+    runtimeLogger.error("Attorney dashboard error:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

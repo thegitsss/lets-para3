@@ -5,13 +5,19 @@ const request = require("supertest");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "cco-autonomy-phase2-test-secret";
 process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_cco_autonomy_phase2";
+process.env.OPENAI_SUPPORT_MANAGER_ENABLED = "false";
+process.env.OPENAI_ATTORNEY_LEGACY_FALLBACK = "true";
 
 const mockGenerateSupportConversationReply = jest.fn();
 
-jest.mock("../ai/supportAgent", () => ({
-  generateSupportConversationReply: (...args) => mockGenerateSupportConversationReply(...args),
-  triageSupportIssue: jest.fn(),
-}));
+jest.mock("../ai/supportAgent", () => {
+  const actual = jest.requireActual("../ai/supportAgent");
+  return {
+    ...actual,
+    generateSupportConversationReply: (...args) => mockGenerateSupportConversationReply(...args),
+    triageSupportIssue: jest.fn(),
+  };
+});
 
 const AutonomousAction = require("../models/AutonomousAction");
 const Incident = require("../models/Incident");
@@ -316,7 +322,7 @@ describe("CCO autonomy phase 2", () => {
     );
 
     const res = await postSupportMessage(user, conversation.id, {
-      text: "I need human help with this issue now.",
+      text: "Please escalate this existing issue now.",
       pageContext: {
         pathname: "/dashboard-attorney.html",
       },
@@ -359,7 +365,7 @@ describe("CCO autonomy phase 2", () => {
     );
 
     const res = await postSupportMessage(user, conversation.id, {
-      text: "I need human help.",
+      text: "Please escalate this issue.",
       pageContext: {
         pathname: "/dashboard-attorney.html",
       },

@@ -1,0 +1,40 @@
+.overlay {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.auth-matter-field {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.82;
+  pointer-events: none;
+}
+
+.overlay::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(255, 255, 255, 0.72) 35%,
+    transparent 70%
+  );
+  content: "";
+  pointer-events: none;
+}
+
+.overlay > .left-panel {
+  position: relative;
+  z-index: 2;
+}
+
+@media (max-width: 768px) {
+  .auth-matter-field {
+    opacity: 0.5;
+  }
+}

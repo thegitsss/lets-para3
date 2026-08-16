@@ -129,7 +129,7 @@ describe("Notification preferences", () => {
     expect(sendEmail).toHaveBeenCalledTimes(1);
     expect(sendEmail).toHaveBeenCalledWith(
       user.email,
-      "Case update",
+      "Matter update on LPC",
       expect.any(String)
     );
   });

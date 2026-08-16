@@ -8,31 +8,10 @@
   (function () {
     const root = document.documentElement;
     root.classList.add("js");
-    try {
-      const raw = localStorage.getItem("lpc_user");
-      if (!raw) return;
-      const user = JSON.parse(raw);
-      const theme = String(user?.preferences?.theme || "").toLowerCase();
-      const classes = [];
-      if (theme === "mountain-dark") {
-        classes.push("theme-mountain-dark", "theme-dark");
-      } else if (theme === "dark" || theme === "mountain" || theme === "light") {
-        classes.push(`theme-${theme}`);
-      }
-      classes.forEach((value) => root.classList.add(value));
-      if (theme === "dark" || theme === "mountain-dark") {
-        root.style.backgroundColor = "#0f172a";
-        root.style.color = "#f4f6fb";
-        root.style.setProperty("--bg", "#0f172a");
-      } else if (theme === "mountain") {
-        root.style.backgroundColor = "#f8f6f1";
-        root.style.setProperty("--bg", "#f8f6f1");
-      } else {
-        root.style.backgroundColor = "#ffffff";
-        root.style.color = "#1a1a1a";
-        root.style.setProperty("--bg", "#ffffff");
-      }
-    } catch (_) {}
+    root.classList.add("theme-light");
+    root.style.backgroundColor = "#ffffff";
+    root.style.color = "#1a1a1a";
+    root.style.setProperty("--bg", "#ffffff");
   })();
 </script>
 <style>
@@ -48,7 +27,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admin Dashboard – Let’s-ParaConnect</title>
-<script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script defer src="/assets/vendor/chart-4.5.1.js"></script>
 <script defer src="assets/scripts/utils/session.js"></script>
 <script type="module" src="assets/scripts/auth.js"></script>
 <style>
@@ -75,7 +54,7 @@
 --bg:#fff;
 --sidebar-bg:#f5f5f5e6;
 --line:rgba(0,0,0,.08);
---muted:#8a8a8a;
+--muted:#6b7280;
 --ink:#1a1a1a;
 --panel:#fcfcfc;
 --sidebar-text:#1a1a1a;
@@ -139,15 +118,19 @@ text-align:center;
 margin-bottom:36px;
 }
 nav{display:flex;flex-direction:column;gap:8px;}
-nav a{
+nav a,
+nav button[data-section]{
 text-decoration:none;
 color:var(--ink);
 font-size:.95rem;
+font-family:inherit;
+font-weight:inherit;
 padding:10px 14px;
 border-radius:8px;
 transition:background .3s;
 }
-nav a.active,nav a:hover{background:rgba(0,0,0,0.04);}
+nav button[data-section]{width:100%;border:0;background:transparent;text-align:left;cursor:pointer;}
+nav a.active,nav a:hover,nav button[data-section].active,nav button[data-section]:hover{background:rgba(0,0,0,0.04);}
 .sidebar-link{
 display:block;
 width:100%;
@@ -187,11 +170,12 @@ position:relative;
 display:none;
 align-items:center;
 justify-content:center;
-width:42px;
-height:42px;
-border-radius:12px;
-border:none;
-background:transparent;
+width:44px;
+height:44px;
+color:#202124;
+border-radius:8px;
+border:1px solid #e5e7eb;
+background:#fff;
 padding:0;
 cursor:pointer;
 position:relative;
@@ -199,9 +183,13 @@ z-index:2100;
 }
 
 .sidebar-toggle-icon{
-width:28px;
-height:28px;
+width:20px;
+height:20px;
 display:block;
+fill:none;
+stroke:currentColor;
+stroke-width:1.8;
+stroke-linecap:round;
 }
 
 .sidebar-backdrop{
@@ -212,26 +200,13 @@ background:rgba(0,0,0,0.35);
 z-index:1900;
 }
 
-/* Weather widget footer */
-#weatherSidebar{
-position:absolute;
-bottom:48px;
-left:0;
-width:100%;
-text-align:center;
-color:var(--sidebar-text);
-font-size:1rem;
-font-family:var(--font-serif);
-z-index:2;
-}
-
 html.theme-light,
 html.theme-light body,
 body.theme-light{
 --bg:#ffffff;
 --sidebar-bg:#f5f5f5e6;
 --line:rgba(0,0,0,0.08);
---muted:#8a8a8a;
+--muted:#6b7280;
 --ink:#1a1a1a;
 --panel:#fcfcfc;
 --sidebar-text:#1a1a1a;
@@ -252,35 +227,30 @@ body.theme-dark{
 html.theme-mountain,
 html.theme-mountain body,
 body.theme-mountain{
---bg:#f8f6f1;
+--bg:#ffffff;
 --panel:#ffffff;
---muted:#7a736a;
---sidebar-text:#ffffff;
+--muted:#6b7280;
+--sidebar-bg:#ffffff;
+--sidebar-text:#1a1a1a;
 }
 
 html.theme-mountain .sidebar,
-html.theme-mountain-dark .sidebar,
-body.theme-mountain .sidebar,
-body.theme-mountain-dark .sidebar{
-background:url('hero-mountain.jpg') center/cover no-repeat;
+body.theme-mountain .sidebar{
+background:#ffffff;
 }
 
-html.theme-mountain .sidebar::before,
-html.theme-mountain-dark .sidebar::before,
-body.theme-mountain .sidebar::before,
-body.theme-mountain-dark .sidebar::before{
-background:rgba(0,0,0,0.45);
+html.theme-mountain-dark .sidebar,
+body.theme-mountain-dark .sidebar{
+background:#1c2333;
 }
 
 html.theme-mountain nav a,
-html.theme-mountain-dark nav a,
 body.theme-mountain nav a,
-body.theme-mountain-dark nav a,
+html.theme-mountain nav button[data-section],
+body.theme-mountain nav button[data-section],
 html.theme-mountain .sidebar-link,
-html.theme-mountain-dark .sidebar-link,
-body.theme-mountain .sidebar-link,
-body.theme-mountain-dark .sidebar-link{
-color:#fff;
+body.theme-mountain .sidebar-link{
+color:#1a1a1a;
 }
 
 html.theme-dark nav a.active,
@@ -296,6 +266,24 @@ body.theme-mountain nav a:hover,
 body.theme-mountain-dark nav a.active,
 body.theme-mountain-dark nav a:hover{
 background:rgba(255,255,255,0.14);
+}
+
+html.theme-dark nav button[data-section].active,
+html.theme-dark nav button[data-section]:hover,
+body.theme-dark nav button[data-section].active,
+body.theme-dark nav button[data-section]:hover,
+html.theme-mountain-dark nav button[data-section].active,
+html.theme-mountain-dark nav button[data-section]:hover,
+body.theme-mountain-dark nav button[data-section].active,
+body.theme-mountain-dark nav button[data-section]:hover{
+background:rgba(255,255,255,0.14);
+}
+
+html.theme-mountain nav button[data-section].active,
+html.theme-mountain nav button[data-section]:hover,
+body.theme-mountain nav button[data-section].active,
+body.theme-mountain nav button[data-section]:hover{
+background:rgba(0,0,0,0.04);
 }
 
 html.theme-dark .sidebar-link:hover,
@@ -418,6 +406,9 @@ background:#fff;
 .user-management-secondary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.5rem;align-items:start;margin-top:1.5rem;}
 .user-management-secondary .panel{width:100%;}
 .mass-email-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0 .75rem;}
+.mass-email-actions .btn[hidden]{display:none;}
+#section-user-management .stats-cards .metric{background:#fff;}
+#section-user-management .stats-cards .metric p{color:var(--ink);}
 .panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.5rem;}
 .user-list{list-style:none;padding:0;margin:0;} .user-list li{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--line);}
 .user-list li .user-actions{display:flex;gap:0.35rem;}
@@ -436,6 +427,11 @@ background:#fff;
 .card {background:#fff;border:1px solid var(--line);border-radius:10px;padding:1rem;text-align:center;}
 .card.highlight {background:#1abc9c;color:#fff;}
 .card.highlight h3,.card.highlight p{color:#fff;}
+.main .card.highlight{background:#fff;color:var(--ink);}
+.main .card.highlight h3,.main .card.highlight p{color:inherit;}
+.chart-empty-state{min-height:110px;display:grid;place-items:center;text-align:center;color:var(--muted);}
+.chart-empty-state[hidden]{display:none;}
+.main canvas[hidden]{display:none!important;}
 .card.clickable{cursor:pointer;transition:transform .2s ease,box-shadow .2s ease;}
 .card.clickable:hover{transform:translateY(-2px);box-shadow:0 16px 30px rgba(15,23,42,0.12);}
 .card.clickable:focus-visible{outline:1px solid rgba(26,26,26,.16);outline-offset:2px;}
@@ -641,6 +637,9 @@ background:rgba(255,255,255,0.88);
 #section-ai-control-room{gap:1.35rem;}
 #section-ai-control-room.visible{display:grid;}
 #section-ai-control-room .ai-room-header{align-items:flex-start;margin-bottom:0;}
+@media (min-width:821px){
+#section-ai-control-room .ai-room-header{padding-right:4.5rem;}
+}
 #section-ai-control-room .ai-room-header p{margin-bottom:0;}
 #section-ai-control-room .ai-room-header-controls{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;justify-content:flex-end;}
 #section-ai-control-room .ai-room-header-badge,
@@ -1133,8 +1132,9 @@ right:14px;
 .ledger-table{width:100%;border-collapse:collapse;}
 .ledger-table th,.ledger-table td{padding:.75rem;border-bottom:1px solid var(--line);text-align:left;}
 .receipts-header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
-.receipts-actions{display:flex;align-items:center;gap:10px;}
+.receipts-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .receipts-actions input{min-width:240px;padding:.5rem .85rem;border:1px solid var(--line);border-radius:999px;font-size:.9rem;}
+.receipts-actions select{padding:.5rem .75rem;border:1px solid var(--line);border-radius:6px;background:#fff;font-size:.9rem;}
 .receipt-id{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-size:.85rem;color:var(--muted);}
 .tax-summary,.payout-schedule{list-style:none;padding:0;margin:0;}
 .tax-summary li,.payout-schedule li{padding:.4rem 0;border-bottom:1px solid var(--line);font-size:.95rem;}
@@ -1147,7 +1147,7 @@ right:14px;
 .dispute-status{font-size:.85rem;text-transform:capitalize;}
 .dispute-actions .btn{white-space:nowrap;}
 .dispute-tabs{display:flex;flex-wrap:wrap;gap:8px;}
-.dispute-tabs .tab-btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:6px 12px;border-radius:999px;font-size:.85rem;cursor:pointer;transition:all .2s ease;}
+.dispute-tabs .tab-btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:6px 12px;border-radius:999px;font-size:.85rem;cursor:pointer;transition:background-color .2s ease,border-color .2s ease,color .2s ease,box-shadow .2s ease;}
 .dispute-tabs .tab-btn.active{border-color:rgba(26,26,26,.16);color:var(--ink);box-shadow:none;}
 .dispute-notes{display:flex;flex-direction:column;gap:8px;}
 .dispute-notes textarea{width:100%;min-width:180px;min-height:70px;padding:8px;border:1px solid var(--line);border-radius:8px;font-family:var(--font-sans);font-size:.9rem;resize:vertical;}
@@ -1195,6 +1195,18 @@ letter-spacing:.08em;
 text-transform:uppercase;
 color:var(--muted);
 font-weight:500;
+}
+#section-overview .overview-action-table th:last-child,
+#section-overview .overview-action-table td:last-child{
+width:1%;
+white-space:nowrap;
+}
+#section-overview .overview-action-table td:last-child .btn{
+display:inline-flex;
+align-items:center;
+justify-content:center;
+min-width:max-content;
+white-space:nowrap;
 }
 #section-overview .overview-action-row{
 cursor:pointer;
@@ -1264,7 +1276,7 @@ border:1px solid var(--line);
 border-radius:10px;
 padding:1.25rem 1.5rem;
 background:#fff;
-transition:all .25s ease;
+transition:border-color .25s ease,box-shadow .25s ease;
 }
 .panel:hover{border-color:rgba(26,26,26,.12);}
 .panel h2{
@@ -1292,11 +1304,14 @@ display:block;
 table{width:100%;border-collapse:collapse;font-size:.9rem;}
 th,td{text-align:left;padding:10px 6px;border-bottom:1px solid var(--line);}
 th{color:var(--muted);font-weight:200;}
-.btn{border:none;border-radius:6px;padding:6px 12px;font-size:.9rem;cursor:pointer;transition:all .2s ease;}
+.btn{border:none;border-radius:6px;padding:6px 12px;font-size:.9rem;cursor:pointer;transition:background-color .2s ease,border-color .2s ease,color .2s ease,box-shadow .2s ease,transform .2s ease;}
 .btn.primary{background:var(--accent);color:#fff;}
 .btn.primary:hover{background:#a38e5f;}
 .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
 .btn.secondary:hover{border-color:rgba(26,26,26,.16);color:var(--ink);}
+.btn:disabled{opacity:.52;cursor:not-allowed;}
+.btn:disabled:hover{background:var(--accent);}
+.btn.secondary:disabled:hover{background:#fff;border-color:var(--line);}
 .weather{display:flex;align-items:center;justify-content:space-between;}
 .weather h3{font-family:var(--font-serif);font-weight:300;}
 .toast{
@@ -1319,8 +1334,6 @@ font-size:.95rem;
 .pending-controls{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem;align-items:flex-start;}
 .pending-controls .search{flex:1;min-width:220px;}
 .pending-controls select{padding:.55rem .8rem;border:1px solid var(--line);border-radius:6px;background:#fff;font-family:var(--font-sans);font-size:.95rem;}
-.test-email-row{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;}
-.test-email-row .search{flex:1;min-width:220px;}
 .pending-count{color:var(--muted);font-size:.9rem;}
 .pending-empty{padding:1rem;text-align:center;color:var(--muted);}
 .pending-users-table td.actions{width:160px;display:flex;flex-direction:column;gap:8px;}
@@ -1374,7 +1387,7 @@ padding:.5rem .25rem;
 
 @media (max-width: 1024px){
 body{flex-direction:row;}
-.main{overflow-x:hidden;}
+.main{padding-top:72px;overflow-x:hidden;}
 .main #section-user-management.visible{
 display:flex;
 flex-direction:column;
@@ -1496,9 +1509,7 @@ line-height:1.1;
 border-radius:4px;
 }
 .pending-controls,
-.test-email-row{flex-direction:column;align-items:stretch;}
 .pending-controls .search,
-.test-email-row .search{min-width:0;width:100%;}
 .sidebar{
 position:fixed;
 top:0;
@@ -1529,7 +1540,8 @@ nav{
 flex-direction:column;
 gap:8px;
 }
-nav a{
+nav a,
+nav button[data-section]{
 width:100%;
 text-align:left;
 padding:10px 14px;
@@ -1541,27 +1553,29 @@ font-size:.95rem;
 
 <body class="is-loading">
   <a class="skip-link" href="#main">Skip to main content</a>
+<button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open navigation" aria-controls="sidebarNav" aria-expanded="false">
+  <svg class="sidebar-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+</button>
 <aside class="sidebar" id="sidebarNav">
 <div class="logo">Admin Panel</div>
 <nav>
-<a href="#" class="active" data-section="overview">Overview</a>
-<a href="#" data-section="user-management">User Management</a>
-<a href="#" data-section="ai-control-room">AI Control Room</a>
-<a href="#" data-section="engineering">Engineering</a>
-<a href="#" data-section="approvals-workspace">Approvals</a>
-<a href="#" data-section="knowledge-studio">Knowledge Studio</a>
-<a href="#" data-section="marketing-drafts">Marketing</a>
-<a href="#" data-section="support-ops">Support Ops</a>
-<a href="#" data-section="sales-workspace">Sales</a>
+<button type="button" class="active" data-section="overview" aria-current="page">Overview</button>
+<button type="button" data-section="user-management">User Management</button>
+<button type="button" data-section="ai-control-room">AI Control Room</button>
+<button type="button" data-section="engineering">Engineering</button>
+<button type="button" data-section="approvals-workspace">Approvals</button>
+<button type="button" data-section="knowledge-studio">Knowledge Studio</button>
+<button type="button" data-section="marketing-drafts">Marketing</button>
+<button type="button" data-section="support-ops">Support Ops</button>
+<button type="button" data-section="sales-workspace">Sales</button>
 <a href="admin-directors.html">Director Oversight</a>
-<a href="#" data-section="finance">Finance</a>
-<a href="#" data-section="posts">Attorney Posts</a>
+<button type="button" data-section="finance">Finance</button>
+<button type="button" data-section="posts">Attorney Posts</button>
 <span class="nav-section-label">Utilities</span>
-<a href="#" data-section="activity-logs">Activity Logs</a>
-<a href="#" data-section="settings">Settings</a>
+<button type="button" data-section="activity-logs">Activity Logs</button>
+<button type="button" data-section="settings">Settings</button>
 </nav>
 <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-<div id="weatherSidebar">Loading weather…</div>
 <div class="sidebar-footer">© Let’s-ParaConnect 2026</div>
 </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
@@ -1609,8 +1623,8 @@ font-size:.95rem;
 
 <div class="metrics">
 <div class="metric"><h3>Total Users</h3><p id="totalUsers">0</p></div>
-<div class="metric"><h3>Funds in Stripe</h3><p id="escrowTotal">—</p></div>
-<div class="metric"><h3>Active Cases</h3><p id="activeCases">0</p></div>
+<div class="metric"><h3>Funded Payments in Stripe</h3><p id="escrowTotal">—</p></div>
+<div class="metric"><h3>Active Matters</h3><p id="activeCases">0</p></div>
 <div class="metric" id="pendingApprovalsMetric" role="button" tabindex="0" aria-label="Open pending user signup approvals"><h3>Pending Approvals</h3><p id="pendingUsers">0</p></div>
 </div>
 
@@ -1996,7 +2010,7 @@ font-size:.95rem;
 <section id="section-marketing-drafts" class="section">
 <header>
 <h1>Marketing Draft Queue</h1>
-<p>Create post drafts, review them, and manage posting settings for LinkedIn and Facebook.</p>
+<p>Create post drafts, review them, and manage production posting for LinkedIn.</p>
 </header>
 
 <div class="workspace-grid founder-layer-grid">
@@ -2100,7 +2114,7 @@ font-size:.95rem;
 <div class="panel-header">
 <div>
 <h2>Posting Settings</h2>
-<p class="small">Set how often draft post batches are created and whether LinkedIn or Facebook are enabled.</p>
+<p class="small">Set how often LinkedIn company draft batches are created.</p>
 </div>
 </div>
 <div class="grid-four" style="margin-bottom:1rem;">
@@ -2145,7 +2159,6 @@ font-size:.95rem;
 </label>
 <label class="checkbox-inline"><input id="marketingPublishingIsEnabled" type="checkbox" /> Enable schedule</label>
 <label class="checkbox-inline"><input id="marketingPublishingLinkedIn" type="checkbox" /> LinkedIn company</label>
-<label class="checkbox-inline"><input id="marketingPublishingFacebook" type="checkbox" /> Facebook Page</label>
 <label style="grid-column:1 / -1;">Pause Reason
 <input id="marketingPublishingPauseReason" type="text" maxlength="500" placeholder="Optional reason to pause scheduled cycles" />
 </label>
@@ -2176,9 +2189,6 @@ font-size:.95rem;
 <label style="grid-column:1 / -1;">Organization URN Hint
 <input id="marketingLinkedInOrgUrn" type="text" maxlength="240" placeholder="Optional if discovery is ambiguous" />
 </label>
-<label>API Version
-<input id="marketingLinkedInApiVersion" type="text" maxlength="40" placeholder="202503" />
-</label>
 <div class="workspace-form-actions">
 <button class="btn secondary" type="button" id="marketingLinkedInRefreshBtn">Refresh LinkedIn Status</button>
 <button class="btn secondary" type="button" id="marketingLinkedInValidateBtn">Check Connection</button>
@@ -2198,7 +2208,7 @@ font-size:.95rem;
 <div class="panel-header">
 <div>
 <h2>Post Batches</h2>
-<p class="small">Each batch groups the LinkedIn and Facebook drafts created for the same posting window.</p>
+<p class="small">Each batch groups the LinkedIn company draft and approval work for one posting window.</p>
 </div>
 </div>
 <div id="marketingCycleList" class="ai-room-list">
@@ -2258,7 +2268,7 @@ font-size:.95rem;
 </select>
 </label>
 <label>Target Audience
-<input id="marketingTargetAudience" type="text" maxlength="240" placeholder="e.g. founding attorneys, approved paralegals" />
+<input id="marketingTargetAudience" type="text" maxlength="240" placeholder="e.g. solo attorneys, approved paralegals" />
 </label>
 <label style="grid-column:1 / -1;">Title
 <input id="marketingTitle" type="text" maxlength="240" required placeholder="Short internal title" />
@@ -2660,10 +2670,6 @@ font-size:.95rem;
 <div class="chart-card">
 <div class="chart-header">
 <h2>Registration Trends</h2>
-<select id="userMgmtView">
-<option>Show By Month</option>
-<option>Show By Week</option>
-</select>
 </div>
 <canvas id="userMgmtComboChart" height="70"></canvas>
 </div>
@@ -2676,17 +2682,6 @@ font-size:.95rem;
 </div>
 
 <div class="user-management-secondary">
-<div class="panel" id="approvalEmailTestPanel">
-<div class="panel-header">
-<h2>Approval Email Test</h2>
-<p class="pending-count">Send the approval email without changing user status.</p>
-</div>
-<div class="test-email-row">
-<input type="email" id="approvalTestEmail" class="search" placeholder="Email address" aria-label="Approval email test address" />
-<button class="btn secondary" type="button" id="approvalTestSendBtn">Send Approval Email</button>
-</div>
-</div>
-
 <div class="panel collapsed" id="deletedUsersPanel">
 <div class="panel-header">
 <h2 role="button" tabindex="0" aria-expanded="false" data-panel-toggle="deletedUsersPanel">Deactivated Users <span>▾</span></h2>
@@ -2702,7 +2697,7 @@ font-size:.95rem;
 </select>
 <select id="deletedPageSelect" aria-label="Deactivated users page"></select>
 <button class="btn secondary" type="button" id="refreshDeletedUsers">Refresh</button>
-<button class="btn danger" type="button" id="purgeDeletedSelected">Permanently Delete Selected</button>
+<button class="btn danger" type="button" id="purgeDeletedSelected">Process Data Removal</button>
 </div>
 <div class="table-wrap">
 <table class="pending-users-table">
@@ -2726,24 +2721,22 @@ font-size:.95rem;
 
 <div class="panel" id="massEmailPanel">
 <div class="panel-header">
-<h2>Send Mass Email</h2>
+<h2>Targeted Email</h2>
 <p class="pending-count" id="massEmailCountLabel">0 users selected</p>
 </div>
 <p class="settings-help" id="massEmailHelpText">Approved paralegals missing a profile photo.</p>
 <div class="pending-controls mass-email-controls">
-<select id="massEmailAudienceSelect" aria-label="Mass email audience">
+<select id="massEmailAudienceSelect" aria-label="Target email audience">
 <option value="missing_photo">Approved paralegals missing a profile photo</option>
 <option value="has_photo">Approved paralegals with an uploaded profile photo</option>
 <option value="attorney_no_matter">Approved attorneys who have not posted a matter yet</option>
 </select>
 </div>
 <div class="mass-email-actions">
-<button class="btn secondary" type="button" id="massEmailAcceptanceBtn">Send Acceptance</button>
-<button class="btn secondary" type="button" id="massEmailDenialBtn">Send Denial</button>
-<button class="btn primary" type="button" id="massEmailCompleteBtn">Send Complete Profile</button>
-<button class="btn primary" type="button" id="massEmailAttorneyLaunchSetupBtn">Send Launch + Setup</button>
-<button class="btn primary" type="button" id="massEmailAttorneyLaunchBtn">Send Attorney Launch</button>
-<button class="btn primary" type="button" id="massEmailAttorneyFirstMatterBtn">Send First Matter Reminder</button>
+<button class="btn primary" type="button" id="massEmailCompleteBtn">Send profile-photo reminder</button>
+<button class="btn primary" type="button" id="massEmailAttorneyLaunchSetupBtn">Send launch + full-setup notice</button>
+<button class="btn primary" type="button" id="massEmailAttorneyLaunchBtn">Send launch + payout-setup notice</button>
+<button class="btn primary" type="button" id="massEmailAttorneyFirstMatterBtn">Send first-matter reminder</button>
 </div>
 <div class="pending-controls mass-email-controls">
 <select id="massEmailPageSelect" aria-label="Mass email users page"></select>
@@ -2820,15 +2813,16 @@ font-size:.95rem;
 <!-- Top Chart Row -->
 <div class="grid-two escrow-chart-row" style="margin-bottom:2rem;">
 <div class="panel">
-<h2>Monthly Funds Report</h2>
+<h2>Monthly Payment Activity</h2>
 <canvas id="escrowReportChart" height="90"></canvas>
+<p id="escrowReportEmpty" class="chart-empty-state" hidden>No payment activity in the reporting window.</p>
 </div>
 
 <div class="panel">
-<h2>Reconcile Case Payment</h2>
-<p class="small">Force-sync Stripe payment status for a case.</p>
-<label for="reconcileCaseId">Case ID</label>
-<input type="text" id="reconcileCaseId" class="input-field" placeholder="Enter case ID">
+<h2>Reconcile Matter Payment</h2>
+<p class="small">Refresh a matter’s payment status from Stripe.</p>
+<label for="reconcileCaseId">Matter ID</label>
+<input type="text" id="reconcileCaseId" class="input-field" placeholder="Enter Matter ID">
 <button class="btn primary" type="button" id="reconcileCaseBtn">Reconcile</button>
 <p class="small" id="reconcileStatus"></p>
 </div>
@@ -2840,12 +2834,12 @@ font-size:.95rem;
 <header>
 <p class="workspace-step-label">Money risk</p>
 <h2>Disputes</h2>
-<p>Review disputed cases and resolve refunds or payouts from the same finance workspace.</p>
+<p>Review disputed Matters and resolve refunds or payouts from the same finance workspace.</p>
 </header>
 
 <div class="panel">
 <div class="panel-header">
-<h2>Disputed Cases</h2>
+<h2>Disputed Matters</h2>
 </div>
 <div class="pending-controls">
 <div class="dispute-tabs" id="disputeTabs">
@@ -2853,7 +2847,7 @@ font-size:.95rem;
 <button class="tab-btn" type="button" data-dispute-tab="resolved">Resolved</button>
 <button class="tab-btn" type="button" data-dispute-tab="rejected">Rejected</button>
 </div>
-<input type="search" id="disputeSearch" class="search" placeholder="Search case or dispute…" aria-label="Search disputes" />
+<input type="search" id="disputeSearch" class="search" placeholder="Search Matter or dispute…" aria-label="Search disputes" />
 <select id="disputeStatusFilter" aria-label="Filter dispute status">
 <option value="open">Open disputes</option>
 <option value="resolved">Resolved disputes</option>
@@ -2865,11 +2859,11 @@ font-size:.95rem;
 <table class="pending-users-table">
 <thead>
 <tr id="disputesHeaderRow">
-<th>Case</th>
+<th>Matter</th>
 <th>Parties</th>
 <th>Dispute</th>
 <th>Status</th>
-<th>Funds</th>
+<th>Payment Amount</th>
 <th>Actions</th>
 </tr>
 </thead>
@@ -2885,36 +2879,35 @@ font-size:.95rem;
 <section id="section-revenue" class="section">
 <header>
 <p class="workspace-step-label">Accounting</p>
-<h2>Revenue & Accounting</h2>
-<p>Reporting, ledger detail, receipts, tax estimates, and payout scheduling.</p>
+<h2>Payments & Revenue</h2>
+<p>Recorded platform fees, funding, payouts, and payment receipts. This is an operational view, not a general ledger or tax report.</p>
 </header>
 
 <!-- Overview Row -->
 <div class="grid-four">
-<div class="card"><h3>Total Revenue</h3><p id="revenueTotalValue">—</p></div>
-<div class="card highlight"><h3>Funds Released</h3><p id="fundsReleasedValue">—</p></div>
+<div class="card"><h3>Platform Fee Revenue</h3><p id="revenueTotalValue">—</p></div>
+<div class="card highlight"><h3>Matter Payments Released</h3><p id="fundsReleasedValue">—</p></div>
 <div class="card"><h3>Pending Payouts</h3><p id="pendingPayoutsValue">—</p></div>
-<div class="card highlight"><h3>Platform Fees Collected</h3><p id="platformFeesCollectedValue">—</p></div>
+<div class="card highlight"><h3>Payouts Recorded</h3><p id="payoutsRecordedValue">—</p></div>
 </div>
 
 <!-- Charts -->
-<div class="grid-two" style="margin-top:2rem;">
+<div style="margin-top:2rem;">
 <div class="panel">
-<div class="panel-header"><h2>Monthly Revenue Trends</h2><select id="revView"><option>Show by Month</option><option>Show by Quarter</option></select></div>
+<div class="panel-header"><h2>Monthly Platform Fee Revenue</h2></div>
 <canvas id="revMainChart" height="90"></canvas>
-</div>
-
-<div class="panel">
-<h2>Expense Breakdown</h2>
-<canvas id="revExpenseChart" height="90"></canvas>
+<p id="revMainChartEmpty" class="chart-empty-state" hidden>No platform fee revenue in the reporting window.</p>
 </div>
 </div>
 
 <!-- Accounting Table -->
 <div class="panel" style="margin-top:2rem;">
 <div class="panel-header">
-<h2>Accounting Ledger</h2>
-<button class="btn primary" onclick="downloadCSV()">Download CSV ⬇</button>
+<div>
+<h2>Operational Money Movement</h2>
+<p class="settings-help">Funding, fee, and payout records. Reconcile these records with Stripe before making accounting decisions.</p>
+</div>
+<button class="btn primary" type="button" id="downloadLedgerCsvBtn">Download CSV</button>
 </div>
 <table class="ledger-table">
 <thead>
@@ -2931,14 +2924,15 @@ font-size:.95rem;
 <div class="panel-header receipts-header">
 <h2>Receipts</h2>
 <div class="receipts-actions">
-<input type="search" id="receiptSearch" placeholder="Search receipt ID, case, or party">
+<input type="search" id="receiptSearch" placeholder="Search receipts" aria-label="Search receipt ID, matter, or party">
+<select id="receiptPageSelect" aria-label="Receipts page"></select>
 <button class="btn secondary" type="button" id="receiptRefreshBtn">Refresh</button>
 </div>
 </div>
 <div class="table-wrap">
 <table class="ledger-table receipts-table">
 <thead>
-<tr><th>Date</th><th>Receipt ID</th><th>Case</th><th>Party</th><th>Type</th><th>Amount</th></tr>
+<tr><th>Date</th><th>Receipt ID</th><th>Matter</th><th>Party</th><th>Type</th><th>Amount</th></tr>
 </thead>
 <tbody id="receiptsBody">
 <tr><td colspan="6" style="text-align:center;color:var(--muted)">Loading receipts…</td></tr>
@@ -2947,25 +2941,12 @@ font-size:.95rem;
 </div>
 </div>
 
-<!-- Tax Summary -->
-<div class="grid-two" style="margin-top:2rem;">
-<div class="panel">
-<h2>Tax Summary</h2>
-<ul class="tax-summary">
-<li><strong>Gross Earnings:</strong> —</li>
-<li><strong>Deductible Expenses:</strong> —</li>
-<li><strong>Estimated Tax Owed (22%):</strong> —</li>
-<li><strong>Next Filing Deadline:</strong> April 15 2026</li>
+<div class="panel" style="margin-top:2rem;">
+<h2>Pending Payout Queue</h2>
+<p class="settings-help">Amounts awaiting release. Matter deadlines are shown for context and are not promised payout dates.</p>
+<ul class="payout-schedule" aria-live="polite">
+<li>No pending payouts.</li>
 </ul>
-<button class="btn secondary" id="taxReportBtn" type="button">Generate Tax Report</button>
-</div>
-
-<div class="panel">
-<h2>Upcoming Payout Schedule</h2>
-<ul class="payout-schedule">
-<li>No payouts scheduled.</li>
-</ul>
-</div>
 </div>
 </section>
 
@@ -2978,7 +2959,7 @@ font-size:.95rem;
 
 <!-- Analytics Summary -->
 <div class="grid-four">
-<div class="card"><h3>Total Attorney Posts</h3><p>1,248</p></div>
+<div class="card"><h3>Total Attorney Posts</h3><p>—</p></div>
 <div class="card highlight"><h3>Active</h3><p>—</p></div>
 <div class="card"><h3>Archived</h3><p>—</p></div>
 <div class="card clickable" data-posts-flagged-card role="button" tabindex="0"><h3>Flagged</h3><p>—</p></div>
@@ -2990,12 +2971,14 @@ font-size:.95rem;
 <h2>Deadlines (Next 90 Days)</h2>
 <div class="deadline-chart-compact">
 <canvas id="deadlineChart" height="70"></canvas>
+<p id="deadlineChartEmpty" class="chart-empty-state" hidden>No deadlines fall within the next 90 days.</p>
 </div>
-<p style="margin-top:1rem;color:var(--muted);">Attorney case deadlines grouped by month.</p>
+<p style="margin-top:1rem;color:var(--muted);">Attorney Matter deadlines grouped by month.</p>
 </div>
 <div class="panel">
 <h2>Posts by State</h2>
 <canvas id="postStateChart" height="90"></canvas>
+<p id="postStateChartEmpty" class="chart-empty-state" hidden>No active post locations to report.</p>
 </div>
 </div>
 
@@ -3003,35 +2986,14 @@ font-size:.95rem;
 <div class="panel" style="margin-top:2rem;">
 <div class="panel-header">
 <h2>Latest Attorney Posts</h2>
-  <input type="text" id="postSearch" class="search" placeholder="Search by keyword or author…" aria-label="Search job posts">
+  <input type="text" id="postSearch" class="search" placeholder="Search by keyword or author…" aria-label="Search Matter posts">
 </div>
 <table class="posts-table">
 <thead>
 <tr><th>Title</th><th>Author</th><th>Category</th><th>Location</th><th>Date</th><th>Status</th><th>Action</th></tr>
 </thead>
 <tbody id="postsList">
-<tr>
-<td>Contract Drafting Assistance</td>
-<td>Attorney J. Moore</td>
-<td>Corporate</td>
-<td>VA</td>
-<td>Nov 10 2026</td>
-<td><span class="status pending">Pending</span></td>
-<td>
-<button class="btn danger" onclick="deletePost(this)">Delete</button>
-</td>
-</tr>
-<tr>
-<td>Discovery Review Needed</td>
-<td>Attorney R. Hughes</td>
-<td>Litigation</td>
-<td>MD</td>
-<td>Nov 09 2026</td>
-<td><span class="status approved">Approved</span></td>
-<td>
-<button class="btn danger" onclick="deletePost(this)">Delete</button>
-</td>
-</tr>
+<tr><td colspan="7" class="pending-empty">Loading posts…</td></tr>
 </tbody>
 </table>
 </div>
@@ -3041,23 +3003,22 @@ font-size:.95rem;
 <h2>Posts by Category</h2>
 <div class="post-category-compact">
 <canvas id="postCategoryChart" height="90"></canvas>
+<p id="postCategoryChartEmpty" class="chart-empty-state" hidden>No active post categories to report.</p>
 </div>
 </div>
 
 <div class="panel">
 <h2>Flagged Content Summary</h2>
 <ul class="flagged-list" id="flaggedList">
-<li><strong>Contract Drafting Assistance</strong> – flagged for missing pay rate</li>
-<li><strong>Discovery Review Needed</strong> – contains vague requirements</li>
-<li><strong>Case Communication Post</strong> – unprofessional language detected</li>
+<li>Loading flagged posts…</li>
 </ul>
 </div>
 </div>
 
-<div id="postDetailsModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="postDetailsTitle">
+<div id="postDetailsModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="postDetailsTitle" aria-hidden="true" inert>
 <div class="details-content">
 <div class="details-header">
-<h2 id="postDetailsTitle">Case details</h2>
+<h2 id="postDetailsTitle">Matter details</h2>
 <button type="button" class="btn secondary" data-post-details-close>Close ✕</button>
 </div>
 <div class="author-posts-meta" id="postDetailsMeta"></div>
@@ -3067,7 +3028,7 @@ font-size:.95rem;
 </div>
 </div>
 
-<div id="authorPostsModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="authorPostsTitle">
+<div id="authorPostsModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="authorPostsTitle" aria-hidden="true" inert>
 <div class="details-content">
 <div class="details-header">
 <h2 id="authorPostsTitle">Author posts</h2>
@@ -3093,7 +3054,7 @@ font-size:.95rem;
 </div>
 </div>
 
-<div id="suspendUserModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="suspendUserTitle">
+<div id="suspendUserModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="suspendUserTitle" aria-hidden="true" inert>
 <div class="details-content">
 <div class="details-header">
 <h2 id="suspendUserTitle">Suspend attorney</h2>
@@ -3111,13 +3072,13 @@ font-size:.95rem;
 </div>
 </div>
 
-<div id="deletePostModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="deletePostTitle">
+<div id="deletePostModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="deletePostTitle" aria-hidden="true" inert>
 <div class="details-content">
 <div class="details-header">
 <h2 id="deletePostTitle">Delete post</h2>
 <button type="button" class="btn secondary" data-delete-close>Close ✕</button>
 </div>
-<p class="suspend-helper">This will permanently delete the post and notify the attorney.</p>
+<p class="suspend-helper">Only an open posting with no hire, payment, or dispute history can be permanently deleted. The attorney will be notified.</p>
 <label for="deleteReason">Reason (required)</label>
 <textarea id="deleteReason" class="input-field" rows="3" placeholder="Explain why this post is being deleted"></textarea>
 <label for="deleteMessage">Custom note in email (optional)</label>
@@ -3132,8 +3093,8 @@ font-size:.95rem;
 
 <!-- ACTIVITY LOGS -->
 <section id="section-activity-logs" class="section">
-<h2>Admin Activity Logs</h2>
-<p>View and export full audit logs for compliance.</p>
+<h1>Admin Activity Logs</h1>
+<p>Search audit history and export the currently loaded page for compliance review.</p>
 <div class="panel">
 <div class="panel-header">
 <h3>Log Entries</h3>
@@ -3151,15 +3112,16 @@ font-size:.95rem;
 <select id="auditTargetFilter" aria-label="Filter by target type">
 <option value="all">All Targets</option>
 <option value="user">User</option>
-<option value="case">Case</option>
+<option value="case">Matter</option>
 <option value="payment">Payment</option>
 <option value="message">Message</option>
 <option value="dispute">Dispute</option>
 <option value="document">Document</option>
 <option value="other">Other</option>
 </select>
+<select id="auditPageSelect" aria-label="Activity logs page"></select>
 <button class="btn secondary" type="button" id="refreshAuditLogs">Refresh</button>
-<button class="btn secondary" type="button" id="exportAuditLogs">Export CSV</button>
+<button class="btn secondary" type="button" id="exportAuditLogs">Export page CSV</button>
 </div>
 <div class="table-wrap">
 <table class="pending-users-table">
@@ -3183,7 +3145,7 @@ font-size:.95rem;
 
 <!-- SETTINGS -->
 <section id="section-settings" class="section">
-<h2>Settings</h2>
+<h1>Settings</h1>
 <p>Manage platform-wide admin controls separately from your own dashboard preferences.</p>
 <div class="settings-grid">
   <div class="panel">
@@ -3204,12 +3166,6 @@ font-size:.95rem;
     <p class="settings-help">When enabled, only admins can log in.</p>
   </div>
   <div class="panel">
-    <h3>Finance Defaults</h3>
-    <label for="settingTaxRate">Estimated tax rate (%)</label>
-    <input type="number" id="settingTaxRate" class="input-field" min="0" max="50" step="0.1" placeholder="22">
-    <p class="settings-help">Updates the Tax Summary calculation on this dashboard.</p>
-  </div>
-  <div class="panel">
     <h3>Support Contact</h3>
     <label for="settingSupportEmail">Support email</label>
     <input type="email" id="settingSupportEmail" class="input-field" placeholder="help@lets-paraconnect.com">
@@ -3218,25 +3174,16 @@ font-size:.95rem;
       <span id="settingsUpdatedAt" class="muted"></span>
     </div>
   </div>
-    <div class="panel">
-      <h3>My Preferences</h3>
-    <label for="settingAdminTheme">Admin dashboard theme</label>
-    <select id="settingAdminTheme" class="input-field">
-      <option value="light">Light</option>
-      <option value="mountain">Mountain Light</option>
-    </select>
-    <p class="settings-help">Personal admin preference only. This does not change platform-wide settings.</p>
-  </div>
 </div>
 <div class="settings-actions">
-  <button class="btn primary" type="button" id="saveAdminSettings">Save Settings</button>
+  <button class="btn primary" type="button" id="saveAdminSettings" disabled>Save Settings</button>
   <span id="settingsStatus" class="muted"></span>
 </div>
 </section>
 
 </main>
 
-<div id="pendingUserModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="pendingModalTitle">
+<div id="pendingUserModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="pendingModalTitle" aria-hidden="true" inert>
 <div class="details-content">
 <div class="details-header">
 <div>
@@ -3261,18 +3208,68 @@ font-size:.95rem;
 <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
 
 <style>
-.section {display:none;opacity:0;transition:opacity .4s ease;}
+.section {display:none;opacity:1;transition:none;}
 .section.visible {display:block;opacity:1;}
-nav a.active {background:rgba(0,0,0,0.04);}
+nav [data-section].active {background:rgba(0,0,0,0.04);}
+
+/* Operational admin UI: dense, stable, and legible. */
+body,
+body :where(input, select, textarea, button) {
+font-weight:400;
+}
+html.js .main,
+html.js body.is-ready .main {
+opacity:1;
+transform:none;
+transition:none;
+}
+.main :where(h1, h2, h3, h4),
+#section-user-management :where(h1, h2, h3),
+#section-photo-reviews :where(h1, h2, h3) {
+font-family:var(--font-sans) !important;
+font-weight:600 !important;
+letter-spacing:-0.015em;
+}
+.main h1 {font-size:2rem;line-height:1.15;}
+.main :where(.btn, button, [role="button"]) {font-weight:500;}
+nav :where(a, button[data-section]),
+.sidebar-link {font-weight:400;}
+.main :where(
+.metric p,
+.ai-room-summary-value,
+.ai-room-card-metric-value,
+.ai-room-card-state-pill strong,
+[id^="metric"]
+) {
+font-family:var(--font-sans) !important;
+font-variant-numeric:tabular-nums;
+font-weight:600 !important;
+}
+#section-ai-control-room :where(.ai-room-summary-tile, .ai-room-card) {
+border-radius:10px;
+box-shadow:none;
+}
+#section-ai-control-room .ai-room-card:hover {
+transform:none;
+box-shadow:none;
+}
+#section-ai-control-room .ai-room-card-title {
+font-family:var(--font-sans) !important;
+font-size:1.35rem;
+font-weight:600 !important;
+line-height:1.2;
+}
+@media (max-width:600px) {
+.main h1 {font-size:1.8rem;}
+}
 </style>
 
 <script src="assets/scripts/utils/toast.js?v=20260208"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 void window.checkSession('admin');
-const navLinks=document.querySelectorAll("nav a");
+const navLinks=document.querySelectorAll("nav [data-section]");
 const sections=document.querySelectorAll(".section");
-const logoutButton=document.getElementById("logoutBtn");
 const sidebarToggle=document.getElementById("sidebarToggle");
 const sidebarNav=document.getElementById("sidebarNav");
 const sidebarBackdrop=document.getElementById("sidebarBackdrop");
@@ -3328,22 +3325,27 @@ healthBannerText.textContent="System status: Unable to check";
 }
 };
 
-const closeSidebar=()=>{
-document.body.classList.remove("nav-open");
-if(sidebarToggle) sidebarToggle.setAttribute("aria-expanded","false");
+const setSidebarOpen=(open,{restoreFocus=false}={})=>{
+const nextOpen=Boolean(open)&&window.innerWidth<=1024;
+document.body.classList.toggle("nav-open",nextOpen);
+if(sidebarToggle){
+sidebarToggle.setAttribute("aria-expanded",String(nextOpen));
+sidebarToggle.setAttribute("aria-label",nextOpen?"Close navigation":"Open navigation");
+}
+if(sidebarBackdrop) sidebarBackdrop.setAttribute("aria-hidden",String(!nextOpen));
+if(nextOpen) sidebarNav?.querySelector("a,button")?.focus({preventScroll:true});
+else if(restoreFocus) sidebarToggle?.focus({preventScroll:true});
 };
-const openSidebar=()=>{
-document.body.classList.add("nav-open");
-if(sidebarToggle) sidebarToggle.setAttribute("aria-expanded","true");
-};
+const closeSidebar=(options)=>setSidebarOpen(false,options);
+const openSidebar=()=>setSidebarOpen(true);
 if(sidebarToggle){
 sidebarToggle.addEventListener("click",()=>{
-if(document.body.classList.contains("nav-open")) closeSidebar();
+if(document.body.classList.contains("nav-open")) closeSidebar({restoreFocus:true});
 else openSidebar();
 });
 }
 if(sidebarBackdrop){
-sidebarBackdrop.addEventListener("click",closeSidebar);
+sidebarBackdrop.addEventListener("click",()=>closeSidebar({restoreFocus:true}));
 }
 if(sidebarNav){
 sidebarNav.addEventListener("click",(event)=>{
@@ -3352,6 +3354,11 @@ closeSidebar();
 }
 });
 }
+document.addEventListener("keydown",(event)=>{
+if(event.key==="Escape"&&document.body.classList.contains("nav-open")){
+closeSidebar({restoreFocus:true});
+}
+});
 refreshHealth();
 setInterval(refreshHealth,60000);
 window.addEventListener("resize",()=>{
@@ -3369,6 +3376,8 @@ history.replaceState(null,"",`#${normalizedSection}`);
 navLinks.forEach(link=>{
 const match=link.dataset.section===normalizedSection;
 link.classList.toggle("active",match);
+if(match) link.setAttribute("aria-current","page");
+else link.removeAttribute("aria-current");
 });
 const visibleSectionIds=new Set(SECTION_GROUPS[normalizedSection]||[`section-${normalizedSection}`]);
 sections.forEach(section=>{
@@ -3478,96 +3487,14 @@ document.body.classList.add("is-ready");
 window.addEventListener("load",clearLoadingState,{once:true});
 setTimeout(clearLoadingState,2000);
 
-const WEATHER_CACHE_KEY="adminWeatherCache";
-const WEATHER_CACHE_MS=15*60*1000;
-function readCachedWeather(){
-try{
-const cached=JSON.parse(sessionStorage.getItem(WEATHER_CACHE_KEY)||"");
-if(cached?.text&&Date.now()-(cached.timestamp||0)<WEATHER_CACHE_MS){
-return cached.text;
-}
-}catch{}
-return null;
-}
-function writeCachedWeather(text){
-try{sessionStorage.setItem(WEATHER_CACHE_KEY,JSON.stringify({text,timestamp:Date.now()}));}catch{}
-}
-async function maybeGetGeo(){
-if(!("geolocation" in navigator)) return null;
-try{
-const perm=await (navigator.permissions?.query?navigator.permissions.query({name:"geolocation"}):Promise.resolve(null));
-if(perm&&perm.state!=="granted") return null;
-}catch{}
-try{
-const position=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{maximumAge:300000,timeout:1500}));
-if(position?.coords){
-return{lat:position.coords.latitude,lon:position.coords.longitude};
-}
-}catch{}
-return null;
-}
-async function loadSidebarWeather(){
-const weatherEl=document.getElementById("weatherSidebar");
-if(!weatherEl) return;
-const cached=readCachedWeather();
-if(cached) weatherEl.textContent=cached;
-else weatherEl.textContent="Loading weather…";
-const params=new URLSearchParams();
-const coords=await maybeGetGeo();
-if(coords){
-params.set("lat",coords.lat.toFixed(3));
-params.set("lon",coords.lon.toFixed(3));
-}
-try{
-const res=await fetch(`/api/public/weather${params.toString()?`?${params.toString()}`:""}`,{headers:{Accept:"application/json"}});
-if(!res.ok) throw new Error("weather");
-const data=await res.json().catch(()=>({}));
-const temp=typeof data.temperature==="number"?Math.round(data.temperature):null;
-const condition=data?.condition||"Fair";
-if(temp===null) throw new Error("weather");
-const label=`${temp}\u00B0F ${condition}`;
-weatherEl.textContent=label;
-writeCachedWeather(label);
-}catch(err){
-if(!cached) weatherEl.textContent="Weather unavailable";
-}
-}
-loadSidebarWeather();
-
-if(logoutButton&&!logoutButton.dataset.boundLogoutEnhanced){
-logoutButton.dataset.boundLogoutEnhanced="true";
-logoutButton.dataset.boundLogout="true";
-const defaultLabel=(logoutButton.textContent||"").trim()||"Log Out";
-logoutButton.addEventListener("click",async(event)=>{
-event.preventDefault();
-event.stopPropagation();
-logoutButton.disabled=true;
-logoutButton.textContent="Logging out…";
-try{
-if(typeof window.logoutUser==="function"){
-await window.logoutUser(event);
-}else{
-try{await fetch("/api/auth/logout",{method:"POST",credentials:"include"});}catch{}
-try{localStorage.removeItem("lpc_user");sessionStorage.removeItem("lpc_user");}catch{}
-window.location.href="login.html";
-}
-}catch(err){
-console.error("Logout failed",err);
-logoutButton.disabled=false;
-logoutButton.textContent=defaultLabel;
-}
-});
-}
-
-document.querySelector(".sidebar-footer")?.addEventListener("click",()=>{
-window.location.href="index.html";
-});
 });
 </script>
 
 
 <script type="module">
 import { secureFetch, fetchCSRF, logoutUser } from './assets/scripts/auth.js';
+import { activateDialogFocus, deactivateDialogFocus } from './assets/scripts/utils/dialog-focus.js';
+import { confirmAction, promptForText, showAlert } from './assets/scripts/utils/dialogs.js';
 const toastHelper = window.toastUtils;
 const toastTarget = 'toastBanner';
 
@@ -3666,19 +3593,19 @@ const ctx = document.getElementById("userMgmtComboChart");
 pushChart(ctx,{
 type:"bar",
 data:{
-labels:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct"],
+labels:[],
 datasets:[
 {
 type:"bar",
 label:"Registrations",
-data:[25,40,30,50,70,60,90,85,75,95],
+data:[],
 backgroundColor:"rgba(182,164,122,0.35)",
 borderRadius:6,
 },
 {
 type:"line",
 label:"Growth Rate (%)",
-data:[10,20,15,30,25,35,40,38,33,45],
+data:[],
 borderColor:"#b6a47a",
 backgroundColor:"rgba(182,164,122,0.15)",
 fill:true,
@@ -3697,83 +3624,75 @@ y1:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},title:{displa
 }
 });
 
-/* -------- Escrow Charts -------- */
+/* -------- Funding Charts -------- */
 pushChart(document.getElementById("escrowReportChart"), {
 type:"line",
 data:{
-labels:["Mar 05","Mar 10","Mar 15","Mar 16","Mar 18"],
+labels:[],
 datasets:[{
-label:"Deposits",
-data:[2,7,2,1,3],
-borderColor:"#1abc9c",
-backgroundColor:"rgba(26,188,156,0.15)",
+label:"In Stripe",
+data:[],
+borderColor:"#b6a47a",
+backgroundColor:"rgba(182,164,122,0.15)",
+tension:0.4,
+fill:true
+},{
+label:"Released",
+data:[],
+borderColor:"#1f78d1",
+backgroundColor:"rgba(31,120,209,0.15)",
 tension:0.4,
 fill:true
 }]
 },
-options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+options:{plugins:{legend:{position:"bottom"}},scales:{y:{beginAtZero:true}}}
 });
 
 /* -------- Revenue Charts -------- */
 pushChart(document.getElementById("revMainChart"),{
 type:"bar",
 data:{
-labels:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov"],
+labels:[],
 datasets:[
 {
-label:"Revenue",
-data:[0,0,0,0,0,0,0,0,0,0,0],
+label:"Platform fee revenue",
+data:[],
 backgroundColor:"rgba(182,164,122,0.6)",
 borderRadius:6
-},
-{
-type:"line",
-label:"Profit Margin %",
-data:[0,0,0,0,0,0,0,0,0,0,0],
-borderColor:"#1abc9c",
-tension:0.4,
-yAxisID:"y1",
-fill:false
 }
 ]
 },
 options:{
 plugins:{legend:{position:"bottom"}},
 scales:{
-y:{beginAtZero:true,title:{display:true,text:"Revenue"}},
-y1:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"Margin %"}}
+y:{beginAtZero:true,title:{display:true,text:"USD"}}
 }
 }
-});
-
-pushChart(document.getElementById("revExpenseChart"),{
-type:"doughnut",
-data:{
-labels:["Platform Fees","Taxes","Operational Costs","Payouts"],
-datasets:[{
-data:[0,0,0,0],
-backgroundColor:["#b6a47a","#f4d03f","#95a5a6","#1abc9c"]
-}]
-},
-options:{plugins:{legend:{position:"bottom"}}}
 });
 
 /* -------- Accounting Download -------- */
 function downloadCSV(){
 const rows=[["Date","Category","Description","Amount","Type","Status"]];
 document.querySelectorAll("#ledgerBody tr").forEach(tr=>{
+if(tr.children.length!==6)return;
 const cells=[...tr.children].map(td=>td.innerText.trim());
 rows.push(cells);
 });
-const csv=rows.map(r=>r.join(",")).join("\n");
-const blob=new Blob([csv],{type:"text/csv"});
+const escapeCsvCell=(value)=>{
+let normalized=String(value??"").replace(/\r?\n/g," ").trim();
+if(/^[=+\-@\t\r]/.test(normalized))normalized=`'${normalized}`;
+return `"${normalized.replace(/"/g,'""')}"`;
+};
+const csv=rows.map(r=>r.map(escapeCsvCell).join(",")).join("\r\n");
+const blob=new Blob(["\uFEFF",csv],{type:"text/csv;charset=utf-8"});
 const url=URL.createObjectURL(blob);
 const a=document.createElement("a");
 a.href=url;
-a.download="LetsParaConnect_RevenueLedger.csv";
+a.download=`LetsParaConnect_MoneyMovement_${new Date().toISOString().slice(0,10)}.csv`;
 a.click();
 URL.revokeObjectURL(url);
 }
+document.getElementById("downloadLedgerCsvBtn")?.addEventListener("click", downloadCSV);
 
 /* -------- Post Analytics Charts -------- */
 const postsTableBody=document.getElementById("postsList");
@@ -3783,12 +3702,10 @@ const postsSection=document.getElementById("section-posts");
 const postsSummaryCards=postsSection?Array.from(postsSection.querySelectorAll(".grid-four .card")):[];
 const postSummaryTargets={
 total:postsSummaryCards[0]?.querySelector("p"),
-pending:postsSummaryCards[1]?.querySelector("p"),
-approved:postsSummaryCards[2]?.querySelector("p"),
+active:postsSummaryCards[1]?.querySelector("p"),
+archived:postsSummaryCards[2]?.querySelector("p"),
 flagged:postsSummaryCards[3]?.querySelector("p")
 };
-const pendingPostStatuses=new Set();
-const flaggedPostStatuses=new Set(["disputed"]);
 let adminPosts=[];
 let adminPostsSource=[];
 const AUTHOR_POSTS_PAGE_SIZE=5;
@@ -3841,32 +3758,6 @@ const match=/State:\s*([^•\n]+)/i.exec(summary);
 return match?match[1].trim():"";
 }
 
-function evaluatePostQuality(text="",title=""){
-const combined=`${title||""} ${text||""}`.trim();
-if(!combined)return{score:40,reasons:["Missing description"]};
-let score=100;
-const reasons=[];
-if(combined.length<120){score-=20;reasons.push("Description too short");}
-const penalties=[
-{pattern:/lol|haha|hey/i,points:15,reason:"Unprofessional tone"},
-{pattern:/urgent|asap|immediately/i,points:10,reason:"Overly urgent phrasing"},
-{pattern:/tbd|unknown|n\/a/i,points:8,reason:"Incomplete details"},
-{pattern:/\?\s*$/m,points:5,reason:"Unclear requirements"}
-];
-penalties.forEach((rule)=>{
-if(rule.pattern.test(combined)){
-score-=rule.points;
-reasons.push(rule.reason);
-}
-});
-if(!/experience|years|skill/i.test(combined)){
-score-=5;
-reasons.push("Missing experience expectations");
-}
-score=Math.max(20,Math.min(100,score));
-return{score,reasons};
-}
-
 function formatFlagReason(reason="",details=""){
 const normalized=String(reason||"").toLowerCase().trim();
 const labelMap={
@@ -3901,11 +3792,21 @@ authorPostsState.page=1;
 authorPostsState.total=0;
 authorPostsState.pages=1;
 authorPostsModal.classList.remove("hidden");
+authorPostsModal.setAttribute("aria-hidden","false");
+authorPostsModal.removeAttribute("inert");
+activateDialogFocus(authorPostsModal,{
+initialFocus:authorPostsClose,
+onEscape:closeAuthorPosts,
+});
 loadAuthorPosts();
 }
 
 function closeAuthorPosts(){
-if(authorPostsModal)authorPostsModal.classList.add("hidden");
+if(!authorPostsModal)return;
+authorPostsModal.classList.add("hidden");
+authorPostsModal.setAttribute("aria-hidden","true");
+authorPostsModal.setAttribute("inert","");
+deactivateDialogFocus(authorPostsModal);
 }
 
 async function loadAuthorPosts(){
@@ -3950,7 +3851,7 @@ tr.append(titleTd,statusTd,payTd,dateTd);
 authorPostsBody.appendChild(tr);
 });
 }catch(err){
-authorPostsBody.innerHTML=`<tr><td colspan="4" class="pending-empty">${err?.message||"Unable to load posts."}</td></tr>`;
+authorPostsBody.innerHTML=`<tr><td colspan="4" class="pending-empty">${escapeHtml(err?.message||"Unable to load posts.")}</td></tr>`;
 authorPostsPage.textContent="Page 1";
 authorPostsPrev.disabled=true;
 authorPostsNext.disabled=true;
@@ -3959,25 +3860,23 @@ authorPostsNext.disabled=true;
 
 function shapeAdminPost(entry={}){
 const status=String(entry.status||"open").toLowerCase();
-const quality=evaluatePostQuality(entry.details||entry.briefSummary||"",entry.title||"");
-const flaggedByStatus=flaggedPostStatuses.has(status);
 const flagCount=Number(entry.flagCount||0);
 const flagReasons=Array.isArray(entry.flagReasons)?entry.flagReasons:[];
 const flagDetails=entry.flagDetails||"";
 const flaggedByReports=flagCount>0;
 const moderationStatus=String(entry.moderationStatus||"none").toLowerCase();
 const isReported=flaggedByReports;
-const isFlagged=flaggedByStatus||moderationStatus==="flagged"||moderationStatus==="resolution_requested"||quality.score<75;
+const isFlagged=flaggedByReports||moderationStatus==="flagged"||moderationStatus==="resolution_requested";
 const attorney=entry.attorney||{};
 const author=entry.authorName||attorney.name||`${attorney.firstName||""} ${attorney.lastName||""}`.trim()||attorney.email||"Unknown";
 const authorId=attorney.id||attorney._id||entry.attorneyId||entry.attorney||"";
 const state=deriveState(entry);
 const statusLabel=
-moderationStatus==="resolution_requested"?"Flag resolved":
-isFlagged?"Flagged":
+moderationStatus==="resolution_requested"?"Edits submitted":
+moderationStatus==="flagged"?"Edits requested":
 isReported?"Reported":
 toTitle(status.replace(/_/g," "))||"Pending";
-const statusClass=(isFlagged||isReported)?"pending":"approved";
+const statusClass=isFlagged?"pending":"approved";
 return{
 id:entry.id||entry._id,
 title:entry.title||"Untitled Post",
@@ -3986,7 +3885,7 @@ authorId,
 category:entry.category||entry.practiceArea||"General",
 state:state||"—",
 createdAt:entry.createdAt||entry.created_at||null,
-flaggedAt:entry.flaggedAt||null,
+flaggedAt:entry.flaggedAt||entry.moderationResolutionRequestedAt||entry.moderationFlaggedAt||null,
 status,
 statusLabel,
 statusClass,
@@ -3995,13 +3894,19 @@ isReported,
 moderationStatus,
 flaggedReason:flaggedByReports
 ? formatFlagReason(flagReasons[0]||"",flagDetails)
-: flaggedByStatus
-? "Status requires admin review"
-: quality.reasons[0]||"Low quality description",
-qualityScore:quality.score,
-qualityReasons:quality.reasons,
+: moderationStatus==="resolution_requested"
+? "Attorney submitted edits for admin review"
+: moderationStatus==="flagged"
+? "Admin requested edits"
+: "",
 details:entry.details||entry.briefSummary||"",
 archived:!!entry.archived,
+hasParalegal:!!(entry.paralegal||entry.paralegalId||entry.hiredAt),
+hasFinancialHistory:!!(
+entry.escrowIntentId||entry.paymentIntentId||entry.paymentReleased||entry.payoutTransferId||entry.payoutFinalizedAt||
+String(entry.escrowStatus||"").toLowerCase()==="funded"
+),
+hasDisputeHistory:Array.isArray(entry.disputes)&&entry.disputes.length>0,
 flagCount,
 flagReasons,
 flagDetails
@@ -4010,7 +3915,7 @@ flagDetails
 
 function setPostsTableMessage(message){
 if(!postsTableBody)return;
-postsTableBody.innerHTML=`<tr><td colspan="7" class="pending-empty">${message}</td></tr>`;
+postsTableBody.innerHTML=`<tr><td colspan="7" class="pending-empty">${escapeHtml(message)}</td></tr>`;
 postsTableState.refresh();
 }
 
@@ -4079,7 +3984,11 @@ menu.appendChild(item);
 };
 
 addItem("View Details","",()=>openPostDetails(record));
+const canDeleteRecord=
+record.status==="open"&&!record.hasParalegal&&!record.hasFinancialHistory&&!record.hasDisputeHistory;
+if(canDeleteRecord){
 addItem("Delete","danger",()=>deletePost(record));
+}
 if(record.isFlagged){
 addItem("Resolve Flag","",()=>resolveFlag(record));
 }
@@ -4179,6 +4088,10 @@ function updatePostsCharts(records=[]){
 if(postCategoryChart){
 const categoryCounts=aggregateCounts(records,(record)=>record.category&&record.category.trim());
 const {labels,values}=selectTopEntries(categoryCounts);
+const hasCategoryData=values.some((value)=>Number(value)>0);
+postCategoryChart.canvas.hidden=!hasCategoryData;
+const categoryEmpty=document.getElementById("postCategoryChartEmpty");
+if(categoryEmpty) categoryEmpty.hidden=hasCategoryData;
 postCategoryChart.data.labels=labels;
 postCategoryChart.data.datasets[0].data=values;
 postCategoryChart.update("none");
@@ -4186,6 +4099,10 @@ postCategoryChart.update("none");
 if(postStateChart){
 const stateCounts=aggregateCounts(records,(record)=>record.state&&record.state!=="—"?record.state.trim():null);
 const topStates=Array.from(stateCounts.entries()).sort((a,b)=>b[1]-a[1]).slice(0,5);
+const hasStateData=topStates.some(([,value])=>Number(value)>0);
+postStateChart.canvas.hidden=!hasStateData;
+const stateEmpty=document.getElementById("postStateChartEmpty");
+if(stateEmpty) stateEmpty.hidden=hasStateData;
 postStateChart.data.labels=topStates.map(([label])=>label);
 postStateChart.data.datasets[0].data=topStates.map(([,value])=>value);
 postStateChart.update("none");
@@ -4224,6 +4141,10 @@ cursor.setMonth(cursor.getMonth()+1);
 }
 deadlineChart.data.labels=labels;
 deadlineChart.data.datasets[0].data=values;
+const hasDeadlineData=values.some((value)=>Number(value)>0);
+deadlineChart.canvas.hidden=!hasDeadlineData;
+const deadlineEmpty=document.getElementById("deadlineChartEmpty");
+if(deadlineEmpty) deadlineEmpty.hidden=hasDeadlineData;
 deadlineChart.update("none");
 }
 
@@ -4237,9 +4158,10 @@ else stats.active+=1;
 if(typeof overrides.total==="number")stats.total=overrides.total;
 if(typeof overrides.active==="number")stats.active=overrides.active;
 if(typeof overrides.archived==="number")stats.archived=overrides.archived;
+if(typeof overrides.flagged==="number")stats.flagged=overrides.flagged;
 if(postSummaryTargets.total)postSummaryTargets.total.textContent=stats.total.toLocaleString();
-if(postSummaryTargets.pending)postSummaryTargets.pending.textContent=stats.active.toLocaleString();
-if(postSummaryTargets.approved)postSummaryTargets.approved.toLocaleString();
+if(postSummaryTargets.active)postSummaryTargets.active.textContent=stats.active.toLocaleString();
+if(postSummaryTargets.archived)postSummaryTargets.archived.textContent=stats.archived.toLocaleString();
 if(postSummaryTargets.flagged)postSummaryTargets.flagged.textContent=stats.flagged.toLocaleString();
 }
 
@@ -4251,11 +4173,11 @@ const flaggedEntries=records
 const aFlag=a.flaggedAt?new Date(a.flaggedAt).getTime():0;
 const bFlag=b.flaggedAt?new Date(b.flaggedAt).getTime():0;
 if(aFlag!==bFlag)return bFlag-aFlag;
-return a.qualityScore-b.qualityScore||new Date(b.createdAt||0)-new Date(a.createdAt||0);
+return new Date(b.createdAt||0)-new Date(a.createdAt||0);
 })
 .slice(0,5);
 if(!flaggedEntries.length){
-flaggedList.innerHTML="<li>All posts look good right now.</li>";
+flaggedList.innerHTML="<li>No reported or moderation-flagged posts.</li>";
 return;
 }
 flaggedList.innerHTML="";
@@ -4269,24 +4191,6 @@ flaggedList.appendChild(li);
 
 function updateQualityOutputs(records=[]){
 updateFlaggedList(records);
-}
-
-function isInProgressStatus(value){
-const normalized=String(value||"").toLowerCase();
-return [
-"in progress",
-"in_progress",
-"active",
-"awaiting_documents",
-"reviewing"
-].includes(normalized);
-}
-
-function computePostSummaryOverrides(source=[]){
-const total=source.length;
-const active=source.filter((entry)=>isInProgressStatus(entry.status)).length;
-const archived=source.filter((entry)=>!!entry.archived).length;
-return {total,active,archived};
 }
 
 async function loadAdminPosts(){
@@ -4317,12 +4221,15 @@ const bFlag=b.flaggedAt?new Date(b.flaggedAt).getTime():0;
 if(aFlag!==bFlag) return bFlag-aFlag;
 return new Date(b.createdAt||0)-new Date(a.createdAt||0);
 });
-const summaryOverrides=computePostSummaryOverrides(adminPostsSource);
+const summaryOverrides=payload?.summary&&typeof payload.summary==="object"
+? payload.summary
+: {total:source.length,active:postedCases.length,archived:source.filter((entry)=>!!entry.archived).length};
 if(!adminPosts.length){
 setPostsTableMessage("No posts found.");
 updatePostsSummary([],summaryOverrides);
 updatePostsCharts([]);
 updateQualityOutputs([]);
+updateDeadlineChart(adminPostsSource);
 return;
 }
 renderPostsTable(adminPosts);
@@ -4357,7 +4264,12 @@ return null;
 
 async function resolveFlag(record){
 if(!record?.id)return;
-const note=window.prompt("Optional internal note for resolving this flag:","")??null;
+const note=await promptForText("Add an optional internal note to the resolution record.",{
+title:"Resolve flagged post",
+label:"Internal note (optional)",
+confirmLabel:"Resolve flag",
+maxLength:1000
+});
 if(note===null)return;
 try{
 await fetchCSRF?.();
@@ -4379,8 +4291,15 @@ showToast(err?.message||"Unable to resolve flag.","err");
 
 async function requestEdits(record){
 if(!record?.id)return;
-const message=window.prompt("Enter the edit request for the attorney (required):","")??"";
-if(!message.trim())return;
+const message=await promptForText("Explain what the attorney must change before this post can be cleared.",{
+title:"Request edits",
+label:"Edit request",
+confirmLabel:"Send request",
+required:true,
+requiredMessage:"Enter the requested edits before sending.",
+maxLength:2000
+});
+if(message===null)return;
 try{
 await fetchCSRF?.();
 const res=await secureFetch(`/api/cases/${encodeURIComponent(record.id)}/flags/request-edits`,{
@@ -4400,7 +4319,11 @@ showToast(err?.message||"Unable to request edits.","err");
 
 async function archivePost(record){
 if(!record?.id)return;
-const confirmed=window.confirm("Archive this post? It will be removed from public listings.");
+const confirmed=await confirmAction("The post will be removed from public listings.",{
+title:"Archive this post?",
+confirmLabel:"Archive post",
+tone:"danger"
+});
 if(!confirmed)return;
 try{
 await fetchCSRF?.();
@@ -4439,30 +4362,39 @@ return tr;
 function closePostDetails(){
 if(!postDetailsModal)return;
 postDetailsModal.classList.add("hidden");
+postDetailsModal.setAttribute("aria-hidden","true");
+postDetailsModal.setAttribute("inert","");
+deactivateDialogFocus(postDetailsModal);
 if(postDetailsBody) postDetailsBody.innerHTML="";
 if(postDetailsMeta) postDetailsMeta.textContent="";
-if(postDetailsTitle) postDetailsTitle.textContent="Case details";
+if(postDetailsTitle) postDetailsTitle.textContent="Matter details";
 }
 
 async function openPostDetails(record){
 if(!record?.id||!postDetailsModal||!postDetailsBody)return;
 postDetailsModal.classList.remove("hidden");
-if(postDetailsTitle) postDetailsTitle.textContent=record.title||"Case details";
-if(postDetailsMeta) postDetailsMeta.textContent="Loading case details...";
-postDetailsBody.innerHTML=`<tr><td colspan="2" class="pending-empty">Loading case details...</td></tr>`;
+postDetailsModal.setAttribute("aria-hidden","false");
+postDetailsModal.removeAttribute("inert");
+activateDialogFocus(postDetailsModal,{
+initialFocus:postDetailsCloseBtn,
+onEscape:closePostDetails,
+});
+if(postDetailsTitle) postDetailsTitle.textContent=record.title||"Matter details";
+if(postDetailsMeta) postDetailsMeta.textContent="Loading Matter details...";
+postDetailsBody.innerHTML=`<tr><td colspan="2" class="pending-empty">Loading Matter details...</td></tr>`;
 try{
 const res=await secureFetch(`/api/cases/${encodeURIComponent(record.id)}`,{headers:{Accept:"application/json"}});
 const payload=await res.json().catch(()=>({}));
 if(!res.ok){
-throw new Error(payload?.error||"Unable to load case details.");
+throw new Error(payload?.error||"Unable to load Matter details.");
 }
 const entry=payload?.case||payload||{};
 const deadline=entry.deadline?formatDate(entry.deadline):"—";
 const amount=entry.totalAmount?formatCurrencyCents(entry.totalAmount,entry.currency||"USD"):"—";
 const moderationStatus=String(entry.moderationStatus||"none").toLowerCase();
 const moderationLabel=
-moderationStatus==="resolution_requested"?"Flag resolved":
-moderationStatus==="flagged"?"Flagged":
+moderationStatus==="resolution_requested"?"Edits submitted for review":
+moderationStatus==="flagged"?"Edits requested":
 "—";
 const tasks=Array.isArray(entry.tasks)&&entry.tasks.length
 ? `<ul>${entry.tasks.map((task)=>`<li>${escapeHtml(task?.title||"Task")}</li>`).join("")}</ul>`
@@ -4472,7 +4404,7 @@ postDetailsBody.innerHTML="";
 postDetailsBody.appendChild(buildPostDetailsRow("Status", escapeHtml(record.statusLabel||"—")));
 postDetailsBody.appendChild(buildPostDetailsRow("Moderation", escapeHtml(moderationLabel)));
 if(record.isReported || record.moderationStatus==="flagged" || record.moderationStatus==="resolution_requested"){
-postDetailsBody.appendChild(buildPostDetailsRow("Report reason", escapeHtml(record.flaggedReason||"Needs admin review")));
+postDetailsBody.appendChild(buildPostDetailsRow("Review reason", escapeHtml(record.flaggedReason||"Needs admin review")));
 }
 postDetailsBody.appendChild(buildPostDetailsRow("Category", escapeHtml(entry.practiceArea||record.category||"—")));
 postDetailsBody.appendChild(buildPostDetailsRow("Location", escapeHtml(entry.locationState||entry.state||record.state||"—")));
@@ -4485,7 +4417,7 @@ const updated=entry.updatedAt?formatDate(entry.updatedAt):"—";
 postDetailsMeta.textContent=`Last updated ${updated}`;
 }
 }catch(err){
-postDetailsBody.innerHTML=`<tr><td colspan="2" class="pending-empty">${escapeHtml(err?.message||"Unable to load case details.")}</td></tr>`;
+postDetailsBody.innerHTML=`<tr><td colspan="2" class="pending-empty">${escapeHtml(err?.message||"Unable to load Matter details.")}</td></tr>`;
 if(postDetailsMeta) postDetailsMeta.textContent="";
 }
 }
@@ -4528,12 +4460,20 @@ if(suspendUserTitle) suspendUserTitle.textContent=`Suspend ${suspendTarget.name}
 if(suspendReasonInput) suspendReasonInput.value="";
 if(suspendMessageInput) suspendMessageInput.value="";
 suspendUserModal.classList.remove("hidden");
-suspendReasonInput?.focus();
+suspendUserModal.setAttribute("aria-hidden","false");
+suspendUserModal.removeAttribute("inert");
+activateDialogFocus(suspendUserModal,{
+initialFocus:suspendReasonInput,
+onEscape:closeSuspendModal,
+});
 }
 
 function closeSuspendModal(){
 if(!suspendUserModal)return;
 suspendUserModal.classList.add("hidden");
+suspendUserModal.setAttribute("aria-hidden","true");
+suspendUserModal.setAttribute("inert","");
+deactivateDialogFocus(suspendUserModal);
 suspendTarget=null;
 }
 
@@ -4609,12 +4549,20 @@ if(deletePostTitle) deletePostTitle.textContent=`Delete ${deleteTarget.title}`;
 if(deleteReasonInput) deleteReasonInput.value="";
 if(deleteMessageInput) deleteMessageInput.value="";
 deletePostModal.classList.remove("hidden");
-deleteReasonInput?.focus();
+deletePostModal.setAttribute("aria-hidden","false");
+deletePostModal.removeAttribute("inert");
+activateDialogFocus(deletePostModal,{
+initialFocus:deleteReasonInput,
+onEscape:closeDeleteModal,
+});
 }
 
 function closeDeleteModal(){
 if(!deletePostModal)return;
 deletePostModal.classList.add("hidden");
+deletePostModal.setAttribute("aria-hidden","true");
+deletePostModal.setAttribute("inert","");
+deactivateDialogFocus(deletePostModal);
 deleteTarget=null;
 }
 
@@ -4773,7 +4721,6 @@ document.body.classList.remove("is-loading");
 document.body.classList.add("is-ready");
 });
 window.togglePanel = togglePanel;
-window.deletePost = deletePost;
 const pendingTableBody = document.getElementById('pendingUsersBody');
 const pendingMetric = document.getElementById('pendingUsers');
 const pendingCountLabel = document.getElementById('pendingUsersCountLabel');
@@ -4809,6 +4756,7 @@ const auditLogsCountLabel = document.getElementById('auditLogsCountLabel');
 const auditSearch = document.getElementById('auditSearch');
 const auditRoleFilter = document.getElementById('auditRoleFilter');
 const auditTargetFilter = document.getElementById('auditTargetFilter');
+const auditPageSelect = document.getElementById('auditPageSelect');
 const refreshAuditLogsBtn = document.getElementById('refreshAuditLogs');
 const exportAuditLogsBtn = document.getElementById('exportAuditLogs');
 const modal = document.getElementById('pendingUserModal');
@@ -4821,14 +4769,10 @@ const denyBtn = document.getElementById('denyUserBtn');
 const viewProfileBtn = document.getElementById('viewProfileBtn');
 const roleToggleBtn = document.getElementById('roleToggleBtn');
 const editEmailBtn = document.getElementById('editEmailBtn');
-const approvalTestEmailInput = document.getElementById('approvalTestEmail');
-const approvalTestSendBtn = document.getElementById('approvalTestSendBtn');
 const massEmailUsersBody = document.getElementById('massEmailUsersBody');
 const massEmailSelectAll = document.getElementById('massEmailSelectAll');
 const massEmailCountLabel = document.getElementById('massEmailCountLabel');
 const massEmailHelpText = document.getElementById('massEmailHelpText');
-const massEmailAcceptanceBtn = document.getElementById('massEmailAcceptanceBtn');
-const massEmailDenialBtn = document.getElementById('massEmailDenialBtn');
 const massEmailCompleteBtn = document.getElementById('massEmailCompleteBtn');
 const massEmailAttorneyLaunchSetupBtn = document.getElementById('massEmailAttorneyLaunchSetupBtn');
 const massEmailAttorneyLaunchBtn = document.getElementById('massEmailAttorneyLaunchBtn');
@@ -4849,6 +4793,7 @@ let deletedRequestId = 0;
 const AUDIT_LOG_LIMIT = 20;
 let auditLogs = [];
 let auditRequestId = 0;
+let auditPage = 1;
 let massEmailAllUsers = [];
 let massEmailUsers = [];
 const massEmailSelected = new Set();
@@ -4860,12 +4805,13 @@ let approvedPage = 1;
 let deletedPage = 1;
 let massEmailPage = 1;
 let massEmailAudience = 'missing_photo';
+let massEmailSending = false;
 
 const showToast = (message, type = 'info') => {
 if (toastHelper?.show) {
 toastHelper.show(message, { targetId: toastTarget, type });
 } else {
-alert(message);
+void showAlert(message,{title:type==='err'?'Action unavailable':'Notice'});
 }
 };
 
@@ -4877,8 +4823,8 @@ if (reconcileCaseBtn) {
 reconcileCaseBtn.addEventListener("click", async () => {
 const caseId = reconcileCaseInput?.value.trim();
 if (!caseId) {
-showToast("Enter a case ID to reconcile.", "err");
-if (reconcileStatus) reconcileStatus.textContent = "Case ID is required.";
+showToast("Enter a Matter ID to reconcile.", "err");
+if (reconcileStatus) reconcileStatus.textContent = "Matter ID is required.";
 return;
 }
 const originalLabel = reconcileCaseBtn.textContent || "Reconcile";
@@ -4893,17 +4839,17 @@ headers: { Accept: "application/json" },
 });
 const payload = await res.json().catch(() => ({}));
 if (!res.ok) {
-throw new Error(payload?.error || "Unable to reconcile this case.");
+throw new Error(payload?.error || "Unable to reconcile this Matter.");
 }
 const statusLabel = payload.status || "—";
 const escrowLabel = payload.escrowStatus || "—";
 const paymentLabel = payload.paymentStatus || payload.paymentIntentStatus || "—";
 if (reconcileStatus) {
-reconcileStatus.textContent = `Status: ${statusLabel} · Case funding: ${escrowLabel} · Payment: ${paymentLabel}`;
+reconcileStatus.textContent = `Status: ${statusLabel} · Matter funding: ${escrowLabel} · Payment: ${paymentLabel}`;
 }
 showToast("Reconciliation complete.", "info");
 } catch (err) {
-const message = err?.message || "Unable to reconcile this case.";
+const message = err?.message || "Unable to reconcile this Matter.";
 if (reconcileStatus) reconcileStatus.textContent = message;
 showToast(message, "err");
 } finally {
@@ -4996,8 +4942,8 @@ count === 1 ? '1 deactivated user' : `${count} deactivated users`;
 
 const updateAuditCount = (count = 0) => {
 if (auditLogsCountLabel) {
-if (count > AUDIT_LOG_LIMIT) {
-auditLogsCountLabel.textContent = `Showing ${AUDIT_LOG_LIMIT} of ${count} entries`;
+if (count > auditLogs.length) {
+auditLogsCountLabel.textContent = `Showing ${auditLogs.length} of ${count} entries · Page ${auditPage}`;
 return;
 }
 auditLogsCountLabel.textContent =
@@ -5054,6 +5000,7 @@ return Math.min(totalPages, Math.max(1, safePage));
 const updatePageSelect = (select, total, page, pageSize = USERS_PAGE_SIZE) => {
 if (!select) return;
 const totalPages = getTotalPages(total, pageSize);
+select.hidden = totalPages <= 1;
 select.innerHTML = '';
 for (let i = 1; i <= totalPages; i += 1) {
 const option = document.createElement('option');
@@ -5298,6 +5245,11 @@ const checkbox = document.createElement('input');
 checkbox.type = 'checkbox';
 checkbox.className = 'deleted-select';
 checkbox.dataset.userId = String(user.id || user._id || '');
+const alreadyMinimized = user.personalDataStatus === 'minimized';
+checkbox.disabled = alreadyMinimized;
+checkbox.setAttribute('aria-label', alreadyMinimized
+? `Personal data already minimized for ${displayName(user)}`
+: `Select ${displayName(user)} for data removal`);
 selectTd.appendChild(checkbox);
 
 const nameTd = document.createElement('td');
@@ -5315,7 +5267,7 @@ deletedTd.textContent = formatDate(user.deletedAt || user.updatedAt || user.crea
 const statusTd = document.createElement('td');
 const badge = document.createElement('span');
 badge.className = 'status held';
-badge.textContent = 'Deactivated';
+badge.textContent = alreadyMinimized ? 'Data minimized' : 'Deactivated';
 statusTd.appendChild(badge);
 
 [selectTd, nameTd, roleTd, emailTd, deletedTd, statusTd].forEach((td) =>
@@ -5427,8 +5379,17 @@ const submitEmailUpdate = async (user, mode) => {
 const userId = user?.id || user?._id;
 if (!userId) return;
 const currentEmail = String(user.email || '').trim();
-const nextEmail = window.prompt('Enter the corrected email address:', currentEmail);
-if (!nextEmail) return;
+const nextEmail = await promptForText('Enter the corrected address for this account.', {
+title: 'Update email address',
+label: 'Email address',
+initialValue: currentEmail,
+confirmLabel: 'Update email',
+required: true,
+requiredMessage: 'Enter an email address.',
+multiline: false,
+maxLength: 254,
+});
+if (nextEmail === null) return;
 const normalized = nextEmail.trim().toLowerCase();
 if (!normalized || normalized === currentEmail.toLowerCase()) {
 showToast('Email unchanged.', 'info');
@@ -5503,7 +5464,7 @@ helpText: 'Approved paralegals missing a profile photo.',
 statusText: 'Missing photo',
 filter: isMissingProfilePhoto,
 loadParams: paralegalLoadParams,
-enabledTypes: ['acceptance', 'denial', 'complete_profile', 'attorney_launch_setup'],
+enabledTypes: ['complete_profile', 'attorney_launch_setup'],
 };
 };
 
@@ -5511,8 +5472,6 @@ const syncMassEmailActionState = () => {
 const { helpText, enabledTypes } = getMassEmailAudienceConfig();
 if (massEmailHelpText) massEmailHelpText.textContent = helpText;
 const buttonMap = {
-acceptance: massEmailAcceptanceBtn,
-denial: massEmailDenialBtn,
 complete_profile: massEmailCompleteBtn,
 attorney_launch_setup: massEmailAttorneyLaunchSetupBtn,
 attorney_launch: massEmailAttorneyLaunchBtn,
@@ -5520,8 +5479,9 @@ attorney_first_matter: massEmailAttorneyFirstMatterBtn,
 };
 Object.entries(buttonMap).forEach(([type, button]) => {
 if (!button) return;
-button.disabled = !enabledTypes.includes(type);
-button.classList.toggle('secondary', !enabledTypes.includes(type));
+const isAvailable = enabledTypes.includes(type);
+button.hidden = !isAvailable;
+button.disabled = !isAvailable || massEmailSelected.size === 0 || massEmailSending;
 });
 };
 
@@ -5542,6 +5502,7 @@ if (massEmailSelectAll) {
 massEmailSelectAll.checked = count > 0 && count === massEmailUsers.length;
 massEmailSelectAll.indeterminate = count > 0 && count < massEmailUsers.length;
 }
+syncMassEmailActionState();
 };
 
 const renderMassEmailUsers = () => {
@@ -5550,6 +5511,7 @@ const { statusText } = getMassEmailAudienceConfig();
 if (!massEmailUsers.length) {
 massEmailUsersBody.innerHTML =
 '<tr><td colspan="4" class="pending-empty">No matching users found.</td></tr>';
+updatePageSelect(massEmailPageSelect, 0, 1, MASS_EMAIL_PAGE_SIZE);
 updateMassEmailCount();
 return;
 }
@@ -5616,12 +5578,13 @@ massEmailUsers = [];
 massEmailPage = 1;
 massEmailSelected.clear();
 massEmailUsersBody.innerHTML =
-`<tr><td colspan="4" class="pending-empty">${err?.message || 'Unable to load users.'}</td></tr>`;
+`<tr><td colspan="4" class="pending-empty">${escapeHtml(err?.message || 'Unable to load users.')}</td></tr>`;
 updateMassEmailCount();
 }
 };
 
 const sendMassEmail = async (type) => {
+if (massEmailSending) return;
 const { enabledTypes } = getMassEmailAudienceConfig();
 if (!enabledTypes.includes(type)) {
 showToast('That email is not available for the current audience.', 'err');
@@ -5632,22 +5595,30 @@ if (!selectedIds.length) {
 showToast('Select at least one user.', 'err');
 return;
 }
-if (type === 'denial') {
-const confirmed = window.confirm('Send a denial email to the selected users?');
-if (!confirmed) return;
-}
 const buttons = {
-acceptance: massEmailAcceptanceBtn,
-denial: massEmailDenialBtn,
 complete_profile: massEmailCompleteBtn,
 attorney_launch_setup: massEmailAttorneyLaunchSetupBtn,
 attorney_launch: massEmailAttorneyLaunchBtn,
 attorney_first_matter: massEmailAttorneyFirstMatterBtn,
 };
 const button = buttons[type];
+const campaignName = button?.textContent?.replace(/^Send\s+/i, '') || 'email';
+massEmailSending = true;
+syncMassEmailActionState();
+const confirmed = await confirmAction(
+`Send the ${campaignName} to ${selectedIds.length} selected ${selectedIds.length === 1 ? 'user' : 'users'} now?`,
+{
+title: 'Confirm bulk email',
+confirmLabel: `Send to ${selectedIds.length}`,
+}
+);
+if (!confirmed) {
+massEmailSending = false;
+syncMassEmailActionState();
+return;
+}
 const originalLabel = button?.textContent || '';
 if (button) {
-button.disabled = true;
 button.textContent = 'Sending…';
 }
 try {
@@ -5665,11 +5636,19 @@ showToast(`Sent ${sent} email${sent === 1 ? '' : 's'}.`, 'ok');
 } catch (err) {
 showToast(err?.message || 'Unable to send email.', 'err');
 } finally {
+massEmailSending = false;
 if (button) {
-button.disabled = false;
 button.textContent = originalLabel;
 }
+syncMassEmailActionState();
 }
+};
+
+const replaceClickHandler = (element, handler) => {
+if (!element) return;
+if (element.__lpcClickHandler) element.removeEventListener('click', element.__lpcClickHandler);
+element.__lpcClickHandler = handler;
+element.addEventListener('click', handler);
 };
 
 const openUserModal = (user, { mode = 'pending' } = {}) => {
@@ -5716,10 +5695,10 @@ const profilePath = roleValue === 'paralegal' ? 'profile-paralegal.html' : 'prof
 const profileId = user.id || user._id;
 const canView = Boolean(profileId);
 viewProfileBtn.classList.toggle('hidden', !isApprovedView || !canView);
-viewProfileBtn.onclick = () => {
+replaceClickHandler(viewProfileBtn, () => {
 if (!profileId) return;
 window.open(`${profilePath}?id=${encodeURIComponent(profileId)}`, '_blank', 'noopener');
-};
+});
 }
 if (roleToggleBtn) {
 const roleValue = String(user.role || '').toLowerCase();
@@ -5727,18 +5706,23 @@ const canToggle = roleValue === 'attorney' || roleValue === 'paralegal';
 const nextRole = roleValue === 'paralegal' ? 'attorney' : 'paralegal';
 roleToggleBtn.classList.toggle('hidden', !isApprovedView || !canToggle);
 roleToggleBtn.textContent = nextRole === 'paralegal' ? 'Make Paralegal' : 'Make Attorney';
-roleToggleBtn.onclick = () => {
+replaceClickHandler(roleToggleBtn, () => {
 submitRoleChange(user.id || user._id, nextRole, roleToggleBtn);
-};
+});
 }
 if (editEmailBtn) {
 const userId = user.id || user._id;
 editEmailBtn.classList.toggle('hidden', !userId);
-editEmailBtn.onclick = () => submitEmailUpdate(user, mode);
+replaceClickHandler(editEmailBtn, () => submitEmailUpdate(user, mode));
 }
 
 modal.classList.remove('hidden');
 modal.setAttribute('aria-hidden', 'false');
+modal.removeAttribute('inert');
+activateDialogFocus(modal, {
+initialFocus: closeModalBtn,
+onEscape: closePendingModal,
+});
 };
 
 const openPendingModal = (userId) => {
@@ -5757,6 +5741,8 @@ const closePendingModal = () => {
 if (!modal) return;
 modal.classList.add('hidden');
 modal.setAttribute('aria-hidden', 'true');
+modal.setAttribute('inert', '');
+deactivateDialogFocus(modal);
 activeUserId = null;
 if (modalDetails) modalDetails.innerHTML = '';
 if (viewProfileBtn) viewProfileBtn.classList.add('hidden');
@@ -5770,7 +5756,11 @@ const isApprove = action === 'approve';
 const btn = isApprove ? approveBtn : denyBtn;
 if (!btn) return;
 if (!isApprove) {
-const confirmed = window.confirm('Are you sure you want to deny this applicant?');
+const confirmed = await confirmAction('The applicant will be denied and lose access to the pending workflow.', {
+title: 'Deny this applicant?',
+confirmLabel: 'Deny applicant',
+tone: 'danger',
+});
 if (!confirmed) return;
 }
 const originalText = btn.textContent;
@@ -5808,7 +5798,11 @@ btn.textContent = originalText;
 
 const submitRoleChange = async (userId, nextRole, button) => {
 if (!userId || !nextRole) return;
-if (!window.confirm(`Change role to ${toTitle(nextRole)}?`)) return;
+if (!(await confirmAction('This changes the user’s permissions immediately.', {
+title: `Change role to ${toTitle(nextRole)}?`,
+confirmLabel: 'Change role',
+tone: 'danger',
+}))) return;
 const originalText = button?.textContent;
 if (button) {
 button.disabled = true;
@@ -5877,40 +5871,6 @@ clickedBtn.textContent = originalText || (isApprove ? 'Approve' : 'Reject');
 }
 };
 
-const sendApprovalEmailTestByEmail = async () => {
-if (!approvalTestSendBtn) return;
-const email = approvalTestEmailInput?.value?.trim() || '';
-if (!email) {
-showToast('Enter an email address.', 'err');
-return;
-}
-const originalText = approvalTestSendBtn.textContent;
-approvalTestSendBtn.disabled = true;
-approvalTestSendBtn.textContent = 'Sending…';
-try {
-await fetchCSRF();
-const res = await secureFetch('/api/admin/email/approval-test', {
-method: 'POST',
-body: { email },
-});
-let payload = {};
-try {
-payload = await res.json();
-} catch (_) {
-payload = {};
-}
-if (!res.ok) {
-throw new Error(payload?.msg || payload?.error || 'Unable to send approval email.');
-}
-showToast('Approval email sent.', 'ok');
-} catch (err) {
-showToast(err?.message || 'Unable to send approval email.', 'err');
-} finally {
-approvalTestSendBtn.disabled = false;
-approvalTestSendBtn.textContent = originalText;
-}
-};
-
 const loadPendingUsers = async () => {
 if (!pendingTableBody) return;
 const requestId = ++pendingRequestId;
@@ -5941,7 +5901,7 @@ typeof data.total === 'number' ? data.total : pendingUsers.length
 if (requestId !== pendingRequestId) return;
 pendingUsers = [];
 updatePendingCount(0);
-pendingTableBody.innerHTML = `<tr><td colspan="4" class="pending-empty">${err?.message || 'Unable to load pending users.'}</td></tr>`;
+pendingTableBody.innerHTML = `<tr><td colspan="4" class="pending-empty">${escapeHtml(err?.message || 'Unable to load pending users.')}</td></tr>`;
 } finally {
 if (requestId === pendingRequestId) setPendingLoading(false);
 }
@@ -5970,7 +5930,7 @@ if (requestId !== photoReviewRequestId) return;
 photoReviewItems = [];
 updatePhotoReviewCount(0);
 photoReviewsBody.innerHTML =
-`<tr><td colspan="6" class="pending-empty">${err?.message || 'Unable to load photo reviews.'}</td></tr>`;
+`<tr><td colspan="6" class="pending-empty">${escapeHtml(err?.message || 'Unable to load photo reviews.')}</td></tr>`;
 } finally {
 if (requestId === photoReviewRequestId) setPhotoReviewLoading(false);
 }
@@ -6003,7 +5963,7 @@ typeof data.total === 'number' ? data.total : approvedUsers.length
 if (requestId !== approvedRequestId) return;
 approvedUsers = [];
 updateApprovedCount(0);
-approvedTableBody.innerHTML = `<tr><td colspan="5" class="pending-empty">${err?.message || 'Unable to load approved users.'}</td></tr>`;
+approvedTableBody.innerHTML = `<tr><td colspan="5" class="pending-empty">${escapeHtml(err?.message || 'Unable to load approved users.')}</td></tr>`;
 } finally {
 if (requestId === approvedRequestId) setApprovedLoading(false);
 }
@@ -6036,7 +5996,7 @@ typeof data.total === 'number' ? data.total : deletedUsers.length
 if (requestId !== deletedRequestId) return;
 deletedUsers = [];
 updateDeletedCount(0);
-deletedTableBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${err?.message || 'Unable to load deactivated users.'}</td></tr>`;
+deletedTableBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${escapeHtml(err?.message || 'Unable to load deactivated users.')}</td></tr>`;
 } finally {
 if (requestId === deletedRequestId) setDeletedLoading(false);
 }
@@ -6048,7 +6008,7 @@ const requestId = ++auditRequestId;
 setAuditLoading(true);
 auditLogsBody.innerHTML =
 '<tr><td colspan="6" class="pending-empty">Loading activity logs…</td></tr>';
-const params = new URLSearchParams({ limit: String(AUDIT_LOG_LIMIT) });
+const params = new URLSearchParams({ limit: String(AUDIT_LOG_LIMIT), page: String(auditPage) });
 const roleValue = (auditRoleFilter?.value || '').toLowerCase();
 if (roleValue && roleValue !== 'all') params.set('role', roleValue);
 const targetValue = (auditTargetFilter?.value || '').toLowerCase();
@@ -6064,14 +6024,15 @@ const data = res.ok ? await res.json() : { logs: [] };
 if (requestId !== auditRequestId) return;
 auditLogs = Array.isArray(data.logs) ? data.logs : [];
 renderAuditLogs();
-updateAuditCount(
-typeof data.total === 'number' ? data.total : auditLogs.length
-);
+const total = typeof data.total === 'number' ? data.total : auditLogs.length;
+updatePageSelect(auditPageSelect, total, auditPage, AUDIT_LOG_LIMIT);
+updateAuditCount(total);
 } catch (err) {
 if (requestId !== auditRequestId) return;
 auditLogs = [];
+updatePageSelect(auditPageSelect, 0, 1, AUDIT_LOG_LIMIT);
 updateAuditCount(0);
-auditLogsBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${err?.message || 'Unable to load activity logs.'}</td></tr>`;
+auditLogsBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${escapeHtml(err?.message || 'Unable to load activity logs.')}</td></tr>`;
 } finally {
 if (requestId === auditRequestId) setAuditLoading(false);
 }
@@ -6148,15 +6109,28 @@ deletedPageSelect?.addEventListener('change', () => {
 deletedPage = Number(deletedPageSelect.value) || 1;
 renderDeletedUsers();
 });
-auditRoleFilter?.addEventListener('change', () => loadAuditLogs());
-auditTargetFilter?.addEventListener('change', () => loadAuditLogs());
+auditRoleFilter?.addEventListener('change', () => {
+auditPage = 1;
+loadAuditLogs();
+});
+auditTargetFilter?.addEventListener('change', () => {
+auditPage = 1;
+loadAuditLogs();
+});
 refreshAuditLogsBtn?.addEventListener('click', () => loadAuditLogs());
-auditSearch?.addEventListener('input', debounce(() => loadAuditLogs()));
+auditSearch?.addEventListener('input', debounce(() => {
+auditPage = 1;
+loadAuditLogs();
+}));
+auditPageSelect?.addEventListener('change', () => {
+auditPage = Number(auditPageSelect.value) || 1;
+loadAuditLogs();
+});
 if (deletedSelectAll) {
 deletedSelectAll.addEventListener('change', () => {
 const checked = deletedSelectAll.checked;
 document.querySelectorAll('.deleted-select').forEach((input) => {
-input.checked = checked;
+if (!input.disabled) input.checked = checked;
 });
 });
 }
@@ -6166,36 +6140,47 @@ const selected = Array.from(document.querySelectorAll('.deleted-select:checked')
   .map((input) => input.dataset.userId)
   .filter(Boolean);
 if (!selected.length) {
-showToast('Select at least one user to permanently delete.', 'err');
+showToast('Select at least one deactivated user to process.', 'err');
 return;
 }
-const confirmed = window.confirm(
-`Permanently delete ${selected.length} user${selected.length === 1 ? '' : 's'}? This cannot be undone.`
+const confirmed = await confirmAction(
+`Accounts with retained Matter, financial, audit, or safety records will be minimized instead of destroying those records.`,
+{
+title:`Process data removal for ${selected.length} deactivated user${selected.length === 1 ? '' : 's'}?`,
+confirmLabel:'Process removal',
+tone:'danger',
+}
 );
 if (!confirmed) return;
 purgeDeletedBtn.disabled = true;
-const originalLabel = purgeDeletedBtn.textContent || 'Permanently Delete Selected';
-purgeDeletedBtn.textContent = 'Deleting…';
+const originalLabel = purgeDeletedBtn.textContent || 'Process Data Removal';
+purgeDeletedBtn.textContent = 'Processing…';
 try {
 await fetchCSRF?.();
 const results = await Promise.allSettled(
-selected.map((userId) =>
-secureFetch(`/api/admin/users/${encodeURIComponent(userId)}/purge`, {
+selected.map(async (userId) => {
+const response = await secureFetch(`/api/admin/users/${encodeURIComponent(userId)}/purge`, {
 method: 'POST',
 body: {},
 headers: { Accept: 'application/json' },
+});
+const payload = await response.json().catch(() => ({}));
+if (!response.ok) throw new Error(payload?.error || payload?.msg || `Request failed (${response.status})`);
+return payload;
 })
-)
 );
 const failed = results.filter((r) => r.status === 'rejected');
+const completed = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+const minimized = completed.filter((item) => item?.mode === 'minimized').length;
+const purged = completed.filter((item) => item?.mode === 'purged').length;
 if (failed.length) {
-showToast(`Deleted ${selected.length - failed.length}. ${failed.length} failed.`, 'err');
+showToast(`Processed ${completed.length}: ${minimized} minimized, ${purged} fully removed. ${failed.length} failed.`, 'err');
 } else {
-showToast('Permanently deleted selected users.', 'info');
+showToast(`Processed ${completed.length}: ${minimized} minimized, ${purged} fully removed.`, 'info');
 }
 await loadDeletedUsers();
 } catch (err) {
-showToast(err?.message || 'Unable to permanently delete users.', 'err');
+showToast(err?.message || 'Unable to process user data removal.', 'err');
 } finally {
 purgeDeletedBtn.disabled = false;
 purgeDeletedBtn.textContent = originalLabel;
@@ -6216,8 +6201,8 @@ const headers = [
 'Action',
 'Target Type',
 'Target ID',
-'Case ID',
-'Case Title',
+'Matter ID',
+'Matter Title',
 'Path',
 'Method',
 ];
@@ -6245,7 +6230,7 @@ const url = URL.createObjectURL(blob);
 const link = document.createElement('a');
 const stamp = new Date().toISOString().slice(0, 10);
 link.href = url;
-link.download = `audit-logs-${stamp}.csv`;
+link.download = `audit-logs-page-${auditPage}-${stamp}.csv`;
 document.body.appendChild(link);
 link.click();
 link.remove();
@@ -6263,7 +6248,6 @@ closePendingModal();
 });
 approveBtn?.addEventListener('click', () => submitDecision('approve'));
 denyBtn?.addEventListener('click', () => submitDecision('deny'));
-approvalTestSendBtn?.addEventListener('click', () => sendApprovalEmailTestByEmail());
 massEmailSelectAll?.addEventListener('change', () => {
 const isChecked = massEmailSelectAll.checked;
 massEmailSelected.clear();
@@ -6284,8 +6268,6 @@ massEmailAudience = String(massEmailAudienceSelect.value || 'missing_photo');
 syncMassEmailActionState();
 loadMassEmailUsers();
 });
-massEmailAcceptanceBtn?.addEventListener('click', () => sendMassEmail('acceptance'));
-massEmailDenialBtn?.addEventListener('click', () => sendMassEmail('denial'));
 massEmailCompleteBtn?.addEventListener('click', () => sendMassEmail('complete_profile'));
 massEmailAttorneyLaunchSetupBtn?.addEventListener('click', () => sendMassEmail('attorney_launch_setup'));
 massEmailAttorneyLaunchBtn?.addEventListener('click', () => sendMassEmail('attorney_launch'));
@@ -6305,11 +6287,7 @@ softRefreshTimer = null;
 const softRefreshAdmin = async () => {
 if (document.hidden || softRefreshInFlight) return;
 softRefreshInFlight = true;
-const tasks = [];
-if (typeof window.loadSidebarWeather === 'function') {
-tasks.push(window.loadSidebarWeather());
-}
-tasks.push(
+const tasks = [
 loadFinanceCards(),
 loadAdminPosts(),
 window.loadOverviewActionBoard?.(true),
@@ -6319,7 +6297,7 @@ loadApprovedUsers(),
 loadMassEmailUsers(),
 loadDeletedUsers(),
 loadAuditLogs()
-);
+];
 await Promise.allSettled(tasks);
 softRefreshInFlight = false;
 };

@@ -1,0 +1,267 @@
+name: Quality and security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  deployment-blueprint:
+    name: Deployment Blueprint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Verify pinned Node and npm runtimes
+        run: node scripts/verify-runtime.js
+
+      - name: Install exact dependency graph
+        working-directory: backend
+        run: npm ci
+
+      - name: Validate Render schema and LPC deployment contract
+        working-directory: backend
+        run: npm run check:deploy
+
+  validate:
+    name: Runtime, dependency, and test gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      JWT_SECRET: ci-only-jwt-secret-that-is-longer-than-32-bytes
+      DATA_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Verify pinned Node and npm runtimes
+        run: node scripts/verify-runtime.js
+
+      - name: Record exact release candidate
+        run: npm run check:candidate
+
+      - name: Install exact dependency graph
+        run: npm ci
+
+      - name: Validate runtime, source, and performance budgets
+        run: npm run check:ci-workflow && npm run check:repository && npm run check:runtime && npm run check:syntax && npm run check:focus && npm run check:routes && npm run check:backend-reachability && npm run check:runtime-bindings && npm run check:route-security && npm run check:logging && npm run check:secrets && npm run check:frontend && npm run check:frontend-bindings && npm run check:vendor && npm run check:no-theater && npm run check:api-contract && npm run check:performance && npm run check:legal && npm run check:install-scripts
+
+      - name: Generate production dependency SBOM
+        run: npm run generate:sbom && npm run check:licenses
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Upload supply-chain launch evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: supply-chain-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/supply-chain
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload candidate identity evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-identity-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/release/candidate.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Run complete Jest suite
+        run: npm test -- --ci --reporters=default --reporters=jest-junit
+        env:
+          JEST_JUNIT_OUTPUT_DIR: test-results/jest
+          JEST_JUNIT_OUTPUT_NAME: results.xml
+
+      - name: Run launch-critical payment suite
+        run: npm run test:payments
+
+      - name: Run launch-critical authentication suite
+        run: npm run test:auth
+
+      - name: Upload Jest launch evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jest-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/jest/results.xml
+          if-no-files-found: error
+          retention-days: 30
+
+  browser-contracts:
+    name: Browser contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      JWT_SECRET: ci-only-jwt-secret-that-is-longer-than-32-bytes
+      DATA_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Verify pinned Node and npm runtimes
+        run: node scripts/verify-runtime.js
+
+      - name: Install exact dependency graph
+        run: npm ci
+
+      - name: Install browser engines and system dependencies
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Run deterministic UI contracts
+        run: npm run test:browser:contracts
+
+      - name: Run full browser and lifecycle E2E suite
+        run: npm run test:e2e
+
+      - name: Run public WCAG browser audit
+        run: npm run test:playwright:a11y
+
+      - name: Run public performance budgets
+        run: npm run test:playwright:performance
+
+      - name: Run launch-critical role journeys
+        run: npm run test:playwright:critical
+
+      - name: Upload browser launch evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/junit
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload failed browser evidence
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-failure-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            backend/test-results/playwright-accessibility
+            backend/test-results/playwright-performance
+            backend/test-results/playwright-support
+            backend/test-results/playwright-paralegal-support
+            backend/test-results/playwright-director
+            backend/test-results/playwright-control-room
+          if-no-files-found: ignore
+          retention-days: 7
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Reject vulnerable dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          deny-licenses: AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@988661ebb5e81487b3fb31b2185d2856c0a10679 # v4
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - name: Analyze source
+        uses: github/codeql-action/analyze@988661ebb5e81487b3fb31b2185d2856c0a10679 # v4
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan repository history
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

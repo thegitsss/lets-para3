@@ -744,7 +744,7 @@ jest.mock("../ai/supportAgent", () => {
             category: "payment",
             primaryAsk: "navigation",
             activeTask: "NAVIGATION",
-            navigation: nav("Billing & Payments", "dashboard-attorney.html#billing"),
+            navigation: nav("Payments", "dashboard-attorney.html#funds"),
             selectionTopics: selectedTopics.length ? selectedTopics : ["theme_settings", "billing"],
             lastSelectionTopic: "billing",
             topicKey: "billing_navigation",
@@ -809,7 +809,7 @@ jest.mock("../ai/supportAgent", () => {
             category: "payment",
             primaryAsk: "navigation",
             activeTask: "NAVIGATION",
-            navigation: nav("Billing & Payments", "dashboard-attorney.html#billing"),
+            navigation: nav("Payments", "dashboard-attorney.html#funds"),
             lastSelectionTopic: "billing",
             topicKey: "billing_navigation",
             topicMode: "continue",
@@ -827,7 +827,7 @@ jest.mock("../ai/supportAgent", () => {
             category: "payment",
             primaryAsk: "navigation",
             activeTask: "NAVIGATION",
-            navigation: nav("Billing & Payments", "dashboard-attorney.html#billing"),
+            navigation: nav("Payments", "dashboard-attorney.html#funds"),
             lastSelectionTopic: "billing",
             topicKey: "billing_navigation",
             topicMode: "continue",
@@ -913,7 +913,7 @@ jest.mock("../ai/supportAgent", () => {
             category: "case_posting",
             primaryAsk: "issue_review_status",
             activeTask: "ANSWER",
-            navigation: nav("Billing & Payments", "dashboard-attorney.html#billing"),
+            navigation: nav("Payments", "dashboard-attorney.html#funds"),
           });
         }
 
@@ -1110,8 +1110,8 @@ jest.mock("../ai/supportAgent", () => {
       if (normalized.includes("where can i see my payouts")) {
         return buildReply({
           reply: "You can open that here.",
-          suggestions: ["Completed cases", "My applications", "Profile settings"],
-          navigation: nav("Completed cases", "dashboard-paralegal.html#cases-completed"),
+          suggestions: ["Completed Matters", "My applications", "Profile settings"],
+          navigation: nav("Completed Matters", "dashboard-paralegal.html#cases-completed"),
           primaryAsk: "navigation",
           activeTask: "NAVIGATION",
           topicKey: "payout_history_navigation",
@@ -1184,7 +1184,7 @@ jest.mock("../ai/supportAgent", () => {
           reply: "You can open that here.",
           primaryAsk: "navigation",
           activeTask: "NAVIGATION",
-          navigation: nav("Completed cases", "dashboard-paralegal.html#cases-completed"),
+          navigation: nav("Completed Matters", "dashboard-paralegal.html#cases-completed"),
         });
       }
 
@@ -1485,7 +1485,7 @@ jest.mock("../ai/supportAgent", () => {
           category: "payment",
           primaryAsk: "navigation",
           activeTask: "NAVIGATION",
-          navigation: nav("Billing & Payments", "dashboard-attorney.html#billing"),
+          navigation: nav("Payments", "dashboard-attorney.html#funds"),
           selectionTopics: selectedTopics,
           lastSelectionTopic: "billing",
           topicKey: "billing_navigation",
@@ -1503,7 +1503,7 @@ jest.mock("../ai/supportAgent", () => {
           navigation: nav("Preferences", "profile-settings.html#preferencesSection"),
           actions: [
             linkAction("Preferences", "profile-settings.html#preferencesSection"),
-            linkAction("Billing & Payments", "dashboard-attorney.html#billing"),
+            linkAction("Payments", "dashboard-attorney.html#funds"),
           ],
         });
       }
@@ -1610,7 +1610,7 @@ jest.mock("../ai/supportAgent", () => {
           primaryAsk: "billing_payment_method",
           activeTask: "NAVIGATION",
           responseMode: "DIRECT_ANSWER",
-          navigation: nav("Billing & Payments", "dashboard-attorney.html#billing"),
+          navigation: nav("Payments", "dashboard-attorney.html#funds"),
           paymentSubIntent: "billing_method",
           topicKey: "billing_navigation",
           topicMode: "switch",
@@ -1727,7 +1727,7 @@ jest.mock("../ai/supportAgent", () => {
           primaryAsk: /\bupdate billing method\b/i.test(messageText || "") ? "billing_payment_method" : "navigation",
           activeTask: "NAVIGATION",
           paymentSubIntent: "billing_method",
-          navigation: nav("Billing & Payments", "dashboard-attorney.html#billing"),
+          navigation: nav("Payments", "dashboard-attorney.html#funds"),
           supportFacts: {
             userRole: context.role,
             billingMethodState,
@@ -1801,7 +1801,7 @@ jest.mock("../ai/supportAgent", () => {
 
         if (context.role === "attorney") {
           return buildReply({
-            reply: "Attorney accounts don't receive payouts. Billing and case payments are managed from Billing & Payments.",
+            reply: "Attorney accounts don't receive payouts. Billing and case payments are managed from Payments.",
             category: "payment",
             primaryAsk: "payout_question",
             paymentSubIntent: "payout",
@@ -2153,7 +2153,7 @@ describe("Support assistant API", () => {
     });
 
     const firstRes = await createConversation(attorney, {
-      sourcePage: "/dashboard-attorney.html#billing",
+      sourcePage: "/dashboard-attorney.html#funds",
       pageTitle: "Billing",
       viewName: "billing",
     });
@@ -2164,7 +2164,7 @@ describe("Support assistant API", () => {
         id: expect.any(String),
         status: "open",
         role: "attorney",
-        sourcePage: "/dashboard-attorney.html#billing",
+        sourcePage: "/dashboard-attorney.html#funds",
       })
     );
 
@@ -2180,7 +2180,7 @@ describe("Support assistant API", () => {
     expect(messagesRes.body.messages).toEqual([
       expect.objectContaining({
         sender: "assistant",
-        text: "Hi — I can help with account questions, payouts, case activity, and platform issues.",
+        text: "Hi — I can help with account questions, payouts, Matter activity, and platform issues.",
       }),
     ]);
   });
@@ -2262,7 +2262,7 @@ describe("Support assistant API", () => {
     expect(restartRes.body.messages).toEqual([
       expect.objectContaining({
         sender: "assistant",
-        text: "Hi — I can help with account questions, payouts, case activity, and platform issues.",
+        text: "Hi — I can help with account questions, payouts, Matter activity, and platform issues.",
       }),
     ]);
 
@@ -2484,8 +2484,8 @@ describe("Support assistant API", () => {
     expect(conversationRes.status).toBe(200);
     expect(conversationRes.body.conversation.supportState.proactivePrompt).toEqual(
       expect.objectContaining({
-        text: "You still have an open case issue.",
-        message: "Can you check on my open case issue?",
+        text: "You still have an open Matter issue.",
+        message: "Can you check on my open Matter issue?",
       })
     );
 
@@ -2500,7 +2500,7 @@ describe("Support assistant API", () => {
 
     expect(sendRes.status).toBe(201);
     expect(sendRes.body.assistantMessage.text).not.toMatch(/open a case issue/i);
-    expect(sendRes.body.assistantMessage.text).toMatch(/your case issue/i);
+    expect(sendRes.body.assistantMessage.text).toMatch(/your Matter issue/i);
   });
 
   test("uses structured proactive prompt intent for resolved issue updates instead of relying on message wording", async () => {
@@ -2891,11 +2891,13 @@ describe("Support assistant API", () => {
     expect(sendRes.status).toBe(201);
     expect(sendRes.body.assistantReply.primaryAsk).toBe("issue_review_status");
     expect(sendRes.body.assistantMessage.text).toMatch(/your case issue is still open with the team/i);
-    expect(sendRes.body.assistantMessage.text).toMatch(/Also, you can find that here\./i);
+    expect(sendRes.body.assistantMessage.text).toMatch(
+      /Also, LPC does not create invoice records\. You can find Matter payment history and receipts here\./
+    );
     expect(sendRes.body.assistantReply.navigation).toEqual(
       expect.objectContaining({
-        ctaLabel: "Billing & Payments",
-        ctaHref: "dashboard-attorney.html#billing",
+        ctaLabel: "Payments",
+        ctaHref: "dashboard-attorney.html#funds",
       })
     );
   });
@@ -3305,8 +3307,8 @@ describe("Support assistant API", () => {
         paymentSubIntent: "billing_method",
         needsEscalation: false,
         navigation: expect.objectContaining({
-          ctaLabel: "Billing & Payments",
-          ctaHref: "dashboard-attorney.html#billing",
+          ctaLabel: "Payments",
+          ctaHref: "dashboard-attorney.html#funds",
           ctaType: "deep_link",
           inlineLinkText: "here",
         }),
@@ -3316,13 +3318,13 @@ describe("Support assistant API", () => {
     expect(sendRes.body.assistantMessage.text).not.toMatch(/Stripe Connect|payout|bank account/i);
     expect(sendRes.body.assistantMessage.metadata.navigation).toEqual(
       expect.objectContaining({
-        ctaHref: "dashboard-attorney.html#billing",
+        ctaHref: "dashboard-attorney.html#funds",
       })
     );
     expect(sendRes.body.assistantReply.actions).toEqual([
       expect.objectContaining({
-        label: "Billing & Payments",
-        href: "dashboard-attorney.html#billing",
+        label: "Payments",
+        href: "dashboard-attorney.html#funds",
         type: "deep_link",
       }),
     ]);
@@ -5015,8 +5017,8 @@ describe("Support assistant API", () => {
     expect(secondRes.body.assistantMessage.text).toBe("You can find that here.");
     expect(secondRes.body.assistantReply.navigation).toEqual(
       expect.objectContaining({
-        ctaLabel: "Billing & Payments",
-        ctaHref: "dashboard-attorney.html#billing",
+        ctaLabel: "Payments",
+        ctaHref: "dashboard-attorney.html#funds",
       })
     );
   });
@@ -5059,8 +5061,8 @@ describe("Support assistant API", () => {
     expect(thirdRes.body.assistantReply.primaryAsk).toBe("navigation");
     expect(thirdRes.body.assistantReply.navigation).toEqual(
       expect.objectContaining({
-        ctaLabel: "Billing & Payments",
-        ctaHref: "dashboard-attorney.html#billing",
+        ctaLabel: "Payments",
+        ctaHref: "dashboard-attorney.html#funds",
       })
     );
   });
@@ -5106,8 +5108,8 @@ describe("Support assistant API", () => {
           href: "profile-settings.html#preferencesSection",
         }),
         expect.objectContaining({
-          label: "Billing & Payments",
-          href: "dashboard-attorney.html#billing",
+          label: "Payments",
+          href: "dashboard-attorney.html#funds",
         }),
       ])
     );
@@ -5231,8 +5233,8 @@ describe("Support assistant API", () => {
     expect(secondRes.body.assistantMessage.text).toBe("You can update that here.");
     expect(secondRes.body.assistantReply.navigation).toEqual(
       expect.objectContaining({
-        ctaLabel: "Billing & Payments",
-        ctaHref: "dashboard-attorney.html#billing",
+        ctaLabel: "Payments",
+        ctaHref: "dashboard-attorney.html#funds",
       })
     );
   });
@@ -5861,8 +5863,8 @@ describe("Support assistant API", () => {
     const script = `
       import { buildSupportInlineSegments } from ${JSON.stringify(pathToFileURL(helperPath).href)};
       const result = buildSupportInlineSegments("You can find that here.", {
-        ctaLabel: "Billing & Payments",
-        ctaHref: "dashboard-attorney.html#billing",
+        ctaLabel: "Payments",
+        ctaHref: "dashboard-attorney.html#funds",
         inlineLinkText: "here",
       });
       console.log(JSON.stringify(result));
@@ -5874,7 +5876,7 @@ describe("Support assistant API", () => {
 
     expect(JSON.parse(output.trim())).toEqual([
       { type: "text", text: "You can find that " },
-      { type: "link", text: "here", href: "dashboard-attorney.html#billing" },
+      { type: "link", text: "here", href: "dashboard-attorney.html#funds" },
       { type: "text", text: "." },
     ]);
   });
@@ -6506,11 +6508,13 @@ describe("Support assistant API", () => {
     });
 
     expect(invoiceRes.status).toBe(201);
-    expect(invoiceRes.body.assistantMessage.text).toBe("You can find that here.");
+    expect(invoiceRes.body.assistantMessage.text).toBe(
+      "LPC does not create invoice records. You can find Matter payment history and receipts here."
+    );
     expect(invoiceRes.body.assistantReply.navigation).toEqual(
       expect.objectContaining({
-        ctaLabel: "Billing & Payments",
-        ctaHref: "dashboard-attorney.html#billing",
+        ctaLabel: "Payments",
+        ctaHref: "dashboard-attorney.html#funds",
       })
     );
 
@@ -6523,11 +6527,11 @@ describe("Support assistant API", () => {
     });
 
     expect(receiptRes.status).toBe(201);
-    expect(receiptRes.body.assistantMessage.text).toBe("You can find that here.");
+    expect(receiptRes.body.assistantMessage.text).toBe("You can find Matter payment history and receipts here.");
     expect(receiptRes.body.assistantReply.navigation).toEqual(
       expect.objectContaining({
-        ctaLabel: "Billing & Payments",
-        ctaHref: "dashboard-attorney.html#billing",
+        ctaLabel: "Payments",
+        ctaHref: "dashboard-attorney.html#funds",
       })
     );
   });
@@ -6771,7 +6775,7 @@ describe("Support assistant API", () => {
     expect(payoutsRes.status).toBe(201);
     expect(payoutsRes.body.assistantReply.navigation).toEqual(
       expect.objectContaining({
-        ctaLabel: "Completed cases",
+        ctaLabel: "Completed Matters",
         ctaHref: "dashboard-paralegal.html#cases-completed",
       })
     );
@@ -6886,7 +6890,7 @@ describe("Support assistant API", () => {
     expect(completedRes.body.assistantReply.needsEscalation).toBe(false);
     expect(completedRes.body.assistantReply.navigation).toEqual(
       expect.objectContaining({
-        ctaLabel: "Completed cases",
+        ctaLabel: "Completed Matters",
         ctaHref: "dashboard-paralegal.html#cases-completed",
       })
     );
@@ -7197,8 +7201,8 @@ describe("Support assistant API", () => {
         responseMode: "DIRECT_ANSWER",
         needsEscalation: false,
         navigation: expect.objectContaining({
-          ctaLabel: "Billing & Payments",
-          ctaHref: "dashboard-attorney.html#billing",
+          ctaLabel: "Payments",
+          ctaHref: "dashboard-attorney.html#funds",
         }),
       })
     );
@@ -7509,7 +7513,7 @@ describe("Support assistant API", () => {
         conversationQuery: { viewName: "billing" },
         pageContext: { pathname: "/dashboard-attorney.html", viewName: "billing" },
         expectText: /here/i,
-        expectNavigation: { ctaLabel: "Billing & Payments", ctaHref: "dashboard-attorney.html#billing" },
+        expectNavigation: { ctaLabel: "Payments", ctaHref: "dashboard-attorney.html#funds" },
         rejectText: /browse open cases|profile so attorneys/i,
       },
       {
@@ -7621,7 +7625,7 @@ describe("Support assistant API", () => {
       {
         role: "admin",
         email: "support-knowledge-fee-admin@lets-paraconnect.test",
-        expected: /attorneys a 22%.*paralegals an 18%/i,
+        expected: /22% attorney platform fee.*18% paralegal platform fee/i,
       },
     ];
 
@@ -7706,7 +7710,7 @@ describe("Support assistant API", () => {
     );
     expect(response.body.assistantReply.actions).toEqual([
       expect.objectContaining({
-        label: "Open case",
+        label: "Open Matter",
         href: `case-detail.html?caseId=${deadlineCase._id}`,
       }),
     ]);
@@ -7774,7 +7778,7 @@ describe("Support assistant API", () => {
     );
     expect(response.body.assistantReply.actions).toEqual([
       expect.objectContaining({
-        label: "Open case",
+        label: "Open Matter",
         href: `case-detail.html?caseId=${caseDoc._id}`,
       }),
     ]);
@@ -8355,8 +8359,8 @@ describe("Support assistant API", () => {
         case "billing_link":
           expect(reply.navigation).toEqual(
             expect.objectContaining({
-              ctaLabel: "Billing & Payments",
-              ctaHref: "dashboard-attorney.html#billing",
+              ctaLabel: "Payments",
+              ctaHref: "dashboard-attorney.html#funds",
             })
           );
           expect(text).toMatch(/here/i);
@@ -8462,7 +8466,7 @@ describe("Support assistant API", () => {
           expect(reply.primaryAsk).toBe("billing_payment_method");
           expect(reply.navigation).toEqual(
             expect.objectContaining({
-              ctaHref: "dashboard-attorney.html#billing",
+              ctaHref: "dashboard-attorney.html#funds",
             })
           );
           expect(text).toBe("You can update that here.");
@@ -8524,10 +8528,12 @@ describe("Support assistant API", () => {
         case "issue_status_and_billing":
           expect(reply.primaryAsk).toBe("issue_review_status");
           expect(text).toMatch(/still open with the team/i);
-          expect(text).toMatch(/Also, you can find that here\./i);
+          expect(text).toMatch(
+            /Also, LPC does not create invoice records\. You can find Matter payment history and receipts here\./
+          );
           expect(reply.navigation).toEqual(
             expect.objectContaining({
-              ctaHref: "dashboard-attorney.html#billing",
+              ctaHref: "dashboard-attorney.html#funds",
             })
           );
           break;
@@ -8957,11 +8963,11 @@ describe("Support assistant API", () => {
       email: "support-manager-navigation-button@lets-paraconnect.test",
     });
     mockGenerateSupportManagerReply.mockResolvedValueOnce({
-      reply: "You can open Billing & Payments here.",
+      reply: "You can open Payments here.",
       suggestions: [],
       navigation: {
-        ctaLabel: "Billing & Payments",
-        ctaHref: "dashboard-attorney.html#billing",
+        ctaLabel: "Payments",
+        ctaHref: "dashboard-attorney.html#funds",
         ctaType: "deep_link",
         inlineLinkText: "here",
       },
@@ -8982,13 +8988,13 @@ describe("Support assistant API", () => {
 
     const conversationRes = await createConversation(attorney);
     const response = await sendSupportMessage(attorney, conversationRes.body.conversation.id, {
-      text: "Where is Billing & Payments?",
+      text: "Where is Payments?",
     });
 
     expect(response.status).toBe(201);
     expect(response.body.assistantReply.actions).toEqual([{
-      label: "Billing & Payments",
-      href: "dashboard-attorney.html#billing",
+      label: "Payments",
+      href: "dashboard-attorney.html#funds",
       type: "deep_link",
     }]);
     expect(response.body.assistantReply.suggestedReplies).toEqual([]);

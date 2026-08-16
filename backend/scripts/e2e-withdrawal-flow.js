@@ -2,16 +2,36 @@ const path = require("path");
 const http = require("http");
 const express = require("express");
 const cookieParser = require("cookie-parser");
-const puppeteer = require("puppeteer");
-const jwt = require("jsonwebtoken");
+const { clickVisible, launchPuppeteer } = require("./puppeteerBrowser");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 const mongoose = require("mongoose");
+const {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+} = require("../utils/legalDocuments");
+
+const ACCOUNT_PASSWORD = "Correct-Horse-Battery-Staple-9";
+const BROWSER_STEP_TIMEOUT_MS = 45_000;
+const paymentIntentCaseIds = new Map();
+
+function launchReadyAccountFields() {
+  const acceptedAt = new Date();
+  return {
+    emailVerified: true,
+    termsAccepted: true,
+    termsVersion: CURRENT_TERMS_VERSION,
+    termsAcceptedAt: acceptedAt,
+    privacyVersion: CURRENT_PRIVACY_VERSION,
+    privacyAcknowledgedAt: acceptedAt,
+    legalAcceptanceSource: "signup",
+  };
+}
 
 process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret";
-process.env.DISABLE_WITHDRAWAL_WORKER = "true";
 process.env.S3_BUCKET = process.env.S3_BUCKET || "test-bucket";
 process.env.S3_REGION = process.env.S3_REGION || "us-east-1";
+process.env.CLIENT_BASE_URL = process.env.CLIENT_BASE_URL || "http://127.0.0.1:5050";
 
 const emailLog = [];
 const sendEmailMock = async (to, subject, html, opts = {}) => {
@@ -22,10 +42,14 @@ sendEmailMock.log = emailLog;
 
 const stripeMock = {
   paymentIntents: {
-    retrieve: async () => ({
-      id: "pi_test_123",
+    retrieve: async (intentId) => ({
+      id: intentId,
       status: "succeeded",
+      amount: 122000,
+      amount_received: 122000,
       currency: "usd",
+      transfer_group: `case_${paymentIntentCaseIds.get(intentId) || "missing"}`,
+      metadata: { caseId: paymentIntentCaseIds.get(intentId) || "" },
       charges: { data: [{ id: "ch_test_123" }] },
     }),
   },
@@ -56,6 +80,7 @@ const stripeMock = {
   isTransferablePaymentIntent: () => ({ transferable: true, charge: { id: "ch_test_123" } }),
   sanitizeStripeError: (err, fallback) => err?.message || fallback,
   caseTransferGroup: (caseId) => `case_${caseId}`,
+  stripeIdempotencyKey: (operation, ...parts) => `test_${operation}_${parts.join("_")}`,
   _transfers: [],
 };
 
@@ -89,21 +114,6 @@ const Case = require("../models/Case");
 const Job = require("../models/Job");
 const Notification = require("../models/Notification");
 
-function patchElementHandleClick() {
-  const { ElementHandle } = puppeteer;
-  if (!ElementHandle || ElementHandle.prototype.__safeClickPatched) return;
-  const original = ElementHandle.prototype.click;
-  ElementHandle.prototype.click = async function (...args) {
-    try {
-      return await this.evaluate((el) => el.click());
-    } catch {
-      return original.apply(this, args);
-    }
-  };
-  ElementHandle.prototype.__safeClickPatched = true;
-}
-patchElementHandleClick();
-
 function expect(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -120,44 +130,25 @@ async function waitFor(check, { timeout = 10_000, interval = 200 } = {}) {
   }
 }
 
-function authCookieFor(user) {
-  const payload = {
-    id: user._id.toString(),
-    role: user.role,
-    email: user.email,
-    status: user.status,
-  };
-  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "2h" });
-  return `token=${token}`;
-}
-
-async function apiFetch(baseUrl, path, { method = "GET", body, cookie } = {}) {
-  const res = await fetch(`${baseUrl}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...(cookie ? { Cookie: cookie } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  let data = null;
-  try {
-    data = await res.json();
-  } catch {}
-  if (!res.ok) {
-    const msg = data?.error || data?.message || `Request failed (${res.status})`;
-    throw new Error(msg);
-  }
-  return data;
-}
-
-function buildApp() {
+function buildApp(completedMutations) {
   const app = express();
   const frontendDir = path.join(__dirname, "../../frontend");
   const publicDir = path.join(__dirname, "../../public");
 
   app.use(cookieParser());
   app.use(express.json({ limit: "2mb" }));
+  app.use((req, res, next) => {
+    if (req.method === "POST") {
+      res.once("finish", () => {
+        completedMutations.push({
+          method: req.method,
+          path: req.originalUrl,
+          status: res.statusCode,
+        });
+      });
+    }
+    next();
+  });
   app.get("/api/csrf", (_req, res) => res.json({ csrfToken: "test-csrf" }));
 
   app.use("/api/auth", authRouter);
@@ -188,39 +179,44 @@ function buildApp() {
 }
 
 async function startServer() {
-  const app = buildApp();
+  const completedMutations = [];
+  const app = buildApp(completedMutations);
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, resolve));
   const { port } = server.address();
-  return { server, port };
+  return { server, port, completedMutations };
 }
 
 async function seedData() {
   const admin = await User.create({
+    ...launchReadyAccountFields(),
     firstName: "Admin",
     lastName: "User",
     email: "admin@letsparaconnect.com",
-    password: "Password123!",
+    password: ACCOUNT_PASSWORD,
     role: "admin",
     status: "approved",
   });
 
   const attorney = await User.create({
+    ...launchReadyAccountFields(),
     firstName: "Claire",
     lastName: "Attorney",
     email: "samanthasider+attorney@gmail.com",
-    password: "Password123!",
+    password: ACCOUNT_PASSWORD,
     role: "attorney",
     status: "approved",
     state: "CA",
     stripeCustomerId: "cus_test",
+    attorneyPricingAccepted: true,
   });
 
   const paralegal1 = await User.create({
+    ...launchReadyAccountFields(),
     firstName: "Priya",
     lastName: "Ng",
     email: "samanthasider+11@gmail.com",
-    password: "Password123!",
+    password: ACCOUNT_PASSWORD,
     role: "paralegal",
     status: "approved",
     state: "CA",
@@ -231,10 +227,11 @@ async function seedData() {
   });
 
   const paralegal2 = await User.create({
+    ...launchReadyAccountFields(),
     firstName: "Sara",
     lastName: "Testing",
     email: "samanthasider+56@gmail.com",
-    password: "Password123!",
+    password: ACCOUNT_PASSWORD,
     role: "paralegal",
     status: "approved",
     state: "CA",
@@ -245,10 +242,11 @@ async function seedData() {
   });
 
   const paralegal3 = await User.create({
+    ...launchReadyAccountFields(),
     firstName: "Avery",
     lastName: "Third",
     email: "samanthasider+0@gmail.com",
-    password: "Password123!",
+    password: ACCOUNT_PASSWORD,
     role: "paralegal",
     status: "approved",
     state: "CA",
@@ -265,7 +263,6 @@ async function seedData() {
     details: "E2E withdrawal flow case.",
     status: "in progress",
     escrowStatus: "funded",
-    escrowIntentId: "pi_test_123",
     lockedTotalAmount: 100000,
     totalAmount: 100000,
     currency: "usd",
@@ -274,6 +271,7 @@ async function seedData() {
   const caseZero = await Case.create({
     ...baseCase,
     title: "Withdrawal zero tasks",
+    escrowIntentId: "pi_withdrawal_zero",
     paralegal: paralegal1._id,
     paralegalId: paralegal1._id,
     tasks: [
@@ -281,10 +279,12 @@ async function seedData() {
       { title: "Outline case", completed: false },
     ],
   });
+  paymentIntentCaseIds.set(caseZero.escrowIntentId, String(caseZero._id));
 
   const casePartial = await Case.create({
     ...baseCase,
     title: "Withdrawal partial payout",
+    escrowIntentId: "pi_withdrawal_partial",
     paralegal: paralegal1._id,
     paralegalId: paralegal1._id,
     tasks: [
@@ -293,10 +293,12 @@ async function seedData() {
       { title: "Review filings", completed: false },
     ],
   });
+  paymentIntentCaseIds.set(casePartial.escrowIntentId, String(casePartial._id));
 
   const caseDispute = await Case.create({
     ...baseCase,
     title: "Withdrawal dispute flow",
+    escrowIntentId: "pi_withdrawal_dispute",
     paralegal: paralegal1._id,
     paralegalId: paralegal1._id,
     tasks: [
@@ -304,10 +306,12 @@ async function seedData() {
       { title: "Summarize exhibits", completed: false },
     ],
   });
+  paymentIntentCaseIds.set(caseDispute.escrowIntentId, String(caseDispute._id));
 
   const caseCycle = await Case.create({
     ...baseCase,
     title: "Withdrawal multi-cycle",
+    escrowIntentId: "pi_withdrawal_cycle",
     paralegal: paralegal1._id,
     paralegalId: paralegal1._id,
     tasks: [
@@ -315,6 +319,7 @@ async function seedData() {
       { title: "Revise draft", completed: false },
     ],
   });
+  paymentIntentCaseIds.set(caseCycle.escrowIntentId, String(caseCycle._id));
 
   return {
     admin,
@@ -333,82 +338,207 @@ async function loginUI(page, baseUrl, email, password, expectedPath) {
   await page.goto(`${baseUrl}/login.html`, { waitUntil: "networkidle0" });
   await page.type("#email", email);
   await page.type("#password", password);
-  await Promise.all([
-    page.waitForFunction(
-      (pathFragment) => window.location.pathname.includes(pathFragment),
-      { timeout: 20_000 },
-      expectedPath
-    ),
-    page.click("button.login-btn"),
-  ]);
-}
-
-async function withdrawCaseViaUI(page, baseUrl, caseId) {
-  await page.goto(`${baseUrl}/case-detail.html?caseId=${caseId}`, { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(
-    () => !!document.querySelector("#caseWithdrawButton, #caseDisputeButton"),
-    { timeout: 20_000 }
+  const responsePromise = page.waitForResponse(
+    (response) => response.url().includes("/api/auth/login") && response.request().method() === "POST",
+    { timeout: BROWSER_STEP_TIMEOUT_MS }
   );
-  const hasDirectWithdraw = await page.$("#caseWithdrawButton");
-  if (hasDirectWithdraw) {
-    await page.click("#caseWithdrawButton");
-    await page.waitForSelector(".case-withdraw-overlay.is-visible");
-    await page.click("[data-withdraw-confirm]");
-  } else {
-    await page.evaluate(async (targetCaseId) => {
-      const res = await fetch(`/api/cases/${encodeURIComponent(targetCaseId)}/withdraw`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        throw new Error(payload?.error || `Withdrawal failed (${res.status})`);
-      }
-      sessionStorage.setItem(
-        "lpc-withdrawal-toast",
-        JSON.stringify({
-          message: "You withdrew from this case.",
-          type: "success",
-        })
-      );
-      window.location.href = "dashboard-paralegal.html#cases";
-    }, caseId);
+  await clickVisible(page, "button.login-btn");
+  const response = await responsePromise;
+  if (!response.ok()) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(`Login failed (${response.status()}): ${payload?.error || payload?.msg || "unknown error"}`);
   }
-  await page.waitForFunction(
-    () => window.location.pathname.includes("dashboard-paralegal.html"),
-    { timeout: 20_000 }
+  try {
+    await page.waitForFunction(
+      (pathFragment) => window.location.pathname.includes(pathFragment),
+      { timeout: BROWSER_STEP_TIMEOUT_MS },
+      expectedPath
+    );
+  } catch (error) {
+    const state = await page.evaluate(() => ({
+      url: window.location.href,
+      toast: document.getElementById("toastBanner")?.textContent?.trim() || "",
+    }));
+    throw new Error(`${error.message}; login state=${JSON.stringify(state)}`);
+  }
+}
+
+async function browserOperation(label, action) {
+  try {
+    return await action();
+  } catch (error) {
+    throw new Error(`${label}: ${error.message}`, { cause: error });
+  }
+}
+
+async function openMatterActions(page, baseUrl, caseId) {
+  await browserOperation("open matter", () =>
+    page.goto(`${baseUrl}/case-detail.html?caseId=${caseId}`, { waitUntil: "domcontentloaded" })
+  );
+  await browserOperation("wait for matter actions", () =>
+    page.waitForFunction(
+      () => Boolean(document.querySelector("#caseDisputeButton:not([hidden])")),
+      { timeout: BROWSER_STEP_TIMEOUT_MS }
+    )
+  );
+  let overlay = await page.$(".case-flag-overlay.is-visible");
+  if (!overlay) {
+    await browserOperation("open work tab", () => clickVisible(page, '[data-matter-tab="work"]'));
+    await browserOperation("wait for work panel", () =>
+      page.waitForSelector('[data-matter-panel="work"]:not([hidden])', { visible: true })
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    overlay = await page.$(".case-flag-overlay.is-visible");
+  }
+  if (!overlay) {
+    await browserOperation("open matter action menu", () => clickVisible(page, "#caseDisputeButton"));
+  }
+  await browserOperation("wait for matter action menu", () =>
+    page.waitForSelector(".case-flag-overlay.is-visible", { visible: true })
   );
 }
 
-async function getOpenJobForCase(baseUrl, caseId, cookie) {
-  return waitFor(async () => {
-    try {
-      const jobs = await apiFetch(baseUrl, "/api/jobs/open", { cookie });
-      const match = jobs.find((job) => String(job.caseId) === String(caseId));
-      return match || null;
-    } catch {
-      return null;
-    }
-  }, { timeout: 20_000 });
+async function createPostRequestWaiter(page, pathFragment) {
+  const client = await page.createCDPSession();
+  await client.send("Network.enable");
+  let settled = false;
+  let cancelWaiter = null;
+
+  const request = new Promise((resolve, reject) => {
+    const observedPostUrls = [];
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      client.off("Network.requestWillBeSent", onRequest);
+      void client.detach().catch(() => {});
+    };
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback(value);
+    };
+    cancelWaiter = (error) => finish(reject, error);
+    const onRequest = ({ requestId, request }) => {
+      if (request.method !== "POST") return;
+      observedPostUrls.push(request.url);
+      if (request.url.includes(pathFragment)) {
+        finish(resolve, { requestId, url: request.url });
+      }
+    };
+    const timeoutId = setTimeout(() => {
+      finish(
+        reject,
+        new Error(
+          `Timed out waiting for POST response: ${pathFragment}; observed POSTs=${JSON.stringify(observedPostUrls)}`
+        )
+      );
+    }, BROWSER_STEP_TIMEOUT_MS);
+    client.on("Network.requestWillBeSent", onRequest);
+  });
+
+  return {
+    request,
+    cancel(error = new Error(`Cancelled POST request wait: ${pathFragment}`)) {
+      if (settled || !cancelWaiter) return;
+      cancelWaiter(error);
+    },
+  };
 }
 
-async function applyAndHire({ baseUrl, caseId, paralegal, attorney, coverLetter }) {
-  const paraCookie = authCookieFor(paralegal);
-  const attorneyCookie = authCookieFor(attorney);
-  const job = await getOpenJobForCase(baseUrl, caseId, paraCookie);
-  await apiFetch(baseUrl, "/api/applications", {
-    method: "POST",
-    cookie: paraCookie,
-    body: {
-      jobId: job._id || job.jobId,
-      coverLetter: coverLetter || "Applying for this role. I can start immediately.",
-    },
-  });
-  await apiFetch(baseUrl, `/api/cases/${caseId}/hire/${paralegal._id}`, {
-    method: "POST",
-    cookie: attorneyCookie,
-  });
+async function clickMutationAndRequireSuccess(page, selector, pathFragment, completedMutations) {
+  const baseline = completedMutations.length;
+  const waiter = await createPostRequestWaiter(page, pathFragment);
+  try {
+    await clickVisible(page, selector);
+  } catch (error) {
+    waiter.cancel(error);
+    await waiter.request.catch(() => {});
+    throw error;
+  }
+  await waiter.request;
+  const response = await waitFor(
+    async () => completedMutations.slice(baseline).find(
+      (entry) => entry.method === "POST" && entry.path.includes(pathFragment)
+    ) || null,
+    { timeout: BROWSER_STEP_TIMEOUT_MS, interval: 25 }
+  );
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`${pathFragment} failed (${response.status})`);
+  }
+}
+
+async function withdrawCaseViaUI(page, baseUrl, caseId, completedMutations) {
+  await openMatterActions(page, baseUrl, caseId);
+  await browserOperation("choose withdrawal", () => clickVisible(page, '[data-flag-action="withdraw"]'));
+  await browserOperation("wait for withdrawal confirmation", () =>
+    page.waitForSelector(".case-withdraw-overlay.is-visible", { visible: true })
+  );
+  await browserOperation("submit withdrawal", () =>
+    clickMutationAndRequireSuccess(
+      page,
+      "[data-withdraw-confirm]",
+      `/api/cases/${caseId}/withdraw`,
+      completedMutations
+    )
+  );
+  await browserOperation("wait for withdrawal redirect", () =>
+    waitFor(
+      async () => {
+        if (!page.url().includes("dashboard-paralegal.html")) return false;
+        return page.evaluate(() => document.readyState === "complete").catch(() => false);
+      },
+      { timeout: BROWSER_STEP_TIMEOUT_MS, interval: 100 }
+    )
+  );
+}
+
+async function finalizePartialPayoutViaUI(page, baseUrl, caseId, amount, completedMutations) {
+  await openMatterActions(page, baseUrl, caseId);
+  await clickVisible(page, '[data-flag-action="partial"]');
+  await page.waitForSelector(".case-payout-overlay.is-visible", { visible: true });
+  await page.type("[data-payout-input]", amount);
+  await clickMutationAndRequireSuccess(
+    page,
+    "[data-payout-confirm]",
+    `/api/cases/${caseId}/partial-payout`,
+    completedMutations
+  );
+  await page.waitForSelector("[data-payout-close]", { visible: true });
+  await clickVisible(page, "[data-payout-close]");
+}
+
+async function rejectPayoutViaUI(page, baseUrl, caseId, completedMutations) {
+  await openMatterActions(page, baseUrl, caseId);
+  await clickVisible(page, '[data-flag-action="reject"]');
+  await page.waitForSelector(".case-reject-overlay.is-visible", { visible: true });
+  await clickMutationAndRequireSuccess(
+    page,
+    "[data-reject-confirm]",
+    `/api/cases/${caseId}/reject-payout`,
+    completedMutations
+  );
+}
+
+async function runBrowserStep(label, page, action) {
+  try {
+    return await action();
+  } catch (error) {
+    const state = await page
+      .evaluate(() => ({
+        url: window.location.href,
+        readyState: document.readyState,
+        toast: document.getElementById("toastBanner")?.textContent?.trim() || "",
+        visibleOverlay: Array.from(
+          document.querySelectorAll(
+            ".case-flag-overlay.is-visible, .case-withdraw-overlay.is-visible, .case-payout-overlay.is-visible, .case-reject-overlay.is-visible"
+          )
+        ).map((element) => element.className),
+      }))
+      .catch(() => ({ unavailable: true }));
+    throw new Error(`${label}: ${error.message}; browser state=${JSON.stringify(state)}`, {
+      cause: error,
+    });
+  }
 }
 
 async function assertCaseNotification(userId, type, caseId) {
@@ -420,33 +550,19 @@ async function assertCaseNotification(userId, type, caseId) {
   expect(found, `Expected notification ${type} for user ${userId} on case ${caseId}`);
 }
 
-async function completeCaseAsAttorney(baseUrl, caseId, attorney) {
-  const doc = await Case.findById(caseId);
-  const completedTasks = (doc.tasks || []).map((task) => ({
-    ...task,
-    completed: true,
-  }));
-  await Case.findByIdAndUpdate(caseId, { tasks: completedTasks });
-  await apiFetch(baseUrl, `/api/cases/${caseId}/complete`, {
-    method: "POST",
-    cookie: authCookieFor(attorney),
-  });
-}
 
 async function run() {
   const mongo = await MongoMemoryServer.create();
   await mongoose.connect(mongo.getUri(), { dbName: "e2e" });
-  const { server, port } = await startServer();
+  const { server, port, completedMutations } = await startServer();
   const baseUrl = `http://localhost:${port}`;
   let browser;
 
   try {
     const seed = await seedData();
-    const attorneyCookie = authCookieFor(seed.attorney);
-    const paralegalCookie = authCookieFor(seed.paralegal1);
 
     const headless = process.env.HEADLESS === "false" ? false : "new";
-    browser = await puppeteer.launch({
+    browser = await launchPuppeteer({
       headless,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
       protocolTimeout: 120_000,
@@ -470,11 +586,17 @@ async function run() {
     pagePara.setDefaultTimeout(60_000);
     pageAttorney.setDefaultTimeout(60_000);
 
-    await loginUI(pagePara, baseUrl, seed.paralegal1.email, "Password123!", "dashboard-paralegal.html");
-    await loginUI(pageAttorney, baseUrl, seed.attorney.email, "Password123!", "dashboard-attorney.html");
+    await runBrowserStep("paralegal login", pagePara, () =>
+      loginUI(pagePara, baseUrl, seed.paralegal1.email, ACCOUNT_PASSWORD, "dashboard-paralegal.html")
+    );
+    await runBrowserStep("attorney login", pageAttorney, () =>
+      loginUI(pageAttorney, baseUrl, seed.attorney.email, ACCOUNT_PASSWORD, "dashboard-attorney.html")
+    );
 
     // Scenario 1: Withdrawal with 0 tasks completed -> auto $0 payout + auto relist
-    await withdrawCaseViaUI(pagePara, baseUrl, seed.caseZero._id);
+    await runBrowserStep("zero-task withdrawal", pagePara, () =>
+      withdrawCaseViaUI(pagePara, baseUrl, seed.caseZero._id, completedMutations)
+    );
     const caseZero = await waitFor(async () => {
       const doc = await Case.findById(seed.caseZero._id).lean();
       return doc?.payoutFinalizedType === "zero_auto" ? doc : null;
@@ -486,16 +608,22 @@ async function run() {
     await assertCaseNotification(seed.attorney._id, "case_update", seed.caseZero._id);
     await assertCaseNotification(seed.paralegal1._id, "case_update", seed.caseZero._id);
 
-    // Scenario 2: Withdrawal with 1+ tasks -> attorney partial payout -> relist -> hire -> complete
+    // Scenario 2: Withdrawal with completed work -> attorney partial payout and remaining-balance accounting.
     await pageAttorney.goto(`${baseUrl}/case-detail.html?caseId=${seed.casePartial._id}`, {
       waitUntil: "domcontentloaded",
     });
-    await withdrawCaseViaUI(pagePara, baseUrl, seed.casePartial._id);
-    await apiFetch(baseUrl, `/api/cases/${seed.casePartial._id}/partial-payout`, {
-      method: "POST",
-      cookie: attorneyCookie,
-      body: { amountCents: 40000 },
-    });
+    await runBrowserStep("partial-work withdrawal", pagePara, () =>
+      withdrawCaseViaUI(pagePara, baseUrl, seed.casePartial._id, completedMutations)
+    );
+    await runBrowserStep("attorney partial payout", pageAttorney, () =>
+      finalizePartialPayoutViaUI(
+        pageAttorney,
+        baseUrl,
+        seed.casePartial._id,
+        "400.00",
+        completedMutations
+      )
+    );
 
     const casePartial = await waitFor(async () => {
       const doc = await Case.findById(seed.casePartial._id).lean();
@@ -508,11 +636,12 @@ async function run() {
     await pageAttorney.goto(`${baseUrl}/case-detail.html?caseId=${seed.caseDispute._id}`, {
       waitUntil: "domcontentloaded",
     });
-    await withdrawCaseViaUI(pagePara, baseUrl, seed.caseDispute._id);
-    await apiFetch(baseUrl, `/api/cases/${seed.caseDispute._id}/reject-payout`, {
-      method: "POST",
-      cookie: attorneyCookie,
-    });
+    await runBrowserStep("dispute-path withdrawal", pagePara, () =>
+      withdrawCaseViaUI(pagePara, baseUrl, seed.caseDispute._id, completedMutations)
+    );
+    await runBrowserStep("attorney payout rejection", pageAttorney, () =>
+      rejectPayoutViaUI(pageAttorney, baseUrl, seed.caseDispute._id, completedMutations)
+    );
 
     const caseDispute = await waitFor(async () => {
       const doc = await Case.findById(seed.caseDispute._id).lean();

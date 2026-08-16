@@ -14,12 +14,15 @@ const request = require("supertest");
 const axios = require("axios");
 
 const MarketingDraftPacket = require("../models/MarketingDraftPacket");
+const MarketingChannelConnection = require("../models/MarketingChannelConnection");
 const MarketingPublishAttempt = require("../models/MarketingPublishAttempt");
 const MarketingPublishIntent = require("../models/MarketingPublishIntent");
 const User = require("../models/User");
 const adminKnowledgeRouter = require("../routes/adminKnowledge");
 const adminMarketingRouter = require("../routes/adminMarketing");
 const linkedinPublisher = require("../services/marketing/linkedinPublisher");
+const { LINKEDIN_API_VERSION } = require("../services/marketing/linkedinApiPolicy");
+const { encryptString } = require("../utils/dataEncryption");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "marketing-publishing-phase2-test-secret";
@@ -85,17 +88,29 @@ async function createPublishingCycle(admin, label = "Phase 2 cycle") {
 }
 
 async function saveLinkedInConnection(admin, overrides = {}) {
+  const accessToken = String(overrides.accessToken || "linkedin-access-token-1234");
+  const scopeSnapshot = overrides.scopeSnapshot || ["w_organization_social", "rw_organization_admin"];
+  await MarketingChannelConnection.findOneAndUpdate(
+    { channelKey: "linkedin_company" },
+    {
+      $set: {
+        provider: "linkedin",
+        isActive: true,
+        encryptedAccessToken: encryptString(accessToken),
+        accessTokenLast4: accessToken.slice(-4),
+        scopeSnapshot,
+        apiVersion: LINKEDIN_API_VERSION,
+      },
+    },
+    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+  );
   const response = await request(app)
     .post("/api/admin/marketing/publishing/channel-connections/linkedin_company")
     .set("Cookie", authCookieFor(admin))
     .send({
-      organizationName: "Let's ParaConnect",
-      organizationId: "123456789",
-      organizationUrn: "urn:li:organization:123456789",
-      accessToken: "linkedin-access-token-1234",
-      apiVersion: "202503",
-      scopeSnapshot: ["w_organization_social", "rw_organization_admin"],
-      ...overrides,
+      organizationName: overrides.organizationName || "Let's ParaConnect",
+      organizationId: overrides.organizationId || "123456789",
+      organizationUrn: overrides.organizationUrn || "urn:li:organization:123456789",
     });
   expect(response.status).toBe(200);
   return response.body.connection;
@@ -296,8 +311,32 @@ describe("Marketing publishing Phase 2", () => {
         authorizationGranted: true,
         organizationId: "123456789",
         organizationUrn: "urn:li:organization:123456789",
+        apiVersion: LINKEDIN_API_VERSION,
       })
     );
+  });
+
+  test("connection APIs reject browser-selected versions and raw provider credentials", async () => {
+    const admin = await createAdmin();
+    const cookie = authCookieFor(admin);
+
+    const staleVersion = await request(app)
+      .post("/api/admin/marketing/publishing/channel-connections/linkedin_company")
+      .set("Cookie", cookie)
+      .send({ apiVersion: "202503" });
+    expect(staleVersion.status).toBe(400);
+
+    const rawToken = await request(app)
+      .post("/api/admin/marketing/publishing/channel-connections/linkedin_company")
+      .set("Cookie", cookie)
+      .send({ accessToken: "do-not-accept-browser-secrets" });
+    expect(rawToken.status).toBe(400);
+
+    const oauthOverride = await request(app)
+      .post("/api/admin/marketing/publishing/channel-connections/linkedin_company/oauth/start")
+      .set("Cookie", cookie)
+      .send({ apiVersion: "202503" });
+    expect(oauthOverride.status).toBe(400);
   });
 
   test("admin API reports blocked connection state when organization authorization cannot be proven", async () => {

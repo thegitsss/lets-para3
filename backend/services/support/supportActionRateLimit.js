@@ -1,4 +1,4 @@
-const { rateLimit } = require("express-rate-limit");
+const { ipKeyGenerator, rateLimit } = require("express-rate-limit");
 
 const SUPPORT_ACTION_RATE_LIMIT = Object.freeze({
   windowMs: 60 * 1000,
@@ -6,7 +6,11 @@ const SUPPORT_ACTION_RATE_LIMIT = Object.freeze({
 });
 
 function supportActionKey(req = {}) {
-  return String(req.user?._id || req.user?.id || req.ip || "anonymous");
+  const userId = req.user?._id || req.user?.id;
+  if (userId) return `user:${String(userId)}`;
+
+  const normalizedIp = ipKeyGenerator(req.ip || req.socket?.remoteAddress || "");
+  return `ip:${normalizedIp || "anonymous"}`;
 }
 
 function createSupportActionRateLimiter({

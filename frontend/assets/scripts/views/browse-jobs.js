@@ -1,5 +1,6 @@
 import { secureFetch } from "../auth.js";
 import { getStripeConnectStatus, isStripeConnected, STRIPE_GATE_MESSAGE } from "../utils/stripe-connect.js";
+import { showAlert } from "../utils/dialogs.js";
 
 const jobsGrid = document.getElementById("jobs-grid");
 const pagination = document.getElementById("pagination");
@@ -15,7 +16,10 @@ const jobAttorneyButton = document.getElementById("jobAttorneyButton");
 const jobAttorneyAvatar = document.getElementById("jobAttorneyAvatar");
 const jobAttorneyName = document.getElementById("jobAttorneyName");
 const jobAttorneyFirm = document.getElementById("jobAttorneyFirm");
-const FALLBACK_AVATAR = "https://via.placeholder.com/64x64.png?text=A";
+const sidebarToggle = document.getElementById("sidebarToggle");
+const sidebarNav = document.getElementById("sidebarNav");
+const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+const FALLBACK_AVATAR = "assets/avatar-placeholder.svg";
 const attorneyPreviewCache = new Map();
 const urlParams = new URLSearchParams(window.location.search);
 const explicitCaseId = (urlParams.get("caseId") || urlParams.get("caseID") || urlParams.get("case_id") || "").trim();
@@ -25,7 +29,6 @@ let allJobs = [];
 let filteredJobs = [];
 const APPLY_MAX_CHARS = 2000;
 const APPLIED_STORAGE_KEY = "lpc_applied_jobs";
-const REAPPLY_BYPASS_EMAILS = new Set(["samanthasider+0@gmail.com"]);
 const appliedJobs = new Map(); // applyKey -> appliedAt ISO
 let viewerId = "";
 let applyModal = null;
@@ -38,7 +41,8 @@ let applyConfirmModal = null;
 let applyConfirmTitle = null;
 let applyConfirmMessage = null;
 let currentApplyJob = null;
-let csrfToken = "";
+let applyReturnFocus = null;
+let applyConfirmReturnFocus = null;
 const toast = window.toastUtils;
 let expandedJobId = "";
 let stripeConnected = false;
@@ -54,12 +58,7 @@ const MAX_FILTER_COMPENSATION = PAY_FILTER_STOPS[PAY_FILTER_STOPS.length - 1];
 let currentPage = 1;
 let userPageOverride = false;
 const initialJobParam = (idParam || explicitCaseId || "").trim();
-const STRIPE_BYPASS_EMAILS = new Set([
-  "samanthasider+11@gmail.com",
-  "samanthasider+56@gmail.com",
-]);
 const PROFILE_PHOTO_REQUIRED_MESSAGE = "Complete your profile before applying.";
-let viewerEmail = "";
 let viewerHasProfilePhoto = false;
 const FLAG_REASONS = [
   { value: "inappropriate", label: "Inappropriate content" },
@@ -70,6 +69,34 @@ const FLAG_REASONS = [
 ];
 let openFlagMenu = null;
 let flagMenuHandlersBound = false;
+let listScrollState = { shell: 0, window: 0 };
+let expandedReturnJobId = "";
+
+function setSidebarOpen(open, { restoreFocus = false } = {}) {
+  const nextOpen = Boolean(open) && window.innerWidth <= 900;
+  document.body.classList.toggle("nav-open", nextOpen);
+  sidebarToggle?.setAttribute("aria-expanded", String(nextOpen));
+  sidebarToggle?.setAttribute("aria-label", nextOpen ? "Close navigation" : "Open navigation");
+  sidebarBackdrop?.setAttribute("aria-hidden", String(!nextOpen));
+  if (nextOpen) sidebarNav?.querySelector("a, button")?.focus({ preventScroll: true });
+  else if (restoreFocus) sidebarToggle?.focus({ preventScroll: true });
+}
+
+sidebarToggle?.addEventListener("click", () => {
+  setSidebarOpen(!document.body.classList.contains("nav-open"));
+});
+sidebarBackdrop?.addEventListener("click", () => setSidebarOpen(false, { restoreFocus: true }));
+sidebarNav?.addEventListener("click", (event) => {
+  if (event.target.closest("a")) setSidebarOpen(false);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.body.classList.contains("nav-open")) {
+    setSidebarOpen(false, { restoreFocus: true });
+  }
+});
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 900 && document.body.classList.contains("nav-open")) setSidebarOpen(false);
+});
 
 const STATE_NAME_MAP = {
   AL: "Alabama",
@@ -135,12 +162,12 @@ const filterMenu = document.getElementById("filterMenu");
 const practiceAreaSelect = document.getElementById("filterPracticeArea");
 const stateSelect = document.getElementById("filterState");
 const sortSelect = document.getElementById("sortBy");
+const deadlineSelect = document.getElementById("filterDeadline");
+const postedSelect = document.getElementById("filterPosted");
+const activeFilterCount = document.getElementById("activeFilterCount");
 
 const minPaySlider = document.getElementById("filterMinPay");
 const minPayValue = document.getElementById("minPayValue");
-
-const minExpSlider = document.getElementById("filterMinExp");
-const minExpValue = document.getElementById("minExpValue");
 
 const applyFiltersBtn = document.getElementById("applyFilters");
 const clearFiltersBtn = document.getElementById("clearFilters");
@@ -170,17 +197,6 @@ function readStoredUserId() {
   }
 }
 
-function readStoredUserEmail() {
-  try {
-    const raw = localStorage.getItem("lpc_user");
-    if (!raw) return "";
-    const user = JSON.parse(raw);
-    return String(user?.email || "").toLowerCase().trim();
-  } catch {
-    return "";
-  }
-}
-
 function readStoredProfilePhoto() {
   try {
     const raw = localStorage.getItem("lpc_user");
@@ -190,10 +206,6 @@ function readStoredProfilePhoto() {
   } catch {
     return "";
   }
-}
-
-function isReapplyBypassUser() {
-  return REAPPLY_BYPASS_EMAILS.has(viewerEmail);
 }
 
 function readStoredState() {
@@ -281,11 +293,9 @@ async function ensureSession() {
     }
     viewerRole = String(session?.role || session?.user?.role || "").toLowerCase();
     viewerId = String(session?.user?.id || session?.user?._id || session?.id || session?._id || readStoredUserId());
-    viewerEmail = String(session?.user?.email || session?.email || "").toLowerCase().trim();
     viewerHasProfilePhoto = Boolean(
       session?.user?.profileImage || session?.user?.avatarURL || readStoredProfilePhoto()
     );
-    if (!viewerEmail) viewerEmail = readStoredUserEmail();
     viewerState = normalizeViewerState(session?.user?.state || session?.user?.location || readStoredState());
     viewerStateExperience = normalizeStateExperience(
       session?.user?.stateExperience || readStoredStateExperience()
@@ -330,12 +340,12 @@ function notifyStripeGate(message = STRIPE_GATE_MESSAGE) {
   if (toast?.show) {
     toast.show(message, { targetId: "toastBanner", type: "error" });
   } else {
-    alert(message);
+    void showAlert(message, { title: "Action needed" });
   }
 }
 
 function stripeAllowed() {
-  return stripeConnected || STRIPE_BYPASS_EMAILS.has(viewerEmail);
+  return stripeConnected;
 }
 
 function profilePhotoAllowed() {
@@ -344,20 +354,29 @@ function profilePhotoAllowed() {
 
 async function refreshStripeStatus() {
   const data = await getStripeConnectStatus();
-  stripeConnected = isStripeConnected(data) || STRIPE_BYPASS_EMAILS.has(viewerEmail);
+  stripeConnected = isStripeConnected(data);
   return data;
 }
 
 // Toggle filter menu
 if (filterToggle && filterMenu) {
+  const setFilterMenuOpen = (open) => {
+    filterMenu.classList.toggle("active", open);
+    filterToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  };
   filterToggle.addEventListener("click", () => {
-    filterMenu.classList.toggle("active");
+    setFilterMenuOpen(!filterMenu.classList.contains("active"));
   });
 
   document.addEventListener("click", (e) => {
     if (!filterMenu.contains(e.target) && !filterToggle.contains(e.target)) {
-      filterMenu.classList.remove("active");
+      setFilterMenuOpen(false);
     }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !filterMenu.classList.contains("active")) return;
+    setFilterMenuOpen(false);
+    filterToggle.focus();
   });
 }
 
@@ -382,24 +401,14 @@ function updatePayLabel(value) {
   minPayValue.textContent = display;
 }
 
-function clampExperienceValue(raw) {
-  return Math.max(0, Math.min(10, Number(raw) || 0));
-}
-
-function updateExperienceLabel(value) {
-  if (!minExpValue) return;
-  const label = value <= 0 ? "Any" : value >= 10 ? "10+ years" : `${value} year${value === 1 ? "" : "s"}`;
-  minExpValue.textContent = label;
-}
-
 // Dynamic filter population
 function populateFilters() {
-  if (!practiceAreaSelect || !stateSelect || !minPaySlider || !minExpSlider) return;
+  if (!practiceAreaSelect || !stateSelect || !minPaySlider) return;
 
   // Practice areas
-  const areas = [...new Set(allJobs.map((j) => j.practiceArea).filter(Boolean))];
-  practiceAreaSelect.innerHTML =
-    `<option value="">Any</option>` + areas.map((a) => `<option value="${a}">${a}</option>`).join("");
+  const areas = [...new Set(allJobs.map((j) => String(j.practiceArea || "").trim()).filter(Boolean))].sort();
+  practiceAreaSelect.replaceChildren(new Option("Any", ""));
+  areas.forEach((area) => practiceAreaSelect.add(new Option(area, area)));
 
   // States
   const states = [...new Set(allJobs.map((j) => getJobState(j)).filter(Boolean))];
@@ -414,8 +423,9 @@ function populateFilters() {
       states.push(preferred);
     }
   });
-  stateSelect.innerHTML =
-    `<option value="">Any</option>` + states.map((s) => `<option value="${s}">${s}</option>`).join("");
+  states.sort((left, right) => left.localeCompare(right));
+  stateSelect.replaceChildren(new Option("Any", ""));
+  states.forEach((stateName) => stateSelect.add(new Option(stateName, stateName)));
 
   // Pay slider
   minPaySlider.min = MIN_CASE_COMPENSATION;
@@ -424,12 +434,6 @@ function populateFilters() {
   minPaySlider.value = MIN_CASE_COMPENSATION;
   updatePayLabel(MIN_CASE_COMPENSATION);
 
-  // Experience slider
-  minExpSlider.min = 0;
-  minExpSlider.max = 10;
-  minExpSlider.step = 1;
-  minExpSlider.value = 0;
-  updateExperienceLabel(0);
 }
 
 // Slider displays
@@ -439,31 +443,35 @@ minPaySlider?.addEventListener("input", () => {
   updatePayLabel(value);
 });
 
-minExpSlider?.addEventListener("input", () => {
-  const value = clampExperienceValue(minExpSlider.value);
-  minExpSlider.value = value;
-  updateExperienceLabel(value);
-});
-
 // Apply filters
 function applyFilters(options = {}) {
   const { render = true } = options;
   const area = practiceAreaSelect?.value || "";
   const state = stateSelect?.value || "";
   const minPay = quantizePayValue(minPaySlider?.value || MIN_CASE_COMPENSATION);
-  const maxExpValue = clampExperienceValue(minExpSlider?.value || 0);
-  const expLimit = maxExpValue >= 10 ? Infinity : maxExpValue;
+  const deadlineMode = String(deadlineSelect?.value || "");
+  const postedMode = String(postedSelect?.value || "");
+  const today = window.LPCBusinessDate?.today() || "";
+  const sevenDaysFromToday = window.LPCBusinessDate?.addDays(today, 7) || "";
+  const thirtyDaysFromToday = window.LPCBusinessDate?.addDays(today, 30) || "";
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
 
   filteredJobs = allJobs.filter((job) => {
     if (shouldHideAppliedJob(job)) return false;
     const payUSD = getJobPayUSD(job);
-    const exp = getJobExperience(job);
     const jobState = getJobState(job);
+    const deadline = window.LPCBusinessDate?.matterValue(job) || "";
+    const posted = new Date(job?.createdAt || 0).getTime();
 
     if (area && job.practiceArea !== area) return false;
     if (state && jobState !== state) return false;
     if (payUSD < minPay) return false;
-    if (expLimit !== Infinity && exp > expLimit) return false;
+    if (deadlineMode === "none" && deadline) return false;
+    if (deadlineMode === "7_days" && (!deadline || !today || deadline < today || deadline > sevenDaysFromToday)) return false;
+    if (deadlineMode === "30_days" && (!deadline || !today || deadline < today || deadline > thirtyDaysFromToday)) return false;
+    if (postedMode === "7_days" && (!posted || posted < now - 7 * day)) return false;
+    if (postedMode === "30_days" && (!posted || posted < now - 30 * day)) return false;
 
     return true;
   });
@@ -471,9 +479,12 @@ function applyFilters(options = {}) {
   currentPage = 1;
   userPageOverride = false;
   applySort();
+  syncBrowseFilterUrl();
+  updateActiveFilterCount();
   if (render) {
     renderJobs();
     filterMenu?.classList.remove("active");
+    filterToggle?.setAttribute("aria-expanded", "false");
   }
 }
 
@@ -506,18 +517,19 @@ function clearFilters() {
     minPaySlider.value = MIN_CASE_COMPENSATION;
     updatePayLabel(MIN_CASE_COMPENSATION);
   }
-  if (minExpSlider) {
-    minExpSlider.value = 0;
-    updateExperienceLabel(0);
-  }
-  if (sortSelect) sortSelect.value = "";
+  if (deadlineSelect) deadlineSelect.value = "";
+  if (postedSelect) postedSelect.value = "";
+  if (sortSelect) sortSelect.value = "newest";
 
   filteredJobs = allJobs.filter((job) => !shouldHideAppliedJob(job));
   currentPage = 1;
   userPageOverride = false;
   applySort();
+  syncBrowseFilterUrl();
+  updateActiveFilterCount();
   renderJobs();
   filterMenu?.classList.remove("active");
+  filterToggle?.setAttribute("aria-expanded", "false");
 }
 
 clearFiltersBtn?.addEventListener("click", clearFilters);
@@ -550,10 +562,6 @@ function getJobCompensation(job) {
   if (budget) return `$${formatPay(budget)} compensation`;
   if (payUSD) return `$${formatPay(payUSD)} total`;
   return "Rate negotiable";
-}
-
-function getJobExperience(job) {
-  return Number(job?.minimumExperienceRequired ?? job?.minExperience ?? 0) || 0;
 }
 
 function getJobState(job) {
@@ -656,7 +664,7 @@ function prepareExpandedContent(raw, jobState) {
     }
     return true;
   });
-  const description = filtered.join("\n").trim() || "No additional description provided for this case.";
+  const description = filtered.join("\n").trim() || "No additional description was provided for this Matter.";
   return { description, experienceLine: experienceLine.trim() };
 }
 
@@ -668,14 +676,17 @@ function stripDuplicateStateLine(text, jobState) {
 }
 
 function applySort() {
-  if (!sortSelect || !sortSelect.value) return;
-  const mode = sortSelect.value;
+  const mode = sortSelect?.value || "newest";
   switch (mode) {
     case "newest":
       filteredJobs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       break;
-    case "oldest":
-      filteredJobs.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    case "deadline":
+      filteredJobs.sort((a, b) => {
+        const left = window.LPCBusinessDate?.matterValue(a) || "9999-12-31";
+        const right = window.LPCBusinessDate?.matterValue(b) || "9999-12-31";
+        return left.localeCompare(right) || new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      });
       break;
     case "payHigh":
       filteredJobs.sort((a, b) => getJobPayUSD(b) - getJobPayUSD(a));
@@ -686,6 +697,64 @@ function applySort() {
     default:
       break;
   }
+}
+
+function updateActiveFilterCount() {
+  const count = [
+    practiceAreaSelect?.value,
+    stateSelect?.value,
+    Number(minPaySlider?.value || MIN_CASE_COMPENSATION) > MIN_CASE_COMPENSATION ? "pay" : "",
+    deadlineSelect?.value,
+    postedSelect?.value,
+  ].filter(Boolean).length;
+  if (activeFilterCount) activeFilterCount.textContent = count ? `(${count})` : "";
+}
+
+function syncBrowseFilterUrl() {
+  const url = new URL(window.location.href);
+  const values = {
+    browsePractice: practiceAreaSelect?.value || "",
+    browseState: stateSelect?.value || "",
+    browseMinPay: Number(minPaySlider?.value || MIN_CASE_COMPENSATION) > MIN_CASE_COMPENSATION ? minPaySlider.value : "",
+    browseDeadline: deadlineSelect?.value || "",
+    browsePosted: postedSelect?.value || "",
+    browseSort: (sortSelect?.value || "newest") === "newest" ? "" : sortSelect.value,
+  };
+  Object.entries(values).forEach(([key, value]) => {
+    if (value) url.searchParams.set(key, value);
+    else url.searchParams.delete(key);
+  });
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+function restoreBrowseFilterUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const practice = String(params.get("browsePractice") || "");
+  const stateValue = String(params.get("browseState") || "");
+  const deadline = String(params.get("browseDeadline") || "");
+  const posted = String(params.get("browsePosted") || "");
+  const sort = String(params.get("browseSort") || "newest");
+  let restored = false;
+  if (practiceAreaSelect && [...practiceAreaSelect.options].some((option) => option.value === practice)) {
+    practiceAreaSelect.value = practice;
+    restored ||= Boolean(practice);
+  }
+  if (stateSelect && [...stateSelect.options].some((option) => option.value === stateValue)) {
+    stateSelect.value = stateValue;
+    restored ||= Boolean(stateValue);
+  }
+  const minPay = quantizePayValue(params.get("browseMinPay") || MIN_CASE_COMPENSATION);
+  if (minPaySlider) {
+    minPaySlider.value = minPay;
+    updatePayLabel(minPay);
+    restored ||= minPay > MIN_CASE_COMPENSATION;
+  }
+  if (deadlineSelect && ["", "7_days", "30_days", "none"].includes(deadline)) deadlineSelect.value = deadline;
+  if (postedSelect && ["", "7_days", "30_days"].includes(posted)) postedSelect.value = posted;
+  if (sortSelect && ["newest", "deadline", "payHigh", "payLow"].includes(sort)) sortSelect.value = sort;
+  restored ||= Boolean(deadline || posted || sort !== "newest");
+  updateActiveFilterCount();
+  return restored;
 }
 
 // Render jobs
@@ -758,7 +827,7 @@ function renderJobs() {
     if (meta && isPartiallyCompletedRelist(job)) {
       const note = document.createElement("div");
       note.className = "partial-completion-note";
-      note.textContent = "This case has been partially completed";
+      note.textContent = "This Matter has been partially completed";
       meta.insertAdjacentElement("afterend", note);
     }
 
@@ -775,7 +844,8 @@ function renderJobs() {
     const caseBtn = document.createElement("button");
     caseBtn.type = "button";
     caseBtn.className = "clear-button";
-    caseBtn.textContent = "View Case";
+    caseBtn.textContent = "View Matter";
+    caseBtn.dataset.jobId = caseId;
     caseBtn.addEventListener("click", (event) => {
       event.stopPropagation();
       if (caseId) {
@@ -794,7 +864,7 @@ function renderJobs() {
       const { total, completed } = getJobTaskCounts(job);
       const footer = document.createElement("div");
       footer.className = "job-card-footer";
-      footer.textContent = `This case has ${completed}/${total} tasks completed`;
+      footer.textContent = `This Matter has ${completed}/${total} tasks completed`;
       card.appendChild(footer);
     }
 
@@ -876,10 +946,10 @@ async function fetchJobs() {
     userPageOverride = false;
 
     populateFilters();
-    const autoFiltered = applyDefaultStateFilter();
-    if (!autoFiltered) {
-      applySort();
-    }
+    const restored = restoreBrowseFilterUrl();
+    const autoFiltered = !restored && applyDefaultStateFilter();
+    if (restored) applyFilters({ render: false });
+    else if (!autoFiltered) applySort();
     if (initialJobParam) {
       const match = filteredJobs.find((job) => getJobUniqueId(job) === initialJobParam);
       if (match) {
@@ -891,12 +961,23 @@ async function fetchJobs() {
     console.error("Failed to load jobs", err);
     allJobs = [];
     filteredJobs = [];
-    renderJobs();
     if (jobsGrid) {
-      const error = document.createElement("p");
-      error.className = "area";
-      error.style.textAlign = "center";
-      error.textContent = "Unable to load open cases right now. Please refresh.";
+      jobsGrid.innerHTML = "";
+      const error = document.createElement("div");
+      error.className = "empty-results";
+      const message = document.createElement("p");
+      message.className = "area";
+      message.textContent = "Available Matters could not be loaded. Your filters are still preserved.";
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "pagination-btn";
+      retry.textContent = "Retry";
+      retry.addEventListener("click", () => {
+        retry.disabled = true;
+        retry.textContent = "Retrying…";
+        void fetchJobs();
+      });
+      error.append(message, retry);
       jobsGrid.appendChild(error);
     }
   }
@@ -913,14 +994,17 @@ ensureSession().then(async (ready) => {
 });
 
 sortSelect?.addEventListener("change", () => {
+  currentPage = 1;
+  userPageOverride = false;
   applySort();
+  syncBrowseFilterUrl();
   renderJobs();
 });
 
 function openApplyModal(job) {
   if (!job) return;
   if (!allowApply) {
-    showToast("Only paralegals can apply to cases.", "info");
+    showToast("Only paralegals can apply to Matters.", "info");
     return;
   }
   if (!stripeAllowed()) {
@@ -931,14 +1015,15 @@ function openApplyModal(job) {
   const existingConfirm = applyModal.querySelector(".apply-confirm");
   if (existingConfirm) existingConfirm.remove();
   currentApplyJob = job;
+  applyReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const target = resolveApplyTarget(job);
   if (!target) {
-    showToast("Unable to apply to this case right now.", "error");
+    showToast("Unable to apply to this Matter right now.", "error");
     return;
   }
   applyModal.dataset.applyType = target.type;
   applyModal.dataset.jobId = target.id;
-  applyTitle.textContent = `Apply to ${escapeHtml(job.title || "this job")}`;
+  applyTitle.textContent = `Apply to ${String(job.title || "this Matter")}`;
   applyTextarea.value = "";
   applyStatus.textContent = "";
   applyCounter.textContent = `0 / ${APPLY_MAX_CHARS}`;
@@ -948,12 +1033,13 @@ function openApplyModal(job) {
   applyTextarea.focus();
 }
 
-function closeApplyModal() {
+function closeApplyModal({ restoreFocus = true } = {}) {
   if (applyModal) {
     applyModal.classList.remove("show");
     applyModal.querySelector(".apply-confirm")?.remove();
   }
   currentApplyJob = null;
+  if (restoreFocus && applyReturnFocus?.isConnected) applyReturnFocus.focus({ preventScroll: true });
 }
 
 function openApplyConfirmModal(jobTitle = "") {
@@ -974,6 +1060,34 @@ function openApplyConfirmModal(jobTitle = "") {
 
 function closeApplyConfirmModal() {
   if (applyConfirmModal) applyConfirmModal.classList.remove("show");
+  if (applyConfirmReturnFocus?.isConnected) {
+    applyConfirmReturnFocus.focus({ preventScroll: true });
+  } else {
+    const nextMatter = jobsGrid?.querySelector('.clear-button[data-job-id]');
+    const fallback = nextMatter || jobsGrid;
+    if (fallback) {
+      if (fallback === jobsGrid && !fallback.hasAttribute("tabindex")) fallback.setAttribute("tabindex", "-1");
+      fallback.focus({ preventScroll: true });
+    }
+  }
+  applyConfirmReturnFocus = null;
+}
+
+function trapDialogFocus(container, event) {
+  if (event.key !== "Tab" || !container) return;
+  const focusable = Array.from(
+    container.querySelectorAll('button:not([disabled]), a[href], textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])')
+  ).filter((node) => !node.hidden && node.getAttribute("aria-hidden") !== "true");
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function ensureApplyModal() {
@@ -982,17 +1096,18 @@ function ensureApplyModal() {
   applyModal = document.createElement("div");
   applyModal.className = "job-apply-overlay";
   applyModal.innerHTML = `
-    <div class="job-apply-dialog" role="dialog" aria-modal="true">
+    <div class="job-apply-dialog" role="dialog" aria-modal="true" aria-labelledby="jobApplyTitle" aria-describedby="jobApplyHelp">
       <header>
-        <h3 data-apply-title>Apply to this job</h3>
+        <h3 id="jobApplyTitle" data-apply-title>Apply to this Matter</h3>
         <button type="button" class="close-btn" aria-label="Close apply form">&times;</button>
       </header>
-      <p class="muted">Share why you are a great fit (max ${APPLY_MAX_CHARS} characters).</p>
-      <textarea rows="6" data-apply-text></textarea>
+      <p class="muted" id="jobApplyHelp">Share why you are a great fit (max ${APPLY_MAX_CHARS} characters).</p>
+      <label class="sr-only" for="jobApplyCoverLetter">Cover letter</label>
+      <textarea id="jobApplyCoverLetter" rows="6" maxlength="${APPLY_MAX_CHARS}" aria-describedby="jobApplyHelp" data-apply-text></textarea>
       <p class="apply-footnote">Your résumé and LinkedIn profile are included automatically.</p>
       <div class="apply-meta">
         <span data-apply-counter>0 / ${APPLY_MAX_CHARS}</span>
-        <span data-apply-status></span>
+        <span role="status" aria-live="polite" data-apply-status></span>
       </div>
       <div class="modal-actions">
         <button type="button" class="clear-button" data-apply-cancel>Cancel</button>
@@ -1014,9 +1129,12 @@ function ensureApplyModal() {
     if (event.target === applyModal) closeApplyModal();
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && applyModal?.classList.contains("show")) {
+    if (!applyModal?.classList.contains("show")) return;
+    if (event.key === "Escape") {
       closeApplyModal();
+      return;
     }
+    trapDialogFocus(applyModal, event);
   });
 }
 
@@ -1047,9 +1165,12 @@ function ensureApplyConfirmModal() {
     if (event.target === applyConfirmModal) closeApplyConfirmModal();
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && applyConfirmModal?.classList.contains("show")) {
+    if (!applyConfirmModal?.classList.contains("show")) return;
+    if (event.key === "Escape") {
       closeApplyConfirmModal();
+      return;
     }
+    trapDialogFocus(applyConfirmModal, event);
   });
 }
 
@@ -1129,15 +1250,9 @@ async function submitApplication() {
   try {
     const active = await ensureSession();
     if (!active) throw new Error("Session expired. Refresh and try again.");
-    const csrf = await ensureCsrfToken();
-    const res = await fetch(applyPath, {
+    const res = await secureFetch(applyPath, {
       method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(csrf ? { "X-CSRF-Token": csrf } : {}),
-      },
-      body: JSON.stringify({ coverLetter: note }),
+      body: { coverLetter: note },
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -1159,8 +1274,10 @@ async function submitApplication() {
     }
     applyStatus.textContent = "";
     markJobAsApplied(jobId);
-    closeApplyModal();
-    openApplyConfirmModal(currentApplyJob?.title || "");
+    const submittedTitle = currentApplyJob?.title || "";
+    applyConfirmReturnFocus = applyReturnFocus;
+    closeApplyModal({ restoreFocus: false });
+    openApplyConfirmModal(submittedTitle);
     fetchJobs();
   } catch (error) {
     console.error(error);
@@ -1171,7 +1288,6 @@ async function submitApplication() {
 }
 
 function markJobAsApplied(jobId) {
-  if (isReapplyBypassUser()) return;
   const now = new Date().toISOString();
   const normalizedJobId = normalizeId(jobId);
   if (normalizedJobId) appliedJobs.set(normalizedJobId, now);
@@ -1233,19 +1349,6 @@ function persistAppliedJobs() {
   }
 }
 
-async function ensureCsrfToken() {
-  if (csrfToken) return csrfToken;
-  try {
-    const res = await fetch("/api/csrf", { credentials: "include" });
-    if (!res.ok) return "";
-    const data = await res.json().catch(() => ({}));
-    csrfToken = data?.csrfToken || "";
-  } catch {
-    csrfToken = "";
-  }
-  return csrfToken;
-}
-
 async function ensureAttorneyPreview(job) {
   if (!job) return null;
   const existing = job.attorney || {};
@@ -1290,11 +1393,10 @@ async function openJobModal(job) {
   if (!jobModal || !job) return;
   modalJob = job;
   if (jobApplyBtn) {
-    const applyKey = getApplyKey(job);
     const appliedAt = getAppliedAt(job);
     if (!allowApply) {
       jobApplyBtn.disabled = false;
-      jobApplyBtn.textContent = "Apply for this case";
+      jobApplyBtn.textContent = "Apply for this Matter";
       jobApplyBtn.title = "Only paralegals can apply.";
       jobApplyBtn.classList.add("is-disabled");
       jobApplyBtn.setAttribute("aria-disabled", "true");
@@ -1309,7 +1411,7 @@ async function openJobModal(job) {
       jobApplyBtn.removeAttribute("data-hover-label");
     } else if (!profilePhotoAllowed()) {
       jobApplyBtn.disabled = false;
-      jobApplyBtn.textContent = "Apply for this case";
+      jobApplyBtn.textContent = "Apply for this Matter";
       jobApplyBtn.title = PROFILE_PHOTO_REQUIRED_MESSAGE;
       jobApplyBtn.classList.add("is-disabled");
       jobApplyBtn.setAttribute("aria-disabled", "true");
@@ -1317,7 +1419,7 @@ async function openJobModal(job) {
       jobApplyBtn.removeAttribute("data-hover-label");
     } else if (!stripeAllowed()) {
       jobApplyBtn.disabled = false;
-      jobApplyBtn.textContent = "Apply for this case";
+      jobApplyBtn.textContent = "Apply for this Matter";
       jobApplyBtn.title = STRIPE_GATE_MESSAGE;
       jobApplyBtn.classList.add("is-disabled");
       jobApplyBtn.setAttribute("aria-disabled", "true");
@@ -1325,7 +1427,7 @@ async function openJobModal(job) {
       jobApplyBtn.dataset.hoverLabel = "Stripe Setup Required";
     } else {
       jobApplyBtn.disabled = false;
-      jobApplyBtn.textContent = "Apply for this case";
+      jobApplyBtn.textContent = "Apply for this Matter";
       jobApplyBtn.removeAttribute("title");
       jobApplyBtn.classList.remove("is-disabled");
       jobApplyBtn.removeAttribute("aria-disabled");
@@ -1339,7 +1441,7 @@ async function openJobModal(job) {
     console.warn("Attorney preview load failed", err);
   }
 
-  const title = job.title || "Untitled job";
+  const title = job.title || "Untitled Matter";
   const summary = job.shortDescription || job.practiceArea || job.briefSummary || "";
   const description = job.description || job.details || "No additional description provided.";
   const compensation = getJobCompensation(job);
@@ -1387,32 +1489,32 @@ document.addEventListener("keydown", (event) => {
 jobAttorneyButton?.addEventListener("click", async () => {
   if (!jobAttorneyButton) return;
   let attorneyId = jobAttorneyButton.dataset.attorneyId || "";
-  let jobId = jobAttorneyButton.dataset.jobId || "";
   if (!attorneyId && modalJob) {
     try {
       await ensureAttorneyPreview(modalJob);
-    } catch {}
+    } catch (error) {
+      console.warn("[browse-matters] attorney preview hydration failed", error);
+    }
     attorneyId = modalJob?.attorney?._id || modalJob?.attorneyId || "";
-    jobId = jobId || modalJob?.id || modalJob?._id || "";
   }
   if (!attorneyId) {
     if (toast?.show) {
       toast.show("Unable to open this attorney profile right now.");
     } else {
-      alert("Unable to open this attorney profile right now.");
+      void showAlert("Unable to open this attorney profile right now.", { title: "Profile unavailable" });
     }
     return;
   }
   const url = new URL("profile-attorney.html", window.location.href);
   url.searchParams.set("id", attorneyId);
-  if (jobId) url.searchParams.set("job", jobId);
+  url.searchParams.set("from", "browse");
   window.location.href = url.toString();
 });
 
 jobApplyBtn?.addEventListener("click", (event) => {
   event.stopPropagation();
   if (!allowApply) {
-    showToast("Only paralegals can apply to cases.", "info");
+    showToast("Only paralegals can apply to Matters.", "info");
     return;
   }
   if (!profilePhotoAllowed()) {
@@ -1473,7 +1575,7 @@ function showToast(message, type = "info") {
   if (toast?.show) {
     toast.show(message, { targetId: "toastBanner", type });
   } else {
-    alert(message);
+    void showAlert(message, { title: type === "error" ? "Action unavailable" : "Notice" });
   }
 }
 
@@ -1525,22 +1627,22 @@ function buildFlagMenu(job) {
   menu.hidden = true;
   menu.setAttribute("role", "dialog");
   menu.setAttribute("aria-modal", "false");
-  menu.setAttribute("aria-label", "Flag case");
+  menu.setAttribute("aria-label", "Flag Matter");
   const rawGroup = `flag-reason-${normalizeId(getJobUniqueId(job) || "case") || "case"}`;
   const groupName = rawGroup.replace(/[^a-zA-Z0-9_-]/g, "") || "flag-reason-case";
 
   const optionsMarkup = FLAG_REASONS.map(
     (reason) => `
       <label class="flag-option">
-        <input type="radio" name="${groupName}" value="${reason.value}" />
+        <input type="radio" name="${escapeAttr(groupName)}" value="${escapeAttr(reason.value)}" />
         <span>${reason.label}</span>
       </label>
     `
   ).join("");
 
   menu.innerHTML = `
-    <div class="flag-menu-title">Flag this case</div>
-    <div class="flag-menu-subtitle">Why are you reporting this case?</div>
+    <div class="flag-menu-title">Flag this Matter</div>
+    <div class="flag-menu-subtitle">Why are you reporting this Matter?</div>
     <form class="flag-menu-form">
       ${optionsMarkup}
       <div class="flag-menu-other" data-flag-other hidden>
@@ -1602,7 +1704,7 @@ function buildFlagMenu(job) {
           const payload = await res.json().catch(() => ({}));
           throw new Error(payload?.error || "Unable to submit flag.");
         }
-        showToast("Thanks for letting us know. We'll review this case.", "info");
+        showToast("Thanks for letting us know. We'll review this Matter.", "info");
         closeFlagMenu(menu);
       })
       .catch((err) => {
@@ -1622,8 +1724,8 @@ function buildFlagButton(job) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "flag-button";
-  button.setAttribute("aria-label", "Flag this case");
-  button.setAttribute("title", "Flag this case");
+  button.setAttribute("aria-label", "Flag this Matter");
+  button.setAttribute("title", "Flag this Matter");
   button.setAttribute("aria-expanded", "false");
   button.innerHTML = `
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1646,9 +1748,6 @@ function escapeAttr(value) {
   return String(value || "").replace(/"/g, '\\"');
 }
 
-function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 function normalizeId(value) {
   if (!value) return "";
@@ -1694,7 +1793,6 @@ function getApplyKey(job) {
 
 function getAppliedAt(job) {
   if (!job) return null;
-  if (isReapplyBypassUser()) return null;
   if (job.appliedAt) return job.appliedAt;
   const jobKey = getApplyKey(job);
   if (jobKey && appliedJobs.has(jobKey)) return appliedJobs.get(jobKey);
@@ -1711,6 +1809,12 @@ function expandJob(job) {
     openJobModal(job);
     return;
   }
+  const shell = document.querySelector(".browse-page-shell");
+  listScrollState = {
+    shell: shell?.scrollTop || 0,
+    window: window.scrollY || 0,
+  };
+  expandedReturnJobId = id;
   expandedJobId = id;
   renderJobs();
   setTimeout(scrollToExpandedCard, 10);
@@ -1719,18 +1823,30 @@ function expandJob(job) {
 function collapseExpanded() {
   expandedJobId = "";
   renderJobs();
-  if (jobsGrid?.scrollIntoView) {
-    setTimeout(() => jobsGrid.scrollIntoView({ behavior: "smooth", block: "start" }), 10);
-  }
+  requestAnimationFrame(() => {
+    const shell = document.querySelector(".browse-page-shell");
+    if (shell) shell.scrollTop = listScrollState.shell;
+    window.scrollTo({ top: listScrollState.window, behavior: "auto" });
+    if (expandedReturnJobId) {
+      const selector = `.job-card .clear-button[data-job-id="${escapeAttr(expandedReturnJobId)}"]`;
+      document.querySelector(selector)?.focus({ preventScroll: true });
+    }
+    expandedReturnJobId = "";
+  });
 }
 
 function scrollToExpandedCard() {
   const card = document.querySelector(".job-card.expanded");
   if (!card) return;
-  const header = document.querySelector(".site-header");
-  const headerOffset = header ? header.getBoundingClientRect().height + 12 : 0;
+  const shell = document.querySelector(".browse-page-shell");
   const rect = card.getBoundingClientRect();
-  const target = Math.max(0, rect.top + window.scrollY - headerOffset);
+  if (shell && shell.scrollHeight > shell.clientHeight) {
+    const shellRect = shell.getBoundingClientRect();
+    const target = Math.max(0, shell.scrollTop + rect.top - shellRect.top - 24);
+    shell.scrollTo({ top: target, behavior: "smooth" });
+    return;
+  }
+  const target = Math.max(0, rect.top + window.scrollY - 24);
   window.scrollTo({ top: target, behavior: "smooth" });
 }
 
@@ -1740,13 +1856,13 @@ function buildApplyButton(job, jobId, appliedAt) {
   applyBtn.className = "apply-button";
   applyBtn.dataset.jobId = jobId;
   if (!allowApply) {
-    applyBtn.textContent = "Apply for this case";
+    applyBtn.textContent = "Apply for this Matter";
     applyBtn.title = "Only paralegals can apply.";
     applyBtn.classList.add("is-disabled");
     applyBtn.setAttribute("aria-disabled", "true");
     applyBtn.addEventListener("click", (event) => {
       event.stopPropagation();
-      showToast("Only paralegals can apply to cases.", "info");
+      showToast("Only paralegals can apply to Matters.", "info");
     });
     } else if (appliedAt) {
       applyBtn.disabled = true;
@@ -1754,7 +1870,7 @@ function buildApplyButton(job, jobId, appliedAt) {
       applyBtn.removeAttribute("data-stripe-required");
       applyBtn.removeAttribute("data-hover-label");
     } else if (!profilePhotoAllowed()) {
-      applyBtn.textContent = "Apply for this case";
+      applyBtn.textContent = "Apply for this Matter";
       applyBtn.title = PROFILE_PHOTO_REQUIRED_MESSAGE;
       applyBtn.classList.add("is-disabled");
       applyBtn.setAttribute("aria-disabled", "true");
@@ -1763,7 +1879,7 @@ function buildApplyButton(job, jobId, appliedAt) {
         showToast(PROFILE_PHOTO_REQUIRED_MESSAGE, "error");
       });
     } else if (!stripeAllowed()) {
-      applyBtn.textContent = "Apply for this case";
+      applyBtn.textContent = "Apply for this Matter";
       applyBtn.title = STRIPE_GATE_MESSAGE;
       applyBtn.classList.add("is-disabled");
       applyBtn.setAttribute("aria-disabled", "true");
@@ -1774,7 +1890,7 @@ function buildApplyButton(job, jobId, appliedAt) {
         notifyStripeGate();
       });
     } else {
-      applyBtn.textContent = "Apply for this case";
+      applyBtn.textContent = "Apply for this Matter";
       applyBtn.removeAttribute("data-stripe-required");
       applyBtn.removeAttribute("data-hover-label");
       applyBtn.addEventListener("click", (event) => {
@@ -1797,7 +1913,6 @@ function renderExpandedJob(job) {
     ? new Date(job.createdAt).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })
     : "Recently posted";
   const showPartial = isPartiallyCompletedRelist(job);
-  const { total: totalTasks, completed: completedTasks } = getJobTaskCounts(job);
   const rawSummary = job.briefSummary || job.shortDescription || job.practiceArea || "";
   const summary = scrubStateLines(rawSummary, jobState);
   const rawDescription = job.description || job.details || job.briefSummary || "";
@@ -1832,7 +1947,7 @@ function renderExpandedJob(job) {
               <li>The attorney reviews applications</li>
               <li>Selected applicants are invited to the workspace</li>
               <li>Scope is confirmed and work begins</li>
-              <li>Compensation is released after attorney approval and case completion</li>
+              <li>Compensation is released after attorney approval and Matter completion</li>
             </ul>
           </div>
         </details>
@@ -1841,7 +1956,7 @@ function renderExpandedJob(job) {
 
   card.className = "job-card expanded";
 
-  const title = escapeHtml(job.title || "Case");
+  const title = escapeHtml(job.title || "Matter");
   card.innerHTML = `
     <div class="expanded-card-grid">
       <div class="expanded-header">
@@ -1853,7 +1968,7 @@ function renderExpandedJob(job) {
             <span>${escapeHtml(compensation)}</span>
             <span>Posted ${escapeHtml(when)}</span>
           </div>
-          ${showPartial ? `<div class="partial-completion-note">This case has been partially completed</div>` : ""}
+          ${showPartial ? `<div class="partial-completion-note">This Matter has been partially completed</div>` : ""}
 
         </div>
         <div class="expanded-actions">
@@ -1870,7 +1985,7 @@ function renderExpandedJob(job) {
       <div class="expanded-footer">
         <div class="posted-by" data-posted-by>
           <div class="posted-label">Posted by</div>
-          <a class="posted-link" href="#" data-attorney-link>
+          <a class="posted-link" data-attorney-link>
             <img class="posted-avatar" alt="Attorney photo">
             <div>
               <div class="posted-name" data-posted-name></div>
@@ -1904,7 +2019,7 @@ function renderExpandedJob(job) {
     const backBtn = document.createElement("button");
     backBtn.type = "button";
     backBtn.className = "clear-button ghost-button";
-    backBtn.textContent = "Back to all jobs";
+    backBtn.textContent = "Back to all Matters";
     backBtn.addEventListener("click", (event) => {
       event.preventDefault();
       collapseExpanded();
@@ -1927,7 +2042,9 @@ function renderExpandedJob(job) {
       };
       updatePostedBy(card, job);
     })
-    .catch(() => {});
+    .catch((error) => {
+      console.warn("[browse] attorney preview hydration rejected", error);
+    });
 
   return card;
 }
@@ -1937,15 +2054,6 @@ function syncExpansionLayout() {
   document.body.classList.toggle("job-expanded", isExpanded);
 }
 
-function formatDeadline(raw) {
-  if (!raw) return "";
-  const date = new Date(raw);
-  if (!Number.isNaN(date.getTime())) {
-    return date.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
-  }
-  if (typeof raw === "string" && raw.trim()) return raw.trim();
-  return "";
-}
 
 function getCompletedJobsCount(job) {
   const attorney = job?.attorney || {};
@@ -1967,10 +2075,9 @@ function getCompletedJobsCount(job) {
 function buildAttorneyProfileUrl(attorney, job) {
   const attorneyId = attorney?._id || attorney?.id || job?.attorneyId || "";
   if (!attorneyId) return "";
-  const jobId = job?.id || job?._id || getJobUniqueId(job) || "";
   const url = new URL("profile-attorney.html", window.location.href);
   url.searchParams.set("id", attorneyId);
-  if (jobId) url.searchParams.set("job", jobId);
+  url.searchParams.set("from", "browse");
   return url.toString();
 }
 
@@ -1994,7 +2101,7 @@ function updatePostedBy(card, job) {
   if (countEl) {
     const count = getCompletedJobsCount(job);
     if (count >= 2) {
-      countEl.textContent = `${count} completed jobs`;
+      countEl.textContent = `${count} completed Matters`;
       countEl.style.display = "";
     } else {
       countEl.textContent = "";
@@ -2006,7 +2113,7 @@ function updatePostedBy(card, job) {
       linkEl.href = profileUrl;
       linkEl.dataset.attorneyLinkReady = "true";
     } else {
-      linkEl.href = "#";
+      linkEl.removeAttribute("href");
       delete linkEl.dataset.attorneyLinkReady;
     }
   }

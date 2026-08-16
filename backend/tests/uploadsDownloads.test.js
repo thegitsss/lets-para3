@@ -38,7 +38,12 @@ jest.mock("@aws-sdk/client-s3", () => {
       this.input = input;
     }
   }
-  return { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand };
+  class GetObjectTaggingCommand {
+    constructor(input) {
+      this.input = input;
+    }
+  }
+  return { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, GetObjectTaggingCommand };
 });
 
 jest.mock("@aws-sdk/s3-request-presigner", () => ({
@@ -64,7 +69,6 @@ const app = (() => {
   instance.use("/api/cases", casesRouter);
   instance.use("/api/notifications", notificationsRouter);
   instance.use((err, _req, res, _next) => {
-    console.error(err);
     res.status(500).json({ msg: "Server error", error: err?.message || "Unknown error" });
   });
   return instance;
@@ -103,11 +107,118 @@ beforeEach(async () => {
       err.$metadata = { httpStatusCode: 404 };
       throw err;
     }
+    if (cmd?.constructor?.name === "GetObjectCommand") {
+      return { Body: { transformToByteArray: async () => Buffer.from("%PDF-1.4\ntest document") } };
+    }
     return {};
   });
 });
 
 describe("File uploads + downloads", () => {
+  test("Retired attachment probes do not report false upload success", async () => {
+    const attorney = await User.create({
+      firstName: "Upload",
+      lastName: "Probe",
+      email: "upload.probe@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const response = await request(app)
+      .post("/api/uploads/attach")
+      .set("Cookie", authCookieFor(attorney))
+      .send({});
+
+    expect(response.status).toBe(404);
+  });
+
+  test("Profile-photo upload stores private object keys and returns only LPC delivery URLs", async () => {
+    const paralegal = await User.create({
+      firstName: "Photo",
+      lastName: "Privacy",
+      email: "photo.privacy@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+
+    const response = await request(app)
+      .post("/api/uploads/profile-photo")
+      .set("Cookie", authCookieFor(paralegal))
+      .attach("file", Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]), {
+        filename: "profile.jpg",
+        contentType: "image/jpeg",
+      })
+      .attach("original", Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), {
+        filename: "original.png",
+        contentType: "image/png",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      pending: true,
+      status: "pending_review",
+    });
+    expect(response.body.url).toContain(`/api/users/profile-photo/${paralegal._id}?variant=pending`);
+    expect(response.body.pendingProfileImageOriginal).toContain(
+      `/api/users/profile-photo/${paralegal._id}?variant=pending-original`
+    );
+    expect(JSON.stringify(response.body)).not.toMatch(/amazonaws\.com|profile-photos\//i);
+
+    const putInputs = mockSend.mock.calls
+      .map(([command]) => command?.input)
+      .filter((input) => input?.Key?.startsWith(`profile-photos/${paralegal._id}/`));
+    expect(putInputs).toHaveLength(2);
+    expect(putInputs.every((input) => !("ACL" in input))).toBe(true);
+
+    const stored = await User.findById(paralegal._id)
+      .select("+pendingProfileImageKey +pendingProfileImageOriginalKey")
+      .lean();
+    expect(stored.pendingProfileImageKey).toMatch(
+      new RegExp(`^profile-photos/${paralegal._id}/profile-[0-9]+-[a-f0-9]{12}\\.jpg$`)
+    );
+    expect(stored.pendingProfileImageOriginalKey).toMatch(
+      new RegExp(`^profile-photos/${paralegal._id}/original-[0-9]+-[a-f0-9]{12}\\.png$`)
+    );
+    expect(stored.pendingProfileImage).toContain(`/api/users/profile-photo/${paralegal._id}?variant=pending`);
+  });
+
+  test("Approved replacement upload changes the public cache version token", async () => {
+    const paralegal = await User.create({
+      firstName: "Cache",
+      lastName: "Refresh",
+      email: "cache.refresh@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+      profilePhotoStatus: "approved",
+      profileImage: "https://test-bucket.s3.us-east-1.amazonaws.com/profile-photos/64b000000000000000000001/profile-1700000000000.jpg",
+      avatarURL: "https://test-bucket.s3.us-east-1.amazonaws.com/profile-photos/64b000000000000000000001/profile-1700000000000.jpg",
+    });
+    const previousVersion = String(paralegal.updatedAt.getTime());
+
+    const response = await request(app)
+      .post("/api/uploads/profile-photo")
+      .set("Cookie", authCookieFor(paralegal))
+      .field("editExisting", "true")
+      .attach("file", Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]), {
+        filename: "replacement.jpg",
+        contentType: "image/jpeg",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.pending).toBe(false);
+    const delivered = new URL(response.body.url, "https://www.lets-paraconnect.com");
+    expect(delivered.pathname).toBe(`/api/public/paralegals/${paralegal._id}/photo`);
+    expect(delivered.searchParams.get("v")).toMatch(/^[0-9]+$/);
+    expect(delivered.searchParams.get("v")).not.toBe(previousVersion);
+  });
+
   test("Presign upload returns signed URL for funded case", async () => {
     // Description: Assigned paralegal requests presigned upload for funded case.
     // Input values: contentType="application/pdf", ext="pdf", size=1024.
@@ -255,6 +366,145 @@ describe("File uploads + downloads", () => {
     expect(res.body.msg).toMatch(/File not found/i);
   });
 
+  test("Matter File signed access remains participant-only and rejects anonymous, unrelated, and revoked viewers", async () => {
+    const attorney = await User.create({
+      firstName: "File",
+      lastName: "Owner",
+      email: "file.owner@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const assigned = await User.create({
+      firstName: "Assigned",
+      lastName: "Viewer",
+      email: "assigned.viewer@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const unrelated = await User.create({
+      firstName: "Unrelated",
+      lastName: "Viewer",
+      email: "unrelated.viewer@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Private Matter file",
+      details: "Matter File access regression.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: assigned._id,
+      paralegalId: assigned._id,
+      escrowIntentId: "pi_private_file",
+      escrowStatus: "funded",
+      totalAmount: 100000,
+      currency: "usd",
+    });
+    const key = `cases/${caseDoc._id}/documents/private.pdf`;
+    await CaseFile.create({
+      caseId: caseDoc._id,
+      userId: attorney._id,
+      originalName: "private.pdf",
+      storageKey: key,
+      mimeType: "application/pdf",
+      size: 1234,
+      securityStatus: "not_required",
+      securityScanResult: "NOT_REQUIRED",
+    });
+    const path = `/api/uploads/signed-get?caseId=${caseDoc._id}&key=${encodeURIComponent(key)}`;
+
+    const authorized = await request(app).get(path).set("Cookie", authCookieFor(assigned));
+    expect(authorized.status).toBe(200);
+    expect(authorized.body.url).toBe("https://signed-url.test/object");
+
+    const anonymous = await request(app).get(path);
+    expect(anonymous.status).toBe(401);
+
+    const unrelatedResponse = await request(app).get(path).set("Cookie", authCookieFor(unrelated));
+    expect(unrelatedResponse.status).toBe(403);
+
+    caseDoc.paralegalAccessRevokedAt = new Date();
+    await caseDoc.save();
+    const revoked = await request(app).get(path).set("Cookie", authCookieFor(assigned));
+    expect(revoked.status).toBe(403);
+  });
+
+  test.each([
+    [[], 423, "FILE_SCAN_PENDING"],
+    [[{ Key: "GuardDutyMalwareScanStatus", Value: "THREATS_FOUND" }], 422, "FILE_SECURITY_BLOCKED"],
+    [[{ Key: "GuardDutyMalwareScanStatus", Value: "FAILED" }], 503, "FILE_SCAN_ERROR"],
+  ])("Matter file access fails closed for scan result %#", async (tagSet, status, code) => {
+    const previousRequired = process.env.S3_MALWARE_SCAN_REQUIRED;
+    process.env.S3_MALWARE_SCAN_REQUIRED = "true";
+    try {
+      const attorney = await User.create({
+        firstName: "Scan",
+        lastName: "Owner",
+        email: `scan.owner.${status}@example.com`,
+        password: "Password123!",
+        role: "attorney",
+        status: "approved",
+        state: "CA",
+      });
+      const paralegal = await User.create({
+        firstName: "Scan",
+        lastName: "Viewer",
+        email: `scan.viewer.${status}@example.com`,
+        password: "Password123!",
+        role: "paralegal",
+        status: "approved",
+        state: "CA",
+      });
+      const caseDoc = await Case.create({
+        title: "Quarantined Matter file",
+        details: "File scan access regression.",
+        status: "in progress",
+        attorney: attorney._id,
+        attorneyId: attorney._id,
+        paralegal: paralegal._id,
+        paralegalId: paralegal._id,
+        escrowIntentId: `pi_scan_${status}`,
+        escrowStatus: "funded",
+        totalAmount: 100000,
+        currency: "usd",
+      });
+      const key = `cases/${caseDoc._id}/documents/quarantined.pdf`;
+      const record = await CaseFile.create({
+        caseId: caseDoc._id,
+        userId: attorney._id,
+        originalName: "quarantined.pdf",
+        storageKey: key,
+        mimeType: "application/pdf",
+        size: 1234,
+        securityStatus: "pending",
+        securityScanResult: "PENDING",
+      });
+      mockSend.mockImplementation((command) => {
+        if (command?.constructor?.name === "GetObjectTaggingCommand") return { TagSet: tagSet };
+        return {};
+      });
+
+      const response = await request(app)
+        .get(`/api/uploads/signed-get?caseId=${caseDoc._id}&key=${encodeURIComponent(key)}`)
+        .set("Cookie", authCookieFor(paralegal));
+      expect(response.status).toBe(status);
+      expect(response.body.code).toBe(code);
+      const refreshed = await CaseFile.findById(record._id).lean();
+      expect(refreshed.securityStatus).toBe(status === 423 ? "pending" : status === 422 ? "blocked" : "error");
+      expect(mockGetSignedUrl).not.toHaveBeenCalled();
+    } finally {
+      if (previousRequired == null) delete process.env.S3_MALWARE_SCAN_REQUIRED;
+      else process.env.S3_MALWARE_SCAN_REQUIRED = previousRequired;
+    }
+  });
+
   test("Requested pre-engagement paralegal can access confidentiality document signed-get", async () => {
     const attorney = await User.create({
       firstName: "Alex",
@@ -309,6 +559,62 @@ describe("File uploads + downloads", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.url).toBe("https://signed-url.test/object");
+  });
+
+  test("Requested pre-engagement paralegal cannot access another known Matter key", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "alex.stone-pre-isolation@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "priya.ng-pre-isolation@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseId = new mongoose.Types.ObjectId();
+    const confidentialityKey = `cases/${caseId}/pre-engagement/confidentiality-agreement.pdf`;
+    const unrelatedKey = `cases/${caseId}/documents/attorney-private-draft.pdf`;
+    const caseDoc = await Case.create({
+      _id: caseId,
+      title: "Pre-engagement document isolation",
+      details: "Only the requested confidentiality document is visible before hire.",
+      status: "open",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      totalAmount: 50000,
+      currency: "usd",
+      preEngagement: {
+        status: "requested",
+        requestedParalegalId: paralegal._id,
+        confidentialityAgreementRequired: true,
+        confidentialityDocument: {
+          key: confidentialityKey,
+          name: "confidentiality-agreement.pdf",
+          mimeType: "application/pdf",
+          size: 1024,
+          uploadedAt: new Date(),
+        },
+        requestedAt: new Date(),
+        requestedBy: attorney._id,
+      },
+    });
+
+    const res = await request(app)
+      .get(`/api/uploads/signed-get?caseId=${caseDoc._id}&key=${encodeURIComponent(unrelatedKey)}`)
+      .set("Cookie", authCookieFor(paralegal));
+
+    expect(res.status).toBe(403);
+    expect(res.body.msg).toBe("Forbidden");
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
   test("Requested paralegal can upload a signed confidentiality agreement with pre-engagement response", async () => {
@@ -370,7 +676,7 @@ describe("File uploads + downloads", () => {
       .field("confidentialityAcknowledged", "true")
       .field("conflictsResponseType", "")
       .field("conflictsDisclosureText", "")
-      .attach("paralegalConfidentialityFile", Buffer.from("signed agreement"), "signed-confidentiality.pdf");
+      .attach("paralegalConfidentialityFile", Buffer.from("%PDF-1.4\nsigned agreement"), "signed-confidentiality.pdf");
 
     expect(res.status).toBe(200);
     expect(res.body.preEngagement?.status).toBe("submitted");
@@ -425,7 +731,7 @@ describe("File uploads + downloads", () => {
     const res = await request(app)
       .post(`/api/uploads/case/${caseDoc._id}`)
       .set("Cookie", authCookieFor(attorney))
-      .attach("file", Buffer.from("draft content"), "draft.pdf");
+      .attach("file", Buffer.from("%PDF-1.4\ndraft content"), "draft.pdf");
 
     expect(res.status).toBe(201);
 
@@ -434,6 +740,55 @@ describe("File uploads + downloads", () => {
       .lean();
     expect(notif).toBeFalsy();
     expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  test("Direct Matter upload deletes stored objects when metadata persistence fails", async () => {
+    const attorney = await User.create({
+      firstName: "Upload",
+      lastName: "Recovery",
+      email: "upload.recovery.attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Upload",
+      lastName: "Participant",
+      email: "upload.recovery.paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Upload recovery",
+      details: "An object must not remain orphaned after a database failure.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowIntentId: "pi_upload_recovery",
+      escrowStatus: "funded",
+      totalAmount: 100000,
+      currency: "usd",
+    });
+    const createSpy = jest.spyOn(CaseFile, "create").mockRejectedValueOnce(new Error("metadata unavailable"));
+
+    const response = await request(app)
+      .post(`/api/uploads/case/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(attorney))
+      .attach("file", Buffer.from("%PDF-1.4\ndraft content"), "draft.pdf");
+    createSpy.mockRestore();
+
+    expect(response.status).toBe(500);
+    const storageCalls = mockSend.mock.calls.map(([command]) => command?.input || {});
+    const uploaded = storageCalls.find((input) => input.Body && input.Key?.includes(`/documents/`));
+    const deleted = storageCalls.find((input) => !input.Body && input.Key === uploaded?.Key);
+    expect(uploaded).toBeTruthy();
+    expect(deleted).toBeTruthy();
+    expect(await CaseFile.countDocuments({ caseId: caseDoc._id })).toBe(0);
   });
 
   test("Unauthorized user cannot presign uploads", async () => {
@@ -494,6 +849,58 @@ describe("File uploads + downloads", () => {
     expect([403, 404]).toContain(res.status);
   });
 
+  test("A valid File id cannot be replayed against a different Matter", async () => {
+    const attorney = await User.create({
+      firstName: "Cross",
+      lastName: "Matter",
+      email: "cross-matter-file-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Assigned",
+      lastName: "Paralegal",
+      email: "cross-matter-file-paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const common = {
+      details: "Cross-Matter object binding regression fixture.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowStatus: "funded",
+      totalAmount: 100000,
+      currency: "usd",
+    };
+    const firstMatter = await Case.create({ ...common, title: "First Matter", escrowIntentId: "pi_first_file" });
+    const secondMatter = await Case.create({ ...common, title: "Second Matter", escrowIntentId: "pi_second_file" });
+    const file = await CaseFile.create({
+      caseId: secondMatter._id,
+      userId: paralegal._id,
+      originalName: "second-matter-only.pdf",
+      storageKey: `cases/${secondMatter._id}/documents/second-matter-only.pdf`,
+      mimeType: "application/pdf",
+      size: 512,
+      uploadedByRole: "paralegal",
+      status: "pending_review",
+    });
+
+    const response = await request(app)
+      .get(`/api/uploads/case/${firstMatter._id}/${file._id}/download`)
+      .set("Cookie", authCookieFor(attorney));
+
+    expect(response.status).toBe(404);
+    expect(JSON.stringify(response.body)).not.toContain("second-matter-only.pdf");
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
   test("Assigned paralegal can attach case file metadata", async () => {
     // Description: Paralegal attaches file metadata to case.
     // Input values: key="cases/<id>/documents/sample.pdf".
@@ -532,6 +939,15 @@ describe("File uploads + downloads", () => {
     });
 
     const key = `cases/${caseDoc._id}/documents/sample.pdf`;
+    mockSend.mockImplementation((cmd) => {
+      if (cmd?.constructor?.name === "HeadObjectCommand") {
+        return { ContentLength: 1234, ContentType: "application/pdf" };
+      }
+      if (cmd?.constructor?.name === "GetObjectCommand") {
+        return { Body: { transformToByteArray: async () => Buffer.from("%PDF-1.4\nsample") } };
+      }
+      return {};
+    });
     const res = await request(app)
       .post(`/api/cases/${caseDoc._id}/files`)
       .set("Cookie", authCookieFor(paralegal))

@@ -10,14 +10,14 @@
       --font-sans: 'Sarabun', sans-serif;
       --font-serif: 'Cormorant Garamond', serif;
       --ink: #171419;
-      --muted: #817b84;
+      --muted: #6f6872;
       --line: rgba(23, 20, 25, 0.1);
       --panel: #ffffff;
       --bg: #f6f7f8;
-      --gold: #b6a47a;
-      --blue: #5b8ee9;
+      --gold: #75613b;
+      --blue: #2f63b5;
       --danger: #b94d62;
-      --green: #3c8a62;
+      --green: #26724d;
     }
     * { box-sizing: border-box; }
     body {
@@ -26,8 +26,10 @@
       background: var(--bg);
       color: var(--ink);
       font-family: var(--font-sans);
-      font-weight: 200;
+      font-weight: 400;
     }
+    .skip-link { position: fixed; left: 12px; top: -48px; z-index: 1000; padding: 8px 12px; border-radius: 6px; background: #171419; color: #fff; }
+    .skip-link:focus { top: 12px; }
     .shell {
       display: grid;
       grid-template-columns: 240px minmax(0, 1fr);
@@ -63,6 +65,9 @@
       text-align: left;
       font: inherit;
       cursor: pointer;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
     }
     nav a:hover,
     .side-btn:hover,
@@ -118,7 +123,7 @@
       border-radius: 8px;
       background: #fff;
       color: var(--ink);
-      min-height: 38px;
+      min-height: 44px;
       padding: 0 0.9rem;
       cursor: pointer;
       font: inherit;
@@ -269,8 +274,12 @@
       background: transparent;
       color: var(--blue);
       cursor: pointer;
-      padding: 0;
+      min-height: 44px;
+      padding: 0.5rem 0;
       font: inherit;
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.2em;
     }
     .empty-state,
     .empty-row td {
@@ -389,6 +398,7 @@
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
   <div class="shell">
     <aside>
       <div class="logo">Let’s-ParaConnect</div>
@@ -398,7 +408,7 @@
         <button class="side-btn" type="button" id="logoutBtn">Log Out</button>
       </nav>
     </aside>
-    <main>
+    <main id="main" tabindex="-1">
       <header class="topbar">
         <div>
           <h1>Director Oversight</h1>
@@ -474,10 +484,10 @@
     </main>
   </div>
 
-  <div class="audit-panel" id="auditPanel" hidden>
-    <div class="audit-dialog">
+  <div class="audit-panel" id="auditPanel" hidden inert>
+    <div class="audit-dialog" role="dialog" aria-modal="true" aria-labelledby="auditTitle" tabindex="-1">
       <div class="audit-head">
-        <h2>Commission Audit</h2>
+        <h2 id="auditTitle">Commission Audit</h2>
         <button class="btn" type="button" id="closeAuditBtn">Close</button>
       </div>
       <div id="auditBody"></div>
@@ -485,5 +495,6 @@
   </div>
 
   <script type="module" src="assets/scripts/admin-directors.js"></script>
+  <script type="module" src="assets/scripts/web-vitals-rum.js"></script>
 </body>
 </html>

@@ -14,12 +14,17 @@ process.env.STRIPE_CONNECT_REFRESH_URL =
   process.env.STRIPE_CONNECT_REFRESH_URL || "http://localhost:5050/stripe/connect/refresh";
 process.env.APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:5050";
 
+const paymentIntentCaseIds = new Map();
 const stripeMock = {
   paymentIntents: {
-    retrieve: async () => ({
-      id: "pi_test_123",
+    retrieve: async (intentId) => ({
+      id: intentId,
       status: "succeeded",
+      amount: 122000,
+      amount_received: 122000,
       currency: "usd",
+      transfer_group: `case_${paymentIntentCaseIds.get(intentId) || "missing"}`,
+      metadata: { caseId: paymentIntentCaseIds.get(intentId) || "" },
       charges: { data: [{ id: "ch_test_123" }] },
     }),
   },
@@ -34,6 +39,7 @@ const stripeMock = {
   accounts: { create: async () => ({ id: "acct_test" }), retrieve: async () => ({}) },
   customers: { create: async () => ({ id: "cus_test" }), retrieve: async () => ({}) },
   caseTransferGroup: (caseId) => `case_${caseId}`,
+  stripeIdempotencyKey: (operation, ...parts) => `test_${operation}_${parts.join("_")}`,
   _lastTransferPayload: null,
 };
 
@@ -126,6 +132,7 @@ async function main() {
       currency: "usd",
       tasks: [{ title: "Finalize and deliver", completed: true }],
     });
+    paymentIntentCaseIds.set(caseDoc.escrowIntentId, String(caseDoc._id));
 
     const cookie = authCookieFor(attorney);
     const paralegalCookie = authCookieFor(paralegal);
@@ -184,6 +191,7 @@ async function main() {
       currency: "usd",
       tasks: [{ title: "Finalize and deliver", completed: true }],
     });
+    paymentIntentCaseIds.set(caseFail.escrowIntentId, String(caseFail._id));
 
     res = await fetch(`${baseUrl}/api/cases/${caseFail._id}/complete`, {
       method: "POST",

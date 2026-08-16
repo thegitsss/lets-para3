@@ -8,10 +8,11 @@
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0B2A4A">
 <link href="assets/styles/styles.css" rel="stylesheet" />
-<link href="assets/styles/hero-pages.css" rel="stylesheet" />
+<link href="assets/styles/hero-pages.css?v=20260729-white-footer" rel="stylesheet" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Contact Support – Let’s-ParaConnect</title>
+  <meta name="description" content="Contact Let’s-ParaConnect support for help with accounts, platform access, Matters, or general questions." />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -118,29 +119,7 @@
       margin-right: 0;
     }
 
-    .contact-links .icon {
-      width: 16px;
-      height: 16px;
-      display: block;
-    }
-
-    .contact-links .icon rect,
-    .contact-links .icon circle,
-    .contact-links .icon path {
-      stroke: currentColor;
-      fill: none;
-      stroke-width: 1.5;
-    }
-
-    .contact-links svg {
-      width: 16px;
-      height: 16px;
-      display: block;
-      fill: currentColor;
-      stroke: none;
-    }
-
-    .contact-details .support-email-link {
+    .contact-details .contact-action-link {
       color: var(--gold);
     }
 
@@ -257,30 +236,47 @@
     }
   </style>
 </head>
-<body>
+<body class="utility-page utility-page--contact">
   <a class="skip-link" href="#main">Skip to main content</a>
-<!-- Header -->
-<header>
-  <div class="header-inner">
-    <nav class="nav-left" aria-label="Primary">
-      <a href="index.html#who-we-are">About</a>
+  <header class="utility-header" data-utility-header>
+    <div class="utility-header__inner">
+      <nav class="utility-header__nav" aria-label="Primary navigation">
+        <a href="index.html#how">How It Works</a>
+        <a href="index.html#for-attorneys">For Attorneys</a>
+        <a href="index.html#for-paralegals">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      </nav>
+      <a class="utility-header__brand" href="index.html">Let<span class="utility-header__brand-mark">’</span>s-ParaConnect</a>
+      <div class="utility-header__actions">
+        <a class="utility-header__signin" href="login.html" data-utility-auth>Sign In</a>
+        <button class="utility-header__logout" type="button" data-utility-logout hidden>Log Out</button>
+        <a class="utility-header__button" href="signup.html" data-utility-signup>Get Started</a>
+      </div>
+      <button class="utility-header__menu" type="button" aria-expanded="false" aria-controls="utilityMenu" data-utility-menu-toggle>Menu</button>
+    </div>
+    <nav class="utility-header__mobile" id="utilityMenu" aria-label="Mobile navigation" data-utility-menu hidden>
       <a href="index.html#how">How It Works</a>
+      <a href="index.html#for-attorneys">For Attorneys</a>
+      <a href="index.html#for-paralegals">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      <a href="login.html" data-utility-auth>Sign In</a>
+      <button type="button" data-utility-logout hidden>Log Out</button>
+      <a href="signup.html" data-utility-signup>Get Started</a>
     </nav>
-
-    <a href="index.html" class="header-logo">
-      Let<span class="accent-apostrophe">’</span>s<span class="accent-dash">-</span>ParaConnect
-    </a>
-
-    <div class="header-actions">
-<a class="pill" href="login.html" id="authAction">Sign In</a>
-    </div>
-    </div>
   </header>
 
-  <div class="hero-banner" role="presentation" aria-hidden="true"></div>
+  <section class="hero-banner utility-hero" aria-labelledby="contact-title">
+    <div class="utility-hero__inner">
+      <div class="utility-hero__copy">
+        <p class="utility-hero__eyebrow">Support</p>
+        <h1 id="contact-title">Contact Support</h1>
+        <p class="utility-hero__description">Questions about LPC, an account, or an active matter.</p>
+      </div>
+      <div class="utility-hero__art" data-matter-field-host aria-hidden="true"></div>
+    </div>
+  </section>
 
   <main tabindex="-1" aria-labelledby="contact-title" id="main">
-    <h1 id="contact-title">Contact Support</h1>
     <p class="muted">Questions, or support—send us a note and we’ll get back to you shortly.</p>
 
     <div class="contact-shell">
@@ -333,9 +329,9 @@
 
         <div class="contact-block">
           <p class="contact-heading">Talk to us</p>
-          <p>+1 (302)-281-4353</p>
-          <p><a class="support-email-link" href="mailto:help@lets-paraconnect.com" style="text-decoration:none;">help@lets-paraconnect.com</a></p>
-          <p>Monday–Friday, 9:00 AM – 5:00 PM EST</p>
+          <p><a class="contact-action-link" href="tel:+13022814353">+1 (302) 281-4353</a></p>
+          <p><a class="contact-action-link" href="mailto:help@lets-paraconnect.com">help@lets-paraconnect.com</a></p>
+          <p>Monday–Friday, 9:00 AM – 5:00 PM Eastern Time</p>
         </div>
 
         <div class="contact-block">
@@ -344,41 +340,39 @@
             <a href="https://www.linkedin.com/company/lets-paraconnect/" target="_blank" rel="noopener" aria-label="LinkedIn">
               in
             </a>
-            <a href="https://www.facebook.com/LetsParaConnect/" target="_blank" rel="noopener" aria-label="Facebook">
-              f
-            </a>
-            <a href="https://www.instagram.com/letsparaconnect/" target="_blank" rel="noopener" aria-label="Instagram">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="3" y="3" width="18" height="18" rx="5"></rect>
-                <circle cx="12" cy="12" r="4.5"></circle>
-                <circle cx="17" cy="7" r="1"></circle>
-              </svg>
-            </a>
           </p>
         </div>
       </aside>
     </div>
   </main>
+  <footer class="home-footer">
+    <div class="home-footer__top">
+      <div class="home-footer__brand">
+        <a class="home-brand" href="index.html">Let<span class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+        <p>Project-based legal support for attorneys and independent paralegals.</p>
+      </div>
+      <nav aria-label="Footer navigation">
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
+        <a href="contact.html">Contact</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="/paralegal-admission.html">Paralegal Admission</a>
+        <a href="accessibility.html">Accessibility</a>
+      </nav>
+    </div>
+    <div class="home-footer__bottom">
+      <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
+      <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg>
+        <span>Accessibility</span>
+      </button>
+    </div>
+  </footer>
 
-<footer class="footer">
-  <div class="footer-inner">
-    <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
-    <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
-    <nav>
-      <a href="privacy.html">Privacy Policy</a>
-      <span>|</span>
-      <a href="terms.html">Terms</a>
-      <span>|</span>
-      <a href="/paralegal-admission.html">Admissions</a>
-      <span>|</span>
-      <a href="contact.html">Contact</a>
-      <span>|</span>
-      <a href="accessibility.html">Accessibility</a>
-    </nav>
-    <div class="region">United States</div>
-  </div>
-</footer>
-<script type="module" src="assets/scripts/hero-parallax.js"></script>
+
+  <script src="assets/scripts/utility-header.js" defer></script>
+<script src="assets/scripts/public-matter-field.js" defer></script>
 <script>
   (async function syncHeaderAuth() {
     const authAction = document.getElementById('authAction');
@@ -514,7 +508,7 @@
 
         const data = await res.json().catch(() => ({}));
         if (res.ok && data?.ok) {
-          setStatus('Message sent. We will get back to you shortly.', 'success');
+          setStatus('Message sent. We’ll reply to the email address you provided.', 'success');
           form.reset();
         } else {
           const msg = data?.msg || 'We could not send your message. Please try again.';

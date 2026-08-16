@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:messages");
 // backend/routes/messages.js
 const router = require("express").Router();
 const mongoose = require("mongoose");
@@ -5,6 +7,7 @@ const verifyToken = require("../utils/verifyToken");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const { requireApproved, requireRole, requireCaseAccess } = require("../utils/authz");
 const Message = require("../models/Message");
+const CaseFile = require("../models/CaseFile");
 const Case = require("../models/Case");
 const User = require("../models/User");
 const AuditLog = require("../models/AuditLog"); // match filename
@@ -16,19 +19,15 @@ const { evaluateMessagingPermission: evaluateParalegalMessagingPermission } = re
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
 const { publishCaseEvent } = require("../utils/caseEvents");
 const { publishNotificationEvent } = require("../utils/notificationEvents");
-const { decryptMessagePayload, decryptString } = require("../utils/dataEncryption");
+const {
+  buildCaseFileKeyQuery,
+  decryptCaseFilePayload,
+  decryptMessagePayload,
+  decryptString,
+} = require("../utils/dataEncryption");
 const { isWorkspacePresenceActive } = require("../utils/workspacePresence");
-
-// ----------------------------------------
-// CSRF (enabled in production or when ENABLE_CSRF=true)
-// ----------------------------------------
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
-}
+const { csrfProtection } = require("../utils/csrf");
+const { resolveMessageNotificationPolicy } = require("../utils/messageNotificationPolicy");
 
 // ----------------------------------------
 // Helpers
@@ -121,14 +120,6 @@ function buildShortPreview(text = "", maxLen = 50) {
   return `${source.slice(0, maxLen - 1).trim()}…`;
 }
 
-function buildMessagesAfterBoundary(createdAt, messageId) {
-  return {
-    $or: [
-      { createdAt: { $gt: createdAt } },
-      { createdAt, _id: { $gt: messageId } },
-    ],
-  };
-}
 
 function buildMessagesBeforeBoundary(createdAt, messageId) {
   return {
@@ -139,10 +130,7 @@ function buildMessagesBeforeBoundary(createdAt, messageId) {
   };
 }
 
-const MESSAGE_NOTIFY_COOLDOWN_MS = Math.max(
-  0,
-  parseInt(process.env.MESSAGE_NOTIFY_COOLDOWN_MS, 10) || 2 * 60 * 60 * 1000
-);
+const MESSAGE_NOTIFICATION_COOLDOWN_MS = resolveMessageNotificationPolicy().suppressMs;
 
 async function shouldNotifyForMessage({ caseId, messageDoc, senderRole }) {
   const caseObjectId = toObjectId(caseId);
@@ -152,7 +140,7 @@ async function shouldNotifyForMessage({ caseId, messageDoc, senderRole }) {
   if (!caseObjectId || !currentMessageId || !currentCreatedAt || Number.isNaN(currentCreatedAt.getTime())) {
     return true;
   }
-  if (!normalizedSenderRole || MESSAGE_NOTIFY_COOLDOWN_MS <= 0) {
+  if (!normalizedSenderRole || MESSAGE_NOTIFICATION_COOLDOWN_MS <= 0) {
     return true;
   }
   const currentBoundary = buildMessagesBeforeBoundary(currentCreatedAt, currentMessageId);
@@ -180,7 +168,7 @@ async function shouldNotifyForMessage({ caseId, messageDoc, senderRole }) {
   }
 
   const gapMs = currentCreatedAt.getTime() - latestMessageCreatedAt.getTime();
-  return gapMs >= MESSAGE_NOTIFY_COOLDOWN_MS;
+  return gapMs >= MESSAGE_NOTIFICATION_COOLDOWN_MS;
 }
 
 async function createMessageNotification({ caseDoc, senderDoc, previewText, messageDoc }) {
@@ -214,12 +202,13 @@ async function createMessageNotification({ caseDoc, senderDoc, previewText, mess
   try {
     await notifyUser(recipientId, "message", {
       caseId: caseDoc._id,
-      caseTitle: caseDoc.title || "Case",
+      caseTitle: caseDoc.title || "Untitled Matter",
       fromName: senderName,
       messageSnippet: buildShortPreview(previewText, 40),
+      messageId: messageDoc?._id || null,
     }, { actorUserId: senderId });
   } catch (err) {
-    console.warn("[messages] notifyUser failed", err);
+    runtimeLogger.warn("[messages] notifyUser failed", err);
   }
 }
 
@@ -240,7 +229,7 @@ function isCaseReadOnly(req) {
 function assertMessagingOpen(req, res) {
   const caseDoc = req.case;
   if (!caseDoc) {
-    return res.status(400).json({ error: "Case not loaded" });
+    return res.status(400).json({ error: "Matter not loaded" });
   }
   const viewerRole = String(req.user?.role || "").toLowerCase();
   const policy = viewerRole === "paralegal"
@@ -260,23 +249,17 @@ function assertMessagingOpen(req, res) {
     return res.status(403).json({ error: "Messaging is available after hire" });
   }
   if (policy.blockers.includes("funding_required")) {
-    return res.status(403).json({ error: "Work begins once payment is secured." });
+    return res.status(403).json({ error: "Work begins once Matter funding is confirmed." });
   }
   if (policy.blockers.includes("messaging_closed") || policy.blockers.includes("case_read_only")) {
-    return res.status(403).json({ error: "Messaging is closed for this case." });
+    return res.status(403).json({ error: "Messaging is closed for this Matter." });
   }
   if (policy.blockers.includes("workspace_not_active")) {
-    return res.status(403).json({ error: "Messaging unlocks once the case is funded and in progress." });
+    return res.status(403).json({ error: "Messaging unlocks once the Matter is funded and in progress." });
   }
   return null;
 }
 
-function resolveSenderRole(req) {
-  if (req?.acl?.isAdmin) return "admin";
-  if (req?.acl?.isParalegal) return "paralegal";
-  if (req?.acl?.isAttorney) return "attorney";
-  return String(req?.user?.role || "");
-}
 
 function normalizeSenderRole(role) {
   const normalized = String(role || "").toLowerCase();
@@ -295,7 +278,7 @@ async function loadSenderDoc(req) {
 // All message routes require auth
 router.use(verifyToken);
 router.use(requireApproved);
-router.use(requireRole("admin", "attorney", "paralegal"));
+router.use(requireRole("attorney", "paralegal"));
 
 router.get(
   "/unread-count",
@@ -357,7 +340,7 @@ router.get(
       const unread = await Message.countDocuments(query);
       items.push({
         caseId: key,
-        title: doc.title || "Case",
+        title: doc.title || "Untitled Matter",
         unread,
       });
     }
@@ -460,7 +443,19 @@ async function ensureNotBlockedForCase(req, res, next) {
   }
 }
 
-router.use("/:caseId", ensureCaseParticipant(), ensureNotBlockedForCase);
+function ensureActiveMessagingParticipant(req, res, next) {
+  if (!req.acl?.isAttorney && !req.acl?.isParalegal) {
+    return res.status(403).json({ error: "Messaging is available only to active Matter participants." });
+  }
+  return next();
+}
+
+router.use(
+  "/:caseId",
+  ensureCaseParticipant(),
+  ensureActiveMessagingParticipant,
+  ensureNotBlockedForCase
+);
 
 /**
  * GET /api/messages/:caseId?before=&after=&limit=&threadRoot=
@@ -508,7 +503,7 @@ router.post(
     const { caseId } = req.params;
     const caseDoc = req.case;
     if (caseDoc?.readOnly && !req.acl?.isAdmin) {
-      return res.status(403).json({ error: "Case is read-only" });
+      return res.status(403).json({ error: "Matter is read-only" });
     }
 
     const text = sanitizeText(req.body?.text);
@@ -540,7 +535,7 @@ router.post(
         messageDoc: msg,
       });
     } catch (err) {
-      console.warn("[messages] notification creation failed", err);
+      runtimeLogger.warn("[messages] notification creation failed", err);
     }
 
     publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
@@ -561,10 +556,27 @@ router.post(
     const closed = assertMessagingOpen(req, res);
     if (closed) return;
     if (isCaseReadOnly(req)) {
-      return res.status(403).json({ error: "Case is read-only" });
+      return res.status(403).json({ error: "Matter is read-only" });
     }
     const { fileKey, fileName, mimeType, fileSize } = req.body || {};
     if (!fileKey || !fileName) return res.status(400).json({ error: "fileKey and fileName required" });
+    const fileRecord = await CaseFile.findOne(buildCaseFileKeyQuery({
+      caseId: req.params.caseId,
+      storageKey: String(fileKey),
+    }));
+    if (!fileRecord) {
+      return res.status(400).json({ error: "Attach the file to this Matter before sending it." });
+    }
+    const plainFile = decryptCaseFilePayload(fileRecord);
+    if (String(plainFile.storageKey || "") !== String(fileKey)) {
+      return res.status(400).json({ error: "The file does not belong to this Matter." });
+    }
+    if (!["clean", "not_required"].includes(String(fileRecord.securityStatus || "pending"))) {
+      return res.status(423).json({
+        error: "This file cannot be sent until security scanning completes.",
+        code: "FILE_SCAN_PENDING",
+      });
+    }
 
     const senderDoc = await loadSenderDoc(req);
     if (!senderDoc) return res.status(403).json({ error: "Invalid sender role" });
@@ -576,10 +588,10 @@ router.post(
       senderRole: senderDoc.role,
       type: "file",
       text: fileName,
-      fileKey,
-      fileName,
+      fileKey: plainFile.storageKey,
+      fileName: plainFile.originalName,
       fileSize: size ?? null,
-      mimeType,
+      mimeType: plainFile.mimeType || mimeType,
       content: {
         size,
       },
@@ -593,63 +605,6 @@ router.post(
 
     publishCaseEvent(req.params.caseId, "messages", { at: new Date().toISOString() });
     res.status(201).json({ message: decryptMessagePayload(msg) });
-  })
-);
-
-/**
- * POST /api/messages/:caseId/voice
- * Body: { fileKey, fileName?, mimeType, transcript? }
- */
-router.post(
-  "/:caseId/voice",
-  requireCaseAccess("caseId"),
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    const closed = assertMessagingOpen(req, res);
-    if (closed) return;
-    if (isCaseReadOnly(req)) {
-      return res.status(403).json({ error: "Case is read-only" });
-    }
-    const { fileKey, fileName, mimeType, transcript = "" } = req.body || {};
-    if (!fileKey) return res.status(400).json({ error: "fileKey required" });
-    if (!mimeType || !String(mimeType).startsWith("audio/")) {
-      return res.status(400).json({ error: "mimeType must be audio/*" });
-    }
-
-    const senderDoc = await loadSenderDoc(req);
-    if (!senderDoc) return res.status(403).json({ error: "Invalid sender role" });
-
-    const safeTranscript = sanitizeText(transcript);
-    const msg = await Message.create({
-      caseId: req.params.caseId,
-      senderId: req.user.id,
-      senderRole: senderDoc.role,
-      type: "audio",
-      text: safeTranscript,
-      fileKey,
-      fileName,
-      mimeType,
-      transcript: safeTranscript,
-      content: { transcript: safeTranscript },
-    });
-
-    await AuditLog.logFromReq(req, "message.audio.create", {
-      targetType: "message",
-      targetId: msg._id,
-      caseId: req.params.caseId,
-    });
-
-    publishCaseEvent(req.params.caseId, "messages", { at: new Date().toISOString() });
-    res.status(201).json({ message: decryptMessagePayload(msg) });
-  })
-);
-
-router.post(
-  "/:caseId/summary",
-  requireCaseAccess("caseId"),
-  csrfProtection,
-  asyncHandler(async (_req, res) => {
-    res.json({ summary: "Summary endpoint placeholder." });
   })
 );
 
@@ -719,7 +674,7 @@ router.patch(
     const closed = assertMessagingOpen(req, res);
     if (closed) return;
     if (isCaseReadOnly(req)) {
-      return res.status(403).json({ error: "Case is read-only" });
+      return res.status(403).json({ error: "Matter is read-only" });
     }
     const { caseId, messageId } = req.params;
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });
@@ -775,7 +730,7 @@ router.post(
     const closed = assertMessagingOpen(req, res);
     if (closed) return;
     if (isCaseReadOnly(req)) {
-      return res.status(403).json({ error: "Case is read-only" });
+      return res.status(403).json({ error: "Matter is read-only" });
     }
     const { caseId, messageId } = req.params;
     const { emoji } = req.body || {};
@@ -808,7 +763,7 @@ router.delete(
     const closed = assertMessagingOpen(req, res);
     if (closed) return;
     if (isCaseReadOnly(req)) {
-      return res.status(403).json({ error: "Case is read-only" });
+      return res.status(403).json({ error: "Matter is read-only" });
     }
     const { caseId, messageId } = req.params;
     const { emoji } = req.body || {};
@@ -844,7 +799,7 @@ router.delete(
     const closed = assertMessagingOpen(req, res);
     if (closed) return;
     if (isCaseReadOnly(req)) {
-      return res.status(403).json({ error: "Case is read-only" });
+      return res.status(403).json({ error: "Matter is read-only" });
     }
     const { caseId, messageId } = req.params;
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });

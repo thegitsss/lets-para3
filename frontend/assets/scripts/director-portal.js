@@ -1,6 +1,6 @@
-import { requireAuth, secureFetch, logoutUser } from "./auth.js";
+import { requireAuth, secureFetch } from "./auth.js";
 
-const directorSession = requireAuth("director");
+requireAuth("director");
 
 const stageFilter = document.getElementById("stageFilter");
 const rangeFilter = document.getElementById("rangeFilter");
@@ -13,21 +13,9 @@ const recordSearchInput = document.getElementById("recordSearchInput");
 const statusEl = document.getElementById("directorStatus");
 const recordsBody = document.getElementById("recordsBody");
 const identityEl = document.getElementById("directorIdentity");
-const translucencyRange = document.getElementById("cardTranslucencyRange");
-const translucencyValue = document.getElementById("cardTranslucencyValue");
-const backgroundInput = document.getElementById("dashboardBackgroundInput");
-const resetAppearanceBtn = document.getElementById("resetAppearanceBtn");
-const doneAppearanceBtn = document.getElementById("doneAppearanceBtn");
-const settingsBtn = document.getElementById("settingsBtn");
-const settingsOverlay = document.getElementById("settingsOverlay");
-const settingsCloseBtn = document.getElementById("settingsCloseBtn");
 const openZohoBtn = document.getElementById("openZohoBtn");
-const appearanceModeBtns = Array.from(document.querySelectorAll("[data-appearance-mode]"));
 const recordsSortButtons = Array.from(document.querySelectorAll("[data-sort-key]"));
-const DEMO_MODE = new URLSearchParams(window.location.search).get("demo") === "1";
 const RECORDS_PER_PAGE = 10;
-const APPEARANCE_KEY = `lpc_director_dashboard_appearance:${directorSession.user?._id || directorSession.user?.id || directorSession.user?.email || "director"}`;
-const LAST_IMPORT_KEY = `lpc_director_last_import:${directorSession.user?._id || directorSession.user?.id || directorSession.user?.email || "director"}`;
 const ZOHO_MAIL_URL = "https://mail.zoho.com/";
 const ZOHO_MAIL_APP_URL = "zohomail://";
 const AUTO_REFRESH_MS = 5 * 60 * 1000;
@@ -113,7 +101,9 @@ function populateSelectedStateOptions() {
   if (!selectedStateSelect) return;
   selectedStateSelect.innerHTML = [
     `<option value="">Choose state…</option>`,
-    ...US_STATE_CODES.map((state) => `<option value="${state}">${state} — ${US_STATE_NAMES[state]}</option>`),
+    ...US_STATE_CODES.map(
+      (state) => `<option value="${escapeHTML(state)}">${escapeHTML(state)} — ${escapeHTML(US_STATE_NAMES[state])}</option>`
+    ),
   ].join("");
 }
 
@@ -189,318 +179,6 @@ function setPageRowsSelected(selected) {
   renderCurrentRecordsPage();
 }
 
-function recordMatchesRange(record = {}, days = 7) {
-  const safeDays = [1, 7, 30].includes(Number(days)) ? Number(days) : 7;
-  const dateValues = [
-    record.firstOutreachSentAt,
-    record.followUpSentAt,
-    record.lastReplyAt,
-    record.registeredAt,
-    record.firstMatterPostedAt,
-    record.firstMatterCompletedAt,
-  ]
-    .map((value) => new Date(value))
-    .filter((date) => !Number.isNaN(date.getTime()));
-  if (!dateValues.length) return false;
-  const end = new Date(Math.max(...DEMO_RECORDS.flatMap((item) => [
-    item.firstOutreachSentAt,
-    item.followUpSentAt,
-    item.lastReplyAt,
-    item.registeredAt,
-    item.firstMatterPostedAt,
-    item.firstMatterCompletedAt,
-  ]).map((value) => new Date(value)).filter((date) => !Number.isNaN(date.getTime())).map((date) => date.getTime())));
-  end.setHours(23, 59, 59, 999);
-  const start = new Date(end);
-  start.setDate(start.getDate() - (safeDays - 1));
-  start.setHours(0, 0, 0, 0);
-  return dateValues.some((date) => date >= start && date <= end);
-}
-
-const DEMO_RECORDS = [
-  {
-    id: "demo-1",
-    attorneyName: "Jordan Ellis",
-    attorneyEmail: "jordan.ellis@examplelaw.com",
-    state: "TX",
-    stage: "commission_complete",
-    stageLabel: "Commission Complete",
-    firstOutreachSentAt: "2026-06-03T14:15:00.000Z",
-    followUpSentAt: null,
-    registeredAt: "2026-06-05T18:20:00.000Z",
-    firstMatterPostedAt: "2026-06-07T16:30:00.000Z",
-    firstMatterCompletedAt: "2026-06-18T19:15:00.000Z",
-    commissionEarnedCents: 11000,
-  },
-  {
-    id: "demo-2",
-    attorneyName: "Amelia Reyes",
-    attorneyEmail: "areyes@reyesfirm.example",
-    state: "TX",
-    stage: "matter_posted",
-    stageLabel: "Matter Posted",
-    firstOutreachSentAt: "2026-06-06T15:10:00.000Z",
-    followUpSentAt: null,
-    registeredAt: "2026-06-09T13:00:00.000Z",
-    firstMatterPostedAt: "2026-06-15T17:45:00.000Z",
-    firstMatterCompletedAt: null,
-    commissionEarnedCents: 0,
-  },
-  {
-    id: "demo-3",
-    attorneyName: "Marcus Chen",
-    attorneyEmail: "mchen@chenlegal.example",
-    state: "TX",
-    stage: "attorney_registered",
-    stageLabel: "Attorney Registered",
-    firstOutreachSentAt: "2026-06-10T16:40:00.000Z",
-    followUpSentAt: null,
-    registeredAt: "2026-06-13T20:15:00.000Z",
-    firstMatterPostedAt: null,
-    firstMatterCompletedAt: null,
-    commissionEarnedCents: 0,
-  },
-  {
-    id: "demo-4",
-    attorneyName: "Priya Shah",
-    attorneyEmail: "pshah@shahlaw.example",
-    state: "TX",
-    stage: "follow_up_sent",
-    stageLabel: "Follow-Up Auto Sent",
-    firstOutreachSentAt: "2026-06-01T14:05:00.000Z",
-    followUpSentAt: "2026-06-17T13:30:00.000Z",
-    registeredAt: "2026-06-08T15:00:00.000Z",
-    firstMatterPostedAt: null,
-    firstMatterCompletedAt: null,
-    commissionEarnedCents: 0,
-  },
-  {
-    id: "demo-5",
-    attorneyName: "Nathan Brooks",
-    attorneyEmail: "nbrooks@brookspllc.example",
-    state: "TX",
-    stage: "founder_attention",
-    stageLabel: "Founder Attention",
-    firstOutreachSentAt: "2026-06-12T18:10:00.000Z",
-    followUpSentAt: null,
-    registeredAt: null,
-    firstMatterPostedAt: null,
-    firstMatterCompletedAt: null,
-    commissionEarnedCents: 0,
-  },
-  {
-    id: "demo-6",
-    attorneyName: "Grace Whitman",
-    attorneyEmail: "gwhitman@whitmanlaw.example",
-    state: "TX",
-    stage: "outreach_sent",
-    stageLabel: "Outreach Sent",
-    firstOutreachSentAt: "2026-06-20T12:50:00.000Z",
-    followUpSentAt: null,
-    registeredAt: null,
-    firstMatterPostedAt: null,
-    firstMatterCompletedAt: null,
-    commissionEarnedCents: 0,
-  },
-  {
-    id: "demo-7",
-    attorneyName: "Evan Castillo",
-    attorneyEmail: "ecastillo@castillolegal.example",
-    state: "TX",
-    stage: "outreach_sent",
-    stageLabel: "Outreach Sent",
-    firstOutreachSentAt: "2026-06-21T13:25:00.000Z",
-    followUpSentAt: null,
-    registeredAt: null,
-    firstMatterPostedAt: null,
-    firstMatterCompletedAt: null,
-    commissionEarnedCents: 0,
-  },
-  {
-    id: "demo-8",
-    attorneyName: "Leah Morgan",
-    attorneyEmail: "lmorgan@morganlaw.example",
-    state: "TX",
-    stage: "attorney_registered",
-    stageLabel: "Attorney Registered",
-    firstOutreachSentAt: "2026-06-14T14:55:00.000Z",
-    followUpSentAt: null,
-    registeredAt: "2026-06-18T16:05:00.000Z",
-    firstMatterPostedAt: null,
-    firstMatterCompletedAt: null,
-    commissionEarnedCents: 0,
-  },
-  {
-    id: "demo-9",
-    attorneyName: "Daniel Foster",
-    attorneyEmail: "dfoster@fosterpllc.example",
-    state: "TX",
-    stage: "matter_completed",
-    stageLabel: "Matter Completed",
-    firstOutreachSentAt: "2026-05-28T15:45:00.000Z",
-    followUpSentAt: null,
-    registeredAt: "2026-06-02T18:30:00.000Z",
-    firstMatterPostedAt: "2026-06-04T21:10:00.000Z",
-    firstMatterCompletedAt: "2026-06-24T14:40:00.000Z",
-    commissionEarnedCents: 0,
-  },
-  {
-    id: "demo-10",
-    attorneyName: "Monica Patel",
-    attorneyEmail: "mpatel@patellaw.example",
-    state: "TX",
-    stage: "commission_complete",
-    stageLabel: "Commission Complete",
-    firstOutreachSentAt: "2026-05-24T12:35:00.000Z",
-    followUpSentAt: null,
-    registeredAt: "2026-05-30T15:45:00.000Z",
-    firstMatterPostedAt: "2026-06-02T17:20:00.000Z",
-    firstMatterCompletedAt: "2026-06-19T20:00:00.000Z",
-    commissionEarnedCents: 8800,
-  },
-  {
-    id: "demo-11",
-    attorneyName: "Caleb Nguyen",
-    attorneyEmail: "cnguyen@nguyenlaw.example",
-    state: "TX",
-    stage: "follow_up_sent",
-    stageLabel: "Follow-Up Auto Sent",
-    firstOutreachSentAt: "2026-06-02T17:15:00.000Z",
-    followUpSentAt: "2026-06-20T13:00:00.000Z",
-    registeredAt: "2026-06-11T14:10:00.000Z",
-    firstMatterPostedAt: null,
-    firstMatterCompletedAt: null,
-    commissionEarnedCents: 0,
-  },
-  {
-    id: "demo-12",
-    attorneyName: "Sofia Martin",
-    attorneyEmail: "smartin@martinlegal.example",
-    state: "TX",
-    stage: "founder_attention",
-    stageLabel: "Founder Attention",
-    firstOutreachSentAt: "2026-06-22T18:20:00.000Z",
-    followUpSentAt: null,
-    registeredAt: null,
-    firstMatterPostedAt: null,
-    firstMatterCompletedAt: null,
-    commissionEarnedCents: 0,
-  },
-];
-
-function buildDemoOverview() {
-  const counts = DEMO_RECORDS.reduce(
-    (acc, record) => {
-      acc.total += 1;
-      acc[record.stage] = (acc[record.stage] || 0) + 1;
-      acc.commissionEarnedCents += Number(record.commissionEarnedCents || 0);
-      if (record.stage === "commission_complete") acc.commissionableMatterCount += 1;
-      return acc;
-    },
-    { total: 0, commissionEarnedCents: 0, commissionableMatterCount: 0 }
-  );
-  return {
-    profile: {
-      displayName: "Skyler Director",
-      zohoEmail: "skyler@lets-paraconnect.com",
-    },
-    counts,
-    attention: {
-      founderReplies: counts.founder_attention || 0,
-      followUpsAutoSent: counts.follow_up_sent || 0,
-      commissionableRecords: DEMO_RECORDS.filter((record) => Number(record.commissionableMatterCount || 0) > 0 || Number(record.commissionEarnedCents || 0) > 0).length,
-    },
-    lastSyncedAt: DEMO_RECORDS.reduce((latest, record) => {
-      const newest = [
-        record.firstOutreachSentAt,
-        record.followUpSentAt,
-        record.lastReplyAt,
-        record.registeredAt,
-        record.firstMatterPostedAt,
-        record.firstMatterCompletedAt,
-      ]
-        .map((value) => (value ? new Date(value).getTime() : 0))
-        .reduce((max, value) => Math.max(max, value), 0);
-      return newest > latest ? newest : latest;
-    }, 0),
-  };
-}
-
-function buildAnalyticsFromRecords(records = [], days = 14) {
-  const safeDays = Math.min(90, Math.max(1, Number(days) || 14));
-  const dates = (records || [])
-    .flatMap((record) => [
-      record.firstOutreachSentAt,
-      record.followUpSentAt,
-      record.lastReplyAt,
-      record.registeredAt,
-      record.firstMatterPostedAt,
-      record.firstMatterCompletedAt,
-    ])
-    .map((value) => new Date(value))
-    .filter((date) => !Number.isNaN(date.getTime()));
-  const end = dates.length ? new Date(Math.max(...dates.map((date) => date.getTime()))) : new Date();
-  end.setHours(0, 0, 0, 0);
-  const start = new Date(end);
-  start.setDate(start.getDate() - (safeDays - 1));
-  const series = [];
-  const byDate = new Map();
-  for (let i = 0; i < safeDays; i += 1) {
-    const date = new Date(start);
-    date.setDate(start.getDate() + i);
-    const key = date.toISOString().slice(0, 10);
-    const bucket = {
-      date: key,
-      emailsSent: 0,
-      registrations: 0,
-      followUps: 0,
-      replies: 0,
-      mattersPosted: 0,
-      mattersCompleted: 0,
-      commissionableMatters: 0,
-    };
-    byDate.set(key, bucket);
-    series.push(bucket);
-  }
-  const increment = (value, field, amount = 1) => {
-    if (!value) return;
-    const key = new Date(value).toISOString().slice(0, 10);
-    const bucket = byDate.get(key);
-    if (bucket) bucket[field] += amount;
-  };
-  records.forEach((record) => {
-    increment(record.firstOutreachSentAt, "emailsSent");
-    increment(record.followUpSentAt, "followUps");
-    increment(record.lastReplyAt, "replies");
-    increment(record.registeredAt, "registrations");
-    increment(record.firstMatterPostedAt, "mattersPosted");
-    increment(record.firstMatterCompletedAt, "mattersCompleted");
-    if (record.firstMatterCompletedAt) {
-      increment(record.firstMatterCompletedAt, "commissionableMatters", Number(record.commissionableMatterCount || 0));
-    }
-  });
-  const totals = series.reduce(
-    (acc, bucket) => {
-      Object.keys(acc).forEach((key) => {
-        if (key in bucket) acc[key] += Number(bucket[key] || 0);
-      });
-      return acc;
-    },
-    { emailsSent: 0, registrations: 0, followUps: 0, replies: 0, mattersPosted: 0, mattersCompleted: 0, commissionableMatters: 0 }
-  );
-  totals.conversionRatePct = totals.emailsSent ? Math.round((totals.registrations / totals.emailsSent) * 100) : 0;
-  totals.replyRatePct = totals.emailsSent ? Math.round((totals.replies / totals.emailsSent) * 100) : 0;
-  return {
-    range: {
-      start: series[0]?.date || "",
-      end: series[series.length - 1]?.date || "",
-      days: series.length,
-    },
-    totals,
-    series,
-  };
-}
-
 function setStatus(message, { tone = "", transient = false } = {}) {
   if (!statusEl) return;
   clearTimeout(statusTimer);
@@ -516,18 +194,6 @@ function setStatus(message, { tone = "", transient = false } = {}) {
       }, 260);
     }, 2600);
   }
-}
-
-function openSettings() {
-  if (!settingsOverlay) return;
-  settingsOverlay.hidden = false;
-  settingsCloseBtn?.focus();
-}
-
-function closeSettings() {
-  if (!settingsOverlay) return;
-  settingsOverlay.hidden = true;
-  settingsBtn?.focus();
 }
 
 function isMobileDevice() {
@@ -549,290 +215,6 @@ function openZohoMail() {
     return;
   }
   window.open(ZOHO_MAIL_URL, "_blank", "noopener,noreferrer");
-}
-
-function readLastImportAt() {
-  try {
-    return localStorage.getItem(LAST_IMPORT_KEY) || "";
-  } catch (_) {
-    return "";
-  }
-}
-
-function saveLastImportAt(value = new Date().toISOString()) {
-  try {
-    localStorage.setItem(LAST_IMPORT_KEY, value);
-  } catch (_) {}
-  renderLastImportAt(value);
-}
-
-function renderLastImportAt(value = readLastImportAt()) {
-  const el = document.getElementById("lastImportAt");
-  if (!el) return;
-  if (!value) {
-    el.textContent = "";
-    return;
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    el.textContent = "";
-    return;
-  }
-  renderRelativeMeta(el, date, "Imported");
-}
-
-function readAppearance() {
-  try {
-    return JSON.parse(localStorage.getItem(APPEARANCE_KEY) || "{}") || {};
-  } catch (_) {
-    return {};
-  }
-}
-
-function saveAppearance(nextAppearance) {
-  try {
-    localStorage.setItem(APPEARANCE_KEY, JSON.stringify(nextAppearance));
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-function normalizeTranslucency(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return 0;
-  return Math.min(100, Math.max(0, Math.round(numeric)));
-}
-
-function normalizeLuminance(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return null;
-  return Math.min(255, Math.max(0, numeric));
-}
-
-function normalizeColorMode(value) {
-  return String(value || "").toLowerCase() === "dark" ? "dark" : "light";
-}
-
-function applyAdaptiveCardPalette({ alpha, backgroundLuminance, colorMode = "light" }) {
-  const root = document.documentElement;
-  const mode = normalizeColorMode(colorMode);
-  const luminance = normalizeLuminance(backgroundLuminance);
-  const hasMeasuredDarkBackground = luminance !== null && luminance < 118;
-  const isMostlyGlass = alpha < 0.45;
-  const useLightCardText = mode === "dark" || (hasMeasuredDarkBackground && isMostlyGlass);
-  const cardRgb = mode === "dark" ? "15, 23, 42" : "255, 255, 255";
-
-  root.dataset.directorContrast = useLightCardText ? "dark-bg" : "light-bg";
-  root.dataset.directorMode = mode;
-  root.style.setProperty("--director-ink", mode === "dark" ? "#f8fafc" : "#120f13");
-  root.style.setProperty("--director-muted", mode === "dark" ? "rgba(248, 250, 252, 0.7)" : "#89838c");
-  root.style.setProperty("--director-bg", mode === "dark" ? "#101820" : "#f4f5f7");
-  root.style.setProperty("--director-panel", mode === "dark" ? "#111827" : "#ffffff");
-  root.style.setProperty("--director-card-bg", `rgba(${cardRgb}, var(--director-card-alpha))`);
-  root.style.setProperty("--director-card-line", mode === "dark" ? "rgba(248, 250, 252, 0.16)" : "rgba(255, 255, 255, 0.42)");
-  root.style.setProperty("--director-card-ink", useLightCardText ? "#f8fafc" : "#120f13");
-  root.style.setProperty("--director-card-muted", useLightCardText ? "rgba(248, 250, 252, 0.72)" : "#89838c");
-  root.style.setProperty("--director-chart-grid", useLightCardText ? "rgba(248, 250, 252, 0.18)" : "rgba(18, 15, 19, 0.08)");
-  root.style.setProperty("--director-chart-bar", useLightCardText ? "rgba(147, 197, 253, 0.22)" : "rgba(91, 142, 233, 0.2)");
-  root.style.setProperty("--director-graph-primary", useLightCardText ? "#bfdbfe" : "#4f8ee8");
-  root.style.setProperty("--director-graph-secondary", useLightCardText ? "#fda4af" : "#c94e68");
-  root.style.setProperty("--director-graph-tertiary", useLightCardText ? "#c4b5fd" : "#625cc0");
-  root.style.setProperty("--director-dot-idle", useLightCardText ? "rgba(248, 250, 252, 0.22)" : "rgba(227, 229, 233, 0.88)");
-  root.style.setProperty("--director-soft-track", useLightCardText ? "rgba(248, 250, 252, 0.2)" : "rgba(18, 15, 19, 0.08)");
-  root.style.setProperty("--director-control-bg", useLightCardText ? "rgba(15, 23, 42, 0.28)" : "rgba(255, 255, 255, 0.9)");
-  root.style.setProperty("--director-control-line", useLightCardText ? "rgba(248, 250, 252, 0.24)" : "rgba(18, 15, 19, 0.08)");
-  root.style.setProperty("--director-hover-bg", useLightCardText ? "rgba(248, 250, 252, 0.12)" : "rgba(255, 255, 255, 0.38)");
-}
-
-function applyGlassCardTreatment({ translucency, colorMode = "light" }) {
-  const root = document.documentElement;
-  const glassAmount = normalizeTranslucency(translucency) / 100;
-  const blur = 22 * (1 - glassAmount);
-  const saturation = 150 - glassAmount * 50;
-  const brightness = 1.06 - glassAmount * 0.06;
-  const isDark = normalizeColorMode(colorMode) === "dark";
-
-  root.style.setProperty("--director-card-blur", `${blur.toFixed(1)}px`);
-  root.style.setProperty("--director-card-saturation", `${saturation.toFixed(0)}%`);
-  root.style.setProperty("--director-card-brightness", brightness.toFixed(2));
-  root.style.setProperty(
-    "--director-card-line",
-    isDark
-      ? `rgba(248, 250, 252, ${0.16 - glassAmount * 0.06})`
-      : `rgba(255, 255, 255, ${0.42 - glassAmount * 0.22})`
-  );
-  root.style.setProperty("--director-shadow", "none");
-}
-
-function deriveUiLuminanceFromPixels(pixels) {
-  const values = [];
-  let total = 0;
-  for (let i = 0; i < pixels.length; i += 4) {
-    const luminance = 0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2];
-    values.push(luminance);
-    total += luminance;
-  }
-  if (!values.length) return null;
-  values.sort((a, b) => a - b);
-  const mean = total / values.length;
-  const median = values[Math.floor(values.length * 0.5)];
-  const upper = values[Math.floor(values.length * 0.72)];
-  return mean * 0.25 + median * 0.25 + upper * 0.5;
-}
-
-function applyAppearance({ translucency = 0, backgroundImage = "", backgroundLuminance = null, colorMode = "light" } = {}) {
-  const normalizedTranslucency = normalizeTranslucency(translucency);
-  const normalizedMode = normalizeColorMode(colorMode);
-  const glassAmount = normalizedTranslucency / 100;
-  const alpha = Math.max(0, 1 - normalizedTranslucency * 0.01);
-  const lightOverlayStart = 0.84 * (1 - glassAmount);
-  const lightOverlayEnd = 0.78 * (1 - glassAmount);
-  const darkOverlayStart = 0.9 * (1 - glassAmount);
-  const darkOverlayEnd = 0.82 * (1 - glassAmount);
-  const lightPhotoStart = 0.1 * (1 - glassAmount);
-  const lightPhotoEnd = 0.08 * (1 - glassAmount);
-  const darkPhotoStart = 0.45 * (1 - glassAmount);
-  const darkPhotoEnd = 0.35 * (1 - glassAmount);
-
-  document.documentElement.style.setProperty("--director-card-alpha", String(alpha));
-  document.documentElement.style.setProperty(
-    "--director-background-overlay",
-    normalizedMode === "dark"
-      ? `linear-gradient(135deg, rgba(15, 18, 24, ${darkOverlayStart.toFixed(2)}), rgba(28, 32, 40, ${darkOverlayEnd.toFixed(2)}))`
-      : `linear-gradient(135deg, rgba(255, 255, 255, ${lightOverlayStart.toFixed(2)}), rgba(244, 245, 247, ${lightOverlayEnd.toFixed(2)}))`
-  );
-  document.documentElement.style.setProperty(
-    "--director-photo-overlay",
-    normalizedMode === "dark"
-      ? `linear-gradient(135deg, rgba(10, 12, 16, ${darkPhotoStart.toFixed(2)}), rgba(10, 12, 16, ${darkPhotoEnd.toFixed(2)}))`
-      : `linear-gradient(135deg, rgba(255, 255, 255, ${lightPhotoStart.toFixed(2)}), rgba(18, 15, 19, ${lightPhotoEnd.toFixed(2)}))`
-  );
-  document.body?.classList.toggle("director-mode-dark", normalizedMode === "dark");
-  applyAdaptiveCardPalette({ alpha, backgroundLuminance, colorMode: normalizedMode });
-  applyGlassCardTreatment({ translucency: normalizedTranslucency, colorMode: normalizedMode });
-  const applyPhotoClass = () => {
-    if (!document.body) return;
-    document.body.classList.toggle("has-director-photo-bg", !!backgroundImage);
-  };
-
-  if (backgroundImage) {
-    document.documentElement.style.setProperty("--director-background-image", `url("${backgroundImage}")`);
-  } else {
-    document.documentElement.style.setProperty("--director-background-image", "none");
-  }
-  if (document.body) applyPhotoClass();
-  else document.addEventListener("DOMContentLoaded", applyPhotoClass, { once: true });
-
-  if (translucencyRange) translucencyRange.value = String(normalizedTranslucency);
-  if (translucencyValue) translucencyValue.textContent = `${normalizedTranslucency}%`;
-  appearanceModeBtns.forEach((button) => {
-    const active = button.dataset.appearanceMode === normalizedMode;
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-pressed", active ? "true" : "false");
-  });
-}
-
-function updateAppearance(patch = {}) {
-  const current = readAppearance();
-  const next = {
-    translucency: normalizeTranslucency(
-      Object.prototype.hasOwnProperty.call(patch, "translucency") ? patch.translucency : current.translucency
-    ),
-    backgroundImage: Object.prototype.hasOwnProperty.call(patch, "backgroundImage")
-      ? patch.backgroundImage || ""
-      : current.backgroundImage || "",
-    backgroundLuminance: Object.prototype.hasOwnProperty.call(patch, "backgroundLuminance")
-      ? normalizeLuminance(patch.backgroundLuminance)
-      : normalizeLuminance(current.backgroundLuminance),
-    colorMode: normalizeColorMode(
-      Object.prototype.hasOwnProperty.call(patch, "colorMode") ? patch.colorMode : current.colorMode
-    ),
-  };
-  if (!next.backgroundImage) next.backgroundLuminance = null;
-  applyAppearance(next);
-  if (!saveAppearance(next)) {
-    setStatus("That image is too large to save in this browser. Try a smaller image.");
-  }
-}
-
-function resizeImageFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Unable to read image."));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("Unable to load image."));
-      img.onload = () => {
-        const maxDimension = 2200;
-        const scale = Math.min(1, maxDimension / Math.max(img.width || 1, img.height || 1));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round((img.width || 1) * scale));
-        canvas.height = Math.max(1, Math.round((img.height || 1) * scale));
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          reject(new Error("Unable to process image."));
-          return;
-        }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        let luminance = null;
-        try {
-          const sampleWidth = Math.min(80, canvas.width);
-          const sampleHeight = Math.min(80, canvas.height);
-          const sampleCanvas = document.createElement("canvas");
-          sampleCanvas.width = sampleWidth;
-          sampleCanvas.height = sampleHeight;
-          const sampleCtx = sampleCanvas.getContext("2d", { willReadFrequently: true });
-          if (!sampleCtx) throw new Error("Unable to sample image.");
-          sampleCtx.drawImage(canvas, 0, 0, sampleWidth, sampleHeight);
-          const pixels = sampleCtx.getImageData(0, 0, sampleWidth, sampleHeight).data;
-          luminance = deriveUiLuminanceFromPixels(pixels);
-        } catch (_) {
-          luminance = null;
-        }
-        resolve({ dataUrl: canvas.toDataURL("image/jpeg", 0.82), luminance });
-      };
-      img.src = String(reader.result || "");
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-function measureImageLuminance(source) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onerror = () => reject(new Error("Unable to load image."));
-    img.onload = () => {
-      try {
-        const sampleWidth = Math.min(80, img.width || 1);
-        const sampleHeight = Math.min(80, img.height || 1);
-        const canvas = document.createElement("canvas");
-        canvas.width = sampleWidth;
-        canvas.height = sampleHeight;
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        if (!ctx) throw new Error("Unable to sample image.");
-        ctx.drawImage(img, 0, 0, sampleWidth, sampleHeight);
-        const pixels = ctx.getImageData(0, 0, sampleWidth, sampleHeight).data;
-        resolve(deriveUiLuminanceFromPixels(pixels));
-      } catch (err) {
-        reject(err);
-      }
-    };
-    img.src = source;
-  });
-}
-
-async function ensureAppearanceLuminance() {
-  const appearance = readAppearance();
-  if (!appearance.backgroundImage) return;
-  try {
-    const luminance = await measureImageLuminance(appearance.backgroundImage);
-    if (Math.abs((normalizeLuminance(appearance.backgroundLuminance) ?? -1) - luminance) > 1) {
-      updateAppearance({ backgroundLuminance: luminance });
-    }
-  } catch (_) {
-    /* Existing background remains usable without adaptive sampling. */
-  }
 }
 
 function formatDate(value) {
@@ -977,7 +359,7 @@ function renderStateSelect(record = {}) {
   const options = [
     `<option value="">Choose state…</option>`,
     ...US_STATE_CODES.map((state) => (
-      `<option value="${state}"${currentState === state ? " selected" : ""}>${state} — ${US_STATE_NAMES[state]}</option>`
+      `<option value="${escapeHTML(state)}"${currentState === state ? " selected" : ""}>${escapeHTML(state)} — ${escapeHTML(US_STATE_NAMES[state])}</option>`
     )),
   ].join("");
   return `<select class="record-state-select" data-record-state-id="${escapeHTML(recordId)}" aria-label="State for ${escapeHTML(record.attorneyName || record.attorneyEmail || "attorney")}">${options}</select>`;
@@ -1086,7 +468,6 @@ function renderOverview(payload = {}) {
   const commissionEarnedCents = Number(counts.commissionEarnedCents || 0);
   document.getElementById("countCommission").textContent = commissionEarnedCents > 0 ? formatMoney(commissionEarnedCents) : "—";
   renderRelativeMeta(document.getElementById("lastSyncedAt"), payload.lastSyncedAt, "Synced");
-  renderLastImportAt();
   const emptyState = document.getElementById("directorEmptyState");
   if (emptyState) emptyState.classList.toggle("visible", total === 0);
 
@@ -1319,40 +700,6 @@ function renderPagination() {
 async function loadPortal({ silent = false, preservePage = false } = {}) {
   if (portalLoadInFlight) return;
   portalLoadInFlight = true;
-  if (DEMO_MODE) {
-    try {
-      const stage = stageFilter?.value || "";
-      const rangeDays = getSelectedRangeDays();
-      const rangedRecords = DEMO_RECORDS.filter((record) => recordMatchesRange(record, rangeDays));
-      const records = stage ? rangedRecords.filter((record) => record.stage === stage) : rangedRecords;
-      const overview = buildDemoOverview();
-      overview.counts = rangedRecords.reduce(
-        (acc, record) => {
-          acc.total += 1;
-          acc[record.stage] = (acc[record.stage] || 0) + 1;
-          acc.commissionEarnedCents += Number(record.commissionEarnedCents || 0);
-          acc.commissionableMatterCount += Number(record.commissionableMatterCount || 0);
-          return acc;
-        },
-        { total: 0, commissionEarnedCents: 0, commissionableMatterCount: 0 }
-      );
-      overview.attention = {
-        founderReplies: rangedRecords.filter((record) => record.stage === "founder_attention").length,
-        followUpsAutoSent: rangedRecords.filter((record) => record.stage === "follow_up_sent" || record.followUpSentAt).length,
-        followUpsFailed: rangedRecords.filter((record) => record.stage === "follow_up_failed").length,
-        commissionableRecords: rangedRecords.filter((record) => Number(record.commissionableMatterCount || 0) > 0 || Number(record.commissionEarnedCents || 0) > 0).length,
-      };
-      overview.range = { days: rangeDays };
-      renderOverview(overview);
-      renderAnalytics(buildAnalyticsFromRecords(rangedRecords, rangeDays));
-      renderRecords(records, { preservePage });
-      if (!silent) setStatus("");
-    } finally {
-      portalLoadInFlight = false;
-    }
-    return;
-  }
-
   if (!silent) setStatus("");
   try {
     const rangeDays = getSelectedRangeDays();
@@ -1390,18 +737,15 @@ async function loadPortal({ silent = false, preservePage = false } = {}) {
 function scheduleAutoRefresh() {
   clearInterval(autoRefreshTimer);
   autoRefreshTimer = window.setInterval(() => {
-    if (document.hidden || (settingsOverlay && !settingsOverlay.hidden)) return;
-    loadPortal({ silent: true, preservePage: true }).catch(() => {});
+    if (document.hidden) return;
+    loadPortal({ silent: true, preservePage: true }).catch((error) => {
+      console.warn("[director] scheduled refresh rejected", error);
+    });
   }, AUTO_REFRESH_MS);
 }
 
 async function importToday() {
-  if (DEMO_MODE) {
-    setStatus("Demo mode", { transient: true });
-    return;
-  }
-
-  setStatus("Importing...");
+  setStatus("Syncing Zoho...");
   try {
     const res = await secureFetch("/api/director/import-today", {
       method: "POST",
@@ -1410,17 +754,17 @@ async function importToday() {
     });
     const payload = await readJsonOrThrow(res, "Unable to import today's outreach.");
     await checkReplies({ silent: true, reload: false });
-    saveLastImportAt();
     await loadPortal();
-    setStatus(`Imported ${payload.imported || 0}`, { tone: "success", transient: true });
+    setStatus(`Sync complete: ${payload.imported || 0} sent message${Number(payload.imported || 0) === 1 ? "" : "s"} imported.`, {
+      tone: "success",
+      transient: true,
+    });
   } catch (err) {
     setStatus(err?.message || "Import unavailable. Try again later.", { tone: "error" });
   }
 }
 
 async function checkReplies({ silent = false, reload = true } = {}) {
-  if (DEMO_MODE) return;
-
   if (!silent) setStatus("Checking replies...");
   try {
     const res = await secureFetch("/api/director/import-replies", {
@@ -1439,56 +783,8 @@ async function checkReplies({ silent = false, reload = true } = {}) {
   }
 }
 
-document.getElementById("logoutBtn")?.addEventListener("click", logoutUser);
 document.getElementById("importTodayBtn")?.addEventListener("click", importToday);
 openZohoBtn?.addEventListener("click", openZohoMail);
-settingsBtn?.addEventListener("click", openSettings);
-settingsCloseBtn?.addEventListener("click", closeSettings);
-settingsOverlay?.addEventListener("click", (event) => {
-  if (event.target === settingsOverlay) closeSettings();
-});
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && settingsOverlay && !settingsOverlay.hidden) {
-    closeSettings();
-  }
-});
-translucencyRange?.addEventListener("input", () => {
-  updateAppearance({ translucency: translucencyRange.value });
-});
-backgroundInput?.addEventListener("change", async () => {
-  const file = backgroundInput.files?.[0];
-  if (!file) return;
-  if (!file.type.startsWith("image/")) {
-    setStatus("Choose an image file for the dashboard background.");
-    backgroundInput.value = "";
-    return;
-  }
-  try {
-    setStatus("Applying dashboard background...");
-    const { dataUrl, luminance } = await resizeImageFile(file);
-    updateAppearance({ backgroundImage: dataUrl, backgroundLuminance: luminance });
-    setStatus("Background updated.");
-  } catch (err) {
-    setStatus(err?.message || "Unable to apply dashboard background.");
-  } finally {
-    backgroundInput.value = "";
-  }
-});
-resetAppearanceBtn?.addEventListener("click", () => {
-  const confirmed = window.confirm("Reset appearance settings?");
-  if (!confirmed) return;
-  try {
-    localStorage.removeItem(APPEARANCE_KEY);
-  } catch (_) {}
-  applyAppearance({ translucency: 0, backgroundImage: "", colorMode: "light" });
-  setStatus("Appearance reset.");
-});
-doneAppearanceBtn?.addEventListener("click", closeSettings);
-appearanceModeBtns.forEach((button) => {
-  button.addEventListener("click", () => {
-    updateAppearance({ colorMode: button.dataset.appearanceMode || "light" });
-  });
-});
 recordsSortButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const key = button.dataset.sortKey || "";
@@ -1534,8 +830,12 @@ document.getElementById("recordsNextBtn")?.addEventListener("click", () => {
   currentPage += 1;
   renderCurrentRecordsPage();
 });
-stageFilter?.addEventListener("change", () => loadPortal().catch(() => {}));
-rangeFilter?.addEventListener("change", () => loadPortal().catch(() => {}));
+stageFilter?.addEventListener("change", () => loadPortal().catch((error) => {
+  console.error("[director] stage filter refresh rejected", error);
+}));
+rangeFilter?.addEventListener("change", () => loadPortal().catch((error) => {
+  console.error("[director] range filter refresh rejected", error);
+}));
 recordSearchInput?.addEventListener("input", () => {
   recordSearchQuery = String(recordSearchInput.value || "").trim().toLowerCase();
   currentPage = 1;
@@ -1545,22 +845,23 @@ selectPageRowsCheckbox?.addEventListener("change", () => setPageRowsSelected(sel
 clearSelectedRowsBtn?.addEventListener("click", clearSelectedRows);
 selectedStateSelect?.addEventListener("change", () => {
   if (!selectedStateSelect.value) return;
-  applyStateToSelectedRows().catch(() => {});
+  applyStateToSelectedRows().catch((error) => {
+    console.error("[director] bulk state update rejected", error);
+  });
 });
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
-    loadPortal({ silent: true, preservePage: true }).catch(() => {});
+    loadPortal({ silent: true, preservePage: true }).catch((error) => {
+      console.warn("[director] visibility refresh rejected", error);
+    });
   }
 });
 
-applyAppearance(readAppearance());
-ensureAppearanceLuminance();
 populateSelectedStateOptions();
 syncSelectionControls();
 loadPortal()
   .then(() => {
     scheduleAutoRefresh();
-    return checkReplies({ silent: true });
   })
   .catch(() => {
     scheduleAutoRefresh();

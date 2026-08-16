@@ -43,7 +43,6 @@ function syntheticUser({ _id = objectId(), role, label, payoutReady = false }) {
     preferences: { theme: "mountain", fontSize: "md", hideProfile: false },
     notificationPrefs: { email: true, inApp: true, browser: false },
     onboarding: {
-      paralegalWelcomeDismissed: true,
       paralegalTourCompleted: true,
       paralegalProfileTourCompleted: true,
     },

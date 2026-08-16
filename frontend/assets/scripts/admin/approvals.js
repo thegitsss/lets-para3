@@ -1,4 +1,7 @@
 import { secureFetch } from "../auth.js";
+import { reportAsyncFailure } from "../utils/promise-errors.js";
+
+const reportFailure = reportAsyncFailure("admin-approvals");
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -9,12 +12,6 @@ function escapeHTML(value) {
     .replace(/'/g, "&#39;");
 }
 
-function formatDate(value) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString();
-}
 
 function titleize(value = "") {
   const text = String(value || "").replace(/_/g, " ").trim();
@@ -61,7 +58,7 @@ function friendlyItemTypeLabel(item = {}) {
   if (itemType === "faq_candidate") return "Help answer draft";
   if (itemType === "marketing_draft_packet") {
     if (workflowType === "linkedin_company_post") return "LinkedIn company post draft";
-    if (workflowType === "facebook_page_post") return "Facebook page post draft";
+    if (workflowType === "facebook_page_post") return "Legacy Facebook page draft (retired)";
     if (workflowType === "platform_update_announcement") return "Platform update draft";
     if (workflowType === "founder_linkedin_post") return "Founder LinkedIn post draft";
     return "Marketing post draft";
@@ -101,7 +98,7 @@ function friendlyApprovalSummary(item = {}) {
       return "Review this LinkedIn company post draft before it can be published.";
     }
     if (workflowType === "facebook_page_post") {
-      return "Review this Facebook page draft before it can be used.";
+      return "This historical Facebook draft is retained for audit history and cannot be approved or published.";
     }
     if (workflowType === "platform_update_announcement") {
       return "Review this platform update draft before it can be shared externally.";
@@ -217,44 +214,7 @@ function approvalQueueOutcomeHint(item = {}) {
   return copy.replace(/^Approve:\s*/i, "");
 }
 
-function friendlyContextItems(item = {}) {
-  const scopes = (item.audienceScopes || []).map(titleize).join(", ");
-  return [
-    {
-      label: "Area",
-      value: friendlyPillarLabel(item.sourcePillar || ""),
-    },
-    {
-      label: "Type",
-      value: friendlyItemTypeLabel(item),
-    },
-    {
-      label: "Status",
-      value: friendlyStatusLabel(item.currentStatus || ""),
-    },
-    {
-      label: "Review level",
-      value: friendlyReviewLevelLabel(item.riskLevel || "low"),
-    },
-    {
-      label: "Audience / scope",
-      value: scopes || "—",
-    },
-    {
-      label: "Created by",
-      value: item.createdBy || "System",
-    },
-  ];
-}
 
-function friendlyNeedsApprovalItems(items = []) {
-  return (Array.isArray(items) ? items : []).map((entry) =>
-    String(entry || "")
-      .replace(/\bSamantha\b/g, "you")
-      .replace(/\bsamantha\b/g, "you")
-      .replace(/\bfounder\b/gi, "admin")
-  );
-}
 
 function friendlyFieldLabel(value = "") {
   const text = String(value || "")
@@ -463,6 +423,18 @@ function renderCounts(overview = {}) {
   }
 }
 
+function buildVisibleCounts(items = []) {
+  const counts = { total: 0, pending: 0, knowledge: 0, marketing: 0, support: 0, sales: 0 };
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    counts.total += 1;
+    const status = String(item.currentStatus || "").trim().toLowerCase();
+    if (status === "pending" || status === "pending_review") counts.pending += 1;
+    const pillar = String(item.sourcePillar || "").trim().toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(counts, pillar)) counts[pillar] += 1;
+  });
+  return counts;
+}
+
 function badgeTone(item = {}) {
   if (item.currentStatus === "approved") return "healthy";
   if (item.currentStatus === "rejected") return "blocked";
@@ -573,16 +545,6 @@ function renderApprovalDetail(item = null) {
   root.dataset.approvalActiveWorkKey = String(item.workKey || activeWorkKey || "");
   root.dataset.approvalDetailState = "loaded";
 
-  const renderList = (title, items = []) => {
-    if (!Array.isArray(items) || !items.length) return "";
-    return `
-      <section class="ai-room-focus-block">
-        <h3>${escapeHTML(title)}</h3>
-        <ul>${items.map((entry) => `<li>${escapeHTML(typeof entry === "string" ? entry : JSON.stringify(entry))}</li>`).join("")}</ul>
-      </section>
-    `;
-  };
-
   const citations = Array.isArray(item.citations) && item.citations.length
     ? `
       <section class="ai-room-focus-block">
@@ -661,22 +623,20 @@ async function fetchApprovalDetail(workKey) {
   return payload.item;
 }
 
-async function loadApprovalsWorkspace(force = false, options = {}) {
+async function loadApprovalsWorkspace(options = {}) {
   const preserveDetailItem = options?.preserveDetailItem || null;
   const filters = currentFilters();
 
   try {
-    const [overviewRes, itemsRes] = await Promise.all([
-      secureFetch("/api/admin/approvals/overview", { headers: { Accept: "application/json" } }),
-      secureFetch(`/api/admin/approvals/items${toQuery(filters)}`, { headers: { Accept: "application/json" } }),
-    ]);
-    const overview = await readJsonOrThrow(overviewRes, "Unable to load approvals overview.");
+    const itemsRes = await secureFetch(`/api/admin/approvals/items${toQuery(filters)}`, {
+      headers: { Accept: "application/json" },
+    });
     const itemsPayload = await readJsonOrThrow(itemsRes, "Unable to load approval items.");
 
     const rawItems = Array.isArray(itemsPayload.items) ? itemsPayload.items : [];
     const visibleItems = filters.hideTests ? rawItems.filter((item) => !isApprovalTestItem(item)) : rawItems;
 
-    renderCounts(overview);
+    renderCounts({ counts: buildVisibleCounts(visibleItems) });
     renderApprovalItems(visibleItems);
 
     if (preserveDetailItem?.workKey) {
@@ -723,8 +683,17 @@ async function decideApproval(action) {
     if (!res.ok) throw new Error(payload?.error || `Unable to ${action} approval item.`);
     const decidedItem = payload.item || null;
     renderApprovalDetail(decidedItem);
-    await loadApprovalsWorkspace(true, { preserveDetailItem: decidedItem });
-  } catch (_err) {}
+    await loadApprovalsWorkspace({ preserveDetailItem: decidedItem });
+  } catch (err) {
+    reportFailure(err);
+    const root = document.getElementById("approvalItemDetail");
+    if (root) {
+      root.dataset.approvalDetailState = "error";
+      root.innerHTML = `<div class="ai-room-empty" role="alert">${escapeHTML(
+        err?.message || `Unable to ${action} this review item.`
+      )}</div>`;
+    }
+  }
 }
 
 async function openApprovalWorkspaceItem(workKey = "") {
@@ -740,7 +709,7 @@ async function openApprovalWorkspaceItem(workKey = "") {
   renderApprovalItems(approvalItemsCache);
   renderApprovalDetailLoading(normalizedWorkKey);
   window.activateAdminSection?.("approvals-workspace");
-  await loadApprovalsWorkspace(true);
+  await loadApprovalsWorkspace();
   try {
     const item = await fetchApprovalDetail(normalizedWorkKey);
     renderApprovalDetail(item);
@@ -759,10 +728,10 @@ function bindApprovalsWorkspace() {
     form.dataset.bound = "true";
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      loadApprovalsWorkspace(true).catch(() => {});
+      loadApprovalsWorkspace().catch(reportFailure);
     });
     form.addEventListener("change", () => {
-      loadApprovalsWorkspace(true).catch(() => {});
+      loadApprovalsWorkspace().catch(reportFailure);
     });
   }
   if (list && !list.dataset.bound) {
@@ -782,12 +751,12 @@ function bindApprovalsWorkspace() {
       }
     };
     list.addEventListener("click", (event) => {
-      selectItem(event.target).catch(() => {});
+      selectItem(event.target).catch(reportFailure);
     });
     list.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      selectItem(event.target).catch(() => {});
+      selectItem(event.target).catch(reportFailure);
     });
   }
   if (detail && !detail.dataset.bound) {
@@ -795,7 +764,7 @@ function bindApprovalsWorkspace() {
     detail.addEventListener("click", (event) => {
       const action = event.target.closest("[data-approval-action]")?.getAttribute("data-approval-action");
       if (!action) return;
-      decideApproval(action).catch(() => {});
+      decideApproval(action).catch(reportFailure);
     });
   }
 }
@@ -805,5 +774,5 @@ window.loadApprovalsWorkspace = loadApprovalsWorkspace;
 window.openApprovalWorkspaceItem = openApprovalWorkspaceItem;
 
 if (document.getElementById("section-approvals-workspace")?.classList.contains("visible")) {
-  loadApprovalsWorkspace().catch(() => {});
+  loadApprovalsWorkspace().catch(reportFailure);
 }

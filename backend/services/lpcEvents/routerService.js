@@ -2,15 +2,12 @@ const ApprovalTask = require("../../models/ApprovalTask");
 const FAQCandidate = require("../../models/FAQCandidate");
 const { LpcAction } = require("../../models/LpcAction");
 const { LpcEvent } = require("../../models/LpcEvent");
-const SupportConversation = require("../../models/SupportConversation");
 const SupportInsight = require("../../models/SupportInsight");
-const SupportMessage = require("../../models/SupportMessage");
 const SupportTicket = require("../../models/SupportTicket");
 const { ensurePendingRevisionFromDrift } = require("../knowledge/syncService");
 const { ensureDraftPacketForBrief } = require("../marketing/draftService");
 const { openLifecycleFollowUp, resolveLifecycleFollowUps } = require("../lifecycle/followUpService");
 const { ensureAccountSnapshotPacket } = require("../sales/snapshotService");
-const { publishConversationEvent } = require("../support/liveUpdateService");
 const { generateFAQCandidates } = require("../support/faqCandidateService");
 const { refreshSupportInsights } = require("../support/patternDetectionService");
 const { updateTicketStatus } = require("../support/ticketService");
@@ -109,17 +106,13 @@ function normalizeWorkflowActor(actor = {}, fallbackLabel = "LPC Router") {
   };
 }
 
-function buildResolvedSupportAssistantMessage() {
-  return "Great news - the issue you reported has been fixed by our engineering team. Please try again and let me know if everything is working!";
-}
-
 function formatSupportCategoryLabel(category = "") {
   const normalized = String(category || "").trim().toLowerCase();
   const labels = {
     payment: "payout",
     stripe_onboarding: "Stripe setup",
     messaging: "messaging",
-    case_posting: "case workflow",
+    case_posting: "Matter workflow",
     interaction_responsiveness_issue: "responsiveness",
     account_access: "account access",
     unknown: "support",
@@ -146,7 +139,7 @@ function deriveSupportEscalationLane(event = {}) {
       lane: "payments_review",
       title: `${requesterRoleLabel} ${category === "stripe_onboarding" ? "Stripe setup" : "payout"} escalation${refSuffix}`,
       recommendedAction:
-        "Review the payout and Stripe context first, confirm whether LPC has released funds or whether onboarding is incomplete, then reply from Support Ops.",
+        "Review the payout and Stripe context first, confirm whether LPC has released the payment or whether onboarding is incomplete, then reply from Support Ops.",
       priority: reason.includes("bank_timing") ? "urgent" : "high",
     };
   }
@@ -156,7 +149,7 @@ function deriveSupportEscalationLane(event = {}) {
       lane: "workflow_review",
       title: `${requesterRoleLabel} responsiveness issue${refSuffix}`,
       recommendedAction:
-        "Review the message thread and case context, then decide whether LPC should intervene or follow up with the other party.",
+        "Review the message thread and Matter context, then decide whether LPC should intervene or follow up with the other party.",
       priority: "high",
     };
   }
@@ -174,9 +167,9 @@ function deriveSupportEscalationLane(event = {}) {
   if (category === "case_posting") {
     return {
       lane: "case_review",
-      title: `${requesterRoleLabel} case workflow issue${refSuffix}`,
+      title: `${requesterRoleLabel} Matter workflow issue${refSuffix}`,
       recommendedAction:
-        "Review the linked case workflow and current workspace state, then reply from Support Ops with the next safe step.",
+        "Review the linked Matter workflow and current workspace state, then reply from Support Ops with the next safe step.",
       priority: "high",
     };
   }
@@ -335,7 +328,7 @@ async function routeApprovalDecided(event) {
 
 async function routeDisputeOpened(event) {
   const disputeId = String(event.facts?.after?.disputeId || event.facts?.disputeId || "").trim();
-  const caseTitle = compactText(event.facts?.after?.caseTitle || event.facts?.caseTitle || "Case", 120);
+  const caseTitle = compactText(event.facts?.after?.caseTitle || event.facts?.caseTitle || "Untitled Matter", 120);
   const result = await openFounderAlert({
     dedupeKey: `founder-alert:dispute:${event.subject.entityId}:${disputeId || "open"}`,
     title: `Open dispute: ${caseTitle}`,
@@ -443,19 +436,16 @@ async function routeSupportSubmissionCreated(event) {
   return routeSupportSubmissionEvent(event);
 }
 
-async function routeIncidentCreated(_event) {
+async function routeIncidentCreated() {
   return { status: "skipped", actionKeys: [] };
 }
 
 async function routeIncidentResolved(event) {
   const incidentId = String(event.subject?.entityId || event.related?.incidentId || "").trim();
-  const incidentPublicId = String(event.subject?.publicId || event.facts?.after?.publicId || "").trim();
   const resolutionSummary = compactText(
     event.facts?.summary || "The linked engineering issue was fixed and verified.",
     3000
   );
-  const resolvedConversationKeys = [];
-
   if (incidentId) {
     const linkedOpenTickets = await SupportTicket.find({
       linkedIncidentIds: incidentId,
@@ -473,56 +463,6 @@ async function routeIncidentResolved(event) {
       });
     }
 
-    const seenConversationIds = new Set();
-    for (const ticket of linkedOpenTickets) {
-      const conversationId = String(ticket.conversationId || "").trim();
-      if (!conversationId || seenConversationIds.has(conversationId)) continue;
-      seenConversationIds.add(conversationId);
-
-      const incidentResolutionDedupeKey = `incident-resolution-follow-up:${incidentId}:${conversationId}`;
-      const existingMessage = await SupportMessage.findOne({
-        conversationId,
-        "metadata.kind": "incident_resolution_follow_up",
-        "metadata.incidentResolutionDedupeKey": incidentResolutionDedupeKey,
-      })
-        .select("_id")
-        .lean();
-      if (existingMessage?._id) continue;
-
-      const conversation = await SupportConversation.findById(conversationId);
-      if (!conversation) continue;
-
-      const message = await SupportMessage.create({
-        conversationId: conversation._id,
-        sender: "assistant",
-        text: buildResolvedSupportAssistantMessage(),
-        sourcePage: ticket.routePath || conversation.sourcePage || "",
-        pageContext:
-          ticket.pageContext && Object.keys(ticket.pageContext).length
-            ? ticket.pageContext
-            : conversation.pageContext || {},
-        metadata: {
-          kind: "incident_resolution_follow_up",
-          source: "lpc_event_router",
-          incidentId,
-          incidentPublicId,
-          incidentResolutionDedupeKey,
-          resolutionSummary,
-        },
-      });
-
-      conversation.lastMessageAt = message.createdAt || new Date();
-      await conversation.save();
-
-      publishConversationEvent(conversation._id, {
-        type: "conversation.updated",
-        reason: "incident.resolved_support_message",
-        incidentId,
-        incidentPublicId,
-        supportMessageId: String(message._id || ""),
-      });
-      resolvedConversationKeys.push(String(conversation._id));
-    }
   }
 
   const candidates = await generateFAQCandidates();
@@ -530,7 +470,6 @@ async function routeIncidentResolved(event) {
     status: incidentId || candidates.length ? "routed" : "skipped",
     actionKeys: [
       ...(incidentId ? [incidentId] : []),
-      ...resolvedConversationKeys,
       ...candidates.map((candidate) => String(candidate._id)),
     ],
   };

@@ -1,8 +1,9 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:public");
 // backend/routes/public.js
 const express = require("express");
 const router = express.Router();
 const rateLimit = require("express-rate-limit");
-const axios = require("axios");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 
@@ -14,23 +15,13 @@ const {
   BLOCKED_MESSAGE,
   findActiveBlockBetween,
   getBlockedUserIds,
-  isBlockedBetween,
 } = require("../utils/blocks");
 const { applyPublicParalegalFilter } = require("../utils/paralegalProfile");
+const { buildPublicProfilePhotoUrl } = require("../services/profilePhotoDelivery");
 const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
 const { looksLikeSupportSubmission } = require("../services/lpcEvents/supportRoutingService");
+const { csrfProtection } = require("../utils/csrf");
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-
-// ----------------------------------------
-// CSRF (enabled in production or when ENABLE_CSRF=true)
-// ----------------------------------------
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
-}
 
 // ----------------------------------------
 // Rate limits
@@ -45,17 +36,6 @@ router.use(
     standardHeaders: true,
     legacyHeaders: false,
     message: { msg: "Too many requests. Please try again later." },
-  })
-);
-
-router.use(
-  "/weather",
-  rateLimit({
-    windowMs: 60 * 1000,
-    max: 30,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: "Too many weather requests. Please slow down." },
   })
 );
 
@@ -180,7 +160,7 @@ const US_STATE_CODE_TO_NAME = Object.fromEntries(
 );
 
 const PUBLIC_PAR_FIELDS =
-  "_id firstName lastName avatarURL profileImage location state stateExperience specialties practiceAreas bestFor yearsExperience linkedInURL education bio about availability approvedAt createdAt";
+  "_id firstName lastName avatarURL profileImage location state stateExperience specialties practiceAreas bestFor yearsExperience linkedInURL education bio about availability approvedAt createdAt updatedAt";
 
 function getStateSearchTerms(value = "") {
   const raw = String(value || "").trim();
@@ -232,14 +212,16 @@ function buildAvailableParalegalFilter() {
 function serializeParalegal(userDoc) {
   if (!userDoc) return null;
   const src = userDoc.toObject ? userDoc.toObject() : userDoc;
+  const photoUrl = buildPublicProfilePhotoUrl(src);
   return {
     _id: String(src._id),
     id: String(src._id),
     firstName: src.firstName || "",
     lastName: src.lastName || "",
     name: `${src.firstName || ""} ${src.lastName || ""}`.trim(),
-    avatarURL: src.avatarURL || "",
-    profileImage: src.profileImage || "",
+    avatarURL: photoUrl,
+    profileImage: photoUrl,
+    photoUrl,
     location: src.location || src.state || "",
     specialties: Array.isArray(src.specialties) ? src.specialties : [],
     practiceAreas: Array.isArray(src.practiceAreas) ? src.practiceAreas : [],
@@ -322,14 +304,14 @@ router.post(
         "help@lets-paraconnect.com";
       if (!to) {
         // Don't fail user submissions if email isn't configured—just acknowledge.
-        console.warn("[contact] No CONTACT_INBOX/SMTP configured; skipping email send.");
+        runtimeLogger.warn("[contact] No CONTACT_INBOX/SMTP configured; skipping email send.");
       } else {
         // sendEmail(to, subject, html, { text, replyTo })
         try {
           await sendEmail(to, safeSubject, html, { text, replyTo: email });
         } catch (e) {
           // non-fatal for UX; we still proceed
-          console.error("[contact] sendEmail failed:", e?.message || e);
+          runtimeLogger.error("[contact] sendEmail failed:", e?.message || e);
         }
       }
 
@@ -345,7 +327,9 @@ router.post(
           },
         });
       } catch (e) {
-        // swallow
+        runtimeLogger.warn("[contact] audit logging failed", {
+          error: e?.message || String(e),
+        });
       }
 
       await publishEventSafe({
@@ -424,57 +408,10 @@ router.post(
 
       return res.json({ ok: true });
     } catch (e) {
-      console.error("contact error", e);
+      runtimeLogger.error("contact error", e);
       return res.status(500).json({ msg: "Server error" });
     }
   }
-);
-
-router.get(
-  "/weather",
-  asyncHandler(async (req, res) => {
-    const apiKey = process.env.WEATHER_API_KEY || process.env.OPENWEATHER_API_KEY || "";
-    const fallbackWeather = () =>
-      res.json({
-        temperature: 72,
-        condition: "Fair",
-        source: "fallback",
-      });
-    if (!apiKey) {
-      return fallbackWeather();
-    }
-
-    const fallbackLat = parseFloat(process.env.WEATHER_LAT || "");
-    const fallbackLon = parseFloat(process.env.WEATHER_LON || "");
-    const fallbackLocation = process.env.WEATHER_LOCATION || "Tysons,VA";
-    const lat = Number.isFinite(parseFloat(req.query.lat)) ? parseFloat(req.query.lat) : (Number.isFinite(fallbackLat) ? fallbackLat : null);
-    const lon = Number.isFinite(parseFloat(req.query.lon)) ? parseFloat(req.query.lon) : (Number.isFinite(fallbackLon) ? fallbackLon : null);
-    const queryLocation = typeof req.query.q === "string" && req.query.q.trim() ? req.query.q.trim() : fallbackLocation;
-
-    const params = new URLSearchParams({ appid: apiKey, units: "imperial" });
-    if (lat !== null && lon !== null) {
-      params.set("lat", String(lat));
-      params.set("lon", String(lon));
-    } else {
-      params.set("q", queryLocation);
-    }
-
-    try {
-      const { data } = await axios.get("https://api.openweathermap.org/data/2.5/weather", {
-        params,
-        timeout: 5000,
-      });
-      const temperature = typeof data?.main?.temp === "number" ? Math.round(data.main.temp) : null;
-      const condition = data?.weather?.[0]?.description || data?.weather?.[0]?.main || "Unknown";
-      if (temperature === null) {
-        return res.status(502).json({ error: "Incomplete weather response" });
-      }
-      res.json({ temperature, condition });
-    } catch (err) {
-      console.error("[public.weather] fetch failed", err?.message || err);
-      return fallbackWeather();
-    }
-  })
 );
 
 // ----------------------------------------
@@ -504,7 +441,12 @@ router.get(
     const minYears = parseInt(req.query.minYears, 10);
     const sortKey = typeof req.query.sort === "string" ? req.query.sort.trim().toLowerCase() : "recent";
 
-    const filter = { role: "paralegal", status: "approved" };
+    const filter = {
+      role: "paralegal",
+      status: "approved",
+      disabled: { $ne: true },
+      deleted: { $ne: true },
+    };
     filter["preferences.hideProfile"] = { $ne: true };
     filter.$and = [...buildAvailableParalegalFilter()];
     applyPublicParalegalFilter(filter);
@@ -592,6 +534,8 @@ router.get(
       _id: id,
       role: "paralegal",
       status: "approved",
+      disabled: { $ne: true },
+      deleted: { $ne: true },
       "preferences.hideProfile": { $ne: true },
     };
     applyPublicParalegalFilter(filter);

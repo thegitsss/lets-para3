@@ -18,7 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/hero-pages.css" rel="stylesheet" />
+  <link href="assets/styles/hero-pages.css?v=20260729-white-footer" rel="stylesheet" />
 
   <style>
     .gold{color:var(--gold);}
@@ -193,39 +193,55 @@
   </style>
 </head>
 
-<body>
+<body class="utility-page utility-page--inset">
   <a class="skip-link" href="#main">Skip to main content</a>
-<header>
-    <div class="header-inner">
-      <nav class="nav-left" aria-label="Primary">
-        <a href="contact.html">Contact Us</a>
-        <a href="index.html#who-we-are">About</a>
+  <header class="utility-header" data-utility-header>
+    <div class="utility-header__inner">
+      <nav class="utility-header__nav" aria-label="Primary navigation">
         <a href="index.html#how">How It Works</a>
+        <a href="index.html#for-attorneys">For Attorneys</a>
+        <a href="index.html#for-paralegals">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
       </nav>
-
-      <a href="index.html" class="header-logo">
-        Let<span class="accent-apostrophe">’</span>s-ParaConnect
-      </a>
-
-      <div class="header-actions">
-<a class="pill" href="login.html" id="authAction">Sign In</a>
-        <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
+      <a class="utility-header__brand" href="index.html">Let<span class="utility-header__brand-mark">’</span>s-ParaConnect</a>
+      <div class="utility-header__actions">
+        <a class="utility-header__signin" href="login.html" data-utility-auth>Sign In</a>
+        <button class="utility-header__logout" type="button" data-utility-logout hidden>Log Out</button>
+        <a class="utility-header__button" href="signup.html" data-utility-signup>Get Started</a>
       </div>
+      <button class="utility-header__menu" type="button" aria-expanded="false" aria-controls="utilityMenu" data-utility-menu-toggle>Menu</button>
     </div>
+    <nav class="utility-header__mobile" id="utilityMenu" aria-label="Mobile navigation" data-utility-menu hidden>
+      <a href="index.html#how">How It Works</a>
+      <a href="index.html#for-attorneys">For Attorneys</a>
+      <a href="index.html#for-paralegals">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      <a href="login.html" data-utility-auth>Sign In</a>
+      <button type="button" data-utility-logout hidden>Log Out</button>
+      <a href="signup.html" data-utility-signup>Get Started</a>
+    </nav>
   </header>
 
-  <div class="hero-banner" role="presentation" aria-hidden="true"></div>
+  <section class="hero-banner utility-hero" aria-labelledby="terms-title">
+    <div class="utility-hero__inner">
+      <div class="utility-hero__copy">
+        <p class="utility-hero__eyebrow">Platform terms</p>
+        <h1 id="terms-title">Terms of Service</h1>
+        <p class="utility-hero__description">The terms governing access to and use of Let’s-ParaConnect.</p>
+        <p class="utility-hero__meta">Effective August 15, 2026 · Version 2026-08-15</p>
+      </div>
+      <div class="utility-hero__art" data-matter-field-host aria-hidden="true"></div>
+    </div>
+  </section>
 
   <main tabindex="-1" aria-labelledby="terms-title" id="main">
-    <h1 id="terms-title">Terms & Conditions</h1>
-    <p class="muted">Effective date: <strong>March 3, 2026</strong></p>
 
     <p>This Terms of Service (the “Agreement”) governs your access to and use of the Let’s-ParaConnect platform, including the website (www.lets-paraconnect.com), all related subpages, subdomains, applications, and all content, services, and features available through the platform (collectively, the “Platform” and the services offered through it, the “Services”). By registering for an account, signing into your account, accessing the Platform, or using the Platform in any manner, you agree to be contractually bound by the terms of this Agreement. If you do not agree to these Terms, you may not access or use the Platform.</p>
 
     <h2>Table of Contents</h2>
     <ul class="toc-list">
       <li><a href="#section-1">1. Let’s-ParaConnect Platform Overview</a></li>
-      <li><a href="#section-2">2. Flat-Fee Cases</a></li>
+      <li><a href="#section-2">2. Flat-Fee Matters</a></li>
       <li><a href="#section-3">3. Paralegal Replacement and Early Termination</a></li>
       <li><a href="#section-4">4. Communication Between Attorneys and Paralegals</a></li>
       <li><a href="#section-5">5. Account Registration</a></li>
@@ -234,47 +250,56 @@
       <li><a href="#section-8">8. Working Together Outside the Platform</a></li>
       <li><a href="#section-9">9. Paralegals Are Independent Contractors</a></li>
       <li><a href="#section-10">10. Tax Reporting and IRS Forms</a></li>
-      <li><a href="#section-11">11. Case Review and Dispute Resolution</a></li>
-      <li><a href="#section-12">12. Probation and Account Termination</a></li>
+      <li><a href="#section-11">11. Matter Review and Dispute Resolution</a></li>
+      <li><a href="#section-12">12. Account Restrictions and Termination</a></li>
       <li><a href="#section-13">13. Using the Platform</a></li>
       <li><a href="#section-14">14. Content and Use of Platform Content</a></li>
       <li><a href="#section-15">15. Notices Regarding Let’s-ParaConnect</a></li>
+      <li><a href="#section-16">16. Electronic Communications</a></li>
+      <li><a href="#section-17">17. Indemnification</a></li>
+      <li><a href="#section-18">18. Disclaimers and Limitations of Liability</a></li>
+      <li><a href="#section-19">19. Choice of Law and Venue</a></li>
+      <li><a href="#section-20">20. Waiver of Jury Trial and Class Action</a></li>
+      <li><a href="#section-21">21. Termination</a></li>
+      <li><a href="#section-22">22. General Terms</a></li>
+      <li><a href="#section-23">23. Changes to This Agreement</a></li>
+      <li><a href="#section-24">24. Definitions</a></li>
     </ul>
 
     <section id="section-1" class="card">
       <h2>1. Let’s-ParaConnect Platform Overview</h2>
-      <p>Let’s-ParaConnect is a technology platform designed to allow attorneys to engage independent paralegals for project-based support work. The Platform enables attorneys to post cases and allows approved paralegals to apply for and perform discrete support assignments as independent contractors. Let’s-ParaConnect provides the software infrastructure that facilitates communication, workflow coordination, and payments through the Platform. Attorneys and paralegals decide independently whether to work together through the Platform. Let’s-ParaConnect does not provide legal services, legal representation, or legal advice, is not a law firm, is not a staffing agency, and does not assign engagements. The Platform does not facilitate attorney-client relationships, and no attorney-client communications or client funds are permitted on the Platform.</p>
+      <p>Let’s-ParaConnect is a technology platform designed to allow attorneys to engage independent paralegals for project-based support work. The Platform enables attorneys to post matters and allows approved paralegals to apply for and perform discrete support assignments as independent contractors. Let’s-ParaConnect provides the software infrastructure that facilitates communication, workflow coordination, and payments through the Platform. Attorneys and paralegals decide independently whether to work together through the Platform. Let’s-ParaConnect does not provide legal services, legal representation, or legal advice, is not a law firm, is not a staffing agency, and does not assign engagements. Use of the Platform does not create an attorney-client relationship between Let’s-ParaConnect and any user. The Platform is not a channel for Attorneys to communicate with their own clients and must not be used to receive, transmit, or hold client trust funds.</p>
     </section>
 
     <section id="section-2" class="card">
-      <h2>2. Flat-Fee Cases</h2>
+      <h2>2. Flat-Fee Matters</h2>
 
-      <h3>2.1 Overview of How Flat-Fee Cases Work</h3>
-      <p>An attorney may post a discrete assignment (a “Case”) to the Platform. Each Case posting includes, among other information:</p>
+      <h3>2.1 Overview of How Flat-Fee Matters Work</h3>
+      <p>An attorney may post a discrete assignment (a “Matter”) to the Platform. Each Matter posting includes, among other information:</p>
       <ul>
         <li>a description of the requested work</li>
         <li>relevant deadlines</li>
         <li>required tasks</li>
-        <li>the flat-fee amount offered for completion of the Case</li>
+        <li>the flat-fee amount offered for completion of the Matter</li>
       </ul>
-      <p>The minimum case compensation on the Platform is $400.</p>
-      <p>Approved paralegals may apply to the Case. When a paralegal applies, their profile is presented to the posting attorney for review. The attorney may review applicants and select a paralegal to perform the work. At that point, the attorney and paralegal are provided access to collaboration tools within the Platform, which may include:</p>
+      <p>The minimum matter compensation on the Platform is $400.</p>
+      <p>Approved paralegals may apply to the Matter. When a paralegal applies, their profile is presented to the posting attorney for review. The attorney may review applicants and select a paralegal to perform the work. At that point, the attorney and paralegal are provided access to collaboration tools within the Platform, which may include:</p>
       <ul>
         <li>secure messaging</li>
         <li>document sharing</li>
-        <li>case-related workflow features</li>
+        <li>matter-related workflow features</li>
       </ul>
 
-      <h3>2.2 Attorney Payment for Flat-Fee Cases</h3>
-      <p>When an Attorney selects a Paralegal for a flat-fee Case, the Attorney authorizes payment for the Case through the Platform. Attorneys must provide valid payment information prior to hiring a Paralegal for a Case. Payment information is managed through the payment settings section of the Attorney’s account dashboard. By posting and hiring for a flat-fee Case through the Platform, the Attorney authorizes payment processing through Stripe Connect or another applicable third-party payment processor supported by the Platform. Payments are processed in accordance with the Platform’s payment workflow and the terms of the applicable payment processor.</p>
+      <h3>2.2 Attorney Payment for Flat-Fee Matters</h3>
+      <p>When an Attorney selects a Paralegal for a flat-fee Matter, the Attorney authorizes payment for the Matter through the Platform. Attorneys must provide valid payment information prior to hiring a Paralegal for a Matter. Payment information is managed through the payment settings section of the Attorney’s account dashboard. By posting and hiring for a flat-fee Matter through the Platform, the Attorney authorizes payment processing through Stripe Connect or another applicable third-party payment processor supported by the Platform. Payments are processed in accordance with the Platform’s payment workflow and the terms of the applicable payment processor.</p>
 
-      <h3>2.3 Paralegal Payment for Flat-Fee Cases</h3>
-      <p>Upon timely completion of a Case, the paralegal will be paid the Case amount presented at the time the paralegal applied for or accepted the Case. Payments are issued to the paralegal’s designated Stripe Connect payout account as provided during the payment onboarding process within the paralegal’s account dashboard. Payments are processed through the Platform’s payment processor and are released only upon: (i) the hiring attorney’s confirmation of completion within the Case dashboard; or (ii) resolution of a dispute or review process administered through the Platform in accordance with the Platform’s payment and workflow policies. Depending on the financial institution used by the paralegal, funds may take several business days to appear in the paralegal’s bank account after the payout is initiated. Let’s-ParaConnect does not take custody of user funds and does not provide banking services. All payment authorization, settlement, and payout timing are governed by the systems and policies of the applicable payment processor.</p>
+      <h3>2.3 Paralegal Payment for Flat-Fee Matters</h3>
+      <p>Upon timely completion of a Matter, the Matter amount presented when the Paralegal applied for or accepted the Matter is the gross compensation basis. The Paralegal platform fee disclosed before application or acceptance is deducted from that gross amount before payout, together with any adjustment authorized through the withdrawal, review, or dispute workflow. The resulting net payout is released to the Paralegal’s designated Stripe Connect account. Payments are processed through the Platform’s payment processor and are released only upon: (i) the hiring Attorney’s confirmation of completion within the Matter dashboard; or (ii) resolution of a dispute or review process administered through the Platform in accordance with the Platform’s payment and workflow policies. Bank-arrival timing varies based on the connected account’s Stripe payout schedule and financial institution; Stripe provides the current payout status and estimated arrival. Let’s-ParaConnect does not take custody of user funds and does not provide banking services. All payment authorization, settlement, and payout timing are governed by the systems and policies of the applicable payment processor.</p>
 
-      <h3>2.4 Rules Governing the Use of Paralegals for Case Work</h3>
-      <p>For each Case posted on the Platform, the Attorney agrees to comply with the following rules governing the use of Paralegals:</p>
+      <h3>2.4 Rules Governing the Use of Paralegals for Matter Work</h3>
+      <p>For each Matter posted on the Platform, the Attorney agrees to comply with the following rules governing the use of Paralegals:</p>
       <ul>
-        <li>The Attorney retains sole professional responsibility for all support work and work product associated with the Case.</li>
+        <li>The Attorney retains sole professional responsibility for all support work and work product associated with the Matter.</li>
         <li>The Attorney will supervise the Paralegal’s work to ensure compliance with all applicable laws and Rules of Professional Conduct.</li>
         <li>Unless permitted by applicable professional conduct rules, Paralegals shall not communicate directly with the Attorney’s clients, opposing counsel, witnesses, or other individuals involved in the legal matter.</li>
         <li>Paralegals shall not appear in court or before any judicial or administrative body on behalf of the Attorney’s client.</li>
@@ -284,35 +309,34 @@
         <li>All payments between Attorneys and Paralegals for work performed through the Platform must be processed through the Let’s-ParaConnect Platform in accordance with these Terms.</li>
       </ul>
 
-      <h3>2.5 Let’s-ParaConnect Platform Fee for Flat-Fee Cases</h3>
-      <p>Let’s-ParaConnect does not provide legal services and does not charge fees for legal services. In exchange for providing the Platform and related software tools, Let’s-ParaConnect charges a platform fee in connection with completed Cases. The platform fee is applied to the Case amount in accordance with the fee structure disclosed to users during the Case posting and acceptance process. Platform fees are collected and processed through the Platform’s payment processor as part of the Case payment workflow. Let’s-ParaConnect reserves the right to modify platform fees prospectively. Any changes will apply only to Cases posted after such changes become effective.</p>
+      <h3>2.5 Let’s-ParaConnect Platform Fee for Flat-Fee Matters</h3>
+      <p>Let’s-ParaConnect does not provide legal services and does not charge fees for legal services. In exchange for providing the Platform and related software tools, Let’s-ParaConnect charges separate platform fees to each side of a paid Matter: the Attorney platform fee is added when the Attorney confirms the initial hire, and the Paralegal platform fee is deducted from completed, paid work before payout. The applicable percentages and total amounts are disclosed to each user before the relevant payment or acceptance action. Platform fees are collected and processed through the Platform’s payment processor as part of the Matter payment workflow. Let’s-ParaConnect reserves the right to modify platform fees prospectively. Any changes will apply only to Matters posted after such changes become effective.</p>
     </section>
 
     <section id="section-3" class="card">
       <h2>3. Paralegal Replacement and Early Termination</h2>
-      <h3>3.1 Dispute Review for Flat-Fee Cases</h3>
-      <p>Any dispute relating to a flat-fee Case must be initiated through the Platform prior to payment release. Let’s-ParaConnect may administer the Platform’s review workflow by collecting information submitted by the Attorney and Paralegal, requesting additional documentation relevant to the Case, and applying the Platform’s payment and workflow policies. Let’s-ParaConnect does not provide legal advice, does not adjudicate legal claims, and does not act as legal counsel for any user.</p>
+      <h3>3.1 Dispute Review for Flat-Fee Matters</h3>
+      <p>Any dispute relating to a flat-fee Matter must be initiated through the Platform prior to payment release. Let’s-ParaConnect may administer the Platform’s review workflow by collecting information submitted by the Attorney and Paralegal, requesting additional documentation relevant to the Matter, and applying the Platform’s payment and workflow policies. Let’s-ParaConnect does not provide legal advice, does not adjudicate legal claims, and does not act as legal counsel for any user.</p>
 
       <h3>3.2 Missed Deadlines</h3>
-      <p>Paralegals are expected to meet all deadlines agreed upon within a Case unless an extension has been requested and approved by the hiring Attorney through the Platform.</p>
+      <p>Paralegals are expected to meet all deadlines agreed upon within a Matter unless an extension has been requested and approved by the hiring Attorney through the Platform.</p>
       <p>A “missed deadline” occurs when a Paralegal fails to submit the required deliverable by the agreed deadline and has not received approval from the Attorney for an extension.</p>
-      <p>If a Paralegal misses a deadline and no work product has been delivered, the hiring Attorney may request review through the Platform and may be eligible for a full refund of the Case amount.</p>
-      <p>Repeated missed deadlines may result in disciplinary action by Let’s-ParaConnect, including warnings, temporary restrictions, probation, suspension, or termination of the Paralegal’s account.</p>
-      <p>As a general guideline, a pattern of three (3) missed deadlines may result in suspension or termination of the Paralegal’s access to the Platform at Let’s-ParaConnect’s sole discretion.</p>
-      <p>Because deadlines are a material part of Case work performed through the Platform, unless a Paralegal can establish that the Paralegal was unable to complete a Case by the agreed deadline due to the Attorney’s inaction, failure to provide necessary information, or other circumstances outside the Paralegal’s control, a dispute based on a missed deadline may be resolved in favor of the Attorney and payment for the Case may be refunded in full through the Platform’s payment processor.</p>
+      <p>If a Paralegal misses a deadline and no work product has been delivered, the hiring Attorney may request review through the Platform and may be eligible for a full refund of the Matter amount.</p>
+      <p>Repeated missed deadlines may result in a manual account review and, where permitted by these Terms and applicable law, a warning, temporary restriction, suspension, or termination of the Paralegal’s account. Let’s-ParaConnect considers the available context rather than applying an automated missed-deadline threshold.</p>
+      <p>Because deadlines are a material part of Matter work performed through the Platform, unless a Paralegal can establish that the Paralegal was unable to complete a Matter by the agreed deadline due to the Attorney’s inaction, failure to provide necessary information, or other circumstances outside the Paralegal’s control, a dispute based on a missed deadline may be resolved in favor of the Attorney and payment for the Matter may be refunded in full through the Platform’s payment processor.</p>
     </section>
 
     <section id="section-4" class="card">
       <h2>4. Communication Between Attorneys and Paralegals</h2>
-      <p>Effective communication is essential to successful collaboration on the Platform. By posting a Case, applying to a Case, or accepting a Case, Attorneys and Paralegals agree to communicate professionally and proactively regarding all aspects of the work. Such communication may occur through the Platform’s messaging features or other mutually agreed-upon communication methods and should include, where appropriate:</p>
+      <p>Effective communication is essential to successful collaboration on the Platform. By posting a Matter, applying to a Matter, or accepting a Matter, Attorneys and Paralegals agree to communicate professionally and proactively regarding all aspects of the work. Such communication may occur through the Platform’s messaging features or other mutually agreed-upon communication methods and should include, where appropriate:</p>
       <ul>
         <li>Establishing clear and reasonable deadlines and confirming the ability to meet those deadlines;</li>
-        <li>Clarifying the scope of the Case and the tasks required to complete the work;</li>
+        <li>Clarifying the scope of the Matter and the tasks required to complete the work;</li>
         <li>Discussing expectations regarding deliverables and work product;</li>
         <li>Coordinating preferred communication methods and response times; and</li>
-        <li>Sharing any information, documents, or materials necessary to complete the Case in a timely and professional manner.</li>
+        <li>Sharing any information, documents, or materials necessary to complete the Matter in a timely and professional manner.</li>
       </ul>
-      <p>Both Attorneys and Paralegals are responsible for maintaining professional communication and promptly responding to reasonable requests for information necessary to complete the Case. Let’s-ParaConnect provides communication tools within the Platform to facilitate collaboration but does not supervise or control communications between users. If users choose to communicate outside the Platform, they do so at their own discretion, and the Attorney remains responsible for supervision, recordkeeping, and compliance with all applicable professional obligations.</p>
+      <p>Both Attorneys and Paralegals are responsible for maintaining professional communication and promptly responding to reasonable requests for information necessary to complete the Matter. Let’s-ParaConnect provides communication tools within the Platform to facilitate collaboration but does not supervise or control communications between users. If users choose to communicate outside the Platform, they do so at their own discretion, and the Attorney remains responsible for supervision, recordkeeping, and compliance with all applicable professional obligations.</p>
     </section>
 
     <section id="section-5" class="card">
@@ -331,39 +355,33 @@
         <li>overall alignment with the Platform’s professional standards</li>
       </ul>
       <p>Let’s-ParaConnect reserves the right to approve or deny Paralegal applications at its sole discretion. Users agree that their use of the Platform is for professional and business purposes only. Users whose access to the Platform has been previously suspended or revoked may not create a new account without express permission from Let’s-ParaConnect.</p>
-      <p>Self-serve account deactivation removes a user from active platform participation but does not guarantee full erasure. Historical case, dispute, payment, audit, and related financial records may be preserved for legal, operational, and integrity purposes. Accounts cannot be deactivated while the user is involved in an active matter or while escrow, payout, dispute, or other financial obligations remain unresolved.</p>
+      <p>Self-serve account deactivation removes a user from active platform participation but does not guarantee full erasure. Historical Matter, dispute, payment, audit, and related financial records may be preserved for legal, operational, and integrity purposes. Accounts cannot be deactivated while the user is involved in an active Matter or while funding, payout, dispute, or other financial obligations remain unresolved.</p>
     </section>
 
     <section id="section-6" class="card">
       <h2>6. User Profiles</h2>
-      <p>To use the Platform, users must complete a user profile (“Profile”). Profiles may be visible to other users of the Platform and, depending on the user’s settings and Platform features, may be visible to prospective Attorneys or Paralegals. Paralegals may be required to complete their full Profile before applying to Cases or being invited to work on the Platform. Users agree to provide accurate, current, and complete information in their Profiles and to update such information as necessary to maintain its accuracy. Users may not provide false, misleading, or incomplete information regarding their identity, qualifications, skills, or experience. Let’s-ParaConnect reserves the right to suspend or terminate any account or Profile that contains false, misleading, or incomplete information or that otherwise violates these Terms.</p>
+      <p>To use the Platform, users must complete a user profile (“Profile”). Profiles may be visible to other users of the Platform and, depending on the user’s settings and Platform features, may be visible to prospective Attorneys or Paralegals. Paralegals may be required to complete their full Profile before applying to Matters or being invited to work on the Platform. Users agree to provide accurate, current, and complete information in their Profiles and to update such information as necessary to maintain its accuracy. Users may not provide false, misleading, or incomplete information regarding their identity, qualifications, skills, or experience. Let’s-ParaConnect reserves the right to suspend or terminate any account or Profile that contains false, misleading, or incomplete information or that otherwise violates these Terms.</p>
 
-      <h3>6.1 Identification and Verification</h3>
-      <p>When you register for an account and periodically thereafter, your account may be subject to identity and credential verification. Verification may include, but is not limited to:</p>
-      <ul>
-        <li>validation of information provided in your account against third-party databases;</li>
-        <li>verification of government-issued identification;</li>
-        <li>verification of professional credentials or employment history; and</li>
-        <li>confirmation of bar membership or professional standing where applicable.</li>
-      </ul>
-      <p>By registering for an account, you authorize Let’s-ParaConnect, directly or through third-party service providers, to conduct reasonable inquiries necessary to verify your identity, location, professional background, and contact information, subject to applicable law. When requested, users must provide accurate and complete information and may be required to submit official government or professional documentation in order to confirm their identity or professional qualifications. During the verification process, certain features of the Platform may be temporarily limited. Access will be restored once verification has been successfully completed. Failure to cooperate with reasonable verification requests may result in suspension or termination of the account.</p>
+      <h3>6.1 Application Review and Information Accuracy</h3>
+      <p>When you register for an account, Let’s-ParaConnect may review the information and materials you submit for completeness, consistency, and alignment with the Platform’s admission requirements. Let’s-ParaConnect may request clarification or additional application information before making an approval decision.</p>
+      <p>The standard admission review is not an independent authentication of a user’s identity, bar status, employment history, certifications, qualifications, or professional standing, and Let’s-ParaConnect does not conduct a background check as part of that review. Users remain responsible for the truth and accuracy of their submissions, and other users remain responsible for independently evaluating whether a person is suitable for a proposed engagement. Let’s-ParaConnect may restrict or terminate an account that contains materially false, misleading, or incomplete information or when access must be limited for security, legal, or Platform-integrity reasons.</p>
     </section>
 
     <section id="section-7" class="card">
       <h2>7. Let’s-ParaConnect Profiles</h2>
-      <p>Let’s-ParaConnect may provide profile browsing tools through which Attorneys may review approved Paralegal profiles and invite Paralegals to apply to Cases posted on the Platform. These tools may allow Attorneys to filter profiles based on criteria such as:</p>
+      <p>Let’s-ParaConnect may provide profile browsing tools through which Attorneys may review approved Paralegal profiles and invite Paralegals to apply to Matters posted on the Platform. These tools may allow Attorneys to filter profiles based on criteria such as:</p>
       <ul>
         <li>jurisdictional experience</li>
         <li>practice areas</li>
         <li>years of experience</li>
         <li>professional background</li>
       </ul>
-      <p>These profile tools are not intended to represent a complete list of all Paralegals registered on the Platform. Only Paralegals who have opted into profile visibility features will appear there. Paralegals may choose whether to: (i) appear in profile browsing tools for Attorney search and invitation; or (ii) remain visible only through Case applications. Let’s-ParaConnect may also highlight certain Paralegal profiles within internal platform communications to Attorneys based on platform activity, qualifications, or other factors intended to facilitate use of the Platform. Inclusion in these profile tools does not guarantee invitations, Case assignments, or work opportunities.</p>
+      <p>These profile tools are not intended to represent a complete list of all Paralegals registered on the Platform. Only Paralegals who have opted into profile visibility features will appear there. Paralegals may choose whether to: (i) appear in profile browsing tools for Attorney search and invitation; or (ii) remain visible only through Matter applications. Inclusion in profile browsing does not guarantee invitations, Matter assignments, or work opportunities.</p>
     </section>
 
     <section id="section-8" class="card">
       <h2>8. Working Together Outside the Platform</h2>
-      <p>Attorneys and Paralegals acknowledge that Let’s-ParaConnect invests significant resources to develop and maintain the Platform and to connect Attorneys with qualified Paralegals. Accordingly, Attorneys and Paralegals agree that introductions and professional relationships formed through the Platform are intended to result in work performed through the Platform. Users may not circumvent the Platform by arranging to work together outside of Let’s-ParaConnect after connecting through the Platform without the prior written consent of Let’s-ParaConnect. If an Attorney and Paralegal wish to engage directly outside of the Platform after meeting through Let’s-ParaConnect, they may request written approval from Let’s-ParaConnect. Let’s-ParaConnect reserves the right to approve such requests and may require the payment of a buyout fee or other reasonable compensation in connection with such approval. Let’s-ParaConnect reserves the right to suspend or terminate accounts that attempt to circumvent the Platform’s payment system or terms of service.</p>
+      <p>Attorneys and Paralegals acknowledge that Let’s-ParaConnect invests significant resources to develop and maintain the Platform and to connect Attorneys with Paralegals. Accordingly, Attorneys and Paralegals agree that introductions and professional relationships formed through the Platform are intended to result in work performed through the Platform. Users may not circumvent the Platform by arranging to work together outside of Let’s-ParaConnect after connecting through the Platform without the prior written consent of Let’s-ParaConnect. If an Attorney and Paralegal wish to engage directly outside of the Platform after meeting through Let’s-ParaConnect, they may request written approval from Let’s-ParaConnect. Any conversion or buyout fee would have to be disclosed in advance and separately agreed to in a signed writing before the direct engagement; no such fee is charged automatically through the Platform. Let’s-ParaConnect reserves the right to suspend or terminate accounts that attempt to circumvent the Platform’s payment system or terms of service.</p>
     </section>
 
     <section id="section-9" class="card">
@@ -377,13 +395,13 @@
     </section>
 
     <section id="section-11" class="card">
-      <h2>11. Case Review and Dispute Resolution</h2>
-      <p>From time to time, disagreements may arise between Attorneys and Paralegals regarding work performed through the Platform. Either party may request review of a Case through the Platform’s dispute or review process. Upon submission of a dispute request, Let’s-ParaConnect may collect the information submitted by the parties and may request additional documentation relevant to the Platform’s payment and workflow process. Users agree to cooperate in good faith with any reasonable requests for information during the review process. Let’s-ParaConnect’s role in the review process is limited to administering the Platform’s policies and workflow. Let’s-ParaConnect does not provide legal advice and does not adjudicate legal claims between users. Failure to respond to reasonable requests for information during a review process may result in the review being handled based on the information available.</p>
+      <h2>11. Matter Review and Dispute Resolution</h2>
+      <p>From time to time, disagreements may arise between Attorneys and Paralegals regarding work performed through the Platform. Either party may request review of a Matter through the Platform’s dispute or review process. Upon submission of a dispute request, Let’s-ParaConnect may collect the information submitted by the parties and may request additional documentation relevant to the Platform’s payment and workflow process. Users agree to cooperate in good faith with any reasonable requests for information during the review process. Let’s-ParaConnect’s role in the review process is limited to administering the Platform’s policies and workflow. Let’s-ParaConnect does not provide legal advice and does not adjudicate legal claims between users. Failure to respond to reasonable requests for information during a review process may result in the review being handled based on the information available.</p>
     </section>
 
     <section id="section-12" class="card">
-      <h2>12. Probation and Account Termination</h2>
-      <p>Let’s-ParaConnect reserves the right, at its sole discretion, to suspend, restrict, place on probation, or terminate any user account at any time, with or without notice, including but not limited to circumstances involving violations of these Terms or behavior that may harm the integrity of the Platform. When a Paralegal account is placed on probation, the Paralegal may continue working on Cases that are already in progress but may be temporarily restricted from applying to new Cases or accepting new invitations until the probation period ends. Let’s-ParaConnect may take action against accounts that engage in conduct that undermines the proper operation of the Platform, including but not limited to:</p>
+      <h2>12. Account Restrictions and Termination</h2>
+      <p>Let’s-ParaConnect reserves the right, at its sole discretion and subject to applicable law, to restrict, suspend, or terminate a user account, with or without notice, including in circumstances involving violations of these Terms or behavior that may harm the integrity or security of the Platform. A restricted or suspended account may lose access to some or all Platform features. Let’s-ParaConnect may take action against accounts that engage in conduct that undermines the proper operation of the Platform, including but not limited to:</p>
       <ul>
         <li>attempting to circumvent the Platform’s payment system;</li>
         <li>repeatedly failing to meet agreed deadlines without reasonable justification;</li>
@@ -392,22 +410,22 @@
         <li>violating applicable laws or professional conduct rules; or</li>
         <li>otherwise violating these Terms.</li>
       </ul>
-      <p>Let’s-ParaConnect may determine the appropriate response to such conduct, which may include warnings, probationary status, temporary restrictions, suspension, or permanent termination of the account. Where appropriate, Let’s-ParaConnect may also review the circumstances surrounding missed deadlines or other issues, including whether such issues were caused by lack of information, delayed communication, or other circumstances outside the Paralegal’s control. Users whose accounts have been suspended or terminated may not create new accounts without the express permission of Let’s-ParaConnect.</p>
-      <p>When self-serve deactivation is available, it disables account access and removes the user from active participation only. It does not reopen prior matters or remove historical platform records. Let’s-ParaConnect may deny self-serve deactivation while an active matter, unresolved dispute, escrowed funds, pending payout, or other unresolved financial relationship remains on the account.</p>
+      <p>Let’s-ParaConnect may determine the appropriate response to such conduct, which may include a warning, temporary restriction, suspension, or permanent termination of the account. Where appropriate, Let’s-ParaConnect may also review the circumstances surrounding missed deadlines or other issues, including whether such issues were caused by lack of information, delayed communication, or other circumstances outside the Paralegal’s control. Users whose accounts have been suspended or terminated may not create new accounts without the express permission of Let’s-ParaConnect.</p>
+      <p>When self-serve deactivation is available, it disables account access and removes the user from active participation only. It does not reopen prior Matters or remove historical platform records. Let’s-ParaConnect may deny self-serve deactivation while an active Matter, unresolved dispute, funded payment awaiting resolution, pending payout, or other unresolved financial relationship remains on the account.</p>
 
-      <h3>12.1 Conduct That May Result in Probation or Account Termination</h3>
-      <p>Without limiting Let’s-ParaConnect’s right to suspend or terminate accounts, the following conduct may result in warnings, probation, suspension, or termination of a user account:</p>
+      <h3>12.1 Conduct That May Result in Account Action</h3>
+      <p>Without limiting Let’s-ParaConnect’s right to restrict, suspend, or terminate accounts, the following conduct may result in a warning, temporary restriction, suspension, or termination of a user account:</p>
       <ul>
         <li>attempting to circumvent the Platform’s payment system or arrange work outside the Platform after connecting through Let’s-ParaConnect without authorization;</li>
         <li>repeated failure to meet agreed deadlines without reasonable justification;</li>
-        <li>failure to communicate with the other party regarding active Cases for an extended period of time;</li>
+        <li>failure to communicate with the other party regarding active Matters for an extended period of time;</li>
         <li>repeated disputes regarding work quality or failure to deliver agreed work product;</li>
         <li>providing false or misleading information in a Profile or application;</li>
         <li>unprofessional, abusive, or inappropriate interactions with other users;</li>
         <li>failure to respond to reasonable requests from Let’s-ParaConnect regarding platform activity or disputes; or</li>
         <li>any other conduct that, in Let’s-ParaConnect’s judgment, undermines the integrity or proper operation of the Platform.</li>
       </ul>
-      <p>Let’s-ParaConnect may determine the appropriate response based on the circumstances of each situation. Such responses may include warnings, temporary restrictions, probationary status, suspension of account privileges, or permanent termination of the account. When evaluating such matters, Let’s-ParaConnect may consider factors including communication between the parties, the clarity of the Case description, whether deadlines were reasonable, and whether delays or issues were caused by factors outside the user’s control.</p>
+      <p>Let’s-ParaConnect may determine the appropriate response based on the circumstances of each situation. Such responses may include a warning, temporary restriction, suspension of account privileges, or permanent termination of the account. When evaluating such matters, Let’s-ParaConnect may consider factors including communication between the parties, the clarity of the Matter description, whether deadlines were reasonable, and whether delays or issues were caused by factors outside the user’s control.</p>
     </section>
 
     <section id="section-13" class="card">
@@ -430,7 +448,7 @@
       <p>Users are solely responsible for all content they upload, submit, transmit, or otherwise make available through the Let’s-ParaConnect platform (collectively, “User Content”). User Content may include, but is not limited to:</p>
       <ul>
         <li>profile information</li>
-        <li>case descriptions</li>
+        <li>matter descriptions</li>
         <li>documents or work product</li>
         <li>communications between users</li>
       </ul>
@@ -444,14 +462,14 @@
       <p>You understand that posting User Content that violates these Terms may expose you to legal liability. Users may not represent or imply that User Content is endorsed or approved by Let’s-ParaConnect.</p>
 
       <h3>14.2 License to Use User Content</h3>
-      <p>Users retain ownership of their User Content. However, by submitting User Content to the Platform, you grant Let’s-ParaConnect a worldwide, non-exclusive, royalty-free, sublicensable license to host, store, display, reproduce, and use such content as necessary to operate, maintain, and improve the Platform. This license includes the right to display User Content:</p>
+      <p>Users retain ownership of their User Content. By submitting User Content to the Platform, you grant Let’s-ParaConnect a worldwide, non-exclusive, royalty-free, sublicensable license to host, store, transmit, display, reproduce, and otherwise process that content only as reasonably necessary to provide, secure, maintain, troubleshoot, and support the Platform. This license includes the right to make User Content available:</p>
       <ul>
         <li>to other users of the Platform;</li>
-        <li>in connection with case postings and applications;</li>
+        <li>in connection with matter postings and applications;</li>
         <li>in Platform profile listings and related user-facing surfaces; and</li>
-        <li>for internal analytics, platform improvement, and service development.</li>
+        <li>to authorized service providers only as needed to operate, secure, maintain, or support the Platform.</li>
       </ul>
-      <p>Let’s-ParaConnect will not use User Content for external marketing purposes without permission, except where such content has been made publicly available through the Platform by the user.</p>
+      <p>Let’s-ParaConnect will not use Matter documents, messages, or work product for external marketing or model training without the user’s explicit permission. The <a class="privacy-inline-link" href="privacy.html">Privacy Policy</a> describes how LPC handles personal information and AI-assisted support data.</p>
 
       <h3>14.3 Platform Moderation of Content</h3>
       <p>User Content does not necessarily reflect the views or opinions of Let’s-ParaConnect. Let’s-ParaConnect reserves the right, but has no obligation, to review, monitor, edit, refuse, or remove any User Content that:</p>
@@ -518,20 +536,20 @@
       <p>The Platform may contain links to third-party websites, services, or other external content (“Third-Party Content”). These links are provided solely for convenience and informational purposes. Let’s-ParaConnect does not control, endorse, or assume responsibility for any Third-Party Content, including the accuracy, reliability, legality, or availability of such content. If you choose to access Third-Party Content, you do so at your own risk. Your interactions with third-party websites or services are governed by the terms and policies of those third parties, and not by these Terms. Let’s-ParaConnect is not responsible for any loss, damage, or liability that may arise from your use of Third-Party Content. Nothing in these Terms grants you permission to copy, distribute, or otherwise use Third-Party Content except as permitted by the applicable third party.</p>
 
       <h3>14.9 No Liability for User Interactions</h3>
-      <p>Let’s-ParaConnect provides a platform that enables Attorneys and Paralegals to connect and collaborate. Let’s-ParaConnect does not supervise, control, or guarantee the conduct of users on the Platform. Users are solely responsible for their interactions with other users of the Platform, including communications, work performed, and any agreements or arrangements made between users. Any liability, loss, or damage resulting from interactions between users is the responsibility of the users involved. Let’s-ParaConnect may monitor or analyze general usage of the Platform for operational, security, and improvement purposes. However, Let’s-ParaConnect does not review or control the substance of work performed between users and cannot access confidential or privileged materials except as necessary to operate the Platform.</p>
+      <p>Let’s-ParaConnect provides a platform that enables Attorneys and Paralegals to connect and collaborate. Let’s-ParaConnect does not supervise, control, or guarantee the conduct of users on the Platform. Users are solely responsible for their interactions with other users of the Platform, including communications, work performed, and any agreements or arrangements made between users. Any liability, loss, or damage resulting from interactions between users is the responsibility of the users involved. Let’s-ParaConnect may monitor or analyze general usage of the Platform for operational, security, and improvement purposes. Let’s-ParaConnect does not routinely review the substance of work performed between users; access by authorized personnel or service providers may occur only when reasonably necessary to operate, secure, support, or comply with legal obligations relating to the Platform.</p>
     </section>
 
     <section id="section-15" class="card">
       <h2>15. Notices Regarding Let’s-ParaConnect</h2>
 
       <h3>15.1 Let’s-ParaConnect Does Not Provide Legal Services</h3>
-      <p>Let’s-ParaConnect is a technology platform that enables Attorneys and Paralegals to communicate and coordinate project-based support work. Let’s-ParaConnect does not provide legal representation, legal advice, legal opinions, recommendations, referrals, or counseling. Attorneys and Paralegals using the Platform are independent professionals and are not employees, agents, or representatives of Let’s-ParaConnect. Let’s-ParaConnect does not review, approve, or supervise work performed by users of the Platform and does not determine the scope of work or pricing for Cases posted by Attorneys. At no time shall Let’s-ParaConnect be responsible for the actions, omissions, work product, or professional conduct of any user of the Platform.</p>
+      <p>Let’s-ParaConnect is a technology platform that enables Attorneys and Paralegals to communicate and coordinate project-based support work. Let’s-ParaConnect does not provide legal representation, legal advice, legal opinions, recommendations, referrals, or counseling. Attorneys and Paralegals using the Platform are independent professionals and are not employees, agents, or representatives of Let’s-ParaConnect. Let’s-ParaConnect does not review, approve, or supervise work performed by users of the Platform and does not determine the scope of work or pricing for Matters posted by Attorneys. At no time shall Let’s-ParaConnect be responsible for the actions, omissions, work product, or professional conduct of any user of the Platform.</p>
 
       <h3>15.2 Let’s-ParaConnect Is Not a Referral Service or Employment Agency</h3>
       <p>Let’s-ParaConnect is not a legal referral service, staffing agency, or employment agency. The Platform provides software tools that allow Attorneys to review approved profiles and engage Paralegals for project-based assistance. Let’s-ParaConnect does not place users into engagements, does not require users to work together, and does not guarantee outcomes. Although Let’s-ParaConnect may review user profiles or application materials as part of its admission process, Let’s-ParaConnect does not guarantee the qualifications, licensing status, experience, competence, or professional standing of any user. Let’s-ParaConnect does not represent or warrant that any Attorney or Paralegal maintains professional liability insurance or other professional coverage. Users are responsible for independently evaluating the qualifications and suitability of other users before engaging in work through the Platform.</p>
 
       <h3>15.3 No Endorsement of Users</h3>
-      <p>Let’s-ParaConnect does not endorse or recommend any user of the Platform. User profiles, reviews, ratings, and other information displayed on the Platform are provided for informational purposes only. Let’s-ParaConnect makes no representations or warranties regarding the accuracy, reliability, or completeness of information provided by users. Attorneys and Paralegals are solely responsible for evaluating and selecting the professionals with whom they choose to work through the Platform.</p>
+      <p>Let’s-ParaConnect does not endorse or recommend any user of the Platform. Profiles and other user-provided information displayed on the Platform are provided for informational purposes only. Let’s-ParaConnect makes no representations or warranties regarding the accuracy, reliability, or completeness of information provided by users. Attorneys and Paralegals are solely responsible for evaluating and selecting the professionals with whom they choose to work through the Platform.</p>
 
       <h3>15.4 No Attorney-Client Relationship</h3>
       <p>Let’s-ParaConnect does not provide legal advice or legal services. Use of the Platform does not create an attorney-client relationship between Let’s-ParaConnect and any user. Any attorney-client relationship exists solely between the Attorney and that Attorney’s own client. Let’s-ParaConnect is not responsible for work performed through the Platform, legal advice provided by Attorneys to their own clients, or the conduct of Attorneys or Paralegals using the Platform.</p>
@@ -539,27 +557,119 @@
       <h3>15.5 Intellectual Property Notice</h3>
       <p>Let’s-ParaConnect retains all rights, title, and interest in and to the Platform and its associated intellectual property, including but not limited to copyrights, trademarks, service marks, trade names, software, design elements, and proprietary technology. Nothing in these Terms transfers ownership of Let’s-ParaConnect’s intellectual property to any user. Users may not copy, reproduce, distribute, modify, create derivative works from, publicly display, or otherwise exploit any portion of the Platform or its content without the prior written consent of Let’s-ParaConnect. Any trademarks, service marks, logos, or other materials belonging to third parties that appear on the Platform remain the property of their respective owners.</p>
     </section>
-  </main>
 
-  <footer class="footer">
-    <div class="footer-inner">
-      <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
-      <p>© <script>document.write(new Date().getFullYear());</script> Let’s-ParaConnect. All rights reserved.</p>
-      <nav>
-        <a href="privacy.html">Privacy Policy</a>
-        <span>|</span>
-        <a href="terms.html">Terms</a>
-        <span>|</span>
-        <a href="/paralegal-admission.html">Admissions</a>
-        <span>|</span>
+    <section id="section-16" class="card">
+      <h2>16. Electronic Communications</h2>
+      <h3>16.1 Consent to Electronic Communications</h3>
+      <p>By creating an account or using the Platform, you consent to receive communications from Let’s-ParaConnect in electronic form, including through email or notifications within the Platform. You agree that all agreements, notices, disclosures, and other communications provided electronically by Let’s-ParaConnect satisfy any legal requirement that such communications be provided in writing.</p>
+      <h3>16.2 Maintaining Accurate Contact Information</h3>
+      <p>Users are responsible for maintaining accurate and current contact information associated with their account, including email and mailing addresses. Users agree to promptly update their account information if their contact information changes. Let’s-ParaConnect may rely on the email address and other contact information provided by the user to deliver important communications related to the Platform, including notices regarding disputes, account activity, or policy updates. Failure to maintain accurate contact information or to respond to reasonable communications from Let’s-ParaConnect may result in temporary restrictions, suspension, or termination of the user’s account where necessary to maintain the proper operation of the Platform.</p>
+    </section>
+
+    <section id="section-17" class="card">
+      <h2>17. Indemnification</h2>
+      <p>You agree to indemnify, defend, and hold harmless Let’s-ParaConnect, its affiliates, and any related entities, as well as their respective officers, directors, employees, agents, and representatives, from and against any claims, demands, liabilities, damages, losses, costs, and expenses (including reasonable attorneys’ fees) arising out of or relating to:</p>
+      <ul>
+        <li>(i) your access to or use of the Platform;</li>
+        <li>(ii) your violation of these Terms;</li>
+        <li>(iii) any services, work, or transactions performed or arranged through the Platform; or</li>
+        <li>(iv) your infringement or alleged infringement of any intellectual property or other rights of any person or entity.</li>
+      </ul>
+      <p>Let’s-ParaConnect reserves the right, at its own discretion and at your expense where permitted by law, to assume the exclusive defense and control of any matter subject to indemnification under this section. You agree to cooperate fully with Let’s-ParaConnect in the defense of such claims. You may not settle any claim that involves Let’s-ParaConnect without the prior written consent of Let’s-ParaConnect. Let’s-ParaConnect will make reasonable efforts to notify you of any claim, action, or proceeding for which indemnification may be sought.</p>
+    </section>
+
+    <section id="section-18" class="card">
+      <h2>18. Disclaimers and Limitations of Liability</h2>
+      <p>PLEASE READ THIS SECTION CAREFULLY SINCE IT LIMITS THE LIABILITY OF LET’S-PARACONNECT AND ITS AFFILIATES AND THEIR RESPECTIVE OFFICERS, DIRECTORS, EMPLOYEES, AGENTS, AND REPRESENTATIVES (COLLECTIVELY, THE “LPC ENTITIES”). EACH OF THE SUBSECTIONS BELOW ONLY APPLIES TO THE MAXIMUM EXTENT PERMITTED UNDER APPLICABLE LAW. NOTHING HEREIN IS INTENDED TO LIMIT ANY RIGHTS YOU MAY HAVE WHICH MAY NOT BE LAWFULLY LIMITED.</p>
+      <p><strong>18.1</strong> THE PLATFORM IS MADE AVAILABLE TO YOU ON AN “AS IS,” “WITH ALL FAULTS,” AND “AS AVAILABLE” BASIS. YOUR USE OF THE PLATFORM IS AT YOUR OWN DISCRETION AND RISK. LPC ENTITIES MAKE NO CLAIMS OR PROMISES ABOUT THE QUALITY, ACCURACY, RELIABILITY, COMPLETENESS, OR AVAILABILITY OF THE PLATFORM OR ANY CONTENT, COMMUNICATIONS, DOCUMENTS, PROFILES, MATTERS, OR OTHER MATERIALS AVAILABLE ON OR THROUGH THE PLATFORM. ACCORDINGLY, LPC ENTITIES ARE NOT LIABLE TO YOU FOR ANY LOSS OR DAMAGE THAT MIGHT ARISE, FOR EXAMPLE, FROM YOUR RELIANCE ON THE QUALITY, ACCURACY, RELIABILITY, OR COMPLETENESS OF THE PLATFORM OR ANY CONTENT AVAILABLE THROUGH THE PLATFORM.</p>
+      <p><strong>18.2</strong> LPC ENTITIES EXPRESSLY DISCLAIM ALL WARRANTIES, WHETHER EXPRESS OR IMPLIED, INCLUDING WARRANTIES AS TO ANY SERVICES OFFERED OR PERFORMED BY USERS OF THE PLATFORM, AND ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. NO ORAL OR WRITTEN INFORMATION OR ADVICE PROVIDED TO YOU BY LET’S-PARACONNECT OR ANY REPRESENTATIVE OF THE LPC ENTITIES SHALL CREATE ANY REPRESENTATION OR WARRANTY.</p>
+      <p><strong>18.3</strong> OTHER THAN THE REVIEW OR DISPUTE RESOLUTION PROCEDURES DESCRIBED ELSEWHERE IN THESE TERMS, YOUR SOLE AND EXCLUSIVE RIGHT AND REMEDY IN THE EVENT OF DISSATISFACTION WITH THE PLATFORM, THE SERVICES, OR ANY OTHER GRIEVANCE SHALL BE YOUR TERMINATION AND DISCONTINUATION OF ACCESS TO, OR USE OF, THE PLATFORM.</p>
+      <p><strong>18.4</strong> LPC ENTITIES MAKE NO REPRESENTATION OR WARRANTY THAT THE INFORMATION WE PROVIDE OR THAT IS PROVIDED THROUGH THE SITE IS ACCURATE, RELIABLE, OR CORRECT; THAT THE SERVICES WILL MEET YOUR REQUIREMENTS; THAT THE SERVICES WILL BE AVAILABLE AT ANY PARTICULAR TIME OR LOCATION; THAT THE SERVICES WILL FUNCTION IN AN UNINTERRUPTED MANNER OR BE SECURE EXCEPT AS EXPRESSLY SET FORTH HEREIN; THAT ANY DEFECTS OR ERRORS WILL BE CORRECTED; OR THAT THE SITE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. YOU ASSUME FULL RESPONSIBILITY AND RISK OF LOSS RESULTING FROM YOUR USE OF INFORMATION, CONTENT, OR OTHER MATERIAL OBTAINED FROM THE SITE OR SERVICES.</p>
+      <p><strong>18.5</strong> LPC ENTITIES’ MAXIMUM AGGREGATE LIABILITY TO YOU FOR LOSSES OR DAMAGES THAT YOU SUFFER IN CONNECTION WITH THE PLATFORM OR THESE TERMS IS LIMITED TO THE GREATER OF: (i) THE PLATFORM FEES, IF ANY, PAID BY YOU TO LET’S-PARACONNECT IN CONNECTION WITH THE PLATFORM IN THE TWELVE (12) MONTHS PRIOR TO THE ACTION GIVING RISE TO LIABILITY; OR (ii) $100.</p>
+      <p><strong>18.6</strong> LPC ENTITIES DISCLAIM LIABILITY FOR ANY: (i) INDIRECT, SPECIAL, INCIDENTAL, PUNITIVE, EXEMPLARY, RELIANCE, OR CONSEQUENTIAL DAMAGES; (ii) LOSS OF PROFITS; (iii) BUSINESS INTERRUPTION; (iv) REPUTATIONAL HARM; OR (v) LOSS OF INFORMATION OR DATA.</p>
+      <p><strong>18.7</strong> LEGAL NOTICE TO LET’S-PARACONNECT MUST BE IN WRITING AND NOT BY EMAIL OR PLATFORM MESSAGING. COMMUNICATIONS MADE THROUGH EMAIL OR THROUGH THE PLATFORM’S MESSAGING SYSTEM WILL NOT CONSTITUTE LEGAL NOTICE TO LET’S-PARACONNECT OR ANY OF ITS OFFICERS, EMPLOYEES, AGENTS, OR REPRESENTATIVES IN ANY SITUATION WHERE NOTICE TO LET’S-PARACONNECT IS REQUIRED BY THIS AGREEMENT OR BY LAW. ALL NOTICES TO LET’S-PARACONNECT INTENDED TO HAVE A LEGAL EFFECT CONCERNING THIS AGREEMENT OR USE OF THE PLATFORM OR SERVICES MUST BE IN WRITING AND DELIVERED IN PERSON OR BY MAIL EVIDENCED BY A DELIVERY RECEIPT TO THE FOLLOWING ADDRESS:</p>
+      <p>LET’S-PARACONNECT, INC.<br />ATTN: LEGAL NOTICE<br />16192 COASTAL HIGHWAY<br />LEWES, DELAWARE 19958<br />UNITED STATES</p>
+    </section>
+
+    <section id="section-19" class="card">
+      <h2>19. Choice of Law and Venue</h2>
+      <p>DELAWARE LAW GOVERNS THESE TERMS, AS WELL AS ANY CLAIM, CAUSE OF ACTION, OR DISPUTE THAT MAY ARISE BETWEEN YOU AND LET’S-PARACONNECT (A “CLAIM”), WITHOUT REGARD TO CONFLICT OF LAW PROVISIONS. FOR ANY CLAIM BROUGHT BY OR AGAINST YOU, YOU AGREE TO SUBMIT TO THE PERSONAL AND EXCLUSIVE JURISDICTION OF THE STATE AND FEDERAL COURTS LOCATED IN THE STATE OF DELAWARE.</p>
+    </section>
+
+    <section id="section-20" class="card">
+      <h2>20. Waiver of Jury Trial and Class Action</h2>
+      <p>YOU AGREE THAT BY ENTERING INTO THIS AGREEMENT YOU ARE WAIVING THE RIGHT TO TRIAL BY JURY. YOU ALSO AGREE THAT YOU ARE WAIVING THE RIGHT TO PARTICIPATE IN A CLASS ACTION. YOU AGREE THAT YOU MAY BRING CLAIMS ONLY IN YOUR INDIVIDUAL CAPACITY AND NOT AS A PLAINTIFF OR CLASS MEMBER IN ANY PURPORTED CLASS OR REPRESENTATIVE PROCEEDING.</p>
+    </section>
+
+    <section id="section-21" class="card">
+      <h2>21. Termination</h2>
+      <p>LET’S-PARACONNECT RESERVES THE RIGHT (THOUGH NOT THE OBLIGATION), IN ITS SOLE DISCRETION, TO DETERMINE WHETHER ANY USER CONDUCT IS APPROPRIATE AND COMPLIES WITH THIS AGREEMENT, AND TO TERMINATE OR DENY ACCESS TO OR USE OF THE PLATFORM OR SERVICES TO ANY USER FOR ANY REASON OR NO REASON, WITH OR WITHOUT PRIOR NOTICE.</p>
+      <p>YOU MAY STOP USING THE PLATFORM AND, WHEN YOUR ACCOUNT IS ELIGIBLE, DEACTIVATE IT FROM ACCOUNT SETTINGS. IF SELF-SERVICE DEACTIVATION IS UNAVAILABLE BECAUSE AN ACTIVE MATTER, DISPUTE, PAYMENT, PAYOUT, OR OTHER FINANCIAL OBLIGATION REMAINS, YOU MAY CONTACT LET’S-PARACONNECT FOR ASSISTANCE. DEACTIVATION DISABLES PLATFORM ACCESS BUT IS NOT A REQUEST TO ERASE RECORDS THAT LPC MUST RETAIN. REVIEW THE <a class="privacy-inline-link" href="privacy.html">PRIVACY POLICY</a> FOR INFORMATION ABOUT ACCOUNT DEACTIVATION, RETENTION, AND PRIVACY REQUESTS.</p>
+      <p>LET’S-PARACONNECT MAY CLOSE YOUR ACCOUNT, SUSPEND YOUR ABILITY TO USE CERTAIN FEATURES OF THE PLATFORM, OR TERMINATE YOUR ACCESS TO THE PLATFORM AT ANY TIME, WITH OR WITHOUT NOTICE, FOR ANY REASON PERMITTED BY LAW. SUCH ACTION MAY PREVENT YOU FROM ACCESSING YOUR ACCOUNT, THE PLATFORM, YOUR USER CONTENT, OR OTHER RELATED INFORMATION.</p>
+      <p>IN THE EVENT OF ANY TERMINATION, WHETHER BY YOU OR BY LET’S-PARACONNECT, THIS AGREEMENT SHALL REMAIN BINDING FROM THE DATE YOU FIRST ACCEPTED THESE TERMS UNTIL THE DATE YOUR ACCOUNT TERMINATION IS PROCESSED. FOLLOWING TERMINATION, ALL PROVISIONS OF THIS AGREEMENT THAT BY THEIR NATURE SHOULD SURVIVE TERMINATION SHALL REMAIN IN FULL FORCE AND EFFECT, INCLUDING BUT NOT LIMITED TO SECTIONS RELATING TO DISCLAIMERS, LIMITATIONS OF LIABILITY, INDEMNIFICATION, AND GOVERNING LAW.</p>
+    </section>
+
+    <section id="section-22" class="card">
+      <h2>22. General Terms</h2>
+      <p>LET’S-PARACONNECT RESERVES THE RIGHT TO MODIFY, UPDATE, INTERRUPT, SUSPEND, OR DISCONTINUE THE PLATFORM OR SERVICES AT ANY TIME WITHOUT NOTICE OR LIABILITY.</p>
+      <p>LET’S-PARACONNECT MAY PROVIDE USERS WITH NOTICES, INCLUDING NOTICES REGARDING CHANGES TO THIS AGREEMENT, BY EMAIL, REGULAR MAIL, OR THROUGH COMMUNICATIONS MADE AVAILABLE ON OR THROUGH THE PLATFORM.</p>
+      <p>EXCEPT AS OTHERWISE EXPRESSLY PROVIDED IN THIS AGREEMENT, NOTHING HEREIN IS INTENDED, NOR SHALL BE DEEMED, TO CONFER ANY RIGHTS OR REMEDIES UPON ANY THIRD PARTY.</p>
+      <p>THIS AGREEMENT CONSTITUTES THE ENTIRE AGREEMENT BETWEEN YOU AND LET’S-PARACONNECT REGARDING THE USE OF THE PLATFORM AND SERVICES AND SUPERSEDES ANY PRIOR OR CONTEMPORANEOUS AGREEMENTS, COMMUNICATIONS, OR UNDERSTANDINGS BETWEEN YOU AND LET’S-PARACONNECT RELATING TO THE SUBJECT MATTER HEREOF. YOU ACKNOWLEDGE THAT YOU HAVE NOT RELIED ON ANY REPRESENTATION OR STATEMENT NOT EXPRESSLY SET FORTH IN THIS AGREEMENT.</p>
+      <p>ANY FAILURE BY LET’S-PARACONNECT TO EXERCISE OR ENFORCE ANY RIGHT OR PROVISION OF THIS AGREEMENT SHALL NOT CONSTITUTE A WAIVER OF SUCH RIGHT OR PROVISION. THE FAILURE OF EITHER PARTY AT ANY TIME TO REQUIRE PERFORMANCE BY THE OTHER PARTY OF ANY PROVISION OF THIS AGREEMENT SHALL NOT AFFECT THE RIGHT TO REQUIRE SUCH PERFORMANCE AT ANY LATER TIME.</p>
+      <p>IF ANY PROVISION OF THIS AGREEMENT IS FOUND TO BE INVALID, ILLEGAL, OR UNENFORCEABLE BY A COURT OF COMPETENT JURISDICTION, THAT PROVISION SHALL BE LIMITED OR ELIMINATED TO THE MINIMUM EXTENT NECESSARY SO THAT THE REMAINDER OF THIS AGREEMENT SHALL REMAIN IN FULL FORCE AND EFFECT.</p>
+      <p>THIS AGREEMENT MAY NOT BE ASSIGNED, TRANSFERRED, OR SUBLICENSED BY YOU WITHOUT THE PRIOR WRITTEN CONSENT OF LET’S-PARACONNECT. LET’S-PARACONNECT MAY ASSIGN OR TRANSFER THIS AGREEMENT WITHOUT RESTRICTION. ANY ATTEMPTED ASSIGNMENT IN VIOLATION OF THIS PROVISION SHALL BE VOID.</p>
+      <p>THE SECTION HEADINGS USED IN THIS AGREEMENT ARE FOR CONVENIENCE ONLY AND SHALL NOT AFFECT THE INTERPRETATION OF ANY PROVISION OF THIS AGREEMENT.</p>
+    </section>
+
+    <section id="section-23" class="card">
+      <h2>23. Changes to This Agreement</h2>
+      <p>LET’S-PARACONNECT MAY AMEND OR UPDATE THIS AGREEMENT BY POSTING A REVISED VERSION ON THE PLATFORM. THE EFFECTIVE DATE AND VERSION AT THE TOP IDENTIFY THE CURRENT AGREEMENT. LET’S-PARACONNECT MAY NOTIFY ACCOUNT HOLDERS OF MATERIAL CHANGES AND MAY REQUIRE EXPRESS ACCEPTANCE OF THE UPDATED AGREEMENT BEFORE FURTHER ACCOUNT USE. IF YOU DO NOT ACCEPT AN UPDATE WHEN REQUIRED, YOU MAY NOT CONTINUE USING THE PLATFORM.</p>
+    </section>
+
+    <section id="section-24" class="card">
+      <h2>24. Definitions</h2>
+      <p>THE FOLLOWING TERMS HAVE THE MEANINGS SET FORTH BELOW, REGARDLESS OF CAPITALIZATION, TENSE, OR SINGULAR OR PLURAL USE:</p>
+      <p><strong>“CONTENT”</strong> MEANS DOCUMENTS, COMMUNICATIONS, ALERTS, EMAILS, TEXT, IMAGES, PHOTOS, AUDIO, VIDEO, FILES, LOCATION DATA, AND OTHER DATA OR COMMUNICATIONS TRANSMITTED, STORED, OR PROCESSED THROUGH THE PLATFORM.</p>
+      <p><strong>“ATTORNEY”</strong> MEANS A USER WHO POSTS OR MANAGES MATTERS AND ENGAGES PARALEGALS FOR PROJECT-BASED LEGAL SUPPORT THROUGH THE PLATFORM.</p>
+      <p><strong>“PARALEGAL”</strong> MEANS A USER WHO SEEKS TO FIND OR PERFORM WORK ON MATTERS THROUGH THE PLATFORM AS AN INDEPENDENT PROFESSIONAL.</p>
+      <p><strong>“LET’S-PARACONNECT,” “LPC,” “WE,” “US,” AND “OUR”</strong> MEANS LET’S-PARACONNECT, INC., A DELAWARE CORPORATION, TOGETHER WITH ITS AFFILIATES, MEMBERS, MANAGERS, DIRECTORS, OFFICERS, AND EMPLOYEES.</p>
+      <p><strong>“PLATFORM” OR “SITE”</strong> MEANS THE LET’S-PARACONNECT WEBSITE, RELATED SUBPAGES, SUBDOMAINS, APPLICATIONS, SERVICES, AND FEATURES MADE AVAILABLE THROUGH WWW.LETS-PARACONNECT.COM.</p>
+      <p><strong>“MATTER”</strong> MEANS A DISCRETE PROJECT OR ASSIGNMENT POSTED BY AN ATTORNEY THROUGH THE PLATFORM FOR WHICH A PARALEGAL MAY APPLY OR BE INVITED TO PERFORM WORK.</p>
+      <p><strong>“LET’S-PARACONNECT CONTENT” OR “LPC CONTENT”</strong> MEANS CONTENT THAT LET’S-PARACONNECT CREATES AND MAKES AVAILABLE IN CONNECTION WITH THE PLATFORM.</p>
+      <p><strong>“PROTECTED CONTENT”</strong> MEANS: (i) CONTENT RELATED TO WORK PERFORMED THROUGH A MATTER THAT IS POSTED BY AN ATTORNEY OR PARALEGAL AND STORED IN THE PLATFORM’S DOCUMENT SHARING OR COMMUNICATION FEATURES; AND (ii) PAYMENT OR PAYOUT INFORMATION ASSOCIATED WITH PLATFORM USERS.</p>
+      <p><strong>“THIRD-PARTY CONTENT”</strong> MEANS CONTENT THAT ORIGINATES FROM PARTIES OTHER THAN LET’S-PARACONNECT OR ITS USERS AND IS MADE AVAILABLE THROUGH OR IN CONNECTION WITH THE PLATFORM. <strong>“PLATFORM CONTENT”</strong> MEANS ALL CONTENT MADE AVAILABLE THROUGH THE PLATFORM, INCLUDING USER CONTENT, THIRD-PARTY CONTENT, AND LPC CONTENT.</p>
+      <p><strong>“USER,” “YOU,” AND “YOUR”</strong> REFER TO ANY PERSON, COMPANY, OR ORGANIZATION THAT VISITS OR USES THE PLATFORM OR SERVICES.</p>
+      <p><strong>“USER CONTENT”</strong> MEANS CONTENT THAT USERS SUBMIT OR TRANSMIT TO OR THROUGH THE PLATFORM. USER CONTENT DOES NOT INCLUDE PROTECTED CONTENT.</p>
+    </section>
+  </main>
+  <footer class="home-footer">
+    <div class="home-footer__top">
+      <div class="home-footer__brand">
+        <a class="home-brand" href="index.html">Let<span class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+        <p>Project-based legal support for attorneys and independent paralegals.</p>
+      </div>
+      <nav aria-label="Footer navigation">
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
         <a href="contact.html">Contact</a>
-        <span>|</span>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="/paralegal-admission.html">Paralegal Admission</a>
         <a href="accessibility.html">Accessibility</a>
       </nav>
-      <div class="region">United States</div>
+    </div>
+    <div class="home-footer__bottom">
+      <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
+      <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg>
+        <span>Accessibility</span>
+      </button>
     </div>
   </footer>
-<script type="module" src="assets/scripts/hero-parallax.js"></script>
+
+
+  <script src="assets/scripts/utility-header.js" defer></script>
+<script src="assets/scripts/public-matter-field.js" defer></script>
   <script src="assets/scripts/accessibility-toggle.js"></script>
 </body>
 </html>

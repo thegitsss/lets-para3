@@ -86,7 +86,7 @@ describe("CTO agent service", () => {
         ]),
         filesToInspect: expect.arrayContaining([
           "frontend/assets/scripts/attorney-tabs.js",
-          "frontend/assets/scripts/views/case-detail.js",
+          "frontend/assets/scripts/case-detail.js",
           "backend/routes/cases.js",
         ]),
         readyToApply: true,

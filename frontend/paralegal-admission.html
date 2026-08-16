@@ -9,6 +9,7 @@
   <meta name="theme-color" content="#0B2A4A">
   <meta charset="utf-8" />
   <title>Paralegal Admission Requirements | Let’s-ParaConnect</title>
+  <meta name="description" content="Review the qualifications and application requirements for independent paralegals joining Let’s-ParaConnect." />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -18,7 +19,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/hero-pages.css" rel="stylesheet" />
+  <link href="assets/styles/hero-pages.css?v=20260729-white-footer" rel="stylesheet" />
 
   <style>
     .gold{color:var(--gold);}
@@ -128,52 +129,69 @@
   </style>
 </head>
 
-<body>
+<body class="utility-page utility-page--inset">
   <a class="skip-link" href="#main">Skip to main content</a>
-<header>
-    <div class="header-inner">
-      <nav class="nav-left" aria-label="Primary">
-        <a href="index.html#who-we-are">About</a>
+  <header class="utility-header" data-utility-header>
+    <div class="utility-header__inner">
+      <nav class="utility-header__nav" aria-label="Primary navigation">
         <a href="index.html#how">How It Works</a>
+        <a href="index.html#for-attorneys">For Attorneys</a>
+        <a href="index.html#for-paralegals">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
       </nav>
-
-      <a href="index.html" class="header-logo">
-        Let’s-ParaConnect
-      </a>
-
-      <div class="header-actions">
-<a class="pill" href="login.html" id="authAction">Sign In</a>
-        <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
+      <a class="utility-header__brand" href="index.html">Let<span class="utility-header__brand-mark">’</span>s-ParaConnect</a>
+      <div class="utility-header__actions">
+        <a class="utility-header__signin" href="login.html" data-utility-auth>Sign In</a>
+        <button class="utility-header__logout" type="button" data-utility-logout hidden>Log Out</button>
+        <a class="utility-header__button" href="signup.html" data-utility-signup>Get Started</a>
       </div>
+      <button class="utility-header__menu" type="button" aria-expanded="false" aria-controls="utilityMenu" data-utility-menu-toggle>Menu</button>
     </div>
+    <nav class="utility-header__mobile" id="utilityMenu" aria-label="Mobile navigation" data-utility-menu hidden>
+      <a href="index.html#how">How It Works</a>
+      <a href="index.html#for-attorneys">For Attorneys</a>
+      <a href="index.html#for-paralegals">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      <a href="login.html" data-utility-auth>Sign In</a>
+      <button type="button" data-utility-logout hidden>Log Out</button>
+      <a href="signup.html" data-utility-signup>Get Started</a>
+    </nav>
   </header>
 
-  <div class="hero-banner" role="presentation" aria-hidden="true"></div>
+  <section class="hero-banner utility-hero" aria-labelledby="terms-title">
+    <div class="utility-hero__inner">
+      <div class="utility-hero__copy">
+        <p class="utility-hero__eyebrow">Network standards</p>
+        <h1 id="terms-title">Paralegal Admission Requirements</h1>
+        <p class="utility-hero__description">How LPC evaluates applications for its approved paralegal network.</p>
+        <p class="utility-hero__meta">Last updated August 15, 2026</p>
+      </div>
+      <div class="utility-hero__art" data-matter-field-host aria-hidden="true"></div>
+    </div>
+  </section>
 
   <main tabindex="-1" aria-labelledby="terms-title" id="main">
-      <h1 id="terms-title">Paralegal Admission Requirements</h1>
-    <p class="muted">Last updated: <strong>January 2026</strong></p>
 
-    <p>Let’s-ParaConnect (“LPC”) is a technology platform that enables attorneys to engage qualified paralegals for project-based support work. Admission to the platform is approval-based and not guaranteed.</p>
+    <p>Let’s-ParaConnect (“LPC”) is a technology platform that enables attorneys to review approved independent paralegal profiles and engage paralegals for project-based support work. Admission to the platform is approval-based and not guaranteed.</p>
 
     <section class="card">
       <h2>How Applications Are Reviewed</h2>
-      <p>Paralegal applications are reviewed through a holistic evaluation process. A holistic review means that applications are assessed as a whole rather than on any single factor such as years of experience, job title, or certifications alone. LPC considers the clarity and substance of legal experience, supervision by licensed attorneys, professional presentation, jurisdictional alignment, platform needs, and overall suitability for attorney-directed project work. Admission is intentionally limited in order to preserve quality, confidence, and reliability for attorneys using the platform.</p>
+      <p>LPC reviews each submitted application as a whole rather than deciding on a single field such as years of experience, job title, or certification. Reviewers consider the legal-support experience described in the application, whether the résumé and profile are complete and internally consistent, and whether the submitted information supports attorney-directed project work. Approval is discretionary and depends on the application materials and current platform requirements.</p>
     </section>
 
     <section class="card">
       <h2>Minimum Eligibility Requirements</h2>
-      <p>To be considered for admission, applicants must demonstrate clearly defined and verifiable legal support experience performed under the supervision of a licensed attorney. Applicants are expected to identify relevant law firms, legal employers, or supervising attorneys and to present a professional, attorney-facing profile focused specifically on legal support experience appropriate for a private professional platform.</p>
+      <p>Applicants must describe relevant legal-office or legal-support experience performed under attorney supervision, or identify relevant paralegal education or certification. The required résumé and profile should clearly describe the applicant’s experience and the types of attorney-directed work they have performed.</p>
     </section>
 
     <section class="card">
-      <h2>Verification and Documentation</h2>
-      <p>Let’s-ParaConnect reserves the right to request verification materials before or after approval. Such materials may include resumes or curricula vitae reflecting legal experience, identification of supervising attorneys or legal employers, documentation of paralegal education or certification where applicable, and optional writing or work samples. Failure to provide requested verification may result in delayed approval or denial.</p>
+      <h2>Application Materials</h2>
+      <p>A PDF résumé is required with the application. A paralegal certificate or license may be included but is optional. LPC reviews the information and files the applicant submits; the standard admission review does not independently authenticate credentials, contact former employers, query professional databases, or conduct a background check. Applicants are responsible for submitting accurate and complete information.</p>
     </section>
 
     <section class="card">
       <h2>Reasons Applications May Be Declined</h2>
-      <p>Applications may be declined when legal experience is unclear, unverifiable, or insufficiently defined; when an applicant’s background is primarily administrative or non-legal without substantive support work performed under attorney supervision; when law firm or supervision details are omitted; when application materials are unfocused, incomplete, misleading, or unprofessional in presentation; or when the applicant is not authorized to work with U.S.-based attorneys. At this time, LPC operates as a U.S.-focused professional platform.</p>
+      <p>Applications may be declined when the submitted materials do not describe relevant legal-support experience or education, are incomplete or internally inconsistent, contain misleading information, or do not demonstrate alignment with attorney-directed project work and current platform requirements.</p>
     </section>
 
     <section class="card">
@@ -182,8 +200,8 @@
     </section>
 
     <section class="card">
-      <h2>Reapplying</h2>
-      <p>Applicants may reapply in the future if their legal experience, documentation, or professional focus materially changes.</p>
+      <h2>Corrections After a Decision</h2>
+      <p>There is no self-service appeal or reapplication workflow. If an admission decision relied on materially incorrect application information, the applicant may use the <a href="contact.html">contact form</a> to identify the correction. Contacting LPC does not guarantee reconsideration or approval.</p>
     </section>
 
     <section class="card">
@@ -192,26 +210,34 @@
     </section>
 
   </main>
-
-  <footer class="footer">
-    <div class="footer-inner">
-      <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
-      <p>© <script>document.write(new Date().getFullYear());</script> Let’s-ParaConnect. All rights reserved.</p>
-      <nav>
-        <a href="privacy.html">Privacy Policy</a>
-        <span>|</span>
-        <a href="terms.html">Terms</a>
-        <span>|</span>
-        <a href="/paralegal-admission.html">Admissions</a>
-        <span>|</span>
+  <footer class="home-footer">
+    <div class="home-footer__top">
+      <div class="home-footer__brand">
+        <a class="home-brand" href="index.html">Let<span class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+        <p>Project-based legal support for attorneys and independent paralegals.</p>
+      </div>
+      <nav aria-label="Footer navigation">
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
         <a href="contact.html">Contact</a>
-        <span>|</span>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="/paralegal-admission.html">Paralegal Admission</a>
         <a href="accessibility.html">Accessibility</a>
       </nav>
-      <div class="region">United States</div>
+    </div>
+    <div class="home-footer__bottom">
+      <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
+      <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg>
+        <span>Accessibility</span>
+      </button>
     </div>
   </footer>
-<script type="module" src="assets/scripts/hero-parallax.js"></script>
+
+
+  <script src="assets/scripts/utility-header.js" defer></script>
+<script src="assets/scripts/public-matter-field.js" defer></script>
   <script src="assets/scripts/accessibility-toggle.js"></script>
 </body>
 </html>

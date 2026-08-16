@@ -1,6 +1,7 @@
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const request = require("supertest");
 
 process.env.STRIPE_CONNECT_RETURN_URL =
@@ -15,6 +16,7 @@ const mockStripe = {
   transfers: { create: jest.fn() },
   isTransferablePaymentIntent: jest.fn(),
   sanitizeStripeError: jest.fn((_err, message) => message),
+  stripeIdempotencyKey: jest.fn((operation, ...parts) => `test_${operation}_${parts.join("_")}`),
 };
 
 jest.mock("../utils/stripe", () => mockStripe);
@@ -22,6 +24,8 @@ jest.mock("../utils/notifyUser", () => ({ notifyUser: jest.fn(async () => null) 
 
 const User = require("../models/User");
 const Case = require("../models/Case");
+const PaymentOperation = require("../models/PaymentOperation");
+const Payout = require("../models/Payout");
 const disputesRouter = require("../routes/disputes");
 const paymentsRouter = require("../routes/payments");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
@@ -72,15 +76,6 @@ describe("Disputes + refunds", () => {
     // Input values: message="Escrow terms dispute".
     // Expected result: 201 Created, disputeId returned, case status becomes disputed.
 
-    const admin = await User.create({
-      firstName: "Admin",
-      lastName: "Owner",
-      email: "owner@lets-paraconnect.com",
-      password: "Password123!",
-      role: "admin",
-      status: "approved",
-      state: "CA",
-    });
     const attorney = await User.create({
       firstName: "Alex",
       lastName: "Stone",
@@ -110,6 +105,8 @@ describe("Disputes + refunds", () => {
       paralegalId: paralegal._id,
       escrowIntentId: "pi_test_123",
       escrowStatus: "funded",
+      hiredAt: new Date("2026-08-01T12:00:00.000Z"),
+      fundingIntegrityStatus: "verified",
       totalAmount: 100000,
       currency: "usd",
     });
@@ -124,7 +121,157 @@ describe("Disputes + refunds", () => {
 
     const updated = await Case.findById(caseDoc._id).lean();
     expect(updated.status).toBe("disputed");
+    expect(updated.pausedReason).toBe("dispute");
+    expect(updated.adminDisputeDeadlineAt).toBeTruthy();
     expect(updated.disputes?.length).toBe(1);
+  });
+
+  test("Concurrent dispute requests create exactly one open dispute", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "concurrent-dispute-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "concurrent-dispute-paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Concurrent dispute",
+      details: "Only one review may be opened.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowIntentId: "pi_concurrent_dispute",
+      escrowStatus: "funded",
+      hiredAt: new Date(),
+      fundingIntegrityStatus: "verified",
+      totalAmount: 100000,
+      currency: "usd",
+    });
+
+    const [first, second] = await Promise.all([
+      request(app)
+        .post(`/api/disputes/${caseDoc._id}`)
+        .set("Cookie", authCookieFor(attorney))
+        .send({ message: "Attorney review request" }),
+      request(app)
+        .post(`/api/disputes/${caseDoc._id}`)
+        .set("Cookie", authCookieFor(paralegal))
+        .send({ message: "Paralegal review request" }),
+    ]);
+
+    expect([first.status, second.status].sort()).toEqual([201, 409]);
+    const updated = await Case.findById(caseDoc._id).lean();
+    expect(updated.status).toBe("disputed");
+    expect(updated.disputes.filter((entry) => entry.status === "open")).toHaveLength(1);
+  });
+
+  test("Dispute creation keeps cent inputs exact and rejects duplicates, unfunded matters, and excess claims", async () => {
+    const attorney = await User.create({
+      firstName: "Casey",
+      lastName: "Jordan",
+      email: "casey.jordan@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Robin",
+      lastName: "Smith",
+      email: "robin.smith@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const funded = await Case.create({
+      title: "Exact cents dispute",
+      details: "Dispute amount contracts must remain exact.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      hiredAt: new Date("2026-08-01T12:00:00.000Z"),
+      escrowIntentId: "pi_exact_cents",
+      escrowStatus: "funded",
+      fundingIntegrityStatus: "verified",
+      totalAmount: 100000,
+      lockedTotalAmount: 100000,
+      currency: "usd",
+    });
+
+    const excess = await request(app)
+      .post(`/api/disputes/${funded._id}`)
+      .set("Cookie", authCookieFor(attorney))
+      .send({ message: "Excess", amountCents: 100001 });
+    expect(excess.status).toBe(400);
+
+    const created = await request(app)
+      .post(`/api/disputes/${funded._id}`)
+      .set("Cookie", authCookieFor(attorney))
+      .send({ message: "Exact claim", amountCents: 12345 });
+    expect(created.status).toBe(201);
+    const stored = await Case.findById(funded._id).lean();
+    expect(stored.disputes[0].amountRequestedCents).toBe(12345);
+
+    const duplicate = await request(app)
+      .post(`/api/disputes/${funded._id}`)
+      .set("Cookie", authCookieFor(attorney))
+      .send({ message: "Second claim" });
+    expect(duplicate.status).toBe(409);
+
+    const unfunded = await Case.create({
+      title: "Unfunded matter",
+      details: "An open posting cannot enter financial dispute review.",
+      status: "open",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      totalAmount: 50000,
+      currency: "usd",
+    });
+    const unfundedResponse = await request(app)
+      .post(`/api/disputes/${unfunded._id}`)
+      .set("Cookie", authCookieFor(attorney))
+      .send({ message: "Not funded" });
+    expect(unfundedResponse.status).toBe(409);
+  });
+
+  test("Non-financial dispute resolution bypasses are retired", async () => {
+    const admin = await User.create({
+      firstName: "Admin",
+      lastName: "Owner",
+      email: "retired-disputes@example.com",
+      password: "Password123!",
+      role: "admin",
+      status: "approved",
+      state: "CA",
+    });
+    const caseId = new mongoose.Types.ObjectId();
+    const disputeId = new mongoose.Types.ObjectId().toString();
+    const patchResponse = await request(app)
+      .patch(`/api/disputes/${caseId}/${disputeId}`)
+      .set("Cookie", authCookieFor(admin))
+      .send({ status: "resolved" });
+    const resolveResponse = await request(app)
+      .post(`/api/disputes/resolve/${disputeId}`)
+      .set("Cookie", authCookieFor(admin))
+      .send({});
+    expect(patchResponse.status).toBe(404);
+    expect(resolveResponse.status).toBe(404);
   });
 
   test("Admin adds notes after refund settlement", async () => {
@@ -251,7 +398,11 @@ describe("Disputes + refunds", () => {
     mockStripe.paymentIntents.retrieve.mockResolvedValue({
       id: "pi_partial_123",
       status: "succeeded",
-      charges: { data: [{ id: "ch_partial_123" }] },
+      amount: 122000,
+      currency: "usd",
+      transfer_group: `case_${caseDoc._id}`,
+      metadata: { caseId: String(caseDoc._id) },
+      latest_charge: { id: "ch_partial_123", amount: 122000 },
     });
     mockStripe.isTransferablePaymentIntent.mockReturnValue({
       transferable: true,
@@ -270,7 +421,8 @@ describe("Disputes + refunds", () => {
     expect(mockStripe.transfers.create).toHaveBeenCalledWith(
       expect.objectContaining({
         source_transaction: "ch_partial_123",
-      })
+      }),
+      expect.objectContaining({ idempotencyKey: expect.stringContaining("dispute_payout") })
     );
 
     const updated = await Case.findById(caseDoc._id).lean();
@@ -334,7 +486,10 @@ describe("Disputes + refunds", () => {
       status: "succeeded",
       amount: 122,
       amount_received: 122,
-      charges: { data: [{ id: "ch_retry_123", amount: 122, amount_refunded: 61 }] },
+      currency: "usd",
+      transfer_group: `case_${caseDoc._id}`,
+      metadata: { caseId: String(caseDoc._id) },
+      latest_charge: { id: "ch_retry_123", amount: 122, amount_refunded: 61 },
     });
     mockStripe.isTransferablePaymentIntent.mockReturnValue({
       transferable: true,
@@ -350,15 +505,185 @@ describe("Disputes + refunds", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
-    expect(mockStripe.refunds.create).toHaveBeenCalledWith({
-      payment_intent: "pi_partial_retry_123",
-      amount: 24,
-    });
+    expect(mockStripe.refunds.create).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_intent: "pi_partial_retry_123", amount: 24 }),
+      expect.objectContaining({ idempotencyKey: expect.stringContaining("dispute_partial_refund") })
+    );
     expect(mockStripe.transfers.create).toHaveBeenCalledWith(
       expect.objectContaining({
         source_transaction: "ch_retry_123",
         amount: 25,
-      })
+      }),
+      expect.objectContaining({ idempotencyKey: expect.stringContaining("dispute_payout") })
     );
+  });
+
+  test("Refund retry reuses recorded Stripe evidence after the case save fails", async () => {
+    const admin = await User.create({
+      firstName: "Admin",
+      lastName: "Recovery",
+      email: "refund.recovery.admin@example.com",
+      password: "Password123!",
+      role: "admin",
+      status: "approved",
+      state: "CA",
+    });
+    const attorney = await User.create({
+      firstName: "Avery",
+      lastName: "Counsel",
+      email: "refund.recovery.attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Taylor",
+      lastName: "Para",
+      email: "refund.recovery.paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Refund recovery",
+      details: "Refund evidence must survive a local persistence failure.",
+      status: "disputed",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowIntentId: "pi_refund_recovery",
+      escrowStatus: "funded",
+      lockedTotalAmount: 80000,
+      totalAmount: 80000,
+      disputes: [{ message: "Refund this", raisedBy: attorney._id, status: "open" }],
+    });
+    const disputeId = caseDoc.disputes[0].disputeId || String(caseDoc.disputes[0]._id);
+    mockStripe.refunds.create.mockResolvedValue({ id: "re_recovery", amount: 80000 });
+    const saveSpy = jest
+      .spyOn(Case.prototype, "save")
+      .mockRejectedValueOnce(new Error("simulated case persistence failure"));
+
+    const first = await request(app)
+      .post(`/api/payments/dispute/settle/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(admin))
+      .send({ action: "refund", disputeId });
+    saveSpy.mockRestore();
+
+    expect(first.status).toBe(503);
+    expect(first.body.code).toBe("PAYOUT_RECONCILIATION_REQUIRED");
+    let operation = await PaymentOperation.findOne({ caseId: caseDoc._id }).lean();
+    expect(operation.status).toBe("needs_reconciliation");
+    expect(operation.stripeRefundId).toBe("re_recovery");
+
+    const retry = await request(app)
+      .post(`/api/payments/dispute/settle/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(admin))
+      .send({ action: "refund", disputeId });
+
+    expect(retry.status).toBe(200);
+    expect(mockStripe.refunds.create).toHaveBeenCalledTimes(1);
+    const updated = await Case.findById(caseDoc._id).lean();
+    operation = await PaymentOperation.findOne({ caseId: caseDoc._id }).lean();
+    expect(updated.status).toBe("closed");
+    expect(updated.disputeSettlement.refundId).toBe("re_recovery");
+    expect(operation.status).toBe("succeeded");
+  });
+
+  test("Release retry reuses the transfer and completes missing local ledgers", async () => {
+    const admin = await User.create({
+      firstName: "Admin",
+      lastName: "Recovery",
+      email: "release.recovery.admin@example.com",
+      password: "Password123!",
+      role: "admin",
+      status: "approved",
+      state: "CA",
+    });
+    const attorney = await User.create({
+      firstName: "Drew",
+      lastName: "Counsel",
+      email: "release.recovery.attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Morgan",
+      lastName: "Para",
+      email: "release.recovery.paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+      stripeAccountId: "acct_release_recovery",
+      stripeOnboarded: true,
+      stripePayoutsEnabled: true,
+    });
+    const caseDoc = await Case.create({
+      title: "Release recovery",
+      details: "Transfer evidence must prevent a duplicate settlement transfer.",
+      status: "disputed",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowIntentId: "pi_release_recovery",
+      escrowStatus: "funded",
+      lockedTotalAmount: 100000,
+      totalAmount: 100000,
+      currency: "usd",
+      disputes: [{ message: "Release after review", raisedBy: attorney._id, status: "open" }],
+    });
+    const disputeId = caseDoc.disputes[0].disputeId || String(caseDoc.disputes[0]._id);
+    mockStripe.paymentIntents.retrieve.mockResolvedValue({
+      id: "pi_release_recovery",
+      status: "succeeded",
+      amount: 122000,
+      amount_received: 122000,
+      currency: "usd",
+      transfer_group: `case_${caseDoc._id}`,
+      metadata: { caseId: String(caseDoc._id) },
+      latest_charge: { id: "ch_release_recovery", amount: 122000, amount_refunded: 0 },
+    });
+    mockStripe.isTransferablePaymentIntent.mockReturnValue({
+      transferable: true,
+      charge: { id: "ch_release_recovery", amount: 122000, amount_refunded: 0 },
+    });
+    mockStripe.transfers.create.mockResolvedValue({ id: "tr_release_recovery" });
+    const saveSpy = jest
+      .spyOn(Case.prototype, "save")
+      .mockRejectedValueOnce(new Error("simulated case persistence failure"));
+
+    const first = await request(app)
+      .post(`/api/payments/dispute/settle/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(admin))
+      .send({ action: "release_full", disputeId });
+    saveSpy.mockRestore();
+
+    expect(first.status).toBe(503);
+    expect(first.body.code).toBe("PAYOUT_RECONCILIATION_REQUIRED");
+    let operation = await PaymentOperation.findOne({ caseId: caseDoc._id }).lean();
+    expect(operation.status).toBe("needs_reconciliation");
+    expect(operation.stripeTransferId).toBe("tr_release_recovery");
+
+    const retry = await request(app)
+      .post(`/api/payments/dispute/settle/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(admin))
+      .send({ action: "release_full", disputeId });
+
+    expect(retry.status).toBe(200);
+    expect(mockStripe.transfers.create).toHaveBeenCalledTimes(1);
+    const updated = await Case.findById(caseDoc._id).lean();
+    operation = await PaymentOperation.findOne({ caseId: caseDoc._id }).lean();
+    const payouts = await Payout.find({ caseId: caseDoc._id }).lean();
+    expect(updated.status).toBe("closed");
+    expect(updated.payoutTransferId).toBe("tr_release_recovery");
+    expect(operation.status).toBe("succeeded");
+    expect(payouts).toHaveLength(1);
+    expect(payouts[0].transferId).toBe("tr_release_recovery");
   });
 });

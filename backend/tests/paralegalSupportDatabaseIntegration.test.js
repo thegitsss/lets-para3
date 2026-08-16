@@ -181,7 +181,7 @@ describe("paralegal assistant Package 6 database-backed integration", () => {
       available: true,
       title: fixture.cases.assigned.title,
       status: "in progress",
-      deadline: "2026-08-15T21:00:00.000Z",
+      deadline: "2026-08-15",
       attorneyName: "P6 Synthetic Attorney",
       relationship: "assigned",
       scopeTasks: expect.arrayContaining([
@@ -259,7 +259,12 @@ describe("paralegal assistant Package 6 database-backed integration", () => {
       finalized: true,
       paymentReleased: true,
     }));
-    expect(workflow.bankDepositEstimateBusinessDays).toEqual({ minimum: 3, maximum: 5 });
+    expect(workflow.bankDepositTimingSource).toBe("stripe_payout_status_and_estimated_arrival");
+    expect(workflow.bankDepositTimingDependsOn).toEqual([
+      "stripe_account_country",
+      "stripe_payout_schedule",
+      "financial_institution",
+    ]);
     expect(workflow.evaluations.payout.facts.bankReceiptConfirmed).toBe(false);
   });
 
@@ -293,7 +298,7 @@ describe("paralegal assistant Package 6 database-backed integration", () => {
       {
         reply: "The payout is $999.00. Read the raw evidence here: dashboard-paralegal.html#cases-completed",
         navigation: {
-          ctaLabel: "Completed cases",
+          ctaLabel: "Completed Matters",
           ctaHref: "dashboard-paralegal.html#cases-completed",
         },
         suggestions: ["Open billing", "Open payouts"],
@@ -301,7 +306,7 @@ describe("paralegal assistant Package 6 database-backed integration", () => {
       {
         reply: "Completed Payout Matter is completed, and your finalized net payout is $820.00.",
         navigation: {
-          ctaLabel: "Completed cases",
+          ctaLabel: "Completed Matters",
           ctaHref: "dashboard-paralegal.html#cases-completed",
         },
         suggestions: ["Open payouts"],

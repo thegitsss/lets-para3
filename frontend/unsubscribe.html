@@ -5,7 +5,7 @@
   <link rel="stylesheet" href="assets/styles/fonts.css" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lets-ParaConnect Email Preferences</title>
+    <title>Let’s-ParaConnect Email Preferences</title>
     <link
       rel="stylesheet"
     />
@@ -96,7 +96,7 @@
       }
       .btn {
         background: var(--accent);
-        color: #ffffff;
+        color: #1a2230;
         text-decoration: none;
         padding: 12px 28px;
         border-radius: 999px;
@@ -117,15 +117,15 @@
   </head>
   <body>
   <a class="skip-link" href="#main">Skip to main content</a>
-    <div class="wrap" id="main" role="main" tabindex="-1">
+    <main class="wrap" id="main" tabindex="-1">
       <div class="card">
         <div class="logo">
-          <img src="Cleanfav.png" alt="Lets-ParaConnect" />
+          <img src="Cleanfav.png" alt="Let’s-ParaConnect" />
           <span>Let's-ParaConnect</span>
         </div>
         <h1 id="title">You're unsubscribed</h1>
         <p id="message">
-          You're no longer receiving Lets-ParaConnect emails. You can re-enable email
+          You're no longer receiving Let’s-ParaConnect emails. You can re-enable email
           notifications in your profile settings at any time.
         </p>
         <div class="actions">
@@ -136,7 +136,7 @@
           Need help updating preferences? Log in and visit Profile Settings.
         </p>
       </div>
-    </div>
+    </main>
     <script>
       const params = new URLSearchParams(window.location.search);
       const status = params.get("status");
@@ -155,5 +155,6 @@
           "Please contact support if you continue to have trouble.";
       }
     </script>
+    <script type="module" src="assets/scripts/web-vitals-rum.js"></script>
   </body>
 </html>

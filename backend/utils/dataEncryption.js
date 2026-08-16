@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("./logger");
+const runtimeLogger = createRuntimeLogger("utils:dataEncryption");
 const crypto = require("crypto");
 
 const ENCRYPTION_PREFIX = "enc:v1:";
@@ -41,7 +43,7 @@ function getKeyOrNull() {
   }
   if (!warnedMissingKey) {
     warnedMissingKey = true;
-    console.warn("[dataEncryption] DATA_ENCRYPTION_KEY missing; storing data without encryption.");
+    runtimeLogger.warn("[dataEncryption] DATA_ENCRYPTION_KEY missing; storing data without encryption.");
   }
   return null;
 }
@@ -104,6 +106,21 @@ function hashForLookup(value) {
   return crypto.createHmac("sha256", key).update(raw).digest("hex");
 }
 
+function stableLookupFingerprint(value) {
+  if (value == null) return "";
+  let raw = String(value);
+  if (isEncrypted(raw)) {
+    try {
+      raw = decryptString(raw);
+    } catch {
+      return "";
+    }
+  }
+  raw = String(raw || "").trim();
+  if (!raw) return "";
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
+
 function encryptMessageFields(doc) {
   if (!doc) return doc;
   if (doc.text) doc.text = encryptString(doc.text);
@@ -143,6 +160,8 @@ function decryptMessagePayload(message) {
 
 function encryptCaseFileFields(doc) {
   if (!doc) return doc;
+  const storageKeyFingerprint = stableLookupFingerprint(doc.storageKey);
+  if (storageKeyFingerprint) doc.storageKeyFingerprint = storageKeyFingerprint;
   const storageKeyHash = hashForLookup(doc.storageKey);
   if (storageKeyHash) doc.storageKeyHash = storageKeyHash;
   const originalNameHash = hashForLookup(doc.originalName);
@@ -181,13 +200,21 @@ function decryptCaseFilePayload(file) {
 function buildCaseFileKeyQuery({ caseId, storageKey }) {
   const query = { caseId };
   if (!storageKey) return query;
+  const fingerprint = stableLookupFingerprint(storageKey);
   if (!isEncryptionEnabled()) {
-    query.storageKey = storageKey;
+    query.$or = [
+      ...(fingerprint ? [{ storageKeyFingerprint: fingerprint }] : []),
+      { storageKey },
+    ];
     return query;
   }
   const hash = hashForLookup(storageKey);
-  if (hash) {
-    query.$or = [{ storageKeyHash: hash }, { storageKey }];
+  if (hash || fingerprint) {
+    query.$or = [
+      ...(fingerprint ? [{ storageKeyFingerprint: fingerprint }] : []),
+      ...(hash ? [{ storageKeyHash: hash }] : []),
+      { storageKey },
+    ];
     return query;
   }
   query.storageKey = storageKey;
@@ -216,6 +243,7 @@ module.exports = {
   encryptString,
   decryptString,
   hashForLookup,
+  stableLookupFingerprint,
   encryptMessageFields,
   decryptMessagePayload,
   encryptCaseFileFields,

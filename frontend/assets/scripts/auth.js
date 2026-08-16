@@ -3,7 +3,6 @@
 // - Prefetches CSRF token and exposes it
 // - secureFetch(): auto-includes CSRF header for mutating requests, supports FormData/Blob
 // - Role-based visibility via [data-visible="attorney|paralegal|admin"]
-// - Dev-safe reCAPTCHA helper
 
 export let CSRF_TOKEN = "";
 
@@ -11,6 +10,51 @@ const USER_KEY = "lpc_user";
 const SUPPORT_SESSION_USER_KEY = "lpc_support_session_user";
 const LEGACY_TOKEN_KEYS = ["LPC_JWT", "lpc_jwt"];
 let redirectingToLogin = false;
+
+const SESSION_STRING_FIELDS = [
+  "id",
+  "_id",
+  "role",
+  "status",
+  "firstName",
+  "lastName",
+  "name",
+  "avatarURL",
+  "profileImage",
+  "pendingProfileImage",
+  "profilePhotoStatus",
+];
+const SESSION_BOOLEAN_FIELDS = ["disabled", "deleted", "isFirstLogin", "legalAcceptanceRequired"];
+const ONBOARDING_BOOLEAN_FIELDS = [
+  "paralegalTourCompleted",
+  "paralegalProfileTourCompleted",
+  "attorneyTourCompleted",
+  "attorneyProfileCompleted",
+];
+
+export function projectSessionUser(user) {
+  if (typeof window !== "undefined" && typeof window.projectSessionUser === "function") {
+    return window.projectSessionUser(user);
+  }
+  if (!user || typeof user !== "object" || Array.isArray(user)) return null;
+  const snapshot = {};
+  SESSION_STRING_FIELDS.forEach((field) => {
+    if (typeof user[field] === "string") snapshot[field] = user[field];
+  });
+  SESSION_BOOLEAN_FIELDS.forEach((field) => {
+    if (typeof user[field] === "boolean") snapshot[field] = user[field];
+  });
+  const preferences = {};
+  if (typeof user.preferences?.theme === "string") preferences.theme = user.preferences.theme;
+  if (typeof user.preferences?.fontSize === "string") preferences.fontSize = user.preferences.fontSize;
+  if (Object.keys(preferences).length) snapshot.preferences = preferences;
+  const onboarding = {};
+  ONBOARDING_BOOLEAN_FIELDS.forEach((field) => {
+    if (typeof user.onboarding?.[field] === "boolean") onboarding[field] = user.onboarding[field];
+  });
+  if (Object.keys(onboarding).length) snapshot.onboarding = onboarding;
+  return snapshot;
+}
 
 function clearLegacyTokens() {
   LEGACY_TOKEN_KEYS.forEach((key) => {
@@ -30,6 +74,17 @@ function redirectToLoginOnce() {
     if (typeof window !== "undefined") {
       window.location.href = "login.html";
     }
+  } catch {
+    /* noop */
+  }
+}
+
+function redirectToLegalAcceptanceOnce() {
+  if (typeof window === "undefined") return;
+  const currentPath = String(window.location?.pathname || "").toLowerCase();
+  if (currentPath.endsWith("/legal-acceptance.html")) return;
+  try {
+    window.location.replace("legal-acceptance.html");
   } catch {
     /* noop */
   }
@@ -56,7 +111,8 @@ export function getStoredSession() {
 export function persistSession({ user } = {}) {
   if (typeof user === "undefined") return;
   try {
-    const payload = user ? JSON.stringify(user) : "";
+    const snapshot = projectSessionUser(user);
+    const payload = snapshot && Object.keys(snapshot).length ? JSON.stringify(snapshot) : "";
     if (payload) localStorage.setItem(USER_KEY, payload);
     else localStorage.removeItem(USER_KEY);
   } catch {
@@ -71,11 +127,14 @@ export function persistSession({ user } = {}) {
 export function clearSession() {
   try {
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem("avatarURL");
   } catch {
     /* noop */
   }
   try {
     sessionStorage.removeItem(SUPPORT_SESSION_USER_KEY);
+    sessionStorage.removeItem("lpc-support-context");
+    sessionStorage.removeItem("lpc_support_drawer_pin");
   } catch {
     /* noop */
   }
@@ -114,18 +173,29 @@ export function requireAuth(expectedRole) {
     throw new Error("Not approved");
   }
 
+  if (user?.legalAcceptanceRequired === true) {
+    redirectToLegalAcceptanceOnce();
+    const error = new Error("Updated legal documents must be accepted before continuing.");
+    error.code = "LEGAL_ACCEPTANCE_REQUIRED";
+    throw error;
+  }
+
   return session;
 }
 
 // Prefetch CSRF token (sets cookie via server; we store the token for headers)
 export async function fetchCSRF(force = false) {
   if (CSRF_TOKEN && !force) return CSRF_TOKEN;
+  if (force) {
+    CSRF_TOKEN = "";
+    if (typeof window !== "undefined") window.__CSRF__ = "";
+  }
   const r = await fetch("/api/csrf", { credentials: "include" });
   if (r.ok) {
     const { csrfToken } = await r.json();
     CSRF_TOKEN = csrfToken || "";
     // keep compat with older code
-    window.__CSRF__ = CSRF_TOKEN;
+    if (typeof window !== "undefined") window.__CSRF__ = CSRF_TOKEN;
   }
   return CSRF_TOKEN;
 }
@@ -134,6 +204,29 @@ export async function secureJSON(url, opts = {}) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const ct = res.headers.get("content-type") || "";
   return ct.includes("application/json") ? res.json() : res.text();
+}
+
+async function isCsrfFailure(response) {
+  if (response?.status !== 403) return false;
+  try {
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) return false;
+    const payload = await response.clone().json();
+    if (payload?.code === "CSRF_INVALID") return true;
+    return /csrf/i.test(String(payload?.error || payload?.msg || ""));
+  } catch {
+    return false;
+  }
+}
+
+function applyAuthResponseRedirect(response, opts = {}) {
+  if (opts.noRedirect) return;
+  if (response.status === 401) {
+    clearSession();
+    redirectToLoginOnce();
+  } else if (response.status === 428) {
+    redirectToLegalAcceptanceOnce();
+  }
 }
 
 // Fetch wrapper that adds CSRF on mutating methods and handles JSON bodies safely.
@@ -154,7 +247,11 @@ export async function secureFetch(url, opts = {}) {
       }
     }
     if (!CSRF_TOKEN) {
-      try { await fetchCSRF(); } catch {}
+      try {
+        await fetchCSRF();
+      } catch (error) {
+        console.warn("[auth] CSRF preflight failed", error);
+      }
     }
     if (CSRF_TOKEN) headers.set("X-CSRF-Token", CSRF_TOKEN);
 
@@ -175,7 +272,7 @@ export async function secureFetch(url, opts = {}) {
     }
   }
 
-  const res = await fetch(url, {
+  let res = await fetch(url, {
     ...opts,
     body,
     headers,
@@ -183,21 +280,22 @@ export async function secureFetch(url, opts = {}) {
     signal: opts.signal,
   });
 
-  // If CSRF expired and server returns 403, refresh once and retry
-  if (res.status === 403 && isMutation) {
+  // Refresh and retry only an explicit CSRF rejection. A normal authorization
+  // denial must not be double-submitted or treated as an expired session.
+  if (isMutation && await isCsrfFailure(res)) {
     try {
-      await fetchCSRF(true);
-      if (CSRF_TOKEN) headers.set("X-CSRF-Token", CSRF_TOKEN);
-      return fetch(url, { ...opts, body, headers, credentials: "include" });
-    } catch {
-      return res;
+      const refreshedToken = await fetchCSRF(true);
+      if (refreshedToken) {
+        headers.set("X-CSRF-Token", refreshedToken);
+        res = await fetch(url, { ...opts, body, headers, credentials: "include" });
+      }
+    } catch (error) {
+      console.warn("[auth] CSRF refresh failed; preserving the original response", error);
+      // Preserve the original response when a token refresh cannot be completed.
     }
   }
 
-  if ((res.status === 401 || res.status === 403) && !opts.noRedirect) {
-    clearSession();
-    redirectToLoginOnce();
-  }
+  applyAuthResponseRedirect(res, opts);
 
   return res;
 }
@@ -218,9 +316,19 @@ export function applyRoleVisibility(role) {
 
 export async function logout(redirect = "login.html") {
   try {
-    await secureFetch("/api/auth/logout", { method: "POST" });
-  } catch {
-    /* ignore */
+    const response = await secureFetch("/api/auth/logout", { method: "POST", noRedirect: true });
+    if (!response.ok) throw new Error(`Logout failed with HTTP ${response.status}`);
+  } catch (error) {
+    import("./utils/dialogs.js")
+      .then(({ showAlert }) =>
+        showAlert("Your session could not be ended. Check your connection and try again.", {
+          title: "Log out unsuccessful",
+        })
+      )
+      .catch((dialogError) => {
+        console.error("[auth] logout failure dialog could not be shown", dialogError);
+      });
+    return false;
   }
   clearSession();
   if (redirect) {
@@ -228,6 +336,7 @@ export async function logout(redirect = "login.html") {
       window.location.href = redirect;
     } catch {}
   }
+  return true;
 }
 
 export async function logoutUser(event) {
@@ -268,7 +377,8 @@ function loadPageEnhancements() {
     .catch((err) => {
       console.warn("Unable to load the LPC assistant", err);
     });
-  if (path.endsWith("/browse-paralegals.html") || path.endsWith("browse-paralegals.html")) {
+  const pageOwnsStateFilter = document.querySelector("#stateList[data-state-filter-owner='browse-page']");
+  if ((path.endsWith("/browse-paralegals.html") || path.endsWith("browse-paralegals.html")) && !pageOwnsStateFilter) {
     import("./browse-paralegals-state-multiselect.js").catch((err) => {
       console.warn("Unable to load browse paralegal state multi-select", err);
     });
@@ -279,28 +389,43 @@ function loadPageEnhancements() {
 window.addEventListener("DOMContentLoaded", async () => {
   document.body.classList.add("loaded");
 
-  try { await fetchCSRF(); } catch {}
+  try {
+    await fetchCSRF();
+  } catch (error) {
+    console.warn("[auth] initial CSRF hydration failed", error);
+  }
 
   const isPublicPage = document.body?.dataset?.publicPage === "true";
   if (!isPublicPage) {
     try {
-      const r = await fetch("/api/users/me", { credentials: "include" });
-      const payload = await r.json().catch(() => ({}));
-      const me = r.ok ? payload : null;
-      if (!r.ok && (r.status === 401 || r.status === 403)) {
-        const message = payload?.error || payload?.msg || "";
-        clearSession();
-        if (/account has been (disabled|deactivated)/i.test(message)) {
-          try {
-            sessionStorage.setItem("disabledAccountMsg", message);
-          } catch {}
+      let me = null;
+      if (typeof window.getSessionData === "function") {
+        me = (await window.getSessionData())?.user || null;
+      } else {
+        const response = await fetch("/api/auth/me", { credentials: "include" });
+        const payload = await response.json().catch(() => ({}));
+        me = response.ok ? payload?.user || null : null;
+        if (!response.ok && (response.status === 401 || response.status === 403)) {
+          const message = payload?.error || payload?.msg || "";
+          clearSession();
+          if (/account has been (disabled|deactivated)/i.test(message)) {
+            try {
+              sessionStorage.setItem("disabledAccountMsg", message);
+            } catch {}
+          }
         }
+      }
+      if (!me) {
+        clearSession();
         redirectToLoginOnce();
         return;
       }
       if (me?.role) applyRoleVisibility(me.role);
-    } catch {
-      // non-fatal for public/unauthenticated pages
+    } catch (error) {
+      console.warn("[auth] authenticated page guard failed closed", error);
+      clearSession();
+      redirectToLoginOnce();
+      return;
     }
   }
 
@@ -311,12 +436,22 @@ window.addEventListener("DOMContentLoaded", async () => {
 // === Auto-inject logged-in user's name + avatar globally ===
 export async function loadUserHeaderInfo() {
   try {
-    const res = await secureFetch("/api/users/me", { method: "GET" });
-    if (!res.ok) return;
-    const user = await res.json();
+    let user = null;
+    if (typeof window.getSessionData === "function") {
+      user = (await window.getSessionData())?.user || null;
+    } else {
+      const res = await secureFetch("/api/auth/me", { method: "GET" });
+      if (!res.ok) return;
+      user = (await res.json().catch(() => ({})))?.user || null;
+    }
+    if (!user) return;
 
     document.querySelectorAll(".globalProfileImage").forEach((img) => {
-      img.src = user.profileImage || "default.jpg";
+      img.src =
+        user.pendingProfileImage ||
+        user.profileImage ||
+        user.avatarURL ||
+        "assets/avatar-placeholder.svg";
     });
 
     document.querySelectorAll(".globalProfileName").forEach((name) => {

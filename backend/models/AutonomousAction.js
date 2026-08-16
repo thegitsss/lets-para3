@@ -26,10 +26,10 @@ function hasOwnKeys(value) {
   return isPlainObject(value) && Object.keys(value).length > 0;
 }
 
-function blockDeletion(next) {
+function blockDeletion() {
   const error = new Error(APPEND_ONLY_ERROR);
   error.statusCode = 405;
-  next(error);
+  throw error;
 }
 
 const autonomousActionSchema = new Schema(

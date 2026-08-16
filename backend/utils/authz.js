@@ -1,9 +1,12 @@
 // backend/utils/authz.js
 const { Types } = require("mongoose");
 const Case = require("../models/Case");
+const { createLogger } = require("./logger");
+
+const authzLogger = createLogger("authz");
 
 /**
- * Tiny helpers you can reuse elsewhere
+ * Shared authorization helpers.
  */
 const isObjId = (v) => Types.ObjectId.isValid(v);
 const toId = (v) => (v ? String(v) : "");
@@ -79,7 +82,7 @@ function requireCaseAccess(paramKey = "caseId", opts = {}) {
 
       const rawId = req.params?.[paramKey] || req.body?.[paramKey] || req.query?.[paramKey];
       if (!rawId || !isObjId(rawId)) {
-        return res.status(400).json({ error: "Invalid case id" });
+        return res.status(400).json({ error: "Invalid Matter ID" });
       }
 
       // Build a minimal projection; add applicants only if needed
@@ -101,7 +104,7 @@ function requireCaseAccess(paramKey = "caseId", opts = {}) {
 
       const c = await Case.findById(rawId).select(select);
       if (!c) {
-        return res.status(404).json({ error: "Case not found" });
+        return res.status(404).json({ error: "Matter not found" });
       }
 
       const uid = toId(req.user.id);
@@ -113,7 +116,7 @@ function requireCaseAccess(paramKey = "caseId", opts = {}) {
       if (paralegalRevoked) {
         return res
           .status(hideExistence ? 404 : 403)
-          .json({ error: hideExistence ? "Case not found" : "Access revoked" });
+          .json({ error: hideExistence ? "Matter not found" : "Access revoked" });
       }
 
       let isApplicant = false;
@@ -132,15 +135,19 @@ function requireCaseAccess(paramKey = "caseId", opts = {}) {
         try {
           // User-defined extra predicate; do not throw if it fails.
           allowed = !!(await alsoAllow(req, c));
-        } catch {
-          // ignore errors in predicate
+        } catch (error) {
+          authzLogger.warn("[authz] additional case-access predicate failed", {
+            caseId: String(c?._id || req.params?.[paramKey] || ""),
+            userId: String(req.user?.id || ""),
+            error: error?.message || String(error),
+          });
         }
       }
 
       if (!allowed) {
         return res
           .status(hideExistence ? 404 : 403)
-          .json({ error: hideExistence ? "Case not found" : "Forbidden" });
+          .json({ error: hideExistence ? "Matter not found" : "Forbidden" });
       }
 
       // Attach convenience access flags for downstream handlers

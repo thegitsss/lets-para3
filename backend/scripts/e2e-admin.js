@@ -63,6 +63,8 @@ async function main() {
       password: "Password123!",
       role: "attorney",
       status: "pending",
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
       state: "CA",
     });
 
@@ -107,6 +109,8 @@ async function main() {
       password: "Password123!",
       role: "attorney",
       status: "pending",
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
       state: "CA",
     });
 

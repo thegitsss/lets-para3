@@ -1,5 +1,8 @@
-import { secureFetch, fetchCSRF, persistSession, getStoredSession, clearSession } from "./auth.js";
+import { secureFetch, persistSession, getStoredSession, clearSession } from "./auth.js";
 import { startStripeOnboarding } from "./utils/stripe-connect.js";
+import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
+import { confirmAction, showAlert } from "./utils/dialogs.js";
+import { normalizeHttpNavigationUrl } from "./utils/navigation-url.js";
 
 const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
 const ATTORNEY_ONBOARDING_MODAL_SEEN_KEY = "lpc_attorney_onboarding_modal_seen";
@@ -290,15 +293,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const confirm = document.getElementById("confirmPassword")?.value || "";
 
       if (!currentPass) {
-        alert("Enter your current password.");
+        showToast("Enter your current password.", "err");
         return;
       }
       if (newPass !== confirm) {
-        alert("Passwords do not match!");
+        showToast("Passwords do not match.", "err");
         return;
       }
-      if (String(newPass).length < 8) {
-        alert("Password must be at least 8 characters.");
+      if (String(newPass).length < 15) {
+        showToast("Password must be at least 15 characters.", "err");
         return;
       }
 
@@ -309,16 +312,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data?.error || "Unable to update password.");
+        showToast(data?.error || "Unable to update password.", "err");
         return;
       }
-      alert("Password updated!");
+      showToast("Password updated. Sign in again to protect your account.", "ok");
       const currentInput = document.getElementById("currentPassword");
       const newInput = document.getElementById("newPassword");
       const confirmInput = document.getElementById("confirmPassword");
       if (currentInput) currentInput.value = "";
       if (newInput) newInput.value = "";
       if (confirmInput) confirmInput.value = "";
+      try {
+        window.clearStoredSession?.();
+        localStorage.removeItem("lpc_user");
+      } catch {}
+      window.location.href = "login.html";
     });
   }
 
@@ -376,12 +384,13 @@ document.addEventListener("DOMContentLoaded", () => {
         email: emailToggle ? !!emailToggle.checked : false,
         state: statePreferenceSelect ? statePreferenceSelect.value : undefined
       };
-      await fetch("/api/account/preferences", {
+      const response = await secureFetch("/api/account/preferences", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload)
+        body: payload,
       });
+      if (!response.ok) {
+        throw new Error("Unable to save display preferences.");
+      }
     } catch (err) {
       console.error("Failed to persist theme preference", err);
     }
@@ -539,11 +548,9 @@ document.addEventListener("DOMContentLoaded", () => {
         payload.hideProfile = hideProfile;
       }
 
-      const res = await fetch("/api/account/preferences", {
+      const res = await secureFetch("/api/account/preferences", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload)
+        body: payload,
       });
 
       const data = await res.json().catch(() => ({}));
@@ -583,17 +590,15 @@ document.addEventListener("DOMContentLoaded", () => {
   if (deactivateButtons.length) {
     deactivateButtons.forEach((btn) => {
       btn.addEventListener("click", async () => {
-        const confirmed = window.confirm(
-          "Deactivate your account? This will disable sign-in and remove you from active platform participation. Historical case, dispute, payment, audit, and financial records will be preserved. This is not full erasure. Accounts cannot be deactivated while you are involved in an active matter or while payout, dispute, or other financial obligations remain unresolved."
+        const confirmed = await confirmAction(
+          "Sign-in and active platform participation will be disabled. Historical Matter, dispute, payment, audit, and financial records are preserved; this is not full erasure. Deactivation is blocked while active work or financial obligations remain.",
+          { title: "Deactivate your account?", confirmLabel: "Deactivate account", tone: "danger" }
         );
         if (!confirmed) return;
         btn.disabled = true;
         try {
-          const csrfToken = await fetchCSRF().catch(() => "");
-          const res = await fetch("/api/account/deactivate", {
+          const res = await secureFetch("/api/account/deactivate", {
             method: "DELETE",
-            credentials: "include",
-            headers: csrfToken ? { "X-CSRF-Token": csrfToken } : {},
           });
           const data = await res.json().catch(() => ({}));
 
@@ -615,13 +620,13 @@ document.addEventListener("DOMContentLoaded", () => {
           const blockerCopy = Array.isArray(data?.blockers) && data.blockers.length
             ? data.blockers.map((item) => item.message).join("\n")
             : "";
-          alert(blockerCopy || data?.error || "Unable to deactivate account.");
+          showToast(blockerCopy || data?.error || "Unable to deactivate account.", "err");
         } catch (err) {
           if (/session expired|account has been (disabled|deactivated)/i.test(String(err?.message || ""))) {
             redirectAfterDeactivation(err?.message || "This account has been deactivated.");
             return;
           }
-          alert(err?.message || "Unable to deactivate account.");
+          showToast(err?.message || "Unable to deactivate account.", "err");
         } finally {
           btn.disabled = false;
         }
@@ -631,13 +636,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- TWO-STEP VERIFICATION ---
   const twoFactorToggles = Array.from(document.querySelectorAll(".two-factor-toggle"));
+  const twoFactorPasswordInput = document.getElementById("twoFactorCurrentPassword");
+  const generateBackupCodesBtn = document.getElementById("generateBackupCodesBtn");
+  const backupCodesOutput = document.getElementById("backupCodesOutput");
+  const authenticatorSetupPanel = document.getElementById("authenticatorSetupPanel");
+  const authenticatorQrCode = document.getElementById("authenticatorQrCode");
+  const authenticatorManualSecret = document.getElementById("authenticatorManualSecret");
+  const authenticatorConfirmCode = document.getElementById("authenticatorConfirmCode");
+  const authenticatorConfirmBtn = document.getElementById("authenticatorConfirmBtn");
+  const authenticatorCancelBtn = document.getElementById("authenticatorCancelBtn");
+  let authenticatorChallengeId = "";
   let twoFactorUpdating = false;
-
-  const twoFactorLabels = {
-    authenticator: "Authenticator app",
-    sms: "Phone number",
-    email: "Email",
-  };
 
   const setTwoFactorUI = ({ enabled = false, method = "email" } = {}) => {
     const availableMethods = new Set(
@@ -669,18 +678,52 @@ document.addEventListener("DOMContentLoaded", () => {
         method: data?.method || "email",
       });
     } catch (err) {
+      console.warn("[profile-settings] two-step verification status failed", err);
+      twoFactorToggles.forEach((toggle) => {
+        toggle.checked = false;
+        toggle.disabled = true;
+        toggle.setAttribute("aria-disabled", "true");
+      });
+      showToast("Two-step verification status could not be loaded. Try again before changing it.", "err");
     }
   }
 
   const updateTwoFactor = async (enabled, method) => {
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) throw new Error("Enter your current password to change two-step verification.");
     const res = await secureFetch("/api/account/2fa-toggle", {
       method: "POST",
-      body: { enabled, method },
+      body: { enabled, method, currentPassword },
     });
     if (!res.ok) {
       const payload = await res.json().catch(() => ({}));
       throw new Error(payload?.error || "Unable to update 2-step verification.");
     }
+  };
+
+  const closeAuthenticatorSetup = () => {
+    authenticatorChallengeId = "";
+    if (authenticatorSetupPanel) authenticatorSetupPanel.hidden = true;
+    if (authenticatorQrCode) authenticatorQrCode.removeAttribute("src");
+    if (authenticatorManualSecret) authenticatorManualSecret.textContent = "";
+    if (authenticatorConfirmCode) authenticatorConfirmCode.value = "";
+  };
+
+  const beginAuthenticatorSetup = async () => {
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) throw new Error("Enter your current password to set up an authenticator app.");
+    const res = await secureFetch("/api/account/2fa/authenticator/setup", {
+      method: "POST",
+      body: { currentPassword },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || "Unable to start authenticator setup.");
+    authenticatorChallengeId = data.challengeId || "";
+    if (authenticatorQrCode) authenticatorQrCode.src = data.qrDataUrl || "";
+    if (authenticatorManualSecret) authenticatorManualSecret.textContent = data.manualSecret || "";
+    if (authenticatorSetupPanel) authenticatorSetupPanel.hidden = false;
+    authenticatorSetupPanel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    authenticatorConfirmCode?.focus();
   };
 
   if (twoFactorToggles.length) {
@@ -689,6 +732,19 @@ document.addEventListener("DOMContentLoaded", () => {
         if (twoFactorUpdating) return;
         const method = toggle.dataset.twoFactorMethod || "email";
         const enabled = toggle.checked;
+        if (method === "authenticator" && enabled) {
+          twoFactorUpdating = true;
+          try {
+            await beginAuthenticatorSetup();
+            toggle.checked = false;
+          } catch (err) {
+            showToast(err?.message || "Unable to start authenticator setup.", "err");
+            await loadTwoFactorStatus();
+          } finally {
+            twoFactorUpdating = false;
+          }
+          return;
+        }
         if (enabled) {
           twoFactorToggles.forEach((other) => {
             if (other !== toggle) other.checked = false;
@@ -702,9 +758,10 @@ document.addEventListener("DOMContentLoaded", () => {
         twoFactorUpdating = true;
         try {
           await updateTwoFactor(finalEnabled, activeMethod);
+          if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
           await loadTwoFactorStatus();
         } catch (err) {
-          alert(err?.message || "Unable to update 2-step verification.");
+          showToast(err?.message || "Unable to update 2-step verification.", "err");
           await loadTwoFactorStatus();
         } finally {
           twoFactorUpdating = false;
@@ -714,6 +771,184 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   loadTwoFactorStatus();
+
+  authenticatorCancelBtn?.addEventListener("click", () => {
+    closeAuthenticatorSetup();
+    loadTwoFactorStatus();
+  });
+
+  authenticatorConfirmBtn?.addEventListener("click", async () => {
+    const code = String(authenticatorConfirmCode?.value || "").trim();
+    if (!authenticatorChallengeId || !/^\d{6}$/.test(code)) {
+      showToast("Enter the current six-digit code from your authenticator app.", "err");
+      authenticatorConfirmCode?.focus();
+      return;
+    }
+    authenticatorConfirmBtn.disabled = true;
+    try {
+      const res = await secureFetch("/api/account/2fa/authenticator/confirm", {
+        method: "POST",
+        body: { challengeId: authenticatorChallengeId, code },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to confirm authenticator setup.");
+      if (backupCodesOutput) {
+        backupCodesOutput.textContent = [
+          "Authenticator enabled. Save these one-time backup codes now:",
+          "",
+          ...(Array.isArray(data?.backupCodes) ? data.backupCodes : []),
+        ].join("\n");
+        backupCodesOutput.hidden = false;
+      }
+      if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
+      closeAuthenticatorSetup();
+      await loadTwoFactorStatus();
+    } catch (err) {
+      showToast(err?.message || "Unable to confirm authenticator setup.", "err");
+    } finally {
+      authenticatorConfirmBtn.disabled = false;
+    }
+  });
+
+  generateBackupCodesBtn?.addEventListener("click", async () => {
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) {
+      showToast("Enter your current password to generate backup codes.", "err");
+      twoFactorPasswordInput?.focus();
+      return;
+    }
+    if (!(await confirmAction("Any previous backup codes will stop working immediately.", {
+      title: "Generate new backup codes?",
+      confirmLabel: "Generate codes",
+      tone: "danger",
+    }))) return;
+    generateBackupCodesBtn.disabled = true;
+    try {
+      const res = await secureFetch("/api/account/2fa-backup-codes", {
+        method: "POST",
+        body: { currentPassword },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to generate backup codes.");
+      if (backupCodesOutput) {
+        backupCodesOutput.textContent = [
+          "Save these codes now. Each code can be used once:",
+          "",
+          ...(Array.isArray(data?.codes) ? data.codes : []),
+        ].join("\n");
+        backupCodesOutput.hidden = false;
+      }
+      if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
+    } catch (err) {
+      showToast(err?.message || "Unable to generate backup codes.", "err");
+    } finally {
+      generateBackupCodesBtn.disabled = false;
+    }
+  });
+
+  // --- PASSKEYS ---
+  const passkeyList = document.getElementById("passkeyList");
+  const passkeyNameInput = document.getElementById("passkeyName");
+  const addPasskeyBtn = document.getElementById("addPasskeyBtn");
+  const passkeyUnsupported = document.getElementById("passkeyUnsupported");
+  const webAuthnBrowser = window.SimpleWebAuthnBrowser;
+  const passkeysSupported = Boolean(webAuthnBrowser?.browserSupportsWebAuthn?.());
+
+  if (!passkeysSupported) {
+    if (passkeyUnsupported) passkeyUnsupported.hidden = false;
+    if (addPasskeyBtn) addPasskeyBtn.disabled = true;
+  }
+
+  const loadPasskeys = async () => {
+    if (!passkeyList) return;
+    try {
+      const res = await secureFetch("/api/account/passkeys");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to load passkeys.");
+      const passkeys = Array.isArray(data?.passkeys) ? data.passkeys : [];
+      if (!passkeys.length) {
+        passkeyList.innerHTML = '<p class="muted">No passkeys added.</p>';
+        return;
+      }
+      passkeyList.innerHTML = passkeys.map((item) => {
+        const lastUsed = item.lastUsedAt ? `Last used ${new Date(item.lastUsedAt).toLocaleDateString()}` : "Not used yet";
+        return `<div class="passkey-list-item">
+          <div><strong>${escapeHTML(item.name || "Passkey")}</strong><br><span class="muted">${escapeHTML(lastUsed)}</span></div>
+          <button type="button" class="btn btn-outline" data-remove-passkey="${escapeHTML(item.id)}">Remove</button>
+        </div>`;
+      }).join("");
+    } catch (err) {
+      passkeyList.innerHTML = `<p class="muted">${escapeHTML(err?.message || "Unable to load passkeys.")}</p>`;
+    }
+  };
+
+  addPasskeyBtn?.addEventListener("click", async () => {
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) {
+      showToast("Enter your current password to add a passkey.", "err");
+      twoFactorPasswordInput?.focus();
+      return;
+    }
+    addPasskeyBtn.disabled = true;
+    try {
+      const optionsRes = await secureFetch("/api/account/passkeys/registration-options", {
+        method: "POST",
+        body: { currentPassword },
+      });
+      const optionsData = await optionsRes.json().catch(() => ({}));
+      if (!optionsRes.ok) throw new Error(optionsData?.error || "Unable to start passkey setup.");
+      const response = await webAuthnBrowser.startRegistration({ optionsJSON: optionsData.options });
+      const registerRes = await secureFetch("/api/account/passkeys/register", {
+        method: "POST",
+        body: {
+          challengeId: optionsData.challengeId,
+          response,
+          name: String(passkeyNameInput?.value || "").trim() || "Passkey",
+        },
+      });
+      const registerData = await registerRes.json().catch(() => ({}));
+      if (!registerRes.ok) throw new Error(registerData?.error || "Unable to add passkey.");
+      if (passkeyNameInput) passkeyNameInput.value = "";
+      if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
+      await loadPasskeys();
+    } catch (err) {
+      if (err?.name !== "NotAllowedError") showToast(err?.message || "Passkey setup was cancelled or failed.", "err");
+    } finally {
+      addPasskeyBtn.disabled = !passkeysSupported;
+    }
+  });
+
+  passkeyList?.addEventListener("click", async (event) => {
+    const button = event.target instanceof Element ? event.target.closest("[data-remove-passkey]") : null;
+    if (!button) return;
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) {
+      showToast("Enter your current password to remove a passkey.", "err");
+      twoFactorPasswordInput?.focus();
+      return;
+    }
+    if (!(await confirmAction("This passkey will no longer sign in to your account.", {
+      title: "Remove this passkey?",
+      confirmLabel: "Remove passkey",
+      tone: "danger",
+    }))) return;
+    button.disabled = true;
+    try {
+      const res = await secureFetch(`/api/account/passkeys/${encodeURIComponent(button.dataset.removePasskey || "")}`, {
+        method: "DELETE",
+        body: { currentPassword },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to remove passkey.");
+      if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
+      await loadPasskeys();
+    } catch (err) {
+      showToast(err?.message || "Unable to remove passkey.", "err");
+      button.disabled = false;
+    }
+  });
+
+  loadPasskeys();
 
   // --- SESSION HISTORY ---
   const sessionHistoryList = document.getElementById("sessionHistoryList");
@@ -756,17 +991,12 @@ document.addEventListener("DOMContentLoaded", () => {
       sessionHistoryList.innerHTML = "<p class=\"muted\">No recent sessions.</p>";
       return;
     }
-    const currentUa = navigator.userAgent || "";
-    let activeIndex = sessions.findIndex((item) => item.ua && item.ua === currentUa);
-    if (activeIndex === -1) activeIndex = 0;
-
     sessionHistoryList.innerHTML = sessions
-      .map((item, index) => {
-        const isActive = index === activeIndex;
+      .map((item) => {
+        const isActive = item.current === true;
         const deviceLabel = guessDeviceLabel(item.ua);
-        const locationLabel = item.ip ? `IP ${item.ip}` : "Location unavailable";
-        const statusLabel = isActive ? "Active" : formatRelativeTime(item.createdAt);
-        const actionDisabled = !isActive;
+        const locationLabel = escapeHTML(item.ip ? `IP ${item.ip}` : "Location unavailable");
+        const statusLabel = isActive ? "Current session" : `Active ${formatRelativeTime(item.lastSeenAt || item.createdAt)}`;
         return `
           <div class="session-row">
             <div class="session-device">
@@ -777,7 +1007,7 @@ document.addEventListener("DOMContentLoaded", () => {
               </div>
             </div>
             <div class="session-status">${statusLabel}</div>
-            <button class="session-action" type="button" data-session-action="logout" ${actionDisabled ? "disabled" : ""} aria-label="Sign out of this session">
+            <button class="session-action" type="button" data-session-action="logout" data-session-id="${escapeHTML(item.id || "")}" aria-label="Sign out ${isActive ? "of this session" : deviceLabel}">
               <svg viewBox="0 0 20 20">
                 <path fill="currentColor" d="M6.5 3.5h7a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-7v-1.6h6.4v-7.8H6.5V3.5zm3.4 2.8 3.1 3.1-3.1 3.1-1.1-1.1 1.2-1.2H2.5V8.6h7.1L8.4 7.4l1.1-1.1z"/>
               </svg>
@@ -788,18 +1018,29 @@ document.addEventListener("DOMContentLoaded", () => {
       .join("");
 
     sessionHistoryList.querySelectorAll("[data-session-action=\"logout\"]").forEach((btn) => {
-      if (btn.disabled) return;
       btn.addEventListener("click", async () => {
-        const confirmed = window.confirm("Sign out of this device?");
+        const confirmed = await confirmAction("The selected session will lose access and must sign in again.", {
+          title: "Sign out this device?",
+          confirmLabel: "Sign out device",
+          tone: "danger",
+        });
         if (!confirmed) return;
         try {
-          await secureFetch("/api/auth/logout", { method: "POST" });
-        } catch {}
-        try {
-          window.clearStoredSession?.();
-          localStorage.removeItem("lpc_user");
-        } catch {}
-        window.location.href = "login.html";
+          const res = await secureFetch(`/api/account/sessions/${encodeURIComponent(btn.dataset.sessionId || "")}`, { method: "DELETE" });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data?.error || "Unable to sign out that device.");
+          if (data?.currentSessionRevoked) {
+            try {
+              window.clearStoredSession?.();
+              localStorage.removeItem("lpc_user");
+            } catch {}
+            window.location.href = "login.html";
+            return;
+          }
+          await loadSessionHistory();
+        } catch (err) {
+          showToast(err?.message || "Unable to sign out that device.", "err");
+        }
       });
     });
   };
@@ -818,10 +1059,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loadSessionHistory();
 
+  document.getElementById("revokeOtherSessionsBtn")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    if (!(await confirmAction("Every session except this one will lose access and must sign in again.", {
+      title: "Sign out all other devices?",
+      confirmLabel: "Sign out devices",
+      tone: "danger",
+    }))) return;
+    button.disabled = true;
+    try {
+      const res = await secureFetch("/api/account/sessions/revoke-others", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to sign out other devices.");
+      await loadSessionHistory();
+    } catch (err) {
+      showToast(err?.message || "Unable to sign out other devices.", "err");
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   // --- BLOCKED USERS ---
   async function requestUnblock(userId, name = "this user") {
-    const confirmed = window.confirm(
-      `Unblock ${name}? Future interaction restrictions will be removed for new activity only. This will not reopen old matters, messages, or prior workflows. This user will not be notified.`
+    const confirmed = await confirmAction(
+      "Future interaction restrictions will be removed for new activity only. Old Matters, messages, and workflows remain closed. This user will not be notified.",
+      { title: `Unblock ${name}?`, confirmLabel: "Unblock user" }
     );
     if (!confirmed) return false;
     await secureFetch(`/api/blocks/${encodeURIComponent(userId)}`, {
@@ -857,7 +1119,7 @@ document.addEventListener("DOMContentLoaded", () => {
           return `
             <div class="blocked-user-row">
               <div class="blocked-user-name">${safeName}</div>
-              <button class="small-btn danger-lite unblock-btn" data-id="${escapeHTML(userId)}" data-name="${encodeURIComponent(
+              <button class="small-btn danger-lite unblock-btn" type="button" data-id="${escapeHTML(userId)}" data-name="${encodeURIComponent(
                 u.name || "User"
               )}">Unblock</button>
             </div>
@@ -956,7 +1218,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await startStripeOnboarding();
       } catch (err) {
         console.error("Failed to start Stripe connect flow", err);
-        alert(err?.message || "Unable to connect Stripe right now.");
+        showToast(err?.message || "Unable to connect Stripe right now.", "err");
         refreshStripeStatus();
       }
     });
@@ -970,7 +1232,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-const PREFILL_CACHE_KEY = "lpc_edit_profile_prefill";
 const PROFILE_SETTINGS_DRAFT_KEY = "lpc_profile_settings_draft_v1";
 
 const paralegalSettingsSection = document.getElementById("paralegalSettings");
@@ -1022,7 +1283,7 @@ function showPendingSettingsNotice() {
     content.innerHTML = `
       <section class="settings-panel active">
         <h2>Awaiting approval</h2>
-        <p>Your application is under review. You'll receive an email as soon as an administrator approves your access.</p>
+        <p>Your application is under review. You’ll receive an email when the review is complete.</p>
         <p class="muted">Need help? Contact support and reference your signup email.</p>
       </section>
     `;
@@ -1033,11 +1294,9 @@ paralegalSettingsSection?.classList.add("hidden");
 attorneySettingsSection?.classList.add("hidden");
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const prefill = consumeEditPrefillUser();
-  const cachedUser = prefill || getCachedUser();
-  if (cachedUser) {
-    bootstrapProfileSettings(cachedUser);
-  }
+  try {
+    localStorage.removeItem("lpc_edit_profile_prefill");
+  } catch {}
   await window.checkSession();
   await loadSettings();
 });
@@ -1291,7 +1550,6 @@ const educationModalSave = document.getElementById("educationModalSave");
 const educationModalCancel = document.getElementById("educationModalCancel");
 const educationModalClose = document.getElementById("educationModalClose");
 let educationModalBound = false;
-let educationModalOpen = false;
 
 if (addLanguageBtn && languagesEditor) {
   addLanguageBtn.addEventListener("click", () => addLanguageRow());
@@ -1315,17 +1573,6 @@ function buildInitials(name = "", fallback = "A") {
 function getAttorneyInitials(user = {}) {
   const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.name || "";
   return buildInitials(fullName, "A");
-}
-
-function consumeEditPrefillUser() {
-  try {
-    const raw = localStorage.getItem(PREFILL_CACHE_KEY);
-    if (!raw) return null;
-    localStorage.removeItem(PREFILL_CACHE_KEY);
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
 }
 
 function getProfileSettingsDraftStorageKey(user = currentUser || getCachedUser() || {}) {
@@ -1604,7 +1851,7 @@ function bindDocumentFileChooser(triggerId, input, onAfterChoose = null) {
 }
 
 function openProfileDocument(url) {
-  const targetUrl = String(url || "").trim();
+  const targetUrl = normalizeHttpNavigationUrl(url);
   if (!targetUrl) return;
   try {
     window.open(targetUrl, "_blank", "noopener,noreferrer");
@@ -1616,11 +1863,9 @@ function openProfileDocument(url) {
 async function uploadParalegalPdfDocument({
   input,
   endpoint,
-  emptyMessage,
   invalidMessage,
   sizeMessage,
   failureMessage,
-  pendingMessage,
   successMessage,
   onSuccess,
   onFinally,
@@ -1628,13 +1873,13 @@ async function uploadParalegalPdfDocument({
   const file = input?.files?.[0];
   if (!file) return;
   if (!isPdfFile(file)) {
-    alert(invalidMessage);
+    showToast(invalidMessage, "err");
     input.value = "";
     onFinally?.();
     return;
   }
   if (file.size > 10 * 1024 * 1024) {
-    alert(sizeMessage);
+    showToast(sizeMessage, "err");
     input.value = "";
     onFinally?.();
     return;
@@ -1656,7 +1901,7 @@ async function uploadParalegalPdfDocument({
     showToast(successMessage, "ok");
   } catch (err) {
     console.error(`Upload failed for ${endpoint}`, err);
-    alert(err?.message || failureMessage);
+    showToast(err?.message || failureMessage, "err");
   } finally {
     input.value = "";
     onFinally?.();
@@ -1844,15 +2089,23 @@ function initParalegalSettings(user = {}) {
   bindParalegalRequiredFieldWatchers();
   updateRequiredFieldMarkers();
   renderLanguageEditor(user.languages || []);
-  try { loadCertificate(user); } catch {}
-  try { loadResume(user); } catch {}
-  try { loadWritingSample(user); } catch {}
-  try { loadBio(user); } catch {}
-  try { loadEducation(user); } catch {}
-  try { loadAwards(user); } catch {}
-  try { loadSkills(user); } catch {}
-  try { loadLinkedIn(user); } catch {}
-  try { loadNotifications(user); } catch {}
+  [
+    ["certificate", loadCertificate],
+    ["resume", loadResume],
+    ["writing sample", loadWritingSample],
+    ["bio", loadBio],
+    ["education", loadEducation],
+    ["awards", loadAwards],
+    ["skills", loadSkills],
+    ["LinkedIn", loadLinkedIn],
+    ["notifications", loadNotifications],
+  ].forEach(([section, hydrate]) => {
+    try {
+      hydrate(user);
+    } catch (error) {
+      console.error(`[profile] ${section} hydration failed`, error);
+    }
+  });
   syncCluster(user);
   setTimeout(() => initParalegalProfileTour(user), 300);
 }
@@ -1873,7 +2126,6 @@ let onboardingPromise = null;
 
 function normalizeOnboarding(raw = {}) {
   return {
-    paralegalWelcomeDismissed: Boolean(raw?.paralegalWelcomeDismissed),
     paralegalTourCompleted: Boolean(raw?.paralegalTourCompleted),
     paralegalProfileTourCompleted: Boolean(raw?.paralegalProfileTourCompleted),
     attorneyProfileCompleted: Boolean(raw?.attorneyProfileCompleted),
@@ -1939,9 +2191,6 @@ async function updateOnboardingState(updates = {}, { markFirstLoginComplete = fa
   }
 }
 
-function hasCompletedProfileTour(user) {
-  return getCachedOnboarding(user).paralegalProfileTourCompleted;
-}
 
 function markProfileTourCompleted() {
   void updateOnboardingState({ paralegalProfileTourCompleted: true }, { markFirstLoginComplete: true });
@@ -2122,6 +2371,7 @@ async function initParalegalProfileTour(user = {}) {
   };
 
   const clearTour = () => {
+    const returnTarget = activeTourTarget;
     activeRenderToken += 1;
     activeTourTarget = null;
     ensureSidebarVisibleForTarget(null);
@@ -2134,6 +2384,10 @@ async function initParalegalProfileTour(user = {}) {
     overlay.classList.remove("is-active", "spotlight");
     overlay.setAttribute("aria-hidden", "true");
     tooltip.classList.remove("is-active", "arrow-left", "arrow-right", "arrow-top", "arrow-bottom");
+    tooltip.setAttribute("aria-hidden", "true");
+    tooltip.setAttribute("inert", "");
+    deactivateDialogFocus(tooltip, { restoreFocus: false });
+    if (returnTarget instanceof HTMLElement) returnTarget.focus();
     if (forceTour) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -2354,6 +2608,12 @@ async function initParalegalProfileTour(user = {}) {
     overlay.classList.add("is-active", "spotlight");
     overlay.setAttribute("aria-hidden", "false");
     tooltip.classList.add("is-active");
+    tooltip.setAttribute("aria-hidden", "false");
+    tooltip.removeAttribute("inert");
+    activateDialogFocus(tooltip, {
+      initialFocus: nextBtn,
+      onEscape: clearTour,
+    });
     const shouldAutoScroll = allowAutoScroll && step.autoScroll === "smooth";
     if (shouldAutoScroll) {
       target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
@@ -2580,18 +2840,6 @@ function setSectionDisplayText(element, value, fallback) {
   }
 }
 
-function setSectionDisplayList(element, items = [], fallbackItems = []) {
-  if (!element) return;
-  const cleanItems = Array.isArray(items) ? items.filter(Boolean) : [];
-  const useItems = cleanItems.length ? cleanItems : fallbackItems;
-  element.innerHTML = "";
-  useItems.forEach((item) => {
-    const li = document.createElement("li");
-    li.textContent = item;
-    element.appendChild(li);
-  });
-  element.classList.toggle("is-placeholder", !cleanItems.length);
-}
 
 function parseCommaList(value) {
   return String(value || "")
@@ -2616,9 +2864,6 @@ function parseSkillsList(value) {
     });
 }
 
-function formatSkillsValue(value) {
-  return parseSkillsList(value).join(", ");
-}
 
 const MAX_PROFILE_SKILLS = 5;
 const MAX_PROFILE_BEST_FOR = 5;
@@ -4428,11 +4673,13 @@ function openEducationModal() {
   educationModalOverlay.classList.add("is-active");
   educationModalOverlay.setAttribute("aria-hidden", "false");
   educationModal.classList.add("is-active");
-  educationModalOpen = true;
+  educationModal.setAttribute("aria-hidden", "false");
+  educationModal.removeAttribute("inert");
   const firstInput = educationModalList?.querySelector("[data-field='school']");
-  if (firstInput) {
-    setTimeout(() => firstInput.focus(), 0);
-  }
+  activateDialogFocus(educationModal, {
+    initialFocus: firstInput || educationModalClose,
+    onEscape: closeEducationModal,
+  });
 }
 
 function closeEducationModal() {
@@ -4440,7 +4687,9 @@ function closeEducationModal() {
   educationModalOverlay.classList.remove("is-active");
   educationModalOverlay.setAttribute("aria-hidden", "true");
   educationModal.classList.remove("is-active");
-  educationModalOpen = false;
+  educationModal.setAttribute("aria-hidden", "true");
+  educationModal.setAttribute("inert", "");
+  deactivateDialogFocus(educationModal);
 }
 
 function bindEducationModal() {
@@ -4466,11 +4715,6 @@ function bindEducationModal() {
     renderEducationEditor(entries);
     refreshParalegalSectionDisplays();
     closeEducationModal();
-  });
-  document.addEventListener("keydown", (evt) => {
-    if (evt.key === "Escape" && educationModalOpen) {
-      closeEducationModal();
-    }
   });
 }
 
@@ -4516,7 +4760,7 @@ function showToast(message, type = "info") {
       banner.classList.add("show");
       setTimeout(() => banner.classList.remove("show"), 2500);
     } else {
-      console.log(`[toast:${type}] ${message}`);
+      void showAlert(message, { title: type === "err" ? "Action unavailable" : "Notice" });
     }
   }
 }
@@ -4559,7 +4803,7 @@ function bindAttorneyOnboardingModal() {
       const saveBtn = document.getElementById("saveAttorneyProfile") || document.getElementById("attorneyProfileSaveBtn");
       saveBtn?.focus?.();
     } else if (step === "payment") {
-      window.location.href = "dashboard-attorney.html#billing";
+      window.location.href = "dashboard-attorney.html#funds";
     }
   });
   skipBtn?.addEventListener("click", () => {
@@ -4594,6 +4838,11 @@ function showAttorneyOnboardingModal(message, step = "profile", title) {
   overlay.setAttribute("aria-hidden", "false");
   modal.classList.add("is-active");
   modal.setAttribute("aria-hidden", "false");
+  modal.removeAttribute("inert");
+  activateDialogFocus(modal, {
+    initialFocus: modal.querySelector("[data-onboarding-continue]"),
+    onEscape: hideAttorneyOnboardingModal,
+  });
   setAttorneyOnboardingModalSeen(step);
 }
 
@@ -4605,30 +4854,12 @@ function hideAttorneyOnboardingModal() {
   overlay.setAttribute("aria-hidden", "true");
   modal.classList.remove("is-active");
   modal.setAttribute("aria-hidden", "true");
+  modal.setAttribute("inert", "");
+  deactivateDialogFocus(modal);
   document.body.style.overflow = attorneyOnboardingBodyOverflow;
   window.scrollTo({ top: attorneyOnboardingScrollY, left: 0, behavior: "instant" });
 }
 
-function ensureAttorneyBillingCTA() {
-  const stripeBtn = document.getElementById("connectStripeBtn");
-  if (!stripeBtn) return null;
-  const block = stripeBtn.closest(".settings-block");
-  if (!block) return null;
-  let billingBtn = document.getElementById("attorneyBillingSetupBtn");
-  if (!billingBtn) {
-    billingBtn = document.createElement("button");
-    billingBtn.type = "button";
-    billingBtn.id = "attorneyBillingSetupBtn";
-    billingBtn.className = "btn btn-outline";
-    billingBtn.textContent = "Open Billing";
-    block.appendChild(billingBtn);
-  }
-  billingBtn.onclick = () => {
-    setAttorneyOnboardingStep("payment");
-    window.location.href = "dashboard-attorney.html#billing";
-  };
-  return billingBtn;
-}
 
 function runAttorneyOnboardingStep(step, options = {}) {
   const silent = Boolean(options.silent);
@@ -4651,7 +4882,7 @@ function runAttorneyOnboardingStep(step, options = {}) {
       );
       return;
     }
-    window.location.href = "dashboard-attorney.html#billing";
+    window.location.href = "dashboard-attorney.html#funds";
     return;
   }
 
@@ -4760,7 +4991,7 @@ function renderFallback(sectionId, title) {
 function syncCluster(user = {}) {
   const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.name || "Paralegal";
   const roleLabel = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "Paralegal";
-  const avatar = getDisplayProfileImage(user, { allowPending: true }) || "https://via.placeholder.com/64x64.png?text=PL";
+  const avatar = getDisplayProfileImage(user, { allowPending: true }) || DEFAULT_AVATAR_DATA;
   const avatarEl = document.getElementById("clusterAvatar");
   if (avatarEl) avatarEl.src = avatar;
   document.querySelectorAll(".nav-profile-photo").forEach((el) => {
@@ -4786,7 +5017,9 @@ async function loadSettings() {
         if (sessionUser?.role) {
           user.role = sessionUser.role;
         }
-      } catch (_) {}
+      } catch (error) {
+        console.warn("[profile-settings] session role refresh failed", error);
+      }
     }
     ensureUserStatus(user);
     currentUser = mergeSessionPreferences(user);
@@ -4814,39 +5047,7 @@ async function loadSettings() {
     const role = (currentUser?.role || "").toLowerCase();
 
     if (role === "attorney") {
-      // Attorney: ONLY attorney UI should show.
-      showAttorneySettings();
-      return; // IMPORTANT → stops all paralegal hydration
-    }
-
-    // Paralegal: ONLY paralegal UI should show.
-    showParalegalSettings();
-    hydrateProfileForm(user);
-
-    setFullNameInputs(user);
-    const emailInput = document.getElementById("emailInput");
-    if (emailInput) emailInput.value = user.email || "";
-    const phoneInput = document.getElementById("phoneInput");
-    if (phoneInput) phoneInput.value = user.phoneNumber || user.phone || "";
-    const lawFirmInput = document.getElementById("lawFirmInput");
-    if (lawFirmInput) lawFirmInput.value = user.lawFirm || "";
-    if (user.role === "paralegal") {
-      const linkedInInput = document.getElementById("linkedInInput");
-      if (linkedInInput) linkedInInput.value = user.linkedInURL || "";
-    const yearsExperienceInput = document.getElementById("yearsExperienceInput");
-    if (yearsExperienceInput) yearsExperienceInput.value = user.yearsExperience ?? "";
-    renderParalegalPracticeAreas(user.practiceAreas || []);
-      const skillValues = user.highlightedSkills || user.skills || [];
-      applySkillsInput(skillValues);
-      bindSkillsInput();
-      applyStateExperienceInput(getDefaultStateExperienceValues(user));
-      bindStateExperienceInput();
-      renderExperienceRows(Array.isArray(user.experience) ? user.experience : []);
-      bindExperienceAddButton();
-      renderEducationEditor(user.education || []);
-      renderLanguageEditor(user.languages || []);
-      updateRoleLineFromExperience();
-      refreshParalegalSectionDisplays();
+      return;
     }
   } catch (err) {
     renderFallback("settingsCertificate", "Certificate");
@@ -4861,20 +5062,6 @@ async function loadSettings() {
     return;
   }
 
-  // Store existing data
-  seedSettingsState(user);
-  updatePhotoReviewStatus(user);
-
-  // Build UI
-  try { await loadCertificate(user); } catch { renderFallback("settingsCertificate", "Certificate"); }
-  try { await loadResume(user); } catch { renderFallback("settingsResume", "Résumé"); }
-  try { await loadWritingSample(user); } catch { renderFallback("settingsWritingSample", "Writing Sample"); }
-  try { await loadBio(user); } catch { renderFallback("settingsBio", "Bio"); }
-  try { await loadEducation(user); } catch { renderFallback("settingsEducation", "Education"); }
-  try { await loadAwards(user); } catch { renderFallback("settingsAwards", "Awards"); }
-  try { await loadSkills(user); } catch { renderFallback("settingsSkills", "Skills"); }
-  try { await loadLinkedIn(user); } catch { renderFallback("settingsLinkedIn", "LinkedIn"); }
-  try { await loadNotifications(user); } catch { renderFallback("settingsNotifications", "Notifications"); }
   const draft = readProfileSettingsDraft(user);
   if (draft) {
     applyProfileSettingsDraft(draft, user);
@@ -4934,7 +5121,7 @@ function loadCertificate(user) {
     <div class="paralegal-doc-row">
       <div class="paralegal-doc-meta">
         <h3>Upload Certificate (PDF)</h3>
-        <p>Share verified certifications or licenses with attorneys.</p>
+        <p>Share certifications or licenses for attorneys to review.</p>
         <p class="doc-status" id="certificateStatus"></p>
       </div>
       <div class="paralegal-doc-actions">
@@ -4997,8 +5184,12 @@ function loadCertificate(user) {
     });
   }
 
-  document.getElementById("removeCertificateBtn")?.addEventListener("click", () => {
-    const confirmed = window.confirm("Remove certificate? This will update after you save.");
+  document.getElementById("removeCertificateBtn")?.addEventListener("click", async () => {
+    const confirmed = await confirmAction("The certificate will be removed after you save your changes.", {
+      title: "Remove certificate?",
+      confirmLabel: "Remove certificate",
+      tone: "danger",
+    });
     if (!confirmed) return;
     settingsState.pendingCertificateKey = "";
     settingsState.removeCertificate = true;
@@ -5025,7 +5216,7 @@ function loadResume(user) {
     <div class="paralegal-doc-row">
       <div class="paralegal-doc-meta">
         <h3>Résumé (PDF)</h3>
-        <p>Upload a polished résumé so attorneys can verify your expertise.</p>
+        <p>Upload a polished résumé so attorneys can review your experience.</p>
         <p class="doc-status" id="resumeStatus"></p>
       </div>
       <div class="paralegal-doc-actions">
@@ -5100,8 +5291,12 @@ function loadResume(user) {
     });
   }
 
-  document.getElementById("removeResumeBtn")?.addEventListener("click", () => {
-    const confirmed = window.confirm("Remove résumé? This will update after you save.");
+  document.getElementById("removeResumeBtn")?.addEventListener("click", async () => {
+    const confirmed = await confirmAction("The résumé will be removed after you save your changes.", {
+      title: "Remove résumé?",
+      confirmLabel: "Remove résumé",
+      tone: "danger",
+    });
     if (!confirmed) return;
     settingsState.pendingResumeKey = "";
     settingsState.removeResume = true;
@@ -5193,8 +5388,12 @@ function loadWritingSample(user) {
     });
   }
 
-  document.getElementById("removeWritingSampleBtn")?.addEventListener("click", () => {
-    const confirmed = window.confirm("Remove writing sample? This will update after you save.");
+  document.getElementById("removeWritingSampleBtn")?.addEventListener("click", async () => {
+    const confirmed = await confirmAction("The writing sample will be removed after you save your changes.", {
+      title: "Remove writing sample?",
+      confirmLabel: "Remove sample",
+      tone: "danger",
+    });
     if (!confirmed) return;
     settingsState.pendingWritingSampleKey = "";
     settingsState.removeWritingSample = true;
@@ -5220,7 +5419,7 @@ function loadBio(user) {
   if (!section) return;
   section.innerHTML = `
     <h3>Bio</h3>
-    <textarea id="bioInput" style="width:100%;">${user.bio || ""}</textarea>
+    <textarea id="bioInput" style="width:100%;">${escapeHTML(user.bio || "")}</textarea>
   `;
   const bioInput = document.getElementById("bioInput");
   if (bioInput) {
@@ -5241,7 +5440,7 @@ function loadEducation(user) {
   section.innerHTML = `
     <h3>Education</h3>
     <div id="eduList"></div>
-    <button id="addEduBtn">Add Education Entry</button>
+    <button id="addEduBtn" type="button">Add Education Entry</button>
   `;
 
   const list = document.getElementById("eduList");
@@ -5252,10 +5451,10 @@ function loadEducation(user) {
     settingsState.education.forEach((ed, idx) => {
       list.innerHTML += `
         <div class="edu-entry">
-          <input placeholder="Degree" value="${ed.degree || ""}" data-idx="${idx}" data-field="degree">
-          <input placeholder="Institution" value="${ed.institution || ""}" data-idx="${idx}" data-field="institution">
-          <input placeholder="Year" value="${ed.year || ""}" data-idx="${idx}" data-field="year">
-          <input placeholder="Certification" value="${ed.certification || ""}" data-idx="${idx}" data-field="certification">
+          <input placeholder="Degree" value="${escapeHTML(ed.degree || "")}" data-idx="${idx}" data-field="degree">
+          <input placeholder="Institution" value="${escapeHTML(ed.institution || "")}" data-idx="${idx}" data-field="institution">
+          <input placeholder="Year" value="${escapeHTML(ed.year || "")}" data-idx="${idx}" data-field="year">
+          <input placeholder="Certification" value="${escapeHTML(ed.certification || "")}" data-idx="${idx}" data-field="certification">
         </div>
       `;
     });
@@ -5292,7 +5491,7 @@ function loadAwards(user) {
   section.innerHTML = `
     <h3>Awards</h3>
     <div id="awardList"></div>
-    <button id="addAwardBtn">Add Award</button>
+    <button id="addAwardBtn" type="button">Add Award</button>
   `;
 
   const list = document.getElementById("awardList");
@@ -5303,7 +5502,7 @@ function loadAwards(user) {
     settingsState.awards.forEach((a, idx) => {
       list.innerHTML += `
         <div class="award-entry">
-          <input placeholder="Award title" value="${a}" data-idx="${idx}">
+          <input placeholder="Award title" value="${escapeHTML(a)}" data-idx="${idx}">
         </div>
       `;
     });
@@ -5339,7 +5538,7 @@ function loadSkills(user) {
   section.innerHTML = `
     <h3>Highlighted Skills (Top 3–5)</h3>
     <div id="skillsList"></div>
-    <button id="addSkillBtn">Add Skill</button>
+    <button id="addSkillBtn" type="button">Add Skill</button>
   `;
 
   const list = document.getElementById("skillsList");
@@ -5350,7 +5549,7 @@ function loadSkills(user) {
     settingsState.highlightedSkills.forEach((s, idx) => {
       list.innerHTML += `
         <div class="skill-entry">
-          <input placeholder="Skill" value="${s}" data-idx="${idx}">
+          <input placeholder="Skill" value="${escapeHTML(s)}" data-idx="${idx}">
         </div>
       `;
     });
@@ -5385,7 +5584,7 @@ function loadLinkedIn(user) {
   if (!section) return;
   section.innerHTML = `
     <h3>LinkedIn Profile</h3>
-    <input id="linkedInURLInput" type="url" style="width:100%;" value="${user.linkedInURL || ""}">
+    <input id="linkedInURLInput" type="url" style="width:100%;" value="${escapeHTML(user.linkedInURL || "")}">
   `;
   const linkedInInput = document.getElementById("linkedInURLInput");
   if (linkedInInput) {
@@ -5472,10 +5671,21 @@ async function saveSettings() {
   const bioInput = document.getElementById("bioInput");
   const linkedInInput = document.getElementById("linkedInInput");
   const yearsExperienceInput = document.getElementById("yearsExperienceInput");
-  const skillsInput = document.getElementById("skillsInput");
   const resumeKeyInput = document.getElementById("resumeKeyInput");
   const certificateKeyInput = document.getElementById("certificateKeyInput");
   const writingSampleKeyInput = document.getElementById("writingSampleKeyInput");
+  let normalizedLinkedInURL = "";
+  try {
+    normalizedLinkedInURL = normalizeHttpUrlInput(linkedInInput?.value, {
+      fieldLabel: "LinkedIn URL",
+      requiredHost: "linkedin.com",
+    });
+    if (linkedInInput) linkedInInput.value = normalizedLinkedInURL;
+  } catch (error) {
+    showToast(error?.message || "Enter a valid LinkedIn URL.", "err");
+    linkedInInput?.focus();
+    return;
+  }
   if (settingsState.stagedProfilePhotoFile) {
     try {
       const payload = await uploadProfilePhotoFile(
@@ -5499,7 +5709,7 @@ async function saveSettings() {
     education: settingsState.education,
     awards: settingsState.awards,
     highlightedSkills: settingsState.highlightedSkills,
-    linkedInURL: settingsState.linkedInURL,
+    linkedInURL: normalizedLinkedInURL || null,
     notificationPrefs: settingsState.notificationPrefs,
     digestFrequency: settingsState.digestFrequency
   };
@@ -5510,7 +5720,7 @@ async function saveSettings() {
     body.lawFirm = lawFirmInput.value || "";
   }
 
-  body.linkedInURL = linkedInInput?.value.trim() || null;
+  body.linkedInURL = normalizedLinkedInURL || null;
   body.yearsExperience = yearsExperienceInput ? Number(yearsExperienceInput.value) || null : null;
   body.practiceAreas = collectParalegalPracticeAreas();
   body.highlightedSkills = readSkillsInput();
@@ -5584,7 +5794,6 @@ async function saveSettings() {
     ...updatedUser,
     role: updatedUser.role || currentUser?.role || ""
   });
-  localStorage.setItem("lpc_user", JSON.stringify(mergedUser));
   currentUser = mergedUser;
   settingsState.bio = updatedUser.bio || "";
   settingsState.education = updatedUser.education || [];
@@ -5621,26 +5830,26 @@ async function saveSettings() {
   clearProfileSettingsDraft(mergedUser);
 
   applyAvatar?.(mergedUser);
-  updateAvatarRemoveButton(mergedUser);
-  updatePhotoReviewStatus(mergedUser);
-  hydrateProfileForm(mergedUser);
-  renderLanguageEditor(mergedUser.languages || []);
   bootstrapProfileSettings(mergedUser);
   const requiredStatus = isParalegal ? updateRequiredFieldMarkers() : { ok: true, missing: [] };
-  syncCluster?.(mergedUser);
-  window.hydrateParalegalCluster?.(mergedUser);
   try {
     window.dispatchEvent(new CustomEvent("lpc:user-updated", { detail: mergedUser }));
   } catch (_) {}
-  try {
-    localStorage.removeItem(PREFILL_CACHE_KEY);
-  } catch {}
   if (isParalegal && !requiredStatus.ok) {
-    const missingList =
-      Array.isArray(requiredStatus.missing) && requiredStatus.missing.length
-        ? requiredStatus.missing.join(", ")
-        : "your remaining profile fields";
-    showToast(`Settings saved. Complete ${missingList} to finish your profile for attorney review.`, "info");
+    const remainingMissing = Array.isArray(requiredStatus.missing)
+      ? requiredStatus.missing.filter((field) => !(uploadedPhotoPendingReview && field === "Profile photo"))
+      : [];
+    if (uploadedPhotoPendingReview && remainingMissing.length === 0) {
+      showToast("Settings saved and profile photo submitted for review.", "ok");
+      return;
+    }
+    const missingList = remainingMissing.length
+      ? remainingMissing.join(", ")
+      : "your remaining profile fields";
+    const savedMessage = uploadedPhotoPendingReview
+      ? "Settings saved and profile photo submitted for review."
+      : "Settings saved.";
+    showToast(`${savedMessage} Complete ${missingList} to finish your profile for attorney review.`, "info");
     return;
   }
 
@@ -5670,8 +5879,17 @@ const avatarUploadConfigs = [
 const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 const PROFILE_PHOTO_ALLOWED_MIMES = new Set(["image/jpeg", "image/jpg", "image/png"]);
 const PROFILE_PHOTO_ALLOWED_EXT = /\.(jpe?g|png)$/i;
+const PROFILE_PHOTO_CROPPER_TEMPLATE =
+  '<cropper-canvas background>' +
+  '<cropper-image scalable translatable initial-center-size="contain"></cropper-image>' +
+  '<cropper-selection initial-coverage="1" initial-aspect-ratio="1" aspect-ratio="1" outlined precise>' +
+  '<cropper-handle action="move" theme-color="rgba(255, 255, 255, 0.28)"></cropper-handle>' +
+  '</cropper-selection>' +
+  '</cropper-canvas>';
 
 let activeCropper = null;
+let activeCropperImage = null;
+let activeCropperSelection = null;
 let cropperModal = null;
 let cropperImage = null;
 let cropperZoom = null;
@@ -5684,34 +5902,115 @@ let cropperFile = null;
 let cropperOriginalFile = null;
 let cropperOriginalUrl = "";
 let cropperObjectUrl = null;
-let cropperBaseZoom = 1;
-let cropperZoomLock = false;
+let cropperBaseScale = 1;
+let cropperTransformHandler = null;
 let cropperReady = false;
 let cropperLoadRetries = 0;
 
-function getCurrentCropperZoom() {
-  if (!activeCropper) return 1;
-  const data = activeCropper.getImageData();
-  return data?.naturalWidth ? data.width / data.naturalWidth : 1;
+function getCropperConstructor() {
+  const cropperGlobal = globalThis.Cropper;
+  if (typeof cropperGlobal === "function") return cropperGlobal;
+  return typeof cropperGlobal?.default === "function" ? cropperGlobal.default : null;
 }
 
-function syncCropperBaseZoom({ resetSlider = false } = {}) {
-  if (!activeCropper) return;
-  cropperBaseZoom = getCurrentCropperZoom();
-  if (!cropperZoom) return;
-  cropperZoomLock = true;
+function getCropperMatrixScale(matrix = []) {
+  const a = Number(matrix[0]);
+  const b = Number(matrix[1]);
+  return Number.isFinite(a) && Number.isFinite(b) ? Math.hypot(a, b) : 1;
+}
+
+function syncCropperZoomFromMatrix(matrix) {
+  if (!cropperZoom || !cropperBaseScale) return;
+  const currentScale = getCropperMatrixScale(matrix || activeCropperImage?.$getTransform?.());
+  const relative = currentScale / cropperBaseScale - 1;
   cropperZoom.min = "0";
   cropperZoom.max = "0.5";
   cropperZoom.step = "0.01";
-  if (resetSlider) {
-    cropperZoom.value = "0";
-  } else {
-    const relative = cropperBaseZoom ? getCurrentCropperZoom() / cropperBaseZoom - 1 : 0;
-    cropperZoom.value = String(Math.min(0.5, Math.max(0, relative)));
-  }
-  requestAnimationFrame(() => {
-    cropperZoomLock = false;
+  cropperZoom.value = String(Math.min(0.5, Math.max(0, relative)));
+}
+
+function setCropperZoom(targetZoom) {
+  if (!activeCropperImage || !cropperBaseScale) return;
+  const target = Math.min(0.5, Math.max(0, Number(targetZoom) || 0));
+  const currentScale = getCropperMatrixScale(activeCropperImage.$getTransform());
+  const currentZoom = Math.max(0, currentScale / cropperBaseScale - 1);
+  const factor = (1 + target) / (1 + currentZoom);
+  const delta = factor >= 1 ? factor - 1 : 1 - 1 / factor;
+  activeCropperImage.$zoom(delta);
+  syncCropperZoomFromMatrix();
+}
+
+function proposedCropperImageCoversSelection(matrix) {
+  const cropperCanvas = activeCropper?.getCropperCanvas?.();
+  if (!cropperCanvas || !activeCropperImage || !activeCropperSelection) return false;
+  const clone = activeCropperImage.cloneNode();
+  clone.style.transform = `matrix(${matrix.join(", ")})`;
+  clone.style.opacity = "0";
+  clone.setAttribute("aria-hidden", "true");
+  cropperCanvas.appendChild(clone);
+  const imageRect = clone.getBoundingClientRect();
+  clone.remove();
+  const selectionRect = activeCropperSelection.getBoundingClientRect();
+  const tolerance = 0.75;
+  return (
+    imageRect.top <= selectionRect.top + tolerance &&
+    imageRect.right >= selectionRect.right - tolerance &&
+    imageRect.bottom >= selectionRect.bottom - tolerance &&
+    imageRect.left <= selectionRect.left + tolerance
+  );
+}
+
+function bindCropperTransformBoundary() {
+  if (!activeCropperImage) return;
+  cropperTransformHandler = (event) => {
+    const matrix = event.detail?.matrix;
+    if (!Array.isArray(matrix)) return;
+    const relativeZoom = getCropperMatrixScale(matrix) / cropperBaseScale - 1;
+    if (relativeZoom < -0.001 || relativeZoom > 0.501 || !proposedCropperImageCoversSelection(matrix)) {
+      event.preventDefault();
+      syncCropperZoomFromMatrix();
+      return;
+    }
+    syncCropperZoomFromMatrix(matrix);
+  };
+  activeCropperImage.addEventListener("transform", cropperTransformHandler);
+}
+
+async function initializePhotoCropper() {
+  const CropperConstructor = getCropperConstructor();
+  if (!CropperConstructor) throw new Error("Cropper.js 2.x is unavailable.");
+  const cropperInstance = new CropperConstructor(cropperImage, {
+    container: cropperImage.parentElement,
+    template: PROFILE_PHOTO_CROPPER_TEMPLATE,
   });
+  const cropperImageElement = cropperInstance.getCropperImage?.();
+  const cropperSelectionElement = cropperInstance.getCropperSelection?.();
+  if (!cropperImageElement || !cropperSelectionElement || typeof cropperSelectionElement.$toCanvas !== "function") {
+    cropperInstance.destroy();
+    throw new Error("Cropper.js 2.x did not create the required image and selection elements.");
+  }
+  activeCropper = cropperInstance;
+  activeCropperImage = cropperImageElement;
+  activeCropperSelection = cropperSelectionElement;
+  await cropperImageElement.$ready();
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  if (activeCropper !== cropperInstance) return;
+  cropperImageElement.$center("contain");
+  const imageRect = cropperImageElement.getBoundingClientRect();
+  const selectionRect = cropperSelectionElement.getBoundingClientRect();
+  const fitScale = Math.max(
+    selectionRect.width / Math.max(imageRect.width, 1),
+    selectionRect.height / Math.max(imageRect.height, 1)
+  );
+  if (fitScale > 1) cropperImageElement.$scale(fitScale);
+  cropperImageElement.$center();
+  cropperBaseScale = getCropperMatrixScale(cropperImageElement.$getTransform());
+  bindCropperTransformBoundary();
+  syncCropperZoomFromMatrix();
+  if (cropperZoom) cropperZoom.disabled = false;
+  cropperReady = true;
+  if (cropperSaveBtn) cropperSaveBtn.disabled = false;
+  setCropperLoading(false);
 }
 
 async function canDecodeImageFile(file) {
@@ -5721,7 +6020,8 @@ async function canDecodeImageFile(file) {
       const bitmap = await createImageBitmap(file);
       if (bitmap && typeof bitmap.close === "function") bitmap.close();
       return true;
-    } catch (_) {
+    } catch (error) {
+      console.debug("[profile-settings] createImageBitmap decode unavailable; using Image fallback", error);
       // Fall through to Image-based decode check.
     }
   }
@@ -5964,7 +6264,7 @@ async function handleAvatarUpload(config) {
     return;
   }
 
-  if (typeof Cropper !== "undefined" && cropperModal && cropperImage) {
+  if (getCropperConstructor() && cropperModal && cropperImage) {
     openPhotoCropper(file, config);
   } else {
     stagePhotoDirect(file, config);
@@ -6007,17 +6307,24 @@ function initPhotoCropperModal() {
   });
   if (cropperZoom) {
     cropperZoom.disabled = true;
-    cropperZoom.addEventListener("mousedown", () => syncCropperBaseZoom({ resetSlider: true }));
-    cropperZoom.addEventListener("touchstart", () => syncCropperBaseZoom({ resetSlider: true }), {
-      passive: true,
-    });
     cropperZoom.addEventListener("input", () => {
-      if (activeCropper) {
-        const multiplier = Number(cropperZoom.value);
-        activeCropper.zoomTo(cropperBaseZoom * (1 + multiplier));
-      }
+      setCropperZoom(cropperZoom.value);
     });
   }
+  const cropStage = document.getElementById("photoCropStage");
+  cropStage?.addEventListener("keydown", (event) => {
+    if (!cropperReady || !activeCropperImage) return;
+    const step = event.shiftKey ? 20 : 5;
+    const movement = {
+      ArrowLeft: [-step, 0],
+      ArrowRight: [step, 0],
+      ArrowUp: [0, -step],
+      ArrowDown: [0, step],
+    }[event.key];
+    if (!movement) return;
+    event.preventDefault();
+    activeCropperImage.$move(...movement);
+  });
   saveBtn.addEventListener("click", () => {
     if (!cropperReady || !activeCropper) {
       showToast("Image is still loading. Please wait a moment and try again.", "err");
@@ -6088,8 +6395,7 @@ function openExistingPhotoEditor(config) {
   }
 
   if (cropperModal) {
-    cropperModal.classList.add("show");
-    cropperModal.setAttribute("aria-hidden", "false");
+    revealPhotoCropper();
     setCropperLoading(true, "Loading photo…");
   }
 
@@ -6171,13 +6477,9 @@ function loadCropperImage(url, isObjectUrl) {
     cropperObjectUrl = null;
   }
   if (isObjectUrl) cropperObjectUrl = url;
-  cropperModal.classList.add("show");
-  cropperModal.setAttribute("aria-hidden", "false");
+  revealPhotoCropper();
   setCropperLoading(true, "Loading photo…");
-  if (activeCropper) {
-    activeCropper.destroy();
-    activeCropper = null;
-  }
+  destroyActiveCropperInstance();
   cropperImage.onerror = () => {
     const fallbackFile = cropperFile;
     const fallbackConfig = cropperConfig;
@@ -6197,41 +6499,18 @@ function loadCropperImage(url, isObjectUrl) {
   };
   cropperImage.onload = () => {
     try {
-      activeCropper = new Cropper(cropperImage, {
-        aspectRatio: 1,
-        viewMode: 1,
-        dragMode: "move",
-        autoCropArea: 1,
-        background: false,
-        guides: false,
-        center: false,
-        cropBoxMovable: false,
-        cropBoxResizable: false,
-        responsive: true,
-        zoomOnWheel: true,
-        zoomOnTouch: true,
-        ready() {
-          requestAnimationFrame(() => syncCropperBaseZoom({ resetSlider: true }));
-          if (cropperZoom) cropperZoom.disabled = false;
-          cropperReady = true;
-          if (cropperSaveBtn) cropperSaveBtn.disabled = false;
-          setCropperLoading(false);
-        },
-        zoom() {
-          if (!cropperZoom) return;
-          if (cropperZoomLock) return;
-          const data = this.getImageData();
-          const currentZoom = data.naturalWidth ? data.width / data.naturalWidth : 1;
-          const relative = cropperBaseZoom ? currentZoom / cropperBaseZoom - 1 : 0;
-          const clamped = Math.min(0.5, Math.max(0, relative));
-          cropperZoom.value = String(clamped);
-        },
+      void initializePhotoCropper().catch((error) => {
+        console.error("Unable to initialize cropper", error);
+        const fallbackFile = cropperFile;
+        const fallbackConfig = cropperConfig;
+        closePhotoCropper();
+        if (fallbackFile && fallbackConfig) {
+          showToast("Crop editor unavailable. Photo was added without cropping.", "err");
+          stagePhotoDirect(fallbackFile, fallbackConfig);
+        } else {
+          showToast("Unable to open the crop editor right now.", "err");
+        }
       });
-      if (cropperZoom) {
-        cropperZoom.disabled = false;
-      }
-      cropperReady = true;
-      if (cropperSaveBtn) cropperSaveBtn.disabled = false;
     } catch (err) {
       console.error("Unable to initialize cropper", err);
       const fallbackFile = cropperFile;
@@ -6248,32 +6527,45 @@ function loadCropperImage(url, isObjectUrl) {
   cropperImage.src = url;
 }
 
+function revealPhotoCropper() {
+  if (!cropperModal) return;
+  const wasHidden = cropperModal.getAttribute("aria-hidden") !== "false";
+  cropperModal.classList.add("show");
+  cropperModal.setAttribute("aria-hidden", "false");
+  cropperModal.removeAttribute("inert");
+  if (wasHidden) {
+    activateDialogFocus(cropperModal, {
+      initialFocus: document.getElementById("photoCropCancel"),
+      onEscape: closePhotoCropper,
+    });
+  }
+}
+
 function closePhotoCropper() {
   if (!cropperModal) return;
   cropperModal.classList.remove("show");
   cropperModal.setAttribute("aria-hidden", "true");
+  cropperModal.setAttribute("inert", "");
+  deactivateDialogFocus(cropperModal);
   setCropperLoading(false);
   destroyPhotoCropper();
 }
 
 function destroyPhotoCropper() {
-  if (activeCropper) {
-    activeCropper.destroy();
-    activeCropper = null;
-  }
+  destroyActiveCropperInstance();
   if (cropperImage) {
     cropperImage.onerror = null;
     cropperImage.onload = null;
     cropperImage.src = "";
   }
   if (cropperZoom) {
-    cropperZoom.value = "1";
+    cropperZoom.value = "0";
     cropperZoom.disabled = true;
   }
   if (cropperSaveBtn) {
     cropperSaveBtn.disabled = true;
   }
-  cropperBaseZoom = 1;
+  cropperBaseScale = 1;
   cropperReady = false;
   cropperLoadRetries = 0;
   if (cropperObjectUrl) {
@@ -6286,20 +6578,47 @@ function destroyPhotoCropper() {
   cropperOriginalUrl = "";
 }
 
+function destroyActiveCropperInstance() {
+  if (activeCropperImage && cropperTransformHandler) {
+    activeCropperImage.removeEventListener("transform", cropperTransformHandler);
+  }
+  cropperTransformHandler = null;
+  if (activeCropper) {
+    activeCropper.destroy();
+    activeCropper = null;
+  }
+  activeCropperImage = null;
+  activeCropperSelection = null;
+}
+
 async function applyCroppedPhoto() {
-  if (!activeCropper || !cropperConfig) return;
+  if (!activeCropperSelection || !cropperConfig) return;
   const preview = document.getElementById(cropperConfig.previewId);
   const initials = document.getElementById(cropperConfig.initialsId);
   const frame = document.getElementById(cropperConfig.frameId);
-  const canvas = activeCropper.getCroppedCanvas({
-    width: 600,
-    height: 600,
-    imageSmoothingQuality: "high",
-  });
-  if (!canvas) return;
+  if (cropperSaveBtn) cropperSaveBtn.disabled = true;
+  let canvas = null;
+  try {
+    canvas = await activeCropperSelection.$toCanvas({
+      width: 600,
+      height: 600,
+      beforeDraw(context) {
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+      },
+    });
+  } catch (error) {
+    console.error("Unable to render cropped photo", error);
+  }
+  if (!canvas) {
+    if (cropperSaveBtn) cropperSaveBtn.disabled = false;
+    showToast("Unable to process this image. Please choose another JPG or PNG file.", "err");
+    return;
+  }
 
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
   if (!blob) {
+    if (cropperSaveBtn) cropperSaveBtn.disabled = false;
     showToast("Unable to process this image. Please choose a JPG or PNG file.", "err");
     return;
   }
@@ -6433,14 +6752,14 @@ if (profileForm) {
   profileForm.addEventListener("submit", (e) => e.preventDefault());
 }
 
-function handleProfilePreviewNavigation() {
+async function handleProfilePreviewNavigation() {
   const cached = currentUser || getCachedUser() || {};
 
   const role = (cached.role || "").toLowerCase();
   const id = cached._id || cached.id;
 
   if (!id) {
-    alert("Missing user id.");
+    showToast("Your profile could not be opened because the account identifier is missing.", "err");
     return;
   }
 
@@ -6456,22 +6775,3 @@ function handleProfilePreviewNavigation() {
 [document.getElementById("previewProfileBtn"), document.getElementById("attorneyPreviewProfileBtn")]
   .filter(Boolean)
   .forEach((btn) => btn.addEventListener("click", handleProfilePreviewNavigation));
-window.logoutUser = function (e) {
-  if (e) e.preventDefault();
-
-  // Clear client auth (preserve non-auth keys like tour flags)
-  ["lpc_user", "lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"].forEach((key) => {
-    try {
-      localStorage.removeItem(key);
-    } catch {}
-    try {
-      sessionStorage.removeItem(key);
-    } catch {}
-  });
-
-  // Backend logout (if applicable)
-  fetch("/api/auth/logout", { credentials: "include" })
-    .finally(() => {
-      window.location.href = "/login.html";
-    });
-};

@@ -1,8 +1,10 @@
 // backend/utils/email.js
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
-const CONTACT_EMAIL = "admin@lets-paraconnect.com";
-const SIGNATURE = "Let’s-ParaConnect Verification Division";
+const { createLogger } = require("./logger");
+const CONTACT_EMAIL = "help@lets-paraconnect.com";
+const SIGNATURE = "Let’s-ParaConnect";
+const logger = createLogger("email");
 
 // ----------------------------------------
 // Transport setup
@@ -13,9 +15,10 @@ const SECURE = SECURE_ENV || PORT === 465; // auto-secure if using 465
 
 const hasAuth = !!process.env.SMTP_USER && !!process.env.SMTP_PASS;
 const hasHost = !!process.env.SMTP_HOST;
+const emailDisabledAtStartup = String(process.env.EMAIL_DISABLE || "").toLowerCase() === "true";
 
-if (!hasHost) {
-  console.warn("[email] SMTP_HOST not set; email sending will fail.");
+if (!hasHost && !emailDisabledAtStartup) {
+  logger.warn("SMTP_HOST is not configured; email delivery is unavailable.");
 }
 
 const transporter = nodemailer.createTransport({
@@ -53,7 +56,7 @@ async function verifyOnce() {
     verifiedOnce = true;
   } catch (e) {
     // Non-fatal; log and continue so app doesn’t crash at boot
-    console.warn("[email] transport verify failed:", e?.message || e);
+    logger.warn("SMTP transport verification failed.", emailErrorMetadata(e));
   }
 }
 
@@ -63,6 +66,20 @@ async function verifyOnce() {
 function sanitizeSubject(s) {
   // prevent header injection + trim length
   return String(s || "").replace(/[\r\n]/g, " ").trim().slice(0, 140);
+}
+
+function recipientCount(value) {
+  const entries = Array.isArray(value) ? value : String(value || "").split(",");
+  return entries.map((entry) => String(entry || "").trim()).filter(Boolean).length;
+}
+
+function emailErrorMetadata(error) {
+  return {
+    name: String(error?.name || "Error").slice(0, 80),
+    code: String(error?.code || "EMAIL_DELIVERY_FAILED").slice(0, 80),
+    responseCode: Number.isFinite(Number(error?.responseCode)) ? Number(error.responseCode) : undefined,
+    command: error?.command ? String(error.command).slice(0, 40) : undefined,
+  };
 }
 
 function wrapHtml(html) {
@@ -95,7 +112,9 @@ function defaultFrom() {
 module.exports = async function sendEmail(to, subject, html, opts = {}) {
   const DISABLED = String(process.env.EMAIL_DISABLE || "").toLowerCase() === "true";
   if (DISABLED) {
-    console.log(`[email] disabled (EMAIL_DISABLE=true). Pretending to send to ${to} :: ${subject}`);
+    logger.debug("Email delivery skipped because EMAIL_DISABLE is enabled.", {
+      recipientCount: recipientCount(to),
+    });
     return { disabled: true };
   }
 
@@ -167,7 +186,7 @@ module.exports = async function sendEmail(to, subject, html, opts = {}) {
     html: wrapHtml(html || ""),
     text: textFallback,
     headers,
-    replyTo: opts.replyTo,
+    replyTo: opts.replyTo || CONTACT_EMAIL,
     cc: opts.cc,
     bcc: opts.bcc,
     attachments: Array.isArray(opts.attachments) ? opts.attachments : undefined,
@@ -180,11 +199,17 @@ module.exports = async function sendEmail(to, subject, html, opts = {}) {
   try {
     const info = await activeTransporter.sendMail(message);
     if (process.env.NODE_ENV !== "test") {
-      console.log(`✅ Email sent to ${to} (id: ${info.messageId || "n/a"})`);
+      logger.info("Email accepted by the configured transport.", {
+        recipientCount: recipientCount(to),
+        providerMessageIdPresent: Boolean(info.messageId),
+      });
     }
     return info;
   } catch (err) {
-    console.error(`❌ Email error to ${to}:`, err?.message || err);
+    logger.error("Email delivery failed.", {
+      recipientCount: recipientCount(to),
+      ...emailErrorMetadata(err),
+    });
     if (opts.throwOnError) throw err;
     return { error: true, message: err?.message || String(err) };
   }
@@ -215,7 +240,7 @@ function buildVerificationEmail(lastName, paragraphs = []) {
 
 function sendPendingReviewEmail(lastName) {
   return buildVerificationEmail(lastName, [
-    "Thank you for submitting your application. Our verification team is currently reviewing your credentials for the Let’s-ParaConnect elite paralegal professional collective.",
+    "Thank you for submitting your application. Our review team is currently evaluating the information and materials you provided for Let’s-ParaConnect access.",
     "We will email you as soon as the review is complete.",
   ]);
 }
@@ -223,14 +248,14 @@ function sendPendingReviewEmail(lastName) {
 function sendAdditionalInfoEmail(lastName) {
   return buildVerificationEmail(lastName, [
     "Thank you for your continued interest in Let’s-ParaConnect.",
-    "We require additional documentation to complete your verification. Please reply to this email with the requested materials so we can finalize your review.",
+    "We require additional documentation to complete your application review. Please reply to this email with the requested materials so we can finalize the review.",
   ]);
 }
 
 function sendAcceptedEmail(lastName) {
   return buildVerificationEmail(lastName, [
-    "Congratulations! Your application has been approved and you have been accepted into the Let’s-ParaConnect elite paralegal professional collective.",
-    "We will send onboarding instructions as we approach the official platform launch.",
+    "Congratulations! Your application has been approved and your Let’s-ParaConnect profile can now be completed for platform use.",
+    "Sign in to finish your profile and keep your availability current.",
   ]);
 }
 
@@ -252,15 +277,14 @@ async function sendWelcomePacket(user) {
   const body = `
   Dear Ms./Mr. ${lastName},
 
-  Congratulations — your application has been meticulously reviewed and approved.
-  We would like to welcome you to Let’s-ParaConnect as one of our vetted,
-  elite paralegals.
+  Congratulations — your application has been reviewed and approved.
+  Welcome to Let’s-ParaConnect as an approved paralegal member.
 
-  Your acceptance signifies confidence in your professionalism, verified credentials,
-  and commitment to excellence. Your profile will appear to attorneys upon launch.
+  Your approval reflects the information and materials reviewed in your application.
+  Sign in to complete your profile and keep your availability current for attorneys.
 
   Respectfully,
-  Let’s-ParaConnect Verification Division
+  The Let’s-ParaConnect Team
   `;
 
   if (!email) return;
@@ -270,7 +294,6 @@ async function sendWelcomePacket(user) {
 async function sendProfilePhotoRejectedEmail(user, opts = {}) {
   const email = user?.email;
   if (!email) return;
-  const lastName = user?.lastName || "";
   const baseUrl =
     (opts.profileSettingsUrl && String(opts.profileSettingsUrl).trim()) ||
     (process.env.EMAIL_BASE_URL || process.env.APP_BASE_URL || "https://www.lets-paraconnect.com");
@@ -404,30 +427,19 @@ async function sendVerificationEmail(user, code) {
   try {
     await module.exports(user.email, "Verify your email", body);
   } catch (err) {
-    console.warn("[email] verification email placeholder failed", err?.message || err);
+    logger.warn("Verification email delivery failed.", emailErrorMetadata(err));
   }
 }
 
-async function sendVerificationSMS(phone, code) {
-  console.log(`[sms] Placeholder verification SMS to ${phone || "unknown"}: ${code || "000000"}`);
-}
-
 module.exports.sendVerificationEmail = sendVerificationEmail;
-module.exports.sendVerificationSMS = sendVerificationSMS;
 
 async function sendNotificationEmail(to, subject, body) {
   if (!to) return;
   try {
     await module.exports(to, subject || "Let’s-ParaConnect notification", body || "You have a new notification.");
   } catch (err) {
-    console.warn("[email] notification email failed", err?.message || err);
+    logger.warn("Notification email delivery failed.", emailErrorMetadata(err));
   }
 }
 
-function sendNotificationSMS(phone, message) {
-  if (!phone) return;
-  console.log(`[sms] Notification to ${phone}: ${message || "You have a new notification."}`);
-}
-
 module.exports.sendNotificationEmail = sendNotificationEmail;
-module.exports.sendNotificationSMS = sendNotificationSMS;

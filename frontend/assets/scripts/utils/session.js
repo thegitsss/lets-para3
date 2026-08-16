@@ -5,7 +5,6 @@
   let nukedOnRedirect = false;
   let cachedUser = null;
   let sessionPromise = null;
-  let cachedSessionToken = null;
   let lastSessionFailure = null;
   const LEGACY_TOKEN_KEYS = ["lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"];
   const VALID_THEMES = ["light", "dark", "mountain", "mountain-dark"];
@@ -19,6 +18,78 @@
   const MOUNTAIN_BG = "#f8f6f1";
   let currentTheme = null;
   let currentFontSize = null;
+
+  const SESSION_STRING_FIELDS = [
+    "id",
+    "_id",
+    "role",
+    "status",
+    "firstName",
+    "lastName",
+    "name",
+    "avatarURL",
+    "profileImage",
+    "pendingProfileImage",
+    "profilePhotoStatus",
+  ];
+  const SESSION_BOOLEAN_FIELDS = [
+    "disabled",
+    "deleted",
+    "isFirstLogin",
+    "legalAcceptanceRequired",
+  ];
+  const ONBOARDING_BOOLEAN_FIELDS = [
+    "paralegalTourCompleted",
+    "paralegalProfileTourCompleted",
+    "attorneyTourCompleted",
+    "attorneyProfileCompleted",
+  ];
+
+  function projectSessionUser(user) {
+    if (!user || typeof user !== "object" || Array.isArray(user)) return null;
+    const snapshot = {};
+    SESSION_STRING_FIELDS.forEach((field) => {
+      if (typeof user[field] === "string") snapshot[field] = user[field];
+    });
+    SESSION_BOOLEAN_FIELDS.forEach((field) => {
+      if (typeof user[field] === "boolean") snapshot[field] = user[field];
+    });
+
+    const preferences = {};
+    if (typeof user.preferences?.theme === "string") preferences.theme = user.preferences.theme;
+    if (typeof user.preferences?.fontSize === "string") preferences.fontSize = user.preferences.fontSize;
+    if (Object.keys(preferences).length) snapshot.preferences = preferences;
+
+    const onboarding = {};
+    ONBOARDING_BOOLEAN_FIELDS.forEach((field) => {
+      if (typeof user.onboarding?.[field] === "boolean") onboarding[field] = user.onboarding[field];
+    });
+    if (Object.keys(onboarding).length) snapshot.onboarding = onboarding;
+    return snapshot;
+  }
+
+  function sanitizeStoredSessionSnapshot() {
+    try {
+      const raw = localStorage.getItem("lpc_user");
+      if (raw) {
+        const snapshot = projectSessionUser(JSON.parse(raw));
+        if (snapshot && Object.keys(snapshot).length) {
+          const next = JSON.stringify(snapshot);
+          if (next !== raw) localStorage.setItem("lpc_user", next);
+        } else {
+          localStorage.removeItem("lpc_user");
+        }
+      }
+      localStorage.removeItem("avatarURL");
+    } catch (_) {
+      try {
+        localStorage.removeItem("lpc_user");
+        localStorage.removeItem("avatarURL");
+      } catch (_) {}
+    }
+  }
+
+  sanitizeStoredSessionSnapshot();
 
   const earlyTheme = (() => {
     try {
@@ -135,9 +206,7 @@
     const normalized = setThemeClass(theme);
     if (cachedUser) {
       cachedUser.preferences = { ...(cachedUser.preferences || {}), theme: normalized };
-      try {
-        localStorage.setItem("lpc_user", JSON.stringify(cachedUser));
-      } catch (_) {}
+      persistStoredUser(cachedUser);
     }
     return normalized;
   }
@@ -167,9 +236,7 @@
     currentFontSize = normalized;
     if (cachedUser) {
       cachedUser.preferences = { ...(cachedUser.preferences || {}), fontSize: normalized };
-      try {
-        localStorage.setItem("lpc_user", JSON.stringify(cachedUser));
-      } catch (_) {}
+      persistStoredUser(cachedUser);
     }
     return normalized;
   }
@@ -200,10 +267,35 @@
     return path.endsWith("/login.html") || path.endsWith("login.html") || href.includes("login.html");
   }
 
-  function clearServerSession() {
+  function isLegalAcceptancePage() {
+    if (typeof window === "undefined") return false;
+    const path = String(window.location?.pathname || "").toLowerCase();
+    return path.endsWith("/legal-acceptance.html") || path.endsWith("legal-acceptance.html");
+  }
+
+  function redirectToLegalAcceptance() {
+    if (hasRedirected || isLegalAcceptancePage()) return;
+    hasRedirected = true;
     try {
-      fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      window.location.replace("legal-acceptance.html");
     } catch (_) {}
+  }
+
+  async function clearServerSession() {
+    try {
+      const csrfResponse = await fetch("/api/csrf", { credentials: "include" });
+      const payload = await csrfResponse.json().catch(() => ({}));
+      const csrfToken = csrfResponse.ok ? String(payload?.csrfToken || "") : "";
+      if (!csrfToken) return false;
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+        headers: { "X-CSRF-Token": csrfToken },
+      });
+      return response.ok;
+    } catch (_) {
+      return false;
+    }
   }
 
   function rememberDisabled(message) {
@@ -218,7 +310,7 @@
 
   function handleDisabledAccount(message) {
     rememberDisabled(message);
-    clearServerSession();
+    void clearServerSession();
     invalidateAndRedirect();
   }
 
@@ -264,22 +356,12 @@
           syncStoredUser(mergedUser);
           applyThemeFromUser(mergedUser);
           applyFontSizeFromUser(mergedUser);
-          if (typeof document !== "undefined") {
-            if (document.readyState === "loading") {
-              document.addEventListener("DOMContentLoaded", () => injectBetaFooter(resolvedUser), { once: true });
-            } else {
-              injectBetaFooter(resolvedUser);
-            }
-          }
           try {
             const avatarSrc =
               resolvedUser?.pendingProfileImage ||
               resolvedUser?.profileImage ||
               resolvedUser?.avatarURL ||
-              "assets/default-avatar.png";
-            if (resolvedUser?.avatarURL) {
-              localStorage.setItem("avatarURL", resolvedUser.avatarURL);
-            }
+              "assets/avatar-placeholder.svg";
             const avatarNodes = document.querySelectorAll("[data-avatar]");
             avatarNodes.forEach((el) => {
               if (el) el.src = avatarSrc;
@@ -298,10 +380,15 @@
   function clearStoredSession() {
     cachedUser = null;
     sessionPromise = null;
-    cachedSessionToken = null;
     try {
       localStorage.removeItem("lpc_user");
+      localStorage.removeItem("avatarURL");
     } catch (_) {}
+    ["lpc-support-context", "lpc_support_session_user", "lpc_support_drawer_pin"].forEach((key) => {
+      try {
+        sessionStorage.removeItem(key);
+      } catch (_) {}
+    });
     LEGACY_TOKEN_KEYS.forEach((key) => {
       try {
         localStorage.removeItem(key);
@@ -328,7 +415,7 @@
   }
 
   async function checkSession(expectedRole, options = {}) {
-    const { redirectOnFail = true } = options;
+    const { redirectOnFail = true, allowLegalAcceptanceRequired = false } = options;
     let sessionData;
     try {
       sessionData = await getSessionData();
@@ -354,6 +441,16 @@
       if (redirectOnFail) invalidateAndRedirect();
       throw new Error("Not approved");
     }
+    if (
+      user?.legalAcceptanceRequired === true &&
+      !allowLegalAcceptanceRequired &&
+      !isLegalAcceptancePage()
+    ) {
+      if (redirectOnFail) redirectToLegalAcceptance();
+      const error = new Error("Updated legal documents must be accepted before continuing.");
+      error.code = "LEGAL_ACCEPTANCE_REQUIRED";
+      throw error;
+    }
     nukedOnRedirect = false;
     return { user, role: normalizedRole, status };
   }
@@ -361,7 +458,9 @@
   function redirectUserDashboard(roleOverride) {
     const roleValue = roleOverride || cachedUser?.role || "attorney";
     const norm = String(roleValue).toLowerCase();
-    const target =
+    const target = cachedUser?.legalAcceptanceRequired === true
+      ? "legal-acceptance.html"
+      :
       norm === "admin"
         ? "admin-dashboard.html"
         : norm === "director"
@@ -396,26 +495,6 @@
     }
   }
 
-  function readLegacyToken() {
-    for (const key of LEGACY_TOKEN_KEYS) {
-      try {
-        const value = localStorage.getItem(key) || sessionStorage.getItem(key);
-        if (value) return value;
-      } catch (_) {}
-    }
-    return "";
-  }
-
-  function readStoredUser() {
-    if (cachedUser) return cachedUser;
-    try {
-      const raw = localStorage.getItem("lpc_user");
-      return raw ? JSON.parse(raw) : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
   function readStoredUserRaw() {
     try {
       const raw = localStorage.getItem("lpc_user");
@@ -423,58 +502,6 @@
     } catch (_) {
       return null;
     }
-  }
-
-  const BETA_FOOTER_STYLE_ID = "lpc-beta-footer-style";
-
-  function ensureBetaFooterStyles() {
-    if (typeof document === "undefined") return;
-    if (document.getElementById(BETA_FOOTER_STYLE_ID)) return;
-    const style = document.createElement("style");
-    style.id = BETA_FOOTER_STYLE_ID;
-    style.textContent = `
-      .sidebar-footer{display:flex;flex-direction:column;align-items:center;}
-      .sidebar-footer .beta-footer{display:flex;align-items:center;justify-content:center;width:100%;gap:6px;font-size:0.82rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:8px;font-weight:400;}
-      .sidebar-footer .beta-pill{padding:0;border:none;border-radius:0;font-size:0.8rem;letter-spacing:0.12em;font-weight:400;}
-      .sidebar-footer .beta-sep{font-size:0.7rem;letter-spacing:0;opacity:0.6;line-height:1;}
-      .sidebar-footer .beta-link{color:var(--muted);text-decoration:none;border-bottom:1px solid transparent;font-size:0.82rem;letter-spacing:0.08em;font-weight:400;}
-      .sidebar-footer .beta-link:hover{border-bottom-color:currentColor;}
-    `;
-    document.head.appendChild(style);
-  }
-
-  function buildBugReportLink() {
-    const subject = encodeURIComponent("Report an Issue");
-    const body = encodeURIComponent(
-      "What happened?\n\nWhat did you expect?\n\n(Optional) Page or feature:"
-    );
-    return `mailto:help@lets-paraconnect.com?subject=${subject}&body=${body}`;
-  }
-
-  function injectBetaFooter(user) {
-    if (!user || typeof document === "undefined") return;
-    if (String(user.role || "").toLowerCase() === "admin") return;
-    const footers = document.querySelectorAll(".sidebar-footer");
-    if (!footers.length) return;
-    ensureBetaFooterStyles();
-    const href = buildBugReportLink();
-    footers.forEach((footer) => {
-      if (footer.querySelector(".beta-footer")) return;
-      const wrap = document.createElement("div");
-      wrap.className = "beta-footer";
-      const link = document.createElement("a");
-      link.className = "beta-link";
-      link.href = href;
-      link.textContent = "Report an Issue";
-      link.addEventListener("click", (event) => {
-        event.stopPropagation();
-      });
-      wrap.addEventListener("click", (event) => {
-        event.stopPropagation();
-      });
-      wrap.appendChild(link);
-      footer.prepend(wrap);
-    });
   }
 
   function normalizeUserId(user) {
@@ -501,7 +528,12 @@
   function persistStoredUser(user) {
     try {
       if (user) {
-        localStorage.setItem("lpc_user", JSON.stringify(user));
+        const snapshot = projectSessionUser(user);
+        if (snapshot && Object.keys(snapshot).length) {
+          localStorage.setItem("lpc_user", JSON.stringify(snapshot));
+        } else {
+          localStorage.removeItem("lpc_user");
+        }
       } else {
         localStorage.removeItem("lpc_user");
       }
@@ -514,14 +546,13 @@
       if (stored) persistStoredUser(null);
       return;
     }
-    if (!stored) {
-      persistStoredUser(serverUser);
-      return;
-    }
+    const next = projectSessionUser(serverUser);
+    const changed = JSON.stringify(stored || null) !== JSON.stringify(next || null);
+    persistStoredUser(serverUser);
+    if (!stored) return;
     const sameId = normalizeUserId(stored) === normalizeUserId(serverUser);
     const sameRole = normalizeRole(stored) === normalizeRole(serverUser);
-    if (!sameId || !sameRole) {
-      persistStoredUser(serverUser);
+    if (!sameId || !sameRole || changed) {
       if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
         try {
           window.dispatchEvent(new CustomEvent("lpc:user-updated", { detail: serverUser }));
@@ -530,31 +561,16 @@
     }
   }
 
-  function getSessionToken() {
-    if (cachedSessionToken) return cachedSessionToken;
-    const legacy = readLegacyToken();
-    if (legacy) {
-      cachedSessionToken = legacy;
-      return cachedSessionToken;
-    }
-    const user = readStoredUser();
-    if (user?.id || user?._id) {
-      cachedSessionToken = "__cookie_session__";
-      return cachedSessionToken;
-    }
-    return "";
-  }
-
-  fetchSession().catch(() => {});
+  fetchSession().catch((error) => console.warn("[session] background session refresh rejected", error));
 
   window.checkSession = checkSession;
   window.redirectUserDashboard = redirectUserDashboard;
   window.clearStoredSession = clearStoredSession;
-  window.getSessionToken = getSessionToken;
   window.getSessionData = getSessionData;
   window.getStoredUser = getCachedUser;
   window.refreshSession = refreshSession;
   window.updateSessionUser = updateSessionUser;
+  window.projectSessionUser = projectSessionUser;
   window.applyThemePreference = applyThemePreference;
   window.getThemePreference = () => cachedUser?.preferences?.theme || null;
   window.applyFontSizePreference = applyFontSizePreference;
@@ -575,9 +591,14 @@
     headerRoot.style.visibility = "hidden";
     let authed = false;
     try {
-      await checkSession(undefined, { redirectOnFail: false });
+      await checkSession(undefined, {
+        redirectOnFail: false,
+        allowLegalAcceptanceRequired: true,
+      });
       authed = true;
-    } catch {}
+    } catch (error) {
+      console.debug("[session] public header authentication probe failed", error);
+    }
     updateHeaderBasedOnAuth(authed);
     headerRoot.style.visibility = "visible";
   }
@@ -590,7 +611,7 @@
 
   async function requireRole(expectedRole) {
     try {
-      const session = await checkSession(undefined, { redirectOnFail: false });
+      const session = await checkSession(undefined, { redirectOnFail: true });
       const user = session?.user || session;
       if (!user) throw new Error("Not logged-in");
       const normalizedRole = String(user.role || session?.role || "").toLowerCase();
@@ -607,7 +628,8 @@
         protectedRoot.style.visibility = "visible";
       }
       return user;
-    } catch {
+    } catch (error) {
+      if (error?.code === "LEGAL_ACCEPTANCE_REQUIRED") return null;
       window.location.href = "login.html";
       return null;
     }
@@ -629,3 +651,5 @@
 
   window.requireRole = requireRole;
 })();
+
+import("../web-vitals-rum.js").catch((error) => console.warn("[performance] RUM module failed to load", error));

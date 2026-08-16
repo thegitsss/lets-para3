@@ -35,7 +35,12 @@ jest.mock("@aws-sdk/client-s3", () => {
       this.input = input;
     }
   }
-  return { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand };
+  class GetObjectTaggingCommand {
+    constructor(input) {
+      this.input = input;
+    }
+  }
+  return { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, GetObjectTaggingCommand };
 });
 
 jest.mock("@aws-sdk/s3-request-presigner", () => ({

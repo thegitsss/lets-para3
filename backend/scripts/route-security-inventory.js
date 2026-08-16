@@ -17,16 +17,13 @@ const mountByFile = {
   "adminSales.js": "/api/admin/sales",
   "adminSupport.js": "/api/admin/support",
   "aiAdmin.js": "/api/admin/ai",
-  "aiChat.js": "/api/ai-chat",
   "applications.js": "/api/applications",
   "auth.js": "/api/auth",
   "autonomousActions.js": "/api/admin/autonomous-actions",
   "blocks.js": "/api/blocks",
   "caseDrafts.js": "/api/case-drafts",
-  "caseTasks.js": "/api/cases/:caseId/tasks",
   "cases.js": "/api/cases",
   "ccoAutonomyHarness.js": "/api/admin/support/dev/cco-autonomy",
-  "chat.js": "/api/chat",
   "checklist.js": "/api/checklist",
   "controlRoomE2eHarness.js": "/api/admin/ai-control-room/dev/e2e",
   "directorPortal.js": "/api/director",
@@ -40,13 +37,12 @@ const mountByFile = {
   "paralegals.js": "/api/paralegals",
   "payments.js": "/api/payments",
   "paymentsWebhook.js": "/api/webhooks/stripe",
+  "performance.js": "/api/performance",
   "public.js": "/api/public and /public",
   "stripe.js": "/api/stripe",
   "support.js": "/api/support",
-  "tasks.js": "/api/tasks",
   "uploads.js": "/api/uploads",
   "users.js": "/api/users and /api/paralegals",
-  "waitlist.js": "/api/waitlist",
 };
 
 const fileRateLimitNotes = {
@@ -56,7 +52,6 @@ const fileRateLimitNotes = {
   "uploads.js": "App-level /api/uploads and /api limit.",
   "public.js": "Route-level public limits plus app-level /api limit.",
   "paymentsWebhook.js": "Webhook endpoint; no browser rate-limit expected.",
-  "waitlist.js": "App-level /api limit only.",
 };
 
 function lineOf(src, idx) {
@@ -129,22 +124,23 @@ function hasBefore(src, line, pattern) {
 function classify(file, call, beforeLineText) {
   const whole = `${beforeLineText}\n${call}`;
   if (file === "paymentsWebhook.js") return "webhook/system-only";
+  if (file === "performance.js" && /^\/vitals$/.test(firstRoutePath(call))) return "public/telemetry";
   if (/requireRole\(["'`]admin/.test(whole)) return "admin-only";
   if (/requireRole\(["'`]director/.test(whole)) return "director-only";
   if (/requireRole\(["'`]attorney/.test(whole) && !/paralegal/.test(whole)) return "attorney-only";
   if (/requireRole\(["'`]paralegal/.test(whole) && !/attorney/.test(whole)) return "paralegal-only";
   if (/verifyToken\.optional/.test(whole)) return "public/optional-auth";
   if (/verifyToken|auth\b|router\.use\(verifyToken|router\.use\(auth|requireApproved/.test(whole)) return "authenticated";
-  if (file === "auth.js" || file === "public.js" || file === "waitlist.js" || file === "incidents.js") return "public";
+  if (file === "auth.js" || file === "public.js" || file === "incidents.js") return "public";
   return "authenticated/needs-review";
 }
 
 function rowStatus({ csrf, classification, file, call }) {
   if (csrf) return "verified";
   if (classification === "webhook/system-only") return "exempt";
+  if (classification === "public/telemetry") return "exempt";
   if (file === "controlRoomE2eHarness.js") return "exempt";
   if (file === "auth.js") return "exempt-review";
-  if (file === "waitlist.js") return "exempt-review";
   if (file === "incidents.js" && /verifyToken\.optional/.test(call)) return "exempt-review";
   if (classification === "public") return "exempt-review";
   return "open";
@@ -153,9 +149,9 @@ function rowStatus({ csrf, classification, file, call }) {
 function csrfNote({ csrf, status, classification, file }) {
   if (csrf) return "Protected by csrfProtection/protectMutations/mutatingGuards.";
   if (classification === "webhook/system-only") return "Exempt: Stripe webhook requires raw body/signature verification, not browser CSRF.";
+  if (classification === "public/telemetry") return "Exempt: anonymous same-origin metrics intake stores only allowlisted, bounded values and has a dedicated rate limit.";
   if (file === "controlRoomE2eHarness.js") return "Exempt: dev E2E harness route gated by harness enablement and shared secret; not mounted as a normal production browser surface.";
   if (file === "auth.js") return "Exempt-review: public auth flow; protected by auth-specific validation/rate limits, but logout/session CSRF should be reviewed.";
-  if (file === "waitlist.js") return "Exempt-review: public lead capture; app-level rate limit only.";
   if (file === "incidents.js") return "Exempt-review: support incident intake; may be optional-auth public intake.";
   if (status === "open") return "Missing explicit CSRF or exemption.";
   return "Needs review.";
@@ -184,13 +180,16 @@ for (const file of files) {
     const line = lineOf(src, match.index);
     const beforeLineText = src.split("\n").slice(0, line).join("\n");
     const routePath = firstRoutePath(call);
-    const auth =
+    const publicTelemetry = file === "performance.js" && routePath === "/vitals";
+    const auth = publicTelemetry
+      ? "no/public"
+      :
       /verifyToken|auth\b|router\.use\(verifyToken|router\.use\(auth|requireControlRoomE2eHarnessSecret|requireCcoAutonomyHarnessEnabled|stripe\.webhooks\.constructEvent/.test(
         `${beforeLineText}\n${call}`
       )
         ? "yes"
         : "no/public";
-    const approved = /requireApproved|requireApprovedUser|router\.use\(requireApproved/.test(`${beforeLineText}\n${call}`)
+    const approved = !publicTelemetry && /requireApproved|requireApprovedUser|router\.use\(requireApproved/.test(`${beforeLineText}\n${call}`)
       ? "yes"
       : "no/public-or-special";
     const roleMatch = `${beforeLineText}\n${call}`.match(/requireRole\(([^)]*)\)/);
@@ -232,7 +231,7 @@ const exempt = rows.filter((row) => row.status.startsWith("exempt"));
 const lines = [];
 lines.push("# LPC Route Security Inventory");
 lines.push("");
-lines.push(`Generated: ${new Date().toISOString()}`);
+lines.push("Generated from the current route source by `node backend/scripts/route-security-inventory.js`.");
 lines.push("");
 lines.push("Scope: every `router.post`, `router.put`, `router.patch`, and `router.delete` declaration under `backend/routes`. This is a static inventory; route groups with `router.use(...)` middleware are detected heuristically and should be reviewed when a route is marked `open` or `exempt-review`.");
 lines.push("");
@@ -278,5 +277,20 @@ for (const row of rows) {
 }
 lines.push("");
 
-fs.writeFileSync(outFile, `${lines.join("\n")}\n`);
+const renderedInventory = `${lines.join("\n")}\n`;
+const checkOnly = process.argv.includes("--check");
+if (checkOnly) {
+  const currentInventory = fs.existsSync(outFile) ? fs.readFileSync(outFile, "utf8") : "";
+  if (currentInventory !== renderedInventory) {
+    console.error("[route-security] Generated inventory is stale. Run `node backend/scripts/route-security-inventory.js` and commit the result.");
+    process.exitCode = 1;
+  }
+} else {
+  fs.writeFileSync(outFile, renderedInventory);
+}
+
 console.log(JSON.stringify({ outFile, total: rows.length, counts, open: open.length, exemptions: exempt.length }, null, 2));
+if (open.length > 0) {
+  console.error(`[route-security] ${open.length} mutating route${open.length === 1 ? " is" : "s are"} missing CSRF protection or an approved exemption.`);
+  process.exitCode = 1;
+}

@@ -1,4 +1,9 @@
 import { secureFetch } from "../auth.js";
+import { confirmAction, promptForText } from "../utils/dialogs.js";
+import { normalizeHttpNavigationUrl } from "../utils/navigation-url.js";
+import { reportAsyncFailure } from "../utils/promise-errors.js";
+
+const reportFailure = reportAsyncFailure("admin-marketing");
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -7,6 +12,10 @@ function escapeHTML(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function safeHttpUrl(value = "") {
+  return normalizeHttpNavigationUrl(value);
 }
 
 function formatDate(value) {
@@ -25,7 +34,7 @@ function titleize(value = "") {
 function marketingWorkflowLabel(value = "") {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "linkedin_company_post") return "LinkedIn company post";
-  if (normalized === "facebook_page_post") return "Facebook page post";
+  if (normalized === "facebook_page_post") return "Legacy Facebook page post (retired)";
   if (normalized === "platform_update_announcement") return "Platform update post";
   if (normalized === "founder_linkedin_post") return "Founder LinkedIn post";
   return titleize(value || "draft");
@@ -64,7 +73,6 @@ let activePacketId = "";
 let activeCycleId = "";
 let packetCache = [];
 let cycleCache = [];
-let linkedInConnection = null;
 
 function buildMarketingPacketWorkKey(packetId = "") {
   const normalizedPacketId = String(packetId || "").trim();
@@ -75,7 +83,7 @@ function renderJrCmoLibrary(library = null) {
   const root = document.getElementById("marketingJrCmoLibrary");
   if (!root) return;
   if (!library) {
-    root.innerHTML = `<div class="ai-room-empty">Jr. CMO library not available yet.</div>`;
+    root.innerHTML = `<div class="ai-room-empty">Jr. CMO library data is unavailable.</div>`;
     return;
   }
 
@@ -159,12 +167,16 @@ function renderJrCmoLibrary(library = null) {
       ${
         sourceRefs.length
           ? `<ul>${sourceRefs
-              .map(
-                (item) =>
-                  `<li>${escapeHTML(item.source || "Source")} · <a href="${escapeHTML(item.url || "#")}" target="_blank" rel="noopener noreferrer">${escapeHTML(
-                    item.label || item.url || "Reference"
-                  )}</a> <span class="small">${escapeHTML(formatDate(item.publishedAt || ""))}</span></li>`
-              )
+              .map((item) => {
+                const href = safeHttpUrl(item.url);
+                const label = escapeHTML(item.label || item.url || "Reference");
+                const reference = href
+                  ? `<a href="${escapeHTML(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`
+                  : `<span>${label}</span>`;
+                return `<li>${escapeHTML(item.source || "Source")} · ${reference} <span class="small">${escapeHTML(
+                  formatDate(item.publishedAt || "")
+                )}</span></li>`;
+              })
               .join("")}</ul>`
           : "<p>No external source references are stored for today's context.</p>"
       }
@@ -236,7 +248,7 @@ function renderFounderDailyLog(log = null) {
   const root = document.getElementById("marketingFounderDailyLog");
   if (!root) return;
   if (!log) {
-    root.innerHTML = `<div class="ai-room-empty">Daily summary not available yet.</div>`;
+    root.innerHTML = `<div class="ai-room-empty">Daily summary data is unavailable.</div>`;
     return;
   }
 
@@ -392,7 +404,7 @@ function formatEnabled(value) {
 
 function formatChannelName(channelKey = "") {
   if (channelKey === "linkedin_company") return "LinkedIn company";
-  if (channelKey === "facebook_page") return "Facebook Page";
+  if (channelKey === "facebook_page") return "Facebook Page (retired)";
   return titleize(channelKey || "channel");
 }
 
@@ -424,14 +436,12 @@ function formatScopeSnapshot(values = []) {
 }
 
 function renderLinkedInConnection(connection = null) {
-  linkedInConnection = connection || null;
   const status = document.getElementById("marketingLinkedInConnectionStatus");
   const meta = document.getElementById("marketingLinkedInValidationMeta");
   const facts = document.getElementById("marketingLinkedInConnectionFacts");
   const orgName = document.getElementById("marketingLinkedInOrgName");
   const orgId = document.getElementById("marketingLinkedInOrgId");
   const orgUrn = document.getElementById("marketingLinkedInOrgUrn");
-  const apiVersion = document.getElementById("marketingLinkedInApiVersion");
 
   const normalizedStatus = String(connection?.status || "not_connected").trim() || "not_connected";
   const discoveredCount = Array.isArray(connection?.discoveredOrganizations) ? connection.discoveredOrganizations.length : 0;
@@ -443,7 +453,6 @@ function renderLinkedInConnection(connection = null) {
   if (orgName) orgName.value = sanitizedOrgName;
   if (orgId) orgId.value = sanitizedOrgId;
   if (orgUrn) orgUrn.value = sanitizedOrgUrn;
-  if (apiVersion) apiVersion.value = connection?.apiVersion || "202503";
 
   if (status) {
     if (!connection || normalizedStatus === "not_connected") {
@@ -531,7 +540,6 @@ function renderPublishingSummary(overview = {}) {
   const maxOpenCycles = document.getElementById("marketingPublishingMaxOpenCycles");
   const isEnabled = document.getElementById("marketingPublishingIsEnabled");
   const linkedIn = document.getElementById("marketingPublishingLinkedIn");
-  const facebook = document.getElementById("marketingPublishingFacebook");
   const pauseReason = document.getElementById("marketingPublishingPauseReason");
 
   if (cadenceMode) cadenceMode.value = settings.cadenceMode || "manual_only";
@@ -540,7 +548,6 @@ function renderPublishingSummary(overview = {}) {
   if (maxOpenCycles) maxOpenCycles.value = Number(settings.maxOpenCycles ?? 1);
   if (isEnabled) isEnabled.checked = settings.isEnabled === true;
   if (linkedIn) linkedIn.checked = enabledChannels.includes("linkedin_company");
-  if (facebook) facebook.checked = enabledChannels.includes("facebook_page");
   if (pauseReason) pauseReason.value = settings.pauseReason || "";
 }
 
@@ -549,7 +556,7 @@ function renderCycleList(cycles = []) {
   const root = document.getElementById("marketingCycleList");
   if (!root) return;
   if (!cycleCache.length) {
-    root.innerHTML = `<div class="ai-room-empty">No publishing cycles exist yet. Trigger a manual cycle or enable cadence to open the first paired review unit.</div>`;
+    root.innerHTML = `<div class="ai-room-empty">No publishing cycles exist yet. Trigger a manual cycle or enable cadence to open the first LinkedIn review unit.</div>`;
     return;
   }
 
@@ -610,12 +617,12 @@ function renderCycleDetail(cycle = null) {
           <p class="small">${escapeHTML(channel.whyThisHelpsPageGrowth || "No page-growth rationale recorded yet.")}</p>
           <div class="workspace-form-actions">
             ${
-              channel.packetId
+              channel.packetId && !channel.historical
                 ? `<button class="btn secondary" type="button" data-marketing-open-packet="${escapeHTML(channel.packetId)}">Open Packet</button>`
                 : ""
             }
             ${
-              channel.packetId && (channel.approvalTaskState === "pending" || channel.packetApprovalState === "pending_review")
+              channel.packetId && !channel.historical && (channel.approvalTaskState === "pending" || channel.packetApprovalState === "pending_review")
                 ? `<button class="btn secondary" type="button" data-marketing-open-approvals="${escapeHTML(
                     buildMarketingPacketWorkKey(channel.packetId)
                   )}">Open In Approvals</button>`
@@ -654,7 +661,6 @@ function renderCycleDetail(cycle = null) {
       <ul>
         <li>Approval is not publish.</li>
         <li>LinkedIn company publish is enabled only through explicit publish-now for approved packets.</li>
-        <li>Facebook Page publishing remains unavailable in this phase.</li>
       </ul>
       ${
         cycle.status !== "skipped"
@@ -1056,7 +1062,6 @@ async function savePublishingSettings(event) {
       isEnabled: document.getElementById("marketingPublishingIsEnabled")?.checked === true,
       enabledChannels: [
         document.getElementById("marketingPublishingLinkedIn")?.checked ? "linkedin_company" : "",
-        document.getElementById("marketingPublishingFacebook")?.checked ? "facebook_page" : "",
       ].filter(Boolean),
       pauseReason: document.getElementById("marketingPublishingPauseReason")?.value || "",
     };
@@ -1091,7 +1096,6 @@ async function saveLinkedInConnection(event) {
       organizationName: document.getElementById("marketingLinkedInOrgName")?.value || "",
       organizationId: document.getElementById("marketingLinkedInOrgId")?.value || "",
       organizationUrn: document.getElementById("marketingLinkedInOrgUrn")?.value || "",
-      apiVersion: document.getElementById("marketingLinkedInApiVersion")?.value || "202503",
     };
 
     const res = await secureFetch("/api/admin/marketing/publishing/channel-connections/linkedin_company", {
@@ -1123,7 +1127,6 @@ async function startLinkedInOAuth() {
       organizationName: document.getElementById("marketingLinkedInOrgName")?.value || "",
       organizationId: document.getElementById("marketingLinkedInOrgId")?.value || "",
       organizationUrn: document.getElementById("marketingLinkedInOrgUrn")?.value || "",
-      apiVersion: document.getElementById("marketingLinkedInApiVersion")?.value || "202503",
     };
     const res = await secureFetch("/api/admin/marketing/publishing/channel-connections/linkedin_company/oauth/start", {
       method: "POST",
@@ -1133,7 +1136,11 @@ async function startLinkedInOAuth() {
     const response = await res.json();
     if (!res.ok) throw new Error(response?.error || "Unable to start LinkedIn OAuth.");
 
-    const popup = window.open(response.connectUrl, "linkedin-marketing-connect", "width=640,height=760");
+    const connectUrl = normalizeHttpNavigationUrl(response.connectUrl, {
+      allowedHosts: ["www.linkedin.com", "linkedin.com"],
+    });
+    if (!connectUrl) throw new Error("LinkedIn returned an invalid authorization destination.");
+    const popup = window.open(connectUrl, "linkedin-marketing-connect", "width=640,height=760,noopener");
     if (!popup) throw new Error("Popup was blocked. Allow popups and try again.");
     if (status) status.textContent = "LinkedIn OAuth window opened.";
   } catch (err) {
@@ -1252,7 +1259,10 @@ async function approvePacket(packetId = "") {
   if (!packetId) return;
   const founderStatus = document.getElementById("marketingFounderStatus");
   const queueStatus = document.getElementById("marketingFormStatus");
-  if (!window.confirm("Approve this draft?")) return;
+  if (!(await confirmAction("This draft will become eligible for publishing.", {
+    title: "Approve this draft?",
+    confirmLabel: "Approve draft",
+  }))) return;
   if (founderStatus) founderStatus.textContent = "Approving draft…";
   if (queueStatus) queueStatus.textContent = "Approving draft…";
 
@@ -1281,7 +1291,11 @@ async function rejectPacket(packetId = "") {
   if (!packetId) return;
   const founderStatus = document.getElementById("marketingFounderStatus");
   const queueStatus = document.getElementById("marketingFormStatus");
-  if (!window.confirm("Reject this draft?")) return;
+  if (!(await confirmAction("The draft will return to the rejected queue with the current review note.", {
+    title: "Reject this draft?",
+    confirmLabel: "Reject draft",
+    tone: "danger",
+  }))) return;
   const note = document.getElementById("marketingDecisionNote")?.value || "";
   if (founderStatus) founderStatus.textContent = "Rejecting draft…";
   if (queueStatus) queueStatus.textContent = "Rejecting draft…";
@@ -1311,7 +1325,10 @@ async function publishPacketNow(packetId = "") {
   if (!packetId) return;
   const status = document.getElementById("marketingFormStatus");
   const founderStatus = document.getElementById("marketingFounderStatus");
-  if (!window.confirm("Publish this approved LinkedIn post right now?")) return;
+  if (!(await confirmAction("The approved post will be sent to LinkedIn immediately.", {
+    title: "Publish this post now?",
+    confirmLabel: "Publish now",
+  }))) return;
   if (status) status.textContent = "Publishing approved LinkedIn post…";
   if (founderStatus) founderStatus.textContent = "Publishing approved LinkedIn post…";
 
@@ -1341,8 +1358,18 @@ async function skipCycle(cycleId = "") {
   const normalizedCycleId = String(cycleId || "").trim();
   if (!normalizedCycleId) return;
   const status = document.getElementById("marketingPublishingStatus");
-  const reason = window.prompt("Optional reason for skipping this cycle:", "") || "";
-  if (!window.confirm("Skip this publishing cycle?")) return;
+  const reason = await promptForText("Add an optional internal reason before skipping this publishing cycle.", {
+    title: "Skip publishing cycle?",
+    label: "Reason (optional)",
+    confirmLabel: "Continue",
+    maxLength: 500,
+  });
+  if (reason === null) return;
+  if (!(await confirmAction("No content will publish for this cycle.", {
+    title: "Confirm skipped cycle",
+    confirmLabel: "Skip cycle",
+    tone: "danger",
+  }))) return;
   if (status) status.textContent = "Skipping publishing cycle…";
 
   try {
@@ -1468,12 +1495,12 @@ function bindMarketingQueue() {
       }
     };
     list.addEventListener("click", (event) => {
-      selectPacket(event).catch(() => {});
+      selectPacket(event).catch(reportFailure);
     });
     list.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      selectPacket(event).catch(() => {});
+      selectPacket(event).catch(reportFailure);
     });
   }
   if (publishingForm && !publishingForm.dataset.bound) {
@@ -1483,19 +1510,19 @@ function bindMarketingQueue() {
   if (publishingRefreshBtn && !publishingRefreshBtn.dataset.bound) {
     publishingRefreshBtn.dataset.bound = "true";
     publishingRefreshBtn.addEventListener("click", () => {
-      Promise.allSettled([loadFounderDailyLog(true), loadPublishingLoop(true), loadJrCmoLibrary(true)]).catch(() => {});
+      void Promise.allSettled([loadFounderDailyLog(true), loadPublishingLoop(true), loadJrCmoLibrary(true)]);
     });
   }
   if (jrCmoRefreshBtn && !jrCmoRefreshBtn.dataset.bound) {
     jrCmoRefreshBtn.dataset.bound = "true";
     jrCmoRefreshBtn.addEventListener("click", () => {
-      loadJrCmoLibrary(true).catch(() => {});
+      loadJrCmoLibrary(true).catch(reportFailure);
     });
   }
   if (founderRefreshBtn && !founderRefreshBtn.dataset.bound) {
     founderRefreshBtn.dataset.bound = "true";
     founderRefreshBtn.addEventListener("click", () => {
-      loadFounderDailyLog(true).catch(() => {});
+      loadFounderDailyLog(true).catch(reportFailure);
     });
   }
   if (founderOpenQueueBtn && !founderOpenQueueBtn.dataset.bound) {
@@ -1513,7 +1540,7 @@ function bindMarketingQueue() {
         button.getAttribute("data-founder-action-type") || "",
         button.getAttribute("data-founder-packet-id") || "",
         button.getAttribute("data-founder-cycle-id") || ""
-      ).catch(() => {});
+      ).catch(reportFailure);
     });
   }
   if (founderReadyPosts && !founderReadyPosts.dataset.bound) {
@@ -1525,19 +1552,19 @@ function bindMarketingQueue() {
         button.getAttribute("data-founder-action-type") || "",
         button.getAttribute("data-founder-packet-id") || "",
         button.getAttribute("data-founder-cycle-id") || ""
-      ).catch(() => {});
+      ).catch(reportFailure);
     });
   }
   if (manualCycleBtn && !manualCycleBtn.dataset.bound) {
     manualCycleBtn.dataset.bound = "true";
     manualCycleBtn.addEventListener("click", () => {
-      triggerManualCycle().catch(() => {});
+      triggerManualCycle().catch(reportFailure);
     });
   }
   if (runScheduledBtn && !runScheduledBtn.dataset.bound) {
     runScheduledBtn.dataset.bound = "true";
     runScheduledBtn.addEventListener("click", () => {
-      runScheduledCycleCheck().catch(() => {});
+      runScheduledCycleCheck().catch(reportFailure);
     });
   }
   if (linkedInConnectionForm && !linkedInConnectionForm.dataset.bound) {
@@ -1549,19 +1576,19 @@ function bindMarketingQueue() {
     linkedInRefreshBtn.addEventListener("click", () => {
       fetchLinkedInConnection()
         .then((connection) => renderLinkedInConnection(connection))
-        .catch(() => {});
+        .catch(reportFailure);
     });
   }
   if (linkedInConnectBtn && !linkedInConnectBtn.dataset.bound) {
     linkedInConnectBtn.dataset.bound = "true";
     linkedInConnectBtn.addEventListener("click", () => {
-      startLinkedInOAuth().catch(() => {});
+      startLinkedInOAuth().catch(reportFailure);
     });
   }
   if (linkedInValidateBtn && !linkedInValidateBtn.dataset.bound) {
     linkedInValidateBtn.dataset.bound = "true";
     linkedInValidateBtn.addEventListener("click", () => {
-      validateLinkedInConnectionNow().catch(() => {});
+      validateLinkedInConnectionNow().catch(reportFailure);
     });
   }
   if (cycleList && !cycleList.dataset.bound) {
@@ -1579,12 +1606,12 @@ function bindMarketingQueue() {
       }
     };
     cycleList.addEventListener("click", (event) => {
-      selectCycle(event).catch(() => {});
+      selectCycle(event).catch(reportFailure);
     });
     cycleList.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      selectCycle(event).catch(() => {});
+      selectCycle(event).catch(reportFailure);
     });
   }
   const cycleDetail = document.getElementById("marketingCycleDetail");
@@ -1594,13 +1621,13 @@ function bindMarketingQueue() {
       const skipButton = event.target.closest("[data-marketing-skip-cycle]");
       if (skipButton) {
         const cycleId = skipButton.getAttribute("data-marketing-skip-cycle") || "";
-        skipCycle(cycleId).catch(() => {});
+        skipCycle(cycleId).catch(reportFailure);
         return;
       }
       const packetButton = event.target.closest("[data-marketing-open-packet]");
       if (packetButton) {
         const packetId = packetButton.getAttribute("data-marketing-open-packet") || "";
-        openPacketInMarketing(packetId).catch(() => {});
+        openPacketInMarketing(packetId).catch(reportFailure);
         return;
       }
       const approvalButton = event.target.closest("[data-marketing-open-approvals]");
@@ -1616,13 +1643,13 @@ function bindMarketingQueue() {
       const approveButton = event.target.closest("[data-marketing-approve-packet]");
       if (approveButton) {
         const packetId = approveButton.getAttribute("data-marketing-approve-packet") || "";
-        approvePacket(packetId).catch(() => {});
+        approvePacket(packetId).catch(reportFailure);
         return;
       }
       const rejectButton = event.target.closest("[data-marketing-reject-packet]");
       if (rejectButton) {
         const packetId = rejectButton.getAttribute("data-marketing-reject-packet") || "";
-        rejectPacket(packetId).catch(() => {});
+        rejectPacket(packetId).catch(reportFailure);
         return;
       }
       const approvalButton = event.target.closest("[data-marketing-open-approvals]");
@@ -1634,13 +1661,13 @@ function bindMarketingQueue() {
       const refreshButton = event.target.closest("[data-marketing-refresh-readiness]");
       if (refreshButton) {
         const packetId = refreshButton.getAttribute("data-marketing-refresh-readiness") || "";
-        refreshPublishReadiness(packetId).catch(() => {});
+        refreshPublishReadiness(packetId).catch(reportFailure);
         return;
       }
       const publishButton = event.target.closest("[data-marketing-publish-now]");
       if (publishButton) {
         const packetId = publishButton.getAttribute("data-marketing-publish-now") || "";
-        publishPacketNow(packetId).catch(() => {});
+        publishPacketNow(packetId).catch(reportFailure);
       }
     });
   }
@@ -1663,12 +1690,12 @@ window.addEventListener("message", (event) => {
     renderLinkedInConnection(payload.connection);
   }
   if (status) status.textContent = payload.message || (payload.ok ? "LinkedIn connection completed." : "LinkedIn connection failed.");
-  Promise.allSettled([loadFounderDailyLog(true), loadPublishingLoop(true), refreshActivePacketDetail(), loadJrCmoLibrary(true)]).catch(() => {});
+  void Promise.allSettled([loadFounderDailyLog(true), loadPublishingLoop(true), refreshActivePacketDetail(), loadJrCmoLibrary(true)]);
 });
 
 if (document.getElementById("section-marketing-drafts")?.classList.contains("visible")) {
-  loadFounderDailyLog().catch(() => {});
-  loadMarketingDraftQueue().catch(() => {});
-  loadPublishingLoop().catch(() => {});
-  loadJrCmoLibrary().catch(() => {});
+  loadFounderDailyLog().catch(reportFailure);
+  loadMarketingDraftQueue().catch(reportFailure);
+  loadPublishingLoop().catch(reportFailure);
+  loadJrCmoLibrary().catch(reportFailure);
 }

@@ -4,19 +4,22 @@
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
   <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
+  <link rel="stylesheet" href="assets/styles/global-search.css" />
+  <link rel="stylesheet" href="assets/styles/context-panel.css?v=20260812-paralegal-heading" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0B2A4A">
-  <title>Case Workspace - Let's-ParaConnect</title>
+  <title>Matter Workspace - Let's-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
   <script src="assets/scripts/utils/session.js"></script>
+  <script src="assets/scripts/utils/business-date.js"></script>
   <style>
     :root {
       --font-sans: "Sarabun", sans-serif;
@@ -157,6 +160,8 @@
     }
 
     .case-shell {
+      width: 100%;
+      min-width: 0;
       min-height: 100vh;
       height: 100vh;
       display: flex;
@@ -227,6 +232,10 @@
       display: flex;
       flex-direction: column;
       gap: 14px;
+    }
+
+    .sidebar nav[hidden] {
+      display: none !important;
     }
 
     .sidebar nav a {
@@ -529,6 +538,39 @@
 
     .case-topbar-title .case-thread-subtitle {
       font-size: 0.85rem;
+    }
+
+    .case-thread-context,
+    .case-thread-attention {
+      margin: 0;
+      color: var(--app-muted);
+      font-size: 0.8rem;
+    }
+
+    .case-thread-attention {
+      color: #8a641d;
+    }
+
+    .case-next-action {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      margin-top: 4px;
+      color: #75613b;
+      font-size: 0.82rem;
+      font-weight:600;
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.2em;
+    }
+
+    .case-next-action[hidden] {
+      display: none;
+    }
+
+    .case-next-action:hover,
+    .case-next-action:focus-visible {
+      text-decoration: underline;
     }
 
     .back-button {
@@ -1499,10 +1541,16 @@
       display: flex;
       align-items: flex-start;
       gap: 8px;
+      padding: 0;
+      border: 0;
+      background: transparent;
       color: inherit;
+      font: inherit;
+      text-align: left;
       text-decoration: none;
       min-width: 0;
       max-width: 100%;
+      cursor: pointer;
     }
 
     .document-link:hover {
@@ -1634,48 +1682,14 @@
       color: var(--app-text);
     }
 
-    .document-comments {
-      border-top: 1px solid var(--app-border-soft);
-      padding-top: 12px;
-      display: grid;
-      gap: 12px;
-    }
-
-    .document-comments h4 {
-      font-size: 0.95rem;
-    }
-
-    .document-comments ol {
-      list-style: none;
-      display: grid;
-      gap: 10px;
-      margin: 0;
-      padding: 0;
-    }
-
-    .document-comments article {
-      background: var(--app-surface-muted);
-      border-radius: var(--radius-sm);
-      padding: 12px 14px;
-      border: none;
-      box-shadow: var(--app-shadow-soft);
-    }
-
-    .document-comments h5 {
-      font-size: 0.9rem;
-      margin-bottom: 4px;
-    }
-
     .message-composer form,
-    .document-upload form,
-    .document-comments form {
+    .document-upload form {
       display: grid;
       gap: 6px;
     }
 
     .message-composer textarea,
-    .document-upload textarea,
-    .document-comments textarea {
+    .document-upload textarea {
       width: 100%;
       border: none;
       border-radius: var(--radius-sm);
@@ -1719,8 +1733,7 @@
     }
 
     .message-composer input,
-    .document-upload input,
-    .document-comments input {
+    .document-upload input {
       border: none;
       border-radius: var(--radius-sm);
       padding: 12px 14px;
@@ -2171,6 +2184,31 @@
       color: var(--app-muted);
     }
 
+    .case-documents-security,
+    .document-security-status {
+      font-size: 0.76rem;
+      line-height: 1.35;
+      color: var(--app-muted);
+    }
+
+    .case-documents-security.is-blocked,
+    .case-documents-security.is-error,
+    .document-security-status.is-blocked,
+    .document-security-status.is-error {
+      color: var(--app-danger, #b42318);
+    }
+
+    .case-documents-item.is-security-pending {
+      cursor: default;
+      background: color-mix(in srgb, var(--app-surface-contrast) 88%, var(--app-muted) 12%);
+    }
+
+    .document-link[aria-disabled="true"] {
+      color: var(--app-muted);
+      cursor: not-allowed;
+      text-decoration: none;
+    }
+
     .case-documents-actions {
       display: flex;
       justify-content: flex-end;
@@ -2189,37 +2227,54 @@
     .case-documents-approve {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      justify-content: center;
+      min-height: 36px;
+      padding: 7px 11px;
+      border: 1px solid var(--app-border);
+      border-radius: 8px;
+      background: var(--app-surface);
       font-size: 0.78rem;
       color: var(--app-text);
+      cursor: pointer;
     }
 
     .case-documents-request {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      justify-content: center;
+      min-height: 36px;
+      padding: 7px 11px;
+      border: 1px solid var(--app-border);
+      border-radius: 8px;
+      background: var(--app-surface);
       font-size: 0.78rem;
       color: var(--app-text);
+      cursor: pointer;
     }
 
-    .case-documents-approve input {
-      width: 14px;
-      height: 14px;
-      accent-color: var(--app-accent);
-    }
-
-    .case-documents-request input {
-      width: 14px;
-      height: 14px;
-      accent-color: var(--app-accent);
+    .case-documents-approve:hover,
+    .case-documents-request:hover,
+    .case-documents-approve:focus-visible,
+    .case-documents-request:focus-visible {
+      border-color: var(--app-accent);
     }
 
     .case-documents-approve.is-approved {
-      color: var(--app-muted);
+      border-color: color-mix(in srgb, var(--app-accent) 55%, var(--app-border));
+      background: color-mix(in srgb, var(--app-accent) 12%, var(--app-surface));
+      color: var(--app-text);
     }
 
     .case-documents-request.is-requested {
-      color: var(--app-muted);
+      border-color: color-mix(in srgb, var(--app-accent) 55%, var(--app-border));
+      background: color-mix(in srgb, var(--app-accent) 12%, var(--app-surface));
+      color: var(--app-text);
+    }
+
+    .case-documents-approve:disabled,
+    .case-documents-request:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
     }
 
     .case-overview-actions {
@@ -2449,23 +2504,24 @@
 
     #caseTaskList input[type="checkbox"]::after {
       content: "";
-      width: 8px;
+      width: 4px;
       height: 8px;
-      border-radius: 3px;
-      background: var(--app-accent);
+      border: solid var(--app-surface);
+      border-width: 0 2px 2px 0;
+      background: transparent;
       opacity: 0;
-      transform: scale(0.7);
+      transform: rotate(45deg) scale(0.7);
       transition: opacity 0.2s ease, transform 0.2s ease;
     }
 
     #caseTaskList input[type="checkbox"]:checked {
-      border-color: rgba(172, 154, 120, 0.85);
-      background: #efe5d5;
+      border-color: var(--app-accent);
+      background: var(--app-accent);
     }
 
     #caseTaskList input[type="checkbox"]:checked::after {
       opacity: 1;
-      transform: scale(1);
+      transform: rotate(45deg) scale(1);
     }
 
     #caseTaskList input[type="checkbox"]:focus,
@@ -2496,8 +2552,8 @@
     html.theme-dark #caseTaskList input[type="checkbox"]:checked,
     body.theme-mountain-dark #caseTaskList input[type="checkbox"]:checked,
     html.theme-mountain-dark #caseTaskList input[type="checkbox"]:checked {
-      border-color: rgba(182, 164, 122, 0.65);
-      background: #1f2533;
+      border-color: var(--app-accent);
+      background: var(--app-accent);
     }
 
     body.theme-dark #caseTaskList input[type="checkbox"]:focus,
@@ -2774,6 +2830,10 @@
         overflow: visible;
       }
 
+      .case-topbar {
+        padding-top: 52px;
+      }
+
       .case-workspace {
         flex: 0 0 auto;
         overflow: visible;
@@ -2793,12 +2853,14 @@
 
       .case-topbar-left {
         width: 100%;
-        align-items: flex-end;
+        align-items: flex-start;
+        padding-left: 0;
       }
 
       .case-topbar-title {
-        text-align: right;
-        margin-top: 32px;
+        width: 100%;
+        margin-top: 0;
+        text-align: left;
       }
 
       .case-overview-panel {
@@ -2951,54 +3013,624 @@
       }
 
       .case-main {
-        padding: 24px;
+        padding: 16px;
+      }
+    }
+
+    /* Prompt 2: Matter sections compose the existing workspace without changing LPC's shell. */
+    .case-workspace {
+      grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+    }
+
+    .matter-stage {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--app-surface);
+    }
+
+    .matter-tabs {
+      display: flex;
+      align-items: stretch;
+      gap: 4px;
+      padding: 0 22px;
+      border-bottom: 1px solid var(--app-border-soft);
+      overflow-x: auto;
+      scrollbar-width: thin;
+      flex: 0 0 auto;
+    }
+
+    .matter-tabs button {
+      position: relative;
+      min-height: 52px;
+      padding: 0 12px;
+      border: 0;
+      background: transparent;
+      color: var(--app-muted);
+      font:300 0.88rem/1 var(--font-sans);
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .matter-tabs button::after {
+      content: "";
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 0;
+      height: 2px;
+      background: transparent;
+    }
+
+    .matter-tabs button[aria-selected="true"] {
+      color: var(--app-text);
+    }
+
+    .matter-tabs button[aria-selected="true"]::after {
+      background: var(--app-accent);
+    }
+
+    .matter-tabs button:focus-visible,
+    .matter-tab-panel a:focus-visible,
+    .matter-tab-panel button:focus-visible {
+      outline: 2px solid var(--app-accent);
+      outline-offset: 2px;
+    }
+
+    .matter-tab-panel {
+      min-width: 0;
+      min-height: 0;
+      padding: 26px 30px 34px;
+      overflow: auto;
+      flex: 1 1 auto;
+    }
+
+    .matter-tab-panel[hidden] {
+      display: none !important;
+    }
+
+    .matter-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 24px;
+      padding-bottom: 18px;
+      margin-bottom: 22px;
+      border-bottom: 1px solid var(--app-border-soft);
+    }
+
+    .matter-section-header h2 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2vw, 2rem);
+      font-weight:300;
+    }
+
+    .matter-section-header > p,
+    .matter-section-state,
+    .matter-files-toolbar p {
+      margin: 0;
+      color: var(--app-muted);
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .matter-section-header > p {
+      max-width: 460px;
+      text-align: right;
+    }
+
+    .matter-section-eyebrow {
+      margin: 0 0 4px;
+      color: #75613b;
+      font:600 0.72rem/1 var(--font-sans);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .case-overview-panel {
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .case-overview-content {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(230px, 0.75fr);
+      gap: 22px 34px;
+    }
+
+    .case-overview-summary,
+    .case-participants,
+    .case-overview-hire,
+    .matter-facts,
+    .case-overview-tasks,
+    .case-overview-actions,
+    .case-documents-panel,
+    .matter-financial-status {
+      padding: 18px 0;
+      border-top: 1px solid var(--app-border-soft);
+    }
+
+    .case-overview-summary {
+      grid-column: 1 / -1;
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .matter-facts dl,
+    .case-overview-hire dl,
+    .matter-financial-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px 28px;
+      margin: 0;
+    }
+
+    .matter-facts dl > div,
+    .case-overview-hire dl > div,
+    .matter-financial-list > div {
+      min-width: 0;
+    }
+
+    .matter-facts dt,
+    .case-overview-hire dt,
+    .matter-financial-list dt,
+    .matter-financial-status span {
+      color: var(--app-muted);
+      font-size: 0.76rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .matter-facts dd,
+    .case-overview-hire dd,
+    .matter-financial-list dd {
+      margin: 5px 0 0;
+      color: var(--app-text);
+      font-size: 0.98rem;
+    }
+
+    .case-participants ul {
+      display: grid;
+    }
+
+    /* Compact matter workspace: the selector is a toolbar, not an empty rail. */
+    .case-workspace {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .case-rail-stack {
+      grid-column: 1;
+      grid-row: 1;
+      padding: 14px 22px;
+      border-right: 0;
+      border-bottom: 1px solid var(--app-border-soft);
+    }
+
+    .case-rail-header {
+      justify-content: flex-start;
+      gap: 16px;
+    }
+
+    .case-rail-title {
+      flex: 0 0 auto;
+      font-size: 0.9rem;
+      font-weight:300;
+    }
+
+    .case-rail-header select {
+      width: min(360px, 100%);
+      max-width: 360px;
+      min-height: 38px;
+      padding: 7px 36px 7px 12px;
+      border-radius: 6px;
+      background-color: var(--app-surface);
+      font-size: 0.88rem;
+    }
+
+    .matter-stage {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    .matter-tabs {
+      gap: 8px;
+      padding: 0 28px;
+    }
+
+    .matter-tabs button {
+      min-height: 48px;
+      padding: 0 10px;
+      font-size: 0.84rem;
+      font-weight:300;
+    }
+
+    .case-overview-panel {
+      padding: 28px 36px 40px;
+    }
+
+    .case-overview-panel > .matter-section-header,
+    .case-overview-content {
+      width: 100%;
+      max-width: 1040px;
+      margin-right: auto;
+      margin-left: auto;
+    }
+
+    .case-overview-panel > .matter-section-header {
+      align-items: flex-start;
+      margin-bottom: 4px;
+      padding-bottom: 20px;
+    }
+
+    .case-overview-panel > .matter-section-header > p {
+      max-width: 390px;
+      padding-top: 4px;
+      font-size: 0.84rem;
+      text-align: left;
+    }
+
+    .case-overview-content {
+      grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+      gap: 0 48px;
+    }
+
+    .case-overview-content > section {
+      padding: 22px 0 !important;
+      border-top: 1px solid var(--app-border-soft) !important;
+    }
+
+    .case-overview-summary {
+      grid-column: 1 / -1;
+      padding-top: 20px !important;
+    }
+
+    .case-overview-summary h3,
+    .case-participants h3,
+    .case-overview-hire h3 {
+      margin-bottom: 10px;
+      text-align: left;
+    }
+
+    .case-overview-summary p {
+      max-width: 760px;
+      margin: 0;
+      font-size: 0.98rem;
+      line-height: 1.55;
+    }
+
+    .matter-facts {
+      grid-column: 1;
+    }
+
+    .matter-facts dl {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px 36px;
+    }
+
+    .matter-facts dl > div,
+    .case-overview-hire dl > div {
+      display: block;
+    }
+
+    .matter-facts dt,
+    .case-overview-hire dt {
+      line-height: 1.3;
+    }
+
+    .matter-facts dd,
+    .case-overview-hire dd {
+      margin-top: 6px;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+
+    .case-participants {
+      grid-column: 2;
+      grid-row: 2 / span 2;
+    }
+
+    .case-participants ul {
+      gap: 18px;
+    }
+
+    .case-participants ul li {
+      display: grid;
+      gap: 4px;
+      padding: 0;
+      text-align: left;
+    }
+
+    .participant-role {
+      color: var(--app-muted);
+      font-size: 0.74rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .participant-name {
+      color: var(--app-text);
+      font-family: var(--font-sans);
+      font-size: 0.98rem;
+      font-weight: 300;
+      line-height: 1.4;
+    }
+
+    .case-overview-hire {
+      grid-column: 1;
+    }
+
+    .case-overview-hire dl {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px 28px;
+    }
+
+    .matter-application-list,
+    .matter-activity-list {
+      list-style: none;
+      display: grid;
+      gap: 0;
+      margin: 0;
+      padding: 0;
+    }
+
+    .matter-application-list li,
+    .matter-activity-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--app-border-soft);
+    }
+
+    .matter-row-copy {
+      display: grid;
+      gap: 4px;
+    }
+
+    .matter-row-copy strong {
+      font-size: 0.96rem;
+      font-weight:300;
+    }
+
+    .matter-row-copy span,
+    .matter-row-meta {
+      color: var(--app-muted);
+      font-size: 0.82rem;
+    }
+
+    .matter-row-preview {
+      min-height: 40px;
+      align-self: center;
+      border: 1px solid var(--app-border);
+      border-radius: 999px;
+      background: var(--app-surface);
+      color: var(--app-text);
+      padding: 8px 14px;
+      font: inherit;
+      font-size: 0.84rem;
+      font-weight:300;
+      cursor: pointer;
+    }
+
+    .matter-row-preview:hover,
+    .matter-row-preview:focus-visible {
+      border-color: var(--app-accent);
+      outline: 2px solid color-mix(in srgb, var(--app-accent) 28%, transparent);
+      outline-offset: 2px;
+    }
+
+    .message-card.is-deep-linked {
+      border-radius: 16px;
+      outline: 3px solid color-mix(in srgb, var(--app-accent) 42%, transparent);
+      outline-offset: 4px;
+    }
+
+    .matter-section-action {
+      display: inline-flex;
+      width: max-content;
+      margin-top: 20px;
+      text-decoration: none;
+    }
+
+    .matter-section-action[hidden] {
+      display: none !important;
+    }
+
+    .matter-work-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.75fr);
+      gap: 32px;
+    }
+
+    .matter-work-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding-top: 22px;
+      margin-top: 22px;
+      border-top: 1px solid var(--app-border-soft);
+    }
+
+    .matter-work-footer .case-dispute-button {
+      position: static;
+      width: auto;
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .matter-work-footer .case-dispute-button svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .matter-files-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 8px;
+    }
+
+    .matter-messages-panel {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .matter-messages-panel .case-thread {
+      height: 100%;
+      padding: 18px 24px 12px;
+      border: 0;
+    }
+
+    .matter-financial-status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      border-top: 0;
+      border-bottom: 1px solid var(--app-border-soft);
+      margin-bottom: 22px;
+    }
+
+    .matter-financial-status strong {
+      font-size: 1rem;
+      font-weight:300;
+    }
+
+    body.theme-dark .matter-stage,
+    body.theme-mountain-dark .matter-stage,
+    html.theme-dark .matter-stage,
+    html.theme-mountain-dark .matter-stage {
+      background: #151b29;
+    }
+
+    @media (max-width: 1200px) {
+      .case-workspace {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+      .case-rail-stack,
+      .matter-stage { grid-column: 1; }
+      .case-rail-stack { grid-row: 1; border-right: 0; }
+      .matter-stage { grid-row: 2; }
+      .case-overview-panel { grid-column: auto; grid-row: auto; border-top: 0; }
+    }
+
+    @media (max-width: 900px) {
+      .case-workspace {
+        display: block;
+        overflow: visible;
+      }
+      .case-rail-stack {
+        border-right: 0;
+        border-bottom: 1px solid var(--app-border-soft);
+      }
+      .case-rail-header {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .case-rail-header select {
+        width: 100%;
+        max-width: none;
+      }
+      .matter-stage { min-height: 640px; }
+      .matter-tabs { padding: 0 12px; }
+      .matter-tabs button { min-height: 48px; padding: 0 10px; }
+      .matter-tab-panel { padding: 22px 18px 30px; overflow: visible; }
+      .matter-messages-panel { padding: 0; }
+      .matter-messages-panel .case-thread { height: 70vh; border-top: 0; }
+      .case-overview-content,
+      .matter-work-grid { display: grid; grid-template-columns: 1fr; }
+      .case-overview-content { gap: 8px; }
+      .case-overview-panel.is-open .case-overview-content,
+      .case-overview-content { display: grid; }
+      .case-participants ul { display: grid; }
+      .case-participants,
+      .case-overview-hire,
+      .matter-facts { grid-column: 1; grid-row: auto; }
+      .matter-section-header { align-items: flex-start; flex-direction: column; gap: 8px; }
+      .matter-section-header > p { text-align: left; }
+      .matter-facts dl,
+      .case-overview-hire dl,
+      .matter-financial-list { grid-template-columns: 1fr; gap: 14px; }
+      .matter-application-list li,
+      .matter-activity-list li,
+      .matter-files-toolbar,
+      .matter-work-footer { align-items: flex-start; flex-direction: column; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .matter-tabs *,
+      .matter-tab-panel * {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
       }
     }
   </style>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260812-11" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260812-7"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260812-1" />
+  <script defer src="assets/scripts/universal-header.js?v=20260812-1"></script>
+  <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
+  <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
 </head>
-<body class="dashboard-no-shadows">
-  <a href="#case-messages" class="skip-link">Skip to case messages</a>
+<body class="dashboard-no-shadows lpc-product-clean">
+  <a href="#main" class="skip-link">Skip to main content</a>
+  <a href="#case-messages" class="skip-link" id="matterMessagesSkipLink" hidden>Skip to Matter messages</a>
   <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
-    <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
+    <span class="lpc-mobile-menu-icon" aria-hidden="true"></span>
   </button>
 
   <div class="case-shell">
     <aside class="sidebar" id="sidebarNav">
       <div class="logo">Dashboard</div>
-      <nav aria-label="Attorney navigation" data-visible="attorney">
+      <nav aria-label="Attorney navigation" data-visible="attorney" hidden>
         <a href="dashboard-attorney.html#home" data-view-target="home">Home</a>
         <a href="dashboard-attorney.html#cases" class="active case-nav-toggle" data-view-target="cases" data-case-nav-toggle>
-          Cases &amp; Files
+          Matters
           <span class="case-nav-caret" aria-hidden="true">▾</span>
         </a>
         <div class="case-nav-dropdown" data-case-nav-dropdown aria-hidden="true">
-          <div class="case-nav-status" data-case-nav-status>Loading cases...</div>
+          <div class="case-nav-status" data-case-nav-status>Loading Matters...</div>
           <ul class="case-nav-list" data-case-nav-list></ul>
         </div>
-        <a href="dashboard-attorney.html#billing" data-view-target="billing">Billing &amp; Funds</a>
+        <a href="browse-paralegals.html">Paralegals</a>
+        <a href="dashboard-attorney.html#funds" data-view-target="funds">Payments</a>
         <a href="help.html">Help</a>
       </nav>
-      <nav aria-label="Paralegal navigation" data-visible="paralegal">
+      <nav aria-label="Paralegal navigation" data-visible="paralegal" hidden>
         <a href="dashboard-paralegal.html#home" data-view-link="home">Home</a>
+        <a href="browse-jobs.html">Browse Matters</a>
         <a href="dashboard-paralegal.html#cases" class="active case-nav-toggle" data-view-link="cases" data-case-nav-toggle>
-          Active Cases
+          My Matters
           <span class="case-nav-caret" aria-hidden="true">▾</span>
         </a>
         <div class="case-nav-dropdown" data-case-nav-dropdown aria-hidden="true">
-          <div class="case-nav-status" data-case-nav-status>Loading cases...</div>
+          <div class="case-nav-status" data-case-nav-status>Loading Matters...</div>
           <ul class="case-nav-list" data-case-nav-list></ul>
         </div>
         <a href="profile-settings.html">Profile Settings</a>
         <a href="paralegalhelp.html">Help</a>
       </nav>
       <div class="sidebar-bottom">
-        <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
         <div class="sidebar-footer">&copy; Let&#8217;s-ParaConnect 2026</div>
       </div>
     </aside>
     <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
-    <main class="case-main" role="main">
+    <main class="case-main" id="main" tabindex="-1">
       <div class="case-topbar">
         <div class="case-topbar-left">
           <button type="button" class="back-button" data-back-button aria-label="Go back">
@@ -3008,8 +3640,11 @@
             Back
           </button>
           <div class="case-topbar-title">
-            <p class="case-thread-title" id="caseTitle">Select a case</p>
-            <p class="case-thread-subtitle" id="caseStatusLine">Waiting for case selection.</p>
+            <h1 class="case-thread-title" id="caseTitle">Select a Matter</h1>
+            <p class="case-thread-subtitle" id="caseStatusLine">Waiting for Matter selection.</p>
+            <p class="case-thread-context" id="caseContextLine"></p>
+            <p class="case-thread-attention" id="caseAttentionLine" hidden></p>
+            <a class="case-next-action" id="caseNextAction" hidden></a>
           </div>
         </div>
         <div class="case-topbar-controls" data-notification-center>
@@ -3027,7 +3662,7 @@
             <button type="button" class="notif-markall" data-notification-mark>Mark All Read</button>
           </div>
           <button type="button" class="user-chip" data-profile-toggle aria-haspopup="true" aria-expanded="false">
-            <img class="globalProfileImage" data-avatar src="assets/default-avatar.png" alt="Profile avatar" />
+            <img class="globalProfileImage" data-avatar src="assets/avatar-placeholder.svg" alt="Profile avatar" />
             <div>
               <strong class="globalProfileName">Member</strong>
               <span class="globalProfileRole">User</span>
@@ -3042,155 +3677,146 @@
 
       <div class="case-workspace">
         <div class="case-rail-stack">
-          <aside class="case-rail" aria-label="Case switcher">
+          <aside class="case-rail" aria-label="Matter switcher">
             <header class="case-rail-header">
-              <div class="case-rail-title">Cases</div>
-              <select id="case-select" name="case-select" aria-label="Select a case"></select>
+              <div class="case-rail-title">Matters</div>
+              <select id="case-select" name="case-select" aria-label="Select a Matter"></select>
             </header>
           </aside>
-
-          <section class="case-participants" aria-label="Participants">
-            <div class="case-participants-header">
-              <h2>Participants</h2>
-              <button type="button" class="case-participants-toggle" aria-expanded="false" aria-controls="caseParticipants">
-                <span class="visually-hidden">Toggle participants</span>
-                <span class="case-participants-caret" aria-hidden="true">▾</span>
-              </button>
-            </div>
-            <ul id="caseParticipants"></ul>
-          </section>
-
-          <section class="case-documents-panel" aria-label="Shared Documents">
-            <h2>Shared Documents</h2>
-            <ul id="caseSharedDocuments" class="case-documents-list" aria-live="polite"></ul>
-            <p class="case-overview-note" id="caseSharedDocumentsEmpty">No documents shared yet.</p>
-          </section>
         </div>
 
-        <section id="case-messages" class="case-thread" aria-label="Case conversation" data-case-id="">
-          <section class="message-panel" aria-label="Conversation">
-            <header class="message-panel-header">
-              <div class="message-panel-title-row">
-                <div class="message-panel-title-wrap">
-                  <h2 id="messagePanelTitle"></h2>
-                  <span class="message-panel-banner" id="messagePanelBanner"></span>
-                </div>
-              </div>
-              <p class="message-panel-subtitle" id="messagePanelSubtitle"></p>
+        <article class="matter-stage" aria-label="Matter workspace">
+          <nav class="matter-tabs" id="matter-tabs" role="tablist" aria-label="Matter sections">
+            <button type="button" role="tab" id="matter-tab-overview" aria-controls="matter-panel-overview" aria-selected="true" tabindex="0" data-matter-tab="overview">Overview</button>
+            <button type="button" role="tab" id="matter-tab-applications" aria-controls="matter-panel-applications" aria-selected="false" tabindex="-1" data-matter-tab="applications">Applications</button>
+            <button type="button" role="tab" id="matter-tab-work" aria-controls="matter-panel-work" aria-selected="false" tabindex="-1" data-matter-tab="work">Work</button>
+            <button type="button" role="tab" id="matter-tab-files" aria-controls="matter-panel-files" aria-selected="false" tabindex="-1" data-matter-tab="files">Files</button>
+            <button type="button" role="tab" id="matter-tab-messages" aria-controls="matter-panel-messages" aria-selected="false" tabindex="-1" data-matter-tab="messages">Messages</button>
+            <button type="button" role="tab" id="matter-tab-activity" aria-controls="matter-panel-activity" aria-selected="false" tabindex="-1" data-matter-tab="activity">Activity</button>
+            <button type="button" role="tab" id="matter-tab-financials" aria-controls="matter-panel-financials" aria-selected="false" tabindex="-1" data-matter-tab="financials">Financials</button>
+          </nav>
+          <p class="matter-tab-live visually-hidden" id="matterTabLive" aria-live="polite"></p>
+
+          <section class="matter-tab-panel case-overview-panel is-open" id="matter-panel-overview" role="tabpanel" aria-labelledby="matter-tab-overview" data-matter-panel="overview">
+            <header class="matter-section-header">
+              <div><p class="matter-section-eyebrow">Matter</p><h2>Overview</h2></div>
+              <p>Identity, scope, people, and current progress.</p>
             </header>
-            <div class="message-panel-divider"><span id="messagePanelDivider">Today</span></div>
-            <div class="message-dropzone" id="caseDropzoneOverlay" aria-hidden="true">Drop files here</div>
-            <div class="message-scroll" role="region" aria-label="Conversation thread">
-              <ol class="message-list" id="caseMessageList" data-case-id=""></ol>
+            <div id="caseOverviewContent" class="case-overview-content">
+              <section class="case-overview-summary">
+                <h3>Matter summary</h3>
+                <p id="caseSummary">-</p>
+              </section>
+              <section class="matter-facts" aria-label="Matter facts">
+                <dl>
+                  <div><dt>Practice area</dt><dd id="caseMatterType">-</dd></div>
+                  <div><dt>Jurisdiction</dt><dd id="caseJurisdiction">-</dd></div>
+                  <div><dt>Deadline</dt><dd id="caseDeadlineSummary">-</dd></div>
+                  <div><dt>Task progress</dt><dd id="caseTaskProgress">-</dd></div>
+                </dl>
+              </section>
+              <section class="case-participants" aria-label="Participants">
+                <div class="case-participants-header"><h3>Participants</h3></div>
+                <ul id="caseParticipants"></ul>
+              </section>
+              <section class="case-overview-deadlines" hidden>
+                <h3>Deadline</h3>
+                <ul id="caseDeadlineList"></ul>
+              </section>
+              <section class="case-overview-hire">
+                <h3>Matter record</h3>
+                <dl>
+                  <div><dt>Work started</dt><dd id="caseHireDate">-</dd></div>
+                  <div><dt>Compensation</dt><dd id="caseEscrowAmount">-</dd></div>
+                  <div><dt>Financial state</dt><dd id="caseEscrowStatus">-</dd></div>
+                </dl>
+              </section>
             </div>
-            <section class="message-composer" aria-label="Write a message">
-              <form id="caseMessageForm">
-                <label for="caseMessageInput" class="visually-hidden">Message</label>
-                <div class="composer-row">
-                  <label for="message-attachment" class="attach-button">
-                    <span class="visually-hidden">Attach a file</span>
-                    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M21.44 11.05l-7.78 7.78a5 5 0 01-7.07-7.07l8.49-8.49a3.5 3.5 0 014.95 4.95l-8.13 8.13a2 2 0 11-2.83-2.83l7.78-7.78" />
-                    </svg>
-                  </label>
-                  <input id="message-attachment" name="message-attachment" type="file" multiple class="attachment-input" />
-                  <textarea id="caseMessageInput" name="message-body" rows="1" placeholder="Write your message"></textarea>
-                  <button type="submit" class="composer-send" aria-label="Send message">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 19V5" />
-                      <path d="M6 11l6-6 6 6" />
-                    </svg>
-                    <span class="visually-hidden">Send</span>
-                  </button>
-                </div>
-                <div id="caseAttachmentStaging" class="composer-attachments" aria-live="polite" hidden></div>
-                <p id="caseMessageStatus" class="case-thread-subtitle" role="status" aria-live="polite"></p>
-              </form>
-            </section>
           </section>
-        </section>
 
-        <aside class="case-overview-panel is-open" aria-label="Case Overview">
-          <header class="case-overview-header">
-            <h2>Case Overview</h2>
-            <button type="button" class="case-overview-toggle" aria-expanded="true" aria-controls="caseOverviewContent">
-              <span class="visually-hidden">Toggle case overview</span>
-              <span class="case-overview-caret" aria-hidden="true">▾</span>
-            </button>
-          </header>
+          <section class="matter-tab-panel" id="matter-panel-applications" role="tabpanel" aria-labelledby="matter-tab-applications" data-matter-panel="applications" hidden>
+            <header class="matter-section-header"><div><p class="matter-section-eyebrow">Matter</p><h2>Applications</h2></div><p>Candidate and pre-engagement state from the existing hiring workflow.</p></header>
+            <div class="matter-section-state" id="matterApplicationsState" role="status"></div>
+            <ul class="matter-application-list" id="matterApplicationList"></ul>
+            <a class="case-action-btn matter-section-action" id="matterApplicationsAction" hidden></a>
+          </section>
 
-          <div id="caseOverviewContent" class="case-overview-content">
-            <section class="case-overview-tasks">
-              <h3>Tasks</h3>
-              <details class="case-tasks-help" data-visible="paralegal">
-                <summary aria-label="Task help">?</summary>
-                <div class="case-tasks-help-panel">
-                  Attorneys check off boxes. They will appear here as required tasks are completed.
-                </div>
-              </details>
-              <ul id="caseTaskList"></ul>
-            </section>
-
-            <section class="case-overview-actions" id="caseCompleteSection" data-visible="attorney" hidden>
-              <h3>Complete &amp; release</h3>
-              <details class="case-tasks-help case-release-help">
-                <summary aria-label="Complete &amp; release help">?</summary>
-                <div class="case-tasks-help-panel">
-                  All tasks must be checked off before payment may be released to the paralegal.
-                </div>
-              </details>
-              <p class="case-overview-note" id="caseCompleteNote">
-                Mark work complete and release payment to the paralegal.
-              </p>
-              <button type="button" class="case-action-btn" id="caseCompleteButton">Complete &amp; Release Funds</button>
-              <p class="case-overview-note" id="caseCompleteStatus" role="status" aria-live="polite"></p>
-            </section>
-
-            <section class="case-overview-deadlines">
-              <h3>Deadline</h3>
-              <ul id="caseDeadlineList"></ul>
-            </section>
-
-            <section class="case-overview-summary">
-              <h3>Case summary</h3>
-              <p id="caseSummary">-</p>
-            </section>
-
-            <section class="case-overview-hire">
-              <h3>Hire details</h3>
-              <dl>
-                <div>
-                  <dt>Hire date</dt>
-                  <dd id="caseHireDate">-</dd>
-                </div>
-                <div>
-                  <dt>Matter type</dt>
-                  <dd id="caseMatterType">-</dd>
-                </div>
-                <div>
-                  <dt>Case amount</dt>
-                  <dd id="caseEscrowAmount">-</dd>
-                </div>
-              </dl>
-            </section>
-
-            <footer class="case-overview-footer">
-            <button type="button" class="case-dispute-button is-floating" id="caseDisputeButton" aria-label="Flag dispute">
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M6 4v16" />
-                  <path d="M6 5h11l-2 4 2 4H6" />
-                </svg>
-                <span class="visually-hidden">Flag dispute</span>
-              </button>
+          <section class="matter-tab-panel" id="matter-panel-work" role="tabpanel" aria-labelledby="matter-tab-work" data-matter-panel="work" hidden>
+            <header class="matter-section-header"><div><p class="matter-section-eyebrow">Matter</p><h2>Work</h2></div><p>Scope, tasks, completion, and existing permitted work actions.</p></header>
+            <div class="matter-work-grid">
+              <section class="case-overview-tasks">
+                <h3>Tasks</h3>
+                <details class="case-tasks-help" data-visible="paralegal"><summary aria-label="Task help">?</summary><div class="case-tasks-help-panel">Attorneys update task completion. Completed work appears here for both participants.</div></details>
+                <ul id="caseTaskList"></ul>
+              </section>
+              <section class="case-overview-actions" id="caseCompleteSection" data-visible="attorney" hidden>
+                <h3>Complete &amp; release</h3>
+                <p class="case-overview-note" id="caseCompleteNote">Mark work complete and release payment to the paralegal.</p>
+                <button type="button" class="case-action-btn" id="caseCompleteButton">Complete &amp; Release Payment</button>
+                <p class="case-overview-note" id="caseCompleteStatus" role="status" aria-live="polite"></p>
+              </section>
+            </div>
+            <footer class="case-overview-footer matter-work-footer">
+              <button type="button" class="case-dispute-button" id="caseDisputeButton" aria-label="Matter actions"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4v16"/><path d="M6 5h11l-2 4 2 4H6"/></svg><span>Matter actions</span></button>
               <p class="case-dispute-status" id="caseDisputeStatus" role="status" aria-live="polite"></p>
             </footer>
-          </div>
-        </aside>
+          </section>
+
+          <section class="matter-tab-panel" id="matter-panel-files" role="tabpanel" aria-labelledby="matter-tab-files" data-matter-panel="files" hidden>
+            <header class="matter-section-header"><div><p class="matter-section-eyebrow">Matter</p><h2>Files</h2></div><p>Shared deliverables and existing review actions.</p></header>
+            <section class="case-documents-panel" aria-label="Shared files">
+              <div class="matter-files-toolbar"><p id="matterFilesStatus" role="status">Files load when this section opens.</p><button type="button" class="case-action-btn secondary" id="matterAddFilesButton">Add files</button></div>
+              <ul id="caseSharedDocuments" class="case-documents-list" aria-live="polite"></ul>
+              <p class="case-overview-note" id="caseSharedDocumentsEmpty">No files shared yet.</p>
+            </section>
+          </section>
+
+          <section class="matter-tab-panel matter-messages-panel" id="matter-panel-messages" role="tabpanel" aria-labelledby="matter-tab-messages" data-matter-panel="messages" hidden>
+            <section id="case-messages" class="case-thread" aria-label="Matter conversation" data-case-id="" tabindex="-1">
+              <section class="message-panel" aria-label="Conversation">
+                <header class="message-panel-header"><div class="message-panel-title-row"><div class="message-panel-title-wrap"><h2 id="messagePanelTitle">Messages</h2><span class="message-panel-banner" id="messagePanelBanner"></span></div></div><p class="message-panel-subtitle" id="messagePanelSubtitle"></p></header>
+                <div class="message-panel-divider"><span id="messagePanelDivider">Today</span></div>
+                <div class="message-dropzone" id="caseDropzoneOverlay" aria-hidden="true">Drop files here</div>
+                <div class="message-scroll" role="region" aria-label="Conversation thread"><ol class="message-list" id="caseMessageList" data-case-id=""></ol></div>
+                <section class="message-composer" aria-label="Write a message">
+                  <form id="caseMessageForm">
+                    <label for="caseMessageInput" class="visually-hidden">Message</label>
+                    <div class="composer-row">
+                      <label for="message-attachment" class="attach-button"><span class="visually-hidden">Attach a file</span><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-7.78 7.78a5 5 0 01-7.07-7.07l8.49-8.49a3.5 3.5 0 014.95 4.95l-8.13 8.13a2 2 0 11-2.83-2.83l7.78-7.78"/></svg></label>
+                      <input id="message-attachment" name="message-attachment" type="file" multiple class="attachment-input" />
+                      <textarea id="caseMessageInput" name="message-body" rows="1" placeholder="Write your message"></textarea>
+                      <button type="submit" class="composer-send" aria-label="Send message"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg><span class="visually-hidden">Send</span></button>
+                    </div>
+                    <div id="caseAttachmentStaging" class="composer-attachments" aria-live="polite" hidden></div>
+                    <p id="caseMessageStatus" class="case-thread-subtitle" role="status" aria-live="polite"></p>
+                  </form>
+                </section>
+              </section>
+            </section>
+          </section>
+
+          <section class="matter-tab-panel" id="matter-panel-activity" role="tabpanel" aria-labelledby="matter-tab-activity" data-matter-panel="activity" hidden>
+            <header class="matter-section-header"><div><p class="matter-section-eyebrow">Matter</p><h2>Activity</h2></div><p>An honest timeline of supported lifecycle events.</p></header>
+            <ol class="matter-activity-list" id="matterActivityList"></ol>
+            <div class="matter-section-state" id="matterActivityState">No activity to show yet.</div>
+          </section>
+
+          <section class="matter-tab-panel" id="matter-panel-financials" role="tabpanel" aria-labelledby="matter-tab-financials" data-matter-panel="financials" hidden>
+            <header class="matter-section-header"><div><p class="matter-section-eyebrow">Matter</p><h2>Financials</h2></div><p>Saved compensation, funding, payout, and receipt information.</p></header>
+            <div class="matter-financial-status"><span>Current state</span><strong id="matterFinancialStatus">Payment status unavailable</strong></div>
+            <dl class="matter-financial-list" id="matterFinancialList"></dl>
+            <p class="matter-section-state" id="matterFinancialNote"></p>
+            <a class="case-action-btn matter-section-action" id="matterReceiptAction" target="_blank" rel="noopener" hidden>View receipt</a>
+          </section>
+        </article>
       </div>
     </main>
   </div>
   <script type="module" src="assets/scripts/utils/notifications.js"></script>
+  <script src="assets/scripts/context-panel.js?v=20260812-paralegal-heading"></script>
+  <script src="assets/scripts/productivity-command-registry.js"></script>
   <script type="module" src="assets/scripts/case-detail.js"></script>
+  <script src="assets/scripts/global-search.js"></script>
   <script>
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebarNav = document.getElementById('sidebarNav');

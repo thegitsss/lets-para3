@@ -15,6 +15,7 @@ jest.mock("../utils/stripe", () => ({
     charge: { receipt_url: "https://stripe.test/receipt" },
   })),
   getPaymentIntentCharge: jest.fn(() => ({ receipt_url: "https://stripe.test/receipt" })),
+  stripeIdempotencyKey: jest.fn((operation, ...parts) => `test_${operation}_${parts.join("_")}`),
 }));
 
 const authRouter = require("../routes/auth");
@@ -60,7 +61,7 @@ describe("Error handling", () => {
 
     const res = await request(app).post("/api/auth/login").send({ email: "bad@example.com" });
     expect(res.status).toBe(400);
-    expect(res.body.msg).toMatch(/invalid credentials/i);
+    expect(res.body.msg).toMatch(/invalid email or password/i);
   });
 
   test("Backend returns 401 for unauthenticated case post", async () => {

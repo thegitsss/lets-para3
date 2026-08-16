@@ -1,4 +1,5 @@
 import { secureFetch } from "./auth.js";
+import { showAlert } from "./utils/dialogs.js";
 
 let allFiles = [];
 let currentConfig = null;
@@ -32,7 +33,7 @@ function normalizeConfig(config) {
     emptyCopy: config.emptyCopy || "No files found.",
     emptySubtext: config.emptySubtext || "",
     unauthorizedCopy: config.unauthorizedCopy || "Unable to load files.",
-    gatedCopy: config.gatedCopy || "No funded cases yet.",
+    gatedCopy: config.gatedCopy || "No funded Matters yet.",
     formatStatus:
       typeof config.formatStatus === "function"
         ? config.formatStatus
@@ -129,7 +130,7 @@ async function loadCaseFiles() {
     gatedEmpty = cases.length > 0 && eligibleCases.length === 0;
     allFiles = eligibleCases.flatMap((caseItem = {}) => {
       const caseId = caseItem.id || caseItem._id;
-      const caseTitle = caseItem.title || caseItem.name || "Untitled Case";
+      const caseTitle = caseItem.title || caseItem.name || "Untitled Matter";
       const caseStatus = normalizeStatus(caseItem.status) || "pending";
       const files = Array.isArray(caseItem.files) ? caseItem.files : [];
       if (!files.length) {
@@ -158,7 +159,7 @@ async function loadCaseFiles() {
       allFiles = eligibleFallback.map((c) => ({
         placeholder: true,
         caseId: c.caseId || c.id || c._id || "",
-        caseTitle: c.jobTitle || c.title || c.practiceArea || "Case",
+        caseTitle: c.jobTitle || c.title || c.practiceArea || "Matter",
         status: normalizeStatus(c.status) || "in progress",
       }));
     }
@@ -212,12 +213,12 @@ function renderFiles(files) {
   }
   container.innerHTML = files
     .map((file) => {
-      const caseId = file.caseId || file.id || "";
-      const caseLink = caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "#";
+      const caseId = file.caseId || "";
       const fileId = file.id || file._id || "";
       const fileKey = file.storageKey || file.key || "";
       const fileName = file.original || file.filename || "Untitled document";
       const mimeType = file.mimeType || file.mime || "";
+      const security = fileSecurityPresentation(file);
       const downloadUrl =
         caseId && fileId
           ? `/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(fileId)}/download`
@@ -226,26 +227,41 @@ function renderFiles(files) {
         caseId && fileKey
           ? `/api/uploads/view?caseId=${encodeURIComponent(caseId)}&key=${encodeURIComponent(fileKey)}`
           : "";
+      const unavailableAction = `<span class="btn-link" aria-disabled="true">File unavailable</span>`;
       if (file.placeholder) {
+        const caseAction = caseId
+          ? `<a href="case-detail.html?caseId=${encodeURIComponent(caseId)}" class="btn-link">View</a>`
+          : unavailableAction;
         return `
           <article class="file-card" data-case-id="${sanitize(caseId)}">
             <div class="file-line">
-              <span class="file-name">${sanitize(file.caseTitle || "Case")}</span>
+              <span class="file-name">${sanitize(file.caseTitle || "Matter")}</span>
             </div>
             <div class="file-actions">
-              <a href="${caseLink}" class="btn-link">View</a>
+              ${caseAction}
             </div>
           </article>
         `;
       }
+      const readyActions = [
+        viewUrl
+          ? `<a href="${viewUrl}" class="btn-link" data-file-action="view" data-case-id="${sanitize(caseId)}" data-file-key="${sanitize(fileKey)}" data-file-name="${sanitize(fileName)}" data-file-mime="${sanitize(mimeType)}" target="_blank" rel="noopener">View</a>`
+          : "",
+        downloadUrl
+          ? `<a href="${downloadUrl}" class="btn-link" data-file-action="download" data-case-id="${sanitize(caseId)}" data-file-id="${sanitize(fileId)}" data-file-name="${sanitize(fileName)}" download>Download</a>`
+          : "",
+      ].filter(Boolean).join("\n");
+      const detailsAction = caseId
+        ? `<a href="case-detail.html?caseId=${encodeURIComponent(caseId)}&tab=files&fileId=${encodeURIComponent(fileId)}" class="btn-link">Open details</a>`
+        : unavailableAction;
       return `
-        <article class="file-card" data-case-id="${sanitize(caseId)}">
+        <article class="file-card" data-case-id="${sanitize(caseId)}" data-security-status="${sanitize(security.status)}">
           <div class="file-line">
             <span class="file-name">${sanitize(fileName)}</span>
           </div>
+          <div class="file-meta" aria-live="polite">${sanitize(security.label)} · ${sanitize(security.detail)}</div>
           <div class="file-actions">
-            <a href="${viewUrl || "#"}" class="btn-link" data-file-action="view" data-case-id="${sanitize(caseId)}" data-file-key="${sanitize(fileKey)}" data-file-name="${sanitize(fileName)}" data-file-mime="${sanitize(mimeType)}" target="_blank" rel="noopener">View</a>
-            <a href="${downloadUrl || "#"}" class="btn-link" data-file-action="download" data-case-id="${sanitize(caseId)}" data-file-id="${sanitize(fileId)}" data-file-name="${sanitize(fileName)}" download>Download</a>
+            ${security.ready ? readyActions || unavailableAction : detailsAction}
           </div>
         </article>
       `;
@@ -286,11 +302,9 @@ function bindFileActions() {
       return;
     }
 
-    if (action === "download") {
-      if (!target.getAttribute("href") || target.getAttribute("href") === "#") {
-        event.preventDefault();
-        notifyFileAction("Download unavailable for this file.");
-      }
+    if (action === "download" && !target.getAttribute("href")) {
+      event.preventDefault();
+      notifyFileAction("Download unavailable for this file.");
     }
   });
 }
@@ -302,6 +316,16 @@ function defaultFormatStatus(status) {
   if (normalized === "attorney_revision") return "Requested Revisions";
   if (normalized === "in progress" || normalized === "in_progress") return "In Progress";
   return status || "Unknown";
+}
+
+function fileSecurityPresentation(file = {}) {
+  const status = String(file.securityStatus || "not_required").toLowerCase();
+  if (["clean", "not_required"].includes(status)) {
+    return { status, ready: true, label: "Security checked", detail: "Ready" };
+  }
+  if (status === "blocked") return { status, ready: false, label: "Blocked", detail: "Did not pass security scanning" };
+  if (status === "error") return { status, ready: false, label: "Scan needs attention", detail: "Try again later" };
+  return { status: "pending", ready: false, label: "Security scan in progress", detail: "Open details to check again" };
 }
 
 function normalizeStatus(status) {
@@ -342,7 +366,7 @@ function notifyFileAction(message) {
     window.toastUtils.show(message, { targetId: toastTarget, type: "info" });
     return;
   }
-  alert(message);
+  void showAlert(message, { title: "File unavailable" });
 }
 
 function sanitize(value = "") {

@@ -1,24 +1,19 @@
 // backend/models/Case.js
 const mongoose = require("mongoose");
 const { Schema, Types } = mongoose;
+const { dateOnlyToUtcDate, normalizeDateOnly } = require("../utils/businessDate");
+const {
+  CASE_STATUS_ENUM,
+  CASE_TRANSITIONS,
+  STATUS_IN_PROGRESS,
+  assertCaseLifecycleInvariants,
+  canTransitionCaseStatus,
+  normalizeCaseStatus,
+} = require("../utils/caseState");
 
 /** ----------------------------------------
  * Enums & Helpers
  * -----------------------------------------*/
-const STATUS_IN_PROGRESS = "in progress";
-const LEGACY_STATUS_IN_PROGRESS = "in_progress";
-
-const CASE_STATUS = [
-  "open",            // posted and visible
-  STATUS_IN_PROGRESS, // work underway
-  "paused",          // paused (paralegal withdrawal / admin pause)
-  "completed",       // work marked complete
-  "disputed",        // dispute opened
-  "closed",          // final closed state
-];
-
-const CASE_STATUS_ENUM = [...CASE_STATUS, LEGACY_STATUS_IN_PROGRESS];
-
 const DISPUTE_STATUS = ["open", "resolved", "rejected"];
 const APPLICANT_STATUS = ["pending", "accepted", "rejected"];
 const FILE_STATUS = ["pending_review", "approved", "attorney_revision"];
@@ -37,16 +32,9 @@ function cents(n) {
   return Math.max(0, Math.round(Number(n)));
 }
 
-function normalizeCaseStatus(value) {
-  if (!value) return "";
-  const normalized = String(value).trim();
-  if (!normalized) return "";
-  const lower = normalized.toLowerCase();
-  if (lower === LEGACY_STATUS_IN_PROGRESS) return STATUS_IN_PROGRESS;
-  if (["cancelled", "canceled"].includes(lower)) return "closed";
-  if (["assigned", "awaiting_funding"].includes(lower)) return "open";
-  if (["active", "awaiting_documents", "reviewing"].includes(lower)) return STATUS_IN_PROGRESS;
-  return lower;
+function referenceId(value) {
+  const resolved = value?._id || value?.id || value || "";
+  return resolved ? String(resolved) : "";
 }
 
 /** ----------------------------------------
@@ -134,6 +122,13 @@ const inviteSchema = new Schema(
     status: { type: String, enum: ["pending", "accepted", "declined", "expired"], default: "pending", index: true },
     invitedAt: { type: Date, default: Date.now },
     respondedAt: { type: Date, default: null },
+    syncStatus: {
+      type: String,
+      enum: ["pending", "synced", "needs_reconciliation"],
+      default: "synced",
+    },
+    syncedAt: { type: Date, default: null },
+    syncError: { type: String, trim: true, maxlength: 1000, default: "" },
   },
   { _id: false }
 );
@@ -170,6 +165,7 @@ const preEngagementDocumentSchema = new Schema(
 
 const preEngagementSchema = new Schema(
   {
+    revision: { type: Number, default: 0, min: 0 },
     status: { type: String, enum: ["requested", "submitted", "approved", "changes_requested"], default: "requested" },
     requestedParalegalId: { type: Types.ObjectId, ref: "User", default: null },
     confidentialityAgreementRequired: { type: Boolean, default: false },
@@ -222,7 +218,20 @@ const caseSchema = new Schema(
     status: { type: String, enum: CASE_STATUS_ENUM, default: "open", index: true },
 
     // Timeline
-    deadline: { type: Date, default: null }, // optional target date
+    // deadlineDate is authoritative because a Matter deadline is a calendar date,
+    // not a timezone-specific instant. deadline remains an indexed compatibility
+    // mirror while existing consumers and records are migrated.
+    deadlineDate: {
+      type: String,
+      default: "",
+      trim: true,
+      validate: {
+        validator: (value) => !value || normalizeDateOnly(value) === value,
+        message: "Deadline must use YYYY-MM-DD.",
+      },
+      index: true,
+    },
+    deadline: { type: Date, default: null },
     hiredAt: { type: Date, default: null },  // when a paralegal was hired
     completedAt: { type: Date, default: null },
     pausedReason: {
@@ -257,8 +266,39 @@ const caseSchema = new Schema(
     purgedAt: { type: Date, default: null },
     fundingRequestKey: { type: String, default: "" },
     fundingRequestFingerprint: { type: String, default: "" },
+    postingSyncStatus: {
+      type: String,
+      enum: ["synced", "needs_reconciliation"],
+      default: "synced",
+      index: true,
+    },
+    postingSyncedAt: { type: Date, default: null },
+    postingSyncError: { type: String, default: "", trim: true, maxlength: 1000 },
+    hiringClaimToken: { type: String, default: "", trim: true },
+    hiringClaimParalegalId: { type: Types.ObjectId, ref: "User", default: null },
+    hiringClaimedAt: { type: Date, default: null },
+    hiringClaimStatus: {
+      type: String,
+      enum: ["claimed", "needs_reconciliation", null],
+      default: null,
+      index: true,
+    },
+    hiringClaimPaymentIntentId: { type: String, default: "", trim: true },
+    hiringClaimAmount: { type: Number, default: 0, min: 0 },
+    hiringClaimError: { type: String, default: "", trim: true, maxlength: 1000 },
+    completionClaimToken: { type: String, default: "", trim: true },
+    completionClaimedAt: { type: Date, default: null },
+    completionClaimStatus: {
+      type: String,
+      enum: ["claimed", "needs_reconciliation", null],
+      default: null,
+      index: true,
+    },
+    completionClaimTransferId: { type: String, default: "", trim: true },
+    completionClaimError: { type: String, default: "", trim: true, maxlength: 1000 },
     paralegalNameSnapshot: { type: String, trim: true, default: "" },
     attorneyNameSnapshot: { type: String, trim: true, default: "" },
+    taskRevision: { type: Number, default: 0, min: 0 },
     preEngagement: { type: preEngagementSchema, default: null },
     terminationReason: { type: String, trim: true, maxlength: 2000, default: "" },
     terminationStatus: { type: String, enum: ["none", "auto_cancelled", "disputed", "resolved"], default: "none", index: true },
@@ -318,9 +358,24 @@ const caseSchema = new Schema(
     paymentIntentId: { type: String, default: null, index: true },
     stripeMode: { type: String, enum: ["live", "test", "unknown"], default: "unknown", index: true },
     escrowStatus: { type: String, default: null, index: true }, // awaiting_funding, funded
-    paymentReleased: { type: Boolean, default: false }, // funds released to paralegal
+    paymentReleased: { type: Boolean, default: false }, // Matter payment release recorded
     paidOutAt: { type: Date, default: null },
     paymentStatus: { type: String, default: "pending", trim: true },
+    fundingIntegrityStatus: {
+      type: String,
+      enum: ["pending", "verified", "failed"],
+      default: "pending",
+      index: true,
+    },
+    fundingIntegrityFailure: { type: String, default: "", trim: true, maxlength: 500 },
+    fundingVerifiedAt: { type: Date, default: null },
+    payoutStatus: {
+      type: String,
+      enum: ["not_started", "pending", "paid", "failed", "reversed", "needs_reconciliation"],
+      default: "not_started",
+      index: true,
+    },
+    payoutFailureReason: { type: String, default: "", trim: true, maxlength: 500 },
 
     // Platform fee snapshots (computed at funding time)
     feeAttorneyPct: { type: Number, default: DEFAULT_ATTORNEY_FEE_PCT, min: 0, max: 100 }, // %
@@ -338,6 +393,8 @@ const caseSchema = new Schema(
       feeParalegalPct: { type: Number, default: null, min: 0, max: 100 }, // %
       payoutAmount: { type: Number, default: null, min: 0 }, // cents (net paid)
       refundAmount: { type: Number, default: null, min: 0 }, // cents
+      refundId: { type: String, default: "", trim: true },
+      transferId: { type: String, default: "", trim: true },
       resolvedAt: { type: Date, default: null },
       disputeId: { type: String, default: null },
     },
@@ -371,6 +428,9 @@ caseSchema.index({ paralegal: 1, createdAt: -1 });
 caseSchema.index({ paralegalId: 1, createdAt: -1 });
 caseSchema.index({ pendingParalegalId: 1, createdAt: -1 });
 caseSchema.index({ "invites.paralegalId": 1, "invites.status": 1, createdAt: -1 });
+caseSchema.index({ "invites.syncStatus": 1, updatedAt: 1 });
+caseSchema.index({ postingSyncStatus: 1, updatedAt: 1 });
+caseSchema.index({ completionClaimStatus: 1, completionClaimedAt: 1 });
 caseSchema.index({ status: 1, createdAt: -1 });
 caseSchema.index({ "applicants.paralegalId": 1, createdAt: -1 }); // helpful when showing "my applications"
 
@@ -388,18 +448,27 @@ caseSchema.virtual("fileCount").get(function () { return (this.files || []).leng
  * Validation & Hooks
  * -----------------------------------------*/
 // Prevent duplicate applicants for the same paralegal
-caseSchema.pre("validate", function (next) {
+caseSchema.pre("validate", function () {
   if (!this.attorney && this.attorneyId) this.attorney = this.attorneyId;
   if (!this.attorneyId && this.attorney) this.attorneyId = this.attorney;
   if (!this.paralegal && this.paralegalId) this.paralegal = this.paralegalId;
   if (!this.paralegalId && this.paralegal) this.paralegalId = this.paralegal;
+  if (this.attorney && this.attorneyId && referenceId(this.attorney) !== referenceId(this.attorneyId)) {
+    throw new Error("attorney and attorneyId must reference the same user.");
+  }
+  if (this.paralegal && this.paralegalId && referenceId(this.paralegal) !== referenceId(this.paralegalId)) {
+    throw new Error("paralegal and paralegalId must reference the same user.");
+  }
   this.status = normalizeCaseStatus(this.status);
+  const normalizedDeadline = normalizeDateOnly(this.deadlineDate || this.deadline);
+  this.deadlineDate = normalizedDeadline;
+  this.deadline = normalizedDeadline ? dateOnlyToUtcDate(normalizedDeadline) : null;
 
   if (Array.isArray(this.applicants) && this.applicants.length > 1) {
     const seen = new Set();
     for (const a of this.applicants) {
       const key = String(a.paralegalId);
-      if (key && seen.has(key)) return next(new Error("Duplicate applicant for the same paralegalId."));
+      if (key && seen.has(key)) throw new Error("Duplicate applicant for the same paralegalId.");
       if (key) seen.add(key);
     }
   }
@@ -407,15 +476,14 @@ caseSchema.pre("validate", function (next) {
     const seen = new Set();
     for (const invite of this.invites) {
       const key = String(invite.paralegalId);
-      if (key && seen.has(key)) return next(new Error("Duplicate invite for the same paralegalId."));
+      if (key && seen.has(key)) throw new Error("Duplicate invite for the same paralegalId.");
       if (key) seen.add(key);
     }
   }
-  next();
 });
 
 // Normalize money fields to integer cents and non-negative
-caseSchema.pre("save", function (next) {
+caseSchema.pre("save", function () {
   this.totalAmount = cents(this.totalAmount);
   if (this.lockedTotalAmount != null) {
     this.lockedTotalAmount = cents(this.lockedTotalAmount);
@@ -435,37 +503,40 @@ caseSchema.pre("save", function (next) {
     this.disputeSettlement.payoutAmount = cents(this.disputeSettlement.payoutAmount);
     this.disputeSettlement.refundAmount = cents(this.disputeSettlement.refundAmount);
   }
-  next();
 });
 
 /** ----------------------------------------
  * Methods & Statics
  * -----------------------------------------*/
-// Enforce simple status transitions to avoid accidental jumps
-const ALLOWED_TRANSITIONS = {
-  open: [STATUS_IN_PROGRESS, "closed"],
-  [STATUS_IN_PROGRESS]: ["paused", "completed", "disputed", "closed"],
-  paused: [STATUS_IN_PROGRESS, "disputed", "closed"],
-  completed: ["disputed", "closed"],
-  disputed: ["closed"],
-  closed: [],
-};
-
 caseSchema.methods.canTransitionTo = function (nextStatus) {
-  const target = normalizeCaseStatus(nextStatus);
-  const current = normalizeCaseStatus(this.status);
-  if (!CASE_STATUS.includes(target)) return false;
-  const allowed = ALLOWED_TRANSITIONS[current] || [];
-  return allowed.includes(target);
+  return canTransitionCaseStatus(this.status, nextStatus);
 };
 
-caseSchema.methods.transitionTo = function (nextStatus) {
+caseSchema.methods.transitionTo = function (nextStatus, { enforceInvariants = true } = {}) {
   const target = normalizeCaseStatus(nextStatus);
   if (!this.canTransitionTo(target)) {
-    const allowed = ALLOWED_TRANSITIONS[this.status] || [];
+    const current = normalizeCaseStatus(this.status);
+    const allowed = CASE_TRANSITIONS[current] || [];
     throw new Error(`Invalid status transition from '${this.status}' to '${target}'. Allowed: ${allowed.join(", ") || "none"}`);
   }
+  if (enforceInvariants) assertCaseLifecycleInvariants(this, { status: target });
   this.status = target;
+  return this;
+};
+
+caseSchema.methods.ensureLifecycleStatus = function (nextStatus, { enforceInvariants = true } = {}) {
+  const target = normalizeCaseStatus(nextStatus);
+  const current = normalizeCaseStatus(this.status);
+  if (current === target) {
+    if (enforceInvariants) assertCaseLifecycleInvariants(this, { status: target });
+    this.status = target;
+    return this;
+  }
+  return this.transitionTo(target, { enforceInvariants });
+};
+
+caseSchema.methods.assertLifecycleInvariants = function () {
+  assertCaseLifecycleInvariants(this);
   return this;
 };
 
@@ -506,20 +577,37 @@ caseSchema.methods.acceptApplicant = function (paralegalId) {
 // Create a dispute embedded record
 caseSchema.methods.createDispute = function ({ message, raisedBy, amountRequestedCents }) {
   if (!message || !raisedBy) throw new Error("message and raisedBy are required to create a dispute.");
+  if ((this.disputes || []).some((dispute) => String(dispute?.status || "open").toLowerCase() === "open")) {
+    const error = new Error("An open dispute already exists for this case.");
+    error.code = "OPEN_DISPUTE_EXISTS";
+    throw error;
+  }
+  if (!this.canTransitionTo("disputed")) {
+    const error = new Error(`A dispute cannot be opened while the case is '${normalizeCaseStatus(this.status)}'.`);
+    error.code = "DISPUTE_STATE_INVALID";
+    throw error;
+  }
   const payload = { message: String(message).trim(), raisedBy, status: "open" };
   if (Number.isFinite(amountRequestedCents) && amountRequestedCents > 0) {
-    payload.amountRequestedCents = amountRequestedCents;
+    const amount = Math.round(amountRequestedCents);
+    const available = cents(this.remainingAmount ?? this.lockedTotalAmount ?? this.totalAmount);
+    if (amount > available) {
+      const error = new Error("Requested amount exceeds the funded matter balance.");
+      error.code = "DISPUTE_AMOUNT_EXCEEDS_BALANCE";
+      throw error;
+    }
+    payload.amountRequestedCents = amount;
   }
   this.disputes.push(payload);
-  // Surface status to disputed if not closed
-  if (this.status !== "closed") this.status = "disputed";
+  this.pausedReason = "dispute";
+  this.transitionTo("disputed");
   return this;
 };
 
 // Convenience markers
-caseSchema.methods.markInProgress = function () { return this.transitionTo(STATUS_IN_PROGRESS); };
-caseSchema.methods.markCompleted  = function () { return this.transitionTo("completed"); };
-caseSchema.methods.markClosed     = function () { return this.transitionTo("closed"); };
+caseSchema.methods.markInProgress = function () { return this.ensureLifecycleStatus(STATUS_IN_PROGRESS); };
+caseSchema.methods.markCompleted  = function () { return this.ensureLifecycleStatus("completed"); };
+caseSchema.methods.markClosed     = function () { return this.ensureLifecycleStatus("closed"); };
 
 /** ----------------------------------------
  * Model

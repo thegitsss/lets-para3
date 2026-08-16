@@ -139,7 +139,7 @@ describe("attorney assistant Package 6 database-backed integration", () => {
       ok: true,
       available: true,
       title: fixture.cases.active.title,
-      deadline: "2026-08-15T21:00:00.000Z",
+      deadline: "2026-08-15",
       assignedParalegal: { assigned: true, name: "P6 Assigned" },
       tasks: expect.objectContaining({ total: 2, completed: 1, incomplete: 1, locked: true }),
       files: expect.objectContaining({ total: 2, pendingReview: 0, revisionsRequested: 1, approved: 1 }),
@@ -398,12 +398,12 @@ describe("attorney assistant Package 6 database-backed integration", () => {
       toolName: "find_navigation_destination",
       args: { destination: "billing" },
       finalReply: managerReply({
-        reply: "Open Billing & Payments.",
+        reply: "Open Payments.",
         activeTask: "NAVIGATION",
         navigation: {
-          ctaLabel: "Billing & payments",
-          ctaHref: "dashboard-attorney.html#billing",
-          inlineLinkText: "Billing & Payments",
+          ctaLabel: "Payments",
+          ctaHref: "dashboard-attorney.html#funds",
+          inlineLinkText: "Payments",
         },
       }),
     });
@@ -412,14 +412,14 @@ describe("attorney assistant Package 6 database-backed integration", () => {
       user: fixture.users.owner,
       client: allowedClient,
     });
-    expect(allowed.navigation).toEqual(expect.objectContaining({ ctaHref: "dashboard-attorney.html#billing" }));
+    expect(allowed.navigation).toEqual(expect.objectContaining({ ctaHref: "dashboard-attorney.html#funds" }));
     expect(allowed.suggestions).toEqual([]);
 
     const strippedClient = scriptedManagerClient({
       toolName: "find_navigation_destination",
       args: { destination: "billing" },
       finalReply: managerReply({
-        reply: "Open Billing & Payments.",
+        reply: "Open Payments.",
         activeTask: "NAVIGATION",
         navigation: {
           ctaLabel: "Admin finance",

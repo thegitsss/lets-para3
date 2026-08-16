@@ -3,10 +3,11 @@ const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const request = require("supertest");
 
+const Incident = require("../models/Incident");
 const CtoAgentRun = require("../models/CtoAgentRun");
 const CtoExecutionRun = require("../models/CtoExecutionRun");
 const User = require("../models/User");
-const aiAdminRouter = require("../routes/aiAdmin");
+const adminEngineeringRouter = require("../routes/adminEngineering");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "cto-execution-route-test-secret";
@@ -15,23 +16,17 @@ const app = (() => {
   const instance = express();
   instance.use(cookieParser());
   instance.use(express.json({ limit: "1mb" }));
-  instance.use("/api/admin/ai", aiAdminRouter);
-  instance.use((err, _req, res, _next) => {
-    console.error(err);
-    res.status(500).json({ error: err?.message || "Server error" });
-  });
+  instance.use("/api/admin/engineering", adminEngineeringRouter);
   return instance;
 })();
 
 function authCookieFor(user) {
-  const payload = {
+  return `token=${jwt.sign({
     id: user._id.toString(),
     role: user.role,
     email: user.email,
     status: user.status,
-  };
-  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "2h" });
-  return `token=${token}`;
+  }, process.env.JWT_SECRET, { expiresIn: "2h" })}`;
 }
 
 async function createAdmin() {
@@ -46,107 +41,83 @@ async function createAdmin() {
   });
 }
 
-beforeAll(async () => {
-  await connect();
-});
+beforeAll(connect);
+afterAll(closeDatabase);
+beforeEach(clearDatabase);
 
-afterAll(async () => {
-  await closeDatabase();
-});
-
-beforeEach(async () => {
-  await clearDatabase();
-});
-
-describe("CTO execution admin route", () => {
-  test("can build and persist an execution packet from an existing CTO run", async () => {
+describe("Engineering execution route", () => {
+  test("builds and persists an execution packet for a diagnosed incident", async () => {
     const admin = await createAdmin();
+    const incident = await Incident.create({
+      publicId: "INC-ENGINEERING-EXECUTION",
+      source: "help_form",
+      reporter: { role: "attorney", email: "user@example.com" },
+      context: { surface: "attorney", routePath: "/cases/example" },
+      summary: "Confirm Hire action fails.",
+      originalReportText: "The Confirm Hire button does not complete the hire.",
+      state: "investigating",
+      classification: { domain: "matching", severity: "high", riskLevel: "medium", confidence: "high" },
+    });
     const ctoRun = await CtoAgentRun.create({
       category: "hire_flow",
       urgency: "high",
       technicalSeverity: "high",
       diagnosisSummary: "Likely Confirm Hire action failure in attorney flow.",
-      likelyRootCauses: [
-        "Missing click handler",
-        "Disabled state never clears",
-        "Backend hire route blocked by guard",
-      ],
-      filesToInspect: [
-        "frontend/assets/scripts/views/case-detail.js",
-        "frontend/assets/scripts/attorney-tabs.js",
-        "backend/routes/cases.js",
-      ],
-      recommendedFixStrategy: "Inspect Confirm Hire click handling and backend route response path.",
-      testPlan: [
-        "Open case detail as attorney",
-        "Click Confirm Hire",
-        "Verify request fires and UI updates",
-      ],
+      likelyRootCauses: ["Missing click handler", "Backend hire route blocked by guard"],
+      filesToInspect: ["frontend/assets/scripts/attorney-tabs.js", "backend/routes/cases.js"],
+      recommendedFixStrategy: "Inspect Confirm Hire handling and the backend response path.",
+      testPlan: ["Click Confirm Hire", "Verify the request and funded state"],
       deploymentRisk: "Medium to high",
-      approvalRequired: true,
-      canAutoDeploy: false,
-      notifyUserWhenResolved: true,
-      generatedAt: new Date(),
+      metadata: { incidentId: String(incident._id), incidentPublicId: incident.publicId },
     });
 
     const res = await request(app)
-      .post("/api/admin/ai/cto-execution-test")
+      .post(`/api/admin/engineering/items/${incident.publicId}/execution`)
       .set("Cookie", authCookieFor(admin))
-      .send({
-        ctoRunId: String(ctoRun._id),
-        saveRun: true,
-      });
+      .send({});
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual(
-      expect.objectContaining({
+    expect(res.body).toEqual(expect.objectContaining({
+      ok: true,
+      reused: false,
+      execution: expect.objectContaining({
         ok: true,
         ctoRunId: String(ctoRun._id),
         executionRunId: expect.any(String),
-        category: "hire_flow",
         executionStatus: "awaiting_approval",
-        codexExecutionPrompt: expect.stringMatching(/Implement a narrow LPC production fix/i),
-        deploymentReadiness: expect.objectContaining({
-          status: "not_ready",
-          riskLevel: "medium",
-        }),
-        resolutionMessageDraft: expect.stringMatching(/We’re actively working on the issue/i),
         saved: true,
-        saveSkippedReason: "",
-      })
-    );
+        canAutoDeploy: false,
+      }),
+      item: expect.objectContaining({ publicId: incident.publicId }),
+    }));
 
-    const executionRun = await CtoExecutionRun.findById(res.body.executionRunId).lean();
-    expect(executionRun).toEqual(
-      expect.objectContaining({
-        ctoRunId: ctoRun._id,
-        category: "hire_flow",
-        executionStatus: "awaiting_approval",
-      })
-    );
+    const execution = await CtoExecutionRun.findById(res.body.execution.executionRunId).lean();
+    expect(execution).toEqual(expect.objectContaining({
+      ctoRunId: ctoRun._id,
+      category: "hire_flow",
+      executionStatus: "awaiting_approval",
+    }));
   });
 
-  test("returns a structured error when the CTO run cannot be found", async () => {
+  test("returns 409 when an incident has not been diagnosed", async () => {
     const admin = await createAdmin();
-    const missingId = "67e1d7d0d4c0f2d3b4a12345";
+    const incident = await Incident.create({
+      publicId: "INC-ENGINEERING-NO-DIAGNOSIS",
+      source: "help_form",
+      reporter: { role: "attorney", email: "user@example.com" },
+      context: { surface: "attorney", routePath: "/cases/example" },
+      summary: "Hire action issue.",
+      originalReportText: "The hire action needs diagnosis.",
+      state: "reported",
+      classification: { domain: "matching", severity: "medium", riskLevel: "medium", confidence: "high" },
+    });
 
     const res = await request(app)
-      .post("/api/admin/ai/cto-execution-test")
+      .post(`/api/admin/engineering/items/${incident.publicId}/execution`)
       .set("Cookie", authCookieFor(admin))
-      .send({
-        ctoRunId: missingId,
-        saveRun: true,
-      });
+      .send({});
 
-    expect(res.status).toBe(404);
-    expect(res.body).toEqual(
-      expect.objectContaining({
-        ok: false,
-        ctoRunId: missingId,
-        executionRunId: null,
-        saved: false,
-        saveSkippedReason: "CtoAgentRun not found.",
-      })
-    );
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/needs a diagnosis/i);
   });
 });

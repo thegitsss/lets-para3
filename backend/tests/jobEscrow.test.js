@@ -5,6 +5,8 @@ const request = require("supertest");
 
 const User = require("../models/User");
 const Case = require("../models/Case");
+const Job = require("../models/Job");
+const Application = require("../models/Application");
 
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
@@ -14,9 +16,11 @@ jest.mock("../utils/stripe", () => {
   const paymentIntents = {
     create: jest.fn(),
     retrieve: jest.fn(),
+    cancel: jest.fn(),
   };
   return {
     paymentIntents,
+    refunds: { create: jest.fn() },
     customers: {
       create: jest.fn(),
       retrieve: jest.fn(),
@@ -39,9 +43,12 @@ jest.mock("../utils/stripe", () => {
     },
     isTransferablePaymentIntent: jest.fn(() => ({
       transferable: true,
-      charge: { receipt_url: "https://stripe.test/receipt" },
+      charge: { id: "ch_test_transferable", receipt_url: "https://stripe.test/receipt" },
     })),
+    sanitizeStripeError: jest.fn((_err, fallback) => fallback),
+    caseTransferGroup: jest.fn((caseId) => `case_${String(caseId)}`),
     getPaymentIntentCharge: jest.fn(() => ({ receipt_url: "https://stripe.test/receipt" })),
+    stripeIdempotencyKey: jest.fn((operation, ...parts) => `test_${operation}_${parts.join("_")}`),
   };
 });
 
@@ -93,13 +100,43 @@ beforeEach(async () => {
   await clearDatabase();
   stripe.paymentIntents.create.mockReset();
   stripe.paymentIntents.retrieve.mockReset();
+  stripe.paymentIntents.cancel.mockReset();
+  stripe.refunds.create.mockReset();
   stripe.isTransferablePaymentIntent.mockClear();
   stripe.customers.retrieve.mockReset();
+  stripe.customers.create.mockReset();
   stripe.customers.retrieve.mockResolvedValue({
     invoice_settings: { default_payment_method: "pm_test_default" },
   });
+  stripe.paymentMethods.retrieve.mockReset();
   caseLifecycle.buildReceiptPdfBuffer.mockClear();
   sendEmail.mockClear();
+});
+
+test("reading payment readiness does not create a Stripe customer for an attorney without one", async () => {
+  const attorney = await User.create({
+    firstName: "Avery",
+    lastName: "No Card",
+    email: "attorney-no-card@example.com",
+    password: "Password123!",
+    role: "attorney",
+    status: "approved",
+    state: "CA",
+  });
+
+  const response = await request(app)
+    .get("/api/payments/payment-method/default")
+    .set("Cookie", authCookieFor(attorney));
+
+  expect(response.status).toBe(200);
+  expect(response.body).toEqual({
+    customerId: null,
+    hasDefault: false,
+    paymentMethod: null,
+  });
+  expect(stripe.customers.create).not.toHaveBeenCalled();
+  expect(stripe.customers.retrieve).not.toHaveBeenCalled();
+  expect(stripe.paymentMethods.retrieve).not.toHaveBeenCalled();
 });
 
 describe("Job posting + escrow", () => {
@@ -148,8 +185,8 @@ describe("Job posting + escrow", () => {
     expect(created.totalAmount).toBe(40000);
     expect(sendEmail).toHaveBeenCalledWith(
       admin.email,
-      "New attorney job posted: Immigration support",
-      expect.stringContaining("Review job posting in Admin")
+      "New attorney Matter posted: Immigration support",
+      expect.stringContaining("Review Matter posting in Admin")
     );
   });
 
@@ -219,6 +256,116 @@ describe("Job posting + escrow", () => {
     expect(res.body.error).toMatch(/at least \$400/i);
   });
 
+  test("Concurrent hire requests atomically select one paralegal and create one charge", async () => {
+    const attorney = await User.create({
+      firstName: "Ava",
+      lastName: "Stone",
+      email: "concurrent-hire-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+      stripeCustomerId: "cus_concurrent_hire",
+    });
+    const [firstParalegal, secondParalegal] = await User.create([
+      {
+        firstName: "Jamie",
+        lastName: "Lopez",
+        email: "concurrent-hire-one@example.com",
+        password: "Password123!",
+        role: "paralegal",
+        status: "approved",
+        stripeAccountId: "acct_concurrent_one",
+        stripeOnboarded: true,
+        stripePayoutsEnabled: true,
+      },
+      {
+        firstName: "Priya",
+        lastName: "Ng",
+        email: "concurrent-hire-two@example.com",
+        password: "Password123!",
+        role: "paralegal",
+        status: "approved",
+        stripeAccountId: "acct_concurrent_two",
+        stripeOnboarded: true,
+        stripePayoutsEnabled: true,
+      },
+    ]);
+    const caseDoc = await Case.create({
+      title: "Concurrent hire protection",
+      practiceArea: "business law",
+      details: "Only one paralegal may be selected and funded for this matter.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      status: "open",
+      totalAmount: 40000,
+      lockedTotalAmount: 40000,
+      currency: "usd",
+      tasks: [{ title: "Prepare intake summary", completed: false }],
+      applicants: [
+        { paralegalId: firstParalegal._id, status: "pending" },
+        { paralegalId: secondParalegal._id, status: "pending" },
+      ],
+    });
+    const job = await Job.create({
+      caseId: caseDoc._id,
+      attorneyId: attorney._id,
+      title: caseDoc.title,
+      practiceArea: caseDoc.practiceArea,
+      description: caseDoc.details,
+      budget: 400,
+      status: "open",
+      applicantsCount: 2,
+    });
+    caseDoc.jobId = job._id;
+    await caseDoc.save();
+    await Application.create([
+      { jobId: job._id, paralegalId: firstParalegal._id, coverLetter: "First qualified application." },
+      { jobId: job._id, paralegalId: secondParalegal._id, coverLetter: "Second qualified application." },
+    ]);
+
+    stripe.paymentIntents.create.mockImplementation(async (params) => {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      return {
+        id: "pi_concurrent_hire",
+        status: "succeeded",
+        amount: params.amount,
+        currency: params.currency,
+        transfer_group: params.transfer_group,
+        metadata: params.metadata,
+        livemode: false,
+        latest_charge: { id: "ch_concurrent_hire", paid: true, captured: true },
+      };
+    });
+
+    const cookie = authCookieFor(attorney);
+    const responses = await Promise.all([
+      request(app)
+        .post(`/api/cases/${caseDoc._id}/hire/${firstParalegal._id}`)
+        .set("Cookie", cookie)
+        .send({}),
+      request(app)
+        .post(`/api/cases/${caseDoc._id}/hire/${secondParalegal._id}`)
+        .set("Cookie", cookie)
+        .send({}),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(stripe.paymentIntents.create).toHaveBeenCalledTimes(1);
+    const stored = await Case.findById(caseDoc._id).lean();
+    expect([String(firstParalegal._id), String(secondParalegal._id)]).toContain(
+      String(stored?.paralegalId || "")
+    );
+    expect(String(stored?.paralegalId || "")).toBe(String(stored?.paralegal || ""));
+    expect(stored?.escrowIntentId).toBe("pi_concurrent_hire");
+    expect(stored?.escrowStatus).toBe("funded");
+    expect(stored?.hiringClaimStatus).toBeNull();
+    expect(stored?.hiringClaimToken).toBe("");
+    expect(await Application.countDocuments({ jobId: job._id, status: "accepted" })).toBe(1);
+    expect(await Application.countDocuments({ jobId: job._id, status: "rejected" })).toBe(1);
+    expect((await Job.findById(job._id).lean())?.applicantsCount).toBe(0);
+  });
+
   test("Stripe escrow can be funded in test mode and receipt is returned", async () => {
     // Description: Create an escrow intent, confirm it succeeds, then fetch the receipt.
     // Input values: lockedTotalAmount=40000 cents, Stripe intent status=succeeded.
@@ -273,7 +420,8 @@ describe("Job posting + escrow", () => {
       amount: 48800,
       currency: "usd",
       transfer_group: `case_${caseDoc._id}`,
-      charges: { data: [{ receipt_url: "https://stripe.test/receipt" }] },
+      metadata: { caseId: String(caseDoc._id) },
+      latest_charge: { id: "ch_test_123", receipt_url: "https://stripe.test/receipt" },
     });
 
     const cookie = authCookieFor(attorney);
@@ -326,7 +474,7 @@ describe("Job posting + escrow", () => {
     expect(caseLifecycle.buildReceiptPdfBuffer).toHaveBeenLastCalledWith(
       expect.objectContaining({
         lineItems: expect.arrayContaining([
-          expect.objectContaining({ label: "Case fee", value: "$400.00" }),
+          expect.objectContaining({ label: "Matter amount", value: "$400.00" }),
           expect.objectContaining({ label: "Platform fee (22%)", value: "$88.00" }),
         ]),
         totalAmount: "$488.00",
@@ -365,7 +513,10 @@ describe("Job posting + escrow", () => {
       status: "succeeded",
       amount: 48800,
       currency: "usd",
-      charges: { data: [{ payment_method_details: { card: { brand: "visa", last4: "4242" } } }] },
+      latest_charge: {
+        id: "ch_historical_123",
+        payment_method_details: { card: { brand: "visa", last4: "4242" } },
+      },
     });
 
     const cookie = authCookieFor(attorney);
@@ -378,7 +529,7 @@ describe("Job posting + escrow", () => {
     expect(caseLifecycle.buildReceiptPdfBuffer).toHaveBeenLastCalledWith(
       expect.objectContaining({
         lineItems: expect.arrayContaining([
-          expect.objectContaining({ label: "Case fee", value: "$400.00" }),
+          expect.objectContaining({ label: "Matter amount", value: "$400.00" }),
           expect.objectContaining({ label: "Platform fee (22%)", value: "$88.00" }),
         ]),
         totalAmount: "$488.00",

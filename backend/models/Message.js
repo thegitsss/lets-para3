@@ -63,14 +63,9 @@ const MessageSchema = new Schema(
   }
 );
 
-MessageSchema.pre("save", function (next) {
-  try {
-    encryptMessageFields(this);
-    this.updatedAt = new Date();
-    next();
-  } catch (err) {
-    next(err);
-  }
+MessageSchema.pre("save", function () {
+  encryptMessageFields(this);
+  this.updatedAt = new Date();
 });
 
 MessageSchema.methods.markEdited = function () {

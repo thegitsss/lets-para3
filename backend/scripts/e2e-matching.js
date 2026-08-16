@@ -1,22 +1,7 @@
 const path = require("path");
 const http = require("http");
 const express = require("express");
-const puppeteer = require("puppeteer");
-
-function patchElementHandleClick() {
-  const { ElementHandle } = puppeteer;
-  if (!ElementHandle || ElementHandle.prototype.__safeClickPatched) return;
-  const original = ElementHandle.prototype.click;
-  ElementHandle.prototype.click = async function (...args) {
-    try {
-      return await this.evaluate((el) => el.click());
-    } catch {
-      return original.apply(this, args);
-    }
-  };
-  ElementHandle.prototype.__safeClickPatched = true;
-}
-patchElementHandleClick();
+const { clickVisible, launchPuppeteer } = require("./puppeteerBrowser");
 
 const PARALEGAL = {
   id: "507f191e810c19729de860ea",
@@ -26,6 +11,7 @@ const PARALEGAL = {
   firstName: "Priya",
   lastName: "Ng",
   email: "samanthasider+56@gmail.com", // always Stripe bypass
+  profileImage: "/assets/avatar-placeholder.svg",
 };
 
 const ATTORNEYS = {
@@ -72,18 +58,21 @@ const JOBS = [
   },
 ];
 
-async function safeClick(page, selector) {
-  await page.evaluate((sel) => document.querySelector(sel)?.click(), selector);
-}
-
 function startStubServer() {
   const app = express();
   const frontendDir = path.join(__dirname, "../../frontend");
   const publicDir = path.join(__dirname, "../../public");
+  const applicationRequests = [];
+  const applications = [];
 
   app.use(express.json({ limit: "1mb" }));
   app.use(express.static(publicDir));
   app.use(express.static(frontendDir));
+
+  app.get("/assets/vendor/web-vitals-6.1.1.js", (_req, res) => {
+    res.type("application/javascript");
+    res.sendFile(path.resolve(__dirname, "../node_modules/web-vitals/dist/web-vitals.js"));
+  });
 
   app.get("/api/csrf", (_req, res) => res.json({ csrfToken: "test-csrf" }));
 
@@ -93,6 +82,33 @@ function startStubServer() {
 
   app.get("/api/jobs/open", (_req, res) => {
     res.json(JOBS);
+  });
+
+  app.get("/api/applications/my", (_req, res) => {
+    res.json(applications);
+  });
+
+  app.post("/api/jobs/:jobId/apply", async (req, res) => {
+    const job = JOBS.find((item) => item._id === req.params.jobId);
+    if (!job) return res.status(404).json({ error: "Matter not found" });
+    applicationRequests.push({ jobId: req.params.jobId, body: req.body });
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const application = {
+      _id: `64b7f1f77bcf86cd79943${String(applications.length + 20).padStart(3, "0")}`,
+      jobId: { _id: job._id },
+      coverLetter: String(req.body?.coverLetter || ""),
+      createdAt: new Date().toISOString(),
+    };
+    applications.push(application);
+    return res.status(201).json(application);
+  });
+
+  app.get("/api/payments/connect/status", (_req, res) => {
+    res.json({ connected: true, details_submitted: true, payouts_enabled: true });
+  });
+
+  app.get("/api/notifications", (_req, res) => {
+    res.json({ notifications: [], unread: 0 });
   });
 
   app.get("/api/users/attorneys/:id", (req, res) => {
@@ -106,16 +122,16 @@ function startStubServer() {
   return new Promise((resolve) => {
     server.listen(0, () => {
       const { port } = server.address();
-      resolve({ server, port });
+      resolve({ server, port, applicationRequests });
     });
   });
 }
 
 async function run() {
-  const { server, port } = await startStubServer();
+  const { server, port, applicationRequests } = await startStubServer();
   const baseUrl = `http://localhost:${port}`;
 
-  const browser = await puppeteer.launch({
+  const browser = await launchPuppeteer({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
     protocolTimeout: 120_000,
@@ -139,6 +155,16 @@ async function run() {
 
   const context = await createContext();
   const page = await context.newPage();
+  const pageErrors = [];
+  const failedLocalAssets = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("response", (response) => {
+    const url = new URL(response.url());
+    if (url.origin === baseUrl && !url.pathname.startsWith("/api/") && response.status() >= 400) {
+      failedLocalAssets.push(`${response.status()} ${url.pathname}`);
+    }
+  });
+  await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 });
   page.setDefaultTimeout(60_000);
   page.setDefaultNavigationTimeout(60_000);
 
@@ -156,16 +182,42 @@ async function run() {
     // Expected result: two job cards render.
     await page.goto(`${baseUrl}/browse-jobs.html`, { waitUntil: "networkidle0" });
     await page.waitForSelector(".job-card");
+    const initialPanelState = await page.evaluate(() => ({
+      openPanels: document.querySelectorAll("[data-notification-panel].show").length,
+      visibleHiddenPanels: Array.from(document.querySelectorAll("[data-notification-panel].hidden"))
+        .filter((panel) => {
+          const style = getComputedStyle(panel);
+          return style.visibility !== "hidden" && Number.parseFloat(style.opacity || "1") > 0;
+        }).length,
+    }));
+    if (initialPanelState.openPanels || initialPanelState.visibleHiddenPanels) {
+      throw new Error(`Notifications opened without user action: ${JSON.stringify(initialPanelState)}`);
+    }
     const initialCount = await page.$$eval(".job-card", (cards) => cards.length);
     if (initialCount !== JOBS.length) {
       throw new Error(`Expected ${JOBS.length} jobs, saw ${initialCount}`);
     }
+    const desktopLayout = await page.evaluate(() => {
+      const shell = document.querySelector(".browse-page-shell")?.getBoundingClientRect();
+      const main = document.querySelector(".jobs-shell")?.getBoundingClientRect();
+      const cards = Array.from(document.querySelectorAll(".job-card"), (card) => card.getBoundingClientRect());
+      const boundary = Math.min(window.innerWidth, shell?.right || window.innerWidth);
+      return {
+        boundary,
+        mainRight: main?.right || 0,
+        clippedCards: cards.filter((card) => card.right > boundary + 1).length,
+      };
+    });
+    if (desktopLayout.mainRight > desktopLayout.boundary + 1 || desktopLayout.clippedCards) {
+      throw new Error(`Browse Matters desktop content is clipped: ${JSON.stringify(desktopLayout)}`);
+    }
+    await page.screenshot({ path: "/tmp/lpc-prompt5-paralegal-browse-matters-list-desktop.png", fullPage: true });
 
     // Test: Filter by state works (CA).
     // Input values: filterState=CA, apply filters.
     // Expected result: only the CA job remains.
     await page.select("#filterState", "CA");
-    await safeClick(page, "#applyFilters");
+    await clickVisible(page, "#applyFilters");
     await page.waitForFunction(
       () => document.querySelectorAll(".job-card").length === 1,
       { timeout: 5000 }
@@ -178,13 +230,13 @@ async function run() {
     // Test: Filter by practice area works (Business Law).
     // Input values: filterPracticeArea=Business Law, apply filters.
     // Expected result: only the Business Law job remains.
-    await safeClick(page, "#clearFilters");
+    await clickVisible(page, "#clearFilters");
     await page.waitForFunction(
       () => document.querySelectorAll(".job-card").length === 2,
       { timeout: 5000 }
     );
     await page.select("#filterPracticeArea", "Business Law");
-    await safeClick(page, "#applyFilters");
+    await clickVisible(page, "#applyFilters");
     await page.waitForFunction(
       () => document.querySelectorAll(".job-card").length === 1,
       { timeout: 5000 }
@@ -199,31 +251,175 @@ async function run() {
     // Expected result: empty-state message shown.
     await page.select("#filterState", "CA");
     await page.select("#filterPracticeArea", "Business Law");
-    await safeClick(page, "#applyFilters");
+    await clickVisible(page, "#applyFilters");
     await page.waitForFunction(() => {
       const text = document.querySelector(".jobs-grid")?.textContent || "";
       return text.includes("No matters match your filters yet");
     }, { timeout: 5000 });
 
-    // Test: Selecting a job shows full details.
-    // Input values: click "View Case" on a job card.
+    // Test: Selecting a Matter shows full details.
+    // Input values: click "View Matter" on a Matter card.
     // Expected result: expanded job card renders with full description.
-    await safeClick(page, "#clearFilters");
+    await clickVisible(page, "#clearFilters");
     await page.waitForFunction(
       () => document.querySelectorAll(".job-card").length === 2,
       { timeout: 5000 }
     );
     const viewButtons = await page.$$(".job-card .clear-button");
-    if (!viewButtons.length) throw new Error("No View Case buttons found");
-    await page.evaluate(() => document.querySelector(".job-card .clear-button")?.click());
+    if (!viewButtons.length) throw new Error("No View Matter buttons found");
+    await clickVisible(page, ".job-card .clear-button");
     await page.waitForSelector(".job-card.expanded .rich-text.main-description");
     const description = await page.$eval(
       ".job-card.expanded .rich-text.main-description",
       (el) => el.textContent.trim()
     );
-    if (!description.includes("USCIS packet review")) {
+    if (!JOBS.some((job) => description.includes(job.description))) {
       throw new Error(`Expanded job details missing description: ${description}`);
     }
+    const expandedTitle = await page.$eval(".job-card.expanded h3", (el) => el.textContent.trim());
+
+    await page.screenshot({ path: "/tmp/lpc-prompt5-paralegal-browse-matters-desktop.png", fullPage: true });
+
+    // Test: Application dialog is named, labeled, keyboard-contained, and restores focus.
+    const applySelector = ".job-card.expanded .apply-button";
+    await page.waitForSelector(applySelector);
+    await page.focus(applySelector);
+    await clickVisible(page, applySelector);
+    await page.waitForSelector(".job-apply-overlay.show");
+    const dialogState = await page.evaluate(() => ({
+      labelledBy: document.querySelector(".job-apply-dialog")?.getAttribute("aria-labelledby"),
+      focusedId: document.activeElement?.id || "",
+      hasLabel: Boolean(document.querySelector('label[for="jobApplyCoverLetter"]')),
+      title: document.querySelector("#jobApplyTitle")?.textContent || "",
+    }));
+    if (dialogState.labelledBy !== "jobApplyTitle" || dialogState.focusedId !== "jobApplyCoverLetter" || !dialogState.hasLabel) {
+      throw new Error(`Application dialog accessibility failed: ${JSON.stringify(dialogState)}`);
+    }
+    if (!dialogState.title.includes(expandedTitle)) {
+      throw new Error(`Application dialog lost Matter title: ${dialogState.title}`);
+    }
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !document.querySelector(".job-apply-overlay.show"));
+    const restored = await page.evaluate((selector) => document.activeElement === document.querySelector(selector), applySelector);
+    if (!restored) throw new Error("Application dialog did not restore focus to its launch control");
+
+    await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await page.screenshot({ path: "/tmp/lpc-prompt5-paralegal-browse-matters-mobile.png", fullPage: true });
+    const mobileMetrics = await page.evaluate(() => ({
+      viewport: window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      applyHeight: document.querySelector(".job-card.expanded .apply-button")?.getBoundingClientRect().height || 0,
+    }));
+    if (mobileMetrics.scrollWidth > mobileMetrics.viewport + 1 || mobileMetrics.applyHeight < 44) {
+      throw new Error(`Browse Matters mobile layout failed: ${JSON.stringify(mobileMetrics)}`);
+    }
+
+    await clickVisible(page, ".job-card.expanded .ghost-button");
+    await page.waitForFunction(() => document.querySelectorAll(".job-card").length === 2);
+    await page.waitForFunction(() => document.activeElement?.matches('.job-card .clear-button[data-job-id]'));
+    const mobileListMetrics = await page.evaluate(() => {
+      const toggle = document.querySelector("#filterToggle")?.getBoundingClientRect();
+      const navigationToggle = document.querySelector("#sidebarToggle")?.getBoundingClientRect();
+      const clippedCards = Array.from(document.querySelectorAll(".job-card"))
+        .filter((card) => card.getBoundingClientRect().right > window.innerWidth + 1).length;
+      return {
+        scrollWidth: document.documentElement.scrollWidth,
+        viewport: window.innerWidth,
+        toggleWidth: toggle?.width || 0,
+        toggleHeight: toggle?.height || 0,
+        navigationToggleWidth: navigationToggle?.width || 0,
+        navigationToggleHeight: navigationToggle?.height || 0,
+        listScrollTop: document.querySelector(".browse-page-shell")?.scrollTop || 0,
+        returnFocusLabel: document.activeElement?.textContent?.trim() || "",
+        clippedCards,
+      };
+    });
+    if (
+      mobileListMetrics.scrollWidth > mobileListMetrics.viewport + 1 ||
+      mobileListMetrics.toggleWidth < 44 ||
+      mobileListMetrics.toggleHeight < 44 ||
+      mobileListMetrics.navigationToggleWidth < 44 ||
+      mobileListMetrics.navigationToggleHeight < 44 ||
+      mobileListMetrics.listScrollTop > 1 ||
+      mobileListMetrics.returnFocusLabel !== "View Matter" ||
+      mobileListMetrics.clippedCards
+    ) {
+      throw new Error(`Browse Matters mobile list failed: ${JSON.stringify(mobileListMetrics)}`);
+    }
+    await page.screenshot({ path: "/tmp/lpc-prompt5-paralegal-browse-matters-list-mobile.png", fullPage: true });
+    await clickVisible(page, "#sidebarToggle");
+    await page.waitForFunction(() => document.body.classList.contains("nav-open"));
+    const mobileNavigationState = await page.evaluate(() => ({
+      expanded: document.querySelector("#sidebarToggle")?.getAttribute("aria-expanded"),
+      sidebarLeft: document.querySelector("#sidebarNav")?.getBoundingClientRect().left,
+      activeElement: document.activeElement?.closest("#sidebarNav")?.id || "",
+    }));
+    if (
+      mobileNavigationState.expanded !== "true" ||
+      mobileNavigationState.sidebarLeft < -1 ||
+      mobileNavigationState.activeElement !== "sidebarNav"
+    ) {
+      throw new Error(`Browse Matters mobile navigation failed: ${JSON.stringify(mobileNavigationState)}`);
+    }
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !document.body.classList.contains("nav-open"));
+    const restoredNavigationFocus = await page.evaluate(() => document.activeElement?.id === "sidebarToggle");
+    if (!restoredNavigationFocus) throw new Error("Browse Matters mobile navigation did not restore focus");
+
+    // Test: a paralegal submits a real application through the visible dialog.
+    const applyingMatter = await page.$eval(".job-card", (card) => ({
+      id: card.querySelector(".clear-button")?.dataset?.jobId || "",
+      title: card.querySelector("h3")?.textContent?.trim() || "",
+    }));
+    await clickVisible(page, ".job-card .clear-button");
+    await page.waitForSelector(".job-card.expanded .apply-button");
+    await clickVisible(page, ".job-card.expanded .apply-button");
+    await page.waitForSelector(".job-apply-overlay.show");
+    await clickVisible(page, "[data-apply-submit]");
+    await page.waitForFunction(() =>
+      document.querySelector("[data-apply-status]")?.textContent.includes("Add a short cover letter")
+    );
+    if (applicationRequests.length !== 0) {
+      throw new Error("An empty application reached the server.");
+    }
+
+    const coverLetter = "I have eight years of immigration filing experience and can organize the submission immediately.";
+    await page.type("#jobApplyCoverLetter", coverLetter);
+    const applicationResponsePromise = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return response.request().method() === "POST" && url.pathname.endsWith("/apply");
+    });
+    await clickVisible(page, "[data-apply-submit]");
+    await page.waitForFunction(() => {
+      const button = document.querySelector("[data-apply-submit]");
+      return Boolean(button?.disabled && button.textContent?.trim() === "Applying…");
+    });
+    const applicationResponse = await applicationResponsePromise;
+    if (applicationResponse.status() !== 201) {
+      throw new Error(`Expected application 201, received ${applicationResponse.status()}`);
+    }
+    await page.waitForSelector(".apply-confirm-overlay.show");
+    const confirmation = await page.$eval("[data-apply-confirm-message]", (node) => node.textContent.trim());
+    if (!confirmation.includes(applyingMatter.title)) {
+      throw new Error(`Application confirmation lost the Matter title: ${confirmation}`);
+    }
+    if (
+      applicationRequests.length !== 1 ||
+      applicationRequests[0].jobId !== applyingMatter.id ||
+      applicationRequests[0].body?.coverLetter !== coverLetter
+    ) {
+      throw new Error(`Unexpected application request: ${JSON.stringify(applicationRequests)}`);
+    }
+    await clickVisible(page, "[data-apply-confirm-close]");
+    await page.waitForFunction(() => !document.querySelector(".apply-confirm-overlay.show"));
+    await page.waitForFunction(() => document.activeElement?.matches('.clear-button[data-job-id]'));
+    const remainingTitles = await page.$$eval(".job-card h3", (nodes) => nodes.map((node) => node.textContent.trim()));
+    if (remainingTitles.includes(applyingMatter.title)) {
+      throw new Error(`Applied Matter remained in the open list: ${remainingTitles.join(", ")}`);
+    }
+    if (pageErrors.length) throw new Error(`Browse Matters UI page errors:\n${pageErrors.join("\n")}`);
+    if (failedLocalAssets.length) throw new Error(`Browse Matters UI asset failures:\n${failedLocalAssets.join("\n")}`);
 
     console.log("E2E matching + discovery validation complete.");
   } finally {

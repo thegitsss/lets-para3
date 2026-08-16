@@ -14,7 +14,6 @@ const {
   claimNextIncidentJob,
   processClaimedIncidentJob,
   runIncidentSchedulerOnce,
-  stopIncidentScheduler,
 } = require("../scheduler/incidentScheduler");
 const { runIncidentRunnerOnce } = require("../scripts/incident-runner");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
@@ -115,7 +114,7 @@ async function seedUnsupportedAwaitingVerificationIncident(user, options = {}) {
     ],
     impactedDomains: options.impactedDomains || ["documents"],
     suspectedRoutes: options.suspectedRoutes || ["/documents"],
-    suspectedFiles: options.suspectedFiles || ["frontend/assets/scripts/views/documents.js"],
+    suspectedFiles: options.suspectedFiles || ["frontend/assets/scripts/case-files-view.js"],
     recommendedAction: "patch",
     startedAt: new Date(),
     completedAt: new Date(),
@@ -133,7 +132,7 @@ async function seedUnsupportedAwaitingVerificationIncident(user, options = {}) {
     worktreePath,
     headCommitSha: "b".repeat(40),
     patchSummary: "Unsupported patch candidate awaiting safe verification coverage.",
-    filesTouched: options.suspectedFiles || ["frontend/assets/scripts/views/documents.js"],
+    filesTouched: options.suspectedFiles || ["frontend/assets/scripts/case-files-view.js"],
     testsAdded: [],
     testsModified: [],
     requiresApproval: false,
@@ -152,7 +151,7 @@ async function seedUnsupportedAwaitingVerificationIncident(user, options = {}) {
   incident.classification.severity = options.severity || "medium";
   incident.classification.confidence = options.confidence || "medium";
   incident.classification.suspectedRoutes = options.suspectedRoutes || ["/documents"];
-  incident.classification.suspectedFiles = options.suspectedFiles || ["frontend/assets/scripts/views/documents.js"];
+  incident.classification.suspectedFiles = options.suspectedFiles || ["frontend/assets/scripts/case-files-view.js"];
   incident.autonomyMode = "full_auto";
   incident.approvalState = "not_needed";
   incident.orchestration.nextJobType = "verification";
@@ -167,7 +166,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  stopIncidentScheduler();
   await closeDatabase();
 });
 

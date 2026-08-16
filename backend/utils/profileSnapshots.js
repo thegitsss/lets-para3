@@ -15,6 +15,7 @@ function shapeParalegalSnapshot(person = {}) {
     person.availabilityDetails && typeof person.availabilityDetails === "object"
       ? person.availabilityDetails.status || ""
       : "";
+  const hasPhoto = Boolean(person.profileImage || person.avatarURL);
 
   return {
     location: person.location || "",
@@ -24,10 +25,11 @@ function shapeParalegalSnapshot(person = {}) {
     languages: normalizeList(person.languages),
     specialties: normalizeList(person.specialties),
     bio: person.bio || "",
-    profileImage: person.profileImage || person.avatarURL || "",
+    profileImage: hasPhoto ? buildAuthenticatedProfilePhotoUrl(person) : "",
   };
 }
 
 module.exports = {
   shapeParalegalSnapshot,
 };
+const { buildAuthenticatedProfilePhotoUrl } = require("../services/profilePhotoDelivery");

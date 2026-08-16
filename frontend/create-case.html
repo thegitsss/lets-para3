@@ -17,6 +17,7 @@
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
   <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
+  <link rel="stylesheet" href="assets/styles/dashboard-system.css" />
   <link rel="preload" as="image" href="hero-mountain.jpg" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
@@ -31,7 +32,9 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
+  <link rel="stylesheet" href="assets/styles/global-search.css" />
   <script src="assets/scripts/utils/session.js"></script>
+  <script src="assets/scripts/utils/business-date.js"></script>
   <style>
     .skip-link {
       position: absolute;
@@ -53,7 +56,7 @@
     .gold{color:#b4975a;}
     :root {
       --bg:#ffffff;
-      --sidebar-bg:#f5f5f5e6;
+      --sidebar-bg:#ffffff;
       --accent:#b6a47a;
       --ink:#1a1a1a;
       --muted:#8a8a8a;
@@ -61,7 +64,7 @@
       --panel:#fcfcfc;
       --sidebar-text:#1a1a1a;
       --radius:14px;
-      --font-serif:'Cormorant Garamond',serif;
+      --font-serif:'Sarabun',sans-serif;
       --font-sans:'Sarabun',sans-serif;
     }
     body.theme-dark{
@@ -340,7 +343,7 @@
   margin: 0 auto 8px;
   font-size: 0.8rem;
   color: var(--muted);
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 .step.active .circle {
@@ -385,8 +388,8 @@
     body.theme-mountain #createCaseTopbar .user-profile span{color:#6b6b6b;}
 
     header h1{
-      font-family:var(--font-serif);
-      font-weight:300;
+      font-family:var(--font-sans);
+      font-weight:400;
       font-size:2rem;
       margin:0 0 0.75rem;
     }
@@ -457,6 +460,12 @@
       margin-bottom:6px;
       font-size:0.9rem;
       color:var(--ink);
+    }
+    .field-requirement{
+      margin-left:6px;
+      color:var(--muted);
+      font-size:0.76rem;
+      font-weight:400;
     }
     button{
       font-family:var(--font-serif);
@@ -550,7 +559,7 @@
       font-family:var(--font-serif);
       font-weight:300;
       cursor:pointer;
-      transition:all .2s;
+      transition:background-color .2s, border-color .2s, color .2s, box-shadow .2s, transform .2s;
     }
     .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
     .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
@@ -628,7 +637,7 @@ body.theme-dark #comp{
   padding: 0.4rem 0.8rem;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
 }
 body.theme-dark .type-btn{
   background:rgba(15,23,42,0.55);
@@ -971,8 +980,8 @@ body.theme-dark .select-field select{
       line-height:1.45;
     }
     .summary h2{
-      font-family:'Cormorant Garamond',serif;
-      font-weight:300;
+      font-family:'Sarabun',sans-serif;
+      font-weight:400;
       font-size:1.5rem;
       line-height:1.2;
       margin-bottom:0.65rem;
@@ -1018,7 +1027,7 @@ body.theme-dark .select-field select{
       padding:0 2rem;
       justify-content:flex-end;
     }
-    .btn{border:none;border-radius:6px;padding:0.6rem 1.1rem;font-size:0.9rem;font-family:var(--font-serif);font-weight:300;cursor:pointer;transition:all .2s;}
+    .btn{border:none;border-radius:6px;padding:0.6rem 1.1rem;font-size:0.9rem;font-family:var(--font-serif);font-weight:300;cursor:pointer;transition:background-color .2s,border-color .2s,color .2s,box-shadow .2s,transform .2s;}
     .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
     .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
     .btn.primary{background:var(--accent);color:#fff;}
@@ -1054,8 +1063,8 @@ body.theme-dark .select-field select{
       color:var(--ink);
     }
     .modal-content h3{
-      font-family:'Cormorant Garamond',serif;
-      font-weight:300;
+      font-family:'Sarabun',sans-serif;
+      font-weight:400;
       font-size:1.9rem;
       color:#1a1a1a;
       margin-bottom:2rem;
@@ -1088,8 +1097,8 @@ body.theme-dark .select-field select{
       color:#e6ecf8;
     }
     .modal-content strong{
-      font-family:'Cormorant Garamond',serif;
-      font-weight:300;
+      font-family:'Sarabun',sans-serif;
+      font-weight:400;
       font-size:1rem;
       color:#111;
       min-width:130px;
@@ -1109,8 +1118,8 @@ body.theme-dark .select-field select{
       font-size:0.9rem;
       cursor:pointer;
       color:#333;
-      transition:all 0.2s ease;
-      font-family:'Cormorant Garamond',serif;
+      transition:background-color 0.2s ease,border-color 0.2s ease,color 0.2s ease,box-shadow 0.2s ease,transform 0.2s ease;
+      font-family:'Sarabun',sans-serif;
     }
     body.theme-dark .close-btn,
     body.theme-mountain-dark .close-btn{
@@ -1370,8 +1379,14 @@ body.theme-dark .select-field select{
     }
 
   </style>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260812-11" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260812-7"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260812-1" />
+  <script defer src="assets/scripts/universal-header.js?v=20260812-1"></script>
+  <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
+  <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
 </head>
-  <body class="dashboard-no-shadows">
+  <body class="dashboard-no-shadows lpc-role-dashboard lpc-product-clean">
   <script>
     (function applyStoredTheme() {
       try {
@@ -1399,13 +1414,13 @@ body.theme-dark .select-field select{
   <aside class="sidebar" id="sidebarNav">
     <div class="logo">Dashboard</div>
     <nav>
-      <a href="dashboard-attorney.html">Home</a>
-      <a href="dashboard-attorney.html#cases">Matters</a>
-      <a href="dashboard-attorney.html#billing">Funds &amp; Payments</a>
-      <a href="help.html">Help</a>
+      <a href="dashboard-attorney.html"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"></path><path d="M5 9v11h14V9"></path><path d="M9 20v-6h6v6"></path></svg><span>Home</span></a>
+      <a href="dashboard-attorney.html#cases"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M3 12h18"></path></svg><span>Matters</span></a>
+      <a href="browse-paralegals.html"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><span>Paralegals</span></a>
+      <a href="dashboard-attorney.html#funds"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M2 10h20"></path><path d="M6 15h2"></path></svg><span>Payments</span></a>
+      <a href="help.html"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9a2.7 2.7 0 1 1 4.6 1.9c-1.1.9-2.1 1.3-2.1 3.1"></path><path d="M12 18h.01"></path></svg><span>Help</span></a>
     </nav>
     <div class="sidebar-bottom">
-      <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
       <div class="sidebar-footer">© Let’s‑ParaConnect 2026</div>
     </div>
   </aside>
@@ -1415,14 +1430,11 @@ body.theme-dark .select-field select{
   <main id="main" tabindex="-1" class="main">
     <div class="topbar" id="createCaseTopbar">
       <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Show menu" aria-controls="sidebarNav" aria-expanded="false">
-        <span class="sidebar-toggle-glyph" aria-hidden="true">
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--top"></span>
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--middle"></span>
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--bottom"></span>
-        </span>
+        <span class="lpc-mobile-menu-icon" aria-hidden="true"></span>
       </button>
-      <div class="topbar-actions">
-      <div class="notification-wrapper" data-notification-center>
+      <div class="topbar-actions" data-notification-center>
+      <div class="lpc-global-search-host" data-productivity-trigger-host></div>
+      <div class="notification-wrapper">
         <button class="notification-icon" id="createCaseNotifBtn" type="button" aria-label="View notifications" data-notification-toggle>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -1440,10 +1452,9 @@ body.theme-dark .select-field select{
         </div>
       </div>
       <div class="user-profile" id="createCaseUserChip" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-controls="createCaseProfileMenu" aria-label="Open profile menu">
-        <img id="createCaseAvatar" src="assets/default-avatar.png" alt="Attorney avatar" />
+        <img id="createCaseAvatar" src="assets/avatar-placeholder.svg" alt="Attorney avatar" />
         <div>
           <strong id="createCaseName">Attorney</strong>
-          <span id="createCaseRole">Attorney</span>
         </div>
         <div class="profile-dropdown" id="createCaseProfileMenu" aria-hidden="true">
           <a href="profile-settings.html" data-account-settings>Account Settings</a>
@@ -1472,12 +1483,12 @@ body.theme-dark .select-field select{
 
       <form>
         <div class="field">
-          <label for="caseTitleInput">Matter Title</label>
-          <input id="caseTitleInput" type="text" placeholder="e.g., Draft asset purchase agreement" />
+          <label for="caseTitleInput">Matter Title <span class="field-requirement">Required</span></label>
+          <input id="caseTitleInput" type="text" placeholder="e.g., Draft asset purchase agreement" autocomplete="off" required />
         </div>
       <div class="field">
-        <label for="specialty">Field of Law</label>
-        <select id="specialty">
+        <label for="specialty">Field of Law <span class="field-requirement">Required</span></label>
+        <select id="specialty" required>
               <option value="">Select…</option>
     <option>Administrative Law</option>
     <option>Admiralty & Maritime Law</option>
@@ -1535,8 +1546,8 @@ body.theme-dark .select-field select{
 </div>
 
       <div class="field">
-  <label for="state">Location (State)</label>
-  <select id="state">
+  <label for="state">Location (State) <span class="field-requirement">Required</span></label>
+  <select id="state" required>
     <option value="">Select…</option>
     <option>Alabama</option>
     <option>Alaska</option>
@@ -1593,10 +1604,10 @@ body.theme-dark .select-field select{
 </div>
 
   <div class="field">
-  <label for="comp">Compensation<span class="fee-info" tabindex="0" data-tooltip="Your card will not be charged until you select and hire a paralegal. Payment is securely processed through Stripe and released only after you mark the matter complete.">?</span></label>
+  <label for="comp">Compensation <span class="field-requirement">Required</span><span class="fee-info" tabindex="0" data-tooltip="Your card will not be charged until you select and hire a paralegal. Payment is processed through Stripe and released after you approve completed work or a platform review or dispute is resolved.">?</span></label>
   <div class="comp-wrapper">
     <span class="dollar-sign">$</span>
-    <input id="comp" type="text" inputmode="numeric" placeholder="3,500+" />
+    <input id="comp" type="text" inputmode="numeric" placeholder="3,500+" autocomplete="off" required />
   </div>
 </div>
 
@@ -1646,21 +1657,21 @@ body.theme-dark .select-field select{
             <span class="value" id="caseTitlePreviewText">Untitled Matter</span>
           </div>
           <div class="field">
-            <label for="caseDescription">Matter Description</label>
-            <textarea id="caseDescription" placeholder="Describe your matter, goals, and expectations for the paralegal..." maxlength="4000"></textarea>
+            <label for="caseDescription">Matter Description <span class="field-requirement">Required</span></label>
+            <textarea id="caseDescription" placeholder="Describe your matter, goals, and expectations for the paralegal..." maxlength="4000" required></textarea>
             <div class="char-count" id="descriptionCharCount">0 / 4000</div>
           </div>
           <div class="field" id="caseTasksField">
-            <label for="caseTaskInput">Required Tasks</label>
+            <label for="caseTaskInput">Required Tasks <span class="field-requirement">At least one</span></label>
             <div class="task-input-row">
-              <input id="caseTaskInput" type="text" placeholder="e.g., Draft initial motion" />
+              <input id="caseTaskInput" type="text" placeholder="e.g., Draft initial motion" aria-describedby="caseTaskHelper" />
               <button type="button" class="btn secondary" id="addCaseTaskBtn">Add</button>
             </div>
             <p class="task-helper" id="caseTaskHelper">Add at least one task. Tasks describe the overall scope of deliverables required to satisfy the matter.</p>
             <ul class="task-list" id="caseTaskList"></ul>
           </div>
           <div class="field">
-            <label for="caseDeadline">Deadline</label>
+            <label for="caseDeadline">Deadline <span class="field-requirement">Optional</span></label>
             <input id="caseDeadline" type="date" placeholder="YYYY-MM-DD" />
           </div>
         </form>
@@ -1696,7 +1707,7 @@ body.theme-dark .select-field select{
           </div>
           <aside class="compliance-note" aria-label="Professional guidelines">
             <h3>Professional Guidelines</h3>
-            <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed securely through Stripe and are released only upon attorney approval within the workspace or resolution of a platform review or dispute.</p>
+            <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed through Stripe and are released only upon attorney approval within the workspace or resolution of a platform review or dispute.</p>
           </aside>
           <div class="summary-wide"></div>
         </div>
@@ -1711,13 +1722,13 @@ body.theme-dark .select-field select{
     </section>
   </main>
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
-  <div class="modal" id="previewModal" aria-hidden="true">
+  <div class="modal" id="previewModal" aria-hidden="true" inert>
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
       <h3 id="previewTitle"></h3>
       <p><strong>Field of Law:</strong> <span id="previewField">—</span></p>
       <p><strong>Location:</strong> <span id="previewState">—</span></p>
       <p><strong>Compensation:</strong> <span id="previewComp">—</span></p>
-      <p><strong>Platform fee (22%):</strong> <span id="previewPlatformFee">—</span><span class="fee-info" tabindex="0" data-tooltip="The platform fee supports tools that enable attorneys and paralegals to collaborate, including secure workspace, messaging, document sharing, case workflow tools, payment processing, identity verification, and platform administration. The platform fee is not a fee for legal services.">?</span></p>
+      <p><strong>Platform fee (22%):</strong> <span id="previewPlatformFee">—</span><span class="fee-info" tabindex="0" data-tooltip="The platform fee supports tools that enable attorneys and paralegals to collaborate, including the Matter workspace, messaging, document sharing, workflow tools, Stripe payment processing, account review, and platform administration. The platform fee is not a fee for legal services.">?</span></p>
       <p><strong>Estimated total due at hire:</strong> <span id="previewTotalDue">—</span></p>
       <p><strong>Experience:</strong> <span id="previewExperience">—</span></p>
       <p id="previewDeadlineRow" hidden><strong>Deadline:</strong> <span id="previewDeadline">—</span></p>
@@ -1750,16 +1761,14 @@ body.theme-dark .select-field select{
           user?.profileImage ||
           user?.avatarURL ||
           user?.pendingProfileImage ||
-          "assets/default-avatar.png"
+          "assets/avatar-placeholder.svg"
         );
       }
 
       function applyUser(user) {
         const nameEl = document.getElementById("createCaseName");
-        const roleEl = document.getElementById("createCaseRole");
         const avatarEl = document.getElementById("createCaseAvatar");
         if (nameEl) nameEl.textContent = userDisplayName(user);
-        if (roleEl) roleEl.textContent = userRoleLabel(user);
         if (avatarEl) avatarEl.src = userAvatar(user);
       }
 
@@ -1853,7 +1862,7 @@ body.theme-dark .select-field select{
         if (item.link) return item.link;
         if (caseId) {
           const base = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
-          if (type === "message") return `${base}#case-messages`;
+          if (type === "message") return `${base}&tab=messages`;
           return base;
         }
         return "dashboard-attorney.html";
@@ -2124,26 +2133,11 @@ body.theme-dark .select-field select{
         } catch (_) {}
       }
 
-      async function logoutNow(event) {
-        event?.preventDefault?.();
-        try {
-          await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-        } catch (_) {}
-        window.clearStoredSession?.();
-        window.location.href = "login.html";
-      }
-
       document.addEventListener("DOMContentLoaded", () => {
-        const logoutBtn = document.getElementById("logoutBtn");
-        if (logoutBtn) logoutBtn.addEventListener("click", logoutNow);
         bindNotificationCenter();
 
         const userChip = document.getElementById("createCaseUserChip");
         const profileMenu = document.getElementById("createCaseProfileMenu");
-        const menuLogoutBtn = profileMenu?.querySelector("[data-logout]");
-        if (menuLogoutBtn) {
-          menuLogoutBtn.addEventListener("click", logoutNow);
-        }
         if (userChip && profileMenu) {
           const setProfileMenuOpen = (open) => {
             profileMenu.classList.toggle("show", open);
@@ -2233,7 +2227,6 @@ body.theme-dark .select-field select{
     let currentDraftId = !isEditing ? draftIdParam : "";
     const DRAFT_AUTOSAVE_MS = 1600;
     const DRAFT_SAVE_ERROR_BACKOFF_MS = 3000;
-    const EDIT_PREFILL_KEY = "lpc_case_edit_prefill";
     let draftLoaded = false;
     let draftSaveTimer = null;
     let draftSavePending = false;
@@ -2281,6 +2274,7 @@ body.theme-dark .select-field select{
     const postBtn = document.getElementById("postBtn");
     const previewModal = document.getElementById("previewModal");
     const closePreviewBtn = document.getElementById("closePreview");
+    let previewReturnFocus = null;
     const toastEl = document.getElementById("toast");
     const previewFields = {
       title: document.getElementById("previewTitle"),
@@ -2299,13 +2293,9 @@ body.theme-dark .select-field select{
     const autoNoteCopy = "";
     const PLATFORM_FEE_PCT = 22;
     const PLATFORM_FEE_NOTE =
-      "The platform fee supports tools that enable attorneys and paralegals to collaborate, including secure workspace, messaging, document sharing, case workflow tools, payment processing, identity verification, and platform administration. The platform fee is not a fee for legal services.";
-    const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
-      "samanthasider+attorney@gmail.com",
-      "samanthasider+56@gmail.com",
-    ]);
+      "The platform fee supports tools that enable attorneys and paralegals to collaborate, including the Matter workspace, messaging, document sharing, workflow tools, Stripe payment processing, account review, and platform administration. The platform fee is not a fee for legal services.";
     let latestCaseData = null;
-    let csrfToken = "";
+    let authModulePromise = null;
     const tasksState = {
       items: [],
       locked: false,
@@ -2329,8 +2319,8 @@ body.theme-dark .select-field select{
       },
       {
         field: fields.comp,
-        check: (value) => parseCompAmount(value) > 0,
-        message: "Enter a valid compensation amount greater than $400.",
+        check: (value) => parseCompAmount(value) >= 400,
+        message: "Enter a compensation amount of at least $400.",
       },
     ];
 
@@ -2734,7 +2724,12 @@ body.theme-dark .select-field select{
       field.setAttribute("aria-invalid", "true");
       const error = document.createElement("div");
       error.className = "field-error";
+      error.id = `${field.id || "field"}-error`;
+      error.setAttribute("role", "alert");
       error.textContent = message;
+      const describedBy = new Set(String(field.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean));
+      describedBy.add(error.id);
+      field.setAttribute("aria-describedby", Array.from(describedBy).join(" "));
       const wrapper = field.closest(".field") || field.closest("[data-field-wrapper]");
       if (wrapper) wrapper.appendChild(error);
       else field.insertAdjacentElement("afterend", error);
@@ -2744,6 +2739,12 @@ body.theme-dark .select-field select{
       if (!field) return;
       field.classList.remove("input-error");
       field.removeAttribute("aria-invalid");
+      const errorId = `${field.id || "field"}-error`;
+      const describedBy = String(field.getAttribute("aria-describedby") || "")
+        .split(/\s+/)
+        .filter((id) => id && id !== errorId);
+      if (describedBy.length) field.setAttribute("aria-describedby", describedBy.join(" "));
+      else field.removeAttribute("aria-describedby");
       const wrapper = field.closest(".field") || field.closest("[data-field-wrapper]");
       if (wrapper) {
         const existing = wrapper.querySelector(".field-error");
@@ -2844,13 +2845,17 @@ body.theme-dark .select-field select{
     function ensureReviewReady() {
       if (!validateDetails()) return false;
       if (!validateTasks()) return false;
+      clearFieldError(descriptionInput);
       if (!hasDescription()) {
+        showFieldError(descriptionInput, "Describe the Matter, its goals, and the expected deliverables.");
+        descriptionInput?.focus();
         return false;
       }
       if (fields.deadline && fields.deadline.value) {
-        const parsed = new Date(fields.deadline.value);
-        if (Number.isNaN(parsed.getTime())) {
-          showToastBanner("Enter a valid deadline date (YYYY-MM-DD).", "error");
+        const parsed = window.LPCBusinessDate?.normalize(fields.deadline.value);
+        if (!parsed) {
+          showFieldError(fields.deadline, "Enter a valid deadline date.");
+          fields.deadline.focus();
           return false;
         }
       }
@@ -2862,7 +2867,7 @@ body.theme-dark .select-field select{
       const data = collectCaseData();
       latestCaseData = data;
       const deadlineText = data.deadline
-        ? new Date(data.deadline).toLocaleDateString() || data.deadline
+        ? window.LPCBusinessDate?.format(data.deadline) || data.deadline
         : "No deadline set";
       const tasks = Array.isArray(data.tasks) ? data.tasks : [];
       const visibleTasks = tasks.slice(0, MAX_REVIEW_TASKS);
@@ -2901,7 +2906,7 @@ body.theme-dark .select-field select{
       const guidelinesHtml = `
         <aside class="compliance-note" aria-label="Professional guidelines">
           <h3>Professional Guidelines</h3>
-          <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed securely through Stripe and are released only upon attorney approval within the workspace or resolution of a platform review or dispute.</p>
+          <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed through Stripe and are released only upon attorney approval within the workspace or resolution of a platform review or dispute.</p>
         </aside>
       `;
       reviewSummary.innerHTML = `
@@ -2967,7 +2972,7 @@ body.theme-dark .select-field select{
       previewFields.tasks && (previewFields.tasks.innerHTML = tasksMarkup);
       if (previewFields.deadline && previewFields.deadlineRow) {
         if (data.deadline) {
-          const deadlineText = new Date(data.deadline).toLocaleDateString() || data.deadline;
+          const deadlineText = window.LPCBusinessDate?.format(data.deadline) || data.deadline;
           previewFields.deadline.textContent = deadlineText;
           previewFields.deadlineRow.hidden = false;
         } else {
@@ -2976,14 +2981,21 @@ body.theme-dark .select-field select{
         }
       }
       if (previewAutoNote) previewAutoNote.textContent = autoNoteCopy;
+      previewReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : previewBtn;
       previewModal.classList.add("active");
+      previewModal.setAttribute("aria-hidden", "false");
+      previewModal.removeAttribute("inert");
       document.body.classList.add("modal-open");
+      closePreviewBtn?.focus();
     }
 
     function closePreviewModal() {
       if (!previewModal) return;
       previewModal.classList.remove("active");
+      previewModal.setAttribute("aria-hidden", "true");
+      previewModal.setAttribute("inert", "");
       document.body.classList.remove("modal-open");
+      previewReturnFocus?.focus();
     }
 
     function clearDraft() {
@@ -2999,23 +3011,18 @@ body.theme-dark .select-field select{
 
     function showToast(message, href, isError = false, linkLabel = "View Matter") {
       if (!toastEl) return;
-      const linkHtml = href ? ` <a href="${href}">${escapeHTML(linkLabel || "View Matter")}</a>` : "";
-      toastEl.innerHTML = `${isError ? "⚠️" : "✅"} ${message}${linkHtml}`;
+      const statusText = document.createTextNode(`${isError ? "⚠️" : "✅"} ${String(message || "")}`);
+      toastEl.replaceChildren(statusText);
+      if (href) {
+        toastEl.appendChild(document.createTextNode(" "));
+        const link = document.createElement("a");
+        link.href = href;
+        link.textContent = linkLabel || "View Matter";
+        toastEl.appendChild(link);
+      }
       toastEl.classList.toggle("error", Boolean(isError));
       toastEl.classList.add("show");
       setTimeout(() => toastEl.classList.remove("show"), 5000);
-    }
-
-    async function fetchCsrfToken() {
-      if (csrfToken) return csrfToken;
-      try {
-        const res = await fetch("/api/csrf", { credentials: "include" });
-        const json = await res.json().catch(() => ({}));
-        csrfToken = json?.csrfToken || "";
-      } catch (err) {
-        console.warn("Unable to fetch CSRF token", err);
-      }
-      return csrfToken;
     }
 
     async function readResponsePayload(res) {
@@ -3028,29 +3035,10 @@ body.theme-dark .select-field select{
       }
     }
 
-    function resolveAuthHeader(token) {
-      if (!token || token === "__cookie_session__") return {};
-      return { Authorization: `Bearer ${token}` };
-    }
-
     async function authorizedFetch(url, options = {}) {
-      const token = (window.getSessionToken && window.getSessionToken()) || "";
-      const headers = { ...(options.headers || {}), ...resolveAuthHeader(token) };
-      let body = options.body;
-      if (typeof body !== "undefined" && body !== null && !(body instanceof FormData)) {
-        headers["Content-Type"] = headers["Content-Type"] || "application/json";
-        body = JSON.stringify(body);
-      }
-      if (options.method && options.method !== "GET") {
-        await fetchCsrfToken();
-        headers["X-CSRF-Token"] = csrfToken || "";
-      }
-      return fetch(url, {
-        credentials: "include",
-        ...options,
-        headers,
-        body,
-      });
+      authModulePromise ||= import("./assets/scripts/auth.js");
+      const { secureFetch } = await authModulePromise;
+      return secureFetch(url, options);
     }
 
     async function fetchDraftById(draftId) {
@@ -3105,37 +3093,26 @@ body.theme-dark .select-field select{
     }
 
     async function submitCase(payload) {
-      const token = (window.getSessionToken && window.getSessionToken()) || "";
-      if (!token) {
-        window.checkSession?.("attorney");
+      const activeSession = await window.checkSession?.("attorney");
+      if (!activeSession) {
         throw new Error("Please log in again before posting.");
       }
-      await fetchCsrfToken();
-      const res = await fetch("/api/cases", {
+      const res = await authorizedFetch("/api/cases", {
         method: "POST",
         suppressToast: true,
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...resolveAuthHeader(token),
-          "X-CSRF-Token": csrfToken || "",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers: { Accept: "application/json" },
+        body: payload,
       });
       const { data, text } = await readResponsePayload(res);
       if (!res.ok) {
         const message = data?.error || data?.msg || data?.message || (text && !text.includes("<") ? text : "");
         const statusNote = res.status ? ` (HTTP ${res.status})` : "";
-        throw new Error(message || `Unable to post this case right now.${statusNote}`);
+        throw new Error(message || `Unable to post this Matter right now.${statusNote}`);
       }
       return data;
     }
 
     async function hasDefaultPaymentMethod() {
-      const storedUser = window.getStoredUser?.() || null;
-      const email = String(storedUser?.email || "").toLowerCase().trim();
-      if (STRIPE_PAYMENT_METHOD_BYPASS_EMAILS.has(email)) return true;
       const res = await authorizedFetch("/api/payments/payment-method/default", {
         headers: { Accept: "application/json" },
         suppressToast: true,
@@ -3145,7 +3122,7 @@ body.theme-dark .select-field select{
         const message = data?.error || data?.msg || data?.message || (text && !text.includes("<") ? text : "");
         throw new Error(message || "Unable to verify your payment method.");
       }
-      return Boolean(data?.paymentMethod);
+      return Boolean(data?.hasDefault || data?.paymentMethod);
     }
 
     function mapPracticeArea(area = "") {
@@ -3253,18 +3230,8 @@ body.theme-dark .select-field select{
       return "civil litigation";
     }
 
-    function padDescription(text = "") {
-      if (text.length >= 50) return text;
-      const filler = " Additional details will be provided to qualified applicants.";
-      let result = text.trim();
-      while (result.length < 50) {
-        result += filler;
-      }
-      return result;
-    }
-
     function buildPayload(data) {
-      const description = data.description || "Additional details will be provided once the case is accepted.";
+      const description = String(data.description || "").trim();
       const practiceArea = mapPracticeArea(data.field);
       const deadline = data.deadline || "";
       const payload = {
@@ -3388,10 +3355,10 @@ body.theme-dark .select-field select{
           const paymentMethodReady = await hasDefaultPaymentMethod();
           if (!paymentMethodReady) {
             showToast(
-              "Connect Stripe and add a payment method before posting a matter.",
-              "dashboard-attorney.html#billing",
+              "Add a payment method in Payments before posting a Matter.",
+              "dashboard-attorney.html#funds",
               true,
-              "Open Billing"
+              "Open Payments"
             );
             if (postBtn) postBtn.disabled = false;
             return;
@@ -3427,8 +3394,6 @@ body.theme-dark .select-field select{
     function showToastBanner(message, type = "info") {
       if (toastHelper?.show) {
         toastHelper.show(message, { targetId: "toastBanner", type });
-      } else {
-        alert(message);
       }
     }
 
@@ -3436,6 +3401,27 @@ body.theme-dark .select-field select{
     closePreviewBtn?.addEventListener("click", closePreviewModal);
     previewModal?.addEventListener("click", (event) => {
       if (event.target === previewModal) closePreviewModal();
+    });
+    previewModal?.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closePreviewModal();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(
+        previewModal.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
+      ).filter((element) => !element.hidden && getComputedStyle(element).display !== "none");
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     });
     postBtn?.addEventListener("click", handlePost);
 
@@ -3507,57 +3493,6 @@ body.theme-dark .select-field select{
       return String(match[1] || "").trim();
     }
 
-    function consumeEditPrefill(caseId) {
-      if (!caseId) return null;
-      try {
-        const raw = sessionStorage.getItem(EDIT_PREFILL_KEY);
-        if (!raw) return null;
-        const payload = JSON.parse(raw);
-        if (!payload || String(payload.caseId) !== String(caseId)) return null;
-        sessionStorage.removeItem(EDIT_PREFILL_KEY);
-        return payload.payload || null;
-      } catch {
-        return null;
-      }
-    }
-
-    function mergeEditPrefill(prefill, data) {
-      if (!prefill) return data;
-      const summary = data?.briefSummary || prefill?.briefSummary || "";
-      const merged = {
-        ...prefill,
-        ...data,
-      };
-      merged.practiceArea = data?.practiceArea || prefill?.practiceArea || "";
-      const stateValue =
-        data?.locationState ||
-        data?.state ||
-        prefill?.locationState ||
-        prefill?.state ||
-        extractStateFromSummary(summary);
-      merged.state = stateValue;
-      merged.locationState = stateValue;
-      merged.details =
-        data?.details ||
-        data?.description ||
-        prefill?.details ||
-        prefill?.description ||
-        "";
-      merged.tasks =
-        Array.isArray(data?.tasks) && data.tasks.length
-          ? data.tasks
-          : Array.isArray(prefill?.tasks)
-          ? prefill.tasks
-          : [];
-      merged.totalAmount =
-        typeof data?.totalAmount === "number"
-          ? data.totalAmount
-          : typeof prefill?.totalAmount === "number"
-          ? prefill.totalAmount
-          : data?.totalAmount || prefill?.totalAmount || 0;
-      return merged;
-    }
-
     function applyCaseDataToForm(caseData = {}) {
       if (fields.title) {
         fields.title.value = caseData.title || "";
@@ -3590,7 +3525,7 @@ body.theme-dark .select-field select{
         updateDescriptionCount();
       }
       if (fields.deadline && caseData.deadline) {
-        const iso = new Date(caseData.deadline).toISOString().slice(0, 10);
+        const iso = window.LPCBusinessDate?.normalize(caseData.deadlineDate || caseData.deadline) || "";
         fields.deadline.value = iso;
       }
       const incomingTasks = Array.isArray(caseData.tasks) ? caseData.tasks : [];
@@ -3608,56 +3543,39 @@ body.theme-dark .select-field select{
 
     async function loadExistingCase() {
       if (!editingCaseId) return;
-      const prefill = consumeEditPrefill(editingCaseId);
-      if (prefill) {
-        applyCaseDataToForm(prefill);
-      }
       try {
-        const token = (window.getSessionToken && window.getSessionToken()) || "";
-        const res = await fetch(`/api/cases/${encodeURIComponent(editingCaseId)}`, {
-          headers: Object.assign({ Accept: "application/json" }, resolveAuthHeader(token)),
-          credentials: "include",
+        const res = await authorizedFetch(`/api/cases/${encodeURIComponent(editingCaseId)}`, {
+          headers: { Accept: "application/json" },
         });
         const { data, text } = await readResponsePayload(res);
         if (!res.ok) {
           const message = data?.error || data?.msg || data?.message || (text && !text.includes("<") ? text : "");
           const statusNote = res.status ? ` (HTTP ${res.status})` : "";
-          throw new Error(message || `Unable to load this case for editing.${statusNote}`);
+          throw new Error(message || `Unable to load this Matter for editing.${statusNote}`);
         }
-        const merged = mergeEditPrefill(prefill, data);
-        applyCaseDataToForm(merged);
+        applyCaseDataToForm(data);
       } catch (err) {
         console.warn("Edit case load failed", err);
-        if (!prefill) {
-          showToastBanner(err?.message || "Unable to load this case for editing.", "error");
-        }
+        showToastBanner(err?.message || "Unable to load this Matter for editing.", "error");
       }
     }
 
     async function updateCase(caseId, payload) {
-      const token = (window.getSessionToken && window.getSessionToken()) || "";
-      if (!token) {
-        window.checkSession?.("attorney");
+      const activeSession = await window.checkSession?.("attorney");
+      if (!activeSession) {
         throw new Error("Please log in again before saving changes.");
       }
-      await fetchCsrfToken();
-      const res = await fetch(`/api/cases/${encodeURIComponent(caseId)}`, {
+      const res = await authorizedFetch(`/api/cases/${encodeURIComponent(caseId)}`, {
         method: "PATCH",
         suppressToast: true,
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...resolveAuthHeader(token),
-          "X-CSRF-Token": csrfToken || "",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers: { Accept: "application/json" },
+        body: payload,
       });
       const { data, text } = await readResponsePayload(res);
       if (!res.ok) {
         const message = data?.error || data?.msg || data?.message || (text && !text.includes("<") ? text : "");
         const statusNote = res.status ? ` (HTTP ${res.status})` : "";
-        throw new Error(message || `Unable to save changes to this case.${statusNote}`);
+        throw new Error(message || `Unable to save changes to this Matter.${statusNote}`);
       }
       return data;
     }
@@ -3670,6 +3588,8 @@ body.theme-dark .select-field select{
   })();
   </script>
   <script src="assets/scripts/create-case-nav.js"></script>
+  <script src="assets/scripts/productivity-command-registry.js"></script>
+  <script src="assets/scripts/global-search.js"></script>
   <script type="module" src="assets/scripts/utils/support-drawer.js"></script>
 </body>
 </html>

@@ -130,7 +130,7 @@ async function recordPacketOutcomeEvaluation({ packet, brief = null, decision = 
         expiresAt: new Date(new Date(decidedAt).setDate(new Date(decidedAt).getDate() + 180)),
       },
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
   ).lean();
 }
 

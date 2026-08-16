@@ -10,6 +10,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Accessibility Statement – Let’s-ParaConnect</title>
+  <meta name="description" content="Read Let’s-ParaConnect’s accessibility commitment and learn how to request assistance using the platform." />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -17,7 +18,7 @@
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/hero-pages.css" rel="stylesheet" />
+  <link href="assets/styles/hero-pages.css?v=20260729-white-footer" rel="stylesheet" />
   <style>
     .gold{color:#b4975a;}
     body {
@@ -33,14 +34,6 @@
      header {
       border-bottom: 1px solid var(--line);
       background: white;
-    }
-
-    .hero {
-      background-image: url("hero-mountain.jpg");
-      background-size: cover;
-      background-position: center;
-      height: 300px;
-      width: 100%;
     }
 
     .content {
@@ -142,79 +135,110 @@
 
   </style>
 </head>
-<body>
+<body class="utility-page">
   <a class="skip-link" href="#main">Skip to main content</a>
-<!-- Header -->
-<header>
-  <div class="header-inner">
-    <nav class="nav-left" aria-label="Primary">
-      <a href="contact.html">Contact Us</a>
-      <a href="index.html#who-we-are">About</a>
-      <a href="index.html#how">How It Works</a>
-    </nav>
-
-    <a href="index.html" class="header-logo">
-      Let’s-ParaConnect
-    </a>
-
-    <div class="header-actions">
-<a class="pill" href="login.html" id="authAction">Sign In</a>
-      <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
+  <header class="utility-header" data-utility-header>
+    <div class="utility-header__inner">
+      <nav class="utility-header__nav" aria-label="Primary navigation">
+        <a href="index.html#how">How It Works</a>
+        <a href="index.html#for-attorneys">For Attorneys</a>
+        <a href="index.html#for-paralegals">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      </nav>
+      <a class="utility-header__brand" href="index.html">Let<span class="utility-header__brand-mark">’</span>s-ParaConnect</a>
+      <div class="utility-header__actions">
+        <a class="utility-header__signin" href="login.html" data-utility-auth>Sign In</a>
+        <button class="utility-header__logout" type="button" data-utility-logout hidden>Log Out</button>
+        <a class="utility-header__button" href="signup.html" data-utility-signup>Get Started</a>
+      </div>
+      <button class="utility-header__menu" type="button" aria-expanded="false" aria-controls="utilityMenu" data-utility-menu-toggle>Menu</button>
     </div>
-  </div>
-</header>
+    <nav class="utility-header__mobile" id="utilityMenu" aria-label="Mobile navigation" data-utility-menu hidden>
+      <a href="index.html#how">How It Works</a>
+      <a href="index.html#for-attorneys">For Attorneys</a>
+      <a href="index.html#for-paralegals">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      <a href="login.html" data-utility-auth>Sign In</a>
+      <button type="button" data-utility-logout hidden>Log Out</button>
+      <a href="signup.html" data-utility-signup>Get Started</a>
+    </nav>
+  </header>
 
-  <!-- HERO IMAGE -->
-  <div class="hero-banner" role="presentation" aria-hidden="true"></div>
+  <section class="hero-banner utility-hero" aria-labelledby="page-title">
+    <div class="utility-hero__inner">
+      <div class="utility-hero__copy">
+        <p class="utility-hero__eyebrow">Accessibility</p>
+        <h1 id="page-title">Accessibility Statement</h1>
+        <p class="utility-hero__description">Our commitment to an accessible experience for all LPC users.</p>
+        <p class="utility-hero__meta">Last reviewed August 15, 2026</p>
+      </div>
+      <div class="utility-hero__art" data-matter-field-host aria-hidden="true"></div>
+    </div>
+  </section>
 
   <!-- MAIN CONTENT -->
   <main tabindex="-1" class="content" id="main" aria-labelledby="page-title">
-    <h1 id="page-title">Web Accessibility Statement</h1>
 
-    <h2>General</h2>
+    <h2>Our Accessibility Target</h2>
     <p>
-      Let’s-ParaConnect cares about all users and is committed to making our platform accessible to everyone,
-      including individuals with disabilities. We strive to ensure that our site follows the Web Content
-      Accessibility Guidelines (WCAG), and adheres to applicable laws such as the Americans with Disabilities Act (ADA).
+      Let’s-ParaConnect is committed to making the platform usable by people with disabilities. Our current
+      design and engineering target is the Web Content Accessibility Guidelines (WCAG) 2.2 Level AA. This target
+      guides our work; it is not a representation that every page or third-party surface has completed an independent
+      conformance audit.
     </p>
 
     <p>
-      We use accessibility testing tools and user feedback to identify and fix issues that may interfere with
-      access. Features include screen-reader support, keyboard navigation, and sufficient color contrast.
+      Our release checks include automated accessibility testing across supported browser engines, keyboard and
+      focus checks for critical workflows, semantic structure checks, and contrast checks. Automated testing cannot
+      identify every accessibility barrier, so reports from people using assistive technology remain important.
     </p>
 
-    <h2>Disclaimer</h2>
+    <h2>Third-Party Services</h2>
     <p>
-      While we strive to make our platform as accessible as possible, some third-party integrations may not be fully compliant.
-      We continue to work towards a more inclusive experience for all users.
+      Some workflows open services operated by other companies, including Stripe. Those services maintain their own
+      accessibility practices, and LPC may not control every part of their hosted experience. Please report a barrier
+      even when it occurs on a linked service so we can investigate the handoff and provide available assistance.
     </p>
 
+    <h2>Report an Accessibility Barrier</h2>
     <p>
-      If you experience difficulty accessing any part of our site, please contact us at
-      <a href="mailto:help@lets-paraconnect.com">help@lets-paraconnect.com</a>.
+      If you experience difficulty accessing any part of LPC, email
+      <a href="mailto:help@lets-paraconnect.com">help@lets-paraconnect.com</a> or use the
+      <a href="contact.html">contact form</a>. Include the page, the action you were trying to complete, your browser
+      and assistive technology if relevant, and the barrier you encountered. Do not send passwords, payment-card data,
+      or confidential Matter content by email.
     </p>
   </main>
 
   <!-- FOOTER -->
-<footer class="footer">
-  <div class="footer-inner">
-    <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
-    <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
-    <nav>
-      <a href="privacy.html">Privacy Policy</a>
-      <span>|</span>
-      <a href="terms.html">Terms</a>
-      <span>|</span>
-      <a href="/paralegal-admission.html">Admissions</a>
-      <span>|</span>
-      <a href="contact.html">Contact</a>
-      <span>|</span>
-      <a href="accessibility.html">Accessibility</a>
-    </nav>
-    <div class="region">United States</div>
-  </div>
-</footer>
-<script type="module" src="assets/scripts/hero-parallax.js"></script>
+  <footer class="home-footer">
+    <div class="home-footer__top">
+      <div class="home-footer__brand">
+        <a class="home-brand" href="index.html">Let<span class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+        <p>Project-based legal support for attorneys and independent paralegals.</p>
+      </div>
+      <nav aria-label="Footer navigation">
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
+        <a href="contact.html">Contact</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="/paralegal-admission.html">Paralegal Admission</a>
+        <a href="accessibility.html">Accessibility</a>
+      </nav>
+    </div>
+    <div class="home-footer__bottom">
+      <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
+      <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg>
+        <span>Accessibility</span>
+      </button>
+    </div>
+  </footer>
+
+
+  <script src="assets/scripts/utility-header.js" defer></script>
+<script src="assets/scripts/public-matter-field.js" defer></script>
   <script src="assets/scripts/accessibility-toggle.js"></script>
 </body>
 </html>

@@ -1,5 +1,7 @@
 # LPC Premium Execution Tracker
 
+> Historical tracker: this July 2026 execution snapshot is superseded. Do not use its statuses or counts for launch approval. Current release status is maintained in `LAUNCH_CHECKLIST.md`, `docs/RELEASE_GATES.md`, and `docs/LAUNCH_CERTIFICATION_CURRENT.md`; the current generated route detail is in `docs/LPC_ROUTE_SECURITY_INVENTORY.md`.
+
 Date started: July 5, 2026
 
 Purpose: track execution against the premium readiness standard before attorney inflow. This is the operational tracker, not just an audit. Every item should move through `Not started`, `In progress`, `Blocked`, `Needs verification`, or `Done`, with evidence.
@@ -13,13 +15,13 @@ Working product standard: `docs/LPC_PREMIUM_PRODUCT_UPGRADE_SPEC.md` defines wha
 | Attorney-facing UX | In progress | High | Stabilize browse/profile/case creation/case detail | Browse state filter and availability fixes completed; more attorney flow review pending |
 | Paralegal-facing UX | In progress | Medium | Availability/profile visibility/case work clarity | Availability exclusion from browse completed |
 | Admin/control room | In progress | High | Admin mutations, payment risk visibility, recovery controls | Some admin CSRF gaps fixed; wider admin audit pending |
-| Security hardening | In progress | Medium | Route security inventory complete; remaining exemptions documented | 220 mutating routes inventoried; 206 verified protected; 14 exempt/exemption-review; 0 open |
+| Security hardening | Done for this historical scope | Low | Route inventory is now enforced by CI | Current gate: 203 mutating routes; 196 verified protected; seven narrow exemptions; zero open |
 | Payment/escrow readiness | In progress | High | Money-flow matrix and high-risk route verification | Focused payment/lifecycle tests passed after first hardening pass |
 | Case lifecycle readiness | In progress | High | State transition matrix and attorney/paralegal next actions | Case summary fix completed; lifecycle tests passed in focused run |
 | AI implementation | In progress | High | Attorney and paralegal pre-deployment implementations complete; admin remains frozen | Attorney: 561/561 generated cases, 172/172 live routing runs, 34/34 live full-pipeline runs, and 4/4 drawer scenarios. Paralegal: 551/551 generated cases, 172/172 live routing runs, 34/34 live full-pipeline runs, a passing 120-event synthetic reliability dashboard, and default-off Package 9 rollout controls; no deployment performed |
 | Testing/verification | In progress | High | Focused tests after each high-risk fix | `securityEdgeCases`, `lifecycleTransitions`, `jobEscrow` passed |
-| Mobile/responsive | Not started | Medium | Attorney critical screens first | Pending screenshot pass |
-| Production operations | In progress | High | Scheduler safety, monitoring, runbooks | API no-store fixed; scheduler review pending |
+| Mobile/responsive | Automated verification complete; manual evidence pending | Medium | Exact-candidate device and assistive-tech signoff | Responsive contracts and desktop/mobile performance journeys pass; manual production-like evidence remains |
+| Production operations | Repository implementation complete; live evidence pending | High | Exact-candidate Render, alert, backup/restore, and rollback evidence | Web starts no business timers; dedicated incident runner, automation cron, and operations-monitor cron are defined and locally verified |
 
 ## Completed Work
 
@@ -78,7 +80,8 @@ Evidence:
 - `backend/routes/disputes.js`
 - `backend/routes/incidents.js`
 - `backend/routes/messages.js`
-- `backend/routes/tasks.js`
+- `backend/routes/checklist.js`
+- `backend/models/ChecklistTask.js`
 - `backend/routes/users.js`
 - `backend/index.js`
 - `backend/scripts/route-security-inventory.js`
@@ -88,7 +91,7 @@ Evidence:
 - `node --check` passed for touched backend files.
 - `npm test -- securityEdgeCases.test.js lifecycleTransitions.test.js jobEscrow.test.js` passed: 3 suites, 13 tests.
 - `npm test -- uploadsDownloads.test.js disputesRefunds.test.js jobEscrow.test.js securityEdgeCases.test.js lifecycleTransitions.test.js` passed: 5 suites, 25 tests.
-- `node backend/scripts/route-security-inventory.js` passed: 220 total mutating routes, 206 verified, 14 exempt/exemption-review, 0 open.
+- `npm run check:route-security` currently passes: 203 total mutating routes, 196 verified, seven narrow exemptions, zero open.
 - `npm test -- accountPreferences.test.js disputesRefunds.test.js uploadsDownloads.test.js messagingNotifications.test.js securityEdgeCases.test.js lifecycleTransitions.test.js jobEscrow.test.js` passed: 6 suites, 32 tests.
 - `npm test -- incidentRoutes.test.js` passed: 1 suite, 6 tests.
 
@@ -96,7 +99,7 @@ Route inventory status:
 
 - Critical/P0 route-security gaps: none open.
 - P1 route-security gaps: none open.
-- P2 route-security items: public auth and public lead/intake routes remain in exemption-review and should receive a later auth-flow hardening review.
+- P2 route-security items: none open in the current generated inventory.
 - P3 route-security items: inventory generator is heuristic and should be rerun/reviewed when route declarations change.
 - Fixed but not covered by a dedicated behavioral route test in this pass: account preferences CSRF, admin enable-user CSRF, message summary CSRF, task create/update CSRF, legacy users approve/reject CSRF. These are statically verified by the inventory and syntax checks; dedicated behavioral tests should be added during regression-prevention work.
 
@@ -104,8 +107,8 @@ CSRF exemptions / exemption-review items:
 
 - Stripe webhook: exempt because it requires raw-body Stripe signature verification and is not a browser-originated route.
 - Control-room E2E harness routes: exempt because they are dev harness routes gated by harness enablement and shared secret, not normal production browser surfaces.
-- Public auth routes: exemption-review because they are public auth flows protected by auth-specific validation/rate limits; logout/session CSRF remains a lower-severity review item.
-- Waitlist route: exemption-review because it is public lead capture with app-level rate limiting.
+- Anonymous Web Vitals intake: exempt because it stores only bounded allowlisted telemetry, verifies same-origin browser context, and has a dedicated rate limit.
+- Logout is CSRF-protected; the unused public waitlist mail endpoint was removed.
 
 ### Readiness Documentation
 
@@ -245,7 +248,7 @@ Evidence required before done:
 
 ### UX Consistency
 
-Status: Not started
+Status: Automated verification complete; manual production-like evidence pending
 
 - Define shared filter/list behavior.
 - Define shared empty/loading/error state behavior.
@@ -257,7 +260,7 @@ Status: Not started
 
 ### AI Boundaries
 
-Status: In progress
+Status: Repository implementation complete; production evidence pending
 
 - Done: Replaced the primary attorney intent-rewrite path with a bounded Responses API manager loop that selects live LPC tools from natural-language requests.
 - Done: Limited the manager rollout to attorneys by default. Paralegal and admin remain on the existing deterministic assistant until their dedicated implementation and evaluation passes.
@@ -321,18 +324,10 @@ Status: Not started
 
 Status: In progress
 
-- Review scheduler single-runner safety.
-- Document production environment variables.
-- Review health checks.
-- Review logging/monitoring for payment, dispute, upload, and support failures.
-- Review backup/restore documentation.
-- Review incident runbooks.
+- Done: Removed business schedulers from the HTTP entrypoint and route imports; supervised cron/worker services have single ownership with atomic claims or renewable leases.
+- Done: Documented and statically validated production environment, health, monitoring, backup/restore, and incident-runner contracts.
+- Pending external evidence: prove same-commit Render health/heartbeats/cron runs, alert delivery/recovery, Atlas restore, and rollback on production-like infrastructure.
 
 ## Next Execution Order
 
-1. Finish route security inventory for high-risk routes.
-2. Fix remaining missing CSRF or document exemptions.
-3. Build payment and case lifecycle matrices.
-4. Start attorney UX walkthrough and fix launch-blocking trust issues.
-5. Add or run focused tests after each risk-area change.
-6. Update this tracker after every completed fix or verification pass.
+This historical tracker no longer defines execution order. Follow the live order in `docs/LAUNCH_CERTIFICATION_CURRENT.md`: create the immutable reviewed candidate, obtain protected CI/review and authorized dependency-audit evidence, then complete legal, production-provider, role/device/accessibility, recovery, and named-owner signoffs.

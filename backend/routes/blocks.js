@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:blocks");
 const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
@@ -16,24 +18,7 @@ const {
   isBlockableRole,
   normalizeId,
 } = require("../utils/blocks");
-
-const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-const noop = (_req, _res, next) => next();
-const csrf = require("csurf");
-const csrfMiddleware = csrf({
-  cookie: {
-    httpOnly: true,
-    sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
-  },
-});
-const protectMutations = (req, res, next) => {
-  const requireCsrf = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-  if (!requireCsrf) return noop(req, res, next);
-  const method = String(req.method || "").toUpperCase();
-  if (SAFE_METHODS.has(method)) return next();
-  return csrfMiddleware(req, res, next);
-};
+const { protectMutations } = require("../utils/csrf");
 
 const isObjId = (val) => mongoose.Types.ObjectId.isValid(val);
 const normalizeReason = (value = "") =>
@@ -72,7 +57,7 @@ router.get("/", async (req, res) => {
 
     return res.json(items);
   } catch (err) {
-    console.error("[blocks] list error", err);
+    runtimeLogger.error("[blocks] list error", err);
     return res.status(500).json({ error: "Unable to load blocks." });
   }
 });
@@ -96,7 +81,7 @@ router.post("/", async (req, res) => {
       .populate("withdrawnParalegalId", "firstName lastName role")
       .populate("paralegal", "firstName lastName role")
       .populate("attorney", "firstName lastName role");
-    if (!caseDoc) return res.status(404).json({ error: "Case not found." });
+    if (!caseDoc) return res.status(404).json({ error: "Matter not found." });
 
     const counterparty = getCaseCounterparty(caseDoc, req.user);
     if (!counterparty?.counterpartyId) {
@@ -109,7 +94,7 @@ router.post("/", async (req, res) => {
       normalizeId(caseDoc.withdrawnParalegalId),
     ].filter(Boolean));
     if (!participants.has(requesterId)) {
-      return res.status(403).json({ error: "You do not have access to block users for this case." });
+      return res.status(403).json({ error: "You do not have access to block users for this Matter." });
     }
 
     let targetId = counterparty.counterpartyId;
@@ -173,7 +158,7 @@ router.post("/", async (req, res) => {
     if (err?.code === 11000) {
       return res.status(200).json({ ok: true, blocked: true });
     }
-    console.error("[blocks] create error", err);
+    runtimeLogger.error("[blocks] create error", err);
     return res.status(500).json({ error: "Unable to block user." });
   }
 });
@@ -188,7 +173,7 @@ router.delete("/:blockedId", async (req, res) => {
     await deactivateBlock({ blockerId: req.user.id, blockedId });
     return res.json({ ok: true, blocked: false });
   } catch (err) {
-    console.error("[blocks] delete error", err);
+    runtimeLogger.error("[blocks] delete error", err);
     return res.status(500).json({ error: "Unable to unblock user." });
   }
 });

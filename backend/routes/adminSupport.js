@@ -2,6 +2,7 @@ const router = require("express").Router();
 
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
+const { csrfProtection } = require("../utils/csrf");
 const {
   addSupportTicketNote,
   createSupportTicket,
@@ -14,20 +15,6 @@ const {
 } = require("../services/support/ticketService");
 const { generateFAQCandidates, listFAQCandidates } = require("../services/support/faqCandidateService");
 const { listSupportInsights, refreshSupportInsights } = require("../services/support/patternDetectionService");
-
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({
-    cookie: {
-      httpOnly: true,
-      sameSite: "strict",
-      secure: process.env.NODE_ENV === "production",
-    },
-  });
-}
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -63,7 +50,7 @@ router.post(
   "/tickets",
   csrfProtection,
   asyncHandler(async (req, res) => {
-    const ticket = await createSupportTicket(req.body || {}, req.user || {});
+    const ticket = await createSupportTicket(req.body || {});
     res.status(201).json({ ok: true, ticket });
   })
 );

@@ -471,14 +471,16 @@
   font-weight: 200;
 }
 
-    main a {
-      color: var(--accent);
-      text-decoration: none;
+    main a:not(.btn) {
+      color: #75613b;
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.16em;
       font-weight: 200;
     }
-    main a:hover,
-    main a:focus-visible {
-      color: #9c8a63;
+    main a:not(.btn):hover,
+    main a:not(.btn):focus-visible {
+      color: #5f4d2d;
     }
 
   @media (max-width: 1024px) {
@@ -598,19 +600,25 @@
     }
   }
   </style>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260812-11" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260812-7"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260812-1" />
+  <script defer src="assets/scripts/universal-header.js?v=20260812-1"></script>
+  <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
+  <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
 </head>
-<body>
+<body class="lpc-product-clean">
   <a class="skip-link" href="#main">Skip to main content</a>
   <aside class="sidebar" id="sidebarNav">
     <div class="logo">Dashboard</div>
     <nav id="helpNav" aria-label="Primary">
       <a href="dashboard-attorney.html">Home</a>
       <a href="dashboard-attorney.html#cases">Matters</a>
-      <a href="dashboard-attorney.html#billing">Funds &amp; Payments</a>
+      <a href="browse-paralegals.html">Paralegals</a>
+      <a href="dashboard-attorney.html#funds">Payments</a>
       <a href="help.html" class="active">Help</a>
     </nav>
     <div class="sidebar-bottom">
-      <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
       <div class="sidebar-footer">© Let’s‑ParaConnect 2026</div>
     </div>
   </aside>
@@ -618,11 +626,7 @@
   <main id="main" tabindex="-1" aria-labelledby="help-title">
     <div class="topbar">
       <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Show menu" aria-controls="sidebarNav" aria-expanded="false">
-        <span class="sidebar-toggle-glyph" aria-hidden="true">
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--top"></span>
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--middle"></span>
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--bottom"></span>
-        </span>
+        <span class="lpc-mobile-menu-icon" aria-hidden="true"></span>
       </button>
     </div>
     <h1 id="help-title">Help for Attorneys</h1>
@@ -641,7 +645,7 @@
     <section id="attorney-help">
       <h3>Account &amp; access</h3>
       <p>Forgot your password? <a href="forgot-password.html">Reset it here</a> and check spam or junk if the email doesn’t arrive. If two-factor auth is enabled, watch for autofilled or expired codes. Update your email, profile, or security settings anytime in <a href="profile-settings.html">Settings</a>. If you can’t access your account, contact support.</p>
-      <p>Self-serve account deactivation is available in Settings and removes your account from active platform participation, but it is not full erasure. Attorneys cannot deactivate while involved in an active matter or while escrow, payout, dispute, or other financial obligations remain unresolved.</p>
+      <p>Self-serve account deactivation is available in Settings and removes your account from active platform participation, but it is not full erasure. Attorneys cannot deactivate while involved in an active Matter or while funding, payout, dispute, or other financial obligations remain unresolved.</p>
 
       <h3>Posting a matter</h3>
       <p>To begin, create a new matter by providing a clear description of the work required, including the scope of the assignment, expected timeline, required tasks and deliverables. You may review applications from paralegals who express interest in the matter.</p>
@@ -655,11 +659,14 @@
       <h3>Workflow</h3>
       <p>Post a matter or single-scope assignment with a clear description of the work needed, the timeline, and required tasks the paralegal must complete. Once applications begin coming in, review the paralegals who apply and select the one you want to hire. If needed, you may first request optional pre-engagement items such as a confidentiality agreement or conflicts check. After hiring, use the matter workspace to communicate, share files, and review drafts or completed documents. When the final work meets your expectations, confirm completion to release payment and close the matter.</p>
 
+      <h3>Private tasks</h3>
+      <p>Use <a href="dashboard-attorney.html#tasks">Tasks</a> for your own reminders. You can add a due date and optionally link a reminder to a matter, but private tasks are not visible to the paralegal and never add to or change the agreed matter scope. Matter deliverables remain in the matter workspace.</p>
+
       <h3>Funding, release, and disputes</h3>
       <p>During matter creation, attorneys set the matter amount required to hire a paralegal. When selecting a paralegal to hire, the total cost of the matter, including any applicable platform fees, will be displayed for confirmation before funding.</p>
       <p>Once the matter is funded through Stripe, the matter workspace opens for both the attorney and the assigned paralegal to begin work. Within the workspace, attorneys may communicate with the paralegal, upload reference documents, and review progress as the assignment is completed. Only the attorney may mark tasks as completed and confirm when the matter is finished.</p>
       <p>When the final deliverable meets the agreed scope of work, the attorney can confirm completion to release the funded payment to the paralegal.</p>
-      <p>If the work does not meet the agreed scope, the attorney may open a dispute before releasing funds by selecting the flag icon within the matter workspace. Opening a dispute temporarily pauses the workspace and payment release while the matter is reviewed. The attorney may then provide additional context explaining the concern so that the issue can be evaluated and resolved appropriately.</p>
+      <p>If the work does not meet the agreed scope, the attorney may open a dispute before releasing the payment by selecting the flag icon within the matter workspace. Opening a dispute temporarily pauses the workspace and payment release while the matter is reviewed. The attorney may then provide additional context explaining the concern so that the issue can be evaluated and resolved appropriately.</p>
     </section>
 
     <section id="help-links">
@@ -670,7 +677,6 @@
   </main>
   <script src="assets/scripts/help-incident-intake.js"></script>
   <script>
-    const logoutBtn = document.getElementById('logoutBtn');
     const nav = document.getElementById('helpNav');
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebarNav = document.getElementById('sidebarNav');
@@ -689,29 +695,18 @@
         sidebarToggle.setAttribute('aria-label', 'Hide menu');
       }
     };
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', async (event) => {
-        event.preventDefault();
-        try {
-          await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-        } catch {}
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.href = 'index.html';
-      });
-    }
     if (nav && window.checkSession) {
       const navItems = {
         attorney: [
           { href: 'dashboard-attorney.html', label: 'Home' },
           { href: 'dashboard-attorney.html#cases', label: 'Matters' },
-          { href: 'dashboard-attorney.html#billing', label: 'Funds & Payments' },
+          { href: 'dashboard-attorney.html#funds', label: 'Payments' },
           { href: 'help.html', label: 'Help', active: true },
         ],
         paralegal: [
           { href: 'contact.html', label: 'Contact Support' },
           { href: 'dashboard-paralegal.html', label: 'Home' },
-          { href: 'dashboard-paralegal.html#cases', label: 'Cases and Applications' },
+          { href: 'dashboard-paralegal.html#cases', label: 'My Matters & Applications' },
           { href: 'profile-settings.html', label: 'Profile Settings' },
           { href: 'paralegalhelp.html', label: 'Help', active: true },
         ],

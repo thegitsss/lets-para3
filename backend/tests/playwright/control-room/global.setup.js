@@ -1,6 +1,6 @@
-const fs = require("fs");
 const path = require("path");
 const { chromium, request: playwrightRequest } = require("playwright/test");
+const { writeStorageStateOwnerOnly } = require("../auth-state");
 
 const STORAGE_STATE_PATH = path.join(__dirname, "../.auth/control-room-admin.json");
 
@@ -9,7 +9,7 @@ function truthy(value) {
 }
 
 function resolveBaseURL() {
-  return process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:5050";
+  return process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:5053";
 }
 
 function resolveHarnessHeaders() {
@@ -53,10 +53,15 @@ async function loginAsAdmin({ baseURL, email, password }) {
     page.waitForURL(/admin-dashboard\.html(?:[#?].*)?$/),
     page.locator("#loginForm button[type='submit']").click(),
   ]);
-  await page.waitForLoadState("networkidle");
+  await page.waitForLoadState("domcontentloaded");
+  await page.locator("body").waitFor({ state: "visible" });
+  const sessionResponse = await page.request.get("/api/users/me");
+  const sessionPayload = await sessionResponse.json().catch(() => ({}));
+  if (!sessionResponse.ok() || String(sessionPayload?.role || "").toLowerCase() !== "admin") {
+    throw new Error(`Control Room admin session verification failed (${sessionResponse.status()}).`);
+  }
 
-  fs.mkdirSync(path.dirname(STORAGE_STATE_PATH), { recursive: true });
-  await context.storageState({ path: STORAGE_STATE_PATH });
+  await writeStorageStateOwnerOnly(context, STORAGE_STATE_PATH);
   await browser.close();
 }
 

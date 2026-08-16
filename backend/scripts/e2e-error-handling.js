@@ -1,22 +1,7 @@
 const express = require("express");
 const http = require("http");
 const path = require("path");
-const puppeteer = require("puppeteer");
-
-function patchElementHandleClick() {
-  const { ElementHandle } = puppeteer;
-  if (!ElementHandle || ElementHandle.prototype.__safeClickPatched) return;
-  const original = ElementHandle.prototype.click;
-  ElementHandle.prototype.click = async function (...args) {
-    try {
-      return await this.evaluate((el) => el.click());
-    } catch {
-      return original.apply(this, args);
-    }
-  };
-  ElementHandle.prototype.__safeClickPatched = true;
-}
-patchElementHandleClick();
+const { clickVisible, launchPuppeteer } = require("./puppeteerBrowser");
 
 async function startServer() {
   const app = express();
@@ -47,7 +32,7 @@ async function run() {
   const { server, port } = await startServer();
   const baseUrl = `http://localhost:${port}`;
 
-  const browser = await puppeteer.launch({
+  const browser = await launchPuppeteer({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
     protocolTimeout: 120_000,
@@ -82,9 +67,7 @@ async function run() {
       page.once("dialog", handler);
     });
 
-    await page.evaluate(() => {
-      document.querySelector("button[type=submit]")?.click();
-    });
+    await clickVisible(page, "button[type=submit]");
 
     const toastShown = await page
       .waitForFunction(
@@ -118,7 +101,7 @@ async function run() {
     console.log("E2E error handling: signup validation");
     await page.goto(`${baseUrl}/signup.html`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#nextStepBtn", { timeout: 15_000 });
-    await page.evaluate(() => document.getElementById("nextStepBtn")?.click());
+    await clickVisible(page, "#nextStepBtn");
     await page.waitForFunction(
       () => {
         const el = document.getElementById("msg");

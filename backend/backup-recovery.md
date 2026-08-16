@@ -1,137 +1,50 @@
 # Backup and recovery
 
-This project uses MongoDB. Backups are created with `mongodump` and restored with `mongorestore`.
+MongoDB Atlas Cloud Backup is LPC's production backup authority. The operations monitor verifies snapshot freshness through a read-only Atlas service account. A local `mongodump` file is only a developer-controlled export or an input to an isolated restore drill; it is not Render backup evidence.
 
-## Requirements
-- Install MongoDB Database Tools (provides `mongodump` and `mongorestore`).
-- Set `MONGO_URI` (or `MONGO_URL`/`DATABASE_URL`) for the target database.
+## Manual export
 
-## Run a backup
-```
-cd backend
-MONGO_URI="mongodb://127.0.0.1:27017/lets-para" \
-BACKUP_DIR="./backups" \
-BACKUP_RETENTION_DAYS=14 \
-node scripts/backup-db.js
-```
+Requirements:
 
-Optional environment variables:
-- `BACKUP_DIR`: where backups are written (default: `backend/backups`)
-- `BACKUP_RETENTION_DAYS`: delete backups older than this many days (default: `14`)
-- `BACKUP_STATUS_FILE`: JSON status file written after each backup run (default: `backend/backups/last-backup.json`)
-- `BACKUP_ALERT_ON_SUCCESS=true`: optionally email the owner on successful backup completion
+- Install current MongoDB Database Tools (`mongodump` and `mongorestore`).
+- Configure `MONGO_URI` in the ignored `backend/.env` file or an approved secret-injection mechanism. Do not place the URI in shell history, cron definitions, process arguments, logs, or source control.
+- Choose a private, encrypted destination with enough capacity. `BACKUP_DIR` defaults to the ignored `backend/backups` directory.
 
-Each backup run now writes a machine-readable status artifact containing:
+Run from `backend/`:
 
-- `status`: `running`, `ok`, or `failed`
-- `startedAt`
-- `completedAt`
-- `outPath`
-- `sizeBytes` on success
-- `error` on failure
-
-## Automate with cron (example)
-Use this only on a server or local machine you control directly. Do not use this as the primary production backup strategy on Render.
-
-```
-0 2 * * * /usr/bin/env MONGO_URI="mongodb://127.0.0.1:27017/lets-para" BACKUP_DIR="/var/backups/lets-para" BACKUP_RETENTION_DAYS=14 node /path/to/backend/scripts/backup-db.js >> /var/log/lets-para-backup.log 2>&1
+```sh
+npm run backup:db
 ```
 
-## Daily backups (macOS launchd template)
-Template: `backend/ops/launchd/com.letsparaconnect.mongo-backup.plist`
+Optional non-secret settings are `BACKUP_DIR`, `BACKUP_RETENTION_DAYS` (default `14`), `BACKUP_STATUS_FILE`, and `BACKUP_ALERT_ON_SUCCESS=true`. The script uses a short-lived mode-0600 MongoDB Tools configuration file so credentials do not appear in the child process arguments, applies a restrictive umask, writes the archive/status file privately, and removes the credential file when the tool exits.
 
-Replace these placeholders:
-- `__PROJECT_ROOT__` (absolute path to repo)
-- `__MONGO_URI__` (Atlas connection string)
-- `__BACKUP_DIR__` (backup folder)
-- `__LOG_PATH__` (log file path)
+Do not schedule this command on Render: cron filesystems are ephemeral. Do not install the removed legacy cron/launchd templates. Production backup scheduling, retention, encryption, and snapshots belong to Atlas.
 
-Then load it:
-```
-launchctl load -w ~/Library/LaunchAgents/com.letsparaconnect.mongo-backup.plist
-```
+## Isolated restore drill
 
-## Daily backups (cron template)
-Template: `backend/ops/cron.backup.example`
+Never point a drill at production. Provision an isolated non-production Atlas cluster with separately scoped credentials, then configure its URI through the ignored `.env` file or approved secret injection. Use an absolute path to a regular, non-symlink archive file.
 
-Replace placeholders, then add the line to your crontab:
-```
-crontab -e
-```
-
-## Automated monitoring
-
-You can run the ops monitor on a short schedule to catch:
-
-- `/api/health` failures
-- stale or failed backups
-- recent failed Stripe webhook events
-
-Example:
-
-```
-cd backend
-OPS_HEALTHCHECK_URL="https://www.lets-paraconnect.com/api/health" \
-MONGO_URI="mongodb://127.0.0.1:27017/lets-para" \
-OWNER_ALERT_EMAILS="you@example.com" \
-node scripts/ops-monitor.js
-```
-
-The monitor writes local state to `backend/ops/monitor-state.json` by default and exits non-zero when checks fail.
-
-### Render production guidance
-
-If production runs on Render, use Render's deployment model instead of machine cron:
-
-- Set the web service health check path to `/api/health`.
-- Turn on Render email or Slack notifications for unhealthy service, healthy-again, deploy failure, and cron job failure events.
-- Use Mongo Atlas automated backups as the primary production backup system.
-- Treat `backup-db.js` as a manual export and restore-drill tool, not the primary Render backup system.
-- If you run `ops-monitor.js` as a Render Cron Job, set:
-  - `MONITOR_REQUIRE_BACKUP=false`
-  - `MONITOR_PERSIST_STATE=false`
-  - `MONITOR_SEND_OWNER_ALERTS=false`
-
-Those settings avoid false assumptions about persistent local disk on Render and prevent duplicate alerts when Render itself is already sending service-level notifications.
-
-Templates:
-
-- cron: `backend/ops/cron.ops-monitor.example`
-- macOS launchd: `backend/ops/launchd/com.letsparaconnect.ops-monitor.plist`
-- systemd: `backend/ops/systemd/lpc-ops-monitor.service.example`
-
-## Restore (safe default)
-To avoid overwriting an active database, restore into a new database first by changing the database name in `MONGO_URI`.
-
-```
-mongorestore --uri "mongodb://127.0.0.1:27017/lets-para-restore" --archive=/path/to/backup_YYYYMMDD_HHMMSS.archive.gz --gzip
-```
-
-Once validated, point the app to the restored database.
-
-## One‑click restore (script)
-```
-cd backend
-MONGO_URI="mongodb://127.0.0.1:27017/lets-para-restore" \
-BACKUP_FILE="/path/to/backup_YYYYMMDD_HHMMSS.archive.gz" \
-CONFIRM_RESTORE=YES \
+```sh
+BACKUP_FILE=/absolute/path/to/backup_YYYYMMDD_HHMMSS.archive.gz \
+CONFIRM_RESTORE=ISOLATED_NON_PRODUCTION \
 node scripts/restore-db.js
 ```
 
-Optional:
-- `RESTORE_DROP=true` to drop existing collections before restore (destructive).
-- `RESTORE_NS_INCLUDE` to explicitly include matching namespaces from the archive when restoring to a different database name.
-- `RESTORE_NS_FROM` and `RESTORE_NS_TO` to remap namespaces when restoring an archive into a different database name.
+Optional namespace controls:
 
-Example namespace remap from production into a safe restore database:
+- `RESTORE_NS_INCLUDE` limits restored namespaces.
+- `RESTORE_NS_FROM` and `RESTORE_NS_TO` must be provided together to remap namespaces.
+- `RESTORE_DROP=true` is destructive and additionally requires `CONFIRM_RESTORE_DROP=DROP_ISOLATED_TARGET`.
 
-```
-cd backend
-MONGO_URI="mongodb://127.0.0.1:27017/lets-para-restore" \
-BACKUP_FILE="/path/to/backup_YYYYMMDD_HHMMSS.archive.gz" \
-CONFIRM_RESTORE=YES \
-RESTORE_NS_INCLUDE="letspara.*" \
-RESTORE_NS_FROM="letspara.*" \
-RESTORE_NS_TO="letspara_restore_20260401.*" \
-node scripts/restore-db.js
-```
+The restore script uses the same ephemeral credential-file boundary as the backup script. After completion, verify representative users, matters, indexes, payment ledgers, payouts, audit records, and application startup; record RPO/RTO evidence; then destroy the isolated cluster through the approved infrastructure workflow.
+
+## Production evidence
+
+A launch record must link:
+
+1. Atlas backup policy/retention and encryption configuration for the exact production cluster.
+2. A fresh successful snapshot check from the LPC operations monitor.
+3. An isolated restore drill with source snapshot, target identifier, start/end times, verification results, RPO/RTO, operator, and cleanup evidence.
+4. A controlled stale/missing snapshot alert and recovery notification.
+
+See `docs/production-operations.md`, `../LAUNCH_CHECKLIST.md`, and `../docs/RELEASE_GATES.md`. A local archive or passing script alone is not production attestation.

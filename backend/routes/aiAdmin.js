@@ -1,9 +1,12 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:aiAdmin");
 const express = require("express");
 const mongoose = require("mongoose");
 
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
-const AiIssueReport = require("../models/AiIssueReport");
+const { csrfProtection } = require("../utils/csrf");
+const { respondToCsrfError } = require("../utils/csrf");
 const Incident = require("../models/Incident");
 const SupportTicket = require("../models/SupportTicket");
 const User = require("../models/User");
@@ -19,14 +22,11 @@ const { getSupportOverview, listSupportTickets } = require("../services/support/
 const { listFAQCandidates } = require("../services/support/faqCandidateService");
 const { listSupportInsights } = require("../services/support/patternDetectionService");
 const { getSalesOverview } = require("../services/sales/accountService");
-const { listSalesDraftPackets } = require("../services/sales/outreachDraftService");
 const {
   getApprovalWorkspaceOverview,
   listApprovalWorkspaceItems,
 } = require("../services/approvals/workspaceService");
 const { getEngineeringOverview } = require("../services/engineering/workspaceService");
-const { runCtoDiagnosis } = require("../services/ai/ctoAgentService");
-const { buildExecutionPacket } = require("../services/ai/ctoExecutionService");
 const {
   CONTROL_ROOM_DECISION_POLICY,
   evaluateControlRoomPolicy,
@@ -44,36 +44,9 @@ const { INCIDENT_STATES, INCIDENT_TERMINAL_STATES } = require("../utils/incident
 
 const router = express.Router();
 
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({
-    cookie: {
-      httpOnly: true,
-      sameSite: "strict",
-      secure: process.env.NODE_ENV === "production",
-    },
-  });
-}
-
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 router.use(verifyToken, requireApproved, requireRole("admin"));
-
-const LEGACY_AI_ISSUE_ROUTE_META = Object.freeze({
-  legacy: true,
-  canonical: false,
-  visibility: "compatibility_only",
-  deprecationStatus: "non_canonical",
-  sourceModel: "AiIssueReport",
-  canonicalOpsSource: "Incident",
-  replacementRoute: "/api/admin/incidents",
-  operatorWarning:
-    "Compatibility-only legacy issue route. Use Incident Control Room and /api/admin/incidents for canonical operator truth.",
-  message: "Legacy AI issue queue only. Incident is the canonical operational system.",
-});
 
 const OPEN_INCIDENT_STATES = INCIDENT_STATES.filter((state) => !INCIDENT_TERMINAL_STATES.includes(state));
 const SUPPORT_INCIDENT_SURFACES = ["public", "attorney", "paralegal"];
@@ -119,12 +92,6 @@ const PRODUCT_INCIDENT_DOMAINS = new Set([
   "notifications",
   "performance",
   "data_integrity",
-]);
-const BLOCKED_INCIDENT_STATES = new Set([
-  "needs_more_context",
-  "needs_human_owner",
-  "verification_failed",
-  "deploy_failed",
 ]);
 const SYNTHETIC_NAME_PATTERNS = Object.freeze([
   /\bqa\b/i,
@@ -173,49 +140,6 @@ function buildExecutiveStatus({ unavailable = false, priority = false, review = 
   return { status: "HEALTHY", tone: "healthy" };
 }
 
-function formatMetricValue(value) {
-  return Number.isFinite(Number(value)) ? Number(value) : null;
-}
-
-function buildExecutiveCard({
-  key,
-  title,
-  department,
-  status,
-  tone,
-  description,
-  metric1,
-  metric2,
-  recommendedAction,
-  footerNote,
-  actionButton,
-}) {
-  return {
-    key,
-    title,
-    department,
-    status,
-    tone,
-    description,
-    metric1: {
-      label: metric1?.label || "",
-      value: formatMetricValue(metric1?.value),
-    },
-    metric2: {
-      label: metric2?.label || "",
-      value: formatMetricValue(metric2?.value),
-    },
-    actionText: recommendedAction || "",
-    recommendedAction: recommendedAction || "",
-    footerNote: footerNote || "",
-    actionButton: {
-      label: actionButton?.label || "Open",
-      targetTab: actionButton?.targetTab || "",
-      disabled: actionButton?.disabled === true,
-    },
-  };
-}
-
 function minutesSince(value) {
   if (!value) return Number.POSITIVE_INFINITY;
   const date = new Date(value);
@@ -226,18 +150,6 @@ function minutesSince(value) {
 function formatUserName(user = {}) {
   const name = `${String(user.firstName || "").trim()} ${String(user.lastName || "").trim()}`.trim();
   return name || String(user.email || "Applicant").trim() || "Applicant";
-}
-
-function applyLegacyIssueRouteHeaders(res) {
-  res.set("X-LPC-Legacy-Route", "true");
-  res.set("X-LPC-Canonical-Ops-Source", LEGACY_AI_ISSUE_ROUTE_META.canonicalOpsSource);
-  res.set("Deprecation", "true");
-  res.set("Warning", '299 - "Compatibility-only legacy route. Incident is the canonical ops source."');
-  res.set("Cache-Control", "no-store");
-}
-
-function buildLegacyIssueRouteMeta() {
-  return { ...LEGACY_AI_ISSUE_ROUTE_META };
 }
 
 function buildAdmissionsMissingFields(user = {}) {
@@ -385,21 +297,7 @@ function isProductIncident(incident = {}) {
   return PRODUCT_INCIDENT_DOMAINS.has(domain) || isCaseProgressIncident(incident);
 }
 
-function isBlockedIncident(incident = {}) {
-  return BLOCKED_INCIDENT_STATES.has(String(incident.state || "").trim().toLowerCase());
-}
 
-function isPriorityIncident(incident = {}) {
-  const severity = String(incident.classification?.severity || "").trim().toLowerCase();
-  const riskLevel = String(incident.classification?.riskLevel || "").trim().toLowerCase();
-  const state = String(incident.state || "").trim().toLowerCase();
-  return (
-    severity === "critical" ||
-    severity === "high" ||
-    riskLevel === "high" ||
-    state === "awaiting_founder_approval"
-  );
-}
 
 function buildIncidentLine(incident = {}) {
   const area = String(
@@ -551,7 +449,7 @@ async function getSupportSnapshot() {
   } else if (blockerTickets.length || blockerIncidents.length) {
     recommendation = "Review blocking support items before routine queue cleanup because they interrupt active work.";
   } else if (caseTickets.length || caseIncidents.length) {
-    recommendation = "Review case and application workflow questions before lower-priority support because they affect active work.";
+    recommendation = "Review Matter and application workflow questions before lower-priority support because they affect active work.";
   } else if (actionableTickets.length) {
     recommendation = "Review the newest support tickets and confirm the draft packet before replying externally.";
   } else if (rankedIncidents.length) {
@@ -800,7 +698,9 @@ async function getLifecycleSnapshot() {
   );
 
   const followUpTodayCount = followUpCandidates.length;
-  const followUpToday = followUpCandidates.slice(0, 8).map(({ priority, sortDays, ...signal }) => signal);
+  const followUpToday = followUpCandidates
+    .slice(0, 8)
+    .map(({ priority: _priority, sortDays: _sortDays, ...signal }) => signal);
   const stalledCount = stalledUserIds.size;
 
   let recommendation = "No lifecycle follow-up signals are currently visible.";
@@ -1082,173 +982,6 @@ async function getAdminOpsSnapshot() {
   };
 }
 
-async function getEngineeringIncidentSnapshot() {
-  const openIncidents = await getOpenIncidentsForWarRoom();
-  const blockedCount = openIncidents.filter(isBlockedIncident).length;
-  const priorityCount = openIncidents.filter(isPriorityIncident).length;
-
-  let recommendation = "No open incidents are currently visible.";
-  if (blockedCount) {
-    recommendation = "Review blocked incidents first because engineering work is currently stuck in a non-terminal state.";
-  } else if (priorityCount) {
-    recommendation = "Review the highest-risk open incidents before lower-priority engineering cleanup.";
-  } else if (openIncidents.length) {
-    recommendation = "Review the newest open incidents and clear the oldest unresolved engineering work first.";
-  }
-
-  return {
-    openCount: openIncidents.length,
-    blockedCount,
-    priorityCount,
-    recommendation,
-  };
-}
-
-function buildAiControlRoomCards({
-  admissions,
-  support,
-  payments,
-  lifecycle,
-  marketing,
-  sales,
-  engineeringIncident,
-}) {
-  const cmoStatus = buildExecutiveStatus({
-    review: Number(marketing.pendingReviewCount || 0) > 0,
-  });
-  const ctoStatus = buildExecutiveStatus({
-    priority: Number(engineeringIncident.blockedCount || 0) > 0 || Number(engineeringIncident.priorityCount || 0) > 0,
-    review: Number(engineeringIncident.openCount || 0) > 0,
-  });
-  const cfoStatus = buildExecutiveStatus({
-    priority: Number(payments.moneyIssueCount || 0) > 0,
-    review: Number(payments.openDisputesCount || 0) > 0,
-  });
-  const cooStatus = buildExecutiveStatus({
-    priority: Number((lifecycle.stripeIncomplete || []).length || 0) > 0,
-    review: Number(lifecycle.stalledCount || 0) > 0 || Number(lifecycle.followUpTodayCount || 0) > 0,
-  });
-  const csoStatus = buildExecutiveStatus({
-    review: Number(sales.pendingReviewCount || 0) > 0,
-  });
-  const ccoStatus = buildExecutiveStatus({
-    priority: Number(support.escalationCount || 0) > 0,
-    review: Number(support.activeIssueCount || 0) > 0,
-  });
-  const caoStatus = buildExecutiveStatus({
-    review: Number(admissions.attorneyCount || 0) > 0 || Number(admissions.paralegalCount || 0) > 0,
-  });
-  const cpoStatus = buildExecutiveStatus({ unavailable: true });
-
-  return [
-    buildExecutiveCard({
-      key: "cmo",
-      title: "CMO",
-      department: "Marketing",
-      status: cmoStatus.status,
-      tone: cmoStatus.tone,
-      description: "Oversees founder-reviewed marketing draft volume and outbound packet readiness on LPC.",
-      metric1: { label: "Pending review", value: marketing.pendingReviewCount },
-      metric2: { label: "Draft packets", value: marketing.packetsCount },
-      recommendedAction: marketing.recommendation,
-      footerNote: "Source: MarketingDraftPacket records. Publishing state is not shown on this card.",
-      actionButton: { label: "Open Marketing", targetTab: "marketing-drafts" },
-    }),
-    buildExecutiveCard({
-      key: "cto",
-      title: "CTO",
-      department: "Engineering",
-      status: ctoStatus.status,
-      tone: ctoStatus.tone,
-      description: "Oversees live incident load and blocked engineering work across LPC.",
-      metric1: { label: "Open incidents", value: engineeringIncident.openCount },
-      metric2: { label: "Blocked incidents", value: engineeringIncident.blockedCount },
-      recommendedAction: engineeringIncident.recommendation,
-      footerNote: "Source: Incident collection only. Blocked counts are derived from non-terminal blocker states.",
-      actionButton: { label: "Open Engineering", targetTab: "engineering" },
-    }),
-    buildExecutiveCard({
-      key: "cfo",
-      title: "CFO",
-      department: "Payments & Risk",
-      status: cfoStatus.status,
-      tone: cfoStatus.tone,
-      description: "Oversees dispute exposure and money-sensitive incident risk.",
-      metric1: { label: "Open disputes", value: payments.openDisputesCount },
-      metric2: { label: "Money issues", value: payments.moneyIssueCount },
-      recommendedAction: payments.recommendation,
-      footerNote: "Disputes live on Case records; money issues come from Incident risk classification.",
-      actionButton: { label: "Open Disputes", targetTab: "disputes" },
-    }),
-    buildExecutiveCard({
-      key: "coo",
-      title: "COO",
-      department: "Operations",
-      status: cooStatus.status,
-      tone: cooStatus.tone,
-      description: "Oversees stalled user operations and the current lifecycle follow-up load.",
-      metric1: { label: "Stalled users", value: lifecycle.stalledCount },
-      metric2: { label: "Follow-ups today", value: lifecycle.followUpTodayCount },
-      recommendedAction: lifecycle.recommendation,
-      footerNote: lifecycle.hasLegacyCompatibility
-        ? "Lifecycle counts blend event-backed follow-ups with legacy compatibility signals."
-        : "Source: lifecycle follow-up system and live user activity.",
-      actionButton: { label: "Open Operations", targetTab: "user-management" },
-    }),
-    buildExecutiveCard({
-      key: "cso",
-      title: "CSO",
-      department: "Sales",
-      status: csoStatus.status,
-      tone: csoStatus.tone,
-      description: "Oversees awareness accounts and the current sales review workload.",
-      metric1: { label: "Pending review", value: sales.pendingReviewCount },
-      metric2: { label: "Active accounts", value: sales.accountsCount },
-      recommendedAction: sales.recommendation,
-      footerNote: "Source: SalesAccount and SalesDraftPacket records. No outbound sending is automated here.",
-      actionButton: { label: "Open Sales", targetTab: "sales-workspace" },
-    }),
-    buildExecutiveCard({
-      key: "cco",
-      title: "CCO",
-      department: "Customer Support",
-      status: ccoStatus.status,
-      tone: ccoStatus.tone,
-      description: "Oversees open support workload and tickets that have already escalated.",
-      metric1: { label: "Open support issues", value: support.activeIssueCount },
-      metric2: { label: "Escalations", value: support.escalationCount },
-      recommendedAction: support.recommendation,
-      footerNote: "Source: SupportTicket collection. Escalations include high-priority and handed-off tickets.",
-      actionButton: { label: "Open Support", targetTab: "support-ops" },
-    }),
-    buildExecutiveCard({
-      key: "cpo",
-      title: "CPO",
-      department: "Product",
-      status: cpoStatus.status,
-      tone: cpoStatus.tone,
-      description: "Will surface product issue and roadmap signal quality once a dedicated product source exists.",
-      metric1: { label: "Open product issues", value: null },
-      metric2: { label: "Pattern alerts", value: null },
-      recommendedAction: "No standalone product data source exists yet for this dashboard.",
-      footerNote: "No dedicated product collection is wired into the admin control room yet.",
-      actionButton: { label: "Coming Soon", targetTab: "", disabled: true },
-    }),
-    buildExecutiveCard({
-      key: "cao",
-      title: "CAO",
-      department: "Admissions",
-      status: caoStatus.status,
-      tone: caoStatus.tone,
-      description: "Oversees pending attorney and paralegal admissions review volume.",
-      metric1: { label: "Attorney review", value: admissions.attorneyCount },
-      metric2: { label: "Paralegal review", value: admissions.paralegalCount },
-      recommendedAction: admissions.recommendation,
-      footerNote: "Source: pending User admissions records. Completeness remains heuristic until reviewed.",
-      actionButton: { label: "Open Admissions", targetTab: "user-management" },
-    }),
-  ];
-}
 
 async function getControlRoomHealthSnapshot() {
   if (mongoose.connection.readyState !== 1) {
@@ -2225,7 +1958,7 @@ function buildFounderOperatingSurface({
 }) {
   const laneRegistry = createControlRoomLaneRegistry();
 
-  const supportDecisions = (approvals.support || []).map((item) =>
+  (approvals.support || []).forEach((item) =>
     registerControlRoomItem(
       laneRegistry,
       applyControlRoomPolicyToItem({
@@ -2241,7 +1974,7 @@ function buildFounderOperatingSurface({
       })
     )
   );
-  const marketingDecisions = (approvals.marketing || []).map((item) =>
+  (approvals.marketing || []).forEach((item) =>
     registerControlRoomItem(
       laneRegistry,
       applyControlRoomPolicyToItem({
@@ -2258,7 +1991,7 @@ function buildFounderOperatingSurface({
       })
     )
   );
-  const salesDecisions = (approvals.sales || []).map((item) =>
+  (approvals.sales || []).forEach((item) =>
     registerControlRoomItem(
       laneRegistry,
       applyControlRoomPolicyToItem({
@@ -2275,7 +2008,7 @@ function buildFounderOperatingSurface({
       })
     )
   );
-  const incidentDecisions = (incidents.incidents || [])
+  (incidents.incidents || [])
     .filter((incident) => {
       const incidentState = String(incident.state || "").toLowerCase();
       const approvalState = String(incident.approvalState || "").toLowerCase();
@@ -2284,7 +2017,7 @@ function buildFounderOperatingSurface({
         (incidentState === "awaiting_founder_approval" || approvalState === "pending")
       );
     })
-    .map((incident) =>
+    .forEach((incident) =>
       registerControlRoomItem(
         laneRegistry,
         applyControlRoomPolicyToItem({
@@ -2295,7 +2028,7 @@ function buildFounderOperatingSurface({
         })
       )
     );
-  const admissionsDecisions = (admissions.readyItems || []).map((item) =>
+  (admissions.readyItems || []).forEach((item) =>
     registerControlRoomItem(
       laneRegistry,
       applyControlRoomPolicyToItem({
@@ -2840,7 +2573,7 @@ function buildSummaryPayload({
         recommendation: payments.recommendation,
         actionLabel: "Open Disputes",
         navSection: "disputes",
-        meta: "Case disputes + incident money-risk signals.",
+        meta: "Matter disputes + incident money-risk signals.",
         laneState: cfoLane,
       }),
       buildCard({
@@ -3052,10 +2785,15 @@ function buildSummaryPayload({
 function buildFounderFocus({ founder, lifecycle, founderOperating }) {
   const view = buildFounderFocusView({ founder, lifecycle });
   const needsDecisionCount = Number(founderOperating?.counts?.needsDecisionCount || 0);
+  const urgentInfoCount = Number(founder?.urgentCount || 0);
   const autoHandledCount = Number(founderOperating?.counts?.autoHandledCount || 0);
   const blockedWaitingCount = Number(founderOperating?.counts?.blockedWaitingCount || 0);
 
-  view.queueLabel = `${pluralize(needsDecisionCount, "decision")} pending`;
+  view.queueLabel = needsDecisionCount
+    ? `${pluralize(needsDecisionCount, "decision")} pending`
+    : urgentInfoCount
+      ? `${pluralize(urgentInfoCount, "urgent item")} to review`
+      : "0 decisions pending";
   view.primary = {
     title: "What Needs Samantha Today",
     body:
@@ -3254,7 +2992,7 @@ function buildPaymentsFocus(payments) {
     quaternary: {
       title: "Canonical Source Notes",
       items: [
-        "Disputes remain authoritative on the Case record.",
+        "Disputes remain authoritative on the Matter record.",
         "Money-risk incidents remain authoritative in the Incident system.",
       ],
     },
@@ -3346,30 +3084,40 @@ function buildSalesFocus(sales = {}) {
   };
 }
 
-function buildEngineeringFocus() {
+function buildEngineeringFocus(engineering) {
+  const activeCount = Number(engineering.activeCount || 0);
+  const blockedCount = Number(engineering.blockedCount || 0);
+  const awaitingApprovalCount = Number(engineering.awaitingApprovalCount || 0);
+  const readyForTestCount = Number(engineering.readyForTestCount || 0);
+  const status = blockedCount ? "Priority" : activeCount || awaitingApprovalCount || readyForTestCount ? "Needs Review" : "Healthy";
+  const tone = blockedCount ? "priority" : activeCount || awaitingApprovalCount || readyForTestCount ? "needs-review" : "healthy";
   return {
-    title: "Engineering Triage",
-    status: "Unavailable",
-    tone: "blocked",
-    queueLabel: "Unavailable",
+    title: "Engineering Operations",
+    status,
+    tone,
+    queueLabel: pluralize(activeCount, "active incident"),
     primary: {
       title: "Status",
-      body: "Engineering triage is not yet wired into the War Room. Incident Control Room is the canonical operator path.",
+      body: engineering.recommendation,
     },
     secondary: {
-      title: "Availability",
-      items: ["No live backend source is available for engineering triage in this pass."],
+      title: "Current Queue",
+      items: [
+        `${pluralize(activeCount, "incident")} active.`,
+        `${pluralize(blockedCount, "incident")} blocked.`,
+        `${pluralize(awaitingApprovalCount, "incident")} awaiting approval.`,
+      ],
     },
     tertiary: {
-      title: "Queue",
-      items: ["No engineering triage queue is available."],
+      title: "Verification",
+      items: [
+        `${pluralize(readyForTestCount, "incident")} ready for test.`,
+        `${pluralize(engineering.resolvedTodayCount, "incident")} resolved today.`,
+      ],
     },
     quaternary: {
-      title: "Canonical Source Notes",
-      items: [
-        "Legacy AI issue routes remain compatibility-only.",
-        "Incident Control Room is the canonical operational queue for incident-like work.",
-      ],
+      title: "Guardrail",
+      items: [engineering.guardrail || "Incident Control Room is the sole operational queue for incident-like work."],
     },
   };
 }
@@ -3557,7 +3305,8 @@ router.get(
 router.get(
   "/control-room/engineering",
   asyncHandler(async (_req, res) => {
-    return res.json({ ok: true, generatedAt: new Date().toISOString(), view: buildEngineeringFocus() });
+    const engineering = await getEngineeringSnapshot();
+    return res.json({ ok: true, generatedAt: new Date().toISOString(), view: buildEngineeringFocus(engineering) });
   })
 );
 
@@ -3585,97 +3334,9 @@ router.get(
   })
 );
 
-router.get(
-  "/issues",
-  asyncHandler(async (req, res) => {
-    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 25));
-    const skip = (page - 1) * limit;
-
-    const filter = {};
-    const status = String(req.query.status || "").trim().toLowerCase();
-    const surface = String(req.query.surface || "").trim().toLowerCase();
-
-    if (["new", "reviewed", "resolved"].includes(status)) {
-      filter.status = status;
-    }
-    if (["public", "attorney", "paralegal"].includes(surface)) {
-      filter.surface = surface;
-    }
-
-    const [issues, total] = await Promise.all([
-      AiIssueReport.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      AiIssueReport.countDocuments(filter),
-    ]);
-
-    applyLegacyIssueRouteHeaders(res);
-    return res.json({
-      ok: true,
-      meta: buildLegacyIssueRouteMeta(),
-      issues,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.max(1, Math.ceil(total / limit)),
-      },
-    });
-  })
-);
-
-router.post(
-  "/cto-diagnose-test",
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    const diagnosis = await runCtoDiagnosis(req.body || {});
-    return res.status(diagnosis.ok ? 200 : Number(diagnosis.statusCode) || 400).json(diagnosis);
-  })
-);
-
-router.post(
-  "/cto-execution-test",
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    const execution = await buildExecutionPacket(req.body || {});
-    return res.status(execution.ok ? 200 : Number(execution.statusCode) || 400).json(execution);
-  })
-);
-
-router.patch(
-  "/issues/:id",
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    const issueId = String(req.params.id || "").trim();
-    if (!mongoose.isValidObjectId(issueId)) {
-      return res.status(400).json({ error: "Invalid issue id" });
-    }
-
-    const nextStatus = String(req.body?.status || "").trim().toLowerCase();
-    if (!["new", "reviewed", "resolved"].includes(nextStatus)) {
-      return res.status(400).json({ error: "Valid status is required" });
-    }
-
-    const issue = await AiIssueReport.findByIdAndUpdate(
-      issueId,
-      { status: nextStatus },
-      { new: true, runValidators: true }
-    );
-
-    if (!issue) {
-      return res.status(404).json({ error: "Issue not found" });
-    }
-
-    applyLegacyIssueRouteHeaders(res);
-    return res.json({
-      ok: true,
-      meta: buildLegacyIssueRouteMeta(),
-      issue,
-    });
-  })
-);
-
 router.use((err, _req, res, _next) => {
-  console.error("[aiAdmin]", err);
+  if (respondToCsrfError(err, res)) return;
+  runtimeLogger.error("[aiAdmin]", err);
   return res.status(500).json({ error: "Unable to process admin AI request" });
 });
 

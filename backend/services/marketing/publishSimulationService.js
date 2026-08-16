@@ -3,6 +3,7 @@ const MarketingDraftPacket = require("../../models/MarketingDraftPacket");
 const { serializeConnection, getChannelConnectionDoc } = require("./channelConnectionService");
 const { buildIntentSnapshot } = require("./publishService");
 const { getPacketPublishReadiness } = require("./publishReadinessService");
+const { LINKEDIN_API_VERSION } = require("./linkedinApiPolicy");
 
 function toActor(actor = {}) {
   return {
@@ -77,7 +78,7 @@ async function simulatePacketPublish({ packetId = "", actor = {} } = {}) {
           workflowType: packet.workflowType || "",
           endpoint: "https://api.linkedin.com/rest/posts",
           organizationUrn: connection?.organizationUrn || "",
-          apiVersion: connection?.apiVersion || "202503",
+          apiVersion: LINKEDIN_API_VERSION,
           publishTextLength: readiness.publishTextLength || 0,
         }
       : null,

@@ -652,7 +652,7 @@ async function refreshPreferenceLearning(agentRole = "", actionType = "") {
       },
     },
     {
-      new: true,
+      returnDocument: "after",
       upsert: true,
     }
   );
@@ -668,7 +668,7 @@ async function refreshAllPreferenceLearning() {
   return Promise.all(AUTONOMY_DEFINITIONS.map((definition) => refreshPreferenceLearning(definition.agentRole, definition.actionType)));
 }
 
-function buildSuggestionActions(definition, preference) {
+function buildSuggestionActions(definition) {
   return {
     yes: {
       kind: "autonomy_preference",
@@ -717,7 +717,7 @@ function buildUpgradeSuggestion(definition, preference) {
     confidenceReason: "",
     createdAt: preference.createdAt || null,
     updatedAt: preference.lastPromptedAt || null,
-    actions: buildSuggestionActions(definition, preference),
+    actions: buildSuggestionActions(definition),
   };
 }
 
@@ -766,7 +766,7 @@ async function setAutonomyPreferenceMode(agentRole = "", actionType = "", mode =
       },
     },
     {
-      new: true,
+      returnDocument: "after",
       upsert: true,
     }
   );

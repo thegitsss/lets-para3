@@ -10,6 +10,7 @@ const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 const { publishEvent } = require("../services/lpcEvents/publishEventService");
 const { getFounderCopilotRollup } = require("../services/founderCopilot/rollupService");
 const { syncSourceRegistry } = require("../services/knowledge/syncService");
+const { syncIncidentNotifications } = require("../services/incidents/notificationService");
 const { subscribeToConversationEvents } = require("../services/support/liveUpdateService");
 const { createSupportTicket, updateTicketStatus } = require("../services/support/ticketService");
 
@@ -354,7 +355,7 @@ describe("LPC Phase 2 support routing", () => {
     expect(refreshedTicket.resolutionSummary).toMatch(/fixed and verified/i);
   });
 
-  test("posts an assistant follow-up into linked support conversations when the incident resolves", async () => {
+  test("posts one canonical lifecycle update when a linked incident resolves", async () => {
     await syncSourceRegistry();
 
     const user = await createUser({
@@ -420,7 +421,7 @@ describe("LPC Phase 2 support routing", () => {
         reject(new Error("Timed out waiting for the incident-resolved support update."));
       }, 3000);
       const unsubscribe = subscribeToConversationEvents(conversation._id, (payload) => {
-        if (payload?.reason !== "incident.resolved_support_message") return;
+        if (payload?.reason !== "incident.lifecycle_update") return;
         clearTimeout(timeout);
         unsubscribe();
         resolve(payload);
@@ -428,13 +429,15 @@ describe("LPC Phase 2 support routing", () => {
     });
 
     const liveIncident = await Incident.findById(incident._id);
-    liveIncident.state = "resolved";
+    liveIncident.userVisibleStatus = "fixed_live";
     liveIncident.resolution = {
       code: "fixed_deployed",
       summary: "The Save Preferences workflow was fixed and verified.",
       resolvedAt: new Date(),
       closedAt: null,
     };
+    await syncIncidentNotifications({ incident: liveIncident });
+    liveIncident.state = "resolved";
     await liveIncident.save();
 
     const conversationUpdate = await conversationUpdatePromise;
@@ -442,37 +445,45 @@ describe("LPC Phase 2 support routing", () => {
     expect(conversationUpdate).toEqual(
       expect.objectContaining({
         type: "conversation.updated",
-        reason: "incident.resolved_support_message",
+        reason: "incident.lifecycle_update",
         incidentId: String(incident._id),
         incidentPublicId: "INC-20260325-410002",
+        lifecycleStatusKey: "fixed_live",
       })
     );
 
     const refreshedConversation = await SupportConversation.findById(conversation._id).lean();
-    const followUpMessage = await SupportMessage.findOne({
+    const lifecycleMessages = await SupportMessage.find({
       conversationId: conversation._id,
-      sender: "assistant",
-      "metadata.kind": "incident_resolution_follow_up",
-      "metadata.incidentId": String(incident._id),
+      "metadata.kind": "support_status_update",
+      "metadata.lifecycleIncidentId": String(incident._id),
     })
-      .sort({ createdAt: -1, _id: -1 })
+      .sort({ createdAt: 1, _id: 1 })
       .lean();
 
-    expect(followUpMessage).toEqual(
+    expect(lifecycleMessages).toHaveLength(1);
+    expect(lifecycleMessages[0]).toEqual(
       expect.objectContaining({
-        sender: "assistant",
+        sender: "system",
         text:
-          "Great news - the issue you reported has been fixed by our engineering team. Please try again and let me know if everything is working!",
+          "The issue you reported (Save Preferences issue) has been resolved. If it's still happening, reply here and we'll reopen it.",
         metadata: expect.objectContaining({
-          kind: "incident_resolution_follow_up",
-          source: "lpc_event_router",
-          incidentId: String(incident._id),
-          incidentPublicId: "INC-20260325-410002",
+          kind: "support_status_update",
+          source: "incident_lifecycle",
+          lifecycleIncidentId: String(incident._id),
+          lifecycleIncidentPublicId: "INC-20260325-410002",
+          lifecycleStatusKey: "fixed_live",
         }),
       })
     );
+    expect(
+      await SupportMessage.countDocuments({
+        conversationId: conversation._id,
+        "metadata.kind": "incident_resolution_follow_up",
+      })
+    ).toBe(0);
     expect(new Date(refreshedConversation.lastMessageAt).getTime()).toBeGreaterThanOrEqual(
-      new Date(followUpMessage.createdAt).getTime()
+      new Date(lifecycleMessages[0].createdAt).getTime()
     );
   });
 

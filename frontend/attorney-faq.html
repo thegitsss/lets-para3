@@ -8,10 +8,11 @@
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0B2A4A">
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/hero-pages.css" rel="stylesheet" />
+  <link href="assets/styles/hero-pages.css?v=20260729-white-footer" rel="stylesheet" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>For Attorneys – Let’s-ParaConnect</title>
+  <meta name="description" content="Learn how attorneys use Let’s-ParaConnect to scope matters, review approved independent paralegals, collaborate, and manage payment." />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -185,34 +186,43 @@
 
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
-<header>
-  <div class="header-inner">
-    <nav class="nav-left" aria-label="Primary">
-      <a href="contact.html">Contact Us</a>
-      <a href="index.html#who-we-are">About</a>
-      <a href="index.html#how">How It Works</a>
-    </nav>
-
-    <a href="index.html" class="header-logo">
-      Let’s-ParaConnect
-    </a>
-
-    <div class="header-actions">
-<a class="pill" href="login.html" id="authAction">Sign In</a>
-      <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
+  <header class="utility-header" data-utility-header>
+    <div class="utility-header__inner">
+      <nav class="utility-header__nav" aria-label="Primary navigation">
+        <a href="index.html#how">How It Works</a>
+        <a href="index.html#for-attorneys">For Attorneys</a>
+        <a href="index.html#for-paralegals">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      </nav>
+      <a class="utility-header__brand" href="index.html">Let<span class="utility-header__brand-mark">’</span>s-ParaConnect</a>
+      <div class="utility-header__actions">
+        <a class="utility-header__signin" href="login.html" data-utility-auth>Sign In</a>
+        <button class="utility-header__logout" type="button" data-utility-logout hidden>Log Out</button>
+        <a class="utility-header__button" href="signup.html" data-utility-signup>Get Started</a>
+      </div>
+      <button class="utility-header__menu" type="button" aria-expanded="false" aria-controls="utilityAttorneyFaqMenu" data-utility-menu-toggle>Menu</button>
     </div>
-  </div>
-</header>
+    <nav class="utility-header__mobile" id="utilityAttorneyFaqMenu" aria-label="Mobile navigation" data-utility-menu hidden>
+      <a href="index.html#how">How It Works</a>
+      <a href="index.html#for-attorneys">For Attorneys</a>
+      <a href="index.html#for-paralegals">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      <a href="login.html" data-utility-auth>Sign In</a>
+      <button type="button" data-utility-logout hidden>Log Out</button>
+      <a href="signup.html" data-utility-signup>Get Started</a>
+    </nav>
+  </header>
 
-<div class="hero-banner" role="presentation" aria-hidden="true"></div>
+<section class="hero-banner" aria-labelledby="faq-title">
+  <div class="hero-banner__title"><h1 id="faq-title">For Attorneys</h1></div>
+</section>
 
 <main tabindex="-1" id="main" aria-labelledby="faq-title">
-  <h1 id="faq-title">For Attorneys</h1>
   <p class="muted">A software platform for project-based paralegal support.</p>
 
   <p>Let’s-ParaConnect is a software platform designed to help solo and small-firm attorneys engage experienced paralegals through structured, project-based support work — without staffing agencies, full-time hiring commitments, or administrative friction.</p>
-  <p>Account access is approval-based. Attorney and paralegal profiles are reviewed for platform access and professional fit.</p>
-  <p><strong>Minimum case compensation is $400.</strong></p>
+  <p>Account access is approval-based. LPC reviews submitted account and profile information before deciding whether to grant platform access; approval is not independent credential verification or an endorsement.</p>
+  <p><strong>Minimum Matter compensation is $400.</strong></p>
 
   <section>
     <h2>Table of Contents</h2>
@@ -220,10 +230,10 @@
       <li><a href="#q1">1. Approved paralegal profiles</a></li>
       <li><a href="#q2">2. Project-based work — not placement</a></li>
       <li><a href="#q3">3. Clear scope before work begins</a></li>
-      <li><a href="#q4">4. Secure, approval-based payments</a></li>
+      <li><a href="#q4">4. Stripe-processed, approval-based payments</a></li>
       <li><a href="#q5">5. Independent, professional engagement</a></li>
       <li><a href="#q6">6. What Let’s-ParaConnect is — and isn’t</a></li>
-      <li><a href="#q7">7. Is there a minimum case budget?</a></li>
+      <li><a href="#q7">7. Is there a minimum Matter amount?</a></li>
       <li><a href="#q8">8. Are there platform fees?</a></li>
       <li><a href="#q9">9. Can attorneys request conflict checks?</a></li>
       <li><a href="#q10">10. Admission &amp; availability</a></li>
@@ -232,7 +242,7 @@
 
   <section id="q1" class="card">
     <h2>1) Approved paralegal profiles</h2>
-    <p>Paralegals on Let’s-ParaConnect are experienced professionals with prior law-firm and professional office experience. Each paralegal creates a detailed profile outlining their background, practice areas, and project experience. Platform access is approval-based, and profiles are reviewed before approval.</p>
+    <p>Each approved paralegal profile contains applicant-submitted information about the person’s background, practice areas, and project experience. LPC reviews submitted profiles for platform access, but does not independently authenticate credentials or guarantee qualifications. Attorneys remain responsible for evaluating experience and fit before engaging anyone.</p>
   </section>
 
   <section id="q2" class="card">
@@ -242,12 +252,12 @@
 
   <section id="q3" class="card">
     <h2>3) Clear scope before work begins</h2>
-    <p>Each project includes a task overview so expectations are aligned from the outset. Final task details and workflow are confirmed after a paralegal is hired, allowing flexibility while maintaining clarity and control.</p>
+    <p>Each Matter includes a task overview so expectations are aligned from the outset. Final task details and workflow are confirmed after a paralegal is hired, allowing flexibility while maintaining clarity and control.</p>
   </section>
 
   <section id="q4" class="card">
-    <h2>4) Secure, approval-based payments</h2>
-    <p>Attorneys pay through Stripe Connect for project work. Let’s-ParaConnect uses Stripe Connect to facilitate payment processing and route payouts to the paralegal connected to that project once project completion is confirmed in the platform or a platform review is resolved. Let’s-ParaConnect charges a platform fee for use of the software platform and does not take custody of user funds.</p>
+    <h2>4) Stripe-processed, approval-based payments</h2>
+    <p>Attorneys fund Matter work through Stripe. Let’s-ParaConnect uses Stripe Connect to facilitate payment processing and route payouts to the paralegal connected to that Matter once completion is confirmed in the platform or a platform review is resolved. Let’s-ParaConnect charges a platform fee for use of the software platform and does not take custody of user funds.</p>
   </section>
 
   <section id="q5" class="card">
@@ -272,18 +282,18 @@
       <li>A job board</li>
       <li>An open or public sign-up platform</li>
     </ul>
-    <p>Let’s-ParaConnect is a software platform that enables attorneys to engage independent paralegals and facilitate payments through Stripe Connect. Let’s-ParaConnect is not a law firm, does not provide legal advice, does not assign engagements, and is not an escrow service, money transmitter, or payment processor. The platform does not facilitate attorney-client relationships, and attorney-client communications are not permitted on the platform.</p>
+    <p>Let’s-ParaConnect is a software platform that enables attorneys to engage independent paralegals and facilitate payments through Stripe Connect. Let’s-ParaConnect is not a law firm, does not provide legal advice, does not assign engagements, and is not an escrow service, money transmitter, or payment processor. Using LPC does not create an attorney-client relationship with LPC. LPC is not a channel for attorneys to communicate with their own clients and must not be used to receive, transmit, or hold client trust funds.</p>
     <p>Let’s-ParaConnect is a private, approval-based platform. Admission is limited and granted by approval only.</p>
   </section>
 
   <section id="q7" class="card">
-    <h2>7) Is there a minimum case budget?</h2>
-    <p>Yes. To maintain the standards of the platform, cases posted on Let’s-ParaConnect have a minimum of $400. This reflects the experience level of participating paralegals, whose profiles are reviewed before approval for platform access, and supports focused, professional engagements rather than transactional or under-scoped work.</p>
+    <h2>7) Is there a minimum Matter amount?</h2>
+    <p>Yes. Matters posted on Let’s-ParaConnect have a minimum compensation amount of $400. The minimum is a posting requirement, not a guarantee that a Matter is adequately scoped or that a particular engagement will be successful.</p>
   </section>
 
   <section id="q8" class="card">
     <h2>8) Are there platform fees?</h2>
-    <p>Yes. For an initial hire, Let’s-ParaConnect charges the matter amount plus a 22% attorney platform fee through Stripe when the attorney confirms the hire. Stripe processing fees apply as part of the Stripe payment transaction. The billing area and matter receipt reflect the applicable case-specific amounts.</p>
+    <p>Yes. For an initial hire, Let’s-ParaConnect charges the Matter amount plus a 22% attorney platform fee through Stripe when the attorney confirms the hire. No separate Stripe processing line item is added beyond the total displayed at confirmation. The billing area and Matter receipt reflect the applicable Matter-specific amounts.</p>
   </section>
 
   <section id="q9" class="card">
@@ -294,15 +304,15 @@
 
   <section id="q10" class="card">
     <h2>10) Admission &amp; availability</h2>
-    <p>Attorney accounts are reviewed and approved manually. We are currently onboarding a limited group of founding attorneys ahead of project posting.</p>
-    <p>Self-serve account deactivation is handled in Settings. It disables access and removes an account from active platform participation, but it is not full erasure. Attorneys cannot deactivate while involved in an active matter or while escrow, payout, dispute, or other financial obligations remain unresolved.</p>
+    <p>Attorney accounts are reviewed manually, and platform access is limited to approved accounts.</p>
+    <p>Self-serve account deactivation is handled in Settings. It disables access and removes an account from active platform participation, but it is not full erasure. Attorneys cannot deactivate while involved in an active Matter or while funding, payout, dispute, or other financial obligations remain unresolved.</p>
   </section>
 </main>
 
 <section class="section about wrap" style="text-align: center; background-color: #ffffff;" id="cta">
   <h2 style="color: #1a2230; font-family: 'Cormorant Garamond', sans-serif; font-weight: 200;">Ready to Get Started?</h2>
   <p style="color: #333333; font-family: 'Sarabun', sans-serif; font-weight: 200; max-width: 600px; margin: 0 auto 1.5rem;">
-    Join a limited group of founding attorneys and access approved paralegal support for your next project.
+    Apply to join Let’s-ParaConnect. After approval, you can post a Matter, review applicants, and choose whom to engage.
   </p>
   <a class="cta" href="signup.html" style="
     margin-top: 1rem;
@@ -314,30 +324,38 @@
     border-radius: 6px;
     display: inline-block;
     text-decoration: none;
-    transition: all 0.3s ease;
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
   ">Request Access</a>
 </section>
+  <footer class="home-footer">
+    <div class="home-footer__top">
+      <div class="home-footer__brand">
+        <a class="home-brand" href="index.html">Let<span class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+        <p>Project-based legal support for attorneys and independent paralegals.</p>
+      </div>
+      <nav aria-label="Footer navigation">
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
+        <a href="contact.html">Contact</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="/paralegal-admission.html">Paralegal Admission</a>
+        <a href="accessibility.html">Accessibility</a>
+      </nav>
+    </div>
+    <div class="home-footer__bottom">
+      <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
+      <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg>
+        <span>Accessibility</span>
+      </button>
+    </div>
+  </footer>
 
-<footer class="footer">
-  <div class="footer-inner">
-    <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
-    <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
-    <nav>
-      <a href="privacy.html">Privacy Policy</a>
-      <span>|</span>
-      <a href="terms.html">Terms</a>
-      <span>|</span>
-      <a href="/paralegal-admission.html">Admissions</a>
-      <span>|</span>
-      <a href="contact.html">Contact</a>
-      <span>|</span>
-      <a href="accessibility.html">Accessibility</a>
-    </nav>
-    <div class="region">United States</div>
-  </div>
-</footer>
 
-<script type="module" src="assets/scripts/hero-parallax.js"></script>
+
+<script src="assets/scripts/utility-header.js" defer></script>
+<script src="assets/scripts/public-matter-field.js" defer></script>
 <script>
   const ctaSection = document.getElementById("cta");
   if (ctaSection) {

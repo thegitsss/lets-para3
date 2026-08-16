@@ -26,7 +26,7 @@ async function sendVerificationEmail({ user, email }) {
     userId: user._id.toString(),
     email: targetEmail,
   });
-  const verifyUrl = `${process.env.APP_BASE_URL || ""}/verify-email?token=${verifyToken}`;
+  const verifyUrl = `${process.env.APP_BASE_URL || ""}/verify-email.html?token=${verifyToken}`;
   await sendEmail(targetEmail, "Verify your email", `Click to verify: ${verifyUrl}`);
 }
 

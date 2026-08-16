@@ -238,8 +238,8 @@ function runPreferencesUiVerification(source) {
     },
     {
       key: "preferences-post",
-      label: "The preferences flow posts back to /api/account/preferences.",
-      passed: source.includes('fetch("/api/account/preferences", {'),
+      label: "The preferences flow posts through the CSRF-aware request wrapper.",
+      passed: source.includes('secureFetch("/api/account/preferences", {'),
     },
     {
       key: "preferences-post-method",
@@ -248,8 +248,8 @@ function runPreferencesUiVerification(source) {
     },
     {
       key: "preferences-body",
-      label: "The preferences payload still includes email, theme, and state.",
-      passed: source.includes("body: JSON.stringify({ email, theme, state })"),
+      label: "The validated preferences payload is sent through the request wrapper.",
+      passed: source.includes("body: payload"),
     },
     {
       key: "preferences-response-guard",
@@ -545,7 +545,7 @@ async function runPreferencesSaveVerification({ incident, patch, verification })
   };
 }
 
-function resolveVerificationRecipe({ incident, investigation, patch }) {
+function resolveVerificationRecipe({ incident, investigation }) {
   const recipe = selectPatchRecipe({ incident, investigation });
   if (!recipe) {
     return {
@@ -809,7 +809,7 @@ async function runVerification(incident) {
     });
   }
 
-  const verificationRecipe = resolveVerificationRecipe({ incident, investigation, patch });
+  const verificationRecipe = resolveVerificationRecipe({ incident, investigation });
   let verificationResult;
   if (!verificationRecipe.supported) {
     const blockedChecks = buildBlockedCoverageChecks(patch, verificationRecipe.reason);

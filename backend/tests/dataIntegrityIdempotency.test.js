@@ -63,12 +63,17 @@ describe("Data integrity + idempotency", () => {
       state: "CA",
     });
 
+    const assignedParalegalId = new (require("mongoose").Types.ObjectId)();
     const caseDoc = await Case.create({
       title: "Immigration support",
       details: "Idempotency test case details.",
       status: "in progress",
       attorney: attorney._id,
       attorneyId: attorney._id,
+      paralegal: assignedParalegalId,
+      paralegalId: assignedParalegalId,
+      escrowIntentId: "pi_file_idempotency",
+      escrowStatus: "funded",
       totalAmount: 100000,
       currency: "usd",
     });

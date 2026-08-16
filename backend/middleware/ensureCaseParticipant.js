@@ -17,7 +17,7 @@ async function evaluateCaseParticipant(req, caseId) {
   }
 
   const caseDoc = await Case.findById(caseId).select(
-    "_id title status escrowStatus escrowIntentId paymentReleased attorney attorneyId paralegal paralegalId withdrawnParalegalId pendingParalegalId invites readOnly tasksLocked hiredAt"
+    "_id title status escrowStatus escrowIntentId paymentReleased attorney attorneyId paralegal paralegalId paralegalAccessRevokedAt withdrawnParalegalId pendingParalegalId invites readOnly tasksLocked hiredAt"
   );
   if (!caseDoc) {
     const err = new Error("Case not found");
@@ -38,6 +38,18 @@ async function evaluateCaseParticipant(req, caseId) {
   const isParalegal =
     (caseDoc.paralegal && String(caseDoc.paralegal) === uid) ||
     (caseDoc.paralegalId && String(caseDoc.paralegalId) === uid);
+  const baseUrl = String(req.baseUrl || "");
+  const path = String(req.path || "");
+  const allowFinalizedParalegalReceipt =
+    isParalegal &&
+    caseDoc.paralegalAccessRevokedAt &&
+    baseUrl.includes("/payments") &&
+    path.includes("/receipt/paralegal");
+  if (isParalegal && caseDoc.paralegalAccessRevokedAt && !allowFinalizedParalegalReceipt) {
+    const err = new Error("Access denied");
+    err.statusCode = 403;
+    throw err;
+  }
   const isWithdrawnParalegal =
     caseDoc.withdrawnParalegalId && String(caseDoc.withdrawnParalegalId) === uid;
   const isPendingParalegal =
@@ -51,8 +63,6 @@ async function evaluateCaseParticipant(req, caseId) {
       ));
 
   if (!isAttorney && !isParalegal) {
-    const baseUrl = String(req.baseUrl || "");
-    const path = String(req.path || "");
     const allowWithdrawn =
       isWithdrawnParalegal &&
       (baseUrl.includes("/disputes") ||

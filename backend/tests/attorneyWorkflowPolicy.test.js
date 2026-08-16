@@ -24,6 +24,7 @@ const {
   DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT,
   DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT,
   getCurrentPlatformFeePolicy,
+  resolvePlatformFeePolicy,
 } = require("../services/platformFeePolicy");
 
 function activeCase(overrides = {}) {
@@ -106,6 +107,13 @@ describe("attorney executable workflow policy", () => {
       "conflicts_details_required",
       "confidentiality_document_required",
     ]));
+    expect(evaluateInvitationEligibility({
+      caseDoc: { status: "paused", pausedReason: "attorney_paused" },
+      ownerAuthorized: true,
+      targetSelected: true,
+      paralegalApproved: true,
+      payoutSetupReady: true,
+    }).blockers).toContain("matter_not_open");
   });
 
   test("hiring policy requires successful prerequisites and states actual charge timing", () => {
@@ -159,6 +167,14 @@ describe("attorney executable workflow policy", () => {
       ownerAuthorized: true,
     });
     expect(completed.evidenceState).toBe(EVIDENCE_STATES.NOT_APPLICABLE);
+    expect(evaluateCompletionEligibility({
+      caseDoc: activeCase({ status: "paused", pausedReason: "attorney_paused" }),
+      ownerAuthorized: true,
+    }).blockers).toContain("active_matter_required");
+    expect(evaluateCompletionEligibility({
+      caseDoc: activeCase({ disputes: [{ status: "open" }] }),
+      ownerAuthorized: true,
+    }).blockers).toContain("open_dispute");
   });
 
   test("completion policy exposes the authoritative paralegal payout and bank timing", () => {
@@ -167,8 +183,12 @@ describe("attorney executable workflow policy", () => {
       verifiedFundingRequired: true,
       paralegalPayoutSetupRequired: true,
       payoutReleaseTrigger: "when_attorney_completes_matter",
-      bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-      bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+      bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+      bankDepositTimingDependsOn: [
+        "stripe_account_country",
+        "stripe_payout_schedule",
+        "financial_institution",
+      ],
     }));
   });
 
@@ -200,6 +220,10 @@ describe("attorney executable workflow policy", () => {
       caseDoc: activeCase({ terminationStatus: "disputed" }),
       ownerAuthorized: true,
     }).blockers).toContain("termination_already_in_progress");
+    expect(evaluateTerminationEligibility({
+      caseDoc: activeCase({ status: "paused", pausedReason: "attorney_paused" }),
+      ownerAuthorized: true,
+    }).blockers).toContain("active_matter_required");
   });
 
   test("enforcing routes import the shared policy instead of private minimum/timing rules", () => {
@@ -218,8 +242,9 @@ describe("attorney executable workflow policy", () => {
     expect(sources[1]).toContain("evaluateMatterPosting");
     expect(sources[2]).toContain("evaluateApplicationEligibility");
     expect(sources[3]).toContain("evaluateMessagingPermission");
-    expect(sources[4]).toContain("bankDepositEstimateBusinessDays");
-    expect(sources[4]).not.toContain("ranges from 3–5 business days");
+    expect(sources[0]).toContain("current payout status and estimated arrival");
+    expect(sources[0]).not.toContain("bankDepositEstimateBusinessDays");
+    expect(sources[0]).not.toMatch(/3[–-]5 business days/);
   });
 
   test("stage registry includes every Package 2 workflow family", () => {
@@ -234,11 +259,35 @@ describe("attorney executable workflow policy", () => {
       attorneyPercent: DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT,
       paralegalPercent: DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT,
       attorneyChargeTiming: "charged_when_hire_is_confirmed",
+      paralegalChargeTiming: "deducted_from_completed_paid_work_before_payout",
       historicalSource: "case_fee_snapshot",
     });
     const root = path.join(__dirname, "..");
-    for (const relative of ["models/Case.js", "routes/cases.js", "routes/payments.js"]) {
+    for (const relative of [
+      "models/Case.js",
+      "routes/admin.js",
+      "routes/cases.js",
+      "routes/paralegalDashboard.js",
+      "routes/payments.js",
+      "scripts/backfill-attorney-fees.js",
+      "utils/paymentIntegrity.js",
+      "utils/stripe.js",
+    ]) {
       expect(fs.readFileSync(path.join(root, relative), "utf8")).toContain("platformFeePolicy");
     }
+  });
+
+  test("fee policy defaults only missing values and rejects malformed configured percentages", () => {
+    expect(resolvePlatformFeePolicy({})).toEqual({
+      attorneyPercent: 22,
+      paralegalPercent: 18,
+      attorneyChargeTiming: "charged_when_hire_is_confirmed",
+      paralegalChargeTiming: "deducted_from_completed_paid_work_before_payout",
+      historicalSource: "case_fee_snapshot",
+    });
+    expect(() => resolvePlatformFeePolicy({ PLATFORM_FEE_ATTORNEY_PERCENT: "twenty-two" }))
+      .toThrow(/must be a percentage from 0 to 100/i);
+    expect(() => resolvePlatformFeePolicy({ PLATFORM_FEE_PARALEGAL_PERCENT: "101" }))
+      .toThrow(/must be a percentage from 0 to 100/i);
   });
 });

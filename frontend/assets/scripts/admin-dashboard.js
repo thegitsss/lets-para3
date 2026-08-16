@@ -1,4 +1,4 @@
-import { secureFetch, fetchCSRF } from "./auth.js";
+import { secureFetch } from "./auth.js";
 import {
   fetchIncidentList,
   fetchIncidentDetail,
@@ -10,6 +10,7 @@ import { renderIncidentList } from "./admin/incidents/list.js";
 import { renderIncidentDetail } from "./admin/incidents/detail.js";
 import { renderIncidentTimeline } from "./admin/incidents/timeline.js";
 import { renderIncidentClusters } from "./admin/incidents/clusters.js";
+import { confirmAction, showAlert } from "./utils/dialogs.js";
 import "./admin/knowledge.js";
 import "./admin/engineering.js";
 import "./admin/marketing.js";
@@ -22,7 +23,6 @@ userLine: null,
 combo: null,
 escrow: null,
 revenue: null,
-expense: null,
   escrowReport: null,
 };
 
@@ -87,7 +87,6 @@ chartCache.userLine = Chart.getChart("userChart") || chartCache.userLine;
 chartCache.combo = Chart.getChart("userMgmtComboChart") || chartCache.combo;
 chartCache.escrow = Chart.getChart("escrowChart") || chartCache.escrow;
 chartCache.revenue = Chart.getChart("revMainChart") || chartCache.revenue;
-chartCache.expense = Chart.getChart("revExpenseChart") || chartCache.expense;
   chartCache.escrowReport = Chart.getChart("escrowReportChart") || chartCache.escrowReport;
 }
 
@@ -108,10 +107,6 @@ if (!Number.isFinite(Number(value))) return "0";
 return Number(value).toLocaleString();
 }
 
-function parseCountText(value, fallback = 0) {
-  const match = String(value || "").replace(/,/g, "").match(/-?\d+/);
-  return match ? Number(match[0]) : fallback;
-}
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -122,17 +117,6 @@ function escapeHTML(value) {
     .replace(/'/g, "&#39;");
 }
 
-async function fetchAdminJson(url, fallback = null) {
-  try {
-    const res = await secureFetch(url, { headers: { Accept: "application/json" } });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(payload?.error || `Unable to load ${url}.`);
-    return payload;
-  } catch (err) {
-    console.warn(`Unable to load admin dashboard resource: ${url}`, err);
-    return fallback;
-  }
-}
 
 async function fetchOverviewResource(key, url, fallback = null) {
   try {
@@ -153,9 +137,6 @@ function formatActionCount(count, noun) {
   return `${formatNumber(total)} ${noun}${total === 1 ? "" : "s"}`;
 }
 
-function pluralize(count, singular, plural = `${singular}s`) {
-  return Number(count) === 1 ? singular : plural;
-}
 
 function flashOverviewTarget(target) {
   if (!target) return;
@@ -790,7 +771,9 @@ function animateAIControlRoomDecisionQueueTransition(snapshot = null, root = nul
         fill: "forwards",
       }
     );
-    animation.finished.catch(() => {}).finally(() => {
+    animation.finished.catch((error) => {
+      if (error?.name !== "AbortError") console.warn("[admin] removal animation rejected", error);
+    }).finally(() => {
       ghost.remove();
     });
   });
@@ -1062,10 +1045,7 @@ function buildAIControlRoomFallbackData() {
       founder: buildAIControlRoomFounderFallbackView(isUnavailable),
       admissions: buildNeutralFocus("Admissions / Review"),
       support: buildNeutralFocus("Support Ops"),
-      engineering: buildAIControlRoomUnavailableFocus(
-        "Engineering Triage",
-        "Engineering triage is not available in the War Room yet."
-      ),
+      engineering: buildNeutralFocus("Engineering Operations"),
       payments: buildNeutralFocus("Payments & Risk"),
       incidents: buildNeutralFocus("Incident Control Room"),
       lifecycle: buildNeutralFocus("Lifecycle & Follow-Up"),
@@ -1232,7 +1212,9 @@ async function syncAIControlRoomInBackground({ refreshIncidentWorkspace = false 
         repaintAIControlRoomFromState();
 
         if (refreshIncidentWorkspace) {
-          void renderIncidentWorkspace(true).catch(() => {});
+          void renderIncidentWorkspace(true).catch((error) => {
+            console.error("[admin] incident workspace refresh rejected", error);
+          });
         }
       } while (aiControlRoomState.queuedBackgroundSync);
     } finally {
@@ -1303,18 +1285,17 @@ function deepCloneAIControlRoomValue(value) {
 }
 
 function buildAIControlRoomSummaryNotes({
-  urgentDecisionCount = 0,
   needsDecisionCount = 0,
   autoHandledCount = 0,
   blockedWaitingCount = 0,
 } = {}) {
   return {
     urgent: {
-      value: String(urgentDecisionCount),
+      value: String(needsDecisionCount),
       note:
-        urgentDecisionCount > 0
-          ? `${pluralizeAIControlRoom(urgentDecisionCount, "decision")} need a yes or no right now across the live lanes.`
-          : "No urgent decision is currently required across the live lanes.",
+        needsDecisionCount > 0
+          ? `${pluralizeAIControlRoom(needsDecisionCount, "decision")} need a yes or no right now across the live lanes.`
+          : "No decision is currently required across the live lanes.",
     },
     review: {
       value: String(autoHandledCount),
@@ -1684,9 +1665,6 @@ function applyAIControlRoomDecisionGroupingToData(data = {}) {
     .filter(Boolean);
 
   const needsDecisionCount = groupedDecisionQueue.length;
-  const urgentDecisionCount = groupedDecisionQueue.filter((item) =>
-    /urgent/i.test(String(item?.urgencyLabel || ""))
-  ).length;
   const autoHandledCount = Array.isArray(founderView.autoHandledItems) ? founderView.autoHandledItems.length : 0;
   const blockedWaitingCount = founderView.blockedItems.reduce((sum, item) => {
     const laneKey = String(item?.laneKey || "").trim().toLowerCase();
@@ -1753,7 +1731,6 @@ function applyAIControlRoomDecisionGroupingToData(data = {}) {
   });
 
   const summaryNotes = buildAIControlRoomSummaryNotes({
-    urgentDecisionCount,
     needsDecisionCount,
     autoHandledCount,
     blockedWaitingCount,
@@ -2218,9 +2195,9 @@ function renderAIControlRoomFounderConsole(view) {
               <div>
                 <p class="ai-room-section-label">Decision Queue</p>
                 <h3>Decision Queue</h3>
-                <p class="ai-room-founder-queue-progress" aria-live="polite">${urgentDecisionCount} urgent remaining</p>
+                <p class="ai-room-founder-queue-progress" aria-live="polite">${pluralizeAIControlRoom(decisionQueue.length, "decision")} remaining</p>
               </div>
-              <span class="pending-count">${decisionQueue.length} total</span>
+              <span class="pending-count">${urgentDecisionCount ? `${urgentDecisionCount} urgent` : "No urgent flags"}</span>
             </div>
         ${
           decisionQueue.length
@@ -2249,140 +2226,9 @@ function renderAIControlRoomFounderConsole(view) {
   `;
 }
 
-function renderAIControlRoomList(containerId, countId, items = []) {
-  const container = document.getElementById(containerId);
-  const countEl = document.getElementById(countId);
-  if (!container) return;
-  if (countEl) countEl.textContent = `${items.length} ${items.length === 1 ? "item" : "items"}`;
-  if (!items.length) {
-    let emptyMessage = "No live items are currently visible.";
-    if (aiControlRoomState.loadStatus === "error") {
-      emptyMessage = "Live data is unavailable.";
-      if (containerId === "aiRoomOutboundMessages") {
-        emptyMessage = "Draft records are unavailable.";
-      }
-    } else if (!aiControlRoomState.summary) {
-      emptyMessage = "Loading live data...";
-    } else if (containerId === "aiRoomUrgentQueue") {
-      emptyMessage = "No urgent items are currently visible.";
-    } else if (containerId === "aiRoomAwaitingReview") {
-      emptyMessage = "No items are currently awaiting review.";
-    } else if (containerId === "aiRoomRecentEscalations") {
-      emptyMessage = "No recent escalations are currently visible.";
-    } else if (containerId === "aiRoomOutboundMessages") {
-      emptyMessage = "No real draft records are available.";
-    }
-    container.innerHTML = `<div class="ai-room-empty">${escapeHTML(emptyMessage)}</div>`;
-    return;
-  }
 
-  container.innerHTML = items
-    .map(
-      (item) => `
-      <article class="ai-room-list-item ${containerId === "aiRoomOutboundMessages" ? "ai-room-message" : ""}">
-        <div class="ai-room-list-item-top">
-          <strong class="ai-room-list-item-title">${escapeHTML(item.title)}</strong>
-          <span class="${getBadgeClass(item.tone)}">${escapeHTML(item.badge)}</span>
-        </div>
-        <p>${escapeHTML(item.body)}</p>
-      </article>
-    `
-    )
-    .join("");
-}
 
-function getAIControlRoomEmptyMessage(kind = "") {
-  if (aiControlRoomState.loadStatus === "error") {
-    return kind === "outbound" ? "Draft records are unavailable." : "Live data is unavailable.";
-  }
-  if (!aiControlRoomState.summary) {
-    return "Loading live data...";
-  }
-  if (kind === "urgent") return "No urgent items are currently visible.";
-  if (kind === "review") return "No items are currently awaiting review.";
-  if (kind === "escalations") return "No recent escalations are currently visible.";
-  if (kind === "outbound") return "No real draft records are available.";
-  return "No live items are currently visible.";
-}
 
-function buildAIControlRoomFeedItem(item = {}, options = {}) {
-  const isMessage = options.message === true;
-  return `
-    <article class="ai-room-list-item ${isMessage ? "ai-room-message" : ""}">
-      <div class="ai-room-list-item-top">
-        <strong class="ai-room-list-item-title">${escapeHTML(item.title)}</strong>
-        <span class="${getBadgeClass(item.tone)}">${escapeHTML(item.badge)}</span>
-      </div>
-      <p>${escapeHTML(item.body)}</p>
-    </article>
-  `;
-}
-
-function renderAIControlRoomCombinedFeed(data = {}) {
-  const container = document.getElementById("aiRoomCombinedFeed");
-  const metaEl = document.getElementById("aiRoomCombinedFeedMeta");
-  if (!container) return;
-
-  const sections = [
-    {
-      key: "urgent",
-      label: "Queue",
-      title: "Urgent Queue",
-      items: Array.isArray(data.urgentQueue) ? data.urgentQueue : [],
-    },
-    {
-      key: "review",
-      label: "Review",
-      title: "Awaiting Review",
-      items: Array.isArray(data.awaitingReview) ? data.awaitingReview : [],
-    },
-    {
-      key: "escalations",
-      label: "Signals",
-      title: "Recent Escalations",
-      items: Array.isArray(data.recentEscalations) ? data.recentEscalations : [],
-    },
-    {
-      key: "outbound",
-      label: "Drafts",
-      title: "Outbound Messages",
-      items: Array.isArray(data.outboundMessages) ? data.outboundMessages : [],
-      message: true,
-    },
-  ];
-
-  const activeSections = sections.filter((section) => section.items.length);
-  const totalItems = sections.reduce((sum, section) => sum + section.items.length, 0);
-
-  if (metaEl) {
-    metaEl.textContent = `${totalItems} ${totalItems === 1 ? "item" : "items"}`;
-  }
-
-  if (!activeSections.length) {
-    container.innerHTML = `<div class="ai-room-empty">${escapeHTML(getAIControlRoomEmptyMessage())}</div>`;
-    return;
-  }
-
-  container.innerHTML = sections
-    .filter((section) => section.items.length)
-    .map(
-      (section) => `
-        <section class="ai-room-feed-section">
-          <div class="ai-room-feed-section-top">
-            <div>
-              <p class="ai-room-section-label">${escapeHTML(section.label)}</p>
-              <h3>${escapeHTML(section.title)}</h3>
-            </div>
-            <span class="pending-count">${section.items.length} ${section.items.length === 1 ? "item" : "items"}</span>
-          </div>
-          <div class="ai-room-list">
-            ${section.items.map((item) => buildAIControlRoomFeedItem(item, { message: section.message === true })).join("")}
-          </div>
-        </section>
-      `
-    )
-    .join("");
-}
 
 function paintAIControlRoom(data, focusKey) {
   renderAIControlRoomSummary(data.summary);
@@ -2624,7 +2470,8 @@ async function openAIControlRoomCard(key, shouldScroll = true) {
     if (liveView) {
       renderAIControlRoomFocus(liveView);
     }
-  } catch (_err) {
+  } catch (err) {
+    console.warn("[admin-control-room] live focus refresh failed", err);
     // Keep the current focus panel state instead of repainting the whole control room.
   }
   if (shouldScroll) {
@@ -2669,7 +2516,9 @@ function applyOptimisticAIControlRoomDecisionDescriptor(input = {}) {
           descriptor.kind === "incident_approval" ||
           activeAIControlRoomKey === "engineering" ||
           activeAIControlRoomKey === "incidents",
-      }).catch(() => {});
+      }).catch((error) => {
+        console.error("[admin] control-room background synchronization rejected", error);
+      });
     },
   };
 }
@@ -2749,7 +2598,9 @@ async function runAIControlRoomDecisionAction(button) {
       if (completedCount > 0) {
         await syncAIControlRoomInBackground({
           refreshIncidentWorkspace: shouldRefreshIncidentWorkspace,
-        }).catch(() => {});
+        }).catch((syncError) => {
+          console.error("[admin] partial batch synchronization rejected", syncError);
+        });
       }
       throw error;
     }
@@ -2763,7 +2614,7 @@ function showToast(message, type = "info") {
   if (toast?.show) {
     toast.show(message, { targetId: "toastBanner", type });
   } else if (message) {
-    alert(message);
+    void showAlert(message, { title: type === "err" ? "Action unavailable" : "Notice" });
   }
 }
 
@@ -2866,7 +2717,7 @@ function renderDisputeHeader(status) {
   if (!disputesHeaderRow) return;
   if (status === "resolved") {
     disputesHeaderRow.innerHTML = `
-      <th>Case</th>
+      <th>Matter</th>
       <th>Parties</th>
       <th>Resolution</th>
       <th>Resolved</th>
@@ -2876,7 +2727,7 @@ function renderDisputeHeader(status) {
   }
   if (status === "rejected") {
     disputesHeaderRow.innerHTML = `
-      <th>Case</th>
+      <th>Matter</th>
       <th>Parties</th>
       <th>Dispute</th>
       <th>Status</th>
@@ -2885,7 +2736,7 @@ function renderDisputeHeader(status) {
     return;
   }
   disputesHeaderRow.innerHTML = `
-    <th>Case</th>
+    <th>Matter</th>
     <th>Parties</th>
     <th>Dispute</th>
     <th>Status</th>
@@ -2969,28 +2820,9 @@ pageItems.forEach((user) => {
 });
 }
 
-function clampNumber(value, min, max) {
-const num = Number(value);
-if (!Number.isFinite(num)) return null;
-return Math.min(max, Math.max(min, num));
-}
-
-function formatTaxRatePercent(rate) {
-if (!Number.isFinite(Number(rate))) return "";
-const percent = Number(rate) * 100;
-return percent % 1 === 0 ? String(percent) : percent.toFixed(1);
-}
-
 function setSettingsStatus(message = "") {
 const status = document.getElementById("settingsStatus");
 if (status) status.textContent = message;
-}
-
-let adminThemeManuallyChanged = false;
-
-function normalizeAdminTheme(value) {
-const candidate = String(value || "").toLowerCase();
-return candidate === "light" || candidate === "mountain" ? candidate : "mountain";
 }
 
 function applySettingsToForm(settings = {}) {
@@ -3000,51 +2832,10 @@ const maintenanceInput = document.getElementById("settingMaintenanceMode");
 if (maintenanceInput) maintenanceInput.checked = !!settings.maintenanceMode;
 const emailInput = document.getElementById("settingSupportEmail");
 if (emailInput) emailInput.value = settings.supportEmail || "";
-const taxInput = document.getElementById("settingTaxRate");
-if (taxInput) taxInput.value = formatTaxRatePercent(settings.taxRate);
 const updatedLabel = document.getElementById("settingsUpdatedAt");
 if (updatedLabel) {
 const updated = settings.updatedAt ? formatDate(settings.updatedAt) : "";
 updatedLabel.textContent = updated ? `Last updated ${updated}` : "";
-}
-}
-
-function applyAdminThemeToForm(theme) {
-const themeInput = document.getElementById("settingAdminTheme");
-if (themeInput) themeInput.value = normalizeAdminTheme(theme);
-}
-
-function previewAdminTheme(theme) {
-const normalizedTheme = normalizeAdminTheme(theme);
-applyAdminThemeToForm(normalizedTheme);
-if (typeof window.applyThemePreference === "function") {
-window.applyThemePreference(normalizedTheme);
-}
-return normalizedTheme;
-}
-
-async function loadAdminThemePreference() {
-const fallbackTheme =
-  typeof window.getThemePreference === "function" ? window.getThemePreference() : "mountain";
-try {
-  const res = await secureFetch("/api/account/preferences", {
-    headers: { Accept: "application/json" },
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data?.error || data?.msg || "Unable to load theme preference.");
-  }
-  const resolvedTheme = normalizeAdminTheme(data?.theme || fallbackTheme);
-  if (!adminThemeManuallyChanged) {
-    previewAdminTheme(resolvedTheme);
-  }
-  return resolvedTheme;
-} catch (err) {
-  console.error("Failed to load admin theme preference", err);
-  if (!adminThemeManuallyChanged) {
-    previewAdminTheme(fallbackTheme);
-  }
-  return normalizeAdminTheme(fallbackTheme);
 }
 }
 
@@ -3060,6 +2851,7 @@ throw new Error(data?.error || data?.msg || "Unable to load settings.");
 const settings = data.settings || data;
 adminSettingsCache = settings;
 applySettingsToForm(settings);
+syncSettingsDirtyState({ updateStatus: false });
 setSettingsStatus("");
 return settings;
 } catch (err) {
@@ -3074,49 +2866,61 @@ function readSettingsFromForm() {
 const allowInput = document.getElementById("settingAllowSignups");
 const maintenanceInput = document.getElementById("settingMaintenanceMode");
 const emailInput = document.getElementById("settingSupportEmail");
-const taxInput = document.getElementById("settingTaxRate");
 
-const payload = {
+return {
 allowSignups: !!allowInput?.checked,
 maintenanceMode: !!maintenanceInput?.checked,
 supportEmail: emailInput ? emailInput.value.trim() : "",
 };
-if (taxInput) {
-const normalized = clampNumber(taxInput.value, 0, 50);
-if (normalized !== null) {
-payload.taxRate = normalized / 100;
-}
-}
-return payload;
 }
 
-async function saveAdminThemePreference() {
-const themeInput = document.getElementById("settingAdminTheme");
-const normalizedTheme = normalizeAdminTheme(themeInput?.value);
-const res = await secureFetch("/api/account/preferences", {
-method: "POST",
-body: { theme: normalizedTheme },
-});
-const data = await res.json().catch(() => ({}));
-if (!res.ok) {
-throw new Error(data?.error || data?.msg || "Unable to save theme preference.");
+function settingsAreDirty() {
+if (!adminSettingsCache) return false;
+const current = readSettingsFromForm();
+return current.allowSignups !== (adminSettingsCache.allowSignups !== false)
+  || current.maintenanceMode !== !!adminSettingsCache.maintenanceMode
+  || current.supportEmail.trim().toLowerCase() !== String(adminSettingsCache.supportEmail || "").trim().toLowerCase();
 }
-const savedTheme = normalizeAdminTheme(data?.preferences?.theme || data?.theme || normalizedTheme);
-adminThemeManuallyChanged = false;
-previewAdminTheme(savedTheme);
-return savedTheme;
+
+function syncSettingsDirtyState({ updateStatus = true } = {}) {
+const saveBtn = document.getElementById("saveAdminSettings");
+const dirty = settingsAreDirty();
+if (saveBtn) saveBtn.disabled = !dirty;
+if (updateStatus) setSettingsStatus(dirty ? "Unsaved changes." : "");
+return dirty;
 }
 
 async function saveAdminSettings() {
 const saveBtn = document.getElementById("saveAdminSettings");
 const original = saveBtn?.textContent || "Save Settings";
+const payload = readSettingsFromForm();
+const restrictions = [];
+if (payload.allowSignups === false && adminSettingsCache?.allowSignups !== false) {
+restrictions.push("pause all new account registrations");
+}
+if (payload.maintenanceMode === true && adminSettingsCache?.maintenanceMode !== true) {
+restrictions.push("block non-admin logins with maintenance mode");
+}
+if (restrictions.length) {
+const confirmed = await confirmAction(
+`This change will ${restrictions.join(" and ")}. Existing work should be coordinated before continuing.`,
+{
+title: "Apply platform restrictions?",
+confirmLabel: "Apply restrictions",
+tone: "danger",
+}
+);
+if (!confirmed) {
+setSettingsStatus("Not saved.");
+return null;
+}
+}
 if (saveBtn) {
 saveBtn.disabled = true;
 saveBtn.textContent = "Saving...";
 }
 setSettingsStatus("");
 try {
-const payload = readSettingsFromForm();
 const res = await secureFetch("/api/admin/settings", {
 method: "PUT",
 body: payload,
@@ -3125,10 +2929,10 @@ const data = await res.json().catch(() => ({}));
 if (!res.ok) {
 throw new Error(data?.error || data?.msg || "Unable to save settings.");
 }
-await saveAdminThemePreference();
 const settings = data.settings || data;
 adminSettingsCache = settings;
 applySettingsToForm(settings);
+syncSettingsDirtyState({ updateStatus: false });
 showToast("Settings saved.", "ok");
 setSettingsStatus("Saved.");
 await hydrateAnalytics();
@@ -3140,88 +2944,26 @@ setSettingsStatus("Save failed.");
 return null;
 } finally {
 if (saveBtn) {
-saveBtn.disabled = false;
 saveBtn.textContent = original;
 }
+syncSettingsDirtyState({ updateStatus: false });
 }
 }
 
 function bindSettingsActions() {
 if (settingsBound) return;
 const saveBtn = document.getElementById("saveAdminSettings");
-const themeInput = document.getElementById("settingAdminTheme");
+const allowInput = document.getElementById("settingAllowSignups");
+const maintenanceInput = document.getElementById("settingMaintenanceMode");
+const emailInput = document.getElementById("settingSupportEmail");
 if (saveBtn) {
 saveBtn.addEventListener("click", () => {
 saveAdminSettings();
 });
 }
-if (themeInput) {
-themeInput.addEventListener("change", () => {
-adminThemeManuallyChanged = true;
-previewAdminTheme(themeInput.value);
-setSettingsStatus("Theme preview updated. Save settings to keep it.");
-});
-}
+[allowInput, maintenanceInput].forEach((input) => input?.addEventListener("change", () => syncSettingsDirtyState()));
+emailInput?.addEventListener("input", () => syncSettingsDirtyState());
 settingsBound = true;
-}
-
-function formatReportDate(value = new Date()) {
-const date = value instanceof Date ? value : new Date(value);
-if (Number.isNaN(date.getTime())) return "";
-return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
-function csvEscape(value) {
-const normalized = String(value ?? "").replace(/\r?\n/g, " ").trim();
-return `"${normalized.replace(/"/g, "\"\"")}"`;
-}
-
-function buildTaxReportRows(data) {
-const { taxSummary = {}, ledger = [] } = data || {};
-const reportDate = formatReportDate(new Date());
-const rows = [
-["Lets-ParaConnect Tax Report"],
-["Generated", reportDate || formatDate(new Date())],
-[],
-["Tax Summary"],
-["Gross Earnings", formatCurrency(taxSummary.grossEarnings)],
-["Deductible Expenses", formatCurrency(taxSummary.deductibleExpenses)],
-["Estimated Tax Owed (22%)", formatCurrency(taxSummary.estimatedTax)],
-["Next Filing Deadline", taxSummary.nextFilingDeadline || "—"],
-];
-
-if (Array.isArray(ledger) && ledger.length) {
-rows.push([]);
-rows.push(["Ledger Entries"]);
-rows.push(["Date", "Category", "Description", "Amount", "Type", "Status"]);
-ledger.forEach((entry) => {
-rows.push([
-formatDate(entry.date),
-entry.category || "—",
-entry.description || "—",
-formatCurrency(entry.amount),
-toTitle(entry.type || "income"),
-toTitle(entry.status || "pending"),
-]);
-});
-}
-
-return rows;
-}
-
-function downloadTaxReport(data) {
-const rows = buildTaxReportRows(data);
-const csv = rows
-.map((row) => (row.length ? row.map(csvEscape).join(",") : ""))
-.join("\n");
-const blob = new Blob([csv], { type: "text/csv" });
-const url = URL.createObjectURL(blob);
-const a = document.createElement("a");
-const stamp = new Date().toISOString().split("T")[0];
-a.href = url;
-a.download = `LetsParaConnect_TaxReport_${stamp}.csv`;
-a.click();
-URL.revokeObjectURL(url);
 }
 
 function formatMonthLabel(value) {
@@ -3229,7 +2971,7 @@ if (!value) return "";
 const [year, month] = value.split("-");
 if (!year || !month) return value;
 const date = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
-return date.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+return date.toLocaleDateString(undefined, { month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 function toTitle(value) {
@@ -3240,7 +2982,7 @@ return String(value)
 }
 
 function populateMetrics(data) {
-const { userMetrics = {}, escrowMetrics = {}, revenueMetrics = {}, caseMetrics = {}, expenses = {} } = data || {};
+const { userMetrics = {}, escrowMetrics = {}, revenueMetrics = {}, caseMetrics = {}, payoutMetrics = {} } = data || {};
 
 updateText("#totalUsers", formatNumber(userMetrics.totalUsers));
 updateText("#activeCases", formatNumber(caseMetrics.activeCases));
@@ -3255,12 +2997,12 @@ populateQuickStats(userMetrics, caseMetrics, escrowMetrics);
 updateText("#revenueTotalValue", formatCurrency(revenueMetrics.totalRevenue));
 updateText("#fundsReleasedValue", formatCurrency(escrowMetrics.totalEscrowReleased));
 updateText("#pendingPayoutsValue", formatCurrency(escrowMetrics.pendingPayouts));
-updateText("#platformFeesCollectedValue", formatCurrency(revenueMetrics.platformFeesCollected));
+updateText("#payoutsRecordedValue", formatCurrency(payoutMetrics.totalRecorded));
 
-updateText("#payoutTotal", formatCurrency(expenses.payoutTotal));
+updateText("#payoutTotal", formatCurrency(payoutMetrics.totalRecorded));
 const payoutCountEl = document.getElementById("payoutCount");
 if (payoutCountEl) {
-const payoutCount = Number(expenses.payoutCount) || 0;
+const payoutCount = Number(payoutMetrics.count) || 0;
 payoutCountEl.textContent = `${payoutCount.toLocaleString()} payout${payoutCount === 1 ? "" : "s"} recorded`;
 }
 
@@ -3277,10 +3019,10 @@ const nodes = document.querySelectorAll(".quick-stats div");
 const configs = [
 { label: "Total Users", value: formatNumber(userMetrics.totalUsers) },
 { label: "Pending Approvals", value: formatNumber(userMetrics.pendingApprovals) },
-{ label: "Active Cases", value: formatNumber(caseMetrics.activeCases) },
-{ label: "Completed Cases", value: formatNumber(caseMetrics.completedCases) },
-  { label: "Case funding in progress", value: formatCurrency(escrowMetrics.totalEscrowHeld) },
-  { label: "Funds released", value: formatCurrency(escrowMetrics.totalEscrowReleased) },
+{ label: "Active Matters", value: formatNumber(caseMetrics.activeCases) },
+{ label: "Completed Matters", value: formatNumber(caseMetrics.completedCases) },
+  { label: "Matter funding in progress", value: formatCurrency(escrowMetrics.totalEscrowHeld) },
+  { label: "Matter payments released", value: formatCurrency(escrowMetrics.totalEscrowReleased) },
 ];
 nodes.forEach((node, index) => {
 const strong = node.querySelector("strong") || node.appendChild(document.createElement("strong"));
@@ -3304,35 +3046,22 @@ if (!chart) return;
 const entries = revenueMetrics.monthlyRevenue || [];
 const labels = entries.map((entry) => formatMonthLabel(entry.month));
 const revenueData = entries.map((entry) => Math.round((Number(entry.revenue) || 0) / 100));
-const marginData = entries.map((entry) => Number(entry.margin) || 0);
+const hasRevenue = revenueData.some((value) => value !== 0);
+const emptyState = document.getElementById("revMainChartEmpty");
+chart.canvas.hidden = !hasRevenue;
+if (emptyState) emptyState.hidden = hasRevenue;
 
 chart.data.labels = labels;
 if (chart.data.datasets[0]) chart.data.datasets[0].data = revenueData;
-if (chart.data.datasets[1]) chart.data.datasets[1].data = marginData;
 chart.update("none");
-}
-
-function populateExpenseChart(data) {
-cacheCharts();
-const { revenueMetrics = {}, taxSummary = {}, expenses = {} } = data || {};
-const chart = chartCache.expense;
-if (!chart) return;
-const values = [
-Math.round((Number(revenueMetrics.platformFeesCollected) || 0) / 100),
-Math.round((Number(taxSummary.taxOwed ?? taxSummary.estimatedTax) || 0) / 100),
-Math.round((Number(expenses.operationalCosts) || 0) / 100),
-Math.round((Number(expenses.payoutTotal) || 0) / 100),
-];
-if (chart.data.datasets[0]) {
-chart.data.datasets[0].data = values;
-chart.update("none");
-}
 }
 
 function populateLedger(data) {
 const tbody = document.getElementById("ledgerBody");
 if (!tbody) return;
 const entries = data?.ledger || [];
+const downloadButton = document.getElementById("downloadLedgerCsvBtn");
+if (downloadButton) downloadButton.disabled = entries.length === 0;
 if (!entries.length) {
 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted)">No ledger entries found.</td></tr>';
 return;
@@ -3357,8 +3086,26 @@ tbody.appendChild(row);
 const receiptsBody = document.getElementById("receiptsBody");
 const receiptSearchInput = document.getElementById("receiptSearch");
 const receiptRefreshBtn = document.getElementById("receiptRefreshBtn");
+const receiptPageSelect = document.getElementById("receiptPageSelect");
 const RECEIPTS_PAGE_SIZE = 10;
 let receiptSearchTimer = null;
+let receiptPage = 1;
+
+function updateReceiptPagination(total = 0) {
+  if (!receiptPageSelect) return;
+  const pages = Math.max(1, Math.ceil(Math.max(0, Number(total) || 0) / RECEIPTS_PAGE_SIZE));
+  receiptPage = Math.min(pages, Math.max(1, receiptPage));
+  receiptPageSelect.innerHTML = "";
+  for (let page = 1; page <= pages; page += 1) {
+    const option = document.createElement("option");
+    option.value = String(page);
+    option.textContent = `Page ${page} of ${pages}`;
+    receiptPageSelect.appendChild(option);
+  }
+  receiptPageSelect.value = String(receiptPage);
+  receiptPageSelect.hidden = pages <= 1;
+  receiptPageSelect.disabled = pages <= 1;
+}
 
 function renderReceipts(items = []) {
   if (!receiptsBody) return;
@@ -3372,7 +3119,7 @@ function renderReceipts(items = []) {
     .map((item) => {
       const issuedAt = item?.issuedAt ? formatDate(item.issuedAt) : "—";
       const receiptId = escapeHTML(item.receiptId || "—");
-      const caseTitle = escapeHTML(item.caseTitle || "Case");
+      const caseTitle = escapeHTML(item.caseTitle || "Untitled Matter");
       const party = escapeHTML(item.party || "—");
       const type = escapeHTML(item.type || "Receipt");
       const amount = formatCurrencyValue(item.amountCents);
@@ -3396,7 +3143,7 @@ async function loadReceipts() {
     '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Loading receipts…</td></tr>';
   try {
     const q = String(receiptSearchInput?.value || "").trim();
-    const params = new URLSearchParams({ limit: String(RECEIPTS_PAGE_SIZE) });
+    const params = new URLSearchParams({ limit: String(RECEIPTS_PAGE_SIZE), page: String(receiptPage) });
     if (q) params.set("q", q);
     const res = await secureFetch(`/api/payments/receipts?${params.toString()}`, {
       headers: { Accept: "application/json" },
@@ -3404,38 +3151,29 @@ async function loadReceipts() {
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(payload?.error || "Unable to load receipts.");
     const items = Array.isArray(payload?.items) ? payload.items : [];
+    updateReceiptPagination(payload?.total ?? items.length);
     renderReceipts(items);
   } catch (err) {
+    updateReceiptPagination(0);
     receiptsBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted)">${escapeHTML(
       err?.message || "Unable to load receipts."
     )}</td></tr>`;
   }
 }
 
-function populateTaxSummary(data) {
-const list = document.querySelector(".tax-summary");
-if (!list) return;
-const { taxSummary = {} } = data || {};
-const items = list.querySelectorAll("li");
-const taxRateLabel = formatTaxRatePercent(taxSummary.taxRate) || "22";
-if (items[0]) items[0].innerHTML = `<strong>Gross Earnings:</strong> ${formatCurrency(taxSummary.grossEarnings)}`;
-if (items[1]) items[1].innerHTML = `<strong>Deductible Expenses:</strong> ${formatCurrency(taxSummary.deductibleExpenses)}`;
-if (items[2]) items[2].innerHTML = `<strong>Estimated Tax Owed (${taxRateLabel}%):</strong> ${formatCurrency(taxSummary.estimatedTax)}`;
-if (items[3]) items[3].innerHTML = `<strong>Next Filing Deadline:</strong> ${taxSummary.nextFilingDeadline || "—"}`;
-}
-
-function populatePayoutSchedule(data) {
+function populatePendingPayoutQueue(data) {
 const container = document.querySelector(".payout-schedule");
 if (!container) return;
-const payouts = data?.upcomingPayouts || [];
+const payouts = data?.pendingPayoutQueue || [];
 container.innerHTML = "";
 if (!payouts.length) {
-container.innerHTML = "<li>No upcoming payouts scheduled.</li>";
+container.innerHTML = "<li>No pending payouts.</li>";
 return;
 }
 payouts.forEach((payout) => {
 const item = document.createElement("li");
-item.textContent = `${formatDate(payout.date)} – ${formatCurrency(payout.amount)} to ${payout.recipient || "Recipient"}`;
+const deadline = payout.matterDeadline ? ` · matter deadline ${formatDate(payout.matterDeadline)}` : " · matter deadline not set";
+item.textContent = `${formatCurrency(payout.amount)} to ${payout.recipient || "Recipient"}${deadline}`;
 container.appendChild(item);
 });
 }
@@ -3492,6 +3230,10 @@ function populateEscrowReportChart(data) {
   const released = (Array.isArray(trends.released) ? trends.released : []).map((v) =>
     Math.round((Number(v) || 0) / 100)
   );
+  const hasActivity = held.some((value) => value !== 0) || released.some((value) => value !== 0);
+  const emptyState = document.getElementById("escrowReportEmpty");
+  chart.canvas.hidden = !hasActivity;
+  if (emptyState) emptyState.hidden = hasActivity;
 
   if (!chart.data.datasets[0]) {
     chart.data.datasets[0] = {
@@ -3539,11 +3281,9 @@ latestAnalytics = data;
 lastAnalyticsRenderAt = Date.now();
 populateMetrics(data);
 populateCharts(data);
-populateExpenseChart(data);
-  populateEscrowReportChart(data);
+populateEscrowReportChart(data);
 populateLedger(data);
-populateTaxSummary(data);
-populatePayoutSchedule(data);
+populatePendingPayoutQueue(data);
 populateRegistrationChart(data);
 populateEscrowChart(data);
 populateNewUsers(data);
@@ -3590,11 +3330,11 @@ function filterActiveUsers(users = []) {
 
 async function deactivateUser(userId, { source } = {}) {
   if (!userId) return;
-  const confirmed = window.confirm("Remove/deactivate this user?");
+  const confirmed = await confirmAction(
+    "The user will lose access and be removed from active platform participation.",
+    { title: "Deactivate this user?", confirmLabel: "Deactivate user", tone: "danger" }
+  );
   if (!confirmed) return;
-  try {
-    await fetchCSRF();
-  } catch (_) {}
   try {
     const res = await secureFetch(`/api/admin/users/${encodeURIComponent(userId)}/deny`, {
       method: "POST",
@@ -3622,72 +3362,8 @@ async function deactivateUser(userId, { source } = {}) {
   }
 }
 
-async function loadPendingParalegals() {
-try {
-const res = await secureFetch("/api/admin/pending-paralegals", {
-headers: { Accept: "application/json" },
-noRedirect: true,
-});
-const payload = await res.json().catch(() => ({}));
-renderVerificationList(Array.isArray(payload?.items) ? payload.items : []);
-} catch (err) {
-console.warn("Unable to load pending paralegals", err);
-renderVerificationList([]);
-}
-}
-
 function escapeAttribute(value = "") {
 return String(value || "").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-}
-
-function buildFileHref(value) {
-const raw = String(value || "").trim();
-if (!raw) return "";
-if (/^https?:\/\//i.test(raw)) return raw;
-if (raw.startsWith("/api/uploads/view")) return raw;
-return `/api/uploads/view?key=${encodeURIComponent(raw)}`;
-}
-
-function renderVerificationList(items) {
-const list = document.getElementById("paralegalVerificationList");
-if (!list) return;
-if (!items.length) {
-list.innerHTML = "<p>No paralegals awaiting verification.</p>";
-return;
-}
-const cards = items
-.map((p) => {
-const id = escapeAttribute(p._id || p.id || "");
-const firstName = escapeHTML(p.firstName || "");
-const lastName = escapeHTML(p.lastName || "");
-const email = escapeHTML(p.email || "");
-const years = Number.isFinite(Number(p.yearsExperience)) ? Number(p.yearsExperience) : null;
-const yearsLabel = years === null ? "N/A" : `${years} year${years === 1 ? "" : "s"}`;
-const linkedIn = p.linkedInURL
-? `<p><a href="${escapeAttribute(p.linkedInURL)}" target="_blank" rel="noopener">LinkedIn Profile</a></p>`
-: "<p>LinkedIn profile not provided.</p>";
-const certificateHref = buildFileHref(p.certificateURL);
-const certificate = certificateHref
-? `<p><a href="${escapeAttribute(certificateHref)}" target="_blank" rel="noopener">Certificate</a></p>`
-: "<p>Certificate not uploaded.</p>";
-    return `
-       <div class="verify-card" data-id="${id}">
-         <strong>${lastName || "N/A"}, ${firstName || "N/A"}</strong>
-         <p>Email: ${email || "N/A"}</p>
-         <p>Years Experience: ${yearsLabel}</p>
-         ${linkedIn}
-         ${certificate}
-         <button class="approveParalegalBtn" data-id="${id}">Approve</button>
-         <button class="rejectParalegalBtn" data-id="${id}">Reject</button>
-         <div class="user-card-actions">
-           <button class="disableUserBtn" data-id="${id}">Disable</button>
-           <button class="enableUserBtn" data-id="${id}">Enable</button>
-         </div>
-       </div>
-     `;
-})
-.join("");
-list.innerHTML = cards;
 }
 
 function renderOpenDisputes(items = []) {
@@ -3740,7 +3416,7 @@ function renderOpenDisputes(items = []) {
                 caseId
               )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Finalize payout</button>
             </div>
-            ${recommendedLabel ? `<div class="dispute-meta">Enter the payout amount to release to the paralegal. Recommended: no more than ${recommendedLabel} (70% of original case payout).</div>` : ""}
+            ${recommendedLabel ? `<div class="dispute-meta">Enter the payout amount to release to the paralegal. Recommended: no more than ${recommendedLabel} (70% of original Matter payout).</div>` : ""}
             ${actionNote}
       `;
       const standardActions = `
@@ -3764,7 +3440,7 @@ function renderOpenDisputes(items = []) {
           <td>
             <div>
               <a class="btn-link" href="/api/cases/${escapeAttribute(caseId)}/archive/download" target="_blank" rel="noopener">
-                ${escapeHTML(item.caseTitle || "Case")}
+                ${escapeHTML(item.caseTitle || "Untitled Matter")}
               </a>
             </div>
             <div class="dispute-meta">${escapeHTML(caseId)}</div>
@@ -3823,7 +3499,7 @@ function renderResolvedDisputes(items = []) {
           <td>
             <div>
               <a class="btn-link" href="/api/cases/${escapeAttribute(caseId)}/archive/download" target="_blank" rel="noopener">
-                ${escapeHTML(item.caseTitle || "Case")}
+                ${escapeHTML(item.caseTitle || "Untitled Matter")}
               </a>
             </div>
             <div class="dispute-meta">${escapeHTML(caseId)}</div>
@@ -3877,7 +3553,7 @@ function renderRejectedDisputes(items = []) {
           <td>
             <div>
               <a class="btn-link" href="/api/cases/${escapeAttribute(caseId)}/archive/download" target="_blank" rel="noopener">
-                ${escapeHTML(item.caseTitle || "Case")}
+                ${escapeHTML(item.caseTitle || "Untitled Matter")}
               </a>
             </div>
             <div class="dispute-meta">${escapeHTML(caseId)}</div>
@@ -3971,9 +3647,6 @@ async function loadDisputes() {
 
 async function settleDispute({ action, caseId, disputeId, payoutAmountCents, grossAmountCents }) {
   if (!caseId || !disputeId) return;
-  try {
-    await fetchCSRF();
-  } catch (_) {}
   const body = { action, disputeId };
   if (Number.isFinite(payoutAmountCents)) {
     body.payoutAmountCents = payoutAmountCents;
@@ -3994,9 +3667,6 @@ async function settleDispute({ action, caseId, disputeId, payoutAmountCents, gro
 
 async function saveDisputeNotes({ caseId, disputeId, notes }) {
   if (!caseId || !disputeId) return;
-  try {
-    await fetchCSRF();
-  } catch (_) {}
   const res = await secureFetch(
     `/api/disputes/${encodeURIComponent(caseId)}/${encodeURIComponent(disputeId)}/admin-notes`,
     {
@@ -4127,7 +3797,7 @@ if (disputesBody) {
       payoutAmountCents = Math.round(amountUsd * 100);
       const max = Number(row?.dataset?.payoutMax || 0);
       if (Number.isFinite(max) && max > 0 && payoutAmountCents > max) {
-        showToast("Payout amount exceeds the maximum available payout for this case.", "info");
+        showToast("Payout amount exceeds the maximum available payout for this Matter.", "info");
         return;
       }
     }
@@ -4138,7 +3808,11 @@ if (disputesBody) {
         : actionKey === "release-full"
         ? "Release full payout to the paralegal and close this dispute?"
         : "Release the partial payout to the paralegal and close this dispute?";
-    if (!window.confirm(confirmText)) return;
+    if (!(await confirmAction(confirmText, {
+      title: "Settle this dispute?",
+      confirmLabel: actionKey === "refund" ? "Issue refund" : "Release payout",
+      tone: "danger",
+    }))) return;
 
     const action =
       actionKey === "refund"
@@ -4185,13 +3859,7 @@ async function bootAdminDashboard() {
 const user = typeof window.requireRole === "function" ? await window.requireRole("admin") : null;
 if (!user) return null;
 applyRoleVisibility(user);
-await loadPendingParalegals();
 return user;
-}
-
-async function loadUsers() {
-await Promise.allSettled([loadPendingParalegals(), hydrateAnalytics()]);
-await renderAIControlRoom(true);
 }
 
 window.loadOverviewActionBoard = loadOverviewActionBoard;
@@ -4202,7 +3870,6 @@ if (!user) return;
 
 bindSettingsActions();
 await loadAdminSettings();
-await loadAdminThemePreference();
 await hydrateAnalytics();
 await loadDisputeSummary();
 await loadOverviewActionBoard(true);
@@ -4218,30 +3885,18 @@ if (receiptSearchInput) {
 receiptSearchInput.addEventListener("input", () => {
 if (receiptSearchTimer) window.clearTimeout(receiptSearchTimer);
 receiptSearchTimer = window.setTimeout(() => {
+receiptPage = 1;
 loadReceipts();
 }, 250);
 });
 }
-
-const taxReportBtn = document.getElementById("taxReportBtn");
-if (taxReportBtn) {
-taxReportBtn.addEventListener("click", async () => {
-const originalLabel = taxReportBtn.textContent || "Generate Tax Report";
-taxReportBtn.disabled = true;
-taxReportBtn.textContent = "Generating...";
-try {
-const payload = latestAnalytics || (await hydrateAnalytics());
-if (!payload) throw new Error("Unable to load tax summary.");
-downloadTaxReport(payload);
-showToast("Tax report generated.", "ok");
-} catch (err) {
-showToast(err?.message || "Unable to generate tax report.", "err");
-} finally {
-taxReportBtn.disabled = false;
-taxReportBtn.textContent = originalLabel;
-}
+if (receiptPageSelect) {
+receiptPageSelect.addEventListener("change", () => {
+receiptPage = Number(receiptPageSelect.value) || 1;
+loadReceipts();
 });
 }
+
 });
 
 document.addEventListener("visibilitychange", () => {
@@ -4251,7 +3906,7 @@ destroyCharts();
 });
 
 document.addEventListener("click", async (evt) => {
-	const aiRoomTab = evt.target.closest('a[data-section="ai-control-room"]');
+	const aiRoomTab = evt.target.closest('[data-section="ai-control-room"]');
 	if (aiRoomTab) {
 	await renderAIControlRoom();
 	}
@@ -4305,7 +3960,10 @@ document.addEventListener("click", async (evt) => {
 	const approvalId = incidentApprovalBtn.getAttribute("data-approval-id");
 	const note = document.getElementById("incidentApprovalDecisionNote")?.value?.trim() || "";
 	if (!decision || !incidentId || !approvalId) return;
-	if (decision === "reject" && !window.confirm("Reject this release candidate?")) return;
+	if (decision === "reject" && !(await confirmAction(
+    "This rejection will be recorded in the incident approval timeline.",
+    { title: "Reject this release candidate?", confirmLabel: "Reject release", tone: "danger" }
+  ))) return;
   const optimisticUpdate = applyOptimisticAIControlRoomDecisionDescriptor({
     kind: "incident_approval",
     decision,
@@ -4341,63 +3999,4 @@ document.addEventListener("click", async (evt) => {
 	return;
 	}
 
-	const disableBtn = evt.target.closest(".disableUserBtn");
-	if (disableBtn) {
-const id = disableBtn.dataset.id;
-if (!id) return;
-try {
-await secureFetch(`/api/admin/disable/${encodeURIComponent(id)}`, { method: "POST" });
-await loadUsers();
-} catch (err) {
-console.error("Failed to disable user", err);
-}
-return;
-}
-
-const enableBtn = evt.target.closest(".enableUserBtn");
-if (enableBtn) {
-const id = enableBtn.dataset.id;
-if (!id) return;
-try {
-await secureFetch(`/api/admin/enable/${encodeURIComponent(id)}`, { method: "POST" });
-await loadUsers();
-} catch (err) {
-console.error("Failed to enable user", err);
-}
-return;
-}
-
-const approveBtn = evt.target.closest(".approveParalegalBtn");
-const rejectBtn = evt.target.closest(".rejectParalegalBtn");
-if (approveBtn) {
-const id = approveBtn.dataset.id;
-if (!id) return;
-try {
-	await secureFetch(`/api/admin/approve/${encodeURIComponent(id)}`, { method: "POST" });
-	await loadPendingParalegals();
-	await hydrateAnalytics();
-	await renderAIControlRoom(true);
-if (typeof window.loadPendingUsers === "function") {
-await window.loadPendingUsers();
-}
-} catch (err) {
-console.error("Failed to approve paralegal", err);
-}
-return;
-}
-if (rejectBtn) {
-const id = rejectBtn.dataset.id;
-if (!id) return;
-try {
-	await secureFetch(`/api/admin/reject/${encodeURIComponent(id)}`, { method: "POST" });
-	await loadPendingParalegals();
-	await hydrateAnalytics();
-	await renderAIControlRoom(true);
-if (typeof window.loadPendingUsers === "function") {
-await window.loadPendingUsers();
-}
-} catch (err) {
-console.error("Failed to reject paralegal", err);
-}
-}
 });

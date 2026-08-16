@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("../../utils/logger");
+const runtimeLogger = createRuntimeLogger("services:lpcEvents:supportRoutingService");
 const Incident = require("../../models/Incident");
 const SupportTicket = require("../../models/SupportTicket");
 const { INCIDENT_TERMINAL_STATES } = require("../../utils/incidentConstants");
@@ -182,7 +184,7 @@ function shouldEscalateTicketToIncident(ticket = {}, submission = {}) {
   }
 
   if (riskFlags.has("case_progress") && blockerHits > 0) {
-    return { shouldEscalate: true, reason: "Active case-progress work appears blocked." };
+    return { shouldEscalate: true, reason: "Active Matter progress appears blocked." };
   }
 
   if (["case_workflow", "job_application"].includes(category) && blockerHits >= 2) {
@@ -307,7 +309,7 @@ async function startEngineeringDiagnosisForIncident(incident = {}) {
       incidentPublicId: String(result?.item?.publicId || incident?.publicId || ""),
     };
   } catch (error) {
-    console.error("Unable to start engineering diagnosis for support incident", error);
+    runtimeLogger.error("Unable to start engineering diagnosis for support incident", error);
     const execution = await buildFallbackExecutionKickoff(error?.message || "Engineering diagnosis kickoff failed.");
     return {
       ok: execution?.execution?.ok === true,
@@ -328,11 +330,7 @@ async function startEngineeringDiagnosisForIncident(incident = {}) {
 
 async function routeSupportSubmissionEvent(event = {}) {
   const submission = buildTicketPayloadFromEvent(event);
-  const ticket = await createSupportTicket(submission, {
-    actorType: event.actor?.actorType || "system",
-    userId: event.actor?.userId || null,
-    label: event.actor?.label || "LPC Router",
-  });
+  const ticket = await createSupportTicket(submission);
   const ticketId = String(ticket?._id || ticket?.id || "").trim();
 
   const actionKeys = ticketId ? [ticketId] : [];

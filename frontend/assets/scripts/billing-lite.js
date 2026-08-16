@@ -1,10 +1,9 @@
 import { getStoredSession, secureFetch } from "./auth.js";
-import { createElements, mountPaymentElement, confirmSetup } from "./payments.js";
+import { createElements, mountPaymentElement, confirmSetup, loadStripeJs } from "./payments.js";
+import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
+import { normalizeHttpNavigationUrl } from "./utils/navigation-url.js";
 
 const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
-const STRIPE_JS_SRC = "https://js.stripe.com/v3/";
-const CASE_PREVIEW_STORAGE_KEY = "lpc_case_preview_id";
-const CASE_PREVIEW_RECEIPT_KEY = "lpc_case_preview_receipt";
 
 let historyList = null;
 let portalBtn = null;
@@ -12,7 +11,6 @@ let currencyFormatter = new Intl.NumberFormat(undefined, { style: "currency", cu
 let paymentSummaryEl = null;
 let paymentFormEl = null;
 let paymentElementHost = null;
-let paymentPanelActionsEl = null;
 let paymentErrorsEl = null;
 let paymentModalEl = null;
 let addCardBtn = null;
@@ -25,7 +23,6 @@ let setupPaymentElement = null;
 let pendingHire = null;
 let pendingHireLoaded = false;
 let paymentFlowOpening = false;
-let stripeJsPromise = null;
 let billingLiteInitialized = false;
 
 function getAttorneyOnboardingStep() {
@@ -59,7 +56,6 @@ function initBillingLite() {
   paymentSummaryEl = document.getElementById("paymentMethodSummary");
   paymentFormEl = document.getElementById("paymentMethodForm");
   paymentElementHost = document.getElementById("paymentMethodElement");
-  paymentPanelActionsEl = document.querySelector(".payment-method-panel .panel-actions");
   paymentErrorsEl = document.getElementById("paymentMethodErrors");
   paymentModalEl = document.getElementById("paymentMethodModal");
   addCardBtn = document.getElementById("addPaymentMethodBtn");
@@ -72,6 +68,7 @@ function initBillingLite() {
 }
 
 async function initBillingSurface() {
+  consumeCheckoutReturnStatus();
   pendingHire = await loadPendingHire();
   if (pendingHire?.message) {
     showToast(pendingHire.message, "info");
@@ -88,6 +85,27 @@ async function initBillingSurface() {
     resumePendingHire(pendingHire);
   }
   await loadHistory();
+}
+
+function consumeCheckoutReturnStatus() {
+  let url;
+  try {
+    url = new URL(window.location.href);
+  } catch {
+    return;
+  }
+  const status = String(url.searchParams.get("payment") || "").trim().toLowerCase();
+  if (!["success", "cancel"].includes(status)) return;
+
+  showToast(
+    status === "success"
+      ? "Payment submitted. Funding status will update after Stripe confirms it."
+      : "Payment was not completed. No payment was processed.",
+    "info"
+  );
+  url.searchParams.delete("payment");
+  url.searchParams.delete("caseId");
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 function bindEvents() {
@@ -110,20 +128,8 @@ function bindEvents() {
     const caseId = card.getAttribute("data-case-id");
     if (!caseId) return;
     const receiptUrl = card.getAttribute("data-receipt-url") || "";
-    if (receiptUrl) {
-      try {
-        sessionStorage.setItem(
-          CASE_PREVIEW_RECEIPT_KEY,
-          JSON.stringify({ caseId: String(caseId), receiptUrl })
-        );
-      } catch {}
-    } else {
-      try {
-        sessionStorage.removeItem(CASE_PREVIEW_RECEIPT_KEY);
-      } catch {}
-    }
     if (typeof window.openCasePreview === "function") {
-      window.openCasePreview(caseId, { keepView: true });
+      window.openCasePreview(caseId, { keepView: true, receiptUrl });
       return;
     }
     showToast("Unable to load details right now.", "info");
@@ -198,37 +204,15 @@ async function openBillingPortal() {
     if (!res.ok || !data?.url) {
       throw new Error(data?.error || "Unable to open the Stripe portal right now.");
     }
-    window.location.href = data.url;
+    const portalUrl = normalizeHttpNavigationUrl(data.url, { allowedHosts: ["billing.stripe.com"] });
+    if (!portalUrl) throw new Error("The Stripe portal returned an invalid destination.");
+    window.location.href = portalUrl;
   } catch (err) {
     console.error("Billing portal error", err);
     showToast(err.message || "Unable to open the Stripe portal.", "error");
     portalBtn.disabled = false;
     portalBtn.textContent = originalText;
   }
-}
-
-function ensureStripeJs() {
-  if (window.Stripe) return Promise.resolve();
-  if (!stripeJsPromise) {
-    stripeJsPromise = new Promise((resolve, reject) => {
-      const existing = document.querySelector(`script[src="${STRIPE_JS_SRC}"]`);
-      if (existing) {
-        existing.addEventListener("load", () => resolve());
-        existing.addEventListener("error", () =>
-          reject(new Error("We couldn't load the secure payment form. Please allow js.stripe.com or disable ad blockers and try again."))
-        );
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = STRIPE_JS_SRC;
-      script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () =>
-        reject(new Error("We couldn't load the secure payment form. Please allow js.stripe.com or disable ad blockers and try again."));
-      document.head.appendChild(script);
-    });
-  }
-  return stripeJsPromise;
 }
 
 async function loadPaymentMethodStatus() {
@@ -255,6 +239,7 @@ function renderPaymentMethodSummary(payload = {}) {
   const pm = payload.paymentMethod;
   window.__lpcBillingPaymentMethod = pm || null;
   if (pm) {
+    paymentSummaryEl.classList.remove("is-empty");
     const brand = (pm.brand || pm.type || "Card").toString().toUpperCase();
     const last4 = pm.last4 || "••••";
     const exp =
@@ -273,7 +258,13 @@ function renderPaymentMethodSummary(payload = {}) {
     addCardBtn?.setAttribute("hidden", "hidden");
     replaceCardBtn?.removeAttribute("hidden");
   } else {
-    paymentSummaryEl.innerHTML = "";
+    paymentSummaryEl.classList.add("is-empty");
+    paymentSummaryEl.innerHTML = `
+      <div>
+        <p class="lpc-empty-title">No payment method saved</p>
+        <p class="lpc-empty-copy">Add a card before funding a matter.</p>
+      </div>
+    `;
     addCardBtn?.removeAttribute("hidden");
     replaceCardBtn?.setAttribute("hidden", "hidden");
   }
@@ -296,13 +287,18 @@ async function startPaymentMethodFlow() {
   if (paymentModalEl) {
     paymentModalEl.classList.remove("hidden");
     paymentModalEl.setAttribute("aria-hidden", "false");
+    paymentModalEl.removeAttribute("inert");
+    activateDialogFocus(paymentModalEl, {
+      initialFocus: cancelCardBtn,
+      onEscape: cancelPaymentFlow,
+    });
   }
   paymentFormEl.hidden = false;
-  paymentElementHost.innerHTML = `<p class="muted">Loading secure card form…</p>`;
+  paymentElementHost.innerHTML = `<p class="muted">Loading Stripe card form…</p>`;
   addCardBtn?.setAttribute("aria-busy", "true");
   replaceCardBtn?.setAttribute("aria-busy", "true");
   try {
-    await ensureStripeJs();
+    await loadStripeJs();
     const session = await createSetupIntentSession();
     resetPaymentElement();
     setupElements = await createElements(session.clientSecret, { theme: "flat" });
@@ -312,7 +308,7 @@ async function startPaymentMethodFlow() {
     if (paymentErrorsEl) paymentErrorsEl.textContent = err?.message || "Unable to start card setup.";
     showToast(err?.message || "Unable to start card setup.", "error");
     if (paymentElementHost) {
-      paymentElementHost.innerHTML = `<p class="muted">${escapeHtml(err?.message || "Unable to load the secure card form right now.")}</p>`;
+      paymentElementHost.innerHTML = `<p class="muted">${escapeHtml(err?.message || "Unable to load the Stripe card form right now.")}</p>`;
     }
   } finally {
     addCardBtn?.removeAttribute("aria-busy");
@@ -322,9 +318,10 @@ async function startPaymentMethodFlow() {
 }
 
 async function createSetupIntentSession() {
+  const requestKey = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const res = await secureFetch("/api/payments/payment-method/setup-intent", {
     method: "POST",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", "Idempotency-Key": requestKey },
     noRedirect: true,
   });
   const payload = await res.json().catch(() => ({}));
@@ -343,7 +340,7 @@ async function savePaymentMethod() {
   saveCardBtn?.setAttribute("disabled", "disabled");
   saveCardBtn?.setAttribute("aria-busy", "true");
   try {
-    await ensureStripeJs();
+    await loadStripeJs();
     const { error, setupIntent } = await confirmSetup(setupElements);
     if (error) throw new Error(error.message || "Unable to save card.");
     const pmId = setupIntent?.payment_method;
@@ -388,6 +385,8 @@ function cancelPaymentFlow() {
   if (paymentModalEl) {
     paymentModalEl.classList.add("hidden");
     paymentModalEl.setAttribute("aria-hidden", "true");
+    paymentModalEl.setAttribute("inert", "");
+    deactivateDialogFocus(paymentModalEl);
   }
 }
 
@@ -415,8 +414,8 @@ async function clearPendingHire() {
   pendingHireLoaded = true;
   try {
     await secureFetch("/api/users/me/pending-hire", { method: "DELETE", headers: { Accept: "application/json" } });
-  } catch {
-    /* ignore */
+  } catch (error) {
+    console.warn("[billing] pending-hire cleanup failed", error);
   }
 }
 
@@ -424,8 +423,10 @@ function resumePendingHire(pending) {
   if (!pending?.caseId) return;
   pendingHire = null;
   void clearPendingHire();
-  const target = pending.fundUrl || `dashboard-attorney.html?openApplicants=1&caseId=${encodeURIComponent(pending.caseId)}#cases:inquiries`;
-  showToast("Payment method ready. Return to the case to hire the paralegal.", "success");
+  const target =
+    sanitizeUrl(pending.fundUrl, { sameOrigin: true }) ||
+    `dashboard-attorney.html?openApplicants=1&caseId=${encodeURIComponent(pending.caseId)}#cases:inquiries`;
+  showToast("Payment method ready. Return to the Matter to hire the paralegal.", "success");
   setTimeout(() => {
     window.location.href = target;
   }, 600);
@@ -438,9 +439,9 @@ function renderHistoryCard(entry = {}) {
   const datePaid = formatDate(entry.releaseDate || entry.paidOutAt || entry.completedAt);
   const receipt = sanitizeUrl(entry.stripeReceiptUrl || entry.receiptUrl || entry.receipt);
   const caseId = String(entry.caseId || entry.id || "");
-  const receiptAttr = receipt ? ` data-receipt-url="${receipt}"` : "";
+  const receiptAttr = receipt ? ` data-receipt-url="${escapeHtml(receipt)}"` : "";
   return `
-    <article class="history-card" role="button" tabindex="0" data-case-id="${caseId}"${receiptAttr}>
+    <article class="history-card" role="button" tabindex="0" data-case-id="${escapeHtml(caseId)}"${receiptAttr}>
       <div class="history-primary">
         <div class="case-name">${caseName}</div>
         <div class="paralegal-name">Paralegal: ${paralegal}</div>
@@ -502,14 +503,6 @@ function renderHistorySkeleton(count = 2) {
     .join("");
 }
 
-function viewCase(caseId) {
-  if (!caseId) return;
-  if (typeof window.openCasePreview === "function") {
-    window.openCasePreview(caseId, { keepView: true });
-    return;
-  }
-  window.location.href = `dashboard-attorney.html?previewCaseId=${encodeURIComponent(caseId)}#cases`;
-}
 
 function formatDate(raw) {
   if (!raw) return "—";
@@ -518,13 +511,8 @@ function formatDate(raw) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function sanitizeUrl(url = "") {
-  if (!url) return "";
-  const trimmed = String(url).trim();
-  if (/^(https?:\/\/|\/)/i.test(trimmed)) {
-    return trimmed.replace(/"/g, "%22");
-  }
-  return "";
+function sanitizeUrl(url = "", { sameOrigin = false } = {}) {
+  return normalizeHttpNavigationUrl(url, { sameOrigin });
 }
 
 function escapeHtml(value = "") {

@@ -1,4 +1,5 @@
 import { secureFetch } from "./auth.js";
+import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
 
 function getStoredUserSnapshot() {
   if (typeof window.getStoredUser === "function") {
@@ -18,7 +19,6 @@ let onboardingPromise = null;
 
 function normalizeOnboarding(raw = {}) {
   return {
-    paralegalWelcomeDismissed: Boolean(raw?.paralegalWelcomeDismissed),
     paralegalTourCompleted: Boolean(raw?.paralegalTourCompleted),
     paralegalProfileTourCompleted: Boolean(raw?.paralegalProfileTourCompleted),
     attorneyTourCompleted: Boolean(raw?.attorneyTourCompleted),
@@ -247,20 +247,20 @@ async function initAttorneyTour(user = {}, options = {}) {
         "#paymentMethodSummary",
       ],
       view: "billing",
-      title: "Fund Cases",
-      text: "Add a payment method so cases can be funded when you hire. Let's-ParaConnect is partnered with Stripe, and payments are processed through Stripe. Funds remain within Stripe's infrastructure until you approve release.",
+      title: "Fund Matters",
+      text: "Add a payment method so Matters can be funded when you hire. Stripe processes each payment and reports its status until you approve completed work or a platform review or dispute is resolved.",
     },
     {
       selectors: ['[data-case-quick="create"]', '[data-quick-link="create-case"]'],
       view: "cases",
-      title: "Create a case",
-      text: "Start a new matter with scope, tasks, and timeline.",
+      title: "Create a Matter",
+      text: "Start a new Matter with scope, tasks, and timeline.",
     },
     {
       selector: '[data-quick-link="browse-paralegals"]',
       view: "home",
       title: "Browse paralegals",
-      text: "Find vetted paralegals and invite the right fit to your case. Paralegals can also apply to matters if you prefer not to invite directly.",
+      text: "Find approved paralegals and invite the right fit to your Matter. Paralegals can also apply to open Matters if you prefer not to invite directly.",
     },
   ];
 
@@ -314,7 +314,13 @@ async function initAttorneyTour(user = {}, options = {}) {
     overlay.classList.remove("is-active", "spotlight");
     overlay.setAttribute("aria-hidden", "true");
     modal.classList.remove("is-active");
+    modal.setAttribute("aria-hidden", "true");
+    modal.setAttribute("inert", "");
     tooltip.classList.remove("is-active");
+    tooltip.setAttribute("aria-hidden", "true");
+    tooltip.setAttribute("inert", "");
+    deactivateDialogFocus(modal, { restoreFocus: false });
+    deactivateDialogFocus(tooltip, { restoreFocus: false });
     clearHighlight();
   };
 
@@ -426,7 +432,16 @@ async function initAttorneyTour(user = {}, options = {}) {
     ensureSidebarVisibleForTarget(null);
     overlay.classList.remove("spotlight");
     modal.classList.add("is-active");
+    modal.setAttribute("aria-hidden", "false");
+    modal.removeAttribute("inert");
     tooltip.classList.remove("is-active");
+    tooltip.setAttribute("aria-hidden", "true");
+    tooltip.setAttribute("inert", "");
+    deactivateDialogFocus(tooltip, { restoreFocus: false });
+    activateDialogFocus(modal, {
+      initialFocus: startBtn,
+      onEscape: completeTour,
+    });
     clearHighlight();
   };
 
@@ -473,7 +488,16 @@ async function initAttorneyTour(user = {}, options = {}) {
       showOverlay();
       ensureSidebarVisibleForTarget(target);
       modal.classList.remove("is-active");
+      modal.setAttribute("aria-hidden", "true");
+      modal.setAttribute("inert", "");
+      deactivateDialogFocus(modal, { restoreFocus: false });
       overlay.classList.add("spotlight");
+      tooltip.setAttribute("aria-hidden", "false");
+      tooltip.removeAttribute("inert");
+      activateDialogFocus(tooltip, {
+        initialFocus: nextBtn,
+        onEscape: completeTour,
+      });
 
       if (typeof target.scrollIntoView === "function") {
         target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
@@ -512,6 +536,7 @@ async function initAttorneyTour(user = {}, options = {}) {
     tooltip.classList.remove("is-active");
     setProfileMenuOpen(false);
     hideOverlay();
+    document.getElementById("headerUser")?.focus();
     clearTourProgress();
   };
 

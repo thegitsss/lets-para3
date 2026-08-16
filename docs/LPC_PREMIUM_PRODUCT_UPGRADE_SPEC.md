@@ -1,5 +1,7 @@
 # LPC Premium Product Upgrade Spec
 
+> Historical specification: this July 2026 document records the requirements used to guide the remediation program. It is not current launch status. Use `docs/LPC_PRODUCT_NORTH_STAR.md`, `LAUNCH_CHECKLIST.md`, `docs/RELEASE_GATES.md`, and `docs/LAUNCH_CERTIFICATION_CURRENT.md` for current policy, evidence, and the release decision.
+
 Date: July 7, 2026
 
 Purpose: convert vague upgrade language into concrete, testable product requirements. This is the execution standard for making LPC feel like a modern $150,000-$500,000 legal-tech marketplace that attorneys and paralegals trust, understand, and return to regularly.

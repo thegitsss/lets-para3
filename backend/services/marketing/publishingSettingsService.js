@@ -1,7 +1,7 @@
 const MarketingPublishingSettings = require("../../models/MarketingPublishingSettings");
 const {
   MARKETING_PUBLISHING_CADENCE_MODES,
-  MARKETING_PUBLISHING_CHANNELS,
+  MARKETING_ACTIVE_PUBLISHING_CHANNELS,
 } = require("./constants");
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -10,7 +10,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   cadenceMode: "manual_only",
   timezone: "America/New_York",
   preferredHourLocal: 9,
-  enabledChannels: ["linkedin_company", "facebook_page"],
+  enabledChannels: ["linkedin_company"],
   pauseReason: "",
   maxOpenCycles: 1,
 });
@@ -39,7 +39,7 @@ function normalizeCadenceMode(value = "") {
 }
 
 function normalizeEnabledChannels(values = []) {
-  const channels = uniqueStrings(values).filter((value) => MARKETING_PUBLISHING_CHANNELS.includes(value));
+  const channels = uniqueStrings(values).filter((value) => MARKETING_ACTIVE_PUBLISHING_CHANNELS.includes(value));
   return channels.length ? channels : DEFAULT_SETTINGS.enabledChannels.slice();
 }
 
@@ -190,13 +190,30 @@ function serializeSettings(settings = {}) {
 }
 
 async function ensurePublishingSettings() {
-  let settings = await MarketingPublishingSettings.findOne({ singletonKey: DEFAULT_SETTINGS.singletonKey });
-  if (settings) return settings;
-  settings = await MarketingPublishingSettings.create({
+  // The singleton upsert is only concurrency-safe once Mongo has materialized
+  // the unique index. Await model initialization so first traffic after a new
+  // deployment cannot create duplicate settings documents.
+  await MarketingPublishingSettings.init();
+  const filter = { singletonKey: DEFAULT_SETTINGS.singletonKey };
+  const insertDefaults = {
     ...DEFAULT_SETTINGS,
     updatedBy: { actorType: "system", label: "Publishing Settings Service" },
-  });
-  return settings;
+  };
+
+  try {
+    return await MarketingPublishingSettings.findOneAndUpdate(
+      filter,
+      { $setOnInsert: insertDefaults },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+  } catch (error) {
+    // Concurrent first reads can race before the unique singleton index is
+    // visible to both writers. The winning insert is authoritative.
+    if (Number(error?.code) !== 11000) throw error;
+    const settings = await MarketingPublishingSettings.findOne(filter);
+    if (settings) return settings;
+    throw error;
+  }
 }
 
 async function getPublishingSettings() {

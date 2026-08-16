@@ -1,34 +1,23 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:notifications");
 const express = require("express");
 const Notification = require("../models/Notification");
-const User = require("../models/User");
 const Case = require("../models/Case");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved } = require("../utils/authz");
 const { addSubscriber, publishNotificationEvent } = require("../utils/notificationEvents");
+const { getBlocksForUser, normalizeId } = require("../utils/blocks");
+const {
+  notificationCaseId,
+  presentNotification,
+} = require("../services/notificationPresentation");
 const {
   markWorkspacePresence,
   clearWorkspacePresence,
 } = require("../utils/workspacePresence");
+const { protectMutations } = require("../utils/csrf");
 
 const router = express.Router();
-
-const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-const noop = (_req, _res, next) => next();
-const csrf = require("csurf");
-const csrfMiddleware = csrf({
-  cookie: {
-    httpOnly: true,
-    sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
-  },
-});
-const protectMutations = (req, res, next) => {
-  const requireCsrf = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-  if (!requireCsrf) return noop(req, res, next);
-  const method = String(req.method || "").toUpperCase();
-  if (SAFE_METHODS.has(method)) return next();
-  return csrfMiddleware(req, res, next);
-};
 
 router.use(verifyToken, requireApproved);
 router.use(protectMutations);
@@ -56,11 +45,11 @@ router.post("/workspace-presence", async (req, res) => {
     const caseId = String(req.body?.caseId || "").trim();
     if (!caseId) return res.status(400).json({ message: "caseId is required" });
     const allowed = await canTrackWorkspacePresence(req.user, caseId);
-    if (!allowed) return res.status(404).json({ message: "Case not found" });
+    if (!allowed) return res.status(404).json({ message: "Matter not found" });
     markWorkspacePresence(req.user.id, caseId);
     return res.json({ success: true, caseId });
   } catch (err) {
-    console.error("Failed to set workspace presence:", err);
+    runtimeLogger.error("Failed to set workspace presence:", err);
     return res.status(500).json({ message: "Unable to update workspace presence" });
   }
 });
@@ -75,7 +64,7 @@ router.delete("/workspace-presence", async (req, res) => {
     clearWorkspacePresence(req.user.id, caseId);
     return res.json({ success: true, caseId });
   } catch (err) {
-    console.error("Failed to clear workspace presence:", err);
+    runtimeLogger.error("Failed to clear workspace presence:", err);
     return res.status(500).json({ message: "Unable to update workspace presence" });
   }
 });
@@ -122,32 +111,44 @@ router.get("/", async (req, res) => {
   try {
     const items = await Notification.find({ userId: req.user.id })
       .sort({ createdAt: -1, _id: -1 })
+      .limit(100)
       .lean();
-    const normalized = items
-      .filter((item) => {
-        if (item.type !== "message") return true;
-        if (!item.actorUserId) return true;
-        return String(item.actorUserId) !== String(req.user.id);
-      })
-      .map((item) => ({
-      id: String(item._id),
-      _id: item._id,
-      userId: item.userId,
-      userRole: item.userRole || "",
-      type: item.type,
-      message: item.message || item.payload?.message || "You have a new notification.",
-      link: item.link || item.payload?.link || "",
-      payload: item.payload || {},
-      isRead: item.isRead ?? item.read ?? false,
-      read: item.isRead ?? item.read ?? false,
-      actorUserId: item.actorUserId || null,
-      actorFirstName: item.actorFirstName || "",
-      actorProfileImage: item.actorProfileImage || "",
-      createdAt: item.createdAt,
-    }));
+    const visibleItems = items.filter((item) => {
+      if (item.type !== "message") return true;
+      if (!item.actorUserId) return true;
+      return String(item.actorUserId) !== String(req.user.id);
+    });
+    const caseIds = [...new Set(visibleItems.map(notificationCaseId).filter(Boolean))];
+    const [caseDocs, blocks] = await Promise.all([
+      caseIds.length
+        ? Case.find({ _id: { $in: caseIds } })
+            .select(
+              "_id title status paymentReleased archived attorney attorneyId paralegal paralegalId paralegalAccessRevokedAt withdrawnParalegalId pendingParalegalId applicants.paralegalId applicants.status invites.paralegalId invites.status"
+            )
+            .lean()
+        : Promise.resolve([]),
+      caseIds.length ? getBlocksForUser(req.user.id) : Promise.resolve([]),
+    ]);
+    const casesById = new Map(caseDocs.map((doc) => [String(doc._id), doc]));
+    const viewerId = normalizeId(req.user.id || req.user._id);
+    const blockedIds = new Set();
+    blocks.forEach((block) => {
+      const blockerId = normalizeId(block.blockerId);
+      const blockedId = normalizeId(block.blockedId);
+      if (blockerId === viewerId && blockedId) blockedIds.add(blockedId);
+      if (blockedId === viewerId && blockerId) blockedIds.add(blockerId);
+    });
+    const normalized = visibleItems.map((item) => {
+      const caseId = notificationCaseId(item);
+      return presentNotification(item, {
+        viewer: req.user,
+        caseDoc: caseId ? casesById.get(caseId) || null : null,
+        blockedIds,
+      });
+    });
     res.json(normalized);
   } catch (err) {
-    console.error("Failed to fetch notifications:", err);
+    runtimeLogger.error("Failed to fetch notifications:", err);
     res.status(500).json({ message: "Unable to load notifications" });
   }
 });
@@ -162,7 +163,7 @@ router.post("/:id/read", async (req, res) => {
     publishNotificationEvent(req.user.id, "notifications", { at: new Date().toISOString() });
     res.json({ success: true });
   } catch (err) {
-    console.error("Failed to mark notification read:", err);
+    runtimeLogger.error("Failed to mark notification read:", err);
     res.status(500).json({ message: "Unable to update notification" });
   }
 });
@@ -174,7 +175,7 @@ router.post("/read-all", async (req, res) => {
     publishNotificationEvent(req.user.id, "notifications", { at: new Date().toISOString() });
     res.json({ success: true });
   } catch (err) {
-    console.error("Failed to mark notifications read:", err);
+    runtimeLogger.error("Failed to mark notifications read:", err);
     res.status(500).json({ message: "Unable to update notifications" });
   }
 });
@@ -186,7 +187,7 @@ router.delete("/", async (req, res) => {
     publishNotificationEvent(req.user.id, "notifications", { at: new Date().toISOString() });
     res.json({ success: true });
   } catch (err) {
-    console.error("Failed to clear notifications:", err);
+    runtimeLogger.error("Failed to clear notifications:", err);
     res.status(500).json({ message: "Unable to clear notifications" });
   }
 });
@@ -199,32 +200,8 @@ router.delete("/:id", async (req, res) => {
     publishNotificationEvent(req.user.id, "notifications", { at: new Date().toISOString() });
     res.json({ success: true });
   } catch (err) {
-    console.error("Failed to delete notification:", err);
+    runtimeLogger.error("Failed to delete notification:", err);
     res.status(500).json({ message: "Unable to delete notification" });
-  }
-});
-
-// Public VAPID key for push subscriptions
-router.get("/vapid-key", (_req, res) => {
-  res.json({ key: process.env.VAPID_PUBLIC_KEY || "" });
-});
-
-// Save browser push subscription
-router.post("/subscribe", async (req, res) => {
-  try {
-    const me = await User.findById(req.user.id).select("notificationPrefs pushSubscription");
-    if (!me) return res.status(404).json({ message: "User not found" });
-    me.pushSubscription = req.body || null;
-    me.notificationPrefs = Object.assign(
-      {},
-      typeof me.notificationPrefs?.toObject === "function" ? me.notificationPrefs.toObject() : me.notificationPrefs || {},
-      { browser: true }
-    );
-    await me.save();
-    res.json({ success: true });
-  } catch (err) {
-    console.error("Push subscription failed:", err);
-    res.status(500).json({ message: "Unable to save subscription" });
   }
 });
 

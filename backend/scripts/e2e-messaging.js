@@ -1,22 +1,7 @@
 const http = require("http");
 const express = require("express");
 const cookieParser = require("cookie-parser");
-const puppeteer = require("puppeteer");
-
-function patchElementHandleClick() {
-  const { ElementHandle } = puppeteer;
-  if (!ElementHandle || ElementHandle.prototype.__safeClickPatched) return;
-  const original = ElementHandle.prototype.click;
-  ElementHandle.prototype.click = async function (...args) {
-    try {
-      return await this.evaluate((el) => el.click());
-    } catch {
-      return original.apply(this, args);
-    }
-  };
-  ElementHandle.prototype.__safeClickPatched = true;
-}
-patchElementHandleClick();
+const { launchPuppeteer } = require("./puppeteerBrowser");
 
 const CASE_ID = "507f1f77bcf86cd799439099";
 
@@ -189,7 +174,7 @@ async function run() {
   const { server, port } = await startStubServer();
   const baseUrl = `http://localhost:${port}`;
 
-  const browser = await puppeteer.launch({
+  const browser = await launchPuppeteer({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
     protocolTimeout: 120_000,

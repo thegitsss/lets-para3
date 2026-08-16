@@ -2,6 +2,7 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const request = require("supertest");
+const { S3Client } = require("@aws-sdk/client-s3");
 
 const User = require("../models/User");
 const Case = require("../models/Case");
@@ -61,6 +62,69 @@ beforeEach(async () => {
 });
 
 describe("Admin workflows", () => {
+  test("Admin cannot approve a profile photo when its retained original fails malware scanning", async () => {
+    const priorBucket = process.env.S3_BUCKET;
+    const priorRegion = process.env.S3_REGION;
+    const priorRequired = process.env.S3_MALWARE_SCAN_REQUIRED;
+    process.env.S3_BUCKET = "test-bucket";
+    process.env.S3_REGION = "us-east-1";
+    process.env.S3_MALWARE_SCAN_REQUIRED = "true";
+    const scanSpy = jest.spyOn(S3Client.prototype, "send")
+      .mockResolvedValueOnce({
+        TagSet: [{ Key: "GuardDutyMalwareScanStatus", Value: "NO_THREATS_FOUND" }],
+      })
+      .mockResolvedValueOnce({
+        TagSet: [{ Key: "GuardDutyMalwareScanStatus", Value: "THREATS_FOUND" }],
+      });
+
+    try {
+      const admin = await User.create({
+        firstName: "Admin",
+        lastName: "Reviewer",
+        email: "photo-review-admin@example.com",
+        password: "Password123!",
+        role: "admin",
+        status: "approved",
+        state: "CA",
+      });
+      const candidate = await User.create({
+        firstName: "Photo",
+        lastName: "Candidate",
+        email: "photo-candidate@example.com",
+        password: "Password123!",
+        role: "attorney",
+        status: "approved",
+        state: "CA",
+      });
+      candidate.pendingProfileImage = `profile-photos/${candidate._id}/profile-1760000000000.jpg`;
+      candidate.pendingProfileImageKey = candidate.pendingProfileImage;
+      candidate.pendingProfileImageOriginal = `profile-photos/${candidate._id}/original-1760000000001.jpg`;
+      candidate.pendingProfileImageOriginalKey = candidate.pendingProfileImageOriginal;
+      candidate.profilePhotoStatus = "pending_review";
+      await candidate.save();
+
+      const response = await request(app)
+        .post(`/api/admin/profile-photos/${candidate._id}/approve`)
+        .set("Cookie", authCookieFor(admin))
+        .send({});
+
+      expect(response.status).toBe(422);
+      expect(response.body.code).toBe("FILE_SECURITY_BLOCKED");
+      expect(scanSpy).toHaveBeenCalledTimes(2);
+      const unchanged = await User.findById(candidate._id).select("+pendingProfileImageKey +pendingProfileImageOriginalKey");
+      expect(unchanged.profilePhotoStatus).toBe("pending_review");
+      expect(unchanged.pendingProfileImageOriginalKey).toContain("original-");
+    } finally {
+      scanSpy.mockRestore();
+      if (priorBucket == null) delete process.env.S3_BUCKET;
+      else process.env.S3_BUCKET = priorBucket;
+      if (priorRegion == null) delete process.env.S3_REGION;
+      else process.env.S3_REGION = priorRegion;
+      if (priorRequired == null) delete process.env.S3_MALWARE_SCAN_REQUIRED;
+      else process.env.S3_MALWARE_SCAN_REQUIRED = priorRequired;
+    }
+  });
+
   test("Admin approves attorney registration and login succeeds", async () => {
     // Description: Admin approves a pending attorney and the attorney can log in.
     // Input values: admin role=admin; attorney status=pending; approval note="Looks good".
@@ -83,6 +147,7 @@ describe("Admin workflows", () => {
       password: "Password123!",
       role: "attorney",
       status: "pending",
+      emailVerified: true,
       state: "CA",
     });
 
@@ -109,6 +174,8 @@ describe("Admin workflows", () => {
     expect(approvalEmailHtml).toContain("What You Can Use LPC For:");
     expect(approvalEmailHtml).toContain("Next Steps:");
     expect(approvalEmailHtml).toContain("Go to Your Dashboard");
+    expect(approvalEmailHtml).toContain("https://www.linkedin.com/company/lets-paraconnect/");
+    expect(approvalEmailHtml).not.toMatch(/facebook|instagram/i);
     expect(approvalEmailHtml).not.toContain("Attorney launch begins today");
 
     const updated = await User.findById(attorney._id);
@@ -172,6 +239,159 @@ describe("Admin workflows", () => {
     });
     expect(deniedLogin.status).toBe(403);
     expect(deniedLogin.body.msg).toMatch(/not approved/i);
+  });
+
+  test("Bulk email enforces campaign audience, consent, active-account, and size rules", async () => {
+    const admin = await User.create({
+      firstName: "Admin",
+      lastName: "Campaigns",
+      email: "campaign-admin@example.com",
+      password: "Password123!",
+      role: "admin",
+      status: "approved",
+      state: "CA",
+    });
+    const [missingPhoto, uploadedPhoto, optedOutPhoto, disabledParalegal, pendingParalegal, attorney] = await User.create([
+      {
+        firstName: "Missing",
+        lastName: "Photo",
+        email: "missing-photo@example.com",
+        password: "Password123!",
+        role: "paralegal",
+        status: "approved",
+        state: "CA",
+      },
+      {
+        firstName: "Uploaded",
+        lastName: "Photo",
+        email: "uploaded-photo@example.com",
+        password: "Password123!",
+        role: "paralegal",
+        status: "approved",
+        profileImage: "profile-photos/uploaded/profile.jpg",
+        state: "CA",
+      },
+      {
+        firstName: "Opted",
+        lastName: "Out",
+        email: "opted-out@example.com",
+        password: "Password123!",
+        role: "paralegal",
+        status: "approved",
+        profileImage: "profile-photos/opted-out/profile.jpg",
+        emailPref: { product: true, marketing: false },
+        state: "CA",
+      },
+      {
+        firstName: "Disabled",
+        lastName: "Paralegal",
+        email: "disabled-paralegal@example.com",
+        password: "Password123!",
+        role: "paralegal",
+        status: "approved",
+        disabled: true,
+        state: "CA",
+      },
+      {
+        firstName: "Pending",
+        lastName: "Paralegal",
+        email: "pending-paralegal@example.com",
+        password: "Password123!",
+        role: "paralegal",
+        status: "pending",
+        state: "CA",
+      },
+      {
+        firstName: "First",
+        lastName: "Matter",
+        email: "first-matter-attorney@example.com",
+        password: "Password123!",
+        role: "attorney",
+        status: "approved",
+        state: "CA",
+      },
+    ]);
+    const cookie = authCookieFor(admin);
+
+    const profileReminder = await request(app)
+      .post("/api/admin/bulk-email")
+      .set("Cookie", cookie)
+      .send({
+        type: "complete_profile",
+        userIds: [missingPhoto, uploadedPhoto, disabledParalegal, pendingParalegal, attorney].map((user) => user._id),
+      });
+
+    expect(profileReminder.status).toBe(200);
+    expect(profileReminder.body).toEqual(expect.objectContaining({ total: 5, sent: 1, skipped: 4, failed: 0 }));
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(sendEmail.mock.calls[0][0]).toBe(missingPhoto.email);
+    expect(sendEmail.mock.calls[0][1]).toBe("Add your profile photo on Let’s-ParaConnect");
+    expect(sendEmail.mock.calls[0][2]).toContain("Open Profile Settings");
+
+    sendEmail.mockClear();
+    const launchNotice = await request(app)
+      .post("/api/admin/bulk-email")
+      .set("Cookie", cookie)
+      .send({
+        type: "attorney_launch",
+        userIds: [uploadedPhoto, missingPhoto, optedOutPhoto].map((user) => user._id),
+      });
+
+    expect(launchNotice.status).toBe(200);
+    expect(launchNotice.body).toEqual(expect.objectContaining({ total: 3, sent: 1, skipped: 2, failed: 0 }));
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(sendEmail.mock.calls[0][0]).toBe(uploadedPhoto.email);
+    expect(sendEmail.mock.calls[0][1]).toBe("Attorney Access Is Now Open");
+    expect(sendEmail.mock.calls[0][2]).toContain("your paralegal profile");
+    expect(sendEmail.mock.calls[0][2]).toContain("Stripe Connect payout setup");
+    expect(sendEmail.mock.calls[0][2]).not.toMatch(/add a payment method|fund a Matter when you are ready to hire/i);
+    expect(sendEmail.mock.calls[0][2]).not.toMatch(/launch begins today/i);
+    expect(sendEmail.mock.calls[0][2]).not.toMatch(/facebook|instagram/i);
+
+    sendEmail.mockClear();
+    const launchSetupNotice = await request(app)
+      .post("/api/admin/bulk-email")
+      .set("Cookie", cookie)
+      .send({
+        type: "attorney_launch_setup",
+        userIds: [missingPhoto, uploadedPhoto].map((user) => user._id),
+      });
+
+    expect(launchSetupNotice.status).toBe(200);
+    expect(launchSetupNotice.body).toEqual(expect.objectContaining({ total: 2, sent: 1, skipped: 1, failed: 0 }));
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(sendEmail.mock.calls[0][0]).toBe(missingPhoto.email);
+    expect(sendEmail.mock.calls[0][2]).toContain("add your paralegal profile photo");
+    expect(sendEmail.mock.calls[0][2]).toContain("Stripe Connect payout setup");
+    expect(sendEmail.mock.calls[0][2]).not.toMatch(/add a payment method|facebook|instagram/i);
+
+    sendEmail.mockClear();
+    const firstMatterReminder = await request(app)
+      .post("/api/admin/bulk-email")
+      .set("Cookie", cookie)
+      .send({
+        type: "attorney_first_matter",
+        userIds: [attorney._id, missingPhoto._id],
+      });
+
+    expect(firstMatterReminder.status).toBe(200);
+    expect(firstMatterReminder.body).toEqual(expect.objectContaining({ total: 2, sent: 1, skipped: 1, failed: 0 }));
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(sendEmail.mock.calls[0][0]).toBe(attorney.email);
+    expect(sendEmail.mock.calls[0][2]).not.toMatch(/facebook|instagram/i);
+
+    const obsoleteDecisionCampaign = await request(app)
+      .post("/api/admin/bulk-email")
+      .set("Cookie", cookie)
+      .send({ type: "acceptance", userIds: [missingPhoto._id] });
+    expect(obsoleteDecisionCampaign.status).toBe(400);
+
+    const oversizedCampaign = await request(app)
+      .post("/api/admin/bulk-email")
+      .set("Cookie", cookie)
+      .send({ type: "complete_profile", userIds: Array(201).fill(String(missingPhoto._id)) });
+    expect(oversizedCampaign.status).toBe(400);
+    expect(oversizedCampaign.body.msg).toMatch(/limited to 200/i);
   });
 
   test("Admin email change keeps the current login email active until the new email is verified", async () => {
@@ -295,7 +515,7 @@ describe("Admin workflows", () => {
     expect(res.body.users[0].deletedAt).toBeTruthy();
   });
 
-  test("Admin can force-delete a hired funded case from the posts workflow", async () => {
+  test("Admin cannot hard-delete hired funded matters from the posts workflow", async () => {
     const admin = await User.create({
       firstName: "Admin",
       lastName: "Owner",
@@ -329,7 +549,7 @@ describe("Admin workflows", () => {
     const caseDoc = await Case.create({
       title: "Force delete test",
       practiceArea: "probate",
-      details: "Admin delete should override hired and funded restrictions.",
+      details: "Funded matter history must remain auditable.",
       attorney: attorney._id,
       attorneyId: attorney._id,
       paralegal: paralegal._id,
@@ -363,18 +583,18 @@ describe("Admin workflows", () => {
       .set("Cookie", authCookieFor(admin))
       .send({ reason: "Policy violation", message: "Remove immediately." });
 
-    expect(res.status).toBe(200);
-    expect(res.body.ok).toBe(true);
+    expect(res.status).toBe(409);
+    expect(res.body.msg).toMatch(/never-engaged|retained|audit|payment/i);
 
-    const [deletedCase, deletedJob, deletedApplication] = await Promise.all([
+    const [retainedCase, retainedJob, retainedApplication] = await Promise.all([
       Case.findById(caseDoc._id).lean(),
       Job.findById(job._id).lean(),
       Application.findOne({ jobId: job._id, paralegalId: paralegal._id }).lean(),
     ]);
 
-    expect(deletedCase).toBeNull();
-    expect(deletedJob).toBeNull();
-    expect(deletedApplication).toBeNull();
+    expect(retainedCase).toBeTruthy();
+    expect(retainedJob).toBeTruthy();
+    expect(retainedApplication).toBeTruthy();
   });
 
   test("Admin analytics aggregates payment totals for the dashboard", async () => {
@@ -485,6 +705,14 @@ describe("Admin workflows", () => {
     expect(analyticsRes.body.escrowMetrics.totalEscrowReleased).toBe(100000);
     expect(analyticsRes.body.escrowMetrics.totalEscrowHeld).toBe(75000);
     expect(analyticsRes.body.revenueMetrics.platformFeesCollected).toBe(60000);
+    expect(analyticsRes.body.payoutMetrics).toEqual({ totalRecorded: 82000, count: 1 });
+    expect(analyticsRes.body).not.toHaveProperty("taxSummary");
+    expect(analyticsRes.body).not.toHaveProperty("expenses");
+    expect(analyticsRes.body.pendingPayoutQueue).toHaveLength(1);
+    expect(analyticsRes.body.pendingPayoutQueue[0]).toEqual(expect.objectContaining({
+      recipient: "Taylor Paralegal",
+      matterDeadline: null,
+    }));
 
     const payoutsRes = await request(app)
       .get("/api/admin/payouts")

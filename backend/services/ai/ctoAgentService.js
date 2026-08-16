@@ -219,7 +219,6 @@ const PAGE_FILE_MAP = Object.freeze({
   "/profile-attorney.html": [
     "frontend/profile-attorney.html",
     "frontend/assets/scripts/profile-attorney.js",
-    "frontend/assets/scripts/profile.js",
     "backend/routes/users.js",
     "backend/routes/account.js",
     "backend/routes/uploads.js",
@@ -227,7 +226,6 @@ const PAGE_FILE_MAP = Object.freeze({
   "/profile-paralegal.html": [
     "frontend/profile-paralegal.html",
     "frontend/assets/scripts/profile-paralegal.js",
-    "frontend/assets/scripts/profile.js",
     "backend/routes/users.js",
     "backend/routes/account.js",
     "backend/routes/uploads.js",
@@ -235,7 +233,6 @@ const PAGE_FILE_MAP = Object.freeze({
   "/profile-settings.html": [
     "frontend/profile-settings.html",
     "frontend/assets/scripts/profile-settings.js",
-    "frontend/assets/scripts/profile.js",
     "backend/routes/account.js",
     "backend/routes/users.js",
   ],
@@ -272,20 +269,19 @@ const PAGE_FILE_MAP = Object.freeze({
   "/case-detail.html": [
     "frontend/case-detail.html",
     "frontend/assets/scripts/case-detail.js",
-    "frontend/assets/scripts/views/case-detail.js",
     "backend/routes/cases.js",
     "backend/routes/messages.js",
   ],
   "/case-applications.html": [
     "frontend/case-applications.html",
-    "frontend/assets/scripts/case-applications.js",
+    "frontend/dashboard-attorney.html",
+    "frontend/assets/scripts/attorney-tabs.js",
     "backend/routes/cases.js",
     "backend/routes/applications.js",
   ],
   "/admin-dashboard.html": [
     "frontend/admin-dashboard.html",
     "frontend/assets/scripts/admin-dashboard.js",
-    "frontend/assets/scripts/admin.js",
     "backend/routes/admin.js",
     "backend/routes/adminApprovals.js",
   ],
@@ -312,7 +308,7 @@ const CATEGORY_FILE_MAP = Object.freeze({
   },
   hire_flow: {
     backendAreasToCheck: [
-      "Case hire route and attorney authorization checks",
+      "Matter hire route and attorney authorization checks",
       "Funding and payment prerequisites inside the hire flow",
       "Hire state persistence and post-hire status updates",
     ],
@@ -323,7 +319,7 @@ const CATEGORY_FILE_MAP = Object.freeze({
     ],
     files: [
       "frontend/assets/scripts/attorney-tabs.js",
-      "frontend/assets/scripts/views/case-detail.js",
+      "frontend/assets/scripts/case-detail.js",
       "frontend/case-detail.html",
       "frontend/dashboard-attorney.html",
       "backend/routes/cases.js",
@@ -349,7 +345,6 @@ const CATEGORY_FILE_MAP = Object.freeze({
       "frontend/assets/scripts/profile-attorney.js",
       "frontend/assets/scripts/profile-paralegal.js",
       "frontend/assets/scripts/profile-settings.js",
-      "frontend/assets/scripts/profile.js",
       "backend/routes/users.js",
       "backend/routes/account.js",
       "backend/routes/uploads.js",
@@ -377,12 +372,12 @@ const CATEGORY_FILE_MAP = Object.freeze({
   },
   case_posting: {
     backendAreasToCheck: [
-      "Case creation and draft route validation",
+      "Matter creation and draft route validation",
       "Role and funding prerequisites",
-      "Case persistence and follow-up mutations",
+      "Matter persistence and follow-up mutations",
     ],
     frontendAreasToCheck: [
-      "Create-case navigation and step submission",
+      "Matter-posting navigation and step submission",
       "Client payload shape and step gating",
     ],
     files: [
@@ -398,7 +393,7 @@ const CATEGORY_FILE_MAP = Object.freeze({
   messaging: {
     backendAreasToCheck: [
       "Message send route and permissions",
-      "Thread lookup and case access checks",
+      "Thread lookup and Matter access checks",
       "Message persistence and notification side effects",
     ],
     frontendAreasToCheck: [
@@ -407,17 +402,15 @@ const CATEGORY_FILE_MAP = Object.freeze({
     ],
     files: [
       "frontend/case-detail.html",
-      "frontend/assets/scripts/views/chat.js",
       "frontend/assets/scripts/case-detail.js",
       "backend/routes/messages.js",
-      "backend/routes/chat.js",
       "backend/models/Message.js",
     ],
   },
   message_send: {
     backendAreasToCheck: [
       "Message send route and permissions",
-      "Thread lookup and case access checks",
+      "Thread lookup and Matter access checks",
       "Message persistence and notification side effects",
     ],
     frontendAreasToCheck: [
@@ -426,11 +419,9 @@ const CATEGORY_FILE_MAP = Object.freeze({
       "Thread state refresh after send",
     ],
     files: [
-      "frontend/assets/scripts/views/chat.js",
       "frontend/assets/scripts/case-detail.js",
       "frontend/case-detail.html",
       "backend/routes/messages.js",
-      "backend/routes/chat.js",
       "backend/models/Message.js",
     ],
   },
@@ -438,7 +429,7 @@ const CATEGORY_FILE_MAP = Object.freeze({
     backendAreasToCheck: [
       "Payment route validation and state transitions",
       "Stripe webhook state sync",
-      "Escrow, payout, or withdrawal side effects",
+      "Funding, payout, or withdrawal side effects",
     ],
     frontendAreasToCheck: [
       "Payment submit flow and client error handling",
@@ -448,7 +439,6 @@ const CATEGORY_FILE_MAP = Object.freeze({
       "frontend/assets/scripts/payments.js",
       "frontend/assets/scripts/utils/stripe-connect.js",
       "backend/routes/payments.js",
-      "backend/routes/stripe.js",
       "backend/routes/paymentsWebhook.js",
     ],
   },
@@ -466,7 +456,6 @@ const CATEGORY_FILE_MAP = Object.freeze({
       "frontend/assets/scripts/payments.js",
       "frontend/assets/scripts/utils/stripe-connect.js",
       "backend/routes/payments.js",
-      "backend/routes/stripe.js",
       "backend/routes/paymentsWebhook.js",
     ],
   },
@@ -483,7 +472,6 @@ const CATEGORY_FILE_MAP = Object.freeze({
     files: [
       "frontend/assets/scripts/payments.js",
       "frontend/assets/scripts/utils/stripe-connect.js",
-      "backend/routes/stripe.js",
       "backend/routes/payments.js",
       "backend/routes/paymentsWebhook.js",
     ],
@@ -537,7 +525,7 @@ const CATEGORY_FILE_MAP = Object.freeze({
     ],
     files: [
       "frontend/assets/scripts/login.js",
-      "frontend/assets/scripts/profile.js",
+      "frontend/assets/scripts/profile-settings.js",
       "frontend/assets/scripts/create-case-nav.js",
       "frontend/assets/scripts/case-detail.js",
       "frontend/assets/scripts/admin-dashboard.js",
@@ -728,15 +716,15 @@ function buildLikelyRootCauses({ category = "", messageText = "", metadata = {} 
   }
   if (normalizedCategory === "case_posting") {
     roots.push(
-      "Likely case-create step validation mismatch between frontend payload and backend requirements.",
-      "Possible route-level guard blocking the case submission due to role or funding prerequisites.",
-      "Possible regression in multi-step case navigation state."
+      "Likely Matter-creation step validation mismatch between frontend payload and backend requirements.",
+      "Possible route-level guard blocking the Matter submission due to role or funding prerequisites.",
+      "Possible regression in multi-step Matter navigation state."
     );
   }
   if (normalizedCategory === "messaging") {
     roots.push(
-      "Likely permissions or case-access check blocking message send or thread load.",
-      "Possible send-message handler failure in the case-detail or chat client script.",
+      "Likely permissions or Matter-access check blocking message send or thread load.",
+      "Possible send-message handler failure in the Matter detail or chat client script.",
       "Possible server-side thread lookup or persistence error."
     );
   }
@@ -749,9 +737,9 @@ function buildLikelyRootCauses({ category = "", messageText = "", metadata = {} 
   }
   if (normalizedCategory === "payment") {
     roots.push(
-      "Likely payment-state mismatch or Stripe-related backend failure in payout, escrow, or checkout logic.",
+      "Likely payment-state mismatch or Stripe-related backend failure in payout, funding, or checkout logic.",
       "Possible webhook synchronization gap leaving LPC state stale after Stripe changes.",
-      "Possible permissions or case-status guard blocking the money workflow."
+      "Possible permissions or Matter-status guard blocking the money workflow."
     );
   }
   if (normalizedCategory === "payment_action") {
@@ -792,7 +780,7 @@ function buildLikelyRootCauses({ category = "", messageText = "", metadata = {} 
   return uniqueStrings(roots).slice(0, 5);
 }
 
-function buildAreaMapping({ category = "", metadata = {}, messageText = "" } = {}) {
+function buildAreaMapping({ category = "", metadata = {} } = {}) {
   const normalizedCategory = normalizeCategory(category);
   const categoryMap = CATEGORY_FILE_MAP[normalizedCategory] || CATEGORY_FILE_MAP.unknown;
   const pageFiles = pageContextPaths(metadata?.page || metadata?.routePath || metadata?.pagePath || "");
@@ -836,7 +824,7 @@ function buildRecommendedFixStrategy({ category = "", filesToInspect = [], metad
     return `Treat this as a high-risk money path. Reproduce with a safe test account, inspect the Stripe/connect route behavior, and confirm whether the failure is in link generation, requirements sync, webhook state, or LPC-side gating. Do not widen the fix into unrelated payments logic. Add regression checks around the same money flow before considering deployment. Relevant files: ${firstFiles || "payments files"} .`;
   }
   if (normalizedCategory === "messaging") {
-    return `Reproduce the messaging flow${page} using the reported role and case context, then inspect thread load and send-message behavior end to end. Confirm permissions, case access, and message persistence before changing client-side UI assumptions. Keep the patch narrow to the failing send or load path and add regression checks for both participants. Relevant files: ${firstFiles || "messaging files"} .`;
+    return `Reproduce the messaging flow${page} using the reported role and Matter context, then inspect thread load and send-message behavior end to end. Confirm permissions, Matter access, and message persistence before changing client-side UI assumptions. Keep the patch narrow to the failing send or load path and add regression checks for both participants. Relevant files: ${firstFiles || "messaging files"} .`;
   }
   if (normalizedCategory === "message_send") {
     return `Reproduce the exact send-message action${page} and inspect whether the button click, composer submit branch, or message API call fails first. Confirm permissions and thread access before changing UI assumptions, and keep the patch scoped to the send action rather than the broader messaging surface. Add regression checks for both thread load and successful send. Relevant files: ${firstFiles || "message send files"} .`;
@@ -845,7 +833,7 @@ function buildRecommendedFixStrategy({ category = "", filesToInspect = [], metad
     return `Treat this as a focused payment-action issue${page}. Reproduce the exact CTA flow, inspect the button click and client payload, then confirm whether the backend route or Stripe action is rejecting the request. Do not widen the patch into broader billing logic. Add regression coverage for the same money action before any deploy recommendation. Relevant files: ${firstFiles || "payment action files"} .`;
   }
   if (normalizedCategory === "case_posting") {
-    return `Reproduce the case-posting path${page} step by step and identify whether the failure is in client validation, multi-step state, or backend route validation. Confirm any role or funding prerequisite gates before changing the form flow. Keep the fix scoped to the failing step and add a regression check for the same create-case path. Relevant files: ${firstFiles || "case posting files"} .`;
+    return `Reproduce the Matter-posting path${page} step by step and identify whether the failure is in client validation, multi-step state, or backend route validation. Confirm any role or funding prerequisite gates before changing the form flow. Keep the fix scoped to the failing step and add a regression check for the same create-case path. Relevant files: ${firstFiles || "Matter posting files"} .`;
   }
   return `Reproduce the reported issue${page} and inspect the page-specific client script together with the most likely backend route or validation guard. Confirm whether the interaction fails before the request, during route handling, or after a partial success. Keep the patch narrow, grounded in the first failing path, and add regression coverage around the same surface. Relevant files: ${firstFiles || "page and route files"} .`;
 }
@@ -886,7 +874,7 @@ function buildTestPlan({ category = "", metadata = {}, urgency = "medium" } = {}
     );
   } else if (normalizedCategory === "messaging") {
     plan.push(
-      "Verify both thread load and message send succeed for the intended case participants.",
+      "Verify both thread load and message send succeed for the intended Matter participants.",
       "Regression check another existing conversation still renders and sends normally."
     );
   } else if (normalizedCategory === "message_send") {
@@ -901,7 +889,7 @@ function buildTestPlan({ category = "", metadata = {}, urgency = "medium" } = {}
     );
   } else if (normalizedCategory === "case_posting") {
     plan.push(
-      "Verify the affected create-case step submits successfully and the created case appears in the expected dashboard list.",
+      "Verify the affected Matter-posting step submits successfully and the created Matter appears in the expected dashboard list.",
       "Regression check the adjacent step navigation and validation still behave correctly."
     );
   } else {
@@ -929,7 +917,7 @@ function buildDeploymentRisk({ category = "", technicalSeverity = "medium" } = {
   return "Medium: still approval-first in this phase, but the likely patch surface appears narrower than an auth or money path.";
 }
 
-function buildDiagnosisSummary({ category = "", technicalSeverity = "", messageText = "", metadata = {} } = {}) {
+function buildDiagnosisSummary({ category = "", messageText = "", metadata = {} } = {}) {
   const normalizedCategory = normalizeCategory(category);
   const page = metadata?.page ? ` on ${metadata.page}` : "";
   const role = metadata?.role ? ` for the ${metadata.role} flow` : "";
@@ -1136,7 +1124,6 @@ async function runCtoDiagnosis(input = {}) {
   const areaMap = buildAreaMapping({
     category: normalized.category,
     metadata: normalized.metadata,
-    messageText: normalized.originalMessage,
   });
   const baseNotes = uniqueStrings([
     "This packet is a first-pass technical diagnosis, not a confirmed root-cause report.",
@@ -1151,7 +1138,6 @@ async function runCtoDiagnosis(input = {}) {
   const heuristic = {
     diagnosisSummary: buildDiagnosisSummary({
       category: normalized.category,
-      technicalSeverity,
       messageText: normalized.internalSummary || normalized.originalMessage,
       metadata: normalized.metadata,
     }),

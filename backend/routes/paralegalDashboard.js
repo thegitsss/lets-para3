@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:paralegalDashboard");
 const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();
@@ -9,6 +11,8 @@ const Job = require("../models/Job");
 const Application = require("../models/Application");
 const Case = require("../models/Case");
 const Payout = require("../models/Payout");
+const { resolveMatterDeadlineDate } = require("../utils/businessDate");
+const { DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT } = require("../services/platformFeePolicy");
 
 /**
  * Optional helper: compute paralegal earnings based on completed payouts
@@ -74,7 +78,7 @@ async function getParalegalEarnings(paralegalId) {
         .select("caseId")
         .lean();
       const payoutCaseIdSet = new Set(payoutCaseIds.map((p) => String(p.caseId)));
-      const defaultParalegalFeePct = Number(process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18);
+      const defaultParalegalFeePct = DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT;
 
       withdrawalCases.forEach((doc) => {
         if (payoutCaseIdSet.has(String(doc._id))) return;
@@ -104,7 +108,7 @@ async function getParalegalEarnings(paralegalId) {
       total: (allTimeTotal + withdrawalAllTimeTotal) / 100,
     };
   } catch (err) {
-    console.error("Error computing paralegal earnings:", err);
+    runtimeLogger.error("Error computing paralegal earnings:", err);
     return { month: 0, last30: 0 };
   }
 }
@@ -130,6 +134,7 @@ router.get("/", auth, requireApproved, requireRole(["paralegal"]), async (req, r
     // 2. Jobs I have applied to
     const myApplications = await Application.find({
       paralegalId,
+      status: { $ne: "withdrawn" },
     })
       .populate("jobId")
       .sort({ createdAt: -1 });
@@ -179,7 +184,8 @@ router.get("/", auth, requireApproved, requireRole(["paralegal"]), async (req, r
         ? `${c.attorneyId.firstName} ${c.attorneyId.lastName}`
         : null,
       status: String(c.status || "").toLowerCase() === "in_progress" ? "in progress" : c.status,
-      deadline: c.deadline || null,
+      deadlineDate: resolveMatterDeadlineDate(c),
+      deadline: resolveMatterDeadlineDate(c) || null,
       createdAt: c.createdAt,
       archived: c.archived,
       paymentReleased: c.paymentReleased,
@@ -216,7 +222,7 @@ router.get("/", auth, requireApproved, requireRole(["paralegal"]), async (req, r
       myApplications: myApplicationsSummary,
     });
   } catch (err) {
-    console.error("Paralegal dashboard error:", err);
+    runtimeLogger.error("Paralegal dashboard error:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

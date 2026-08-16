@@ -1,6 +1,7 @@
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const request = require("supertest");
 
 process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_stub";
@@ -48,20 +49,7 @@ beforeEach(async () => {
 });
 
 describe("Case lifecycle transitions", () => {
-  test("Open (with assignee) → in progress → completed → archived", async () => {
-    // Description: Admin and attorney move a case through lifecycle.
-    // Input values: status transitions + archive=true.
-    // Expected result: status updates in order and archived=true.
-
-    const admin = await User.create({
-      firstName: "Admin",
-      lastName: "Owner",
-      email: "owner@lets-paraconnect.com",
-      password: "Password123!",
-      role: "admin",
-      status: "approved",
-      state: "CA",
-    });
+  test("Open → funded work → paid completion requires the full lifecycle evidence", async () => {
     const attorney = await User.create({
       firstName: "Alex",
       lastName: "Stone",
@@ -91,46 +79,38 @@ describe("Case lifecycle transitions", () => {
       currency: "usd",
     });
 
-    const assignRes = await request(app)
-      .patch(`/api/admin/assign/${caseDoc._id}`)
-      .set("Cookie", authCookieFor(admin))
-      .send({ paralegalId: paralegal._id });
-    expect(assignRes.status).toBe(200);
-    expect(assignRes.body.case.status).toBe("open");
-    const assignedParalegal =
-      assignRes.body.case.paralegal?._id ||
-      assignRes.body.case.paralegalId?._id ||
-      assignRes.body.case.paralegal ||
-      assignRes.body.case.paralegalId;
-    expect(String(assignedParalegal)).toBe(String(paralegal._id));
+    expect(() => caseDoc.transitionTo("in progress")).toThrow(/active_paralegal_required/);
 
-    const inProgressRes = await request(app)
-      .patch(`/api/admin/cases/${caseDoc._id}/status`)
-      .set("Cookie", authCookieFor(admin))
-      .send({ status: "in progress" });
-    expect(inProgressRes.status).toBe(200);
-    expect(inProgressRes.body.case.status).toMatch(/in progress/i);
+    const fundedAt = new Date("2026-08-01T12:00:00.000Z");
+    caseDoc.paralegal = paralegal._id;
+    caseDoc.paralegalId = paralegal._id;
+    caseDoc.hiredAt = fundedAt;
+    caseDoc.escrowIntentId = "pi_lifecycle_verified";
+    caseDoc.escrowStatus = "funded";
+    caseDoc.fundingIntegrityStatus = "verified";
+    caseDoc.transitionTo("in progress");
+    expect(caseDoc.status).toBe("in progress");
 
-    const completedRes = await request(app)
-      .patch(`/api/admin/cases/${caseDoc._id}/status`)
-      .set("Cookie", authCookieFor(admin))
-      .send({ status: "completed" });
-    expect(completedRes.status).toBe(200);
-    expect(completedRes.body.case.status).toBe("completed");
+    expect(() => caseDoc.transitionTo("completed")).toThrow(/payment_release_required/);
 
-    const archiveRes = await request(app)
-      .patch(`/api/cases/${caseDoc._id}/archive`)
-      .set("Cookie", authCookieFor(attorney))
-      .send({ archived: true });
-    expect(archiveRes.status).toBe(200);
-    expect(archiveRes.body.archived).toBe(true);
+    const completedAt = new Date("2026-08-08T12:00:00.000Z");
+    caseDoc.paymentReleased = true;
+    caseDoc.payoutTransferId = "tr_lifecycle_verified";
+    caseDoc.paidOutAt = completedAt;
+    caseDoc.completedAt = completedAt;
+    caseDoc.archived = true;
+    caseDoc.readOnly = true;
+    caseDoc.transitionTo("completed");
+    await caseDoc.save();
+
+    const stored = await Case.findById(caseDoc._id).lean();
+    expect(stored.status).toBe("completed");
+    expect(stored.archived).toBe(true);
+    expect(stored.readOnly).toBe(true);
+    expect(stored.paymentReleased).toBe(true);
   });
 
-  test("Guardrail: invalid transition is blocked", async () => {
-    // Description: Admin attempts invalid transition open → completed.
-    // Input values: status="completed" on open case.
-    // Expected result: 400 with invalid transition message.
-
+  test("Obsolete manual assignment and status mutation endpoints are retired", async () => {
     const admin = await User.create({
       firstName: "Admin",
       lastName: "Owner",
@@ -160,15 +140,20 @@ describe("Case lifecycle transitions", () => {
       currency: "usd",
     });
 
-    const res = await request(app)
+    const assignment = await request(app)
+      .patch(`/api/admin/assign/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(admin))
+      .send({ paralegalId: new mongoose.Types.ObjectId() });
+    const statusMutation = await request(app)
       .patch(`/api/admin/cases/${caseDoc._id}/status`)
       .set("Cookie", authCookieFor(admin))
       .send({ status: "completed" });
-    expect(res.status).toBe(400);
-    expect(res.body.msg).toMatch(/Invalid transition/i);
+    expect(assignment.status).toBe(404);
+    expect(statusMutation.status).toBe(404);
+    expect((await Case.findById(caseDoc._id).lean()).status).toBe("open");
   });
 
-  test("Attorney can delete an archived completed case after hiring and payment release", async () => {
+  test("Attorney cannot hard-delete an archived completed case with payment history", async () => {
     const attorney = await User.create({
       firstName: "Dana",
       lastName: "Hart",
@@ -209,9 +194,9 @@ describe("Case lifecycle transitions", () => {
       .delete(`/api/cases/${caseDoc._id}`)
       .set("Cookie", authCookieFor(attorney));
 
-    expect(res.status).toBe(200);
-    expect(res.body.ok).toBe(true);
-    expect(await Case.findById(caseDoc._id).lean()).toBeNull();
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/never-engaged|retained|hiring a paralegal/i);
+    expect(await Case.findById(caseDoc._id).lean()).not.toBeNull();
   });
 
   test("Attorney still cannot delete an active hired funded case", async () => {
@@ -254,8 +239,8 @@ describe("Case lifecycle transitions", () => {
       .delete(`/api/cases/${caseDoc._id}`)
       .set("Cookie", authCookieFor(attorney));
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toBe("Cannot delete a case after hiring a paralegal");
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/never-engaged|hiring a paralegal/i);
     expect(await Case.findById(caseDoc._id).lean()).not.toBeNull();
   });
 });

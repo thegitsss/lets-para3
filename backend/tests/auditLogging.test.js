@@ -47,11 +47,7 @@ beforeEach(async () => {
 });
 
 describe("Audit logging", () => {
-  test("Admin case status update writes audit log", async () => {
-    // Description: Admin changes a case status and the action is logged.
-    // Input values: status="in progress" on open case.
-    // Expected result: AuditLog entry with action="admin.case.status.update".
-
+  test("Admin account suspension writes an audit log", async () => {
     const admin = await User.create({
       firstName: "Admin",
       lastName: "Owner",
@@ -71,33 +67,23 @@ describe("Audit logging", () => {
       state: "CA",
     });
 
-    const caseDoc = await Case.create({
-      title: "Immigration support",
-      details: "Audit logging test case details.",
-      status: "open",
-      attorney: attorney._id,
-      attorneyId: attorney._id,
-      totalAmount: 100000,
-      currency: "usd",
-    });
-
     const res = await request(app)
-      .patch(`/api/admin/cases/${caseDoc._id}/status`)
+      .post(`/api/admin/disable/${attorney._id}`)
       .set("Cookie", authCookieFor(admin))
-      .send({ status: "in progress" });
+      .send({ reason: "Security review" });
     expect(res.status).toBe(200);
 
     const log = await AuditLog.findOne({
-      action: "admin.case.status.update",
-      targetId: String(caseDoc._id),
+      action: "admin.user.suspended",
+      targetId: String(attorney._id),
     }).lean();
 
     expect(log).toBeTruthy();
     expect(String(log.actor)).toBe(String(admin._id));
     expect(log.actorRole).toBe("admin");
-    expect(log.targetType).toBe("case");
-    expect(String(log.case)).toBe(String(caseDoc._id));
-    expect(log.meta?.status).toBe("in progress");
-    expect(log.path).toMatch(/\/api\/admin\/cases\/.+\/status/);
+    expect(log.targetType).toBe("user");
+    expect(log.meta).toMatchObject({ reasonProvided: true, customMessageProvided: false });
+    expect(JSON.stringify(log.meta)).not.toContain("Security review");
+    expect(log.path).toMatch(/\/api\/admin\/disable\/.+/);
   });
 });

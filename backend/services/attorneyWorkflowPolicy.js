@@ -74,15 +74,19 @@ const ATTORNEY_WORKFLOW_POLICY = Object.freeze({
   }),
   [ATTORNEY_WORKFLOW_STAGES.MESSAGING]: Object.freeze({ label: "Send matter messages" }),
   [ATTORNEY_WORKFLOW_STAGES.COMPLETE_AND_RELEASE]: Object.freeze({
-    label: "Complete the matter and release funds",
+    label: "Complete the Matter and release payment",
     allScopeTasksComplete: true,
     verifiedFundingRequired: true,
     paralegalPayoutSetupRequired: true,
     payoutReleaseTrigger: "when_attorney_completes_matter",
     resultingMatterStatus: "completed",
     paymentReleased: true,
-    bankDepositEstimateBusinessDays: Object.freeze({ minimum: 3, maximum: 5 }),
-    bankDepositTimingDependsOn: Object.freeze(["stripe", "paralegal_bank"]),
+    bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+    bankDepositTimingDependsOn: Object.freeze([
+      "stripe_account_country",
+      "stripe_payout_schedule",
+      "financial_institution",
+    ]),
   }),
   [ATTORNEY_WORKFLOW_STAGES.WITHDRAWAL_DECISION]: Object.freeze({
     label: "Resolve a paralegal withdrawal",
@@ -176,7 +180,12 @@ function evaluateInvitationEligibility(input = {}) {
   const blockers = [];
   const status = normalizeCaseStatus(input.caseDoc?.status);
   if (input.ownerAuthorized !== true) blockers.push("attorney_ownership_required");
-  if (["completed", "closed", "disputed"].includes(status) || input.caseDoc?.archived === true) blockers.push("matter_final");
+  const relisted =
+    status === "paused" &&
+    input.caseDoc?.pausedReason === "paralegal_withdrew" &&
+    input.caseDoc?.payoutFinalizedAt &&
+    Number(input.caseDoc?.remainingAmount) > 0;
+  if (input.caseDoc?.archived === true || (status !== "open" && !relisted)) blockers.push("matter_not_open");
   if (input.targetSelected !== true) blockers.push("paralegal_selection_required");
   if (input.targetSelected === true && input.paralegalApproved !== true) blockers.push("approved_paralegal_required");
   if (input.targetSelected === true && input.payoutSetupReady !== true) blockers.push("paralegal_payout_setup_required");
@@ -193,7 +202,12 @@ function evaluatePreEngagementRequest(input = {}) {
   const status = normalizeCaseStatus(caseDoc.status);
   if (input.ownerAuthorized !== true) blockers.push("attorney_ownership_required");
   if (input.targetSelected !== true) blockers.push("paralegal_selection_required");
-  if (["completed", "closed", "disputed"].includes(status) || caseDoc.archived === true) blockers.push("matter_final");
+  const relisted =
+    status === "paused" &&
+    caseDoc.pausedReason === "paralegal_withdrew" &&
+    caseDoc.payoutFinalizedAt &&
+    Number(caseDoc.remainingAmount) > 0;
+  if (caseDoc.archived === true || (status !== "open" && !relisted)) blockers.push("matter_not_open");
   if (hasParalegal(caseDoc)) blockers.push("paralegal_already_assigned");
   if (!Array.isArray(caseDoc.tasks) || caseDoc.tasks.length === 0) blockers.push("scope_task_required");
   if (input.partiesBlocked === true) blockers.push("parties_blocked");
@@ -217,7 +231,12 @@ function evaluateHiringEligibility(input = {}) {
   const preEngagementStatus = String(caseDoc.preEngagement?.status || "").toLowerCase();
   if (input.ownerAuthorized !== true) blockers.push("attorney_ownership_required");
   if (input.targetSelected !== true) blockers.push("paralegal_selection_required");
-  if (["completed", "closed", "disputed"].includes(status) || caseDoc.archived === true) blockers.push("matter_final");
+  const relisted =
+    status === "paused" &&
+    caseDoc.pausedReason === "paralegal_withdrew" &&
+    caseDoc.payoutFinalizedAt &&
+    Number(caseDoc.remainingAmount) > 0;
+  if (caseDoc.archived === true || (status !== "open" && !relisted)) blockers.push("matter_not_open");
   if (hasParalegal(caseDoc)) blockers.push("paralegal_already_assigned");
   if (!Array.isArray(caseDoc.tasks) || caseDoc.tasks.length === 0) blockers.push("scope_task_required");
   if (!Number.isFinite(amount) || amount < MIN_MATTER_AMOUNT_CENTS) blockers.push("minimum_matter_amount_required");
@@ -262,15 +281,23 @@ function evaluateMessagingPermission(input = {}) {
 function evaluateCompletionEligibility(input = {}) {
   const caseDoc = input.caseDoc || {};
   const blockers = [];
+  const status = normalizeCaseStatus(caseDoc.status);
+  const hasOpenDispute = Array.isArray(caseDoc.disputes) && caseDoc.disputes.some(
+    (dispute) => String(dispute?.status || "open").toLowerCase() === "open"
+  );
+  if (["completed", "closed"].includes(status)) {
+    return result(ATTORNEY_WORKFLOW_STAGES.COMPLETE_AND_RELEASE, [], { alreadyCompleted: true }, { applicable: false });
+  }
   if (input.ownerAuthorized !== true) blockers.push("attorney_ownership_required");
+  if (status !== "in progress") blockers.push("active_matter_required");
+  if (caseDoc.archived === true && input.reconcileReleasedPayout !== true) blockers.push("matter_archived");
+  if (caseDoc.readOnly === true && input.reconcileReleasedPayout !== true) blockers.push("matter_read_only");
+  if (hasOpenDispute || status === "disputed") blockers.push("open_dispute");
   if (!hasParalegal(caseDoc)) blockers.push("hire_required");
   if (!Array.isArray(caseDoc.tasks) || caseDoc.tasks.length === 0) blockers.push("scope_task_required");
   else if (!allScopeTasksComplete(caseDoc)) blockers.push("incomplete_scope_tasks");
   if (!(caseDoc.escrowIntentId && String(caseDoc.escrowStatus || "").toLowerCase() === "funded")) {
     blockers.push("verified_funding_required");
-  }
-  if (["completed", "closed"].includes(normalizeCaseStatus(caseDoc.status))) {
-    return result(ATTORNEY_WORKFLOW_STAGES.COMPLETE_AND_RELEASE, [], { alreadyCompleted: true }, { applicable: false });
   }
   return result(ATTORNEY_WORKFLOW_STAGES.COMPLETE_AND_RELEASE, blockers, { alreadyCompleted: false });
 }
@@ -307,7 +334,11 @@ function evaluateTerminationEligibility(input = {}) {
   const blockers = [];
   if (input.ownerAuthorized !== true && input.adminAuthorized !== true) blockers.push("attorney_ownership_required");
   if (!hasParalegal(caseDoc)) blockers.push("assigned_paralegal_required");
-  if (["completed", "closed"].includes(normalizeCaseStatus(caseDoc.status))) blockers.push("matter_final");
+  if (normalizeCaseStatus(caseDoc.status) !== "in progress") blockers.push("active_matter_required");
+  if (caseDoc.archived === true || caseDoc.readOnly === true) blockers.push("matter_final");
+  if (Array.isArray(caseDoc.disputes) && caseDoc.disputes.some(
+    (dispute) => String(dispute?.status || "open").toLowerCase() === "open"
+  )) blockers.push("open_dispute");
   if (!["", "none", "resolved"].includes(String(caseDoc.terminationStatus || "").toLowerCase())) {
     blockers.push("termination_already_in_progress");
   }

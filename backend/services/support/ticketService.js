@@ -279,8 +279,8 @@ async function loadContextSnapshot({ requesterUserId, caseId, jobId, application
   ]);
 
   if (requesterUserId && !user) throw new Error("Requester user not found.");
-  if (caseId && !supportCase) throw new Error("Case not found.");
-  if (jobId && !job) throw new Error("Job not found.");
+  if (caseId && !supportCase) throw new Error("Matter not found.");
+  if (jobId && !job) throw new Error("Matter posting not found.");
   if (applicationId && !application) throw new Error("Application not found.");
 
   return {
@@ -314,7 +314,7 @@ async function hydrateTicket(ticketId) {
     .lean();
 }
 
-async function createSupportTicket(payload = {}, actor = {}) {
+async function createSupportTicket(payload = {}) {
   if (!String(payload.subject || "").trim()) throw new Error("Support ticket subject is required.");
   if (!String(payload.message || "").trim()) throw new Error("Support ticket message is required.");
 
@@ -460,7 +460,11 @@ async function syncConversationStatus(conversationId, ticket = {}, { lastMessage
   if (lastMessageAt) update.lastMessageAt = lastMessageAt;
 
   if (normalizedConversationId && SupportConversation.collection) {
-    return SupportConversation.findByIdAndUpdate(normalizedConversationId, { $set: update }, { new: true });
+    return SupportConversation.findByIdAndUpdate(
+      normalizedConversationId,
+      { $set: update },
+      { returnDocument: "after" }
+    );
   }
   return null;
 }

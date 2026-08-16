@@ -9,7 +9,8 @@ Use this for a manual pass through the paralegal experience on Let’s-ParaConne
 
 ## Before You Start
 - [ ] Use a fresh browser session or Incognito window.
-- [ ] If payouts or payments are involved, use only approved test details. (use 5555 5555 5555 4444 cvc: any 3 digits. date: any future date.)
+- [ ] Record the exact environment and release commit. Never run this checklist against an unidentified build.
+- [ ] Use environment-owner-approved Stripe test fixtures only when the environment is explicitly in test mode. Never enter test data in live mode or real financial data in a non-production environment.
 - [ ] Keep notes on anything confusing, broken, slow, or misleading.
 - [ ] If something fails, write down the exact page, action, and error message.
 
@@ -71,49 +72,49 @@ Use this for a manual pass through the paralegal experience on Let’s-ParaConne
 - [ ] Any profile or approval banners are understandable.
 - [ ] Refreshing the dashboard preserves the correct state.
 
-## 8. Browse Open Jobs
-- [ ] `browse-jobs.html` loads available jobs correctly.
-- [ ] Job cards are clear and easy to scan.
-- [ ] Opening a job modal/detail works.
+## 8. Browse Open Matters
+- [ ] `browse-jobs.html` loads available Matters correctly.
+- [ ] Matter cards are clear and easy to scan.
+- [ ] Opening a Matter detail works.
 - [ ] Attorney preview/profile link works if shown.
 - [ ] If Stripe is required, the gating message is clear before applying.
-- [ ] If no jobs are available, the empty state feels intentional.
+- [ ] If no Matters are available, the empty state is truthful and provides an appropriate next step.
 
-## 9. Apply to a Job
+## 9. Apply to a Matter
 - [ ] Apply action is available only when expected.
 - [ ] Cover letter prompt/form is understandable.
 - [ ] Application validation is clear.
 - [ ] Successful application shows confirmation.
 - [ ] Duplicate/confusing application state does not occur.
-- [ ] Applied job appears in `paralegal-applications.html`.
+- [ ] The application appears in `dashboard-paralegal.html#cases`.
 
 ## 10. My Applications
-- [ ] `paralegal-applications.html` loads correctly.
+- [ ] The Applications view in `dashboard-paralegal.html#cases` loads correctly.
 - [ ] Submitted applications list is accurate.
 - [ ] Status labels are understandable.
 - [ ] Opening an application detail view/modal works.
-- [ ] Application detail shows the correct job info and cover message.
-- [ ] Deep links with a specific application still open correctly if tested.
+- [ ] Application detail shows the correct Matter information and cover message.
+- [ ] A legacy application deep link, if tested, preserves context and converges on the canonical Applications view.
 
-## 11. Assigned Cases (after applying to a case and getting hired)
-- [ ] `paralegal-assigned.html` loads correctly.
-- [ ] Assigned matters list shows the right attorney/case info.
+## 11. Assigned Matters
+- [ ] The assigned-Matters view in `dashboard-paralegal.html#cases` loads correctly after hire.
+- [ ] Assigned Matters list shows the correct attorney and Matter information.
 - [ ] Workspace access becomes available only when attorney funding/status allow it. 
-- [ ] Opening an eligible hired/assigned case goes to `case-detail.html`.
+- [ ] Opening an eligible hired/assigned Matter goes to `case-detail.html`.
 
-## 12. Case Workspace
-- [ ] Open the case workspace in `case-detail.html`.
-- [ ] Case title, status, tasks, and attorney info load correctly.
+## 12. Matter Workspace
+- [ ] Open the Matter workspace in `case-detail.html`.
+- [ ] Matter title, status, tasks, and attorney information load correctly.
 - [ ] Messaging works in the workspace.
 - [ ] Message sending feels immediate and readable.
 - [ ] File/document section loads correctly.
 - [ ] Uploading a file works if tested.
 - [ ] Download/open actions work for shared files if tested.
 - [ ] Task status behavior feels clear.
-- [ ] Refreshing the page preserves the correct case state.
+- [ ] Refreshing the page preserves the correct Matter state.
 
 ## 14. Withdrawal / Dispute Flow
-- [ ] If testing an active case, the paralegal can find the withdrawal option when eligible.
+- [ ] If testing an active Matter, the paralegal can find the withdrawal option when eligible.
 - [ ] Withdrawal messaging is understandable before confirming.
 - [ ] After withdrawal, the next state is clear to the paralegal.
 - [ ] If a dispute window exists, that is explained clearly.

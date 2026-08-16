@@ -468,8 +468,8 @@ describe("support manager agent", () => {
         result: {
           ok: true,
           available: true,
-          ctaLabel: "Billing & payments",
-          ctaHref: "dashboard-attorney.html#billing",
+          ctaLabel: "Payments",
+          ctaHref: "dashboard-attorney.html#funds",
         },
       },
     ];
@@ -477,8 +477,8 @@ describe("support manager agent", () => {
       managerReply({
         reply: "Open billing here.",
         navigation: {
-          ctaLabel: "Billing & payments",
-          ctaHref: "dashboard-attorney.html#billing",
+          ctaLabel: "Payments",
+          ctaHref: "dashboard-attorney.html#funds",
           inlineLinkText: "here",
         },
         activeTask: "NAVIGATION",
@@ -500,7 +500,7 @@ describe("support manager agent", () => {
       { messageText: "where is billing?", toolOutputs: evidence }
     );
 
-    expect(accepted.navigation?.ctaHref).toBe("dashboard-attorney.html#billing");
+    expect(accepted.navigation?.ctaHref).toBe("dashboard-attorney.html#funds");
     expect(stripped.navigation).toBeNull();
   });
 
@@ -814,15 +814,19 @@ describe("support manager agent", () => {
               allScopeTasksCompleteRequired: true,
               verifiedFundingRequired: true,
               paralegalPayoutSetupRequired: true,
-              bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-              bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+              bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+              bankDepositTimingDependsOn: [
+                "stripe_account_country",
+                "stripe_payout_schedule",
+                "financial_institution",
+              ],
             },
           },
         },
       },
     ];
     expect(validateManagerReply(managerReply({
-      reply: "The paralegal’s payout is released when you complete the matter, after all scope tasks, funding, and payout setup are ready. Bank deposit typically takes 3–5 business days after release, depending on Stripe and the bank.",
+      reply: "The paralegal’s payout is released when you complete the matter, after all scope tasks, funding, and payout setup are ready. Stripe provides the current payout status and estimated arrival based on the connected account’s payout schedule and financial institution.",
       suggestions: [],
     }), {
       messageText: "When does the paralegal get paid?",
@@ -841,7 +845,12 @@ describe("support manager agent", () => {
           requirements: {
             paralegalPayoutTiming: {
               releaseTrigger: "when_attorney_completes_matter",
-              bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
+              bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+              bankDepositTimingDependsOn: [
+                "stripe_account_country",
+                "stripe_payout_schedule",
+                "financial_institution",
+              ],
             },
           },
         },
@@ -871,8 +880,12 @@ describe("support manager agent", () => {
                 allScopeTasksCompleteRequired: true,
                 verifiedFundingRequired: true,
                 paralegalPayoutSetupRequired: true,
-                bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-                bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+                bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+                bankDepositTimingDependsOn: [
+                  "stripe_account_country",
+                  "stripe_payout_schedule",
+                  "financial_institution",
+                ],
               },
             },
           }),
@@ -881,7 +894,7 @@ describe("support manager agent", () => {
       validationFailures: ["generation_unsupported_claim"],
     });
     expect(result).toEqual(expect.objectContaining({
-      reply: expect.stringMatching(/matter complete[\s\S]*3–5 business days/i),
+      reply: expect.stringMatching(/matter complete[\s\S]*Stripe provides the current payout status and estimated arrival/i),
       provider: "openai_manager_safe_fallback",
       grounded: true,
       confidence: "high",
@@ -908,8 +921,12 @@ describe("support manager agent", () => {
               allScopeTasksCompleteRequired: true,
               verifiedFundingRequired: true,
               paralegalPayoutSetupRequired: true,
-              bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-              bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+              bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+              bankDepositTimingDependsOn: [
+                "stripe_account_country",
+                "stripe_payout_schedule",
+                "financial_institution",
+              ],
             },
           },
         }),
@@ -923,8 +940,12 @@ describe("support manager agent", () => {
               allScopeTasksCompleteRequired: true,
               verifiedFundingRequired: true,
               paralegalPayoutSetupRequired: true,
-              bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-              bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+              bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+              bankDepositTimingDependsOn: [
+                "stripe_account_country",
+                "stripe_payout_schedule",
+                "financial_institution",
+              ],
             },
           },
         }),
@@ -933,7 +954,7 @@ describe("support manager agent", () => {
       validationFailures: ["repeated_tool_call_without_new_information"],
     });
     expect(result).toEqual(expect.objectContaining({
-      reply: expect.stringMatching(/3–5 business days/i),
+      reply: expect.stringMatching(/Stripe provides the current payout status and estimated arrival/i),
       primaryAsk: "deposit_timing",
       evidenceCapability: "deposit_timing",
       provider: "openai_manager_safe_fallback",
@@ -991,12 +1012,17 @@ describe("support manager agent", () => {
       requirements: {
         paralegalPayoutTiming: {
           releaseTrigger: "when_attorney_completes_matter",
-          bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
+          bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+          bankDepositTimingDependsOn: [
+            "stripe_account_country",
+            "stripe_payout_schedule",
+            "financial_institution",
+          ],
         },
       },
     });
     const audit = auditManagerReply(managerReply({
-      reply: "Bank deposit usually takes 3–5 business days.",
+      reply: "Stripe provides the current payout status and estimated arrival.",
       evidenceCapability: "deposit_timing",
       suggestions: [],
     }), {

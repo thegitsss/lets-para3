@@ -1,7 +1,12 @@
+const { createLogger: createRuntimeLogger, logPromiseFailure } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("services:userDeletion");
+const crypto = require("crypto");
 const Application = require("../models/Application");
-const AuditLog = require("../models/AuditLog");
+const AuthChallenge = require("../models/AuthChallenge");
+const AuthSession = require("../models/AuthSession");
 const Block = require("../models/Block");
 const Case = require("../models/Case");
+const CaseDraft = require("../models/CaseDraft");
 const CaseFile = require("../models/CaseFile");
 const Event = require("../models/Event");
 const Job = require("../models/Job");
@@ -9,9 +14,23 @@ const Message = require("../models/Message");
 const Notification = require("../models/Notification");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
+const PasskeyCredential = require("../models/PasskeyCredential");
+const SupportConversation = require("../models/SupportConversation");
+const SupportMessage = require("../models/SupportMessage");
+const SupportTicket = require("../models/SupportTicket");
 const Task = require("../models/Task");
+const ChecklistTask = require("../models/ChecklistTask");
 const User = require("../models/User");
-const { deleteCaseFolder } = require("./caseLifecycle");
+const WeeklyNote = require("../models/WeeklyNote");
+const { revokeAllUserSessions } = require("./authSessionService");
+const { syncApplicantsCount } = require("./applicationService");
+const {
+  USER_STORAGE_FIELDS,
+  activatePersonalStorageDeletion,
+  cancelPersonalStorageDeletion,
+  collectUserPersonalStorageKeys,
+  stagePersonalStorageDeletion,
+} = require("./personalStorageDeletion");
 
 const ACTIVE_JOB_STATUSES = ["open", "in_review", "assigned"];
 const ACTIVE_CASE_STATUSES = ["open", "in progress", "in_progress", "paused", "disputed"];
@@ -114,7 +133,7 @@ async function getAttorneyDeactivationBlockers(userId) {
     unresolvedFunds
       ? makeBlocker(
           "unresolved_financials",
-          "Deactivation is unavailable while escrowed funds, withdrawal decisions, or other unresolved financial relationships remain.",
+          "Deactivation is unavailable while funded payments, withdrawal decisions, or other unresolved financial relationships remain.",
           unresolvedFunds
         )
       : null,
@@ -178,7 +197,7 @@ async function getParalegalDeactivationBlockers(userId) {
     unresolvedFunds
       ? makeBlocker(
           "unresolved_financials",
-          "Deactivation is unavailable while escrowed funds, withdrawal decisions, or other unresolved financial relationships remain.",
+          "Deactivation is unavailable while funded payments, withdrawal decisions, or other unresolved financial relationships remain.",
           unresolvedFunds
         )
       : null,
@@ -219,10 +238,47 @@ async function getAccountDeactivationEligibility(userOrId) {
 }
 
 async function clearPendingParalegalParticipation(userId, now = new Date()) {
-  await Application.updateMany(
-    { paralegalId: userId, status: { $in: [...ACTIVE_APPLICATION_STATUSES, "accepted"] } },
-    { $set: { status: "rejected" } }
-  );
+  const pendingApplications = await Application.find({
+    paralegalId: userId,
+    status: { $in: [...ACTIVE_APPLICATION_STATUSES, "accepted"] },
+  }).select("_id jobId status");
+  if (pendingApplications.length) {
+    await Application.updateMany(
+      { _id: { $in: pendingApplications.map((application) => application._id) } },
+      {
+        $set: {
+          status: "rejected",
+          syncStatus: "synced",
+          syncedAt: now,
+          syncError: "",
+        },
+        $push: {
+          statusHistory: {
+            $each: [{
+              to: "rejected",
+              reason: "account_deactivated",
+              actorId: userId,
+              at: now,
+            }],
+            $slice: -50,
+          },
+        },
+      }
+    );
+    const affectedJobIds = [...new Set(pendingApplications.map((application) => String(application.jobId)))];
+    const countResults = await Promise.allSettled(
+      affectedJobIds.map((jobId) => syncApplicantsCount(jobId))
+    );
+    countResults.forEach((result, index) => {
+      if (result.status === "rejected") {
+        runtimeLogger.error(
+          "[userDeletion] application count reconciliation deferred",
+          affectedJobIds[index],
+          result.reason?.message || result.reason
+        );
+      }
+    });
+  }
 
   const cases = await Case.find({
     $or: [
@@ -284,7 +340,7 @@ async function clearPendingAttorneyParticipation(userId, now = new Date()) {
   await Job.updateMany({ attorneyId: userId, status: { $in: ACTIVE_JOB_STATUSES } }, { $set: { status: "closed" } });
 
   const cases = await Case.find(buildClearableAttorneyCaseFilter(userId)).select(
-    "applicants invites pendingParalegalId pendingParalegalInvitedAt paralegal paralegalId paralegalNameSnapshot hiredAt tasksLocked status paymentReleased escrowStatus paymentStatus archived"
+    "attorney attorneyId applicants invites disputes pendingParalegalId pendingParalegalInvitedAt paralegal paralegalId paralegalNameSnapshot hiredAt tasksLocked status paymentReleased escrowStatus paymentStatus archived"
   );
 
   for (const caseDoc of cases) {
@@ -312,8 +368,8 @@ async function clearPendingAttorneyParticipation(userId, now = new Date()) {
     caseDoc.tasksLocked = false;
     caseDoc.escrowStatus = null;
     caseDoc.paymentStatus = "cancelled";
-    caseDoc.status = "closed";
     caseDoc.archived = true;
+    caseDoc.ensureLifecycleStatus("closed");
     await caseDoc.save({ validateBeforeSave: false });
   }
 }
@@ -321,8 +377,8 @@ async function clearPendingAttorneyParticipation(userId, now = new Date()) {
 async function deactivateUserAccount(userOrId, { now = new Date() } = {}) {
   const user =
     userOrId && typeof userOrId === "object" && userOrId._id
-      ? userOrId
-      : await User.findById(userOrId);
+      ? await User.findById(userOrId._id).select("+authVersion +twoFactorChallengeHash +twoFactorFailedAttempts +twoFactorBackupCodes +totpSecretEncrypted +totpLastUsedTimeStep")
+      : await User.findById(userOrId).select("+authVersion +twoFactorChallengeHash +twoFactorFailedAttempts +twoFactorBackupCodes +totpSecretEncrypted +totpLastUsedTimeStep");
   if (!user) {
     const err = new Error("User not found.");
     err.statusCode = 404;
@@ -347,82 +403,270 @@ async function deactivateUserAccount(userOrId, { now = new Date() } = {}) {
   user.deletedAt = now;
   user.disabled = true;
   user.status = "denied";
-  user.pushSubscription = null;
   user.pendingHire = null;
+  user.authVersion = Number(user.authVersion || 0) + 1;
+  user.twoFactorEnabled = false;
   user.twoFactorTempCode = null;
   user.twoFactorExpiresAt = null;
+  user.twoFactorChallengeHash = null;
+  user.twoFactorFailedAttempts = 0;
+  user.twoFactorBackupCodes = [];
+  user.totpSecretEncrypted = null;
+  user.totpLastUsedTimeStep = null;
   await user.save();
+  await Promise.all([
+    revokeAllUserSessions(user._id, "account_deactivated"),
+    AuthChallenge.deleteMany({ userId: user._id }),
+  ]);
 
   return { userId: user._id, role: user.role };
 }
 
-async function purgeAttorneyAccount(userId) {
-  const [caseDocs, jobDocs] = await Promise.all([
-    Case.find({ $or: [{ attorney: userId }, { attorneyId: userId }] }).select("_id").lean(),
-    Job.find({ attorneyId: userId }).select("_id caseId").lean(),
-  ]);
-
-  const caseIds = [];
-  const caseIdSet = new Set();
-  const addCaseId = (id) => {
-    if (!id) return;
-    const key = String(id);
-    if (caseIdSet.has(key)) return;
-    caseIdSet.add(key);
-    caseIds.push(id);
+function accountRecordFilters(userId) {
+  return {
+    matters: {
+      $or: [
+        { attorney: userId },
+        { attorneyId: userId },
+        { paralegal: userId },
+        { paralegalId: userId },
+        { pendingParalegalId: userId },
+        { withdrawnParalegalId: userId },
+        { "applicants.paralegalId": userId },
+        { "invites.paralegalId": userId },
+        { "disputes.raisedBy": userId },
+        { "disputes.comments.by": userId },
+        { "flags.by": userId },
+        { "files.uploadedBy": userId },
+      ],
+    },
+    jobs: { attorneyId: userId },
+    applications: {
+      $or: [
+        { paralegalId: userId },
+        { starredBy: userId },
+        { "statusHistory.actorId": userId },
+      ],
+    },
+    messages: {
+      $or: [
+        { senderId: userId },
+        { readBy: userId },
+        { "readReceipts.user": userId },
+        { pinnedBy: userId },
+        { deletedBy: userId },
+      ],
+    },
+    caseFiles: { userId },
+    tasks: { paralegalId: userId },
+    payouts: { paralegalId: userId },
+    platformIncome: { $or: [{ attorneyId: userId }, { paralegalId: userId }] },
+    caseEvents: {
+      caseId: { $ne: null },
+      $or: [{ owner: userId }, { "attendees.user": userId }],
+    },
+    safetyBlocks: { $or: [{ blockerId: userId }, { blockedId: userId }] },
   };
+}
 
-  caseDocs.forEach((doc) => addCaseId(doc._id));
-  jobDocs.forEach((doc) => addCaseId(doc.caseId));
+async function getDurableAccountRecordSummary(userId) {
+  const filters = accountRecordFilters(userId);
+  const entries = await Promise.all([
+    ["matters", Case.countDocuments(filters.matters)],
+    ["jobs", Job.countDocuments(filters.jobs)],
+    ["applications", Application.countDocuments(filters.applications)],
+    ["messages", Message.countDocuments(filters.messages)],
+    ["caseFiles", CaseFile.countDocuments(filters.caseFiles)],
+    ["tasks", Task.countDocuments(filters.tasks)],
+    ["payouts", Payout.countDocuments(filters.payouts)],
+    ["platformIncome", PlatformIncome.countDocuments(filters.platformIncome)],
+    ["caseEvents", Event.countDocuments(filters.caseEvents)],
+    ["safetyBlocks", Block.countDocuments(filters.safetyBlocks)],
+  ].map(async ([name, query]) => [name, await query]));
+  return Object.fromEntries(entries.filter(([, count]) => Number(count) > 0));
+}
 
-  const jobIds = jobDocs.map((doc) => doc._id).filter(Boolean);
-
-  for (const caseId of caseIds) {
-    try {
-      await deleteCaseFolder(String(caseId));
-    } catch (err) {
-      console.warn("[userDeletion] deleteCaseFolder failed", caseId, err?.message || err);
-    }
-  }
-
-  const deleteOps = [
-    Message.deleteMany({ senderId: userId }),
-    Event.deleteMany({ owner: userId }),
+async function removeEphemeralAccountData(userId) {
+  const conversations = await SupportConversation.find({ userId }).select("_id").lean();
+  const conversationIds = conversations.map((entry) => entry._id);
+  await Promise.all([
+    AuthChallenge.deleteMany({ userId }),
+    AuthSession.deleteMany({ userId }),
+    PasskeyCredential.deleteMany({ userId }),
     Notification.deleteMany({ $or: [{ userId }, { actorUserId: userId }] }),
-    Block.deleteMany({ $or: [{ blockerId: userId }, { blockedId: userId }] }),
-    AuditLog.deleteMany({ $or: [{ actor: userId }, { targetId: userId }] }),
-    CaseFile.deleteMany({ userId }),
-  ];
+    CaseDraft.deleteMany({ owner: userId }),
+    WeeklyNote.deleteMany({ userId }),
+    ChecklistTask.deleteMany({ owner: userId }),
+    Event.deleteMany({ owner: userId, caseId: null }),
+    conversationIds.length
+      ? SupportMessage.deleteMany({ conversationId: { $in: conversationIds } })
+      : Promise.resolve(),
+    SupportConversation.deleteMany({ userId }),
+    SupportTicket.updateMany(
+      { $or: [{ userId }, { requesterUserId: userId }] },
+      {
+        $set: {
+          userId: null,
+          requesterUserId: null,
+          requesterEmail: "",
+          pageContext: {},
+          contextSnapshot: {},
+          supportFactsSnapshot: {},
+          latestUserMessage: "[Removed during account data minimization]",
+        },
+      }
+    ),
+  ]);
+}
 
-  if (jobIds.length) {
-    deleteOps.push(Application.deleteMany({ jobId: { $in: jobIds } }));
+function minimizeUserDocument(user, now) {
+  const id = String(user._id);
+  user.firstName = "Deactivated";
+  user.lastName = "User";
+  user.email = `deleted-${id}@redacted.invalid`;
+  user.pendingEmail = null;
+  user.pendingEmailRequestedAt = null;
+  user.password = crypto.randomBytes(48).toString("base64url");
+  user.emailVerified = false;
+  user.phoneNumber = null;
+  user.phoneVerified = false;
+  user.barNumber = "";
+  user.resumeURL = null;
+  user.certificateURL = "";
+  user.writingSampleURL = "";
+  user.bio = "";
+  user.about = "";
+  user.availability = "Unavailable";
+  user.availabilityDetails = { status: "unavailable", nextAvailable: null, updatedAt: now };
+  user.avatarURL = "";
+  user.profileImage = null;
+  user.profileImageKey = "";
+  user.profileImageOriginal = "";
+  user.profileImageOriginalKey = "";
+  user.pendingProfileImage = "";
+  user.pendingProfileImageKey = "";
+  user.pendingProfileImageOriginal = "";
+  user.pendingProfileImageOriginalKey = "";
+  user.profilePhotoStatus = "unsubmitted";
+  user.lawFirm = "";
+  user.firmWebsite = "";
+  user.state = "";
+  user.timezone = "UTC";
+  user.location = "";
+  user.practiceAreas = [];
+  user.primaryPracticeArea = "";
+  user.preferredPracticeAreas = [];
+  user.collaborationStyle = "";
+  user.bestFor = [];
+  user.specialties = [];
+  user.jurisdictions = [];
+  user.stateExperience = [];
+  user.skills = [];
+  user.yearsExperience = 0;
+  user.languages = [];
+  user.writingSamples = [];
+  user.experience = [];
+  user.education = [];
+  user.publications = [];
+  user.resetPasswordTokenHash = null;
+  user.resetPasswordExpiresAt = null;
+  user.resetPasswordRequestedAt = null;
+  user.failedLogins = 0;
+  user.lockedUntil = null;
+  user.notificationsLastViewedAt = null;
+  user.messageLastViewedAt = new Map();
+  user.twoFactorEnabled = false;
+  user.twoFactorTempCode = null;
+  user.twoFactorExpiresAt = null;
+  user.twoFactorChallengeHash = null;
+  user.twoFactorFailedAttempts = 0;
+  user.twoFactorBackupCodes = [];
+  user.totpSecretEncrypted = null;
+  user.totpLastUsedTimeStep = null;
+  user.authProviders = [];
+  user.blockedUsers = [];
+  user.notifications = {};
+  user.notificationPrefs = {};
+  user.preferences = { theme: "light", fontSize: "md", hideProfile: true, dashboardViews: [] };
+  user.onboarding = {};
+  user.pendingHire = null;
+  user.digestFrequency = "off";
+  user.emailPref = { marketing: false, product: false };
+  user.linkedInURL = null;
+  user.disabled = true;
+  user.deleted = true;
+  user.deletedAt = user.deletedAt || now;
+  user.status = "denied";
+  user.authVersion = Number(user.authVersion || 0) + 1;
+  user.personalDataStatus = "minimized";
+  user.personalDataMinimizedAt = now;
+  return user;
+}
+
+async function finalizeAccountDataRemoval(userId, { now = new Date() } = {}) {
+  const user = await User.findById(userId).select(
+    `_id role status disabled deleted deletedAt personalDataStatus ${USER_STORAGE_FIELDS} ` +
+      "+password +authVersion +resetPasswordTokenHash +resetPasswordExpiresAt " +
+      "+resetPasswordRequestedAt +twoFactorTempCode +twoFactorExpiresAt +twoFactorChallengeHash " +
+      "+twoFactorFailedAttempts +twoFactorBackupCodes +totpSecretEncrypted +totpLastUsedTimeStep +authProviders"
+  );
+  if (!user) {
+    const error = new Error("User not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+  if (!user.deleted || !user.disabled) {
+    const error = new Error("Deactivate the account before processing personal-data removal.");
+    error.statusCode = 409;
+    throw error;
+  }
+  if (["admin", "director"].includes(String(user.role || "").toLowerCase())) {
+    const error = new Error("Operational accounts require a separately approved offboarding procedure.");
+    error.statusCode = 409;
+    throw error;
   }
 
-  if (caseIds.length) {
-    deleteOps.push(
-      Message.deleteMany({ caseId: { $in: caseIds } }),
-      CaseFile.deleteMany({ caseId: { $in: caseIds } }),
-      Task.deleteMany({ caseId: { $in: caseIds } }),
-      Event.deleteMany({ caseId: { $in: caseIds } }),
-      Payout.deleteMany({ caseId: { $in: caseIds } }),
-      PlatformIncome.deleteMany({ caseId: { $in: caseIds } }),
-      AuditLog.deleteMany({ case: { $in: caseIds } }),
-      Case.deleteMany({ _id: { $in: caseIds } })
+  const recordSummary = await getDurableAccountRecordSummary(user._id);
+  const retainedRecordTypes = Object.keys(recordSummary);
+  const storageTaskIds = await stagePersonalStorageDeletion({
+    ownerId: user._id,
+    keys: collectUserPersonalStorageKeys(user),
+    reason: "account_data_removal",
+    now,
+  });
+
+  try {
+    await removeEphemeralAccountData(user._id);
+    if (retainedRecordTypes.length) {
+      minimizeUserDocument(user, now);
+      await user.save();
+    } else {
+      await User.deleteOne({ _id: user._id });
+    }
+  } catch (error) {
+    await cancelPersonalStorageDeletion(storageTaskIds, { now }).catch(
+      logPromiseFailure(runtimeLogger, "[user-deletion] personal storage rollback failed")
     );
+    throw error;
   }
 
-  if (jobIds.length) {
-    deleteOps.push(Job.deleteMany({ _id: { $in: jobIds } }));
-  }
+  await activatePersonalStorageDeletion(storageTaskIds, { now }).catch((error) => {
+    runtimeLogger.error("[userDeletion] account storage cleanup activation deferred", {
+      errorCode: String(error?.name || error?.code || "STORAGE_TASK_TRANSITION_FAILED"),
+    });
+  });
 
-  await Promise.all(deleteOps);
-  await User.deleteOne({ _id: userId });
-
-  return { caseIds, jobIds };
+  return {
+    mode: retainedRecordTypes.length ? "minimized" : "purged",
+    retainedRecordTypes,
+    retainedRecordCounts: recordSummary,
+    storageTaskCount: storageTaskIds.length,
+  };
 }
 
 module.exports = {
   deactivateUserAccount,
+  finalizeAccountDataRemoval,
+  getDurableAccountRecordSummary,
   getAccountDeactivationEligibility,
-  purgeAttorneyAccount,
 };

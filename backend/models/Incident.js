@@ -210,7 +210,7 @@ const incidentSchema = new Schema(
   }
 );
 
-incidentSchema.pre("save", async function captureLpcIncidentState(next) {
+incidentSchema.pre("save", async function captureLpcIncidentState() {
   this.$locals = this.$locals || {};
   this.$locals.lpcWasNew = this.isNew;
   this.$locals.lpcPreviousState = "";
@@ -219,8 +219,6 @@ incidentSchema.pre("save", async function captureLpcIncidentState(next) {
     const previous = await this.constructor.findById(this._id).select("state").lean();
     this.$locals.lpcPreviousState = String(previous?.state || "");
   }
-
-  next();
 });
 
 incidentSchema.post("save", async function publishLpcIncidentEvents(doc) {

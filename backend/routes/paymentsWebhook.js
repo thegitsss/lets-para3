@@ -15,9 +15,21 @@ const mongoose = require("mongoose");
 const Case = require("../models/Case");
 const AuditLog = require("../models/AuditLog"); // match filename
 const WebhookEvent = require("../models/WebhookEvent");
+const Payout = require("../models/Payout");
+const PaymentOperation = require("../models/PaymentOperation");
 const { notifyUser } = require("../utils/notifyUser");
 const { currentStripeMode, pickStripeMode, stripeModeFromLivemode } = require("../utils/stripeMode");
 const { sendOwnerAlert } = require("../utils/opsAlerting");
+const { expectedCaseFunding, validatePaymentIntentForCase } = require("../utils/paymentIntegrity");
+const { createLogger, logPromiseFailure } = require("../utils/logger");
+const logger = createLogger("stripe-webhook");
+
+function errorMetadata(error) {
+  return {
+    name: String(error?.name || "Error").slice(0, 80),
+    code: String(error?.code || error?.type || "STRIPE_WEBHOOK_ERROR").slice(0, 100),
+  };
+}
 
 // ----------------------------------------
 // Durable dedupe (db-backed) with retry-safe status tracking
@@ -41,27 +53,28 @@ async function claimWebhookEvent(event) {
         $set: { status: "processing", lastAttemptAt: now, stripeMode },
         $inc: { attempts: 1 },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     );
     return { deduped: false, record };
   } catch (err) {
     if (err?.code === 11000) {
-      return { deduped: true };
+      const existing = await WebhookEvent.findOne({ eventId: event.id }).select("status").lean();
+      if (existing?.status === "processed") return { deduped: true };
+      return { deduped: false, retryLater: true };
     }
-    console.warn("[stripe] webhook dedupe failed", err?.message || err);
-    return { deduped: false, record: null };
+    logger.error("Webhook receipt claim failed.", errorMetadata(err));
+    throw err;
   }
 }
 
 async function markWebhookEventProcessed(eventId) {
   if (!eventId) return;
-  try {
-    await WebhookEvent.updateOne(
-      { eventId },
-      { $set: { status: "processed", lastError: "" } }
-    );
-  } catch (err) {
-    console.warn("[stripe] webhook processed update failed", err?.message || err);
+  const result = await WebhookEvent.updateOne(
+    { eventId, status: "processing" },
+    { $set: { status: "processed", lastError: "" } }
+  );
+  if (!result?.matchedCount) {
+    throw new Error(`Webhook delivery receipt could not be finalized for ${eventId}.`);
   }
 }
 
@@ -77,10 +90,10 @@ async function markWebhookEventFailed(eventId, err) {
         "A payment status update did not finish cleanly and should be reviewed.",
         `Reference: ${eventId}`,
         `Details: ${String(err?.message || err || "Unknown error")}`,
-      ]).catch(() => {});
+      ]).catch(logPromiseFailure(logger, "Webhook failure owner alert delivery failed.", { eventId }));
     }
   } catch (updateErr) {
-    console.warn("[stripe] webhook failed update failed", updateErr?.message || updateErr);
+    logger.warn("Webhook failure-state update failed.", errorMetadata(updateErr));
   }
 }
 
@@ -97,10 +110,6 @@ function stripeAccountOpts(req) {
   return acct ? { stripeAccount: acct } : {};
 }
 
-function safeObjId(v) {
-  try { return mongoose.isValidObjectId(v) ? new mongoose.Types.ObjectId(v) : null; }
-  catch { return null; }
-}
 
 // Map PI -> Case using metadata.caseId or escrowIntentId
 async function findCaseForPaymentIntent(pi) {
@@ -129,9 +138,9 @@ function buildCaseLink(caseDoc) {
 router.post("/", express.raw({ type: "application/json" }), async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const secret = pickSecret(req);
-  console.log("[stripe] webhook received", {
+  logger.info("Webhook delivery received.", {
     hasSignature: Boolean(sig),
-    type: req.headers["stripe-signature"] ? "signed" : "unsigned",
+    signatureState: req.headers["stripe-signature"] ? "present" : "missing",
   });
 
   let event;
@@ -139,13 +148,22 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
     // req.body must be a Buffer (raw), not a parsed object
     event = stripe.webhooks.constructEvent(req.body, sig, secret);
   } catch (err) {
-    console.error("[stripe] Bad signature:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    logger.warn("Webhook signature verification failed.", errorMetadata(err));
+    return res.status(400).json({ error: "Webhook signature verification failed" });
   }
 
-  const { deduped } = await claimWebhookEvent(event);
+  let claim;
+  try {
+    claim = await claimWebhookEvent(event);
+  } catch (err) {
+    return res.status(503).json({ received: false, handled: false, retryable: true });
+  }
+  const { deduped, retryLater } = claim;
   if (deduped) {
     return res.json({ received: true, deduped: true });
+  }
+  if (retryLater) {
+    return res.status(503).json({ received: false, handled: false, retryable: true });
   }
 
   try {
@@ -166,14 +184,43 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
         if (c) {
           // Snapshot funding info (do NOT auto-release or payout here)
           const wasFunded = String(c.escrowStatus || "").toLowerCase() === "funded";
+          const integrity = validatePaymentIntentForCase(pi, c);
+          c.stripeMode = stripeMode;
+          if (!integrity.valid) {
+            c.fundingIntegrityStatus = "failed";
+            c.fundingIntegrityFailure = integrity.reasons.join(",");
+            if (!wasFunded) c.paymentStatus = "verification_failed";
+            await c.save();
+            await AuditLog.create({
+              actor: null,
+              actorRole: "system",
+              action: "payment.intent.integrity_failed",
+              targetType: "payment",
+              targetId: pi.id,
+              case: c._id,
+              ip: req.ip,
+              ua: req.headers["user-agent"],
+              method: "POST",
+              path: "/api/webhooks/stripe",
+              meta: {
+                eventId: event.id,
+                reasons: integrity.reasons,
+                expected: integrity.expected,
+                actual: integrity.actual,
+              },
+            });
+            await sendOwnerAlert("LPC urgent: Stripe funding verification failed", [
+              `Case: ${String(c._id)}`,
+              `PaymentIntent: ${String(pi.id || "unknown")}`,
+              `Checks: ${integrity.reasons.join(", ")}`,
+              "The Matter was not marked funded.",
+            ]).catch(logPromiseFailure(logger, "Payment-integrity owner alert delivery failed.", {
+              eventId: event.id,
+            }));
+            break;
+          }
           if (!c.escrowIntentId) c.escrowIntentId = pi.id;
           if (!c.paymentIntentId) c.paymentIntentId = pi.id;
-          if (!c.currency) c.currency = pi.currency || c.currency || "usd";
-          c.stripeMode = stripeMode;
-          if (c.lockedTotalAmount == null && (!c.totalAmount || c.totalAmount <= 0)) {
-            c.totalAmount = pi.amount || c.totalAmount || 0;
-          }
-          if (c.lockedTotalAmount == null) c.lockedTotalAmount = c.totalAmount;
           const { transferable } = stripe.isTransferablePaymentIntent(pi, { caseId: c._id });
           if (!c.escrowStatus || c.escrowStatus !== "funded") {
             if (transferable) {
@@ -183,14 +230,14 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
             }
           }
           c.paymentStatus = "succeeded";
+          c.fundingIntegrityStatus = "verified";
+          c.fundingIntegrityFailure = "";
+          c.fundingVerifiedAt = new Date();
           const hasParalegal = !!(c.paralegal || c.paralegalId);
           const status = String(c.status || "").toLowerCase();
           if (transferable && hasParalegal && ["awaiting_funding", "assigned", "open"].includes(status)) {
-            if (typeof c.canTransitionTo === "function" && c.canTransitionTo("in_progress")) {
-              c.transitionTo("in_progress");
-            } else {
-              c.status = "in_progress";
-            }
+            c.hiredAt = c.hiredAt || new Date();
+            c.transitionTo("in progress");
           }
           await c.save();
 
@@ -200,11 +247,11 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
               try {
                 await notifyUser(paralegalId, "case_work_ready", {
                   caseId: c._id,
-                  caseTitle: c.title || "Case",
+                  caseTitle: c.title || "Untitled Matter",
                   link: buildCaseLink(c),
                 });
               } catch (err) {
-                console.warn("[stripe] notifyUser case_work_ready failed", err?.message || err);
+                logger.warn("Case-work-ready notification failed.", errorMetadata(err));
               }
             }
           }
@@ -227,6 +274,21 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
               stripeMode,
               transfer_group: pi.transfer_group || null,
             },
+          });
+        }
+        if (!c) {
+          await AuditLog.create({
+            actor: null,
+            actorRole: "system",
+            action: "payment.intent.unmatched",
+            targetType: "payment",
+            targetId: pi.id,
+            case: null,
+            ip: req.ip,
+            ua: req.headers["user-agent"],
+            method: "POST",
+            path: "/api/webhooks/stripe",
+            meta: { eventId: event.id, metadataCaseId: pi?.metadata?.caseId || null },
           });
         }
         break;
@@ -254,17 +316,17 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
               const link = buildCaseLink(c);
               const summary =
                 event.type === "payment_intent.requires_action"
-                  ? "Payment requires action. Open the case to update funding."
+                  ? "Payment requires action. Open the Matter to update funding."
                   : "Funding failed. Please update your payment method and try again.";
               try {
                 await notifyUser(attorneyId, "case_update", {
                   caseId: c._id,
-                  caseTitle: c.title || "Case",
+                  caseTitle: c.title || "Untitled Matter",
                   summary,
                   link,
                 });
               } catch (err) {
-                console.warn("[stripe] notifyUser case_update failed", err?.message || err);
+                logger.warn("Case-update notification failed.", errorMetadata(err));
               }
             }
           }
@@ -360,13 +422,33 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
                 : obj.payment_intent;
             caseForRefund = await findCaseForPaymentIntent(pi);
           } catch (err) {
-            console.error("[stripe] refund webhook PI lookup failed:", {
+            logger.error("Refund payment-intent lookup failed.", {
               eventId: event.id,
-              paymentIntent: obj.payment_intent,
-              stripeAccount: req.headers["stripe-account"] || null,
-              message: err.message,
+              connectedAccount: Boolean(req.headers["stripe-account"]),
+              ...errorMetadata(err),
             });
           }
+        }
+
+        if (caseForRefund) {
+          const expected = expectedCaseFunding(caseForRefund);
+          const refundedAmount = Number(obj.amount_refunded ?? obj.amount ?? 0);
+          if (event.type === "refund.failed") {
+            caseForRefund.paymentStatus = "refund_failed";
+            await sendOwnerAlert("LPC urgent: Stripe refund failed", [
+              `Case: ${String(caseForRefund._id)}`,
+              `Refund: ${String(obj.id || "unknown")}`,
+              `Amount: ${String(obj.amount || 0)} ${String(obj.currency || "")}`,
+            ]).catch(logPromiseFailure(logger, "Refund-failure owner alert delivery failed.", {
+              eventId: event.id,
+            }));
+          } else if (event.type === "charge.refunded" && refundedAmount >= expected.totalAmount) {
+            caseForRefund.paymentStatus = "refunded";
+            caseForRefund.paymentReleased = false;
+          } else if (["refund.succeeded", "charge.refunded"].includes(event.type)) {
+            caseForRefund.paymentStatus = "partially_refunded";
+          }
+          await caseForRefund.save();
         }
 
         await AuditLog.create({
@@ -406,10 +488,66 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
         }
         const caseObj = caseId ? await Case.findById(caseId) : null;
 
-        if (caseObj && !caseObj.payoutTransferId) {
-          caseObj.payoutTransferId = tr.id;
-          if (event.type === "transfer.created") caseObj.paidOutAt = new Date();
+        if (caseObj) {
+          if (event.type === "transfer.created") {
+            if (!caseObj.payoutTransferId) caseObj.payoutTransferId = tr.id;
+            caseObj.payoutStatus = "paid";
+            caseObj.payoutFailureReason = "";
+            caseObj.paidOutAt = caseObj.paidOutAt || new Date();
+          } else if (event.type === "transfer.reversed") {
+            caseObj.payoutStatus = "reversed";
+            caseObj.paymentReleased = false;
+            caseObj.payoutFailureReason = "Stripe transfer was reversed";
+          } else if (event.type === "transfer.failed") {
+            caseObj.payoutStatus = "failed";
+            caseObj.paymentReleased = false;
+            caseObj.payoutFailureReason = String(tr.failure_message || tr.failure_code || "Stripe transfer failed");
+          }
           await caseObj.save();
+
+          if (["transfer.reversed", "transfer.failed"].includes(event.type)) {
+            await Payout.updateOne(
+              { transferId: tr.id },
+              {
+                $set: {
+                  status: event.type === "transfer.reversed" ? "reversed" : "failed",
+                  failureReason: caseObj.payoutFailureReason,
+                  ...(event.type === "transfer.reversed" ? { reversedAt: new Date() } : {}),
+                },
+              }
+            );
+            await sendOwnerAlert("LPC urgent: Stripe payout requires reconciliation", [
+              `Case: ${String(caseObj._id)}`,
+              `Transfer: ${String(tr.id || "unknown")}`,
+              `Event: ${event.type}`,
+            ]).catch(logPromiseFailure(logger, "Payout-reconciliation owner alert delivery failed.", {
+              eventId: event.id,
+            }));
+          }
+
+          if (event.type === "transfer.created") {
+            await PaymentOperation.updateMany(
+              { caseId: caseObj._id, status: "pending" },
+              {
+                $set: {
+                  stripeObjectId: tr.id,
+                  status: "needs_reconciliation",
+                  lastError: "Stripe transfer exists; waiting for the local payout ledger to finalize.",
+                },
+              }
+            );
+          } else if (["transfer.reversed", "transfer.failed"].includes(event.type)) {
+            await PaymentOperation.updateMany(
+              { caseId: caseObj._id, stripeObjectId: { $in: ["", tr.id] } },
+              {
+                $set: {
+                  stripeObjectId: tr.id,
+                  status: "needs_reconciliation",
+                  lastError: caseObj.payoutFailureReason,
+                },
+              }
+            );
+          }
         }
 
         await AuditLog.create({
@@ -456,14 +594,18 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
       }
     }
   } catch (err) {
-    console.error("[stripe] Webhook handling error:", err);
+    logger.error("Webhook handling failed.", { eventId: event.id, ...errorMetadata(err) });
     await markWebhookEventFailed(event.id, err);
-    // Preserve 400 for signature failures only. For downstream processing errors,
-    // acknowledge the event so Stripe stops retrying and investigate from logs.
-    return res.json({ received: true, handled: false });
+    return res.status(500).json({ received: false, handled: false });
   }
 
-  await markWebhookEventProcessed(event.id);
+  try {
+    await markWebhookEventProcessed(event.id);
+  } catch (err) {
+    logger.error("Webhook receipt finalization failed.", { eventId: event.id, ...errorMetadata(err) });
+    await markWebhookEventFailed(event.id, err);
+    return res.status(500).json({ received: false, handled: false });
+  }
   res.json({ received: true });
 });
 

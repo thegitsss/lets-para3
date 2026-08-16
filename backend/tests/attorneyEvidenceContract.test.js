@@ -36,8 +36,12 @@ function workflowResult(overrides = {}) {
         allScopeTasksCompleteRequired: true,
         verifiedFundingRequired: true,
         paralegalPayoutSetupRequired: true,
-        bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-        bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+        bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+        bankDepositTimingDependsOn: [
+          "stripe_account_country",
+          "stripe_payout_schedule",
+          "financial_institution",
+        ],
         resultingMatterStatus: "completed",
         paymentReleased: true,
       },
@@ -118,7 +122,8 @@ describe("attorney normalized evidence contract", () => {
       "completion.actor",
       "completion.resulting_matter_status",
       "completion.payout_release_trigger",
-      "payout.bank_deposit_estimate_business_days",
+      "payout.bank_deposit_timing_source",
+      "payout.bank_deposit_timing_dependencies",
     ]));
   });
 
@@ -181,7 +186,8 @@ describe("attorney normalized evidence contract", () => {
       evidenceEnvelopes: [envelope("deposit_timing")],
     });
     expect(rendered.reply).toMatch(/attorney marks the matter complete/i);
-    expect(rendered.reply).toMatch(/3–5 business days/i);
+    expect(rendered.reply).toMatch(/Stripe provides the current payout status and estimated arrival/i);
+    expect(rendered.reply).toMatch(/payout schedule/i);
   });
 
   test("attributes one shared workflow tool to the selected semantic capability", () => {
@@ -282,17 +288,17 @@ describe("attorney normalized evidence contract", () => {
     expect(audit.failureClasses).toContain(FAILURE_CLASSES.PLANNER_WRONG_SOURCE);
   });
 
-  test("renders available payout facts and names only the missing deposit estimate", () => {
+  test("renders available payout facts and names only the missing timing source", () => {
     const result = workflowResult();
-    delete result.requirements.paralegalPayoutTiming.bankDepositEstimateBusinessDays;
+    delete result.requirements.paralegalPayoutTiming.bankDepositTimingSource;
     const rendered = renderAttorneyEvidenceAnswer({
       capability: "deposit_timing",
       evidenceEnvelopes: [envelope("deposit_timing", result)],
     });
     expect(rendered.ok).toBe(true);
     expect(rendered.reply).toMatch(/released when the attorney marks the matter complete/i);
-    expect(rendered.reply).toMatch(/bank-deposit estimate is not available/i);
-    expect(rendered.missingFacts).toContain("payout.bank_deposit_estimate_business_days");
+    expect(rendered.reply).toMatch(/source of the current bank-deposit timing is not available/i);
+    expect(rendered.missingFacts).toContain("payout.bank_deposit_timing_source");
   });
 
   test("refuses evidence rendering when lifecycle evidence contradicts itself", () => {

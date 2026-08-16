@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const mongoose = require("mongoose");
 
 const AutonomousAction = require("../../models/AutonomousAction");
@@ -10,7 +11,6 @@ const { createConversationMessage } = require("../support/conversationService");
 const { assertCcoAutonomyHarnessEnabled } = require("../../utils/ccoAutonomyHarnessAccess");
 
 const SAFE_MESSAGE_PATTERN = /\b(payment|payout|billing|refund|chargeback|dispute|legal|lawsuit|arbitration)\b/i;
-const DEFAULT_PASSWORD = "HarnessPassword123!";
 
 const SCENARIOS = Object.freeze({
   reopen: {
@@ -193,7 +193,7 @@ async function createHarnessUser({ scenario } = {}) {
     firstName: "CCO",
     lastName: `Harness ${scenario.label}`,
     email: `cco-autonomy+${suffix}@lets-paraconnect.local`,
-    password: DEFAULT_PASSWORD,
+    password: crypto.randomBytes(32).toString("base64url"),
     role: scenario.userRole,
     status: "approved",
     approvedAt: new Date(),

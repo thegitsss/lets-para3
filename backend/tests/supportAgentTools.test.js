@@ -172,8 +172,12 @@ describe("support manager tool permissions", () => {
             allScopeTasksCompleteRequired: true,
             verifiedFundingRequired: true,
             paralegalPayoutSetupRequired: true,
-            bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-            bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+            bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+            bankDepositTimingDependsOn: [
+              "stripe_account_country",
+              "stripe_payout_schedule",
+              "financial_institution",
+            ],
           }),
         }),
       })
@@ -457,7 +461,7 @@ describe("support manager tool permissions", () => {
 
   test("returns navigation only from the signed-in role's allowlist", () => {
     expect(getNavigationDestination("attorney", "billing")).toEqual(
-      expect.objectContaining({ available: true, ctaHref: "dashboard-attorney.html#billing" })
+      expect.objectContaining({ available: true, ctaHref: "dashboard-attorney.html#funds" })
     );
     expect(getNavigationDestination("paralegal", "billing")).toEqual({
       available: false,

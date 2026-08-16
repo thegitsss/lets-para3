@@ -20,6 +20,7 @@ const PlatformIncome = require("../models/PlatformIncome");
 const User = require("../models/User");
 const adminDirectorsRouter = require("../routes/adminDirectors");
 const directorRouter = require("../routes/directorPortal");
+const { createAuthSession } = require("../services/authSessionService");
 const {
   autoImportDirectorMail,
   processAutomaticDirectorFollowUps,
@@ -40,15 +41,27 @@ const app = (() => {
   return instance;
 })();
 
-function authCookieFor(user) {
+const authCookieCache = new WeakMap();
+
+async function authCookieFor(user) {
+  const cached = authCookieCache.get(user);
+  if (cached) return cached;
+  const authState = await User.findById(user._id).select("+authVersion").lean();
+  const { sessionId } = await createAuthSession(authState, {
+    headers: { "user-agent": "lpc-director-portal-test" },
+  });
   const payload = {
     id: user._id.toString(),
     role: user.role,
     email: user.email,
     status: user.status,
+    av: Number(authState?.authVersion || 0),
+    sid: sessionId,
   };
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "2h" });
-  return `token=${token}`;
+  const cookie = `token=${token}`;
+  authCookieCache.set(user, cookie);
+  return cookie;
 }
 
 function daysAgo(days, hour = 12) {
@@ -116,7 +129,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/outreach")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({
         attorneyName: "Jordan Ellis",
         attorneyEmail: "jordan@example-law.com",
@@ -161,7 +174,7 @@ describe("Director portal", () => {
 
     const duplicate = await request(app)
       .post("/api/director/outreach")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({
         attorneyName: "Jordan Ellis",
         attorneyEmail: "jordan@example-law.com",
@@ -184,7 +197,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/import-today")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({});
 
     expect(res.status).toBe(200);
@@ -214,7 +227,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/import-today")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({});
 
     expect(res.status).toBe(200);
@@ -237,7 +250,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/import-today")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({});
 
     expect(res.status).toBe(200);
@@ -346,7 +359,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/import-replies")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({});
 
     expect(res.status).toBe(200);
@@ -374,7 +387,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/import-replies")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({});
 
     expect(res.status).toBe(200);
@@ -425,7 +438,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/outreach")
-      .set("Cookie", authCookieFor(secondDirector))
+      .set("Cookie", await authCookieFor(secondDirector))
       .send({
         attorneyName: "Claimed Attorney",
         attorneyEmail: "claimed@example-law.com",
@@ -491,7 +504,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .get("/api/director/records")
-      .set("Cookie", authCookieFor(director));
+      .set("Cookie", await authCookieFor(director));
 
     expect(res.status).toBe(200);
     expect(res.body.records[0]).toEqual(
@@ -568,7 +581,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .get("/api/director/analytics?days=30")
-      .set("Cookie", authCookieFor(director));
+      .set("Cookie", await authCookieFor(director));
 
     expect(res.status).toBe(200);
     expect(res.body.totals).toEqual(
@@ -622,7 +635,7 @@ describe("Director portal", () => {
 
     const overview = await request(app)
       .get("/api/director/overview?rangeDays=1")
-      .set("Cookie", authCookieFor(director));
+      .set("Cookie", await authCookieFor(director));
     expect(overview.status).toBe(200);
     expect(overview.body.counts.total).toBe(1);
     expect(overview.body.attention).toEqual(
@@ -633,7 +646,7 @@ describe("Director portal", () => {
 
     const records = await request(app)
       .get("/api/director/records?rangeDays=1")
-      .set("Cookie", authCookieFor(director));
+      .set("Cookie", await authCookieFor(director));
     expect(records.status).toBe(200);
     expect(records.body.records).toHaveLength(1);
     expect(records.body.records[0].attorneyEmail).toBe(recentAttorney.email);
@@ -670,6 +683,9 @@ describe("Director portal", () => {
     expect(sendEmail).toHaveBeenCalledTimes(1);
     expect(sendEmail.mock.calls[0][0]).toBe("jordan@example-law.com");
     expect(sendEmail.mock.calls[0][1]).toBe("need help posting your first matter?");
+    expect(sendEmail.mock.calls[0][2]).toContain("https://www.linkedin.com/company/lets-paraconnect/");
+    expect(sendEmail.mock.calls[0][2]).not.toMatch(/facebook|instagram/i);
+    expect(sendEmail.mock.calls[0][3].text).not.toMatch(/facebook|instagram/i);
     expect(sendEmail.mock.calls[0][3]).toEqual(
       expect.objectContaining({
         replyTo: "skyler@lets-paraconnect.com",
@@ -780,14 +796,14 @@ describe("Director portal", () => {
 
     const overview = await request(app)
       .get("/api/admin/directors/overview")
-      .set("Cookie", authCookieFor(admin));
+      .set("Cookie", await authCookieFor(admin));
     expect(overview.status).toBe(200);
     expect(overview.body.directors).toHaveLength(1);
     expect(overview.body.replies).toHaveLength(1);
 
     const audit = await request(app)
       .get(`/api/admin/directors/records/${record._id}/audit`)
-      .set("Cookie", authCookieFor(admin));
+      .set("Cookie", await authCookieFor(admin));
     expect(audit.status).toBe(200);
     expect(audit.body.commissionAudit[0]).toEqual(
       expect.objectContaining({
@@ -799,7 +815,7 @@ describe("Director portal", () => {
 
     const csv = await request(app)
       .get("/api/admin/directors/records.csv")
-      .set("Cookie", authCookieFor(admin));
+      .set("Cookie", await authCookieFor(admin));
     expect(csv.status).toBe(200);
     expect(csv.text).toContain("Director,Attorney Name,Attorney Email");
     expect(csv.text).toContain("audit@example-law.com");
@@ -862,7 +878,7 @@ describe("Director portal", () => {
 
     const paid = await request(app)
       .patch(`/api/admin/directors/records/${record._id}/commission-payout`)
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({ paid: true, note: "ACH sent from LPC bank." });
 
     expect(paid.status).toBe(200);
@@ -877,7 +893,7 @@ describe("Director portal", () => {
 
     const directorView = await request(app)
       .get("/api/director/records?rangeDays=90")
-      .set("Cookie", authCookieFor(director));
+      .set("Cookie", await authCookieFor(director));
     expect(directorView.status).toBe(200);
     expect(directorView.body.records[0]).toEqual(
       expect.objectContaining({
@@ -888,7 +904,7 @@ describe("Director portal", () => {
 
     const unpaid = await request(app)
       .patch(`/api/admin/directors/records/${record._id}/commission-payout`)
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({ paid: false });
 
     expect(unpaid.status).toBe(200);

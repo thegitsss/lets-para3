@@ -53,9 +53,11 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0B2A4A">
-  <link rel="preload" as="image" href="hero-mountain.jpg">
 <link href="assets/styles/styles.css" rel="stylesheet" />
+<link href="assets/styles/auth-matter-field.css?v=20260730" rel="stylesheet" />
+<link href="assets/styles/auth-google.css?v=20260730" rel="stylesheet" />
 <script src="assets/scripts/utils/session.js"></script>
+<script src="assets/scripts/auth-matter-field.js?v=20260730" defer></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Login – Let’s-ParaConnect</title>
@@ -72,11 +74,9 @@
       padding: 0;
       font-synthesis: none;
       background-color: #ffffff;
-      background-image: url('hero-mountain.jpg');
-      background-size: cover;
-      background-position: center center;
-      background-repeat: no-repeat;
-      background-attachment: scroll;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(180, 151, 90, 0.13), transparent 34%),
+        linear-gradient(180deg, #fff 0%, #f6f3eb 100%);
     }
 
     :root {
@@ -98,20 +98,23 @@
       width: 100%;
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
-      background: url('./hero-mountain.jpg') no-repeat center center fixed;
-      background-size: cover;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(180, 151, 90, 0.13), transparent 34%),
+        linear-gradient(180deg, #fff 0%, #f6f3eb 100%);
     }
 
     .overlay {
       display: flex;
-      height: 100vh;
+      min-height: 100vh;
+      min-height: 100dvh;
       width: 100vw;
-      backdrop-filter: blur(5px);
-      background-color: rgba(0, 0, 0, 0.2); /* subtle dim layer over the mountain */
+      background-color: transparent;
     }
 
     .left-panel {
       width: 50%;
+      min-height: 100vh;
+      min-height: 100dvh;
       background-color: rgba(255, 255, 255, 0.95);
       padding: 60px;
       display: flex;
@@ -197,36 +200,58 @@ h2 {
       font-weight: 500;
       color: var(--muted);
       cursor: pointer;
+      min-height: 32px;
+      display: inline-flex;
+      align-items: center;
     }
 
-    button[type="submit"] {
-      all: unset;
+    button[type="submit"],
+    .passkey-login-btn {
+      appearance: none;
+      border: 1px solid var(--navy);
+      border-radius: 8px;
       font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 0.9rem;
-      letter-spacing: 0.04em;
+      font-weight: 500;
+      font-size: 0.95rem;
+      letter-spacing: 0.01em;
       text-transform: none;
-      color: #1a2230;
-      background-color: transparent;
+      color: #fff;
+      background-color: var(--navy);
       padding: 0.75rem 1rem;
-      width: 100%; /* 🔥 full width */
-      border:0.02px solid transparent;
-      transition: background-color 0.4s ease, transform 0.3s ease, border-color 0.3s ease;
+      min-height: 46px;
+      width: 100%;
+      cursor: pointer;
+      transition: background-color 0.16s ease, border-color 0.16s ease;
       text-align: center;
       box-sizing: border-box;
   }
 
-button[type="submit"]:hover {
-  background-color: #ffffff;
-  color: #1a2230;
-  border-color: #1a2230;
+button[type="submit"]:hover,
+.passkey-login-btn:hover {
+  background-color: #1d2b3b;
+  color: #fff;
+  border-color: #1d2b3b;
   box-shadow: none;
-  transform: scale(1.01);
 }
 
-button[type="submit"]:focus-visible {
+button[type="submit"]:focus-visible,
+.passkey-login-btn:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
+}
+
+.passkey-login-btn {
+  display: block;
+  margin-top: 0.5rem;
+  border-color: #cfd7e2;
+  background: #fff;
+  color: var(--navy);
+}
+
+.passkey-login-btn:hover {
+  border-color: var(--navy);
+  background: #f8fafc;
+  color: var(--navy);
 }
 
     
@@ -275,7 +300,9 @@ button[type="submit"]:focus-visible {
 
       .left-panel {
         width: 100%;
-        padding: 40px;
+        min-height: 100vh;
+        min-height: 100dvh;
+        padding: 88px 24px 48px;
       }
     }
     .back-link {
@@ -346,36 +373,44 @@ button[type="submit"]:focus-visible {
       font-size: 0.95rem;
     }
 
-    @media (max-width: 768px) {
-      .login-title {
-        display: none;
-      }
-    }
-
   </style>
 </head>
 
-<body>
+<body data-public-page="true">
   <a class="skip-link" href="#main">Skip to main content</a>
-  <div class="overlay" id="main" role="main" tabindex="-1">
+  <main class="overlay" id="main" tabindex="-1">
+    <canvas class="auth-matter-field" data-auth-matter-field aria-hidden="true"></canvas>
     <!-- LEFT PANEL -->
     <div class="left-panel">
       <div class="form-container">
 <h1>
   <a href="index.html" class="brand">Let<span class="accent-apostrophe">’</span>s-ParaConnect</a>
 </h1>
-<h2 class="login-title">Login to Let<span class="accent-apostrophe">’</span>s-ParaConnect</h2>
+<h2 class="login-title">Sign in to Let<span class="accent-apostrophe">’</span>s-ParaConnect</h2>
 
         <div id="loginPanel">
+          <a class="google-auth-button" href="/api/auth/google?intent=login">
+            <svg viewBox="0 0 18 18" aria-hidden="true">
+              <path fill="#4285F4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.482h4.844a4.14 4.14 0 0 1-1.797 2.715v2.258h2.909c1.702-1.567 2.684-3.876 2.684-6.614Z"/>
+              <path fill="#34A853" d="M9 18c2.43 0 4.468-.806 5.956-2.181l-2.909-2.258c-.806.54-1.835.859-3.047.859-2.344 0-4.329-1.585-5.039-3.714H.953v2.332A9 9 0 0 0 9 18Z"/>
+              <path fill="#FBBC05" d="M3.961 10.706A5.41 5.41 0 0 1 3.679 9c0-.592.102-1.168.282-1.706V4.962H.953A9 9 0 0 0 0 9c0 1.452.347 2.827.953 4.038l3.008-2.332Z"/>
+              <path fill="#EA4335" d="M9 3.58c1.321 0 2.507.454 3.441 1.346l2.581-2.581C13.464.892 11.425 0 9 0A9 9 0 0 0 .953 4.962l3.008 2.332C4.671 5.165 6.656 3.58 9 3.58Z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </a>
+          <div class="auth-divider"><span>or</span></div>
           <form id="loginForm">
-            <input id="email" name="email" type="email" placeholder="you@example.com" required />
+            <label class="sr-only" for="email">Email address</label>
+            <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
 
             <div class="pw-wrap">
-              <input id="password" name="password" type="password" placeholder="••••••••" required />
-              <button type="button" class="show-toggle" aria-pressed="false">Show</button>
+              <label class="sr-only" for="password">Password</label>
+              <input id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+              <button type="button" class="show-toggle" aria-controls="password" aria-pressed="false">Show password</button>
             </div>
 
             <button type="submit" class="login-btn">Log In</button>
+            <button type="button" class="login-btn passkey-login-btn" id="passkeyLoginBtn">Sign in with a passkey</button>
 
   <div class="login-actions">
     <p>
@@ -402,6 +437,9 @@ button[type="submit"]:focus-visible {
             <p>
               <button type="button" class="link-button" id="twoFactorBackupToggle">Use a backup code</button>
             </p>
+            <p id="twoFactorPasskeyAction" hidden>
+              <button type="button" class="link-button" id="twoFactorPasskeyBtn">Use a passkey</button>
+            </p>
             <button type="button" class="link-button" id="twoFactorBackBtn">Back to login</button>
           </div>
         </div>
@@ -409,7 +447,7 @@ button[type="submit"]:focus-visible {
     </div>
 
     <!-- RIGHT PANEL: implicitly handled by mountain background -->
-  </div>
+  </main>
 
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
 
@@ -422,13 +460,14 @@ button[type="submit"]:focus-visible {
         event.preventDefault();
         const isHidden = input.type === 'password';
         input.type = isHidden ? 'text' : 'password';
-        toggle.textContent = isHidden ? 'Hide' : 'Show';
+        toggle.textContent = isHidden ? 'Hide password' : 'Show password';
         toggle.setAttribute('aria-pressed', String(isHidden));
       });
     });
   </script>
 
   <script src="assets/scripts/utils/toast.js?v=20260208"></script>
+  <script src="/assets/vendor/simplewebauthn.js"></script>
   <script type="module" src="assets/scripts/login.js"></script>
 </body>
 </html>

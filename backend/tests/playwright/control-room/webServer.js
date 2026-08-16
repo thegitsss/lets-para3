@@ -20,17 +20,15 @@ async function main() {
     process.env.STRIPE_PUBLISHABLE_KEY || "pk_test_control_room_playwright";
   process.env.STRIPE_WEBHOOK_SECRET =
     process.env.STRIPE_WEBHOOK_SECRET || "whsec_control_room_playwright";
-  process.env.APP_BASE_URL = process.env.APP_BASE_URL || "http://127.0.0.1:5050";
+  const serverOrigin = `http://127.0.0.1:${process.env.PORT || "5050"}`;
+  process.env.APP_BASE_URL = process.env.APP_BASE_URL || serverOrigin;
   process.env.CLIENT_BASE_URL = process.env.CLIENT_BASE_URL || process.env.APP_BASE_URL;
   process.env.FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || process.env.APP_BASE_URL;
-  process.env.AGENT_SCHEDULER_ENABLED = "false";
-  process.env.INCIDENT_SCHEDULER_ENABLED = "false";
   process.env.INCIDENT_ALLOW_ADMIN_APPROVER_FALLBACK = "true";
   process.env.INCIDENT_FOUNDER_APPROVER_EMAILS =
     process.env.INCIDENT_FOUNDER_APPROVER_EMAILS ||
     process.env.CONTROL_ROOM_E2E_ADMIN_EMAIL ||
     "control-room.e2e.admin@lets-paraconnect.dev";
-  process.env.DISABLE_CASE_PURGER = "true";
 
   let shuttingDown = false;
   const shutdown = async () => {

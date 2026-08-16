@@ -1,55 +1,66 @@
 // backend/routes/admin.js
 const router = require("express").Router();
 const mongoose = require("mongoose");
-const path = require("path");
 const jwt = require("jsonwebtoken");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
+const { csrfProtection, respondToCsrfError } = require("../utils/csrf");
+const { createLogger, logPromiseFailure } = require("../utils/logger");
+const { createS3Client } = require("../utils/s3Client");
 const User = require("../models/User");
 const Case = require("../models/Case");
 const Job = require("../models/Job");
 const Application = require("../models/Application");
-const AuditLog = require("../models/AuditLog"); // NOTE: file name fix
+const AuditLog = require("../models/AuditLog");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
-const Notification = require("../models/Notification");
-const { purgeAttorneyAccount } = require("../services/userDeletion");
+const logger = createLogger("admin");
+const {
+  deactivateUserAccount,
+  finalizeAccountDataRemoval,
+} = require("../services/userDeletion");
+const { revokeAllUserSessions } = require("../services/authSessionService");
 const sendEmail = require("../utils/email");
-const { sendWelcomePacket, sendProfilePhotoRejectedEmail } = sendEmail;
+const { sendProfilePhotoRejectedEmail } = sendEmail;
 const { notifyUser } = require("../utils/notifyUser");
-const { getAppSettings, normalizeTaxRate, serializeAppSettings } = require("../utils/appSettings");
-const { triageSupportIssue } = require("../ai/supportAgent");
+const { getAppSettings, serializeAppSettings } = require("../utils/appSettings");
 const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
 const { ensureApprovedUserAuthReady } = require("../utils/authReady");
+const { resolveMatterDeadlineDate } = require("../utils/businessDate");
+const { DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT } = require("../services/platformFeePolicy");
 const { normalizeEmail, sendVerificationEmail } = require("../utils/emailVerification");
+const { assertObjectMalwareSafe, malwareScanRequired } = require("../utils/fileSecurity");
+const { extractPersonalFileKey } = require("../utils/personalFileReference");
+const {
+  buildAuthenticatedProfilePhotoUrl,
+  buildPublicProfilePhotoUrl,
+  extractProfilePhotoKey,
+  hasPhotoReference,
+  resolveProfilePhotoKey,
+} = require("../services/profilePhotoDelivery");
+const {
+  activatePersonalStorageDeletion,
+  cancelPersonalStorageDeletion,
+  collectUserPersonalStorageKeys,
+  stagePersonalStorageDeletion,
+} = require("../services/personalStorageDeletion");
 
-// -----------------------------------------
-// CSRF (enabled in production or when ENABLE_CSRF=true)
-// -----------------------------------------
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-const CSRF_SECURE = process.env.NODE_ENV === "production";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: CSRF_SECURE } });
-}
-
-const APP_BASE_URL = (process.env.APP_BASE_URL || "").replace(/\/$/, "");
 const EMAIL_BASE_URL = (process.env.EMAIL_BASE_URL || "").replace(/\/$/, "");
 const ASSET_BASE_URL = EMAIL_BASE_URL || "https://www.lets-paraconnect.com";
 const LOGIN_URL = `${ASSET_BASE_URL}/login.html`;
 const ATTORNEY_DASHBOARD_URL = `${ASSET_BASE_URL}/dashboard-attorney.html`;
+const LINKEDIN_COMPANY_URL = "https://www.linkedin.com/company/lets-paraconnect/";
 const APPROVAL_EMAIL_SUBJECT =
 "Welcome to Let’s-ParaConnect";
 const ATTORNEY_APPROVAL_EMAIL_SUBJECT =
 "Welcome to Let’s-ParaConnect";
 const DENIAL_EMAIL_SUBJECT =
 "Your application to join Let's-ParaConnect has been reviewed and was unfortunately not approved.";
-const ATTORNEY_LAUNCH_EMAIL_SUBJECT = "Attorney Launch Begins Today";
+const ATTORNEY_LAUNCH_EMAIL_SUBJECT = "Attorney Access Is Now Open";
 const ATTORNEY_FIRST_MATTER_EMAIL_SUBJECT = "Post Your First Matter on Let’s-ParaConnect";
-const PLATFORM_FEE_PARALEGAL_PERCENT = Number(process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18);
+const PLATFORM_FEE_PARALEGAL_PERCENT = DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT;
 const CREATE_CASE_URL = `${ASSET_BASE_URL}/create-case.html`;
+const adminS3 = createS3Client();
 
 // -----------------------------------------
 // Helpers
@@ -88,17 +99,6 @@ function formatMonthFromGroup(group) {
 if (!group?._id) return "";
 const { year, month } = group._id;
 return `${year}-${String(month).padStart(2, "0")}`;
-}
-
-function formatFilingDeadline() {
-const now = new Date();
-let year = now.getUTCFullYear();
-let deadline = new Date(Date.UTC(year, 3, 15)); // April (0-indexed month)
-if (deadline <= now) {
-year += 1;
-deadline = new Date(Date.UTC(year, 3, 15));
-}
-return deadline.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
 function isObjId(id) {
@@ -156,12 +156,15 @@ const fee = computeParalegalFeeAmount(base, doc);
 return Math.max(0, base - fee);
 }
 
-function toFileViewUrl(value) {
-const raw = String(value || "").trim();
-if (!raw) return raw;
-if (/^https?:\/\//i.test(raw)) return raw;
-if (raw.startsWith("/api/uploads/view")) return raw;
-return `/api/uploads/view?key=${encodeURIComponent(raw)}`;
+function toFileViewUrl(value, ownerId, type) {
+const key = extractPersonalFileKey(value, {
+  ownerId,
+  type,
+  bucket: process.env.S3_BUCKET,
+  region: process.env.S3_REGION,
+  cdnBase: process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL,
+});
+return key ? `/api/uploads/view?key=${encodeURIComponent(key)}` : "";
 }
 
 function buildApprovedCasePipeline(match = {}) {
@@ -206,35 +209,6 @@ function withCreatedAtFloor(match = {}, floor = null) {
   return next;
 }
 
-function stripeModeGroupId(field = "$stripeMode") {
-  return { $ifNull: [field, "unknown"] };
-}
-
-function buildCaseStripeModeAggregate(match = {}, amountExpr = CASE_AMOUNT_EXPR) {
-  return buildApprovedCasePipeline(match).concat([
-    {
-      $group: {
-        _id: stripeModeGroupId(),
-        total: { $sum: amountExpr },
-        count: { $sum: 1 },
-      },
-    },
-  ]);
-}
-
-function buildModelStripeModeAggregate(match = {}, amountField = "$feeAmount") {
-  return [
-    { $match: match },
-    {
-      $group: {
-        _id: stripeModeGroupId(),
-        total: { $sum: amountField },
-        count: { $sum: 1 },
-      },
-    },
-  ];
-}
-
 function pickUserSafe(u) {
 // fields safe to return to admin tools
 const {
@@ -244,8 +218,15 @@ lastLoginAt, lockedUntil, failedLogins, audit, createdAt, updatedAt,
 specialties, jurisdictions, skills, yearsExperience, languages,
 avatarURL, timezone, location, state, kycStatus, stripeCustomerId, stripeAccountId,
 barNumber, resumeURL, certificateURL, practiceAreas, experience, education,
-disabled, deleted, deletedAt, profileImage, pendingProfileImage, profilePhotoStatus, linkedInURL,
+disabled, deleted, deletedAt, personalDataStatus, personalDataMinimizedAt,
+profileImage, pendingProfileImage, profilePhotoStatus, linkedInURL,
 } = u;
+const approvedPhotoUrl = profileImage || avatarURL
+  ? buildAuthenticatedProfilePhotoUrl(u)
+  : "";
+const pendingPhotoUrl = pendingProfileImage
+  ? buildAuthenticatedProfilePhotoUrl(u, { variant: "pending" })
+  : "";
 return {
 id: _id,
 firstName,
@@ -262,20 +243,22 @@ pendingEmail,
 pendingEmailRequestedAt,
 lastLoginAt, lockedUntil, failedLogins, audit, createdAt, updatedAt,
 specialties, jurisdictions, skills, yearsExperience, languages,
-avatarURL, timezone, location, state, kycStatus, stripeCustomerId, stripeAccountId,
-profileImage,
-pendingProfileImage,
+avatarURL: approvedPhotoUrl, timezone, location, state, kycStatus, stripeCustomerId, stripeAccountId,
+profileImage: approvedPhotoUrl,
+pendingProfileImage: pendingPhotoUrl,
 profilePhotoStatus,
 barNumber,
 linkedInURL,
-resumeURL: toFileViewUrl(resumeURL),
-certificateURL: toFileViewUrl(certificateURL),
+resumeURL: toFileViewUrl(resumeURL, _id, "resume"),
+certificateURL: toFileViewUrl(certificateURL, _id, "certificate"),
 practiceAreas,
 experience,
 education,
 disabled,
 deleted,
 deletedAt,
+personalDataStatus,
+personalDataMinimizedAt,
 };
 }
 
@@ -308,8 +291,57 @@ const text = String(note).trim();
 return text ? text.slice(0, 1000) : undefined;
 }
 
+function assertOwnedAdmissionKey(user, value, type, label) {
+  const raw = String(value || "").trim();
+  const key = extractPersonalFileKey(value, {
+    ownerId: user?._id,
+    type,
+    bucket: process.env.S3_BUCKET,
+    region: process.env.S3_REGION,
+    cdnBase: process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL,
+  });
+  if (raw && !key) {
+    const error = new Error(`${label} is not stored in the applicant's protected LPC folder.`);
+    error.code = "ADMISSION_FILE_INVALID";
+    error.statusCode = 409;
+    throw error;
+  }
+  return key;
+}
+
+async function assertAdmissionFilesSafe(user) {
+  if (String(user?.role || "").toLowerCase() !== "paralegal") return;
+  const resumeKey = assertOwnedAdmissionKey(user, user.resumeURL, "resume", "Résumé");
+  if (!resumeKey) {
+    const error = new Error("A protected résumé is required before approving this paralegal.");
+    error.code = "ADMISSION_FILE_REQUIRED";
+    error.statusCode = 409;
+    throw error;
+  }
+  const keys = [
+    resumeKey,
+    assertOwnedAdmissionKey(user, user.certificateURL, "certificate", "Certificate"),
+    assertOwnedAdmissionKey(user, user.writingSampleURL, "writingSample", "Writing sample"),
+  ].filter(Boolean);
+  if (!malwareScanRequired()) return;
+  for (const key of keys) {
+    // Every submitted admission artifact must be clean before approval.
+    // eslint-disable-next-line no-await-in-loop
+    await assertObjectMalwareSafe({ s3: adminS3, bucket: process.env.S3_BUCKET, key });
+  }
+}
+
 function escapeRegex(value = "") {
 return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function escapeEmailHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 async function getAttorneyIdsWithPostedMatters(attorneyIds = []) {
@@ -375,13 +407,13 @@ function buildApprovalEmailHtml(user, opts = {}) {
           <tr>
             <td align="center" style="padding:16px 32px 0;">
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.7;">
-                Hi ${user?.firstName || "there"},
+                Hi ${escapeEmailHtml(user?.firstName || "there")},
                 <br><br>
                 Thank you for applying to join Let’s-ParaConnect.
                 <br><br>
                 Your application has been reviewed and approved. At this time, we’re onboarding a limited number of paralegals as we open the platform carefully and maintain a high standard across the network.
                 <br><br>
-                You now have access to complete your profile and explore the platform. Attorneys will begin posting work as onboarding continues.
+                You now have access to complete your profile and explore the platform. You can browse available Matters as attorneys post them.
                 <br><br>
                 We’re glad to have you as part of the community.
                 <br><br>
@@ -416,8 +448,8 @@ function buildApprovalEmailHtml(user, opts = {}) {
             <td align="center" style="padding:0 32px 28px;">
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
                 Let's-ParaConnect was built to create a more reliable way for attorneys and paralegals to work together.
-                Every interaction on the platform is supported by verification and Stripe-processed payments, helping set
-                clear expectations and support both sides.
+                Approval-based access, structured Matter workspaces, and Stripe-processed payments help set clear
+                expectations for both sides.
               </div>
             </td>
           </tr>
@@ -430,7 +462,7 @@ function buildApprovalEmailHtml(user, opts = {}) {
                 Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#545454;text-decoration:none;">help@lets-paraconnect.com</a> or reply to this email.
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#7a7a7a;line-height:1.4;margin-top:14px;">
-                ${unsubscribeLine}. Required account and case notices may still be sent.
+                ${unsubscribeLine}. Required account and Matter notices may still be sent.
               </div>
             </td>
           </tr>
@@ -447,12 +479,9 @@ function buildAttorneyApprovalEmailHtml(user, opts = {}) {
   const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const contactUrl = `${ASSET_BASE_URL}/contact.html`;
   const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
-  const linkedinUrl = "https://www.linkedin.com/company/lets-paraconnect/";
-  const facebookUrl = "https://www.facebook.com/LetsParaConnect/";
-  const instagramUrl = "https://www.instagram.com/letsparaconnect/";
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const friendlyName = user?.firstName || formatFullName(user) || "there";
+  const friendlyName = escapeEmailHtml(user?.firstName || formatFullName(user) || "there");
   const unsubscribeLine = unsubscribeUrl
     ? `<a href="${unsubscribeUrl}" style="color:#7a7a7a;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
     : "Unsubscribe from non-essential emails";
@@ -493,11 +522,11 @@ function buildAttorneyApprovalEmailHtml(user, opts = {}) {
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.01em;color:#1f1f1f;line-height:1.7;text-align:left;">
                 <p style="margin:0 0 18px;">Dear ${friendlyName},</p>
                 <p style="margin:0 0 18px;">Congratulations! We are pleased to inform you that you have been accepted to Let&rsquo;s-ParaConnect.</p>
-                <p style="margin:0 0 18px;">LPC is a platform designed for attorneys and paralegals to connect in a streamlined, efficient, and secure environment. Through LPC, you can easily find, collaborate with, and manage skilled professionals to support your legal work&mdash;whether for case preparation, document drafting, research, or administrative assistance.</p>
+                <p style="margin:0 0 18px;">LPC is a platform designed for attorneys and independent paralegals to connect through structured, project-based work. Through LPC, you can review approved paralegal profiles, collaborate in a Matter workspace, and manage legal-support work such as preparation, drafting, research, or administrative assistance.</p>
                 <p style="margin:0 0 10px;"><strong>What You Can Use LPC For:</strong></p>
                 <ul style="margin:0 0 18px 20px;padding:0;">
-                  <li style="margin:0 0 10px;">Connecting with vetted paralegals</li>
-                  <li style="margin:0 0 10px;">Delegating legal research, drafting, and case support tasks</li>
+                  <li style="margin:0 0 10px;">Reviewing approved paralegal profiles</li>
+                  <li style="margin:0 0 10px;">Delegating legal research, drafting, and Matter support tasks</li>
                   <li style="margin:0 0 10px;">Managing workflows and improving operational efficiency</li>
                   <li style="margin:0;">Scaling your practice with flexible, on-demand support</li>
                 </ul>
@@ -506,9 +535,9 @@ function buildAttorneyApprovalEmailHtml(user, opts = {}) {
                   <li style="margin:0 0 10px;">Log in to your account using the credentials you provided during sign-up.</li>
                   <li style="margin:0 0 10px;">Complete your profile.</li>
                   <li style="margin:0 0 10px;">Explore available paralegal professionals.</li>
-                  <li style="margin:0;">Post your first task or project.</li>
+                  <li style="margin:0;">Post your first Matter.</li>
                 </ul>
-                <p style="margin:0 0 18px;">The goal is to help you save time, increase productivity, and focus on delivering the highest quality legal services to your clients.</p>
+                <p style="margin:0 0 18px;">The goal is to help you organize project-based support work and stay focused on your clients.</p>
                 <p style="margin:0 0 18px;">If you have any questions or need assistance getting started, please don&rsquo;t hesitate to contact us.</p>
                 <p style="margin:0 0 18px;">Welcome aboard&mdash;we&rsquo;re excited to have you as part of the platform.</p>
               </div>
@@ -531,7 +560,7 @@ function buildAttorneyApprovalEmailHtml(user, opts = {}) {
             <td align="center" style="padding:18px 40px 28px;">
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.01em;color:#1f1f1f;line-height:1.7;text-align:left;">
                 Warm regards,<br>
-                The Lets-ParaConnect Team
+                The Let’s-ParaConnect Team
               </div>
             </td>
           </tr>
@@ -539,9 +568,7 @@ function buildAttorneyApprovalEmailHtml(user, opts = {}) {
             unsubscribeLine,
             contactUrl,
             privacyUrl,
-            linkedinUrl,
-            facebookUrl,
-            instagramUrl,
+            linkedinUrl: LINKEDIN_COMPANY_URL,
             backgroundColor: "#f5f7fb",
           })}
         </table>
@@ -556,7 +583,7 @@ function buildDenialEmailHtml(user, opts = {}) {
   const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const friendlyName = formatFullName(user) || "there";
+  const friendlyName = escapeEmailHtml(formatFullName(user) || "there");
 
   const unsubscribeLine = unsubscribeUrl
     ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
@@ -616,7 +643,7 @@ function buildDenialEmailHtml(user, opts = {}) {
                 Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#545454;text-decoration:none;">help@lets-paraconnect.com</a> or reply to this email.
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#7a7a7a;line-height:1.4;margin-top:14px;">
-                ${unsubscribeLine}. Required account and case notices may still be sent.
+                ${unsubscribeLine}. Required account and Matter notices may still be sent.
               </div>
             </td>
           </tr>
@@ -628,12 +655,12 @@ function buildDenialEmailHtml(user, opts = {}) {
 }
 
 function buildCompleteProfileEmailHtml(user, opts = {}) {
-  const loginUrl = LOGIN_URL;
+  const profileSettingsUrl = `${ASSET_BASE_URL}/profile-settings.html`;
   const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
   const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const friendlyName = formatFullName(user) || "there";
+  const friendlyName = escapeEmailHtml(formatFullName(user) || "there");
 
   const unsubscribeLine = unsubscribeUrl
     ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
@@ -666,7 +693,7 @@ function buildCompleteProfileEmailHtml(user, opts = {}) {
           <tr>
             <td align="center" style="padding:8px 32px 0;">
               <div style="font-family:Georgia, 'Times New Roman', serif;font-size:30px;letter-spacing:0.04em;color:#6e6e6e;">
-                Complete your profile
+                Add your profile photo
               </div>
             </td>
           </tr>
@@ -674,9 +701,9 @@ function buildCompleteProfileEmailHtml(user, opts = {}) {
             <td align="center" style="padding:16px 40px 0;">
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;">
                 Hi ${friendlyName},<br><br>
-                This is a friendly reminder to complete your profile on Let’s-ParaConnect.
-                A complete, professional profile helps attorneys find and select you more quickly.
-                Please log in and finish your profile details and photo at your earliest convenience.
+                Your Let’s-ParaConnect profile is missing a photo.
+                Adding a clear, professional photo helps attorneys recognize your profile when reviewing applicants.
+                Open Profile Settings to upload one.
               </div>
             </td>
           </tr>
@@ -685,8 +712,8 @@ function buildCompleteProfileEmailHtml(user, opts = {}) {
               <table cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td bgcolor="#0a84ff" style="border-radius:999px;">
-                    <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
-                      Login
+                    <a href="${profileSettingsUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
+                      Open Profile Settings
                     </a>
                   </td>
                 </tr>
@@ -718,7 +745,7 @@ function buildCompleteProfileEmailHtml(user, opts = {}) {
                 Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a>
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
-                ${unsubscribeLine}. Required account and case notices may still be sent.
+                ${unsubscribeLine}. Required account and Matter notices may still be sent.
               </div>
             </td>
           </tr>
@@ -738,11 +765,7 @@ function buildLaunchEmailFooter({
   contactUrl,
   privacyUrl,
   linkedinUrl,
-  facebookUrl,
-  instagramUrl,
   linkedinIconUrl = `${ASSET_BASE_URL}/assets/email/linkedin-icon.svg`,
-  facebookIconUrl = `${ASSET_BASE_URL}/assets/email/facebook-icon.svg`,
-  instagramIconUrl = `${ASSET_BASE_URL}/assets/email/instagram-icon.svg`,
   backgroundColor = "#ffffff",
 } = {}) {
   return `
@@ -756,19 +779,9 @@ function buildLaunchEmailFooter({
               </div>
               <table cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;">
                 <tr>
-                  <td style="padding-right:10px;">
+                  <td>
                     <a href="${linkedinUrl}" target="_blank" rel="noopener" aria-label="LinkedIn" style="display:inline-block;text-decoration:none;">
                       <img src="${linkedinIconUrl}" alt="LinkedIn" width="18" height="18" style="display:block;border:0;width:18px;height:18px;">
-                    </a>
-                  </td>
-                  <td style="padding-right:10px;">
-                    <a href="${facebookUrl}" target="_blank" rel="noopener" aria-label="Facebook" style="display:inline-block;text-decoration:none;">
-                      <img src="${facebookIconUrl}" alt="Facebook" width="18" height="18" style="display:block;border:0;width:18px;height:18px;">
-                    </a>
-                  </td>
-                  <td>
-                    <a href="${instagramUrl}" target="_blank" rel="noopener" aria-label="Instagram" style="display:inline-block;text-decoration:none;">
-                      <img src="${instagramIconUrl}" alt="Instagram" width="18" height="18" style="display:block;border:0;width:18px;height:18px;">
                     </a>
                   </td>
                 </tr>
@@ -782,7 +795,7 @@ function buildLaunchEmailFooter({
                 &copy; 2026 Let&rsquo;s-ParaConnect
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#7a7a7a;line-height:1.4;margin-top:14px;">
-                ${unsubscribeLine}. Required account and case notices may still be sent.
+                ${unsubscribeLine}. Required account and Matter notices may still be sent.
               </div>
             </td>
           </tr>
@@ -795,12 +808,9 @@ function buildAttorneyLaunchEmailHtml(user, opts = {}) {
   const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const contactUrl = `${ASSET_BASE_URL}/contact.html`;
   const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
-  const linkedinUrl = "https://www.linkedin.com/company/lets-paraconnect/";
-  const facebookUrl = "https://www.facebook.com/LetsParaConnect/";
-  const instagramUrl = "https://www.instagram.com/letsparaconnect/";
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const friendlyName = user?.firstName || "there";
+  const friendlyName = escapeEmailHtml(user?.firstName || "there");
   const unsubscribeLine = unsubscribeUrl
     ? `<a href="${unsubscribeUrl}" style="color:#7a7a7a;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
     : "Unsubscribe from non-essential emails";
@@ -832,7 +842,7 @@ function buildAttorneyLaunchEmailHtml(user, opts = {}) {
           <tr>
             <td align="center" style="padding:8px 32px 0;">
               <div style="font-family:Georgia, 'Times New Roman', serif;font-size:30px;letter-spacing:0.04em;color:#6e6e6e;">
-                Attorney launch begins today
+                Attorney access is now open
               </div>
             </td>
           </tr>
@@ -840,7 +850,7 @@ function buildAttorneyLaunchEmailHtml(user, opts = {}) {
             <td align="center" style="padding:16px 40px 0;">
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;text-align:left;">
                 Hi ${friendlyName},<br><br>
-                We are officially opening Let&rsquo;s-ParaConnect to attorneys today. Please log in and complete your Stripe Connect payout setup under Profile Settings &gt; Security so your account is fully ready. We&rsquo;re excited to begin opening the door to project-based opportunities between paralegals and attorneys.
+                Attorney access is now open. Make sure your paralegal profile is ready for paid Matters by completing Stripe Connect payout setup under Profile Settings &gt; Security. Attorneys can now use LPC to find and hire approved paralegals for project-based work.
               </div>
             </td>
           </tr>
@@ -877,9 +887,7 @@ function buildAttorneyLaunchEmailHtml(user, opts = {}) {
             unsubscribeLine,
             contactUrl,
             privacyUrl,
-            linkedinUrl,
-            facebookUrl,
-            instagramUrl,
+            linkedinUrl: LINKEDIN_COMPANY_URL,
           })}
         </table>
       </td>
@@ -894,12 +902,9 @@ function buildAttorneyLaunchSetupEmailHtml(user, opts = {}) {
   const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const contactUrl = `${ASSET_BASE_URL}/contact.html`;
   const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
-  const linkedinUrl = "https://www.linkedin.com/company/lets-paraconnect/";
-  const facebookUrl = "https://www.facebook.com/LetsParaConnect/";
-  const instagramUrl = "https://www.instagram.com/letsparaconnect/";
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const friendlyName = user?.firstName || "there";
+  const friendlyName = escapeEmailHtml(user?.firstName || "there");
   const unsubscribeLine = unsubscribeUrl
     ? `<a href="${unsubscribeUrl}" style="color:#7a7a7a;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
     : "Unsubscribe from non-essential emails";
@@ -931,7 +936,7 @@ function buildAttorneyLaunchSetupEmailHtml(user, opts = {}) {
           <tr>
             <td align="center" style="padding:8px 32px 0;">
               <div style="font-family:Georgia, 'Times New Roman', serif;font-size:30px;letter-spacing:0.04em;color:#6e6e6e;">
-                Attorney launch begins today
+                Attorney access is now open
               </div>
             </td>
           </tr>
@@ -939,7 +944,7 @@ function buildAttorneyLaunchSetupEmailHtml(user, opts = {}) {
             <td align="center" style="padding:16px 40px 0;">
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;text-align:left;">
                 Hi ${friendlyName},<br><br>
-                We are officially opening Let&rsquo;s-ParaConnect to attorneys today. Please log in to complete your profile and set up Stripe Connect under Profile Settings &gt; Security. We&rsquo;re excited to begin opening the door to project-based opportunities between paralegals and attorneys.
+                Attorney access is now open. Please log in to add your paralegal profile photo and complete Stripe Connect payout setup under Profile Settings &gt; Security so attorneys can evaluate your experience and you are ready to receive payouts for paid Matters.
               </div>
             </td>
           </tr>
@@ -976,9 +981,7 @@ function buildAttorneyLaunchSetupEmailHtml(user, opts = {}) {
             unsubscribeLine,
             contactUrl,
             privacyUrl,
-            linkedinUrl,
-            facebookUrl,
-            instagramUrl,
+            linkedinUrl: LINKEDIN_COMPANY_URL,
           })}
         </table>
       </td>
@@ -993,12 +996,9 @@ function buildAttorneyFirstMatterEmailHtml(user, opts = {}) {
   const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const contactUrl = `${ASSET_BASE_URL}/contact.html`;
   const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
-  const linkedinUrl = "https://www.linkedin.com/company/lets-paraconnect/";
-  const facebookUrl = "https://www.facebook.com/LetsParaConnect/";
-  const instagramUrl = "https://www.instagram.com/letsparaconnect/";
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const friendlyName = user?.firstName || formatFullName(user) || "there";
+  const friendlyName = escapeEmailHtml(user?.firstName || formatFullName(user) || "there");
   const unsubscribeLine = unsubscribeUrl
     ? `<a href="${unsubscribeUrl}" style="color:#7a7a7a;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
     : "Unsubscribe from non-essential emails";
@@ -1067,9 +1067,7 @@ function buildAttorneyFirstMatterEmailHtml(user, opts = {}) {
             unsubscribeLine,
             contactUrl,
             privacyUrl,
-            linkedinUrl,
-            facebookUrl,
-            instagramUrl,
+            linkedinUrl: LINKEDIN_COMPANY_URL,
           })}
         </table>
       </td>
@@ -1099,7 +1097,11 @@ async function sendDecisionEmailSafe(user, status) {
 try {
 await dispatchDecisionEmail(user, status);
 } catch (err) {
-console.warn(`[admin] Failed to send ${status} email to ${user?.email || "unknown"}`, err?.message || err);
+logger.warn("Account-status email delivery failed.", {
+  status: String(status || "unknown").slice(0, 40),
+  name: String(err?.name || "Error").slice(0, 80),
+  code: String(err?.code || "EMAIL_DELIVERY_FAILED").slice(0, 100),
+});
 }
 }
 
@@ -1111,6 +1113,9 @@ error.statusCode = 400;
 throw error;
 }
 const wasApproved = user.status === "approved";
+  if (!wasApproved && normalized === "approved") {
+    await assertAdmissionFilesSafe(user);
+  }
   const previousStatus = String(user.status || "");
   const cleanNote = sanitizeNote(note);
   user.status = normalized;
@@ -1141,7 +1146,7 @@ targetId: user._id,
 meta: { status: normalized, note: cleanNote },
 });
 } catch (err) {
-console.warn("[admin] Failed to log audit event", err?.message || err);
+logger.warn("[admin] Failed to log audit event", err?.message || err);
 }
 
 await publishEventSafe({
@@ -1195,26 +1200,6 @@ return user;
 // All admin routes are protected & admin-only
 router.use(verifyToken, requireApproved, requireRole("admin"));
 
-router.post(
-  "/ai/support-triage-test",
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    const { messageText, userEmail, source, saveIssue } = req.body || {};
-    if (!String(messageText || "").trim()) {
-      return res.status(400).json({ error: "messageText is required" });
-    }
-
-    const result = await triageSupportIssue({
-      messageText,
-      userEmail,
-      source: source || "admin_test",
-      saveToDb: Boolean(saveIssue),
-    });
-
-    res.json(result);
-  })
-);
-
 router.get(
   "/settings",
   asyncHandler(async (_req, res) => {
@@ -1238,10 +1223,6 @@ router.put(
     }
     if (typeof updates.supportEmail === "string") {
       settings.supportEmail = updates.supportEmail.trim();
-    }
-    const normalizedTaxRate = normalizeTaxRate(updates.taxRate);
-    if (normalizedTaxRate !== null) {
-      settings.taxRate = normalizedTaxRate;
     }
     settings.updatedBy = req.user.id;
     await settings.save();
@@ -1341,21 +1322,6 @@ recentUsers,
 }));
 
 router.get(
-"/pending-paralegals",
-asyncHandler(async (_req, res) => {
-const pending = await User.find({ role: "paralegal", status: "pending", deleted: { $ne: true } })
-    .select("firstName lastName email linkedInURL certificateURL yearsExperience createdAt")
-.sort({ createdAt: 1 })
-.lean();
-const items = pending.map((item) => ({
-  ...item,
-  certificateURL: toFileViewUrl(item.certificateURL),
-}));
-res.json({ items });
-})
-);
-
-router.get(
   "/profile-photos",
   asyncHandler(async (req, res) => {
     const status = normalizePhotoStatus(req.query?.status) || "pending_review";
@@ -1377,18 +1343,28 @@ router.get(
       ];
     }
     const users = await User.find(filter)
-      .select("firstName lastName email profilePhotoStatus pendingProfileImage profileImage avatarURL createdAt")
+      .select(
+        "firstName lastName email role profilePhotoStatus pendingProfileImage profileImage avatarURL createdAt updatedAt " +
+        "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
+      )
       .sort({ updatedAt: -1 })
       .lean();
-    const items = users.map((user) => ({
-      id: user._id,
-      name: formatFullName(user) || user.email || "User",
-      email: user.email || "",
-      status: resolvePhotoStatus(user),
-      pendingProfileImage: user.pendingProfileImage || "",
-      profileImage: user.profileImage || user.avatarURL || "",
-      createdAt: user.createdAt || null,
-    }));
+    const items = users.map((user) => {
+      const approvedUrl = String(user.role || "").toLowerCase() === "paralegal"
+        ? buildPublicProfilePhotoUrl(user)
+        : buildAuthenticatedProfilePhotoUrl(user);
+      return {
+        id: user._id,
+        name: formatFullName(user) || user.email || "User",
+        email: user.email || "",
+        status: resolvePhotoStatus(user),
+        pendingProfileImage: hasPhotoReference(user, "pending")
+          ? buildAuthenticatedProfilePhotoUrl(user, { variant: "pending" })
+          : "",
+        profileImage: hasPhotoReference(user, "approved") ? approvedUrl : "",
+        createdAt: user.createdAt || null,
+      };
+    });
     res.json({ items });
   })
 );
@@ -1399,7 +1375,9 @@ router.post(
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
-    const user = await User.findById(id);
+    const user = await User.findById(id).select(
+      "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
+    );
     if (!user) return res.status(404).json({ error: "User not found" });
     const role = String(user.role || "").toLowerCase();
     if (!["paralegal", "attorney"].includes(role)) {
@@ -1408,13 +1386,61 @@ router.post(
     if (!user.pendingProfileImage) {
       return res.status(400).json({ error: "No pending profile photo to approve" });
     }
-    user.profileImage = user.pendingProfileImage;
-    user.avatarURL = user.pendingProfileImage;
-    if (user.pendingProfileImageOriginal) {
-      user.profileImageOriginal = user.pendingProfileImageOriginal;
+    const pendingKey = resolveProfilePhotoKey(user, {
+      bucket: process.env.S3_BUCKET,
+      region: process.env.S3_REGION,
+      variant: "pending",
+    });
+    if (!pendingKey) return res.status(400).json({ error: "Pending profile photo is invalid" });
+    const pendingOriginalKey = extractProfilePhotoKey(
+      user.pendingProfileImageOriginalKey || user.pendingProfileImageOriginal,
+      { bucket: process.env.S3_BUCKET, region: process.env.S3_REGION, ownerId: user._id }
+    );
+    try {
+      await assertObjectMalwareSafe({ s3: adminS3, bucket: process.env.S3_BUCKET, key: pendingKey });
+      if (user.pendingProfileImageOriginalKey || user.pendingProfileImageOriginal) {
+        if (!pendingOriginalKey) {
+          return res.status(400).json({ error: "Pending original profile photo is invalid" });
+        }
+        await assertObjectMalwareSafe({
+          s3: adminS3,
+          bucket: process.env.S3_BUCKET,
+          key: pendingOriginalKey,
+        });
+      }
+    } catch (error) {
+      if (error?.statusCode) return res.status(error.statusCode).json({ error: error.message, code: error.code });
+      throw error;
     }
+    const oldApprovedKeys = collectUserPersonalStorageKeys(user).filter(
+      (key) =>
+        key.startsWith(`profile-photos/${user._id}/`) &&
+        key !== pendingKey &&
+        key !== pendingOriginalKey
+    );
+    const storageTaskIds = await stagePersonalStorageDeletion({
+      ownerId: user._id,
+      keys: oldApprovedKeys,
+      reason: "profile_photo_approved_replacement",
+    });
+    const photoVersion = new Date();
+    const approvedUrl = role === "paralegal"
+      ? buildPublicProfilePhotoUrl(user, photoVersion)
+      : buildAuthenticatedProfilePhotoUrl(user, { updatedAt: photoVersion });
+    user.profileImageKey = pendingKey;
+    user.profileImage = approvedUrl;
+    user.avatarURL = approvedUrl;
+    user.profileImageOriginalKey = pendingOriginalKey;
+    user.profileImageOriginal = pendingOriginalKey
+      ? buildAuthenticatedProfilePhotoUrl(user, {
+          variant: "approved-original",
+          updatedAt: photoVersion,
+        })
+      : "";
     user.pendingProfileImage = "";
+    user.pendingProfileImageKey = "";
     user.pendingProfileImageOriginal = "";
+    user.pendingProfileImageOriginalKey = "";
     user.profilePhotoStatus = "approved";
     if (role === "paralegal") {
       user.preferences = {
@@ -1424,21 +1450,33 @@ router.post(
         hideProfile: false,
       };
     }
-    await user.save();
+    try {
+      await user.save();
+    } catch (error) {
+      await cancelPersonalStorageDeletion(storageTaskIds).catch(
+        logPromiseFailure(logger, "[admin] approved profile photo cleanup rollback failed")
+      );
+      throw error;
+    }
+    await activatePersonalStorageDeletion(storageTaskIds).catch((error) => {
+      logger.error("[admin] approved profile photo cleanup activation deferred", {
+        errorCode: String(error?.name || error?.code || "STORAGE_TASK_TRANSITION_FAILED"),
+      });
+    });
     try {
       await AuditLog.logFromReq(req, "admin.profile_photo.approved", {
         targetType: "user",
         targetId: user._id,
       });
     } catch (err) {
-      console.warn("[admin] profile photo approval audit failed", err?.message || err);
+      logger.warn("[admin] profile photo approval audit failed", err?.message || err);
     }
     try {
       if (role === "paralegal") {
         await notifyUser(user._id, "profile_photo_approved", {}, { actorUserId: req.user.id });
       }
     } catch (err) {
-      console.warn("[admin] notifyUser profile_photo_approved failed", err);
+      logger.warn("[admin] notifyUser profile_photo_approved failed", err);
     }
     res.json({ ok: true, user: pickUserSafe(user.toObject()), profilePhotoStatus: user.profilePhotoStatus });
   })
@@ -1450,86 +1488,99 @@ router.post(
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
-    const user = await User.findById(id);
+    const user = await User.findById(id).select(
+      "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
+    );
     if (!user) return res.status(404).json({ error: "User not found" });
     const role = String(user.role || "").toLowerCase();
     if (!["paralegal", "attorney"].includes(role)) {
       return res.status(400).json({ error: "Only attorney or paralegal profile photos can be reviewed here" });
     }
+    const allPhotoKeys = collectUserPersonalStorageKeys(user).filter((key) =>
+      key.startsWith(`profile-photos/${user._id}/`)
+    );
+    const approvedKeys = [
+      resolveProfilePhotoKey(user, {
+        bucket: process.env.S3_BUCKET,
+        region: process.env.S3_REGION,
+        variant: "approved",
+      }),
+      resolveProfilePhotoKey(user, {
+        bucket: process.env.S3_BUCKET,
+        region: process.env.S3_REGION,
+        variant: "approved-original",
+      }),
+    ].filter(Boolean);
+    const keysToDelete = [];
     if (user.pendingProfileImage) {
+      if (role === "attorney") keysToDelete.push(...allPhotoKeys);
+      else keysToDelete.push(...allPhotoKeys.filter((key) => !approvedKeys.includes(key)));
       user.pendingProfileImage = "";
+      user.pendingProfileImageKey = "";
       user.pendingProfileImageOriginal = "";
-      user.profilePhotoStatus = "rejected";
+      user.pendingProfileImageOriginalKey = "";
+      user.profilePhotoStatus = role === "paralegal" && approvedKeys.length ? "approved" : "rejected";
       if (role === "attorney") {
         user.profileImage = null;
+        user.profileImageKey = "";
         user.avatarURL = "";
         user.profileImageOriginal = "";
+        user.profileImageOriginalKey = "";
       }
     } else if (user.profileImage || user.avatarURL) {
+      keysToDelete.push(...allPhotoKeys);
       user.profileImage = null;
+      user.profileImageKey = "";
       user.avatarURL = "";
       user.pendingProfileImage = "";
+      user.pendingProfileImageKey = "";
       user.profileImageOriginal = "";
+      user.profileImageOriginalKey = "";
       user.pendingProfileImageOriginal = "";
+      user.pendingProfileImageOriginalKey = "";
       user.profilePhotoStatus = "rejected";
     } else {
       return res.status(400).json({ error: "No profile photo to reject" });
     }
-    await user.save();
+    const storageTaskIds = await stagePersonalStorageDeletion({
+      ownerId: user._id,
+      keys: [...new Set(keysToDelete)],
+      reason: "profile_photo_rejected",
+    });
+    try {
+      await user.save();
+    } catch (error) {
+      await cancelPersonalStorageDeletion(storageTaskIds).catch(
+        logPromiseFailure(logger, "[admin] rejected profile photo cleanup rollback failed")
+      );
+      throw error;
+    }
+    await activatePersonalStorageDeletion(storageTaskIds).catch((error) => {
+      logger.error("[admin] rejected profile photo cleanup activation deferred", {
+        errorCode: String(error?.name || error?.code || "STORAGE_TASK_TRANSITION_FAILED"),
+      });
+    });
     try {
       await AuditLog.logFromReq(req, "admin.profile_photo.rejected", {
         targetType: "user",
         targetId: user._id,
       });
     } catch (err) {
-      console.warn("[admin] profile photo rejection audit failed", err?.message || err);
+      logger.warn("[admin] profile photo rejection audit failed", err?.message || err);
     }
     try {
       const profileSettingsUrl = `${ASSET_BASE_URL}/profile-settings.html`;
       await sendProfilePhotoRejectedEmail(user, { profileSettingsUrl });
     } catch (err) {
-      console.warn("[admin] profile photo rejection email failed", err?.message || err);
+      logger.warn("[admin] profile photo rejection email failed", err?.message || err);
     }
     try {
       await notifyUser(user._id, "profile_photo_rejected", {}, { actorUserId: req.user.id });
     } catch (err) {
-      console.warn("[admin] notifyUser profile_photo_rejected failed", err);
+      logger.warn("[admin] notifyUser profile_photo_rejected failed", err);
     }
     res.json({ ok: true, user: pickUserSafe(user.toObject()), profilePhotoStatus: user.profilePhotoStatus });
   })
-);
-
-router.post(
-"/approve/:id",
-csrfProtection,
-asyncHandler(async (req, res) => {
-const { id } = req.params;
-  if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
-  const user = await User.findById(id);
-  if (!user) return res.status(404).json({ error: "User not found" });
-  if (user.role !== "paralegal") return res.status(400).json({ error: "Only paralegals can be approved here" });
-  const updated = await applyUserDecision(req, user, "approved");
-  try {
-    await sendWelcomePacket(updated);
-  } catch (err) {
-    console.warn("[admin] Failed to send welcome packet", err?.message || err);
-  }
-  res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
-})
-);
-
-router.post(
-"/reject/:id",
-csrfProtection,
-asyncHandler(async (req, res) => {
-const { id } = req.params;
-if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
-const user = await User.findById(id);
-if (!user) return res.status(404).json({ error: "User not found" });
-if (user.role !== "paralegal") return res.status(400).json({ error: "Only paralegals can be reviewed here" });
-  const updated = await applyUserDecision(req, user, "denied");
-  res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
-})
 );
 
 router.post(
@@ -1538,10 +1589,15 @@ csrfProtection,
 asyncHandler(async (req, res) => {
 const { id } = req.params;
 if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
-const user = await User.findById(id);
+const user = await User.findById(id).select("+authVersion");
 if (!user) return res.status(404).json({ error: "User not found" });
+if (String(user._id) === String(req.user?.id)) {
+  return res.status(409).json({ error: "You cannot suspend your own active admin session." });
+}
 user.disabled = true;
+user.authVersion = Number(user.authVersion || 0) + 1;
 await user.save();
+await revokeAllUserSessions(user._id, "admin_suspended");
 const reasonRaw = typeof req.body?.reason === "string" ? req.body.reason : "";
 const messageRaw = typeof req.body?.message === "string" ? req.body.message : "";
 const reason = reasonRaw.trim().slice(0, 2000);
@@ -1557,17 +1613,17 @@ if (reason || message) {
   try {
     await notifyUser(user._id, "account_suspended", payload, { actorUserId: req.user?.id || null });
   } catch (err) {
-    console.warn("[admin] notifyUser account_suspended failed", err?.message || err);
+    logger.warn("[admin] notifyUser account_suspended failed", err?.message || err);
   }
 }
 try {
   await AuditLog.logFromReq(req, "admin.user.suspended", {
     targetType: "user",
     targetId: user._id,
-    meta: { reason: reason || "", message: message || "" },
+    meta: { reasonProvided: Boolean(reason), customMessageProvided: Boolean(message) },
   });
 } catch (err) {
-  console.warn("[admin] Failed to log suspension", err?.message || err);
+  logger.warn("[admin] Failed to log suspension", err?.message || err);
 }
 res.json({ ok: true, disabled: true });
 })
@@ -1579,10 +1635,15 @@ csrfProtection,
 asyncHandler(async (req, res) => {
 const { id } = req.params;
 if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
-const user = await User.findById(id);
+const user = await User.findById(id).select("+authVersion");
 if (!user) return res.status(404).json({ error: "User not found" });
+if (user.deleted || user.personalDataStatus === "minimized") {
+  return res.status(409).json({ error: "A deactivated or minimized account cannot be re-enabled." });
+}
 user.disabled = false;
+user.authVersion = Number(user.authVersion || 0) + 1;
 await user.save();
+await revokeAllUserSessions(user._id, "admin_reenabled");
 res.json({ ok: true, disabled: false });
 })
 );
@@ -1665,37 +1726,28 @@ const COMPLETED_CASE_STATUSES = ["completed", "closed"];
 const LEDGER_LIMIT = 20;
 
 const [
-settings,
 roleAggregation,
 pendingApprovalsCount,
 registrationsAgg,
 escrowHeldAgg,
 escrowReleasedAgg,
-escrowHeldByModeAgg,
-escrowReleasedByModeAgg,
       escrowHeldByMonthAgg,
       escrowReleasedByMonthAgg,
-grossVolumeAgg,
-grossVolumeByModeAgg,
-monthlyGrossAgg,
 platformFeeAgg,
-platformFeeByModeAgg,
 monthlyFeesAgg,
 jobsPostedAgg,
 jobsCompletedAgg,
 practiceAgg,
 escrowInProgressCount,
 pendingPayoutAgg,
-pendingPayoutByModeAgg,
 payoutTotalsAgg,
 caseStatusAgg,
 caseLedgerDocs,
 payoutLedgerDocs,
 feeLedgerDocs,
-upcomingPayoutCases,
+pendingPayoutCases,
 recentUsersRaw,
 ] = await Promise.all([
-getAppSettings(),
 User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
 User.countDocuments(PENDING_USER_MATCH),
 User.aggregate([
@@ -1713,8 +1765,6 @@ Case.aggregate(
     { $group: { _id: null, total: { $sum: CASE_AMOUNT_EXPR } } },
   ])
 ),
-Case.aggregate(buildCaseStripeModeAggregate(withCreatedAtFloor({ paymentReleased: { $ne: true } }, financialStart))),
-Case.aggregate(buildCaseStripeModeAggregate(withCreatedAtFloor({ paymentReleased: true }, financialStart))),
       Case.aggregate(
         buildApprovedCasePipeline(withCreatedAtFloor({
           paymentReleased: { $ne: true },
@@ -1739,21 +1789,7 @@ Case.aggregate(buildCaseStripeModeAggregate(withCreatedAtFloor({ paymentReleased
         },
         { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
-Case.aggregate(buildApprovedCasePipeline(withCreatedAtFloor({}, financialStart)).concat([{ $group: { _id: null, total: { $sum: "$totalAmount" }, count: { $sum: 1 } } }])),
-Case.aggregate(buildCaseStripeModeAggregate(withCreatedAtFloor({}, financialStart))),
-Case.aggregate(
-  buildApprovedCasePipeline(withCreatedAtFloor({}, financeWindowStart)).concat([
-    {
-      $group: {
-        _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
-        total: { $sum: CASE_AMOUNT_EXPR },
-      },
-    },
-    { $sort: { "_id.year": 1, "_id.month": 1 } },
-  ])
-),
 PlatformIncome.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$feeAmount" }, count: { $sum: 1 } } }]),
-PlatformIncome.aggregate(buildModelStripeModeAggregate(withCreatedAtFloor({}, financialStart), "$feeAmount")),
 PlatformIncome.aggregate([
 { $match: withCreatedAtFloor({}, financeWindowStart) },
 { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, revenue: { $sum: "$feeAmount" } } },
@@ -1785,12 +1821,6 @@ Case.aggregate(
     { $group: { _id: null, total: { $sum: CASE_PAYOUT_EXPR }, count: { $sum: 1 } } },
   ])
 ),
-Case.aggregate(
-  buildCaseStripeModeAggregate(
-    withCreatedAtFloor({ paymentReleased: { $ne: true }, status: { $in: COMPLETED_CASE_STATUSES } }, financialStart),
-    CASE_PAYOUT_EXPR
-  )
-),
 Payout.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
 Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
 Case.find(withCreatedAtFloor({ $or: [{ lockedTotalAmount: { $gt: 0 } }, { totalAmount: { $gt: 0 } }] }, financialStart))
@@ -1810,13 +1840,17 @@ PlatformIncome.find(withCreatedAtFloor({}, financialStart))
 .lean(),
 Case.find(withCreatedAtFloor({
   paymentReleased: { $ne: true },
-  paralegal: { $ne: null },
-  $or: [{ lockedTotalAmount: { $gt: 0 } }, { totalAmount: { $gt: 0 } }],
+  status: { $in: COMPLETED_CASE_STATUSES },
+  $and: [
+    { $or: [{ paralegal: { $ne: null } }, { paralegalId: { $ne: null } }] },
+    { $or: [{ lockedTotalAmount: { $gt: 0 } }, { totalAmount: { $gt: 0 } }] },
+  ],
 }, financialStart))
 .sort({ deadline: 1, createdAt: 1 })
 .limit(5)
-.select("deadline totalAmount lockedTotalAmount feeParalegalAmount feeParalegalPct paralegalNameSnapshot paralegal createdAt")
+.select("deadline deadlineDate totalAmount lockedTotalAmount feeParalegalAmount feeParalegalPct paralegalNameSnapshot paralegal paralegalId createdAt")
 .populate("paralegal", "firstName lastName")
+.populate("paralegalId", "firstName lastName")
 .lean(),
 User.find()
 .sort({ createdAt: -1 })
@@ -1890,30 +1924,17 @@ const escrowMetrics = {
   pendingPayoutCount: pendingPayoutAgg[0]?.count || 0,
 };
 
-const grossVolume = grossVolumeAgg[0]?.total || 0;
-const jobCount = grossVolumeAgg[0]?.count || 0;
 const platformFeeTotals = platformFeeAgg[0] || { total: 0, count: 0 };
 const platformFeesCollected = platformFeeTotals.total || 0;
 const platformFeeCount = platformFeeTotals.count || 0;
-const averageJobValue = jobCount ? Math.round(grossVolume / jobCount) : 0;
-const profitMargin = grossVolume > 0 ? platformFeesCollected / grossVolume : 0;
-const monthlyGrossMap = monthlyGrossAgg.reduce((acc, entry) => {
-acc[formatMonthFromGroup(entry)] = entry.total;
-return acc;
-}, {});
 
 const revenueMetrics = {
-grossVolume,
 platformFeesCollected,
 totalRevenue: platformFeesCollected,
-monthlyRevenue: monthlyFeesAgg.map((entry) => {
-const month = formatMonthFromGroup(entry);
-const gross = monthlyGrossMap[month] || 0;
-const margin = gross > 0 ? Math.round((entry.revenue / gross) * 100) : 0;
-return { month, revenue: entry.revenue, margin };
-}),
-averageJobValue,
-profitMargin,
+monthlyRevenue: monthlyFeesAgg.map((entry) => ({
+month: formatMonthFromGroup(entry),
+revenue: entry.revenue || 0,
+})),
 platformFeeCount,
 };
 
@@ -1937,33 +1958,33 @@ completedCases,
 const ledgerEntries = [];
 caseLedgerDocs.forEach((doc) => {
 ledgerEntries.push({
-date: doc.createdAt ? doc.createdAt.toISOString() : new Date().toISOString(),
-category: "Attorney Payment",
+date: doc.createdAt ? doc.createdAt.toISOString() : null,
+category: "Matter Funding",
 description: doc.title
 ? `${doc.title}${doc.practiceArea ? ` – ${doc.practiceArea}` : ""}`
-: "Case payment",
+: "Matter funding",
 amount: doc.lockedTotalAmount || doc.totalAmount || 0,
-type: "income",
+type: "funding",
 status: doc.paymentStatus || (doc.paymentReleased ? "Released" : "Pending"),
 });
 });
 payoutLedgerDocs.forEach((doc) => {
 ledgerEntries.push({
-date: doc.createdAt ? doc.createdAt.toISOString() : new Date().toISOString(),
+date: doc.createdAt ? doc.createdAt.toISOString() : null,
 category: "Paralegal Payout",
-description: doc.caseId ? `Payout for case ${doc.caseId}` : "Paralegal payout",
+description: doc.caseId ? `Payout for Matter ${doc.caseId}` : "Paralegal payout",
 amount: doc.amountPaid || 0,
-type: "expense",
+type: "payout",
 status: doc.transferId ? "Transferred" : "Pending",
 });
 });
 feeLedgerDocs.forEach((doc) => {
 ledgerEntries.push({
-date: doc.createdAt ? doc.createdAt.toISOString() : new Date().toISOString(),
+date: doc.createdAt ? doc.createdAt.toISOString() : null,
 category: "Platform Fee",
-description: doc.caseId ? `Fee from case ${doc.caseId}` : "Platform income",
+description: doc.caseId ? `Fee from Matter ${doc.caseId}` : "Platform income",
 amount: doc.feeAmount || 0,
-type: "income",
+type: "revenue",
 status: "Recorded",
 });
 });
@@ -1973,37 +1994,24 @@ const ledger = ledgerEntries
 .slice(0, LEDGER_LIMIT * 2);
 
 const payoutSummary = payoutTotalsAgg[0] || { total: 0, count: 0 };
-let operationalCosts = grossVolume - payoutSummary.total - platformFeesCollected;
-if (operationalCosts < 0) {
-operationalCosts = Math.max(0, Math.round(grossVolume * 0.05));
-}
-const expenses = {
-operationalCosts,
-payoutTotal: payoutSummary.total,
-payoutCount: payoutSummary.count || 0,
-};
-const normalizedTaxRate = normalizeTaxRate(settings?.taxRate);
-const taxRate = normalizedTaxRate !== null ? normalizedTaxRate : 0.22;
-const taxableBase = platformFeesCollected - operationalCosts;
-const estimatedTax = Math.max(0, Math.round(taxableBase * taxRate));
-const taxSummary = {
-grossEarnings: platformFeesCollected,
-deductibleExpenses: operationalCosts + payoutSummary.total,
-estimatedTax,
-taxOwed: estimatedTax,
-taxRate,
-nextFilingDeadline: formatFilingDeadline(),
+const payoutMetrics = {
+totalRecorded: payoutSummary.total,
+count: payoutSummary.count || 0,
 };
 
-const upcomingPayouts = upcomingPayoutCases.map((caseDoc) => {
-const rawDate = caseDoc.deadline || caseDoc.createdAt || new Date();
+const pendingPayoutQueue = pendingPayoutCases.map((caseDoc) => {
+const matterDeadline = resolveMatterDeadlineDate(caseDoc);
 const recipient =
 caseDoc.paralegalNameSnapshot ||
-[caseDoc.paralegal?.firstName, caseDoc.paralegal?.lastName].filter(Boolean).join(" ") ||
+[caseDoc.paralegal?.firstName || caseDoc.paralegalId?.firstName, caseDoc.paralegal?.lastName || caseDoc.paralegalId?.lastName]
+.filter(Boolean)
+.join(" ") ||
 "Paralegal";
 const baseAmount = Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
 return {
-date: rawDate ? rawDate.toISOString().split("T")[0] : "",
+matterDeadline: matterDeadline
+? (typeof matterDeadline === "string" ? matterDeadline : matterDeadline.toISOString().split("T")[0])
+: null,
 amount: computeParalegalPayoutAmount(baseAmount, caseDoc),
 recipient,
 };
@@ -2023,9 +2031,8 @@ userMetrics,
 escrowMetrics,
 revenueMetrics,
 caseMetrics,
-taxSummary,
-expenses,
-upcomingPayouts,
+payoutMetrics,
+pendingPayoutQueue,
 ledger,
 recentUsers,
       escrowTrends,
@@ -2035,7 +2042,7 @@ recentUsers,
 
 const listUsersHandler = asyncHandler(async (req, res) => {
 const { status = "pending", role, q } = req.query;
-const { skip, limit, page } = parsePagination(req, { defaultLimit: 25 });
+const { skip, limit, page } = parsePagination(req, { defaultLimit: 25, maxLimit: 200 });
 const audience = String(req.query.audience || "").trim().toLowerCase();
 
 const filter = {};
@@ -2090,12 +2097,10 @@ users: items.map(pickUserSafe),
 
 /**
 * GET /api/admin/pending-users
-* GET /api/admin/users/pending
-* Optional query: ?status=pending|approved|denied&role=attorney|paralegal|admin&q=search&page=&limit=
-* Returns paginated users (password never selected).
-*/
+ * Optional query: ?status=pending|approved|denied&role=attorney|paralegal|admin&q=search&page=&limit=
+ * Returns paginated users (password never selected).
+ */
 router.get("/pending-users", listUsersHandler);
-router.get("/users/pending", listUsersHandler);
 
 /**
 * GET /api/admin/audit-logs
@@ -2141,7 +2146,11 @@ $or: [{ firstName: rx }, { lastName: rx }, { email: rx }],
   .limit(100)
   .lean();
 actorIds = matches.map((user) => user._id);
-} catch (_) {}
+} catch (error) {
+logger.warn("[admin] audit-log actor search failed", {
+  error: error?.message || String(error),
+});
+}
 const orFilters = [
 { action: rx },
 { path: rx },
@@ -2198,25 +2207,6 @@ logs,
 });
 }));
 
-/**
-* PATCH /api/admin/user/:id
-* Body: { status: 'approved' | 'denied', note? }
-* Approve or deny a user, email them, and audit.
-*/
-router.patch("/user/:id", csrfProtection, asyncHandler(async (req, res) => {
-const { id } = req.params;
-const { status, note } = req.body || {};
-if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
-const normalized = normalizeUserStatus(status);
-if (!normalized || normalized === "pending") return res.status(400).json({ msg: "Invalid status" });
-
-const user = await User.findById(id);
-if (!user) return res.status(404).json({ msg: "User not found" });
-
-const updated = await applyUserDecision(req, user, normalized, note);
-res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
-}));
-
 router.patch("/users/:id/role", csrfProtection, asyncHandler(async (req, res) => {
 const { id } = req.params;
 const nextRole = String(req.body?.role || "").trim().toLowerCase();
@@ -2246,7 +2236,7 @@ try {
     meta: { from: currentRole, to: nextRole },
   });
 } catch (err) {
-  console.warn("[admin] Failed to log role change", err?.message || err);
+  logger.warn("[admin] Failed to log role change", err?.message || err);
 }
 
 res.json({ ok: true, user: pickUserSafe(user.toObject()) });
@@ -2276,7 +2266,7 @@ if (nextEmail !== normalizeEmail(user.email) && nextEmail !== normalizeEmail(use
   try {
     await sendVerificationEmail({ user, email: user.pendingEmail });
   } catch (err) {
-    console.warn("[admin] pending email verification send failed", err?.message || err);
+    logger.warn("[admin] pending email verification send failed", err?.message || err);
   }
   try {
     await AuditLog.logFromReq(req, "admin.user.email_changed", {
@@ -2285,25 +2275,10 @@ if (nextEmail !== normalizeEmail(user.email) && nextEmail !== normalizeEmail(use
       meta: { from: previousEmail, pendingTo: nextEmail },
     });
   } catch (err) {
-    console.warn("[admin] Failed to log email change", err?.message || err);
+    logger.warn("[admin] Failed to log email change", err?.message || err);
   }
 }
 res.json({ ok: true, user: pickUserSafe(user.toObject()) });
-}));
-
-/**
-* (Alias) POST /api/admin/approve-user/:id
-* Approve via friendlier endpoint.
-*/
-router.post("/approve-user/:id", csrfProtection, asyncHandler(async (req, res) => {
-const { id } = req.params;
-if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
-
-const user = await User.findById(id);
-if (!user) return res.status(404).json({ msg: "User not found" });
-
-const updated = await applyUserDecision(req, user, "approved");
-res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
 }));
 
 router.post("/users/:id/approve", csrfProtection, asyncHandler(async (req, res) => {
@@ -2343,35 +2318,51 @@ res.set("Content-Type", "text/html").send(html);
 router.post("/bulk-email", csrfProtection, asyncHandler(async (req, res) => {
 const { type, userIds } = req.body || {};
 const normalizedType = String(type || "").trim().toLowerCase();
-if (!["acceptance", "denial", "complete_profile", "attorney_launch", "attorney_launch_setup", "attorney_first_matter"].includes(normalizedType)) {
+if (!["complete_profile", "attorney_launch", "attorney_launch_setup", "attorney_first_matter"].includes(normalizedType)) {
   return res.status(400).json({ msg: "Invalid email type" });
 }
 if (!Array.isArray(userIds) || !userIds.length) {
   return res.status(400).json({ msg: "No users selected" });
 }
-const ids = userIds.filter(isObjId);
-if (!ids.length) {
-  return res.status(400).json({ msg: "No valid user ids" });
+if (userIds.length > 200) {
+  return res.status(400).json({ msg: "Bulk email is limited to 200 recipients per send" });
+}
+const ids = Array.from(new Set(userIds.map((id) => String(id || "").trim())));
+if (!ids.length || ids.some((id) => !isObjId(id))) {
+  return res.status(400).json({ msg: "One or more user ids are invalid" });
 }
 
 const users = await User.find({ _id: { $in: ids } })
-  .select("firstName lastName email role status profileImage avatarURL profilePhotoStatus")
+  .select("firstName lastName email role status profileImage avatarURL profilePhotoStatus disabled deleted notificationPrefs emailPref")
   .lean();
 const emailOpts = {
   throwOnError: true,
 };
 
 let sent = 0;
-let skipped = 0;
+let skipped = Math.max(0, ids.length - users.length);
 const failures = [];
 const attorneyIdsWithPostedMatters = normalizedType === "attorney_first_matter"
   ? await getAttorneyIdsWithPostedMatters(users.map((user) => user?._id).filter(Boolean))
   : new Set();
 for (const user of users) {
   const email = user?.email;
-  if (!email) {
+  const isActiveApprovedUser = String(user?.status || "").toLowerCase() === "approved"
+    && user?.disabled !== true
+    && user?.deleted !== true;
+  const allowsNonEssentialEmail = user?.notificationPrefs?.email !== false
+    && user?.emailPref?.product !== false
+    && (normalizedType === "complete_profile" || user?.emailPref?.marketing !== false);
+  if (!email || !isActiveApprovedUser || !allowsNonEssentialEmail) {
     skipped += 1;
     continue;
+  }
+  if (normalizedType === "complete_profile") {
+    const isApprovedParalegal = String(user?.role || "").toLowerCase() === "paralegal";
+    if (!isApprovedParalegal || userHasUploadedProfilePhoto(user)) {
+      skipped += 1;
+      continue;
+    }
   }
   if (normalizedType === "attorney_launch" || normalizedType === "attorney_launch_setup") {
     const isApprovedParalegal = String(user?.role || "").toLowerCase() === "paralegal"
@@ -2395,19 +2386,8 @@ for (const user of users) {
   }
   let subject = "";
   let html = "";
-  if (normalizedType === "acceptance") {
-    if (String(user?.role || "").toLowerCase() === "attorney") {
-      subject = ATTORNEY_APPROVAL_EMAIL_SUBJECT;
-      html = buildAttorneyApprovalEmailHtml(user);
-    } else {
-      subject = APPROVAL_EMAIL_SUBJECT;
-      html = buildApprovalEmailHtml(user);
-    }
-  } else if (normalizedType === "denial") {
-    subject = DENIAL_EMAIL_SUBJECT;
-    html = buildDenialEmailHtml(user);
-  } else if (normalizedType === "complete_profile") {
-    subject = "Complete your profile on Let’s-ParaConnect";
+  if (normalizedType === "complete_profile") {
+    subject = "Add your profile photo on Let’s-ParaConnect";
     html = buildCompleteProfileEmailHtml(user);
   } else if (normalizedType === "attorney_launch") {
     subject = ATTORNEY_LAUNCH_EMAIL_SUBJECT;
@@ -2440,7 +2420,7 @@ try {
     },
   });
 } catch (err) {
-  console.warn("[admin] Failed to log bulk email", err?.message || err);
+  logger.warn("[admin] Failed to log bulk email", err?.message || err);
 }
 
 res.json({ ok: true, total: ids.length, sent, skipped, failed: failures.length, failures });
@@ -2451,34 +2431,22 @@ const { id } = req.params;
 if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
 const user = await User.findById(id);
 if (!user) return res.status(404).json({ msg: "User not found" });
-
-if (String(user.role || "").toLowerCase() === "attorney") {
-  await purgeAttorneyAccount(user._id);
-  try {
-    await AuditLog.logFromReq(req, "admin.user.delete", {
-      targetType: "user",
-      targetId: user._id,
-      meta: { email: user.email || "", role: user.role || "" },
-    });
-  } catch {}
-  return res.json({ ok: true, id });
+if (String(user._id) === String(req.user?.id) || ["admin", "director"].includes(String(user.role || "").toLowerCase())) {
+  return res.status(409).json({ msg: "Operational accounts require a separately approved offboarding procedure." });
 }
-
-user.deleted = true;
-user.deletedAt = new Date();
-user.disabled = true;
-user.status = "denied";
-await user.save();
+if (!user.deleted || !user.disabled) await deactivateUserAccount(user, { now: new Date() });
 
 try {
 await AuditLog.logFromReq(req, "admin.user.delete", {
   targetType: "user",
   targetId: user._id,
-  meta: { email: user.email || "", role: user.role || "" },
+  meta: { role: user.role || "", outcome: "deactivated" },
 });
-} catch {}
+} catch (auditError) {
+  logger.error("[admin] account deactivation audit persistence failed", auditError);
+}
 
-res.json({ ok: true, user: pickUserSafe(user.toObject()) });
+res.json({ ok: true, id, mode: "deactivated" });
 }));
 
 router.post("/users/:id/purge", csrfProtection, asyncHandler(async (req, res) => {
@@ -2486,26 +2454,27 @@ const { id } = req.params;
 if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
 const user = await User.findById(id);
 if (!user) return res.status(404).json({ msg: "User not found" });
-
-if (String(user.role || "").toLowerCase() === "attorney") {
-  await purgeAttorneyAccount(user._id);
-} else {
-  await User.findByIdAndDelete(id);
-
-  try {
-    await Notification.deleteMany({ userId: id });
-  } catch {}
+if (String(user._id) === String(req.user?.id) || ["admin", "director"].includes(String(user.role || "").toLowerCase())) {
+  return res.status(409).json({ msg: "Operational accounts require a separately approved offboarding procedure." });
 }
+const result = await finalizeAccountDataRemoval(user._id, { now: new Date() });
 
 try {
-await AuditLog.logFromReq(req, "admin.user.purge", {
+await AuditLog.logFromReq(req, "admin.user.data_removal.finalized", {
   targetType: "user",
   targetId: id,
-  meta: { email: user.email || "", role: user.role || "" },
+  meta: {
+    role: user.role || "",
+    mode: result.mode,
+    retainedRecordTypes: result.retainedRecordTypes,
+    storageTaskCount: result.storageTaskCount,
+  },
 });
-} catch {}
+} catch (auditError) {
+  logger.error("[admin] account deletion audit persistence failed", auditError);
+}
 
-res.json({ ok: true, id });
+res.json({ ok: true, id, ...result });
 }));
 
 /**
@@ -2527,6 +2496,7 @@ const [items, total] = await Promise.all([
 Case.find(filter)
 .sort({ createdAt: -1 })
 .skip(skip).limit(limit)
+.select("-files -downloadUrl")
 .populate("attorney paralegal", "firstName lastName email role status")
 .lean(),
 Case.countDocuments(filter),
@@ -2539,102 +2509,39 @@ cases: items.map(sanitizeCaseForAdmin),
 }));
 
 /**
-* PATCH /api/admin/assign/:caseId
-* Body: { paralegalId }
-* Manually assign a paralegal to a case (sets status to 'assigned' if applicable).
-*/
-router.patch("/assign/:caseId", csrfProtection, asyncHandler(async (req, res) => {
-const { caseId } = req.params;
-const { paralegalId } = req.body || {};
-if (!isObjId(caseId)) return res.status(400).json({ msg: "Invalid case id" });
-if (!isObjId(paralegalId)) return res.status(400).json({ msg: "Invalid paralegalId" });
-
-const para = await User.findById(paralegalId).lean();
-if (!para || para.role !== "paralegal") {
-return res.status(400).json({ msg: "Invalid paralegalId" });
-}
-
-const c = await Case.findById(caseId);
-if (!c) return res.status(404).json({ msg: "Case not found" });
-
-// Prefer model helpers if present (from upgraded Case model)
-if (typeof c.acceptApplicant === "function") {
-try { c.acceptApplicant(paralegalId); } catch (_) { /* ignore if not applied yet */ }
-}
-c.paralegal = paralegalId;
-if (c.status === "open" && typeof c.transitionTo === "function") {
-if (c.canTransitionTo("assigned")) c.transitionTo("assigned");
-else c.status = "assigned";
-} else if (c.status === "open") {
-c.status = "assigned";
-}
-await c.save();
-
-await AuditLog.logFromReq(req, "admin.case.assign", {
-targetType: "case",
-targetId: c._id,
-caseId: c._id,
-meta: { paralegalId },
-});
-
-const populated = await Case.findById(c._id).populate("attorney paralegal", "firstName lastName email role status").lean();
-res.json({ ok: true, msg: "Paralegal assigned", case: sanitizeCaseForAdmin(populated) });
-}));
-
-/**
-* PATCH /api/admin/cases/:id/status
-* Body: { status }
-* Update a case status as admin (uses Case transition guardrails if available).
-*/
-router.patch("/cases/:id/status", csrfProtection, asyncHandler(async (req, res) => {
-const { id } = req.params;
-const { status } = req.body || {};
-if (!isObjId(id)) return res.status(400).json({ msg: "Invalid case id" });
-const normalizedStatus = typeof status === "string" && status.toLowerCase() === "in_progress" ? "in progress" : status;
-const ALLOWED = ["open", "assigned", "in progress", "in_progress", "completed", "disputed", "closed"];
-if (!ALLOWED.includes(normalizedStatus)) return res.status(400).json({ msg: "Invalid status" });
-
-const c = await Case.findById(id);
-if (!c) return res.status(404).json({ msg: "Case not found" });
-
-if (typeof c.transitionTo === "function") {
-  // prefer safe transitions
-  if (!c.canTransitionTo(normalizedStatus)) {
-    return res.status(400).json({ msg: `Invalid transition from '${c.status}' to '${normalizedStatus}'.` });
-  }
-  c.transitionTo(normalizedStatus);
-} else {
-  c.status = normalizedStatus;
-}
-
-await c.save();
-
-await AuditLog.logFromReq(req, "admin.case.status.update", {
-targetType: "case",
-targetId: c._id,
-caseId: c._id,
-meta: { status },
-});
-
-const populated = await Case.findById(id)
-.populate("attorney paralegal", "firstName lastName email role")
-.lean();
-res.json({ ok: true, msg: "Case updated", case: sanitizeCaseForAdmin(populated) });
-}));
-
-/**
 * DELETE /api/admin/cases/:id
 * Body: { reason, message }
-* Force-delete a case from the admin posts workflow regardless of normal case-state restrictions.
+* Permanently removes only open postings that were never hired or funded.
 */
 router.delete("/cases/:id", csrfProtection, asyncHandler(async (req, res) => {
 const { id } = req.params;
-if (!isObjId(id)) return res.status(400).json({ msg: "Invalid case id" });
+if (!isObjId(id)) return res.status(400).json({ msg: "Invalid Matter ID" });
 
 const doc = await Case.findById(id).select(
-  "title attorney attorneyId jobId job"
+  "title status attorney attorneyId paralegal paralegalId hiredAt escrowStatus escrowIntentId paymentIntentId paymentReleased payoutTransferId payoutFinalizedAt disputes jobId job"
 ).lean();
-if (!doc) return res.status(404).json({ msg: "Case not found" });
+if (!doc) return res.status(404).json({ msg: "Matter not found" });
+
+const statusKey = String(doc.status || "").trim().toLowerCase().replace("in_progress", "in progress");
+if (doc.paralegal || doc.paralegalId || doc.hiredAt) {
+  return res.status(409).json({ msg: "Hired matters must be retained for audit and payment history." });
+}
+if (
+  String(doc.escrowStatus || "").toLowerCase() === "funded" ||
+  doc.escrowIntentId ||
+  doc.paymentIntentId ||
+  doc.paymentReleased ||
+  doc.payoutTransferId ||
+  doc.payoutFinalizedAt
+) {
+  return res.status(409).json({ msg: "Funded matters must be retained for audit and payment history." });
+}
+if (Array.isArray(doc.disputes) && doc.disputes.length) {
+  return res.status(409).json({ msg: "Matters with dispute history must be retained." });
+}
+if (statusKey !== "open") {
+  return res.status(409).json({ msg: "Only open, never-engaged postings can be permanently deleted." });
+}
 
 const reason = sanitizeAdminNote(req.body?.reason || "", 2000);
 const message = sanitizeAdminNote(req.body?.message || "", 4000);
@@ -2648,7 +2555,7 @@ try {
     if (jobId && !relatedJobIds.includes(jobId)) relatedJobIds.push(jobId);
   });
 } catch (jobListErr) {
-  console.warn("[admin] Unable to load related jobs for force delete", doc._id, jobListErr);
+  logger.warn("[admin] Unable to load related jobs for post deletion", doc._id, jobListErr);
 }
 
 await Case.deleteOne({ _id: doc._id });
@@ -2660,7 +2567,7 @@ try {
     await Job.deleteMany({ caseId: doc._id });
   }
 } catch (jobErr) {
-  console.warn("[admin] Unable to clean up related jobs for deleted case", doc._id, jobErr);
+  logger.warn("[admin] Unable to clean up related jobs for deleted case", doc._id, jobErr);
 }
 
 try {
@@ -2668,10 +2575,10 @@ try {
     await Application.deleteMany({ jobId: { $in: relatedJobIds } });
   }
 } catch (appErr) {
-  console.warn("[admin] Unable to clean up applications for deleted case", doc._id, appErr);
+  logger.warn("[admin] Unable to clean up applications for deleted case", doc._id, appErr);
 }
 
-await AuditLog.logFromReq(req, "admin.case.force_delete", {
+await AuditLog.logFromReq(req, "admin.case.delete", {
 targetType: "case",
 targetId: doc._id,
 caseId: doc._id,
@@ -2684,34 +2591,19 @@ if (attorneyRef && (reason || message)) {
       attorneyRef,
       "case_deleted",
       {
-        caseTitle: doc.title || "Case",
+        caseTitle: doc.title || "Untitled Matter",
         reason: reason || "Admin review",
         customNote: message || "",
-        message: `Your case posting "${doc.title || "Case"}" was removed by the platform.`,
+        message: `Your Matter posting "${doc.title || "Untitled Matter"}" was removed by the platform.`,
       },
       { actorUserId: req.user?.id || req.user?._id || null }
     );
   } catch (err) {
-    console.warn("[admin] notifyUser case_deleted failed", err?.message || err);
+    logger.warn("[admin] notifyUser case_deleted failed", err?.message || err);
   }
 }
 
 res.json({ ok: true });
-}));
-
-/**
-* GET /api/admin/metrics
-* Quick admin overview counts.
-*/
-router.get("/metrics", asyncHandler(async (_req, res) => {
-const [users, cases] = await Promise.all([
-User.aggregate([
-{ $group: { _id: { role: "$role", status: "$status" }, count: { $sum: 1 } } },
-]),
-Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
-]);
-
-res.json({ users, cases });
 }));
 
 router.get("/payouts", asyncHandler(async (_req, res) => {
@@ -2744,8 +2636,13 @@ items,
 // Fallback error handler (keeps admin routes tidy)
 // -----------------------------------------
 router.use((err, _req, res, _next) => {
-console.error(err);
-res.status(500).json({ msg: "Server error", error: err?.message || "Unknown error" });
+if (respondToCsrfError(err, res, { field: "msg" })) return;
+logger.error(err);
+const status = Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500;
+res.status(status).json({
+  msg: status < 500 ? err.message : "Server error",
+  ...(err?.code ? { code: err.code } : {}),
+});
 });
 
 module.exports = router;

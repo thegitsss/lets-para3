@@ -5,10 +5,22 @@ const MARKETING_WORKFLOW_TYPES = Object.freeze([
   "facebook_page_post",
 ]);
 
+// Historical enum values stay valid so old briefs and packets remain readable.
+// Only these workflows may be created after the Facebook authoring retirement.
+const MARKETING_ACTIVE_WORKFLOW_TYPES = Object.freeze([
+  "founder_linkedin_post",
+  "platform_update_announcement",
+  "linkedin_company_post",
+]);
+
 const MARKETING_PUBLISHING_CHANNELS = Object.freeze([
   "linkedin_company",
   "facebook_page",
 ]);
+
+// Keep the wider channel enum for stored cycle history, but never use it to
+// advertise or create work for a channel without a production publisher.
+const MARKETING_ACTIVE_PUBLISHING_CHANNELS = Object.freeze(["linkedin_company"]);
 
 const MARKETING_LINKEDIN_COMPANY_CONTENT_LANES = Object.freeze([
   "platform_explanation",
@@ -119,6 +131,8 @@ const MARKETING_PUBLISH_FAILURE_CLASSES = Object.freeze([
 ]);
 
 module.exports = {
+  MARKETING_ACTIVE_PUBLISHING_CHANNELS,
+  MARKETING_ACTIVE_WORKFLOW_TYPES,
   MARKETING_CHANNEL_CONNECTION_STATUSES,
   MARKETING_JR_CMO_DAY_CONTEXT_STATUSES,
   MARKETING_JR_CMO_EVALUATION_TYPES,

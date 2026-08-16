@@ -71,7 +71,12 @@ const PARALEGAL_WORKFLOW_POLICY = Object.freeze({
   [PARALEGAL_WORKFLOW_STAGES.PAYOUT]: Object.freeze({
     payoutSetupRequired: true,
     releaseTrigger: "attorney_marks_matter_complete",
-    bankDepositEstimateBusinessDays: Object.freeze({ minimum: 3, maximum: 5 }),
+    bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+    bankDepositTimingDependsOn: Object.freeze([
+      "stripe_account_country",
+      "stripe_payout_schedule",
+      "financial_institution",
+    ]),
     bankReceiptRequiresProcessorEvidence: true,
   }),
   [PARALEGAL_WORKFLOW_STAGES.WITHDRAWAL]: Object.freeze({
@@ -267,8 +272,10 @@ function evaluatePayoutReadiness(input = {}) {
     matterCompleted: normalizeStatus(caseDoc.status) === "completed" || Boolean(caseDoc.completedAt),
     paymentReleased: caseDoc.paymentReleased === true,
     paidOutAt: caseDoc.paidOutAt || null,
-    bankDepositEstimateBusinessDays:
-      PARALEGAL_WORKFLOW_POLICY[PARALEGAL_WORKFLOW_STAGES.PAYOUT].bankDepositEstimateBusinessDays,
+    bankDepositTimingSource:
+      PARALEGAL_WORKFLOW_POLICY[PARALEGAL_WORKFLOW_STAGES.PAYOUT].bankDepositTimingSource,
+    bankDepositTimingDependsOn:
+      PARALEGAL_WORKFLOW_POLICY[PARALEGAL_WORKFLOW_STAGES.PAYOUT].bankDepositTimingDependsOn,
     bankReceiptConfirmed: input.bankReceiptConfirmed === true,
   });
 }

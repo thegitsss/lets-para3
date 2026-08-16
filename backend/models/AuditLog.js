@@ -2,8 +2,8 @@
 const mongoose = require("mongoose");
 const { Schema, Types } = mongoose;
 
-const ROLE_ENUM = ["attorney", "paralegal", "admin", "system"];
-const TARGET_ENUM = ["user", "case", "message", "payment", "dispute", "document", "other"];
+const ROLE_ENUM = ["attorney", "paralegal", "admin", "director", "system"];
+const TARGET_ENUM = ["user", "case", "message", "payment", "dispute", "document", "event", "task", "other"];
 
 const AuditLogSchema = new Schema(
   {

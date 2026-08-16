@@ -3,10 +3,10 @@ const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const request = require("supertest");
 
-const AgentIssue = require("../models/AgentIssue");
+const Incident = require("../models/Incident");
 const CtoAgentRun = require("../models/CtoAgentRun");
 const User = require("../models/User");
-const aiAdminRouter = require("../routes/aiAdmin");
+const adminEngineeringRouter = require("../routes/adminEngineering");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "cto-agent-route-test-secret";
@@ -15,23 +15,17 @@ const app = (() => {
   const instance = express();
   instance.use(cookieParser());
   instance.use(express.json({ limit: "1mb" }));
-  instance.use("/api/admin/ai", aiAdminRouter);
-  instance.use((err, _req, res, _next) => {
-    console.error(err);
-    res.status(500).json({ error: err?.message || "Server error" });
-  });
+  instance.use("/api/admin/engineering", adminEngineeringRouter);
   return instance;
 })();
 
 function authCookieFor(user) {
-  const payload = {
+  return `token=${jwt.sign({
     id: user._id.toString(),
     role: user.role,
     email: user.email,
     status: user.status,
-  };
-  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "2h" });
-  return `token=${token}`;
+  }, process.env.JWT_SECRET, { expiresIn: "2h" })}`;
 }
 
 async function createAdmin() {
@@ -46,74 +40,66 @@ async function createAdmin() {
   });
 }
 
-beforeAll(async () => {
-  await connect();
-});
-
-afterAll(async () => {
-  await closeDatabase();
-});
+beforeAll(connect);
+afterAll(closeDatabase);
 
 beforeEach(async () => {
   delete process.env.OPENAI_API_KEY;
   await clearDatabase();
 });
 
-describe("CTO agent admin route", () => {
-  test("can diagnose from AgentIssue id and persist a CTO run", async () => {
+describe("Engineering diagnosis route", () => {
+  test("diagnoses a canonical incident and persists a linked CTO run", async () => {
     const admin = await createAdmin();
-    const issue = await AgentIssue.create({
-      category: "dashboard_load",
-      urgency: "high",
-      originalMessage: "My dashboard is blank and the page never finishes loading.",
-      internalSummary: "User reports blank attorney dashboard after login.",
-      userEmail: "user@example.com",
-      metadata: {
-        page: "/dashboard-attorney.html",
-        role: "attorney",
-      },
-      status: "new",
-      source: "support_agent",
+    const incident = await Incident.create({
+      publicId: "INC-ENGINEERING-DIAGNOSE",
+      source: "help_form",
+      reporter: { role: "attorney", email: "user@example.com" },
+      context: { surface: "attorney", routePath: "/dashboard-attorney.html" },
+      summary: "User reports blank attorney dashboard after login.",
+      originalReportText: "My dashboard is blank and the page never finishes loading.",
+      state: "reported",
+      classification: { domain: "ui", severity: "high", riskLevel: "medium", confidence: "high" },
     });
 
     const res = await request(app)
-      .post("/api/admin/ai/cto-diagnose-test")
+      .post(`/api/admin/engineering/items/${incident.publicId}/diagnose`)
       .set("Cookie", authCookieFor(admin))
-      .send({
-        issueId: String(issue._id),
-        saveRun: true,
-      });
+      .send({});
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual(
-      expect.objectContaining({
+    expect(res.body).toEqual(expect.objectContaining({
+      ok: true,
+      reused: false,
+      diagnosis: expect.objectContaining({
         ok: true,
-        issueId: String(issue._id),
         runId: expect.any(String),
         saved: true,
-        saveSkippedReason: "",
         category: "dashboard_load",
         diagnosisSummary: expect.stringMatching(/dashboard/i),
-        readyToApply: true,
-        filesToInspect: expect.arrayContaining([
-          "frontend/dashboard-attorney.html",
-          "frontend/assets/scripts/attorney-dashboard.js",
-          "backend/routes/attorneyDashboard.js",
-        ]),
         approvalRequired: true,
         canAutoDeploy: false,
-      })
-    );
+      }),
+      item: expect.objectContaining({ publicId: incident.publicId }),
+    }));
 
-    const run = await CtoAgentRun.findById(res.body.runId).lean();
-    expect(run).toEqual(
-      expect.objectContaining({
-        issueId: issue._id,
-        category: "dashboard_load",
-        sourceIssueSnapshot: expect.objectContaining({
-          originalMessage: expect.stringMatching(/blank/i),
-        }),
-      })
-    );
+    const run = await CtoAgentRun.findById(res.body.diagnosis.runId).lean();
+    expect(run).toEqual(expect.objectContaining({
+      category: "dashboard_load",
+      sourceIssueSnapshot: expect.objectContaining({
+        metadata: expect.objectContaining({ incidentId: String(incident._id) }),
+      }),
+    }));
+  });
+
+  test("returns 404 for an unknown incident", async () => {
+    const admin = await createAdmin();
+    const res = await request(app)
+      .post("/api/admin/engineering/items/INC-NOT-FOUND/diagnose")
+      .set("Cookie", authCookieFor(admin))
+      .send({});
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toMatch(/incident not found/i);
   });
 });

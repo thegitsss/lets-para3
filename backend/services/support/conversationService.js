@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("../../utils/logger");
+const runtimeLogger = createRuntimeLogger("services:support:conversationService");
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 
@@ -38,6 +40,7 @@ const { createIncidentFromSupportSignal } = require("../incidents/intakeService"
 const { notifyFounderSupportEngineeringIssue } = require("../incidents/notificationService");
 const { publishEventSafe } = require("../lpcEvents/publishEventService");
 const { INCIDENT_TERMINAL_STATES } = require("../../utils/incidentConstants");
+const { formatDateOnly } = require("../../utils/businessDate");
 const {
   findMatchingActiveIncident,
   routeSupportSubmissionEvent,
@@ -61,8 +64,7 @@ const {
 } = require("./paralegalRolloutService");
 
 const SUPPORT_WELCOME_MESSAGE =
-  "Hi — I can help with account questions, payouts, case activity, and platform issues.";
-const MANUAL_REVIEW_SENTENCE = "Thanks for letting us know. I'm sending this to the team for review now.";
+  "Hi — I can help with account questions, payouts, Matter activity, and platform issues.";
 const ACTIVE_CONVERSATION_STATUSES = ["open", "escalated"];
 const OPEN_TICKET_STATUSES = ["open", "in_review", "waiting_on_user", "waiting_on_info"];
 const RESOLVED_TICKET_STATUSES = ["resolved", "closed"];
@@ -188,9 +190,6 @@ function normalizeId(value) {
   return String(value);
 }
 
-function uniqueStrings(values = []) {
-  return [...new Set(values.filter(Boolean).map((value) => String(value).trim()).filter(Boolean))];
-}
 
 function sanitizePageContext(value = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -215,6 +214,13 @@ function sanitizePageContext(value = {}) {
     jobId: trimString(value.jobId, 80),
     applicationId: trimString(value.applicationId, 80),
     recentViewName: trimString(value.recentViewName, 120),
+    currentTab: trimString(value.currentTab, 40),
+    objectType: trimString(value.objectType, 40),
+    objectId: trimString(value.objectId, 80),
+    matterStatus: trimString(value.matterStatus, 120),
+    matterRelationship: trimString(value.matterRelationship, 120),
+    matterAttention: trimString(value.matterAttention, 180),
+    matterNextAction: trimString(value.matterNextAction, 180),
   };
   const normalized = Object.fromEntries(Object.entries(next).filter(([, entry]) => entry));
   const repeatViewCount = Number(value.repeatViewCount || 0) || 0;
@@ -224,6 +230,17 @@ function sanitizePageContext(value = {}) {
   }
   if (repeatViewCount > 0) normalized.repeatViewCount = Math.min(repeatViewCount, 20);
   if (supportOpenCount > 0) normalized.supportOpenCount = Math.min(supportOpenCount, 20);
+  const allowedTabs = ["overview", "applications", "work", "files", "messages", "activity", "financials"];
+  const availableMatterTabs = Array.isArray(value.availableMatterTabs)
+    ? [...new Set(value.availableMatterTabs.map((entry) => String(entry || "").toLowerCase()))].filter((entry) => allowedTabs.includes(entry))
+    : [];
+  const permittedCommandCodes = Array.isArray(value.permittedCommandCodes)
+    ? [...new Set(value.permittedCommandCodes.map((entry) => String(entry || "").trim()))]
+        .filter((entry) => /^[a-z][a-z0-9_.]{1,79}$/.test(entry))
+        .slice(0, 20)
+    : [];
+  if (availableMatterTabs.length) normalized.availableMatterTabs = availableMatterTabs;
+  if (permittedCommandCodes.length) normalized.permittedCommandCodes = permittedCommandCodes;
   return normalized;
 }
 
@@ -337,7 +354,7 @@ function cleanSupportIssueLabelText(value = "", category = "") {
   if (!text) return "";
 
   text = normalizeSupportUserText(text)
-    .replace(/^(case workflow|payments|messaging|profile updates|payout setup|general support)\s*:\s*/i, "")
+    .replace(/^(?:case|matter) workflow\s*:\s*|^(?:payments|messaging|profile updates|payout setup|general support)\s*:\s*/i, "")
     .replace(/^can you (please )?check on my open /i, "")
     .replace(/^can you (please )?check on my /i, "")
     .replace(/^can you (please )?check on /i, "")
@@ -358,7 +375,7 @@ function cleanSupportIssueLabelText(value = "", category = "") {
 
   const normalizedCategory = String(category || "").trim().toLowerCase();
   if (!text) return "";
-  if (/^a case issue$/i.test(text)) text = "case issue";
+  if (/^a case issue$/i.test(text)) text = "Matter issue";
   if (/\bsave preferences\b/i.test(text)) return "Save Preferences issue";
   if (normalizedCategory === "profile_save") return "Save Preferences issue";
   if (normalizedCategory === "messaging") return /\bmessage/i.test(text) ? text : "messaging issue";
@@ -370,10 +387,10 @@ function cleanSupportIssueLabelText(value = "", category = "") {
       /\bopen a case issue\b/i.test(text) ||
       /\bcase issue\b/i.test(text)
     ) {
-      return "case issue";
+      return "Matter issue";
     }
     if (/\bcase\b|\bmatter\b/i.test(text) && text.split(" ").length <= 6) {
-      return "case issue";
+      return "Matter issue";
     }
   }
   if (normalizedCategory === "payment") return /\bpayout\b/i.test(text) ? "payout issue" : "payment issue";
@@ -382,7 +399,6 @@ function cleanSupportIssueLabelText(value = "", category = "") {
 
 function detectFrustrationSignals(text = "") {
   const normalized = String(text || "");
-  const lowered = normalized.toLowerCase();
   let score = 0;
   if (/\b(wtf|ridiculous|frustrated|annoyed|angry|furious|this makes no sense)\b/i.test(normalized)) score += 3;
   if (/\b(why is this|still broken|still not working|come on)\b/i.test(normalized)) score += 2;
@@ -423,7 +439,7 @@ async function ensureWelcomeMessage(conversationId) {
   const seededConversation = await SupportConversation.findOneAndUpdate(
     { _id: conversationId, welcomeSentAt: null },
     { $set: { welcomeSentAt: now, lastMessageAt: now } },
-    { new: true }
+    { returnDocument: "after" }
   ).lean();
   if (!seededConversation) return;
 
@@ -454,7 +470,7 @@ function buildRouting(category = "", urgency = "medium") {
     return {
       ownerKey: "admissions",
       priority,
-      queueLabel: "Verification review",
+      queueLabel: "Admissions review",
     };
   }
   if (category === "login" || category === "password_reset") {
@@ -485,11 +501,11 @@ function formatCategoryLabel(category = "") {
     profile_save: "Profile updates",
     profile_photo_upload: "Profile photo",
     dashboard_load: "Dashboard",
-    case_posting: "Case workflow",
+    case_posting: "Matter workflow",
     messaging: "Messaging",
     payment: "Payments",
     stripe_onboarding: "Payout setup",
-    account_approval: "Verification",
+    account_approval: "Admissions review",
     platform_knowledge: "LPC information",
     product_guidance: "Product guidance",
     unknown: "General support",
@@ -505,6 +521,9 @@ function formatSupportTicketReference(ticketId = "") {
 
 function formatDate(value) {
   if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+    return formatDateOnly(value);
+  }
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleDateString("en-US", {
@@ -523,7 +542,7 @@ function buildPlatformKnowledgeReply(cards = [], role = "", text = "") {
     const attorneyCard = safeCards.find((card) => card.key === "objection_platform_fee_attorney");
     const paralegalCard = safeCards.find((card) => card.key === "objection_paralegal_fee");
     if (attorneyCard && paralegalCard) {
-      return "LPC charges attorneys a 22% platform fee on completed, paid projects and charges paralegals an 18% platform fee on completed, paid work. Stripe processing fees also apply to attorney payment transactions.";
+      return "When an attorney confirms a hire, LPC charges the Matter amount plus a 22% attorney platform fee. LPC deducts an 18% paralegal platform fee from completed, paid work before payout. No separate Stripe processing line item is added beyond the attorney total displayed at confirmation.";
     }
   }
   return trimString(safeCards[0].answer, MAX_REPLY_LENGTH);
@@ -543,14 +562,6 @@ function buildPlatformKnowledgeFacts(cards = [], role = "") {
   };
 }
 
-function formatMoneyCents(value, currency = "USD") {
-  const amount = Number(value || 0);
-  if (!Number.isFinite(amount) || amount <= 0) return "";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: String(currency || "USD").toUpperCase(),
-  }).format(amount / 100);
-}
 
 function normalizeReplyText(value = "") {
   return String(value || "")
@@ -560,7 +571,7 @@ function normalizeReplyText(value = "") {
     .trim();
 }
 
-function enforceSupportReplyBrevity(reply = "", { category = "", paymentSubIntent = "", detailLevel = "" } = {}) {
+function enforceSupportReplyBrevity(reply = "", { detailLevel = "" } = {}) {
   const normalizedReply = normalizeReplyText(reply);
   if (!normalizedReply) return "";
   const normalizedDetailLevel = String(detailLevel || "").trim().toLowerCase();
@@ -590,18 +601,6 @@ function stripRedundantNavigationCopy(reply = "", navigation = null) {
   );
 }
 
-function addReviewSentence(text = "", needsEscalation = false) {
-  if (!needsEscalation) return text;
-  if (
-    text.includes(MANUAL_REVIEW_SENTENCE) ||
-    /\bi['’]m sending this to the team for review\b/i.test(text) ||
-    /\bi can send this to the team(?: now)? for review\b/i.test(text) ||
-    /\bthe team can review\b/i.test(text)
-  ) {
-    return text;
-  }
-  return `${text} ${MANUAL_REVIEW_SENTENCE}`.trim();
-}
 
 function stripEscalationConfirmationCopy(text = "") {
   let next = String(text || "");
@@ -628,7 +627,7 @@ function stripEscalationConfirmationCopy(text = "") {
 }
 
 function formatCaseTitle(facts = {}) {
-  return facts.caseState?.title || facts.payoutState?.relevantCaseTitle || "this case";
+  return facts.caseState?.title || facts.payoutState?.relevantCaseTitle || "this Matter";
 }
 
 function hasPatternMatch(text = "", patterns = []) {
@@ -963,7 +962,7 @@ const SUPPORT_TOPIC_SELECTORS = [
   },
   {
     key: "cases",
-    label: "Cases",
+    label: "Matters",
     patterns: [/\b(case|cases|workspace|matter|matters)\b/i],
   },
   {
@@ -1015,13 +1014,6 @@ function formatTopicSelectionLabel(key = "") {
   return match?.label || normalized.replace(/_/g, " ");
 }
 
-function formatNaturalList(items = []) {
-  const values = [...new Set((Array.isArray(items) ? items : []).map((item) => trimString(item, 120)).filter(Boolean))];
-  if (!values.length) return "";
-  if (values.length === 1) return values[0];
-  if (values.length === 2) return `${values[0]} and ${values[1]}`;
-  return `${values.slice(0, -1).join(", ")}, and ${values[values.length - 1]}`;
-}
 
 function hasCorrectionLead(text = "") {
   return /\b(actually|no[, ]|nope|not that|i meant|i mean|specifically|rather)\b/i.test(String(text || ""));
@@ -1115,14 +1107,6 @@ function resolveOptionByOrdinal(text = "", options = [], lastSelection = "") {
   return "";
 }
 
-function isAllTopicSelection(text = "", options = []) {
-  const normalized = String(text || "").trim().toLowerCase();
-  const normalizedOptions = Array.isArray(options)
-    ? options.map((option) => String(option || "").trim().toLowerCase()).filter(Boolean)
-    : [];
-  if (!normalized || normalizedOptions.length < 2) return false;
-  return /\b(both|both of them|all of them|all those|all of those|everything|both please)\b/i.test(normalized);
-}
 
 function buildCompoundSuggestedReplies(explainIntent = "") {
   const normalized = String(explainIntent || "").trim().toLowerCase();
@@ -1237,11 +1221,6 @@ function detectOverloadedSupportRequest(text = "") {
   return detectSupportTopics(normalized).length >= 3 && /\b(help|question|issue|problem|trying to|need)\b/i.test(normalized);
 }
 
-function describeDetectedSupportTopics(text = "") {
-  return detectSupportTopics(text)
-    .map((topicKey) => formatTopicSelectionLabel(topicKey).toLowerCase())
-    .slice(0, 3);
-}
 
 function resolveTopicSelection(text = "", optionsOrState = []) {
   const normalized = String(text || "").trim().toLowerCase();
@@ -1401,6 +1380,17 @@ function buildNavigationReplyText(action = "find", inlineLinkText = "here") {
     return `You can open that ${linkText}.`;
   }
   return `You can find that ${linkText}.`;
+}
+
+function buildPaymentRecordNavigationReply(text = "") {
+  const normalized = String(text || "");
+  if (/\binvoices?\b/i.test(normalized)) {
+    return "LPC does not create invoice records. You can find Matter payment history and receipts here.";
+  }
+  if (/\breceipts?\b/i.test(normalized)) {
+    return "You can find Matter payment history and receipts here.";
+  }
+  return "";
 }
 
 function isAdminDashboardSupportScope({ user = {}, pageContext = {}, sourcePage = "" } = {}) {
@@ -1567,16 +1557,16 @@ function buildSelfServiceActions({
       ? supportFacts.pendingParalegalState.items
       : [];
     if (pendingItems.length === 1 && pendingItems[0]?.caseId) {
-      return [buildActionPayload({ label: "Open case", href: buildCaseHref(pendingItems[0].caseId) })].filter(Boolean);
+      return [buildActionPayload({ label: "Open Matter", href: buildCaseHref(pendingItems[0].caseId) })].filter(Boolean);
     }
     if (pendingItems.length > 1) {
-      return [buildActionPayload({ label: "View cases", href: "dashboard-attorney.html#cases" })].filter(Boolean);
+      return [buildActionPayload({ label: "View Matters", href: "dashboard-attorney.html#cases" })].filter(Boolean);
     }
     return [];
   }
 
   if (category === "payment" && paymentSubIntent === "billing_method") {
-    return [buildActionPayload({ label: "Open Billing", href: "dashboard-attorney.html#billing" })].filter(Boolean);
+    return [buildActionPayload({ label: "Open Payments", href: "dashboard-attorney.html#funds" })].filter(Boolean);
   }
   if (
     (category === "payment" && paymentSubIntent === "payout") ||
@@ -1610,7 +1600,7 @@ function buildSelfServiceActions({
   ) {
     return [
       buildActionPayload({
-        label: "Open case",
+        label: "Open Matter",
         href: buildCaseHref(supportFacts.caseState.caseId),
       }),
     ].filter(Boolean);
@@ -1634,7 +1624,7 @@ function buildSelfServiceActions({
   if (category === "payment" && primaryAsk === "case_payment" && supportFacts.caseState?.caseId) {
     return [
       buildActionPayload({
-        label: "Open case",
+        label: "Open Matter",
         href: buildCaseHref(supportFacts.caseState.caseId),
       }),
     ].filter(Boolean);
@@ -1671,7 +1661,6 @@ function buildSuggestedReplies({
   supportFacts = {},
   conversationState = {},
   selectionTopics = [],
-  navigation = null,
 } = {}) {
   if (awaitingField === "topic_selection") {
     const topicOptions = Array.isArray(selectionTopics) && selectionTopics.length
@@ -1685,10 +1674,10 @@ function buildSuggestedReplies({
     if (branchReplies.length) return branchReplies;
   }
   if (primaryAsk === "payment_clarify" || paymentSubIntent === "unclear") {
-    return ["Billing method", "Case payment", "Payouts"];
+    return ["Billing method", "Matter payment", "Payouts"];
   }
   if (primaryAsk === "messaging_access" && (awaitingField === "case_identifier" || supportFacts.messagingState?.clarificationNeeded)) {
-    return ["This case", "Across all messages"];
+    return ["This Matter", "Across all messages"];
   }
   return [];
 }
@@ -1899,7 +1888,6 @@ async function getActiveEntity(message = "", pageContext = {}, previousState = {
 async function fetchTaskFacts({
   task = "UNKNOWN",
   message = "",
-  analysis = {},
   user = {},
   pageContext = {},
   previousState = {},
@@ -2206,45 +2194,6 @@ async function fetchTaskFacts({
   };
 }
 
-function chooseTaskResponseType({
-  task = "UNKNOWN",
-  message = "",
-  previousState = {},
-  activeEntity = null,
-  facts = {},
-} = {}) {
-  if (task === "ESCALATION") return "ESCALATE";
-  if (task === "HUMAN_ISSUE") {
-    if (previousState.escalationShown === true || /\b(still|again|nothing|yet|same)\b/i.test(String(message || ""))) {
-      return "ESCALATE";
-    }
-    return "ANSWER";
-  }
-  if (task === "NAVIGATION") {
-    const navigation = resolveNavigationTarget({
-      text: message,
-      pageContext: {},
-      supportFacts: facts,
-      previousState,
-    });
-    return navigation.mode === "resolved" ? "ANSWER" : "ASK";
-  }
-  if (task === "EXPLAIN") {
-    return "ANSWER";
-  }
-  if (task === "FACT_LOOKUP") {
-    if (detectFactLookupIntent(message) !== "stripe" && !activeEntity) return "ASK";
-    return "ANSWER";
-  }
-  if (task === "TROUBLESHOOT") {
-    const troubleshootIntent = detectTroubleshootIntent(message, facts.userRole || "");
-    if (["messaging", "workspace", "case_payment"].includes(troubleshootIntent) && !activeEntity) {
-      return "ASK";
-    }
-    return "ANSWER";
-  }
-  return "ASK";
-}
 
 function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {}, previousState = {} } = {}) {
   const normalized = String(text || "").trim().toLowerCase();
@@ -2256,7 +2205,6 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
   const caseId = trimString(caseState.caseId || pageContext.caseId, 80);
   const caseAccessible = Boolean(caseId && caseState.accessible !== false);
   const asksToUpdate = hasPatternMatch(normalized, [/\b(update|change|edit|manage|set up|setup|connect)\b/i]);
-  const asksToOpen = asksToUpdate || hasPatternMatch(normalized, [/\b(open|see|view|go to|get to|access)\b/i]);
   const genericReference = hasPatternMatch(normalized, [/\b(that|it|this|there)\b/i]);
   const selectedTopicOption = resolveTopicSelection(normalized, previousState);
   const explicitTopicSelection =
@@ -2292,10 +2240,12 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
   if (explicitTopicSelection && selectedTopicOption === "billing" && role === "attorney") {
     return {
       mode: "resolved",
-      reply: buildNavigationReplyText(asksToUpdate ? "update" : "find"),
+      reply:
+        buildPaymentRecordNavigationReply(normalized) ||
+        buildNavigationReplyText(asksToUpdate ? "update" : "find"),
       navigation: buildNavigationPayload({
-        ctaLabel: "Billing & Payments",
-        ctaHref: "dashboard-attorney.html#billing",
+        ctaLabel: "Payments",
+        ctaHref: "dashboard-attorney.html#funds",
         ctaType: "deep_link",
       }),
     };
@@ -2335,10 +2285,10 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
   ) {
     return {
       mode: "resolved",
-      reply: buildNavigationReplyText("find"),
+      reply: buildPaymentRecordNavigationReply(normalized),
       navigation: buildNavigationPayload({
-        ctaLabel: "Billing & Payments",
-        ctaHref: "dashboard-attorney.html#billing",
+        ctaLabel: "Payments",
+        ctaHref: "dashboard-attorney.html#funds",
         ctaType: "deep_link",
       }),
     };
@@ -2417,10 +2367,10 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
     return {
       mode: "resolved",
       reply: applyWorkflowQuestion
-        ? "You can apply when a case is open to applicants. You can browse open cases here."
+        ? "You can apply when a Matter is open to applicants. You can browse open Matters here."
         : buildNavigationReplyText("find"),
       navigation: buildNavigationPayload({
-        ctaLabel: "Browse cases",
+        ctaLabel: "Browse Matters",
         ctaHref: "browse-jobs.html",
         ctaType: "deep_link",
       }),
@@ -2490,7 +2440,7 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
       mode: "resolved",
       reply: buildNavigationReplyText("find"),
       navigation: buildNavigationPayload({
-        ctaLabel: "Completed cases",
+        ctaLabel: "Completed Matters",
         ctaHref: "dashboard-paralegal.html#cases-completed",
         ctaType: "deep_link",
       }),
@@ -2505,7 +2455,7 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
       mode: "resolved",
       reply: buildNavigationReplyText("find"),
       navigation: buildNavigationPayload({
-        ctaLabel: "Completed cases",
+        ctaLabel: "Completed Matters",
         ctaHref: "dashboard-paralegal.html#cases-completed",
         ctaType: "deep_link",
       }),
@@ -2538,7 +2488,7 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
       mode: "resolved",
       reply: buildNavigationReplyText("open"),
       navigation: buildNavigationPayload({
-        ctaLabel: "Cases & Files",
+        ctaLabel: "Matters",
         ctaHref: "dashboard-attorney.html#cases",
         ctaType: "deep_link",
       }),
@@ -2554,7 +2504,7 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
       mode: "resolved",
       reply: buildNavigationReplyText("open"),
       navigation: buildNavigationPayload({
-        ctaLabel: "Cases & Files",
+        ctaLabel: "Matters",
         ctaHref: "dashboard-attorney.html#cases",
         ctaType: "deep_link",
       }),
@@ -2567,7 +2517,7 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
         mode: "resolved",
         reply: buildNavigationReplyText("open"),
         navigation: buildNavigationPayload({
-          ctaLabel: caseState.title || "Case workspace",
+          ctaLabel: caseState.title || "Matter workspace",
           ctaHref: buildCaseHref(caseId),
           ctaType: "deep_link",
         }),
@@ -2577,7 +2527,7 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
       mode: "resolved",
       reply: buildNavigationReplyText("open"),
       navigation: buildNavigationPayload({
-        ctaLabel: role === "attorney" ? "Cases & Files" : "Cases and Applications",
+        ctaLabel: role === "attorney" ? "Matters" : "My Matters & Applications",
         ctaHref: role === "attorney" ? "dashboard-attorney.html#cases" : "dashboard-paralegal.html#cases",
         ctaType: "deep_link",
       }),
@@ -2599,8 +2549,8 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
       mode: "resolved",
       reply: buildNavigationReplyText(asksToUpdate ? "update" : "find"),
       navigation: buildNavigationPayload({
-        ctaLabel: "Billing & Payments",
-        ctaHref: "dashboard-attorney.html#billing",
+        ctaLabel: "Payments",
+        ctaHref: "dashboard-attorney.html#funds",
         ctaType: "deep_link",
       }),
     };
@@ -2638,7 +2588,7 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
         mode: "resolved",
         reply: buildNavigationReplyText("open"),
         navigation: buildNavigationPayload({
-          ctaLabel: "Case messages",
+          ctaLabel: "Matter messages",
           ctaHref: buildCaseHref(caseId, "#case-messages"),
           ctaType: "deep_link",
         }),
@@ -2647,7 +2597,7 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
     return {
       mode: "clarify",
       navigation: null,
-      reply: "Is this for a specific case?",
+      reply: "Is this for a specific Matter?",
     };
   }
 
@@ -2657,7 +2607,7 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
         mode: "resolved",
         reply: buildNavigationReplyText("open"),
         navigation: buildNavigationPayload({
-          ctaLabel: caseState.title || "Case workspace",
+          ctaLabel: caseState.title || "Matter workspace",
           ctaHref: buildCaseHref(caseId),
           ctaType: "deep_link",
         }),
@@ -2666,7 +2616,7 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
     return {
       mode: "clarify",
       navigation: null,
-      reply: "Which case are you trying to open?",
+      reply: "Which Matter are you trying to open?",
     };
   }
 
@@ -2675,7 +2625,7 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
       return {
         mode: "clarify",
         navigation: null,
-        reply: "Are you looking for billing, messages, profile settings, or a specific case?",
+        reply: "Are you looking for billing, messages, profile settings, or a specific Matter?",
       };
     }
     return {
@@ -2689,7 +2639,7 @@ function resolveNavigationTarget({ text = "", pageContext = {}, supportFacts = {
     return {
       mode: "clarify",
       navigation: null,
-      reply: "Are you looking for billing, messages, profile settings, or a specific case?",
+      reply: "Are you looking for billing, messages, profile settings, or a specific Matter?",
     };
   }
 
@@ -2830,7 +2780,6 @@ function detectPrimaryAsk({
   text = "",
   analysis = {},
   supportFacts = {},
-  pageContext = {},
   conversationState = {},
   issueLifecycle = null,
   paymentSubIntent = "",
@@ -3231,8 +3180,6 @@ function chooseResponseMode({
   navigation = {},
   conversationState = {},
   text = "",
-  frustration = {},
-  escalation = {},
 } = {}) {
   if (primaryAsk === "issue_resolved") return "DIRECT_ANSWER";
   if (primaryAsk === "issue_reopen") return "DIRECT_ANSWER";
@@ -3259,7 +3206,6 @@ function orchestrateSupportTurn({
   supportFacts = {},
   conversationState = {},
   issueLifecycle = null,
-  frustration = {},
   task = "",
   resolvedCaseId = "",
   resolvedCaseSource = "",
@@ -3274,7 +3220,6 @@ function orchestrateSupportTurn({
     text,
     analysis,
     supportFacts,
-    pageContext,
     conversationState,
     issueLifecycle,
     paymentSubIntent,
@@ -3305,20 +3250,12 @@ function orchestrateSupportTurn({
     resolvedCaseSource,
   });
   const relevantFacts = selectRelevantSupportFacts(primaryAsk, supportFacts);
-  const draftEscalation = deriveEscalation({
-    category: normalizedCategory,
-    facts: relevantFacts,
-    confidence: deriveConfidence(normalizedCategory, supportFacts),
-    options: { paymentSubIntent },
-  });
   const responseMode = chooseResponseMode({
     primaryAsk,
     activeEntity: entityResolution,
     navigation,
     conversationState,
     text,
-    frustration,
-    escalation: draftEscalation,
   });
 
   return {
@@ -3350,45 +3287,45 @@ function buildBillingMethodReply(facts = {}) {
         : "";
     return `I can confirm a saved payment method on this account: ${brand}${last4}${expiry}.${validityLine}`.trim();
   }
-  return "I can't confirm your saved payment method from current platform data yet. Are you asking about your account billing method or a specific case payment?";
+  return "I can't confirm your saved payment method from current platform data yet. Are you asking about your account billing method or a specific Matter payment?";
 }
 
 function buildPaymentClarificationReply(facts = {}) {
   const role = String(facts.userRole || "").toLowerCase();
   if (role === "paralegal") {
-    return "Are you asking about payout setup or a specific case payment?";
+    return "Are you asking about payout setup or a specific Matter payment?";
   }
-  return "Are you asking about your account billing method or a specific case payment?";
+  return "Are you asking about your account billing method or a specific Matter payment?";
 }
 
 function buildCasePaymentReply(facts = {}) {
   const { caseState = {} } = facts;
   if (!caseState.caseId) {
-    return "Which case is this payment issue about?";
+    return "Which Matter is this payment issue about?";
   }
   const caseTitle = formatCaseTitle(facts);
   if (caseState.paymentReleased) {
     return `Payment for ${caseTitle} has been released by LPC. Bank timing depends on Stripe and your bank.`;
   }
   if (caseState.escrowStatus) {
-    return `For ${caseTitle}, LPC currently shows escrow as ${String(caseState.escrowStatus || "").replace(/_/g, " ")}.`;
+    return `For ${caseTitle}, LPC currently shows the funding status as ${String(caseState.escrowStatus || "").replace(/_/g, " ")}.`;
   }
-  return `I can see ${caseTitle}, but I can't confirm the case payment status yet.`;
+  return `I can see ${caseTitle}, but I can't confirm the Matter payment status yet.`;
 }
 
 function buildWorkspaceAccessReply(facts = {}) {
   const { caseState = {}, workspaceState = {} } = facts;
 
   if (!caseState.caseId) {
-    return "Which case workspace are you trying to open?";
+    return "Which Matter workspace are you trying to open?";
   }
 
   if (!caseState.found || !caseState.accessible) {
     return "It looks like you don't currently have access to that workspace.";
   }
 
-  const qualifier = caseState.inferred ? `I checked ${caseState.title || "your most recent case"}. ` : "";
-  if (workspaceState.reason === "Case is read-only") {
+  const qualifier = caseState.inferred ? `I checked ${caseState.title || "your most recent Matter"}. ` : "";
+  if (workspaceState.reason === "Matter is read-only") {
     return `${qualifier}That workspace is available, but it's read-only right now.`;
   }
   if (workspaceState.reason) {
@@ -3412,29 +3349,7 @@ function inferDetailLevel(text = "") {
     : "concise";
 }
 
-function selectPrimaryNextAction(category = "", supportFacts = {}, options = {}) {
-  const paymentSubIntent = String(options.paymentSubIntent || "").trim().toLowerCase();
-  if (category === "stripe_onboarding" && isStripeConceptQuestion(options.text)) {
-    return "";
-  }
-  if (category === "payment" && paymentSubIntent === "payout") {
-    return supportFacts.stripeState?.nextSteps?.[0] || "";
-  }
-  if (category === "stripe_onboarding") {
-    return supportFacts.stripeState?.nextSteps?.[0] || "";
-  }
-  if (category === "messaging") {
-    return supportFacts.messagingState?.nextSteps?.[0] || supportFacts.caseState?.nextSteps?.[0] || "";
-  }
-  if (category === "case_posting") {
-    return supportFacts.caseState?.nextSteps?.[0] || "";
-  }
-  return "";
-}
 
-function replyAlreadyContainsAction(reply = "") {
-  return /\b(finish|set up|open|tell me|reply with|check|use|try|return to)\b/i.test(String(reply || ""));
-}
 
 function simplifyResponseLanguage(text = "") {
   return normalizeReplyText(
@@ -3449,6 +3364,7 @@ function simplifyResponseLanguage(text = "") {
 function lowercaseSentenceLead(text = "") {
   const value = String(text || "").trim();
   if (!value) return "";
+  if (/^(?:LPC|Stripe|Let['’]s-ParaConnect)\b/.test(value)) return value;
   return `${value.charAt(0).toLowerCase()}${value.slice(1)}`;
 }
 
@@ -3462,15 +3378,8 @@ function appendSecondarySupportReply(primaryReply = "", secondaryReply = "") {
 }
 
 function shapeSupportResponse({
-  category = "",
   text = "",
   groundedReply = "",
-  supportFacts = {},
-  nextSteps = [],
-  escalation = {},
-  intakeMode = false,
-  awaitingClarification = false,
-  options = {},
 } = {}) {
   const detailLevel = inferDetailLevel(text);
   const reply = simplifyResponseLanguage(groundedReply);
@@ -3487,52 +3396,52 @@ function buildParticipantReply(facts = {}, options = {}) {
   const requestedRole = inferParticipantRoleRequested(options.text);
 
   if (!caseState.caseId) {
-    return "Which case are you asking about?";
+    return "Which Matter are you asking about?";
   }
   if (!caseState.found || !caseState.accessible) {
-    return "I can't confirm that case from here yet.";
+    return "I can't confirm that Matter from here yet.";
   }
   if (!requestedRole) {
-    return "Are you asking about the attorney or the paralegal on that case?";
+    return "Are you asking about the attorney or the paralegal on that Matter?";
   }
 
   const participant = participantState[requestedRole] || {};
   const roleLabel = requestedRole === "attorney" ? "attorney" : "paralegal";
   if (participant.name) {
-    return `The ${roleLabel} on ${caseState.title || "this case"} is ${participant.name}.`;
+    return `The ${roleLabel} on ${caseState.title || "this Matter"} is ${participant.name}.`;
   }
   if (participant.present) {
-    return `I can confirm a ${roleLabel} is assigned on ${caseState.title || "this case"}, but I can't show the name yet.`;
+    return `I can confirm a ${roleLabel} is assigned on ${caseState.title || "this Matter"}, but I can't show the name yet.`;
   }
-  return `I don't see a ${roleLabel} assigned on ${caseState.title || "this case"} yet.`;
+  return `I don't see a ${roleLabel} assigned on ${caseState.title || "this Matter"} yet.`;
 }
 
 function buildCaseStatusReply(facts = {}) {
   const caseState = facts.caseState || {};
   if (!caseState.caseId) {
-    return "Which case are you asking about?";
+    return "Which Matter are you asking about?";
   }
   if (!caseState.found || !caseState.accessible) {
-    return "I can't confirm that case from here yet.";
+    return "I can't confirm that Matter from here yet.";
   }
 
   const statusLabel = caseState.normalizedStatus || caseState.status || "unknown";
   if (caseState.pausedReason) {
-    return `${caseState.title || "This case"} is currently ${statusLabel}. It's paused for ${String(caseState.pausedReason).replace(/_/g, " ")}.`;
+    return `${caseState.title || "This Matter"} is currently ${statusLabel}. It's paused for ${String(caseState.pausedReason).replace(/_/g, " ")}.`;
   }
-  return `${caseState.title || "This case"} is currently ${statusLabel}.`;
+  return `${caseState.title || "This Matter"} is currently ${statusLabel}.`;
 }
 
 function buildDeadlineReply(facts = {}) {
   const caseState = facts.caseState || {};
   if (!caseState.caseId || !caseState.deadline) {
-    return "You don’t have an upcoming case deadline recorded in LPC right now.";
+    return "You don’t have an upcoming Matter deadline recorded in LPC right now.";
   }
   const deadlineLabel = formatDate(caseState.deadline);
   if (!deadlineLabel) {
     return "I found an upcoming deadline, but I can’t verify its date right now.";
   }
-  return `Your next recorded deadline is ${deadlineLabel} for ${caseState.title || "your case"}.`;
+  return `Your next recorded deadline is ${deadlineLabel} for ${caseState.title || "your Matter"}.`;
 }
 
 function joinPendingReasons(reasons = []) {
@@ -3675,150 +3584,7 @@ function buildIssueStatusSecondaryGuidance({
   );
 }
 
-function buildTopicSelectionResponse({
-  topicKey = "",
-  supportFacts = {},
-  pageContext = {},
-  conversationState = {},
-} = {}) {
-  const normalizedTopicKey = trimString(topicKey, 80).toLowerCase();
-  if (!normalizedTopicKey) return null;
 
-  if (normalizedTopicKey === "billing") {
-    return {
-      reply: "You can find billing and invoices here.",
-      navigation: buildNavigationPayload({
-        ctaLabel: "Billing & Payments",
-        ctaHref: "dashboard-attorney.html#billing",
-        ctaType: "deep_link",
-      }),
-    };
-  }
-
-  if (normalizedTopicKey === "theme_preferences") {
-    return {
-      reply: "Yes — you can change that in Preferences.",
-      navigation: buildNavigationPayload({
-        ctaLabel: "Preferences",
-        ctaHref: "profile-settings.html#preferencesSection",
-        ctaType: "deep_link",
-      }),
-    };
-  }
-
-  if (normalizedTopicKey === "profile_setup") {
-    return buildExplainReply(
-      {
-        ...supportFacts,
-        explainIntent: "profile_setup",
-      },
-      {
-        text: "How do I create my profile?",
-        pageContext,
-        conversationState,
-      }
-    );
-  }
-
-  if (normalizedTopicKey === "payouts") {
-    return buildExplainReply(
-      {
-        ...supportFacts,
-        explainIntent: "stripe",
-      },
-      {
-        text: "Do I need Stripe?",
-        pageContext,
-        conversationState,
-      }
-    );
-  }
-
-  if (normalizedTopicKey === "messages") {
-    return buildExplainReply(
-      {
-        ...supportFacts,
-        explainIntent: "messaging_workflow",
-      },
-      {
-        text: "How does messaging work?",
-        pageContext,
-        conversationState,
-      }
-    );
-  }
-
-  if (normalizedTopicKey === "applications") {
-    return buildExplainReply(
-      {
-        ...supportFacts,
-        explainIntent: "apply",
-      },
-      {
-        text: "How do I apply?",
-        pageContext,
-        conversationState,
-      }
-    );
-  }
-
-  return null;
-}
-
-function buildCombinedTopicSelectionReply({
-  text = "",
-  selectionTopics = [],
-  supportFacts = {},
-  pageContext = {},
-  conversationState = {},
-} = {}) {
-  const normalizedTopics = Array.isArray(selectionTopics)
-    ? selectionTopics.map((value) => trimString(value, 80).toLowerCase()).filter(Boolean)
-    : [];
-  if (normalizedTopics.length < 2 || normalizedTopics.length > 3) return null;
-  if (!isAllTopicSelection(text, normalizedTopics)) return null;
-
-  const responses = normalizedTopics
-    .map((topicKey) =>
-      buildTopicSelectionResponse({
-        topicKey,
-        supportFacts,
-        pageContext,
-        conversationState,
-      })
-    )
-    .filter((response) => response?.reply);
-
-  if (responses.length !== normalizedTopics.length) return null;
-
-  const reply = responses.reduce((combined, response) => appendSecondarySupportReply(combined, response.reply), "");
-  const actions = responses
-    .map((response) =>
-      response?.navigation?.ctaLabel && response?.navigation?.ctaHref
-        ? buildActionPayload({
-            label: response.navigation.ctaLabel,
-            href: response.navigation.ctaHref,
-            type: "deep_link",
-          })
-        : null
-    )
-    .filter(Boolean)
-    .filter((action, index, items) => items.findIndex((item) => item.href === action.href) === index);
-  const explainOnly = normalizedTopics.every((topicKey) =>
-    ["profile_setup", "payouts", "messages", "applications"].includes(topicKey)
-  );
-  const navigationOnly = normalizedTopics.every((topicKey) =>
-    ["billing", "theme_preferences"].includes(topicKey)
-  );
-
-  return {
-    reply,
-    navigation: responses[0].navigation || null,
-    actions,
-    primaryAsk: explainOnly ? "product_guidance" : navigationOnly ? "navigation" : "generic_intake",
-    activeTask: explainOnly ? "EXPLAIN" : navigationOnly ? "NAVIGATION" : "UNKNOWN",
-  };
-}
 
 function buildResponsivenessReply(facts = {}) {
   const caseState = facts.caseState || {};
@@ -3831,14 +3597,14 @@ function buildResponsivenessReply(facts = {}) {
 }
 
 function buildPayoutReply(facts = {}, options = {}) {
-  const { userRole, stripeState = {}, payoutState = {}, caseState = {} } = facts;
+  const { userRole, stripeState = {}, payoutState = {} } = facts;
   const normalizedText = String(options.text || "").toLowerCase();
   const isStatusQuestion = /\b(where is my payout|when do i get paid|my money didn'?t come|my money did not come|where are my payouts?)\b/i.test(
     normalizedText
   );
 
   if (userRole === "attorney") {
-    return "Attorney accounts don't receive payouts on LPC. If this is about a case payment, tell me which case.";
+    return "Attorney accounts don't receive payouts on LPC. If this is about a Matter payment, tell me which Matter.";
   }
 
   if (options.paymentSubIntent === "payout" && /\b(enabled|enable|onboarding|setup|account)\b/i.test(String(options.text || ""))) {
@@ -3861,7 +3627,7 @@ function buildPayoutReply(facts = {}, options = {}) {
   }
 
   if (payoutState.payoutFinalizedAt && !payoutState.paymentReleased) {
-    return `A payout was finalized for ${caseTitle} on ${formatDate(payoutState.payoutFinalizedAt)}, but I can't verify that funds were sent yet.`;
+    return `A payout was finalized for ${caseTitle} on ${formatDate(payoutState.payoutFinalizedAt)}, but I can't verify that the payout was sent yet.`;
   }
 
   if (userRole === "paralegal" && (!stripeState.accountId || !stripeState.payoutsEnabled || !stripeState.detailsSubmitted)) {
@@ -3894,8 +3660,8 @@ function buildStripeReply(facts = {}, options = {}) {
   if (conceptQuestion) {
     const base =
       userRole === "attorney"
-        ? "Stripe is the payment processor LPC uses to handle billing and payments securely."
-        : "Stripe is the payment processor LPC uses to handle payouts securely.";
+        ? "Stripe is the payment processor LPC uses for billing and payments."
+        : "Stripe is the payment processor LPC uses for payouts.";
     if (userRole === "attorney") {
       return base;
     }
@@ -3909,7 +3675,7 @@ function buildStripeReply(facts = {}, options = {}) {
   }
 
   if (userRole === "attorney") {
-    return "Stripe handles secure billing and payment processing on LPC. If this is about a specific case payment, tell me which case.";
+    return "Stripe handles billing and payment processing on LPC. If this is about a specific Matter payment, tell me which Matter.";
   }
 
   if (!stripeState.accountId) {
@@ -3932,35 +3698,35 @@ function buildMessagingReply(facts = {}) {
 
   if (!caseState.caseId) {
     return (
-      messagingState.clarificationPrompt || "Is this happening in a specific case or across all messages?"
+      messagingState.clarificationPrompt || "Is this happening in a specific Matter or across all messages?"
     );
   }
 
   if (!caseState.found) {
-    return "I couldn't match that to a case yet.";
+    return "I couldn't match that to a Matter yet.";
   }
 
   if (!caseState.accessible) {
-    const qualifier = caseState.inferred ? `I checked ${caseState.title || "your most recent case"}. ` : "";
+    const qualifier = caseState.inferred ? `I checked ${caseState.title || "your most recent Matter"}. ` : "";
     return `${qualifier}It looks like you don't currently have access to that workspace.`;
   }
 
   if (messagingState.isBlocked) {
-    const qualifier = caseState.inferred ? `I checked ${caseState.title || "your most recent case"}. ` : "";
+    const qualifier = caseState.inferred ? `I checked ${caseState.title || "your most recent Matter"}. ` : "";
     return `${qualifier}Messaging is blocked for this workspace. ${messagingState.reason}`;
   }
 
-  if (workspaceState.reason === "Case is read-only") {
-    const qualifier = caseState.inferred ? `I checked ${caseState.title || "your most recent case"}. ` : "";
-    return `${qualifier}This case is read-only right now, so new messages are disabled.`;
+  if (workspaceState.reason === "Matter is read-only") {
+    const qualifier = caseState.inferred ? `I checked ${caseState.title || "your most recent Matter"}. ` : "";
+    return `${qualifier}This Matter is read-only right now, so new messages are disabled.`;
   }
 
   if (!messagingState.canSend) {
-    const qualifier = caseState.inferred ? `I checked ${caseState.title || "your most recent case"}. ` : "";
+    const qualifier = caseState.inferred ? `I checked ${caseState.title || "your most recent Matter"}. ` : "";
     return `${qualifier}${messagingState.reason || "Messaging isn't available in that workspace right now."}`;
   }
 
-  const qualifier = caseState.inferred ? `I checked ${caseState.title || "your most recent case"}. ` : "";
+  const qualifier = caseState.inferred ? `I checked ${caseState.title || "your most recent Matter"}. ` : "";
   return `${qualifier}Messaging should be available in that workspace. Open messages here.`;
 }
 
@@ -3969,29 +3735,29 @@ function buildCaseReply(facts = {}) {
 
   if (!caseState.caseId) {
     if (String(facts.userRole || "").toLowerCase() === "attorney") {
-      return "I can help with an LPC matter from a few angles: open matters, applicants or invites, messages, files, tasks, funding, or completion. Open your matters to pick the case, or tell me what part is stuck and I'll narrow it down.";
+      return "I can help with an LPC Matter from a few angles: open Matters, applicants or invitations, messages, files, tasks, funding, or completion. Open your Matters to choose one, or tell me what part is stuck and I'll narrow it down.";
     }
     if (String(facts.userRole || "").toLowerCase() === "paralegal") {
-      return "I can help with a case workspace, application, messages, files, tasks, or payout status. Tell me which case or what part is stuck and I'll narrow it down.";
+      return "I can help with a Matter workspace, application, messages, files, tasks, or payout status. Tell me which Matter or what part is stuck and I'll narrow it down.";
     }
-    return "Tell me which case you're asking about.";
+    return "Tell me which Matter you're asking about.";
   }
   if (!caseState.found) {
-    return "I couldn't match that to a case yet.";
+    return "I couldn't match that to a Matter yet.";
   }
   if (!caseState.accessible) {
-    return "It looks like you don't currently have access to that case.";
+    return "It looks like you don't currently have access to that Matter.";
   }
 
   const statusLabel = caseState.normalizedStatus || caseState.status || "unknown";
-  const parts = [`I can confirm ${caseState.title || "this case"} is currently ${statusLabel}.`];
+  const parts = [`I can confirm ${caseState.title || "this Matter"} is currently ${statusLabel}.`];
   if (caseState.pausedReason) {
-    parts.push(`The case is paused for ${String(caseState.pausedReason).replace(/_/g, " ")}.`);
+    parts.push(`The Matter is paused for ${String(caseState.pausedReason).replace(/_/g, " ")}.`);
   }
-  if (workspaceState.reason && workspaceState.reason !== "Case is read-only") {
+  if (workspaceState.reason && workspaceState.reason !== "Matter is read-only") {
     parts.push(workspaceState.reason);
   }
-  if (workspaceState.reason === "Case is read-only") {
+  if (workspaceState.reason === "Matter is read-only") {
     parts.push("The workspace is read-only right now.");
   }
   return parts.join(" ").trim();
@@ -4041,9 +3807,9 @@ function buildContextualNextStepReply(facts = {}, options = {}) {
 
   if (topicKey === "messaging_support" && caseState.caseId) {
     return {
-      reply: "The next step is to open the case messages so you can check that thread directly.",
+      reply: "The next step is to open the Matter messages so you can check that thread directly.",
       navigation: buildNavigationPayload({
-        ctaLabel: "Case messages",
+        ctaLabel: "Matter messages",
         ctaHref: buildCaseHref(caseState.caseId, "#case-messages"),
         ctaType: "deep_link",
       }),
@@ -4052,9 +3818,9 @@ function buildContextualNextStepReply(facts = {}, options = {}) {
 
   if (topicKey === "case_support" && caseState.caseId) {
     return {
-      reply: `The next step is to open ${caseState.title || "that case"} and work from the case workspace.`,
+      reply: `The next step is to open ${caseState.title || "that Matter"} and work from the Matter workspace.`,
       navigation: buildNavigationPayload({
-        ctaLabel: caseState.title || "Case workspace",
+        ctaLabel: caseState.title || "Matter workspace",
         ctaHref: buildCaseHref(caseState.caseId),
         ctaType: "deep_link",
       }),
@@ -4063,14 +3829,14 @@ function buildContextualNextStepReply(facts = {}, options = {}) {
 
   if (role === "paralegal") {
     return {
-      reply: "Tell me whether you need help with your profile, a case, messaging, or payouts, and I'll point you to the right next step.",
+      reply: "Tell me whether you need help with your profile, a Matter, messaging, or payouts, and I'll point you to the right next step.",
       navigation: null,
     };
   }
 
   if (role === "attorney") {
     return {
-      reply: "Tell me whether you need help with billing, a case, messaging, or finding a paralegal, and I'll point you to the right next step.",
+      reply: "Tell me whether you need help with billing, a Matter, messaging, or finding a paralegal, and I'll point you to the right next step.",
       navigation: null,
     };
   }
@@ -4151,9 +3917,9 @@ function buildExplainReply(facts = {}, options = {}) {
   if (role === "paralegal" && facts.explainIntent === "apply_and_messaging") {
     return {
       reply:
-        "You can apply when a case is open to applicants, and messaging happens inside each active case workspace. Start by browsing open cases, and if you mean an existing case conversation, tell me which case so I can point you to that thread.",
+        "You can apply when a Matter is open to applicants, and messaging happens inside each active Matter workspace. Start by browsing open Matters, and if you mean an existing Matter conversation, tell me which Matter so I can point you to that thread.",
       navigation: buildNavigationPayload({
-        ctaLabel: "Browse cases",
+        ctaLabel: "Browse Matters",
         ctaHref: "browse-jobs.html",
         ctaType: "deep_link",
       }),
@@ -4166,9 +3932,9 @@ function buildExplainReply(facts = {}, options = {}) {
 
   if (role === "paralegal" && facts.explainIntent === "apply") {
     return {
-      reply: "You can apply when a case is open to applicants. You can browse open cases here. If you'd like, I can also help you find your applications.",
+      reply: "You can apply when a Matter is open to applicants. You can browse open Matters here. If you'd like, I can also help you find your applications.",
       navigation: buildNavigationPayload({
-        ctaLabel: "Browse cases",
+        ctaLabel: "Browse Matters",
         ctaHref: "browse-jobs.html",
         ctaType: "deep_link",
       }),
@@ -4251,14 +4017,14 @@ function buildExplainReply(facts = {}, options = {}) {
 
   if (role === "attorney" && facts.explainIntent === "attorney_workflow") {
     return {
-      reply: "You manage cases from your dashboard, then work with your paralegal in the case workspace once a matter is active. If you'd like, I can point you to the right page next.",
+      reply: "You manage Matters from your dashboard, then work with your paralegal in the Matter workspace once a Matter is active. If you'd like, I can point you to the right page next.",
       navigation: null,
     };
   }
 
   if (role === "paralegal" && facts.explainIntent === "messaging_workflow") {
     return {
-      reply: "Messaging happens inside each case workspace. Once you're on an active matter, open the case and use the messages area to talk with the attorney in that thread.",
+      reply: "Messaging happens inside each Matter workspace. Once you're on an active Matter, open it and use the messages area to talk with the attorney in that thread.",
       navigation: null,
     };
   }
@@ -4297,14 +4063,14 @@ function buildExplainReply(facts = {}, options = {}) {
 
   if (role === "paralegal" && facts.explainIntent === "messaging_simple") {
     return {
-      reply: "In simple terms, messages live inside each case workspace. Open the case and use the messages section there.",
+      reply: "In simple terms, messages live inside each Matter workspace. Open the Matter and use the messages section there.",
       navigation: null,
     };
   }
 
   if (role === "paralegal" && facts.explainIntent === "paralegal_workflow") {
     return {
-      reply: "On LPC, you complete your profile, browse open cases, apply to the ones that fit, and then work inside the case workspace once you're engaged on a matter.",
+      reply: "On LPC, you complete your profile, browse open Matters, apply to the ones that fit, and then work inside the Matter workspace once you're engaged.",
       navigation: null,
     };
   }
@@ -4312,7 +4078,7 @@ function buildExplainReply(facts = {}, options = {}) {
   if (role === "paralegal" && facts.explainIntent === "paralegal_workflow_simple") {
     return {
       reply:
-        "In simple terms, you complete your profile, apply to open cases that fit your skills, and then work with the attorney inside the case workspace once you're engaged on a matter.",
+        "In simple terms, you complete your profile, apply to open Matters that fit your skills, and then work with the attorney inside the Matter workspace once you're engaged.",
       navigation: null,
     };
   }
@@ -4320,7 +4086,7 @@ function buildExplainReply(facts = {}, options = {}) {
   if (role === "paralegal" && facts.explainIntent === "paralegal_first_steps") {
     return {
       reply:
-        "Start by completing your profile so attorneys can understand your experience. Then browse open cases that fit your skills and apply when a case is open to applicants.",
+        "Start by completing your profile so attorneys can understand your experience. Then browse open Matters that fit your skills and apply when a Matter is open to applicants.",
       navigation: buildNavigationPayload({
         ctaLabel: "Profile settings",
         ctaHref: "profile-settings.html?onboardingStep=profile&profilePrompt=1",
@@ -4332,7 +4098,7 @@ function buildExplainReply(facts = {}, options = {}) {
   if (role === "attorney" && facts.explainIntent === "attorney_first_steps") {
     return {
       reply:
-        "Start from your dashboard by posting or reviewing your matters. Then choose the paralegal support you need. If needed, you can request optional pre-engagement items like a confidentiality agreement or conflicts check before hiring, then work together in the case workspace once the matter is active.",
+        "Start from your dashboard by posting or reviewing your Matters. Then choose the paralegal support you need. If needed, you can request optional pre-engagement items like a confidentiality agreement or conflicts check before hiring, then work together in the Matter workspace once the Matter is active.",
       navigation: null,
     };
   }
@@ -4340,7 +4106,7 @@ function buildExplainReply(facts = {}, options = {}) {
   if (role === "attorney" && facts.explainIntent === "attorney_workflow_simple") {
     return {
       reply:
-        "In simple terms, you manage matters from your dashboard, review applicants, optionally request pre-engagement items like a confidentiality agreement or conflicts check, and then work together inside the case workspace once the matter is active.",
+        "In simple terms, you manage Matters from your dashboard, review applicants, optionally request pre-engagement items like a confidentiality agreement or conflicts check, and then work together inside the Matter workspace once the Matter is active.",
       navigation: null,
     };
   }
@@ -4349,8 +4115,8 @@ function buildExplainReply(facts = {}, options = {}) {
     return {
       reply:
         role === "paralegal"
-          ? "On LPC, you build your profile, browse open cases, apply when a matter is open to applicants, and then collaborate inside the case workspace once you're engaged. Payouts run through Stripe after payment is released."
-          : "On LPC, you manage matters from your dashboard, review applicants, may request optional pre-engagement items like confidentiality agreements or conflicts checks, and then collaborate inside the case workspace once a matter is active. Billing stays on the attorney side, and there is no subscription model.",
+          ? "On LPC, you build your profile, browse open Matters, apply when a Matter is open to applicants, and then collaborate inside the Matter workspace once you're engaged. Payouts run through Stripe after payment is released."
+          : "On LPC, you manage Matters from your dashboard, review applicants, may request optional pre-engagement items like confidentiality agreements or conflicts checks, and then collaborate inside the Matter workspace once a Matter is active. Billing stays on the attorney side, and there is no subscription model.",
       navigation: null,
     };
   }
@@ -4362,8 +4128,8 @@ function buildExplainReply(facts = {}, options = {}) {
   return {
     reply:
       role === "paralegal"
-        ? "You can browse open cases, apply when a case is open to applicants, and use the workspace once you're engaged on a matter. If you'd like, I can point you to the next step."
-        : "You can post and manage cases from your dashboard, then work in the case workspace once a matter is active. If you'd like, I can point you to the next step.",
+        ? "You can browse open Matters, apply when a Matter is open to applicants, and use the workspace once you're engaged. If you'd like, I can point you to the next step."
+        : "You can create and manage Matters from your dashboard, then work in the Matter workspace once a Matter is active. If you'd like, I can point you to the next step.",
     navigation: null,
   };
 }
@@ -4400,29 +4166,13 @@ function isVagueSupportInput(text = "") {
 
 function buildIntakeReply({ followUpAttempted = false } = {}) {
   if (followUpAttempted) {
-    return "I can help with billing, cases, messages, or account issues. What do you need help with today?";
+    return "I can help with billing, Matters, messages, or account issues. What do you need help with today?";
   }
   return "How can I help today?";
 }
 
-function shouldUseIntakeMode({ analysis = {}, supportFacts = {}, text = "" } = {}) {
-  const category = String(analysis.category || "unknown").toLowerCase();
-  const classifierConfidence = String(analysis.confidence || "low").toLowerCase();
-  const vagueInput = isVagueSupportInput(text);
-  const noClearCategoryMatch = category === "unknown" || classifierConfidence === "low";
-  const hasGroundedSignals =
-    Boolean(supportFacts.caseState?.caseId) ||
-    Boolean(supportFacts.stripeState?.accountId) ||
-    Boolean(supportFacts.payoutState?.hasRecentPayoutActivity) ||
-    Boolean(supportFacts.messagingState?.totalMessages);
 
-  if (!noClearCategoryMatch) return false;
-  if (vagueInput) return true;
-  if (category === "unknown" && classifierConfidence === "low" && !hasGroundedSignals) return true;
-  return false;
-}
-
-function buildGenericReply({ analysis = {}, facts = {}, pageContext = {} } = {}) {
+function buildGenericReply({ analysis = {}, pageContext = {} } = {}) {
   const category = String(analysis.category || "").toLowerCase();
   if (category === "password_reset") {
     return "You can change your password in Security settings.";
@@ -4439,47 +4189,6 @@ function buildGenericReply({ analysis = {}, facts = {}, pageContext = {} } = {})
   return "Tell me what happened, and I’ll take a closer look.";
 }
 
-function getCategoryScopedNextSteps(category = "", supportFacts = {}, options = {}) {
-  const normalizedCategory = String(category || "").trim().toLowerCase();
-  const paymentSubIntent = String(options.paymentSubIntent || "").trim().toLowerCase();
-
-  if (normalizedCategory === "messaging") {
-    return uniqueStrings([
-      ...(supportFacts.messagingState?.nextSteps || []),
-      ...(supportFacts.workspaceState?.nextSteps || []),
-      ...(supportFacts.caseState?.nextSteps || []),
-    ]);
-  }
-
-  if (normalizedCategory === "case_posting") {
-    return uniqueStrings([
-      ...(supportFacts.caseState?.nextSteps || []),
-      ...(supportFacts.workspaceState?.nextSteps || []),
-    ]);
-  }
-
-  if (normalizedCategory === "payment") {
-    if (paymentSubIntent === "billing_method" || paymentSubIntent === "unclear") {
-      return [];
-    }
-    if (paymentSubIntent === "case_payment") {
-      return uniqueStrings([
-        ...(supportFacts.caseState?.nextSteps || []),
-        ...(supportFacts.workspaceState?.nextSteps || []),
-      ]);
-    }
-    return uniqueStrings([
-      ...(supportFacts.payoutState?.nextSteps || []),
-      ...(supportFacts.stripeState?.nextSteps || []),
-    ]);
-  }
-
-  if (normalizedCategory === "stripe_onboarding") {
-    return uniqueStrings([...(supportFacts.stripeState?.nextSteps || [])]);
-  }
-
-  return uniqueStrings(supportFacts.nextSteps || []);
-}
 
 function deriveConfidence(category = "", facts = {}) {
   const hasCase = Boolean(facts.caseState?.caseId);
@@ -4626,11 +4335,11 @@ function summarizeSupportIssueLabel({
   if (ask === "messaging_access") return caseTitle ? `messaging in ${caseTitle}` : "messaging issue";
   if (ask === "workspace_access") return caseTitle ? `workspace access in ${caseTitle}` : "workspace issue";
   if (ask === "participant_lookup") return caseTitle ? `participant details for ${caseTitle}` : "participant question";
-  if (ask === "case_status") return caseTitle ? `status of ${caseTitle}` : "case status question";
-  if (ask === "help_with_case") return caseTitle ? `case help for ${caseTitle}` : "case question";
+  if (ask === "case_status") return caseTitle ? `status of ${caseTitle}` : "Matter status question";
+  if (ask === "help_with_case") return caseTitle ? `Matter help for ${caseTitle}` : "Matter question";
   if (ask === "billing_payment_method") return "billing method question";
   if (ask === "payment_clarify") return "payment question";
-  if (ask === "case_payment") return caseTitle ? `case payment for ${caseTitle}` : "case payment issue";
+  if (ask === "case_payment") return caseTitle ? `Matter payment for ${caseTitle}` : "Matter payment issue";
   if (ask === "payout_question") return caseTitle ? `payout for ${caseTitle}` : "payout issue";
   if (ask === "stripe_onboarding") return "Stripe payout setup";
   if (ask === "profile_save") return "Save Preferences issue";
@@ -4642,7 +4351,7 @@ function summarizeSupportIssueLabel({
   if (ask === "navigation" || ask === "product_guidance" || ask === "generic_intake" || ask === "issue_resolved") return "";
 
   if (normalizedCategory && normalizedCategory !== "unknown") {
-    if (normalizedCategory === "case_posting") return "case issue";
+    if (normalizedCategory === "case_posting") return "Matter issue";
     if (normalizedCategory === "payment") return "payment issue";
     if (normalizedCategory === "stripe_onboarding") return "payout setup";
     if (normalizedCategory === "profile_save") return "Save Preferences issue";
@@ -4681,10 +4390,10 @@ function formatSupportTopicLabel(topicKey = "") {
     profile_guidance: "profile guidance",
     theme_preferences: "theme preferences",
     settings_navigation: "settings navigation",
-    case_navigation: "case navigation",
+    case_navigation: "Matter navigation",
     billing_support: "billing support",
     messaging_support: "messaging support",
-    case_support: "case support",
+    case_support: "Matter support",
     issue_status: "issue status",
     support_review: "support review",
     general_guidance: "general guidance",
@@ -4818,49 +4527,8 @@ function buildConversationTopicTrail(previousTopics = [], nextLabel = "") {
   return [...new Set(trail)].slice(0, 3);
 }
 
-function shouldReferenceCurrentIssue({ text = "", conversationState = {}, primaryAsk = "" } = {}) {
-  const issueLabel = trimString(conversationState.currentIssueLabel, 180);
-  if (!issueLabel) return false;
-  if (String(primaryAsk || "").trim().toLowerCase() === "issue_resolved") return false;
-  if (String(primaryAsk || "").trim().toLowerCase() === "issue_reopen") return false;
-  if (String(primaryAsk || "").trim().toLowerCase() === "issue_review_status") return false;
 
-  const normalized = String(text || "").trim().toLowerCase();
-  if (!normalized) return false;
-  if (/\b(still|same|again|yet)\b/i.test(normalized)) return true;
-  if (/\b(it|that|this)\b/i.test(normalized) && String(conversationState.activeAsk || "").trim().toLowerCase() === String(primaryAsk || "").trim().toLowerCase()) {
-    return true;
-  }
-  return false;
-}
 
-function buildCurrentIssueLead({ text = "", conversationState = {} } = {}) {
-  const issueLabel = trimString(conversationState.currentIssueLabel, 180);
-  if (!issueLabel) return "";
-  const normalized = String(text || "").trim().toLowerCase();
-  if (/\b(still|same|again|yet)\b/i.test(normalized)) {
-    return `I'm still with you on the ${issueLabel}.`;
-  }
-  return `Staying with the ${issueLabel},`;
-}
-
-function applyConversationMemoryTone({
-  reply = "",
-  text = "",
-  conversationState = {},
-  primaryAsk = "",
-  conversationPlan = {},
-} = {}) {
-  const nextReply = trimString(reply, MAX_REPLY_LENGTH);
-  if (!nextReply) return "";
-  if (conversationPlan.shouldRetainIssueContext !== true) return nextReply;
-  if (!shouldReferenceCurrentIssue({ text, conversationState, primaryAsk })) return nextReply;
-  if (/^(i('|’)m still with you|staying with the)\b/i.test(nextReply)) return nextReply;
-
-  const lead = buildCurrentIssueLead({ text, conversationState });
-  if (!lead) return nextReply;
-  return normalizeReplyText(`${lead} ${nextReply}`.trim());
-}
 
 function normalizeSupportEntity(entity = {}) {
   return {
@@ -4921,7 +4589,7 @@ function buildOpenTicketIssueLabel(ticket = {}) {
   }
   if (["payment", "stripe_onboarding", "payments_risk", "fees"].includes(category)) return "payout issue";
   if (category === "messaging") return "messaging issue";
-  if (["case_posting", "case_workflow", "job_application"].includes(category)) return "case issue";
+  if (["case_posting", "case_workflow", "job_application"].includes(category)) return "Matter issue";
   if (category === "profile_save") return "Save Preferences issue";
   return "support issue";
 }
@@ -5151,64 +4819,8 @@ function shouldTreatAsStrongNewAsk(text = "", activeAsk = "") {
   return false;
 }
 
-function buildFrustrationAcknowledgement(frustration = {}) {
-  if (frustration.frustrationScore >= 3) return "I'm sorry you've had to deal with that.";
-  if (frustration.frustrationScore >= 2) return "I know that's frustrating.";
-  return "";
-}
 
-function buildConversationalClarificationReply({
-  orchestration = {},
-  frustration = {},
-  conversationPlan = {},
-  text = "",
-} = {}) {
-  const primaryAsk = String(orchestration.primaryAsk || "").toLowerCase();
-  const topicKey = String(conversationPlan.topicKey || "").toLowerCase();
-  const splitTopics = detectSplitSupportRequest(text, orchestration.relevantFacts?.userRole || "");
-  const detectedTopics = splitTopics.length ? splitTopics.map((topic) => formatTopicSelectionLabel(topic).toLowerCase()) : describeDetectedSupportTopics(text);
-  const empatheticLead =
-    frustration.frustrationScore >= 3
-      ? "I'm sorry you've had to deal with that. "
-      : frustration.frustrationScore >= 2
-      ? "I know that's frustrating. "
-      : "";
 
-  if ((splitTopics.length || detectOverloadedSupportRequest(text)) && detectedTopics.length) {
-    return `${empatheticLead}I can help with ${formatNaturalList(detectedTopics)}. Which one do you want to start with?`.trim();
-  }
-
-  if (primaryAsk === "generic_intake" || topicKey === "general_support") {
-    return `${empatheticLead}I can help with payouts, cases, messages, profile settings, or platform issues. What are you trying to do?`.trim();
-  }
-
-  if (topicKey === "general_guidance" || primaryAsk === "product_guidance") {
-    return `${empatheticLead}Tell me what you're trying to do, and I'll point you in the right direction.`.trim();
-  }
-
-  if (primaryAsk === "navigation") {
-    return `${empatheticLead}Tell me what page or area you're looking for, and I'll point you there.`.trim();
-  }
-
-  return `${empatheticLead}Tell me what you're trying to do and what happened, and I'll take it from there.`.trim();
-}
-
-function deriveSupportSnapshotCategoryHint(text = "", analysisCategory = "") {
-  const normalized = String(text || "").trim().toLowerCase();
-  const category = String(analysisCategory || "").trim().toLowerCase();
-
-  if (category && category !== "unknown") return category;
-  if (/\b(can'?t access|cannot access|locked out of)\b/i.test(normalized) && /\b(workspace|case|matter)\b/i.test(normalized)) {
-    return "case_posting";
-  }
-  if (/\b(upload|share)\b/i.test(normalized) && /\b(documents?|files?)\b/i.test(normalized)) {
-    return "case_posting";
-  }
-  if (/\b(messages?|chat|thread|msg)\b/i.test(normalized)) {
-    return "messaging";
-  }
-  return category || "unknown";
-}
 
 async function buildWelcomeSupportState({ user = {}, conversation = {}, pageContext = {} } = {}) {
   const supportMeta = conversation?.metadata?.support || {};
@@ -5291,23 +4903,23 @@ async function buildWelcomeSupportState({ user = {}, conversation = {}, pageCont
     } else if (viewName === "case-detail" && pageContext.caseId && repeatViewCount >= 2) {
       proactivePrompt = {
         key: `case-help:${trimString(pageContext.caseId, 80)}`,
-        text: "Need help with this case?",
-        actionText: "Get case help",
-        message: "I need help with this case.",
+        text: "Need help with this Matter?",
+        actionText: "Get Matter help",
+        message: "I need help with this Matter.",
       };
     } else if (viewName === "dashboard-attorney" && role === "attorney" && supportOpenCount >= 2) {
       proactivePrompt = {
         key: "attorney-dashboard-help",
-        text: "Need help finding a paralegal or funding a case?",
+        text: "Need help finding a paralegal or funding a Matter?",
         actionText: "Get help",
-        message: "I need help with a case.",
+        message: "I need help with a Matter.",
       };
     } else if (viewName === "dashboard-paralegal" && role === "paralegal" && supportOpenCount >= 2) {
       proactivePrompt = {
         key: "paralegal-dashboard-help",
-        text: "Need help with payouts, messaging, or a case workspace?",
+        text: "Need help with payouts, messaging, or a Matter workspace?",
         actionText: "Get help",
-        message: "I need help with a case.",
+        message: "I need help with a Matter.",
       };
     }
   }
@@ -5318,103 +4930,6 @@ async function buildWelcomeSupportState({ user = {}, conversation = {}, pageCont
   };
 }
 
-function responsePolicy({
-  text = "",
-  orchestration = {},
-  conversationState = {},
-  lastAssistantMessage = null,
-  candidateReply = "",
-  frustration = {},
-  escalation = {},
-  conversationPlan = {},
-} = {}) {
-  const lastReply = normalizeForComparison(lastAssistantMessage?.text || conversationState.lastAssistantReply || "");
-  const nextReply = normalizeForComparison(candidateReply);
-  const repeated = Boolean(lastReply && nextReply && lastReply === nextReply);
-  let responseMode = String(orchestration.responseMode || "DIRECT_ANSWER").toUpperCase();
-  let reply = candidateReply;
-  const frustrationAcknowledgement = buildFrustrationAcknowledgement(frustration);
-
-  if (frustration.needsAcknowledgement && frustrationAcknowledgement && !repeated) {
-    const normalizedAcknowledgement = normalizeForComparison(frustrationAcknowledgement);
-    if (!nextReply.startsWith(normalizedAcknowledgement)) {
-      reply = `${frustrationAcknowledgement} ${reply}`.trim();
-    }
-  }
-
-  if (
-    responseMode === "CLARIFY_ONCE" &&
-    orchestration.primaryAsk === "generic_intake" &&
-    (
-      frustration.needsAcknowledgement ||
-      trimString(conversationState.activeAsk, 120) ||
-      detectOverloadedSupportRequest(text) ||
-      detectSplitSupportRequest(text, orchestration.relevantFacts?.userRole || "").length
-    )
-  ) {
-    reply = buildConversationalClarificationReply({
-      orchestration,
-      frustration,
-      conversationPlan,
-      text,
-    });
-  }
-
-  if (repeated) {
-    if (["topic_switch", "correction", "new_topic", "same_topic_followup"].includes(String(conversationPlan.turnKind || ""))) {
-      return {
-        responseMode,
-        reply: candidateReply,
-        repeated,
-        maxSentences: 4,
-      };
-    }
-    if (orchestration.primaryAsk === "navigation" || /^you can (find|open|update) that here\.?$/i.test(String(candidateReply || "").trim())) {
-      return {
-        responseMode,
-        reply: candidateReply,
-        repeated,
-        maxSentences: 2,
-      };
-    }
-    if (responseMode === "DIRECT_ANSWER" && orchestration.primaryAsk === "responsiveness_issue") {
-      responseMode = "ESCALATE";
-      reply =
-        conversationState.escalationOffered === true
-          ? "If they still haven't replied, the team can review the thread."
-          : buildEscalationReply("responsiveness_issue");
-    } else if (responseMode === "DIRECT_ANSWER" && orchestration.awaitingField) {
-      responseMode = "CLARIFY_ONCE";
-      reply = orchestration.awaitingField === "case_identifier"
-        ? "Which case are you asking about?"
-        : "Tell me a little more about what you're trying to do.";
-    } else if (responseMode === "CLARIFY_ONCE" && orchestration.primaryAsk === "generic_intake") {
-      reply = buildConversationalClarificationReply({
-        orchestration,
-        frustration,
-        conversationPlan,
-        text,
-      });
-    } else if (orchestration.primaryAsk === "payment_clarify") {
-      reply = buildPaymentClarificationReply(orchestration.relevantFacts || {});
-    } else {
-      responseMode = "CLARIFY_ONCE";
-      reply = buildConversationalClarificationReply({
-        orchestration,
-        frustration,
-        conversationPlan,
-        text,
-      });
-    }
-  }
-
-  return {
-    responseMode,
-    reply,
-    repeated,
-    maxSentences: 4,
-  };
-}
 
 function buildAssistantSummary({ category = "", reply = "", facts = {}, pageContext = {} } = {}) {
   const parts = [`Category: ${formatCategoryLabel(category)}.`];
@@ -5533,300 +5048,10 @@ function buildGroundedReply({ analysis = {}, facts = {}, pageContext = {}, optio
   if (category === "case_posting") return buildCaseReply(facts);
   if (category === "account_approval") return buildApprovalReply(facts);
 
-  return buildGenericReply({ analysis, facts, pageContext });
+  return buildGenericReply({ analysis, pageContext });
 }
 
-function buildTaskAnswer({
-  task = "UNKNOWN",
-  message = "",
-  facts = {},
-  pageContext = {},
-  analysis = {},
-  previousState = {},
-} = {}) {
-  if (task === "NAVIGATION") {
-    return resolveNavigationTarget({ text: message, pageContext, supportFacts: facts, previousState });
-  }
 
-  if (task === "FACT_LOOKUP") {
-    const lookupIntent = detectFactLookupIntent(message);
-    if (lookupIntent === "participant") {
-      return { reply: buildParticipantReply(facts, { text: message }), navigation: null };
-    }
-    if (lookupIntent === "status") {
-      return { reply: buildCaseStatusReply(facts), navigation: null };
-    }
-    if (lookupIntent === "stripe") {
-      return { reply: buildStripeReply(facts, { text: message }), navigation: null };
-    }
-    return { reply: buildCaseReply(facts), navigation: null };
-  }
-
-  if (task === "EXPLAIN") {
-    return buildExplainReply(facts, {
-      text: message,
-      pageContext,
-      conversationState: previousState,
-    });
-  }
-
-  if (task === "TROUBLESHOOT") {
-    const troubleshootIntent = detectTroubleshootIntent(message, facts.userRole || "");
-    if (troubleshootIntent === "account_access") {
-      return {
-        reply: String(analysis.category || "").toLowerCase() === "password_reset"
-          ? "You can change your password in Security settings."
-          : "You can manage account access from Security settings.",
-        navigation: null,
-      };
-    }
-    if (troubleshootIntent === "billing") {
-      return { reply: buildBillingMethodReply(facts), navigation: null };
-    }
-    if (troubleshootIntent === "payout") {
-      return { reply: buildPayoutReply(facts, { text: message, paymentSubIntent: "payout" }), navigation: null };
-    }
-    if (troubleshootIntent === "case_payment") {
-      return { reply: buildCasePaymentReply(facts), navigation: null };
-    }
-    if (troubleshootIntent === "messaging") {
-      return { reply: buildMessagingReply(facts), navigation: null };
-    }
-    if (troubleshootIntent === "workspace") {
-      return { reply: buildWorkspaceAccessReply(facts), navigation: null };
-    }
-    if (troubleshootIntent === "payment_ambiguous") {
-      return { reply: buildPaymentClarificationReply(facts), navigation: null };
-    }
-    return { reply: buildGenericReply({ analysis, facts, pageContext }), navigation: null };
-  }
-
-  if (task === "HUMAN_ISSUE") {
-    const escalationShown = previousState.escalationShown === true || previousState.escalationOffered === true;
-    if (escalationShown || /\b(still|again|nothing|yet|same)\b/i.test(String(message || ""))) {
-      return {
-        reply: "If they still haven't replied, I'm sending this to the team for review now.",
-        navigation: null,
-      };
-    }
-    return {
-      reply: buildResponsivenessReply(facts),
-      navigation: null,
-    };
-  }
-
-  if (task === "ESCALATION") {
-    return {
-      reply: buildEscalationReply("request_human_help"),
-      navigation: null,
-    };
-  }
-
-  return {
-    reply: buildIntakeReply({ followUpAttempted: previousState.lastResponseType === "ASK" }),
-    navigation: null,
-  };
-}
-
-function buildTaskDrivenReplyPayload({
-  text = "",
-  analysis = {},
-  pageContext = {},
-  facts = {},
-  previousState = {},
-  task = "UNKNOWN",
-  activeEntity = null,
-  frustration = {},
-} = {}) {
-  const responseType = chooseTaskResponseType({
-    task,
-    message: text,
-    previousState,
-    activeEntity,
-    facts,
-  });
-  const answer = buildTaskAnswer({
-    task,
-    message: text,
-    facts,
-    pageContext,
-    analysis,
-    previousState,
-  });
-
-  let reply = "";
-  let awaiting = null;
-  let navigation = answer.navigation || null;
-  if (responseType === "ASK") {
-    if (task === "NAVIGATION" && answer.reply) {
-      reply = answer.reply;
-    } else if (task === "FACT_LOOKUP" || task === "TROUBLESHOOT") {
-      awaiting = "case";
-      reply = "Which case is this about?";
-    } else {
-      reply = buildIntakeReply({ followUpAttempted: previousState.lastResponseType === "ASK" });
-    }
-  } else if (responseType === "ESCALATE") {
-    reply = answer.reply || buildEscalationReply("request_human_help");
-  } else {
-    if (task === "NAVIGATION" && answer.mode === "resolved") {
-      reply = answer.reply;
-      navigation = answer.navigation || null;
-    } else {
-      reply = answer.reply;
-    }
-  }
-
-  reply = simplifyResponseLanguage(trimString(reply, MAX_REPLY_LENGTH));
-  const policy = responsePolicy({
-    text,
-    orchestration: {
-      primaryAsk: task,
-      responseMode: responseType,
-      awaitingField: awaiting || "",
-    },
-    conversationState: previousState,
-    lastAssistantMessage: null,
-    candidateReply: reply,
-    frustration,
-    escalation: {
-      needsEscalation: responseType === "ESCALATE",
-      escalationReason:
-        task === "HUMAN_ISSUE"
-          ? "interaction_responsiveness_review"
-          : responseType === "ESCALATE"
-          ? "support_review_recommended"
-          : "",
-    },
-  });
-
-  const showEscalationCard =
-    responseType === "ESCALATE" &&
-    previousState.escalationSent !== true &&
-    previousState.escalationShown !== true;
-  const category = mapPrimaryAskToCategory(
-    task === "FACT_LOOKUP"
-      ? detectFactLookupIntent(text) === "participant"
-        ? "participant_lookup"
-        : detectFactLookupIntent(text) === "status"
-        ? "case_status"
-        : detectFactLookupIntent(text) === "stripe"
-        ? "stripe_onboarding"
-        : "help_with_case"
-      : task === "NAVIGATION"
-      ? "navigation"
-      : task === "EXPLAIN"
-      ? "product_guidance"
-      : task === "HUMAN_ISSUE"
-      ? "responsiveness_issue"
-      : task === "TROUBLESHOOT"
-      ? detectTroubleshootIntent(text, facts.userRole || "") === "billing"
-        ? "billing_payment_method"
-        : detectTroubleshootIntent(text, facts.userRole || "") === "payout"
-        ? "payout_question"
-        : detectTroubleshootIntent(text, facts.userRole || "") === "case_payment"
-        ? "case_payment"
-        : detectTroubleshootIntent(text, facts.userRole || "") === "workspace"
-        ? "workspace_access"
-        : detectTroubleshootIntent(text, facts.userRole || "") === "messaging"
-        ? "messaging_access"
-        : "generic_intake"
-      : task === "ESCALATION"
-      ? "request_human_help"
-      : "generic_intake",
-    analysis.category
-  );
-  const actions = buildSelfServiceActions({
-    category,
-    primaryAsk: category,
-    paymentSubIntent:
-      category === "payment"
-        ? detectTroubleshootIntent(text, facts.userRole || "") === "billing"
-          ? "billing_method"
-          : detectTroubleshootIntent(text, facts.userRole || "") === "case_payment"
-          ? "case_payment"
-          : detectTroubleshootIntent(text, facts.userRole || "") === "payout"
-          ? "payout"
-          : "none"
-        : "none",
-    navigation,
-    supportFacts: facts,
-    pageContext,
-  });
-  const suggestedReplies =
-    responseType === "ASK" && awaiting === "case"
-      ? ["This case", "Across all messages"]
-      : [];
-
-  return {
-    text: policy.reply,
-    payload: {
-      category,
-      categoryLabel: formatCategoryLabel(category),
-      urgency: String(analysis.urgency || "medium").toLowerCase(),
-      confidence: activeEntity || ["NAVIGATION", "EXPLAIN"].includes(task) ? "high" : "medium",
-      provider: analysis.provider || "rules",
-      aiEnabled: analysis.aiEnabled === true,
-      grounded: true,
-      pageContext: {
-        ...pageContext,
-        ...(navigation ? { navigation } : {}),
-      },
-      supportFacts: facts,
-      primaryAsk: category,
-      activeTask: task,
-      activeEntity: activeEntity
-        ? { type: "case", id: activeEntity, source: pageContext.caseId ? "page_context" : "resolved" }
-        : null,
-      awaitingField: awaiting || "",
-      awaiting: awaiting || null,
-      navigation,
-      actions,
-      suggestedReplies,
-      manualReviewSuggested: showEscalationCard,
-      needsEscalation: showEscalationCard,
-      escalationReason:
-        task === "HUMAN_ISSUE"
-          ? "interaction_responsiveness_review"
-          : responseType === "ESCALATE"
-          ? "support_review_recommended"
-          : "",
-      awaitingClarification: responseType === "ASK",
-      intakeMode: task === "UNKNOWN",
-      detailLevel: "concise",
-      routing: buildRouting(category, String(analysis.urgency || "medium").toLowerCase()),
-      responseMode: responseType,
-      responseType,
-      sentiment: frustration.sentiment,
-      frustrationScore: frustration.frustrationScore,
-      escalationPriority: frustration.escalationPriority,
-      escalation: {
-        available: showEscalationCard,
-        requested: false,
-        ticketId: "",
-        ticketReference: "",
-        reason:
-          task === "HUMAN_ISSUE"
-            ? "interaction_responsiveness_review"
-            : responseType === "ESCALATE"
-            ? "support_review_recommended"
-            : "",
-        requestedAt: null,
-      },
-    },
-    internalSummary: buildAssistantSummary({
-      category,
-      reply: policy.reply,
-      facts,
-      pageContext: {
-        ...pageContext,
-        primaryAsk: task,
-        responseMode: responseType,
-        ...(navigation ? { navigation } : {}),
-      },
-    }),
-  };
-}
 
 function buildReplyPayload({ analysis = {}, pageContext = {}, supportFacts = {}, text = "", conversationContext = {} } = {}) {
   const conversationState = conversationContext.supportState || {};
@@ -5853,7 +5078,6 @@ function buildReplyPayload({ analysis = {}, pageContext = {}, supportFacts = {},
     supportFacts: effectiveSupportFacts,
     conversationState,
     issueLifecycle: conversationContext.issueLifecycle || null,
-    frustration,
     task: conversationContext.task || conversationState.activeTask || "",
     resolvedCaseId: conversationContext.resolvedCaseId || "",
     resolvedCaseSource: conversationContext.resolvedCaseSource || "",
@@ -6012,20 +5236,8 @@ function buildReplyPayload({ analysis = {}, pageContext = {}, supportFacts = {},
   const awaitingClarification = navigation.mode === "clarify" || Boolean(persistedAwaitingField);
 
   const shaped = shapeSupportResponse({
-    category,
     text,
     groundedReply,
-    supportFacts: orchestration.relevantFacts,
-    nextSteps: [],
-    escalation,
-    intakeMode,
-    awaitingClarification,
-    options: {
-      paymentSubIntent,
-      text,
-      frustrationScore: frustration.frustrationScore,
-      primaryAsk: orchestration.primaryAsk,
-    },
   });
 
   const conversationPlan = planSupportConversationTurn({
@@ -6104,7 +5316,6 @@ function buildReplyPayload({ analysis = {}, pageContext = {}, supportFacts = {},
     supportFacts: orchestration.relevantFacts,
     conversationState,
     selectionTopics: persistedSelectionTopics,
-    navigation: navigation.navigation,
   });
 
   return {
@@ -6296,123 +5507,8 @@ async function getLatestAssistantMessageForConversation(conversationId) {
     .lean();
 }
 
-function isCaseHelpPrompt(text = "") {
-  return /\b(help with (?:a|my|this) case|help with (?:a|my|this) matter|case help|matter help)\b/i.test(
-    String(text || "")
-  );
-}
 
-function getRoleAwareFallbackReply(user = {}, text = "") {
-  const role = String(user?.role || "").trim().toLowerCase();
-  if (role === "attorney" && isCaseHelpPrompt(text)) {
-    return {
-      text:
-        "I can help with an LPC matter from a few angles: open matters, applicants or invites, messages, files, tasks, funding, or completion. Open your matters to pick the case, or tell me what part is stuck and I'll narrow it down.",
-      suggestedReplies: ["Open matters", "Applicants or invites", "Messages or files"],
-      actions: [
-        buildActionPayload({ label: "Open matters", href: "dashboard-attorney.html#cases" }),
-        buildActionPayload({ label: "Browse paralegals", href: "browse-paralegals.html" }),
-      ].filter(Boolean),
-    };
-  }
-  if (role === "paralegal" && isCaseHelpPrompt(text)) {
-    return {
-      text:
-        "I can help with a case workspace, application, messages, files, tasks, or payout status. Tell me which case or what part is stuck and I'll narrow it down.",
-      suggestedReplies: ["Case workspace", "Messages or files", "Payout status"],
-      actions: [buildActionPayload({ label: "Open assigned matters", href: "dashboard-paralegal.html#cases" })].filter(Boolean),
-    };
-  }
-  if (role === "attorney") {
-    return {
-      text:
-        "I can help with LPC attorney questions about posting matters, hiring paralegals, billing, messages, case workspaces, or account settings. What are you trying to do?",
-      suggestedReplies: ["Post a matter", "Billing", "Messages"],
-      actions: [],
-    };
-  }
-  if (role === "paralegal") {
-    return {
-      text:
-        "I can help with LPC paralegal questions about your profile, applications, messages, case workspaces, payouts, or account settings. What are you trying to do?",
-      suggestedReplies: ["Profile", "Applications", "Payouts"],
-      actions: [],
-    };
-  }
-  if (role === "admin") {
-    return {
-      text:
-        "I can help with LPC admin questions about approvals, support operations, control-room visibility, user review, or platform workflows. What are you trying to do?",
-      suggestedReplies: ["Approvals", "Support ops", "Control room"],
-      actions: [],
-    };
-  }
-  return {
-    text:
-      "I can help with LPC questions about accounts, cases, messages, payments, or platform workflows. What are you trying to do?",
-    suggestedReplies: [],
-    actions: [],
-  };
-}
 
-function buildSupportFallbackPayload({ user = {}, text = "" } = {}) {
-  const fallback = getRoleAwareFallbackReply(user, text);
-  return {
-    text: fallback.text,
-    payload: {
-      category: "general_support",
-      categoryLabel: "Support",
-      urgency: "medium",
-      confidence: "low",
-      provider: "fallback",
-      manualReviewSuggested: false,
-      needsEscalation: false,
-      escalationReason: "",
-      routing: null,
-      navigation: null,
-      actions: fallback.actions || [],
-      suggestedReplies: fallback.suggestedReplies,
-      grounded: true,
-      supportFacts: null,
-      primaryAsk: "general_support",
-      activeTask: "ANSWER",
-      activeEntity: null,
-      awaiting: null,
-      awaitingField: "",
-      responseMode: "DIRECT_ANSWER",
-      escalation: {
-        available: false,
-        requested: false,
-        ticketId: "",
-        ticketReference: "",
-        reason: "",
-        requestedAt: null,
-      },
-      sentiment: "neutral",
-      frustrationScore: 0,
-      escalationPriority: "normal",
-      currentIssueLabel: "",
-      currentIssueSummary: "",
-      compoundIntent: "",
-      lastCompoundBranch: "",
-      selectionTopics: [],
-      lastSelectionTopic: "",
-      topicKey: "",
-      topicLabel: "",
-      topicMode: "",
-      turnKind: "",
-      recentTopics: [],
-      lastNavigationLabel: "",
-      lastNavigationHref: "",
-      turnCount: 1,
-      awaitingClarification: false,
-      intakeMode: false,
-      detailLevel: "concise",
-      aiEnabled: false,
-    },
-    internalSummary: "OpenAI support reply failed; returned role-aware LPC fallback.",
-  };
-}
 
 function hasMeaningfulSupportFactValue(value) {
   if (value === null || value === undefined) return false;
@@ -6613,8 +5709,6 @@ function buildLlmAssistantPayload({
   allowFallbackSuggestions = true,
 } = {}) {
   const brevityAdjustedReply = enforceSupportReplyBrevity(reply, {
-    category,
-    paymentSubIntent,
     detailLevel,
   });
   const safeReply = trimString(brevityAdjustedReply, MAX_REPLY_LENGTH) || "I'm having trouble right now, please try again.";
@@ -6628,6 +5722,9 @@ function buildLlmAssistantPayload({
           ctaHref: trimString(navigation.ctaHref, 500),
           ctaType: trimString(navigation.ctaType, 80) || "deep_link",
           inlineLinkText: trimString(navigation.inlineLinkText, 40) || "here",
+          ...( /^[a-z][a-z0-9_.]{1,79}$/.test(String(navigation.commandCode || ""))
+            ? { commandCode: String(navigation.commandCode) }
+            : {} ),
         }
       : null;
   const navigationAdjustedReply = stripRedundantNavigationCopy(safeReply, safeNavigation);
@@ -6654,7 +5751,14 @@ function buildLlmAssistantPayload({
     ? actions.map((value) => sanitizeActionLikePayload(value)).filter(Boolean)
     : [];
   const fallbackActions =
-    providedActions.length > 0
+    safeNavigation?.commandCode
+      ? [{
+          type: "deep_link",
+          label: safeNavigation.ctaLabel,
+          href: safeNavigation.ctaHref,
+          commandCode: safeNavigation.commandCode,
+        }]
+      : providedActions.length > 0
       ? providedActions
       : allowFallbackActions
       ? buildSelfServiceActions({
@@ -6685,7 +5789,6 @@ function buildLlmAssistantPayload({
           paymentSubIntent: resolvedPaymentSubIntent,
           supportFacts: safeSupportFacts,
           selectionTopics,
-          navigation: safeNavigation,
         })
       : [];
   const resolvedResponseMode =
@@ -6802,6 +5905,19 @@ function sanitizeModelGroundingValue(value, depth = 0) {
     "paymentMethodId",
     "transferId",
     "clientSecret",
+    "stripeMode",
+    "paymentIntentId",
+    "escrowIntentId",
+    "payoutTransferId",
+    "storageKey",
+    "previewKey",
+    "archiveZipKey",
+    "internalNotes",
+    "auditLog",
+    "auditLogs",
+    "documents",
+    "files",
+    "messages",
   ]);
   return Object.entries(value).reduce((result, [key, entry]) => {
     if (deniedKeys.has(key)) return result;
@@ -6810,7 +5926,7 @@ function sanitizeModelGroundingValue(value, depth = 0) {
   }, {});
 }
 
-function buildModelServerDecision(reply = {}) {
+function buildModelServerDecision(reply = {}, { contextual = false } = {}) {
   const payload = reply?.payload || {};
   return {
     canonicalReply: trimString(reply?.text, MAX_REPLY_LENGTH),
@@ -6825,8 +5941,8 @@ function buildModelServerDecision(reply = {}) {
     confidence: trimString(payload.confidence, 40),
     needsEscalation: payload.needsEscalation === true,
     escalationReason: trimString(payload.escalationReason, 160),
-    navigation: payload.navigation || null,
-    allowedActions: Array.isArray(payload.actions) ? payload.actions : [],
+    navigation: contextual ? null : payload.navigation || null,
+    allowedActions: contextual ? [] : Array.isArray(payload.actions) ? payload.actions : [],
     requiredSuggestions: Array.isArray(payload.suggestedReplies) ? payload.suggestedReplies : [],
   };
 }
@@ -7131,7 +6247,6 @@ async function buildAssistantReply({
     : await fetchTaskFacts({
         task,
         message: normalizedText,
-        analysis,
         user: supportUser,
         pageContext,
         previousState: supportState,
@@ -7169,6 +6284,10 @@ async function buildAssistantReply({
   if (
     ["platform_knowledge", "paralegal_pending", "deadline_lookup"].includes(
       String(serverReply.payload.primaryAsk || "").toLowerCase()
+    ) ||
+    (
+      /\b(?:invoices?|receipts?)\b/i.test(normalizedText) &&
+      String(serverReply.payload.navigation?.ctaHref || "") === "dashboard-attorney.html#funds"
     )
   ) {
     return serverReply;
@@ -7181,7 +6300,7 @@ async function buildAssistantReply({
     currentMessageId: conversationContext.currentMessageId || "",
     pageContext,
     verifiedSupportFacts: sanitizeModelGroundingValue(verifiedSupportFacts),
-    serverDecision: buildModelServerDecision(serverReply),
+    serverDecision: buildModelServerDecision(serverReply, { contextual: Boolean(pageContext.objectType) }),
     conversationState: sanitizeModelGroundingValue(supportState),
     issueLifecycle: sanitizeModelGroundingValue(issueLifecycle),
     safetyIdentifier: buildOpenAiSafetyIdentifier(supportUser),
@@ -7255,7 +6374,7 @@ async function createOrReuseOpenConversationDocument({ user = {}, update = {} } 
         $set: update,
       },
       {
-        new: true,
+        returnDocument: "after",
         upsert: true,
         setDefaultsOnInsert: true,
       }
@@ -7965,7 +7084,7 @@ async function createConversationMessage({
       systemMessage = escalationResult.systemMessage || null;
       syncedTicket = escalationResult.ticketDoc || null;
     } catch (error) {
-      console.error("Auto-escalation failed for support conversation", error);
+      runtimeLogger.error("Auto-escalation failed for support conversation", error);
       syncedTicket = await syncEscalatedTicketFromConversation({
         conversationId: conversation._id,
         latestUserMessage: normalizedText,
@@ -8026,21 +7145,10 @@ function buildEscalationMessageText(ticketReference = "", handoffSummary = "") {
   return `${base} I've shared a summary with the team so you won't need to repeat yourself.`;
 }
 
-async function notifySupportEscalationOnce({
-  userId = null,
-  userRole = "",
-  sourcePage = "",
-  caseTitle = "",
-  ticketId = "",
-  ticketReference = "",
-} = {}) {
-  return null;
-}
-
 function buildTicketSubject(categoryLabel = "", latestUserMessage = "") {
   const normalizedCategoryLabel = normalizeForComparison(categoryLabel);
   let category = "";
-  if (normalizedCategoryLabel === "case workflow") category = "case_posting";
+  if (["case workflow", "matter workflow"].includes(normalizedCategoryLabel)) category = "case_posting";
   if (normalizedCategoryLabel === "payments") category = "payment";
   if (normalizedCategoryLabel === "messaging") category = "messaging";
   if (normalizedCategoryLabel === "profile updates") category = "profile_save";
@@ -8048,11 +7156,11 @@ function buildTicketSubject(categoryLabel = "", latestUserMessage = "") {
 
   const cleaned = cleanSupportIssueLabelText(latestUserMessage || "", category);
   if (cleaned) {
-    if (category === "case_posting") return "Case issue";
+    if (category === "case_posting") return "Matter issue";
     return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
   }
 
-  if (category === "case_posting") return "Case issue";
+  if (category === "case_posting") return "Matter issue";
   if (category === "profile_save") return "Save Preferences issue";
   if (category === "messaging") return "Messaging issue";
   if (category === "payment") return "Payment issue";
@@ -8399,11 +7507,6 @@ async function ensureConversationEscalated({
 
   const ticketId = normalizeId(ticketDoc._id);
   const ticketReference = formatSupportTicketReference(ticketId);
-  const caseTitle =
-    assistantMessage?.metadata?.supportFacts?.caseState?.title ||
-    ticketDoc.supportFactsSnapshot?.caseState?.title ||
-    ticketDoc.supportFactsSnapshot?.payoutState?.relevantCaseTitle ||
-    "";
 
   if (conversation.escalation?.requested !== true) {
     systemMessage = await SupportMessage.create({
@@ -8420,14 +7523,6 @@ async function ensureConversationEscalated({
       },
     });
 
-    await notifySupportEscalationOnce({
-      userId: user._id,
-      userRole: user.role || "",
-      sourcePage: context.sourcePage || "",
-      caseTitle,
-      ticketId,
-      ticketReference,
-    });
   }
 
   const updatedAssistantMessage = await updateAssistantEscalationMetadata({

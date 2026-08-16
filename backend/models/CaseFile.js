@@ -10,11 +10,21 @@ const caseFileSchema = new Schema(
     originalNameHash: { type: String, trim: true, index: true, default: "" },
     storageKey: { type: String, required: true, trim: true },
     storageKeyHash: { type: String, trim: true, index: true, default: "" },
+    storageKeyFingerprint: { type: String, trim: true, default: undefined, select: false },
     previewKey: { type: String, trim: true, default: "" },
     mimeType: { type: String, trim: true, default: "" },
     previewMimeType: { type: String, trim: true, default: "" },
     size: { type: Number, default: 0 },
     previewSize: { type: Number, default: 0 },
+    securityStatus: {
+      type: String,
+      enum: ["pending", "clean", "blocked", "error", "not_required"],
+      default: "pending",
+      index: true,
+    },
+    securityScanResult: { type: String, trim: true, default: "PENDING" },
+    securityScannedAt: { type: Date, default: null },
+    securityCheckedAt: { type: Date, default: null },
     uploadedByRole: { type: String, enum: ["attorney", "paralegal", "admin"], default: "attorney" },
     status: { type: String, enum: ["pending_review", "approved", "attorney_revision"], default: "pending_review" },
     version: { type: Number, default: 1 },
@@ -31,20 +41,22 @@ const caseFileSchema = new Schema(
   },
   {
     timestamps: { createdAt: true, updatedAt: false },
-    versionKey: false,
+    optimisticConcurrency: true,
     minimize: false,
   }
 );
 
 caseFileSchema.index({ caseId: 1, createdAt: -1 });
-
-caseFileSchema.pre("save", function (next) {
-  try {
-    encryptCaseFileFields(this);
-    next();
-  } catch (err) {
-    next(err);
+caseFileSchema.index(
+  { caseId: 1, storageKeyFingerprint: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { storageKeyFingerprint: { $type: "string" } },
   }
+);
+
+caseFileSchema.pre("save", function () {
+  encryptCaseFileFields(this);
 });
 
 module.exports = mongoose.model("CaseFile", caseFileSchema);

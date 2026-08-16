@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger, logPromiseFailure } = require("../../utils/logger");
+const runtimeLogger = createRuntimeLogger("services:director:directorPortalService");
 const mongoose = require("mongoose");
 
 const Case = require("../../models/Case");
@@ -209,7 +211,7 @@ async function upsertRecordFromImport({ profile, item, state = "" } = {}) {
   const record = await DirectorOutreachRecord.findOneAndUpdate(
     { directorUserId: profile.userId, attorneyEmail },
     update,
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
   );
 
   let eventCreated = false;
@@ -234,7 +236,7 @@ async function upsertRecordFromImport({ profile, item, state = "" } = {}) {
 
   if (eventCreated && eventType === "reply_received") {
     await notifyFounderOfReply({ record, item }).catch((err) => {
-      console.warn("[director] founder reply notification failed", err?.message || err);
+      runtimeLogger.warn("[director] founder reply notification failed", err?.message || err);
     });
   }
 
@@ -367,7 +369,7 @@ async function sendDirectorOutreach({ user = {}, attorneyName = "", attorneyEmai
         updatedAt: now,
       },
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
   );
 
   try {
@@ -428,7 +430,7 @@ async function updateDirectorZohoSyncStatus(profile, payload = {}) {
         zohoLastSyncError: String(payload.error || "").slice(0, 1000),
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 }
 
@@ -466,7 +468,7 @@ async function importDirectorSentMail({
         status: "failed",
         summary: "Sent mail import failed.",
         error: err?.message || String(err),
-      }).catch(() => {});
+      }).catch(logPromiseFailure(runtimeLogger, "[director] sent-mail failure status persistence failed"));
     }
     throw err;
   }
@@ -505,7 +507,7 @@ async function importDirectorInboxReplies({
         status: "failed",
         summary: "Inbox import failed.",
         error: err?.message || String(err),
-      }).catch(() => {});
+      }).catch(logPromiseFailure(runtimeLogger, "[director] inbox failure status persistence failed"));
     }
     throw err;
   }
@@ -571,7 +573,7 @@ async function autoImportDirectorMail({
         status: "failed",
         summary: "Auto-sync failed.",
         error: err?.message || String(err),
-      }).catch(() => {});
+      }).catch(logPromiseFailure(runtimeLogger, "[director] auto-sync failure status persistence failed"));
     }
   }
 
@@ -693,7 +695,7 @@ async function sendAutomaticFollowUp({ record, profile, now = new Date() } = {})
         stage: "follow_up_sent",
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!claim) return { sent: false, reason: "not_claimed" };
 
@@ -863,7 +865,7 @@ async function updateDirectorRecordState({ user = {}, recordId = "", state = "" 
       directorUserId: new mongoose.Types.ObjectId(user.id || user._id),
     },
     { $set: { state: normalizedState, updatedAt: new Date() } },
-    { new: true }
+    { returnDocument: "after" }
   ).lean();
   if (!record) {
     const error = new Error("Outreach record not found.");

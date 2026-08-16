@@ -296,11 +296,11 @@
               <input id="incidentFeatureKey" name="featureKey" type="text" maxlength="120" value="${escapeHtml(defaults.featureKey)}" placeholder="Optional" />
             </div>
             <div class="incident-field">
-              <label for="incidentCaseId">Related case id</label>
+              <label for="incidentCaseId">Related Matter ID</label>
               <input id="incidentCaseId" name="caseId" type="text" maxlength="64" value="${escapeHtml(defaults.caseId)}" placeholder="Optional" />
             </div>
             <div class="incident-field">
-              <label for="incidentJobId">Related job id</label>
+              <label for="incidentJobId">Related Matter ID</label>
               <input id="incidentJobId" name="jobId" type="text" maxlength="64" value="${escapeHtml(defaults.jobId)}" placeholder="Optional" />
             </div>
             <div class="incident-field">
@@ -396,7 +396,7 @@
     if (!session || role !== surface) {
       container.innerHTML = buildUnavailableMarkup(
         "Structured reporting unavailable",
-        "This form is available for signed-in users on the matching help surface."
+        "This form is available for signed-in users on the corresponding help page."
       );
       return;
     }

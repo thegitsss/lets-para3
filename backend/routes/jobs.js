@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:jobs");
 const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();
@@ -5,6 +7,7 @@ const Job = require("../models/Job");
 const Application = require("../models/Application");
 const Case = require("../models/Case");
 const User = require("../models/User");
+const { buildAuthenticatedProfilePhotoUrl } = require("../services/profilePhotoDelivery");
 const auth = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const applicationsRouter = require("./applications");
@@ -17,8 +20,11 @@ const {
   evaluateMatterPosting,
   isAttorneyPaymentMethodRequired,
 } = require("../services/attorneyWorkflowPolicy");
+const { createDevOnlyEmailSet } = require("../utils/devOnlyEmailSet");
+const { resolveMatterDeadlineDate } = require("../utils/businessDate");
+const { protectMutations } = require("../utils/csrf");
 const createApplicationForJob = applicationsRouter?.createApplicationForJob;
-const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
+const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = createDevOnlyEmailSet([
   "samanthasider+attorney@gmail.com",
   "samanthasider+56@gmail.com",
   "game4funwithme1+1@gmail.com",
@@ -53,24 +59,6 @@ const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
 }, {});
 const authenticatedGuards = [auth, requireApproved];
 
-const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-const noop = (_req, _res, next) => next();
-const csrf = require("csurf");
-const csrfMiddleware = csrf({
-  cookie: {
-    httpOnly: true,
-    sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
-  },
-});
-const protectMutations = (req, res, next) => {
-  const requireCsrf = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-  if (!requireCsrf) return noop(req, res, next);
-  const method = String(req.method || "").toUpperCase();
-  if (SAFE_METHODS.has(method)) return next();
-  return csrfMiddleware(req, res, next);
-};
-
 const mutatingGuards = [...authenticatedGuards, protectMutations];
 
 async function attorneyHasPaymentMethod(attorneyId) {
@@ -83,7 +71,7 @@ async function attorneyHasPaymentMethod(attorneyId) {
     const customer = await stripe.customers.retrieve(attorney.stripeCustomerId);
     return Boolean(customer?.invoice_settings?.default_payment_method);
   } catch (err) {
-    console.warn("[jobs] Unable to verify attorney payment method", err?.message || err);
+    runtimeLogger.warn("[jobs] Unable to verify attorney payment method", err?.message || err);
     return false;
   }
 }
@@ -106,21 +94,21 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
     if (isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.POST_MATTER) && !hasPaymentMethod) {
       return res
         .status(403)
-        .json({ error: "Connect Stripe and add a payment method before posting a job." });
+        .json({ error: "Connect Stripe and add a payment method before posting a Matter." });
     }
     const caseId = req.body?.caseId || null;
     let caseDoc = null;
     if (caseId) {
       if (!mongoose.isValidObjectId(caseId)) {
-        return res.status(400).json({ error: "Invalid case id" });
+        return res.status(400).json({ error: "Invalid Matter ID" });
       }
       caseDoc = await Case.findById(caseId).select("attorney attorneyId jobId");
       if (!caseDoc) {
-        return res.status(404).json({ error: "Case not found" });
+        return res.status(404).json({ error: "Matter not found" });
       }
       const ownerId = String(caseDoc.attorneyId || caseDoc.attorney || "");
       if (!ownerId || ownerId !== String(req.user._id)) {
-        return res.status(403).json({ error: "You are not the attorney for this case" });
+        return res.status(403).json({ error: "You are not the attorney for this Matter" });
       }
       if (caseDoc.jobId) {
         const existingById = await Job.findById(caseDoc.jobId);
@@ -137,7 +125,7 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
     const attorneyProfile = await User.findById(req.user._id || req.user.id).select("state");
     const attorneyState = String(attorneyProfile?.state || "").trim().toUpperCase();
     if (!attorneyState) {
-      return res.status(400).json({ error: "Attorney profile state is required to post a job." });
+      return res.status(400).json({ error: "Attorney profile state is required to create a Matter." });
     }
 
     const title = cleanTitle(req.body.title, 150);
@@ -174,7 +162,7 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
       attorneyState,
     });
     if (!postingPolicy.ready) {
-      return res.status(400).json({ error: "This job is not ready to publish.", blockers: postingPolicy.blockers });
+      return res.status(400).json({ error: "This Matter is not ready to publish.", blockers: postingPolicy.blockers });
     }
 
     const jobPayload = {
@@ -200,7 +188,7 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
     }
 
     if (!job) {
-      return res.status(409).json({ error: "A job already exists for this case." });
+      return res.status(409).json({ error: "A posting already exists for this Matter." });
     }
 
     if (caseDoc) {
@@ -209,7 +197,7 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
 
     res.json(job);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -221,7 +209,10 @@ function buildAttorneyPreview(doc) {
     firstName: doc.firstName || "",
     lastName: doc.lastName || "",
     lawFirm: doc.lawFirm || doc.firmName || "",
-    profileImage: doc.profileImage || doc.avatarURL || "",
+    profileImage:
+      doc.profileImage || doc.avatarURL
+        ? buildAuthenticatedProfilePhotoUrl(doc)
+        : "",
   };
 }
 
@@ -260,7 +251,7 @@ function shapeListing({ job = null, caseDoc = null }) {
     _id: caseDoc?._id || job?._id,
     caseId: caseDoc?._id || job?.caseId || null,
     jobId: job?._id || caseDoc?.jobId || null,
-    title: job?.title || caseDoc?.title || "Untitled Case",
+    title: job?.title || caseDoc?.title || "Untitled Matter",
     practiceArea: job?.practiceArea || caseDoc?.practiceArea || "",
     briefSummary: caseDoc?.briefSummary || "",
     shortDescription: job?.shortDescription || caseDoc?.briefSummary || "",
@@ -273,9 +264,17 @@ function shapeListing({ job = null, caseDoc = null }) {
     state: resolvedState,
     locationState: job?.locationState || job?.state || caseDoc?.locationState || caseDoc?.state || "",
     createdAt: job?.createdAt || caseDoc?.createdAt || new Date(),
+    deadlineDate: resolveMatterDeadlineDate(caseDoc),
+    deadline: resolveMatterDeadlineDate(caseDoc) || null,
     attorneyId: normalizedAttorneyId,
     attorney: buildAttorneyPreview(attorneySource),
-    applicantsCount: Array.isArray(caseDoc?.applicants) ? caseDoc.applicants.length : job?.applicantsCount || 0,
+    applicantsCount: job
+      ? Math.max(0, Number(job.applicantsCount || 0))
+      : Array.isArray(caseDoc?.applicants)
+        ? caseDoc.applicants.filter(
+            (entry) => String(entry?.status || "pending").toLowerCase() === "pending"
+          ).length
+        : 0,
     status: caseDoc?.status || job?.status || "open",
     contextCaseId: caseDoc?._id || job?.caseId || null,
     tasks: Array.isArray(caseDoc?.tasks) ? caseDoc.tasks : [],
@@ -324,7 +323,7 @@ router.get("/open", ...authenticatedGuards, requireRole("paralegal"), async (req
       Case.find(caseFilter)
         .sort({ createdAt: -1 })
         .limit(limit)
-        .select("title practiceArea details briefSummary totalAmount lockedTotalAmount remainingAmount currency state locationState status applicants attorney attorneyId jobId createdAt tasks relistRequestedAt payoutFinalizedAt payoutFinalizedType")
+        .select("title practiceArea details briefSummary totalAmount lockedTotalAmount remainingAmount currency state locationState status applicants attorney attorneyId jobId createdAt deadline deadlineDate tasks relistRequestedAt payoutFinalizedAt payoutFinalizedType")
         .populate({
           path: "attorney",
           select: "firstName lastName lawFirm firmName profileImage avatarURL",
@@ -398,6 +397,7 @@ router.get("/open", ...authenticatedGuards, requireRole("paralegal"), async (req
         const apps = await Application.find({
           paralegalId: req.user._id || req.user.id,
           jobId: { $in: jobIds },
+          status: { $ne: "withdrawn" },
         })
           .select("jobId createdAt")
           .lean();
@@ -411,7 +411,7 @@ router.get("/open", ...authenticatedGuards, requireRole("paralegal"), async (req
 
     res.json(items);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -421,7 +421,7 @@ router.get("/my", ...authenticatedGuards, requireRole("attorney"), async (req, r
     const jobs = await Job.find({ attorneyId: req.user._id });
     res.json(jobs);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -437,14 +437,14 @@ router.post("/:jobId/apply", ...mutatingGuards, requireRole("paralegal"), async 
     if (err.status) {
       return res.status(err.status).json({ error: err.message });
     }
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-// POST /jobs/:jobId/hire/:paralegalId — disabled to avoid hiring without funded escrow
+// POST /jobs/:jobId/hire/:paralegalId — disabled to avoid hiring without confirmed Matter funding
 router.post("/:jobId/hire/:paralegalId", auth, protectMutations, requireRole(["attorney"]), async (_req, res) => {
   return res.status(410).json({
-    error: "Direct job-to-paralegal hire is disabled. Use the case hire + funding flow to ensure the case is funded.",
+    error: "Direct posting-to-paralegal hire is disabled. Use the Matter hire and funding flow to ensure the Matter is funded.",
   });
 });
 

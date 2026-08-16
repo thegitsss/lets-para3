@@ -1,8 +1,13 @@
 const crypto = require("crypto");
 const Case = require("../models/Case");
 
-function buildFundingFingerprint({ caseId, amount, currency = "usd", mode = "escrow" }) {
-  return [mode, String(caseId || ""), String(amount || 0), String(currency || "usd").toLowerCase()].join(":");
+function buildFundingFingerprint({ caseId, amount, currency = "usd", mode = "escrow", targetId } = {}) {
+  const parts = [mode, String(caseId || "")];
+  // Hiring keys historically bind a selected paralegal; other funding flows do not.
+  // Preserve both established formats so deploys never rotate an in-flight Stripe key.
+  if (targetId !== undefined) parts.push(String(targetId || ""));
+  parts.push(String(amount || 0), String(currency || "usd").toLowerCase());
+  return parts.join(":");
 }
 
 async function ensureFundingRequestKey(caseId, fingerprint, { forceNew = false } = {}) {
@@ -41,7 +46,7 @@ async function ensureFundingRequestKey(caseId, fingerprint, { forceNew = false }
       },
     },
     {
-      new: true,
+      returnDocument: "after",
       projection: { fundingRequestKey: 1 },
     }
   ).lean();

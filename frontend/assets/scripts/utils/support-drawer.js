@@ -6,9 +6,10 @@ import {
   isSupportedEscalationMetadata,
 } from "./support-response-ui.mjs";
 import { startStripeOnboarding } from "./stripe-connect.js";
+import { activateDialogFocus, deactivateDialogFocus } from "./dialog-focus.js";
 
 const SUPPORT_STYLESHEET_ID = "lpc-support-drawer-styles";
-const SUPPORT_STYLESHEET_HREF = "/assets/styles/support-drawer.css";
+const SUPPORT_STYLESHEET_HREF = "/assets/styles/support-drawer.css?v=20260812-remove-legacy-tab";
 const SUPPORT_DRAWER_ID = "supportDrawer";
 const SUPPORT_THREAD_ID = "supportThread";
 const SUPPORT_CONTEXT_STORAGE_KEY = "lpc-support-context";
@@ -24,7 +25,7 @@ function getRoleAwareComposerPrompts(role = "") {
   if (normalizedRole === "attorney") {
     return [
       "Ask about billing",
-      "Ask about a case",
+      "Ask about a Matter",
       "Ask about messages",
       "Ask about profile settings",
       "Describe what's blocking you",
@@ -34,7 +35,7 @@ function getRoleAwareComposerPrompts(role = "") {
     return [
       "Ask about a payout",
       "Ask about Stripe onboarding",
-      "Ask about a case",
+      "Ask about a Matter",
       "Ask about messages",
       "Describe what's blocking you",
     ];
@@ -50,7 +51,7 @@ function getRoleAwareComposerPrompts(role = "") {
   }
   return [
     "Ask about billing",
-    "Ask about a case",
+    "Ask about a Matter",
     "Ask about messages",
     "Ask about account settings",
     "Describe what's blocking you",
@@ -61,10 +62,10 @@ function getRoleAwareQuickPrompts(role = "") {
   const normalizedRole = String(role || "").trim().toLowerCase();
   if (normalizedRole === "attorney") {
     return [
-      "Where is Billing & Payments?",
-      "Where can I see my cases?",
+      "Where are Payments?",
+      "Where can I see my Matters?",
       "I can't send messages",
-      "I need help with a case",
+      "I need help with a Matter",
     ];
   }
   if (normalizedRole === "paralegal") {
@@ -72,7 +73,7 @@ function getRoleAwareQuickPrompts(role = "") {
       "Where is my payout?",
       "Why aren't payouts enabled?",
       "I can't send messages",
-      "I need help with a case",
+      "I need help with a Matter",
     ];
   }
   if (normalizedRole === "admin") {
@@ -85,9 +86,9 @@ function getRoleAwareQuickPrompts(role = "") {
   }
   return [
     "Where is billing?",
-    "Where can I see my cases?",
+    "Where can I see my Matters?",
     "I can't send messages",
-    "I need help with a case",
+    "I need help with a Matter",
   ];
 }
 
@@ -238,36 +239,12 @@ function syncSidebarCollapseTab() {
 }
 
 function ensureSidebarCollapseTab() {
-  if (typeof document === "undefined" || state.sidebarCollapseTab?.isConnected) return;
-  const sidebar = document.querySelector("#sidebarNav.sidebar");
-  if (!(sidebar instanceof HTMLElement)) return;
-  const tab = document.createElement("button");
-  tab.type = "button";
-  tab.className = "support-sidebar-collapse-tab";
-  tab.setAttribute("aria-controls", "sidebarNav");
-  tab.innerHTML = `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="m14.5 6-6 6 6 6"></path>
-    </svg>
-  `;
-  tab.addEventListener("click", () => {
-    if (isCompactSidebarLayout()) {
-      document.body.classList.toggle("nav-open");
-      syncSidebarCollapseTab();
-      return;
-    }
-    if (!canCollapseDashboardSidebar()) return;
-    document.body.classList.toggle("support-sidebar-collapsed");
-    syncSidebarCollapseTab();
-  });
-  document.body.appendChild(tab);
-  state.sidebarCollapseTab = tab;
-  if (typeof MutationObserver !== "undefined") {
-    state.sidebarClassObserver?.disconnect?.();
-    state.sidebarClassObserver = new MutationObserver(syncSidebarCollapseTab);
-    state.sidebarClassObserver.observe(document.body, { attributes: true, attributeFilter: ["class"] });
-  }
-  syncSidebarCollapseTab();
+  if (typeof document === "undefined") return;
+  document.querySelectorAll(".support-sidebar-collapse-tab").forEach((tab) => tab.remove());
+  document.body?.classList.remove("support-sidebar-collapsed");
+  state.sidebarClassObserver?.disconnect?.();
+  state.sidebarClassObserver = null;
+  state.sidebarCollapseTab = null;
 }
 
 function readSupportSessionMarker() {
@@ -315,7 +292,8 @@ function inferViewName(pathname = "", hash = "", caseId = "") {
 function readSupportContextStore() {
   if (typeof window === "undefined") return { views: [], opens: [] };
   try {
-    const raw = window.localStorage.getItem(SUPPORT_CONTEXT_STORAGE_KEY);
+    window.localStorage.removeItem(SUPPORT_CONTEXT_STORAGE_KEY);
+    const raw = window.sessionStorage.getItem(SUPPORT_CONTEXT_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
     return {
       views: Array.isArray(parsed.views) ? parsed.views : [],
@@ -329,7 +307,7 @@ function readSupportContextStore() {
 function writeSupportContextStore(nextStore = {}) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(SUPPORT_CONTEXT_STORAGE_KEY, JSON.stringify(nextStore));
+    window.sessionStorage.setItem(SUPPORT_CONTEXT_STORAGE_KEY, JSON.stringify(nextStore));
   } catch (_error) {
     // Ignore storage failures.
   }
@@ -441,7 +419,7 @@ function ensureStylesheet() {
 
 function buildLauncherIcon() {
   return `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path>
       <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-2.9 2.7-2.9 4"></path>
       <path d="M12 17h.01"></path>
@@ -515,10 +493,6 @@ function buildUtilityIcon(type = "") {
   return `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6.2 11.7 2.9 5.3a1.5 1.5 0 0 0 2.8-.9v-3h3.2A2 2 0 0 0 17 10.5l-1.5-5A2.2 2.2 0 0 0 13.4 4H6.2"></path><path d="M3 4h3.2v7.7H3z"></path></svg>`;
 }
 
-function buildArrowIcon() {
-  return `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h11"></path><path d="m11 6 4 4-4 4"></path></svg>`;
-}
-
 function createDrawerMarkup() {
   const backdrop = document.createElement("div");
   backdrop.className = "support-drawer-backdrop";
@@ -531,6 +505,7 @@ function createDrawerMarkup() {
   drawer.setAttribute("role", "dialog");
   drawer.setAttribute("aria-modal", "true");
   drawer.setAttribute("aria-hidden", "true");
+  drawer.setAttribute("inert", "");
   drawer.setAttribute("aria-labelledby", "supportDrawerTitle");
   drawer.hidden = !state.stylesReady;
   drawer.innerHTML = `
@@ -592,7 +567,7 @@ function createDrawerMarkup() {
           ${buildSendIcon()}
         </button>
       </div>
-      <p class="support-composer-hint"><span class="support-composer-hint-icon">${buildShieldCheckIcon()}</span><span>Uses your authorized LPC context. Verify important details.</span></p>
+      <p class="support-composer-hint"><span class="support-composer-hint-icon">${buildShieldCheckIcon()}</span><span>AI support uses OpenAI. Don’t enter confidential or privileged matter content, passwords, payment details, or documents. Use the Matter workspace for work content, and verify important decisions. <a href="/privacy.html" target="_blank" rel="noopener">Privacy</a></span></p>
     </form>
   `;
 
@@ -815,40 +790,44 @@ function getCurrentPageContext() {
   const params = new URLSearchParams(window.location.search);
   const session = getSupportSession();
   const pathname = window.location.pathname;
-  const search = window.location.search;
   const hash = window.location.hash;
   const caseId = params.get("caseId") || params.get("highlightCase") || "";
-  const billingPaymentMethod =
-    window.__lpcBillingPaymentMethod && typeof window.__lpcBillingPaymentMethod === "object"
-      ? {
-          brand: String(window.__lpcBillingPaymentMethod.brand || ""),
-          last4: String(window.__lpcBillingPaymentMethod.last4 || ""),
-          exp_month: Number(window.__lpcBillingPaymentMethod.exp_month || 0) || null,
-          exp_year: Number(window.__lpcBillingPaymentMethod.exp_year || 0) || null,
-          type: String(window.__lpcBillingPaymentMethod.type || ""),
-        }
-      : null;
+  const productivity = window.LPCProductivityContext && typeof window.LPCProductivityContext === "object"
+    ? window.LPCProductivityContext
+    : {};
+  const panelContext = window.LPCContextPanel?.current?.() || null;
+  const commandContext = {
+    role: String(session?.role || ""),
+    caseId: String(productivity.caseId || caseId || ""),
+    availableMatterTabs: Array.isArray(productivity.availableMatterTabs) ? productivity.availableMatterTabs : [],
+  };
+  const permittedCommandCodes = window.LPCProductivityCommands?.listCommands
+    ? window.LPCProductivityCommands.listCommands(commandContext).map((command) => command.code).slice(0, 20)
+    : [];
   const viewName = inferViewName(pathname, hash, caseId);
   const behavior = getSupportBehaviorSnapshot(viewName);
   return {
-    href: window.location.href,
     pathname,
-    search,
     hash,
     title: document.title,
     label: heading?.textContent?.trim() || "",
     viewName,
     roleHint: String(session?.role || ""),
-    caseId,
+    caseId: commandContext.caseId,
     jobId: params.get("jobId") || "",
     applicationId: params.get("applicationId") || "",
     repeatViewCount: behavior.repeatViewCount,
     supportOpenCount: behavior.supportOpenCount,
     recentViewName: behavior.recentViewName,
-    ...(billingPaymentMethod &&
-    (billingPaymentMethod.last4 || billingPaymentMethod.brand || billingPaymentMethod.exp_month || billingPaymentMethod.exp_year)
-      ? { paymentMethod: billingPaymentMethod }
-      : {}),
+    currentTab: String(productivity.currentTab || ""),
+    objectType: String(panelContext?.kind || productivity.objectType || ""),
+    objectId: String(panelContext?.id || productivity.objectId || ""),
+    matterStatus: String(productivity.status || ""),
+    matterRelationship: String(productivity.relationship || ""),
+    matterAttention: String(productivity.attention || ""),
+    matterNextAction: String(productivity.nextAction || ""),
+    availableMatterTabs: commandContext.availableMatterTabs,
+    permittedCommandCodes,
   };
 }
 
@@ -889,25 +868,22 @@ function getLatestAssistantMessage() {
   return [...state.messages].reverse().find((message) => getMessageVariant(message) === "assistant") || null;
 }
 
-function getLatestTeamReply() {
-  return [...state.messages].reverse().find((message) => getMessageVariant(message) === "team") || null;
-}
 
 function buildSuggestedReplyMessage(option = "") {
   const normalized = String(option || "").trim().toLowerCase();
   if (!normalized) return "";
-  if (normalized === "this case") return "This is happening in this case.";
+  if (normalized === "this case") return "This is happening in this Matter.";
   if (normalized === "across all messages") return "This is happening across all messages.";
   if (normalized === "billing method") return "This is about my billing method.";
-  if (normalized === "case payment") return "This is about a specific case payment.";
+  if (normalized === "case payment") return "This is about a specific Matter payment.";
   if (normalized === "billing") return "I need help with billing.";
   if (normalized === "my applications") return "Where do I see my applications?";
-  if (normalized === "a case") return "I need help with a case.";
-  if (normalized === "browse cases") return "Where can I browse open cases?";
+  if (normalized === "a case") return "I need help with a Matter.";
+  if (normalized === "browse cases") return "Where can I browse open Matters?";
   if (normalized === "messages") return "I need help with messages.";
   if (normalized === "payouts") return "I need help with payouts.";
   if (normalized === "resume application") return "How do I resume my application?";
-  if (normalized === "case payment") return "This is about a specific case payment.";
+  if (normalized === "case payment") return "This is about a specific Matter payment.";
   if (normalized === "billing method") return "This is about my billing method.";
   if (normalized === "profile settings") return "I need help with profile settings.";
   return String(option || "").trim();
@@ -925,9 +901,6 @@ function appendLocalNotice(text = "") {
   });
 }
 
-function getThreadStatusNotice() {
-  return null;
-}
 
 function delay(ms = 0) {
   return new Promise((resolve) => {
@@ -963,13 +936,29 @@ function removeRedundantActionBubbleReference(text = "", navigation = null) {
     .trim();
 }
 
+function validateSupportCommandNavigation(navigation = null) {
+  if (!navigation || typeof navigation !== "object") return null;
+  const code = String(navigation.commandCode || "").trim();
+  if (!code) return navigation;
+  const productivity = window.LPCProductivityContext && typeof window.LPCProductivityContext === "object"
+    ? window.LPCProductivityContext
+    : {};
+  const command = window.LPCProductivityCommands?.resolveCommand?.(code, {
+    role: getSupportRole(),
+    caseId: String(productivity.caseId || ""),
+    availableMatterTabs: Array.isArray(productivity.availableMatterTabs) ? productivity.availableMatterTabs : [],
+  });
+  if (!command || command.href !== String(navigation.ctaHref || "")) return null;
+  return { ...navigation, ctaLabel: command.label, ctaHref: command.href };
+}
+
 function appendMessageBubbleContent(bubble, message = {}) {
   const actionHrefs = new Set(
     (Array.isArray(message.metadata?.actions) ? message.metadata.actions : [])
       .map((action) => String(action?.href || "").trim())
       .filter((href) => isSafeSupportHref(href))
   );
-  const navigation = message.metadata?.navigation || null;
+  const navigation = validateSupportCommandNavigation(message.metadata?.navigation || null);
   const navigationHref = String(navigation?.ctaHref || "").trim();
   const actionDuplicatesNavigation = Boolean(navigationHref && actionHrefs.has(navigationHref));
   const segments = buildSupportInlineSegments(
@@ -1061,6 +1050,13 @@ function createMessageElement(message = {}) {
 async function runSupportAction(action = {}) {
   const actionType = String(action?.type || "").trim().toLowerCase();
   const invokeAction = String(action?.action || "").trim().toLowerCase();
+  const commandCode = String(action?.commandCode || "").trim();
+  if (commandCode) {
+    const command = validateSupportCommandNavigation({ commandCode, ctaHref: String(action?.href || "") });
+    if (!command) return;
+    await navigateFromSupport(command.ctaHref);
+    return;
+  }
   if (actionType === "invoke" && invokeAction === "start_stripe_onboarding") {
     try {
       await startStripeOnboarding();
@@ -1147,6 +1143,10 @@ function createMessageActions(message = {}) {
   bar.className = "support-message-actions";
   actions.slice(0, getAssistantActionLimit(message.metadata)).forEach((action) => {
     const isInvoke = String(action?.type || "").trim().toLowerCase() === "invoke";
+    if (action?.commandCode && !validateSupportCommandNavigation({
+      commandCode: action.commandCode,
+      ctaHref: String(action?.href || ""),
+    })) return;
     if (!isInvoke && !isSafeSupportHref(action?.href || "")) return;
     const button = document.createElement("button");
     button.type = "button";
@@ -1154,7 +1154,9 @@ function createMessageActions(message = {}) {
     button.textContent = String(action.label || "Open");
     button.disabled = state.sending || state.loadingConversation || state.restartingConversation;
     button.addEventListener("click", () => {
-      runSupportAction(action).catch(() => {});
+      runSupportAction(action).catch((error) => {
+        console.error("[support] assistant action rejected", error);
+      });
     });
     bar.appendChild(button);
   });
@@ -1335,10 +1337,7 @@ function renderPrompts() {
     button.className = "support-quick-prompt";
     const label = document.createElement("span");
     label.textContent = promptText;
-    const arrow = document.createElement("span");
-    arrow.className = "support-quick-prompt-arrow";
-    arrow.innerHTML = buildArrowIcon();
-    button.append(label, arrow);
+    button.append(label);
     button.disabled = state.sending || state.loadingConversation || state.restartingConversation;
     button.addEventListener("click", async () => {
       await sendSupportMessage(promptText);
@@ -1510,7 +1509,9 @@ function syncPolling() {
 
   if (state.pollTimer) return;
   state.pollTimer = window.setInterval(() => {
-    refreshConversationMessages({ silent: true }).catch(() => {});
+    refreshConversationMessages({ silent: true }).catch((error) => {
+      console.warn("[support] conversation poll rejected", error);
+    });
   }, 15000);
 }
 
@@ -1545,7 +1546,9 @@ function syncLiveUpdates() {
     );
     source.addEventListener("conversation.ready", () => {});
     source.addEventListener("conversation.updated", () => {
-      refreshConversationMessages({ silent: true }).catch(() => {});
+      refreshConversationMessages({ silent: true }).catch((error) => {
+        console.warn("[support] live conversation refresh rejected", error);
+      });
     });
     source.onerror = () => {
       if (state.eventSource === source) {
@@ -1835,6 +1838,7 @@ function syncPinnedSupportDrawer() {
   state.pinButton?.setAttribute("aria-pressed", isPinned ? "true" : "false");
   state.pinButton?.setAttribute("aria-label", isPinned ? "Unpin assistant" : "Pin assistant while you browse");
   if (state.pinButton) state.pinButton.title = isPinned ? "Unpin assistant" : "Pin assistant";
+  if (isPinned) deactivateDialogFocus(state.drawer, { restoreFocus: false });
 }
 
 function setSupportDrawerPinned(pinned = false) {
@@ -1843,6 +1847,15 @@ function setSupportDrawerPinned(pinned = false) {
   persistPinnedSupportDrawer(state.pinned);
   if (state.pinned) closeSupportMenu();
   syncPinnedSupportDrawer();
+  if (state.open && !state.pinned && state.drawer) {
+    activateDialogFocus(state.drawer, {
+      initialFocus: document.activeElement instanceof HTMLElement && state.drawer.contains(document.activeElement)
+        ? document.activeElement
+        : state.textarea,
+      returnFocus: state.lastFocusedLauncher,
+      onEscape: () => closeSupportDrawer(),
+    });
+  }
 }
 
 export function closeSupportDrawer({ restoreFocus = true } = {}) {
@@ -1855,6 +1868,8 @@ export function closeSupportDrawer({ restoreFocus = true } = {}) {
   document.documentElement.classList.remove("support-drawer-open");
   document.body.classList.remove("support-drawer-open");
   state.drawer?.setAttribute("aria-hidden", "true");
+  state.drawer?.setAttribute("inert", "");
+  deactivateDialogFocus(state.drawer, { restoreFocus: false });
   syncPinnedSupportDrawer();
   syncLauncherState();
   if (restoreFocus && state.lastFocusedLauncher?.focus) {
@@ -1862,7 +1877,7 @@ export function closeSupportDrawer({ restoreFocus = true } = {}) {
   }
 }
 
-export async function openSupportDrawer({ launcher = null, focusComposer = true } = {}) {
+export async function openSupportDrawer({ launcher = null, focusComposer = true, promptText = "", submitPrompt = false } = {}) {
   if (!isSupportSessionAllowed()) return;
   if (!state.open) state.pinned = readPinnedSupportDrawer() && canPinSupportDrawer();
   ensureDrawer();
@@ -1879,13 +1894,27 @@ export async function openSupportDrawer({ launcher = null, focusComposer = true 
   document.documentElement.classList.add("support-drawer-open");
   document.body.classList.add("support-drawer-open");
   state.drawer.setAttribute("aria-hidden", "false");
+  state.drawer.removeAttribute("inert");
   syncPinnedSupportDrawer();
   render();
   await ensureConversationLoaded();
   syncLiveUpdates();
   syncComposerPrompt();
+  const normalizedPrompt = String(promptText || "").trim();
+  if (normalizedPrompt && state.textarea) {
+    state.textarea.value = normalizedPrompt;
+    state.textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    if (submitPrompt) await sendSupportMessage(normalizedPrompt);
+  }
   if (focusComposer && state.textarea) {
     state.textarea.focus();
+  }
+  if (!state.pinned) {
+    activateDialogFocus(state.drawer, {
+      initialFocus: focusComposer ? state.textarea : state.closeButton,
+      returnFocus: state.lastFocusedLauncher,
+      onEscape: () => closeSupportDrawer(),
+    });
   }
 }
 

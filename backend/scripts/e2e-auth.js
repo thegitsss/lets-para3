@@ -1,22 +1,7 @@
 const path = require("path");
 const http = require("http");
 const express = require("express");
-const puppeteer = require("puppeteer");
-
-function patchElementHandleClick() {
-  const { ElementHandle } = puppeteer;
-  if (!ElementHandle || ElementHandle.prototype.__safeClickPatched) return;
-  const original = ElementHandle.prototype.click;
-  ElementHandle.prototype.click = async function (...args) {
-    try {
-      return await this.evaluate((el) => el.click());
-    } catch {
-      return original.apply(this, args);
-    }
-  };
-  ElementHandle.prototype.__safeClickPatched = true;
-}
-patchElementHandleClick();
+const { clickVisible, launchPuppeteer } = require("./puppeteerBrowser");
 
 const VALID_EMAIL = "attorney@example.com";
 const VALID_PASSWORD = "Password123!";
@@ -87,7 +72,7 @@ async function runLoginFlow(page, baseUrl, { email, password }) {
   await page.type("#password", password);
   await Promise.all([
     page.waitForNavigation({ waitUntil: "networkidle0" }),
-    page.evaluate((selector) => document.querySelector(selector)?.click(), "#loginForm button[type=\"submit\"]"),
+    clickVisible(page, "#loginForm button[type=\"submit\"]"),
   ]);
 }
 
@@ -96,7 +81,7 @@ async function runInvalidLoginFlow(page, baseUrl) {
   await page.waitForSelector("#loginForm");
   await page.type("#email", "bad@example.com");
   await page.type("#password", "wrong");
-  await page.evaluate((selector) => document.querySelector(selector)?.click(), "#loginForm button[type=\"submit\"]");
+  await clickVisible(page, "#loginForm button[type=\"submit\"]");
   await page.waitForSelector("#toastBanner.show");
   const toastText = await page.$eval("#toastBanner", (el) => el.textContent.trim());
   if (!toastText || !toastText.toLowerCase().includes("invalid credentials")) {
@@ -108,7 +93,7 @@ async function run() {
   const { server, port } = await startStubServer();
   const baseUrl = `http://localhost:${port}`;
 
-  const browser = await puppeteer.launch({
+  const browser = await launchPuppeteer({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
     protocolTimeout: 120_000,

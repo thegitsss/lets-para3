@@ -1,4 +1,5 @@
-import { requireAuth, secureFetch, logoutUser } from "./auth.js";
+import { requireAuth, secureFetch } from "./auth.js";
+import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
 
 requireAuth("admin");
 
@@ -220,6 +221,12 @@ async function openAudit(recordId) {
   const body = document.getElementById("auditBody");
   if (!panel || !body || !recordId) return;
   panel.hidden = false;
+  panel.removeAttribute("inert");
+  activateDialogFocus(panel, {
+    initialFocus: document.getElementById("closeAuditBtn"),
+    returnFocus: document.activeElement,
+    onEscape: closeAudit,
+  });
   body.innerHTML = `<p class="muted">Loading...</p>`;
   try {
     const res = await secureFetch(`/api/admin/directors/records/${encodeURIComponent(recordId)}/audit`, {
@@ -264,6 +271,14 @@ async function openAudit(recordId) {
   }
 }
 
+function closeAudit() {
+  const panel = document.getElementById("auditPanel");
+  if (!panel) return;
+  panel.hidden = true;
+  panel.setAttribute("inert", "");
+  deactivateDialogFocus(panel);
+}
+
 async function downloadCsv() {
   setStatus("Preparing CSV...");
   try {
@@ -286,18 +301,21 @@ async function downloadCsv() {
 
 document.getElementById("refreshBtn")?.addEventListener("click", loadOverview);
 document.getElementById("downloadCsvBtn")?.addEventListener("click", downloadCsv);
-document.getElementById("logoutBtn")?.addEventListener("click", logoutUser);
-document.getElementById("closeAuditBtn")?.addEventListener("click", () => {
-  const panel = document.getElementById("auditPanel");
-  if (panel) panel.hidden = true;
+document.getElementById("closeAuditBtn")?.addEventListener("click", closeAudit);
+document.getElementById("auditPanel")?.addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) closeAudit();
 });
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-audit-id]");
-  if (button) openAudit(button.getAttribute("data-audit-id")).catch(() => {});
+  if (button) openAudit(button.getAttribute("data-audit-id")).catch((error) => {
+    console.error("[admin-directors] audit detail action rejected", error);
+  });
   const payoutButton = event.target.closest("[data-payout-id]");
   if (payoutButton) {
     const paid = payoutButton.getAttribute("data-paid") === "true";
-    updatePayoutStatus(payoutButton.getAttribute("data-payout-id"), paid).catch(() => {});
+    updatePayoutStatus(payoutButton.getAttribute("data-payout-id"), paid).catch((error) => {
+      console.error("[admin-directors] payout status action rejected", error);
+    });
   }
 });
 

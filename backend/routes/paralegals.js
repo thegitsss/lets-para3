@@ -1,41 +1,32 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:paralegals");
 const router = require("express").Router();
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const { csrfProtection } = require("../utils/csrf");
+const { formatDateOnly } = require("../utils/businessDate");
+const { parseAvailabilityUpdate } = require("../utils/availability");
 const Paralegal = require("../models/User");
-
-function normalizeStatus(value) {
-  const status = String(value || "").toLowerCase();
-  return status === "unavailable" ? "unavailable" : "available";
-}
-
-function normalizeDate(value) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
 
 router.post("/update-availability", verifyToken, requireApproved, requireRole("paralegal"), csrfProtection, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { status, nextAvailable } = req.body || {};
-
-    const normalizedStatus = normalizeStatus(status);
-    const normalizedDate = normalizeDate(nextAvailable);
+    const parsed = parseAvailabilityUpdate(req.body || {});
+    if (parsed.error) return res.status(400).json({ msg: parsed.error });
     const updatedAt = new Date();
 
     const update = {
       availabilityDetails: {
-        status: normalizedStatus,
-        nextAvailable: normalizedDate,
+        status: parsed.status,
+        nextAvailable: parsed.nextAvailable,
         updatedAt,
       },
     };
 
-    if (normalizedStatus === "available") {
+    if (parsed.status === "available") {
       update.availability = "Available now";
-    } else if (normalizedDate) {
-      update.availability = `Unavailable until ${normalizedDate.toLocaleDateString("en-US", {
+    } else if (parsed.nextAvailableDate) {
+      update.availability = `Unavailable until ${formatDateOnly(parsed.nextAvailableDate, "en-US", {
         month: "short",
         day: "numeric",
       })}`;
@@ -43,13 +34,17 @@ router.post("/update-availability", verifyToken, requireApproved, requireRole("p
       update.availability = "Unavailable";
     }
 
-    const result = await Paralegal.findByIdAndUpdate(userId, { $set: update }, { new: true });
+    const result = await Paralegal.findByIdAndUpdate(
+      userId,
+      { $set: update },
+      { returnDocument: "after" }
+    );
     if (!result) {
       return res.status(404).json({ msg: "Paralegal not found" });
     }
 
     const availabilityDetails = {
-      status: result.availabilityDetails?.status || normalizedStatus,
+      status: result.availabilityDetails?.status || parsed.status,
       nextAvailable: result.availabilityDetails?.nextAvailable || null,
       updatedAt: result.availabilityDetails?.updatedAt || updatedAt,
     };
@@ -60,7 +55,7 @@ router.post("/update-availability", verifyToken, requireApproved, requireRole("p
       availabilityDetails,
     });
   } catch (err) {
-    console.error(err);
+    runtimeLogger.error(err);
     res.status(500).json({ msg: "Server error" });
   }
 });

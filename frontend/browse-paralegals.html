@@ -6,15 +6,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Browse Paralegals – Let’s-ParaConnect</title>
+  <meta name="description" content="Browse approved independent paralegals by practice area, experience, availability, and professional background." />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/hero-pages.css" rel="stylesheet" />
+  <link href="assets/styles/hero-pages.css?v=20260729-white-footer" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
-  <script type="module" src="assets/scripts/auth.js"></script>
+  <script type="module" src="assets/scripts/auth.js?v=20260812-state-filter-owner"></script>
   <style>
     :root {
       --gold: #887244;
@@ -134,24 +135,25 @@
 
     .jobs-shell {
       width: min(1200px, 92vw);
-      margin: 60px auto 90px;
+      margin: 38px auto 72px;
       padding: 0;
       box-sizing: border-box;
     }
 
     .layout {
       display: flex;
-      gap: 2rem;
+      gap: 1.25rem;
       align-items: flex-start;
     }
 
     aside.filter {
-      width: 240px;
+      width: 224px;
       flex-shrink: 0;
+      margin-top: 3rem;
       background: #fff;
       border: 1px solid rgba(26, 34, 48, 0.08);
-      border-radius: 20px;
-      padding: 1.2rem;
+      border-radius: 16px;
+      padding: 1rem;
       position: sticky;
       top: 120px;
     }
@@ -161,10 +163,10 @@
       font-size: 1.25rem;
       font-weight: 300;
       text-align: center;
-      margin-bottom: 0.8rem;
+      margin-bottom: 0.65rem;
     }
 
-    .filter-group { margin-bottom: 1.25rem; }
+    .filter-group { margin-bottom: 0.8rem; }
 
     .filter-group label {
       display: block;
@@ -198,7 +200,7 @@
     .filter-actions {
       display: flex;
       flex-direction: column;
-      gap: 0.6rem;
+      gap: 0.45rem;
     }
 
     .filter-actions button {
@@ -222,7 +224,7 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
+      gap: 0.65rem;
     }
 
     .auth-blocker {
@@ -313,39 +315,29 @@
     }
 
     .results-header {
-      background: rgba(255, 255, 255, 0.95);
-      border: 1px solid rgba(26, 34, 48, 0.05);
-      border-radius: 22px;
-      padding: 1.05rem 1.25rem;
-      box-shadow: 0 24px 70px rgba(10, 15, 25, 0.08);
       display: flex;
       flex-wrap: wrap;
-      justify-content: space-between;
-      gap: 1rem;
+      justify-content: flex-end;
       align-items: center;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
     }
-
-    .results-header h2 {
-      margin: 0;
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 2rem;
-      font-weight: 300;
-    }
-
-    .results-header p { color: #64748b; margin: 0.2rem 0 0; }
 
     .results-controls {
       display: flex;
       align-items: center;
-      gap: 0.6rem;
+      gap: 0.45rem;
       flex-wrap: wrap;
     }
 
     .results-controls select {
       border: 1px solid rgba(26, 34, 48, 0.12);
       border-radius: 999px;
-      padding: 0.35rem 0.9rem;
-      font-size: 0.95rem;
+      padding: 0.3rem 0.75rem;
+      font-size: 0.9rem;
       background: #fff;
     }
 
@@ -356,16 +348,16 @@
     .jobs-grid {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 0.55rem;
     }
 
     .job-card {
       border: 1px solid rgba(26, 34, 48, 0.08);
       border-left: 4px solid #111;
       background: #fff;
-      padding: 1.4rem 1.6rem;
-      border-radius: 18px;
-      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+      padding: 1.15rem 1.35rem;
+      border-radius: 14px;
+      box-shadow: none;
     }
 
     .job-card h3 {
@@ -448,13 +440,255 @@
 
     footer a { color: #6b7280; text-decoration: none; }
 
+    .authenticated-browse-sidebar,
+    .authenticated-browse-toggle,
+    .authenticated-browse-backdrop {
+      box-sizing: border-box;
+    }
+
+    .authenticated-browse-sidebar[hidden],
+    .authenticated-browse-toggle[hidden],
+    .authenticated-browse-backdrop[hidden] {
+      display: none !important;
+    }
+
+    .authenticated-browse-sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 300;
+      display: flex;
+      width: 240px;
+      flex-direction: column;
+      padding: 24px 16px;
+      border-right: 1px solid rgba(15, 23, 42, 0.08);
+      background: rgba(245, 245, 245, 0.98);
+      color: #1a1a1a;
+      font-family: "Sarabun", sans-serif;
+    }
+
+    .authenticated-browse-sidebar__logo {
+      margin-bottom: 36px;
+      color: #1a1a1a;
+      font:300 1.7rem/1.1 "Cormorant Garamond", serif;
+      letter-spacing: 0.01em;
+      text-align: center;
+    }
+
+    .authenticated-browse-sidebar nav {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .authenticated-browse-sidebar nav a {
+      padding: 10px 14px;
+      border-radius: 14px;
+      color: #1a1a1a;
+      font:300 0.95rem/1.35 "Sarabun", sans-serif;
+      text-decoration: none;
+    }
+
+    .authenticated-browse-sidebar nav a:hover,
+    .authenticated-browse-sidebar nav a:focus-visible,
+    .authenticated-browse-sidebar nav a.active {
+      background: rgba(0, 0, 0, 0.055);
+      outline: none;
+    }
+
+    .authenticated-browse-sidebar__bottom {
+      display: grid;
+      gap: 12px;
+      margin-top: auto;
+    }
+
+    .authenticated-browse-sidebar__logout {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 14px;
+      background: transparent;
+      color: #1a1a1a;
+      font:300 0.9rem/1.3 "Sarabun", sans-serif;
+      cursor: pointer;
+    }
+
+    .authenticated-browse-sidebar__footer {
+      color: #8a8a8a;
+      font:300 0.7rem/1.4 "Sarabun", sans-serif;
+      text-align: center;
+    }
+
+    .authenticated-browse-sidebar__brand {
+      font-family: "Cormorant Garamond", serif;
+      font-weight:400;
+    }
+
+    .authenticated-browse-toggle {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 320;
+      display: none;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      border-radius: 10px;
+      background: #ffffff;
+      color: #1a1a1a;
+      font:300 0.8rem/1 "Sarabun", sans-serif;
+      cursor: pointer;
+    }
+
+    .authenticated-browse-toggle__glyph {
+      display: grid;
+      width: 18px;
+      gap: 4px;
+    }
+
+    .authenticated-browse-toggle__glyph span {
+      display: block;
+      width: 100%;
+      height: 2px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .authenticated-browse-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 290;
+      background: rgba(15, 23, 42, 0.35);
+    }
+
+    .browse-page-shell {
+      width: 100%;
+      min-width: 0;
+    }
+
+    body.authenticated-browse .browse-page-shell {
+      width: calc(100% - 240px);
+      margin-left: 240px;
+    }
+
+    body.authenticated-browse .jobs-shell {
+      width: min(1200px, 92%);
+      margin-top: 24px;
+    }
+
+    body.authenticated-browse .hero-banner {
+      min-height: 128px;
+      height: 128px;
+      padding: 0;
+      background: #ffffff !important;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    body.authenticated-browse .hero-banner::after,
+    body.authenticated-browse .hero-banner__matter-field {
+      display: none !important;
+    }
+
+    body.authenticated-browse .hero-banner__title {
+      width: min(1200px, 92%);
+      min-height: 128px;
+      display: flex;
+      align-items: flex-end;
+      position: relative;
+      inset: auto;
+      box-sizing: border-box;
+      margin: 0 auto;
+      padding: 48px 0 22px;
+      text-align: left;
+      transform: none;
+    }
+
+    html.has-user-cache .home-footer,
+    body.authenticated-browse .home-footer {
+      display: none !important;
+    }
+
+    html.has-user-cache .utility-header,
+    html.has-user-cache [data-utility-guest],
+    html.has-user-cache [data-utility-auth],
+    html.has-user-cache [data-utility-signup],
+    body.authenticated-browse .utility-header,
+    body.authenticated-browse [data-utility-guest],
+    body.authenticated-browse [data-utility-auth],
+    body.authenticated-browse [data-utility-signup] {
+      display: none !important;
+    }
+
+    body.authenticated-browse .hero-banner__title h1,
+    body.authenticated-browse .filter h2 {
+      font-family: "Sarabun", sans-serif !important;
+      font-weight:600 !important;
+    }
+
+    body.authenticated-browse .hero-banner__title h1 {
+      margin: 0;
+      color: #202124;
+      font-size: clamp(2rem, 3.4vw, 2.5rem) !important;
+      line-height: 1.1;
+      text-shadow: none;
+    }
+
+    body.authenticated-browse :where(
+      .browse-page-shell,
+      .browse-page-shell *,
+      .authenticated-browse-sidebar,
+      .authenticated-browse-sidebar *
+    ) {
+      font-family: "Sarabun", sans-serif !important;
+    }
+
     @media (max-width: 960px) {
       .browse-paralegals-page {
         --mobile-header-offset: calc(env(safe-area-inset-top, 0px) + 88px);
       }
+
+      body.authenticated-browse {
+        padding-left: 0;
+      }
+
+      body.authenticated-browse .browse-page-shell {
+        width: 100%;
+        margin-left: 0;
+      }
+
+      body.authenticated-browse .authenticated-browse-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .authenticated-browse-sidebar {
+        box-shadow: 18px 0 44px rgba(15, 23, 42, 0.18);
+        transform: translateX(-105%);
+        transition: transform 180ms ease;
+      }
+
+      body.authenticated-browse.authenticated-sidebar-open .authenticated-browse-sidebar {
+        transform: translateX(0);
+      }
+
+      body.authenticated-browse .hero-banner {
+        min-height: 112px;
+        height: 112px;
+        padding-top: 0;
+      }
+      body.authenticated-browse .hero-banner__title {
+        width: calc(100% - 32px);
+        min-height: 112px;
+        padding: 48px 52px 18px 0;
+      }
+      body.authenticated-browse .hero-banner__title h1 {
+        font-size: 2rem !important;
+      }
       .layout { flex-direction: column; }
       aside.filter {
         position: fixed;
+        margin-top: 0;
         inset: var(--mobile-header-offset) auto 0 0;
         width: min(320px, 85vw);
         max-width: 90vw;
@@ -906,7 +1140,7 @@
       font-family: 'Cormorant Garamond', serif;
       font-weight: 300;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     }
 
     .pagination-controls button:disabled {
@@ -997,73 +1231,446 @@
       opacity: 1;
       transform: translate(-50%, 0);
     }
+
+    /* Compact Stripe-style filter control. */
+    .browse-paralegals-page .layout {
+      display: block;
+    }
+
+    .browse-paralegals-page .results {
+      position: relative;
+      width: 100%;
+    }
+
+    .browse-paralegals-page .filter-toggle {
+      position: relative;
+      width: 34px;
+      height: 34px;
+      min-width: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      color: #53627a;
+      background: #fff;
+      border: 1px solid #dfe3e8;
+      border-radius: 7px;
+      box-shadow: none;
+      cursor: pointer;
+      transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+    }
+
+    .browse-paralegals-page .filter-toggle:hover,
+    .browse-paralegals-page .filter-toggle:focus-visible,
+    .browse-paralegals-page .filter-toggle[aria-expanded="true"] {
+      color: #24324a;
+      background: #f6f8fb;
+      border-color: #cbd2dc;
+      outline: none;
+    }
+
+    .browse-paralegals-page .filter-toggle svg {
+      width: 17px;
+      height: 17px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .browse-paralegals-page .filter-count {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      min-width: 16px;
+      height: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      color: #fff;
+      background: #635bff;
+      border: 2px solid #fff;
+      border-radius: 999px;
+      font-size: 0.62rem;
+      line-height: 1;
+    }
+
+    .browse-paralegals-page .filter-count[hidden] {
+      display: none;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover {
+      position: absolute;
+      top: 42px;
+      right: 0;
+      left: auto;
+      z-index: 120;
+      width: min(304px, calc(100vw - 32px));
+      max-height: min(520px, calc(100vh - 150px));
+      margin: 0;
+      padding: 14px;
+      overflow: visible;
+      background: #fff;
+      border: 1px solid #dfe3e8;
+      border-radius: 10px;
+      box-shadow: 0 12px 32px rgba(17, 24, 39, 0.13);
+      transform: none;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover[hidden] {
+      display: none !important;
+    }
+
+    .browse-paralegals-page .filter-popover__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 0 12px;
+    }
+
+    .browse-paralegals-page .filter-popover__header h2 {
+      margin: 0;
+      color: #202124;
+      font-family: "Sarabun", sans-serif;
+      font-size: 0.92rem;
+      line-height: 1.2;
+      text-align: left;
+    }
+
+    .browse-paralegals-page .filter-popover__close {
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      color: #6b7280;
+      background: transparent;
+      border: 0;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .browse-paralegals-page .filter-popover__close:hover,
+    .browse-paralegals-page .filter-popover__close:focus-visible {
+      color: #202124;
+      background: #f4f5f7;
+      outline: none;
+    }
+
+    .browse-paralegals-page .filter-popover__close svg {
+      width: 15px;
+      height: 15px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover .filter-group {
+      margin-bottom: 9px;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover :where(select, input[type="text"]) {
+      min-height: 36px;
+      padding: 7px 32px 7px 10px;
+      border-color: #dfe3e8;
+      border-radius: 7px;
+      font-size: 0.86rem;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover #stateList,
+    .browse-paralegals-page aside.filter.filter-popover #specialtyList {
+      right: auto;
+      width: 224px;
+      max-width: 100%;
+      max-height: 168px;
+      box-sizing: border-box;
+      margin-top: 5px;
+      padding: 4px;
+      background: #fff;
+      border: 1px solid #dfe3e8;
+      border-radius: 8px;
+      box-shadow: 0 8px 22px rgba(17, 24, 39, 0.11);
+      scrollbar-width: thin;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover #stateList li,
+    .browse-paralegals-page aside.filter.filter-popover #specialtyList li {
+      min-height: 30px;
+      gap: 8px;
+      padding: 5px 7px;
+      color: #374151;
+      border-radius: 5px;
+      font-size: 0.8rem;
+      line-height: 1.25;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover #stateList li:hover,
+    .browse-paralegals-page aside.filter.filter-popover #stateList li[aria-selected="true"],
+    .browse-paralegals-page aside.filter.filter-popover #specialtyList li:hover,
+    .browse-paralegals-page aside.filter.filter-popover #specialtyList li[aria-selected="true"] {
+      background: #f6f8fb;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover #stateList li label,
+    .browse-paralegals-page aside.filter.filter-popover #specialtyList li label {
+      flex: 1;
+      color: #374151;
+      font-size: 0.8rem;
+      line-height: 1.25;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover #stateList input[type="checkbox"],
+    .browse-paralegals-page aside.filter.filter-popover #specialtyList input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      flex: 0 0 14px;
+      margin: 0;
+      accent-color: #635bff;
+      transform: none;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover .filter-actions {
+      flex-direction: row-reverse;
+      justify-content: flex-start;
+      gap: 7px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #eceef1;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover .filter-actions button {
+      min-height: 32px;
+      padding: 6px 12px;
+      border-color: #dfe3e8;
+      border-radius: 6px;
+      color: #53627a;
+      background: #fff;
+      font-size: 0.8rem;
+      letter-spacing: 0;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover .filter-actions button.primary {
+      color: #fff;
+      background: #635bff;
+      border-color: #635bff;
+    }
+
+    @media (max-width: 960px) {
+      .browse-paralegals-page aside.filter.filter-popover {
+        position: absolute;
+        inset: 42px 0 auto auto;
+        width: min(304px, calc(100vw - 32px));
+        height: auto;
+        max-height: min(520px, calc(100vh - 150px));
+        margin: 0;
+        overflow-y: auto;
+        border-radius: 10px;
+        box-shadow: 0 12px 32px rgba(17, 24, 39, 0.13);
+        transform: none;
+      }
+    }
+
+    /* Compact public-only footer for this directory page. */
+    .browse-paralegals-page .home-footer {
+      padding: 30px clamp(20px, 4vw, 52px) 20px;
+      color: #374151;
+      background: #fff;
+      border-top: 1px solid #e5e7eb;
+      text-align: left;
+    }
+
+    .browse-paralegals-page .home-footer__top,
+    .browse-paralegals-page .home-footer__bottom {
+      width: min(1200px, 100%);
+    }
+
+    .browse-paralegals-page .home-footer__top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 40px;
+      padding-bottom: 28px;
+    }
+
+    .browse-paralegals-page .home-footer__brand p {
+      max-width: 330px;
+      margin-top: 10px;
+      color: #6b7280;
+      font-size: 0.78rem;
+      line-height: 1.5;
+    }
+
+    .browse-paralegals-page .home-footer nav {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px 22px;
+      max-width: 520px;
+      margin: 0;
+    }
+
+    .browse-paralegals-page .home-footer nav a {
+      color: #53627a;
+      font-size: 0.74rem;
+      white-space: nowrap;
+    }
+
+    .browse-paralegals-page .home-footer__bottom {
+      padding-top: 16px;
+      border-top-color: #eceef1;
+    }
+
+    .browse-paralegals-page .home-footer .accessibility-toggle {
+      padding: 6px 9px;
+      border-color: #dfe3e8;
+      border-radius: 6px;
+    }
+
+    @media (max-width: 720px) {
+      .browse-paralegals-page .home-footer__top {
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .browse-paralegals-page .home-footer nav {
+        justify-content: flex-start;
+      }
+    }
   </style>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260812-11" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260812-7"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260812-1" />
+  <script defer src="assets/scripts/universal-header.js?v=20260812-1"></script>
+  <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
+  <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
 </head>
 <body class="browse-jobs-page browse-paralegals-page" data-public-page="true">
   <a class="skip-link" href="#main">Skip to main content</a>
-<header class="site-header">
-    <div class="header-inner">
-      <nav aria-label="Primary"></nav>
-      <a class="brand" href="index.html">Let<span class="accent-apostrophe">’</span>s-ParaConnect</a>
-      <div class="header-actions">
-<a class="pill signup-pill" href="dashboard-attorney.html" id="returnDashboard">RETURN TO DASHBOARD</a>
-      </div>
+  <button class="authenticated-browse-toggle" type="button" aria-label="Open dashboard navigation" aria-controls="authenticatedBrowseSidebar" aria-expanded="false" data-auth-sidebar-toggle hidden>
+    <span class="authenticated-browse-toggle__glyph" aria-hidden="true"><span></span><span></span><span></span></span>
+  </button>
+  <aside class="sidebar authenticated-browse-sidebar" id="authenticatedBrowseSidebar" aria-label="Dashboard navigation" data-auth-sidebar hidden>
+    <div class="logo authenticated-browse-sidebar__logo">Dashboard</div>
+    <nav data-auth-sidebar-nav></nav>
+    <div class="sidebar-bottom authenticated-browse-sidebar__bottom">
+      <div class="sidebar-footer authenticated-browse-sidebar__footer">© <span class="authenticated-browse-sidebar__brand">Let’s-ParaConnect</span> 2026</div>
     </div>
+  </aside>
+  <div class="authenticated-browse-backdrop" data-auth-sidebar-backdrop hidden></div>
+  <div class="browse-page-shell">
+  <header class="utility-header" data-utility-header>
+    <div class="utility-header__inner">
+      <nav class="utility-header__nav" aria-label="Primary navigation">
+        <a href="index.html#how">How It Works</a>
+        <a href="index.html#for-attorneys">For Attorneys</a>
+        <a href="index.html#for-paralegals">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      </nav>
+      <a class="utility-header__brand" href="index.html">Let<span class="utility-header__brand-mark">’</span>s-ParaConnect</a>
+      <div class="utility-header__actions">
+        <div class="utility-header__guest" data-utility-guest>
+          <a class="utility-header__signin" href="login.html">Sign In</a>
+          <a class="utility-header__button" href="signup.html">Get Started</a>
+        </div>
+        <div class="utility-header__member" data-utility-member hidden>
+          <a class="utility-header__button" href="dashboard-attorney.html" data-utility-dashboard>Dashboard</a>
+          <button
+            class="utility-header__account-chip"
+            type="button"
+            aria-expanded="false"
+            aria-haspopup="true"
+            aria-controls="browseAccountMenu"
+            data-utility-account-toggle
+          >
+            <img src="assets/avatar-placeholder.svg" alt="" data-utility-avatar />
+            <span>
+              <strong data-utility-name>LPC Member</strong>
+              <small data-utility-role>Workspace</small>
+            </span>
+          </button>
+          <div class="utility-header__account-menu" id="browseAccountMenu" data-utility-account-menu hidden>
+            <a href="profile-settings.html">Account Settings</a>
+            <button type="button" data-utility-logout>Log Out</button>
+          </div>
+        </div>
+      </div>
+      <button class="utility-header__menu" type="button" aria-expanded="false" aria-controls="utilityBrowseMenu" data-utility-menu-toggle>Menu</button>
+    </div>
+    <nav class="utility-header__mobile" id="utilityBrowseMenu" aria-label="Mobile navigation" data-utility-menu hidden>
+      <a href="index.html#how">How It Works</a>
+      <a href="index.html#for-attorneys">For Attorneys</a>
+      <a href="index.html#for-paralegals">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      <a href="login.html" data-utility-auth>Sign In</a>
+      <button type="button" data-utility-logout hidden>Log Out</button>
+      <a href="signup.html" data-utility-signup>Get Started</a>
+    </nav>
   </header>
 
-  <div class="hero-banner" role="presentation" aria-hidden="true" data-hero-banner></div>
+  <section class="hero-banner" aria-labelledby="browse-paralegals-title" data-hero-banner>
+    <div class="hero-banner__title"><h1 id="browse-paralegals-title">Browse Paralegals</h1></div>
+  </section>
 
   <main id="main" tabindex="-1" class="jobs-shell">
     <div class="layout">
-      <aside class="filter" id="filterMenu">
-        <h2>Filter</h2>
-        <div class="filter-group">
-          <select id="experience" aria-label="Experience">
-            <option value="">Experience</option>
-            <option value="1+ years">1+ years</option>
-            <option value="3+ years">3+ years</option>
-            <option value="5+ years">5+ years</option>
-            <option value="10+ years">10+ years</option>
-          </select>
-        </div>
-
-        <div class="filter-group">
-          <div class="dropdown-wrapper">
-            <input type="text" id="specialtyInput" placeholder="Specialty" aria-label="Specialty" readonly />
-            <ul id="specialtyList"></ul>
-          </div>
-        </div>
-
-        <div class="filter-group">
-          <div class="dropdown-wrapper">
-            <input type="text" id="stateInput" placeholder="State" aria-label="State" autocomplete="off" />
-            <ul id="stateList"></ul>
-          </div>
-          <div class="selected-filter-chips" id="selectedStateChips" aria-live="polite"></div>
-        </div>
-
-        <div class="filter-actions">
-          <button type="button" class="primary" id="applyFilters">Apply</button>
-          <button type="button" id="clearFilters">Reset</button>
-        </div>
-      </aside>
-
       <section class="results">
         <div class="results-header">
-          <div class="title-block">
-            <h2>Available Paralegals</h2>
-          </div>
           <div class="results-controls">
             <label for="sortBy">Sort by</label>
             <select id="sortBy">
-              <option value="">Recommended</option>
               <option value="recent">Newest first</option>
               <option value="experience">Most experience</option>
               <option value="alpha">Name A-Z</option>
             </select>
-            <button type="button" class="filter-toggle" id="filterToggle">Filters</button>
+            <button type="button" class="filter-toggle" id="filterToggle" aria-label="Open filters" aria-controls="filterMenu" aria-expanded="false" title="Filters">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16M7 12h10M10 17h4"></path>
+              </svg>
+              <span class="filter-count" id="filterCount" hidden aria-hidden="true">0</span>
+            </button>
           </div>
         </div>
+        <aside class="filter filter-popover" id="filterMenu" aria-label="Filter paralegals" hidden>
+          <div class="filter-popover__header">
+            <h2>Filters</h2>
+            <button type="button" class="filter-popover__close" data-filter-close aria-label="Close filters">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg>
+            </button>
+          </div>
+          <div class="filter-group">
+            <select id="experience" aria-label="Experience">
+              <option value="">Experience</option>
+              <option value="1+ years">1+ years</option>
+              <option value="3+ years">3+ years</option>
+              <option value="5+ years">5+ years</option>
+              <option value="10+ years">10+ years</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <div class="dropdown-wrapper">
+              <input type="text" id="specialtyInput" placeholder="Specialty" aria-label="Specialty" readonly />
+              <ul id="specialtyList"></ul>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <div class="dropdown-wrapper">
+              <input type="text" id="stateInput" placeholder="State" aria-label="State" autocomplete="off" />
+              <ul id="stateList" data-state-filter-owner="browse-page"></ul>
+            </div>
+            <div class="selected-filter-chips" id="selectedStateChips" aria-live="polite"></div>
+          </div>
+
+          <div class="filter-actions">
+            <button type="button" class="primary" id="applyFilters">Apply</button>
+            <button type="button" id="clearFilters">Reset</button>
+          </div>
+        </aside>
         <div id="paralegalResults" class="jobs-grid">
           <div class="results-status" id="resultsStatus">Loading paralegals…</div>
         </div>
@@ -1080,8 +1687,8 @@
     </div>
   </main>
 
-  <div class="auth-blocker" id="authBlocker" aria-hidden="true">
-    <div class="auth-blocker__card" role="dialog" aria-labelledby="authBlockerTitle">
+  <div class="auth-blocker" id="authBlocker" aria-hidden="true" inert>
+    <div class="auth-blocker__card" role="dialog" aria-modal="true" aria-labelledby="authBlockerTitle">
       <h2 id="authBlockerTitle">Create an account to interact</h2>
       <p>Sign in to filter, open profiles, or send inquiries.</p>
       <div class="auth-blocker__actions">
@@ -1091,13 +1698,14 @@
     </div>
   </div>
 
-  <div class="modal-overlay" id="inquireModal">
-    <div class="inquire-modal">
-      <h3>Send Inquiry</h3>
+  <div class="modal-overlay" id="inquireModal" aria-hidden="true" inert>
+    <div class="inquire-modal" role="dialog" aria-modal="true" aria-labelledby="inquireModalTitle" aria-describedby="selectedParalegalText">
+      <h3 id="inquireModalTitle">Send Inquiry</h3>
       <p id="selectedParalegalText">Select a matter to send this paralegal.</p>
       <div class="job-list" id="jobList"></div>
       <p class="invite-lock-note">Sending an invitation locks the matter amount.</p>
       <label class="modal-note">
+        <span class="sr-only">Message (optional)</span>
         <textarea id="inquireMessage" placeholder="Add context or next steps" rows="3"></textarea>
       </label>
       <div class="modal-actions">
@@ -1106,86 +1714,40 @@
       </div>
     </div>
   </div>
-
-  <footer class="footer">
-    <div class="footer-inner">
-      <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
-      <p>© <script>document.write(new Date().getFullYear());</script> Let’s-ParaConnect. All rights reserved.</p>
-      <nav>
-        <a href="privacy.html">Privacy Policy</a>
-        <span>|</span>
-        <a href="terms.html">Terms</a>
-        <span>|</span>
-        <a href="/paralegal-admission.html">Admissions</a>
-        <span>|</span>
+  <footer class="home-footer" data-public-footer>
+    <div class="home-footer__top">
+      <div class="home-footer__brand">
+        <a class="home-brand" href="index.html">Let<span class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+        <p>Project-based legal support for attorneys and independent paralegals.</p>
+      </div>
+      <nav aria-label="Footer navigation">
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
         <a href="contact.html">Contact</a>
-        <span>|</span>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="/paralegal-admission.html">Paralegal Admission</a>
         <a href="accessibility.html">Accessibility</a>
       </nav>
-      <div class="region">United States</div>
+    </div>
+    <div class="home-footer__bottom">
+      <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
+      <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg>
+        <span>Accessibility</span>
+      </button>
     </div>
   </footer>
+  </div>
+
+
 
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
 
   <script src="assets/scripts/utils/toast.js?v=20260208"></script>
-  <script type="module" src="assets/scripts/browse-paralegals.js"></script>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const header = document.querySelector(".site-header");
-      const hero = document.querySelector("[data-hero-banner]");
-      const body = document.body;
-
-      function lockShellStyles() {
-        if (body && !body.classList.contains("shell-locked")) {
-          body.style.backgroundColor = "#ffffff";
-          body.classList.add("shell-locked");
-        }
-        if (header) {
-          header.style.background = "rgba(255, 255, 255, 0.18)";
-          header.style.borderBottom = "1px solid rgba(255, 255, 255, 0.35)";
-          header.style.backdropFilter = "saturate(140%) blur(16px)";
-          header.style.boxShadow = "none";
-        }
-        if (hero && !hero.dataset.heroReady) {
-          hero.style.backgroundImage = "url('hero-mountain.jpg')";
-          hero.style.backgroundSize = "cover";
-          hero.style.backgroundPosition = "center";
-          hero.dataset.heroReady = "true";
-        }
-      }
-
-      function updateHeader() {
-        if (!header || !hero) return;
-        const heroBottom = hero.offsetTop + hero.offsetHeight;
-        const headerBottom = window.scrollY + header.offsetHeight;
-        const offHero = headerBottom >= heroBottom;
-        header.classList.toggle("over-image", offHero);
-      }
-
-      lockShellStyles();
-      let lockTicks = 0;
-      const lockInterval = setInterval(() => {
-        lockShellStyles();
-        lockTicks += 1;
-        if (lockTicks > 20) clearInterval(lockInterval);
-      }, 250);
-      window.addEventListener("scroll", updateHeader, { passive: true });
-      window.addEventListener("resize", updateHeader);
-      if (window.ResizeObserver) {
-        const observer = new ResizeObserver(() => {
-          lockShellStyles();
-          updateHeader();
-        });
-        observer.observe(hero);
-      } else {
-        setTimeout(updateHeader, 150);
-        setTimeout(lockShellStyles, 150);
-      }
-      updateHeader();
-    });
-  </script>
-  <script type="module" src="assets/scripts/hero-parallax.js"></script>
+  <script type="module" src="assets/scripts/browse-paralegals.js?v=20260812-public-footer"></script>
+  <script src="assets/scripts/utility-header.js" defer></script>
+  <script src="assets/scripts/public-matter-field.js" defer></script>
   <script src="assets/scripts/accessibility-toggle.js"></script>
 </body>
 </html>

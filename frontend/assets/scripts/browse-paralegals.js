@@ -1,4 +1,7 @@
-import { secureFetch, logout } from "./auth.js";
+import { secureFetch, logout } from "./auth.js?v=20260812-state-filter-owner";
+import { normalizePresentation } from "./authenticated-object-search.mjs";
+import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
+import { showAlert } from "./utils/dialogs.js";
 
 const states = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","District of Columbia","Florida","Georgia",
@@ -44,10 +47,19 @@ const elements = {
   selectedParalegalText: document.getElementById("selectedParalegalText"),
   filterMenu: document.getElementById("filterMenu"),
   filterToggle: document.getElementById("filterToggle"),
+  filterCount: document.getElementById("filterCount"),
+  filterClose: document.querySelector("[data-filter-close]"),
   applyFilters: document.getElementById("applyFilters"),
   clearFilters: document.getElementById("clearFilters"),
   authBlocker: document.getElementById("authBlocker"),
   returnDashboard: document.getElementById("returnDashboard"),
+  utilityHeader: document.querySelector("[data-utility-header]"),
+  authSidebar: document.querySelector("[data-auth-sidebar]"),
+  authSidebarNav: document.querySelector("[data-auth-sidebar-nav]"),
+  authSidebarToggle: document.querySelector("[data-auth-sidebar-toggle]"),
+  authSidebarBackdrop: document.querySelector("[data-auth-sidebar-backdrop]"),
+  authSidebarLogout: document.querySelector("[data-auth-sidebar-logout]"),
+  publicFooter: document.querySelector("[data-public-footer]"),
 };
 
 const state = {
@@ -96,6 +108,7 @@ document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   await hydrateViewer();
+  syncAuthenticatedShell();
   syncAuthButtons();
   toggleAuthBlocker();
   initStateDropdown();
@@ -104,6 +117,7 @@ async function init() {
   bindFilterMenuToggle();
   bindFilterButtons();
   bindModalEvents();
+  updateFilterCount();
 
   if (state.canInvite) {
     await loadCases();
@@ -114,6 +128,89 @@ async function init() {
   await loadParalegals();
 }
 
+function dashboardHrefForRole(role = "") {
+  if (role === "paralegal") return "dashboard-paralegal.html";
+  if (role === "admin") return "admin-dashboard.html";
+  return "dashboard-attorney.html";
+}
+
+function authenticatedNavItems(role = "") {
+  if (role === "paralegal") {
+    return [
+      ["Home", "dashboard-paralegal.html#home"],
+      ["Browse Matters", "browse-jobs.html"],
+      ["My Matters & Applications", "dashboard-paralegal.html#cases"],
+      ["Profile Settings", "profile-settings.html"],
+      ["Help", "paralegalhelp.html"],
+    ];
+  }
+  if (role === "admin") {
+    return [
+      ["Dashboard", "admin-dashboard.html"],
+      ["Browse Paralegals", "browse-paralegals.html", true],
+      ["Help", "help.html"],
+    ];
+  }
+  return [
+    ["Home", "dashboard-attorney.html#home"],
+    ["Matters", "dashboard-attorney.html#cases"],
+    ["Paralegals", "browse-paralegals.html", true],
+    ["Payments", "dashboard-attorney.html#funds"],
+    ["Help", "help.html"],
+  ];
+}
+
+function closeAuthenticatedSidebar() {
+  document.body?.classList.remove("authenticated-sidebar-open");
+  elements.authSidebarToggle?.setAttribute("aria-expanded", "false");
+  elements.authSidebarToggle?.setAttribute("aria-label", "Open dashboard navigation");
+  if (elements.authSidebarBackdrop) elements.authSidebarBackdrop.hidden = true;
+}
+
+function syncAuthenticatedShell() {
+  const signedIn = state.isLoggedIn;
+  document.body?.classList.toggle("authenticated-browse", signedIn);
+  document.body?.classList.toggle("lpc-product-clean", signedIn);
+  document.documentElement.classList.toggle("authenticated-browse", signedIn);
+  document.documentElement.classList.toggle("has-user-cache", signedIn);
+  if (elements.utilityHeader) elements.utilityHeader.hidden = signedIn;
+  if (elements.authSidebar) elements.authSidebar.hidden = !signedIn;
+  if (elements.authSidebarToggle) elements.authSidebarToggle.hidden = !signedIn;
+  if (elements.publicFooter) elements.publicFooter.hidden = signedIn;
+  if (!signedIn) {
+    closeAuthenticatedSidebar();
+    return;
+  }
+
+  if (elements.authSidebarNav) {
+    const links = authenticatedNavItems(state.viewerRole).map(([label, href, active]) => {
+      const link = document.createElement("a");
+      link.href = href;
+      link.textContent = label;
+      if (active) {
+        link.classList.add("active");
+        link.setAttribute("aria-current", "page");
+      }
+      link.addEventListener("click", closeAuthenticatedSidebar);
+      return link;
+    });
+    elements.authSidebarNav.replaceChildren(...links);
+  }
+
+  elements.authSidebarToggle?.addEventListener("click", () => {
+    const open = !document.body.classList.contains("authenticated-sidebar-open");
+    document.body.classList.toggle("authenticated-sidebar-open", open);
+    elements.authSidebarToggle.setAttribute("aria-expanded", String(open));
+    elements.authSidebarToggle.setAttribute("aria-label", open ? "Close dashboard navigation" : "Open dashboard navigation");
+    if (elements.authSidebarBackdrop) elements.authSidebarBackdrop.hidden = !open;
+  });
+  elements.authSidebarBackdrop?.addEventListener("click", closeAuthenticatedSidebar);
+  elements.authSidebarLogout?.addEventListener("click", () => logout("login.html"));
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 960) closeAuthenticatedSidebar();
+  });
+}
+
 async function hydrateViewer() {
   let user = null;
   let role = "";
@@ -122,7 +219,9 @@ async function hydrateViewer() {
       const session = await window.getSessionData();
       user = session?.user || null;
       role = session?.role || "";
-    } catch {}
+    } catch (error) {
+      console.warn("[browse-paralegals] session hydration failed", error);
+    }
   }
   state.viewer = user;
   state.viewerRole = String(role || "").toLowerCase();
@@ -133,14 +232,9 @@ async function hydrateViewer() {
 function syncAuthButtons() {
   const signInLink = document.getElementById("authAction");
   const logoutBtn = document.getElementById("logoutAction");
+  const dashboardHref = dashboardHrefForRole(state.viewerRole);
   if (elements.returnDashboard) {
     if (state.isLoggedIn) {
-      const dashboardHref =
-        state.viewerRole === "paralegal"
-          ? "dashboard-paralegal.html"
-          : state.viewerRole === "admin"
-          ? "admin-dashboard.html"
-          : "dashboard-attorney.html";
       elements.returnDashboard.href = dashboardHref;
       elements.returnDashboard.textContent = "RETURN TO DASHBOARD";
     } else {
@@ -161,14 +255,23 @@ function syncAuthButtons() {
     if (logoutBtn) logoutBtn.style.display = "none";
     if (signInLink) signInLink.style.display = "inline-flex";
   }
+  document.querySelectorAll("[data-utility-guest]").forEach((element) => {
+    element.hidden = state.isLoggedIn;
+  });
+  document.querySelectorAll("[data-utility-member]").forEach((element) => {
+    element.hidden = !state.isLoggedIn;
+  });
+  document.querySelectorAll("[data-utility-auth], [data-utility-signup]").forEach((element) => {
+    element.hidden = state.isLoggedIn;
+  });
+  document.querySelectorAll("[data-utility-dashboard]").forEach((element) => {
+    element.href = dashboardHref;
+  });
 }
 
 function toggleAuthBlocker() {
   if (!elements.authBlocker || !document.body) return;
-  if (state.isLoggedIn) {
-    closeAuthBlocker();
-  }
-  if (!state.isLoggedIn) closeAuthBlocker();
+  closeAuthBlocker();
 }
 
 function openAuthBlocker() {
@@ -176,6 +279,11 @@ function openAuthBlocker() {
   document.body.classList.add(AUTH_LOCK_CLASS);
   document.body.classList.add(AUTH_BLOCKER_READY_CLASS);
   elements.authBlocker.setAttribute("aria-hidden", "false");
+  elements.authBlocker.removeAttribute("inert");
+  activateDialogFocus(elements.authBlocker, {
+    initialFocus: elements.authBlocker.querySelector("a[href]"),
+    onEscape: closeAuthBlocker,
+  });
 }
 
 function closeAuthBlocker() {
@@ -183,6 +291,8 @@ function closeAuthBlocker() {
   document.body.classList.remove(AUTH_LOCK_CLASS);
   document.body.classList.remove(AUTH_BLOCKER_READY_CLASS);
   elements.authBlocker.setAttribute("aria-hidden", "true");
+  elements.authBlocker.setAttribute("inert", "");
+  deactivateDialogFocus(elements.authBlocker);
 }
 
 function requireSignIn(event) {
@@ -222,20 +332,57 @@ function bindFilterMenuToggle() {
   const menu = elements.filterMenu;
   const toggle = elements.filterToggle;
   if (!menu || !toggle) return;
-  toggle.addEventListener("click", () => {
-    menu.classList.toggle("active");
+
+  const setOpen = (open, { restoreFocus = false } = {}) => {
+    menu.hidden = !open;
+    menu.classList.toggle("active", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.setAttribute("aria-label", open ? "Close filters" : "Open filters");
+    if (restoreFocus) toggle.focus();
+  };
+
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setOpen(menu.hidden);
   });
+  elements.filterClose?.addEventListener("click", () => setOpen(false, { restoreFocus: true }));
   document.addEventListener("click", (event) => {
     if (!menu.contains(event.target) && !toggle.contains(event.target)) {
-      menu.classList.remove("active");
+      setOpen(false);
     }
   });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !menu.hidden) setOpen(false, { restoreFocus: true });
+  });
+}
+
+function closeFilterMenu() {
+  if (!elements.filterMenu || !elements.filterToggle) return;
+  elements.filterMenu.hidden = true;
+  elements.filterMenu.classList.remove("active");
+  elements.filterToggle.setAttribute("aria-expanded", "false");
+  elements.filterToggle.setAttribute("aria-label", "Open filters");
+}
+
+function updateFilterCount() {
+  const count = (elements.experience?.value ? 1 : 0) + selectedStates.size + selectedSpecialties.size;
+  if (elements.filterCount) {
+    elements.filterCount.textContent = String(count);
+    elements.filterCount.hidden = count === 0;
+  }
+  elements.filterToggle?.classList.toggle("has-filters", count > 0);
+  const description = count
+    ? `Open filters, ${count} active filter${count === 1 ? "" : "s"}`
+    : "Open filters";
+  if (elements.filterToggle?.getAttribute("aria-expanded") !== "true") {
+    elements.filterToggle?.setAttribute("aria-label", description);
+  }
 }
 
 function bindFilterButtons() {
   elements.applyFilters?.addEventListener("click", () => {
     syncFiltersFromInputs();
-    elements.filterMenu?.classList.remove("active");
+    closeFilterMenu();
     resetPageAndFetch();
   });
   elements.clearFilters?.addEventListener("click", () => {
@@ -259,7 +406,7 @@ function bindFilterButtons() {
       });
       elements.specialtyList.classList.remove("show");
     }
-    elements.filterMenu?.classList.remove("active");
+    closeFilterMenu();
     syncFiltersFromInputs();
     resetPageAndFetch();
   });
@@ -301,13 +448,24 @@ function bindModalEvents() {
 
 function initStateDropdown() {
   if (!elements.stateInput || !elements.stateList) return;
+  elements.stateInput.readOnly = true;
+  elements.stateInput.placeholder = "State";
+  elements.stateInput.setAttribute("aria-haspopup", "listbox");
+  elements.stateInput.setAttribute("aria-expanded", "false");
+  elements.stateList.setAttribute("role", "listbox");
+  elements.stateList.setAttribute("aria-multiselectable", "true");
   const stateWrapper = elements.stateInput.closest(".dropdown-wrapper");
   const specialtyWrapper = elements.specialtyInput?.closest(".dropdown-wrapper") || null;
-  const closeList = () => elements.stateList.classList.remove("show");
+  const closeList = () => {
+    elements.stateList.classList.remove("show");
+    elements.stateInput.setAttribute("aria-expanded", "false");
+  };
   const openList = () => {
-    renderList(elements.stateInput.value);
+    renderList();
     elements.specialtyList?.classList.remove("show");
+    elements.specialtyInput?.setAttribute("aria-expanded", "false");
     elements.stateList.classList.add("show");
+    elements.stateInput.setAttribute("aria-expanded", "true");
   };
   const renderList = (query = "") => {
     const normalizedQuery = String(query || "").trim().toLowerCase();
@@ -317,7 +475,7 @@ function initStateDropdown() {
       .map((stateName) => {
         const slug = stateName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         return `
-        <li>
+        <li role="option" aria-selected="${selectedStates.has(stateName) ? "true" : "false"}">
           <input type="checkbox" id="state-${slug}" value="${escapeHTML(stateName)}" ${selectedStates.has(stateName) ? "checked" : ""}>
           <label for="state-${slug}">${escapeHTML(stateName)}</label>
         </li>`;
@@ -327,12 +485,8 @@ function initStateDropdown() {
   };
   elements.stateInput.addEventListener("click", (event) => {
     event.preventDefault();
-    openList();
-  });
-  elements.stateInput.addEventListener("focus", openList);
-  elements.stateInput.addEventListener("input", () => {
-    renderList(elements.stateInput.value);
-    elements.stateList.classList.add("show");
+    if (elements.stateList.classList.contains("show")) closeList();
+    else openList();
   });
   elements.stateInput.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -350,16 +504,16 @@ function initStateDropdown() {
     if (!row) return;
     const checkbox = row.querySelector("input[type='checkbox']");
     if (!checkbox) return;
-    if (event.target === checkbox || event.target.tagName === "LABEL") return;
-    checkbox.checked = !checkbox.checked;
-    checkbox.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  elements.stateList.addEventListener("change", (event) => {
-    const value = event.target.value;
-    if (!value) return;
-    if (event.target.checked) selectedStates.add(value);
+    if (event.target !== checkbox) {
+      event.preventDefault();
+      checkbox.checked = !checkbox.checked;
+    }
+    const value = checkbox.value;
+    if (checkbox.checked) selectedStates.add(value);
     else selectedStates.delete(value);
+    row.setAttribute("aria-selected", String(checkbox.checked));
     renderSelectedStateChips();
+    updateStateInput();
     state.filters.location = [...selectedStates].join("|");
     scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
   });
@@ -391,22 +545,42 @@ function initStateDropdown() {
     }
   });
   renderSelectedStateChips();
+  updateStateInput();
+}
+
+function updateStateInput() {
+  if (!elements.stateInput) return;
+  const count = selectedStates.size;
+  elements.stateInput.value = count ? `${count} state${count === 1 ? "" : "s"} selected` : "";
 }
 
 function syncStateCheckboxes() {
   if (!elements.stateList) return;
   elements.stateList.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
     checkbox.checked = selectedStates.has(checkbox.value);
+    checkbox.closest("li")?.setAttribute("aria-selected", String(checkbox.checked));
   });
+  updateStateInput();
 }
 
 function initSpecialtyDropdown() {
   if (!elements.specialtyInput || !elements.specialtyList) return;
-  const closeList = () => elements.specialtyList.classList.remove("show");
+  elements.specialtyInput.readOnly = true;
+  elements.specialtyInput.placeholder = "Specialty";
+  elements.specialtyInput.setAttribute("aria-haspopup", "listbox");
+  elements.specialtyInput.setAttribute("aria-expanded", "false");
+  elements.specialtyList.setAttribute("role", "listbox");
+  elements.specialtyList.setAttribute("aria-multiselectable", "true");
+  const closeList = () => {
+    elements.specialtyList.classList.remove("show");
+    elements.specialtyInput.setAttribute("aria-expanded", "false");
+  };
   const openList = () => {
     renderList();
     elements.stateList?.classList.remove("show");
+    elements.stateInput?.setAttribute("aria-expanded", "false");
     elements.specialtyList.classList.add("show");
+    elements.specialtyInput.setAttribute("aria-expanded", "true");
   };
   const toggleList = () => {
     if (elements.specialtyList.classList.contains("show")) {
@@ -420,8 +594,8 @@ function initSpecialtyDropdown() {
       .map((spec) => {
         const slug = spec.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         return `
-        <li>
-          <input type="checkbox" id="spec-${slug}" value="${spec}" ${selectedSpecialties.has(spec) ? "checked" : ""}>
+        <li role="option" aria-selected="${selectedSpecialties.has(spec) ? "true" : "false"}">
+          <input type="checkbox" id="spec-${slug}" value="${escapeHTML(spec)}" ${selectedSpecialties.has(spec) ? "checked" : ""}>
           <label for="spec-${slug}">${spec}</label>
         </li>`;
       })
@@ -431,7 +605,6 @@ function initSpecialtyDropdown() {
     event.preventDefault();
     toggleList();
   });
-  elements.specialtyInput.addEventListener("focus", openList);
   elements.specialtyInput.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       closeList();
@@ -448,17 +621,16 @@ function initSpecialtyDropdown() {
     if (!row) return;
     const checkbox = row.querySelector("input[type='checkbox']");
     if (!checkbox) return;
-    if (event.target === checkbox || event.target.tagName === "LABEL") return;
-    checkbox.checked = !checkbox.checked;
-    checkbox.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  elements.specialtyList.addEventListener("change", (event) => {
-    const value = event.target.value;
-    if (!value) return;
-    if (event.target.checked) selectedSpecialties.add(value);
+    if (event.target !== checkbox) {
+      event.preventDefault();
+      checkbox.checked = !checkbox.checked;
+    }
+    const value = checkbox.value;
+    if (checkbox.checked) selectedSpecialties.add(value);
     else selectedSpecialties.delete(value);
+    row.setAttribute("aria-selected", String(checkbox.checked));
     updateSpecialtyInput();
-    resetPageAndFetch();
+    scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
   });
   updateSpecialtyInput();
 }
@@ -486,10 +658,12 @@ function renderSelectedStateChips() {
 
 function updateSpecialtyInput() {
   if (!elements.specialtyInput) return;
-  elements.specialtyInput.value = [...selectedSpecialties].join(", ");
+  const count = selectedSpecialties.size;
+  elements.specialtyInput.value = count ? `${count} specialt${count === 1 ? "y" : "ies"} selected` : "";
 }
 
 function resetPageAndFetch(options = {}) {
+  updateFilterCount();
   if (filterFetchTimer) {
     clearTimeout(filterFetchTimer);
     filterFetchTimer = null;
@@ -499,6 +673,7 @@ function resetPageAndFetch(options = {}) {
 }
 
 function scheduleResetPageAndFetch(options = {}) {
+  updateFilterCount();
   if (filterFetchTimer) clearTimeout(filterFetchTimer);
   filterFetchTimer = setTimeout(() => {
     filterFetchTimer = null;
@@ -589,20 +764,26 @@ function renderParalegals(items) {
   setResultsStatus("");
   const fragment = document.createDocumentFragment();
   items.forEach((item) => {
-    fragment.appendChild(buildParalegalCard(item));
+    const card = buildParalegalCard(item);
+    if (card) fragment.appendChild(card);
   });
   elements.results.appendChild(fragment);
 }
 
 function buildParalegalCard(paralegal) {
   const paralegalId = String(paralegal._id || paralegal.id || paralegal.paralegalId || "");
-  const name = formatName(paralegal);
-  const summary = (paralegal.bio || paralegal.about || "This professional hasn’t added a summary yet.").trim();
-  const location = paralegal.location || "Location not specified";
-  const availability = paralegal.availability || "Availability on request";
-  const specialties = (paralegal.practiceAreas || []).slice(0, 2);
+  const presentation = normalizePresentation(paralegal.presentation, window.location.origin, {
+    expectedKind: "card",
+    expectedType: "profile",
+    expectedId: paralegalId,
+  });
+  if (!presentation) return null;
+  const name = presentation.object.title;
+  const location = presentation.details.find((item) => item.label === "Location")?.value || "Location not specified";
+  const specialties = (presentation.details.find((item) => item.label === "Practice areas")?.value || "").split(", ").filter(Boolean).slice(0, 2);
   const experience = formatExperience(paralegal.yearsExperience);
   const avatar = paralegal.avatarURL || buildInitialAvatar(getInitials(name));
+  const profileHref = presentation.links.self;
 
   const card = document.createElement("article");
   card.className = "paralegal-card";
@@ -612,18 +793,22 @@ function buildParalegalCard(paralegal) {
 
   const photoLink = document.createElement("a");
   photoLink.className = "profile-photo-link profile-link";
-  photoLink.href = buildParalegalProfileUrl(paralegalId);
+  photoLink.href = profileHref;
   photoLink.addEventListener("click", (event) => {
     requireSignIn(event);
   });
   const img = document.createElement("img");
   img.src = avatar;
   img.alt = `Portrait of ${name}`;
+  img.addEventListener("error", () => {
+    const fallback = buildInitialAvatar(getInitials(name));
+    if (img.src !== fallback) img.src = fallback;
+  }, { once: true });
   photoLink.appendChild(img);
   card.appendChild(photoLink);
   const heading = document.createElement("h3");
   const headingLink = document.createElement("a");
-  headingLink.href = buildParalegalProfileUrl(paralegalId);
+  headingLink.href = profileHref;
   headingLink.textContent = name;
   headingLink.className = "profile-name-link profile-link";
   headingLink.addEventListener("click", (event) => {
@@ -638,14 +823,16 @@ function buildParalegalCard(paralegal) {
   intro.textContent = `${specialties[0] || "Generalist"} · ${location}`;
   content.appendChild(intro);
 
-  const bio = document.createElement("p");
-  bio.textContent = getFirstSentence(summary);
-  content.appendChild(bio);
+  if (presentation.summary) {
+    const bio = document.createElement("p");
+    bio.textContent = getFirstSentence(presentation.summary);
+    content.appendChild(bio);
+  }
 
   const meta = document.createElement("div");
   meta.className = "card-meta";
   meta.appendChild(buildMetaChip("Experience", experience));
-  meta.appendChild(buildMetaChip("Availability", availability, { hideLabel: true }));
+  meta.appendChild(buildMetaChip("Status", presentation.status.label, { hideLabel: true }));
   content.appendChild(meta);
   card.appendChild(content);
 
@@ -655,7 +842,7 @@ function buildParalegalCard(paralegal) {
     const inquireBtn = document.createElement("button");
     inquireBtn.type = "button";
     inquireBtn.className = "action-btn invite-btn";
-    inquireBtn.textContent = "Invite to Case";
+    inquireBtn.textContent = "Invite to Matter";
     inquireBtn.addEventListener("click", () => openInquireModal({ id: paralegalId, name }));
     actions.appendChild(inquireBtn);
   }
@@ -668,7 +855,7 @@ function buildParalegalCard(paralegal) {
     const isProfileLink = event.target.closest(".profile-link");
     if (isAction || isProfileLink || !paralegalId) return;
     if (requireSignIn(event)) return;
-    window.location.href = buildParalegalProfileUrl(paralegalId);
+    window.location.href = profileHref;
   });
 
   return card;
@@ -716,17 +903,26 @@ function openInquireModal(paralegal) {
   if (!elements.inquireModal) return;
   clearFieldError(elements.jobList);
   clearFieldError(elements.inquireMessage);
-  elements.selectedParalegalText.textContent = `Select an open case for ${paralegal.name}.`;
+  elements.selectedParalegalText.textContent = `Select an open Matter for ${paralegal.name}.`;
   elements.inquireMessage.value = "";
   const firstOption = elements.jobList.querySelector("input[name='jobOption']");
   if (firstOption) firstOption.checked = false;
   elements.confirmInquire.disabled = !availableCases.length;
   elements.inquireModal.classList.add("show");
+  elements.inquireModal.setAttribute("aria-hidden", "false");
+  elements.inquireModal.removeAttribute("inert");
+  activateDialogFocus(elements.inquireModal, {
+    initialFocus: firstOption || elements.inquireMessage || elements.cancelInquire,
+    onEscape: closeInquireModal,
+  });
 }
 
 function closeInquireModal() {
   activeParalegal = null;
   elements.inquireModal?.classList.remove("show");
+  elements.inquireModal?.setAttribute("aria-hidden", "true");
+  elements.inquireModal?.setAttribute("inert", "");
+  deactivateDialogFocus(elements.inquireModal);
   elements.inquireMessage.value = "";
   clearFieldError(elements.jobList);
   clearFieldError(elements.inquireMessage);
@@ -737,7 +933,7 @@ function closeInquireModal() {
 function renderCaseOptions() {
   if (!elements.jobList) return;
   if (!availableCases.length) {
-    elements.jobList.innerHTML = "<p>No open cases available. Post a job to invite paralegals.</p>";
+    elements.jobList.innerHTML = "<p>No open Matters are available. Create a Matter before inviting a paralegal.</p>";
     elements.confirmInquire.disabled = true;
     return;
   }
@@ -774,7 +970,7 @@ function renderCaseOptions() {
   const visibleOptions = options.filter((opt) => opt.statusLabel !== "A paralegal is already assigned");
   const hasSelectable = visibleOptions.some((opt) => !opt.disabled);
   if (!visibleOptions.length) {
-    elements.jobList.innerHTML = "<p>No open cases available. Post a job to invite paralegals.</p>";
+    elements.jobList.innerHTML = "<p>No open Matters are available. Create a Matter before inviting a paralegal.</p>";
     elements.confirmInquire.disabled = true;
     return;
   }
@@ -782,7 +978,7 @@ function renderCaseOptions() {
     .map(
       (opt) => `
       <label class="job-option${opt.disabled ? " disabled" : ""}">
-        <input type="radio" name="jobOption" value="${opt.caseId}" ${opt.disabled ? "disabled" : ""} aria-disabled="${opt.disabled ? "true" : "false"}">
+        <input type="radio" name="jobOption" value="${escapeHTML(opt.caseId)}" ${opt.disabled ? "disabled" : ""} aria-disabled="${opt.disabled ? "true" : "false"}">
         <span>${escapeHtml(opt.title)}${opt.statusLabel ? ` — ${escapeHtml(opt.statusLabel)}` : ""}</span>
       </label>`
     )
@@ -795,8 +991,8 @@ async function sendInquiry() {
   const selected = elements.jobList.querySelector("input[name='jobOption']:checked");
   clearFieldError(elements.jobList);
   if (!selected) {
-    showFieldError(elements.jobList, "Select an open case before sending.");
-    showToast("Select an open case first.", "err");
+    showFieldError(elements.jobList, "Select an open Matter before sending.");
+    showToast("Select an open Matter first.", "err");
     return;
   }
   const message = (elements.inquireMessage.value || "").trim();
@@ -816,11 +1012,11 @@ async function sendInquiry() {
       normalizeId(caseMeta.paralegal?._id) ||
       normalizeId(caseMeta.paralegal);
     if (inviteStatus === "pending" || inviteStatus === "accepted") {
-      showToast("Invitation already sent to this paralegal for this case.", "err");
+      showToast("Invitation already sent to this paralegal for this Matter.", "err");
       return;
     }
     if (assignedId || caseMeta.acceptedParalegal) {
-      showToast("A paralegal is already assigned to this case.", "err");
+      showToast("A paralegal is already assigned to this Matter.", "err");
       return;
     }
   }
@@ -856,14 +1052,6 @@ function normalizeSortValue(value = "") {
   return "recent";
 }
 
-function handleContactClick(paralegalId) {
-  if (!paralegalId) return;
-  if (!state.isLoggedIn) {
-    window.location.href = "login.html";
-    return;
-  }
-  window.location.href = buildParalegalProfileUrl(paralegalId);
-}
 
 function formatExperience(years) {
   const num = Number(years);
@@ -873,11 +1061,6 @@ function formatExperience(years) {
   return `${Math.round(num)}+ years`;
 }
 
-function formatName(person = {}) {
-  const fn = person.firstName || person.first_name || "";
-  const ln = person.lastName || person.last_name || "";
-  return `${fn} ${ln}`.trim() || "Experienced Paralegal";
-}
 
 function getInitials(name = "") {
   const parts = name.trim().split(/\\s+/).filter(Boolean);
@@ -891,16 +1074,7 @@ function buildInitialAvatar(initials) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
-function truncate(text, max = 200) {
-  if (!text) return "";
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
-}
 
-function buildParalegalProfileUrl(paralegalId = "") {
-  const safeId = String(paralegalId || "").trim();
-  if (!safeId) return "profile-paralegal.html";
-  return `profile-paralegal.html?paralegalId=${encodeURIComponent(safeId)}`;
-}
 
 function escapeHtml(value = "") {
   return String(value)
@@ -946,6 +1120,6 @@ function showToast(message, type = "info") {
   if (toast?.show) {
     toast.show(message, { targetId: "toastBanner", type });
   } else {
-    alert(message);
+    void showAlert(message, { title: type === "err" || type === "error" ? "Action unavailable" : "Notice" });
   }
 }

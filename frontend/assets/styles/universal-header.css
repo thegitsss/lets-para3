@@ -1,0 +1,115 @@
+/* Shared authenticated header: Search, Create (attorney), Notifications, Assistant. */
+body.lpc-product-clean .lpc-universal-header-shell {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: relative;
+  overflow: visible;
+}
+
+body.lpc-product-clean .lpc-universal-header-shell--created {
+  margin: 0 0 24px;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-left: auto;
+  position: relative;
+  z-index: 2100;
+  overflow: visible;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls > :where(
+  .lpc-global-search-host,
+  .lpc-quick-create,
+  .notification-wrapper,
+  .support-launcher
+) {
+  flex-shrink: 0;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls > .notification-wrapper {
+  width: 46px;
+  height: 46px;
+  position: relative;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls .notification-icon,
+body.lpc-product-clean .lpc-universal-header-controls .support-launcher {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  padding: 0;
+  color: #53627a;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls :where(.notification-icon, .support-launcher):hover,
+body.lpc-product-clean .lpc-universal-header-controls :where(.notification-icon, .support-launcher):focus-visible {
+  color: #24324a;
+  background: #f6f8fb;
+  outline: none;
+  opacity: 1;
+  transform: none;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls :where(.notification-icon, .support-launcher) svg {
+  width: 19px;
+  height: 19px;
+}
+
+/* The account identity belongs exclusively to the shared sidebar. */
+body.lpc-product-clean :where(.topbar, .case-topbar, .page-header, .lpc-universal-header-shell)
+  :where(.user-chip, .user-profile, .profile-menu, [data-profile-toggle]) {
+  display: none !important;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls .lpc-global-search-host {
+  order: 1;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls .lpc-quick-create {
+  order: 2;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls .notification-wrapper {
+  order: 3;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls .support-launcher {
+  order: 4;
+}
+
+@media (max-width: 700px) {
+  body.lpc-product-clean .lpc-universal-header-shell {
+    min-height: 48px;
+    gap: 8px;
+  }
+
+  body.lpc-product-clean .lpc-universal-header-controls {
+    gap: 0;
+  }
+
+  body.lpc-product-clean .lpc-universal-header-controls :where(
+    .notification-icon,
+    .support-launcher,
+    .lpc-quick-create,
+    .lpc-global-search-host
+  ) {
+    width: 42px;
+    min-width: 42px;
+    max-width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+  }
+}

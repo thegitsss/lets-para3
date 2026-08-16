@@ -5,6 +5,10 @@ import {
   startStripeOnboarding,
   STRIPE_GATE_MESSAGE,
 } from "./utils/stripe-connect.js";
+import { mountDashboardSavedViews } from "./dashboard-saved-views.js";
+import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
+import { showAlert } from "./utils/dialogs.js";
+import { normalizeHttpNavigationUrl } from "./utils/navigation-url.js";
 
 const FUNDED_WORKSPACE_STATUSES = new Set([
   "in progress",
@@ -82,7 +86,7 @@ function isWorkspaceEligibleCase(caseItem) {
 
 function navigateToCase(caseId, { messages = false } = {}) {
   if (!caseId) return;
-  const target = `case-detail.html?caseId=${encodeURIComponent(caseId)}${messages ? "#case-messages" : ""}`;
+  const target = `case-detail.html?caseId=${encodeURIComponent(caseId)}${messages ? "&tab=messages" : ""}`;
   window.location.href = target;
 }
 
@@ -117,7 +121,7 @@ function deriveAttorneyId(invite = {}) {
 const selectors = {
   messageBox: document.getElementById('messageBox'),
   messageCount: document.getElementById('messageCount'),
-  pluralText: document.getElementById('plural'),
+  messageLabel: document.getElementById('messageLabel'),
   deadlineList: document.getElementById('deadlineList'),
   assignmentList: document.getElementById('assignmentList'),
   recentActivityList: document.getElementById('recentActivityList'),
@@ -142,8 +146,6 @@ const selectors = {
   revokeConfirmClose: document.querySelector('[data-revoke-confirm-close]'),
   revokeConfirmCancel: document.querySelector('[data-revoke-confirm-cancel]'),
   revokeConfirmSubmit: document.querySelector('[data-revoke-confirm-submit]'),
-  welcomeNotice: document.getElementById('paralegalWelcomeNotice'),
-  welcomeNoticeDismiss: document.getElementById('dismissWelcomeNotice'),
   earningsCard: document.getElementById('earnedThisMonthCard'),
   earningsToggle: document.getElementById('earningsToggle'),
   earningsLabel: document.getElementById('earningsLabelText'),
@@ -162,6 +164,7 @@ const appliedFilters = {
   status: document.getElementById('appliedStatusFilter'),
   practice: document.getElementById('appliedPracticeFilter'),
   dateRange: document.getElementById('appliedDateFilter'),
+  sort: document.getElementById('appliedSort'),
   count: document.getElementById('appliedCount'),
 };
 
@@ -190,7 +193,6 @@ async function fetchJson(url, options = {}) {
   }
 }
 
-let viewerProfile = null;
 let latestMessageThread = null;
 let unreadMessageCount = 0;
 let stripeConnected = false;
@@ -199,6 +201,8 @@ let pendingApprovalReady = false;
 let appliedAppsCache = [];
 let appliedFiltersBound = false;
 let appliedFilterToggleBound = false;
+let applicationSavedViews = null;
+let paralegalPrioritySnapshot = { activeCases: [], invites: [], threads: [], deadlines: [], applications: [] };
 let activeApplication = null;
 let applicationPreEngagementDraft = null;
 let applicationPreEngagementExpandedKey = '';
@@ -211,6 +215,7 @@ let applicationModalBound = false;
 let appliedPreviewBound = false;
 let appliedQueryHandled = false;
 let appliedHighlightHandled = false;
+let applicationReturnFocus = null;
 let dashboardRefreshInFlight = false;
 let lastDashboardRefreshAt = 0;
 const DASHBOARD_REFRESH_COOLDOWN_MS = 4000;
@@ -225,11 +230,6 @@ function bindClusterProfileMenu() {
     const trigger = document.getElementById('clusterProfileTrigger');
     const menu = document.getElementById('clusterProfileDropdown');
     if (!trigger || !menu) return;
-    const logoutTarget = event.target?.closest?.('[data-cluster-logout]');
-    if (logoutTarget) {
-      window.logoutUser?.(event);
-      return;
-    }
     if (trigger.contains(event.target) && !menu.contains(event.target)) {
       const open = !menu.classList.contains('show');
       menu.classList.toggle('show', open);
@@ -270,8 +270,17 @@ function updateUnreadDisplay(count = 0) {
   if (selectors.messageCount) {
     selectors.messageCount.textContent = unread;
   }
-  if (selectors.pluralText) {
-    selectors.pluralText.textContent = unread === 1 ? ' waiting' : 's waiting';
+  if (selectors.messageLabel) {
+    selectors.messageLabel.textContent =
+      unread === 0 ? 'No unread messages' : unread === 1 ? 'Message waiting' : 'Messages waiting';
+  }
+  if (selectors.messageBox) {
+    selectors.messageBox.disabled = unread < 1;
+    selectors.messageBox.classList.toggle('has-unread', unread > 0);
+    selectors.messageBox.setAttribute(
+      'aria-label',
+      unread > 0 ? `Open ${unread} unread message${unread === 1 ? '' : 's'}` : 'No unread messages'
+    );
   }
 }
 
@@ -285,14 +294,6 @@ function notifyCasesApplicationsRefresh(reason = '', payload = {}) {
   } catch {}
 }
 
-function escapeHTML(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 function notifyStripeGate(message = STRIPE_GATE_MESSAGE) {
   const toastHelper = window.toastUtils;
@@ -300,7 +301,7 @@ function notifyStripeGate(message = STRIPE_GATE_MESSAGE) {
     toastHelper.show(message, { targetId: selectors.toastBanner.id, type: "info" });
     return;
   }
-  alert(message);
+  void showAlert(message, { title: "Action needed" });
 }
 
 function applyStripeGateToApplyActions() {
@@ -332,7 +333,6 @@ function applyStripeGateToApplyActions() {
 
 async function loadViewerProfile() {
   const profile = await fetchJson('/api/users/me');
-  viewerProfile = profile || null;
   return profile;
 }
 
@@ -365,7 +365,7 @@ async function loadStripeStatus() {
         await startStripeOnboarding();
       } catch (err) {
         console.error("Stripe connect failed", err);
-        alert(err?.message || "Unable to start Stripe onboarding.");
+        await showAlert(err?.message || "Unable to start Stripe onboarding.", { title: "Stripe connection unavailable" });
         cta.disabled = false;
         cta.textContent = original;
       }
@@ -390,26 +390,23 @@ async function loadDeadlineEvents(limit = 5) {
 }
 
 function getCaseDeadlineDate(caseItem = {}) {
-  const raw = caseItem.deadline || caseItem.dueDate || caseItem.deadlineDate || null;
-  if (!raw) return null;
-  const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return window.LPCBusinessDate?.matterValue(caseItem) || "";
 }
 
 function buildCaseDeadlines(activeCases = []) {
   return (Array.isArray(activeCases) ? activeCases : [])
     .map((caseItem) => {
-      const date = getCaseDeadlineDate(caseItem);
-      if (!date) return null;
+      const dateOnly = getCaseDeadlineDate(caseItem);
+      if (!dateOnly) return null;
       return {
-        title: caseItem.jobTitle || caseItem.title || 'Case deadline',
+        title: caseItem.jobTitle || caseItem.title || 'Matter deadline',
         where: caseItem.practiceArea || '',
-        start: date.toISOString(),
+        start: dateOnly,
         caseId: getCaseId(caseItem),
       };
     })
     .filter(Boolean)
-    .sort((a, b) => new Date(a.start) - new Date(b.start));
+    .sort((a, b) => String(a.start).localeCompare(String(b.start)));
 }
 
 async function loadMessageThreads(limit = 50) {
@@ -433,8 +430,8 @@ function formatCaseCompensation(cents = 0) {
 
 function deriveNextDeadline(events = []) {
   const next = Array.isArray(events) ? events[0] : null;
-  if (!next) return '--';
-  return next.start ? new Date(next.start).toLocaleDateString() : '--';
+  if (!next) return '—';
+  return next.start ? formatMatterDeadline(next.start) : '—';
 }
 
 function setField(field, value) {
@@ -482,7 +479,7 @@ function toggleEarningsMode(event) {
 function updateStats(stats = {}) {
   const activeCases = Number(stats.activeCases ?? 0);
   const unread = Number(stats.unreadMessages ?? 0);
-  const nextDeadline = stats.nextDeadline ?? '--';
+  const nextDeadline = stats.nextDeadline ?? '—';
   const monthEarnings = Number(stats.monthEarnings ?? 0);
   const totalEarnings = Number(stats.totalEarnings ?? monthEarnings ?? 0);
   const payout30Days = Number(stats.payout30Days ?? 0);
@@ -557,6 +554,14 @@ async function refreshDashboardFromServer(reason = '') {
     });
     maybeOpenInviteFromQuery();
     await loadAppliedJobs({ preservePage: true });
+    paralegalPrioritySnapshot = {
+      activeCases,
+      invites: Array.isArray(invites) ? invites : [],
+      threads: Array.isArray(threads) ? threads : [],
+      deadlines: deadlineEvents,
+      applications: appliedAppsCache,
+    };
+    renderParalegalPriorityQueue();
     notifyCasesApplicationsRefresh(reason, {
       activeCases: activeCases,
     });
@@ -595,7 +600,7 @@ function renderDeadlines(deadlines = []) {
     .map((deadline) => {
       const title = deadline.title || 'Deadline';
       const where = deadline.where ? ` · ${deadline.where}` : '';
-      const dueText = deadline.start ? ` due ${new Date(deadline.start).toLocaleDateString()}` : '';
+      const dueText = deadline.start ? ` due ${formatMatterDeadline(deadline.start)}` : '';
       return `<div class="info-line">• ${title}${where}${dueText}</div>`;
     })
     .join('');
@@ -627,7 +632,6 @@ function renderAssignments(assignments = []) {
   usableAssignments.forEach((assignment) => {
     const node = selectors.assignmentTemplate.content.cloneNode(true);
     const card = node.querySelector('.case-card');
-    const header = card.querySelector('.case-header');
     const titleEl = card.querySelector('[data-field="assignmentTitle"]');
     const metaEl = card.querySelector('[data-field="assignmentMeta"]');
     const summaryEl = card.querySelector('[data-field="assignmentSummary"]');
@@ -643,7 +647,7 @@ function renderAssignments(assignments = []) {
     const caseId = assignment.caseId;
     const eligible = isWorkspaceEligibleCase(assignment);
 
-    titleEl.textContent = assignment.title || 'Case';
+    titleEl.textContent = assignment.title || 'Matter';
     metaEl.textContent = metaParts.join(' · ');
     summaryEl.textContent = assignment.summary || '';
     if (card) card.dataset.caseId = caseId;
@@ -653,7 +657,12 @@ function renderAssignments(assignments = []) {
       actions.hidden = !eligible;
     }
     if (secondaryBtn) {
-      secondaryBtn.remove();
+      secondaryBtn.hidden = !caseId;
+      secondaryBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (window.LPCContextPanel?.openMatter?.(caseId, { historyMode: 'push', returnFocus: secondaryBtn })) return;
+        navigateToCase(caseId);
+      });
     }
     if (eligible && caseId) {
       if (primaryBtn) {
@@ -675,10 +684,10 @@ function mapActiveCasesToAssignments(activeCases = []) {
       if (!caseId) return null;
       return {
         caseId,
-        title: caseItem.jobTitle || caseItem.title || 'Case',
+        title: caseItem.jobTitle || caseItem.title || 'Matter',
         attorney: caseItem.attorneyName || '',
         due: caseItem.deadline
-          ? new Date(caseItem.deadline).toLocaleDateString()
+          ? formatMatterDeadline(caseItem.deadlineDate || caseItem.deadline)
           : caseItem.dueDate
             ? new Date(caseItem.dueDate).toLocaleDateString()
             : caseItem.createdAt
@@ -708,9 +717,6 @@ async function loadInvites() {
   }
 }
 
-function renderInvites(invites = []) {
-  return renderRecentActivity({ invites });
-}
 
 function findInviteByCaseId(caseId = '') {
   const target = String(caseId || '').trim();
@@ -756,7 +762,7 @@ function buildRecentActivityEntries({ invites = [], threads = [], deadlines = []
       invite.attorney?.name ||
       [invite.attorney?.firstName, invite.attorney?.lastName].filter(Boolean).join(' ').trim() ||
       '';
-    const title = invite.title || 'Case invitation';
+    const title = invite.title || 'Matter invitation';
     entries.push({
       type: 'invite',
       caseId: String(inviteId),
@@ -775,7 +781,7 @@ function buildRecentActivityEntries({ invites = [], threads = [], deadlines = []
       type: 'message',
       caseId: String(caseId),
       timestamp,
-      title: thread?.title || 'Case thread',
+      title: thread?.title || 'Matter thread',
       meta: thread?.lastMessageSnippet || 'New message',
       time: formatActivityDate(timestamp),
       href: caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : '',
@@ -811,7 +817,7 @@ function renderRecentActivity({ invites = [], threads = [], deadlines = [] } = {
   recentActivityState.deadlines = deadlines;
 
   const entries = buildRecentActivityEntries({ invites, threads, deadlines });
-  const subtitle = entries.length ? 'Latest updates from your cases.' : 'No recent activity yet.';
+  const subtitle = entries.length ? 'Latest updates from your Matters.' : 'No recent activity yet.';
   const card = document.createElement('div');
   card.className = `case-card activity-card${entries.length ? '' : ' empty-state'}`;
   card.innerHTML = `
@@ -986,12 +992,6 @@ async function revokeAcceptedInvite(caseId, button) {
   }
 }
 
-function handleCaseAction(action, title) {
-  const toastHelper = window.toastUtils;
-  const message = `${action} for “${title}” is coming soon.`;
-  toastHelper?.show?.(message, { targetId: selectors.toastBanner?.id });
-}
-
 function attachUIHandlers() {
   const toastHelper = window.toastUtils;
   const stagedToast = toastHelper?.consume?.();
@@ -1049,16 +1049,11 @@ function attachUIHandlers() {
       if (unreadMessageCount < 1) return;
       const caseId = latestMessageThread?.id || latestMessageThread?._id || '';
       if (!caseId) return;
-      window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}#case-messages`;
+      window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}&tab=messages`;
     });
   }
   if (selectors.earningsToggle) {
     selectors.earningsToggle.addEventListener('click', toggleEarningsMode);
-    selectors.earningsToggle.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        toggleEarningsMode(event);
-      }
-    });
   }
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && selectors.inviteOverlay?.classList.contains('show')) {
@@ -1072,15 +1067,55 @@ function attachUIHandlers() {
 
 let activeInvite = null;
 let pendingRevokeAction = null;
+let inviteReturnFocus = null;
 
 function closeRevokeConfirmModal() {
-  selectors.revokeConfirmModal?.classList.add('hidden');
+  const modal = selectors.revokeConfirmModal;
+  modal?.classList.add('hidden');
+  modal?.setAttribute('aria-hidden', 'true');
+  modal?.setAttribute('inert', '');
+  if (applicationModal && !applicationModal.classList.contains('hidden')) {
+    applicationModal.removeAttribute('inert');
+  }
+  if (selectors.inviteOverlay?.classList.contains('show')) {
+    selectors.inviteOverlay.removeAttribute('inert');
+  }
+  deactivateDialogFocus(modal);
+  if (applicationModal && !applicationModal.classList.contains('hidden')) {
+    activateDialogFocus(applicationModal, {
+      initialFocus: applicationModal.querySelector('[data-application-revoke]'),
+      returnFocus: applicationReturnFocus,
+      onEscape: closeApplicationModal,
+    });
+  } else if (selectors.inviteOverlay?.classList.contains('show')) {
+    activateDialogFocus(selectors.inviteOverlay, {
+      initialFocus: selectors.inviteDeclineBtn,
+      returnFocus: inviteReturnFocus,
+      onEscape: closeInviteOverlay,
+    });
+  }
   pendingRevokeAction = null;
 }
 
 function openRevokeConfirmModal(onConfirm) {
   pendingRevokeAction = typeof onConfirm === 'function' ? onConfirm : null;
-  selectors.revokeConfirmModal?.classList.remove('hidden');
+  const modal = selectors.revokeConfirmModal;
+  if (!modal) return;
+  if (applicationModal && !applicationModal.classList.contains('hidden')) {
+    deactivateDialogFocus(applicationModal, { restoreFocus: false });
+    applicationModal.setAttribute('inert', '');
+  }
+  if (selectors.inviteOverlay?.classList.contains('show')) {
+    deactivateDialogFocus(selectors.inviteOverlay, { restoreFocus: false });
+    selectors.inviteOverlay.setAttribute('inert', '');
+  }
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+  modal.removeAttribute('inert');
+  activateDialogFocus(modal, {
+    initialFocus: selectors.revokeConfirmCancel,
+    onEscape: closeRevokeConfirmModal,
+  });
 }
 
 function openInviteOverlay(invite) {
@@ -1101,7 +1136,7 @@ function openInviteOverlay(invite) {
   } = selectors;
   const inviteActions = inviteOverlay?.querySelector('.actions');
   if (!inviteOverlay) return;
-  const title = invite?.title || 'Case Invitation';
+  const title = invite?.title || 'Matter Invitation';
   const attorneyName =
     invite?.attorney?.name ||
     [invite?.attorney?.firstName, invite?.attorney?.lastName].filter(Boolean).join(' ').trim() ||
@@ -1140,11 +1175,11 @@ function openInviteOverlay(invite) {
   const inviteStatus = String(invite?.inviteStatus || '').toLowerCase();
   const isAccepted = inviteStatus === 'accepted';
 
-  if (inviteCaseTitle) inviteCaseTitle.textContent = isAccepted ? 'Await attorney action' : "You've been invited to a case";
+  if (inviteCaseTitle) inviteCaseTitle.textContent = isAccepted ? 'Await attorney action' : "You've been invited to a Matter";
   if (inviteJobTitle) inviteJobTitle.textContent = title;
   if (inviteLead) {
     inviteLead.textContent = isAccepted
-      ? 'You accepted this invitation. The attorney must confirm hire and fund the case next.'
+      ? 'You accepted this invitation. The attorney must confirm hire and fund the Matter next.'
       : '';
   }
   if (inviteMeta) {
@@ -1177,7 +1212,7 @@ function openInviteOverlay(invite) {
         </div>
       `);
     }
-    inviteDetails.innerHTML = detailParts.join('') || '<p>No case description provided.</p>';
+    inviteDetails.innerHTML = detailParts.join('') || '<p>No Matter description was provided.</p>';
   }
   if (inviteAttorneyName) inviteAttorneyName.textContent = attorneyName;
   if (inviteAttorneyFirm) inviteAttorneyFirm.textContent = invite?.attorney?.firm || invite?.attorney?.lawFirm || '';
@@ -1218,11 +1253,23 @@ function openInviteOverlay(invite) {
   inviteActions?.classList.toggle('is-accepted', isAccepted);
 
   setInviteQuery(caseId);
+  inviteReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   inviteOverlay.classList.add('show');
+  inviteOverlay.setAttribute('aria-hidden', 'false');
+  inviteOverlay.removeAttribute('inert');
+  activateDialogFocus(inviteOverlay, {
+    initialFocus: isAccepted ? inviteDeclineBtn : inviteAcceptBtn,
+    returnFocus: inviteReturnFocus,
+    onEscape: closeInviteOverlay,
+  });
 }
 
 function closeInviteOverlay() {
   selectors.inviteOverlay?.classList.remove('show');
+  selectors.inviteOverlay?.setAttribute('aria-hidden', 'true');
+  selectors.inviteOverlay?.setAttribute('inert', '');
+  deactivateDialogFocus(selectors.inviteOverlay);
+  inviteReturnFocus = null;
   activeInvite = null;
   clearInviteQuery();
 }
@@ -1264,7 +1311,6 @@ let onboardingPromise = null;
 
 function normalizeOnboarding(raw = {}) {
   return {
-    paralegalWelcomeDismissed: Boolean(raw?.paralegalWelcomeDismissed),
     paralegalTourCompleted: Boolean(raw?.paralegalTourCompleted),
     paralegalProfileTourCompleted: Boolean(raw?.paralegalProfileTourCompleted),
   };
@@ -1329,63 +1375,15 @@ async function updateOnboardingState(updates = {}, { markFirstLoginComplete = fa
   }
 }
 
-function hasCompletedTour(user) {
-  return getCachedOnboarding(user).paralegalTourCompleted;
-}
 
 function markTourCompleted() {
   void updateOnboardingState({ paralegalTourCompleted: true }, { markFirstLoginComplete: true });
 }
 
-function updateWelcomeGreeting(user) {
+function updateWelcomeGreeting() {
   const greetingEl = selectors.welcomeGreeting;
   if (!greetingEl) return;
   greetingEl.textContent = "Welcome";
-}
-
-function hasDismissedWelcome(user) {
-  return getCachedOnboarding(user).paralegalWelcomeDismissed;
-}
-
-function markWelcomeDismissed(user) {
-  void updateOnboardingState({ paralegalWelcomeDismissed: true });
-}
-
-function applyParalegalWelcomeNotice(user) {
-  const notice = selectors.welcomeNotice;
-  const dismissBtn = selectors.welcomeNoticeDismiss;
-  if (!notice || !dismissBtn) return;
-  // Welcome notice is intentionally disabled.
-  notice.classList.add("hidden");
-  return;
-
-  const stored = getStoredUserSnapshot();
-  const role = String((user?.role || stored?.role || "")).toLowerCase();
-  if (role !== "paralegal") {
-    notice.classList.add("hidden");
-    return;
-  }
-  const storedFlag = stored?.isFirstLogin;
-  const userFlag = user?.isFirstLogin;
-  const isFirstLogin = typeof storedFlag === "boolean" ? storedFlag : Boolean(userFlag);
-  const applyState = (onboarding) => {
-    const dismissed = Boolean(onboarding?.paralegalWelcomeDismissed);
-    notice.classList.toggle("hidden", !isFirstLogin || dismissed);
-  };
-  const cached = getCachedOnboarding(user || stored);
-  if (cached && (cached.paralegalWelcomeDismissed || cached.paralegalTourCompleted || cached.paralegalProfileTourCompleted)) {
-    applyState(cached);
-  } else {
-    void loadOnboardingState(user || stored).then(applyState);
-  }
-
-  if (!dismissBtn.dataset.bound) {
-    dismissBtn.dataset.bound = "true";
-    dismissBtn.addEventListener("click", () => {
-      notice.classList.add("hidden");
-      markWelcomeDismissed(user || stored);
-    });
-  }
 }
 
 let tourInitialized = false;
@@ -1490,7 +1488,13 @@ async function initParalegalTour(user, options = {}) {
     overlay.classList.remove("is-active", "spotlight");
     overlay.setAttribute("aria-hidden", "true");
     modal.classList.remove("is-active");
+    modal.setAttribute("aria-hidden", "true");
+    modal.setAttribute("inert", "");
     tooltip.classList.remove("is-active");
+    tooltip.setAttribute("aria-hidden", "true");
+    tooltip.setAttribute("inert", "");
+    deactivateDialogFocus(modal, { restoreFocus: false });
+    deactivateDialogFocus(tooltip, { restoreFocus: false });
     profileLink.classList.remove("tour-highlight");
   };
 
@@ -1511,14 +1515,28 @@ async function initParalegalTour(user, options = {}) {
     ensureSidebarVisibleForTarget(null);
     overlay.classList.remove("spotlight");
     modal.classList.add("is-active");
+    modal.setAttribute("aria-hidden", "false");
+    modal.removeAttribute("inert");
     tooltip.classList.remove("is-active");
+    tooltip.setAttribute("aria-hidden", "true");
+    tooltip.setAttribute("inert", "");
+    deactivateDialogFocus(tooltip, { restoreFocus: false });
+    activateDialogFocus(modal, {
+      initialFocus: startBtn || closeBtn,
+      onEscape: completeTour,
+    });
   };
 
   const showProfileStep = () => {
     showOverlay();
     ensureSidebarVisibleForTarget(profileLink);
     modal.classList.remove("is-active");
+    modal.setAttribute("aria-hidden", "true");
+    modal.setAttribute("inert", "");
+    deactivateDialogFocus(modal, { restoreFocus: false });
     overlay.classList.add("spotlight");
+    tooltip.setAttribute("aria-hidden", "false");
+    tooltip.removeAttribute("inert");
     const positionProfileStep = () => {
       const rect = profileLink.getBoundingClientRect();
       const padding = 10;
@@ -1538,12 +1556,17 @@ async function initParalegalTour(user, options = {}) {
       }
     };
     requestAnimationFrame(sync);
+    activateDialogFocus(tooltip, {
+      initialFocus: nextBtn || tooltipCloseBtn,
+      onEscape: completeTour,
+    });
   };
 
   const completeTour = () => {
     tooltip.classList.remove("is-active");
     hideOverlay();
-    updateWelcomeGreeting(user);
+    profileLink.focus();
+    updateWelcomeGreeting();
   };
 
   const buildProfileTourUrl = (href = "profile-settings.html") => {
@@ -1597,7 +1620,7 @@ function updateProfile(profile = {}) {
       .split(/\s+/)[0] ||
     'Paralegal';
   setField('name', firstName);
-  updateWelcomeGreeting(profile);
+  updateWelcomeGreeting();
   const avatarUrl = getAvatarUrl(profile);
   document.querySelectorAll('[data-avatar]').forEach((node) => {
     node.src = avatarUrl;
@@ -1606,22 +1629,49 @@ function updateProfile(profile = {}) {
   const a = document.querySelector('#user-avatar');
   if (a) a.src = avatarUrl;
   updatePendingApprovalBanner(profile);
+  syncAvailabilityProfile(profile);
+}
+
+function availabilityDateOnly(value) {
+  if (!value) return "";
+  const direct = String(value).trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(direct)) return "";
+  const parsed = new Date(`${direct}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === direct ? direct : "";
+}
+
+function syncAvailabilityProfile(profile = {}) {
+  const details = profile?.availabilityDetails || {};
+  const status =
+    String(details.status || "").toLowerCase() === "unavailable" ||
+    /unavailable/i.test(String(profile?.availability || ""))
+      ? "unavailable"
+      : "available";
+  const nextAvailableDate = status === "unavailable" ? availabilityDateOnly(details.nextAvailable) : "";
+  const statusDisplay = document.getElementById("availabilityStatus");
+  const nextDisplay = document.getElementById("availabilityNext");
+  if (statusDisplay) {
+    statusDisplay.dataset.value = status;
+    statusDisplay.textContent = status === "available" ? "Available now" : "Not available";
+  }
+  if (nextDisplay) {
+    nextDisplay.dataset.date = nextAvailableDate;
+    const friendly = formatAvailabilityDate(nextAvailableDate);
+    nextDisplay.textContent = friendly ? `Available on ${friendly}` : status === "unavailable" ? "No return date set" : "";
+  }
 }
 
 function persistAvailabilityState(availabilityText, details = {}) {
   try {
-    const raw = localStorage.getItem('lpc_user');
-    if (!raw) return;
-    const user = JSON.parse(raw);
+    const user = window.getStoredUser?.();
     if (!user || typeof user !== 'object') return;
-    if (availabilityText) user.availability = availabilityText;
-    user.availabilityDetails = details;
-    localStorage.setItem('lpc_user', JSON.stringify(user));
-    window.updateSessionUser?.(user);
-    window.hydrateParalegalCluster?.(user);
-    try {
-      window.dispatchEvent(new CustomEvent('lpc:user-updated', { detail: user }));
-    } catch (_) {}
+    const updatedUser = {
+      ...user,
+      ...(availabilityText ? { availability: availabilityText } : {}),
+      availabilityDetails: details,
+    };
+    window.updateSessionUser?.(updatedUser);
+    window.hydrateParalegalCluster?.(updatedUser);
   } catch (err) {
     console.warn('Unable to persist availability', err);
   }
@@ -1631,7 +1681,7 @@ function formatAvailabilityDate(value) {
   if (!value) return '';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '';
-  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
 function handleStoredUserUpdate(event) {
@@ -1675,7 +1725,7 @@ function initLatestMessage(threads = []) {
   }
   const latest = selectLatestThread(threads);
   latestMessageThread = latest || null;
-  setField('latestMessageName', latest?.title || 'Case thread');
+  setField('latestMessageName', latest?.title || 'Matter thread');
   setField('latestMessageExcerpt', latest?.lastMessageSnippet || 'No new messages.');
 }
 
@@ -1690,72 +1740,8 @@ function initQuickActions() {
         }
         return;
       }
-      if (action === 'availability') {
-        event.preventDefault();
-        return;
-      }
-      event.preventDefault();
-      handleCaseAction(button.textContent || 'Action', 'your assignments');
     });
   });
-}
-
-function normalizeState(value = '') {
-  return String(value || '').trim().toLowerCase();
-}
-
-function parseStateFromLocation(value = '') {
-  const parts = String(value || '').split(',');
-  if (parts.length < 2) return '';
-  return parts[parts.length - 1].trim();
-}
-
-function deriveProfileState(profile = {}) {
-  return (
-    profile.locationState ||
-    profile.state ||
-    profile.jurisdiction ||
-    parseStateFromLocation(profile.location || profile.address || '')
-  );
-}
-
-function parseExperience(value) {
-  const num = Number(value);
-  return Number.isFinite(num) && num >= 0 ? num : 0;
-}
-
-function deriveExperience(profile = {}) {
-  return (
-    parseExperience(profile.yearsExperience) ||
-    parseExperience(profile.experienceYears) ||
-    parseExperience(profile.paralegalProfile?.yearsExperience)
-  );
-}
-
-function extractJobState(job = {}) {
-  return (
-    job.state ||
-    job.locationState ||
-    job.location?.state ||
-    job.location ||
-    job.jurisdiction ||
-    job.region ||
-    ''
-  );
-}
-
-function extractJobExperience(job = {}) {
-  return (
-    parseExperience(job.minimumExperienceRequired) ||
-    parseExperience(job.minExperience) ||
-    parseExperience(job.yearsExperience) ||
-    parseExperience(job.experienceRequired)
-  );
-}
-
-function formatExperienceLabel(years = 0) {
-  if (!years) return '';
-  return years === 1 ? '1 year experience' : `${years} years experience`;
 }
 
 function escapeHtml(value = '') {
@@ -1771,6 +1757,10 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Recently';
   return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function formatMatterDeadline(value) {
+  return window.LPCBusinessDate?.format(value) || formatDate(value);
 }
 
 function formatActivityDate(value) {
@@ -2100,7 +2090,11 @@ function buildApplicationDetail(app) {
     return '<p class="muted">Application not found.</p>';
   }
   const job = app.jobId || app.job || {};
-  const title = escapeHtml(job.title || app.caseTitle || 'Job');
+  const browseMatterId = getCaseId(app) || getCaseId(job);
+  const browseMatterHref = browseMatterId
+    ? `browse-jobs.html?caseId=${encodeURIComponent(browseMatterId)}`
+    : '';
+  const title = escapeHtml(job.title || app.caseTitle || 'Matter');
   const practice = escapeHtml(job.practiceArea || 'General practice');
   const description = escapeHtml(job.description || '');
   const budgetValue = Number(job.budget);
@@ -2111,7 +2105,7 @@ function buildApplicationDetail(app) {
 
   return `
     <div class="detail-row">
-      <span class="detail-label">Job</span>
+      <span class="detail-label">Matter</span>
       <span class="detail-value">${title}</span>
     </div>
     <div class="detail-row">
@@ -2142,6 +2136,11 @@ function buildApplicationDetail(app) {
       <strong>Cover message</strong>
       <p>${cover || 'No cover message available.'}</p>
     </div>
+    ${browseMatterHref ? `
+      <div class="application-detail-actions">
+        <a class="card-link" href="${escapeHtml(browseMatterHref)}">View Matter posting</a>
+      </div>
+    ` : ''}
     ${buildApplicationPreEngagementSection(app)}
   `;
 }
@@ -2177,7 +2176,9 @@ async function reviewApplicationPreEngagementDocument(app) {
     if (!res.ok || !payload?.url) {
       throw new Error(payload?.error || 'Unable to open this document.');
     }
-    window.open(payload.url, '_blank', 'noopener');
+    const documentUrl = normalizeHttpNavigationUrl(payload.url);
+    if (!documentUrl) throw new Error('The document destination is invalid.');
+    window.open(documentUrl, '_blank', 'noopener');
   } catch (error) {
     toastHelper?.show?.(error.message || 'Unable to open this document.', {
       targetId: selectors.toastBanner?.id,
@@ -2438,12 +2439,24 @@ function openApplicationModal(app) {
     revokeBtn.textContent = disabled ? 'Revoke unavailable' : 'Revoke application';
   }
   renderActiveApplicationModal();
+  applicationReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   applicationModal.classList.remove('hidden');
+  applicationModal.setAttribute('aria-hidden', 'false');
+  applicationModal.removeAttribute('inert');
+  activateDialogFocus(applicationModal, {
+    initialFocus: applicationModal.querySelector('[data-application-close]'),
+    returnFocus: applicationReturnFocus,
+    onEscape: closeApplicationModal,
+  });
 }
 
 function closeApplicationModal() {
   if (!applicationModal) return;
   applicationModal.classList.add('hidden');
+  applicationModal.setAttribute('aria-hidden', 'true');
+  applicationModal.setAttribute('inert', '');
+  deactivateDialogFocus(applicationModal);
+  applicationReturnFocus = null;
   activeApplication = null;
   applicationPreEngagementDraft = null;
   applicationPreEngagementExpandedKey = '';
@@ -2523,66 +2536,6 @@ function maybeOpenApplicationFromQuery() {
   openApplicationModal(match);
 }
 
-async function loadRecommendedJobs(profile = {}) {
-  const list = document.querySelector('#recommendedPostingsCard .recommendations-list');
-  if (!list) return;
-  list.innerHTML =
-    '<li class="recommended-item"><span class="rec-title">Finding postings for you…</span></li>';
-
-  try {
-    const res = await secureFetch('/api/jobs/open', { headers: { Accept: 'application/json' } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const jobs = await res.json().catch(() => []);
-    if (!Array.isArray(jobs) || !jobs.length) {
-      list.innerHTML =
-        '<li class="recommended-item"><span class="rec-title">No open postings yet.</span></li>';
-      return;
-    }
-
-    const desiredState = normalizeState(deriveProfileState(profile));
-    const yearsExperience = deriveExperience(profile);
-
-    const matched = jobs.filter((job) => {
-      const jobState = normalizeState(extractJobState(job));
-      const jobExp = extractJobExperience(job);
-      const stateOk = desiredState ? jobState === desiredState : true;
-      const expOk = yearsExperience ? jobExp === yearsExperience : true;
-      return stateOk && expOk;
-    });
-
-    const shortlist = (matched.length ? matched : jobs).slice(0, 2);
-
-    list.innerHTML = shortlist
-      .map((job) => {
-        const id = job._id || job.id || '';
-        const title = escapeHtml(job.title || 'Untitled posting');
-        const jobState = escapeHtml(extractJobState(job) || 'Multi-state');
-        const jobExpLabel = formatExperienceLabel(extractJobExperience(job));
-        const payDisplay =
-          job.compensationDisplay ||
-          job.payDisplay ||
-          (typeof job.budget === 'number' ? `$${job.budget.toLocaleString()}` : '');
-        const meta = [jobState, jobExpLabel, payDisplay].filter(Boolean).join(' • ');
-
-        const href = id ? `browse-jobs.html?id=${encodeURIComponent(id)}` : 'browse-jobs.html';
-        return `
-          <li class="recommended-item">
-            <div>
-              <span class="rec-title">${title}</span>
-              <div class="rec-status">${escapeHtml(meta)}</div>
-            </div>
-            <a class="rec-open-link" href="${href}">View</a>
-          </li>
-        `;
-      })
-      .join('');
-  } catch (err) {
-    console.error('Failed to load recommended jobs', err);
-    list.innerHTML =
-      '<li class="recommended-item"><span class="rec-title">Unable to load recommendations.</span></li>';
-  }
-}
-
 async function loadAppliedJobs({ preservePage = false } = {}) {
   const container = document.getElementById('appliedJobsList');
   if (!container) return;
@@ -2601,10 +2554,12 @@ async function loadAppliedJobs({ preservePage = false } = {}) {
     const apps = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
     const visibleApps = apps.filter((app) => isActiveApplication(app));
     appliedAppsCache = visibleApps;
+    paralegalPrioritySnapshot.applications = visibleApps;
     appliedPage = preservePage ? appliedPage : 1;
     bindAppliedFilters();
     populateAppliedFilterOptions(visibleApps);
     applyAppliedFilters({ resetPage: false });
+    renderParalegalPriorityQueue();
     maybeOpenApplicationFromQuery();
   } catch (err) {
     console.error('Failed to load applied jobs', err);
@@ -2613,10 +2568,14 @@ async function loadAppliedJobs({ preservePage = false } = {}) {
         <div class="case-header">
           <div>
             <h2>Unable to load applications</h2>
-            <div class="case-subinfo">Please refresh to try again.</div>
+            <div class="case-subinfo">Your current view is preserved. Try loading the applications again.</div>
+            <button type="button" class="completed-page-btn" data-applications-retry>Retry</button>
           </div>
         </div>
       </div>`;
+    container.querySelector('[data-applications-retry]')?.addEventListener('click', () => {
+      void loadAppliedJobs({ preservePage: true });
+    });
     updateAppliedPagination({ total: 0 });
     maybeOpenApplicationFromQuery();
   }
@@ -2624,7 +2583,7 @@ async function loadAppliedJobs({ preservePage = false } = {}) {
 
 function bindAppliedFilters() {
   if (appliedFiltersBound) return;
-  const { toggle, panel, search, status, practice, dateRange } = appliedFilters;
+  const { toggle, panel, search, status, practice, dateRange, sort } = appliedFilters;
   if (!search || !practice || !dateRange) return;
   appliedFiltersBound = true;
 
@@ -2656,12 +2615,28 @@ function bindAppliedFilters() {
     });
   }
 
-  search.addEventListener('input', () => applyAppliedFilters({ resetPage: true }));
+  search.addEventListener('input', () => {
+    applicationSavedViews?.markCustom();
+    applyAppliedFilters({ resetPage: true });
+  });
   if (status) {
-    status.addEventListener('change', () => applyAppliedFilters({ resetPage: true }));
+    status.addEventListener('change', () => {
+      applicationSavedViews?.markCustom();
+      applyAppliedFilters({ resetPage: true });
+    });
   }
-  practice.addEventListener('change', () => applyAppliedFilters({ resetPage: true }));
-  dateRange.addEventListener('change', () => applyAppliedFilters({ resetPage: true }));
+  practice.addEventListener('change', () => {
+    applicationSavedViews?.markCustom();
+    applyAppliedFilters({ resetPage: true });
+  });
+  dateRange.addEventListener('change', () => {
+    applicationSavedViews?.markCustom();
+    applyAppliedFilters({ resetPage: true });
+  });
+  sort?.addEventListener('change', () => {
+    applicationSavedViews?.markCustom();
+    applyAppliedFilters({ resetPage: true });
+  });
   if (appliedPagination.prev) {
     appliedPagination.prev.addEventListener('click', () => {
       if (appliedPage > 1) {
@@ -2678,6 +2653,34 @@ function bindAppliedFilters() {
       }
     });
   }
+
+  applicationSavedViews = mountDashboardSavedViews({
+    scope: 'paralegal_applications',
+    picker: '[data-application-saved-view]',
+    saveButton: '[data-application-save-view]',
+    deleteButton: '[data-application-delete-view]',
+    status: '[data-application-saved-view-status]',
+    builtIns: [
+      { id: 'recent', name: 'Recent applications', filters: { search: '', status: 'all', practice: 'all', dateRange: '30', sort: 'newest' } },
+      { id: 'all', name: 'All applications', filters: { search: '', status: 'all', practice: 'all', dateRange: 'all', sort: 'newest' } },
+      { id: 'oldest', name: 'Waiting longest', filters: { search: '', status: 'all', practice: 'all', dateRange: 'all', sort: 'oldest' } },
+    ],
+    getState: () => ({
+      search: String(search.value || ''),
+      status: String(status?.value || 'all'),
+      practice: String(practice.value || 'all'),
+      dateRange: String(dateRange.value || 'all'),
+      sort: String(sort?.value || 'newest'),
+    }),
+    applyState: (filters = {}) => {
+      search.value = String(filters.search || '');
+      if (status) status.value = String(filters.status || 'all');
+      practice.value = String(filters.practice || 'all');
+      dateRange.value = String(filters.dateRange || 'all');
+      if (sort) sort.value = String(filters.sort || 'newest');
+      applyAppliedFilters({ resetPage: true });
+    },
+  });
 }
 
 function populateAppliedFilterOptions(apps = []) {
@@ -2719,7 +2722,7 @@ function applyAppliedFilters({ resetPage = false } = {}) {
   if (!container) return;
   if (resetPage) appliedPage = 1;
 
-  const { search, status, practice, dateRange } = appliedFilters;
+  const { search, status, practice, dateRange, sort } = appliedFilters;
   const query = String(search?.value || '').trim().toLowerCase();
   const statusFilter = String(status?.value || 'all');
   const practiceFilter = String(practice?.value || 'all');
@@ -2758,7 +2761,14 @@ function applyAppliedFilters({ resetPage = false } = {}) {
     }
   }
 
-  filtered.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  const sortMode = String(sort?.value || 'newest');
+  filtered.sort((a, b) => {
+    if (sortMode === 'oldest') return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+    if (sortMode === 'matter') {
+      return String(a?.jobId?.title || '').localeCompare(String(b?.jobId?.title || ''));
+    }
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+  });
 
   const highlightTarget = getAppliedHighlightTarget();
   if (!appliedHighlightHandled && (highlightTarget.applicationId || highlightTarget.jobId)) {
@@ -2796,7 +2806,7 @@ function renderAppliedJobs(container, apps, total, { startIndex = 0, endIndex = 
         <div class="case-header">
           <div>
             <h2>No applications yet</h2>
-            <div class="case-subinfo">Jobs you apply to will appear here.</div>
+            <div class="case-subinfo">Matters you apply to will appear here.</div>
           </div>
         </div>
       </div>`;
@@ -2826,7 +2836,7 @@ function renderAppliedJobs(container, apps, total, { startIndex = 0, endIndex = 
   container.innerHTML = apps
     .map((app) => {
       const job = app.jobId || {};
-      const title = escapeHtml(job.title || 'Untitled job');
+      const title = escapeHtml(job.title || 'Untitled Matter');
       const practice = escapeHtml(job.practiceArea || 'General practice');
       const when = app.createdAt
         ? new Date(app.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
@@ -2929,7 +2939,7 @@ function isRejectedApplication(app) {
 function isActiveApplication(app) {
   if (!hasApplicationJob(app)) return false;
   const statusKey = getApplicationStatusKey(app);
-  if (statusKey === 'accepted' || statusKey === 'rejected') return false;
+  if (statusKey === 'accepted' || statusKey === 'rejected' || statusKey === 'withdrawn') return false;
   const jobStatus = String(app?.jobId?.status || '').toLowerCase();
   if (jobStatus && jobStatus !== 'open') return false;
   return true;
@@ -2940,11 +2950,103 @@ function formatApplicationStatus(value) {
   return cleaned ? cleaned.charAt(0).toUpperCase() + cleaned.slice(1) : 'Submitted';
 }
 
+function renderParalegalPriorityQueue() {
+  const list = document.querySelector('[data-paralegal-priority-list]');
+  const count = document.querySelector('[data-paralegal-priority-count]');
+  if (!list) return;
+  const { activeCases = [], invites = [], deadlines = [], applications = [] } = paralegalPrioritySnapshot;
+  const priorities = [];
+  const pendingInvites = invites.filter((invite) => String(invite?.inviteStatus || invite?.status || 'pending').toLowerCase() === 'pending');
+  if (pendingInvites.length) {
+    const first = pendingInvites[0];
+    const caseId = getCaseId(first);
+    priorities.push({
+      title: `${pendingInvites.length} Matter invitation${pendingInvites.length === 1 ? '' : 's'} waiting`,
+      detail: 'Review the scope and respond so the attorney knows whether you are available.',
+      label: 'Review invitation',
+      href: caseId ? `dashboard-paralegal.html?inviteCase=${encodeURIComponent(caseId)}#home` : 'dashboard-paralegal.html#home',
+    });
+  }
+  if (unreadMessageCount > 0) {
+    const caseId = getCaseId(latestMessageThread);
+    priorities.push({
+      title: `${unreadMessageCount} unread message${unreadMessageCount === 1 ? '' : 's'}`,
+      detail: 'Continue the conversation inside the related Matter workspace.',
+      label: 'Open messages',
+      href: caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}&tab=messages` : 'dashboard-paralegal.html#home',
+    });
+  }
+  const applicationNeedingResponse = applications.find((application) => {
+    const pre = getApplicationPreEngagement(application);
+    return ['requested', 'changes_requested'].includes(String(pre?.status || '').toLowerCase());
+  });
+  if (applicationNeedingResponse) {
+    const appId = String(applicationNeedingResponse?._id || applicationNeedingResponse?.id || '');
+    priorities.push({
+      title: 'Pre-engagement information required',
+      detail: 'Complete the requested confidentiality or conflicts information before the Matter can advance.',
+      label: 'Complete request',
+      href: appId ? `dashboard-paralegal.html?applicationId=${encodeURIComponent(appId)}#cases` : 'dashboard-paralegal.html#cases',
+    });
+  }
+  if (!stripeConnected) {
+    priorities.push({
+      title: 'Complete payout setup',
+      detail: 'Finish payout verification before a completed Matter reaches payout.',
+      label: 'Open payout settings',
+      href: 'profile-settings.html?onboardingStep=payment',
+    });
+  }
+  const today = window.LPCBusinessDate?.today() || "";
+  const sevenDaysFromToday = window.LPCBusinessDate?.addDays(today, 7) || "";
+  const dated = deadlines
+    .map((deadline) => ({
+      ...deadline,
+      dateOnly: window.LPCBusinessDate?.normalize(deadline?.start || deadline?.deadline) || "",
+    }))
+    .filter((deadline) => deadline.dateOnly)
+    .sort((left, right) => left.dateOnly.localeCompare(right.dateOnly));
+  const upcoming = dated.find((deadline) => deadline.dateOnly <= sevenDaysFromToday);
+  if (upcoming) {
+    const caseId = getCaseId(upcoming);
+    const overdue = upcoming.dateOnly < today;
+    priorities.push({
+      title: overdue ? 'A Matter deadline is overdue' : 'A Matter deadline is approaching',
+      detail: `${upcoming.title || 'Matter'} · ${formatMatterDeadline(upcoming.dateOnly)}`,
+      label: 'Open Matter',
+      href: caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}&tab=work` : 'dashboard-paralegal.html#cases',
+    });
+  }
+  if (!priorities.length) {
+    priorities.push({
+      title: 'All clear',
+      detail: activeCases.length ? 'No invitations, messages, payout blockers, or near-term deadlines need action.' : 'Browse open Matters when you are ready for another opportunity.',
+      label: activeCases.length ? 'View Matters' : 'Browse Matters',
+      href: activeCases.length ? 'dashboard-paralegal.html#cases' : 'browse-jobs.html',
+    });
+  }
+  const visible = priorities.slice(0, 5);
+  if (count) {
+    count.textContent = priorities[0]?.title === 'All clear'
+      ? 'All clear'
+      : `${visible.length} action${visible.length === 1 ? '' : 's'}`;
+  }
+  list.innerHTML = visible.map((item) => `
+    <div class="lpc-priority-item">
+      <div>
+        <strong>${escapeHtml(item.title)}</strong>
+        <span>${escapeHtml(item.detail)}</span>
+      </div>
+      <a class="lpc-priority-action" href="${escapeHtml(item.href)}">${escapeHtml(item.label)}</a>
+    </div>
+  `).join('');
+}
+
 async function initDashboard() {
   attachUIHandlers();
   initQuickActions();
   try {
-    const [profile, _stripeStatus, dashboard, invites, deadlines, threads, unreadCount] = await Promise.all([
+    const [profile, , dashboard, invites, deadlines, threads, unreadCount] = await Promise.all([
       loadViewerProfile().catch(() => ({})),
       loadStripeStatus().catch(() => null),
       fetchParalegalData().catch(() => ({})),
@@ -2956,7 +3058,6 @@ async function initDashboard() {
     const viewer = profile || {};
     pendingApprovalReady = true;
     updateProfile(viewer);
-    applyParalegalWelcomeNotice(viewer);
     const caseDeadlines = buildCaseDeadlines(dashboard?.activeCases || []);
     const deadlineEvents = deadlines.length ? deadlines : caseDeadlines;
     updateStats({
@@ -2968,12 +3069,19 @@ async function initDashboard() {
       payout30Days: dashboard?.metrics?.earningsLast30Days,
       nextPayout: dashboard?.metrics?.nextPayoutDate,
     });
-    loadRecommendedJobs(viewer);
-    loadAppliedJobs();
+    await loadAppliedJobs();
     renderDeadlines(deadlineEvents);
     initLatestMessage(threads);
     renderAssignments(mapActiveCasesToAssignments(dashboard?.activeCases || []));
     renderRecentActivity({ invites, threads, deadlines: deadlineEvents });
+    paralegalPrioritySnapshot = {
+      activeCases: dashboard?.activeCases || [],
+      invites,
+      threads,
+      deadlines: deadlineEvents,
+      applications: appliedAppsCache,
+    };
+    renderParalegalPriorityQueue();
     maybeOpenInviteFromQuery();
   } catch (err) {
     console.warn('Paralegal dashboard init failed', err);
@@ -2981,8 +3089,9 @@ async function initDashboard() {
     renderRecentActivity({ invites: [], threads: [], deadlines: [] });
     renderDeadlines([]);
     initLatestMessage([]);
-    loadRecommendedJobs({});
     loadAppliedJobs();
+    paralegalPrioritySnapshot = { activeCases: [], invites: [], threads: [], deadlines: [], applications: appliedAppsCache };
+    renderParalegalPriorityQueue();
   }
 }
 
@@ -2996,7 +3105,6 @@ async function bootParalegalDashboard() {
   bindClusterProfileMenu();
   applyRoleVisibility(user);
   updateProfile(user || {});
-  applyParalegalWelcomeNotice(user || {});
   initParalegalTour(user || {}, { force: consumeReplayFlag() });
   window.hydrateParalegalCluster?.(user || {});
   if (window.state) {
@@ -3031,12 +3139,15 @@ function initAvailabilityModal() {
   const nextDisplay = document.getElementById("availabilityNext");
   const nextRow = document.getElementById("availabilityNextRow");
   const dateRow = document.getElementById("availabilityDateRow");
+  const currentSummary = document.getElementById("availabilityCurrentSummary");
   const quickActionBtn = document.querySelector('.quick-actions [data-action="availability"]');
 
-  if (!modal) console.error("❌ availabilityModal not found");
-  if (!openBtn) console.error("❌ updateAvailabilityLink not found");
-
   if (!modal) return;
+
+  if (dateInput) {
+    const now = new Date();
+    dateInput.min = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  }
 
   const resolveStatusValue = (value) => {
     const lowered = String(value || "").toLowerCase();
@@ -3054,8 +3165,15 @@ function initAvailabilityModal() {
 
   const syncFromDisplay = () => {
     if (!statusInput) return;
-    const displayValue = statusDisplay?.textContent || "";
+    const displayValue = statusDisplay?.dataset.value || statusDisplay?.textContent || "";
     statusInput.value = resolveStatusValue(displayValue);
+    if (dateInput) dateInput.value = statusInput.value === "unavailable" ? nextDisplay?.dataset.date || "" : "";
+    if (currentSummary) {
+      currentSummary.textContent =
+        statusInput.value === "available"
+          ? "Current status: Available now"
+          : `Current status: ${nextDisplay?.textContent || "Not available — no return date set"}`;
+    }
     syncAvailabilityUI(statusInput.value);
   };
 
@@ -3065,12 +3183,22 @@ function initAvailabilityModal() {
     syncFromDisplay();
     modal.style.display = "flex";
     modal.classList.add("show");
+    modal.setAttribute("aria-hidden", "false");
+    modal.removeAttribute("inert");
+    activateDialogFocus(modal, {
+      initialFocus: statusInput,
+      returnFocus: event?.currentTarget instanceof HTMLElement ? event.currentTarget : quickActionBtn || openBtn,
+      onEscape: hideModal,
+    });
   };
 
   const hideModal = () => {
     if (!modal) return;
     modal.classList.remove("show");
     modal.style.display = "none";
+    modal.setAttribute("aria-hidden", "true");
+    modal.setAttribute("inert", "");
+    deactivateDialogFocus(modal);
   };
 
   if (openBtn) {
@@ -3090,7 +3218,6 @@ function initAvailabilityModal() {
       hideModal();
     }
   });
-
   if (statusInput) {
     statusInput.addEventListener("change", () => {
       syncAvailabilityUI(statusInput.value);
@@ -3103,6 +3230,10 @@ function initAvailabilityModal() {
     saveBtn.addEventListener("click", async () => {
       const status = statusInput.value;
       const nextDate = status === "unavailable" ? dateInput.value : "";
+      if (nextDate && !dateInput.checkValidity()) {
+        dateInput.reportValidity();
+        return;
+      }
 
       const payload = {
         status,
@@ -3118,7 +3249,7 @@ function initAvailabilityModal() {
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          alert(data.msg || "Failed to update availability.");
+          await showAlert(data.msg || "Failed to update availability.", { title: "Availability not updated" });
           return;
         }
 
@@ -3133,7 +3264,7 @@ function initAvailabilityModal() {
           if (friendly) {
             nextDisplay.textContent = `Available on ${friendly}`;
           } else {
-            nextDisplay.textContent = "This week";
+            nextDisplay.textContent = "No return date set";
           }
         } else {
           nextDisplay.textContent = "";
@@ -3150,11 +3281,18 @@ function initAvailabilityModal() {
           nextAvailable,
           updatedAt: details.updatedAt || new Date().toISOString()
         });
+        syncAvailabilityProfile({
+          availability: availabilityLabel,
+          availabilityDetails: {
+            status: details.status || status,
+            nextAvailable,
+          },
+        });
 
         hideModal();
       } catch (err) {
         console.error(err);
-        alert("Server error updating availability.");
+        await showAlert("Server error updating availability.", { title: "Availability not updated" });
       }
     });
   }

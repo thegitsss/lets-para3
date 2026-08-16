@@ -5,8 +5,17 @@ const MarketingPublishAttempt = require("../../models/MarketingPublishAttempt");
 const { publishApprovalDecisionEvent } = require("../approvals/eventService");
 const { createLogger } = require("../../utils/logger");
 const { recordPacketOutcomeEvaluation } = require("./evaluationService");
+const { MARKETING_ACTIVE_WORKFLOW_TYPES } = require("./constants");
 
 const logger = createLogger("marketing:review");
+const ACTIVE_PACKET_FILTER = Object.freeze({ workflowType: { $in: MARKETING_ACTIVE_WORKFLOW_TYPES } });
+
+function assertActivePacket(packet = {}) {
+  if (MARKETING_ACTIVE_WORKFLOW_TYPES.includes(packet.workflowType)) return;
+  const error = new Error("This historical marketing packet is read-only.");
+  error.statusCode = 409;
+  throw error;
+}
 
 function toActor(actor = {}) {
   return {
@@ -71,8 +80,11 @@ async function countDocumentsWithDiagnostics(Model, filter, label) {
 }
 
 async function listMarketingApprovalTasks() {
+  const activePacketIds = await MarketingDraftPacket.find(ACTIVE_PACKET_FILTER).distinct("_id");
   return ApprovalTask.find({
     taskType: "marketing_review",
+    targetType: "marketing_draft_packet",
+    targetId: { $in: activePacketIds.map((id) => String(id)) },
   })
     .sort({ updatedAt: -1, createdAt: -1 })
     .lean();
@@ -83,6 +95,7 @@ async function approveMarketingPacket({ packetId, actor, note = "" } = {}) {
   if (!packet) {
     throw new Error("Marketing draft packet not found.");
   }
+  assertActivePacket(packet);
 
   const pendingTask = await ApprovalTask.findOne({
     taskType: "marketing_review",
@@ -154,6 +167,7 @@ async function rejectMarketingPacket({ packetId, actor, note = "" } = {}) {
   if (!packet) {
     throw new Error("Marketing draft packet not found.");
   }
+  assertActivePacket(packet);
 
   const pendingTask = await ApprovalTask.findOne({
     taskType: "marketing_review",
@@ -220,19 +234,19 @@ async function rejectMarketingPacket({ packetId, actor, note = "" } = {}) {
 
 async function getMarketingOverview() {
   const [briefsCount, packetsCount, pendingReviewCount, approvedCount, latestPackets] = await Promise.all([
-    countDocumentsWithDiagnostics(MarketingBrief, {}, "marketing_briefs"),
-    countDocumentsWithDiagnostics(MarketingDraftPacket, {}, "marketing_draft_packets"),
+    countDocumentsWithDiagnostics(MarketingBrief, ACTIVE_PACKET_FILTER, "marketing_briefs"),
+    countDocumentsWithDiagnostics(MarketingDraftPacket, ACTIVE_PACKET_FILTER, "marketing_draft_packets"),
     countDocumentsWithDiagnostics(
       MarketingDraftPacket,
-      { approvalState: "pending_review" },
+      { ...ACTIVE_PACKET_FILTER, approvalState: "pending_review" },
       "marketing_draft_packets.pending_review"
     ),
     countDocumentsWithDiagnostics(
       MarketingDraftPacket,
-      { approvalState: "approved" },
+      { ...ACTIVE_PACKET_FILTER, approvalState: "approved" },
       "marketing_draft_packets.approved"
     ),
-    MarketingDraftPacket.find({})
+    MarketingDraftPacket.find(ACTIVE_PACKET_FILTER)
       .sort({ updatedAt: -1, createdAt: -1 })
       .limit(8)
       .lean(),
@@ -291,14 +305,14 @@ async function getMarketingDiagnostics() {
 
   try {
     const [briefsCount, packetsCount, pendingReviewCount, latestBrief, latestSuccessfulAttempt] = await Promise.all([
-      countDocumentsWithDiagnostics(MarketingBrief, {}, "marketing_briefs"),
-      countDocumentsWithDiagnostics(MarketingDraftPacket, {}, "marketing_draft_packets"),
+      countDocumentsWithDiagnostics(MarketingBrief, ACTIVE_PACKET_FILTER, "marketing_briefs"),
+      countDocumentsWithDiagnostics(MarketingDraftPacket, ACTIVE_PACKET_FILTER, "marketing_draft_packets"),
       countDocumentsWithDiagnostics(
         MarketingDraftPacket,
-        { approvalState: "pending_review" },
+        { ...ACTIVE_PACKET_FILTER, approvalState: "pending_review" },
         "marketing_draft_packets.pending_review"
       ),
-      MarketingBrief.findOne({})
+      MarketingBrief.findOne(ACTIVE_PACKET_FILTER)
         .sort({ createdAt: -1, updatedAt: -1 })
         .select("createdAt updatedAt")
         .lean(),
@@ -372,7 +386,7 @@ async function getMarketingControlRoomView() {
         items: [
           "Draft-only and approval-based.",
           "LinkedIn company publish exists only for approved packets with an active configured connection.",
-          "Facebook Page, founder LinkedIn, and platform update drafts remain non-publishing workflows here.",
+          "Founder LinkedIn and platform update drafts remain approval-only workflows here.",
         ],
       },
     },

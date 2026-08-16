@@ -6,7 +6,7 @@ Scope: paralegal-assistant reliability telemetry, failure classification, alerts
 
 ## Privacy and role boundary
 
-Every future paralegal-manager answer must persist only this allowlisted operational summary:
+Every paralegal-manager answer persists only this allowlisted operational summary:
 
 - role, provider, and manager availability;
 - selected P01–P32 capability IDs and evidence state;
@@ -45,8 +45,8 @@ The report first selects conversations with `role: "paralegal"` and then project
 - Technical owner: assigned backend/on-call engineer.
 - Before rollout: run the synthetic dashboard and full Package 2–8 regression on the release commit.
 - During every Package 9 observation stage: review the report daily and record reviewer, window, sample, gate, alerts, open incidents, and disposition.
-- After General release: review weekly for the first 30 days, then monthly while the manager remains enabled.
-- Any critical alert is reviewed immediately; a warning is triaged within one business day.
+- After launch: review weekly for the first 30 days, then monthly while the manager remains enabled.
+- Any critical alert is reviewed immediately. Warning-triage timing must be assigned to a named on-call owner and recorded in the operating schedule; this internal target is not a user-facing response or resolution promise.
 
 Unknown-family counts feed `SOURCE_OF_TRUTH_MATRIX.md` and `paralegalSupportEvalCorpus.js`. Failure samples contain only message ID, timestamp, classification, and a synthetic regression command.
 
