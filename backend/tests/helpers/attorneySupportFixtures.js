@@ -7,6 +7,11 @@ const Job = require("../../models/Job");
 const Message = require("../../models/Message");
 const Payout = require("../../models/Payout");
 const User = require("../../models/User");
+const {
+  addCalendarDays,
+  dateOnlyFromZonedInstant,
+  dateOnlyToUtcDate,
+} = require("../../utils/businessDate");
 
 const SYNTHETIC_DOMAIN = "package6.invalid";
 const SYNTHETIC_TITLE_PREFIX = "P6 Synthetic";
@@ -101,6 +106,10 @@ function assertSyntheticFixtureData(fixture) {
 
 async function seedAttorneySupportFixtures() {
   const now = new Date("2026-07-22T16:00:00.000Z");
+  const upcomingDeadline = addCalendarDays(
+    dateOnlyFromZonedInstant(new Date(), process.env.BUSINESS_TIME_ZONE || undefined),
+    30
+  );
   const ids = {
     owner: objectId(),
     emptyAttorney: objectId(),
@@ -174,7 +183,8 @@ async function seedAttorneySupportFixtures() {
       status: "in progress",
       paralegalId: ids.assignedParalegal,
       now: new Date(now.getTime() - 60 * 60 * 1000),
-      deadline: new Date("2026-08-15T21:00:00.000Z"),
+      deadlineDate: upcomingDeadline,
+      deadline: dateOnlyToUtcDate(upcomingDeadline),
       hiredAt: new Date("2026-06-15T15:00:00.000Z"),
       tasksLocked: true,
       tasks: [
@@ -299,7 +309,7 @@ async function seedAttorneySupportFixtures() {
     }),
   };
 
-  const fixture = { now, ids, caseIds, jobId, users, cases };
+  const fixture = { now, upcomingDeadline, ids, caseIds, jobId, users, cases };
   assertSyntheticFixtureData(fixture);
 
   await User.collection.insertMany(Object.values(users));

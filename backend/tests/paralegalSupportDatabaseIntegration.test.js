@@ -181,7 +181,7 @@ describe("paralegal assistant Package 6 database-backed integration", () => {
       available: true,
       title: fixture.cases.assigned.title,
       status: "in progress",
-      deadline: "2026-08-15",
+      deadline: fixture.upcomingDeadline,
       attorneyName: "P6 Synthetic Attorney",
       relationship: "assigned",
       scopeTasks: expect.arrayContaining([

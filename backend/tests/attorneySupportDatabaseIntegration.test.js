@@ -139,7 +139,7 @@ describe("attorney assistant Package 6 database-backed integration", () => {
       ok: true,
       available: true,
       title: fixture.cases.active.title,
-      deadline: "2026-08-15",
+      deadline: fixture.upcomingDeadline,
       assignedParalegal: { assigned: true, name: "P6 Assigned" },
       tasks: expect.objectContaining({ total: 2, completed: 1, incomplete: 1, locked: true }),
       files: expect.objectContaining({ total: 2, pendingReview: 0, revisionsRequested: 1, approved: 1 }),
