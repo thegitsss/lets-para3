@@ -762,21 +762,27 @@ html.accessibility-mode .lpc-home--hybrid .hero-scroll {
 }
 
 .matter-lens__incoming {
-  opacity: 0.72;
+  opacity: 0.68;
   animation: matter-lens-incoming 7.4s cubic-bezier(0.45, 0, 0.2, 1) infinite;
 }
 
-.matter-lens__signal {
-  stroke-dasharray: 76 14;
+.matter-lens__traces {
+  opacity: 0.64;
+}
+
+.matter-lens__pulse {
+  opacity: 0.84;
+  stroke-dasharray: 0.11 0.89;
+  stroke-dashoffset: 1;
   animation: matter-lens-signal-travel 7.4s linear infinite;
 }
 
-.matter-lens__signal--two {
-  animation-delay: -0.24s;
+.matter-lens__pulse--two {
+  animation-delay: -0.34s;
 }
 
-.matter-lens__signal--three {
-  animation-delay: -0.46s;
+.matter-lens__pulse--three {
+  animation-delay: -0.68s;
 }
 
 .matter-lens__caustic {
@@ -790,6 +796,46 @@ html.accessibility-mode .lpc-home--hybrid .hero-scroll {
   animation: matter-lens-idle 9s ease-in-out infinite alternate;
 }
 
+.matter-lens__shell {
+  stroke: rgba(94, 117, 145, 0.18);
+  stroke-width: 0.75;
+}
+
+.matter-lens__edge {
+  fill: none;
+  stroke: url(#matterLensEdge);
+  stroke-width: 1.35;
+}
+
+.matter-lens__edge--upper {
+  opacity: 0.86;
+}
+
+.matter-lens__edge--lower {
+  opacity: 0.56;
+}
+
+.matter-lens__facet {
+  fill: rgba(111, 159, 232, 0.065);
+}
+
+.matter-lens__facet--lower {
+  fill: rgba(78, 116, 168, 0.035);
+}
+
+.matter-lens__axis {
+  stroke: #6f9fe8;
+  stroke-opacity: 0.3;
+  stroke-width: 0.75;
+}
+
+.matter-lens__datum {
+  fill: none;
+  stroke: #52677f;
+  stroke-opacity: 0.48;
+  stroke-width: 0.85;
+}
+
 .matter-lens__refraction {
   opacity: 0.44;
   animation: matter-lens-refraction 7.4s ease-in-out infinite;
@@ -801,6 +847,7 @@ html.accessibility-mode .lpc-home--hybrid .hero-scroll {
 }
 
 .matter-lens__resolved path {
+  stroke-width: 1.15;
   stroke-dasharray: 240;
   stroke-dashoffset: 240;
   animation: matter-lens-resolve-line 7.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
@@ -820,16 +867,22 @@ html.accessibility-mode .lpc-home--hybrid .hero-scroll {
 }
 
 .matter-lens__label text {
-  fill: #354c67;
+  fill: #304964;
   font-family: "Sarabun", sans-serif;
-  font-size: 10px;
-  font-weight: 400 !important;
-  letter-spacing: 3.8px;
+  font-size: 9px;
+  font-weight: 500 !important;
+  letter-spacing: 3.2px;
+}
+
+.matter-lens__label line {
+  stroke: #6f9fe8;
+  stroke-opacity: 0.5;
+  stroke-width: 0.7;
 }
 
 @keyframes matter-lens-signal-travel {
-  from { stroke-dashoffset: 90; }
-  to { stroke-dashoffset: -90; }
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
 }
 
 @keyframes matter-lens-incoming {
@@ -977,7 +1030,7 @@ html.accessibility-mode .lpc-home--hybrid .hero-scroll {
 @media (prefers-reduced-motion: reduce) {
   .matter-lens :is(
     .matter-lens__incoming,
-    .matter-lens__signal,
+    .matter-lens__pulse,
     .matter-lens__caustic,
     .matter-lens__aperture,
     .matter-lens__refraction,
@@ -989,7 +1042,7 @@ html.accessibility-mode .lpc-home--hybrid .hero-scroll {
   }
 
   .matter-lens__incoming { opacity: 0.4; transform: none; }
-  .matter-lens__signal { stroke-dasharray: none; }
+  .matter-lens__pulse { opacity: 0; }
   .matter-lens__caustic { opacity: 0.18; transform: none; }
   .matter-lens__refraction { opacity: 0.88; }
   .matter-lens__resolved { opacity: 0.88; }
@@ -999,7 +1052,7 @@ html.accessibility-mode .lpc-home--hybrid .hero-scroll {
 
 html.accessibility-mode .matter-lens :is(
   .matter-lens__incoming,
-  .matter-lens__signal,
+  .matter-lens__pulse,
   .matter-lens__caustic,
   .matter-lens__aperture,
   .matter-lens__refraction,
@@ -1011,7 +1064,7 @@ html.accessibility-mode .matter-lens :is(
 }
 
 html.accessibility-mode .matter-lens__incoming { opacity: 0.4; transform: none; }
-html.accessibility-mode .matter-lens__signal { stroke-dasharray: none; }
+html.accessibility-mode .matter-lens__pulse { opacity: 0; }
 html.accessibility-mode .matter-lens__caustic { opacity: 0.18; transform: none; }
 html.accessibility-mode .matter-lens__refraction,
 html.accessibility-mode .matter-lens__resolved { opacity: 0.88; }
