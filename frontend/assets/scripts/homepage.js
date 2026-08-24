@@ -31,11 +31,18 @@
       this.section = canvas.closest("section");
       this.width = 0;
       this.height = 0;
+      this.introStartTime = null;
       this.nodes = [];
+      this.frameId = 0;
+      this.isVisible = !("IntersectionObserver" in window);
+      this.pointer = { x: 0, y: 0, targetX: 0, targetY: 0 };
 
       if (!this.context || !this.section) return;
 
       this.resize = this.resize.bind(this);
+      this.animate = this.animate.bind(this);
+      this.syncAnimation = this.syncAnimation.bind(this);
+      this.onPointerMove = this.onPointerMove.bind(this);
 
       if ("ResizeObserver" in window) {
         this.resizeObserver = new ResizeObserver(this.resize);
@@ -45,6 +52,61 @@
       }
 
       this.resize();
+
+      if ("IntersectionObserver" in window) {
+        this.visibilityObserver = new IntersectionObserver((entries) => {
+          this.isVisible = entries.some((entry) => entry.isIntersecting);
+          this.syncAnimation();
+        }, { rootMargin: "160px 0px", threshold: 0 });
+        this.visibilityObserver.observe(this.section);
+      }
+
+      reducedMotion.addEventListener("change", this.syncAnimation);
+      document.addEventListener("visibilitychange", this.syncAnimation);
+      this.accessibilityObserver = new MutationObserver(this.syncAnimation);
+      this.accessibilityObserver.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+
+      if (this.mode === "hero" && window.matchMedia("(pointer: fine)").matches) {
+        this.section.addEventListener("pointermove", this.onPointerMove, { passive: true });
+        this.section.addEventListener("pointerleave", () => {
+          this.pointer.targetX = 0;
+          this.pointer.targetY = 0;
+        }, { passive: true });
+      }
+
+      this.syncAnimation();
+    }
+
+    onPointerMove(event) {
+      const rect = this.section.getBoundingClientRect();
+      this.pointer.targetX = clamp((event.clientX - rect.left) / rect.width, 0, 1) - 0.5;
+      this.pointer.targetY = clamp((event.clientY - rect.top) / rect.height, 0, 1) - 0.5;
+    }
+
+    shouldAnimate() {
+      return (
+        this.isVisible &&
+        !reducedMotion.matches &&
+        !document.body.classList.contains("accessibility-mode") &&
+        document.visibilityState !== "hidden"
+      );
+    }
+
+    animate(timestamp) {
+      this.frameId = 0;
+      if (!this.shouldAnimate()) return;
+      this.render(timestamp * 0.001);
+      this.frameId = window.requestAnimationFrame(this.animate);
+    }
+
+    syncAnimation() {
+      if (!this.shouldAnimate()) {
+        if (this.frameId) window.cancelAnimationFrame(this.frameId);
+        this.frameId = 0;
+        this.render(0);
+        return;
+      }
+      if (!this.frameId) this.frameId = window.requestAnimationFrame(this.animate);
     }
 
     resize() {
@@ -80,7 +142,7 @@
       const random = this.randomFactory(this.mode === "hero" ? 2841 : 650);
       const labels = ["SCOPE", "FILES", "DEADLINE", "PEOPLE", "MESSAGES", "PAYMENT"];
       if (this.mode === "hero") {
-        const count = this.width < 680 ? 720 : this.width < 1100 ? 1200 : 1900;
+        const count = this.width < 680 ? 840 : this.width < 1100 ? 1200 : 1900;
         this.nodes = Array.from({ length: count }, (_, index) => {
           const band = random();
           const theta = random() * Math.PI * 2;
@@ -179,7 +241,7 @@
 
       if (node.label) {
         context.save();
-        context.font = '500 9px "Sarabun", sans-serif';
+        context.font = '200 9px "Sarabun", sans-serif';
         context.letterSpacing = "1.3px";
         context.textAlign = "center";
         context.fillStyle = `rgba(227, 211, 172, ${0.65 * alpha})`;
@@ -197,19 +259,29 @@
       const context = this.context;
       const width = this.width;
       const height = this.height;
+      if (this.introStartTime === null) this.introStartTime = time;
+      const introRaw = reducedMotion.matches ? 1 : clamp((time - this.introStartTime) / 1.9);
+      const intro = 1 - Math.pow(1 - introRaw, 3);
       const centerX = width * 0.5;
       const centerY = height * 0.51;
       const radius = Math.min(width * 0.47, height * 0.58);
+      const narrowViewport = width < 680;
+      const particleRadiusX = narrowViewport ? width * 0.54 : radius * 1.34;
+      const particleRadiusY = narrowViewport ? height * 0.54 : radius * 0.9;
+      const glowRadius = narrowViewport ? Math.max(width, height) * 0.58 : radius * 1.08;
 
-      const glow = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius * 1.08);
+      this.pointer.x += (this.pointer.targetX - this.pointer.x) * 0.045;
+      this.pointer.y += (this.pointer.targetY - this.pointer.y) * 0.045;
+
+      const glow = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, glowRadius);
       glow.addColorStop(0, "rgba(36, 53, 76, 0.18)");
       glow.addColorStop(0.58, "rgba(180, 151, 90, 0.035)");
       glow.addColorStop(1, "rgba(3, 5, 7, 0)");
       context.fillStyle = glow;
       context.fillRect(0, 0, width, height);
 
-      const rotation = 0;
-      const tilt = -0.22;
+      const rotation = time * 0.055 + this.pointer.x * 0.34;
+      const tilt = -0.22 + this.pointer.y * 0.22;
       const cosTilt = Math.cos(tilt);
       const sinTilt = Math.sin(tilt);
       const spread = 1;
@@ -224,10 +296,10 @@
         const rotatedZ = sphereY * sinTilt + sphereZ * cosTilt;
         const perspective = 0.72 + (rotatedZ + 1) * 0.22;
         const ringWarp = 0.82 + Math.abs(Math.sin(longitude * 1.5 + node.phase)) * 0.22;
-        const x = centerX + sphereX * radius * 1.34 * spread * ringWarp;
-        const y = centerY + rotatedY * radius * 0.9 * spread;
+        const x = centerX + sphereX * particleRadiusX * spread * ringWarp + this.pointer.x * 18;
+        const y = centerY + rotatedY * particleRadiusY * spread + this.pointer.y * 12;
         const pulse = 0.78 + Math.sin(time * 0.8 + node.phase) * 0.22;
-        const alpha = node.alpha * perspective;
+        const alpha = node.alpha * perspective * intro;
         context.beginPath();
         context.arc(x, y, node.size * perspective * pulse, 0, Math.PI * 2);
         context.fillStyle = node.gold
@@ -239,8 +311,6 @@
 
     renderClosing(time) {
       const context = this.context;
-      const width = this.width;
-      const height = this.height;
       const positions = this.nodes.map((node) => ({
         x: node.baseX + Math.sin(time * node.speed + node.phase) * 7,
         y: node.baseY + Math.cos(time * node.speed * 0.8 + node.phase) * 5,
@@ -260,7 +330,7 @@
         const position = positions[index];
         if (node.featured) {
           context.save();
-          context.font = '500 9px "Sarabun", sans-serif';
+          context.font = '200 9px "Sarabun", sans-serif';
           context.textAlign = "center";
           context.fillStyle = "rgba(128, 101, 44, 0.52)";
           context.fillText(node.label, position.x, position.y + 17);
@@ -272,12 +342,6 @@
         context.fill();
       });
 
-      const ring = context.createRadialGradient(width * 0.5, height * 0.5, 70, width * 0.5, height * 0.5, width * 0.47);
-      ring.addColorStop(0, "rgba(255, 255, 255, 0)");
-      ring.addColorStop(0.58, "rgba(180, 151, 90, 0.025)");
-      ring.addColorStop(1, "rgba(180, 151, 90, 0.12)");
-      context.fillStyle = ring;
-      context.fillRect(0, 0, width, height);
     }
 
     render(time) {
@@ -290,6 +354,49 @@
 
   document.querySelectorAll("[data-matter-field]").forEach((canvas) => {
     new MatterField(canvas);
+  });
+
+  const revealTargets = Array.from(document.querySelectorAll([
+    ".hero-bridge__inner",
+    ".workflow__intro > *",
+    ".workflow-chapter",
+    ".workflow-canvas-wrap",
+    ".assistant-showcase__intro",
+    ".assistant-stage",
+    ".path-scene__copy",
+    ".audience-interface",
+    ".trust-band article",
+    ".clarity-section__intro",
+    ".fee-card",
+    ".home-faq",
+    ".closing-scene__content",
+    ".role-action",
+    ".home-footer__top > *",
+  ].join(",")));
+
+  revealTargets.forEach((element) => {
+    const siblings = revealTargets.filter((candidate) => candidate.parentElement === element.parentElement);
+    const siblingIndex = Math.max(0, siblings.indexOf(element));
+    element.classList.add("home-reveal");
+    element.style.setProperty("--home-reveal-delay", `${Math.min(siblingIndex * 80, 240)}ms`);
+    element.addEventListener("focusin", () => element.classList.add("is-revealed"));
+  });
+
+  if (reducedMotion.matches || !("IntersectionObserver" in window)) {
+    revealTargets.forEach((element) => element.classList.add("is-revealed"));
+  } else {
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("is-revealed");
+        revealObserver.unobserve(entry.target);
+      });
+    }, { rootMargin: "0px 0px -12%", threshold: 0.12 });
+    revealTargets.forEach((element) => revealObserver.observe(element));
+  }
+
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => document.body.classList.add("home-motion-ready"));
   });
 
   const setMobileNav = (open) => {
@@ -330,7 +437,9 @@
   const desktopCanvas = document.querySelector("[data-workflow-canvas]");
   const desktopStates = Array.from(desktopCanvas?.querySelectorAll(".workflow-state") || []);
   const chapters = Array.from(document.querySelectorAll("[data-workflow-chapter]"));
-  const workflowControls = Array.from(document.querySelectorAll("[data-workflow-select]"));
+  const workflowChapters = document.querySelector(".workflow-chapters");
+  const workflowMobileCount = document.querySelector("[data-workflow-mobile-count]");
+  const mobileWorkflowQuery = window.matchMedia("(max-width: 640px)");
   const desktopRail = desktopCanvas?.querySelector(".matter-rail");
   const desktopWorkflowStatus = desktopCanvas?.querySelector(".product-topbar .status-chip");
   const workflowStatusLabels = {
@@ -339,8 +448,9 @@
     3: "In Progress",
     4: "Awaiting Review",
     5: "Completed",
-    6: "Payout Released",
+    6: "Payment Released",
   };
+  let activeWorkflowState = "1";
   const stateForMobile = (state) => {
     const source = desktopStates.find((panel) => panel.dataset.state === state);
     const target = document.querySelector(`[data-mobile-workflow-state="${state}"]`);
@@ -358,28 +468,31 @@
     rail.dataset.matterRail = state;
     Array.from(rail.querySelectorAll(":scope > div")).forEach((step, index) => {
       step.classList.toggle("is-active", index + 1 <= Number(state));
+      step.classList.toggle("is-current", index + 1 === Number(state));
     });
   };
 
-  const setWorkflowState = (state) => {
+  const setWorkflowState = (state, direction = Number(state) >= Number(activeWorkflowState) ? "down" : "up") => {
     if (!desktopCanvas) return;
+    activeWorkflowState = state;
     desktopCanvas.dataset.workflowState = state;
+    desktopCanvas.dataset.scrollDirection = direction;
+    if (workflowChapters) workflowChapters.dataset.workflowState = state;
     if (desktopWorkflowStatus) {
       desktopWorkflowStatus.textContent = workflowStatusLabels[state] || "Matter active";
     }
+    if (workflowMobileCount) workflowMobileCount.textContent = `Step ${state} of ${chapters.length}`;
     desktopStates.forEach((panel) => {
       const isActive = panel.dataset.state === state;
       panel.classList.toggle("is-active", isActive);
       panel.setAttribute("aria-hidden", String(!isActive));
     });
 
-    chapters.forEach((chapter) => {
-      chapter.classList.toggle("is-active", chapter.dataset.workflowChapter === state);
+    chapters.forEach((chapter, index) => {
+      const chapterNumber = index + 1;
+      chapter.classList.toggle("is-active", chapterNumber === Number(state));
+      chapter.classList.toggle("is-complete", chapterNumber < Number(state));
     });
-    workflowControls.forEach((control) => {
-      control.setAttribute("aria-pressed", String(control.dataset.workflowSelect === state));
-    });
-
     updateRail(desktopRail, state);
   };
 
@@ -389,11 +502,97 @@
     });
   });
 
-  workflowControls.forEach((control) => {
-    control.addEventListener("click", () => {
-      setWorkflowState(control.dataset.workflowSelect || "1");
+  setWorkflowState(activeWorkflowState, "down");
+
+  if (workflowChapters && chapters.length) {
+    let workflowSwipeFrame = 0;
+    let previousWorkflowScrollLeft = workflowChapters.scrollLeft;
+
+    const centerWorkflowChapter = (chapter, behavior = "smooth") => {
+      if (!chapter || !mobileWorkflowQuery.matches) return;
+      const left = chapter.offsetLeft - ((workflowChapters.clientWidth - chapter.offsetWidth) / 2);
+      workflowChapters.scrollTo({
+        left: Math.max(0, left),
+        behavior: reducedMotion.matches ? "auto" : behavior,
+      });
+    };
+
+    const syncWorkflowSwipe = () => {
+      workflowSwipeFrame = 0;
+      if (!mobileWorkflowQuery.matches) return;
+      const viewportCenter = workflowChapters.scrollLeft + (workflowChapters.clientWidth / 2);
+      const direction = workflowChapters.scrollLeft >= previousWorkflowScrollLeft ? "down" : "up";
+      previousWorkflowScrollLeft = workflowChapters.scrollLeft;
+      const closestChapter = chapters.reduce((closest, chapter) => {
+        const chapterCenter = chapter.offsetLeft + (chapter.offsetWidth / 2);
+        const distance = Math.abs(viewportCenter - chapterCenter);
+        return distance < closest.distance ? { chapter, distance } : closest;
+      }, { chapter: chapters[0], distance: Number.POSITIVE_INFINITY }).chapter;
+      const state = closestChapter.dataset.workflowChapter || "1";
+      if (state !== activeWorkflowState) setWorkflowState(state, direction);
+    };
+
+    const scheduleWorkflowSwipe = () => {
+      if (workflowSwipeFrame) return;
+      workflowSwipeFrame = window.requestAnimationFrame(syncWorkflowSwipe);
+    };
+
+    workflowChapters.addEventListener("scroll", scheduleWorkflowSwipe, { passive: true });
+    workflowChapters.addEventListener("keydown", (event) => {
+      if (!mobileWorkflowQuery.matches || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+      event.preventDefault();
+      const currentIndex = Math.max(0, chapters.findIndex((chapter) => chapter.dataset.workflowChapter === activeWorkflowState));
+      const nextIndex = clamp(currentIndex + (event.key === "ArrowRight" ? 1 : -1), 0, chapters.length - 1);
+      const nextChapter = chapters[nextIndex];
+      setWorkflowState(nextChapter.dataset.workflowChapter || "1", event.key === "ArrowRight" ? "down" : "up");
+      centerWorkflowChapter(nextChapter);
     });
-  });
+    mobileWorkflowQuery.addEventListener("change", () => {
+      previousWorkflowScrollLeft = workflowChapters.scrollLeft;
+      if (mobileWorkflowQuery.matches) centerWorkflowChapter(chapters[Number(activeWorkflowState) - 1], "auto");
+    });
+    syncWorkflowSwipe();
+  }
+
+  if (chapters.length) {
+    let workflowFrame = 0;
+    let previousWorkflowScrollY = window.scrollY;
+
+    const syncWorkflowState = () => {
+      workflowFrame = 0;
+      if (mobileWorkflowQuery.matches) return;
+      const activationLine = window.innerHeight * 0.48;
+      const direction = window.scrollY >= previousWorkflowScrollY ? "down" : "up";
+      previousWorkflowScrollY = window.scrollY;
+      let closestChapter = chapters[0];
+      let closestDistance = Number.POSITIVE_INFINITY;
+
+      chapters.forEach((chapter) => {
+        const rect = chapter.getBoundingClientRect();
+        const distance = activationLine < rect.top
+          ? rect.top - activationLine
+          : activationLine > rect.bottom
+            ? activationLine - rect.bottom
+            : 0;
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestChapter = chapter;
+        }
+      });
+
+      const state = closestChapter.dataset.workflowChapter || "1";
+      if (state !== activeWorkflowState) setWorkflowState(state, direction);
+    };
+
+    const scheduleWorkflowSync = () => {
+      if (workflowFrame) return;
+      workflowFrame = window.requestAnimationFrame(syncWorkflowState);
+    };
+
+    window.addEventListener("scroll", scheduleWorkflowSync, { passive: true });
+    window.addEventListener("resize", scheduleWorkflowSync);
+    syncWorkflowState();
+  }
 
   const assistantShowcase = document.querySelector(".assistant-showcase");
   if (assistantShowcase) {
@@ -422,7 +621,7 @@
       attorney: {
         role: "Attorney Assistant",
         question: "Has payment for this matter been released?",
-        answer: "Yes. LPC recorded the $650 payment release after Medical Records Chronology was marked complete. Stripe provides the payout status.",
+        answer: "Yes. The $793 attorney total included $650 in project compensation and a $143 attorney platform fee. LPC recorded the $650 compensation release after the matter was marked complete; Stripe provides the payout status.",
         action: "Open the completed matter",
         suggestionOne: "What files were submitted?",
         suggestionTwo: "Open the completed matter",
@@ -435,7 +634,7 @@
         rowTwoLabel: "Submitted files",
         rowTwoValue: "2 approved",
         rowThreeLabel: "Payment",
-        rowThreeValue: "$650 · Release recorded",
+        rowThreeValue: "$793 total · $650 released",
         activityOne: "Chronology and source index received",
         activityTwo: "Completion approved",
         activityThree: "Payment release recorded",
@@ -507,6 +706,253 @@
     });
 
   }
+
+  const cinematicMotionQuery = window.matchMedia("(min-width: 1100px) and (min-height: 650px) and (prefers-reduced-motion: no-preference)");
+  const cinematicSceneDefinitions = [
+    {
+      selector: ".hero-bridge",
+      layers: [[".hero-bridge__inner", "rise", 0.08, 0.34]],
+    },
+    {
+      selector: ".workflow__intro",
+      layers: [
+        [".workflow__intro-title", "lateral-left", 0.08, 0.34],
+        [".workflow__intro-support", "lateral-right", 0.18, 0.44],
+      ],
+    },
+    {
+      selector: ".assistant-showcase",
+      layers: [
+        [".assistant-showcase__intro", "lateral-left", 0.06, 0.28],
+        [".assistant-stage", "depth", 0.12, 0.36],
+        [".assistant-workspace__topbar", "rise", 0.24, 0.42],
+        [".assistant-workspace__matter > .interface-label", "rise", 0.28, 0.46],
+        [".assistant-workspace__matter > h3", "rise", 0.31, 0.49],
+        [".assistant-workspace__matter > div:nth-of-type(1)", "rise", 0.34, 0.52],
+        [".assistant-workspace__matter > div:nth-of-type(2)", "rise", 0.37, 0.55],
+        [".assistant-workspace__matter > div:nth-of-type(3)", "rise", 0.40, 0.58],
+        [".assistant-workspace__activity", "rise", 0.40, 0.58],
+        [".assistant-preview__header", "lateral-right", 0.32, 0.50],
+        [".assistant-message--user", "lateral-right", 0.38, 0.56],
+        [".assistant-message--assistant", "rise", 0.44, 0.62],
+        [".assistant-preview__suggestions", "rise", 0.50, 0.68],
+        [".assistant-preview__composer", "rise", 0.54, 0.72],
+      ],
+    },
+    {
+      selector: ".paths__heading",
+      layers: [
+        [".eyebrow", "rise", 0.08, 0.30],
+        ["h2", "depth", 0.14, 0.38],
+      ],
+    },
+    {
+      selector: ".paths-motion-stage",
+      kind: "horizontal-paths",
+      layers: [
+        [".path-scene--attorney .path-scene__copy", "lateral-left", 0.04, 0.18],
+        [".path-scene--attorney .audience-interface", "lateral-right", 0.07, 0.22],
+        [".path-scene--attorney .audience-interface__topbar", "rise", 0.12, 0.24],
+        [".path-scene--attorney .audience-metrics", "rise", 0.16, 0.27],
+        [".path-scene--attorney .audience-matter", "rise", 0.20, 0.30],
+        [".path-scene--attorney .audience-attention", "rise", 0.24, 0.33],
+        [".path-scene--attorney .audience-payment", "rise", 0.27, 0.36],
+        [".path-scene--paralegal .path-scene__copy", "lateral-left", 0.43, 0.57],
+        [".path-scene--paralegal .audience-interface", "lateral-right", 0.46, 0.61],
+        [".path-scene--paralegal .audience-interface__topbar", "rise", 0.51, 0.63],
+        [".path-scene--paralegal .available-project", "rise", 0.55, 0.66],
+        [".path-scene--paralegal .active-assignment", "rise", 0.59, 0.69],
+        [".path-scene--paralegal .audience-payment", "rise", 0.63, 0.72],
+      ],
+    },
+    {
+      selector: ".trust-band",
+      layers: [
+        ["article:nth-child(1)", "card", 0.10, 0.34],
+        ["article:nth-child(2)", "card", 0.18, 0.42],
+        ["article:nth-child(3)", "card", 0.26, 0.50],
+      ],
+    },
+    {
+      selector: ".clarity-section",
+      layers: [
+        [".clarity-section__intro", "lateral-left", 0.04, 0.24],
+        [".fee-card", "lateral-right", 0.10, 0.32],
+        [".fee-card__row:nth-of-type(1)", "rise", 0.20, 0.38],
+        [".fee-card__row:nth-of-type(2)", "rise", 0.26, 0.44],
+        [".home-faq > .interface-label", "rise", 0.40, 0.56],
+        [".home-faq > h3", "rise", 0.43, 0.59],
+        [".home-faq details:nth-of-type(1)", "rise", 0.46, 0.60],
+        [".home-faq details:nth-of-type(2)", "rise", 0.50, 0.64],
+        [".home-faq details:nth-of-type(3)", "rise", 0.54, 0.68],
+        [".home-faq details:nth-of-type(4)", "rise", 0.58, 0.71],
+        [".home-faq__links", "rise", 0.61, 0.72],
+      ],
+    },
+    {
+      selector: ".closing-scene",
+      layers: [
+        [".closing-scene__content > .eyebrow", "rise", 0.08, 0.28],
+        [".closing-scene__content > h2", "depth", 0.14, 0.36],
+        [".closing-scene__content > p:not(.eyebrow)", "rise", 0.22, 0.42],
+        [".role-actions", "rise", 0.30, 0.54],
+      ],
+    },
+  ];
+  const cinematicMotionProfiles = {
+    rise: { x: 0, y: 72, scale: 0.98, rotate: 0, exitX: 0, exitY: -52 },
+    "lateral-left": { x: -110, y: 20, scale: 0.975, rotate: -1.2, exitX: -68, exitY: -18 },
+    "lateral-right": { x: 110, y: 20, scale: 0.975, rotate: 1.2, exitX: 68, exitY: -18 },
+    depth: { x: 0, y: 110, scale: 0.92, rotate: 2.4, exitX: 0, exitY: -62 },
+    card: { x: 0, y: 86, scale: 0.94, rotate: 0, exitX: 0, exitY: -48 },
+  };
+  let cinematicScenes = [];
+  let cinematicFrame = 0;
+  let cinematicAccessibilityMode = document.body.classList.contains("accessibility-mode");
+  const cinematicResizeObserver = "ResizeObserver" in window
+    ? new ResizeObserver(() => {
+      cinematicScenes.forEach((scene) => {
+        scene.top = documentOffsetTop(scene.element);
+        scene.height = Math.max(1, scene.element.offsetHeight);
+      });
+      scheduleCinematicMotion();
+    })
+    : null;
+
+  const smoothProgress = (start, end, value) => {
+    const progress = clamp((value - start) / Math.max(0.001, end - start));
+    return progress * progress * (3 - (2 * progress));
+  };
+
+  const documentOffsetTop = (element) => {
+    let top = 0;
+    for (let node = element; node; node = node.offsetParent) top += node.offsetTop;
+    return top;
+  };
+
+  const clearCinematicMotion = () => {
+    document.body.classList.remove("home-cinematic-motion");
+    cinematicResizeObserver?.disconnect();
+    cinematicScenes.forEach(({ element, layers }) => {
+      element.removeAttribute("data-scroll-scene");
+      element.style.removeProperty("--motion-progress");
+      element.style.removeProperty("--motion-enter");
+      element.style.removeProperty("--motion-exit");
+      element.style.removeProperty("--motion-reveal-inset");
+      element.style.removeProperty("--paths-attorney-x");
+      element.style.removeProperty("--paths-attorney-scale");
+      element.style.removeProperty("--paths-paralegal-x");
+      element.style.removeProperty("--paths-paralegal-scale");
+      layers.forEach(({ element: layer }) => {
+        layer.removeAttribute("data-motion-layer");
+        layer.style.removeProperty("--motion-layer-progress");
+        layer.style.removeProperty("--motion-layer-x");
+        layer.style.removeProperty("--motion-layer-y");
+        layer.style.removeProperty("--motion-layer-scale");
+        layer.style.removeProperty("--motion-layer-rotate");
+        layer.style.removeProperty("--motion-layer-opacity");
+      });
+    });
+    cinematicScenes = [];
+  };
+
+  const syncCinematicMotion = () => {
+    cinematicFrame = 0;
+    if (!cinematicScenes.length) return;
+    const viewportHeight = window.innerHeight;
+    const scrollPosition = window.scrollY;
+
+    cinematicScenes.forEach((scene) => {
+      const top = scene.top;
+      const height = scene.height;
+      const progress = clamp((scrollPosition + viewportHeight - top) / (height + viewportHeight));
+      const progressValue = Number(progress.toFixed(4));
+      if (scene.progress === progressValue) return;
+      scene.progress = progressValue;
+      const enter = smoothProgress(0.04, 0.34, progress);
+      const exit = smoothProgress(0.78, 0.98, progress);
+      scene.element.style.setProperty("--motion-progress", progress.toFixed(4));
+      scene.element.style.setProperty("--motion-enter", enter.toFixed(4));
+      scene.element.style.setProperty("--motion-exit", exit.toFixed(4));
+      scene.element.style.setProperty("--motion-reveal-inset", `${((1 - enter) * 100).toFixed(2)}%`);
+      if (scene.kind === "horizontal-paths") {
+        const horizontalProgress = smoothProgress(0.34, 0.60, progress);
+        scene.element.style.setProperty("--paths-attorney-x", `${(-104 * horizontalProgress).toFixed(3)}%`);
+        scene.element.style.setProperty("--paths-attorney-scale", (1 - (horizontalProgress * 0.035)).toFixed(4));
+        scene.element.style.setProperty("--paths-paralegal-x", `${(104 * (1 - horizontalProgress)).toFixed(3)}%`);
+        scene.element.style.setProperty("--paths-paralegal-scale", (0.965 + (horizontalProgress * 0.035)).toFixed(4));
+      }
+      scene.layers.forEach((layer) => {
+        const layerProgress = smoothProgress(layer.start, layer.end, progress);
+        const profile = cinematicMotionProfiles[layer.type] || cinematicMotionProfiles.rise;
+        const remaining = 1 - layerProgress;
+        const x = (profile.x * remaining) + (profile.exitX * exit);
+        const y = (profile.y * remaining) + (profile.exitY * exit);
+        const scale = 1 - (remaining * (1 - profile.scale)) - (exit * 0.016);
+        const rotate = (profile.rotate * remaining) - (profile.rotate * exit * 0.35);
+        const opacity = clamp(layerProgress);
+        layer.element.style.setProperty("--motion-layer-progress", layerProgress.toFixed(4));
+        layer.element.style.setProperty("--motion-layer-x", `${x.toFixed(2)}px`);
+        layer.element.style.setProperty("--motion-layer-y", `${y.toFixed(2)}px`);
+        layer.element.style.setProperty("--motion-layer-scale", scale.toFixed(4));
+        layer.element.style.setProperty("--motion-layer-rotate", `${rotate.toFixed(3)}deg`);
+        layer.element.style.setProperty("--motion-layer-opacity", opacity.toFixed(4));
+      });
+    });
+  };
+
+  const scheduleCinematicMotion = () => {
+    if (cinematicFrame) return;
+    cinematicFrame = window.requestAnimationFrame(syncCinematicMotion);
+  };
+
+  const configureCinematicMotion = () => {
+    if (
+      !cinematicMotionQuery.matches ||
+      document.body.classList.contains("accessibility-mode")
+    ) {
+      clearCinematicMotion();
+      return;
+    }
+
+    clearCinematicMotion();
+    cinematicScenes = cinematicSceneDefinitions.map((definition) => {
+      const element = document.querySelector(definition.selector);
+      if (!element) return null;
+      element.setAttribute("data-scroll-scene", "");
+      const layers = definition.layers.flatMap(([selector, type, start, end]) =>
+        Array.from(element.querySelectorAll(selector)).map((layer) => {
+          layer.setAttribute("data-motion-layer", type);
+          return { element: layer, type, start, end };
+        }));
+      return {
+        element,
+        layers,
+        kind: definition.kind || "standard",
+        top: documentOffsetTop(element),
+        height: Math.max(1, element.offsetHeight),
+        progress: null,
+      };
+    }).filter(Boolean);
+    cinematicScenes.forEach((scene) => cinematicResizeObserver?.observe(scene.element));
+    document.body.classList.add("home-cinematic-motion");
+    syncCinematicMotion();
+  };
+
+  window.addEventListener("scroll", scheduleCinematicMotion, { passive: true });
+  window.addEventListener("resize", scheduleCinematicMotion);
+  window.addEventListener("load", scheduleCinematicMotion, { once: true });
+  cinematicMotionQuery.addEventListener("change", configureCinematicMotion);
+  new MutationObserver(() => {
+    const accessibilityMode = document.body.classList.contains("accessibility-mode");
+    if (accessibilityMode === cinematicAccessibilityMode) return;
+    cinematicAccessibilityMode = accessibilityMode;
+    configureCinematicMotion();
+  }).observe(document.body, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+  configureCinematicMotion();
 
   const resolveDashboard = (user) => {
     if (String(user?.status || "").toLowerCase() !== "approved") return "";

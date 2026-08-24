@@ -13,8 +13,10 @@
   <meta name="twitter:card" content="summary" />
   <meta name="theme-color" content="#ffffff" />
 
+  <link rel="preload" as="image" href="assets/images/homepage-matter/paper-atmosphere.jpg?v=20260820-black-static" />
   <link rel="stylesheet" href="assets/styles/fonts.css" />
-  <link rel="stylesheet" href="assets/styles/homepage.css?v=20260729-overflow-type" />
+  <link rel="stylesheet" href="assets/styles/homepage.css?v=20260823-plain-workflow-titles" />
+  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20260823-plain-workflow-titles" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -25,7 +27,7 @@
     document.documentElement.classList.add("js");
   </script>
 </head>
-<body class="lpc-home">
+<body class="lpc-home lpc-home--hybrid">
   <a class="skip-link" href="#main">Skip to main content</a>
 
   <header class="home-header" data-home-header>
@@ -75,25 +77,27 @@
   </header>
 
   <main id="main" tabindex="-1">
-    <section class="hero" aria-labelledby="hero-title">
-      <canvas class="matter-field matter-field--hero" data-matter-field="hero" aria-hidden="true"></canvas>
-      <div class="hero__copy">
-        <h1 id="hero-title" aria-label="Your caseload grew. Your payroll doesn’t have to.">
-          <span class="hero-title__line" aria-hidden="true"><span>Your caseload grew.</span></span>
-          <span class="hero-title__line" aria-hidden="true"><span>Your payroll doesn’t have to.</span></span>
-        </h1>
-        <p class="hero__support">Post clearly scoped matters, work with approved independent paralegals, and keep files, messages, progress, and payment in one workspace.</p>
-        <div class="action-row hero__actions">
-          <a class="button button--gold" href="signup.html" data-post-matter-action>Post a Matter <span aria-hidden="true">↗</span></a>
-          <a class="text-action" href="browse-paralegals.html">Browse Paralegals <span aria-hidden="true">→</span></a>
+    <section class="hero-scroll" aria-labelledby="hero-title" data-find-hero>
+      <div class="hero-sticky">
+        <img class="hero-atmosphere" src="assets/images/homepage-matter/paper-atmosphere.jpg?v=20260820-black-static" alt="" fetchpriority="high" />
+        <div class="hero-copy">
+          <h1 id="hero-title">
+            <span>Your caseload grew.</span>
+            <span>Your payroll <em>doesn’t have to.</em></span>
+          </h1>
+          <p>A paralegal when you need one. One matter at a time.</p>
+          <div class="action-row hero-actions">
+            <a class="button button--gold" href="signup.html" data-post-matter-action>Post a Matter <span aria-hidden="true">↗</span></a>
+            <a class="text-action text-action--light" href="browse-paralegals.html">Browse Paralegals <span aria-hidden="true">→</span></a>
+          </div>
         </div>
       </div>
     </section>
 
     <section class="hero-bridge" aria-labelledby="hero-bridge-title">
       <div class="hero-bridge__inner">
-        <h2 id="hero-bridge-title"><span class="hero-bridge__overflow">Over<span class="hero-bridge__overflow-f">f</span><span class="hero-bridge__overflow-l">l</span>ow</span> work, handled one matter at a time.</h2>
-        <p>Let’s-ParaConnect brings attorneys and approved independent paralegals together for clearly scoped legal work, one matter at a time.</p>
+        <h2 id="hero-bridge-title"><span class="hero-bridge__overflow">Over<span class="hero-bridge__overflow-f">f</span><span class="hero-bridge__overflow-l">l</span>ow</span> work, handled with focus.</h2>
+        <p>Legal work does not always require another permanent hire. Let’s-ParaConnect brings attorneys and approved independent paralegals together for clearly scoped, project-based work.</p>
       </div>
     </section>
 
@@ -105,13 +109,18 @@
         <p class="workflow__intro-support">Scope, applications, communication, files, completion, and payment stay connected.</p>
       </div>
 
+      <p class="workflow-mobile-nav" aria-live="polite">
+        <span data-workflow-mobile-count>Step 1 of 6</span>
+        <span aria-hidden="true">Swipe between steps&nbsp; ↔</span>
+      </p>
+
       <div class="workflow__story">
-        <div class="workflow-chapters" role="group" aria-label="Matter workflow steps">
+        <div class="workflow-chapters" role="group" aria-label="Matter workflow steps" tabindex="0">
           <article class="workflow-chapter is-active" data-workflow-chapter="1">
             <span class="workflow-chapter__number">01</span>
             <div>
-              <h3><button class="workflow-chapter__control" type="button" data-workflow-select="1" aria-pressed="true">Matter created.</button></h3>
-              <p>The work begins with a clear scope.</p>
+              <h3>Scope the work.</h3>
+              <p>Define the deliverables, timing, and expectations.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="1"></div>
           </article>
@@ -119,8 +128,8 @@
           <article class="workflow-chapter" data-workflow-chapter="2">
             <span class="workflow-chapter__number">02</span>
             <div>
-              <h3><button class="workflow-chapter__control" type="button" data-workflow-select="2" aria-pressed="false">Applications arrive.</button></h3>
-              <p>Experience and availability, side by side.</p>
+              <h3>Review applicants.</h3>
+              <p>Compare experience, availability, and fit.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="2"></div>
           </article>
@@ -128,8 +137,8 @@
           <article class="workflow-chapter" data-workflow-chapter="3">
             <span class="workflow-chapter__number">03</span>
             <div>
-              <h3><button class="workflow-chapter__control" type="button" data-workflow-select="3" aria-pressed="false">Work begins.</button></h3>
-              <p>Files, messages, and progress stay with the matter.</p>
+              <h3>Work together.</h3>
+              <p>Keep messages, files, and progress in one workspace.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="3"></div>
           </article>
@@ -137,8 +146,8 @@
           <article class="workflow-chapter" data-workflow-chapter="4">
             <span class="workflow-chapter__number">04</span>
             <div>
-              <h3><button class="workflow-chapter__control" type="button" data-workflow-select="4" aria-pressed="false">Ready for review.</button></h3>
-              <p>Two deliverables. One connected record.</p>
+              <h3>Review deliverables.</h3>
+              <p>Check the submitted work and request revisions if needed.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="4"></div>
           </article>
@@ -146,8 +155,8 @@
           <article class="workflow-chapter" data-workflow-chapter="5">
             <span class="workflow-chapter__number">05</span>
             <div>
-              <h3><button class="workflow-chapter__control" type="button" data-workflow-select="5" aria-pressed="false">Approved.</button></h3>
-              <p>The work is complete. Nothing gets scattered.</p>
+              <h3>Confirm completion.</h3>
+              <p>Approve the final work and mark the matter complete.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="5"></div>
           </article>
@@ -155,8 +164,8 @@
           <article class="workflow-chapter" data-workflow-chapter="6">
             <span class="workflow-chapter__number">06</span>
             <div>
-              <h3><button class="workflow-chapter__control" type="button" data-workflow-select="6" aria-pressed="false">Released.</button></h3>
-              <p>The payment release is recorded. Stripe provides the payout status.</p>
+              <h3>Close the matter.</h3>
+              <p>Release payment and keep the completed record in one place.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="6"></div>
           </article>
@@ -236,13 +245,13 @@
                 <div class="completion-mark" aria-hidden="true">↗</div>
                 <p class="interface-label">Work submitted</p>
                 <h4>Awaiting Review</h4>
-                <p>Both deliverables were submitted on August 17. The Matter payment is funded; payout release awaits completion confirmation.</p>
+                <p>Both deliverables were submitted on August 17 and are ready for review.</p>
                 <div class="completion-files">
                   <span><i>PDF</i><b>Medical Records Chronology.pdf</b><small>Submitted Aug 17</small></span>
                   <span><i>PDF</i><b>Source Index.pdf</b><small>Submitted Aug 17</small></span>
                 </div>
                 <div class="payment-summary">
-                  <span><small>Payment</small><strong>$650.00 funded</strong></span>
+                  <span><small>Review status</small><strong>Ready for confirmation</strong></span>
                   <button type="button" tabindex="-1">Confirm completion</button>
                 </div>
               </div>
@@ -259,7 +268,7 @@
                   <span><i>PDF</i><b>Source Index.pdf</b><small>Approved</small></span>
                 </div>
                 <div class="payment-summary">
-                  <span><small>Payout after $117 fee</small><strong>$533.00 ready for release</strong></span>
+                  <span><small>Payment status</small><strong>Ready for release</strong></span>
                   <button type="button" tabindex="-1">Release payment</button>
                 </div>
               </div>
@@ -268,15 +277,15 @@
             <div class="workflow-state" data-state="6" aria-hidden="true">
               <div class="completion-state completion-state--released">
                 <div class="completion-mark" aria-hidden="true">✓</div>
-                <p class="interface-label">Payout released</p>
-                <h4>$533 payout released</h4>
-                <p>The $650 Matter amount, $117 platform fee, and $533 payout are recorded with the completed Matter.</p>
+                <p class="interface-label">Payment released</p>
+                <h4>Payment Released</h4>
+                <p>The payment was released, and the completed work remains in the workspace.</p>
                 <div class="completion-files">
                   <span><i>PDF</i><b>Medical Records Chronology.pdf</b><small>Retained</small></span>
                   <span><i>PDF</i><b>Source Index.pdf</b><small>Retained</small></span>
                 </div>
                 <div class="payment-summary">
-                  <span><small>Payment confirmation</small><strong>Payout Released</strong></span>
+                  <span><small>Payment status</small><strong>Released</strong></span>
                   <button type="button" tabindex="-1" aria-disabled="true">Matter complete</button>
                 </div>
               </div>
@@ -289,7 +298,7 @@
               <div><i>3</i><span>In progress</span></div>
               <div><i>4</i><span>Review</span></div>
               <div><i>5</i><span>Completed</span></div>
-              <div><i>6</i><span>Released</span></div>
+              <div><i>6</i><span>Payment released</span></div>
             </div>
           </div>
         </div>
@@ -297,87 +306,10 @@
     </section>
 
     <div class="feature-sequence">
-    <section class="assistant-showcase" id="assistant" aria-labelledby="assistant-title">
-      <div class="assistant-showcase__intro">
-        <p class="eyebrow">The LPC Assistant</p>
-        <h2 id="assistant-title">Ask LPC about the matter.</h2>
-        <p>Ask about the files, the deadline, the decision, or the payment. LPC answers from the matter already in front of you.</p>
-        <div class="assistant-view-controls" role="group" aria-label="Assistant perspective">
-          <button type="button" data-assistant-view-select="attorney" aria-pressed="true">Attorney view</button>
-          <button type="button" data-assistant-view-select="paralegal" aria-pressed="false">Paralegal view</button>
-        </div>
-      </div>
-
-      <div class="assistant-stage" aria-label="LPC Assistant answering a question about a matter payout">
-        <div class="assistant-stage__ambient" aria-hidden="true"></div>
-        <div class="assistant-workspace">
-          <header class="assistant-workspace__topbar">
-            <span class="product-wordmark">LPC</span>
-            <span class="matter-identity matter-identity--compact">
-              <span data-assistant-record-label>Completed matter</span>
-              <strong>Medical Records Chronology</strong>
-              <small>Personal Injury</small>
-            </span>
-            <span class="assistant-workspace__status"><i></i> <b data-assistant-workspace-status>Payout Released</b></span>
-          </header>
-          <div class="assistant-workspace__body">
-            <div class="assistant-workspace__nav" aria-hidden="true">
-              <span class="is-active">Overview</span>
-              <span>Matters</span>
-              <span>Messages</span>
-              <span data-assistant-nav-label>Billing</span>
-            </div>
-            <div class="assistant-workspace__matter">
-              <p class="interface-label" data-assistant-context-label>Completion record · Personal Injury</p>
-              <h3>Medical Records Chronology</h3>
-              <div><small data-assistant-row-one-label>Status</small><strong data-assistant-row-one-value>Completed</strong></div>
-              <div><small data-assistant-row-two-label>Submitted files</small><strong data-assistant-row-two-value>2 approved</strong></div>
-              <div><small data-assistant-row-three-label>Payment</small><strong data-assistant-row-three-value>$650 · Release recorded</strong></div>
-              <div class="assistant-workspace__activity" aria-hidden="true">
-                <span><i></i><b data-assistant-activity-one>Chronology and source index submitted</b><small>Aug 18</small></span>
-                <span><i></i><b data-assistant-activity-two>Work approved</b><small>Aug 18</small></span>
-                <span><i></i><b data-assistant-activity-three>Payment released</b><small>Complete</small></span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <article class="assistant-preview">
-          <header class="assistant-preview__header">
-            <span class="assistant-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-            <div>
-              <strong data-assistant-role>Attorney Assistant</strong>
-              <small>Uses your authorized LPC context</small>
-            </div>
-            <span class="assistant-preview__online"><i></i> Ready</span>
-          </header>
-          <div class="assistant-preview__thread">
-            <div class="assistant-message assistant-message--user" data-assistant-question>
-              Has payment for this matter been released?
-            </div>
-            <div class="assistant-message assistant-message--assistant">
-              <span class="assistant-message__mark" aria-hidden="true">LPC</span>
-              <p data-assistant-answer>Yes. LPC recorded the $650 payment release after Medical Records Chronology was marked complete. Stripe provides the payout status.</p>
-              <a href="login.html" data-assistant-action>Open the completed matter <span aria-hidden="true">→</span></a>
-            </div>
-          </div>
-          <div class="assistant-preview__suggestions" aria-hidden="true">
-            <span data-assistant-suggestion="1">What files were submitted?</span>
-            <span data-assistant-suggestion="2">Open the completed matter</span>
-          </div>
-          <div class="assistant-preview__composer" aria-hidden="true">
-            <span>Ask about your LPC workspace</span>
-            <i>↑</i>
-          </div>
-        </article>
-      </div>
-
-    </section>
-
     <section class="paths" aria-labelledby="paths-title">
       <div class="paths__heading">
-        <p class="eyebrow">The same matter</p>
-        <h2 id="paths-title">One matter.<br />Seen from both sides.</h2>
+        <p class="eyebrow">Two perspectives</p>
+        <h2 id="paths-title">One shared workspace.<br />Seen from both sides.</h2>
       </div>
 
       <div class="paths__split">
@@ -430,7 +362,7 @@
               </div>
               <div class="audience-payment">
                 <div><small>Project compensation</small><strong>$650.00</strong></div>
-                <div><small>Payment state</small><strong>Funded · release after completion</strong></div>
+                <div><small>Attorney total</small><strong>$793 funded · includes $143 fee</strong></div>
               </div>
             </div>
           </div>
@@ -447,7 +379,7 @@
             <div class="audience-interface__topbar">
               <span class="product-wordmark">LPC</span>
               <span>Paralegal workspace</span>
-              <span class="status-chip">Open for Applications</span>
+              <span class="status-chip">Completed</span>
             </div>
             <div class="audience-interface__body">
               <article class="available-project">
@@ -482,6 +414,83 @@
         </article>
       </div>
     </section>
+    <section class="assistant-showcase" id="assistant" aria-labelledby="assistant-title">
+      <div class="assistant-showcase__intro">
+        <p class="eyebrow">The LPC Assistant</p>
+        <h2 id="assistant-title">Ask LPC what happened.</h2>
+        <p>Ask about the files, the deadline, the decision, or the payment. LPC answers from the workspace already in front of you.</p>
+        <div class="assistant-view-controls" role="group" aria-label="Assistant perspective">
+          <button type="button" data-assistant-view-select="attorney" aria-pressed="true">Attorney view</button>
+          <button type="button" data-assistant-view-select="paralegal" aria-pressed="false">Paralegal view</button>
+        </div>
+      </div>
+
+      <div class="assistant-stage" aria-label="LPC Assistant answering a question about a matter payout">
+        <div class="assistant-stage__ambient" aria-hidden="true"></div>
+        <div class="assistant-workspace">
+          <header class="assistant-workspace__topbar">
+            <span class="product-wordmark">LPC</span>
+            <span class="matter-identity matter-identity--compact">
+              <span data-assistant-record-label>Completed matter</span>
+              <strong>Medical Records Chronology</strong>
+              <small>Personal Injury</small>
+            </span>
+            <span class="assistant-workspace__status"><i></i> <b data-assistant-workspace-status>Payout Released</b></span>
+          </header>
+          <div class="assistant-workspace__body">
+            <div class="assistant-workspace__nav" aria-hidden="true">
+              <span class="is-active">Overview</span>
+              <span>Matters</span>
+              <span>Messages</span>
+              <span data-assistant-nav-label>Billing</span>
+            </div>
+            <div class="assistant-workspace__matter">
+              <p class="interface-label" data-assistant-context-label>Completion record · Personal Injury</p>
+              <h3>Medical Records Chronology</h3>
+              <div><small data-assistant-row-one-label>Status</small><strong data-assistant-row-one-value>Completed</strong></div>
+              <div><small data-assistant-row-two-label>Submitted files</small><strong data-assistant-row-two-value>2 approved</strong></div>
+              <div><small data-assistant-row-three-label>Payment</small><strong data-assistant-row-three-value>$793 total · $650 released</strong></div>
+              <div class="assistant-workspace__activity" aria-hidden="true">
+                <span><i></i><b data-assistant-activity-one>Chronology and source index submitted</b><small>Aug 17</small></span>
+                <span><i></i><b data-assistant-activity-two>Work approved</b><small>Aug 18</small></span>
+                <span><i></i><b data-assistant-activity-three>Payment released</b><small>Complete</small></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <article class="assistant-preview">
+          <header class="assistant-preview__header">
+            <span class="assistant-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+            <div>
+              <strong data-assistant-role>Attorney Assistant</strong>
+              <small>Uses your authorized LPC context</small>
+            </div>
+            <span class="assistant-preview__online"><i></i> Ready</span>
+          </header>
+          <div class="assistant-preview__thread">
+            <div class="assistant-message assistant-message--user" data-assistant-question>
+              Has payment for this matter been released?
+            </div>
+            <div class="assistant-message assistant-message--assistant">
+              <span class="assistant-message__mark" aria-hidden="true">LPC</span>
+              <p data-assistant-answer>Yes. The $793 attorney total included $650 in project compensation and a $143 attorney platform fee. LPC recorded the $650 compensation release after the matter was marked complete; Stripe provides the payout status.</p>
+              <a href="login.html" data-assistant-action>Open the completed matter <span aria-hidden="true">→</span></a>
+            </div>
+          </div>
+          <div class="assistant-preview__suggestions" aria-hidden="true">
+            <span data-assistant-suggestion="1">What files were submitted?</span>
+            <span data-assistant-suggestion="2">Open the completed matter</span>
+          </div>
+          <div class="assistant-preview__composer" aria-hidden="true">
+            <span>Ask about your LPC workspace</span>
+            <i>↑</i>
+          </div>
+        </article>
+      </div>
+
+    </section>
+
     </div>
 
     <section class="trust-band" aria-label="Why attorneys and paralegals use Let’s-ParaConnect">
@@ -493,7 +502,7 @@
         </article>
         <article>
           <span aria-hidden="true">02</span>
-          <h2>One matter workspace</h2>
+          <h2>Everything in one workspace</h2>
           <p>Scope, messages, files, completion, and payment activity stay connected to the same project.</p>
         </article>
         <article>
@@ -511,20 +520,28 @@
       </div>
 
       <div class="clarity-section__grid">
-        <aside class="fee-card" aria-labelledby="fee-card-title">
+        <aside class="fee-card fee-card--hybrid" aria-labelledby="fee-card-title">
           <p class="interface-label">Platform fees</p>
-          <h3 id="fee-card-title">No subscription. No fee to post.</h3>
+          <h3 id="fee-card-title">Three numbers. Clear from the start.</h3>
+          <div class="fee-card__row">
+            <span>Starting cost</span>
+            <strong>$0</strong>
+            <h4>No subscription. No fee to post.</h4>
+            <p>A saved payment method is required before a matter is published.</p>
+          </div>
           <div class="fee-card__row">
             <span>For attorneys</span>
             <strong>22%</strong>
-            <p>An attorney platform fee applies when a paralegal is hired. No separate Stripe processing line item is added beyond the displayed total.</p>
+            <h4>Attorney platform fee.</h4>
+            <p>Applies when a paralegal is hired. No separate Stripe processing line item is added beyond the displayed total.</p>
           </div>
           <div class="fee-card__row">
             <span>For paralegals</span>
             <strong>18%</strong>
+            <h4>Deducted before payout.</h4>
             <p>The platform fee is deducted from completed, paid work before payout.</p>
           </div>
-          <small>A saved payment method is required before a matter is published. Card and payment information is stored and handled by Stripe—not LPC.</small>
+          <small>Card and payment information is stored and handled by Stripe—not LPC.</small>
         </aside>
 
         <div class="home-faq">
@@ -559,7 +576,7 @@
       <div class="closing-scene__content">
         <p class="eyebrow">Choose your path</p>
         <h2 id="closing-title">Start with the role that brings you here.</h2>
-        <p>Join LPC as an attorney seeking project-based support or as a paralegal ready to apply to open Matters.</p>
+        <p>Join LPC as an attorney seeking project-based support or as a paralegal ready to apply to open matters.</p>
         <div class="role-actions">
           <a class="role-action" href="signup.html?role=attorney">
             <span>For attorneys</span>
@@ -601,7 +618,8 @@
     </div>
   </footer>
 
-  <script src="assets/scripts/homepage.js?v=20260729-assistant-perspectives" defer></script>
+  <script src="assets/scripts/homepage.js?v=20260823-plain-workflow-titles" defer></script>
+  <script src="assets/scripts/homepage-hybrid.js?v=20260820-black-static" defer></script>
   <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
 </html>
