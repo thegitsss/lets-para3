@@ -647,3 +647,373 @@ html.accessibility-mode .lpc-home--hybrid .hero-atmosphere {
 html.accessibility-mode .lpc-home--hybrid .hero-scroll {
   height: 100svh;
 }
+
+/* Matter Lens hero */
+.lpc-home--matter-lens .home-header:not(.is-open) {
+  --header-foreground: rgb(16, 24, 32);
+}
+
+.lpc-home--matter-lens .home-header .home-brand__apostrophe {
+  color: #6f9fe8;
+}
+
+.matter-lens-hero {
+  min-height: max(720px, 100svh);
+  display: grid;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  padding: calc(var(--header-height) + 54px) var(--page-gutter) 72px;
+  background: #fff;
+  color: #101820;
+  isolation: isolate;
+}
+
+.matter-lens-hero::before {
+  width: min(48vw, 720px);
+  height: min(20vw, 260px);
+  position: absolute;
+  z-index: -1;
+  top: 46%;
+  right: 1vw;
+  border-radius: 50%;
+  background: rgba(111, 159, 232, 0.045);
+  content: "";
+  filter: blur(54px);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.matter-lens-hero__inner {
+  width: min(100%, var(--content-max));
+  display: grid;
+  align-items: center;
+  margin: 0 auto;
+  grid-template-columns: minmax(400px, 0.88fr) minmax(600px, 1.12fr);
+  gap: clamp(54px, 6vw, 112px);
+}
+
+.matter-lens-hero__copy {
+  position: relative;
+  z-index: 2;
+}
+
+.matter-lens-hero__copy h1 {
+  max-width: 760px;
+  margin: 0;
+  color: #101820;
+  font-family: "Sarabun", sans-serif !important;
+  font-size: clamp(4.7rem, 7.25vw, 7.7rem);
+  font-weight: 200 !important;
+  letter-spacing: -0.07em;
+  line-height: 0.88;
+}
+
+.matter-lens-hero__copy h1 span {
+  display: block;
+}
+
+.matter-lens-hero__copy > p {
+  max-width: 570px;
+  margin: 38px 0 0;
+  color: #4d5965;
+  font-size: clamp(1.02rem, 1.32vw, 1.2rem);
+  line-height: 1.58;
+}
+
+.matter-lens-hero__actions {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  margin-top: 38px;
+}
+
+.matter-lens-hero__primary {
+  min-height: 52px;
+  padding-inline: 24px;
+  border-color: #111b25;
+  background: #111b25;
+  color: #fff;
+}
+
+.matter-lens-hero__primary:hover,
+.matter-lens-hero__primary:focus-visible {
+  border-color: #20354d;
+  background: #20354d;
+}
+
+.matter-lens-hero__secondary {
+  border-color: #65717d;
+  color: #26323e;
+}
+
+.matter-lens {
+  width: min(820px, 58vw);
+  position: relative;
+  justify-self: end;
+  pointer-events: none;
+}
+
+.matter-lens__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.matter-lens__incoming {
+  opacity: 0.72;
+  animation: matter-lens-incoming 7.4s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+}
+
+.matter-lens__signal {
+  stroke-dasharray: 76 14;
+  animation: matter-lens-signal-travel 7.4s linear infinite;
+}
+
+.matter-lens__signal--two {
+  animation-delay: -0.24s;
+}
+
+.matter-lens__signal--three {
+  animation-delay: -0.46s;
+}
+
+.matter-lens__caustic {
+  opacity: 0.08;
+  animation: matter-lens-caustic 7.4s ease-in-out infinite;
+}
+
+.matter-lens__aperture {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: matter-lens-idle 9s ease-in-out infinite alternate;
+}
+
+.matter-lens__refraction {
+  opacity: 0.44;
+  animation: matter-lens-refraction 7.4s ease-in-out infinite;
+}
+
+.matter-lens__resolved {
+  opacity: 0;
+  animation: matter-lens-resolved-opacity 7.4s ease-in-out infinite;
+}
+
+.matter-lens__resolved path {
+  stroke-dasharray: 240;
+  stroke-dashoffset: 240;
+  animation: matter-lens-resolve-line 7.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.matter-lens__resolved path:nth-child(2) {
+  animation-delay: 90ms;
+}
+
+.matter-lens__resolved path:nth-child(3) {
+  animation-delay: 180ms;
+}
+
+.matter-lens__label {
+  opacity: 0;
+  animation: matter-lens-label 7.4s ease-in-out infinite;
+}
+
+.matter-lens__label text {
+  fill: #354c67;
+  font-family: "Sarabun", sans-serif;
+  font-size: 10px;
+  font-weight: 400 !important;
+  letter-spacing: 3.8px;
+}
+
+@keyframes matter-lens-signal-travel {
+  from { stroke-dashoffset: 90; }
+  to { stroke-dashoffset: -90; }
+}
+
+@keyframes matter-lens-incoming {
+  0%, 20% { opacity: 0.72; transform: translateX(-5px); }
+  44% { opacity: 0.58; transform: translateX(4px); }
+  58%, 90% { opacity: 0.22; transform: translateX(6px); }
+  100% { opacity: 0.72; transform: translateX(-5px); }
+}
+
+@keyframes matter-lens-caustic {
+  0%, 22% { opacity: 0.08; transform: scaleX(0.92); }
+  48% { opacity: 0.34; transform: scaleX(1.04); }
+  62%, 90% { opacity: 0.18; transform: scaleX(1); }
+  100% { opacity: 0.08; transform: scaleX(0.92); }
+}
+
+@keyframes matter-lens-idle {
+  from { transform: translate3d(0, -1px, 0) scaleX(0.998); }
+  to { transform: translate3d(0, 1.5px, 0) scaleX(1.002); }
+}
+
+@keyframes matter-lens-refraction {
+  0%, 20% { opacity: 0.3; }
+  44%, 88% { opacity: 0.9; }
+  100% { opacity: 0.3; }
+}
+
+@keyframes matter-lens-resolved-opacity {
+  0%, 30% { opacity: 0; }
+  48%, 90% { opacity: 0.88; }
+  100% { opacity: 0; }
+}
+
+@keyframes matter-lens-resolve-line {
+  0%, 30% { stroke-dashoffset: 240; }
+  50%, 90% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -240; }
+}
+
+@keyframes matter-lens-label {
+  0%, 46% { opacity: 0; transform: translateY(4px); }
+  58%, 90% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-2px); }
+}
+
+@media (max-width: 1120px) {
+  .matter-lens-hero__inner {
+    grid-template-columns: minmax(330px, 0.9fr) minmax(470px, 1.1fr);
+    gap: 36px;
+  }
+
+  .matter-lens-hero__copy h1 {
+    font-size: clamp(4.1rem, 7.2vw, 6.2rem);
+  }
+
+  .matter-lens {
+    width: min(700px, 60vw);
+  }
+}
+
+@media (max-width: 820px) {
+  .matter-lens-hero {
+    min-height: max(760px, 100svh);
+    align-items: start;
+    padding: calc(var(--header-height) + 56px) 0 30px;
+  }
+
+  .matter-lens-hero__inner {
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .matter-lens-hero__copy {
+    padding-inline: var(--page-gutter);
+  }
+
+  .matter-lens-hero__copy h1 {
+    max-width: 640px;
+    font-size: clamp(3.55rem, 13.8vw, 5.4rem);
+    letter-spacing: -0.065em;
+    line-height: 0.9;
+  }
+
+  .matter-lens-hero__copy > p {
+    max-width: 520px;
+    margin-top: 26px;
+    font-size: 1rem;
+  }
+
+  .matter-lens-hero__actions {
+    gap: 24px;
+    margin-top: 28px;
+  }
+
+  .matter-lens {
+    width: min(100%, 760px);
+    max-width: none;
+    justify-self: center;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .matter-lens-hero {
+    min-height: max(720px, 100svh);
+    padding-top: calc(var(--header-height) + 40px);
+    padding-bottom: 34px;
+  }
+
+  .matter-lens-hero__copy h1 {
+    font-size: clamp(3.35rem, 15vw, 4.25rem);
+  }
+
+  .matter-lens-hero__inner {
+    gap: 34px;
+  }
+
+  .matter-lens-hero__copy > p {
+    max-width: 340px;
+    line-height: 1.5;
+  }
+
+  .matter-lens-hero__actions {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .matter-lens-hero__primary {
+    min-height: 50px;
+  }
+
+  .matter-lens {
+    width: 145%;
+    margin-top: -8px;
+    margin-left: 0;
+  }
+
+  .matter-lens__label text {
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .matter-lens :is(
+    .matter-lens__incoming,
+    .matter-lens__signal,
+    .matter-lens__caustic,
+    .matter-lens__aperture,
+    .matter-lens__refraction,
+    .matter-lens__resolved,
+    .matter-lens__resolved path,
+    .matter-lens__label
+  ) {
+    animation: none !important;
+  }
+
+  .matter-lens__incoming { opacity: 0.4; transform: none; }
+  .matter-lens__signal { stroke-dasharray: none; }
+  .matter-lens__caustic { opacity: 0.18; transform: none; }
+  .matter-lens__refraction { opacity: 0.88; }
+  .matter-lens__resolved { opacity: 0.88; }
+  .matter-lens__resolved path { stroke-dashoffset: 0; }
+  .matter-lens__label { opacity: 1; transform: none; }
+}
+
+html.accessibility-mode .matter-lens :is(
+  .matter-lens__incoming,
+  .matter-lens__signal,
+  .matter-lens__caustic,
+  .matter-lens__aperture,
+  .matter-lens__refraction,
+  .matter-lens__resolved,
+  .matter-lens__resolved path,
+  .matter-lens__label
+) {
+  animation: none !important;
+}
+
+html.accessibility-mode .matter-lens__incoming { opacity: 0.4; transform: none; }
+html.accessibility-mode .matter-lens__signal { stroke-dasharray: none; }
+html.accessibility-mode .matter-lens__caustic { opacity: 0.18; transform: none; }
+html.accessibility-mode .matter-lens__refraction,
+html.accessibility-mode .matter-lens__resolved { opacity: 0.88; }
+html.accessibility-mode .matter-lens__resolved path { stroke-dashoffset: 0; }
+html.accessibility-mode .matter-lens__label { opacity: 1; transform: none; }

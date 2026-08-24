@@ -11,7 +11,8 @@
     if (!header) return;
     const fadeDistance = Math.max(280, Math.min(420, window.innerHeight * 0.4));
     const progress = clamp(window.scrollY / fadeDistance);
-    const useInkForeground = progress >= 0.52;
+    const lightHero = document.body.classList.contains("lpc-home--matter-lens");
+    const useInkForeground = lightHero || progress >= 0.52;
     header.style.setProperty("--header-surface-alpha", (progress * 0.94).toFixed(3));
     header.style.setProperty("--header-surface-blur", `${(progress * 16).toFixed(2)}px`);
     header.style.setProperty("--header-foreground", useInkForeground ? "rgb(26, 34, 48)" : "rgb(255, 255, 255)");
@@ -1006,7 +1007,7 @@
     });
 
     document.querySelectorAll("[data-post-matter-action]").forEach((link) => {
-      link.href = approvedAttorney ? "create-case.html" : "signup.html";
+      link.href = approvedAttorney ? "create-case.html" : "signup.html?role=attorney";
     });
   };
 
