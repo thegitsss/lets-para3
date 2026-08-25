@@ -2245,15 +2245,15 @@ html.accessibility-mode .js .home-reveal {
   width: min(var(--content-max), calc(100% - (2 * var(--page-gutter))));
   display: grid;
   margin: 0 auto;
-  padding: clamp(110px, 12vw, 180px) 0;
-  grid-template-columns: minmax(280px, 0.68fr) minmax(620px, 1.32fr);
-  gap: clamp(70px, 9vw, 150px);
+  padding: clamp(90px, 9vw, 140px) 0;
+  grid-template-columns: minmax(260px, 0.7fr) minmax(560px, 1.3fr);
+  gap: clamp(54px, 7vw, 112px);
 }
 
 .clarity-section__intro h2 {
-  max-width: 520px;
+  max-width: 480px;
   margin: 0;
-  font-size: clamp(3.5rem, 5.4vw, 6rem);
+  font-size: clamp(3.25rem, 4.6vw, 5rem);
   letter-spacing: -0.055em;
   line-height: 0.9;
 }
