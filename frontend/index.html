@@ -15,7 +15,7 @@
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
   <link rel="stylesheet" href="assets/styles/homepage.css?v=20260823-plain-workflow-titles" />
-  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20260824-matter-lens-refined" />
+  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20260824-matter-lens" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -90,79 +90,66 @@
         <div class="matter-lens" aria-hidden="true">
           <svg class="matter-lens__svg" viewBox="0 0 920 520" focusable="false">
             <defs>
-              <linearGradient id="matterLensSurface" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stop-color="#ffffff" stop-opacity="0.9" />
-                <stop offset="0.42" stop-color="#eef5ff" stop-opacity="0.68" />
-                <stop offset="0.56" stop-color="#cfe1fa" stop-opacity="0.34" />
-                <stop offset="1" stop-color="#ffffff" stop-opacity="0.92" />
+              <linearGradient id="matterLensSurface" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#ffffff" stop-opacity="0.94" />
+                <stop offset="0.46" stop-color="#eaf2ff" stop-opacity="0.58" />
+                <stop offset="0.72" stop-color="#b8d3ff" stop-opacity="0.24" />
+                <stop offset="1" stop-color="#ffffff" stop-opacity="0.82" />
               </linearGradient>
               <linearGradient id="matterLensEdge" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0" stop-color="#8c99a7" stop-opacity="0.16" />
-                <stop offset="0.18" stop-color="#71849a" stop-opacity="0.54" />
-                <stop offset="0.5" stop-color="#5f94e4" stop-opacity="0.86" />
-                <stop offset="0.82" stop-color="#71849a" stop-opacity="0.54" />
-                <stop offset="1" stop-color="#8c99a7" stop-opacity="0.16" />
+                <stop offset="0" stop-color="#a8b1bd" stop-opacity="0.42" />
+                <stop offset="0.5" stop-color="#6e9fe9" stop-opacity="0.78" />
+                <stop offset="1" stop-color="#a8b1bd" stop-opacity="0.42" />
               </linearGradient>
               <linearGradient id="matterLensSignal" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0" stop-color="#9ca6b1" stop-opacity="0.18" />
-                <stop offset="0.55" stop-color="#74808d" stop-opacity="0.72" />
-                <stop offset="0.74" stop-color="#5f94e4" stop-opacity="0.92" />
-                <stop offset="1" stop-color="#4d5c6c" stop-opacity="0.72" />
+                <stop offset="0" stop-color="#8b96a4" stop-opacity="0.42" />
+                <stop offset="0.48" stop-color="#7d8998" stop-opacity="0.78" />
+                <stop offset="0.7" stop-color="#6f9fe8" stop-opacity="0.88" />
+                <stop offset="1" stop-color="#667482" stop-opacity="0.74" />
               </linearGradient>
               <radialGradient id="matterLensCaustic" cx="50%" cy="50%" r="50%">
-                <stop offset="0" stop-color="#78a9ef" stop-opacity="0.38" />
-                <stop offset="0.5" stop-color="#a9cbf8" stop-opacity="0.14" />
+                <stop offset="0" stop-color="#8bb5f4" stop-opacity="0.42" />
+                <stop offset="0.58" stop-color="#b9d4fb" stop-opacity="0.16" />
                 <stop offset="1" stop-color="#d9e8ff" stop-opacity="0" />
               </radialGradient>
               <clipPath id="matterLensClip">
-                <path d="M274 260 C326 225 398 216 500 216 C612 216 684 226 742 260 C684 294 612 304 500 304 C398 304 326 295 274 260Z" />
+                <ellipse cx="486" cy="260" rx="208" ry="82" />
               </clipPath>
               <filter id="matterLensSoftLight" x="-40%" y="-100%" width="180%" height="300%">
-                <feGaussianBlur stdDeviation="16" />
+                <feGaussianBlur stdDeviation="18" />
               </filter>
             </defs>
 
             <g class="matter-lens__idle">
-              <ellipse class="matter-lens__caustic" cx="514" cy="270" rx="250" ry="58" fill="url(#matterLensCaustic)" filter="url(#matterLensSoftLight)" />
+              <ellipse class="matter-lens__caustic" cx="486" cy="273" rx="238" ry="68" fill="url(#matterLensCaustic)" filter="url(#matterLensSoftLight)" />
 
-              <g class="matter-lens__incoming" fill="none" stroke-linecap="round">
-                <g class="matter-lens__traces" stroke="url(#matterLensSignal)" stroke-width="1">
-                  <path d="M0 190 C92 172 184 207 286 238" />
-                  <path d="M0 268 C94 236 194 286 286 260" />
-                  <path d="M0 346 C100 366 194 314 286 282" />
-                </g>
-                <g class="matter-lens__pulses" stroke="#6f9fe8" stroke-width="1.8">
-                  <path class="matter-lens__pulse matter-lens__pulse--one" pathLength="1" d="M0 190 C92 172 184 207 286 238" />
-                  <path class="matter-lens__pulse matter-lens__pulse--two" pathLength="1" d="M0 268 C94 236 194 286 286 260" />
-                  <path class="matter-lens__pulse matter-lens__pulse--three" pathLength="1" d="M0 346 C100 366 194 314 286 282" />
-                </g>
+              <g class="matter-lens__incoming" fill="none" stroke="#7f8a97" stroke-linecap="round" stroke-width="1.35">
+                <path class="matter-lens__signal matter-lens__signal--one" d="M12 188 C112 175 212 210 294 218" />
+                <path class="matter-lens__signal matter-lens__signal--two" d="M0 270 C112 244 210 288 294 260" />
+                <path class="matter-lens__signal matter-lens__signal--three" d="M18 346 C126 360 216 316 294 304" />
               </g>
 
               <g class="matter-lens__aperture">
-                <path class="matter-lens__shell" d="M274 260 C326 225 398 216 500 216 C612 216 684 226 742 260 C684 294 612 304 500 304 C398 304 326 295 274 260Z" fill="url(#matterLensSurface)" />
-                <path class="matter-lens__edge matter-lens__edge--upper" d="M274 260 C326 225 398 216 500 216 C612 216 684 226 742 260" />
-                <path class="matter-lens__edge matter-lens__edge--lower" d="M274 260 C326 295 398 304 500 304 C612 304 684 294 742 260" />
-                <path class="matter-lens__facet matter-lens__facet--upper" d="M294 256 C364 234 430 231 516 232 C604 233 666 240 720 258 C645 249 577 247 500 247 C416 247 352 249 294 256Z" />
-                <path class="matter-lens__facet matter-lens__facet--lower" d="M294 264 C364 286 430 289 516 288 C604 287 666 280 720 262 C645 271 577 273 500 273 C416 273 352 271 294 264Z" />
-                <line class="matter-lens__axis" x1="500" y1="206" x2="500" y2="314" />
-                <path class="matter-lens__datum" d="M274 247 V273 M262 260 H288 M742 247 V273 M730 260 H754 M488 216 H512 M488 304 H512" />
+                <ellipse cx="486" cy="260" rx="208" ry="82" fill="url(#matterLensSurface)" stroke="url(#matterLensEdge)" stroke-width="1.4" />
+                <ellipse cx="486" cy="260" rx="193" ry="68" fill="none" stroke="#aab5c1" stroke-opacity="0.32" stroke-width="0.8" />
+                <path d="M304 223 H288 M304 297 H288 M668 223 H684 M668 297 H684" fill="none" stroke="#70849b" stroke-opacity="0.46" stroke-width="1" />
               </g>
 
               <g class="matter-lens__refraction" clip-path="url(#matterLensClip)" fill="none" stroke="url(#matterLensSignal)" stroke-linecap="round" stroke-width="1.55">
-                <path d="M266 238 C348 240 412 245 500 244 C588 243 654 240 750 240" />
-                <path d="M266 260 C350 260 414 260 500 260 C590 260 656 260 750 260" />
-                <path d="M266 282 C348 280 412 275 500 276 C588 277 654 280 750 280" />
+                <path d="M278 218 C350 219 410 236 486 236 C550 236 604 230 694 230" />
+                <path d="M278 260 C366 260 422 260 486 260 C558 260 616 260 694 260" />
+                <path d="M278 304 C352 301 412 284 486 284 C552 284 610 290 694 290" />
               </g>
 
-              <g class="matter-lens__resolved" fill="none" stroke="#526171" stroke-linecap="round">
-                <path d="M732 240 H916" />
-                <path d="M732 260 H916" />
-                <path d="M732 280 H916" />
+              <g class="matter-lens__resolved" fill="none" stroke="#667482" stroke-linecap="round" stroke-width="1.4">
+                <path d="M676 230 H916" />
+                <path d="M676 260 H916" />
+                <path d="M676 290 H916" />
               </g>
 
               <g class="matter-lens__label">
-                <line x1="526" y1="251" x2="606" y2="251" />
-                <text x="526" y="244">MATTER 01</text>
+                <line x1="442" y1="204" x2="530" y2="204" stroke="#6f9fe8" stroke-opacity="0.46" stroke-width="0.8" />
+                <text x="486" y="194" text-anchor="middle">MATTER 01</text>
               </g>
             </g>
           </svg>
