@@ -856,31 +856,31 @@ html.lpc-homepage,
 
 @media (prefers-reduced-motion: no-preference) {
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__qualifier-words > span {
-    animation: editorial-hero-word-enter 430ms cubic-bezier(0.22, 1, 0.36, 1) calc(40ms + (var(--word-index) * 75ms)) both;
+    animation: editorial-hero-word-enter 400ms cubic-bezier(0.22, 1, 0.36, 1) calc(80ms + (var(--word-index) * 80ms)) both;
   }
 
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__line--one {
-    animation: editorial-hero-group-enter 720ms cubic-bezier(0.22, 1, 0.36, 1) 360ms both;
+    animation: editorial-hero-group-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 620ms both;
   }
 
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__line--two {
-    animation: editorial-hero-group-enter 720ms cubic-bezier(0.22, 1, 0.36, 1) 480ms both;
+    animation: editorial-hero-group-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 880ms both;
   }
 
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__support {
-    animation: editorial-hero-group-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 610ms both;
+    animation: editorial-hero-group-enter 680ms cubic-bezier(0.22, 1, 0.36, 1) 1180ms both;
   }
 
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__actions {
-    animation: editorial-hero-group-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 740ms both;
+    animation: editorial-hero-group-enter 680ms cubic-bezier(0.22, 1, 0.36, 1) 1500ms both;
   }
 
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__publishing {
-    animation: editorial-hero-group-enter 680ms cubic-bezier(0.22, 1, 0.36, 1) 870ms both;
+    animation: editorial-hero-group-enter 620ms cubic-bezier(0.22, 1, 0.36, 1) 1810ms both;
   }
 
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__reassurance {
-    animation: editorial-hero-group-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 1000ms both;
+    animation: editorial-hero-group-enter 620ms cubic-bezier(0.22, 1, 0.36, 1) 1810ms both;
   }
 
   .js .lpc-home--editorial .home-reveal {
