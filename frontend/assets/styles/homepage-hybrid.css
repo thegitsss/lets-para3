@@ -749,7 +749,7 @@ html.lpc-homepage,
 
 .editorial-hero__line--two {
   margin-top: 0.08em;
-  color: #465f77;
+  color: #3e5469;
   font-family: "Sarabun", sans-serif !important;
   font-style: italic;
   font-synthesis: none;
@@ -763,16 +763,9 @@ html.lpc-homepage,
   margin-top: clamp(32px, 4vh, 48px);
 }
 
-.editorial-hero__support {
-  margin: 0;
-  padding-left: 18px;
-  border-left: 1px solid rgba(74, 100, 132, 0.42);
-  color: #3f4853;
-  font-family: "Sarabun", sans-serif !important;
-  font-size: clamp(1rem, 1.25vw, 1.16rem);
-  font-weight: 300 !important;
-  line-height: 1.65;
-}
+.editorial-hero__support {position:relative;margin:0;padding-left:18px;color:#37414c;font-family:"Sarabun",sans-serif!important;font-size:clamp(1rem,1.25vw,1.16rem);font-weight:300!important;line-height:1.65}
+
+.editorial-hero__support::before {content:"";position:absolute;inset:.3em auto .3em 0;border-left:1px solid #4a64846b}
 
 .editorial-hero__actions {
   justify-content: flex-start;
@@ -905,6 +898,8 @@ html.lpc-homepage,
   }
 }
 
+@media (min-width:641px) and (max-height:820px) {.editorial-hero__main{transform:translateY(-18px)}}
+
 @media (max-width: 1100px) {
   .editorial-hero {
     padding-top: calc(var(--header-height) + 34px);
@@ -958,12 +953,7 @@ html.lpc-homepage,
     width: 100%;
   }
 
-  .editorial-hero__support {
-    max-width: 355px;
-    padding-left: 14px;
-    font-size: 0.94rem;
-    line-height: 1.58;
-  }
+  .editorial-hero__support {max-width:355px;padding-left:14px;font-size:.94rem;line-height:1.58}
 
   .editorial-hero__actions {
     align-items: flex-start;
