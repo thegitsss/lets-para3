@@ -2502,59 +2502,6 @@ html.accessibility-mode .js .home-reveal {
   transform: translateY(-50%);
 }
 
-/* Footer */
-.home-footer {
-  padding: 24px var(--page-gutter);
-  border-top: 1px solid var(--lpc-line);
-  background: #f6f5f2;
-}
-
-.home-footer__bottom {
-  width: min(1200px, 100%);
-  margin: 0 auto;
-}
-
-.home-footer nav a {
-  font-size: 0.75rem;
-  font-weight: 400;
-  text-decoration: none;
-}
-
-.home-footer__bottom {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 28px;
-}
-
-.home-footer__bottom p {
-  margin: 0;
-  color: var(--lpc-muted);
-  font-size: 0.7rem;
-}
-
-.home-footer__legal {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 10px 20px;
-  margin: 0;
-}
-
-@media (min-width: 1000px) {
-  .home-footer__legal {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-
-  .home-footer__bottom > .accessibility-toggle {
-    grid-column: 3;
-  }
-}
-
 .accessibility-toggle {
   display: inline-flex;
   align-items: center;

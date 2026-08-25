@@ -6,6 +6,16 @@
   const mobileNav = document.querySelector("[data-mobile-nav]");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value));
+  const footerDirectoryMedia = window.matchMedia("(max-width: 734px)");
+  const footerDirectories = Array.from(document.querySelectorAll(".home-footer__directory details"));
+  const syncFooterDirectories = () => {
+    footerDirectories.forEach((directory) => {
+      directory.open = !footerDirectoryMedia.matches;
+    });
+  };
+
+  syncFooterDirectories();
+  footerDirectoryMedia.addEventListener?.("change", syncFooterDirectories);
 
   const syncHeaderSurface = () => {
     if (!header) return;
