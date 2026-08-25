@@ -14,8 +14,8 @@
   <meta name="theme-color" content="#FFFFFF" />
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
-  <link rel="stylesheet" href="assets/styles/homepage.css?v=20260825-ending" />
-  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20260825-ending" />
+  <link rel="stylesheet" href="assets/styles/homepage.css?v=20260825-palette" />
+  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20260825-restored" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -538,7 +538,7 @@
             <span>Starting cost</span>
             <strong>$0</strong>
             <h4>No subscription. No fee to post.</h4>
-            <p>No payment method is required to publish. Add one when you hire and fund the matter.</p>
+            <p>A saved payment method is required before a matter is published.</p>
           </div>
           <div class="fee-card__row">
             <span>For attorneys</span>
@@ -583,20 +583,21 @@
     </section>
 
     <section class="closing-scene" aria-labelledby="closing-title">
+      <canvas class="matter-field matter-field--closing" data-matter-field="closing" aria-hidden="true"></canvas>
       <div class="closing-scene__content">
         <p class="eyebrow">Choose your path</p>
         <h2 id="closing-title">Start with the role that brings you here.</h2>
         <p>Join LPC as an attorney seeking project-based support or as a paralegal ready to apply to open matters.</p>
         <div class="role-actions">
           <a class="role-action" href="signup.html?role=attorney">
-            <span>FOR ATTORNEYS</span>
+            <span>For attorneys</span>
             <strong>Post a matter</strong>
-            <i aria-hidden="true">→</i>
+            <i aria-hidden="true">↗</i>
           </a>
           <a class="role-action" href="signup.html?role=paralegal">
-            <span>FOR PARALEGALS</span>
+            <span>For paralegals</span>
             <strong>Apply to join</strong>
-            <i aria-hidden="true">→</i>
+            <i aria-hidden="true">↗</i>
           </a>
         </div>
       </div>
@@ -609,28 +610,16 @@
         <a class="home-brand" href="index.html">Let<span class="home-brand__apostrophe">’</span>s-ParaConnect</a>
         <p>Project-based legal support for attorneys and independent paralegals.</p>
       </div>
-      <nav class="home-footer__group" aria-labelledby="footer-platform">
-        <p id="footer-platform">Platform</p>
-        <a href="#for-attorneys">For Attorneys</a>
-        <a href="#for-paralegals">For Paralegals</a>
-        <a href="browse-paralegals.html">Browse Paralegals</a>
-      </nav>
-      <nav class="home-footer__group" aria-labelledby="footer-resources">
-        <p id="footer-resources">Resources</p>
-        <a href="#how">How It Works</a>
-        <a href="attorney-faq.html">Attorney FAQ</a>
-        <a href="paralegal-faq.html">Paralegal FAQ</a>
+      <nav aria-label="Footer navigation">
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
         <a href="contact.html">Contact</a>
-      </nav>
-      <nav class="home-footer__group" aria-labelledby="footer-legal">
-        <p id="footer-legal">Legal</p>
-        <a href="terms.html">Terms</a>
         <a href="privacy.html">Privacy</a>
-        <a href="accessibility.html">Accessibility</a>
+        <a href="terms.html">Terms</a>
         <a href="/paralegal-admission.html">Paralegal Admission</a>
+        <a href="accessibility.html">Accessibility</a>
       </nav>
     </div>
-    <a class="home-footer__wordmark" href="index.html" aria-label="Let’s-ParaConnect home">Let’s—ParaConnect</a>
     <div class="home-footer__bottom">
       <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
       <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode">
