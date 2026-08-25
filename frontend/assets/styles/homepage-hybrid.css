@@ -843,7 +843,7 @@ html.accessibility-mode .lpc-home--editorial :is(
 .lpc-home--hybrid .home-footer{padding:0 var(--page-gutter) 20px;border:0;background:radial-gradient(circle at 78% 18%,rgba(215,193,143,.13),transparent 27%),linear-gradient(150deg,#10253a 0%,#07131f 72%);color:rgba(248,246,239,.7)}
 .lpc-home--hybrid .home-footer__inner{max-width:var(--content-max);margin:auto}
 .lpc-home--hybrid .home-footer__note{margin:0;padding:17px 0 12px;border-bottom:1px solid rgba(248,246,239,.16);font-size:.72rem;font-weight:300;line-height:1.45}
-.lpc-home--hybrid .home-footer__directory{display:grid;justify-content:space-between;padding:20px 0 28px;grid-template-columns:repeat(4,max-content);gap:32px}
+.lpc-home--hybrid .home-footer__directory{width:min(1100px,100%);display:grid;margin:0 auto;padding:20px 0 28px;grid-template-columns:repeat(4,1fr);gap:32px}
 .lpc-home--hybrid .home-footer details{min-width:0}
 .lpc-home--hybrid .home-footer summary{color:#f8f6ef;cursor:default;font-size:.75rem;font-weight:600!important;letter-spacing:.01em;list-style:none}
 .lpc-home--hybrid .home-footer summary::-webkit-details-marker{display:none}
