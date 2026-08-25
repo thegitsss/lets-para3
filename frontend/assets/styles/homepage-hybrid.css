@@ -828,7 +828,7 @@ html.lpc-homepage,
   }
 
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__reassurance {
-    animation: editorial-hero-group-enter 900ms cubic-bezier(.25,.1,.25,1) 1510ms both;
+    animation: editorial-hero-group-enter 900ms cubic-bezier(.25,.1,.25,1) 1610ms both;
   }
 
   .js .lpc-home--editorial .home-reveal {
