@@ -835,19 +835,19 @@ html.accessibility-mode .lpc-home--editorial :is(
 }
 
 /* Editorial directory footer */
-.home-footer{padding:0 var(--page-gutter);border:0;background:#07131f;color:rgba(248,246,239,.66)}
+.home-footer{margin-bottom:-1px;padding:0 var(--page-gutter);border:0;border-bottom:2px solid #07131f;background:#07131f;color:rgba(248,246,239,.72)}
 .home-footer__inner{max-width:var(--content-max);display:grid;margin:auto;grid-template-columns:minmax(360px,1fr) minmax(0,1.9fr);column-gap:clamp(64px,7vw,112px)}
 .home-footer__statement{align-self:start;margin:0;padding:58px 0 70px;color:#fff;font-size:clamp(2.4rem,3.5vw,3.9rem);font-weight:600!important;letter-spacing:-.05em;line-height:.9;text-transform:uppercase}
 .home-footer__statement span{display:block}
 .home-footer__directory{display:grid;padding:62px 0 70px;grid-template-columns:repeat(4,1fr);gap:clamp(24px,3vw,52px)}
 .home-footer details{min-width:0}
-.home-footer summary{color:#f8f6ef;cursor:default;font-size:.7rem;font-weight:600!important;letter-spacing:.09em;list-style:none;text-transform:uppercase}
+.home-footer summary{color:#c2a665;cursor:default;font-size:.7rem;font-weight:600!important;letter-spacing:.09em;list-style:none;text-transform:uppercase}
 .home-footer summary::-webkit-details-marker{display:none}
 .home-footer__links{display:flex;align-items:flex-start;flex-direction:column;gap:12px;margin-top:18px}
-.home-footer a{color:rgba(248,246,239,.76);font-size:.73rem;font-weight:300;line-height:1.35;text-decoration:none}
+.home-footer a{color:rgba(248,246,239,.84);font-size:.76rem;font-weight:300;line-height:1.4;text-decoration:none}
 .home-footer a:hover,.home-footer a:focus-visible{color:#fff;text-decoration:underline}
 .home-footer__bottom{display:grid;align-items:center;padding:22px 0 28px;border-top:1px solid rgba(248,246,239,.2);grid-column:1 / -1;grid-template-columns:auto 1fr auto;gap:clamp(18px,2.5vw,38px)}
-.home-footer__brand{color:#fff!important;font-size:.82rem!important;font-weight:600!important;letter-spacing:-.01em;text-decoration:none!important}
+.home-footer__brand{color:#fff!important;font-family:"Cormorant Garamond",serif!important;font-size:1.16rem!important;font-weight:300!important;letter-spacing:-.015em;text-decoration:none!important}
 .home-footer__bottom>p{margin:0;font-size:.66rem;font-weight:300}
 .home-footer .accessibility-toggle,.home-footer .accessibility-toggle.is-active{padding:0;border:0;border-radius:0;background:transparent;color:rgba(248,246,239,.72);font-size:.68rem}
 .home-footer .accessibility-toggle:hover,.home-footer .accessibility-toggle:focus-visible{background:transparent;color:#fff;text-decoration:underline}
