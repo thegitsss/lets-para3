@@ -785,11 +785,11 @@
     {
       selector: ".clarity-section",
       layers: [
-        [".clarity-section__intro", "rise", 0.02, 0.12],
-        [".fee-card", "lateral-right", 0.04, 0.14],
-        [".fee-card__row:nth-of-type(1)", "rise", 0.07, 0.16],
-        [".fee-card__row:nth-of-type(2)", "rise", 0.08, 0.17],
-        [".fee-card__row:nth-of-type(3)", "rise", 0.09, 0.18],
+        [".clarity-section__intro", "rise", 0.04, 0.18],
+        [".fee-card", "lateral-right", 0.08, 0.24],
+        [".fee-card__row:nth-of-type(1)", "rise", 0.12, 0.26],
+        [".fee-card__row:nth-of-type(2)", "rise", 0.14, 0.28],
+        [".fee-card__row:nth-of-type(3)", "rise", 0.16, 0.30],
         [".home-faq > .interface-label", "rise", 0.40, 0.56],
         [".home-faq > h3", "rise", 0.43, 0.59],
         [".home-faq details:nth-of-type(1)", "rise", 0.46, 0.60],
