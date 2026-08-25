@@ -841,7 +841,7 @@ html.accessibility-mode .lpc-home--editorial :is(
 
 /* Compact directory footer inspired by Apple's information architecture. */
 .lpc-home--hybrid .home-footer{padding:0 var(--page-gutter) 20px;border:0;background:#f6f3eb;color:#6e6e73}
-.lpc-home--hybrid .home-footer__inner{width:min(980px,100%);margin:0 auto}
+.lpc-home--hybrid .home-footer__inner{max-width:var(--content-max);margin:auto}
 .lpc-home--hybrid .home-footer__note{margin:0;padding:17px 0 12px;border-bottom:1px solid #d2d2d7;font-size:.7rem;font-weight:300;line-height:1.45}
 .lpc-home--hybrid .home-footer__directory{display:grid;padding:20px 0 28px;grid-template-columns:repeat(4,1fr);gap:32px}
 .lpc-home--hybrid .home-footer details{min-width:0}
