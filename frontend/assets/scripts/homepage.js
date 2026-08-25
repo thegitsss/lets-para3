@@ -141,7 +141,7 @@
 
     buildNodes() {
       const random = this.randomFactory(this.mode === "hero" ? 2841 : 650);
-      const labels = ["SCOPE", "FILES", "DEADLINE", "PEOPLE", "MESSAGES", "PAYMENT"];
+      const labels = ["PROBATE", "BUSINESS", "FAMILY", "LITIGATION", "REAL ESTATE", "IMMIGRATION"];
       if (this.mode === "hero") {
         const count = this.width < 680 ? 840 : this.width < 1100 ? 1200 : 1900;
         this.nodes = Array.from({ length: count }, (_, index) => {
