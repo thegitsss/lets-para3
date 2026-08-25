@@ -841,7 +841,7 @@ html.accessibility-mode .lpc-home--editorial :is(
 .home-footer__statement span{display:block}
 .home-footer__directory{display:grid;padding:62px 0 70px;grid-template-columns:repeat(4,1fr);gap:clamp(24px,3vw,52px)}
 .home-footer details{min-width:0}
-.home-footer summary{color:#c2a665;cursor:default;font-size:.7rem;font-weight:600!important;letter-spacing:.09em;list-style:none;text-transform:uppercase}
+.home-footer summary{color:#a99a77;cursor:default;font-size:.7rem;font-weight:600!important;letter-spacing:.09em;list-style:none;text-transform:uppercase}
 .home-footer summary::-webkit-details-marker{display:none}
 .home-footer__links{display:flex;align-items:flex-start;flex-direction:column;gap:12px;margin-top:18px}
 .home-footer a{color:rgba(248,246,239,.84);font-size:.76rem;font-weight:300;line-height:1.4;text-decoration:none}
