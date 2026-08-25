@@ -825,7 +825,7 @@ html.accessibility-mode .js .home-reveal {
   min-height: 600px;
   position: relative;
   top: auto;
-  background: #fff;
+  background: #f8f8f5;
   box-shadow: none;
   transition: border-color 520ms ease;
 }
@@ -834,7 +834,9 @@ html.accessibility-mode .js .home-reveal {
   position: absolute;
   z-index: 0;
   inset: 58px 0 62px;
-  background: none;
+  background:
+    radial-gradient(circle at var(--state-focus-x) var(--state-focus-y), rgba(180, 151, 90, 0.12), transparent 29%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.82), transparent 46%);
   content: "";
   opacity: 0.72;
   pointer-events: none;
@@ -2504,7 +2506,7 @@ html.accessibility-mode .js .home-reveal {
 .home-footer {
   padding: 24px var(--page-gutter);
   border-top: 1px solid var(--lpc-line);
-  background: #fff;
+  background: #f6f5f2;
 }
 
 .home-footer__bottom {
@@ -3059,7 +3061,7 @@ body.accessibility-mode [tabindex]:focus-visible {
     padding: 28px;
     border-top: 1px solid var(--lpc-line);
     border-bottom: 1px solid var(--lpc-line);
-    background: #fff;
+    background: #f8f8f5;
     opacity: 1;
     pointer-events: auto;
     transform: none;
@@ -3670,7 +3672,9 @@ body.accessibility-mode [tabindex]:focus-visible {
 .workflow {
   padding-top: 0;
   padding-bottom: clamp(96px, 10vw, 150px);
-  background: #fff;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(180, 151, 90, 0.06), transparent 24%),
+    linear-gradient(180deg, #fff 0%, #fbfaf7 48%, #fff 100%);
 }
 
 .workflow__intro {
@@ -3722,7 +3726,9 @@ body.accessibility-mode [tabindex]:focus-visible {
   top: auto;
   border-color: rgba(11, 42, 74, 0.1);
   border-radius: 28px;
-  background: #fff;
+  background:
+    radial-gradient(circle at var(--state-focus-x) var(--state-focus-y), rgba(215, 193, 143, 0.14), transparent 28%),
+    #f9f9f6;
 }
 
 .paths {
@@ -3765,7 +3771,9 @@ body.accessibility-mode [tabindex]:focus-visible {
 }
 
 .path-scene--attorney {
-  background: #fff;
+  background:
+    radial-gradient(circle at 84% 22%, rgba(180, 151, 90, 0.09), transparent 25%),
+    #f7f5ef;
 }
 
 .path-scene--paralegal {

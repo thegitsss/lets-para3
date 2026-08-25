@@ -1,19 +1,8 @@
 .lpc-home--hybrid {
   --lpc-paper: #fff;
-  --lpc-cloud: #fff;
-  --lpc-mist: #fff;
+  --lpc-cloud: #f3f1ec;
+  --lpc-mist: #e8e6e0;
   background: #fff;
-}
-
-.lpc-home--hybrid main,
-.lpc-home--hybrid .hero-bridge,
-.lpc-home--hybrid .workflow,
-.lpc-home--hybrid .paths,
-.lpc-home--hybrid .assistant-showcase,
-.lpc-home--hybrid .trust-band,
-.lpc-home--hybrid .clarity-section,
-.lpc-home--hybrid .home-footer {
-  background-color: #fff;
 }
 
 .lpc-home--hybrid .home-brand {
@@ -429,17 +418,6 @@
   margin-top: 26px;
   padding-top: 24px;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
-}
-
-.lpc-home--hybrid .path-scene--attorney,
-.lpc-home--hybrid .trust-band,
-.lpc-home--hybrid .closing-scene,
-.lpc-home--hybrid .home-footer {
-  background: #fff;
-}
-
-.lpc-home--hybrid .closing-scene {
-  background: #fff;
 }
 
 .lpc-home--hybrid .home-footer {
