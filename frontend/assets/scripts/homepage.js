@@ -161,10 +161,8 @@
         });
         return;
       }
-      const count =
-        this.width < 680
-            ? 32
-            : 58;
+      const heroField = this.section.classList.contains("editorial-hero");
+      const count = heroField ? (this.width < 680 ? 18 : 32) : (this.width < 680 ? 32 : 58);
 
       this.nodes = Array.from({ length: count }, (_, index) => {
         const angle = random() * Math.PI * 2;
@@ -184,8 +182,7 @@
             radius: 0.7 + random() * 1.7,
             phase: random() * Math.PI * 2,
             speed: 0.18 + random() * 0.4,
-            featured: featured && this.width > 1100,
-            slot: index,
+            featured: featured && this.width > 1100 && !heroField,
             label: labels[index] || "",
           };
         }
@@ -313,12 +310,11 @@
 
     renderClosing(time) {
       const context = this.context;
-      const labelSlots = this.section.classList.contains("editorial-hero")
-        ? [[.14,.2],[.38,.14],[.68,.16],[.88,.24],[.2,.76],[.77,.74]]
-        : null;
+      const heroField = this.section.classList.contains("editorial-hero");
+      const drift = heroField ? [8, 5] : [12, 8];
       const positions = this.nodes.map((node) => ({
-        x: node.baseX + Math.sin(time * node.speed + node.phase) * 12,
-        y: node.baseY + Math.cos(time * node.speed * 0.8 + node.phase) * 8,
+        x: node.baseX + Math.sin(time * node.speed + node.phase) * drift[0],
+        y: node.baseY + Math.cos(time * node.speed * 0.8 + node.phase) * drift[1],
       }));
 
       positions.forEach((position, index) => {
@@ -334,12 +330,11 @@
       this.nodes.forEach((node, index) => {
         const position = positions[index];
         if (node.featured) {
-          const slot = labelSlots?.[node.slot];
           context.save();
           context.font = '200 9px "Sarabun", sans-serif';
           context.textAlign = "center";
           context.fillStyle = "rgba(128, 101, 44, .38)";
-          context.fillText(node.label, slot ? this.width * slot[0] : position.x, slot ? this.height * slot[1] : position.y + 17);
+          context.fillText(node.label, position.x, position.y + 17);
           context.restore();
         }
         context.beginPath();
