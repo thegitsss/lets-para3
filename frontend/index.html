@@ -13,10 +13,9 @@
   <meta name="twitter:card" content="summary" />
   <meta name="theme-color" content="#ffffff" />
 
-  <link rel="preload" as="image" href="assets/images/homepage-matter/paper-atmosphere.jpg?v=20260820-black-static" />
   <link rel="stylesheet" href="assets/styles/fonts.css" />
   <link rel="stylesheet" href="assets/styles/homepage.css?v=20260823-plain-workflow-titles" />
-  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20260823-plain-workflow-titles" />
+  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20260825-editorial-hero" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -27,7 +26,7 @@
     document.documentElement.classList.add("js");
   </script>
 </head>
-<body class="lpc-home lpc-home--hybrid">
+<body class="lpc-home lpc-home--hybrid lpc-home--editorial">
   <a class="skip-link" href="#main">Skip to main content</a>
 
   <header class="home-header" data-home-header>
@@ -77,32 +76,43 @@
   </header>
 
   <main id="main" tabindex="-1">
-    <section class="hero-scroll" aria-labelledby="hero-title" data-find-hero>
-      <div class="hero-sticky">
-        <img class="hero-atmosphere" src="assets/images/homepage-matter/paper-atmosphere.jpg?v=20260820-black-static" alt="" fetchpriority="high" />
-        <div class="hero-copy">
+    <section class="editorial-hero" aria-labelledby="hero-title">
+      <div class="editorial-hero__inner">
+        <div class="editorial-hero__lead">
+          <p class="editorial-hero__qualifier">
+            <span class="sr-only">For solo and small-firm attorneys</span>
+            <span class="editorial-hero__qualifier-words" aria-hidden="true">
+              <span style="--word-index: 0">For</span>
+              <span style="--word-index: 1">solo</span>
+              <span style="--word-index: 2">and</span>
+              <span style="--word-index: 3">small-firm</span>
+              <span style="--word-index: 4">attorneys</span>
+            </span>
+          </p>
           <h1 id="hero-title">
-            <span>Your caseload grew.</span>
-            <span>Your payroll <em>doesn’t have to.</em></span>
+            <span class="editorial-hero__line editorial-hero__line--one">Your caseload grew.</span>
+            <em class="editorial-hero__line editorial-hero__line--two">Your payroll doesn’t have to.</em>
           </h1>
-          <p>A paralegal when you need one. One matter at a time.</p>
-          <div class="action-row hero-actions">
-            <a class="button button--gold" href="signup.html" data-post-matter-action>Post a Matter <span aria-hidden="true">↗</span></a>
-            <a class="text-action text-action--light" href="browse-paralegals.html">Browse Paralegals <span aria-hidden="true">→</span></a>
-          </div>
         </div>
-      </div>
-    </section>
 
-    <section class="hero-bridge" aria-labelledby="hero-bridge-title">
-      <div class="hero-bridge__inner">
-        <h2 id="hero-bridge-title"><span class="hero-bridge__overflow">Over<span class="hero-bridge__overflow-f">f</span><span class="hero-bridge__overflow-l">l</span>ow</span> work, handled with focus.</h2>
-        <p>Legal work does not always require another permanent hire. Let’s-ParaConnect brings attorneys and approved independent paralegals together for clearly scoped, project-based work.</p>
+        <div class="editorial-hero__details">
+          <p class="editorial-hero__support">Turn clearly scoped paralegal work into a flat-fee matter. Choose a vetted U.S. paralegal, then collaborate through completion in one workspace.</p>
+          <div class="action-row editorial-hero__actions">
+            <a class="button button--ink" href="signup.html" data-post-matter-action>Post a matter <span aria-hidden="true">↗</span></a>
+            <a class="text-action" href="browse-paralegals.html">Browse paralegals <span aria-hidden="true">→</span></a>
+          </div>
+          <p class="editorial-hero__publishing">Publish free. Fund only when you hire.</p>
+        </div>
+
+        <div class="editorial-hero__reassurance">
+          <p>Vetted U.S. paralegals <span aria-hidden="true">·</span> Attorney-supervised <span aria-hidden="true">·</span> Approval-based payment</p>
+        </div>
       </div>
     </section>
 
     <section class="workflow" id="how" aria-labelledby="workflow-title">
       <div class="workflow__intro">
+        <p class="eyebrow workflow__eyebrow">How it works</p>
         <div class="workflow__intro-title">
           <h2 id="workflow-title">One matter.<br />One workspace.</h2>
         </div>
@@ -618,8 +628,7 @@
     </div>
   </footer>
 
-  <script src="assets/scripts/homepage.js?v=20260823-plain-workflow-titles" defer></script>
-  <script src="assets/scripts/homepage-hybrid.js?v=20260820-black-static" defer></script>
+  <script src="assets/scripts/homepage.js?v=20260825-editorial-hero" defer></script>
   <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
 </html>

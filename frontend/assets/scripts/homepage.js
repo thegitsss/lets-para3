@@ -11,7 +11,8 @@
     if (!header) return;
     const fadeDistance = Math.max(280, Math.min(420, window.innerHeight * 0.4));
     const progress = clamp(window.scrollY / fadeDistance);
-    const useInkForeground = progress >= 0.52;
+    const editorialHero = document.body.classList.contains("lpc-home--editorial");
+    const useInkForeground = editorialHero || progress >= 0.52;
     header.style.setProperty("--header-surface-alpha", (progress * 0.94).toFixed(3));
     header.style.setProperty("--header-surface-blur", `${(progress * 16).toFixed(2)}px`);
     header.style.setProperty("--header-foreground", useInkForeground ? "rgb(26, 34, 48)" : "rgb(255, 255, 255)");
@@ -87,6 +88,7 @@
       return (
         this.isVisible &&
         !reducedMotion.matches &&
+        !document.body.classList.contains("lpc-home--editorial") &&
         !document.body.classList.contains("accessibility-mode") &&
         document.visibilityState !== "hidden"
       );
@@ -356,30 +358,74 @@
     new MatterField(canvas);
   });
 
-  const revealTargets = Array.from(document.querySelectorAll([
-    ".hero-bridge__inner",
-    ".workflow__intro > *",
-    ".workflow-chapter",
-    ".workflow-canvas-wrap",
-    ".assistant-showcase__intro",
-    ".assistant-stage",
-    ".path-scene__copy",
-    ".audience-interface",
-    ".trust-band article",
-    ".clarity-section__intro",
-    ".fee-card",
-    ".home-faq",
-    ".closing-scene__content",
-    ".role-action",
-    ".home-footer__top > *",
-  ].join(",")));
-
-  revealTargets.forEach((element) => {
-    const siblings = revealTargets.filter((candidate) => candidate.parentElement === element.parentElement);
-    const siblingIndex = Math.max(0, siblings.indexOf(element));
+  const revealTargets = [];
+  const registerReveal = (element, delay = 0) => {
+    if (!element || revealTargets.includes(element)) return;
+    revealTargets.push(element);
     element.classList.add("home-reveal");
-    element.style.setProperty("--home-reveal-delay", `${Math.min(siblingIndex * 80, 240)}ms`);
+    element.style.setProperty("--home-reveal-delay", `${Math.min(delay, 300)}ms`);
     element.addEventListener("focusin", () => element.classList.add("is-revealed"));
+  };
+
+  const revealSequences = [
+    [".workflow", [
+      [".workflow__eyebrow", 0],
+      [".workflow__intro-title", 100],
+      [".workflow__intro-support", 200],
+      [".workflow__story", 280],
+    ]],
+    [".paths", [
+      [".paths__heading > .eyebrow", 0],
+      [".paths__heading > h2", 110],
+    ]],
+    [".assistant-showcase", [
+      [".assistant-showcase__intro > .eyebrow", 0],
+      [".assistant-showcase__intro > h2", 100],
+      [".assistant-showcase__intro > p:not(.eyebrow)", 200],
+      [".assistant-view-controls", 280],
+      [".assistant-stage", 280],
+    ]],
+    [".clarity-section", [
+      [".clarity-section__intro > .eyebrow", 0],
+      [".clarity-section__intro > h2", 100],
+      [".clarity-section__intro > p:not(.eyebrow)", 200],
+      [".fee-card", 280],
+      [".home-faq", 280],
+    ]],
+    [".closing-scene", [
+      [".closing-scene__content > .eyebrow", 0],
+      [".closing-scene__content > h2", 100],
+      [".closing-scene__content > p:not(.eyebrow)", 200],
+      [".role-actions", 280],
+    ]],
+  ];
+
+  revealSequences.forEach(([rootSelector, groups]) => {
+    const root = document.querySelector(rootSelector);
+    if (!root) return;
+    groups.forEach(([selector, delay]) => {
+      root.querySelectorAll(selector).forEach((element) => registerReveal(element, delay));
+    });
+  });
+
+  document.querySelectorAll(".path-scene").forEach((scene) => {
+    [
+      [".path-scene__copy > .eyebrow", 0],
+      [".path-scene__copy > h3", 100],
+      [".path-scene__copy > p:not(.eyebrow)", 200],
+      [".path-scene__copy > .text-action", 280],
+      [".audience-interface", 280],
+    ].forEach(([selector, delay]) => {
+      scene.querySelectorAll(selector).forEach((element) => registerReveal(element, delay));
+    });
+  });
+
+  document.querySelectorAll(".trust-band article").forEach((element, index) => {
+    registerReveal(element, index * 90);
+  });
+
+  document.querySelectorAll(".home-footer__top > *").forEach((element, index) => {
+    registerReveal(element, index * 90);
   });
 
   if (reducedMotion.matches || !("IntersectionObserver" in window)) {
@@ -909,6 +955,7 @@
   const configureCinematicMotion = () => {
     if (
       !cinematicMotionQuery.matches ||
+      document.body.classList.contains("lpc-home--editorial") ||
       document.body.classList.contains("accessibility-mode")
     ) {
       clearCinematicMotion();
