@@ -749,11 +749,12 @@ html.lpc-homepage,
 
 .editorial-hero__line--two {
   margin-top: 0.08em;
-  color: #60788f;
+  color: #4f687f;
   font-family: "Sarabun", sans-serif !important;
   font-style: italic;
   font-synthesis: none;
   font-weight: 200 !important;
+  letter-spacing: -0.058em;
 }
 
 .editorial-hero__details {
