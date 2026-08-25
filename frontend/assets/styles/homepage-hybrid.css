@@ -1,4 +1,3 @@
-/* Hybrid homepage: the FIND opening scene inside LPC's existing editorial system. */
 .lpc-home--hybrid {
   --lpc-paper: #fff;
   --lpc-cloud: #fff;
@@ -41,7 +40,6 @@
   }
 }
 
-/* FIND-inspired opening scene */
 .lpc-home--hybrid .hero-scroll {
   --hero-copy-opacity: 1;
   --hero-scene-progress: 0;
@@ -54,7 +52,6 @@
   display: none;
 }
 
-/* Keep the simulated product UI readable without changing its compact character. */
 .lpc-home--hybrid :is(
   .workflow-canvas,
   .workflow-mobile-canvas,
@@ -276,14 +273,12 @@
   animation: hybrid-hero-support-enter 720ms var(--ease-out) 490ms both;
 }
 
-/* Main's bridge, with the permanent-hire premise made explicit. */
 .lpc-home--hybrid .hero-bridge p {
   max-width: 760px;
   font-size: clamp(1rem, 1.35vw, 1.18rem);
   line-height: 1.72;
 }
 
-/* The product demo stays crisp after its state transitions. */
 .lpc-home--hybrid .workflow-canvas > .workflow-state {
   visibility: hidden;
 }
@@ -362,7 +357,6 @@
   color: #fff;
 }
 
-/* FIND's pricing clarity, translated into one soft LPC ink card. */
 .lpc-home--hybrid .fee-card--hybrid {
   padding: clamp(34px, 4vw, 58px);
   border: 1px solid rgba(215, 193, 143, 0.18);
@@ -448,7 +442,6 @@
   background: #fff;
 }
 
-/* Restore main's complete footer over the current compact-footer experiment. */
 .lpc-home--hybrid .home-footer {
   padding: 52px var(--page-gutter) 28px;
 }
@@ -648,21 +641,25 @@ html.accessibility-mode .lpc-home--hybrid .hero-scroll {
 }
 
 .lpc-home--editorial {
-  --editorial-ink: #151c25;
-  --editorial-muted: #59616b;
-  --editorial-line: rgba(21, 28, 37, 0.18);
+  --editorial-ink: #f7f7f5;
+  --editorial-muted: #9ca3ad;
+  --editorial-line: rgba(255, 255, 255, 0.2);
 }
 
 html.lpc-homepage,
 .lpc-home--editorial,
-.lpc-home--editorial :is(main, .home-header, .mobile-nav, .editorial-hero) {
+.lpc-home--editorial main {
   background: #fff !important;
 }
 
-.lpc-home--editorial .home-header {
-  --header-foreground: rgb(21, 28, 37);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+.lpc-home--editorial .home-header:not(.is-scrolled):not(.is-open) {
+  --header-foreground: #fff !important;
+  background: #000 !important;
+}
+
+.lpc-home--editorial .home-header.is-scrolled {
+  --header-foreground: #151c25 !important;
+  background: #fff !important;
 }
 
 .lpc-home--editorial :is(.home-header, .editorial-hero)::before,
@@ -677,7 +674,17 @@ html.lpc-homepage,
   align-items: center;
   padding: calc(var(--header-height) + clamp(34px, 5vh, 58px)) 0 clamp(42px, 6vh, 64px);
   overflow: clip;
+  background: #000;
   color: var(--editorial-ink);
+}
+
+.editorial-hero::after {
+  background: radial-gradient(rgba(0, 0, 0, 0.94), rgba(0, 0, 0, 0.76) 35%, transparent 70%);
+}
+
+.editorial-hero .matter-field--closing {
+  opacity: 0.58;
+  filter: brightness(3.2);
 }
 
 .editorial-hero__inner {
@@ -714,7 +721,7 @@ html.lpc-homepage,
 
 .editorial-hero__qualifier {
   margin: 0 0 clamp(22px, 3.2vh, 34px);
-  color: #74613a;
+  color: #cdb77f;
   font-family: "Cormorant Garamond", serif !important;
   font-size: clamp(1.32rem, 1.8vw, 1.72rem);
   font-weight: 300 !important;
@@ -751,7 +758,7 @@ html.lpc-homepage,
 
 .editorial-hero__line--two {
   margin-top: 0.08em;
-  color: #2d3540;
+  color: #d8dce2;
   font-family: "Sarabun", sans-serif !important;
   font-style: italic;
   font-synthesis: none;
@@ -766,7 +773,7 @@ html.lpc-homepage,
 
 .editorial-hero__support {
   margin: 0;
-  color: #3f4853;
+  color: #c4c9d0;
   font-family: "Sarabun", sans-serif !important;
   font-size: clamp(1rem, 1.25vw, 1.16rem);
   font-weight: 300 !important;
@@ -786,9 +793,14 @@ html.lpc-homepage,
   font-weight: 300 !important;
 }
 
+.lpc-home--editorial :is(.home-header:not(.is-scrolled), .editorial-hero__actions) .button--ink {
+  background: #fff;
+  color: #111722;
+}
+
 .editorial-hero__actions .text-action {
-  border-color: #6e747c;
-  color: #27313c;
+  border-color: #7d858f;
+  color: #eef0f3;
   font-family: "Sarabun", sans-serif !important;
   font-weight: 300 !important;
 }
@@ -812,7 +824,7 @@ html.lpc-homepage,
 
 .editorial-hero__reassurance p {
   margin: 0;
-  color: #555e68;
+  color: #9ca3ad;
   font-family: "Sarabun", sans-serif !important;
   font-size: clamp(0.74rem, 0.9vw, 0.86rem);
   font-weight: 300 !important;
