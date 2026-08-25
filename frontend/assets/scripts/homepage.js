@@ -437,9 +437,10 @@
     revealTargets.forEach((element) => revealObserver.observe(element));
   }
 
-  window.requestAnimationFrame(() => {
+  const startHeroMotion = () => window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => document.body.classList.add("home-motion-ready"));
   });
+  (document.fonts?.ready || Promise.resolve()).then(startHeroMotion, startHeroMotion);
 
   const setMobileNav = (open) => {
     if (!header || !mobileToggle || !mobileNav) return;
