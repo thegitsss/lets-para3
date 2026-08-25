@@ -671,7 +671,7 @@ html.lpc-homepage,
   min-height: max(700px, 100svh);
   position: relative;
   display: grid;
-  align-items: center;
+  align-items: stretch;
   padding: calc(var(--header-height) + clamp(34px, 5vh, 58px)) 0 clamp(42px, 6vh, 64px);
   overflow: clip;
   background: #000;
@@ -691,12 +691,15 @@ html.lpc-homepage,
   width: min(100%, var(--content-max));
   position: relative;
   z-index: 2;
+  display: grid;
   margin: 0 auto;
   padding-inline: var(--page-gutter);
+  grid-template-rows: 1fr auto;
 }
 
 .editorial-hero__main {
   display: grid;
+  align-self: center;
   align-items: center;
   grid-template-columns: minmax(0, 1.5fr) minmax(340px, 0.65fr);
   column-gap: clamp(64px, 7vw, 140px);
