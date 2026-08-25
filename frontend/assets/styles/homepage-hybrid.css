@@ -671,14 +671,6 @@ html.lpc-homepage,
   color: var(--editorial-ink);
 }
 
-.editorial-hero::after {
-  background: radial-gradient(rgba(255, 255, 255, .98), rgba(255, 255, 255, .86) 40%, transparent 72%);
-}
-
-.editorial-hero .matter-field--closing {
-  opacity: .52;
-}
-
 .editorial-hero__inner {
   width: min(100%, var(--content-max));
   position: relative;

@@ -161,8 +161,7 @@
         });
         return;
       }
-      const heroField = this.section.classList.contains("editorial-hero");
-      const count = heroField ? (this.width < 680 ? 18 : 32) : (this.width < 680 ? 32 : 58);
+      const count = this.width < 680 ? 32 : 58;
 
       this.nodes = Array.from({ length: count }, (_, index) => {
         const angle = random() * Math.PI * 2;
@@ -182,7 +181,7 @@
             radius: 0.7 + random() * 1.7,
             phase: random() * Math.PI * 2,
             speed: 0.18 + random() * 0.4,
-            featured: featured && this.width > 1100 && !heroField,
+            featured: featured && this.width > 1100,
             label: labels[index] || "",
           };
         }
@@ -310,11 +309,9 @@
 
     renderClosing(time) {
       const context = this.context;
-      const heroField = this.section.classList.contains("editorial-hero");
-      const drift = heroField ? [8, 5] : [12, 8];
       const positions = this.nodes.map((node) => ({
-        x: node.baseX + Math.sin(time * node.speed + node.phase) * drift[0],
-        y: node.baseY + Math.cos(time * node.speed * 0.8 + node.phase) * drift[1],
+        x: node.baseX + Math.sin(time * node.speed + node.phase) * 12,
+        y: node.baseY + Math.cos(time * node.speed * 0.8 + node.phase) * 8,
       }));
 
       positions.forEach((position, index) => {

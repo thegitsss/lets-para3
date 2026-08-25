@@ -2418,7 +2418,6 @@ html.accessibility-mode .js .home-reveal {
   opacity: 0.82;
 }
 
-.editorial-hero::after,
 .closing-scene::after {
   position: absolute;
   z-index: 1;
