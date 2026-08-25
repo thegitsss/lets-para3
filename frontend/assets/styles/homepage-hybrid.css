@@ -125,8 +125,7 @@
 }
 
 @media (min-width: 1100px) and (min-height: 650px) and (prefers-reduced-motion: no-preference) {
-  .lpc-home--hybrid.home-cinematic-motion .hero-bridge,
-  .lpc-home--hybrid.home-cinematic-motion .trust-band {
+  .lpc-home--hybrid.home-cinematic-motion .hero-bridge {
     min-height: 115svh;
   }
 

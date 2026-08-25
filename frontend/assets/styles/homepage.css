@@ -483,6 +483,12 @@ button:focus-visible,
   transform: translateY(0);
 }
 
+.js .home-reveal.is-fast-revealed {
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+
 html.accessibility-mode .js .lpc-home.home-motion-ready .hero-title__line > span,
 html.accessibility-mode .js .lpc-home.home-motion-ready .hero__support,
 html.accessibility-mode .js .lpc-home.home-motion-ready .hero__actions,
@@ -3525,6 +3531,11 @@ body.accessibility-mode [tabindex]:focus-visible {
     will-change: transform, opacity;
   }
 
+  .lpc-home.home-cinematic-motion [data-scroll-scene].is-fast-revealed [data-motion-layer] {
+    opacity: 1;
+    transform: none;
+  }
+
   .lpc-home.home-cinematic-motion .assistant-stage[data-motion-layer] {
     transition:
       background 900ms var(--ease-out),
@@ -4467,15 +4478,6 @@ body.accessibility-mode [tabindex]:focus-visible {
     transform-origin: 0 50%;
   }
 
-  .lpc-home.home-cinematic-motion .trust-band {
-    min-height: 155svh;
-    position: relative;
-  }
-
-  .lpc-home.home-cinematic-motion .trust-band__inner {
-    position: sticky;
-    top: clamp(150px, 23vh, 220px);
-  }
 }
 
 @media (min-width: 1100px) and (min-height: 650px) and (prefers-reduced-motion: no-preference) {
@@ -4516,9 +4518,6 @@ body.accessibility-mode [tabindex]:focus-visible {
     min-height: 0;
   }
 
-  .lpc-home.home-cinematic-motion .trust-band__inner {
-    top: calc(var(--header-height) + 72px);
-  }
 }
 
 /* Cohesive mobile homepage composition. */
@@ -4889,7 +4888,6 @@ body.accessibility-mode [tabindex]:focus-visible {
 
   .lpc-home .hero-bridge,
   .lpc-home .paths__heading,
-  .lpc-home .trust-band,
   .lpc-home .closing-scene {
     min-height: calc(100svh - var(--header-height));
   }
@@ -4899,10 +4897,6 @@ body.accessibility-mode [tabindex]:focus-visible {
     align-content: center;
   }
 
-  .lpc-home .trust-band {
-    display: grid;
-    align-items: center;
-  }
 }
 
 /* Mobile page sections land as stable scenes; reduced-motion/accessibility modes stay free-scrolling. */

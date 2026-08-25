@@ -390,6 +390,41 @@
     element.addEventListener("focusin", () => element.classList.add("is-revealed"));
   });
 
+  const revealReachedContentImmediately = () => {
+    const viewportHeight = window.innerHeight;
+    revealTargets.forEach((element) => {
+      const bounds = element.getBoundingClientRect();
+      if (bounds.bottom < 0 || bounds.top > viewportHeight) return;
+      element.classList.add("is-revealed", "is-fast-revealed");
+    });
+    document.querySelectorAll("[data-scroll-scene]").forEach((scene) => {
+      const bounds = scene.getBoundingClientRect();
+      if (bounds.bottom < 0 || bounds.top > viewportHeight) return;
+      scene.classList.add("is-fast-revealed");
+    });
+  };
+
+  let previousScrollY = window.scrollY;
+  let previousScrollTime = performance.now();
+  window.addEventListener("scroll", () => {
+    const now = performance.now();
+    const distance = Math.abs(window.scrollY - previousScrollY);
+    const elapsed = Math.max(1, now - previousScrollTime);
+    if (distance > Math.min(180, window.innerHeight * 0.28) && distance / elapsed > 1.8) {
+      revealReachedContentImmediately();
+    }
+    previousScrollY = window.scrollY;
+    previousScrollTime = now;
+  }, { passive: true });
+
+  document.addEventListener("click", (event) => {
+    const anchor = event.target.closest('a[href^="#"]');
+    if (!anchor) return;
+    window.requestAnimationFrame(revealReachedContentImmediately);
+  });
+  window.addEventListener("hashchange", revealReachedContentImmediately);
+  if (window.location.hash) window.requestAnimationFrame(revealReachedContentImmediately);
+
   if (reducedMotion.matches || !("IntersectionObserver" in window)) {
     revealTargets.forEach((element) => element.classList.add("is-revealed"));
   } else {
@@ -399,7 +434,7 @@
         entry.target.classList.add("is-revealed");
         revealObserver.unobserve(entry.target);
       });
-    }, { rootMargin: "0px 0px -12%", threshold: 0.12 });
+    }, { rootMargin: "120px 0px 120px", threshold: 0.01 });
     revealTargets.forEach((element) => revealObserver.observe(element));
   }
 
@@ -775,14 +810,6 @@
       ],
     },
     {
-      selector: ".trust-band",
-      layers: [
-        ["article:nth-child(1)", "card", 0.10, 0.34],
-        ["article:nth-child(2)", "card", 0.18, 0.42],
-        ["article:nth-child(3)", "card", 0.26, 0.50],
-      ],
-    },
-    {
       selector: ".clarity-section",
       layers: [
         [".clarity-section__intro", "rise", 0.02, 0.12],
@@ -845,6 +872,7 @@
     cinematicResizeObserver?.disconnect();
     cinematicScenes.forEach(({ element, layers }) => {
       element.removeAttribute("data-scroll-scene");
+      element.classList.remove("is-fast-revealed");
       element.style.removeProperty("--motion-progress");
       element.style.removeProperty("--motion-enter");
       element.style.removeProperty("--motion-exit");
