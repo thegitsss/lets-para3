@@ -88,7 +88,6 @@
       return (
         this.isVisible &&
         !reducedMotion.matches &&
-        !document.body.classList.contains("lpc-home--editorial") &&
         !document.body.classList.contains("accessibility-mode") &&
         document.visibilityState !== "hidden"
       );
