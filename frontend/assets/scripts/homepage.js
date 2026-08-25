@@ -313,8 +313,8 @@
     renderClosing(time) {
       const context = this.context;
       const positions = this.nodes.map((node) => ({
-        x: node.baseX + Math.sin(time * node.speed + node.phase) * 7,
-        y: node.baseY + Math.cos(time * node.speed * 0.8 + node.phase) * 5,
+        x: node.baseX + Math.sin(time * node.speed + node.phase) * 12,
+        y: node.baseY + Math.cos(time * node.speed * 0.8 + node.phase) * 8,
       }));
 
       positions.forEach((position, index) => {
@@ -322,7 +322,7 @@
         context.beginPath();
         context.moveTo(position.x, position.y);
         context.lineTo(next.x, next.y);
-        context.strokeStyle = `rgba(77, 89, 107, ${index % 4 === 0 ? 0.11 : 0.045})`;
+        context.strokeStyle = `rgba(77, 89, 107, ${index % 4 === 0 ? 0.3 : 0.14})`;
         context.lineWidth = 0.65;
         context.stroke();
       });
@@ -339,7 +339,7 @@
         }
         context.beginPath();
         context.arc(position.x, position.y, node.radius, 0, Math.PI * 2);
-        context.fillStyle = index % 5 === 0 ? "rgba(180, 151, 90, 0.55)" : "rgba(58, 72, 92, 0.28)";
+        context.fillStyle = index % 5 === 0 ? "rgba(180, 151, 90, 0.82)" : "rgba(58, 72, 92, 0.58)";
         context.fill();
       });
 

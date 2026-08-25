@@ -679,12 +679,12 @@ html.lpc-homepage,
 }
 
 .editorial-hero::after {
-  background: radial-gradient(rgba(0, 0, 0, 0.94), rgba(0, 0, 0, 0.76) 35%, transparent 70%);
+  background: radial-gradient(rgba(0, 0, 0, 0.68), rgba(0, 0, 0, 0.38) 35%, transparent 70%);
 }
 
 .editorial-hero .matter-field--closing {
-  opacity: 0.58;
-  filter: brightness(3.2);
+  opacity: 0.92;
+  filter: brightness(5.2);
 }
 
 .editorial-hero__inner {
