@@ -850,12 +850,8 @@ html.accessibility-mode .lpc-home--editorial :is(
 .lpc-home--hybrid .home-footer__links{display:flex;align-items:flex-start;flex-direction:column;gap:9px;margin-top:12px}
 .lpc-home--hybrid .home-footer a{color:#424245;font-size:.69rem;font-weight:300;line-height:1.35;text-decoration:none}
 .lpc-home--hybrid .home-footer a:hover,.lpc-home--hybrid .home-footer a:focus-visible{color:#000;text-decoration:underline}
-.lpc-home--hybrid .home-footer__more{margin:0;padding:0 0 11px;border-bottom:1px solid #d2d2d7;font-size:.69rem;font-weight:300;line-height:1.45}
-.lpc-home--hybrid .home-footer__more a{color:#06c;text-decoration:underline}
-.lpc-home--hybrid .home-footer__bottom{display:grid;align-items:center;padding-top:12px;grid-template-columns:auto 1fr auto;gap:24px}
+.lpc-home--hybrid .home-footer__bottom{display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid #d2d2d7;gap:24px}
 .lpc-home--hybrid .home-footer__bottom>p{margin:0;font-size:.68rem;font-weight:300}
-.lpc-home--hybrid .home-footer__legal{display:flex;gap:18px}
-.lpc-home--hybrid .home-footer__legal a{color:#424245;font-weight:400}
 .lpc-home--hybrid .home-footer .accessibility-toggle{padding:0;border:0;border-radius:0;color:#424245;font-size:.68rem}
 .lpc-home--hybrid .home-footer .accessibility-toggle:hover,.lpc-home--hybrid .home-footer .accessibility-toggle:focus-visible{background:transparent;color:#000;text-decoration:underline}
 .lpc-home--hybrid .home-footer .accessibility-toggle svg{width:13px;height:13px}
@@ -868,9 +864,7 @@ html.accessibility-mode .lpc-home--editorial :is(
 .lpc-home--hybrid .home-footer details[open] summary::after{transform:translateY(-50%) rotate(45deg)}
 .lpc-home--hybrid .home-footer__links{display:none;margin:0;padding:0 14px 13px;gap:10px}
 .lpc-home--hybrid .home-footer details[open] .home-footer__links{display:flex}
-.lpc-home--hybrid .home-footer__more{padding-top:12px}
-.lpc-home--hybrid .home-footer__bottom{align-items:start;grid-template-columns:1fr;gap:9px}
-.lpc-home--hybrid .home-footer__legal{justify-content:flex-start;grid-row:auto;gap:16px}
+.lpc-home--hybrid .home-footer__bottom{align-items:flex-start;flex-direction:column;gap:12px}
 .lpc-home--hybrid .home-footer .accessibility-toggle{justify-self:start}
 }
 @media(prefers-reduced-motion:reduce){.lpc-home--hybrid .home-footer summary::after{transition:none}
