@@ -657,7 +657,7 @@ html.accessibility-mode .lpc-home--hybrid .hero-scroll {
 html.lpc-homepage,
 .lpc-home--editorial,
 .lpc-home--editorial :is(main, .home-header, .mobile-nav, .editorial-hero) {
-  background: #fcfcfa !important;
+  background: #fff !important;
 }
 
 .lpc-home--editorial .home-header {
