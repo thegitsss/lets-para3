@@ -184,7 +184,8 @@
             radius: 0.7 + random() * 1.7,
             phase: random() * Math.PI * 2,
             speed: 0.18 + random() * 0.4,
-            featured: featured && this.width > 760,
+            featured: featured && this.width > 1100,
+            slot: index,
             label: labels[index] || "",
           };
         }
@@ -312,6 +313,9 @@
 
     renderClosing(time) {
       const context = this.context;
+      const labelSlots = this.section.classList.contains("editorial-hero")
+        ? [[.14,.2],[.38,.14],[.68,.16],[.88,.24],[.2,.76],[.77,.74]]
+        : null;
       const positions = this.nodes.map((node) => ({
         x: node.baseX + Math.sin(time * node.speed + node.phase) * 12,
         y: node.baseY + Math.cos(time * node.speed * 0.8 + node.phase) * 8,
@@ -330,11 +334,12 @@
       this.nodes.forEach((node, index) => {
         const position = positions[index];
         if (node.featured) {
+          const slot = labelSlots?.[node.slot];
           context.save();
           context.font = '200 9px "Sarabun", sans-serif';
           context.textAlign = "center";
-          context.fillStyle = "rgba(128, 101, 44, 0.52)";
-          context.fillText(node.label, position.x, position.y + 17);
+          context.fillStyle = "rgba(128, 101, 44, .38)";
+          context.fillText(node.label, slot ? this.width * slot[0] : position.x, slot ? this.height * slot[1] : position.y + 17);
           context.restore();
         }
         context.beginPath();
