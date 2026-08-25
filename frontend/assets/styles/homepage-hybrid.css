@@ -835,7 +835,7 @@ html.accessibility-mode .lpc-home--editorial :is(
 }
 
 /* Editorial directory footer */
-.home-footer{margin-bottom:-1px;padding:0 var(--page-gutter);border:0;border-bottom:2px solid #07131f;background:#07131f;color:rgba(248,246,239,.72)}
+.home-footer{margin-bottom:-1px;padding:0 var(--page-gutter);border:0;border-bottom:2px solid #07131f;background:#07131f;color:rgba(248,246,239,.72);box-shadow:0 -14px 30px -18px rgba(7,19,31,.32)}
 .home-footer__inner{max-width:var(--content-max);display:grid;margin:auto;grid-template-columns:minmax(360px,1fr) minmax(0,1.9fr);column-gap:clamp(64px,7vw,112px)}
 .home-footer__statement{align-self:start;margin:0;padding:58px 0 70px;color:#fff;font-size:clamp(2.4rem,3.5vw,3.9rem);font-weight:600!important;letter-spacing:-.05em;line-height:.9;text-transform:uppercase}
 .home-footer__statement span{display:block}
