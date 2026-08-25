@@ -646,9 +646,7 @@ html.accessibility-mode .lpc-home--hybrid .hero-scroll {
   --editorial-line: rgba(21, 28, 37, 0.18);
 }
 
-html.lpc-homepage,
-.lpc-home--editorial,
-.lpc-home--editorial :is(main, .home-header, .mobile-nav, .editorial-hero) {
+.lpc-home--editorial :is(.home-header, .mobile-nav, .editorial-hero) {
   background: #fcfbf8 !important;
 }
 
@@ -756,28 +754,6 @@ html.lpc-homepage,
 
 .editorial-hero__reassurance span {margin-inline:.48em;color:#9c8150}
 
-.lpc-home--editorial .workflow {
-  border-top: 0;
-  padding-inline: 0;
-}
-
-.lpc-home--editorial :is(.workflow__intro, .workflow__story) {
-  width: min(100%, var(--content-max));
-  padding-inline: var(--page-gutter);
-}
-
-.lpc-home--editorial .workflow__intro {
-  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
-  column-gap: clamp(48px, 8vw, 120px);
-  row-gap: clamp(14px, 2vw, 24px);
-}
-
-.lpc-home--editorial .workflow__eyebrow {
-  grid-column: 1 / -1;
-  margin-bottom: clamp(8px, 1.5vw, 18px);
-  color: #735f35;
-}
-
 @keyframes editorial-hero-word-enter {
   from {
     opacity: 0;
@@ -831,19 +807,6 @@ html.lpc-homepage,
     animation: editorial-hero-group-enter 900ms cubic-bezier(.25,.1,.25,1) 1610ms both;
   }
 
-  .js .lpc-home--editorial .home-reveal {
-    filter: blur(4px);
-    transform: translate3d(0, 24px, 0) !important;
-    transition:
-      opacity 700ms cubic-bezier(0.22, 1, 0.36, 1) var(--home-reveal-delay, 0ms),
-      filter 700ms cubic-bezier(0.22, 1, 0.36, 1) var(--home-reveal-delay, 0ms),
-      transform 700ms cubic-bezier(0.22, 1, 0.36, 1) var(--home-reveal-delay, 0ms) !important;
-  }
-
-  .js .lpc-home--editorial .home-reveal.is-revealed {
-    filter: blur(0);
-    transform: translate3d(0, 0, 0) !important;
-  }
 }
 
 @media (min-width:641px) and (max-height:820px) {.editorial-hero__main{transform:translateY(-18px)}}
@@ -922,13 +885,6 @@ html.lpc-homepage,
 
   .editorial-hero__reassurance p {max-width:350px;font-size:.6rem;letter-spacing:.08em}
 
-  .lpc-home--editorial .workflow__intro {
-    grid-template-columns: 1fr;
-  }
-
-  .lpc-home--editorial .workflow__eyebrow {
-    margin-bottom: -2px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -938,8 +894,7 @@ html.lpc-homepage,
     .editorial-hero__support,
     .editorial-hero__actions,
     .editorial-hero__publishing,
-    .editorial-hero__reassurance,
-    .home-reveal
+    .editorial-hero__reassurance
   ) {
     animation: none !important;
     filter: none !important;
@@ -956,8 +911,7 @@ html.accessibility-mode .lpc-home--editorial :is(
   .editorial-hero__support,
   .editorial-hero__actions,
   .editorial-hero__publishing,
-  .editorial-hero__reassurance,
-  .home-reveal
+  .editorial-hero__reassurance
 ) {
   animation: none !important;
   filter: none !important;

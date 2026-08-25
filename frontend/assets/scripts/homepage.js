@@ -141,7 +141,7 @@
 
     buildNodes() {
       const random = this.randomFactory(this.mode === "hero" ? 2841 : 650);
-      const labels = ["PROBATE", "BUSINESS", "FAMILY", "LITIGATION", "REAL ESTATE", "IMMIGRATION"];
+      const labels = ["SCOPE", "FILES", "DEADLINE", "PEOPLE", "MESSAGES", "PAYMENT"];
       if (this.mode === "hero") {
         const count = this.width < 680 ? 840 : this.width < 1100 ? 1200 : 1900;
         this.nodes = Array.from({ length: count }, (_, index) => {
@@ -181,7 +181,7 @@
             radius: 0.7 + random() * 1.7,
             phase: random() * Math.PI * 2,
             speed: 0.18 + random() * 0.4,
-            featured: featured && this.width > 1100,
+            featured: featured && this.width > 760,
             label: labels[index] || "",
           };
         }
@@ -310,8 +310,8 @@
     renderClosing(time) {
       const context = this.context;
       const positions = this.nodes.map((node) => ({
-        x: node.baseX + Math.sin(time * node.speed + node.phase) * 12,
-        y: node.baseY + Math.cos(time * node.speed * 0.8 + node.phase) * 8,
+        x: node.baseX + Math.sin(time * node.speed + node.phase) * 7,
+        y: node.baseY + Math.cos(time * node.speed * 0.8 + node.phase) * 5,
       }));
 
       positions.forEach((position, index) => {
@@ -319,7 +319,7 @@
         context.beginPath();
         context.moveTo(position.x, position.y);
         context.lineTo(next.x, next.y);
-        context.strokeStyle = `rgba(77, 89, 107, ${index % 4 === 0 ? 0.3 : 0.14})`;
+        context.strokeStyle = `rgba(77, 89, 107, ${index % 4 === 0 ? 0.11 : 0.045})`;
         context.lineWidth = 0.65;
         context.stroke();
       });
@@ -330,13 +330,13 @@
           context.save();
           context.font = '200 9px "Sarabun", sans-serif';
           context.textAlign = "center";
-          context.fillStyle = "rgba(128, 101, 44, .38)";
+          context.fillStyle = "rgba(128, 101, 44, 0.52)";
           context.fillText(node.label, position.x, position.y + 17);
           context.restore();
         }
         context.beginPath();
         context.arc(position.x, position.y, node.radius, 0, Math.PI * 2);
-        context.fillStyle = index % 5 === 0 ? "rgba(180, 151, 90, 0.82)" : "rgba(58, 72, 92, 0.58)";
+        context.fillStyle = index % 5 === 0 ? "rgba(180, 151, 90, 0.55)" : "rgba(58, 72, 92, 0.28)";
         context.fill();
       });
 
@@ -354,74 +354,30 @@
     new MatterField(canvas);
   });
 
-  const revealTargets = [];
-  const registerReveal = (element, delay = 0) => {
-    if (!element || revealTargets.includes(element)) return;
-    revealTargets.push(element);
+  const revealTargets = Array.from(document.querySelectorAll([
+    ".hero-bridge__inner",
+    ".workflow__intro > *",
+    ".workflow-chapter",
+    ".workflow-canvas-wrap",
+    ".assistant-showcase__intro",
+    ".assistant-stage",
+    ".path-scene__copy",
+    ".audience-interface",
+    ".trust-band article",
+    ".clarity-section__intro",
+    ".fee-card",
+    ".home-faq",
+    ".closing-scene__content",
+    ".role-action",
+    ".home-footer__top > *",
+  ].join(",")));
+
+  revealTargets.forEach((element) => {
+    const siblings = revealTargets.filter((candidate) => candidate.parentElement === element.parentElement);
+    const siblingIndex = Math.max(0, siblings.indexOf(element));
     element.classList.add("home-reveal");
-    element.style.setProperty("--home-reveal-delay", `${Math.min(delay, 300)}ms`);
+    element.style.setProperty("--home-reveal-delay", `${Math.min(siblingIndex * 80, 240)}ms`);
     element.addEventListener("focusin", () => element.classList.add("is-revealed"));
-  };
-
-  const revealSequences = [
-    [".workflow", [
-      [".workflow__eyebrow", 0],
-      [".workflow__intro-title", 100],
-      [".workflow__intro-support", 200],
-      [".workflow__story", 280],
-    ]],
-    [".paths", [
-      [".paths__heading > .eyebrow", 0],
-      [".paths__heading > h2", 110],
-    ]],
-    [".assistant-showcase", [
-      [".assistant-showcase__intro > .eyebrow", 0],
-      [".assistant-showcase__intro > h2", 100],
-      [".assistant-showcase__intro > p:not(.eyebrow)", 200],
-      [".assistant-view-controls", 280],
-      [".assistant-stage", 280],
-    ]],
-    [".clarity-section", [
-      [".clarity-section__intro > .eyebrow", 0],
-      [".clarity-section__intro > h2", 100],
-      [".clarity-section__intro > p:not(.eyebrow)", 200],
-      [".fee-card", 280],
-      [".home-faq", 280],
-    ]],
-    [".closing-scene", [
-      [".closing-scene__content > .eyebrow", 0],
-      [".closing-scene__content > h2", 100],
-      [".closing-scene__content > p:not(.eyebrow)", 200],
-      [".role-actions", 280],
-    ]],
-  ];
-
-  revealSequences.forEach(([rootSelector, groups]) => {
-    const root = document.querySelector(rootSelector);
-    if (!root) return;
-    groups.forEach(([selector, delay]) => {
-      root.querySelectorAll(selector).forEach((element) => registerReveal(element, delay));
-    });
-  });
-
-  document.querySelectorAll(".path-scene").forEach((scene) => {
-    [
-      [".path-scene__copy > .eyebrow", 0],
-      [".path-scene__copy > h3", 100],
-      [".path-scene__copy > p:not(.eyebrow)", 200],
-      [".path-scene__copy > .text-action", 280],
-      [".audience-interface", 280],
-    ].forEach(([selector, delay]) => {
-      scene.querySelectorAll(selector).forEach((element) => registerReveal(element, delay));
-    });
-  });
-
-  document.querySelectorAll(".trust-band article").forEach((element, index) => {
-    registerReveal(element, index * 90);
-  });
-
-  document.querySelectorAll(".home-footer__top > *").forEach((element, index) => {
-    registerReveal(element, index * 90);
   });
 
   if (reducedMotion.matches || !("IntersectionObserver" in window)) {
@@ -952,7 +908,6 @@
   const configureCinematicMotion = () => {
     if (
       !cinematicMotionQuery.matches ||
-      document.body.classList.contains("lpc-home--editorial") ||
       document.body.classList.contains("accessibility-mode")
     ) {
       clearCinematicMotion();
