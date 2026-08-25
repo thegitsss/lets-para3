@@ -804,31 +804,31 @@ html.lpc-homepage,
 
 @media (prefers-reduced-motion: no-preference) {
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__qualifier-words > span {
-    animation: editorial-hero-word-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) calc(70ms + (var(--word-index) * 70ms)) both;
+    animation: editorial-hero-word-enter 520ms cubic-bezier(.25,.1,.25,1) calc(70ms + (var(--word-index) * 70ms)) both;
   }
 
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__line--one {
-    animation: editorial-hero-group-enter 720ms cubic-bezier(0.22, 1, 0.36, 1) 560ms both;
+    animation: editorial-hero-group-enter 920ms cubic-bezier(.25,.1,.25,1) 520ms both;
   }
 
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__line--two {
-    animation: editorial-hero-group-enter 720ms cubic-bezier(0.22, 1, 0.36, 1) 790ms both;
+    animation: editorial-hero-group-enter 920ms cubic-bezier(.25,.1,.25,1) 760ms both;
   }
 
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__support {
-    animation: editorial-hero-group-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 1020ms both;
+    animation: editorial-hero-group-enter 900ms cubic-bezier(.25,.1,.25,1) 1000ms both;
   }
 
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__actions {
-    animation: editorial-hero-group-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 1270ms both;
+    animation: editorial-hero-group-enter 900ms cubic-bezier(.25,.1,.25,1) 1240ms both;
   }
 
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__publishing {
-    animation: editorial-hero-group-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 1530ms both;
+    animation: editorial-hero-group-enter 900ms cubic-bezier(.25,.1,.25,1) 1510ms both;
   }
 
   .js .lpc-home--editorial.home-motion-ready .editorial-hero__reassurance {
-    animation: editorial-hero-group-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 1530ms both;
+    animation: editorial-hero-group-enter 900ms cubic-bezier(.25,.1,.25,1) 1510ms both;
   }
 
   .js .lpc-home--editorial .home-reveal {
