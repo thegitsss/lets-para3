@@ -750,10 +750,11 @@ html.lpc-homepage,
 .editorial-hero__line--two {
   margin-top: 0.08em;
   color: #465f77;
-  font-family: "Cormorant Garamond", serif !important;
+  font-family: "Sarabun", sans-serif !important;
   font-style: italic;
-  font-weight: 300 !important;
-  letter-spacing: -0.045em;
+  font-synthesis: none;
+  font-weight: 200 !important;
+  letter-spacing: -0.058em;
 }
 
 .editorial-hero__details {
