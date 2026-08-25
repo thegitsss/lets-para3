@@ -732,7 +732,7 @@
     {
       selector: ".assistant-showcase",
       layers: [
-        [".assistant-showcase__intro", "lateral-left", 0.06, 0.28],
+        [".assistant-showcase__intro", "rise", 0.06, 0.28],
         [".assistant-stage", "depth", 0.12, 0.36],
         [".assistant-workspace__topbar", "rise", 0.24, 0.42],
         [".assistant-workspace__matter > .interface-label", "rise", 0.28, 0.46],
@@ -785,7 +785,7 @@
     {
       selector: ".clarity-section",
       layers: [
-        [".clarity-section__intro", "lateral-left", 0.04, 0.24],
+        [".clarity-section__intro", "rise", 0.04, 0.24],
         [".fee-card", "lateral-right", 0.10, 0.32],
         [".fee-card__row:nth-of-type(1)", "rise", 0.20, 0.38],
         [".fee-card__row:nth-of-type(2)", "rise", 0.26, 0.44],
