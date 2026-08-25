@@ -803,24 +803,12 @@ html.lpc-homepage,
   line-height: 1.5;
 }
 
-.editorial-hero__reassurance {
-  position: relative;
-  margin-top: clamp(48px, 5vw, 64px);
-  padding: 0 0 22px;
-  text-align: center;
-}
+.editorial-hero__reassurance {display:flex;align-items:center;justify-content:center;gap:clamp(14px,2vw,28px);margin-top:clamp(48px,5vw,64px);padding:0 0 22px;text-align:center}
 
-.editorial-hero__reassurance::after {content:"";position:absolute;inset:auto 0 0;height:1px;background:var(--editorial-line)}
+.editorial-hero__reassurance::before,
+.editorial-hero__reassurance::after {content:"";width:clamp(32px,8vw,110px);height:1px;background:var(--editorial-line)}
 
-.editorial-hero__reassurance p {
-  margin: 0;
-  color: #555e68;
-  font-family: "Sarabun", sans-serif !important;
-  font-size: clamp(0.74rem, 0.9vw, 0.86rem);
-  font-weight: 300 !important;
-  letter-spacing: 0.045em;
-  line-height: 1.55;
-}
+.editorial-hero__reassurance p {margin:0;color:#555e68;font-family:"Sarabun",sans-serif!important;font-size:clamp(.64rem,.72vw,.72rem);font-weight:300!important;letter-spacing:.12em;line-height:1.55;text-transform:uppercase}
 
 .editorial-hero__reassurance span {margin-inline:.48em;color:#9c8150}
 
@@ -901,10 +889,6 @@ html.lpc-homepage,
     animation: editorial-hero-group-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 1000ms both;
   }
 
-  .js:not(.accessibility-mode) .lpc-home--editorial.home-motion-ready .editorial-hero__reassurance::after {
-    animation: editorial-hero-divider-enter 900ms cubic-bezier(0.22, 1, 0.36, 1) 1320ms both;
-  }
-
   .js .lpc-home--editorial .home-reveal {
     filter: blur(4px);
     transform: translate3d(0, 24px, 0) !important;
@@ -918,10 +902,6 @@ html.lpc-homepage,
     filter: blur(0);
     transform: translate3d(0, 0, 0) !important;
   }
-}
-
-@keyframes editorial-hero-divider-enter {
-  from {transform:scaleX(0)}
 }
 
 @media (max-width: 1100px) {
@@ -996,17 +976,12 @@ html.lpc-homepage,
     font-size: 0.78rem;
   }
 
-  .editorial-hero__reassurance {
-    margin-top: 38px;
-    padding: 0 0 20px;
-    text-align: left;
-  }
+  .editorial-hero__reassurance {gap:10px;margin-top:38px;padding:0 0 20px}
 
-  .editorial-hero__reassurance p {
-    max-width: 350px;
-    font-size: 0.7rem;
-    letter-spacing: 0.035em;
-  }
+  .editorial-hero__reassurance::before,
+  .editorial-hero__reassurance::after {width:24px;flex:none}
+
+  .editorial-hero__reassurance p {max-width:350px;font-size:.6rem;letter-spacing:.08em}
 
   .lpc-home--editorial .workflow__intro {
     grid-template-columns: 1fr;
