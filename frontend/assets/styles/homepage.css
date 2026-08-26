@@ -2365,10 +2365,8 @@ html.accessibility-mode .js .home-reveal {
 }
 
 .home-faq__questions {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: clamp(44px, 7vw, 100px);
+  min-width: 0;
+  grid-column: 1;
 }
 
 .home-faq__column {
@@ -2473,16 +2471,51 @@ html.accessibility-mode .js .home-reveal {
 
 .home-faq__links {
   display: flex;
-  flex-wrap: wrap;
-  grid-column: 1 / -1;
-  gap: 18px 30px;
-  margin-top: 28px;
+  align-self: start;
+  flex-direction: column;
+  grid-column: 2;
+  gap: 16px;
+  margin-top: 0;
 }
 
 .home-faq__links a {
-  border-bottom: 1px solid currentColor;
-  font-size: 0.76rem;
+  min-height: 116px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 28px;
+  border: 1px solid var(--lpc-line);
+  border-radius: 18px;
+  background: #f8f7f3;
+  color: var(--lpc-ink);
+  font-family: "Cormorant Garamond", serif;
+  font-size: clamp(1.65rem, 2.2vw, 2.25rem);
+  line-height: 1;
   text-decoration: none;
+  transition:
+    border-color 220ms ease,
+    background-color 220ms ease,
+    transform 260ms var(--ease-out);
+}
+
+.home-faq__links a span {
+  color: var(--lpc-gold);
+  font-family: "Sarabun", sans-serif;
+  font-size: 1rem;
+  transition: transform 260ms var(--ease-out);
+}
+
+.home-faq__links a:hover,
+.home-faq__links a:focus-visible {
+  border-color: color-mix(in srgb, var(--lpc-gold) 62%, var(--lpc-line));
+  background: #fbfaf7;
+  transform: translateY(-2px);
+}
+
+.home-faq__links a:hover span,
+.home-faq__links a:focus-visible span {
+  transform: translateX(4px);
 }
 
 /* Closing */
@@ -4279,18 +4312,13 @@ body.accessibility-mode [tabindex]:focus-visible {
   }
 
   .home-faq__questions {
-    display: flex;
-    flex-direction: column;
+    grid-column: 1;
   }
 
-  .home-faq__column {
-    display: contents;
+  .home-faq__links {
+    grid-column: 1;
+    margin-top: 28px;
   }
-
-  .home-faq details[data-faq-order="1"] { order: 1; }
-  .home-faq details[data-faq-order="2"] { order: 2; }
-  .home-faq details[data-faq-order="3"] { order: 3; }
-  .home-faq details[data-faq-order="4"] { order: 4; }
 
   .closing-scene__content {
     width: 100%;
@@ -4994,6 +5022,18 @@ body.accessibility-mode [tabindex]:focus-visible {
   }
 }
 
+/* FAQ destination cards retain their editorial scale after the global type lift. */
+.lpc-home .home-faq__links a {
+  font-size: clamp(1.65rem, 2.2vw, 2.25rem);
+}
+
+@media (max-width: 760px) {
+  .lpc-home .home-faq__links a {
+    min-height: 96px;
+    font-size: 1.65rem;
+  }
+}
+
 /* Readability lift for homepage content below the hero. Header, hero, and footer are excluded. */
 @media (min-width: 641px) {
   .lpc-home .workflow__intro h2 {
@@ -5051,7 +5091,7 @@ body.accessibility-mode [tabindex]:focus-visible {
   }
 
   .lpc-home .home-faq__links a {
-    font-size: 0.86rem;
+    font-size: clamp(1.65rem, 2.2vw, 2.25rem);
   }
 
   .lpc-home .closing-scene h2 {
@@ -5124,7 +5164,10 @@ body.accessibility-mode [tabindex]:focus-visible {
     font-size: 1.42rem;
   }
 
-  .lpc-home .home-faq__links a,
+  .lpc-home .home-faq__links a {
+    font-size: 1.65rem;
+  }
+
   .lpc-home .role-action span {
     font-size: 0.86rem;
   }
