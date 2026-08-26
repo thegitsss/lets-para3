@@ -2357,11 +2357,20 @@ html.accessibility-mode .js .home-reveal {
 }
 
 .home-faq > h3 {
-  margin: 8px 0 24px;
+  margin: 8px 0 14px;
   grid-column: 1 / -1;
   font-size: clamp(2.6rem, 4vw, 4.6rem);
   letter-spacing: -0.045em;
   line-height: 0.95;
+}
+
+.home-faq__lead {
+  max-width: 680px;
+  margin: 0 0 30px;
+  grid-column: 1 / -1;
+  color: var(--lpc-muted);
+  font-size: 0.96rem;
+  line-height: 1.6;
 }
 
 .home-faq__questions {
@@ -2377,6 +2386,7 @@ html.accessibility-mode .js .home-reveal {
 }
 
 .home-faq details {
+  width: 100%;
   align-self: start;
   border-bottom: 1px solid var(--lpc-line);
   interpolate-size: allow-keywords;
@@ -2394,6 +2404,12 @@ html.accessibility-mode .js .home-reveal {
 
 .home-faq summary::-webkit-details-marker {
   display: none;
+}
+
+.home-faq summary:focus-visible {
+  border-radius: 8px;
+  outline: 3px solid rgba(11, 42, 74, 0.28);
+  outline-offset: 5px;
 }
 
 .home-faq__icon {
@@ -2478,7 +2494,7 @@ html.accessibility-mode .js .home-reveal {
   margin-top: 0;
 }
 
-.home-faq__links a {
+.home-faq__links > a {
   min-height: 116px;
   display: flex;
   align-items: center;
@@ -2499,23 +2515,67 @@ html.accessibility-mode .js .home-reveal {
     transform 260ms var(--ease-out);
 }
 
-.home-faq__links a span {
+.home-faq__link-copy {
+  min-width: 0;
+  display: grid;
+  gap: 9px;
+}
+
+.home-faq__link-copy small {
+  color: #887244;
+  font-family: "Sarabun", sans-serif;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.home-faq__link-copy strong {
+  font: inherit;
+  font-weight: 400;
+}
+
+.home-faq__links > a > i {
   color: var(--lpc-gold);
   font-family: "Sarabun", sans-serif;
   font-size: 1rem;
+  font-style: normal;
   transition: transform 260ms var(--ease-out);
 }
 
-.home-faq__links a:hover,
-.home-faq__links a:focus-visible {
+.home-faq__links > a:hover,
+.home-faq__links > a:focus-visible {
   border-color: color-mix(in srgb, var(--lpc-gold) 62%, var(--lpc-line));
   background: #fbfaf7;
   transform: translateY(-2px);
 }
 
-.home-faq__links a:hover span,
-.home-faq__links a:focus-visible span {
+.home-faq__links > a:focus-visible {
+  outline: 3px solid rgba(11, 42, 74, 0.28);
+  outline-offset: 4px;
+}
+
+.home-faq__links > a:hover > i,
+.home-faq__links > a:focus-visible > i {
   transform: translateX(4px);
+}
+
+.home-faq__support {
+  margin: 6px 2px 0;
+  color: var(--lpc-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.home-faq__support a {
+  color: var(--lpc-ink);
+  text-underline-offset: 3px;
+}
+
+.home-faq__support a:hover,
+.home-faq__support a:focus-visible {
+  color: #806520;
 }
 
 /* Closing */
@@ -5023,12 +5083,12 @@ body.accessibility-mode [tabindex]:focus-visible {
 }
 
 /* FAQ destination cards retain their editorial scale after the global type lift. */
-.lpc-home .home-faq__links a {
+.lpc-home .home-faq__links > a {
   font-size: clamp(1.65rem, 2.2vw, 2.25rem);
 }
 
 @media (max-width: 760px) {
-  .lpc-home .home-faq__links a {
+  .lpc-home .home-faq__links > a {
     min-height: 96px;
     font-size: 1.65rem;
   }
@@ -5090,7 +5150,7 @@ body.accessibility-mode [tabindex]:focus-visible {
     font-size: 0.96rem;
   }
 
-  .lpc-home .home-faq__links a {
+  .lpc-home .home-faq__links > a {
     font-size: clamp(1.65rem, 2.2vw, 2.25rem);
   }
 
@@ -5164,7 +5224,7 @@ body.accessibility-mode [tabindex]:focus-visible {
     font-size: 1.42rem;
   }
 
-  .lpc-home .home-faq__links a {
+  .lpc-home .home-faq__links > a {
     font-size: 1.65rem;
   }
 
