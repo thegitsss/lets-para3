@@ -2272,6 +2272,10 @@ html.accessibility-mode .js .home-reveal {
   line-height: 0.9;
 }
 
+.clarity-section__intro {
+  align-self: center;
+}
+
 .clarity-section__grid {
   display: contents;
 }
