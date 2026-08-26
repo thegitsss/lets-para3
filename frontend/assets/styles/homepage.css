@@ -4022,6 +4022,115 @@ body.accessibility-mode [tabindex]:focus-visible {
     linear-gradient(145deg, #151c25, #05070a 74%);
 }
 
+/* Keep the static Assistant example informative instead of covering its record. */
+.assistant-showcase .assistant-workspace__nav {
+  display: none;
+}
+
+.assistant-showcase .assistant-workspace__body {
+  grid-template-columns: 1fr;
+}
+
+.assistant-showcase .assistant-workspace {
+  transform: none;
+}
+
+.assistant-showcase .assistant-workspace__matter {
+  width: min(52%, 460px);
+  margin: 34px auto 34px 24px;
+  padding: 26px;
+}
+
+.assistant-showcase .assistant-preview {
+  width: min(50%, 460px);
+  right: 22px;
+  bottom: 34px;
+}
+
+@media (max-width: 960px) {
+  .lpc-home .assistant-showcase {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lpc-home .assistant-showcase__intro,
+  .lpc-home .assistant-stage {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .lpc-home .assistant-stage {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    place-items: stretch;
+    padding: 24px;
+    overflow: visible;
+  }
+
+  .lpc-home .assistant-workspace {
+    width: 100%;
+    min-height: 0;
+    position: relative;
+    top: auto;
+    transform: none;
+  }
+
+  .lpc-home .assistant-workspace__body {
+    min-height: 0;
+  }
+
+  .lpc-home .assistant-workspace__matter {
+    width: calc(100% - 36px);
+    margin: 18px;
+  }
+
+  .lpc-home .assistant-preview {
+    width: min(100%, 600px);
+    position: relative;
+    right: auto;
+    bottom: auto;
+    align-self: flex-end;
+  }
+}
+
+@media (max-width: 640px) {
+  .lpc-home .assistant-stage {
+    width: 100%;
+    margin-left: 0;
+    padding: 14px;
+    border-radius: 24px;
+  }
+
+  .lpc-home .assistant-workspace {
+    position: relative;
+    top: auto;
+  }
+
+  .lpc-home .assistant-workspace__matter {
+    width: calc(100% - 24px);
+    margin: 12px;
+    padding: 20px;
+  }
+
+  .lpc-home .assistant-workspace__matter h3 {
+    margin-bottom: 18px;
+    font-size: 1.65rem;
+  }
+
+  .lpc-home .assistant-workspace__matter > div {
+    padding: 11px 0;
+  }
+
+  .lpc-home .assistant-preview {
+    width: 100%;
+  }
+
+  .lpc-home .assistant-preview__suggestions {
+    display: flex;
+  }
+}
+
 .assistant-showcase[data-assistant-view="paralegal"] .assistant-stage {
   border-color: rgba(111, 154, 191, 0.32);
   background:
