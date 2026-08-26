@@ -527,11 +527,11 @@ html.accessibility-mode .js .home-reveal {
 }
 
 .product-topbar {
-  height: 58px;
+  min-height: var(--workspace-topbar-height, 78px);
   display: flex;
   align-items: center;
   gap: 28px;
-  padding: 0 22px;
+  padding: 12px 22px;
   border-bottom: 1px solid var(--lpc-line);
   background: rgba(255, 255, 255, 0.86);
 }
@@ -844,7 +844,7 @@ html.accessibility-mode .js .home-reveal {
 .workflow-canvas::before {
   position: absolute;
   z-index: 0;
-  inset: 58px 0 62px;
+  inset: var(--workspace-topbar-height, 78px) 0 62px;
   background:
     radial-gradient(circle at var(--state-focus-x) var(--state-focus-y), rgba(180, 151, 90, 0.12), transparent 29%),
     linear-gradient(120deg, rgba(255, 255, 255, 0.82), transparent 46%);
@@ -878,7 +878,7 @@ html.accessibility-mode .js .home-reveal {
 .workflow-state {
   position: absolute;
   z-index: 0;
-  inset: 58px 0 62px;
+  inset: var(--workspace-topbar-height, 78px) 0 62px;
   padding: clamp(26px, 3.6vw, 48px);
   opacity: 0;
   pointer-events: none;
@@ -1463,6 +1463,7 @@ html.accessibility-mode .js .home-reveal {
 }
 
 .assistant-workspace {
+  --workspace-topbar-height: 84px;
   width: min(1040px, calc(100% - 80px));
   min-height: 560px;
   position: relative;
@@ -1476,11 +1477,11 @@ html.accessibility-mode .js .home-reveal {
 }
 
 .assistant-workspace__topbar {
-  height: 60px;
+  min-height: var(--workspace-topbar-height);
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 0 22px;
+  padding: 12px 22px;
   border-bottom: 1px solid var(--lpc-line);
   background: rgba(255, 255, 255, 0.88);
   font-size: 0.66rem;
@@ -1959,11 +1960,11 @@ html.accessibility-mode .js .home-reveal {
 }
 
 .audience-interface__topbar {
-  height: 54px;
+  min-height: var(--workspace-topbar-height, 82px);
   display: flex;
   align-items: center;
   gap: 15px;
-  padding: 0 18px;
+  padding: 12px 18px;
   border-bottom: 0;
   background: rgba(255, 255, 255, 0.9);
   font-size: 0.62rem;
@@ -1992,7 +1993,7 @@ html.accessibility-mode .js .home-reveal {
 
 .audience-interface__body--review {
   position: absolute;
-  inset: 54px 0 0;
+  inset: var(--workspace-topbar-height, 82px) 0 0;
   align-content: center;
   gap: 18px;
 }
@@ -4415,7 +4416,7 @@ body.accessibility-mode [tabindex]:focus-visible {
   .lpc-home .workflow-canvas::after {
     position: absolute;
     z-index: 0;
-    inset: 58px 0 62px;
+    inset: var(--workspace-topbar-height, 78px) 0 62px;
     background: none;
     content: "";
     opacity: 0.72;
