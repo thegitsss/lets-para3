@@ -736,7 +736,6 @@
     const assistantActivityOne = assistantShowcase.querySelector("[data-assistant-activity-one]");
     const assistantActivityTwo = assistantShowcase.querySelector("[data-assistant-activity-two]");
     const assistantActivityThree = assistantShowcase.querySelector("[data-assistant-activity-three]");
-    const assistantViewControls = Array.from(assistantShowcase.querySelectorAll("[data-assistant-view-select]"));
     const assistantViews = {
       attorney: {
         role: "Attorney Assistant",
@@ -783,11 +782,11 @@
     };
     let activeAssistantView = "attorney";
     let assistantSwapTimer = 0;
+    let assistantCycleTimer = 0;
+    let assistantInView = false;
+    let assistantPaused = false;
 
     const renderAssistantView = (view) => {
-      assistantViewControls.forEach((control) => {
-        control.setAttribute("aria-pressed", String(control.dataset.assistantViewSelect === view));
-      });
       if (view === activeAssistantView || !assistantViews[view]) return;
       activeAssistantView = view;
       assistantStage?.classList.add("is-switching");
@@ -815,15 +814,46 @@
         if (assistantActivityTwo) assistantActivityTwo.textContent = content.activityTwo;
         if (assistantActivityThree) assistantActivityThree.textContent = content.activityThree;
         assistantStage?.classList.remove("is-switching");
-      }, reducedMotion.matches ? 0 : 260);
+      }, reducedMotion.matches ? 0 : 340);
     };
 
     assistantShowcase.dataset.assistantView = activeAssistantView;
-    assistantViewControls.forEach((control) => {
-      control.addEventListener("click", () => {
-        renderAssistantView(control.dataset.assistantViewSelect || "attorney");
-      });
+
+    const scheduleAssistantCycle = () => {
+      window.clearTimeout(assistantCycleTimer);
+      if (reducedMotion.matches || !assistantInView || assistantPaused || document.hidden) return;
+      assistantCycleTimer = window.setTimeout(() => {
+        renderAssistantView(activeAssistantView === "attorney" ? "paralegal" : "attorney");
+        scheduleAssistantCycle();
+      }, 6200);
+    };
+
+    if ("IntersectionObserver" in window) {
+      const assistantObserver = new IntersectionObserver(([entry]) => {
+        assistantInView = entry.isIntersecting;
+        scheduleAssistantCycle();
+      }, { threshold: 0.25 });
+      assistantObserver.observe(assistantShowcase);
+    }
+    assistantStage?.addEventListener("pointerenter", () => {
+      assistantPaused = true;
+      scheduleAssistantCycle();
     });
+    assistantStage?.addEventListener("pointerleave", () => {
+      assistantPaused = false;
+      scheduleAssistantCycle();
+    });
+    assistantStage?.addEventListener("focusin", () => {
+      assistantPaused = true;
+      scheduleAssistantCycle();
+    });
+    assistantStage?.addEventListener("focusout", (event) => {
+      if (assistantStage.contains(event.relatedTarget)) return;
+      assistantPaused = false;
+      scheduleAssistantCycle();
+    });
+    document.addEventListener("visibilitychange", scheduleAssistantCycle);
+    reducedMotion.addEventListener?.("change", scheduleAssistantCycle);
 
   }
 

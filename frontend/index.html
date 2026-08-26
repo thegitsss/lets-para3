@@ -14,7 +14,7 @@
   <meta name="theme-color" content="#FFFFFF" />
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
-  <link rel="stylesheet" href="assets/styles/homepage.css?v=20260825-assistant-utility" />
+  <link rel="stylesheet" href="assets/styles/homepage.css?v=20260825-assistant-cycle" />
   <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20260825-content-type-lift" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
@@ -414,13 +414,8 @@
     <section class="assistant-showcase" id="assistant" aria-labelledby="assistant-title">
       <div class="assistant-showcase__intro">
         <p class="eyebrow">The LPC Assistant</p>
-        <h2 id="assistant-title">Find the answers you need.</h2>
+        <h2 id="assistant-title">Find what you need.</h2>
         <p>Ask about files, deadlines, approvals, or payment. The LPC Assistant pulls the relevant details from your matter workspace into one clear answer.</p>
-        <div class="assistant-view-controls" role="group" aria-label="Assistant perspective">
-          <button type="button" data-assistant-view-select="attorney" aria-pressed="true">Attorney view</button>
-          <button type="button" data-assistant-view-select="paralegal" aria-pressed="false">Paralegal view</button>
-        </div>
-        <small class="assistant-showcase__disclaimer">LPC Assistant provides workspace information only. It does not provide legal advice or make decisions.</small>
       </div>
 
       <div class="assistant-stage" aria-label="LPC Assistant answering a question about a matter payout">
@@ -462,7 +457,7 @@
             <span class="assistant-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
             <div>
               <strong data-assistant-role>Attorney Assistant</strong>
-              <small>Uses your authorized LPC context</small>
+              <small>Uses this matter’s workspace</small>
             </div>
             <span class="assistant-preview__online"><i></i> Ready</span>
           </header>
@@ -484,6 +479,7 @@
             <span>Ask about your LPC workspace</span>
             <i>↑</i>
           </div>
+          <small class="assistant-showcase__disclaimer">Provides workspace information—not legal advice or decisions.</small>
         </article>
       </div>
 
@@ -640,7 +636,7 @@
     </div>
   </footer>
 
-  <script src="assets/scripts/homepage.js?v=20260825-lazy-scroll" defer></script>
+  <script src="assets/scripts/homepage.js?v=20260825-assistant-cycle" defer></script>
   <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
 </html>

@@ -2846,13 +2846,6 @@ body.accessibility-mode [tabindex]:focus-visible {
   outline-offset: 3px;
 }
 
-.assistant-showcase__disclaimer {
-  max-width: 440px;
-  margin-top: 18px;
-  color: color-mix(in srgb, var(--lpc-muted) 78%, transparent);
-  font: 400 0.78rem/1.5 "Sarabun", sans-serif;
-}
-
 .assistant-stage {
   position: relative;
   top: auto;
@@ -2863,15 +2856,28 @@ body.accessibility-mode [tabindex]:focus-visible {
 .assistant-preview__thread,
 .assistant-preview__suggestions,
 .assistant-preview__header strong,
+.assistant-workspace__topbar,
+.assistant-workspace__matter,
 .assistant-workspace__nav span {
-  transition: transform 260ms var(--ease-out);
+  transition: opacity 320ms ease, transform 320ms var(--ease-out);
 }
 
 .assistant-stage.is-switching .assistant-preview__thread,
 .assistant-stage.is-switching .assistant-preview__suggestions,
 .assistant-stage.is-switching .assistant-preview__header strong,
+.assistant-stage.is-switching .assistant-workspace__topbar,
+.assistant-stage.is-switching .assistant-workspace__matter,
 .assistant-stage.is-switching .assistant-workspace__nav span {
-  transform: translateY(8px);
+  opacity: 0;
+  transform: translateY(7px);
+}
+
+.assistant-showcase__disclaimer {
+  display: block;
+  padding: 11px 18px 15px;
+  border-top: 1px solid rgba(26, 34, 48, 0.08);
+  color: color-mix(in srgb, var(--lpc-muted) 78%, transparent);
+  font: 400 0.72rem/1.45 "Sarabun", sans-serif;
 }
 
 @media (max-width: 1180px) {
