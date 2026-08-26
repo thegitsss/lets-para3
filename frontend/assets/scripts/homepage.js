@@ -665,7 +665,7 @@
       attorney: {
         role: "Attorney Assistant",
         question: "Has payment for this matter been released?",
-        answer: "Yes. The $793 attorney total included $650 in project compensation and a $143 attorney platform fee. LPC recorded the $650 compensation release after the matter was marked complete; Stripe provides the payout status.",
+        answer: "Yes. The $793 attorney total included $650 in project compensation and a $143 attorney platform fee. LPC recorded the $650 compensation release after the matter was marked complete; the matter record shows the current payout status.",
         action: "Open the completed matter",
         suggestionOne: "What files were submitted?",
         suggestionTwo: "Open the completed matter",
@@ -686,7 +686,7 @@
       paralegal: {
         role: "Paralegal Assistant",
         question: "Were my submitted files approved?",
-        answer: "Yes. Both files were approved, and the $533 payout was released after the $117 platform fee. Stripe provides the current payout status.",
+        answer: "Yes. Both files were approved, and the $533 payout was released after the $117 platform fee. The matter record shows the current payout status.",
         action: "Open the completed assignment",
         suggestionOne: "When was payment released?",
         suggestionTwo: "View the completed assignment",
