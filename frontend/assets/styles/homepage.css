@@ -2814,36 +2814,12 @@ body.accessibility-mode [tabindex]:focus-visible {
   min-height: min(690px, calc(100vh - 120px));
 }
 
-.assistant-view-controls {
-  display: inline-flex;
-  align-self: flex-start;
-  gap: 4px;
-  margin-top: 32px;
-  padding: 4px;
-  border: 1px solid var(--lpc-line);
-  border-radius: 999px;
-  background: #f6f5f2;
-}
-
-.assistant-view-controls button {
-  min-height: 44px;
-  padding: 0 18px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--lpc-muted);
-  cursor: pointer;
-  font: 600 0.72rem/1 "Sarabun", sans-serif;
-}
-
-.assistant-view-controls button[aria-pressed="true"] {
-  background: var(--lpc-ink);
-  color: #fff;
-}
-
-.assistant-view-controls button:focus-visible {
-  outline: 3px solid rgba(11, 42, 74, 0.35);
-  outline-offset: 3px;
+.assistant-showcase__disclaimer {
+  display: block;
+  padding: 11px 18px 15px;
+  border-top: 1px solid rgba(26, 34, 48, 0.08);
+  color: color-mix(in srgb, var(--lpc-muted) 78%, transparent);
+  font: 400 0.72rem/1.45 "Sarabun", sans-serif;
 }
 
 .assistant-stage {
@@ -2851,33 +2827,6 @@ body.accessibility-mode [tabindex]:focus-visible {
   top: auto;
   grid-column: 2;
   grid-row: 1;
-}
-
-.assistant-preview__thread,
-.assistant-preview__suggestions,
-.assistant-preview__header strong,
-.assistant-workspace__topbar,
-.assistant-workspace__matter,
-.assistant-workspace__nav span {
-  transition: opacity 320ms ease, transform 320ms var(--ease-out);
-}
-
-.assistant-stage.is-switching .assistant-preview__thread,
-.assistant-stage.is-switching .assistant-preview__suggestions,
-.assistant-stage.is-switching .assistant-preview__header strong,
-.assistant-stage.is-switching .assistant-workspace__topbar,
-.assistant-stage.is-switching .assistant-workspace__matter,
-.assistant-stage.is-switching .assistant-workspace__nav span {
-  opacity: 0;
-  transform: translateY(7px);
-}
-
-.assistant-showcase__disclaimer {
-  display: block;
-  padding: 11px 18px 15px;
-  border-top: 1px solid rgba(26, 34, 48, 0.08);
-  color: color-mix(in srgb, var(--lpc-muted) 78%, transparent);
-  font: 400 0.72rem/1.45 "Sarabun", sans-serif;
 }
 
 @media (max-width: 1180px) {
@@ -4066,14 +4015,6 @@ body.accessibility-mode [tabindex]:focus-visible {
   font-size: 0.52rem;
 }
 
-.js .assistant-stage.is-switching .assistant-workspace {
-  transform: translate(-8%, -2%) scale(0.975);
-}
-
-.js .assistant-stage.is-switching .assistant-preview {
-  transform: translateX(26px) scale(0.95);
-}
-
 .assistant-showcase[data-assistant-view="attorney"] .assistant-stage {
   background:
     radial-gradient(circle at 76% 18%, rgba(215, 193, 143, 0.18), transparent 30%),
@@ -4686,10 +4627,6 @@ body.accessibility-mode [tabindex]:focus-visible {
     margin-top: 0;
     font-size: 1rem;
     line-height: 1.55;
-  }
-
-  .lpc-home .assistant-view-controls {
-    margin-top: 24px;
   }
 
   .lpc-home .assistant-stage {
