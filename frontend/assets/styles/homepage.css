@@ -2365,6 +2365,7 @@ html.accessibility-mode .js .home-reveal {
 }
 
 .home-faq details {
+  align-self: start;
   border-bottom: 1px solid var(--lpc-line);
   interpolate-size: allow-keywords;
 }
