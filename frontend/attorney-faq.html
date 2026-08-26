@@ -124,6 +124,33 @@
       color: var(--gold);
     }
 
+    .faq-related-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #806520;
+      font-weight: 400;
+      text-decoration: underline;
+      text-decoration-color: rgba(128, 101, 32, 0.4);
+      text-underline-offset: 4px;
+      transition: color 0.2s ease, text-decoration-color 0.2s ease;
+    }
+
+    .faq-related-link:hover,
+    .faq-related-link:focus-visible {
+      color: #5f4915;
+      text-decoration-color: currentColor;
+    }
+
+    .faq-related-link span {
+      transition: transform 0.2s ease;
+    }
+
+    .faq-related-link:hover span,
+    .faq-related-link:focus-visible span {
+      transform: translateX(3px);
+    }
+
     #cta h2,
     #cta p,
     #cta .cta {
@@ -166,6 +193,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
+      .faq-related-link span,
       #cta h2,
       #cta p,
       #cta .cta {
@@ -243,6 +271,7 @@
   <section id="q1" class="card">
     <h2>1) Approved paralegal profiles</h2>
     <p>Each approved paralegal profile contains applicant-submitted information about the person’s background, practice areas, and project experience. LPC reviews submitted profiles for platform access, but does not independently authenticate credentials or guarantee qualifications. Attorneys remain responsible for evaluating experience and fit before engaging anyone.</p>
+    <p><a class="faq-related-link" href="paralegal-admission.html">Our vetting process <span aria-hidden="true">→</span></a></p>
   </section>
 
   <section id="q2" class="card">
