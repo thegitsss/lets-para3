@@ -3651,7 +3651,7 @@ body.accessibility-mode [tabindex]:focus-visible {
   max-width: 820px;
   font-size: clamp(4.2rem, 7.2vw, 7.6rem);
   letter-spacing: -0.055em;
-  line-height: 0.84;
+  line-height: 0.9;
 }
 
 .workflow__intro-support {
