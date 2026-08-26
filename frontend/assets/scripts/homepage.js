@@ -34,6 +34,69 @@
   window.addEventListener("scroll", syncHeaderSurface, { passive: true });
   window.addEventListener("resize", syncHeaderSurface);
 
+  const lazyScrollMedia = window.matchMedia("(min-width: 900px) and (pointer: fine) and (prefers-reduced-motion: no-preference)");
+  let lazyScrollFrame = 0;
+  let lazyScrollPosition = window.scrollY;
+  let lazyScrollTarget = window.scrollY;
+
+  const canNestedScrollerMove = (start, delta) => {
+    for (let node = start instanceof Element ? start : null; node && node !== document.body; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (!/(auto|scroll)/.test(style.overflowY) || node.scrollHeight <= node.clientHeight + 1) continue;
+      if (delta < 0 && node.scrollTop > 0) return true;
+      if (delta > 0 && node.scrollTop + node.clientHeight < node.scrollHeight - 1) return true;
+    }
+    return false;
+  };
+
+  const stopLazyScroll = () => {
+    if (lazyScrollFrame) window.cancelAnimationFrame(lazyScrollFrame);
+    lazyScrollFrame = 0;
+    lazyScrollPosition = window.scrollY;
+    lazyScrollTarget = window.scrollY;
+    document.documentElement.classList.remove("is-lazy-scrolling");
+  };
+
+  const animateLazyScroll = () => {
+    const distance = lazyScrollTarget - lazyScrollPosition;
+    lazyScrollPosition += distance * 0.09;
+    if (Math.abs(distance) < 0.5) {
+      window.scrollTo(0, lazyScrollTarget);
+      stopLazyScroll();
+      return;
+    }
+    window.scrollTo(0, lazyScrollPosition);
+    lazyScrollFrame = window.requestAnimationFrame(animateLazyScroll);
+  };
+
+  window.addEventListener("wheel", (event) => {
+    if (
+      !lazyScrollMedia.matches ||
+      document.body.classList.contains("accessibility-mode") ||
+      event.ctrlKey ||
+      event.metaKey ||
+      Math.abs(event.deltaX) >= Math.abs(event.deltaY) ||
+      !event.deltaY ||
+      canNestedScrollerMove(event.target, event.deltaY)
+    ) return;
+
+    event.preventDefault();
+    const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? window.innerHeight : 1;
+    if (!lazyScrollFrame) {
+      lazyScrollPosition = window.scrollY;
+      lazyScrollTarget = window.scrollY;
+      document.documentElement.classList.add("is-lazy-scrolling");
+    }
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const requestedTarget = lazyScrollTarget + (event.deltaY * unit * 0.55);
+    const maxLead = window.innerHeight * 0.75;
+    lazyScrollTarget = clamp(requestedTarget, Math.max(0, lazyScrollPosition - maxLead), Math.min(maxScroll, lazyScrollPosition + maxLead));
+    if (!lazyScrollFrame) lazyScrollFrame = window.requestAnimationFrame(animateLazyScroll);
+  }, { passive: false });
+
+  lazyScrollMedia.addEventListener?.("change", stopLazyScroll);
+  window.addEventListener("pagehide", stopLazyScroll);
+
   class MatterField {
     constructor(canvas) {
       this.canvas = canvas;
