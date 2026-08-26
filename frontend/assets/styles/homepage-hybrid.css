@@ -68,6 +68,44 @@
   line-height: 1.4;
 }
 
+.lpc-home--hybrid .path-scene--paralegal .audience-interface__topbar {
+  font-size: 0.8rem;
+}
+
+.lpc-home--hybrid .path-scene--paralegal .audience-interface :is(
+  .interface-label,
+  small
+) {
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.lpc-home--hybrid .path-scene--paralegal .audience-interface :is(
+  .available-project h4,
+  .active-assignment h4
+) {
+  font-size: 0.95rem;
+}
+
+.lpc-home--hybrid .path-scene--paralegal .available-project > div > p:not(.interface-label) {
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.lpc-home--hybrid .path-scene--paralegal .audience-interface :is(
+  .available-project__terms strong,
+  .audience-payment strong
+) {
+  font-size: 0.82rem;
+}
+
+.lpc-home--hybrid .path-scene--paralegal .audience-interface :is(
+  .status-chip,
+  .assignment-tasks label
+) {
+  font-size: 0.76rem;
+}
+
 .lpc-home--hybrid .audience-interface :is(
   .audience-matter__meta,
   .audience-payment,
