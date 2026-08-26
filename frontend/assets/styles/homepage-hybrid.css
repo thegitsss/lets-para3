@@ -64,7 +64,7 @@
   .compact-file,
   .matter-identity--compact > span
 ) {
-  font-size: max(0.68rem, 10.5px);
+  font-size: max(0.78rem, 12px);
   line-height: 1.4;
 }
 
@@ -111,11 +111,11 @@
   .audience-payment,
   .available-project__terms
 ) strong {
-  font-size: max(0.72rem, 11px);
+  font-size: max(0.82rem, 13px);
 }
 
 .lpc-home--hybrid :is(.audience-interface__topbar, .assistant-workspace__topbar) {
-  font-size: max(0.7rem, 10.75px);
+  font-size: max(0.8rem, 12.5px);
 }
 
 .lpc-home--hybrid :is(
@@ -135,7 +135,7 @@
   .assistant-preview__suggestions span,
   .assistant-preview__composer
 ) {
-  font-size: max(0.68rem, 10.5px);
+  font-size: max(0.78rem, 12px);
   line-height: 1.4;
 }
 
