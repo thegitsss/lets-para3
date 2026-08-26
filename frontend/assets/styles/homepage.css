@@ -625,11 +625,12 @@ html.accessibility-mode .js .home-reveal {
 
 .matter-rail__line {
   position: absolute;
-  top: 25px;
+  top: 50%;
   right: 12.5%;
   left: 12.5%;
   height: 1px;
   background: var(--lpc-line);
+  transform: translateY(-50%);
 }
 
 .matter-rail > div {
@@ -3090,7 +3091,7 @@ body.accessibility-mode [tabindex]:focus-visible {
   }
 
   .matter-rail__line {
-    top: 23px;
+    top: 28px;
   }
 
   .matter-rail > div {
