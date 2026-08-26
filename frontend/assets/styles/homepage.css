@@ -2377,19 +2377,37 @@ html.accessibility-mode .js .home-reveal {
   display: none;
 }
 
+.home-faq summary::before,
 .home-faq summary::after {
+  width: 16px;
+  height: 1.5px;
   position: absolute;
-  top: 20px;
+  top: 50%;
   right: 2px;
+  background: currentColor;
   color: var(--lpc-gold);
-  content: "+";
-  font-family: "Sarabun", sans-serif;
-  font-size: 1.2rem;
-  font-weight: 300;
+  content: "";
+  transform: translateY(-50%);
+  transform-origin: center;
+}
+
+.home-faq summary::after {
+  opacity: 1;
+  transform: translateY(-50%) rotate(90deg);
+  transition:
+    opacity 160ms ease,
+    transform 240ms var(--ease-out);
 }
 
 .home-faq details[open] summary::after {
-  content: "−";
+  opacity: 0;
+  transform: translateY(-50%) rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-faq summary::after {
+    transition: none;
+  }
 }
 
 .home-faq details p {
