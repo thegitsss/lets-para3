@@ -729,9 +729,24 @@
     },
     {
       selector: ".assistant-showcase",
+      progressMode: "lower-third-section",
+      exitStart: 0.985,
+      exitEnd: 1,
       layers: [
-        [".assistant-showcase__intro", "rise", 0.06, 0.28],
-        [".assistant-stage", "depth", 0.12, 0.36],
+        [".assistant-showcase__intro", "rise", 0, 0.16],
+        [".assistant-stage", "depth", 0.02, 0.20],
+        [".assistant-workspace__topbar", "rise", 0.08, 0.22],
+        [".assistant-workspace__matter > .interface-label", "rise", 0.12, 0.25],
+        [".assistant-workspace__matter > h3", "rise", 0.15, 0.28],
+        [".assistant-workspace__matter > div:nth-of-type(1)", "rise", 0.18, 0.31],
+        [".assistant-workspace__matter > div:nth-of-type(2)", "rise", 0.21, 0.34],
+        [".assistant-workspace__matter > div:nth-of-type(3)", "rise", 0.24, 0.38],
+        [".assistant-workspace__activity", "rise", 0.27, 0.41],
+        [".assistant-preview__header", "lateral-right", 0.18, 0.32],
+        [".assistant-message--user", "lateral-right", 0.25, 0.39],
+        [".assistant-message--assistant", "rise", 0.33, 0.52],
+        [".assistant-preview__suggestions", "rise", 0.42, 0.58],
+        [".assistant-preview__composer", "rise", 0.46, 0.62],
       ],
     },
     {
@@ -852,12 +867,17 @@
     cinematicScenes.forEach((scene) => {
       const top = scene.top;
       const height = scene.height;
-      const progress = clamp((scrollPosition + viewportHeight - top) / (height + viewportHeight));
+      const progress = scene.progressMode === "lower-third-section"
+        ? clamp(
+          (scrollPosition - (top - (viewportHeight * (2 / 3)))) /
+          Math.max(1, (top + height - viewportHeight) - (top - (viewportHeight * (2 / 3))))
+        )
+        : clamp((scrollPosition + viewportHeight - top) / (height + viewportHeight));
       const progressValue = Number(progress.toFixed(4));
       if (scene.progress === progressValue) return;
       scene.progress = progressValue;
       const enter = smoothProgress(0.04, 0.34, progress);
-      const exit = smoothProgress(0.78, 0.98, progress);
+      const exit = smoothProgress(scene.exitStart, scene.exitEnd, progress);
       scene.element.style.setProperty("--motion-progress", progress.toFixed(4));
       scene.element.style.setProperty("--motion-enter", enter.toFixed(4));
       scene.element.style.setProperty("--motion-exit", exit.toFixed(4));
@@ -916,6 +936,9 @@
         element,
         layers,
         kind: definition.kind || "standard",
+        progressMode: definition.progressMode || "viewport",
+        exitStart: definition.exitStart ?? 0.78,
+        exitEnd: definition.exitEnd ?? 0.98,
         top: documentOffsetTop(element),
         height: Math.max(1, element.offsetHeight),
         progress: null,
