@@ -2846,6 +2846,13 @@ body.accessibility-mode [tabindex]:focus-visible {
   outline-offset: 3px;
 }
 
+.assistant-showcase__disclaimer {
+  max-width: 440px;
+  margin-top: 18px;
+  color: color-mix(in srgb, var(--lpc-muted) 78%, transparent);
+  font: 400 0.78rem/1.5 "Sarabun", sans-serif;
+}
+
 .assistant-stage {
   position: relative;
   top: auto;
