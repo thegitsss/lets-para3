@@ -732,18 +732,6 @@
       layers: [
         [".assistant-showcase__intro", "rise", 0.06, 0.28],
         [".assistant-stage", "depth", 0.12, 0.36],
-        [".assistant-workspace__topbar", "rise", 0.24, 0.42],
-        [".assistant-workspace__matter > .interface-label", "rise", 0.28, 0.46],
-        [".assistant-workspace__matter > h3", "rise", 0.31, 0.49],
-        [".assistant-workspace__matter > div:nth-of-type(1)", "rise", 0.34, 0.52],
-        [".assistant-workspace__matter > div:nth-of-type(2)", "rise", 0.37, 0.55],
-        [".assistant-workspace__matter > div:nth-of-type(3)", "rise", 0.40, 0.58],
-        [".assistant-workspace__activity", "rise", 0.40, 0.58],
-        [".assistant-preview__header", "lateral-right", 0.32, 0.50],
-        [".assistant-message--user", "lateral-right", 0.38, 0.56],
-        [".assistant-message--assistant", "rise", 0.44, 0.62],
-        [".assistant-preview__suggestions", "rise", 0.50, 0.68],
-        [".assistant-preview__composer", "rise", 0.54, 0.72],
       ],
     },
     {
