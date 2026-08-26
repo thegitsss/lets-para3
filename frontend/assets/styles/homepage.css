@@ -3543,7 +3543,11 @@ body.accessibility-mode [tabindex]:focus-visible {
 @media (min-width: 1100px) and (min-height: 650px) and (prefers-reduced-motion: no-preference) {
   .lpc-home.home-cinematic-motion [data-scroll-scene] {
     position: relative;
-    overflow-x: clip;
+    overflow: visible;
+  }
+
+  .lpc-home.home-cinematic-motion .paths-motion-viewport {
+    overflow: clip;
   }
 
   .lpc-home.home-cinematic-motion [data-motion-layer] {
@@ -4748,7 +4752,7 @@ body.accessibility-mode [tabindex]:focus-visible {
     .path-scene__copy,
     .clarity-section__intro
   ).home-reveal:not(.is-revealed) {
-    transform: translate3d(-44px, 18px, 0) scale(0.975) rotate(-0.8deg);
+    transform: translate3d(0, 28px, 0) scale(0.975);
   }
 
   .js .lpc-home :is(
@@ -4756,7 +4760,7 @@ body.accessibility-mode [tabindex]:focus-visible {
     .audience-interface,
     .fee-card
   ).home-reveal:not(.is-revealed) {
-    transform: translate3d(44px, 18px, 0) scale(0.975) rotate(0.8deg);
+    transform: translate3d(0, 28px, 0) scale(0.975);
   }
 
   .js .lpc-home :is(

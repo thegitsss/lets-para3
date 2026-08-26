@@ -836,8 +836,8 @@
   ];
   const cinematicMotionProfiles = {
     rise: { x: 0, y: 72, scale: 0.98, rotate: 0, exitX: 0, exitY: -52 },
-    "lateral-left": { x: -110, y: 20, scale: 0.975, rotate: -1.2, exitX: -68, exitY: -18 },
-    "lateral-right": { x: 110, y: 20, scale: 0.975, rotate: 1.2, exitX: 68, exitY: -18 },
+    "lateral-left": { x: 0, y: 64, scale: 0.975, rotate: 0, exitX: 0, exitY: -28 },
+    "lateral-right": { x: 0, y: 64, scale: 0.975, rotate: 0, exitX: 0, exitY: -28 },
     depth: { x: 0, y: 110, scale: 0.92, rotate: 2.4, exitX: 0, exitY: -62 },
     card: { x: 0, y: 86, scale: 0.94, rotate: 0, exitX: 0, exitY: -48 },
   };
