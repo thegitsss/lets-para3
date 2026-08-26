@@ -474,8 +474,8 @@ button:focus-visible,
   opacity: 0;
   transform: translateY(28px);
   transition:
-    opacity 760ms var(--ease-out) var(--home-reveal-delay, 0ms),
-    transform 820ms var(--ease-out) var(--home-reveal-delay, 0ms);
+    opacity 1100ms var(--ease-out) var(--home-reveal-delay, 0ms),
+    transform 1250ms var(--ease-out) var(--home-reveal-delay, 0ms);
 }
 
 .js .home-reveal.is-revealed {

@@ -404,26 +404,39 @@
     });
   };
 
+  const revealAnchorTargetImmediately = (hash = window.location.hash) => {
+    if (!hash || hash === "#") return;
+    let target = null;
+    try {
+      target = document.querySelector(hash);
+    } catch {
+      return;
+    }
+    if (!target) return;
+    revealTargets.forEach((element) => {
+      if (element !== target && !target.contains(element)) return;
+      element.classList.add("is-revealed", "is-fast-revealed");
+    });
+    const scene = target.closest("[data-scroll-scene]") || target.querySelector("[data-scroll-scene]");
+    scene?.classList.add("is-fast-revealed");
+  };
+
   let previousScrollY = window.scrollY;
-  let previousScrollTime = performance.now();
   window.addEventListener("scroll", () => {
-    const now = performance.now();
     const distance = Math.abs(window.scrollY - previousScrollY);
-    const elapsed = Math.max(1, now - previousScrollTime);
-    if (distance > Math.min(180, window.innerHeight * 0.28) && distance / elapsed > 1.8) {
+    if (distance > Math.max(480, window.innerHeight * 0.9)) {
       revealReachedContentImmediately();
     }
     previousScrollY = window.scrollY;
-    previousScrollTime = now;
   }, { passive: true });
 
   document.addEventListener("click", (event) => {
     const anchor = event.target.closest('a[href^="#"]');
     if (!anchor) return;
-    window.requestAnimationFrame(revealReachedContentImmediately);
+    revealAnchorTargetImmediately(anchor.hash);
   });
-  window.addEventListener("hashchange", revealReachedContentImmediately);
-  if (window.location.hash) window.requestAnimationFrame(revealReachedContentImmediately);
+  window.addEventListener("hashchange", () => revealAnchorTargetImmediately());
+  if (window.location.hash) window.requestAnimationFrame(() => revealAnchorTargetImmediately());
 
   if (reducedMotion.matches || !("IntersectionObserver" in window)) {
     revealTargets.forEach((element) => element.classList.add("is-revealed"));
@@ -434,7 +447,7 @@
         entry.target.classList.add("is-revealed");
         revealObserver.unobserve(entry.target);
       });
-    }, { rootMargin: "120px 0px 120px", threshold: 0.01 });
+    }, { rootMargin: "40px 0px -4%", threshold: 0.01 });
     revealTargets.forEach((element) => revealObserver.observe(element));
   }
 
