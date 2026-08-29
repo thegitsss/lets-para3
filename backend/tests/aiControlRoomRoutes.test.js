@@ -869,18 +869,16 @@ describe("AI Control Room source hygiene", () => {
     }
 
     const summaryRes = await request(app)
-      .get("/api/admin/ai/control-room/summary")
+      .get("/api/admin/ai")
       .set("Cookie", authCookieFor(admin));
     expect(summaryRes.status).toBe(200);
 
-    const focusRes = await request(app)
-      .get("/api/admin/ai/control-room/founder")
-      .set("Cookie", authCookieFor(admin));
-    expect(focusRes.status).toBe(200);
+    const founderView = summaryRes.body.focusViews?.founder;
+    expect(founderView).toEqual(expect.objectContaining({ surfaceMode: "decision_hub" }));
 
-    const decisionQueue = Array.isArray(focusRes.body.view.decisionQueue) ? focusRes.body.view.decisionQueue : [];
+    const decisionQueue = Array.isArray(founderView.decisionQueue) ? founderView.decisionQueue : [];
     expect(decisionQueue).toHaveLength(1);
-    expect(focusRes.body.view.queueLabel).toMatch(/1 decision pending/i);
+    expect(founderView.queueLabel).toMatch(/1 decision pending/i);
 
     const groupedDecision = decisionQueue[0];
     expect(groupedDecision).toEqual(
@@ -934,7 +932,7 @@ describe("AI Control Room source hygiene", () => {
       })
     );
 
-    const blockedItems = Array.isArray(focusRes.body.view.blockedItems) ? focusRes.body.view.blockedItems : [];
+    const blockedItems = Array.isArray(founderView.blockedItems) ? founderView.blockedItems : [];
     expect(blockedItems).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

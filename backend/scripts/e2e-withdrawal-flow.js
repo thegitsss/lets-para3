@@ -23,7 +23,6 @@ function launchReadyAccountFields() {
     termsAcceptedAt: acceptedAt,
     privacyVersion: CURRENT_PRIVACY_VERSION,
     privacyAcknowledgedAt: acceptedAt,
-    legalAcceptanceSource: "signup",
   };
 }
 

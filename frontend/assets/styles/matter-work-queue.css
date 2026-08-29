@@ -26,8 +26,9 @@ body.lpc-product-clean .view-cases .cases-header {
 body.lpc-product-clean .view-cases .cases-header h1 {
   margin: 0 0 5px;
   color: var(--matter-ink);
-  font: 300 clamp(1.7rem, 2.5vw, 2.15rem)/1.15 'Sarabun', sans-serif !important;
-  letter-spacing: -0.025em;
+  font: 400 clamp(1.7rem, 2.5vw, 2.15rem)/1.15 var(--lpc-dashboard-heading-font, "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif) !important;
+  font-feature-settings: "ss01" 1;
+  letter-spacing: 0;
 }
 
 body.lpc-product-clean .view-cases .cases-header p {

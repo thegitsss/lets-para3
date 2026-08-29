@@ -22,7 +22,7 @@ const HEADER_ONLY_ROUTES = {
 const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
 const CASE_VIEW_FILTERS = ["active", "draft", "archived", "inquiries"];
 const PLATFORM_FEE_PCT = 22;
-const HOME_PAGE_SIZE = 5;
+const HOME_RECENT_MATTERS_LIMIT = 3;
 const CASE_PAGE_SIZE = 15;
 const ESCROW_PAGE_SIZE = 5;
 const CASE_POSTED_STORAGE_KEY = "lpc_case_posted_notice";
@@ -32,39 +32,19 @@ const FUNDED_WORKSPACE_STATUSES = new Set([
   "in_progress",
 ]);
 const TERMINAL_CASE_STATUSES = new Set(["completed", "closed"]);
-const PARALEGAL_AVATAR_FALLBACK = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-  "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><rect width='220' height='220' rx='110' fill='#f1f5f9'/><circle cx='110' cy='90' r='46' fill='#cbd5e1'/><path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/></svg>"
-)}`;
+const PARALEGAL_AVATAR_FALLBACK = "/assets/avatar-placeholder.svg";
 const ATTORNEY_AVATAR_FALLBACK = PARALEGAL_AVATAR_FALLBACK;
-function getInitials(name = "", fallback = "A") {
-  const trimmed = String(name || "").trim();
-  if (!trimmed) return fallback;
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  const letters = parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("");
-  return letters || fallback;
-}
-function buildAttorneyInitialsAvatar(name = "") {
-  const initials = getInitials(name, "A");
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><rect width='220' height='220' rx='110' fill='#f1f5f9'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#5b6472' font-family='Georgia, serif' font-size='74' letter-spacing='4'>${initials}</text></svg>`
-  )}`;
-}
 function getProfileImageUrl(user = {}) {
   const role = String(user.role || "").toLowerCase();
   const pending = role === "paralegal" ? user.pendingProfileImage : "";
   const stored = user.profileImage || user.avatarURL;
   if (pending) return pending;
   if (stored) return stored;
-  if (role === "attorney") {
-    const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.name || "Attorney";
-    return buildAttorneyInitialsAvatar(name);
-  }
+  if (role === "attorney") return ATTORNEY_AVATAR_FALLBACK;
   return PARALEGAL_AVATAR_FALLBACK;
 }
 
-const INVITE_AVATAR_FALLBACK = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-  "<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='#f4f4f5'/><stop offset='100%' stop-color='#e5e7eb'/></linearGradient></defs><rect width='96' height='96' rx='48' fill='url(#g)'/><circle cx='48' cy='38' r='18' fill='#d1d5db'/><path d='M20 84c6-18 22-28 28-28s22 10 28 28' fill='none' stroke='#cbd5e1' stroke-width='6' stroke-linecap='round'/></svg>"
-)}`;
+const INVITE_AVATAR_FALLBACK = PARALEGAL_AVATAR_FALLBACK;
 
 const overviewSignals = {
   unreadCount: 0,
@@ -349,7 +329,7 @@ function ensureHeaderStyles() {
   .lpc-shared-header .btn.btn-outline:hover{border-color:#b6a47a;color:#b6a47a;background:rgba(182,164,122,0.06)}
   .lpc-shared-header .user-chip{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:none;cursor:pointer;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color .2s ease, box-shadow .2s ease}
   .lpc-shared-header .user-chip img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:none;object-fit:cover}
-  .lpc-shared-header .user-chip strong{display:block;font-family:var(--font-serif);font-weight:500;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lpc-shared-header .user-chip strong{display:block;font-family:var(--font-serif);font-weight: 600;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lpc-shared-header .user-chip span{font-size:.85rem;color:#6b6b6b;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   body.theme-dark .lpc-shared-header .user-chip{background:rgba(15,23,42,0.4);border-color:transparent;box-shadow:none}
   body.theme-dark .lpc-shared-header .user-chip strong{color:#fff}
@@ -773,20 +753,18 @@ function updateOnboardingAttentionCard(progress = getAttorneyOnboardingProgress(
   const titleEl = card.querySelector("[data-onboarding-attention-title]");
   const textEl = card.querySelector("[data-onboarding-attention-text]");
   const ctaEl = card.querySelector("[data-onboarding-attention-action]");
-  const skipBtn = card.querySelector("[data-onboarding-attention-skip]");
-  const checkItems = Array.from(card.querySelectorAll("[data-onboarding-check-step]"));
+  const progressCopyEl = card.querySelector("[data-onboarding-progress-copy]");
+  const progressEl = card.querySelector(".onboarding-attention-progress");
+  const progressBarEl = card.querySelector("[data-onboarding-progress-bar]");
   const doneByStep = {
     profile: Boolean(progress.profileDone),
     payment: Boolean(progress.paymentDone),
     case: Boolean(progress.caseDone),
   };
-  checkItems.forEach((item) => {
-    const key = String(item.dataset.onboardingCheckStep || "").toLowerCase();
-    const done = Boolean(doneByStep[key]);
-    item.classList.toggle("is-complete", done);
-    const indicator = item.querySelector("[data-onboarding-check-input]");
-    indicator?.classList.toggle("is-checked", done);
-  });
+  const completedCount = Object.values(doneByStep).filter(Boolean).length;
+  if (progressCopyEl) progressCopyEl.textContent = `${completedCount} of 3 complete`;
+  if (progressEl) progressEl.setAttribute("aria-valuenow", String(completedCount));
+  if (progressBarEl) progressBarEl.style.width = `${(completedCount / 3) * 100}%`;
 
   if (!onboardingAttentionHydrated) {
     clearOnboardingAttentionCompleteTimer();
@@ -818,11 +796,6 @@ function updateOnboardingAttentionCard(progress = getAttorneyOnboardingProgress(
       ctaEl.textContent = copy.cta;
       ctaEl.setAttribute("aria-label", `${copy.cta}: ${copy.title}`);
     }
-    if (skipBtn) skipBtn.hidden = false;
-    checkItems.forEach((item) => {
-      item.setAttribute("tabindex", "0");
-      item.setAttribute("aria-disabled", "false");
-    });
     if (titleEl) titleEl.textContent = copy.title;
     if (textEl) {
       textEl.hidden = false;
@@ -843,11 +816,6 @@ function updateOnboardingAttentionCard(progress = getAttorneyOnboardingProgress(
     textEl.textContent = "Everything is set. You're ready to work with confidence.";
   }
   if (ctaEl) ctaEl.hidden = true;
-  if (skipBtn) skipBtn.hidden = true;
-  checkItems.forEach((item) => {
-    item.setAttribute("tabindex", "-1");
-    item.setAttribute("aria-disabled", "true");
-  });
 
   if (!transitionedToComplete || getOnboardingCompleteNoticeSeen()) {
     card.hidden = true;
@@ -1066,10 +1034,115 @@ function maybePromptCaseOnboarding() {
 // -------------------------
 // Overview Page
 // -------------------------
+function setOverviewModuleState(bodyId, { state: moduleState, summary = "", detail = "", action = null } = {}) {
+  const body = document.getElementById(bodyId);
+  if (!body) return;
+  const card = body.closest(".status-item, .mini-deadlines");
+  const stateKey = ["loading", "populated", "empty", "failed"].includes(moduleState) ? moduleState : "loading";
+  body.dataset.state = stateKey;
+  if (card) card.setAttribute("aria-busy", stateKey === "loading" ? "true" : "false");
+  if (stateKey === "loading") {
+    body.innerHTML = `<div class="overview-module-skeleton" aria-label="Loading summary"><span></span><span></span></div>`;
+    return;
+  }
+  if (stateKey === "failed") {
+    body.innerHTML = `<p class="overview-module-error">${sanitize(summary || "Unable to load this summary.")}</p>`;
+    return;
+  }
+  const actionMarkup = action?.href && action?.label
+    ? `<a class="overview-module-action" href="${sanitize(action.href)}"${action.viewTarget ? ` data-view-target="${sanitize(action.viewTarget)}"` : ""}>${sanitize(action.label)}</a>`
+    : "";
+  body.innerHTML = `
+    <p class="overview-module-summary">${sanitize(summary)}</p>
+    ${detail ? `<p class="overview-module-detail">${sanitize(detail)}</p>` : ""}
+    ${actionMarkup}
+  `;
+}
+
+function renderMattersOverview(count) {
+  const safeCount = Math.max(0, Number(count || 0));
+  if (safeCount > 0) {
+    setOverviewModuleState("overviewMattersBody", {
+      state: "populated",
+      summary: pluralizeCount(safeCount, "active matter"),
+    });
+    return;
+  }
+  setOverviewModuleState("overviewMattersBody", {
+    state: "empty",
+    summary: "No active matters.",
+    action: { href: "create-case.html", label: "Create a matter" },
+  });
+}
+
+function renderApplicationsOverview(count) {
+  const safeCount = Math.max(0, Number(count || 0));
+  if (safeCount > 0) {
+    setOverviewModuleState("overviewApplicationsBody", {
+      state: "populated",
+      summary: `${pluralizeCount(safeCount, "application")} awaiting review`,
+    });
+    return;
+  }
+  setOverviewModuleState("overviewApplicationsBody", {
+    state: "empty",
+    summary: "No applications yet.",
+    detail: "Applications will appear here when paralegals apply.",
+  });
+}
+
+function renderMessagesOverview(count) {
+  const safeCount = Math.max(0, Number(count || 0));
+  const countNode = document.getElementById("messageCount");
+  if (countNode) {
+    countNode.textContent = String(safeCount);
+    countNode.hidden = true;
+  }
+  setOverviewModuleState("overviewMessagesBody", {
+    state: safeCount > 0 ? "populated" : "empty",
+    summary: safeCount > 0 ? pluralizeCount(safeCount, "unread message") : "You’re all caught up.",
+  });
+}
+
+function renderCompletedOverview(count) {
+  const safeCount = Math.max(0, Number(count || 0));
+  setOverviewModuleState("overviewCompletedBody", {
+    state: safeCount > 0 ? "populated" : "empty",
+    summary: safeCount > 0 ? pluralizeCount(safeCount, "completed matter") : "No completed matters yet.",
+  });
+}
+
+function renderWeekOverview({ count = 0, deadlines = [] } = {}) {
+  const body = document.getElementById("deadlineList");
+  if (!body) return;
+  const safeCount = Math.max(0, Number(count || 0));
+  const rows = Array.isArray(deadlines) ? deadlines.slice(0, 3) : [];
+  const card = body.closest(".mini-deadlines");
+  body.dataset.state = safeCount > 0 ? "populated" : "empty";
+  card?.setAttribute("aria-busy", "false");
+  if (!safeCount) {
+    body.innerHTML = `<p class="overview-module-summary">No deadlines this week.</p>`;
+    return;
+  }
+  const rowsMarkup = rows.map((deadline) => {
+    const caseId = String(deadline?.caseId || "");
+    const href = caseId ? `case-detail.html?id=${encodeURIComponent(caseId)}` : "#cases";
+    const formattedDate = window.LPCBusinessDate?.format(deadline?.dueDate, { year: undefined }) || String(deadline?.dueDate || "");
+    return `
+      <li class="overview-deadline-row">
+        <a href="${sanitize(href)}">${sanitize(deadline?.title || "Untitled Matter")}</a>
+        <time datetime="${sanitize(deadline?.dueDate || "")}">${sanitize(formattedDate)}</time>
+      </li>`;
+  }).join("");
+  body.innerHTML = `
+    <p class="overview-module-summary overview-deadline-summary">${sanitize(pluralizeCount(safeCount, "deadline"))} this week</p>
+    ${rowsMarkup ? `<ul class="overview-deadline-list">${rowsMarkup}</ul>` : ""}
+  `;
+}
+
 async function initOverviewPage() {
   const messageBox = document.getElementById("messageBox");
   const messageCountSpan = document.getElementById("messageCount");
-  const messageLabelSpan = document.getElementById("messageLabel");
   const completedJobsList = document.getElementById("completedJobsList");
   const messageSnippet = document.getElementById("messageSnippet");
   const messagePreviewSender = document.getElementById("messagePreviewSender");
@@ -1084,10 +1157,6 @@ async function initOverviewPage() {
   const weeklyNotesRange = document.getElementById("weeklyNotesRange");
   const onboardingAttentionCard = document.getElementById("attorneyOnboardingAttentionCard");
   const onboardingAttentionAction = onboardingAttentionCard?.querySelector("[data-onboarding-attention-action]");
-  const onboardingAttentionSkip = onboardingAttentionCard?.querySelector("[data-onboarding-attention-skip]");
-  const onboardingAttentionSteps = Array.from(
-    onboardingAttentionCard?.querySelectorAll("[data-onboarding-check-step]") || []
-  );
   const caseOnboardingSkipBtn = document.getElementById("caseOnboardingSkipBtn");
   const attentionList = document.getElementById("attorneyNeedsAttentionList");
   setupOnboardingChecklist();
@@ -1105,20 +1174,9 @@ async function initOverviewPage() {
     event?.stopPropagation?.();
     skipAttorneyOnboardingFlow();
   };
-  onboardingAttentionSteps.forEach((node) => {
-    node.addEventListener("click", () => {
-      handleOnboardingStepOpen(node.dataset.onboardingCheckStep);
-    });
-    node.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      handleOnboardingStepOpen(node.dataset.onboardingCheckStep);
-    });
-  });
   onboardingAttentionAction?.addEventListener("click", () => {
     handleOnboardingStepOpen(onboardingAttentionCard?.dataset.step);
   });
-  onboardingAttentionSkip?.addEventListener("click", handleSkipOnboarding);
   caseOnboardingSkipBtn?.addEventListener("click", handleSkipOnboarding);
   attentionList?.addEventListener("click", (event) => {
     const action = event.target?.closest?.("[data-attention-action]");
@@ -1151,20 +1209,16 @@ async function initOverviewPage() {
   function updateMessageBubble(count = 0) {
     if (messageCountSpan) {
       messageCountSpan.textContent = String(count);
-      messageCountSpan.classList.remove("is-muted");
-      if (messageCountSpan.parentElement) {
-        messageCountSpan.parentElement.hidden = count === 0;
-      }
+      messageCountSpan.hidden = true;
     }
-    if (messageLabelSpan) {
-      messageLabelSpan.textContent =
-        count === 0 ? "Caught up" : count === 1 ? "message waiting" : "messages waiting";
-    }
+    renderMessagesOverview(count);
     updateOverviewSignals({ unreadCount: count });
   }
 
-  updateMessageBubble(0);
-  fetchUnreadMessages().catch((error) => console.warn("[attorney] unread message hydration rejected", error));
+  fetchUnreadMessages().catch((error) => {
+    setOverviewModuleState("overviewMessagesBody", { state: "failed", summary: "Unable to load unread messages." });
+    console.warn("[attorney] unread message hydration rejected", error);
+  });
   loadCompletedJobs(completedJobsList).catch((error) => console.warn("[attorney] completed Matter hydration rejected", error));
   hydrateOverview().catch((error) => console.warn("[attorney] overview hydration rejected", error));
   setupWeeklyNoteModal();
@@ -1185,14 +1239,11 @@ async function initOverviewPage() {
   });
 
   async function fetchUnreadMessages() {
-    try {
-      const res = await secureFetch("/api/messages/unread-count", { headers: { Accept: "application/json" }, noRedirect: true });
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      updateMessageBubble(data.count || 0);
-    } catch (err) {
-      console.warn("Message count fallback", err?.message);
-    }
+    const res = await secureFetch("/api/messages/unread-count", { headers: { Accept: "application/json" }, noRedirect: true });
+    if (!res.ok) throw new Error("Failed to fetch unread messages");
+    const data = await res.json();
+    updateMessageBubble(data.count || 0);
+    return data.count || 0;
   }
 
   function shouldPollOverview() {
@@ -1201,7 +1252,12 @@ async function initOverviewPage() {
 
   async function refreshOverviewMessages({ force = false } = {}) {
     if (!force && !shouldPollOverview()) return;
-    await fetchUnreadMessages();
+    try {
+      await fetchUnreadMessages();
+    } catch (error) {
+      setOverviewModuleState("overviewMessagesBody", { state: "failed", summary: "Unable to load unread messages." });
+      console.warn("Unable to refresh unread messages", error);
+    }
     const threads = await fetchThreadsOverview(200);
     const threadByCase = new Map();
     (threads || []).forEach((thread) => {
@@ -1236,20 +1292,52 @@ async function initOverviewPage() {
 
   async function hydrateOverview() {
     try {
-      const [dashboard, overdueCount, events, threads, apps, hasPaymentMethod] = await Promise.all([
+      const [
+        dashboardResult,
+        overdueResult,
+        threadsResult,
+        applicationsResult,
+        paymentMethodResult,
+        casesResult,
+        archivedCasesResult,
+      ] = await Promise.allSettled([
         fetchDashboardData(),
         fetchOverdueCount(),
-        fetchUpcomingEvents(),
         fetchThreadsOverview(200),
         loadApplicationsForMyJobs(),
         hasDefaultPaymentMethod(),
         loadCasesWithFiles(),
         loadArchivedCases(),
       ]);
+      const dashboard = dashboardResult.status === "fulfilled" ? dashboardResult.value : null;
+      const overdueCount = overdueResult.status === "fulfilled" ? overdueResult.value : 0;
+      const threads = threadsResult.status === "fulfilled" ? threadsResult.value : [];
+      const apps = applicationsResult.status === "fulfilled" ? applicationsResult.value : [];
+      const hasPaymentMethod = paymentMethodResult.status === "fulfilled" ? paymentMethodResult.value : false;
       state.billing.hasPaymentMethod = hasPaymentMethod;
       onboardingAttentionHydrated = true;
       updateOnboardingChecklist();
-      applyApplicationsToCases(apps || []);
+      if (applicationsResult.status === "fulfilled") {
+        applyApplicationsToCases(apps || []);
+        renderApplicationsOverview(filterApplicationsForDisplay(apps || []).length);
+      } else {
+        setOverviewModuleState("overviewApplicationsBody", {
+          state: "failed",
+          summary: "Unable to load applications.",
+        });
+      }
+      if (dashboard) {
+        renderMattersOverview(dashboard?.metrics?.activeCases);
+        renderCompletedOverview(dashboard?.metrics?.completedCases);
+        renderWeekOverview({
+          count: dashboard?.metrics?.weekDeadlines,
+          deadlines: dashboard?.week?.deadlines,
+        });
+      } else {
+        setOverviewModuleState("overviewMattersBody", { state: "failed", summary: "Unable to load active matters." });
+        setOverviewModuleState("overviewCompletedBody", { state: "failed", summary: "Unable to load completed matters." });
+        setOverviewModuleState("deadlineList", { state: "failed", summary: "Unable to load this week’s deadlines." });
+      }
       const eligibleCaseIds = new Set(
         filterWorkspaceEligibleCases(state.cases).map((item) => String(item.id || item._id || ""))
       );
@@ -1265,10 +1353,14 @@ async function initOverviewPage() {
       });
       state.overview.cases = filteredCaseCards;
       state.overview.eligibleCaseIds = eligibleCaseIds;
-      updateMetrics(dashboard?.metrics, overdueCount);
-      renderCaseCards(caseCards, filteredCaseCards, threadByCase);
+      if (dashboard) updateMetrics(dashboard.metrics, overdueCount);
+      if (dashboard) {
+        renderCaseCards(caseCards, filteredCaseCards, threadByCase);
+      } else if (caseCards) {
+        caseCards.setAttribute("aria-busy", "false");
+        caseCards.innerHTML = `<div class="matter-row"><div class="matter-main"><div class="matter-title">Unable to load recent matters</div><div class="matter-meta">Refresh the page to try again.</div></div></div>`;
+      }
       renderEscrowPanel(escrowDetails);
-      renderDeadlines(deadlineList, events);
       updateMessagePreviewUI({
         threads,
         messageSnippet,
@@ -1276,13 +1368,18 @@ async function initOverviewPage() {
         messagePreviewText,
         eligibleCaseIds,
       });
-      renderApplications(apps || [], hasPaymentMethod);
+      if (applicationsResult.status === "fulfilled") renderApplications(apps || [], hasPaymentMethod);
       updateOverviewSignals(
         buildOverviewSignals({ cases: state.cases, archivedCases: state.casesArchived, apps, overdueCount })
       );
+      if (casesResult.status === "rejected") console.warn("Unable to load active matter records", casesResult.reason);
+      if (archivedCasesResult.status === "rejected") console.warn("Unable to load archived matter records", archivedCasesResult.reason);
     } catch (err) {
       console.warn("Overview hydration failed", err);
-      if (deadlineList) deadlineList.innerHTML = `<div class="info-line" style="color:var(--muted);">Unable to load deadlines.</div>`;
+      setOverviewModuleState("overviewMattersBody", { state: "failed", summary: "Unable to load active matters." });
+      setOverviewModuleState("overviewApplicationsBody", { state: "failed", summary: "Unable to load applications." });
+      setOverviewModuleState("overviewCompletedBody", { state: "failed", summary: "Unable to load completed matters." });
+      setOverviewModuleState("deadlineList", { state: "failed", summary: "Unable to load this week’s deadlines." });
       onboardingAttentionHydrated = true;
       updateOnboardingChecklist();
     }
@@ -6157,16 +6254,11 @@ async function fetchThreadsOverview(limit = 10) {
 }
 
 async function fetchApplicationsForMyJobs() {
-  try {
-    const res = await secureFetch("/api/applications/my-postings", {
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) throw new Error("Unable to load applications");
-    return res.json();
-  } catch (err) {
-    console.warn("Failed to load applications", err);
-    return [];
-  }
+  const res = await secureFetch("/api/applications/my-postings", {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error("Unable to load applications");
+  return res.json();
 }
 
 async function loadApplicationsForMyJobs({ force = false } = {}) {
@@ -6178,11 +6270,6 @@ async function loadApplicationsForMyJobs({ force = false } = {}) {
     applyApplicationsToCases(applicationsCache);
     return applicationsCache;
   })()
-    .catch((err) => {
-      console.warn("Applications load failed", err);
-      applicationsCache = [];
-      return [];
-    })
     .finally(() => {
       applicationsPromise = null;
     });
@@ -6512,6 +6599,7 @@ async function refreshApplicationsOverview({ force = false } = {}) {
   state.billing.hasPaymentMethod = hasPaymentMethod;
   updateOnboardingChecklist();
   renderApplications(apps || [], hasPaymentMethod);
+  renderApplicationsOverview(filterApplicationsForDisplay(apps || []).length);
   updateOverviewSignals(
     buildOverviewSignals({
       cases: state.cases,
@@ -7023,7 +7111,7 @@ function ensureHireModalStyles() {
     .hire-confirm-row strong{font-size:1.3rem;font-weight:300;color:var(--ink,#1a1a1a)}
     .hire-confirm-total strong{font-weight:400}
     .hire-confirm-help{display:flex;justify-content:flex-end;margin-top:-6px}
-    .hire-confirm-info{width:26px;height:26px;border-radius:50%;border:1px solid var(--line,rgba(0,0,0,0.08));background:var(--panel,#fff);color:var(--muted,#666);font-size:0.8rem;font-weight:250;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0;transition:border-color .2s ease,color .2s ease,transform .15s ease}
+    .hire-confirm-info{width:40px;height:40px;border-radius:50%;border:1px solid var(--line,rgba(0,0,0,0.08));background:var(--panel,#fff);color:var(--muted,#5f6670);font-size:0.8rem;font-weight: 200;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0;transition:border-color .2s ease,color .2s ease,transform .15s ease}
     .hire-confirm-info:hover,
     .hire-confirm-info:focus-visible{border-color:var(--accent,#b6a47a);color:var(--ink,#1a1a1a);transform:translateY(-1px)}
     .hire-confirm-tooltip{position:absolute;right:0;bottom:calc(100% + 10px);width:min(320px,80vw);padding:12px 14px;border-radius:12px;background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));box-shadow:0 18px 40px rgba(0,0,0,.18);font-size:0.9rem;line-height:1.45;color:var(--ink,#1a1a1a);opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .15s ease,transform .15s ease;z-index:2}
@@ -7037,6 +7125,7 @@ function ensureHireModalStyles() {
     .hire-confirm-terms-link:hover{color:var(--ink,#1a1a1a)}
     .hire-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:4px;flex-wrap:wrap}
     .hire-confirm-actions[hidden]{display:none}
+    @media (max-width:640px){.hire-confirm-info{width:44px;height:44px}}
     @media (prefers-reduced-motion: reduce){
       .hire-confirm-overlay,.hire-confirm-modal{transition:none}
     }
@@ -7058,7 +7147,7 @@ function openHireConfirmModal({
   ensureHireModalStyles();
   const safeName = sanitize(paralegalName || "Paralegal");
   const feeNote =
-    "The platform fee supports tools that enable attorneys and paralegals to collaborate, including the Matter workspace, messaging, document sharing, workflow tools, Stripe payment processing, account review, and platform administration. The platform fee is not a fee for legal services.";
+    "Platform fees support LPC’s application and eligibility review, technology and Matter workspace, platform support, applicable Stripe processing costs, and other platform operations. Platform fees are not fees for legal services.";
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
@@ -7504,11 +7593,12 @@ function openHireConfirmModal({
 
 function renderCaseCards(container, cases = [], threadsByCase = new Map()) {
   if (!container) return;
+  container.setAttribute("aria-busy", "false");
   const homeView = document.querySelector(".view-home");
   if (homeView) {
     homeView.classList.toggle("home-compact", cases.length <= 2);
   }
-  const pageCases = cases.slice(0, HOME_PAGE_SIZE);
+  const pageCases = cases.slice(0, HOME_RECENT_MATTERS_LIMIT);
   if (!cases.length) {
     container.hidden = false;
     container.innerHTML = `

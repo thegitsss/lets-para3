@@ -71,7 +71,7 @@ From a clean checkout of the target commit and its retained candidate manifest:
 2. Run `npm run verify:production`; retain its evidence artifact.
 3. Confirm the suspended incident worker's last heartbeat and the latest automation/monitor executions report the target commit. While LPC maintenance mode remains active, automation must report an intentional pause and the monitor must report `operatingState: "paused"` with `maintenance_mode_active`; neither should claim ordinary healthy operation. The monitor may exit successfully for that intentional state and an expected Render maintenance-page 503, but any unrelated failed check must still fail the run.
 4. Verify representative, read-only attorney, Paralegal, admin/director, Matter, message, file-metadata, payment-ledger, and audit-record reads.
-5. Verify login, legal re-acceptance enforcement, authorization boundaries, and the branded 404/indexing/security-header contract.
+5. Verify login, authorization boundaries, and the branded 404/indexing/security-header contract.
 6. Reconcile Stripe webhooks, payment operations, payouts, disputes, deletion tasks, file-scan states, and migration state before allowing their mutations to resume.
 7. Confirm the owner-alert path can deliver a recovery notice and is not flooding.
 

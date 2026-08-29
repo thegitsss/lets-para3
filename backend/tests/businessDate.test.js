@@ -2,10 +2,12 @@ const {
   addCalendarDays,
   dateOnlyFromZonedInstant,
   dateOnlyToUtcDate,
+  endOfWeekDateOnly,
   formatDateOnly,
   normalizeDateOnly,
   parseMatterDeadline,
   resolveMatterDeadlineDate,
+  startOfWeekDateOnly,
 } = require("../utils/businessDate");
 
 describe("Matter business dates", () => {
@@ -43,6 +45,13 @@ describe("Matter business dates", () => {
   test("adds calendar days without daylight-saving arithmetic", () => {
     expect(addCalendarDays("2026-03-07", 2)).toBe("2026-03-09");
     expect(addCalendarDays("2026-12-31", 1)).toBe("2027-01-01");
+  });
+
+  test("resolves Monday-through-Sunday business week boundaries", () => {
+    expect(startOfWeekDateOnly("2026-08-21")).toBe("2026-08-17");
+    expect(endOfWeekDateOnly("2026-08-21")).toBe("2026-08-23");
+    expect(startOfWeekDateOnly("2026-08-17")).toBe("2026-08-17");
+    expect(endOfWeekDateOnly("2026-08-23")).toBe("2026-08-23");
   });
 
   test("formats a calendar date without shifting it across timezones", () => {

@@ -57,7 +57,7 @@ body.lpc-product-clean .lpc-universal-header-controls .support-launcher {
 body.lpc-product-clean .lpc-universal-header-controls :where(.notification-icon, .support-launcher):hover,
 body.lpc-product-clean .lpc-universal-header-controls :where(.notification-icon, .support-launcher):focus-visible {
   color: #24324a;
-  background: #f6f8fb;
+  background: transparent;
   outline: none;
   opacity: 1;
   transform: none;

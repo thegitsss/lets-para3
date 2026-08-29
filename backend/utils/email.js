@@ -266,7 +266,7 @@ function sendNotAcceptedEmail(lastName) {
     "Our team reviews every submission carefully, and if you believe we may have missed important information in your application, you’re welcome to reply to this email.",
     "Thank you again for your interest in the community.",
   ]);
-  return `${body}<p>For more information about our admissions process, please see our Paralegal Admission Requirements page.</p>`;
+  return `${body}<p>For more information about our admissions process, please see the Our Vetting Process page.</p>`;
 }
 
 async function sendWelcomePacket(user) {
@@ -352,7 +352,6 @@ async function sendAccountDeactivatedEmail(user, opts = {}) {
     (process.env.EMAIL_BASE_URL || process.env.APP_BASE_URL || "https://www.lets-paraconnect.com");
   const assetBase = String(baseUrl).replace(/\/+$/, "").replace(/\/profile-settings\.html$/, "");
   const logoUrl = `${assetBase}/Cleanfav.png`;
-  const heroUrl = `${assetBase}/hero-mountain.jpg`;
 
   const subject = "Your Let’s-ParaConnect account has been deactivated";
   const html = `
@@ -372,11 +371,6 @@ async function sendAccountDeactivatedEmail(user, opts = {}) {
                   </td>
                 </tr>
               </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
             </td>
           </tr>
           <tr>

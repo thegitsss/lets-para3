@@ -3,13 +3,7 @@ import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus
 import { showAlert } from "./utils/dialogs.js";
 import { normalizeHttpNavigationUrl, normalizeSameOriginPath } from "./utils/navigation-url.js";
 
-const PLACEHOLDER_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-  `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>
-    <rect width='220' height='220' rx='110' fill='#f1f5f9'/>
-    <circle cx='110' cy='90' r='46' fill='#cbd5e1'/>
-    <path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/>
-  </svg>`
-)}`;
+const PLACEHOLDER_AVATAR = "/assets/avatar-placeholder.svg";
 const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
 const PLATFORM_FEE_PCT = 22;
 const DEFAULT_HIRE_ERROR = "Unable to hire paralegal.";
@@ -428,7 +422,7 @@ function hydrateHeader() {
   }
   const avatarSrc =
     getProfileImageUrl(state.viewerUser, { allowPending: canEditProfile() }) ||
-    buildInitialAvatar(getInitials(formatName(state.viewerUser)));
+    PLACEHOLDER_AVATAR;
   if (elements.chipAvatar && avatarSrc) {
     elements.chipAvatar.src = avatarSrc;
     elements.chipAvatar.alt = `${formatName(state.viewerUser)} avatar`;
@@ -1461,9 +1455,9 @@ function ensureHireModalStyles() {
     .hire-confirm-modal .btn:focus-visible{outline:2px solid #b6a47a;outline-offset:2px}
     .hire-confirm-modal .btn:disabled,
     .hire-confirm-modal .btn[aria-disabled="true"]{opacity:0.6;cursor:not-allowed}
-    .hire-confirm-modal p{font-weight:300;color:#6b7280}
+    .hire-confirm-modal p{font-weight:300;color:#5f6670}
     .hire-confirm-title{font-weight:300;font-size:1.6rem;letter-spacing:0.01em;text-align:center}
-    .hire-pre-helper{margin:0 0 16px;color:#6b7280;line-height:1.5}
+    .hire-pre-helper{margin:0 0 16px;color:#5f6670;line-height:1.5}
     .hire-pre-options{display:grid;gap:10px;margin-bottom:14px}
     .hire-pre-option{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid rgba(0,0,0,0.08);border-radius:14px;background:#fff;cursor:pointer;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease}
     .hire-pre-option:hover{border-color:rgba(182,164,122,.65);box-shadow:0 10px 24px rgba(15,23,42,.06)}
@@ -1476,18 +1470,18 @@ function ensureHireModalStyles() {
     .hire-pre-upload{display:grid;gap:8px}
     .hire-pre-upload input[type="file"]{display:none}
     .hire-pre-upload-trigger{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:1px solid rgba(26,34,48,0.18);border-radius:999px;background:#fff;color:#1a1a1a;font-weight:300;cursor:pointer;width:max-content}
-    .hire-pre-upload-name{font-size:0.9rem;color:#6b7280}
+    .hire-pre-upload-name{font-size:0.9rem;color:#5f6670}
     .hire-pre-reveal textarea{border:1px solid rgba(26,34,48,0.18);border-radius:12px;padding:10px;font:inherit;min-height:104px;resize:vertical;background:#fff;color:#1a1a1a}
     .hire-pre-reveal textarea.is-invalid{border-color:rgba(185,28,28,.45);background:rgba(254,242,242,.55)}
     .hire-pre-upload-trigger.is-invalid{border-color:rgba(185,28,28,.45);color:#991b1b;background:rgba(254,242,242,.55)}
     .hire-pre-field-help{font-size:0.85rem;color:#991b1b;margin-top:-2px}
     .hire-confirm-summary{border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:14px 18px;display:grid;gap:12px;background:#fff}
     .hire-confirm-row{display:flex;justify-content:space-between;gap:16px;align-items:baseline}
-    .hire-confirm-row span{text-transform:uppercase;font-size:0.75rem;letter-spacing:0.08em;color:#6b7280;font-weight:300}
+    .hire-confirm-row span{text-transform:uppercase;font-size:0.75rem;letter-spacing:0.08em;color:#5f6670;font-weight:300}
     .hire-confirm-row strong{font-size:1.3rem;font-weight:300;color:#1a1a1a}
     .hire-confirm-total strong{font-weight:400}
     .hire-confirm-help{display:flex;justify-content:flex-end;margin-top:-6px}
-    .hire-confirm-info{width:26px;height:26px;border-radius:50%;border:1px solid rgba(0,0,0,0.08);background:#fff;color:#94a3b8;font-size:0.8rem;font-weight:250;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0;transition:border-color .2s ease,color .2s ease,transform .15s ease}
+    .hire-confirm-info{width:40px;height:40px;border-radius:50%;border:1px solid rgba(0,0,0,0.08);background:#fff;color:#5f6670;font-size:0.8rem;font-weight: 200;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0;transition:border-color .2s ease,color .2s ease,transform .15s ease}
     .hire-confirm-info:hover,
     .hire-confirm-info:focus-visible{border-color:#b6a47a;color:#1a1a1a;transform:translateY(-1px)}
     .hire-confirm-tooltip{position:absolute;right:0;bottom:calc(100% + 10px);width:min(320px,80vw);padding:12px 14px;border-radius:12px;background:#fff;border:1px solid rgba(0,0,0,0.08);box-shadow:0 18px 40px rgba(0,0,0,.18);font-size:0.9rem;line-height:1.5;color:#1a1a1a;opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .15s ease,transform .15s ease;z-index:2}
@@ -1499,6 +1493,7 @@ function ensureHireModalStyles() {
     .hire-confirm-terms-link:hover{color:#1a1a1a}
     .hire-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:4px;flex-wrap:wrap}
     .hire-confirm-actions[hidden]{display:none}
+    @media (max-width:640px){.hire-confirm-info{width:44px;height:44px}}
     @media (prefers-reduced-motion: reduce){
       .hire-confirm-overlay,.hire-confirm-modal{transition:none}
     }
@@ -1510,7 +1505,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   ensureHireModalStyles();
   const safeName = escapeHtml(paralegalName || "Paralegal");
   const feeNote =
-    "The platform fee supports tools that enable attorneys and paralegals to collaborate, including the Matter workspace, messaging, document sharing, workflow tools, Stripe payment processing, account review, and platform administration. The platform fee is not a fee for legal services.";
+    "Platform fees support LPC’s application and eligibility review, technology and Matter workspace, platform support, applicable Stripe processing costs, and other platform operations. Platform fees are not fees for legal services.";
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
@@ -1995,21 +1990,6 @@ function describeExperience(years) {
 function getInitials(name = "") {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return (parts[0]?.[0] || "L").toUpperCase() + (parts[1]?.[0] || "P").toUpperCase();
-}
-
-function buildInitialAvatar(initials) {
-  const safe = (initials || "LP").slice(0, 2).toUpperCase();
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>
-    <defs>
-      <linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'>
-        <stop offset='0%' stop-color='#f4f0e6'/>
-        <stop offset='100%' stop-color='#e1dacb'/>
-      </linearGradient>
-    </defs>
-    <rect width='200' height='200' rx='30' ry='30' fill='url(#grad)'/>
-    <text x='50%' y='55%' font-size='72' text-anchor='middle' fill='#4a4030' font-family='Sarabun, Arial' font-weight='600'>${safe}</text>
-  </svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
 function escapeHtml(value = "") {

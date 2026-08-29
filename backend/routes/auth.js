@@ -47,8 +47,7 @@ const {
   applyVerifiedEmail,
 } = require("../utils/emailVerification");
 const {
-  applyCurrentLegalAcceptance,
-  serializeLegalAcceptance,
+  recordSignupPolicyAcknowledgement,
 } = require("../utils/legalDocuments");
 const { csrfProtection, respondToCsrfError } = require("../utils/csrf");
 const { createS3Client } = require("../utils/s3Client");
@@ -212,7 +211,6 @@ function serializePendingHire(pendingHire = {}) {
 
 function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
   const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
   const unsubscribeLine = unsubscribeUrl
@@ -236,11 +234,6 @@ function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
                   </td>
                 </tr>
               </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
             </td>
           </tr>
           <tr>
@@ -330,8 +323,8 @@ function buildTwoFactorEmailHtml(user, code) {
 }
 
 function buildApplicationSubmissionEmailHtml(user, opts = {}) {
+  const isAttorney = String(user?.role || "").toLowerCase() === "attorney";
   const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
   const unsubscribeLine = unsubscribeUrl
@@ -358,22 +351,18 @@ function buildApplicationSubmissionEmailHtml(user, opts = {}) {
             </td>
           </tr>
           <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
-            </td>
-          </tr>
-          <tr>
             <td align="center" style="padding:8px 32px 0;">
               <div style="font-family:Georgia, 'Times New Roman', serif;font-size:34px;letter-spacing:0.06em;color:#6e6e6e;">
-                Application received
+                ${isAttorney ? "Registration received" : "Application received"}
               </div>
             </td>
           </tr>
           <tr>
             <td align="center" style="padding:16px 32px 0;">
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.08em;color:#1f1f1f;line-height:1.6;">
-                Thank you for applying to Let’s-ParaConnect. Our team is reviewing your application and submitted information,
-                and we’ll email you as soon as the review is complete.
+                ${isAttorney
+                  ? "Thank you for registering with Let’s-ParaConnect. We received your attorney information and will email you when your LPC account is ready."
+                  : "Thank you for applying to Let’s-ParaConnect. Our team is reviewing your application and submitted information, and we’ll email you as soon as the review is complete."}
               </div>
             </td>
           </tr>
@@ -389,8 +378,9 @@ function buildApplicationSubmissionEmailHtml(user, opts = {}) {
           <tr>
             <td align="center" style="padding:0 32px 28px;">
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
-                We’ll email you when the review is complete. If any submitted information changes before then,
-                reply to this email and our team will help.
+                ${isAttorney
+                  ? "If any registration information changes before your account is ready, reply to this email and our team will help."
+                  : "We’ll email you when the review is complete. If any submitted information changes before then, reply to this email and our team will help."}
               </div>
             </td>
           </tr>
@@ -572,14 +562,6 @@ function roleDashboard(role) {
   if (normalizedRole === "director") return "/director-portal.html";
   if (normalizedRole === "paralegal") return "/dashboard-paralegal.html";
   return "/dashboard-attorney.html";
-}
-
-function legalAcceptanceFields(user) {
-  const legalAcceptance = serializeLegalAcceptance(user);
-  return {
-    legalAcceptanceRequired: legalAcceptance.required,
-    legalAcceptance,
-  };
 }
 
 async function startGoogleTwoFactor(req, res, user) {
@@ -928,11 +910,7 @@ router.get(
           authLogger.warn("[auth.google] welcome notification failed");
         }
       }
-      return res.redirect(
-        serializeLegalAcceptance(linkedUser).required
-          ? "/legal-acceptance.html"
-          : roleDashboard(linkedUser.role)
-      );
+      return res.redirect(roleDashboard(linkedUser.role));
     }
 
     const emailOwner = await User.findOne({
@@ -1182,6 +1160,17 @@ router.post(
       }
     }
 
+    const parsedYearsExperience = Number(yearsExperience);
+    if (
+      roleLc === "paralegal" &&
+      (!Number.isInteger(parsedYearsExperience) || parsedYearsExperience < 1 || parsedYearsExperience > 80)
+    ) {
+      return res.status(400).json({
+        msg: "At least one year of professional paralegal experience is required.",
+      });
+    }
+    const safeYearsExperience = roleLc === "paralegal" ? parsedYearsExperience : undefined;
+
     const resumeFile = req.files?.resume?.[0] || req.files?.resumeFile?.[0] || null;
     const certificateFile = req.files?.certificateFile?.[0] || null;
 
@@ -1258,11 +1247,6 @@ router.post(
 
     // Let the model hash the password (pre-save hook)
 
-    const parsedYearsExperience = parseInt(yearsExperience, 10);
-    const safeYearsExperience = Number.isFinite(parsedYearsExperience)
-      ? Math.max(0, Math.min(80, parsedYearsExperience))
-      : undefined;
-
     const user = new User({
       firstName: safeFirst,
       lastName: safeLast,
@@ -1295,7 +1279,7 @@ router.post(
           ]
         : [],
     });
-    applyCurrentLegalAcceptance(user, { source: "signup" });
+    recordSignupPolicyAcknowledgement(user);
 
     if (roleLc === "attorney" && normalizedBarState) {
       user.location = normalizedBarState;
@@ -1370,6 +1354,17 @@ router.post(
         userId: String(user._id),
         error: error?.message || String(error),
       });
+    }
+
+    if (!googleSignupHandoff) {
+      try {
+        await sendVerificationEmail({ user, email: user.email });
+      } catch (error) {
+        authLogger.warn("[auth] signup verification email delivery failed", {
+          userId: String(user._id),
+          error: error?.message || String(error),
+        });
+      }
     }
 
     await AuditLog.logFromReq(req, "auth.register", {
@@ -1581,7 +1576,6 @@ router.post(
         isFirstLogin,
         onboarding: serializeOnboarding(user.onboarding || {}),
         pendingHire: serializePendingHire(user.pendingHire || {}),
-        ...legalAcceptanceFields(user),
       },
     });
   })
@@ -1691,7 +1685,6 @@ router.post(
         isFirstLogin,
         onboarding: serializeOnboarding(user.onboarding || {}),
         pendingHire: serializePendingHire(user.pendingHire || {}),
-        ...legalAcceptanceFields(user),
       },
     });
   })
@@ -1789,7 +1782,6 @@ router.post(
         isFirstLogin,
         onboarding: serializeOnboarding(user.onboarding || {}),
         pendingHire: serializePendingHire(user.pendingHire || {}),
-        ...legalAcceptanceFields(user),
       },
     });
   })
@@ -1883,7 +1875,6 @@ router.post(
         isFirstLogin,
         onboarding: serializeOnboarding(user.onboarding || {}),
         pendingHire: serializePendingHire(user.pendingHire || {}),
-        ...legalAcceptanceFields(user),
       },
     });
   })
@@ -1939,15 +1930,15 @@ router.get(
           disabled: Boolean(u.disabled),
           preferences: {
             theme:
-              (u.preferences && typeof u.preferences === "object" && u.preferences.theme) ||
-              "mountain",
+              String(u.preferences && typeof u.preferences === "object" ? u.preferences.theme || "" : "").toLowerCase() === "dark"
+                ? "dark"
+                : "light",
             fontSize:
               (u.preferences && typeof u.preferences === "object" && u.preferences.fontSize) ||
               "md",
           },
           onboarding: serializeOnboarding(u.onboarding || {}),
           pendingHire: serializePendingHire(u.pendingHire || {}),
-          ...legalAcceptanceFields(u),
         },
       });
     } catch (error) {

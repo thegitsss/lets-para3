@@ -276,7 +276,7 @@ async function runRoleJourney(browser, role) {
   assert.equal(new URL(page.url()).searchParams.get("tab"), expectedKeyboardTab);
   assert.equal(await page.evaluate(() => document.activeElement?.dataset?.matterTab), expectedKeyboardTab);
 
-  await page.click("#caseNextAction");
+  await page.click('[data-matter-tab="work"]');
   assert.equal(new URL(page.url()).searchParams.get("tab"), "work");
   await page.click("#caseDisputeButton");
   const actionOverlay = role === "attorney" ? ".case-dispute-overlay.is-visible" : ".case-flag-overlay.is-visible";

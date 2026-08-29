@@ -2,7 +2,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { findActiveSession } = require("../services/authSessionService");
-const { serializeLegalAcceptance } = require("./legalDocuments");
 
 const DEACTIVATED_ACCOUNT_MSG = "This account has been deactivated.";
 
@@ -141,19 +140,6 @@ function shapeUser(payload) {
   };
 }
 
-function isLegalAcceptanceExemptRequest(req) {
-  const requestPath = String(req?.originalUrl || req?.url || "").split("?")[0];
-  return (
-    requestPath === "/api/account/legal-acceptance" ||
-    requestPath === "/api/auth/me" ||
-    requestPath === "/api/auth/logout"
-  );
-}
-
-function isLegalAcceptanceEnforced(env = process.env) {
-  return env.NODE_ENV === "production" || String(env.REQUIRE_LEGAL_ACCEPTANCE || "").toLowerCase() === "true";
-}
-
 // -------------------------------
 // Middleware factory
 // -------------------------------
@@ -202,7 +188,6 @@ function makeVerifier(required = true) {
         if (!required) return next();
         return res.status(403).json({ msg: "Session expired" });
       }
-      const legalAcceptance = serializeLegalAcceptance(currentUser);
       req.user = {
         _id: String(currentUser._id),
         id: String(currentUser._id),
@@ -212,22 +197,8 @@ function makeVerifier(required = true) {
         approved: String(currentUser.status || "").toLowerCase() === "approved",
         scopes: user.scopes,
         orgId: user.orgId,
-        legalAcceptanceRequired: legalAcceptance.required,
       };
       req.authSessionId = user.sessionId;
-      if (
-        required &&
-        isLegalAcceptanceEnforced() &&
-        req.user.approved &&
-        legalAcceptance.required &&
-        !isLegalAcceptanceExemptRequest(req)
-      ) {
-        return res.status(428).json({
-          error: "Updated legal documents must be accepted before continuing.",
-          code: "LEGAL_ACCEPTANCE_REQUIRED",
-          legalAcceptance,
-        });
-      }
     } catch (err) {
       return next(err);
     }
@@ -241,7 +212,5 @@ function verifyToken(req, res, next) {
   return makeVerifier(true)(req, res, next);
 }
 verifyToken.optional = makeVerifier(false);
-verifyToken.isLegalAcceptanceExemptRequest = isLegalAcceptanceExemptRequest;
-verifyToken.isLegalAcceptanceEnforced = isLegalAcceptanceEnforced;
 
 module.exports = verifyToken;

@@ -9,6 +9,7 @@ const { projectPresentation } = require("../services/objectSystem/presentationCo
 
 const frontendRoot = path.resolve(__dirname, "../../frontend");
 const cropFixturePath = path.join(frontendRoot, "favicon-32x32.png");
+const accountSettingsScreenshotDir = process.env.LPC_ACCOUNT_SETTINGS_SCREENSHOTS || "";
 const profileId = "64b000000000000000000021";
 const viewerId = "64b000000000000000000022";
 const updatedAt = "2026-08-10T12:00:00.000Z";
@@ -17,6 +18,9 @@ const onePixelPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
   "base64"
 );
+const wideAttorneyPhotoPath = path.join(frontendRoot, "assets/images/homepage-matter/lpc-sky-v1.jpg");
+const wideAttorneyPhoto = fs.existsSync(wideAttorneyPhotoPath) ? fs.readFileSync(wideAttorneyPhotoPath) : onePixelPng;
+const wideAttorneyPhotoContentType = fs.existsSync(wideAttorneyPhotoPath) ? "image/jpeg" : "image/png";
 
 const profile = {
   _id: profileId,
@@ -96,7 +100,10 @@ function contentTypeFor(filePath) {
   return "application/octet-stream";
 }
 
-async function installRoutes(page, { role, photoStatus = 200 } = {}) {
+async function installRoutes(
+  page,
+  { role, photoStatus = 200, attorneyPhoto = false, userGetDelayMs = 0, dashboardState = "populated", dashboardDelayMs = 0 } = {}
+) {
   let viewer = role === "paralegal"
     ? {
         ...profile,
@@ -119,6 +126,13 @@ async function installRoutes(page, { role, photoStatus = 200 } = {}) {
         practiceDescription: "Litigation counsel working with distributed legal teams.",
         bio: "Litigation counsel working with distributed legal teams.",
         publications: ["Practical Discovery, 2025"],
+        ...(attorneyPhoto
+          ? {
+              profileImage: `/api/users/profile-photo/${viewerId}?v=${Date.parse(updatedAt)}`,
+              avatarURL: `/api/users/profile-photo/${viewerId}?v=${Date.parse(updatedAt)}`,
+              profilePhotoStatus: "approved",
+            }
+          : {}),
       };
   const state = {
     get viewer() {
@@ -126,7 +140,17 @@ async function installRoutes(page, { role, photoStatus = 200 } = {}) {
     },
     patchRequests: [],
     profilePhotoUploads: [],
+    profilePhotoUploadAttempts: 0,
+    preferenceRequests: [],
     failNextProfilePatch: false,
+    failNextPhotoUpload: false,
+    failNextPhotoRemoval: false,
+    dashboardRequests: {
+      summary: 0,
+      applications: 0,
+      unread: 0,
+      events: 0,
+    },
   };
 
   await page.addInitScript((user) => {
@@ -156,22 +180,74 @@ async function installRoutes(page, { role, photoStatus = 200 } = {}) {
       await route.fulfill({ json: { user: state.viewer } });
       return;
     }
+    if (url.pathname === "/api/account/2fa") {
+      await route.fulfill({ json: { enabled: false, method: "email" } });
+      return;
+    }
+    if (url.pathname === "/api/account/passkeys") {
+      await route.fulfill({ json: { passkeys: [] } });
+      return;
+    }
+    if (url.pathname === "/api/account/sessions") {
+      await route.fulfill({ json: { sessions: [] } });
+      return;
+    }
+    if (url.pathname === "/api/blocks") {
+      await route.fulfill({ json: [] });
+      return;
+    }
+    if (url.pathname === "/api/users/me/pending-hire") {
+      await route.fulfill({ json: { pendingHire: null } });
+      return;
+    }
+    if (url.pathname === "/api/payments/payment-method/default") {
+      await route.fulfill({ json: { paymentMethod: null } });
+      return;
+    }
+    if (url.pathname === "/api/payments/history") {
+      await route.fulfill({ json: { items: [], totalSpent: 0, averageJobCost: 0, count: 0 } });
+      return;
+    }
+    if (url.pathname === "/api/account/preferences") {
+      if (route.request().method() === "POST") {
+        const payload = route.request().postDataJSON();
+        state.preferenceRequests.push(payload);
+        await route.fulfill({ json: { success: true, preferences: payload, state: payload.state || "" } });
+      } else {
+        await route.fulfill({ json: { email: true, theme: "mountain", fontSize: "md", hideProfile: false, state: "VA" } });
+      }
+      return;
+    }
     if (url.pathname === "/api/users/me") {
       if (route.request().method() === "PATCH") {
         const payload = route.request().postDataJSON();
         state.patchRequests.push(payload);
         await new Promise((resolve) => setTimeout(resolve, 120));
+        const removesPhoto = payload.profileImage === "" || payload.avatarURL === "";
+        if (removesPhoto && state.failNextPhotoRemoval) {
+          state.failNextPhotoRemoval = false;
+          await route.fulfill({ status: 503, json: { error: "Temporary photo removal failure" } });
+          return;
+        }
         if (state.failNextProfilePatch) {
           state.failNextProfilePatch = false;
           await route.fulfill({ status: 503, json: { error: "Temporary profile failure" } });
           return;
         }
         viewer = { ...viewer, ...payload };
+      } else if (userGetDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, userGetDelayMs));
       }
       await route.fulfill({ json: state.viewer });
       return;
     }
     if (url.pathname === "/api/uploads/profile-photo" && route.request().method() === "POST") {
+      state.profilePhotoUploadAttempts += 1;
+      if (state.failNextPhotoUpload) {
+        state.failNextPhotoUpload = false;
+        await route.fulfill({ status: 503, json: { error: "Temporary photo upload failure" } });
+        return;
+      }
       const body = route.request().postDataBuffer();
       state.profilePhotoUploads.push({
         contentType: route.request().headers()["content-type"] || "",
@@ -215,7 +291,11 @@ async function installRoutes(page, { role, photoStatus = 200 } = {}) {
       return;
     }
     if (url.pathname.startsWith("/api/users/profile-photo/")) {
-      await route.fulfill({ status: 200, contentType: "image/png", body: onePixelPng });
+      await route.fulfill({
+        status: 200,
+        contentType: attorneyPhoto ? wideAttorneyPhotoContentType : "image/png",
+        body: attorneyPhoto ? wideAttorneyPhoto : onePixelPng,
+      });
       return;
     }
     if (url.pathname === `/api/paralegals/${profileId}` || url.pathname === `/api/public/paralegals/${profileId}`) {
@@ -230,6 +310,92 @@ async function installRoutes(page, { role, photoStatus = 200 } = {}) {
     }
     if (url.pathname === "/api/cases/my-active") {
       await route.fulfill({ json: { items: [] } });
+      return;
+    }
+    if (role === "attorney" && url.pathname === "/api/attorney/dashboard") {
+      state.dashboardRequests.summary += 1;
+      if (dashboardDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, dashboardDelayMs));
+      const empty = dashboardState === "empty";
+      const singular = dashboardState === "singular";
+      await route.fulfill({
+        json: {
+          metrics: {
+            activeCases: empty ? 0 : singular ? 1 : 6,
+            completedCases: empty ? 0 : singular ? 1 : 12,
+            openJobs: empty ? 0 : singular ? 1 : 2,
+            pendingApplications: empty ? 0 : singular ? 1 : 4,
+            weekDeadlines: empty ? 0 : singular ? 1 : 2,
+            escrowTotal: 0,
+          },
+          activeCases: empty ? [] : [
+            { caseId: "66b000000000000000000001", jobTitle: "Martinez discovery", practiceArea: "Civil litigation", paralegalName: "Jordan Lee", status: "in progress", createdAt: "2026-08-18T12:00:00.000Z" },
+            { caseId: "66b000000000000000000002", jobTitle: "Northstar contract review", practiceArea: "Contract law", paralegalName: "Taylor Morgan", status: "in progress", createdAt: "2026-08-17T12:00:00.000Z" },
+            { caseId: "66b000000000000000000003", jobTitle: "Acme document production", practiceArea: "Commercial litigation", paralegalName: "Avery Chen", status: "in progress", createdAt: "2026-08-16T12:00:00.000Z" },
+          ].slice(0, singular ? 1 : 3),
+          openJobs: [],
+          pendingApplications: [],
+          week: {
+            start: "2026-08-17",
+            end: "2026-08-23",
+            deadlines: empty ? [] : [
+              { caseId: "66b000000000000000000001", title: "Martinez discovery", dueDate: "2026-08-21", href: "case-detail.html?id=66b000000000000000000001" },
+              { caseId: "66b000000000000000000002", title: "Northstar contract review", dueDate: "2026-08-23", href: "case-detail.html?id=66b000000000000000000002" },
+            ].slice(0, singular ? 1 : 2),
+          },
+        },
+      });
+      return;
+    }
+    if (role === "attorney" && url.pathname === "/api/cases/my") {
+      const empty = dashboardState === "empty";
+      const singular = dashboardState === "singular";
+      const archived = url.searchParams.get("archived") === "true";
+      const activeCases = [
+        { id: "66b000000000000000000001", _id: "66b000000000000000000001", title: "Martinez discovery", practiceArea: "Civil litigation", status: "in progress", archived: false, paymentReleased: false, escrowStatus: "funded", escrowIntentId: "pi_1", paralegal: { id: "66c000000000000000000001", firstName: "Jordan", lastName: "Lee" }, createdAt: "2026-08-18T12:00:00.000Z", files: [] },
+        { id: "66b000000000000000000002", _id: "66b000000000000000000002", title: "Northstar contract review", practiceArea: "Contract law", status: "in progress", archived: false, paymentReleased: false, escrowStatus: "funded", escrowIntentId: "pi_2", paralegal: { id: "66c000000000000000000002", firstName: "Taylor", lastName: "Morgan" }, createdAt: "2026-08-17T12:00:00.000Z", files: [] },
+        { id: "66b000000000000000000003", _id: "66b000000000000000000003", title: "Acme document production", practiceArea: "Commercial litigation", status: "in progress", archived: false, paymentReleased: false, escrowStatus: "funded", escrowIntentId: "pi_3", paralegal: { id: "66c000000000000000000003", firstName: "Avery", lastName: "Chen" }, createdAt: "2026-08-16T12:00:00.000Z", files: [] },
+      ];
+      const completedCases = [
+        { id: "66b000000000000000000010", _id: "66b000000000000000000010", title: "Completed test matter", practiceArea: "Civil litigation", status: "completed", archived: true, paymentReleased: false, completedAt: "2026-08-01T12:00:00.000Z", createdAt: "2026-07-01T12:00:00.000Z", files: [] },
+      ];
+      await route.fulfill({ json: empty ? [] : archived ? completedCases : activeCases.slice(0, singular ? 1 : 3) });
+      return;
+    }
+    if (role === "attorney" && url.pathname === "/api/applications/my-postings") {
+      state.dashboardRequests.applications += 1;
+      if (dashboardDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, dashboardDelayMs));
+      if (dashboardState === "applications-failed") {
+        await route.fulfill({ status: 503, json: { error: "Applications temporarily unavailable" } });
+        return;
+      }
+      const applications = dashboardState === "empty" ? [] : Array.from({ length: dashboardState === "singular" ? 1 : 4 }, (_, index) => ({
+        id: `application-${index + 1}`,
+        jobId: `job-${index + 1}`,
+        jobTitle: `Matter ${index + 1}`,
+        practiceArea: "Civil litigation",
+        paralegal: { id: `paralegal-${index + 1}`, firstName: "Applicant", lastName: String(index + 1) },
+        createdAt: `2026-08-${String(20 - index).padStart(2, "0")}T12:00:00.000Z`,
+      }));
+      await route.fulfill({ json: applications });
+      return;
+    }
+    if (role === "attorney" && url.pathname === "/api/messages/unread-count") {
+      state.dashboardRequests.unread += 1;
+      if (dashboardDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, dashboardDelayMs));
+      await route.fulfill({ json: { count: dashboardState === "empty" ? 0 : dashboardState === "singular" ? 1 : 3 } });
+      return;
+    }
+    if (role === "attorney" && url.pathname === "/api/messages/threads") {
+      await route.fulfill({ json: { threads: [] } });
+      return;
+    }
+    if (role === "attorney" && url.pathname === "/api/events") {
+      state.dashboardRequests.events += 1;
+      await route.fulfill({ json: { items: [], total: 0, page: 1, pages: 0 } });
+      return;
+    }
+    if (role === "attorney" && url.pathname === "/api/checklist") {
+      await route.fulfill({ json: { items: [], total: 0, page: 1, pages: 0 } });
       return;
     }
     if (url.pathname.startsWith("/api/")) {
@@ -268,6 +434,370 @@ async function assertNoHorizontalOverflow(page) {
       .slice(0, 20),
   }));
   assert.ok(dimensions.scrollWidth <= dimensions.viewport + 1, JSON.stringify(dimensions));
+}
+
+async function assertNoCormorant(page, rootSelector = "body") {
+  await page.evaluate(() => document.fonts?.ready);
+  const offenders = await page.locator(rootSelector).evaluate((root) =>
+    [...root.querySelectorAll("*")]
+      .filter((node) => getComputedStyle(node).fontFamily.toLowerCase().includes("cormorant"))
+      .slice(0, 20)
+      .map((node) => ({
+        tag: node.tagName,
+        id: node.id,
+        className: typeof node.className === "string" ? node.className : "",
+        fontFamily: getComputedStyle(node).fontFamily,
+      }))
+  );
+  assert.deepEqual(offenders, [], JSON.stringify(offenders, null, 2));
+}
+
+async function assertStripeDashboardEmphasis(page, rootSelector = "body") {
+  const offenders = await page.locator(rootSelector).evaluate((root) =>
+    [...root.querySelectorAll("h1, h2, h3, h4, h5, h6, strong, b")]
+      .map((node) => ({
+        tag: node.tagName,
+        text: String(node.textContent || "").trim().slice(0, 80),
+        fontFamily: getComputedStyle(node).fontFamily,
+        fontWeight: getComputedStyle(node).fontWeight,
+      }))
+      .filter(({ tag, fontFamily, fontWeight }) =>
+        !/Söhne.*SF Pro Display/i.test(fontFamily) ||
+        (/^H[1-6]$/.test(tag) ? fontWeight !== "400" : fontWeight !== "500")
+      )
+      .slice(0, 30)
+  );
+  assert.deepEqual(offenders, [], JSON.stringify(offenders, null, 2));
+}
+
+async function assertStripeDashboardShell(page) {
+  await page.locator(".lpc-global-search-trigger").waitFor({ state: "visible" });
+  const isAttorney = await page.locator("body").evaluate((body) => body.classList.contains("attorney-dashboard"));
+  const shell = await page.locator("#sidebarNav").evaluate((sidebar) => {
+    const nav = sidebar.querySelector("nav");
+    const firstLink = nav?.querySelector("a, button");
+    const style = getComputedStyle(sidebar);
+    return {
+      width: sidebar.getBoundingClientRect().width,
+      backgroundColor: style.backgroundColor,
+      borderRightColor: style.borderRightColor,
+      navGap: nav ? getComputedStyle(nav).rowGap : "",
+      linkHeight: firstLink?.getBoundingClientRect().height || 0,
+      linkRadius: firstLink ? getComputedStyle(firstLink).borderRadius : "",
+    };
+  });
+  assert.ok(Math.abs(shell.width - 230) <= 1, JSON.stringify(shell));
+  assert.equal(shell.backgroundColor, "rgb(255, 255, 255)", JSON.stringify(shell));
+  assert.equal(
+    shell.borderRightColor,
+    isAttorney ? "rgb(216, 229, 239)" : "rgb(227, 232, 238)",
+    JSON.stringify(shell)
+  );
+  assert.equal(shell.navGap, "2px", JSON.stringify(shell));
+  assert.ok(shell.linkHeight >= 35 && shell.linkHeight <= 37, JSON.stringify(shell));
+  assert.equal(shell.linkRadius, "6px", JSON.stringify(shell));
+
+  const layout = await page.evaluate(() => {
+    const main = document.querySelector("main.main");
+    const topbar = document.querySelector(".topbar");
+    const searchHost = document.querySelector(".lpc-global-search-host");
+    const searchTrigger = document.querySelector(".lpc-global-search-trigger");
+    const searchLabel = document.querySelector(".lpc-global-search-trigger-label");
+    const mainStyle = getComputedStyle(main);
+    const triggerStyle = getComputedStyle(searchTrigger);
+    const mainContentLeft = main.getBoundingClientRect().left + parseFloat(mainStyle.paddingLeft);
+    return {
+      mainContentLeft,
+      mainPaddingLeft: parseFloat(mainStyle.paddingLeft),
+      mainPaddingRight: parseFloat(mainStyle.paddingRight),
+      mainPaddingBottom: parseFloat(mainStyle.paddingBottom),
+      topbarMarginBottom: parseFloat(getComputedStyle(topbar).marginBottom),
+      searchWidth: searchHost.getBoundingClientRect().width,
+      searchLeft: searchHost.getBoundingClientRect().left,
+      searchHeight: searchTrigger.getBoundingClientRect().height,
+      searchRadius: triggerStyle.borderRadius,
+      searchBackground: triggerStyle.backgroundColor,
+      searchLabelOpacity: getComputedStyle(searchLabel).opacity,
+    };
+  });
+  assert.ok(layout.mainPaddingLeft >= 40 && layout.mainPaddingLeft <= 72, JSON.stringify(layout));
+  assert.equal(layout.mainPaddingLeft, layout.mainPaddingRight, JSON.stringify(layout));
+  assert.equal(layout.mainPaddingBottom, 88, JSON.stringify(layout));
+  assert.ok(layout.topbarMarginBottom >= 32, JSON.stringify(layout));
+  assert.ok(layout.searchWidth >= 260 && layout.searchWidth <= 321, JSON.stringify(layout));
+  assert.ok(Math.abs(layout.searchLeft - layout.mainContentLeft) <= 1, JSON.stringify(layout));
+  assert.equal(layout.searchHeight, 40, JSON.stringify(layout));
+  assert.equal(layout.searchRadius, "8px", JSON.stringify(layout));
+  assert.equal(
+    layout.searchBackground,
+    isAttorney ? "rgb(238, 245, 251)" : "rgb(246, 248, 250)",
+    JSON.stringify(layout)
+  );
+  assert.equal(layout.searchLabelOpacity, "1", JSON.stringify(layout));
+}
+
+async function assertDashboardBodyCopyUsesSarabun(page, selector) {
+  const typography = await page.locator(selector).first().evaluate((node) => ({
+    fontFamily: getComputedStyle(node).fontFamily,
+    fontWeight: getComputedStyle(node).fontWeight,
+  }));
+  assert.match(typography.fontFamily, /Sarabun/i, JSON.stringify(typography));
+  assert.doesNotMatch(typography.fontFamily, /Söhne|SF Pro Display/i, JSON.stringify(typography));
+}
+
+async function assertAttorneyOperationalHome(page) {
+  await page.locator("#attorneyNeedsAttention").waitFor({ state: "visible" });
+  await page.locator("#attorneyOnboardingAttentionCard").waitFor({ state: "visible" });
+  await page.waitForFunction(() => document.getElementById("user-name-heading")?.textContent?.trim() === "Alex");
+  await page.waitForFunction(() =>
+    ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
+      .every((id) => ["populated", "empty", "failed"].includes(document.getElementById(id)?.dataset.state))
+  );
+
+  const home = await page.evaluate(() => {
+    const actionQueue = document.getElementById("attorneyNeedsAttention");
+    const recentMatters = document.querySelector(".view-home #caseCards")?.closest(".ledger-shell");
+    const onboarding = document.getElementById("attorneyOnboardingAttentionCard");
+    const statusRail = document.querySelector(".view-home .status-rail-shell");
+    const statusGrid = document.querySelector(".view-home .status-rail");
+    const overviewGrid = document.querySelector(".view-home .home-overview-grid");
+    const overviewCards = Array.from(overviewGrid.querySelectorAll(":scope > .status-rail > .status-item"));
+    const completedCard = overviewGrid.querySelector(":scope > .status-rail > .status-completed");
+    const deadlinesCard = overviewGrid.querySelector(":scope > .mini-deadlines");
+    const caseLedger = document.querySelector(".view-home .case-ledger");
+    const commandHeader = document.querySelector(".view-home .command-header");
+    const homeLayout = document.querySelector(".view-home .home-layout");
+    const homeMain = document.querySelector(".view-home .home-main");
+    const homeSidebar = document.querySelector(".view-home .home-sidebar");
+    const recentTitle = recentMatters.querySelector(".ledger-title");
+    const overviewTitle = statusRail.querySelector(".status-overview-title");
+    const matterRows = Array.from(caseLedger.querySelectorAll(".matter-row:not(.skeleton-row)"));
+    const style = (node) => {
+      const computed = getComputedStyle(node);
+      return {
+        borderTopWidth: computed.borderTopWidth,
+        borderRightWidth: computed.borderRightWidth,
+        borderBottomWidth: computed.borderBottomWidth,
+        borderLeftWidth: computed.borderLeftWidth,
+        borderRadius: computed.borderRadius,
+        boxShadow: computed.boxShadow,
+      };
+    };
+    return {
+      bodyClass: document.body.classList.contains("attorney-dashboard"),
+      heading: document.querySelector(".view-home .command-header h1")?.textContent?.trim(),
+      summary: document.querySelector(".view-home .command-summary")?.textContent?.trim(),
+      summaryNameMinWidth: getComputedStyle(document.getElementById("user-name-heading")).minWidth,
+      createHref: new URL(document.querySelector(".command-create-matter")?.href || "", location.href).pathname,
+      actionQueue: style(actionQueue),
+      actionQueueInMain: actionQueue.parentElement === homeMain,
+      actionQueueDisplay: getComputedStyle(actionQueue).display,
+      actionQueueColumns: getComputedStyle(actionQueue).gridTemplateColumns,
+      actionQueueBackground: getComputedStyle(actionQueue).backgroundColor,
+      headerToAttentionGap: actionQueue.getBoundingClientRect().top - commandHeader.getBoundingClientRect().bottom,
+      overviewGap: statusRail.getBoundingClientRect().top - homeLayout.getBoundingClientRect().bottom,
+      overviewTop: statusRail.getBoundingClientRect().top,
+      overviewWidth: statusRail.getBoundingClientRect().width,
+      overviewHeading: overviewTitle.textContent?.trim(),
+      overviewGridDisplay: getComputedStyle(overviewGrid).display,
+      overviewGridColumns: getComputedStyle(overviewGrid).gridTemplateColumns,
+      overviewGridGap: parseFloat(getComputedStyle(overviewGrid).gap),
+      overviewCardCount: overviewCards.length,
+      overviewCardMinHeight: Math.min(...overviewCards.map((node) => node.getBoundingClientRect().height)),
+      overviewCardMaxHeight: Math.max(...overviewCards.map((node) => node.getBoundingClientRect().height)),
+      overviewFirstCardBorder: getComputedStyle(overviewCards[0]).borderTopWidth,
+      overviewFirstCardWidth: overviewCards[0]?.getBoundingClientRect().width || 0,
+      overviewCompletedWidth: completedCard.getBoundingClientRect().width,
+      deadlinesCardWidth: deadlinesCard.getBoundingClientRect().width,
+      overviewExtendsBelowFold: overviewGrid.getBoundingClientRect().bottom > window.innerHeight,
+      recentMatters: style(recentMatters),
+      recentMatterColumns: getComputedStyle(caseLedger).gridTemplateColumns,
+      recentMatterDisplay: getComputedStyle(caseLedger).display,
+      recentMatterCount: matterRows.length,
+      recentMattersAllHref: recentMatters.querySelector('.recent-matters-all')?.getAttribute('href'),
+      recentMattersAllTarget: recentMatters.querySelector('.recent-matters-all')?.dataset.viewTarget,
+      matterRows: matterRows.slice(0, 2).map((row) => ({
+        left: row.getBoundingClientRect().left,
+        top: row.getBoundingClientRect().top,
+        width: row.getBoundingClientRect().width,
+        paddingTop: parseFloat(getComputedStyle(row).paddingTop),
+        paddingBottom: parseFloat(getComputedStyle(row).paddingBottom),
+      })),
+      recentTitleSize: parseFloat(getComputedStyle(recentTitle).fontSize),
+      recentTitleWeight: Number(getComputedStyle(recentTitle).fontWeight),
+      overviewTitleSize: parseFloat(getComputedStyle(overviewTitle).fontSize),
+      onboarding: style(onboarding),
+      onboardingBackground: getComputedStyle(onboarding).backgroundColor,
+      onboardingHeight: onboarding.getBoundingClientRect().height,
+      onboardingInRail: onboarding.parentElement === homeSidebar,
+      recentMattersInRail: recentMatters.parentElement === homeSidebar,
+      recentMattersInMain: recentMatters.parentElement === homeMain,
+      overviewAfterLayout: statusRail.previousElementSibling === homeLayout,
+      overviewInHomePanel: statusRail.parentElement === document.getElementById("homeCasesPanel"),
+      onboardingProgressCopy: onboarding.querySelector('[data-onboarding-progress-copy]')?.textContent?.trim(),
+      onboardingProgressNow: onboarding.querySelector('.onboarding-attention-progress')?.getAttribute('aria-valuenow'),
+      onboardingProgressWidth: onboarding.querySelector('[data-onboarding-progress-bar]')?.getBoundingClientRect().width,
+      onboardingProgressTrackWidth: onboarding.querySelector('.onboarding-attention-progress')?.getBoundingClientRect().width,
+      onboardingButtonCount: onboarding.querySelectorAll('button').length,
+      onboardingChecklistCount: onboarding.querySelectorAll('[data-onboarding-check-step]').length,
+      onboardingStep: onboarding.dataset.step,
+      onboardingCta: onboarding.querySelector('[data-onboarding-attention-action]')?.textContent?.trim(),
+      onboardingFullyVisible: onboarding.getBoundingClientRect().bottom <= window.innerHeight,
+      onboardingProgressColor: getComputedStyle(onboarding.querySelector('[data-onboarding-progress-bar]')).backgroundColor,
+      overviewStates: Object.fromEntries(
+        ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
+          .map((id) => [id, document.getElementById(id)?.dataset.state])
+      ),
+      overviewCopy: Object.fromEntries(
+        ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
+          .map((id) => [id, document.getElementById(id)?.textContent?.replace(/\s+/g, " ").trim()])
+      ),
+      deadlineRowCount: document.querySelectorAll("#deadlineList .overview-deadline-row").length,
+      statusRail: style(statusRail),
+      statusColumns: getComputedStyle(statusGrid).gridTemplateColumns,
+      weeklyNotesOnHome: Boolean(document.querySelector(".view-home .weekly-notes")),
+      weeklyNotesInTasks: Boolean(document.querySelector('.view-tasks .weekly-notes')),
+      mainWidth: homeMain.getBoundingClientRect().width,
+      railWidth: homeSidebar.getBoundingClientRect().width,
+      columnGap: homeSidebar.getBoundingClientRect().left - homeMain.getBoundingClientRect().right,
+      canvasBackground: getComputedStyle(document.querySelector('main.main')).backgroundColor,
+      searchBackground: getComputedStyle(document.querySelector('.lpc-global-search-trigger')).backgroundColor,
+      activeNavBackground: getComputedStyle(document.querySelector('#sidebarNav [data-view-target="home"]')).backgroundColor,
+      createMatterBackground: getComputedStyle(document.querySelector('.command-create-matter')).backgroundColor,
+      keyShadows: [actionQueue, recentMatters, onboarding, statusRail, commandHeader].map((node) => getComputedStyle(node).boxShadow),
+    };
+  });
+
+  assert.equal(home.bodyClass, true, JSON.stringify(home));
+  assert.equal(home.heading, "Today", JSON.stringify(home));
+  assert.match(home.summary, /Welcome, Alex\. Here’s what needs your attention\./, JSON.stringify(home));
+  assert.equal(home.summaryNameMinWidth, "0px", JSON.stringify(home));
+  assert.equal(home.createHref, "/create-case.html", JSON.stringify(home));
+  assert.equal(home.actionQueueInMain, true, JSON.stringify(home));
+  assert.equal(home.actionQueue.borderLeftWidth, "0px", JSON.stringify(home));
+  assert.equal(home.actionQueue.borderRadius, "0px", JSON.stringify(home));
+  assert.equal(home.actionQueueDisplay, "block", JSON.stringify(home));
+  assert.equal(home.actionQueueColumns, "none", JSON.stringify(home));
+  assert.equal(home.actionQueueBackground, "rgb(255, 255, 255)", JSON.stringify(home));
+  assert.ok(home.headerToAttentionGap >= 40 && home.headerToAttentionGap <= 48, JSON.stringify(home));
+  assert.ok(home.overviewGap >= 48 && home.overviewGap <= 56, JSON.stringify(home));
+  assert.ok(Math.abs(home.overviewWidth - (home.mainWidth + home.railWidth + home.columnGap)) <= 2, JSON.stringify(home));
+  assert.equal(home.overviewHeading, "Your overview", JSON.stringify(home));
+  assert.equal(home.overviewGridDisplay, "grid", JSON.stringify(home));
+  assert.equal(home.overviewGridColumns.split(" ").length, 3, JSON.stringify(home));
+  assert.ok(home.overviewGridGap >= 8 && home.overviewGridGap <= 12, JSON.stringify(home));
+  assert.equal(home.overviewCardCount, 4, JSON.stringify(home));
+  assert.ok(home.overviewCardMinHeight >= 150 && home.overviewCardMinHeight <= 180, JSON.stringify(home));
+  assert.ok(home.overviewCardMaxHeight <= 180, JSON.stringify(home));
+  assert.equal(home.overviewFirstCardBorder, "1px", JSON.stringify(home));
+  assert.ok(Math.abs(home.overviewCompletedWidth - home.overviewFirstCardWidth) <= 2, JSON.stringify(home));
+  assert.ok(home.deadlinesCardWidth >= home.overviewFirstCardWidth * 1.9, JSON.stringify(home));
+  assert.equal(home.recentMatters.borderLeftWidth, "0px", JSON.stringify(home));
+  assert.equal(home.recentMatters.borderRadius, "0px", JSON.stringify(home));
+  assert.equal(home.recentMatterDisplay, "block", JSON.stringify(home));
+  assert.doesNotMatch(home.recentMatterColumns, /px .*px/, JSON.stringify(home));
+  assert.ok(home.recentMatterCount <= 3, JSON.stringify(home));
+  assert.equal(home.recentMattersAllHref, "#cases", JSON.stringify(home));
+  assert.equal(home.recentMattersAllTarget, "cases", JSON.stringify(home));
+  if (home.matterRows.length > 1) {
+    assert.ok(home.matterRows[1].top > home.matterRows[0].top, JSON.stringify(home));
+    assert.ok(Math.abs(home.matterRows[1].left - home.matterRows[0].left) <= 1, JSON.stringify(home));
+    assert.ok(Math.abs(home.matterRows[1].width - home.matterRows[0].width) <= 1, JSON.stringify(home));
+  }
+  home.matterRows.forEach((row) => {
+    assert.equal(row.paddingTop, 16, JSON.stringify(home));
+    assert.equal(row.paddingBottom, 16, JSON.stringify(home));
+  });
+  assert.equal(home.recentTitleWeight, 400, JSON.stringify(home));
+  assert.ok(home.overviewTitleSize > home.recentTitleSize, JSON.stringify(home));
+  assert.equal(home.onboardingInRail, true, JSON.stringify(home));
+  assert.equal(home.recentMattersInRail, false, JSON.stringify(home));
+  assert.equal(home.recentMattersInMain, true, JSON.stringify(home));
+  assert.equal(home.overviewAfterLayout, true, JSON.stringify(home));
+  assert.equal(home.overviewInHomePanel, true, JSON.stringify(home));
+  assert.equal(home.onboarding.borderTopWidth, "0px", JSON.stringify(home));
+  assert.equal(home.onboarding.borderLeftWidth, "0px", JSON.stringify(home));
+  assert.equal(home.onboarding.borderRadius, "8px", JSON.stringify(home));
+  assert.equal(home.onboardingBackground, "rgb(238, 245, 251)", JSON.stringify(home));
+  assert.ok(home.onboardingHeight <= 230, JSON.stringify(home));
+  assert.match(home.onboardingProgressCopy, /^\d of 3 complete$/, JSON.stringify(home));
+  assert.match(home.onboardingProgressNow, /^[0-3]$/, JSON.stringify(home));
+  assert.ok(home.onboardingProgressWidth <= home.onboardingProgressTrackWidth, JSON.stringify(home));
+  assert.equal(home.onboardingButtonCount, 1, JSON.stringify(home));
+  assert.equal(home.onboardingChecklistCount, 0, JSON.stringify(home));
+  assert.equal(home.onboardingStep, "payment", JSON.stringify(home));
+  assert.equal(home.onboardingCta, "Open payments", JSON.stringify(home));
+  assert.equal(home.onboardingFullyVisible, true, JSON.stringify(home));
+  assert.equal(home.onboardingProgressColor, "rgb(85, 124, 159)", JSON.stringify(home));
+  assert.deepEqual(home.overviewStates, {
+    overviewMattersBody: "populated",
+    overviewApplicationsBody: "populated",
+    overviewMessagesBody: "populated",
+    overviewCompletedBody: "populated",
+    deadlineList: "populated",
+  }, JSON.stringify(home));
+  assert.equal(home.overviewCopy.overviewMattersBody, "6 active matters", JSON.stringify(home));
+  assert.equal(home.overviewCopy.overviewApplicationsBody, "4 applications awaiting review", JSON.stringify(home));
+  assert.equal(home.overviewCopy.overviewMessagesBody, "3 unread messages", JSON.stringify(home));
+  assert.equal(home.overviewCopy.overviewCompletedBody, "12 completed matters", JSON.stringify(home));
+  assert.match(home.overviewCopy.deadlineList, /^2 deadlines this week/, JSON.stringify(home));
+  assert.equal(home.deadlineRowCount, 2, JSON.stringify(home));
+  assert.equal(home.statusRail.borderLeftWidth, "0px", JSON.stringify(home));
+  assert.equal(home.statusRail.borderRightWidth, "0px", JSON.stringify(home));
+  assert.equal(home.statusRail.borderRadius, "0px", JSON.stringify(home));
+  assert.doesNotMatch(home.statusColumns, /px .*px/, JSON.stringify(home));
+  assert.equal(home.weeklyNotesOnHome, false, JSON.stringify(home));
+  assert.equal(home.weeklyNotesInTasks, true, JSON.stringify(home));
+  assert.ok(home.mainWidth / (home.mainWidth + home.railWidth) >= 0.69, JSON.stringify(home));
+  assert.ok(home.mainWidth / (home.mainWidth + home.railWidth) <= 0.71, JSON.stringify(home));
+  assert.ok(home.columnGap >= 32 && home.columnGap <= 40, JSON.stringify(home));
+  assert.equal(home.canvasBackground, "rgb(255, 255, 255)", JSON.stringify(home));
+  assert.equal(home.searchBackground, "rgb(238, 245, 251)", JSON.stringify(home));
+  assert.equal(home.activeNavBackground, "rgb(238, 245, 251)", JSON.stringify(home));
+  assert.equal(home.createMatterBackground, "rgb(255, 255, 255)", JSON.stringify(home));
+  assert.deepEqual(home.keyShadows, ["none", "none", "none", "none", "none"], JSON.stringify(home));
+}
+
+async function assertAttorneyWeeklyNotesInTasks(page) {
+  await page.evaluate(() => {
+    window.location.hash = "tasks";
+  });
+  await page.locator('[data-view="tasks"]').waitFor({ state: "visible" });
+  await page.locator('.view-tasks .weekly-notes').waitFor({ state: "visible" });
+  await page.waitForFunction(() => document.getElementById("weeklyNotesRange")?.textContent?.trim().length > 0);
+  await page.waitForFunction(() => document.querySelectorAll('.view-tasks .weekly-note-day').length >= 7);
+
+  const placement = await page.evaluate(() => {
+    const taskView = document.querySelector('.view-tasks');
+    const taskShell = taskView.querySelector('.tasks-shell');
+    const taskBoard = taskView.querySelector('.task-board');
+    const weeklyNotes = taskView.querySelector('.weekly-notes');
+    const styles = getComputedStyle(weeklyNotes);
+    return {
+      onlyInstance: document.querySelectorAll('.weekly-notes').length,
+      insideTaskShell: weeklyNotes.parentElement === taskShell,
+      sectionGap: weeklyNotes.getBoundingClientRect().top - taskBoard.getBoundingClientRect().bottom,
+      borderLeftWidth: styles.borderLeftWidth,
+      borderRadius: styles.borderRadius,
+      backgroundColor: styles.backgroundColor,
+      dayCount: weeklyNotes.querySelectorAll('.weekly-note-day').length,
+    };
+  });
+
+  assert.equal(placement.onlyInstance, 1, JSON.stringify(placement));
+  assert.equal(placement.insideTaskShell, true, JSON.stringify(placement));
+  assert.ok(placement.sectionGap >= 40, JSON.stringify(placement));
+  assert.equal(placement.borderLeftWidth, "0px", JSON.stringify(placement));
+  assert.equal(placement.borderRadius, "0px", JSON.stringify(placement));
+  assert.equal(placement.backgroundColor, "rgba(0, 0, 0, 0)", JSON.stringify(placement));
+  assert.ok(placement.dayCount >= 7, JSON.stringify(placement));
+
+  const rangeBefore = (await page.locator('#weeklyNotesRange').textContent()).trim();
+  await page.locator('#weeklyNotesPrev').click();
+  await page.waitForFunction(
+    (previousRange) => document.getElementById("weeklyNotesRange")?.textContent?.trim() !== previousRange,
+    rangeBefore
+  );
 }
 
 async function runDirectory(browser, viewport, photoStatus = 200, role = "attorney") {
@@ -314,8 +844,9 @@ async function runDirectory(browser, viewport, photoStatus = 200, role = "attorn
   } else {
     await page.waitForFunction((id) => {
       const node = document.querySelector(`.paralegal-card[data-paralegal-id="${id}"] img`);
-      return String(node?.src || "").startsWith("data:image/svg+xml");
+      return node?.complete && node.naturalWidth > 0 && new URL(node.src).pathname === "/assets/avatar-placeholder.svg";
     }, profileId);
+    assert.equal(new URL(await image.getAttribute("src"), "http://lpc.test").pathname, "/assets/avatar-placeholder.svg");
   }
   await assertNoHorizontalOverflow(page);
   if (photoStatus === 200) {
@@ -352,7 +883,7 @@ async function runProfileSettingsCropper(browser, { role, viewport }) {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   const state = await installRoutes(page, { role });
-  await page.goto("http://lpc.test/profile-settings.html");
+  await page.goto(`http://lpc.test/profile-settings.html${role === "attorney" ? "#profile" : ""}`);
 
   const isAttorney = role === "attorney";
   const rolePanel = page.locator(isAttorney ? "#attorneySettings" : "#paralegalSettings");
@@ -384,32 +915,73 @@ async function runProfileSettingsCropper(browser, { role, viewport }) {
     JSON.stringify(accessibility.violations, null, 2)
   );
 
+  await page.evaluate(() => {
+    const stage = document.getElementById("photoCropStage");
+    window.__cropperMutationAudit = { added: 0, removed: 0 };
+    window.__cropperMutationObserver = new MutationObserver((records) => {
+      records.forEach((record) => {
+        record.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE && node.matches?.("cropper-image")) {
+            window.__cropperMutationAudit.added += 1;
+          }
+        });
+        record.removedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE && node.matches?.("cropper-image")) {
+            window.__cropperMutationAudit.removed += 1;
+          }
+        });
+      });
+    });
+    window.__cropperMutationObserver.observe(stage, { childList: true, subtree: true });
+  });
+  const cropSelectionBox = await page.locator(".photo-crop-stage cropper-selection").boundingBox();
+  assert.ok(cropSelectionBox, "Cropper selection has no draggable bounds");
+  const dragX = cropSelectionBox.x + cropSelectionBox.width / 2;
+  const dragY = cropSelectionBox.y + cropSelectionBox.height / 2;
+  await page.mouse.move(dragX, dragY);
+  await page.mouse.down();
+  await page.mouse.move(dragX + 8, dragY + 4, { steps: 8 });
+  await page.mouse.up();
+  const cropperMutationAudit = await page.evaluate(() => {
+    window.__cropperMutationObserver.disconnect();
+    return window.__cropperMutationAudit;
+  });
+  assert.deepEqual(cropperMutationAudit, { added: 0, removed: 0 }, "Dragging the cropper mutated its DOM");
+
   await page.locator("#photoCropStage").focus();
   await page.keyboard.press("ArrowRight");
   await zoom.fill("0.2");
   await zoom.dispatchEvent("input");
-  await saveButton.click();
-  await page.waitForFunction((selector) => {
-    const node = document.querySelector(selector);
-    return (
-      node &&
-      String(node.getAttribute("src") || "").startsWith("data:image/jpeg") &&
-      node.complete &&
-      node.naturalWidth === 600 &&
-      node.naturalHeight === 600
-    );
-  }, isAttorney ? "#attorneyAvatarPreview" : "#avatarPreview");
-  assert.equal(await modal.getAttribute("aria-hidden"), "true");
-  assert.equal(await modal.getAttribute("inert"), "");
-  assert.equal(await preview.isVisible(), true);
   const uploadRequestPromise = page.waitForRequest((request) =>
     request.method() === "POST" && new URL(request.url()).pathname === "/api/uploads/profile-photo"
   );
-  await page.locator(isAttorney ? "#saveAttorneyProfile" : "#profileSaveBtn").click();
+  await saveButton.click();
+  if (isAttorney) {
+    await uploadRequestPromise;
+    await page.waitForFunction(() => {
+      const node = document.getElementById("attorneyAvatarPreview");
+      return node?.complete && node.naturalWidth > 0 && new URL(node.src).pathname.startsWith("/api/users/profile-photo/");
+    });
+  } else {
+    await page.waitForFunction(() => {
+      const node = document.getElementById("avatarPreview");
+      return (
+        node &&
+        String(node.getAttribute("src") || "").startsWith("data:image/jpeg") &&
+        node.complete &&
+        node.naturalWidth === 600 &&
+        node.naturalHeight === 600
+      );
+    });
+    await page.locator("#profileSaveBtn").click();
+  }
+  assert.equal(await modal.getAttribute("aria-hidden"), "true");
+  assert.equal(await modal.getAttribute("inert"), "");
+  assert.equal(await preview.isVisible(), true);
   const uploadRequest = await uploadRequestPromise;
   await waitForToast(
     page,
-    isAttorney ? "Profile updated!" : "Settings saved and profile photo submitted for review."
+    isAttorney ? "Profile photo updated!" : "Settings saved and profile photo submitted for review."
   );
   assert.match(uploadRequest.headers()["content-type"] || "", /^multipart\/form-data; boundary=/);
   assert.equal(state.profilePhotoUploads.length, 1);
@@ -420,6 +992,7 @@ async function runProfileSettingsCropper(browser, { role, viewport }) {
   if (isAttorney) {
     assert.equal(state.viewer.profilePhotoStatus, "approved");
     assert.match(state.viewer.profileImage, /^\/api\/users\/profile-photo\//);
+    assert.equal(state.patchRequests.length, 0, "Attorney photo save must not submit general profile settings");
   } else {
     assert.equal(state.viewer.profilePhotoStatus, "pending_review");
     assert.match(state.viewer.pendingProfileImage, /variant=pending/);
@@ -444,23 +1017,861 @@ async function waitForToast(page, message) {
   }, message);
 }
 
+async function waitForCropperReady(page) {
+  await page.waitForFunction(() => {
+    const save = document.getElementById("photoCropSave");
+    const zoomControl = document.getElementById("photoCropZoom");
+    return save && !save.disabled && zoomControl && !zoomControl.disabled;
+  });
+}
+
+async function assertAttorneyPhotoEditorLayout(page, viewport) {
+  const layout = await page.evaluate(() => {
+    const card = document.querySelector("#photoCropModal .photo-crop-card");
+    const stage = document.getElementById("photoCropStage");
+    const title = document.getElementById("photoCropTitle");
+    const slider = document.getElementById("photoCropZoom");
+    const canvas = stage?.querySelector("cropper-canvas");
+    const selection = stage?.querySelector("cropper-selection");
+    const cardRect = card?.getBoundingClientRect();
+    const stageRect = stage?.getBoundingClientRect();
+    const saveRect = document.getElementById("photoCropSave")?.getBoundingClientRect();
+    const sliderStyle = slider ? getComputedStyle(slider) : null;
+    const titleStyle = title ? getComputedStyle(title) : null;
+    const canvasStyle = canvas ? getComputedStyle(canvas) : null;
+    const selectionStyle = selection ? getComputedStyle(selection) : null;
+    const modalStyle = getComputedStyle(document.getElementById("photoCropModal"));
+    return {
+      card: cardRect && {
+        width: cardRect.width,
+        height: cardRect.height,
+        top: cardRect.top,
+        bottom: cardRect.bottom,
+        clientHeight: card.clientHeight,
+        scrollHeight: card.scrollHeight,
+      },
+      stage: stageRect && { width: stageRect.width, height: stageRect.height },
+      saveBottom: saveRect?.bottom,
+      titleFontSize: titleStyle?.fontSize,
+      titleFontFamily: titleStyle?.fontFamily,
+      sliderAccent: sliderStyle?.accentColor,
+      canvasBackgroundImage: canvasStyle?.backgroundImage,
+      selectionOutline: selectionStyle?.outlineColor,
+      modalZIndex: Number(modalStyle.zIndex),
+      canvasHasCheckerboardAttribute: canvas?.hasAttribute("background"),
+      selectionHasDefaultOutline: selection?.hasAttribute("outlined"),
+      previewCount: document.querySelectorAll(".photo-crop-preview").length,
+    };
+  });
+
+  assert.ok(layout.card && layout.stage, JSON.stringify(layout));
+  const expectedCardWidth = viewport.width <= 640 ? viewport.width - 24 : 480;
+  assert.ok(Math.abs(layout.card.width - expectedCardWidth) <= 1, JSON.stringify(layout));
+  const expectedStageSize = viewport.width <= 640 ? Math.min(320, viewport.width - 66) : 320;
+  assert.ok(Math.abs(layout.stage.width - expectedStageSize) <= 1, JSON.stringify(layout));
+  assert.ok(Math.abs(layout.stage.width - layout.stage.height) <= 1, JSON.stringify(layout));
+  assert.ok(layout.card.height <= Math.min(620, viewport.height - 24), JSON.stringify(layout));
+  assert.ok(layout.card.top >= 11 && layout.card.bottom <= viewport.height - 11, JSON.stringify(layout));
+  assert.ok(layout.saveBottom <= viewport.height - 11, JSON.stringify(layout));
+  if (viewport.width >= 641) {
+    assert.ok(layout.card.scrollHeight <= layout.card.clientHeight + 1, JSON.stringify(layout));
+  }
+  assert.equal(layout.titleFontSize, "20px");
+  assert.match(layout.titleFontFamily || "", /Söhne.*SF Pro Display/i);
+  assert.equal(layout.sliderAccent, "rgb(182, 164, 122)");
+  assert.equal(layout.modalZIndex, 3000);
+  assert.equal(layout.canvasBackgroundImage, "none");
+  assert.doesNotMatch(layout.selectionOutline || "", /0, 85, 255|0, 123, 255|59, 130, 246/);
+  assert.equal(layout.canvasHasCheckerboardAttribute, false);
+  assert.equal(layout.selectionHasDefaultOutline, false);
+  assert.equal(layout.previewCount, 0);
+}
+
+async function openAndAssertSidebarAccountMenu(page, viewport, screenshotDir = "") {
+  if (viewport.width <= 900) {
+    await page.locator("#sidebarToggle").click();
+    await page.waitForFunction(() => document.body.classList.contains("nav-open"));
+  }
+
+  const trigger = page.locator(".lpc-sidebar-profile-trigger");
+  await trigger.waitFor({ state: "visible" });
+  const triggerBox = await trigger.boundingBox();
+  assert.ok(triggerBox, "Sidebar account trigger did not render");
+  assert.match((await trigger.textContent()) || "", /Alex Attorney/);
+  await trigger.click();
+
+  const menu = page.locator(".lpc-sidebar-account-menu");
+  await menu.waitFor({ state: "visible" });
+  assert.equal(await trigger.getAttribute("aria-expanded"), "true");
+  assert.equal(await menu.locator(".lpc-account-menu-product").textContent(), "Let's-ParaConnect");
+  assert.equal(await menu.locator("[data-account-settings] .lpc-account-menu-label").textContent(), "Settings");
+  assert.equal(await menu.locator("[data-account-create] .lpc-account-menu-label").textContent(), "Create");
+  assert.equal(await menu.locator(".lpc-account-menu-user-name").textContent(), "Alex Attorney");
+  const profileLink = menu.locator("a.lpc-account-menu-user");
+  assert.equal(await profileLink.count(), 1);
+  const profileUrl = new URL(await profileLink.getAttribute("href"), "http://lpc.test");
+  assert.equal(profileUrl.pathname, "/profile-settings.html");
+  assert.equal(profileUrl.hash, "#profile");
+  assert.equal(await profileLink.getAttribute("aria-label"), "Open profile settings for Alex Attorney");
+  assert.equal(await menu.locator("[data-logout] .lpc-account-menu-label").textContent(), "Sign out");
+  assert.equal(new URL(await menu.locator("[data-account-settings]").getAttribute("href"), "http://lpc.test").pathname, "/profile-settings.html");
+  assert.equal(new URL(await menu.locator("[data-account-create]").getAttribute("href"), "http://lpc.test").pathname, "/create-case.html");
+  assert.equal(await menu.getByText(/sandbox/i).count(), 0);
+  assert.equal(await menu.locator(".lpc-account-menu-icon").count(), 4);
+  assert.equal(await menu.locator(".lpc-account-menu-trailing-icon").count(), 2);
+  await page.waitForFunction(() => {
+    const image = document.querySelector(".lpc-account-menu-avatar");
+    return image?.complete && image.naturalWidth > 0;
+  });
+
+  const menuBox = await menu.boundingBox();
+  assert.ok(menuBox, "Sidebar account menu did not render");
+  assert.ok(Math.abs(menuBox.width - Math.min(270, viewport.width - 24)) <= 1, JSON.stringify(menuBox));
+  assert.ok(Math.abs(menuBox.y - (triggerBox.y + triggerBox.height + 8)) <= 8, JSON.stringify({ menuBox, triggerBox }));
+  assert.ok(menuBox.x >= 11 && menuBox.x + menuBox.width <= viewport.width - 11, JSON.stringify(menuBox));
+  assert.ok(menuBox.y + menuBox.height <= viewport.height - 11, JSON.stringify(menuBox));
+
+  const accessibility = await new AxeBuilder({ page }).include(".lpc-sidebar-account-menu").analyze();
+  assert.deepEqual(
+    accessibility.violations.map((violation) => violation.id),
+    [],
+    JSON.stringify(accessibility.violations, null, 2)
+  );
+
+  if (screenshotDir) {
+    await page.screenshot({
+      path: path.join(screenshotDir, `attorney-sidebar-account-menu-${viewport.width}x${viewport.height}.png`),
+      fullPage: false,
+    });
+  }
+
+  await page.keyboard.press("Escape");
+  await menu.waitFor({ state: "hidden" });
+  assert.equal(await trigger.getAttribute("aria-expanded"), "false");
+  assert.equal(await trigger.evaluate((node) => node === document.activeElement), true);
+  if (viewport.width <= 900) {
+    if (await page.evaluate(() => document.body.classList.contains("nav-open"))) {
+      await page.locator("#sidebarToggle").click();
+    }
+    await page.waitForFunction(() => !document.body.classList.contains("nav-open"));
+  }
+}
+
+async function confirmRemoval(page) {
+  const dialog = page.locator(".lpc-dialog");
+  await dialog.waitFor({ state: "visible" });
+  await dialog.locator(".lpc-dialog__button--primary").click();
+}
+
+async function runAttorneyPhotoReliability(browser, viewport) {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  const state = await installRoutes(page, { role: "attorney", attorneyPhoto: true });
+  await page.goto("http://lpc.test/profile-settings.html#profile");
+  await page.locator("#attorneySettings").waitFor({ state: "visible" });
+  await page.waitForFunction(() => {
+    const image = document.getElementById("attorneyAvatarPreview");
+    return image?.complete && image.naturalWidth > 0;
+  });
+
+  const avatar = page.locator("#attorneyAvatarPreview");
+  const originalAvatarSrc = await avatar.getAttribute("src");
+  assert.match(originalAvatarSrc, /^\/api\/users\/profile-photo\//);
+
+  await page.locator("#attorneyAvatarFrame").click();
+  await page.locator("#photoCropModal").waitFor({ state: "visible" });
+  await waitForCropperReady(page);
+  assert.equal(await page.locator("#photoCropError").isHidden(), true);
+  assert.equal(await page.locator("#photoCropLoading").getAttribute("aria-hidden"), "true");
+  await page.locator("#photoCropClose").click();
+  assert.equal(
+    await page.locator("#attorneyAvatarFrame").evaluate((node) => node === document.activeElement),
+    true,
+    "Closing the editor did not restore focus to the invoking avatar"
+  );
+
+  state.failNextPhotoUpload = true;
+  await page.locator("#attorneyAvatarInput").setInputFiles(cropFixturePath);
+  await page.locator("#photoCropModal").waitFor({ state: "visible" });
+  await page.waitForFunction(() => document.getElementById("photoCropImage")?.src.startsWith("data:image/"));
+  await waitForCropperReady(page);
+  await page.locator("#photoCropSave").click();
+  await page.locator("#photoCropError").waitFor({ state: "visible" });
+  assert.equal(await page.locator("#photoCropModal").getAttribute("aria-hidden"), "false");
+  assert.equal(await avatar.getAttribute("src"), originalAvatarSrc, "Failed upload replaced the saved avatar");
+  assert.equal(state.profilePhotoUploadAttempts, 1);
+
+  const retryUpload = page.waitForResponse((response) =>
+    response.request().method() === "POST" && new URL(response.url()).pathname === "/api/uploads/profile-photo"
+  );
+  await page.locator("#photoCropTryAgain").click();
+  assert.equal((await retryUpload).ok(), true);
+  await page.waitForFunction(() => document.getElementById("photoCropModal")?.getAttribute("aria-hidden") === "true");
+  await page.waitForFunction((previousSrc) => {
+    const image = document.getElementById("attorneyAvatarPreview");
+    return image?.complete && image.naturalWidth > 0 && image.getAttribute("src") !== previousSrc;
+  }, originalAvatarSrc);
+  assert.equal(state.profilePhotoUploadAttempts, 2);
+  assert.equal(state.profilePhotoUploads.length, 1);
+  const refreshedAvatarSrc = await avatar.getAttribute("src");
+  assert.notEqual(refreshedAvatarSrc, originalAvatarSrc);
+  const globalAvatarSources = await page.locator(".nav-profile-photo, .globalProfileImage").evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("src"))
+  );
+  globalAvatarSources.forEach((src) => assert.equal(src, refreshedAvatarSrc));
+
+  state.failNextPhotoRemoval = true;
+  await page.locator("#removeAttorneyAvatarBtn").click();
+  const failedRemoval = page.waitForResponse((response) =>
+    response.request().method() === "PATCH" && new URL(response.url()).pathname === "/api/users/me"
+  );
+  await confirmRemoval(page);
+  assert.equal((await failedRemoval).status(), 503);
+  await waitForToast(page, "Temporary photo removal failure");
+  assert.equal(await avatar.getAttribute("src"), refreshedAvatarSrc, "Failed removal cleared the avatar");
+
+  await page.locator("#removeAttorneyAvatarBtn").click();
+  const successfulRemoval = page.waitForResponse((response) =>
+    response.request().method() === "PATCH" && new URL(response.url()).pathname === "/api/users/me"
+  );
+  await confirmRemoval(page);
+  assert.equal((await successfulRemoval).ok(), true);
+  await waitForToast(page, "Profile photo removed.");
+  await page.waitForFunction(() => {
+    const image = document.getElementById("attorneyAvatarPreview");
+    return image?.complete && image.naturalWidth > 0 && new URL(image.src).pathname === "/assets/avatar-placeholder.svg";
+  });
+  assert.equal(await page.locator("#removeAttorneyAvatarBtn").isHidden(), true);
+  assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
+  await assertNoHorizontalOverflow(page);
+  await context.close();
+}
+
+async function runAttorneySettingsLayout(browser, viewport) {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  const state = await installRoutes(page, { role: "attorney", attorneyPhoto: true });
+  await page.goto("http://lpc.test/profile-settings.html");
+  await page.locator("#settingsDirectorySection").waitFor({ state: "visible" });
+  await assertNoCormorant(page);
+  assert.equal(await page.locator("#accountSettingsTitle").textContent(), "Settings");
+  assert.equal(await page.locator("[data-settings-destination]").count(), 12);
+  assert.equal(await page.locator("#settingsDirectorySearch").getAttribute("placeholder"), "Search settings");
+  const settingsNavIcons = await page.locator("#navSettings, #navProfile, #navSecurity, #navPreferences").evaluateAll((items) =>
+    items.map((item) => ({ kind: item.dataset.sidebarIcon, markup: item.querySelector(".sidebar-nav-icon")?.innerHTML || "" }))
+  );
+  assert.deepEqual(settingsNavIcons.map(({ kind }) => kind), ["settings", "profile", "security", "preferences"]);
+  assert.equal(new Set(settingsNavIcons.map(({ markup }) => markup)).size, 4, JSON.stringify(settingsNavIcons));
+
+  const directoryLayout = await page.evaluate(() => {
+    const directory = document.getElementById("settingsDirectorySection");
+    const firstGrid = directory.querySelector(".settings-directory-grid");
+    const firstDestination = directory.querySelector(".settings-destination");
+    const directoryStyle = getComputedStyle(directory);
+    const destinationStyle = getComputedStyle(firstDestination);
+    return {
+      columns: getComputedStyle(firstGrid).gridTemplateColumns.split(" ").filter(Boolean).length,
+      width: directory.getBoundingClientRect().width,
+      backgroundColor: directoryStyle.backgroundColor,
+      backgroundImage: directoryStyle.backgroundImage,
+      destinationBorderWidth: destinationStyle.borderTopWidth,
+      destinationBoxShadow: destinationStyle.boxShadow,
+      destinationColor: destinationStyle.color,
+    };
+  });
+  const expectedDirectoryColumns = viewport.width <= 640 ? 1 : viewport.width <= 960 ? 2 : 3;
+  assert.equal(directoryLayout.columns, expectedDirectoryColumns, JSON.stringify(directoryLayout));
+  assert.ok(directoryLayout.width <= 1201, JSON.stringify(directoryLayout));
+  assert.equal(directoryLayout.backgroundImage, "none");
+  assert.equal(directoryLayout.destinationBorderWidth, "0px");
+  assert.equal(directoryLayout.destinationBoxShadow, "none");
+  assert.notEqual(directoryLayout.destinationColor, "rgb(0, 0, 238)");
+
+  const shouldCapture = Boolean(accountSettingsScreenshotDir && [390, 1440].includes(viewport.width));
+  if (shouldCapture) {
+    fs.mkdirSync(accountSettingsScreenshotDir, { recursive: true });
+    await page.screenshot({
+      path: path.join(accountSettingsScreenshotDir, `attorney-settings-directory-${viewport.width}x${viewport.height}.png`),
+      fullPage: true,
+    });
+  }
+
+  await page.locator("#settingsDirectorySearch").fill("passkeys");
+  assert.equal(await page.locator("[data-settings-destination]:visible").count(), 1);
+  assert.equal(await page.locator("[data-settings-destination]:visible strong").textContent(), "Sign-in & security");
+  await page.locator("#settingsDirectorySearch").fill("definitely-not-a-setting");
+  await page.locator("#settingsDirectoryEmpty").waitFor({ state: "visible" });
+  assert.equal(await page.locator("#settingsDirectoryEmpty").textContent(), "No settings found.");
+  await page.locator("#settingsDirectorySearch").fill("");
+
+  const directoryAccessibility = await new AxeBuilder({ page }).include("#settingsDirectorySection").analyze();
+  assert.deepEqual(
+    directoryAccessibility.violations.map((violation) => violation.id),
+    [],
+    JSON.stringify(directoryAccessibility.violations, null, 2)
+  );
+
+  const destinationHrefs = await page.locator("[data-settings-destination]").evaluateAll((links) =>
+    links.map((link) => link.getAttribute("href"))
+  );
+  assert.equal(destinationHrefs.some((href) => /connected|oauth|verification/i.test(href)), false);
+  assert.equal(destinationHrefs.includes("dashboard-attorney.html?from=settings&settingsTarget=payment-method#funds"), true);
+  assert.equal(destinationHrefs.includes("dashboard-attorney.html?from=settings&settingsTarget=billing-history#funds"), true);
+  destinationHrefs.filter((href) => href && !href.startsWith("#")).forEach((href) => {
+    const pathname = new URL(href, "http://lpc.test").pathname.replace(/^\/+/, "");
+    assert.equal(fs.existsSync(path.join(frontendRoot, pathname)), true, `Missing settings destination: ${href}`);
+  });
+
+  await page.locator('a[href="#profile:personal"]').click();
+  await page.locator("#attorneySettings").waitFor({ state: "visible" });
+  assert.equal(new URL(page.url()).hash, "#profile:personal");
+  await page.goBack();
+  await page.locator("#settingsDirectorySection").waitFor({ state: "visible" });
+  assert.equal(new URL(page.url()).hash, "");
+  await page.goForward();
+  await page.locator("#attorneySettings").waitFor({ state: "visible" });
+  assert.equal(new URL(page.url()).hash, "#profile:personal");
+  assert.equal(await page.locator("#accountSettingsTitle").textContent(), "Account settings");
+  assert.equal(await page.locator("#attorneySettings .attorney-settings-panel").count(), 3);
+  assert.equal(await page.locator("#saveAttorneyProfile").isDisabled(), true);
+  assert.equal(await page.locator('#attorneySettings input[type="tel"]').count(), 0);
+  const professionalHeadingTypography = await page.locator("#attorneyProfessionalHeading").evaluate((heading) => {
+    const style = getComputedStyle(heading);
+    return { fontFamily: style.fontFamily, fontWeight: style.fontWeight };
+  });
+  assert.match(professionalHeadingTypography.fontFamily, /Söhne.*SF Pro Display/i);
+  assert.equal(professionalHeadingTypography.fontWeight, "400");
+  const settingsEmphasisTypography = await page.locator("h1, h2, h3, h4, h5, h6, strong, b").evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      tag: node.tagName,
+      text: String(node.textContent || "").trim().slice(0, 80),
+      fontFamily: getComputedStyle(node).fontFamily,
+      fontWeight: getComputedStyle(node).fontWeight,
+    }))
+  );
+  assert.deepEqual(
+    settingsEmphasisTypography.filter(({ fontFamily }) => !/Söhne.*SF Pro Display/i.test(fontFamily)),
+    [],
+    JSON.stringify(settingsEmphasisTypography, null, 2)
+  );
+  assert.deepEqual(
+    settingsEmphasisTypography.filter(({ tag, fontWeight }) =>
+      (/^H[1-6]$/.test(tag) && fontWeight !== "400") || (["STRONG", "B"].includes(tag) && fontWeight !== "500")
+    ),
+    [],
+    JSON.stringify(settingsEmphasisTypography, null, 2)
+  );
+
+  if (viewport.width > 960) {
+    const shellLayout = await page.evaluate(() => {
+      const sidebarRect = document.getElementById("sidebarNav").getBoundingClientRect();
+      const contentRect = document.getElementById("main").getBoundingClientRect();
+      const settingsRect = document.getElementById("settingsContent").getBoundingClientRect();
+      return {
+        sidebarWidth: sidebarRect.width,
+        leftGutter: settingsRect.left - sidebarRect.right,
+        rightGutter: contentRect.right - settingsRect.right,
+        settingsWidth: settingsRect.width,
+        availableWidth: contentRect.width,
+      };
+    });
+    assert.ok(Math.abs(shellLayout.sidebarWidth - 230) <= 1, JSON.stringify(shellLayout));
+    assert.ok(shellLayout.leftGutter >= 31 && shellLayout.leftGutter <= 69, JSON.stringify(shellLayout));
+    assert.ok(Math.abs(shellLayout.leftGutter - shellLayout.rightGutter) <= 1, JSON.stringify(shellLayout));
+    assert.ok(shellLayout.settingsWidth / shellLayout.availableWidth >= 0.88, JSON.stringify(shellLayout));
+
+    const scrollMetrics = await page.locator("#main").evaluate((main) => ({
+      clientHeight: main.clientHeight,
+      scrollHeight: main.scrollHeight,
+      overflowY: getComputedStyle(main).overflowY,
+    }));
+    assert.equal(scrollMetrics.overflowY, "auto", JSON.stringify(scrollMetrics));
+    assert.ok(scrollMetrics.scrollHeight > scrollMetrics.clientHeight + 20, JSON.stringify(scrollMetrics));
+    await page.locator("#main").evaluate((main) => main.scrollTo({ top: 500, behavior: "instant" }));
+    await page.waitForFunction(() => document.getElementById("main")?.scrollTop > 0);
+    await page.locator("#main").evaluate((main) => main.scrollTo({ top: 0, behavior: "instant" }));
+  }
+
+  const flatPanelStyles = await page.locator("#attorneySettings .attorney-settings-panel").evaluateAll((panels) =>
+    panels.map((panel) => {
+      const style = getComputedStyle(panel);
+      return {
+        borderLeftWidth: style.borderLeftWidth,
+        borderRadius: style.borderRadius,
+        boxShadow: style.boxShadow,
+      };
+    })
+  );
+  for (const style of flatPanelStyles) {
+    assert.equal(style.borderLeftWidth, "0px");
+    assert.equal(style.borderRadius, "0px");
+    assert.equal(style.boxShadow, "none");
+  }
+
+  const firstNameLayout = await page.locator("#attorneyFirstName").evaluate((input) => {
+    const label = document.querySelector('label[for="attorneyFirstName"]');
+    const inputRect = input.getBoundingClientRect();
+    const labelRect = label.getBoundingClientRect();
+    return { inputLeft: inputRect.left, labelLeft: labelRect.left, inputTop: inputRect.top, labelTop: labelRect.top };
+  });
+  if (viewport.width > 640) {
+    assert.ok(firstNameLayout.inputLeft > firstNameLayout.labelLeft + 100, "Desktop settings values should align beside labels");
+  } else {
+    assert.ok(firstNameLayout.inputTop > firstNameLayout.labelTop, "Mobile settings values should stack below labels");
+  }
+  await assertNoHorizontalOverflow(page);
+
+  const accessibility = await new AxeBuilder({ page }).include("#attorneySettings").analyze();
+  assert.deepEqual(
+    accessibility.violations.map((violation) => violation.id),
+    [],
+    JSON.stringify(accessibility.violations, null, 2)
+  );
+
+  if (shouldCapture) {
+    await page.screenshot({
+      path: path.join(accountSettingsScreenshotDir, `attorney-account-settings-${viewport.width}x${viewport.height}.png`),
+      fullPage: true,
+    });
+  }
+
+  await openAndAssertSidebarAccountMenu(page, viewport, shouldCapture ? accountSettingsScreenshotDir : "");
+  if (viewport.width <= 900) {
+    await page.waitForFunction(() => document.getElementById("sidebarNav")?.getBoundingClientRect().right <= 1);
+  }
+
+  await page.locator("#navSecurity").evaluate((button) => button.click());
+  await page.locator("#securitySection").waitFor({ state: "visible" });
+  if (viewport.width <= 960 && (await page.locator("#sidebarToggle").getAttribute("aria-expanded")) === "true") {
+    await page.locator("#sidebarToggle").evaluate((button) => button.click());
+  }
+  const securityLayout = await page.locator("#securitySection").evaluate((section) => {
+    const grid = section.querySelector(".security-grid");
+    const firstBlock = section.querySelector(".settings-block:not([data-paralegal-only])");
+    const hero = section.querySelector(".two-factor-hero");
+    const blockStyle = getComputedStyle(firstBlock);
+    return {
+      columns: getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length,
+      borderLeftWidth: blockStyle.borderLeftWidth,
+      borderRadius: blockStyle.borderRadius,
+      boxShadow: blockStyle.boxShadow,
+      heroDisplay: getComputedStyle(hero).display,
+    };
+  });
+  assert.equal(securityLayout.columns, 1);
+  assert.equal(securityLayout.borderLeftWidth, "0px");
+  assert.equal(securityLayout.borderRadius, "0px");
+  assert.equal(securityLayout.boxShadow, "none");
+  assert.equal(securityLayout.heroDisplay, "none");
+  await assertNoHorizontalOverflow(page);
+  const securityAccessibility = await new AxeBuilder({ page }).include("#securitySection").analyze();
+  assert.deepEqual(
+    securityAccessibility.violations.map((violation) => violation.id),
+    [],
+    JSON.stringify(securityAccessibility.violations, null, 2)
+  );
+
+  if (viewport.width === 1440) {
+    await page.reload();
+    await page.locator("#securitySection").waitFor({ state: "visible" });
+    assert.equal(new URL(page.url()).hash, "#security");
+  }
+
+  if (shouldCapture) {
+    await page.screenshot({
+      path: path.join(accountSettingsScreenshotDir, `attorney-security-settings-${viewport.width}x${viewport.height}.png`),
+      fullPage: true,
+    });
+  }
+
+  await page.locator("#navPreferences").evaluate((button) => button.click());
+  await page.locator("#preferencesSection").waitFor({ state: "visible" });
+  assert.equal(await page.locator("#preferencesSection [data-theme-preview]").count(), 2);
+  assert.equal(await page.locator('#preferencesSection [data-theme-preview="light"]').count(), 1);
+  assert.equal(await page.locator('#preferencesSection [data-theme-preview="dark"]').count(), 1);
+  assert.equal(await page.locator('#preferencesSection [data-theme-preview*="mountain"]').count(), 0);
+  assert.equal(await page.locator("#themePreference").inputValue(), "light");
+  await assertNoHorizontalOverflow(page);
+  const preferencesAccessibility = await new AxeBuilder({ page }).include("#preferencesSection").analyze();
+  assert.deepEqual(
+    preferencesAccessibility.violations.map((violation) => violation.id),
+    [],
+    JSON.stringify(preferencesAccessibility.violations, null, 2)
+  );
+
+  if (viewport.width === 1440) {
+    await page.reload();
+    await page.locator("#preferencesSection").waitFor({ state: "visible" });
+    assert.equal(new URL(page.url()).hash, "#preferences");
+  }
+
+  if (shouldCapture) {
+    await page.screenshot({
+      path: path.join(accountSettingsScreenshotDir, `attorney-preferences-settings-${viewport.width}x${viewport.height}.png`),
+      fullPage: true,
+    });
+  }
+
+  const preferencesResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" && new URL(response.url()).pathname === "/api/account/preferences"
+  );
+  await page.locator("#savePreferencesBtn").click();
+  await preferencesResponse;
+  assert.equal(state.preferenceRequests.at(-1)?.theme, "light");
+
+  await page.locator("#navProfile").evaluate((button) => button.click());
+  await page.locator("#attorneySettings").waitFor({ state: "visible" });
+
+  await page.locator("#attorneyAvatarFrame").click();
+  await page.locator("#photoCropModal").waitFor({ state: "visible" });
+  await waitForCropperReady(page);
+  await assertAttorneyPhotoEditorLayout(page, viewport);
+
+  if (shouldCapture) {
+    await page.screenshot({
+      path: path.join(accountSettingsScreenshotDir, `attorney-photo-editor-${viewport.width}x${viewport.height}.png`),
+      fullPage: false,
+    });
+  }
+
+  assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
+  await context.close();
+}
+
+async function runAccountSettingsStableHydration(browser) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await installRoutes(page, {
+    role: "attorney",
+    attorneyPhoto: true,
+    userGetDelayMs: 500,
+  });
+
+  await page.goto("http://lpc.test/profile-settings.html", { waitUntil: "domcontentloaded" });
+  assert.equal(await page.locator("body").evaluate((body) => body.classList.contains("settings-layout-ready")), false);
+  assert.equal(await page.locator("#accountSettingsBoot").isVisible(), true);
+  const loadingVisibility = await page.evaluate(() => ({
+    main: getComputedStyle(document.getElementById("main")).visibility,
+    sidebar: getComputedStyle(document.getElementById("sidebarNav")).visibility,
+  }));
+  assert.deepEqual(loadingVisibility, { main: "hidden", sidebar: "hidden" });
+
+  await page.waitForFunction(() => document.body.classList.contains("settings-layout-ready"));
+  assert.equal(await page.locator("body").evaluate((body) => body.classList.contains("attorney-classic")), true);
+  await page.locator("#accountSettingsBoot").waitFor({ state: "hidden" });
+  assert.equal(await page.locator("#main").evaluate((main) => getComputedStyle(main).visibility), "visible");
+  assert.equal(await page.locator("#settingsDirectorySection").isVisible(), true);
+  assert.equal(await page.locator("#attorneySettings").isVisible(), false);
+  assert.equal(await page.locator("#paralegalSettings").isVisible(), false);
+  assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
+  await context.close();
+}
+
+async function runAttorneyDashboardAccountMenu(browser) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  const routeState = await installRoutes(page, { role: "attorney", attorneyPhoto: true });
+  await page.goto("http://lpc.test/dashboard-attorney.html");
+  await page.locator("#sidebarNav").waitFor({ state: "visible" });
+  await assertNoCormorant(page);
+  await assertStripeDashboardEmphasis(page);
+  await assertStripeDashboardShell(page);
+  await assertDashboardBodyCopyUsesSarabun(page, ".queue-meta");
+  await assertAttorneyOperationalHome(page);
+  assert.equal(routeState.dashboardRequests.summary, 1, JSON.stringify(routeState.dashboardRequests));
+  assert.equal(routeState.dashboardRequests.applications, 1, JSON.stringify(routeState.dashboardRequests));
+  assert.equal(routeState.dashboardRequests.events, 0, JSON.stringify(routeState.dashboardRequests));
+  if (accountSettingsScreenshotDir) {
+    fs.mkdirSync(accountSettingsScreenshotDir, { recursive: true });
+    await page.screenshot({
+      path: path.join(accountSettingsScreenshotDir, "attorney-dashboard-stripe-typography-1440x900.png"),
+      fullPage: false,
+    });
+    await page.evaluate(() => {
+      const main = document.querySelector("main.main");
+      const overview = document.querySelector(".home-overview");
+      if (main && overview) main.scrollTop = Math.max(0, overview.offsetTop - 80);
+    });
+    await page.waitForTimeout(100);
+    await page.screenshot({
+      path: path.join(accountSettingsScreenshotDir, "attorney-dashboard-overview-populated-1440x900.png"),
+      fullPage: false,
+    });
+    await page.evaluate(() => {
+      const main = document.querySelector("main.main");
+      if (main) main.scrollTop = 0;
+    });
+  }
+  await assertAttorneyWeeklyNotesInTasks(page);
+  if (accountSettingsScreenshotDir) {
+    await page.screenshot({
+      path: path.join(accountSettingsScreenshotDir, "attorney-dashboard-tasks-weekly-notes-1440x900.png"),
+      fullPage: false,
+    });
+  }
+  await openAndAssertSidebarAccountMenu(page, { width: 1440, height: 900 });
+
+  await page.goto("http://lpc.test/dashboard-attorney.html?from=settings&settingsTarget=payment-method#funds");
+  await page.locator('[data-view="funds"]').waitFor({ state: "visible" });
+  await page.locator("#paymentsSettingsBackLink").waitFor({ state: "visible" });
+  assert.equal(await page.locator("#paymentsSettingsBackLink").getAttribute("href"), "profile-settings.html");
+  await page.waitForFunction(() => document.activeElement?.id === "payment-method-heading");
+
+  await page.goto("http://lpc.test/dashboard-attorney.html?from=settings&settingsTarget=billing-history#funds");
+  await page.locator('[data-view="funds"]').waitFor({ state: "visible" });
+  await page.locator("#paymentsSettingsBackLink").waitFor({ state: "visible" });
+  await page.waitForFunction(() => document.activeElement?.id === "history-heading");
+  assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
+  await context.close();
+}
+
+async function runAttorneyDashboardMobileLayout(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await installRoutes(page, { role: "attorney", attorneyPhoto: true });
+  await page.goto("http://lpc.test/dashboard-attorney.html");
+  await page.locator("#attorneyNeedsAttention").waitFor({ state: "visible" });
+  await page.waitForFunction(() => document.getElementById("overviewMattersBody")?.dataset.state === "populated");
+
+  const mobile = await page.evaluate(() => {
+    const attention = document.getElementById("attorneyNeedsAttention");
+    const attentionHeader = attention.querySelector(":scope > .ledger-header");
+    const caseLedger = document.querySelector(".view-home .case-ledger");
+    const main = document.querySelector("main.main");
+    const overviewGrid = document.querySelector(".home-overview-grid");
+    const overviewModules = [...document.querySelectorAll(".home-overview .status-item, .home-overview .mini-deadlines")];
+    return {
+      attentionColumns: getComputedStyle(attention).gridTemplateColumns,
+      attentionHeaderRightBorder: getComputedStyle(attentionHeader).borderRightWidth,
+      attentionHeaderBottomBorder: getComputedStyle(attentionHeader).borderBottomWidth,
+      matterColumns: getComputedStyle(caseLedger).gridTemplateColumns,
+      mainClientHeight: main.clientHeight,
+      mainScrollHeight: main.scrollHeight,
+      overviewColumns: getComputedStyle(overviewGrid).gridTemplateColumns.split(" ").length,
+      overviewMaxWidth: Math.max(...overviewModules.map((node) => node.getBoundingClientRect().width)),
+      overviewMinWidth: Math.min(...overviewModules.map((node) => node.getBoundingClientRect().width)),
+    };
+  });
+  assert.doesNotMatch(mobile.attentionColumns, /px .*px/, JSON.stringify(mobile));
+  assert.equal(mobile.attentionHeaderRightBorder, "0px", JSON.stringify(mobile));
+  assert.equal(mobile.attentionHeaderBottomBorder, "1px", JSON.stringify(mobile));
+  assert.doesNotMatch(mobile.matterColumns, /px .*px/, JSON.stringify(mobile));
+  assert.ok(mobile.mainScrollHeight > mobile.mainClientHeight, JSON.stringify(mobile));
+  assert.equal(mobile.overviewColumns, 1, JSON.stringify(mobile));
+  assert.ok(Math.abs(mobile.overviewMaxWidth - mobile.overviewMinWidth) <= 1, JSON.stringify(mobile));
+  if (accountSettingsScreenshotDir) {
+    await page.evaluate(() => document.querySelector(".home-overview")?.scrollIntoView({ block: "start" }));
+    await page.screenshot({
+      path: path.join(accountSettingsScreenshotDir, "attorney-dashboard-overview-populated-390x844.png"),
+      fullPage: false,
+    });
+  }
+  await assertNoHorizontalOverflow(page);
+
+  await page.evaluate(() => {
+    window.location.hash = "tasks";
+  });
+  await page.locator('[data-view="tasks"]').waitFor({ state: "visible" });
+  await page.locator('.view-tasks .weekly-notes').waitFor({ state: "visible" });
+  assert.equal(await page.locator('.view-home .weekly-notes').count(), 0);
+  await assertNoHorizontalOverflow(page);
+  assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
+  await context.close();
+}
+
+async function runAttorneyDashboardEmptyOverview(browser) {
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    const pageErrors = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    const routeState = await installRoutes(page, {
+      role: "attorney",
+      attorneyPhoto: true,
+      dashboardState: "empty",
+    });
+    await page.goto("http://lpc.test/dashboard-attorney.html");
+    await page.waitForFunction(() =>
+      ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
+        .every((id) => document.getElementById(id)?.dataset.state === "empty")
+    );
+    const empty = await page.evaluate(() => ({
+      matters: document.getElementById("overviewMattersBody")?.textContent?.replace(/\s+/g, " ").trim(),
+      applications: document.getElementById("overviewApplicationsBody")?.textContent?.replace(/\s+/g, " ").trim(),
+      messages: document.getElementById("overviewMessagesBody")?.textContent?.replace(/\s+/g, " ").trim(),
+      completed: document.getElementById("overviewCompletedBody")?.textContent?.replace(/\s+/g, " ").trim(),
+      week: document.getElementById("deadlineList")?.textContent?.replace(/\s+/g, " ").trim(),
+      createHref: document.querySelector("#overviewMattersBody .overview-module-action")?.getAttribute("href"),
+      skeletonCount: document.querySelectorAll(".home-overview .overview-module-skeleton").length,
+    }));
+    assert.equal(empty.matters, "No active matters. Create a matter", JSON.stringify(empty));
+    assert.equal(empty.applications, "No applications yet. Applications will appear here when paralegals apply.", JSON.stringify(empty));
+    assert.equal(empty.messages, "You’re all caught up.", JSON.stringify(empty));
+    assert.equal(empty.completed, "No completed matters yet.", JSON.stringify(empty));
+    assert.equal(empty.week, "No deadlines this week.", JSON.stringify(empty));
+    assert.equal(empty.createHref, "create-case.html", JSON.stringify(empty));
+    assert.equal(empty.skeletonCount, 0, JSON.stringify(empty));
+    assert.equal(routeState.dashboardRequests.summary, 1, JSON.stringify(routeState.dashboardRequests));
+    assert.equal(routeState.dashboardRequests.events, 0, JSON.stringify(routeState.dashboardRequests));
+    assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
+    await assertNoHorizontalOverflow(page);
+    if (accountSettingsScreenshotDir) {
+      await page.evaluate(() => document.querySelector(".home-overview")?.scrollIntoView({ block: "start" }));
+      await page.screenshot({
+        path: path.join(accountSettingsScreenshotDir, `attorney-dashboard-overview-empty-${viewport.width}x${viewport.height}.png`),
+        fullPage: false,
+      });
+    }
+    await context.close();
+  }
+}
+
+async function runAttorneyDashboardResponsiveOverview(browser, viewport) {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await installRoutes(page, { role: "attorney", attorneyPhoto: true });
+  await page.goto("http://lpc.test/dashboard-attorney.html");
+  await page.waitForFunction(() => document.getElementById("overviewMattersBody")?.dataset.state === "populated");
+  const responsive = await page.evaluate(() => {
+    const grid = document.querySelector(".home-overview-grid");
+    const layout = document.querySelector(".home-layout");
+    return {
+      overviewColumns: getComputedStyle(grid).gridTemplateColumns.split(" ").length,
+      topColumns: getComputedStyle(layout).gridTemplateColumns.split(" ").length,
+    };
+  });
+  assert.equal(responsive.overviewColumns, viewport.width <= 900 ? 2 : 3, JSON.stringify(responsive));
+  assert.equal(responsive.topColumns, viewport.width <= 900 ? 1 : 2, JSON.stringify(responsive));
+  await assertNoHorizontalOverflow(page);
+  assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
+  await context.close();
+}
+
+async function runAttorneyDashboardSingularOverview(browser) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await installRoutes(page, { role: "attorney", attorneyPhoto: true, dashboardState: "singular" });
+  await page.goto("http://lpc.test/dashboard-attorney.html");
+  await page.waitForFunction(() =>
+    ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
+      .every((id) => document.getElementById(id)?.dataset.state === "populated")
+  );
+  const copy = await page.evaluate(() => Object.fromEntries(
+    ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
+      .map((id) => [id, document.getElementById(id)?.textContent?.replace(/\s+/g, " ").trim()])
+  ));
+  assert.equal(copy.overviewMattersBody, "1 active matter", JSON.stringify(copy));
+  assert.equal(copy.overviewApplicationsBody, "1 application awaiting review", JSON.stringify(copy));
+  assert.equal(copy.overviewMessagesBody, "1 unread message", JSON.stringify(copy));
+  assert.equal(copy.overviewCompletedBody, "1 completed matter", JSON.stringify(copy));
+  assert.match(copy.deadlineList, /^1 deadline this week/, JSON.stringify(copy));
+  assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
+  await context.close();
+}
+
+async function runAttorneyDashboardOverviewStateIsolation(browser) {
+  const loadingContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const loadingPage = await loadingContext.newPage();
+  await installRoutes(loadingPage, {
+    role: "attorney",
+    attorneyPhoto: true,
+    dashboardDelayMs: 350,
+  });
+  await loadingPage.goto("http://lpc.test/dashboard-attorney.html");
+  await loadingPage.locator(".home-overview").waitFor({ state: "visible" });
+  const loading = await loadingPage.evaluate(() => ({
+    states: ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
+      .map((id) => document.getElementById(id)?.dataset.state),
+    skeletons: document.querySelectorAll(".home-overview .overview-module-skeleton").length,
+  }));
+  assert.deepEqual(loading.states, ["loading", "loading", "loading", "loading", "loading"], JSON.stringify(loading));
+  assert.equal(loading.skeletons, 5, JSON.stringify(loading));
+  await loadingPage.waitForFunction(() => document.getElementById("overviewMattersBody")?.dataset.state === "populated");
+  await loadingContext.close();
+
+  const failureContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const failurePage = await failureContext.newPage();
+  const pageErrors = [];
+  failurePage.on("pageerror", (error) => pageErrors.push(error.message));
+  await installRoutes(failurePage, {
+    role: "attorney",
+    attorneyPhoto: true,
+    dashboardState: "applications-failed",
+  });
+  await failurePage.goto("http://lpc.test/dashboard-attorney.html");
+  await failurePage.waitForFunction(() => document.getElementById("overviewApplicationsBody")?.dataset.state === "failed");
+  const isolated = await failurePage.evaluate(() => Object.fromEntries(
+    ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
+      .map((id) => [id, document.getElementById(id)?.dataset.state])
+  ));
+  assert.equal(isolated.overviewApplicationsBody, "failed", JSON.stringify(isolated));
+  assert.equal(isolated.overviewMattersBody, "populated", JSON.stringify(isolated));
+  assert.equal(isolated.overviewMessagesBody, "populated", JSON.stringify(isolated));
+  assert.equal(isolated.overviewCompletedBody, "populated", JSON.stringify(isolated));
+  assert.equal(isolated.deadlineList, "populated", JSON.stringify(isolated));
+  assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
+  await failureContext.close();
+}
+
+async function runParalegalDashboardTypography(browser) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await installRoutes(page, { role: "paralegal" });
+  await page.goto("http://lpc.test/dashboard-paralegal.html");
+  await page.locator("body.lpc-role-dashboard").waitFor({ state: "visible" });
+  await assertNoCormorant(page);
+  await assertStripeDashboardEmphasis(page);
+  await assertStripeDashboardShell(page);
+  await assertDashboardBodyCopyUsesSarabun(page, "#paralegalHomeView .info-label");
+  if (accountSettingsScreenshotDir) {
+    fs.mkdirSync(accountSettingsScreenshotDir, { recursive: true });
+    await page.screenshot({
+      path: path.join(accountSettingsScreenshotDir, "paralegal-dashboard-stripe-typography-1440x900.png"),
+      fullPage: false,
+    });
+  }
+  await context.close();
+}
+
 async function runProfileSettingsSave(browser, { role, viewport }) {
   const context = await browser.newContext({ viewport });
   const page = await context.newPage();
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   const state = await installRoutes(page, { role });
-  await page.goto("http://lpc.test/profile-settings.html");
+  await page.goto(`http://lpc.test/profile-settings.html${role === "attorney" ? "#profile" : ""}`);
 
   const isAttorney = role === "attorney";
   const rolePanel = page.locator(isAttorney ? "#attorneySettings" : "#paralegalSettings");
   await rolePanel.waitFor({ state: "visible" });
+  await assertNoCormorant(page);
+  if (!isAttorney) {
+    assert.equal(await page.locator("#settingsDirectorySection").isVisible(), false);
+    assert.equal(await page.locator("#navSettings").isVisible(), false);
+  }
 
   if (isAttorney) {
     assert.equal(await page.locator("#attorneyFirmName").inputValue(), "Example Law");
+    assert.equal(await page.locator("#saveAttorneyProfile").isDisabled(), true);
     await page.locator("#attorneyLinkedIn").fill("https://example.com/not-linkedin");
     await page.locator("#saveAttorneyProfile").click();
-    await waitForToast(page, "Enter a valid LinkedIn URL.");
+    await page.locator("#attorneyLinkedInError").waitFor({ state: "visible" });
+    assert.equal(await page.locator("#attorneyLinkedInError").textContent(), "Enter a valid LinkedIn URL.");
+    assert.equal(await page.locator("#attorneyLinkedIn").evaluate((node) => node === document.activeElement), true);
     assert.equal(state.patchRequests.length, 0, "Invalid attorney profile must not be submitted");
 
     await page.locator("#attorneyFirstName").fill("Alexandra");
@@ -491,6 +1902,8 @@ async function runProfileSettingsSave(browser, { role, viewport }) {
     const request = await successfulRequest;
     const payload = request.postDataJSON();
     await waitForToast(page, "Profile updated!");
+    assert.equal(await page.locator("#saveAttorneyProfile").isDisabled(), true);
+    assert.equal(await page.locator("#attorneySaveStatus").textContent(), "Changes saved.");
 
     assert.equal(payload.firstName, "Alexandra");
     assert.equal(payload.lastName, "Counsel");
@@ -561,6 +1974,25 @@ async function runProfileSettingsSave(browser, { role, viewport }) {
       await runProfile(browser, { role: "paralegal", viewport: { width: 390, height: 844 }, self: true });
       await runProfileSettingsCropper(browser, { role: "attorney", viewport: { width: 1280, height: 800 } });
       await runProfileSettingsCropper(browser, { role: "paralegal", viewport: { width: 390, height: 844 } });
+      await runAccountSettingsStableHydration(browser);
+      for (const viewport of [
+        { width: 360, height: 800 },
+        { width: 390, height: 844 },
+        { width: 768, height: 1024 },
+        { width: 1440, height: 900 },
+        { width: 1920, height: 1080 },
+      ]) {
+        await runAttorneySettingsLayout(browser, viewport);
+      }
+      await runAttorneyDashboardAccountMenu(browser);
+      await runAttorneyDashboardMobileLayout(browser);
+      await runAttorneyDashboardResponsiveOverview(browser, { width: 768, height: 1024 });
+      await runAttorneyDashboardResponsiveOverview(browser, { width: 1920, height: 1080 });
+      await runAttorneyDashboardSingularOverview(browser);
+      await runAttorneyDashboardOverviewStateIsolation(browser);
+      await runAttorneyDashboardEmptyOverview(browser);
+      await runParalegalDashboardTypography(browser);
+      await runAttorneyPhotoReliability(browser, { width: 1440, height: 900 });
       await runProfileSettingsSave(browser, { role: "attorney", viewport: { width: 1280, height: 800 } });
       await runProfileSettingsSave(browser, { role: "paralegal", viewport: { width: 390, height: 844 } });
     }

@@ -6,9 +6,8 @@
   <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
   <link rel="stylesheet" href="assets/styles/global-search.css" />
   <link rel="stylesheet" href="assets/styles/context-panel.css?v=20260812-paralegal-heading" />
-  <link rel="stylesheet" href="assets/styles/dashboard-system.css" />
+  <link rel="stylesheet" href="assets/styles/dashboard-system.css?v=20260820-4" />
   <link rel="preload" as="font" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
-  <link rel="preload" as="font" href="assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" type="font/woff2" crossorigin />
   <script>
     (function () {
       const root = document.documentElement;
@@ -49,7 +48,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Paralegal Dashboard – Let’s-ParaConnect</title>
-<script defer src="assets/scripts/utils/session.js"></script>
+<script defer src="assets/scripts/utils/session.js?v=20260820-1"></script>
 <script defer src="assets/scripts/utils/business-date.js"></script>
   <style>
     .skip-link {
@@ -3103,8 +3102,8 @@
     }
 
   </style>
-  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260812-11" />
-  <script defer src="assets/scripts/sidebar-profile.js?v=20260812-7"></script>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260820-18" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
   <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260812-1" />
   <script defer src="assets/scripts/universal-header.js?v=20260812-1"></script>
   <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
@@ -3152,7 +3151,7 @@
           <img
             id="clusterAvatar"
             class="nav-profile-photo"
-            src="data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%27220%27%20height%3D%27220%27%20viewBox%3D%270%200%20220%20220%27%3E%3Crect%20width%3D%27220%27%20height%3D%27220%27%20rx%3D%27110%27%20fill%3D%27%23f1f5f9%27/%3E%3Ccircle%20cx%3D%27110%27%20cy%3D%2790%27%20r%3D%2746%27%20fill%3D%27%23cbd5e1%27/%3E%3Cpath%20d%3D%27M40%20188c10-40%2045-68%2070-68s60%2028%2070%2068%27%20fill%3D%27none%27%20stroke%3D%27%23cbd5e1%27%20stroke-width%3D%2718%27%20stroke-linecap%3D%27round%27/%3E%3C/svg%3E"
+            src="assets/avatar-placeholder.svg"
             alt="Paralegal avatar"
           />
           <div>
@@ -3534,9 +3533,7 @@
               el.textContent = name;
             });
           }
-          const placeholderAvatar = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-            "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><rect width='220' height='220' rx='110' fill='#f1f5f9'/><circle cx='110' cy='90' r='46' fill='#cbd5e1'/><path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/></svg>"
-          )}`;
+          const placeholderAvatar = "/assets/avatar-placeholder.svg";
           const avatar = user.pendingProfileImage || user.profileImage || user.avatarURL || placeholderAvatar;
           document.querySelectorAll('[data-avatar]').forEach((el) => {
             el.src = avatar;

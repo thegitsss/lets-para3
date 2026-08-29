@@ -37,12 +37,24 @@ test("director portal is complete, accessible, responsive, and free of implicit 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/director-portal.html", { waitUntil: "domcontentloaded" });
-  await expect(page).not.toHaveURL(/login\.html|legal-acceptance\.html/);
+  await expect(page).not.toHaveURL(/login\.html/);
   await expect(page.locator("main#main")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Director Portal", exact: true })).toBeVisible();
   await expect(page.locator("#directorIdentity")).toContainText("Drew Harness");
   await expect(page.locator("#recordsBody")).not.toContainText("Loading");
   await page.waitForTimeout(200);
+
+  const analyticsValues = await page.locator("#metricEmailsSent, #metricRegisteredCount, #metricCompletedMatters, #metricFollowUpsSent")
+    .allTextContents();
+  if (analyticsValues.every((value) => Number(value.trim()) === 0)) {
+    await expect(page.locator(".director-performance")).toHaveClass(/is-empty/);
+    await expect(page.getByText("No outreach activity in this period", { exact: true })).toBeVisible();
+    await expect(page.locator(".performance-chart svg polyline")).toHaveCount(0);
+    await expect(page.locator(".arc-chart")).toHaveClass(/is-empty/);
+    await expect(page.locator(".dot-grid")).toHaveClass(/is-empty/);
+    await expect(page.locator(".mini-bars")).toHaveClass(/is-empty/);
+    await expect(page.locator(".tiny-line")).toHaveClass(/is-empty/);
+  }
 
   const desktopLayout = await readLayout(page);
   expect(desktopLayout.documentWidth).toBeLessThanOrEqual(desktopLayout.viewportWidth + 1);

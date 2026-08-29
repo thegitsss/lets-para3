@@ -50,7 +50,7 @@ These checks establish that:
 - csurf failures produce HTTP 403 with stable code `CSRF_INVALID`;
 - only explicit CSRF failures refresh and retry, exactly once;
 - ordinary authorization failures are never double-submitted;
-- HTTP 403 preserves a valid session, HTTP 401 clears it, and HTTP 428 enters legal re-acceptance;
+- HTTP 403 preserves a valid session and HTTP 401 clears it;
 - mutating route declarations remain unique;
 - frontend modules and references remain syntactically valid and reachable.
 

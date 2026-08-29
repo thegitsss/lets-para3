@@ -441,6 +441,37 @@ async function getPublishingCycleById(cycleId = "") {
   return refreshCycleLifecycle(cycle);
 }
 
+async function getPublishingStatusCounts() {
+  const groupedStatuses = await MarketingPublishingCycle.aggregate([
+    {
+      $group: {
+        _id: "$status",
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+  const counts = {
+    total: 0,
+    drafted: 0,
+    awaiting_approval: 0,
+    blocked: 0,
+    skipped: 0,
+    ready_to_publish: 0,
+  };
+
+  groupedStatuses.forEach((entry) => {
+    const status = String(entry?._id || "").trim();
+    const count = Number(entry?.count || 0);
+    if (status) counts[status] = count;
+    counts.total += count;
+  });
+
+  return {
+    counts,
+    openCycleCount: OPEN_CYCLE_STATUSES.reduce((sum, status) => sum + Number(counts[status] || 0), 0),
+  };
+}
+
 async function getPublishingOverview() {
   const [settings, cycles] = await Promise.all([
     getPublishingSettings(),
@@ -485,6 +516,7 @@ module.exports = {
   createPublishingCycle,
   getPublishingCycleById,
   getPublishingOverview,
+  getPublishingStatusCounts,
   listPublishingCycles,
   refreshCycleLifecycle,
   runScheduledCycleCreation,

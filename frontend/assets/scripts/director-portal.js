@@ -460,13 +460,11 @@ function renderOverview(payload = {}) {
   const rangeDays = Number(payload.range?.days || getSelectedRangeDays());
   const rangeLabel = rangeDays === 1 ? "today" : rangeDays === 7 ? "last 7 days" : "last 30 days";
 
-  document.getElementById("countTotal").textContent = String(total);
   const countFollowUpEl = document.getElementById("countFollowUp");
   if (countFollowUpEl) countFollowUpEl.textContent = String(counts.follow_up_sent || 0);
   const countAttentionEl = document.getElementById("countAttention");
   if (countAttentionEl) countAttentionEl.textContent = String(counts.founder_attention || 0);
   const commissionEarnedCents = Number(counts.commissionEarnedCents || 0);
-  document.getElementById("countCommission").textContent = commissionEarnedCents > 0 ? formatMoney(commissionEarnedCents) : "—";
   renderRelativeMeta(document.getElementById("lastSyncedAt"), payload.lastSyncedAt, "Synced");
   const emptyState = document.getElementById("directorEmptyState");
   if (emptyState) emptyState.classList.toggle("visible", total === 0);
@@ -517,11 +515,13 @@ function setMiniBars(selector, values = []) {
   if (!bars.length) return;
   const data = values.slice(-bars.length);
   while (data.length < bars.length) data.unshift(0);
+  const hasData = data.some((value) => Number(value) > 0);
+  document.querySelector(selector)?.classList.toggle("is-empty", !hasData);
   const max = Math.max(1, ...data);
   bars.forEach((bar, index) => {
     const value = data[index] || 0;
-    bar.style.height = `${Math.max(16, Math.round((value / max) * 82))}%`;
-    bar.style.opacity = value ? "1" : "0.28";
+    bar.style.height = value ? `${Math.max(12, Math.round((value / max) * 82))}%` : "0%";
+    bar.style.opacity = value ? "1" : "0";
   });
 }
 
@@ -529,6 +529,7 @@ function setDotGrid(selector, activeCount = 0) {
   const dots = Array.from(document.querySelectorAll(`${selector} span`));
   if (!dots.length) return;
   const active = Math.min(dots.length, Math.max(0, Number(activeCount) || 0));
+  document.querySelector(selector)?.classList.toggle("is-empty", active === 0);
   dots.forEach((dot, index) => {
     dot.style.background = index < active ? "rgba(104, 198, 138, 0.62)" : "var(--director-dot-idle)";
   });
@@ -538,6 +539,11 @@ function setArcGauge(percent = 0) {
   const arc = document.querySelector(".arc-chart");
   if (!arc) return;
   const clamped = Math.max(0, Math.min(100, Number(percent) || 0));
+  arc.classList.toggle("is-empty", clamped === 0);
+  if (clamped === 0) {
+    arc.style.background = "none";
+    return;
+  }
   const end = 16 + clamped * 0.6;
   arc.style.background = `
     radial-gradient(circle at center bottom, var(--director-card-bg) 0 52%, transparent 53%),
@@ -564,13 +570,25 @@ function renderPerformanceChart(analytics = {}) {
   const svg = chart?.querySelector("svg");
   if (!chart || !svg) return;
   const series = Array.isArray(analytics.series) ? analytics.series : [];
-  const emailValues = seriesValues(series, "emailsSent");
   const registrationValues = seriesValues(series, "registrations");
+  const followUpValues = seriesValues(series, "followUps");
   const completedValues = seriesValues(series, "mattersCompleted");
-  const max = Math.max(1, ...emailValues, ...registrationValues, ...completedValues);
+  const hasData = [...registrationValues, ...followUpValues, ...completedValues]
+    .some((value) => Number(value) > 0);
+  chart.classList.toggle("is-empty", !hasData);
+  chart.closest(".director-performance")?.classList.toggle("is-empty", !hasData);
+  chart.setAttribute(
+    "aria-label",
+    hasData ? "Outreach performance chart for the selected period" : "No outreach performance data for this period"
+  );
+  if (!hasData) {
+    svg.replaceChildren();
+    return;
+  }
+  const max = Math.max(1, ...registrationValues, ...followUpValues, ...completedValues);
   svg.innerHTML = `
-    <polyline points="${pointsForSeries(emailValues, { max })}" fill="none" stroke="var(--director-graph-primary)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
-    <polyline points="${pointsForSeries(registrationValues, { max })}" fill="none" stroke="var(--director-graph-secondary)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+    <polyline points="${pointsForSeries(registrationValues, { max })}" fill="none" stroke="var(--director-graph-primary)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+    <polyline points="${pointsForSeries(followUpValues, { max })}" fill="none" stroke="var(--director-graph-secondary)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></polyline>
     <polyline points="${pointsForSeries(completedValues, { max })}" fill="none" stroke="var(--director-graph-tertiary)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></polyline>
   `;
 }
@@ -599,6 +617,8 @@ function renderAnalytics(analytics = {}) {
   if (completedCapEl) completedCapEl.textContent = `${completedMatterCount}/50`;
   if (completedBarEl) completedBarEl.style.width = `${Math.min(100, completedMatterCount * 2)}%`;
   if (followUpsSentEl) followUpsSentEl.textContent = String(followUpsSent);
+
+  document.querySelector(".tiny-line")?.classList.toggle("is-empty", followUpsSent === 0);
 
   setArcGauge(emailsSent ? Math.min(100, emailsSent * 8) : 0);
   setDotGrid(".open-card .dot-grid", registeredCount);

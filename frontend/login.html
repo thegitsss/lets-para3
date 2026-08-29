@@ -3,16 +3,17 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <link rel="preload" as="font" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
   <link rel="preload" as="font" href="assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" type="font/woff2" crossorigin />
   <script>
     (function applyStoredPreferences() {
       const FONT_SIZE_MAP = {
-        xs: "14px",
-        sm: "15px",
-        md: "16px",
-        lg: "17px",
-        xl: "20px",
+        xs: "15px",
+        sm: "16px",
+        md: "17px",
+        lg: "20px",
+        xl: "22px",
       };
       try {
         const raw = localStorage.getItem("lpc_user");
@@ -54,13 +55,13 @@
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0B2A4A">
 <link href="assets/styles/styles.css" rel="stylesheet" />
-<link href="assets/styles/auth-matter-field.css?v=20260730" rel="stylesheet" />
+<link href="assets/styles/auth-matter-field.css?v=20260826-darker-field" rel="stylesheet" />
 <link href="assets/styles/auth-google.css?v=20260730" rel="stylesheet" />
-<script src="assets/scripts/utils/session.js"></script>
-<script src="assets/scripts/auth-matter-field.js?v=20260730" defer></script>
+<script src="assets/scripts/utils/session.js?v=20260820-1"></script>
+<script src="assets/scripts/auth-matter-field.js?v=20260826-navy-auth" defer></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Login – Let’s-ParaConnect</title>
+  <title>Sign in – Let’s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -108,15 +109,62 @@
       min-height: 100vh;
       min-height: 100dvh;
       width: 100vw;
-      background-color: transparent;
+      background: linear-gradient(90deg, transparent 0 42%, #0d1723 42% 100%);
+    }
+
+    .login-page .overlay::after {
+      background: linear-gradient(90deg, transparent 0 42%, rgba(13, 23, 35, 0.16) 42% 100%);
+    }
+
+    .login-aside-copy {
+      position: absolute;
+      z-index: 2;
+      inset: 0 0 0 42%;
+      display: grid;
+      place-items: center;
+      padding: clamp(48px, 7vw, 112px);
+      pointer-events: none;
+    }
+
+    .login-aside-copy__inner {
+      width: min(100%, 540px);
+    }
+
+    .login-aside-copy__title {
+      margin: 0;
+      color: #f8f6f1;
+      font-family: "Cormorant Garamond", serif;
+      font-size: clamp(3.8rem, 5.6vw, 6rem);
+      font-weight: 300;
+      letter-spacing: -0.045em;
+      line-height: 0.94;
+    }
+
+    .login-aside-copy__title span {display:block}
+    .login-aside-copy__title span:first-child {white-space:nowrap}
+    .login-aside-copy__title em {
+      font-style: italic;
+      font-synthesis: style;
+      font-weight: 300;
+    }
+
+    .login-aside-copy__text {
+      max-width: 34ch;
+      margin: 28px 0 0;
+      color: rgba(248, 246, 241, .7);
+      font-family: "Sarabun", sans-serif;
+      font-size: clamp(1rem, 1.3vw, 1.16rem);
+      font-weight: 200;
+      letter-spacing: .005em;
+      line-height: 1.6;
     }
 
     .left-panel {
-      width: 50%;
+      width: 42%;
       min-height: 100vh;
       min-height: 100dvh;
       background-color: rgba(255, 255, 255, 0.95);
-      padding: 60px;
+      padding: 60px clamp(34px, 3.2vw, 52px);
       display: flex;
       justify-content: center;
       align-items: center;
@@ -142,12 +190,17 @@
       color: #b4975a;
     }
 
-h1 {
+h1,
+.brand-heading {
   font-family: 'Cormorant Garamond', serif;
   font-size: 1.8rem;
   font-weight: 300;
   color: var(--navy);
   margin-bottom: 24px;
+}
+
+.brand-heading {
+  margin-top: 0;
 }
 
 h2 {
@@ -169,6 +222,7 @@ h2 {
 
     input {
       width: 100%;
+      min-height: 50px;
       padding: 0.75rem 0.9rem;
       font-size: 1rem;
       font-weight: 300;
@@ -184,15 +238,25 @@ h2 {
       outline: none;
     }
 
+    input:focus-visible {
+      border-color: var(--lpc-focus);
+      outline: 2px solid var(--lpc-focus);
+      outline-offset: 2px;
+    }
+
     .pw-wrap {
       position: relative;
     }
 
+    .pw-wrap input { padding-right: 132px; }
+
     .show-toggle {
       position: absolute;
+      z-index: 1;
+      top: 0;
       right: 12px;
-      top: 33%;
-      transform: translateY(-50%);
+      height: 50px;
+      transform: none;
       background: transparent;
       border: 0;
       font: inherit;
@@ -200,7 +264,7 @@ h2 {
       font-weight: 500;
       color: var(--muted);
       cursor: pointer;
-      min-height: 32px;
+      min-height: 44px;
       display: inline-flex;
       align-items: center;
     }
@@ -218,7 +282,7 @@ h2 {
       color: #fff;
       background-color: var(--navy);
       padding: 0.75rem 1rem;
-      min-height: 46px;
+      min-height: 50px;
       width: 100%;
       cursor: pointer;
       transition: background-color 0.16s ease, border-color 0.16s ease;
@@ -236,7 +300,7 @@ button[type="submit"]:hover,
 
 button[type="submit"]:focus-visible,
 .passkey-login-btn:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--lpc-focus);
   outline-offset: 2px;
 }
 
@@ -296,6 +360,11 @@ button[type="submit"]:focus-visible,
     @media (max-width: 768px) {
       .overlay {
         flex-direction: column;
+        background: #fff;
+      }
+
+      .login-page .overlay::after {
+        background: none;
       }
 
       .left-panel {
@@ -303,7 +372,10 @@ button[type="submit"]:focus-visible,
         min-height: 100vh;
         min-height: 100dvh;
         padding: 88px 24px 48px;
+        background: #fff;
       }
+
+      .login-aside-copy {display:none}
     }
     .back-link {
   margin-top: 24px;
@@ -346,6 +418,9 @@ button[type="submit"]:focus-visible,
     }
 
     .link-button {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
       background: none;
       border: none;
       padding: 0;
@@ -373,23 +448,27 @@ button[type="submit"]:focus-visible,
       font-size: 0.95rem;
     }
 
-  </style>
+  @media (max-width: 700px) {
+    .forgot,
+    .signup-prompt a { min-height: 44px; display: inline-flex; align-items: center; }
+  }
+</style>
 </head>
 
-<body data-public-page="true">
+<body class="login-page" data-public-page="true">
   <a class="skip-link" href="#main">Skip to main content</a>
   <main class="overlay" id="main" tabindex="-1">
     <canvas class="auth-matter-field" data-auth-matter-field aria-hidden="true"></canvas>
     <!-- LEFT PANEL -->
     <div class="left-panel">
       <div class="form-container">
-<h1>
+<p class="brand-heading">
   <a href="index.html" class="brand">Let<span class="accent-apostrophe">’</span>s-ParaConnect</a>
-</h1>
-<h2 class="login-title">Sign in to Let<span class="accent-apostrophe">’</span>s-ParaConnect</h2>
+</p>
+<h1 class="login-title">Sign in to Let<span class="accent-apostrophe">’</span>s-ParaConnect</h1>
 
         <div id="loginPanel">
-          <a class="google-auth-button" href="/api/auth/google?intent=login">
+          <a class="google-auth-button" href="/api/auth/google?intent=login" data-public-action="secondary" data-action-shape="control">
             <svg viewBox="0 0 18 18" aria-hidden="true">
               <path fill="#4285F4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.482h4.844a4.14 4.14 0 0 1-1.797 2.715v2.258h2.909c1.702-1.567 2.684-3.876 2.684-6.614Z"/>
               <path fill="#34A853" d="M9 18c2.43 0 4.468-.806 5.956-2.181l-2.909-2.258c-.806.54-1.835.859-3.047.859-2.344 0-4.329-1.585-5.039-3.714H.953v2.332A9 9 0 0 0 9 18Z"/>
@@ -401,25 +480,25 @@ button[type="submit"]:focus-visible,
           <div class="auth-divider"><span>or</span></div>
           <form id="loginForm">
             <label class="sr-only" for="email">Email address</label>
-            <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+            <input id="email" name="email" type="email" autocomplete="username webauthn" placeholder="you@example.com" required />
 
             <div class="pw-wrap">
               <label class="sr-only" for="password">Password</label>
               <input id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
-              <button type="button" class="show-toggle" aria-controls="password" aria-pressed="false">Show password</button>
+              <button type="button" class="show-toggle" aria-controls="password" aria-pressed="false" data-public-action="icon">Show password</button>
             </div>
 
-            <button type="submit" class="login-btn">Log In</button>
-            <button type="button" class="login-btn passkey-login-btn" id="passkeyLoginBtn">Sign in with a passkey</button>
+            <button type="submit" class="login-btn" data-public-action="primary" data-action-shape="control">Sign in</button>
+            <button type="button" class="login-btn passkey-login-btn" id="passkeyLoginBtn" data-public-action="secondary" data-action-shape="control">Sign in with a passkey</button>
 
   <div class="login-actions">
     <p>
-      <a href="forgot-password.html" class="forgot">Forgot password?</a>
+      <a href="forgot-password.html" class="forgot" data-public-action="text">Forgot password?</a>
     </p>
   </div>
 
             <div class="extra-links">
-              Don't have an account? <a href="signup.html">Sign up</a>
+              Don’t have an account? <a href="signup.html">Create an account</a>
             </div>
 
           </form>
@@ -431,22 +510,26 @@ button[type="submit"]:focus-visible,
           <form id="twoFactorForm">
             <label for="twoFactorCode">Verification code</label>
             <input id="twoFactorCode" name="twoFactorCode" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" required />
-            <button type="submit" class="login-btn" id="twoFactorVerifyBtn">Verify</button>
+            <button type="submit" class="login-btn" id="twoFactorVerifyBtn" data-public-action="primary" data-action-shape="control">Verify</button>
           </form>
           <div class="login-actions">
             <p>
-              <button type="button" class="link-button" id="twoFactorBackupToggle">Use a backup code</button>
+              <button type="button" class="link-button" id="twoFactorBackupToggle" data-public-action="text">Use a backup code</button>
             </p>
             <p id="twoFactorPasskeyAction" hidden>
-              <button type="button" class="link-button" id="twoFactorPasskeyBtn">Use a passkey</button>
+              <button type="button" class="link-button" id="twoFactorPasskeyBtn" data-public-action="text">Use a passkey</button>
             </p>
-            <button type="button" class="link-button" id="twoFactorBackBtn">Back to login</button>
+            <button type="button" class="link-button" id="twoFactorBackBtn" data-public-action="text">Back to login</button>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- RIGHT PANEL: implicitly handled by mountain background -->
+    <div class="login-aside-copy">
+      <div class="login-aside-copy__inner">
+        <p class="login-aside-copy__title"><span>Pick up where you</span><span><em>left off.</em></span></p>
+        <p class="login-aside-copy__text">Return to your matters, messages, and workspace.</p>
+      </div>
+    </div>
   </main>
 
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
@@ -467,6 +550,18 @@ button[type="submit"]:focus-visible,
   </script>
 
   <script src="assets/scripts/utils/toast.js?v=20260208"></script>
+  <script>
+    (() => {
+      const status = new URLSearchParams(window.location.search).get('unsubscribe');
+      if (!status || !window.toastUtils) return;
+      window.toastUtils.show(
+        status === 'success'
+          ? 'You have been unsubscribed from nonessential emails.'
+          : 'We could not process that unsubscribe link. Please sign in to update your preferences.',
+        { type: status === 'success' ? 'ok' : 'err', duration: 6000 }
+      );
+    })();
+  </script>
   <script src="/assets/vendor/simplewebauthn.js"></script>
   <script type="module" src="assets/scripts/login.js"></script>
 </body>

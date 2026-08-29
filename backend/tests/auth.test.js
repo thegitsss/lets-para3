@@ -65,7 +65,22 @@ describe("Auth workflows", () => {
     expect(user.privacyVersion).toBe(CURRENT_PRIVACY_VERSION);
     expect(user.termsAcceptedAt).toBeInstanceOf(Date);
     expect(user.privacyAcknowledgedAt).toBeInstanceOf(Date);
-    expect(user.legalAcceptanceSource).toBe("signup");
+
+    const registrationEmail = sendEmail.mock.calls.find((call) => call[1] === "Registration received");
+    expect(registrationEmail).toBeTruthy();
+    expect(registrationEmail[2]).toMatch(/Registration received/i);
+    expect(registrationEmail[2]).not.toMatch(/Application received/i);
+
+    const verificationEmail = sendEmail.mock.calls.find((call) => call[1] === "Verify your email");
+    expect(verificationEmail).toBeTruthy();
+    const verificationToken = extractTokenFromEmailCall(verificationEmail);
+    expect(verificationToken).toBeTruthy();
+
+    const verification = await request(app)
+      .post("/api/auth/verify-email")
+      .send({ token: verificationToken });
+    expect(verification.status).toBe(200);
+    expect((await User.findById(user._id)).emailVerified).toBe(true);
   });
 
   test("Sign up requires a separate privacy acknowledgement", async () => {
@@ -88,6 +103,24 @@ describe("Auth workflows", () => {
 
     expect(res.status).toBe(400);
     expect(res.body.msg).toMatch(/Invalid email/i);
+  });
+
+  test("Paralegal signup enforces the one-year experience minimum", async () => {
+    const res = await request(app)
+      .post("/api/auth/register")
+      .send({
+        ...validAttorneyPayload,
+        email: "new.paralegal@example.com",
+        role: "paralegal",
+        barNumber: undefined,
+        barState: undefined,
+        attorneyPricingAccepted: undefined,
+        yearsExperience: 0,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toMatch(/at least one year of professional paralegal experience/i);
+    expect(await User.countDocuments()).toBe(0);
   });
 
   test("Login works after logout", async () => {

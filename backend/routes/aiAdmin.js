@@ -17,7 +17,7 @@ const SupportInsight = require("../models/SupportInsight");
 const AutonomousAction = require("../models/AutonomousAction");
 const controlRoomService = require("../services/incidents/controlRoomService");
 const { getMarketingControlRoomView, getMarketingOverview } = require("../services/marketing/reviewService");
-const { getPublishingOverview } = require("../services/marketing/publishingCycleService");
+const { getPublishingStatusCounts } = require("../services/marketing/publishingCycleService");
 const { getSupportOverview, listSupportTickets } = require("../services/support/ticketService");
 const { listFAQCandidates } = require("../services/support/faqCandidateService");
 const { listSupportInsights } = require("../services/support/patternDetectionService");
@@ -874,7 +874,7 @@ function mergeFounderSnapshot({ eventFounder = {}, lifecycle = {}, payments = {}
 }
 
 async function getMarketingSnapshot() {
-  const [overview, publishingOverview] = await Promise.all([getMarketingOverview(), getPublishingOverview()]);
+  const [overview, publishingOverview] = await Promise.all([getMarketingOverview(), getPublishingStatusCounts()]);
   const blockedCycleCount = Number(publishingOverview?.counts?.blocked || 0);
   const openCycleCount = Number(publishingOverview?.openCycleCount || 0);
 
@@ -3217,6 +3217,9 @@ router.get(
       generatedAt,
       summary: summaryPayload.summary,
       cards: summaryPayload.cards,
+      focusViews: {
+        founder: buildFounderFocus(data),
+      },
     });
   })
 );

@@ -1543,11 +1543,11 @@ function injectApplyStyles() {
     .job-apply-dialog [data-apply-title]{flex:1;text-align:center;font-family:'Cormorant Garamond',serif;font-weight:300;font-size:1.6rem;margin:0;}
     .job-apply-dialog .close-btn{border:none;background:none;font-size:1.5rem;line-height:1;cursor:pointer}
     .job-apply-dialog textarea{width:100%;max-width:100%;border:1px solid #d1d5db;border-radius:14px;padding:12px 14px;font:inherit;resize:vertical;min-height:120px;box-sizing:border-box;margin-top:4px;}
-    .job-apply-dialog .apply-meta{display:flex;align-items:center;justify-content:space-between;font-size:.85rem;color:#6b7280}
+    .job-apply-dialog .apply-meta{display:flex;align-items:center;justify-content:space-between;font-size:.85rem;color:#5f6670}
     .job-apply-dialog .apply-meta .error{color:#b91c1c}
     .job-apply-dialog .modal-actions{display:flex;justify-content:flex-end;gap:10px}
-    .job-apply-dialog .muted{color:#6b7280;font-size:.9rem;margin:0}
-    .job-apply-dialog .apply-footnote{margin:4px 0 0;color:#6b7280;font-size:.8rem}
+    .job-apply-dialog .muted{color:#5f6670;font-size:.9rem;margin:0}
+    .job-apply-dialog .apply-footnote{margin:4px 0 0;color:#5f6670;font-size:.8rem}
     .apply-confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:1500;opacity:0;pointer-events:none;transition:opacity .2s ease}
     .apply-confirm-overlay.show{opacity:1;pointer-events:auto}
     .apply-confirm-dialog{background:#fff;border-radius:18px;padding:22px;max-width:420px;width:92%;box-shadow:0 30px 60px rgba(0,0,0,.15);display:grid;gap:12px;text-align:center}
@@ -1556,8 +1556,8 @@ function injectApplyStyles() {
     .apply-confirm-dialog .close-btn{border:none;background:none;font-size:1.5rem;line-height:1;cursor:pointer}
     .apply-confirm-message{margin:0;color:#4b5563;font-size:.95rem}
     .apply-confirm-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
-    .apply-confirm-link{background:#b6a47a;color:#fff;border-radius:999px;padding:0.55rem 1.2rem;text-decoration:none;font-weight:250;font-size:.95rem}
-    .apply-confirm-close{border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:0.55rem 1.2rem;font-weight:250;font-size:.95rem;cursor:pointer}
+    .apply-confirm-link{background:#b6a47a;color:#fff;border-radius:999px;padding:0.55rem 1.2rem;text-decoration:none;font-weight: 200;font-size:.95rem}
+    .apply-confirm-close{border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:0.55rem 1.2rem;font-weight: 200;font-size:.95rem;cursor:pointer}
   `;
   document.head.appendChild(style);
 }

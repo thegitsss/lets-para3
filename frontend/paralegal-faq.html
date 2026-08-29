@@ -3,15 +3,19 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0B2A4A">
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/hero-pages.css?v=20260729-white-footer" rel="stylesheet" />
+  <link href="assets/styles/hero-pages.css?v=20260826-uniform-heroes" rel="stylesheet" />
+  <link href="assets/styles/public-site-chrome.css?v=20260828-phase8" rel="stylesheet" />
+  <link href="assets/styles/faq-pages.css?v=20260826-editorial-faq-2" rel="stylesheet" />
+  <script src="assets/scripts/public-site-chrome.js?v=20260827-mobile-footer-alignment" defer></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Paralegal FAQ – Let’s-ParaConnect</title>
+  <title>Paralegal FAQ | Apply to Matter-Based Work – Let’s-ParaConnect</title>
   <meta name="description" content="Learn how independent paralegals apply, find Matters, collaborate with attorneys, and receive payment through Let’s-ParaConnect." />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
@@ -19,86 +23,11 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
-  <style>
-    .gold{color:#887244;}
-    body {
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      margin: 0;
-      padding: 0;
-      background-color: white;
-      color: #1a1a1a;
-      line-height: 1.6;
-    }
-
-    .header-logo {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-size: 1.5rem;
-      letter-spacing: 0.08em;
-    }
-
-    .header-logo a {
-      text-decoration: none;
-      color: #1a1a1a;
-    }
-
-    main {
-      padding: 60px 40px;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    h1 {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-size: 2.5rem;
-      margin-bottom: 30px;
-      letter-spacing: 0.05em;
-    }
-
-    h2 {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      margin-top: 40px;
-      font-size: 1.75rem;
-    }
-
-    p {
-      margin-bottom: 20px;
-    }
-
-    .toc-list {
-      list-style: none;
-      padding-left: 0;
-      margin: 2rem 0;
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-    }
-
-    .toc-list li {
-      margin: 0.5rem 0;
-    }
-
-    .toc-list a {
-      text-decoration: none;
-      color: var(--ink);
-      transition: color 0.2s ease-in-out;
-    }
-
-    .toc-list a:hover {
-      color: var(--gold);
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-  </style>
 </head>
 
-<body>
+<body class="faq-page faq-page--paralegal">
   <a class="skip-link" href="#main">Skip to main content</a>
-  <header class="utility-header" data-utility-header>
+  <header class="utility-header" data-utility-header data-public-header>
     <div class="utility-header__inner">
       <nav class="utility-header__nav" aria-label="Primary navigation">
         <a href="index.html#how">How It Works</a>
@@ -110,7 +39,7 @@
       <div class="utility-header__actions">
         <a class="utility-header__signin" href="login.html" data-utility-auth>Sign In</a>
         <button class="utility-header__logout" type="button" data-utility-logout hidden>Log Out</button>
-        <a class="utility-header__button" href="signup.html" data-utility-signup>Get Started</a>
+        <a class="utility-header__button" href="signup.html" data-utility-signup>Create an account</a>
       </div>
       <button class="utility-header__menu" type="button" aria-expanded="false" aria-controls="utilityParalegalFaqMenu" data-utility-menu-toggle>Menu</button>
     </div>
@@ -121,7 +50,7 @@
         <a href="browse-paralegals.html">Browse Paralegals</a>
       <a href="login.html" data-utility-auth>Sign In</a>
       <button type="button" data-utility-logout hidden>Log Out</button>
-      <a href="signup.html" data-utility-signup>Get Started</a>
+      <a href="signup.html" data-utility-signup>Create an account</a>
     </nav>
   </header>
 
@@ -130,9 +59,9 @@
 </section>
 
 <main tabindex="-1" id="main" aria-labelledby="faq-title">
-  <p class="muted">Everything you need to know before joining the platform.</p>
+  <p class="muted">For independent paralegals</p>
 
-  <section>
+  <section class="faq-toc">
     <h2>Table of Contents</h2>
     <ul class="toc-list">
       <li><a href="#q1">1. What does Let’s-ParaConnect do for paralegals?</a></li>
@@ -145,12 +74,13 @@
       <li><a href="#q8">8. How is Matter compensation handled?</a></li>
       <li><a href="#q9">9. How do I build repeat work?</a></li>
       <li><a href="#q10">10. What if there’s a dispute?</a></li>
+      <li><a href="#q11">11. What do platform fees support?</a></li>
     </ul>
   </section>
 
   <section id="q1" class="card">
     <h2>1) What does Let’s-ParaConnect do for paralegals?</h2>
-    <p>Let’s‑ParaConnect is a technology platform where approved paralegal profiles can connect with attorneys seeking project‑based support work. Attorneys and paralegals decide directly whether to work together. LPC’s workflow supports remote collaboration, and payments are facilitated through Stripe Connect.</p>
+    <p>Let’s‑ParaConnect is a technology platform where approved independent paralegals can connect with attorneys seeking support on clearly scoped matters. Attorneys and paralegals decide directly whether to work together. LPC’s workflow supports remote collaboration, and payments are facilitated through Stripe Connect.</p>
   </section>
 
   <section id="q2" class="card">
@@ -170,12 +100,12 @@
 
   <section id="q5" class="card">
     <h2>5) Do I need to be certified?</h2>
-    <p>Formal certification is not required. Applicants must describe relevant legal-office or legal-support experience performed under attorney supervision, or identify relevant paralegal education or certification. LPC reviews the submitted application as described in <a class="gold" href="paralegal-admission.html">Admissions</a>; approval is not independent authentication of those qualifications.</p>
+    <p>Formal certification is not required. Applicants must describe relevant legal-office or legal-support experience performed under attorney supervision, or identify relevant paralegal education or certification. LPC reviews the submitted application as described in <a class="gold" href="paralegal-admission.html">Our Vetting Process</a>; approval is not independent authentication of those qualifications.</p>
   </section>
 
   <section id="q6" class="card">
     <h2>6) How soon can I start working?</h2>
-    <p>Once your profile is approved, you may begin applying to open Matters. You can check your current application status by signing in.</p>
+    <p>Once your application is approved and your profile is complete, you may begin applying to open matters. You can check your current application status by signing in.</p>
   </section>
 
   <section id="q7" class="card">
@@ -198,31 +128,23 @@
     <p>If there’s a concern about scope or completion, both parties can submit details through the platform’s review workflow before payment release. Let’s-ParaConnect may request supporting information, such as the agreed task list and completion notes, in order to administer the platform’s workflow and payment policies.</p>
     <p>Self-serve account deactivation is handled in Settings. It disables access and removes an account from active platform participation, but it is not full erasure. Paralegals cannot deactivate while involved in an active Matter or while funding, payout, dispute, or other financial obligations remain unresolved.</p>
   </section>
+
+  <section id="q11" class="card">
+    <h2>11) What do platform fees support?</h2>
+    <p>Platform fees support LPC’s application and eligibility review, technology and matter workspace, platform support, applicable Stripe processing costs, and other platform operations. Platform fees are not fees for legal services.</p>
+  </section>
 </main>
 
-<section class="section about wrap" style="text-align: center; background-color: #ffffff;" id="cta">
-  <h2 style="color: #1a2230; font-family: 'Cormorant Garamond', sans-serif; font-weight: 200;">Ready to Get Started?</h2>
-  <p style="color: #333333; font-family: 'Sarabun', sans-serif; font-weight: 200; max-width: 600px; margin: 0 auto 1.5rem;">
-    Apply to join Let’s-ParaConnect. After approval, you can browse open Matters and apply to work that fits your experience.
-  </p>
-  <a class="cta" href="signup.html" style="
-    margin-top: 1rem;
-    border: 1.5px solid #1a2230;
-    color: #1a2230;
-    font-family: 'Sarabun', sans-serif;
-    font-weight: 200;
-    padding: 0.75rem 2rem;
-    border-radius: 6px;
-    display: inline-block;
-    text-decoration: none;
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
-  ">Sign Up</a>
+<section class="faq-cta" id="cta">
+  <h2>Ready to join LPC?</h2>
+  <p>Apply for platform admission, build your profile, and choose matters that fit your experience.</p>
+  <a class="faq-cta__button" href="signup.html?role=paralegal" data-public-action="primary" data-action-shape="pill">Apply to join</a>
 </section>
-  <footer class="home-footer">
+  <footer class="home-footer" data-public-footer>
     <div class="home-footer__top">
       <div class="home-footer__brand">
         <a class="home-brand" href="index.html">Let<span class="home-brand__apostrophe">’</span>s-ParaConnect</a>
-        <p>Project-based legal support for attorneys and independent paralegals.</p>
+        <p>Matter-based legal support for attorneys and independent paralegals.</p>
       </div>
       <nav aria-label="Footer navigation">
         <a href="attorney-faq.html">For Attorneys</a>
@@ -230,7 +152,7 @@
         <a href="contact.html">Contact</a>
         <a href="privacy.html">Privacy</a>
         <a href="terms.html">Terms</a>
-        <a href="/paralegal-admission.html">Paralegal Admission</a>
+        <a href="/paralegal-admission.html">Our Vetting Process</a>
         <a href="accessibility.html">Accessibility</a>
       </nav>
     </div>
@@ -247,6 +169,6 @@
 
 <script src="assets/scripts/utility-header.js" defer></script>
 <script src="assets/scripts/public-matter-field.js" defer></script>
-  <script src="assets/scripts/accessibility-toggle.js"></script>
+  <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
 </html>

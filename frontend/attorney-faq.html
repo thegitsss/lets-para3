@@ -3,218 +3,31 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0B2A4A">
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/hero-pages.css?v=20260729-white-footer" rel="stylesheet" />
+  <link href="assets/styles/hero-pages.css?v=20260826-uniform-heroes" rel="stylesheet" />
+  <link href="assets/styles/public-site-chrome.css?v=20260828-phase8" rel="stylesheet" />
+  <link href="assets/styles/faq-pages.css?v=20260826-editorial-faq-2" rel="stylesheet" />
+  <script src="assets/scripts/public-site-chrome.js?v=20260827-mobile-footer-alignment" defer></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>For Attorneys – Let’s-ParaConnect</title>
-  <meta name="description" content="Learn how attorneys use Let’s-ParaConnect to scope matters, review approved independent paralegals, collaborate, and manage payment." />
+  <title>Attorney FAQ | Matter-Based Paralegal Support – Let’s-ParaConnect</title>
+  <meta name="description" content="Learn how attorneys use Let’s-ParaConnect to scope matters, review vetted independent paralegals, collaborate, and manage payment." />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
-  <style>
-    .gold{color:#b4975a;}
-    .gold-link {
-      color: #b4975a;
-      text-decoration: none;
-    }
-    .gold-link:hover,
-    .gold-link:focus-visible {
-      color: #b4975a;
-      text-decoration: none;
-    }
-    body {
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      margin: 0;
-      padding: 0;
-      background-color: white;
-      color: #1a1a1a;
-      line-height: 1.6;
-    }
-
-    .header-logo {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-size: 1.5rem;
-      letter-spacing: 0.08em;
-    }
-
-    .header-logo a {
-      text-decoration: none;
-      color: #1a1a1a;
-    }
-
-    main {
-      padding: 60px 40px;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    h1 {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-size: 2.5rem;
-      margin-bottom: 30px;
-      letter-spacing: 0.05em;
-    }
-
-    h2 {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      margin-top: 40px;
-      font-size: 1.75rem;
-    }
-
-    p {
-      margin-bottom: 20px;
-    }
-
-    .toc-list {
-      list-style: none;
-      padding-left: 0;
-      margin: 2rem 0;
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-    }
-
-    .toc-list li {
-      margin: 0.5rem 0;
-    }
-
-    .toc-list a {
-      text-decoration: none;
-      color: var(--ink);
-      transition: color 0.2s ease-in-out;
-    }
-
-    .toc-list a:hover {
-      color: var(--gold);
-    }
-
-    .faq-label {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-size: 0.9rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: #6b7280;
-      margin: 20px 0 10px;
-    }
-
-    .faq-list {
-      list-style: disc;
-      padding-left: 1.1rem;
-      margin: 0 0 20px;
-    }
-
-    .faq-list li {
-      margin: 8px 0;
-    }
-
-    .faq-list li::marker {
-      font-size: 0.65em;
-      color: var(--gold);
-    }
-
-    .faq-related-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: #806520;
-      font-weight: 400;
-      text-decoration: underline;
-      text-decoration-color: rgba(128, 101, 32, 0.4);
-      text-underline-offset: 4px;
-      transition: color 0.2s ease, text-decoration-color 0.2s ease;
-    }
-
-    .faq-related-link:hover,
-    .faq-related-link:focus-visible {
-      color: #5f4915;
-      text-decoration-color: currentColor;
-    }
-
-    .faq-related-link span {
-      transition: transform 0.2s ease;
-    }
-
-    .faq-related-link:hover span,
-    .faq-related-link:focus-visible span {
-      transform: translateX(3px);
-    }
-
-    #cta h2,
-    #cta p,
-    #cta .cta {
-      opacity: 0;
-      transform: translateY(14px);
-      transition: opacity 0.35s ease, transform 0.35s ease;
-    }
-
-    #cta.is-visible h2,
-    #cta.is-visible p,
-    #cta.is-visible .cta {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    #cta.is-visible p {
-      transition-delay: 0.06s;
-    }
-
-    #cta.is-visible .cta {
-      transition-delay: 0.12s;
-      transition-property: opacity, transform, box-shadow, background-color;
-      transition-duration: 0.35s, 0.35s, 0.2s, 0.2s;
-      transition-timing-function: ease, ease, ease, ease;
-    }
-
-    #cta .cta:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
-      background: rgba(182, 164, 122, 0.08);
-    }
-
-    #cta .cta:focus-visible {
-      outline: 2px solid #b6a47a;
-      outline-offset: 2px;
-    }
-
-    #cta {
-      margin-bottom: 48px;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .faq-related-link span,
-      #cta h2,
-      #cta p,
-      #cta .cta {
-        opacity: 1;
-        transform: none;
-        transition: none;
-      }
-      #cta .cta {
-        transition: none;
-      }
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-  </style>
 </head>
 
-<body>
+<body class="faq-page faq-page--attorney">
   <a class="skip-link" href="#main">Skip to main content</a>
-  <header class="utility-header" data-utility-header>
+  <header class="utility-header" data-utility-header data-public-header>
     <div class="utility-header__inner">
       <nav class="utility-header__nav" aria-label="Primary navigation">
         <a href="index.html#how">How It Works</a>
@@ -226,7 +39,7 @@
       <div class="utility-header__actions">
         <a class="utility-header__signin" href="login.html" data-utility-auth>Sign In</a>
         <button class="utility-header__logout" type="button" data-utility-logout hidden>Log Out</button>
-        <a class="utility-header__button" href="signup.html" data-utility-signup>Get Started</a>
+        <a class="utility-header__button" href="signup.html" data-utility-signup>Create an account</a>
       </div>
       <button class="utility-header__menu" type="button" aria-expanded="false" aria-controls="utilityAttorneyFaqMenu" data-utility-menu-toggle>Menu</button>
     </div>
@@ -237,26 +50,26 @@
         <a href="browse-paralegals.html">Browse Paralegals</a>
       <a href="login.html" data-utility-auth>Sign In</a>
       <button type="button" data-utility-logout hidden>Log Out</button>
-      <a href="signup.html" data-utility-signup>Get Started</a>
+      <a href="signup.html" data-utility-signup>Create an account</a>
     </nav>
   </header>
 
 <section class="hero-banner" aria-labelledby="faq-title">
-  <div class="hero-banner__title"><h1 id="faq-title">For Attorneys</h1></div>
+  <div class="hero-banner__title"><h1 id="faq-title">Attorney FAQ</h1></div>
 </section>
 
 <main tabindex="-1" id="main" aria-labelledby="faq-title">
-  <p class="muted">A software platform for project-based paralegal support.</p>
+  <p class="muted">For attorneys</p>
 
-  <p>Let’s-ParaConnect is a software platform designed to help solo and small-firm attorneys engage experienced paralegals through structured, project-based support work — without staffing agencies, full-time hiring commitments, or administrative friction.</p>
-  <p>Account access is approval-based. LPC reviews submitted account and profile information before deciding whether to grant platform access; approval is not independent credential verification or an endorsement.</p>
+  <p>Let’s-ParaConnect is a software platform designed to help solo and small-firm attorneys engage independent paralegals for clearly scoped matters—without staffing agencies, full-time hiring commitments, or administrative friction.</p>
+  <p>Account access is approval-based. LPC reviews submitted application information before deciding whether to grant platform access; approval is not independent credential verification or an endorsement.</p>
   <p><strong>Minimum Matter compensation is $400.</strong></p>
 
-  <section>
+  <section class="faq-toc">
     <h2>Table of Contents</h2>
     <ul class="toc-list">
-      <li><a href="#q1">1. Approved paralegal profiles</a></li>
-      <li><a href="#q2">2. Project-based work — not placement</a></li>
+      <li><a href="#q1">1. Vetted paralegals</a></li>
+      <li><a href="#q2">2. Matter-based work—not placement</a></li>
       <li><a href="#q3">3. Clear scope before work begins</a></li>
       <li><a href="#q4">4. Stripe-processed, approval-based payments</a></li>
       <li><a href="#q5">5. Independent, professional engagement</a></li>
@@ -265,17 +78,18 @@
       <li><a href="#q8">8. Are there platform fees?</a></li>
       <li><a href="#q9">9. Can attorneys request conflict checks?</a></li>
       <li><a href="#q10">10. Admission &amp; availability</a></li>
+      <li><a href="#q11">11. What do platform fees support?</a></li>
     </ul>
   </section>
 
   <section id="q1" class="card">
-    <h2>1) Approved paralegal profiles</h2>
-    <p>Each approved paralegal profile contains applicant-submitted information about the person’s background, practice areas, and project experience. LPC reviews submitted profiles for platform access, but does not independently authenticate credentials or guarantee qualifications. Attorneys remain responsible for evaluating experience and fit before engaging anyone.</p>
+    <h2>1) Vetted paralegals</h2>
+    <p>Every paralegal completes LPC’s application and eligibility review before joining the platform. The profile contains information supplied by the paralegal about their background, practice areas, and matter experience. LPC does not independently authenticate credentials or guarantee qualifications. Attorneys remain responsible for evaluating experience and fit before engaging anyone.</p>
     <p><a class="faq-related-link" href="paralegal-admission.html">Our vetting process <span aria-hidden="true">→</span></a></p>
   </section>
 
   <section id="q2" class="card">
-    <h2>2) Project-based work — not placement</h2>
+    <h2>2) Matter-based work—not placement</h2>
     <p>Paralegals independently review postings and apply to work that aligns with their experience. Let’s-ParaConnect does not place, match, or assign paralegals. Attorneys retain full discretion over who they engage and how work is managed.</p>
   </section>
 
@@ -298,7 +112,7 @@
     <h2>6) What Let’s-ParaConnect is — and isn’t</h2>
     <p class="faq-label">It is</p>
     <ul class="faq-list">
-      <li>A professional platform for project-based support work</li>
+      <li>A professional platform for clearly scoped matter work</li>
       <li>Built specifically for solo and small-firm attorneys</li>
       <li>Designed for experienced paralegals</li>
       <li>Structured, transparent, and intentional</li>
@@ -336,31 +150,23 @@
     <p>Attorney accounts are reviewed manually, and platform access is limited to approved accounts.</p>
     <p>Self-serve account deactivation is handled in Settings. It disables access and removes an account from active platform participation, but it is not full erasure. Attorneys cannot deactivate while involved in an active Matter or while funding, payout, dispute, or other financial obligations remain unresolved.</p>
   </section>
+
+  <section id="q11" class="card">
+    <h2>11) What do platform fees support?</h2>
+    <p>Platform fees support LPC’s application and eligibility review, technology and matter workspace, platform support, applicable Stripe processing costs, and other platform operations. Platform fees are not fees for legal services.</p>
+  </section>
 </main>
 
-<section class="section about wrap" style="text-align: center; background-color: #ffffff;" id="cta">
-  <h2 style="color: #1a2230; font-family: 'Cormorant Garamond', sans-serif; font-weight: 200;">Ready to Get Started?</h2>
-  <p style="color: #333333; font-family: 'Sarabun', sans-serif; font-weight: 200; max-width: 600px; margin: 0 auto 1.5rem;">
-    Apply to join Let’s-ParaConnect. After approval, you can post a Matter, review applicants, and choose whom to engage.
-  </p>
-  <a class="cta" href="signup.html" style="
-    margin-top: 1rem;
-    border: 1.5px solid #1a2230;
-    color: #1a2230;
-    font-family: 'Sarabun', sans-serif;
-    font-weight: 200;
-    padding: 0.75rem 2rem;
-    border-radius: 6px;
-    display: inline-block;
-    text-decoration: none;
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
-  ">Request Access</a>
+<section class="faq-cta" id="cta">
+  <h2>Ready to post your first matter?</h2>
+  <p>Create an attorney account, define the work, and review applications from vetted independent paralegals.</p>
+  <a class="faq-cta__button" href="signup.html?role=attorney" data-public-action="primary" data-action-shape="pill">Post a matter</a>
 </section>
-  <footer class="home-footer">
+  <footer class="home-footer" data-public-footer>
     <div class="home-footer__top">
       <div class="home-footer__brand">
         <a class="home-brand" href="index.html">Let<span class="home-brand__apostrophe">’</span>s-ParaConnect</a>
-        <p>Project-based legal support for attorneys and independent paralegals.</p>
+        <p>Matter-based legal support for attorneys and independent paralegals.</p>
       </div>
       <nav aria-label="Footer navigation">
         <a href="attorney-faq.html">For Attorneys</a>
@@ -368,7 +174,7 @@
         <a href="contact.html">Contact</a>
         <a href="privacy.html">Privacy</a>
         <a href="terms.html">Terms</a>
-        <a href="/paralegal-admission.html">Paralegal Admission</a>
+        <a href="/paralegal-admission.html">Our Vetting Process</a>
         <a href="accessibility.html">Accessibility</a>
       </nav>
     </div>
@@ -407,6 +213,6 @@
     }
   }
 </script>
-  <script src="assets/scripts/accessibility-toggle.js"></script>
+  <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
 </html>

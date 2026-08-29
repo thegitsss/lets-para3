@@ -24,7 +24,7 @@ const SESSION_STRING_FIELDS = [
   "pendingProfileImage",
   "profilePhotoStatus",
 ];
-const SESSION_BOOLEAN_FIELDS = ["disabled", "deleted", "isFirstLogin", "legalAcceptanceRequired"];
+const SESSION_BOOLEAN_FIELDS = ["disabled", "deleted", "isFirstLogin"];
 const ONBOARDING_BOOLEAN_FIELDS = [
   "paralegalTourCompleted",
   "paralegalProfileTourCompleted",
@@ -74,17 +74,6 @@ function redirectToLoginOnce() {
     if (typeof window !== "undefined") {
       window.location.href = "login.html";
     }
-  } catch {
-    /* noop */
-  }
-}
-
-function redirectToLegalAcceptanceOnce() {
-  if (typeof window === "undefined") return;
-  const currentPath = String(window.location?.pathname || "").toLowerCase();
-  if (currentPath.endsWith("/legal-acceptance.html")) return;
-  try {
-    window.location.replace("legal-acceptance.html");
   } catch {
     /* noop */
   }
@@ -173,13 +162,6 @@ export function requireAuth(expectedRole) {
     throw new Error("Not approved");
   }
 
-  if (user?.legalAcceptanceRequired === true) {
-    redirectToLegalAcceptanceOnce();
-    const error = new Error("Updated legal documents must be accepted before continuing.");
-    error.code = "LEGAL_ACCEPTANCE_REQUIRED";
-    throw error;
-  }
-
   return session;
 }
 
@@ -224,8 +206,6 @@ function applyAuthResponseRedirect(response, opts = {}) {
   if (response.status === 401) {
     clearSession();
     redirectToLoginOnce();
-  } else if (response.status === 428) {
-    redirectToLegalAcceptanceOnce();
   }
 }
 

@@ -46,6 +46,13 @@ describe("static cache policy", () => {
     expect(response.headers.get("cache-control")).toBe("no-cache");
   });
 
+  test("serves browser ES modules with an executable JavaScript MIME type", () => {
+    const response = responseRecorder();
+    setStaticResponseHeaders(response, "/app/frontend/assets/scripts/search.mjs", { production: true });
+    expect(response.headers.get("content-type")).toBe("application/javascript; charset=utf-8");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=0, must-revalidate");
+  });
+
   test("indexes only the explicit public-document allowlist", () => {
     expect(INDEXABLE_HTML_DOCUMENTS).toEqual([
       "accessibility.html",

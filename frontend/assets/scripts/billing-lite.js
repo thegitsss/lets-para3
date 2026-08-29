@@ -85,6 +85,28 @@ async function initBillingSurface() {
     resumePendingHire(pendingHire);
   }
   await loadHistory();
+  applySettingsEntryContext();
+}
+
+function applySettingsEntryContext() {
+  let params;
+  try {
+    params = new URLSearchParams(window.location.search);
+  } catch {
+    return;
+  }
+  if (params.get("from") !== "settings") return;
+  document.getElementById("paymentsSettingsBackLink")?.removeAttribute("hidden");
+  const targetId = params.get("settingsTarget") === "billing-history"
+    ? "history-heading"
+    : "payment-method-heading";
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  target.setAttribute("tabindex", "-1");
+  window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+    target.scrollIntoView({ block: "start" });
+    target.focus({ preventScroll: true });
+  }));
 }
 
 function consumeCheckoutReturnStatus() {

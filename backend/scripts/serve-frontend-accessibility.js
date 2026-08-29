@@ -6,6 +6,10 @@ const frontendRoot = path.resolve(__dirname, "../../frontend");
 const notFoundDocument = path.join(frontendRoot, "404.html");
 const vendorFiles = new Map([
   ["/assets/vendor/chart-4.5.1.js", path.resolve(__dirname, "../node_modules/chart.js/dist/chart.umd.js")],
+  [
+    "/assets/vendor/simplewebauthn.js",
+    path.resolve(__dirname, "../node_modules/@simplewebauthn/browser/dist/bundle/index.umd.min.js"),
+  ],
   ["/assets/vendor/web-vitals-6.1.1.js", path.resolve(__dirname, "../node_modules/web-vitals/dist/web-vitals.js")],
 ]);
 const port = Number(process.env.PORT || 5054);
@@ -17,6 +21,7 @@ const mimeTypes = {
   ".jpg": "image/jpeg",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".webmanifest": "application/manifest+json",

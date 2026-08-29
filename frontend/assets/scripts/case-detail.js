@@ -822,7 +822,7 @@ function ensureCompleteModalStyles() {
       border-radius:999px;
       padding:0.55rem 1.4rem;
       font-size:.9rem;
-      font-weight:250;
+      font-weight: 200;
       border:1px solid var(--app-border);
       background:var(--app-surface);
       color:var(--app-text);
@@ -880,9 +880,9 @@ function ensureDocumentPreviewStyles() {
     .document-preview-meta{display:grid;gap:10px;margin:0}
     .document-preview-meta div{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
     .document-preview-meta dt{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--app-muted)}
-    .document-preview-meta dd{margin:0;font-size:.95rem;font-weight:250;text-align:right}
+    .document-preview-meta dd{margin:0;font-size:.95rem;font-weight: 200;text-align:right}
     .document-preview-actions{display:flex;justify-content:flex-end;gap:10px}
-    .document-open-btn{background:var(--app-accent);color:var(--app-surface);border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:250;text-decoration:none}
+    .document-open-btn{background:var(--app-accent);color:var(--app-surface);border:none;border-radius:10px;padding:8px 14px;cursor:pointer;font-weight: 200;text-decoration:none}
     .document-open-btn[aria-disabled="true"]{opacity:.6;cursor:not-allowed;pointer-events:none}
   `;
   document.head.appendChild(style);
@@ -1008,14 +1008,14 @@ function ensureDisputeModalStyles() {
     .case-dispute-overlay.is-visible{opacity:1}
     .case-dispute-overlay.is-visible .case-dispute-modal{opacity:1;transform:translateY(0) scale(1)}
     .case-dispute-title{
-      font-weight:500;
+      font-weight: 600;
       font-size:1.4rem;
       text-align:center;
       font-family:"Cormorant Garamond", var(--font-serif, serif);
     }
     .case-dispute-help{color:var(--app-muted);font-size:.92rem;line-height:1.55}
     .case-dispute-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
-    .case-dispute-actions .case-action-btn{font-weight:250}
+    .case-dispute-actions .case-action-btn{font-weight: 200}
     .case-dispute-modal input[type="number"],
     .case-dispute-modal textarea{width:100%;border-radius:12px;border:1px solid var(--app-border-soft);padding:10px 12px;font-family:var(--font-sans)}
     .case-dispute-modal input[type="number"]{min-height:44px}
@@ -1085,13 +1085,13 @@ function ensureWithdrawalModalStyles() {
     .case-withdraw-overlay.is-visible{opacity:1}
     .case-withdraw-overlay.is-visible .case-withdraw-modal{opacity:1;transform:translateY(0) scale(1)}
     .case-withdraw-title{
-      font-weight:500;
+      font-weight: 600;
       font-size:1.4rem;
       text-align:center;
       font-family:"Cormorant Garamond", var(--font-serif, serif);
     }
     .case-withdraw-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
-    .case-withdraw-actions .case-action-btn{font-weight:250}
+    .case-withdraw-actions .case-action-btn{font-weight: 200}
     .case-withdraw-footnote{font-size:9pt;color:var(--app-muted);text-align:right;line-height:1.55}
   `;
   document.head.appendChild(style);
@@ -1144,7 +1144,7 @@ function ensureWithdrawalNoticeModalStyles() {
     .tour-modal.is-active{display:block}
     .tour-hero{height:150px;background-image:url("hero-mountain.jpg");background-size:cover;background-position:center}
     .tour-content{padding:22px 26px 28px}
-    .tour-title{font-family:var(--font-serif);font-size:1.6rem;color:var(--app-text);margin-bottom:8px;font-weight:500}
+    .tour-title{font-family:var(--font-serif);font-size:1.6rem;color:var(--app-text);margin-bottom:8px;font-weight: 600}
     .tour-text{color:var(--app-muted);font-size:.98rem;line-height:1.5;margin-bottom:20px}
     .tour-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
     .tour-btn{border:1px solid var(--app-border);background:var(--app-surface);color:var(--app-text);padding:10px 20px;border-radius:999px;font-weight:300;cursor:pointer;transition:transform .2s ease, box-shadow .2s ease}
@@ -1154,7 +1154,7 @@ function ensureWithdrawalNoticeModalStyles() {
     .withdrawal-decision{display:grid;gap:14px;text-align:left;margin-bottom:16px}
     .decision-card{border:1px solid var(--app-border);border-radius:16px;padding:14px 16px;display:grid;gap:6px;cursor:pointer;transition:border-color .2s ease, box-shadow .2s ease;background:var(--app-surface)}
     .decision-card.selected{border-color:var(--accent);box-shadow:0 0 0 1px rgba(182,164,122,.25)}
-    .decision-title{font-weight:500;color:var(--app-text)}
+    .decision-title{font-weight: 600;color:var(--app-text)}
     .decision-text{font-size:.9rem;color:var(--app-muted)}
     .decision-card.decision-deny{
       background:var(--app-accent-soft);
@@ -1183,7 +1183,7 @@ function ensureWithdrawalNoticeModalStyles() {
       position:absolute;
       left:12px;
       color:var(--app-muted);
-      font-weight:500;
+      font-weight: 600;
       font-size:.95rem;
       pointer-events:none;
     }
@@ -1316,7 +1316,7 @@ function ensurePartialPayoutModalStyles() {
     .line-item-text{display:flex;align-items:center;gap:10px;min-width:0}
     .line-item-title{
       font-family:var(--font-serif);
-      font-weight:500;
+      font-weight: 600;
       color:var(--app-text);
       font-size:1.05rem;
       line-height:1.2;
@@ -1342,7 +1342,7 @@ function ensurePartialPayoutModalStyles() {
     .money-input .prefix{
       padding:0 12px;
       color:rgba(15,23,42,.6);
-      font-weight:500;
+      font-weight: 600;
       font-size:.95rem;
       border-right:1px solid rgba(15,23,42,.14);
       height:100%;
@@ -1378,13 +1378,13 @@ function ensurePartialPayoutModalStyles() {
       margin:0 0 8px;
     }
     .case-payout-summary .summary-label{color:rgba(15,23,42,.7)}
-    .case-payout-summary .summary-value{font-weight:500;color:var(--app-text)}
+    .case-payout-summary .summary-value{font-weight: 600;color:var(--app-text)}
     .case-payout-error{font-size:.82rem;color:#b91c1c;min-height:1.1em}
     .case-payout-footer{display:flex;flex-direction:column;gap:8px;margin-top:0;padding-top:0;transition:opacity .2s ease}
     .case-payout-body.is-fading,
     .case-payout-footer.is-fading{opacity:0}
     .case-payout-actions{display:flex;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;gap:10px}
-    .case-payout-actions .case-action-btn{font-family:var(--font-serif);font-weight:500;letter-spacing:.02em}
+    .case-payout-actions .case-action-btn{font-family:var(--font-serif);font-weight: 600;letter-spacing:.02em}
     .case-payout-actions .case-action-btn.primary{width:auto}
     .case-payout-help-text{font-size:.8rem;color:rgba(15,23,42,.6);margin-top:2px}
     .case-payout-modal.is-processing .case-payout-actions .case-action-btn{cursor:progress}
@@ -1396,7 +1396,7 @@ function ensurePartialPayoutModalStyles() {
     .case-payout-success-title{
       font-family:var(--font-serif);
       font-size:1.2rem;
-      font-weight:500;
+      font-weight: 600;
       color:var(--app-text);
     }
     .case-payout-success-copy{
@@ -1800,7 +1800,7 @@ function ensureFlagMenuStyles() {
       text-align:center;
       padding:12px 14px;
       border-radius:12px;
-      font-weight:500;
+      font-weight: 600;
       font-family:'Sarabun', sans-serif;
       letter-spacing:.01em;
       display:flex;
@@ -2902,7 +2902,7 @@ function normalizeAttorneyCaseTheme() {
   const overrides = {
     "--bg": "#ffffff",
     "--panel": "#fcfcfc",
-    "--muted": "#8a8a8a",
+    "--muted": "#5f6670",
     "--sidebar-text": "#1a1a1a",
     "--sidebar-bg": "#f5f5f5e6",
     "--app-background": "#ffffff",

@@ -4,6 +4,9 @@ const fs = require("fs");
 const path = require("path");
 
 const FRONTEND_ROOT = path.resolve(__dirname, "../../frontend");
+const BACKEND_RUNTIME_ROOTS = ["routes", "services", "utils"].map((directory) =>
+  path.resolve(__dirname, "..", directory)
+);
 const KIB = 1024;
 const BUDGETS = Object.freeze({
   total: 7 * 1024 * KIB,
@@ -68,6 +71,11 @@ function main() {
 
   const searchableText = files
     .filter((filePath) => TEXT_EXTENSIONS.has(path.extname(filePath).toLowerCase()))
+    .concat(
+      BACKEND_RUNTIME_ROOTS.flatMap((directory) => walk(directory)).filter((filePath) =>
+        [".js", ".json", ".mjs"].includes(path.extname(filePath).toLowerCase())
+      )
+    )
     .map((filePath) => fs.readFileSync(filePath, "utf8"))
     .join("\n");
 
@@ -95,7 +103,7 @@ function main() {
       }
       const basename = path.basename(filePath);
       if (!searchableText.includes(basename)) {
-        failures.push(`${rel} is not referenced by any frontend source or manifest`);
+        failures.push(`${rel} is not referenced by any frontend source, manifest, or production backend consumer`);
       }
     }
 

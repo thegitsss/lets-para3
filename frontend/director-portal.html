@@ -1197,11 +1197,11 @@
           <h2>Emails Sent</h2>
           <div class="metric-body">
             <div>
-              <div class="metric-delta">▲ Imported</div>
+              <div class="metric-delta">Imported</div>
               <strong class="metric-value" id="metricEmailsSent">0</strong>
               <div class="metric-note" aria-hidden="true"></div>
             </div>
-            <div class="arc-chart" aria-hidden="true"></div>
+            <div class="arc-chart is-empty" aria-hidden="true"></div>
           </div>
         </article>
 
@@ -1209,7 +1209,7 @@
           <h2>Registered</h2>
           <div class="metric-body">
             <div>
-              <div class="metric-delta">▲ Attorneys</div>
+              <div class="metric-delta">Attorneys</div>
               <strong class="metric-value" id="metricRegisteredCount">0</strong>
               <div class="metric-note" aria-hidden="true"></div>
             </div>
@@ -1228,7 +1228,7 @@
           <h2>Completed Matters</h2>
           <div class="metric-body">
             <div>
-              <div class="metric-delta">▲ Completed</div>
+              <div class="metric-delta">Completed</div>
               <strong class="metric-value" id="metricCompletedMatters">0</strong>
               <div class="metric-note"><span id="metricCompletedCap">0/50</span> completed matters</div>
             </div>
@@ -1242,11 +1242,11 @@
           <h2>Conversion Rate</h2>
           <div class="metric-body">
             <div>
-              <div class="metric-delta">▲ Registered</div>
+              <div class="metric-delta">Registered</div>
               <strong class="metric-value" id="metricConversionRate">0%</strong>
               <div class="metric-note">Registrations</div>
             </div>
-            <div class="mini-bars" aria-hidden="true">
+            <div class="mini-bars is-empty" aria-hidden="true">
               <span></span><span></span><span></span><span></span><span></span><span></span>
             </div>
           </div>
@@ -1256,15 +1256,15 @@
           <h2>Follow-Ups Sent</h2>
           <div class="metric-body">
             <div>
-              <div class="metric-delta">▲ Automatic</div>
+              <div class="metric-delta">Automatic</div>
               <strong class="metric-value" id="metricFollowUpsSent">0</strong>
               <div class="metric-note" aria-hidden="true"></div>
             </div>
-            <div class="tiny-line" aria-hidden="true"><span></span></div>
+            <div class="tiny-line is-empty" aria-hidden="true"><span></span></div>
           </div>
         </article>
 
-        <article class="director-performance">
+        <article class="director-performance is-empty">
           <div class="performance-head">
             <div>
               <h2>Outreach Performance</h2>
@@ -1275,12 +1275,12 @@
             <span>Follow-Ups</span>
             <span>Completed Matters</span>
           </div>
-          <div class="performance-chart" role="img" aria-label="Outreach performance chart">
-            <svg viewBox="0 0 900 246" preserveAspectRatio="none" aria-hidden="true">
-              <path d="M0 220 L55 190 L110 196 L165 176 L220 184 L275 132 L330 116 L385 108 L440 72 L495 98 L550 92 L605 38 L660 52 L715 76 L770 70 L825 78 L900 34" fill="none" stroke="var(--director-graph-primary)" stroke-width="3"/>
-              <path d="M0 218 L55 188 L110 178 L165 168 L220 160 L275 126 L330 112 L385 104 L440 82 L495 106 L550 96 L605 50 L660 58 L715 88 L770 86 L825 74 L900 48" fill="none" stroke="var(--director-graph-secondary)" stroke-width="2"/>
-              <path d="M0 226 L55 206 L110 198 L165 184 L220 174 L275 148 L330 138 L385 132 L440 116 L495 134 L550 124 L605 92 L660 104 L715 126 L770 120 L825 110 L900 82" fill="none" stroke="var(--director-graph-tertiary)" stroke-width="2"/>
-            </svg>
+          <div class="performance-chart is-empty" role="img" aria-label="No outreach performance data for this period">
+            <svg viewBox="0 0 900 246" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+            <div class="performance-chart__empty" aria-live="polite">
+              <strong>No outreach activity in this period</strong>
+              <span>Sync Zoho or choose a longer time range to review real activity.</span>
+            </div>
           </div>
         </article>
       </section>
@@ -1331,11 +1331,6 @@
             <strong id="attentionCommission">—</strong>
           </div>
         </div>
-      </section>
-
-      <section class="director-grid" aria-label="Outreach summary" hidden>
-        <article class="director-card"><span>Total Records</span><strong id="countTotal">0</strong></article>
-        <article class="director-card"><span>Commission Earned</span><strong id="countCommission">—</strong></article>
       </section>
 
       <section>

@@ -3,12 +3,13 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0B2A4A">
   <meta charset="utf-8" />
-  <title>Paralegal Admission Requirements | Let’s-ParaConnect</title>
+  <title>Our Vetting Process | Let’s-ParaConnect</title>
   <meta name="description" content="Review the qualifications and application requirements for independent paralegals joining Let’s-ParaConnect." />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
@@ -19,119 +20,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/hero-pages.css?v=20260729-white-footer" rel="stylesheet" />
-
-  <style>
-    .gold{color:var(--gold);}
-    :root {
-      --ink: #1a2230;
-      --muted: #5c6b7a;
-      --line: #e8edf3;
-      --gold: #887244;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: #ffffff;
-      color: var(--ink);
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 16px;
-      line-height: 1.7;
-    }
-
-    /* MAIN CONTENT */
-    main {
-      max-width: 900px;
-      margin: 60px auto 80px;
-      padding: 0 24px;
-    }
-
-    h1, h2 {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      letter-spacing: 0.4px;
-      margin-bottom: 12px;
-    }
-
-    h1 {
-      font-size: 2.3rem;
-      margin-bottom: 24px;
-    }
-
-    h2 {
-      font-size: 1.5rem;
-      margin-top: 48px;
-    }
-
-    p, ul, ol {
-      margin-bottom: 18px;
-    }
-
-    main p {
-      text-align: justify;
-      text-justify: inter-word;
-    }
-
-    ul, ol {
-      padding-left: 20px;
-    }
-
-    .muted {
-      color: var(--muted);
-      font-size: 15px;
-      margin-bottom: 30px;
-    }
-
-    /* TABLE OF CONTENTS */
-    .toc-list {
-      list-style: none;
-      padding-left: 0;
-      margin: 2rem 0;
-    }
-
-    .toc-list li {
-      margin: 0.5rem 0;
-    }
-
-    .toc-list a {
-      color: var(--ink);
-      text-decoration: none;
-      transition: color 0.2s ease;
-    }
-
-    .toc-list a:hover {
-      color: var(--gold);
-    }
-
-    footer {
-      border-top: 1px solid var(--line);
-      text-align: center;
-      padding: 40px 20px;
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
-
-    footer a {
-      color: var(--muted);
-      text-decoration: none;
-      margin: 0 8px;
-    }
-
-    .privacy-inline-link {
-      color: var(--gold);
-    }
-
-    .support-email-link {
-      color: var(--gold);
-    }
-  </style>
+  <link href="assets/styles/hero-pages.css?v=20260826-uniform-heroes" rel="stylesheet" />
+  <link href="assets/styles/public-site-chrome.css?v=20260828-phase8" rel="stylesheet" />
+  <link href="assets/styles/utility-pages.css?v=20260828-phase-six" rel="stylesheet" />
+  <script src="assets/scripts/public-site-chrome.js?v=20260827-mobile-footer-alignment" defer></script>
 </head>
 
 <body class="utility-page utility-page--inset">
   <a class="skip-link" href="#main">Skip to main content</a>
-  <header class="utility-header" data-utility-header>
+  <header class="utility-header" data-utility-header data-public-header>
     <div class="utility-header__inner">
       <nav class="utility-header__nav" aria-label="Primary navigation">
         <a href="index.html#how">How It Works</a>
@@ -143,7 +40,7 @@
       <div class="utility-header__actions">
         <a class="utility-header__signin" href="login.html" data-utility-auth>Sign In</a>
         <button class="utility-header__logout" type="button" data-utility-logout hidden>Log Out</button>
-        <a class="utility-header__button" href="signup.html" data-utility-signup>Get Started</a>
+        <a class="utility-header__button" href="signup.html" data-utility-signup>Create an account</a>
       </div>
       <button class="utility-header__menu" type="button" aria-expanded="false" aria-controls="utilityMenu" data-utility-menu-toggle>Menu</button>
     </div>
@@ -154,44 +51,41 @@
         <a href="browse-paralegals.html">Browse Paralegals</a>
       <a href="login.html" data-utility-auth>Sign In</a>
       <button type="button" data-utility-logout hidden>Log Out</button>
-      <a href="signup.html" data-utility-signup>Get Started</a>
+      <a href="signup.html" data-utility-signup>Create an account</a>
     </nav>
   </header>
 
-  <section class="hero-banner utility-hero" aria-labelledby="terms-title">
+  <section class="hero-banner utility-hero utility-hero--text-only admission-hero" aria-labelledby="terms-title">
     <div class="utility-hero__inner">
       <div class="utility-hero__copy">
-        <p class="utility-hero__eyebrow">Network standards</p>
-        <h1 id="terms-title">Paralegal Admission Requirements</h1>
-        <p class="utility-hero__description">How LPC evaluates applications for its approved paralegal network.</p>
-        <p class="utility-hero__meta">Last updated August 15, 2026</p>
+        <h1 id="terms-title">Our Vetting Process</h1>
+        <p class="utility-hero__description">How LPC evaluates applications for admission to the platform.</p>
       </div>
-      <div class="utility-hero__art" data-matter-field-host aria-hidden="true"></div>
     </div>
   </section>
 
-  <main tabindex="-1" aria-labelledby="terms-title" id="main">
+  <main class="utility-content admission-document" tabindex="-1" aria-labelledby="terms-title" id="main">
 
-    <p>Let’s-ParaConnect (“LPC”) is a technology platform that enables attorneys to review approved independent paralegal profiles and engage paralegals for project-based support work. Admission to the platform is approval-based and not guaranteed.</p>
+    <p>Let’s-ParaConnect (“LPC”) is a technology platform that enables attorneys to evaluate independent paralegals and engage them for clearly scoped matters. Every paralegal must complete LPC’s application and eligibility review before joining the platform. Admission is approval-based and not guaranteed.</p>
 
     <section class="card">
       <h2>How Applications Are Reviewed</h2>
-      <p>LPC reviews each submitted application as a whole rather than deciding on a single field such as years of experience, job title, or certification. Reviewers consider the legal-support experience described in the application, whether the résumé and profile are complete and internally consistent, and whether the submitted information supports attorney-directed project work. Approval is discretionary and depends on the application materials and current platform requirements.</p>
+      <p>LPC reviews each submitted application as a whole. The review considers whether the application and required résumé are complete and internally consistent, whether the applicant meets LPC’s location and experience requirements, and whether the submitted information supports attorney-directed matter work. The profile is created after application approval and is not part of the vetting decision.</p>
     </section>
 
     <section class="card">
       <h2>Minimum Eligibility Requirements</h2>
-      <p>Applicants must describe relevant legal-office or legal-support experience performed under attorney supervision, or identify relevant paralegal education or certification. The required résumé and profile should clearly describe the applicant’s experience and the types of attorney-directed work they have performed.</p>
+      <p>Applicants must be based in the United States and have at least one year of professional paralegal experience supporting attorneys. Relevant paralegal education or certification may be included and considered with the application, but it does not replace the one-year professional-experience requirement.</p>
     </section>
 
     <section class="card">
       <h2>Application Materials</h2>
-      <p>A PDF résumé is required with the application. A paralegal certificate or license may be included but is optional. LPC reviews the information and files the applicant submits; the standard admission review does not independently authenticate credentials, contact former employers, query professional databases, or conduct a background check. Applicants are responsible for submitting accurate and complete information.</p>
+      <p>A PDF résumé is required with the application. A paralegal certificate or license may be included but is optional. LPC reviews the information and files submitted with the application; the standard vetting process does not independently authenticate credentials, contact former employers, query professional databases, or conduct a background check. Applicants are responsible for submitting accurate and complete information.</p>
     </section>
 
     <section class="card">
       <h2>Reasons Applications May Be Declined</h2>
-      <p>Applications may be declined when the submitted materials do not describe relevant legal-support experience or education, are incomplete or internally inconsistent, contain misleading information, or do not demonstrate alignment with attorney-directed project work and current platform requirements.</p>
+      <p>Applications may be declined when an applicant is not based in the United States, does not have at least one year of professional paralegal experience, submits incomplete or internally inconsistent materials, provides misleading information, or does not demonstrate alignment with attorney-directed matter work and current platform requirements.</p>
     </section>
 
     <section class="card">
@@ -210,34 +104,57 @@
     </section>
 
   </main>
-  <footer class="home-footer">
-    <div class="home-footer__top">
-      <div class="home-footer__brand">
-        <a class="home-brand" href="index.html">Let<span class="home-brand__apostrophe">’</span>s-ParaConnect</a>
-        <p>Project-based legal support for attorneys and independent paralegals.</p>
-      </div>
-      <nav aria-label="Footer navigation">
-        <a href="attorney-faq.html">For Attorneys</a>
-        <a href="paralegal-faq.html">For Paralegals</a>
-        <a href="contact.html">Contact</a>
-        <a href="privacy.html">Privacy</a>
-        <a href="terms.html">Terms</a>
-        <a href="/paralegal-admission.html">Paralegal Admission</a>
-        <a href="accessibility.html">Accessibility</a>
+  <footer class="home-footer" data-public-footer>
+    <div class="home-footer__inner">
+      <p class="home-footer__statement"><span>Legal work.</span><span>Clearly connected.</span></p>
+      <nav class="home-footer__directory" aria-label="Footer navigation">
+        <details open>
+          <summary>Platform</summary>
+          <div class="home-footer__links">
+            <a href="/index.html#how">How It Works</a>
+            <a href="/index.html#for-attorneys">For Attorneys</a>
+            <a href="/index.html#for-paralegals">For Paralegals</a>
+            <a href="browse-paralegals.html">Browse Paralegals</a>
+          </div>
+        </details>
+        <details open>
+          <summary>For Attorneys</summary>
+          <div class="home-footer__links">
+            <a href="signup.html?role=attorney">Post a Matter</a>
+            <a href="attorney-faq.html">Attorney FAQ</a>
+            <a href="contact.html">Contact</a>
+          </div>
+        </details>
+        <details open>
+          <summary>For Paralegals</summary>
+          <div class="home-footer__links">
+            <a href="signup.html?role=paralegal">Apply to Join</a>
+            <a href="paralegal-faq.html">Paralegal FAQ</a>
+            <a href="/paralegal-admission.html">Our Vetting Process</a>
+          </div>
+        </details>
+        <details open>
+          <summary>Legal</summary>
+          <div class="home-footer__links">
+            <a href="terms.html">Terms</a>
+            <a href="privacy.html">Privacy</a>
+            <a href="accessibility.html">Accessibility</a>
+          </div>
+        </details>
       </nav>
-    </div>
-    <div class="home-footer__bottom">
-      <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
-      <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg>
-        <span>Accessibility</span>
-      </button>
+      <div class="home-footer__bottom">
+        <a class="home-footer__brand" href="index.html" aria-label="Let’s-ParaConnect home">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+        <p>Copyright © 2026 Let’s-ParaConnect. All rights reserved.</p>
+        <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg>
+          <span>Accessibility</span>
+        </button>
+      </div>
     </div>
   </footer>
 
 
   <script src="assets/scripts/utility-header.js" defer></script>
-<script src="assets/scripts/public-matter-field.js" defer></script>
-  <script src="assets/scripts/accessibility-toggle.js"></script>
+  <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
 </html>

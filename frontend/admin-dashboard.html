@@ -28,7 +28,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admin Dashboard – Let’s-ParaConnect</title>
 <script defer src="/assets/vendor/chart-4.5.1.js"></script>
-<script defer src="assets/scripts/utils/session.js"></script>
+<script defer src="assets/scripts/utils/session.js?v=20260820-1"></script>
 <script type="module" src="assets/scripts/auth.js"></script>
 <style>
     .skip-link {
@@ -3212,28 +3212,12 @@ font-size:.95rem;
 .section.visible {display:block;opacity:1;}
 nav [data-section].active {background:rgba(0,0,0,0.04);}
 
-/* Operational admin UI: dense, stable, and legible. */
-body,
-body :where(input, select, textarea, button) {
-font-weight:400;
-}
 html.js .main,
 html.js body.is-ready .main {
 opacity:1;
 transform:none;
 transition:none;
 }
-.main :where(h1, h2, h3, h4),
-#section-user-management :where(h1, h2, h3),
-#section-photo-reviews :where(h1, h2, h3) {
-font-family:var(--font-sans) !important;
-font-weight:600 !important;
-letter-spacing:-0.015em;
-}
-.main h1 {font-size:2rem;line-height:1.15;}
-.main :where(.btn, button, [role="button"]) {font-weight:500;}
-nav :where(a, button[data-section]),
-.sidebar-link {font-weight:400;}
 .main :where(
 .metric p,
 .ai-room-summary-value,
@@ -3241,9 +3225,7 @@ nav :where(a, button[data-section]),
 .ai-room-card-state-pill strong,
 [id^="metric"]
 ) {
-font-family:var(--font-sans) !important;
 font-variant-numeric:tabular-nums;
-font-weight:600 !important;
 }
 #section-ai-control-room :where(.ai-room-summary-tile, .ai-room-card) {
 border-radius:10px;
@@ -3252,15 +3234,6 @@ box-shadow:none;
 #section-ai-control-room .ai-room-card:hover {
 transform:none;
 box-shadow:none;
-}
-#section-ai-control-room .ai-room-card-title {
-font-family:var(--font-sans) !important;
-font-size:1.35rem;
-font-weight:600 !important;
-line-height:1.2;
-}
-@media (max-width:600px) {
-.main h1 {font-size:1.8rem;}
 }
 </style>
 

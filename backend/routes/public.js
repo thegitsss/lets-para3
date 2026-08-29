@@ -53,9 +53,7 @@ router.get(
   }),
   asyncHandler(async (req, res) => {
     const redirect = (status, reason) => {
-      const params = new URLSearchParams({ status });
-      if (reason) params.set("reason", reason);
-      return res.redirect(303, `/unsubscribe.html?${params.toString()}`);
+      return res.redirect(303, `/login.html?unsubscribe=${encodeURIComponent(status)}${reason ? `&reason=${encodeURIComponent(reason)}` : ""}`);
     };
     const token = String(req.query?.token || "").trim();
     if (!token) {

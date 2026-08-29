@@ -16,7 +16,6 @@
 
   const dashboardFor = (user) => {
     if (String(user?.status || "").toLowerCase() !== "approved") return "";
-    if (user?.legalAcceptanceRequired === true) return "legal-acceptance.html";
     const role = String(user?.role || "").toLowerCase();
     if (role === "attorney") return "dashboard-attorney.html";
     if (role === "paralegal") return "dashboard-paralegal.html";

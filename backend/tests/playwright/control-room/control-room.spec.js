@@ -64,7 +64,7 @@ test("director oversight is accessible, responsive, and backed by the real admin
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/admin-directors.html", { waitUntil: "domcontentloaded" });
-  await expect(page).not.toHaveURL(/login\.html|legal-acceptance\.html/);
+    await expect(page).not.toHaveURL(/login\.html/);
   await expect(page.locator("main#main")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Director Oversight", exact: true })).toBeVisible();
   await expect(page.locator("#metricDirectors")).toHaveText("1");

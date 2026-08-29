@@ -1,0 +1,98 @@
+:root {
+  /* LPC public color roles */
+  --lpc-ink: #1a2230;
+  --lpc-ink-hover: #1d2b3b;
+  --lpc-gold: #b4975a;
+  --lpc-paper: #ffffff;
+  --lpc-cloud: #f3f1ec;
+  --lpc-muted: #626a74;
+  --lpc-line: rgba(26, 34, 48, 0.14);
+  --lpc-focus: #887244;
+
+  /* Public layout roles */
+  --lpc-gutter-compact: 20px;
+  --lpc-gutter-mobile: 20px;
+  --lpc-gutter-tablet: 32px;
+  --lpc-gutter-desktop: 52px;
+  --lpc-gutter-wide: 68px;
+  --lpc-page-gutter: clamp(var(--lpc-gutter-compact), 4vw, var(--lpc-gutter-wide));
+  --lpc-content-reading: 900px;
+  --lpc-content-text: 980px;
+  --lpc-content-standard: 1200px;
+  --lpc-content-wide: 1440px;
+
+  /* Public action roles */
+  --lpc-action-height: 48px;
+  --lpc-action-height-compact: 40px;
+  --lpc-touch-target: 44px;
+  --lpc-action-radius: 999px;
+  --lpc-control-radius: 8px;
+
+  /* Display roles. Editorial homepage sizes remain page-owned. */
+  --lpc-display-utility: clamp(2.35rem, 3.5vw, 3.35rem);
+  --lpc-display-auth: clamp(3rem, 6vw, 4.5rem);
+  --lpc-display-marketing: clamp(3.25rem, 6.6vw, 6.8rem);
+
+  --header-height: 72px;
+  --page-gutter: var(--lpc-page-gutter);
+  --content-max: var(--lpc-content-wide);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+body:is(.utility-page, .faq-page, .help-page, .browse-paralegals-page) {
+  font-family: "Sarabun", sans-serif;
+}
+
+:where([data-public-action]) {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where([data-public-action="primary"], [data-public-action="secondary"]) {
+  min-height: var(--lpc-action-height);
+}
+
+:where([data-public-action="icon"], [data-public-action="pagination"]) {
+  min-width: var(--lpc-touch-target);
+  min-height: var(--lpc-touch-target);
+}
+
+:where([data-public-action="text"]) {
+  display: inline-flex;
+  align-items: center;
+}
+
+:where([data-public-action="primary"], [data-public-action="secondary"], [data-public-action="pagination"])[data-action-shape="pill"] {
+  border-radius: var(--lpc-action-radius);
+}
+
+:where([data-public-action="primary"], [data-public-action="secondary"])[data-action-shape="control"] {
+  border-radius: var(--lpc-control-radius);
+}
+
+:where([data-public-action]):focus-visible {
+  outline: 2px solid var(--lpc-focus);
+  outline-offset: 3px;
+}
+
+:where([data-public-action]):disabled,
+:where([data-public-action])[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+:where([data-public-action])[aria-busy="true"] {
+  cursor: wait;
+}
+
+:where([data-public-action]):active:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(1px);
+}
+
+@media (max-width: 960px) {
+  :root { --header-height: 66px; }
+
+  :where([data-public-action]) {
+    min-height: var(--lpc-touch-target);
+  }
+}

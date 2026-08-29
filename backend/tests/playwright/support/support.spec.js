@@ -171,7 +171,7 @@ test("attorney critical product surfaces render accessibly without overflow or r
   for (const surface of surfaces) {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(surface.url, { waitUntil: "domcontentloaded" });
-    await expect(page).not.toHaveURL(/login\.html|legal-acceptance\.html/);
+    await expect(page).not.toHaveURL(/login\.html/);
     await expect(page.locator("main#main")).toBeVisible();
     await expect(page.getByRole("heading", { name: surface.heading, exact: true }).first()).toBeVisible();
     await page.waitForTimeout(200);
@@ -261,7 +261,7 @@ test("Matter and public profile detail surfaces render real records accessibly",
   for (const surface of surfaces) {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(surface.url, { waitUntil: "domcontentloaded" });
-    await expect(page).not.toHaveURL(/login\.html|legal-acceptance\.html/);
+    await expect(page).not.toHaveURL(/login\.html/);
     await expect(page.locator("main#main")).toBeVisible();
     await expect(page.getByRole("heading", { name: surface.heading, exact: true }).first()).toBeVisible();
     await page.waitForTimeout(200);
@@ -426,7 +426,7 @@ test("legacy attorney Matter URLs preserve context and converge on canonical wor
   }
 });
 
-test("attorney can open the support drawer and send a support message", async ({ page }) => {
+test("attorney can open the support drawer and send a support message", async ({ page, browserName }) => {
   await page.goto("/dashboard-attorney.html", { waitUntil: "domcontentloaded" });
 
   const launcher = page.locator(".support-launcher");
@@ -498,6 +498,7 @@ test("attorney can open the support drawer and send a support message", async ({
   expect(composerAlignment).not.toBeNull();
   expect(Math.abs(composerAlignment.textX - composerAlignment.promptX)).toBeLessThanOrEqual(1);
   expect(Math.abs(composerAlignment.textY - composerAlignment.promptY)).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: `/tmp/lpc-attorney-assistant-${browserName}.png`, fullPage: true });
 
   const postMessage = page.waitForResponse(
     (response) =>

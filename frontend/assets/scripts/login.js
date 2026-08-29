@@ -12,7 +12,6 @@ const clearLocalSession = () => {
 
 const resolveDashboardTarget = (userOrRole) => {
   const user = userOrRole && typeof userOrRole === "object" ? userOrRole : null;
-  if (user?.legalAcceptanceRequired === true) return "legal-acceptance.html";
   const normalizedRole = String(user?.role || userOrRole || "").toLowerCase();
   if (normalizedRole === "admin") return "admin-dashboard.html";
   if (normalizedRole === "director") return "director-portal.html";
@@ -138,7 +137,7 @@ const initLogin = () => {
 
   if (!passkeysSupported && passkeyLoginBtn) passkeyLoginBtn.hidden = true;
 
-  const performPasskeyAuthentication = async (challengeToken = "") => {
+  const performPasskeyAuthentication = async (challengeToken = "", { useBrowserAutofill = false } = {}) => {
     if (!passkeysSupported) throw new Error("Passkeys are not supported by this browser or device.");
     const csrfToken = await fetchCsrfToken();
     const headers = {
@@ -148,12 +147,16 @@ const initLogin = () => {
     const optionsRes = await fetchWithTimeout(`${API_BASE}/auth/passkeys/authentication-options`, {
       method: "POST",
       credentials: "include",
+      suppressToast: useBrowserAutofill,
       headers,
       body: JSON.stringify(challengeToken ? { challengeToken } : {}),
     });
     const optionsData = await optionsRes.json().catch(() => ({}));
     if (!optionsRes.ok) throw new Error(optionsData?.error || "No passkey is available for this sign-in.");
-    const response = await webAuthnBrowser.startAuthentication({ optionsJSON: optionsData.options });
+    const response = await webAuthnBrowser.startAuthentication({
+      optionsJSON: optionsData.options,
+      useBrowserAutofill,
+    });
     const verifyRes = await fetchWithTimeout(`${API_BASE}/auth/passkeys/authenticate`, {
       method: "POST",
       credentials: "include",
@@ -180,6 +183,23 @@ const initLogin = () => {
       passkeyLoginBtn.disabled = false;
     }
   });
+
+  const startPasskeyAutofill = async () => {
+    if (!passkeysSupported || !window.PublicKeyCredential?.isConditionalMediationAvailable) return;
+    try {
+      const available = await window.PublicKeyCredential.isConditionalMediationAvailable();
+      if (!available) return;
+      await performPasskeyAuthentication("", { useBrowserAutofill: true });
+    } catch (err) {
+      // Conditional UI stays silent unless the user deliberately selects a passkey.
+      // Explicit passkey-button errors continue to use the visible notification above.
+      if (err?.name !== "AbortError" && err?.name !== "NotAllowedError") {
+        console.warn("[login] passkey autofill unavailable", err);
+      }
+    }
+  };
+
+  void startPasskeyAutofill();
 
   twoFactorPasskeyBtn?.addEventListener("click", async () => {
     twoFactorPasskeyBtn.disabled = true;
@@ -225,7 +245,7 @@ const initLogin = () => {
   const restoreLoginButton = (label) => {
     if (!loginButton) return;
     loginButton.disabled = false;
-    loginButton.textContent = label || "Log In";
+    loginButton.textContent = label || "Sign in";
   };
 
   const handleGoogleReturn = async () => {
@@ -331,7 +351,7 @@ const initLogin = () => {
 
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value;
-    const originalLabel = loginButton?.textContent || "Log In";
+    const originalLabel = loginButton?.textContent || "Sign in";
 
     submitLogin({ email, password, originalLabel });
   });

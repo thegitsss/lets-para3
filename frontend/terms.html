@@ -3,12 +3,13 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0B2A4A">
   <meta charset="utf-8" />
-  <title>Terms & Conditions – Let’s-ParaConnect</title>
+  <title>Terms of Service – Let’s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -18,184 +19,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/hero-pages.css?v=20260729-white-footer" rel="stylesheet" />
-
-  <style>
-    .gold{color:var(--gold);}
-    :root {
-      --ink: #1a2230;
-      --muted: #5c6b7a;
-      --line: #e8edf3;
-      --gold: #887244;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: #ffffff;
-      color: var(--ink);
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 16px;
-      line-height: 1.7;
-    }
-
-    /* MAIN CONTENT */
-    main {
-      max-width: 900px;
-      margin: 60px auto 80px;
-      padding: 0 24px;
-    }
-
-    h1, h2, h3 {
-      font-family: 'Cormorant Garamond', serif;
-      letter-spacing: 0.4px;
-      margin-bottom: 12px;
-    }
-
-    h1, h2 {
-      font-weight: 300;
-    }
-
-    h1 {
-      font-size: 2.3rem;
-      margin-bottom: 24px;
-    }
-
-    h2 {
-      font-size: 1.5rem;
-      margin-top: 48px;
-    }
-
-    /* Tighten spacing between major numbered sections only */
-    section.card > h2 {
-      margin-top: 28px;
-    }
-
-    section.card:first-of-type > h2 {
-      margin-top: 20px;
-    }
-
-    h3 {
-      font-size: 1.2rem;
-      font-weight: 400;
-      margin-top: 30px;
-      margin-bottom: 10px;
-    }
-
-    p, ul, ol {
-      margin-bottom: 18px;
-    }
-
-    main p,
-    main ul:not(.toc-list) li {
-      text-align: justify;
-      text-justify: inter-word;
-    }
-
-    ul, ol {
-      padding-left: 20px;
-    }
-
-    ul:not(.toc-list) {
-      list-style: none;
-      padding-left: 0;
-      margin-left: 0;
-    }
-
-    ul:not(.toc-list) li {
-      position: relative;
-      padding-left: 18px;
-      margin: 0.55rem 0;
-    }
-
-    ul:not(.toc-list) li::before {
-      content: "•";
-      position: absolute;
-      left: 0;
-      top: 0.2em;
-      color: var(--gold);
-      font-size: 0.45em;
-    }
-
-    .muted {
-      color: var(--muted);
-      font-size: 15px;
-      margin-bottom: 30px;
-    }
-
-    /* TABLE OF CONTENTS */
-    .toc-list {
-      list-style: none;
-      padding-left: 0;
-      margin: 2rem 0;
-    }
-
-    .toc-list li {
-      margin: 0.5rem 0;
-    }
-
-    .toc-list a {
-      color: var(--ink);
-      text-decoration: none;
-      transition: color 0.2s ease;
-    }
-
-    .toc-list a:hover {
-      color: var(--gold);
-    }
-
-    footer {
-      border-top: 1px solid var(--line);
-      text-align: center;
-      padding: 40px 20px;
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
-
-    footer a {
-      color: var(--muted);
-      text-decoration: none;
-      margin: 0 8px;
-    }
-
-    .privacy-inline-link {
-      color: var(--gold);
-    }
-
-    .support-email-link {
-      color: var(--gold);
-    }
-
-    .header-logo .accent-apostrophe {
-      color: var(--gold);
-    }
-
-    .subsection-title {
-      font-size: 1.1rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      font-weight: 400;
-      color: var(--muted);
-      margin-top: 0;
-    }
-
-    main strong {
-      font-weight: 400;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      font-size: 0.92em;
-    }
-
-    ul:not(.toc-list) li strong {
-      text-transform: uppercase;
-    }
-  </style>
+  <link href="assets/styles/hero-pages.css?v=20260826-uniform-heroes" rel="stylesheet" />
+  <link href="assets/styles/public-site-chrome.css?v=20260828-phase8" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles/legal-documents.css?v=20260828-shared-legal" />
 </head>
 
 <body class="utility-page utility-page--inset">
   <a class="skip-link" href="#main">Skip to main content</a>
-  <header class="utility-header" data-utility-header>
+  <header class="utility-header" data-utility-header data-public-header>
     <div class="utility-header__inner">
       <nav class="utility-header__nav" aria-label="Primary navigation">
         <a href="index.html#how">How It Works</a>
@@ -207,7 +38,7 @@
       <div class="utility-header__actions">
         <a class="utility-header__signin" href="login.html" data-utility-auth>Sign In</a>
         <button class="utility-header__logout" type="button" data-utility-logout hidden>Log Out</button>
-        <a class="utility-header__button" href="signup.html" data-utility-signup>Get Started</a>
+        <a class="utility-header__button" href="signup.html" data-utility-signup>Create an account</a>
       </div>
       <button class="utility-header__menu" type="button" aria-expanded="false" aria-controls="utilityMenu" data-utility-menu-toggle>Menu</button>
     </div>
@@ -218,53 +49,55 @@
         <a href="browse-paralegals.html">Browse Paralegals</a>
       <a href="login.html" data-utility-auth>Sign In</a>
       <button type="button" data-utility-logout hidden>Log Out</button>
-      <a href="signup.html" data-utility-signup>Get Started</a>
+      <a href="signup.html" data-utility-signup>Create an account</a>
     </nav>
   </header>
 
-  <section class="hero-banner utility-hero" aria-labelledby="terms-title">
+  <section class="hero-banner utility-hero terms-hero" aria-labelledby="terms-title">
     <div class="utility-hero__inner">
       <div class="utility-hero__copy">
-        <p class="utility-hero__eyebrow">Platform terms</p>
-        <h1 id="terms-title">Terms of Service</h1>
-        <p class="utility-hero__description">The terms governing access to and use of Let’s-ParaConnect.</p>
-        <p class="utility-hero__meta">Effective August 15, 2026 · Version 2026-08-15</p>
+        <div class="terms-hero__heading-row">
+          <h1 id="terms-title">Terms of Service</h1>
+          <p class="utility-hero__meta">Effective August 15, 2026</p>
+        </div>
       </div>
-      <div class="utility-hero__art" data-matter-field-host aria-hidden="true"></div>
     </div>
+    <div class="utility-hero__art" data-matter-field-host aria-hidden="true"></div>
   </section>
 
-  <main tabindex="-1" aria-labelledby="terms-title" id="main">
+  <main class="legal-document" tabindex="-1" aria-labelledby="terms-title" id="main">
 
     <p>This Terms of Service (the “Agreement”) governs your access to and use of the Let’s-ParaConnect platform, including the website (www.lets-paraconnect.com), all related subpages, subdomains, applications, and all content, services, and features available through the platform (collectively, the “Platform” and the services offered through it, the “Services”). By registering for an account, signing into your account, accessing the Platform, or using the Platform in any manner, you agree to be contractually bound by the terms of this Agreement. If you do not agree to these Terms, you may not access or use the Platform.</p>
 
-    <h2>Table of Contents</h2>
-    <ul class="toc-list">
-      <li><a href="#section-1">1. Let’s-ParaConnect Platform Overview</a></li>
-      <li><a href="#section-2">2. Flat-Fee Matters</a></li>
-      <li><a href="#section-3">3. Paralegal Replacement and Early Termination</a></li>
-      <li><a href="#section-4">4. Communication Between Attorneys and Paralegals</a></li>
-      <li><a href="#section-5">5. Account Registration</a></li>
-      <li><a href="#section-6">6. User Profiles</a></li>
-      <li><a href="#section-7">7. Let’s-ParaConnect Profiles</a></li>
-      <li><a href="#section-8">8. Working Together Outside the Platform</a></li>
-      <li><a href="#section-9">9. Paralegals Are Independent Contractors</a></li>
-      <li><a href="#section-10">10. Tax Reporting and IRS Forms</a></li>
-      <li><a href="#section-11">11. Matter Review and Dispute Resolution</a></li>
-      <li><a href="#section-12">12. Account Restrictions and Termination</a></li>
-      <li><a href="#section-13">13. Using the Platform</a></li>
-      <li><a href="#section-14">14. Content and Use of Platform Content</a></li>
-      <li><a href="#section-15">15. Notices Regarding Let’s-ParaConnect</a></li>
-      <li><a href="#section-16">16. Electronic Communications</a></li>
-      <li><a href="#section-17">17. Indemnification</a></li>
-      <li><a href="#section-18">18. Disclaimers and Limitations of Liability</a></li>
-      <li><a href="#section-19">19. Choice of Law and Venue</a></li>
-      <li><a href="#section-20">20. Waiver of Jury Trial and Class Action</a></li>
-      <li><a href="#section-21">21. Termination</a></li>
-      <li><a href="#section-22">22. General Terms</a></li>
-      <li><a href="#section-23">23. Changes to This Agreement</a></li>
-      <li><a href="#section-24">24. Definitions</a></li>
-    </ul>
+    <nav class="document-toc" aria-labelledby="terms-toc-title">
+      <h2 id="terms-toc-title">Table of contents</h2>
+      <ol>
+      <li><a href="#section-1">Let’s-ParaConnect Platform Overview</a></li>
+      <li><a href="#section-2">Flat-Fee Matters</a></li>
+      <li><a href="#section-3">Paralegal Replacement and Early Termination</a></li>
+      <li><a href="#section-4">Communication Between Attorneys and Paralegals</a></li>
+      <li><a href="#section-5">Account Registration</a></li>
+      <li><a href="#section-6">User Profiles</a></li>
+      <li><a href="#section-7">Let’s-ParaConnect Profiles</a></li>
+      <li><a href="#section-8">Working Together Outside the Platform</a></li>
+      <li><a href="#section-9">Paralegals Are Independent Contractors</a></li>
+      <li><a href="#section-10">Tax Reporting and IRS Forms</a></li>
+      <li><a href="#section-11">Matter Review and Dispute Resolution</a></li>
+      <li><a href="#section-12">Account Restrictions and Termination</a></li>
+      <li><a href="#section-13">Using the Platform</a></li>
+      <li><a href="#section-14">Content and Use of Platform Content</a></li>
+      <li><a href="#section-15">Notices Regarding Let’s-ParaConnect</a></li>
+      <li><a href="#section-16">Electronic Communications</a></li>
+      <li><a href="#section-17">Indemnification</a></li>
+      <li><a href="#section-18">Disclaimers and Limitations of Liability</a></li>
+      <li><a href="#section-19">Choice of Law and Venue</a></li>
+      <li><a href="#section-20">Waiver of Jury Trial and Class Action</a></li>
+      <li><a href="#section-21">Termination</a></li>
+      <li><a href="#section-22">General Terms</a></li>
+      <li><a href="#section-23">Changes to This Agreement</a></li>
+      <li><a href="#section-24">Definitions</a></li>
+      </ol>
+    </nav>
 
     <section id="section-1" class="card">
       <h2>1. Let’s-ParaConnect Platform Overview</h2>
@@ -344,7 +177,7 @@
       <p>To access and use the full features of the Let’s-ParaConnect platform (the “Platform”), you must register for an account as either an Attorney or a Paralegal. All account registrations are subject to review and approval by Let’s-ParaConnect. Let’s-ParaConnect reserves the right to approve, deny, suspend, or revoke any account at its sole discretion, including for violation of these Terms or for any other reason permitted by applicable law.</p>
 
       <h3>Attorney Accounts</h3>
-      <p>To create an Attorney account on the Platform, you must represent and warrant that you are using the Platform solely for legitimate professional purposes and that you are either: (i) an attorney duly licensed and in good standing with one or more state bars; or (ii) an employee or authorized representative of a law firm acting under the direction and supervision of one or more attorneys duly licensed and in good standing with one or more state bars. Attorneys are responsible for ensuring that their use of the Platform complies with all applicable laws and professional conduct rules governing the supervision and use of paralegals.</p>
+      <p>To create an Attorney account on the Platform, you must represent and warrant that you are an attorney duly licensed and in good standing with one or more state bars and that you are using the Platform solely for legitimate professional purposes. Attorney accounts may not be created by a non-attorney employee or other representative of a law firm. Attorneys are responsible for ensuring that their use of the Platform complies with all applicable laws and professional conduct rules governing the supervision and use of paralegals.</p>
 
       <h3>Paralegal Accounts</h3>
       <p>To create a Paralegal account on the Platform, you must represent that you possess relevant professional experience, training, or education in the legal field. Let’s-ParaConnect may review and evaluate each Paralegal application before granting access to the Platform. Approval may be based on factors including, but not limited to:</p>
@@ -369,7 +202,7 @@
 
     <section id="section-7" class="card">
       <h2>7. Let’s-ParaConnect Profiles</h2>
-      <p>Let’s-ParaConnect may provide profile browsing tools through which Attorneys may review approved Paralegal profiles and invite Paralegals to apply to Matters posted on the Platform. These tools may allow Attorneys to filter profiles based on criteria such as:</p>
+      <p>Let’s-ParaConnect may provide profile browsing tools through which Attorneys may review profiles belonging to Paralegals who have been granted platform access and invite Paralegals to apply to Matters posted on the Platform. These tools may allow Attorneys to filter profiles based on criteria such as:</p>
       <ul>
         <li>jurisdictional experience</li>
         <li>practice areas</li>
@@ -546,7 +379,7 @@
       <p>Let’s-ParaConnect is a technology platform that enables Attorneys and Paralegals to communicate and coordinate project-based support work. Let’s-ParaConnect does not provide legal representation, legal advice, legal opinions, recommendations, referrals, or counseling. Attorneys and Paralegals using the Platform are independent professionals and are not employees, agents, or representatives of Let’s-ParaConnect. Let’s-ParaConnect does not review, approve, or supervise work performed by users of the Platform and does not determine the scope of work or pricing for Matters posted by Attorneys. At no time shall Let’s-ParaConnect be responsible for the actions, omissions, work product, or professional conduct of any user of the Platform.</p>
 
       <h3>15.2 Let’s-ParaConnect Is Not a Referral Service or Employment Agency</h3>
-      <p>Let’s-ParaConnect is not a legal referral service, staffing agency, or employment agency. The Platform provides software tools that allow Attorneys to review approved profiles and engage Paralegals for project-based assistance. Let’s-ParaConnect does not place users into engagements, does not require users to work together, and does not guarantee outcomes. Although Let’s-ParaConnect may review user profiles or application materials as part of its admission process, Let’s-ParaConnect does not guarantee the qualifications, licensing status, experience, competence, or professional standing of any user. Let’s-ParaConnect does not represent or warrant that any Attorney or Paralegal maintains professional liability insurance or other professional coverage. Users are responsible for independently evaluating the qualifications and suitability of other users before engaging in work through the Platform.</p>
+      <p>Let’s-ParaConnect is not a legal referral service, staffing agency, or employment agency. The Platform provides software tools that allow Attorneys to review Paralegal profiles and engage Paralegals for project-based assistance. Let’s-ParaConnect does not place users into engagements, does not require users to work together, and does not guarantee outcomes. Although Let’s-ParaConnect may review submitted application materials as part of its admission process, Let’s-ParaConnect does not guarantee the qualifications, licensing status, experience, competence, or professional standing of any user. Let’s-ParaConnect does not represent or warrant that any Attorney or Paralegal maintains professional liability insurance or other professional coverage. Users are responsible for independently evaluating the qualifications and suitability of other users before engaging in work through the Platform.</p>
 
       <h3>15.3 No Endorsement of Users</h3>
       <p>Let’s-ParaConnect does not endorse or recommend any user of the Platform. Profiles and other user-provided information displayed on the Platform are provided for informational purposes only. Let’s-ParaConnect makes no representations or warranties regarding the accuracy, reliability, or completeness of information provided by users. Attorneys and Paralegals are solely responsible for evaluating and selecting the professionals with whom they choose to work through the Platform.</p>
@@ -623,7 +456,7 @@
 
     <section id="section-23" class="card">
       <h2>23. Changes to This Agreement</h2>
-      <p>LET’S-PARACONNECT MAY AMEND OR UPDATE THIS AGREEMENT BY POSTING A REVISED VERSION ON THE PLATFORM. THE EFFECTIVE DATE AND VERSION AT THE TOP IDENTIFY THE CURRENT AGREEMENT. LET’S-PARACONNECT MAY NOTIFY ACCOUNT HOLDERS OF MATERIAL CHANGES AND MAY REQUIRE EXPRESS ACCEPTANCE OF THE UPDATED AGREEMENT BEFORE FURTHER ACCOUNT USE. IF YOU DO NOT ACCEPT AN UPDATE WHEN REQUIRED, YOU MAY NOT CONTINUE USING THE PLATFORM.</p>
+      <p>LET’S-PARACONNECT MAY AMEND OR UPDATE THIS AGREEMENT BY POSTING A REVISED VERSION ON THE PLATFORM. THE EFFECTIVE DATE AT THE TOP IDENTIFIES THE CURRENT AGREEMENT. LET’S-PARACONNECT MAY NOTIFY ACCOUNT HOLDERS OF MATERIAL CHANGES AND MAY REQUIRE EXPRESS ACCEPTANCE OF THE UPDATED AGREEMENT BEFORE FURTHER ACCOUNT USE. IF YOU DO NOT ACCEPT AN UPDATE WHEN REQUIRED, YOU MAY NOT CONTINUE USING THE PLATFORM.</p>
     </section>
 
     <section id="section-24" class="card">
@@ -642,11 +475,11 @@
       <p><strong>“USER CONTENT”</strong> MEANS CONTENT THAT USERS SUBMIT OR TRANSMIT TO OR THROUGH THE PLATFORM. USER CONTENT DOES NOT INCLUDE PROTECTED CONTENT.</p>
     </section>
   </main>
-  <footer class="home-footer">
+  <footer class="home-footer" data-public-footer>
     <div class="home-footer__top">
       <div class="home-footer__brand">
         <a class="home-brand" href="index.html">Let<span class="home-brand__apostrophe">’</span>s-ParaConnect</a>
-        <p>Project-based legal support for attorneys and independent paralegals.</p>
+        <p>Matter-based legal support for attorneys and independent paralegals.</p>
       </div>
       <nav aria-label="Footer navigation">
         <a href="attorney-faq.html">For Attorneys</a>
@@ -654,7 +487,7 @@
         <a href="contact.html">Contact</a>
         <a href="privacy.html">Privacy</a>
         <a href="terms.html">Terms</a>
-        <a href="/paralegal-admission.html">Paralegal Admission</a>
+        <a href="/paralegal-admission.html">Our Vetting Process</a>
         <a href="accessibility.html">Accessibility</a>
       </nav>
     </div>
@@ -668,8 +501,10 @@
   </footer>
 
 
+  <script src="assets/scripts/public-site-chrome.js?v=20260827-mobile-footer-alignment"></script>
   <script src="assets/scripts/utility-header.js" defer></script>
 <script src="assets/scripts/public-matter-field.js" defer></script>
-  <script src="assets/scripts/accessibility-toggle.js"></script>
+  <script src="assets/scripts/legal-documents.js?v=20260828-hero-parallax" defer></script>
+  <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
 </html>

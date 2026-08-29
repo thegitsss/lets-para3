@@ -33,11 +33,6 @@ const {
   normalizeDashboardSavedView,
   serializeDashboardSavedView,
 } = require("../services/dashboardSavedViews");
-const {
-  applyCurrentLegalAcceptance,
-  hasCurrentLegalAcceptance,
-  serializeLegalAcceptance,
-} = require("../utils/legalDocuments");
 
 // ----------------------------------------
 // Helpers
@@ -71,58 +66,16 @@ function hashCode(code) {
 router.use(verifyToken);
 router.use(requireApproved);
 
-router.post(
-  "/legal-acceptance",
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    if (
-      req.body?.termsAccepted !== true ||
-      req.body?.privacyAcknowledged !== true
-    ) {
-      return res.status(400).json({
-        error: "Accept the Terms of Service and acknowledge the Privacy Policy to continue.",
-      });
-    }
-
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    const alreadyCurrent = hasCurrentLegalAcceptance(user);
-    if (!alreadyCurrent) {
-      const acceptedAt = new Date();
-      applyCurrentLegalAcceptance(user, { now: acceptedAt, source: "reacceptance" });
-      await user.save();
-      await AuditLog.logFromReq(req, "account.legal.accept", {
-        targetType: "user",
-        targetId: user._id,
-        meta: {
-          termsVersion: user.termsVersion,
-          privacyVersion: user.privacyVersion,
-          source: user.legalAcceptanceSource,
-        },
-      });
-    }
-
-    const legalAcceptance = serializeLegalAcceptance(user);
-    res.json({
-      ok: true,
-      legalAcceptanceRequired: legalAcceptance.required,
-      legalAcceptance,
-    });
-  })
-);
-
 router.get(
   "/preferences",
   asyncHandler(async (req, res) => {
     const user = await User.findById(req.user.id).select("notificationPrefs preferences location state");
     if (!user) return res.status(404).json({ error: "User not found" });
     const prefs = user.notificationPrefs || {};
+    const storedTheme = String(user.preferences?.theme || "").toLowerCase();
     res.json({
       email: !!prefs.email,
-      theme:
-        (user.preferences && typeof user.preferences === "object" && user.preferences.theme) ||
-        "mountain",
+      theme: storedTheme === "dark" ? "dark" : "light",
       fontSize:
         (user.preferences && typeof user.preferences === "object" && user.preferences.fontSize) ||
         "md",
@@ -156,7 +109,7 @@ router.post(
     }
 
     const normalizedTheme =
-      typeof theme === "string" && ["light", "dark", "mountain", "mountain-dark"].includes(theme.toLowerCase())
+      typeof theme === "string" && ["light", "dark"].includes(theme.toLowerCase())
         ? theme.toLowerCase()
         : null;
     const normalizedFontSize =
@@ -197,7 +150,9 @@ router.post(
       success: true,
       preferences: {
         email: user.notificationPrefs?.email !== false,
-        theme: normalizedTheme || user.preferences?.theme || "mountain",
+        theme:
+          normalizedTheme ||
+          (String(user.preferences?.theme || "").toLowerCase() === "dark" ? "dark" : "light"),
         fontSize: normalizedFontSize || user.preferences?.fontSize || "md",
         hideProfile:
           normalizedHideProfile !== null

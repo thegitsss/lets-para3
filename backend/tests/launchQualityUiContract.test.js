@@ -24,13 +24,35 @@ describe("Prompt 5 launch-quality UI contracts", () => {
     expect(attorneyDashboard).not.toMatch(/animation:\s*(?:onboardingPulse|hirePulse)[^;]*\binfinite\b/);
   });
 
-  test("homepage visuals do not ship hidden preview DOM or continuous decorative animation loops", () => {
+  test("homepage motion is viewport-aware and honors reduced motion", () => {
     const html = read("frontend/index.html");
     const script = read("frontend/assets/scripts/homepage.js");
     const styles = read("frontend/assets/styles/homepage.css");
+    const hybridStyles = read("frontend/assets/styles/homepage-hybrid.css");
+    const fonts = read("frontend/assets/styles/fonts.css");
+    const heroMarkup = html.slice(
+      html.indexOf('<section class="editorial-hero"'),
+      html.indexOf('<section class="workflow"')
+    );
     expect(html).not.toMatch(/hero-product|hero__matter-axis/);
-    expect(script).not.toMatch(/syncHeroHandoff|requestAnimationFrame|IntersectionObserver|setProgress\(/);
+    expect(heroMarkup).toContain("For solo and small-firm attorneys");
+    expect(heroMarkup).toContain("Your caseload grew.");
+    expect(heroMarkup).toContain("Your payroll doesn’t have to.");
+    expect(heroMarkup).toContain("Publish free. Fund only when you hire.");
+    expect(heroMarkup).not.toMatch(/<(?:img|canvas|svg)\b/);
+    expect(fonts).toMatch(/font-family: 'Sarabun';[\s\S]{0,120}font-style: italic;[\s\S]{0,120}font-weight: 200/);
+    expect(hybridStyles).toMatch(/editorial-hero-word-enter/);
+    expect(hybridStyles).toMatch(/prefers-reduced-motion: reduce[\s\S]*\.lpc-home--editorial/);
+    expect(script).toMatch(/requestAnimationFrame/);
+    expect(script).toMatch(/IntersectionObserver/);
+    expect(script).toMatch(/configureCinematicMotion/);
+    expect(script).toMatch(/cinematicResizeObserver/);
+    expect(script).toMatch(/shouldAnimate\(\)/);
+    expect(script).toMatch(/!reducedMotion\.matches/);
+    expect(script).toMatch(/document\.visibilityState !== "hidden"/);
     expect(script).toMatch(/this\.render\(0\)/);
+    expect(styles).toMatch(/\.home-reveal\.is-revealed/);
+    expect(styles).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*\.js \.home-reveal/);
     expect(styles).not.toMatch(/hero-product|hero__matter-axis|--hero-(?:copy|product|white|handoff)/);
   });
 
@@ -117,7 +139,7 @@ describe("Prompt 5 launch-quality UI contracts", () => {
     expect(paralegalFaq).toMatch(/which Matters to apply for|Matter compensation handled/);
     expect(paralegalHelp).toMatch(/Browse Matters|My Matters & Applications|Working a Matter|Matter workspace/);
     expect(browseParalegals).toMatch(/No open Matters are available\. Create a Matter/);
-    expect(browseParalegals).toMatch(/Invite to Matter|Select an open Matter/);
+    expect(browseParalegals).toMatch(/Invite to matter|Select an open Matter/);
     expect(attorneyTour).toMatch(/Fund Matters|Create a Matter|invite the right fit to your Matter/);
     expect(supportDrawer).toMatch(/Ask about a Matter|Where can I see my Matters/);
     expect(attorneySupportTools).toMatch(/ctaLabel: "Post a Matter"/);

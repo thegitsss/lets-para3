@@ -310,14 +310,14 @@ async function runJourney(browser) {
 
   await page.goto(`http://context.test/case-detail.html?caseId=${matterId}&tab=applications`);
   await page.waitForSelector(".matter-row-preview");
-  const unchangedBefore = await page.locator(".case-topbar-title").screenshot();
+  const unchangedBefore = await page.locator(".case-rail-header").screenshot();
   await page.click(".matter-row-preview");
   await page.waitForFunction(() => document.querySelector(".lpc-context-dialog")?.open);
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => !document.querySelector(".lpc-context-dialog")?.open);
   assert.equal(await page.evaluate(() => document.activeElement?.classList.contains("matter-row-preview")), true);
-  const unchangedAfter = await page.locator(".case-topbar-title").screenshot();
-  assert.equal(Buffer.compare(unchangedBefore, unchangedAfter), 0, "the durable Matter header changed outside the contextual panel");
+  const unchangedAfter = await page.locator(".case-rail-header").screenshot();
+  assert.equal(Buffer.compare(unchangedBefore, unchangedAfter), 0, "the Matter selector changed outside the contextual panel");
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.click(".matter-row-preview");

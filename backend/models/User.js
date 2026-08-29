@@ -319,11 +319,6 @@ const userSchema = new Schema(
     termsAcceptedAt: { type: Date, default: null },
     privacyVersion: { type: String, default: "", trim: true, maxlength: 32 },
     privacyAcknowledgedAt: { type: Date, default: null },
-    legalAcceptanceSource: {
-      type: String,
-      enum: ["signup", "reacceptance"],
-      default: undefined,
-    },
     attorneyPricingAccepted: { type: Boolean, default: false },
     lastLoginAt: { type: Date },
     failedLogins: { type: Number, default: 0 },
@@ -373,7 +368,7 @@ const userSchema = new Schema(
       theme: {
         type: String,
         enum: ["light", "dark", "mountain", "mountain-dark"],
-        default: "mountain",
+        default: "light",
       },
       fontSize: {
         type: String,

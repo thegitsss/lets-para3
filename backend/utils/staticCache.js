@@ -49,7 +49,12 @@ function setStaticCacheHeaders(res, filePath, { production = process.env.NODE_EN
 function setStaticResponseHeaders(res, filePath, options) {
   setStaticCacheHeaders(res, filePath, options);
   const normalizedPath = String(filePath || "").replace(/\\/g, "/");
-  if (path.extname(normalizedPath).toLowerCase() !== ".html") return;
+  const extension = path.extname(normalizedPath).toLowerCase();
+  if (extension === ".mjs") {
+    res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+    return;
+  }
+  if (extension !== ".html") return;
   const documentName = path.basename(normalizedPath).toLowerCase();
   if (!INDEXABLE_HTML_SET.has(documentName)) {
     res.setHeader("X-Robots-Tag", "noindex, nofollow");

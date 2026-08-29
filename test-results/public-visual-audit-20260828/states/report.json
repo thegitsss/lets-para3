@@ -1,0 +1,24 @@
+{
+  "mobile": {
+    "signup": "APPLICATION RECEIVED\n\nYour application is with us.\n\nWe sent a verification link to applicant@example.com. Once your email is verified, our team will review your submission and contact you when your LPC account is ready.\n\nReturn home",
+    "verify": {
+      "status": "Your email address is confirmed. Your application remains under review, and we’ll contact you when your LPC account is ready.",
+      "action": "Return home",
+      "url": "http://127.0.0.1:5050/verify-email.html"
+    },
+    "forgot": "Check your email\n\nIf an account exists for that email, a password-reset link is on its way.\n\nDone",
+    "reset": "✅ Password reset successful! Redirecting...",
+    "contact": "Message sent. We’ll reply to the email address you provided."
+  },
+  "desktop": {
+    "signup": "APPLICATION RECEIVED\n\nYour application is with us.\n\nWe sent a verification link to applicant@example.com. Once your email is verified, our team will review your submission and contact you when your LPC account is ready.\n\nReturn home",
+    "verify": {
+      "status": "Your email address is confirmed. Your application remains under review, and we’ll contact you when your LPC account is ready.",
+      "action": "Return home",
+      "url": "http://127.0.0.1:5050/verify-email.html"
+    },
+    "forgot": "Check your email\n\nIf an account exists for that email, a password-reset link is on its way.\n\nDone",
+    "reset": "✅ Password reset successful! Redirecting...",
+    "contact": "Message sent. We’ll reply to the email address you provided."
+  }
+}

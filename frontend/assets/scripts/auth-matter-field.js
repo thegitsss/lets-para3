@@ -7,6 +7,7 @@
   if (!canvas || !host || !context) return;
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const isNavyAuth = document.body.classList.contains("signup-page") || document.body.classList.contains("login-page") || document.body.classList.contains("verify-email-page") || document.body.classList.contains("password-recovery-page");
   const labels = ["SCOPE", "FILES", "DEADLINE", "PEOPLE", "MESSAGES", "PAYMENT"];
   let width = 0;
   let height = 0;
@@ -79,7 +80,9 @@
       context.beginPath();
       context.moveTo(position.x, position.y);
       context.lineTo(next.x, next.y);
-      context.strokeStyle = `rgba(67, 79, 97, ${index % 4 === 0 ? 0.15 : 0.065})`;
+      context.strokeStyle = isNavyAuth
+        ? `rgba(225, 230, 235, ${index % 4 === 0 ? 0.14 : 0.06})`
+        : `rgba(67, 79, 97, ${index % 4 === 0 ? 0.15 : 0.065})`;
       context.lineWidth = 0.85;
       context.stroke();
     });
@@ -90,7 +93,7 @@
         context.save();
         context.font = '500 9px "Sarabun", sans-serif';
         context.textAlign = "center";
-        context.fillStyle = "rgba(128, 101, 44, 0.52)";
+        context.fillStyle = isNavyAuth ? "rgba(201, 178, 128, 0.58)" : "rgba(128, 101, 44, 0.52)";
         context.fillText(node.label, position.x, position.y + 17);
         context.restore();
       }
@@ -99,7 +102,9 @@
       context.fillStyle =
         index % 5 === 0
           ? "rgba(180, 151, 90, 0.55)"
-          : "rgba(58, 72, 92, 0.28)";
+          : isNavyAuth
+            ? "rgba(220, 227, 234, 0.3)"
+            : "rgba(58, 72, 92, 0.28)";
       context.fill();
     });
 

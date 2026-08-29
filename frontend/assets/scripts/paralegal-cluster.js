@@ -1,11 +1,5 @@
 (function(){
-  const FALLBACK_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>
-      <rect width='220' height='220' rx='110' fill='#f1f5f9'/>
-      <circle cx='110' cy='90' r='46' fill='#cbd5e1'/>
-      <path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/>
-    </svg>`
-  )}`;
+  const FALLBACK_AVATAR = "/assets/avatar-placeholder.svg";
   let hydrated = false;
   let stylesInjected = false;
   let pendingStylesInjected = false;

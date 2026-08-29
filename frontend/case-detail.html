@@ -18,12 +18,12 @@
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
-  <script src="assets/scripts/utils/session.js"></script>
+  <script src="assets/scripts/utils/session.js?v=20260820-1"></script>
   <script src="assets/scripts/utils/business-date.js"></script>
   <style>
     :root {
       --font-sans: "Sarabun", sans-serif;
-      --font-serif: "Cormorant Garamond", serif;
+      --font-serif: "Sarabun", sans-serif;
 
       --bg: #ffffff;
       --sidebar-bg: #f5f5f5e6;
@@ -3579,14 +3579,25 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260812-11" />
-  <script defer src="assets/scripts/sidebar-profile.js?v=20260812-7"></script>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260820-18" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
   <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260812-1" />
-  <script defer src="assets/scripts/universal-header.js?v=20260812-1"></script>
   <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
   <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
+  <style>
+    body.case-detail-no-topbar .case-main {
+      padding-top: clamp(12px, 1.5vw, 20px);
+      gap: 0;
+    }
+
+    @media (max-width: 900px) {
+      body.case-detail-no-topbar .case-main {
+        padding-top: 60px;
+      }
+    }
+  </style>
 </head>
-<body class="dashboard-no-shadows lpc-product-clean">
+<body class="dashboard-no-shadows lpc-product-clean lpc-auth-resource-page case-detail-no-topbar">
   <a href="#main" class="skip-link">Skip to main content</a>
   <a href="#case-messages" class="skip-link" id="matterMessagesSkipLink" hidden>Skip to Matter messages</a>
   <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
@@ -3606,9 +3617,9 @@
           <div class="case-nav-status" data-case-nav-status>Loading Matters...</div>
           <ul class="case-nav-list" data-case-nav-list></ul>
         </div>
+        <a href="dashboard-attorney.html#tasks" data-view-target="tasks">Tasks</a>
         <a href="browse-paralegals.html">Paralegals</a>
         <a href="dashboard-attorney.html#funds" data-view-target="funds">Payments</a>
-        <a href="help.html">Help</a>
       </nav>
       <nav aria-label="Paralegal navigation" data-visible="paralegal" hidden>
         <a href="dashboard-paralegal.html#home" data-view-link="home">Home</a>
@@ -3631,50 +3642,6 @@
     <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
     <main class="case-main" id="main" tabindex="-1">
-      <div class="case-topbar">
-        <div class="case-topbar-left">
-          <button type="button" class="back-button" data-back-button aria-label="Go back">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-            Back
-          </button>
-          <div class="case-topbar-title">
-            <h1 class="case-thread-title" id="caseTitle">Select a Matter</h1>
-            <p class="case-thread-subtitle" id="caseStatusLine">Waiting for Matter selection.</p>
-            <p class="case-thread-context" id="caseContextLine"></p>
-            <p class="case-thread-attention" id="caseAttentionLine" hidden></p>
-            <a class="case-next-action" id="caseNextAction" hidden></a>
-          </div>
-        </div>
-        <div class="case-topbar-controls" data-notification-center>
-          <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 01-3.46 0" />
-            </svg>
-            <span class="notification-badge" data-notification-badge>0</span>
-          </button>
-          <div class="notifications-panel hidden" role="region" aria-live="polite" data-notification-panel>
-            <div class="notif-header" aria-label="Notifications"></div>
-            <div class="notif-scroll" data-notification-list></div>
-            <div class="notif-empty" data-notification-empty>Loading...</div>
-            <button type="button" class="notif-markall" data-notification-mark>Mark All Read</button>
-          </div>
-          <button type="button" class="user-chip" data-profile-toggle aria-haspopup="true" aria-expanded="false">
-            <img class="globalProfileImage" data-avatar src="assets/avatar-placeholder.svg" alt="Profile avatar" />
-            <div>
-              <strong class="globalProfileName">Member</strong>
-              <span class="globalProfileRole">User</span>
-            </div>
-          </button>
-          <div class="profile-dropdown" data-profile-menu>
-            <button type="button" data-account-settings>Account Settings</button>
-            <button type="button" data-logout>Log Out</button>
-          </div>
-        </div>
-      </div>
-
       <div class="case-workspace">
         <div class="case-rail-stack">
           <aside class="case-rail" aria-label="Matter switcher">

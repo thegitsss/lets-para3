@@ -66,6 +66,25 @@ function collectHtmlAssetReferences(htmlPath) {
     const resolved = resolveFrontendReference(htmlPath, value);
     if (resolved) references.push({ htmlPath, value, resolved });
   }
+  for (const match of source.matchAll(/<(?:img|source)\b[^>]*?\bsrcset=["']([^"']+)["'][^>]*>/gi)) {
+    for (const candidate of match[1].split(",")) {
+      const value = candidate.trim().split(/\s+/, 1)[0];
+      const resolved = resolveFrontendReference(htmlPath, value);
+      if (resolved) references.push({ htmlPath, value, resolved });
+    }
+  }
+  return references;
+}
+
+function collectCssAssetReferences(stylePath) {
+  const source = fs.readFileSync(stylePath, "utf8");
+  const references = [];
+  for (const match of source.matchAll(/\burl\(\s*(["']?)([^"')]+)\1\s*\)/gi)) {
+    const value = match[2].trim();
+    if (!value || /^(?:data:|blob:|var\(|#)/i.test(value)) continue;
+    const resolved = resolveFrontendReference(stylePath, value);
+    if (resolved) references.push({ htmlPath: stylePath, value, resolved });
+  }
   return references;
 }
 
@@ -179,6 +198,29 @@ function unboundedCssTransitionIssue(source = "") {
 function generatedCssWrapperIssue(source = "", sourcePath = "") {
   if (path.extname(sourcePath) !== ".css") return false;
   return /^(?:\s*```(?:css)?\s*$|\s*\/\/|\s*(?:Absolutely|Sure)[—,!:.\s])/im.test(String(source));
+}
+
+function nativeDialogIssue(source = "") {
+  return /(?:^|[^\w.])(?:window\s*\.\s*)?(?:alert|confirm|prompt)\s*\(/m.test(String(source));
+}
+
+function remoteVisualAssetIssue(source = "", sourcePath = "") {
+  const value = String(source);
+  if (path.extname(sourcePath) === ".css") {
+    return /\burl\(\s*["']?(?:https?:)?\/\//i.test(value);
+  }
+  return (
+    /<(?:img|source|video)\b[^>]*\b(?:src|srcset|poster)\s*=\s*["'](?:https?:)?\/\//i.test(value) ||
+    /\.(?:src|poster)\s*=\s*["'](?:https?:)?\/\//i.test(value)
+  );
+}
+
+function duplicatedAvatarFallbackIssue(source = "") {
+  const value = String(source);
+  return (
+    /\b(?:const|let|var)\s+\w*avatar\w*\s*=\s*`data:image\/svg\+xml/i.test(value) ||
+    /function\s+\w*avatar\w*\([^)]*\)[\s\S]{0,800}?return\s+`data:image\/svg\+xml/i.test(value)
+  );
 }
 
 function duplicateStaticIds(source = "") {
@@ -417,8 +459,12 @@ function runChecks() {
   const failures = [];
   const allFrontendFiles = walk(frontendRoot);
   const htmlFiles = allFrontendFiles.filter((filePath) => path.extname(filePath) === ".html");
+  const cssFiles = allFrontendFiles.filter((filePath) => path.extname(filePath) === ".css");
   const sourceFiles = allFrontendFiles.filter((filePath) => SOURCE_EXTENSIONS.has(path.extname(filePath)));
-  const references = htmlFiles.flatMap(collectHtmlAssetReferences);
+  const references = [
+    ...htmlFiles.flatMap(collectHtmlAssetReferences),
+    ...cssFiles.flatMap(collectCssAssetReferences),
+  ];
 
   for (const reference of references) {
     const virtualAsset = [...VIRTUAL_FRONTEND_ASSETS.values()].includes(reference.resolved);
@@ -490,6 +536,12 @@ function runChecks() {
     if (generatedCssWrapperIssue(source, sourcePath)) {
       failures.push(`${relative(sourcePath)} contains a generated-response wrapper or non-CSS comment`);
     }
+    if (remoteVisualAssetIssue(source, sourcePath)) {
+      failures.push(`${relative(sourcePath)} references a mutable remote visual asset`);
+    }
+    if (duplicatedAvatarFallbackIssue(source)) {
+      failures.push(`${relative(sourcePath)} embeds a duplicate avatar SVG instead of the canonical local fallback`);
+    }
     if (/\b(?:coming soon|available soon|not implemented|under construction|not available yet)\b/i.test(source)) {
       failures.push(`${relative(sourcePath)} exposes unfinished product copy or behavior`);
     }
@@ -505,7 +557,7 @@ function runChecks() {
     if (/\.(?:onchange|onclick|onsubmit|onkeydown|onkeyup)\s*=(?!=)/i.test(source)) {
       failures.push(`${relative(sourcePath)} assigns a DOM event handler property instead of using addEventListener`);
     }
-    if (/\bwindow\.(?:alert|confirm|prompt)\s*\(|(?:^|[^\w.])alert\s*\(/m.test(source)) {
+    if (nativeDialogIssue(source)) {
       failures.push(`${relative(sourcePath)} uses a native browser dialog instead of the accessible product dialog system`);
     }
   }
@@ -567,6 +619,7 @@ if (require.main === module) runChecks();
 
 module.exports = {
   collectHtmlAssetReferences,
+  collectCssAssetReferences,
   collectReachableScripts,
   collectReachableStyles,
   clientSessionCompatibilityIssue,
@@ -585,6 +638,9 @@ module.exports = {
   silentAsyncFailureIssue,
   unboundedCssTransitionIssue,
   generatedCssWrapperIssue,
+  nativeDialogIssue,
+  remoteVisualAssetIssue,
+  duplicatedAvatarFallbackIssue,
   resolveFrontendReference,
   runChecks,
 };

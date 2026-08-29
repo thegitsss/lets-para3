@@ -527,6 +527,7 @@ function createDrawerMarkup() {
             class="support-drawer-menu-trigger"
             type="button"
             data-support-menu-trigger
+            data-public-action="icon"
             aria-label="Open assistant options"
             aria-expanded="false"
             aria-haspopup="menu"
@@ -534,7 +535,7 @@ function createDrawerMarkup() {
             ${buildMenuIcon()}
           </button>
           <div class="support-drawer-menu-panel" data-support-menu-panel role="menu" hidden>
-            <button class="support-drawer-menu-item" type="button" data-support-restart role="menuitem">
+            <button class="support-drawer-menu-item" type="button" data-support-restart data-public-action="text" role="menuitem">
               Start new conversation
             </button>
           </div>
@@ -543,13 +544,14 @@ function createDrawerMarkup() {
           class="support-drawer-pin"
           type="button"
           data-support-pin
+          data-public-action="icon"
           aria-label="Pin assistant while you browse"
           aria-pressed="false"
           title="Pin assistant"
         >
           ${buildPinIcon()}
         </button>
-        <button class="support-drawer-close" type="button" data-support-close aria-label="Close assistant">
+        <button class="support-drawer-close" type="button" data-support-close data-public-action="icon" aria-label="Close assistant">
           ${buildCloseIcon()}
         </button>
       </div>
@@ -563,7 +565,7 @@ function createDrawerMarkup() {
           <span class="support-composer-prompt-text" data-support-composer-prompt-text></span>
         </div>
         <textarea id="supportComposerInput" data-support-textarea rows="1" aria-label="Ask Assistant a question"></textarea>
-        <button class="support-send" type="submit" data-support-submit aria-label="Send message">
+        <button class="support-send" type="submit" data-support-submit data-public-action="icon" aria-label="Send message">
           ${buildSendIcon()}
         </button>
       </div>
@@ -1151,6 +1153,8 @@ function createMessageActions(message = {}) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "support-message-action";
+    button.dataset.publicAction = "secondary";
+    button.dataset.actionShape = "control";
     button.textContent = String(action.label || "Open");
     button.disabled = state.sending || state.loadingConversation || state.restartingConversation;
     button.addEventListener("click", () => {
@@ -1166,6 +1170,7 @@ function createMessageActions(message = {}) {
   const copyButton = document.createElement("button");
   copyButton.type = "button";
   copyButton.className = "support-message-utility";
+  copyButton.dataset.publicAction = "icon";
   copyButton.setAttribute("aria-label", "Copy");
   copyButton.title = "Copy response";
   copyButton.innerHTML = buildUtilityIcon("copy");
@@ -1179,6 +1184,7 @@ function createMessageActions(message = {}) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "support-message-utility";
+    button.dataset.publicAction = "icon";
     button.setAttribute("aria-label", label);
     button.title = label;
     button.innerHTML = buildUtilityIcon(rating);
@@ -1210,6 +1216,8 @@ function createSuggestedReplies(message = {}) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "support-suggested-reply";
+    button.dataset.publicAction = "secondary";
+    button.dataset.actionShape = "pill";
     button.textContent = String(option);
     button.disabled = state.sending || state.loadingConversation || state.restartingConversation;
     button.addEventListener("click", async () => {
@@ -1276,7 +1284,9 @@ function createEscalationCard(message = {}) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "support-escalation-button";
-  button.textContent = state.escalatingMessageId === message.id ? "Sending..." : "Send to the team";
+  button.dataset.publicAction = "primary";
+  button.dataset.actionShape = "control";
+  button.textContent = state.escalatingMessageId === message.id ? "Sending…" : "Send to the team";
   button.disabled = state.escalatingMessageId === message.id || state.sending || state.loadingConversation;
   button.addEventListener("click", async () => {
     await sendEscalationRequest(message.id);
@@ -1335,6 +1345,8 @@ function renderPrompts() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "support-quick-prompt";
+    button.dataset.publicAction = "secondary";
+    button.dataset.actionShape = "pill";
     const label = document.createElement("span");
     label.textContent = promptText;
     button.append(label);
@@ -1363,6 +1375,8 @@ function renderStatus() {
     const retry = document.createElement("button");
     retry.type = "button";
     retry.className = "support-status-retry";
+    retry.dataset.publicAction = "secondary";
+    retry.dataset.actionShape = "control";
     retry.textContent = "Retry";
     retry.disabled = state.sending;
     retry.addEventListener("click", async () => {
@@ -1922,6 +1936,7 @@ function createLauncher() {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "notification-icon support-launcher";
+  button.dataset.publicAction = "icon";
   button.setAttribute("aria-label", "Open AI help chat");
   button.title = "AI help chat";
   button.setAttribute("aria-controls", SUPPORT_DRAWER_ID);

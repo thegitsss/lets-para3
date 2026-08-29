@@ -22,7 +22,7 @@ const {
   assertControlRoomE2eHarnessEnabled,
   isStagingEnvironment,
 } = require("../../utils/controlRoomE2eHarnessAccess");
-const { applyCurrentLegalAcceptance } = require("../../utils/legalDocuments");
+const { recordSignupPolicyAcknowledgement } = require("../../utils/legalDocuments");
 const { validateNewPassword } = require("../../utils/passwordPolicy");
 
 const DEFAULT_ADMIN_EMAIL = "control-room.e2e.admin@lets-paraconnect.dev";
@@ -168,7 +168,7 @@ async function upsertHarnessAdmin() {
     admin.twoFactorEnabled = false;
   }
 
-  applyCurrentLegalAcceptance(admin, { source: "signup" });
+  recordSignupPolicyAcknowledgement(admin);
   await admin.save();
   return {
     admin,
@@ -243,7 +243,7 @@ async function upsertHarnessSupportAttorney(options = {}) {
     attorney.yearsExperience = 8;
   }
 
-  applyCurrentLegalAcceptance(attorney, { source: "signup" });
+  recordSignupPolicyAcknowledgement(attorney);
   await attorney.save();
   return {
     attorney,
@@ -287,7 +287,7 @@ async function upsertHarnessSupportParalegal() {
     paralegal.twoFactorEnabled = false;
   }
 
-  applyCurrentLegalAcceptance(paralegal, { source: "signup" });
+  recordSignupPolicyAcknowledgement(paralegal);
   paralegal.bio = "Experienced litigation paralegal supporting discovery, document review, and trial preparation.";
   paralegal.skills = ["Discovery", "Document review", "Trial preparation"];
   paralegal.practiceAreas = ["Civil Litigation"];
@@ -394,7 +394,7 @@ async function upsertHarnessDirector() {
     director.twoFactorEnabled = false;
   }
 
-  applyCurrentLegalAcceptance(director, { source: "signup" });
+  recordSignupPolicyAcknowledgement(director);
   await director.save();
   await DirectorProfile.findOneAndUpdate(
     { userId: director._id },

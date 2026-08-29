@@ -7,15 +7,15 @@
   let sessionPromise = null;
   let lastSessionFailure = null;
   const LEGACY_TOKEN_KEYS = ["lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"];
-  const VALID_THEMES = ["light", "dark", "mountain", "mountain-dark"];
+  const VALID_THEMES = ["light", "dark"];
+  const THEME_CLASSES_TO_CLEAR = ["theme-light", "theme-dark", "theme-mountain", "theme-mountain-dark"];
   const FONT_SIZE_MAP = {
-    xs: "14px",
-    sm: "15px",
-    md: "16px",
-    lg: "17px",
-    xl: "20px"
+    xs: "15px",
+    sm: "16px",
+    md: "17px",
+    lg: "20px",
+    xl: "22px"
   };
-  const MOUNTAIN_BG = "#f8f6f1";
   let currentTheme = null;
   let currentFontSize = null;
 
@@ -36,7 +36,6 @@
     "disabled",
     "deleted",
     "isFirstLogin",
-    "legalAcceptanceRequired",
   ];
   const ONBOARDING_BOOLEAN_FIELDS = [
     "paralegalTourCompleted",
@@ -100,7 +99,7 @@
       const fontSize = String(stored?.preferences?.fontSize || "").toLowerCase();
       const hasUser = !!(stored?.id || stored?._id || stored?.email || stored?.role);
       if (!VALID_THEMES.includes(theme)) return { classes: [], fontSize, theme: "", hasUser };
-      const classes = theme === "mountain-dark" ? ["theme-mountain-dark", "theme-dark"] : [`theme-${theme}`];
+      const classes = [`theme-${theme}`];
       return { classes, fontSize, theme, hasUser };
     } catch (_) {
       return null;
@@ -108,9 +107,9 @@
   })();
 
   function applyThemeClasses(node, classes) {
-    if (!node || !classes?.length) return;
-    VALID_THEMES.forEach((theme) => node.classList.remove(`theme-${theme}`));
-    classes.forEach((cls) => node.classList.add(cls));
+    if (!node) return;
+    THEME_CLASSES_TO_CLEAR.forEach((className) => node.classList.remove(className));
+    (classes || []).forEach((cls) => node.classList.add(cls));
   }
 
   if (earlyTheme) {
@@ -136,7 +135,7 @@
 
   function normalizeTheme(value) {
     const candidate = String(value || "").toLowerCase();
-    return VALID_THEMES.includes(candidate) ? candidate : "mountain";
+    return VALID_THEMES.includes(candidate) ? candidate : "light";
   }
 
   function applyClassToBody(classNames) {
@@ -145,7 +144,7 @@
     if (document.body) targets.push(document.body);
     if (document.documentElement) targets.push(document.documentElement);
     targets.forEach((node) => {
-      VALID_THEMES.forEach((theme) => node.classList.remove(`theme-${theme}`));
+      THEME_CLASSES_TO_CLEAR.forEach((className) => node.classList.remove(className));
       classes.forEach((value) => {
         if (value) node.classList.add(value);
       });
@@ -153,7 +152,6 @@
   }
 
   function getThemeClasses(theme) {
-    if (theme === "mountain-dark") return ["theme-mountain-dark", "theme-dark"];
     return [`theme-${theme}`];
   }
 
@@ -182,17 +180,10 @@
       const body = document.body;
       const root = document.documentElement;
       if (!body || !root) return;
-      if (theme === "mountain") {
-        body.style.setProperty("--bg", MOUNTAIN_BG);
-        root.style.setProperty("--bg", MOUNTAIN_BG);
-        body.style.setProperty("--app-background", MOUNTAIN_BG);
-        root.style.setProperty("--app-background", MOUNTAIN_BG);
-      } else {
-        body.style.removeProperty("--bg");
-        root.style.removeProperty("--bg");
-        body.style.removeProperty("--app-background");
-        root.style.removeProperty("--app-background");
-      }
+      body.style.removeProperty("--bg");
+      root.style.removeProperty("--bg");
+      body.style.removeProperty("--app-background");
+      root.style.removeProperty("--app-background");
     };
 
     if (document.body) {
@@ -265,20 +256,6 @@
     const path = String(window.location?.pathname || "").toLowerCase();
     const href = String(window.location?.href || "").toLowerCase();
     return path.endsWith("/login.html") || path.endsWith("login.html") || href.includes("login.html");
-  }
-
-  function isLegalAcceptancePage() {
-    if (typeof window === "undefined") return false;
-    const path = String(window.location?.pathname || "").toLowerCase();
-    return path.endsWith("/legal-acceptance.html") || path.endsWith("legal-acceptance.html");
-  }
-
-  function redirectToLegalAcceptance() {
-    if (hasRedirected || isLegalAcceptancePage()) return;
-    hasRedirected = true;
-    try {
-      window.location.replace("legal-acceptance.html");
-    } catch (_) {}
   }
 
   async function clearServerSession() {
@@ -415,7 +392,7 @@
   }
 
   async function checkSession(expectedRole, options = {}) {
-    const { redirectOnFail = true, allowLegalAcceptanceRequired = false } = options;
+    const { redirectOnFail = true } = options;
     let sessionData;
     try {
       sessionData = await getSessionData();
@@ -441,16 +418,6 @@
       if (redirectOnFail) invalidateAndRedirect();
       throw new Error("Not approved");
     }
-    if (
-      user?.legalAcceptanceRequired === true &&
-      !allowLegalAcceptanceRequired &&
-      !isLegalAcceptancePage()
-    ) {
-      if (redirectOnFail) redirectToLegalAcceptance();
-      const error = new Error("Updated legal documents must be accepted before continuing.");
-      error.code = "LEGAL_ACCEPTANCE_REQUIRED";
-      throw error;
-    }
     nukedOnRedirect = false;
     return { user, role: normalizedRole, status };
   }
@@ -458,10 +425,7 @@
   function redirectUserDashboard(roleOverride) {
     const roleValue = roleOverride || cachedUser?.role || "attorney";
     const norm = String(roleValue).toLowerCase();
-    const target = cachedUser?.legalAcceptanceRequired === true
-      ? "legal-acceptance.html"
-      :
-      norm === "admin"
+    const target = norm === "admin"
         ? "admin-dashboard.html"
         : norm === "director"
         ? "director-portal.html"
@@ -591,10 +555,7 @@
     headerRoot.style.visibility = "hidden";
     let authed = false;
     try {
-      await checkSession(undefined, {
-        redirectOnFail: false,
-        allowLegalAcceptanceRequired: true,
-      });
+      await checkSession(undefined, { redirectOnFail: false });
       authed = true;
     } catch (error) {
       console.debug("[session] public header authentication probe failed", error);
@@ -629,7 +590,6 @@
       }
       return user;
     } catch (error) {
-      if (error?.code === "LEGAL_ACCEPTANCE_REQUIRED") return null;
       window.location.href = "login.html";
       return null;
     }

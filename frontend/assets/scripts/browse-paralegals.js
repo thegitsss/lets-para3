@@ -25,12 +25,16 @@ const specialties = [
 
 const selectedSpecialties = new Set();
 const selectedStates = new Set();
+const AVATAR_PLACEHOLDER = "/assets/avatar-placeholder.svg";
 
 const elements = {
   results: document.getElementById("paralegalResults"),
   status: document.getElementById("resultsStatus"),
   experience: document.getElementById("experience"),
   sortBy: document.getElementById("sortBy"),
+  sortMenuTrigger: document.getElementById("sortMenuTrigger"),
+  sortMenuOptions: document.getElementById("sortMenuOptions"),
+  sortMenuValue: document.getElementById("sortMenuValue"),
   stateInput: document.getElementById("stateInput"),
   stateList: document.getElementById("stateList"),
   selectedStateChips: document.getElementById("selectedStateChips"),
@@ -54,6 +58,7 @@ const elements = {
   authBlocker: document.getElementById("authBlocker"),
   returnDashboard: document.getElementById("returnDashboard"),
   utilityHeader: document.querySelector("[data-utility-header]"),
+  publicHeader: document.querySelector("[data-public-header]"),
   authSidebar: document.querySelector("[data-auth-sidebar]"),
   authSidebarNav: document.querySelector("[data-auth-sidebar-nav]"),
   authSidebarToggle: document.querySelector("[data-auth-sidebar-toggle]"),
@@ -83,6 +88,7 @@ const state = {
 let availableCases = [];
 let activeParalegal = null;
 let filterFetchTimer = null;
+let sidebarProfileLoadPromise = null;
 const toast = window.toastUtils;
 const AUTH_LOCK_CLASS = "auth-locked";
 const AUTH_BLOCKER_READY_CLASS = "auth-blocker-ready";
@@ -114,6 +120,7 @@ async function init() {
   initStateDropdown();
   initSpecialtyDropdown();
   bindFilterEvents();
+  bindSortMenu();
   bindFilterMenuToggle();
   bindFilterButtons();
   bindModalEvents();
@@ -154,9 +161,9 @@ function authenticatedNavItems(role = "") {
   return [
     ["Home", "dashboard-attorney.html#home"],
     ["Matters", "dashboard-attorney.html#cases"],
+    ["Tasks", "dashboard-attorney.html#tasks"],
     ["Paralegals", "browse-paralegals.html", true],
     ["Payments", "dashboard-attorney.html#funds"],
-    ["Help", "help.html"],
   ];
 }
 
@@ -167,6 +174,18 @@ function closeAuthenticatedSidebar() {
   if (elements.authSidebarBackdrop) elements.authSidebarBackdrop.hidden = true;
 }
 
+function loadAuthenticatedSidebarProfile() {
+  if (!state.isLoggedIn || !elements.authSidebar) return Promise.resolve();
+  if (!sidebarProfileLoadPromise) {
+    sidebarProfileLoadPromise = import("./sidebar-profile.js?v=20260828-phase1")
+      .catch((error) => {
+        sidebarProfileLoadPromise = null;
+        console.warn("[browse-paralegals] authenticated sidebar profile failed to load", error);
+      });
+  }
+  return sidebarProfileLoadPromise;
+}
+
 function syncAuthenticatedShell() {
   const signedIn = state.isLoggedIn;
   document.body?.classList.toggle("authenticated-browse", signedIn);
@@ -174,6 +193,7 @@ function syncAuthenticatedShell() {
   document.documentElement.classList.toggle("authenticated-browse", signedIn);
   document.documentElement.classList.toggle("has-user-cache", signedIn);
   if (elements.utilityHeader) elements.utilityHeader.hidden = signedIn;
+  if (elements.publicHeader) elements.publicHeader.hidden = signedIn;
   if (elements.authSidebar) elements.authSidebar.hidden = !signedIn;
   if (elements.authSidebarToggle) elements.authSidebarToggle.hidden = !signedIn;
   if (elements.publicFooter) elements.publicFooter.hidden = signedIn;
@@ -196,6 +216,8 @@ function syncAuthenticatedShell() {
     });
     elements.authSidebarNav.replaceChildren(...links);
   }
+
+  void loadAuthenticatedSidebarProfile();
 
   elements.authSidebarToggle?.addEventListener("click", () => {
     const open = !document.body.classList.contains("authenticated-sidebar-open");
@@ -328,12 +350,91 @@ function bindFilterEvents() {
   });
 }
 
+function bindSortMenu() {
+  const trigger = elements.sortMenuTrigger;
+  const menu = elements.sortMenuOptions;
+  const select = elements.sortBy;
+  if (!trigger || !menu || !select) return;
+  const options = Array.from(menu.querySelectorAll("[data-sort-value]"));
+
+  const selectedIndex = () => Math.max(0, options.findIndex((option) => option.getAttribute("aria-selected") === "true"));
+  const focusOption = (index) => {
+    const normalizedIndex = (index + options.length) % options.length;
+    options.forEach((option, optionIndex) => option.setAttribute("tabindex", optionIndex === normalizedIndex ? "0" : "-1"));
+    options[normalizedIndex]?.focus();
+  };
+  const syncVisualSelection = () => {
+    const selectedValue = normalizeSortValue(select.value);
+    const selected = options.find((option) => option.dataset.sortValue === selectedValue) || options[0];
+    options.forEach((option) => {
+      option.setAttribute("aria-selected", String(option === selected));
+      option.setAttribute("tabindex", "-1");
+    });
+    if (elements.sortMenuValue && selected) elements.sortMenuValue.textContent = selected.textContent.trim();
+  };
+  const close = ({ restoreFocus = false } = {}) => {
+    menu.hidden = true;
+    trigger.setAttribute("aria-expanded", "false");
+    options.forEach((option) => option.setAttribute("tabindex", "-1"));
+    if (restoreFocus) trigger.focus();
+  };
+  const open = ({ focusIndex = selectedIndex() } = {}) => {
+    menu.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+    focusOption(focusIndex);
+  };
+  const commit = (option) => {
+    if (!option) return;
+    select.value = option.dataset.sortValue || "recent";
+    syncVisualSelection();
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    close({ restoreFocus: true });
+  };
+
+  trigger.addEventListener("click", () => menu.hidden ? open() : close());
+  trigger.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      open();
+      return;
+    }
+    if (event.key === "Escape" && !menu.hidden) {
+      event.preventDefault();
+      close({ restoreFocus: true });
+    }
+  });
+  options.forEach((option) => option.addEventListener("click", () => commit(option)));
+  menu.addEventListener("keydown", (event) => {
+    const current = options.indexOf(document.activeElement);
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close({ restoreFocus: true });
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const delta = event.key === "ArrowDown" ? 1 : -1;
+      focusOption((current < 0 ? selectedIndex() : current) + delta);
+    } else if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      focusOption(event.key === "Home" ? 0 : options.length - 1);
+    } else if ((event.key === "Enter" || event.key === " ") && current >= 0) {
+      event.preventDefault();
+      commit(options[current]);
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (!menu.hidden && !event.target.closest(".sort-menu-control")) close();
+  });
+  select.addEventListener("change", syncVisualSelection);
+  syncVisualSelection();
+}
+
 function bindFilterMenuToggle() {
   const menu = elements.filterMenu;
   const toggle = elements.filterToggle;
   if (!menu || !toggle) return;
 
   const setOpen = (open, { restoreFocus = false } = {}) => {
+    if (!open) closeFilterOptionLists();
     menu.hidden = !open;
     menu.classList.toggle("active", open);
     toggle.setAttribute("aria-expanded", String(open));
@@ -358,6 +459,7 @@ function bindFilterMenuToggle() {
 
 function closeFilterMenu() {
   if (!elements.filterMenu || !elements.filterToggle) return;
+  closeFilterOptionLists();
   elements.filterMenu.hidden = true;
   elements.filterMenu.classList.remove("active");
   elements.filterToggle.setAttribute("aria-expanded", "false");
@@ -393,16 +495,16 @@ function bindFilterButtons() {
     selectedStates.clear();
     renderSelectedStateChips();
     if (elements.stateList) {
-      elements.stateList.querySelectorAll("input[type='checkbox']").forEach((cb) => {
-        cb.checked = false;
+      elements.stateList.querySelectorAll("[role='option']").forEach((option) => {
+        option.setAttribute("aria-selected", "false");
       });
       elements.stateList.classList.remove("show");
     }
     selectedSpecialties.clear();
     updateSpecialtyInput();
     if (elements.specialtyList) {
-      elements.specialtyList.querySelectorAll("input[type='checkbox']").forEach((cb) => {
-        cb.checked = false;
+      elements.specialtyList.querySelectorAll("[role='option']").forEach((option) => {
+        option.setAttribute("aria-selected", "false");
       });
       elements.specialtyList.classList.remove("show");
     }
@@ -416,6 +518,68 @@ function syncFiltersFromInputs() {
   state.filters.experience = elements.experience?.value || "";
   state.filters.location = [...selectedStates].join("|");
   state.filters.sort = normalizeSortValue(elements.sortBy?.value);
+}
+
+function filterOptionElements(list) {
+  return Array.from(list?.querySelectorAll?.("[role='option'][data-filter-value]") || []);
+}
+
+function closeFilterOptionList(input, list, { restoreFocus = false } = {}) {
+  if (!input || !list) return;
+  list.classList.remove("show");
+  input.setAttribute("aria-expanded", "false");
+  filterOptionElements(list).forEach((option) => option.setAttribute("tabindex", "-1"));
+  if (restoreFocus) input.focus();
+}
+
+function closeFilterOptionLists({ except = null } = {}) {
+  [
+    [elements.specialtyInput, elements.specialtyList],
+    [elements.stateInput, elements.stateList],
+  ].forEach(([input, list]) => {
+    if (list && list !== except) closeFilterOptionList(input, list);
+  });
+}
+
+function focusFilterOption(list, index) {
+  const options = filterOptionElements(list);
+  if (!options.length) return;
+  const normalizedIndex = (index + options.length) % options.length;
+  options.forEach((option, optionIndex) => option.setAttribute("tabindex", optionIndex === normalizedIndex ? "0" : "-1"));
+  options[normalizedIndex].focus();
+  options[normalizedIndex].scrollIntoView({ block: "nearest" });
+}
+
+function openFilterOptionList(input, list, render, { moveFocus = false } = {}) {
+  closeFilterOptionLists({ except: list });
+  render();
+  list.classList.add("show");
+  input.setAttribute("aria-expanded", "true");
+  if (moveFocus) {
+    const options = filterOptionElements(list);
+    const selectedIndex = options.findIndex((option) => option.getAttribute("aria-selected") === "true");
+    focusFilterOption(list, selectedIndex >= 0 ? selectedIndex : 0);
+  }
+}
+
+function handleFilterOptionListKeydown(event, { input, list, toggleSelection }) {
+  const options = filterOptionElements(list);
+  const current = options.indexOf(document.activeElement);
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    closeFilterOptionList(input, list, { restoreFocus: true });
+  } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const delta = event.key === "ArrowDown" ? 1 : -1;
+    focusFilterOption(list, (current < 0 ? 0 : current) + delta);
+  } else if (event.key === "Home" || event.key === "End") {
+    event.preventDefault();
+    focusFilterOption(list, event.key === "Home" ? 0 : options.length - 1);
+  } else if ((event.key === "Enter" || event.key === " ") && current >= 0) {
+    event.preventDefault();
+    toggleSelection(options[current]);
+  }
 }
 
 
@@ -450,38 +614,42 @@ function initStateDropdown() {
   if (!elements.stateInput || !elements.stateList) return;
   elements.stateInput.readOnly = true;
   elements.stateInput.placeholder = "State";
+  elements.stateInput.setAttribute("role", "combobox");
   elements.stateInput.setAttribute("aria-haspopup", "listbox");
+  elements.stateInput.setAttribute("aria-controls", elements.stateList.id);
   elements.stateInput.setAttribute("aria-expanded", "false");
+  elements.stateInput.setAttribute("aria-autocomplete", "none");
   elements.stateList.setAttribute("role", "listbox");
   elements.stateList.setAttribute("aria-multiselectable", "true");
   const stateWrapper = elements.stateInput.closest(".dropdown-wrapper");
   const specialtyWrapper = elements.specialtyInput?.closest(".dropdown-wrapper") || null;
-  const closeList = () => {
-    elements.stateList.classList.remove("show");
-    elements.stateInput.setAttribute("aria-expanded", "false");
-  };
-  const openList = () => {
-    renderList();
-    elements.specialtyList?.classList.remove("show");
-    elements.specialtyInput?.setAttribute("aria-expanded", "false");
-    elements.stateList.classList.add("show");
-    elements.stateInput.setAttribute("aria-expanded", "true");
-  };
-  const renderList = (query = "") => {
-    const normalizedQuery = String(query || "").trim().toLowerCase();
-    const matches = states.filter((stateName) => stateName.toLowerCase().includes(normalizedQuery));
-    elements.stateList.innerHTML = matches.length
-      ? matches
+  const closeList = (options) => closeFilterOptionList(elements.stateInput, elements.stateList, options);
+  const renderList = () => {
+    elements.stateList.innerHTML = states
       .map((stateName) => {
         const slug = stateName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         return `
-        <li role="option" aria-selected="${selectedStates.has(stateName) ? "true" : "false"}">
-          <input type="checkbox" id="state-${slug}" value="${escapeHTML(stateName)}" ${selectedStates.has(stateName) ? "checked" : ""}>
-          <label for="state-${slug}">${escapeHTML(stateName)}</label>
+        <li id="state-option-${slug}" role="option" tabindex="-1" data-filter-value="${escapeHTML(stateName)}" aria-selected="${selectedStates.has(stateName) ? "true" : "false"}">
+          <span class="filter-option-check" aria-hidden="true"></span>
+          <span class="filter-option-label">${escapeHTML(stateName)}</span>
         </li>`;
       })
-      .join("")
-      : '<li class="empty-option">No states match</li>';
+      .join("");
+  };
+  const openList = (options) => {
+    openFilterOptionList(elements.stateInput, elements.stateList, renderList, options);
+  };
+  const toggleSelection = (row) => {
+    const value = row?.dataset.filterValue || "";
+    if (!value) return;
+    const selected = row.getAttribute("aria-selected") !== "true";
+    row.setAttribute("aria-selected", String(selected));
+    if (selected) selectedStates.add(value);
+    else selectedStates.delete(value);
+    renderSelectedStateChips();
+    updateStateInput();
+    state.filters.location = [...selectedStates].join("|");
+    scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
   };
   elements.stateInput.addEventListener("click", (event) => {
     event.preventDefault();
@@ -490,32 +658,26 @@ function initStateDropdown() {
   });
   elements.stateInput.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      closeList();
-      elements.stateInput.blur();
+      event.preventDefault();
+      event.stopPropagation();
+      closeList({ restoreFocus: true });
       return;
     }
     if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown") {
       event.preventDefault();
-      openList();
+      openList({ moveFocus: true });
     }
   });
   elements.stateList.addEventListener("click", (event) => {
-    const row = event.target.closest("li");
-    if (!row) return;
-    const checkbox = row.querySelector("input[type='checkbox']");
-    if (!checkbox) return;
-    if (event.target !== checkbox) {
-      event.preventDefault();
-      checkbox.checked = !checkbox.checked;
-    }
-    const value = checkbox.value;
-    if (checkbox.checked) selectedStates.add(value);
-    else selectedStates.delete(value);
-    row.setAttribute("aria-selected", String(checkbox.checked));
-    renderSelectedStateChips();
-    updateStateInput();
-    state.filters.location = [...selectedStates].join("|");
-    scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
+    const row = event.target.closest("[role='option'][data-filter-value]");
+    if (row) toggleSelection(row);
+  });
+  elements.stateList.addEventListener("keydown", (event) => {
+    handleFilterOptionListKeydown(event, {
+      input: elements.stateInput,
+      list: elements.stateList,
+      toggleSelection,
+    });
   });
   elements.selectedStateChips?.addEventListener("click", (event) => {
     const removeButton = event.target.closest("[data-remove-state]");
@@ -523,7 +685,7 @@ function initStateDropdown() {
     if (removeButton) {
       selectedStates.delete(removeButton.dataset.removeState || "");
       renderSelectedStateChips();
-      syncStateCheckboxes();
+      syncStateOptions();
       state.filters.location = [...selectedStates].join("|");
       scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
       return;
@@ -531,7 +693,7 @@ function initStateDropdown() {
     if (clearButton) {
       selectedStates.clear();
       renderSelectedStateChips();
-      syncStateCheckboxes();
+      syncStateOptions();
       state.filters.location = "";
       scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
     }
@@ -541,7 +703,7 @@ function initStateDropdown() {
       closeList();
     }
     if (!specialtyWrapper?.contains(event.target)) {
-      elements.specialtyList?.classList.remove("show");
+      closeFilterOptionList(elements.specialtyInput, elements.specialtyList);
     }
   });
   renderSelectedStateChips();
@@ -552,13 +714,13 @@ function updateStateInput() {
   if (!elements.stateInput) return;
   const count = selectedStates.size;
   elements.stateInput.value = count ? `${count} state${count === 1 ? "" : "s"} selected` : "";
+  elements.stateInput.setAttribute("aria-label", count ? `State, ${count} selected` : "State");
 }
 
-function syncStateCheckboxes() {
+function syncStateOptions() {
   if (!elements.stateList) return;
-  elements.stateList.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
-    checkbox.checked = selectedStates.has(checkbox.value);
-    checkbox.closest("li")?.setAttribute("aria-selected", String(checkbox.checked));
+  filterOptionElements(elements.stateList).forEach((option) => {
+    option.setAttribute("aria-selected", String(selectedStates.has(option.dataset.filterValue || "")));
   });
   updateStateInput();
 }
@@ -567,70 +729,66 @@ function initSpecialtyDropdown() {
   if (!elements.specialtyInput || !elements.specialtyList) return;
   elements.specialtyInput.readOnly = true;
   elements.specialtyInput.placeholder = "Specialty";
+  elements.specialtyInput.setAttribute("role", "combobox");
   elements.specialtyInput.setAttribute("aria-haspopup", "listbox");
+  elements.specialtyInput.setAttribute("aria-controls", elements.specialtyList.id);
   elements.specialtyInput.setAttribute("aria-expanded", "false");
+  elements.specialtyInput.setAttribute("aria-autocomplete", "none");
   elements.specialtyList.setAttribute("role", "listbox");
   elements.specialtyList.setAttribute("aria-multiselectable", "true");
-  const closeList = () => {
-    elements.specialtyList.classList.remove("show");
-    elements.specialtyInput.setAttribute("aria-expanded", "false");
-  };
-  const openList = () => {
-    renderList();
-    elements.stateList?.classList.remove("show");
-    elements.stateInput?.setAttribute("aria-expanded", "false");
-    elements.specialtyList.classList.add("show");
-    elements.specialtyInput.setAttribute("aria-expanded", "true");
-  };
-  const toggleList = () => {
-    if (elements.specialtyList.classList.contains("show")) {
-      closeList();
-    } else {
-      openList();
-    }
-  };
+  const closeList = (options) => closeFilterOptionList(elements.specialtyInput, elements.specialtyList, options);
   const renderList = () => {
     elements.specialtyList.innerHTML = specialties
       .map((spec) => {
         const slug = spec.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         return `
-        <li role="option" aria-selected="${selectedSpecialties.has(spec) ? "true" : "false"}">
-          <input type="checkbox" id="spec-${slug}" value="${escapeHTML(spec)}" ${selectedSpecialties.has(spec) ? "checked" : ""}>
-          <label for="spec-${slug}">${spec}</label>
+        <li id="specialty-option-${slug}" role="option" tabindex="-1" data-filter-value="${escapeHTML(spec)}" aria-selected="${selectedSpecialties.has(spec) ? "true" : "false"}">
+          <span class="filter-option-check" aria-hidden="true"></span>
+          <span class="filter-option-label">${escapeHTML(spec)}</span>
         </li>`;
       })
       .join("");
   };
+  const openList = (options) => {
+    openFilterOptionList(elements.specialtyInput, elements.specialtyList, renderList, options);
+  };
+  const toggleSelection = (row) => {
+    const value = row?.dataset.filterValue || "";
+    if (!value) return;
+    const selected = row.getAttribute("aria-selected") !== "true";
+    row.setAttribute("aria-selected", String(selected));
+    if (selected) selectedSpecialties.add(value);
+    else selectedSpecialties.delete(value);
+    updateSpecialtyInput();
+    scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
+  };
   elements.specialtyInput.addEventListener("click", (event) => {
     event.preventDefault();
-    toggleList();
+    if (elements.specialtyList.classList.contains("show")) closeList();
+    else openList();
   });
   elements.specialtyInput.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      closeList();
-      elements.specialtyInput.blur();
+      event.preventDefault();
+      event.stopPropagation();
+      closeList({ restoreFocus: true });
       return;
     }
     if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown") {
       event.preventDefault();
-      openList();
+      openList({ moveFocus: true });
     }
   });
   elements.specialtyList.addEventListener("click", (event) => {
-    const row = event.target.closest("li");
-    if (!row) return;
-    const checkbox = row.querySelector("input[type='checkbox']");
-    if (!checkbox) return;
-    if (event.target !== checkbox) {
-      event.preventDefault();
-      checkbox.checked = !checkbox.checked;
-    }
-    const value = checkbox.value;
-    if (checkbox.checked) selectedSpecialties.add(value);
-    else selectedSpecialties.delete(value);
-    row.setAttribute("aria-selected", String(checkbox.checked));
-    updateSpecialtyInput();
-    scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
+    const row = event.target.closest("[role='option'][data-filter-value]");
+    if (row) toggleSelection(row);
+  });
+  elements.specialtyList.addEventListener("keydown", (event) => {
+    handleFilterOptionListKeydown(event, {
+      input: elements.specialtyInput,
+      list: elements.specialtyList,
+      toggleSelection,
+    });
   });
   updateSpecialtyInput();
 }
@@ -660,6 +818,7 @@ function updateSpecialtyInput() {
   if (!elements.specialtyInput) return;
   const count = selectedSpecialties.size;
   elements.specialtyInput.value = count ? `${count} specialt${count === 1 ? "y" : "ies"} selected` : "";
+  elements.specialtyInput.setAttribute("aria-label", count ? `Specialty, ${count} selected` : "Specialty");
 }
 
 function resetPageAndFetch(options = {}) {
@@ -705,9 +864,15 @@ async function loadParalegals(options = {}) {
       headers: { Accept: "application/json" },
       credentials: state.isLoggedIn ? "include" : "omit",
     });
-    const data = await res.json();
+    const contentType = String(res.headers.get("content-type") || "").toLowerCase();
+    const data = contentType.includes("application/json")
+      ? await res.json()
+      : null;
     if (!res.ok) {
-      throw new Error(data?.error || "Unable to load paralegals");
+      throw new Error(data?.error || "Paralegal profiles are temporarily unavailable.");
+    }
+    if (!data || typeof data !== "object") {
+      throw new Error("Paralegal profiles are temporarily unavailable.");
     }
     renderParalegals(Array.isArray(data.items) ? data.items : []);
     updatePagination({ total: data.total, pages: data.pages, page: data.page });
@@ -782,7 +947,7 @@ function buildParalegalCard(paralegal) {
   const location = presentation.details.find((item) => item.label === "Location")?.value || "Location not specified";
   const specialties = (presentation.details.find((item) => item.label === "Practice areas")?.value || "").split(", ").filter(Boolean).slice(0, 2);
   const experience = formatExperience(paralegal.yearsExperience);
-  const avatar = paralegal.avatarURL || buildInitialAvatar(getInitials(name));
+  const avatar = paralegal.avatarURL || AVATAR_PLACEHOLDER;
   const profileHref = presentation.links.self;
 
   const card = document.createElement("article");
@@ -801,8 +966,7 @@ function buildParalegalCard(paralegal) {
   img.src = avatar;
   img.alt = `Portrait of ${name}`;
   img.addEventListener("error", () => {
-    const fallback = buildInitialAvatar(getInitials(name));
-    if (img.src !== fallback) img.src = fallback;
+    if (img.getAttribute("src") !== AVATAR_PLACEHOLDER) img.src = AVATAR_PLACEHOLDER;
   }, { once: true });
   photoLink.appendChild(img);
   card.appendChild(photoLink);
@@ -842,7 +1006,9 @@ function buildParalegalCard(paralegal) {
     const inquireBtn = document.createElement("button");
     inquireBtn.type = "button";
     inquireBtn.className = "action-btn invite-btn";
-    inquireBtn.textContent = "Invite to Matter";
+    inquireBtn.dataset.publicAction = "primary";
+    inquireBtn.dataset.actionShape = "pill";
+    inquireBtn.textContent = "Invite to matter";
     inquireBtn.addEventListener("click", () => openInquireModal({ id: paralegalId, name }));
     actions.appendChild(inquireBtn);
   }
@@ -1060,20 +1226,6 @@ function formatExperience(years) {
   if (num >= 10) return "10+ years";
   return `${Math.round(num)}+ years`;
 }
-
-
-function getInitials(name = "") {
-  const parts = name.trim().split(/\\s+/).filter(Boolean);
-  const initials = parts.slice(0, 2).map((p) => p[0]?.toUpperCase() || "");
-  return (initials.join("") || "A").slice(0, 2);
-}
-
-function buildInitialAvatar(initials) {
-  const label = (initials || "A").slice(0, 2).toUpperCase();
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><circle cx='40' cy='40' r='36' fill='#d4c6a4' stroke='#ffffff' stroke-width='4'/><text x='50%' y='55%' text-anchor='middle' font-family='Sarabun, Arial' font-size='28' fill='#1a1a1a' font-weight='600'>${label}</text></svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
-
 
 
 function escapeHtml(value = "") {

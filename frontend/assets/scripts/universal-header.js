@@ -213,6 +213,7 @@
   }
 
   async function start() {
+    if (document.body.classList.contains("public-site-chrome")) return;
     const cached = storedUser();
     if (["attorney", "paralegal"].includes(roleOf(cached))) {
       await mount(cached);

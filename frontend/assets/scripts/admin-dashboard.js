@@ -1127,6 +1127,9 @@ async function loadAIControlRoomSummary(force = false) {
     try {
       const payload = await fetchAIControlRoomSummaryPayload();
       aiControlRoomState.summary = payload;
+      if (payload?.focusViews?.founder) {
+        aiControlRoomState.focusViews.founder = payload.focusViews.founder;
+      }
       aiControlRoomState.lastLoadedAt = Date.now();
       aiControlRoomState.loadStatus = "ready";
       return payload;
@@ -1178,9 +1181,9 @@ async function syncAIControlRoomInBackground({ refreshIncidentWorkspace = false 
         aiControlRoomState.queuedBackgroundSync = false;
         const focusKeys = Array.from(
           new Set(
-            ["founder", activeAIControlRoomKey]
+            [activeAIControlRoomKey]
               .map((key) => String(key || "").trim())
-              .filter((key) => AI_CONTROL_ROOM_FOCUS_ENDPOINTS[key])
+              .filter((key) => key !== "founder" && AI_CONTROL_ROOM_FOCUS_ENDPOINTS[key])
           )
         );
         const [summaryResult, ...viewResults] = await Promise.allSettled([
@@ -1198,6 +1201,9 @@ async function syncAIControlRoomInBackground({ refreshIncidentWorkspace = false 
           .map((result) => result.value);
 
         aiControlRoomState.summary = summaryPayload;
+        if (summaryPayload?.focusViews?.founder) {
+          aiControlRoomState.focusViews.founder = summaryPayload.focusViews.founder;
+        }
         aiControlRoomState.lastLoadedAt = Date.now();
         aiControlRoomState.loadStatus = "ready";
         views.forEach(({ key, view }) => {
@@ -2415,7 +2421,6 @@ async function renderAIControlRoom(force = false) {
     const loadResults = await Promise.allSettled([
       loadAIControlRoomSummary(force),
       loadAIControlRoomFocus(activeAIControlRoomKey, force),
-      loadAIControlRoomFocus("founder", force),
     ]);
 
     const failures = loadResults.filter((result) => result.status === "rejected");

@@ -3,6 +3,7 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Browse Paralegals – Let’s-ParaConnect</title>
@@ -13,8 +14,10 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/hero-pages.css?v=20260729-white-footer" rel="stylesheet" />
-  <script src="assets/scripts/utils/session.js"></script>
+  <link href="assets/styles/hero-pages.css?v=20260826-uniform-heroes" rel="stylesheet" />
+  <link href="assets/styles/public-site-chrome.css?v=20260828-phase8" rel="stylesheet" />
+  <script src="assets/scripts/public-site-chrome.js?v=20260827-mobile-footer-alignment" defer></script>
+  <script src="assets/scripts/utils/session.js?v=20260820-1"></script>
   <script type="module" src="assets/scripts/auth.js?v=20260812-state-filter-owner"></script>
   <style>
     :root {
@@ -23,6 +26,14 @@
       --muted: #64748b;
       --line: #e8edf3;
       --bg: #ffffff;
+    }
+
+    .browse-paralegals-page [data-auth-sidebar][hidden],
+    .browse-paralegals-page [data-auth-sidebar-toggle][hidden],
+    .browse-paralegals-page [data-auth-sidebar-backdrop][hidden],
+    .browse-paralegals-page [data-utility-account-menu][hidden],
+    .browse-paralegals-page [data-utility-menu][hidden] {
+      display: none !important;
     }
 
     .gold { color: var(--gold); }
@@ -134,7 +145,7 @@
     .site-header.over-image .signup-pill { border-color: rgba(26, 34, 48, 0.35) !important; }
 
     .jobs-shell {
-      width: min(1200px, 92vw);
+      width: min(1200px, calc(100% - (2 * var(--page-gutter, 20px))));
       margin: 38px auto 72px;
       padding: 0;
       box-sizing: border-box;
@@ -262,11 +273,12 @@
     }
 
     .auth-blocker__card {
+      box-sizing: border-box;
       background: #fff;
       border-radius: 16px;
-      padding: 2rem;
+      padding: clamp(1.5rem, 6vw, 2rem);
       max-width: 420px;
-      width: 100%;
+      width: min(100%, 420px);
       text-align: center;
       box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35);
     }
@@ -291,6 +303,8 @@
     }
 
     .auth-blocker__actions .btn {
+      box-sizing: border-box;
+      min-height: 44px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -304,9 +318,9 @@
     }
 
     .auth-blocker__actions .btn.primary {
-      background: var(--gold);
+      background: var(--navy);
       color: #fff;
-      border-color: var(--gold);
+      border-color: var(--navy);
     }
 
     .auth-blocker__actions .btn.secondary {
@@ -387,23 +401,6 @@
       flex-wrap: wrap;
       gap: 0.6rem;
     }
-
-    .clear-button,
-    .apply-button {
-      border: 1px solid var(--gold);
-      border-radius: 999px;
-      padding: 0.45rem 1.3rem;
-      font-size: 0.9rem;
-      cursor: pointer;
-      background: transparent;
-      color: var(--gold);
-      letter-spacing: 0.02em;
-    }
-
-    .apply-button { background: var(--gold); color: #fff; }
-
-    .clear-button:hover { background: rgba(180, 151, 90, 0.1); }
-    .apply-button:hover { background: #a2864d; border-color: #a2864d; }
 
     .results-status {
       border: 1px dashed rgba(26, 34, 48, 0.15);
@@ -604,8 +601,19 @@
     }
 
     html.has-user-cache .home-footer,
+    body.public-site-chrome.authenticated-browse .browse-page-shell > .home-footer,
+    body.public-site-chrome.authenticated-browse [data-public-footer],
     body.authenticated-browse .home-footer {
       display: none !important;
+    }
+
+    body.public-site-chrome.authenticated-browse .home-header,
+    body.public-site-chrome.authenticated-browse [data-public-header] {
+      display: none !important;
+    }
+
+    body.public-site-chrome.authenticated-browse .browse-page-shell > .hero-banner {
+      margin-top: 0;
     }
 
     html.has-user-cache .utility-header,
@@ -712,6 +720,89 @@
         cursor: pointer;
         font-size: 0.9rem;
       }
+    }
+
+    .sort-native,
+    .sort-native[hidden] {
+      display: none !important;
+    }
+
+    .sort-menu-control {
+      position: relative;
+      display: inline-flex;
+    }
+
+    .sort-menu-trigger {
+      min-width: 150px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 7px 14px;
+      border: 1px solid rgba(26, 34, 48, 0.14);
+      border-radius: 999px;
+      background: #fff;
+      color: #1a2230;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .sort-menu-trigger::after {
+      width: 8px;
+      height: 8px;
+      border-right: 1.5px solid currentColor;
+      border-bottom: 1.5px solid currentColor;
+      content: "";
+      transform: translateY(-2px) rotate(45deg);
+    }
+
+    .sort-menu-trigger[aria-expanded="true"]::after {
+      transform: translateY(2px) rotate(225deg);
+    }
+
+    .sort-menu-options {
+      width: 100%;
+      min-width: 100%;
+      position: absolute;
+      z-index: 40;
+      top: calc(100% + 8px);
+      right: 0;
+      box-sizing: border-box;
+      margin: 0;
+      padding: 6px;
+      border: 1px solid rgba(26, 34, 48, 0.14);
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 18px 42px rgba(26, 34, 48, 0.14);
+      list-style: none;
+    }
+
+    .sort-menu-options[hidden] { display: none; }
+
+    .sort-menu-options button {
+      width: 100%;
+      min-height: 44px;
+      padding: 9px 11px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: #1a2230;
+      font: inherit;
+      text-align: left;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .sort-menu-options button:hover,
+    .sort-menu-options button:focus-visible,
+    .sort-menu-options button[aria-selected="true"] {
+      background: #f3f5f7;
+    }
+
+    .sort-menu-options button:focus-visible {
+      outline: 2px solid var(--lpc-focus);
+      outline-offset: -2px;
     }
 
     /* Paralegal-specific styles */
@@ -882,6 +973,14 @@
       border-color: #c8ddfb;
     }
 
+    aside.filter select:focus-visible,
+    aside.filter input[type="text"]:focus-visible,
+    #stateInput:focus-visible,
+    #specialtyInput:focus-visible {
+      outline: 2px solid var(--lpc-focus);
+      outline-offset: 2px;
+    }
+
     aside.filter select:hover,
     aside.filter input[type="text"]:hover,
     #stateInput:hover {
@@ -904,6 +1003,7 @@
     }
 
     .paralegal-card img {
+      box-sizing: border-box;
       width: 150px;
       aspect-ratio: 1 / 1;
       height: auto;
@@ -929,6 +1029,7 @@
 
     .card-content {
       flex: 1;
+      min-width: 0;
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
@@ -939,6 +1040,7 @@
       font-size: 1.5rem;
       font-weight: 300;
       margin: 0 0 0.4rem;
+      overflow-wrap: anywhere;
     }
 
     .card-content p {
@@ -946,6 +1048,7 @@
       color: var(--muted);
       font-weight: 200;
       margin: 0.25rem 0;
+      overflow-wrap: anywhere;
     }
 
     .card-meta {
@@ -957,6 +1060,8 @@
     }
 
     .card-meta span {
+      max-width: 100%;
+      box-sizing: border-box;
       display: inline-flex;
       align-items: center;
       font-size: 0.95rem;
@@ -966,6 +1071,7 @@
       padding: 0.2rem 0.6rem;
       font-weight: 200;
       letter-spacing: 0.3px;
+      overflow-wrap: anywhere;
     }
 
     .card-actions {
@@ -977,23 +1083,22 @@
     }
 
     .action-btn {
+      min-height: 48px;
+      box-sizing: border-box;
       padding: 0.45rem 1.4rem;
       font-size: 0.95rem;
       font-weight: 200;
-      border: 1px solid var(--gold);
-      background: transparent;
-      color: var(--gold);
+      border: 1px solid var(--navy);
+      border-radius: 999px;
+      background: var(--navy);
+      color: #fff;
       text-decoration: none;
       cursor: pointer;
       font-family: 'Sarabun', sans-serif;
       transition: background 0.2s, color 0.2s;
     }
 
-    .action-btn:hover { background: var(--gold); color: #fff; }
-
-    .inquire-btn { border-color: var(--navy); color: var(--navy); }
-
-    .inquire-btn:hover { background: var(--navy); color: #fff; }
+    .action-btn:hover { background: #1d2b3b; border-color: #1d2b3b; color: #fff; }
 
     .modal-overlay {
       position: fixed;
@@ -1099,8 +1204,10 @@
     }
 
     .modal-actions button {
+      min-height: 48px;
       padding: 0.4rem 1.2rem;
       border: 1px solid var(--navy);
+      border-radius: 8px;
       background: transparent;
       color: var(--navy);
       cursor: pointer;
@@ -1110,8 +1217,8 @@
     }
 
     .modal-actions button.confirm {
-      background: var(--gold);
-      border-color: var(--gold);
+      background: var(--navy);
+      border-color: var(--navy);
       color: #fff;
     }
 
@@ -1132,6 +1239,8 @@
     }
 
     .pagination-controls button {
+      min-width: 44px;
+      min-height: 44px;
       border: 1px solid var(--line);
       background: #fff;
       padding: 0.35rem 0.9rem;
@@ -1210,6 +1319,37 @@
       }
     }
 
+    @media (max-width: 359px) {
+      .paralegal-card {
+        display: block;
+        padding: 1.125rem;
+      }
+
+      .profile-photo-link {
+        float: none;
+        width: 112px;
+        height: 112px;
+        margin: 0 auto 1rem;
+        shape-outside: none;
+      }
+
+      .card-content {
+        display: flex;
+      }
+
+      .card-actions {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        clear: none;
+      }
+
+      .card-actions .action-btn {
+        width: 100%;
+        text-align: center;
+      }
+    }
+
     /* Toast */
     .toast {
       position: fixed;
@@ -1232,7 +1372,7 @@
       transform: translate(-50%, 0);
     }
 
-    /* Compact Stripe-style filter control. */
+    /* Compact LPC directory filter control. */
     .browse-paralegals-page .layout {
       display: block;
     }
@@ -1244,9 +1384,9 @@
 
     .browse-paralegals-page .filter-toggle {
       position: relative;
-      width: 34px;
-      height: 34px;
-      min-width: 34px;
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -1266,7 +1406,12 @@
       color: #24324a;
       background: #f6f8fb;
       border-color: #cbd2dc;
-      outline: none;
+    }
+
+    .browse-paralegals-page .filter-toggle:focus-visible,
+    .browse-paralegals-page .filter-popover__close:focus-visible {
+      outline: 2px solid var(--lpc-focus);
+      outline-offset: 2px;
     }
 
     .browse-paralegals-page .filter-toggle svg {
@@ -1290,7 +1435,7 @@
       justify-content: center;
       padding: 0 4px;
       color: #fff;
-      background: #635bff;
+      background: var(--navy);
       border: 2px solid #fff;
       border-radius: 999px;
       font-size: 0.62rem;
@@ -1307,11 +1452,14 @@
       right: 0;
       left: auto;
       z-index: 120;
-      width: min(304px, calc(100vw - 32px));
+      width: min(304px, calc(100vw - (2 * var(--page-gutter, 20px))));
       max-height: min(520px, calc(100vh - 150px));
+      box-sizing: border-box;
       margin: 0;
       padding: 14px;
-      overflow: visible;
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
       background: #fff;
       border: 1px solid #dfe3e8;
       border-radius: 10px;
@@ -1340,8 +1488,8 @@
     }
 
     .browse-paralegals-page .filter-popover__close {
-      width: 28px;
-      height: 28px;
+      width: 44px;
+      height: 44px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -1357,7 +1505,6 @@
     .browse-paralegals-page .filter-popover__close:focus-visible {
       color: #202124;
       background: #f4f5f7;
-      outline: none;
     }
 
     .browse-paralegals-page .filter-popover__close svg {
@@ -1374,7 +1521,7 @@
     }
 
     .browse-paralegals-page aside.filter.filter-popover :where(select, input[type="text"]) {
-      min-height: 36px;
+      min-height: 44px;
       padding: 7px 32px 7px 10px;
       border-color: #dfe3e8;
       border-radius: 7px;
@@ -1383,13 +1530,17 @@
 
     .browse-paralegals-page aside.filter.filter-popover #stateList,
     .browse-paralegals-page aside.filter.filter-popover #specialtyList {
-      right: auto;
-      width: 224px;
-      max-width: 100%;
-      max-height: 168px;
+      position: relative;
+      inset: auto;
+      width: 100%;
+      max-width: none;
+      max-height: 180px;
       box-sizing: border-box;
       margin-top: 5px;
       padding: 4px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
       background: #fff;
       border: 1px solid #dfe3e8;
       border-radius: 8px;
@@ -1399,7 +1550,7 @@
 
     .browse-paralegals-page aside.filter.filter-popover #stateList li,
     .browse-paralegals-page aside.filter.filter-popover #specialtyList li {
-      min-height: 30px;
+      min-height: 44px;
       gap: 8px;
       padding: 5px 7px;
       color: #374151;
@@ -1409,10 +1560,18 @@
     }
 
     .browse-paralegals-page aside.filter.filter-popover #stateList li:hover,
+    .browse-paralegals-page aside.filter.filter-popover #stateList li:focus-visible,
     .browse-paralegals-page aside.filter.filter-popover #stateList li[aria-selected="true"],
     .browse-paralegals-page aside.filter.filter-popover #specialtyList li:hover,
+    .browse-paralegals-page aside.filter.filter-popover #specialtyList li:focus-visible,
     .browse-paralegals-page aside.filter.filter-popover #specialtyList li[aria-selected="true"] {
       background: #f6f8fb;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover #stateList li:focus-visible,
+    .browse-paralegals-page aside.filter.filter-popover #specialtyList li:focus-visible {
+      outline: 2px solid #53627a;
+      outline-offset: -2px;
     }
 
     .browse-paralegals-page aside.filter.filter-popover #stateList li label,
@@ -1423,14 +1582,33 @@
       line-height: 1.25;
     }
 
-    .browse-paralegals-page aside.filter.filter-popover #stateList input[type="checkbox"],
-    .browse-paralegals-page aside.filter.filter-popover #specialtyList input[type="checkbox"] {
+    .browse-paralegals-page aside.filter.filter-popover .filter-option-check {
       width: 14px;
       height: 14px;
       flex: 0 0 14px;
       margin: 0;
-      accent-color: #635bff;
-      transform: none;
+      position: relative;
+      box-sizing: border-box;
+      border: 1px solid #aeb8c5;
+      border-radius: 3px;
+      background: #fff;
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover li[aria-selected="true"] .filter-option-check {
+      background: var(--navy);
+      border-color: var(--navy);
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover li[aria-selected="true"] .filter-option-check::after {
+      width: 4px;
+      height: 7px;
+      position: absolute;
+      top: 1px;
+      left: 4px;
+      border-right: 1.5px solid #fff;
+      border-bottom: 1.5px solid #fff;
+      content: "";
+      transform: rotate(45deg);
     }
 
     .browse-paralegals-page aside.filter.filter-popover .filter-actions {
@@ -1443,7 +1621,7 @@
     }
 
     .browse-paralegals-page aside.filter.filter-popover .filter-actions button {
-      min-height: 32px;
+      min-height: 44px;
       padding: 6px 12px;
       border-color: #dfe3e8;
       border-radius: 6px;
@@ -1455,14 +1633,29 @@
 
     .browse-paralegals-page aside.filter.filter-popover .filter-actions button.primary {
       color: #fff;
-      background: #635bff;
-      border-color: #635bff;
+      background: var(--navy);
+      border-color: var(--navy);
+    }
+
+    .browse-paralegals-page aside.filter.filter-popover .filter-actions button.primary:hover,
+    .browse-paralegals-page aside.filter.filter-popover .filter-actions button.primary:focus-visible {
+      background: #1d2b3b;
+      border-color: #1d2b3b;
     }
 
     @media (max-width: 960px) {
+      .browse-paralegals-page .sort-menu-trigger,
+      .browse-paralegals-page .sort-menu-options button,
+      .browse-paralegals-page aside.filter.filter-popover :where(select, input[type="text"]),
+      .browse-paralegals-page aside.filter.filter-popover .filter-actions button,
+      .browse-paralegals-page aside.filter.filter-popover #stateList li,
+      .browse-paralegals-page aside.filter.filter-popover #specialtyList li {
+        min-height: 44px;
+      }
+
       .browse-paralegals-page aside.filter.filter-popover {
         position: absolute;
-        inset: 42px 0 auto auto;
+        inset: 52px 0 auto auto;
         width: min(304px, calc(100vw - 32px));
         height: auto;
         max-height: min(520px, calc(100vh - 150px));
@@ -1474,75 +1667,17 @@
       }
     }
 
-    /* Compact public-only footer for this directory page. */
-    .browse-paralegals-page .home-footer {
-      padding: 30px clamp(20px, 4vw, 52px) 20px;
-      color: #374151;
-      background: #fff;
-      border-top: 1px solid #e5e7eb;
-      text-align: left;
-    }
-
-    .browse-paralegals-page .home-footer__top,
-    .browse-paralegals-page .home-footer__bottom {
-      width: min(1200px, 100%);
-    }
-
-    .browse-paralegals-page .home-footer__top {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 40px;
-      padding-bottom: 28px;
-    }
-
-    .browse-paralegals-page .home-footer__brand p {
-      max-width: 330px;
-      margin-top: 10px;
-      color: #6b7280;
-      font-size: 0.78rem;
-      line-height: 1.5;
-    }
-
-    .browse-paralegals-page .home-footer nav {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 10px 22px;
-      max-width: 520px;
-      margin: 0;
-    }
-
-    .browse-paralegals-page .home-footer nav a {
-      color: #53627a;
-      font-size: 0.74rem;
-      white-space: nowrap;
-    }
-
-    .browse-paralegals-page .home-footer__bottom {
-      padding-top: 16px;
-      border-top-color: #eceef1;
-    }
-
-    .browse-paralegals-page .home-footer .accessibility-toggle {
-      padding: 6px 9px;
-      border-color: #dfe3e8;
-      border-radius: 6px;
-    }
-
-    @media (max-width: 720px) {
-      .browse-paralegals-page .home-footer__top {
+    @media (max-width: 379px) {
+      .auth-blocker__actions {
         flex-direction: column;
-        gap: 24px;
       }
 
-      .browse-paralegals-page .home-footer nav {
-        justify-content: flex-start;
+      .auth-blocker__actions .btn {
+        width: 100%;
       }
     }
   </style>
-  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260812-11" />
-  <script defer src="assets/scripts/sidebar-profile.js?v=20260812-7"></script>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260820-18" />
   <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260812-1" />
   <script defer src="assets/scripts/universal-header.js?v=20260812-1"></script>
   <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
@@ -1562,7 +1697,7 @@
   </aside>
   <div class="authenticated-browse-backdrop" data-auth-sidebar-backdrop hidden></div>
   <div class="browse-page-shell">
-  <header class="utility-header" data-utility-header>
+  <header class="utility-header" data-utility-header data-public-header>
     <div class="utility-header__inner">
       <nav class="utility-header__nav" aria-label="Primary navigation">
         <a href="index.html#how">How It Works</a>
@@ -1574,7 +1709,7 @@
       <div class="utility-header__actions">
         <div class="utility-header__guest" data-utility-guest>
           <a class="utility-header__signin" href="login.html">Sign In</a>
-          <a class="utility-header__button" href="signup.html">Get Started</a>
+          <a class="utility-header__button" href="signup.html">Create an account</a>
         </div>
         <div class="utility-header__member" data-utility-member hidden>
           <a class="utility-header__button" href="dashboard-attorney.html" data-utility-dashboard>Dashboard</a>
@@ -1607,7 +1742,7 @@
         <a href="browse-paralegals.html">Browse Paralegals</a>
       <a href="login.html" data-utility-auth>Sign In</a>
       <button type="button" data-utility-logout hidden>Log Out</button>
-      <a href="signup.html" data-utility-signup>Get Started</a>
+      <a href="signup.html" data-utility-signup>Create an account</a>
     </nav>
   </header>
 
@@ -1620,13 +1755,23 @@
       <section class="results">
         <div class="results-header">
           <div class="results-controls">
-            <label for="sortBy">Sort by</label>
-            <select id="sortBy">
+            <span id="sortByLabel">Sort by</span>
+            <select id="sortBy" class="sort-native" aria-hidden="true" tabindex="-1" hidden>
               <option value="recent">Newest first</option>
               <option value="experience">Most experience</option>
-              <option value="alpha">Name A-Z</option>
+              <option value="alpha">Name A–Z</option>
             </select>
-            <button type="button" class="filter-toggle" id="filterToggle" aria-label="Open filters" aria-controls="filterMenu" aria-expanded="false" title="Filters">
+            <div class="sort-menu-control">
+              <button type="button" class="sort-menu-trigger" id="sortMenuTrigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="sortByLabel sortMenuValue" data-public-action="secondary" data-action-shape="pill">
+                <span id="sortMenuValue">Newest first</span>
+              </button>
+              <div class="sort-menu-options" id="sortMenuOptions" role="listbox" aria-labelledby="sortByLabel" hidden>
+                <button type="button" role="option" data-sort-value="recent" aria-selected="true" tabindex="-1" data-public-action="secondary" data-action-shape="control">Newest first</button>
+                <button type="button" role="option" data-sort-value="experience" aria-selected="false" tabindex="-1" data-public-action="secondary" data-action-shape="control">Most experience</button>
+                <button type="button" role="option" data-sort-value="alpha" aria-selected="false" tabindex="-1" data-public-action="secondary" data-action-shape="control">Name A–Z</button>
+              </div>
+            </div>
+            <button type="button" class="filter-toggle" id="filterToggle" aria-label="Open filters" aria-controls="filterMenu" aria-expanded="false" title="Filters" data-public-action="icon">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 7h16M7 12h10M10 17h4"></path>
               </svg>
@@ -1637,7 +1782,7 @@
         <aside class="filter filter-popover" id="filterMenu" aria-label="Filter paralegals" hidden>
           <div class="filter-popover__header">
             <h2>Filters</h2>
-            <button type="button" class="filter-popover__close" data-filter-close aria-label="Close filters">
+            <button type="button" class="filter-popover__close" data-filter-close aria-label="Close filters" data-public-action="icon">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg>
             </button>
           </div>
@@ -1653,22 +1798,22 @@
 
           <div class="filter-group">
             <div class="dropdown-wrapper">
-              <input type="text" id="specialtyInput" placeholder="Specialty" aria-label="Specialty" readonly />
+              <input type="text" id="specialtyInput" placeholder="Specialty" aria-label="Specialty" role="combobox" aria-haspopup="listbox" aria-controls="specialtyList" aria-expanded="false" aria-autocomplete="none" readonly />
               <ul id="specialtyList"></ul>
             </div>
           </div>
 
           <div class="filter-group">
             <div class="dropdown-wrapper">
-              <input type="text" id="stateInput" placeholder="State" aria-label="State" autocomplete="off" />
+              <input type="text" id="stateInput" placeholder="State" aria-label="State" role="combobox" aria-haspopup="listbox" aria-controls="stateList" aria-expanded="false" aria-autocomplete="none" autocomplete="off" readonly />
               <ul id="stateList" data-state-filter-owner="browse-page"></ul>
             </div>
             <div class="selected-filter-chips" id="selectedStateChips" aria-live="polite"></div>
           </div>
 
           <div class="filter-actions">
-            <button type="button" class="primary" id="applyFilters">Apply</button>
-            <button type="button" id="clearFilters">Reset</button>
+            <button type="button" class="primary" id="applyFilters" data-public-action="primary" data-action-shape="control" data-action-size="compact">Apply</button>
+            <button type="button" id="clearFilters" data-public-action="secondary" data-action-shape="control" data-action-size="compact">Reset</button>
           </div>
         </aside>
         <div id="paralegalResults" class="jobs-grid">
@@ -1679,9 +1824,9 @@
     <div id="pagination">
       <div class="pagination-controls">
         <div class="page-nav">
-          <button type="button" id="prevPage" class="invite-btn">Previous</button>
+          <button type="button" id="prevPage" class="invite-btn" data-public-action="pagination" data-action-shape="pill">Previous</button>
           <span id="paginationLabel">Page 1</span>
-          <button type="button" id="nextPage" class="invite-btn">Next</button>
+          <button type="button" id="nextPage" class="invite-btn" data-public-action="pagination" data-action-shape="pill">Next</button>
         </div>
       </div>
     </div>
@@ -1689,11 +1834,11 @@
 
   <div class="auth-blocker" id="authBlocker" aria-hidden="true" inert>
     <div class="auth-blocker__card" role="dialog" aria-modal="true" aria-labelledby="authBlockerTitle">
-      <h2 id="authBlockerTitle">Create an account to interact</h2>
-      <p>Sign in to filter, open profiles, or send inquiries.</p>
+      <h2 id="authBlockerTitle">Sign in to connect</h2>
+      <p>You can browse and filter freely. Sign in to open full profiles or send an inquiry.</p>
       <div class="auth-blocker__actions">
-        <a class="btn primary" href="login.html">Sign In</a>
-        <a class="btn secondary" href="signup.html">Create Account</a>
+        <a class="btn primary" href="login.html" data-public-action="primary" data-action-shape="pill">Sign in</a>
+        <a class="btn secondary" href="signup.html" data-public-action="secondary" data-action-shape="pill">Create an account</a>
       </div>
     </div>
   </div>
@@ -1709,8 +1854,8 @@
         <textarea id="inquireMessage" placeholder="Add context or next steps" rows="3"></textarea>
       </label>
       <div class="modal-actions">
-        <button type="button" id="cancelInquire">Cancel</button>
-        <button type="button" class="confirm" id="confirmInquire">Send</button>
+        <button type="button" id="cancelInquire" data-public-action="secondary" data-action-shape="control">Cancel</button>
+        <button type="button" class="confirm" id="confirmInquire" data-public-action="primary" data-action-shape="control">Send</button>
       </div>
     </div>
   </div>
@@ -1718,7 +1863,7 @@
     <div class="home-footer__top">
       <div class="home-footer__brand">
         <a class="home-brand" href="index.html">Let<span class="home-brand__apostrophe">’</span>s-ParaConnect</a>
-        <p>Project-based legal support for attorneys and independent paralegals.</p>
+        <p>Matter-based legal support for attorneys and independent paralegals.</p>
       </div>
       <nav aria-label="Footer navigation">
         <a href="attorney-faq.html">For Attorneys</a>
@@ -1726,7 +1871,7 @@
         <a href="contact.html">Contact</a>
         <a href="privacy.html">Privacy</a>
         <a href="terms.html">Terms</a>
-        <a href="/paralegal-admission.html">Paralegal Admission</a>
+        <a href="/paralegal-admission.html">Our Vetting Process</a>
         <a href="accessibility.html">Accessibility</a>
       </nav>
     </div>
@@ -1745,9 +1890,9 @@
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
 
   <script src="assets/scripts/utils/toast.js?v=20260208"></script>
-  <script type="module" src="assets/scripts/browse-paralegals.js?v=20260812-public-footer"></script>
+  <script type="module" src="assets/scripts/browse-paralegals.js?v=20260828-phase3-responsive-directory"></script>
   <script src="assets/scripts/utility-header.js" defer></script>
   <script src="assets/scripts/public-matter-field.js" defer></script>
-  <script src="assets/scripts/accessibility-toggle.js"></script>
+  <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
 </html>

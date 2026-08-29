@@ -1,0 +1,270 @@
+:root {
+  --faq-ink: #151c25;
+  --faq-muted: #626b76;
+  --faq-gold: #887244;
+  --faq-paper: #f6f3eb;
+  --faq-line: rgba(21, 28, 37, .14);
+}
+
+.faq-page {
+  margin: 0;
+  background: #fff;
+  color: var(--faq-ink);
+  font-family: "Sarabun", sans-serif;
+  font-weight: 200;
+  line-height: 1.6;
+}
+
+.faq-page *,
+.faq-page *::before,
+.faq-page *::after {
+  box-sizing: border-box;
+}
+
+.faq-page .hero-banner {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: var(--header-height, 72px) max(24px, calc((100% - 1152px) / 2)) 0;
+  background: var(--faq-paper);
+  border: 0;
+}
+
+.faq-page .hero-banner__title {
+  width: 100%;
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 54px 0 58px;
+}
+
+.faq-page .hero-banner h1 {
+  max-width: none;
+  margin: 0;
+  color: var(--faq-ink);
+  font: 300 clamp(4rem, 7vw, 7rem)/.88 "Cormorant Garamond", serif;
+  letter-spacing: -.055em;
+  text-align: left;
+}
+
+.faq-page main {
+  width: min(100% - 48px, 980px);
+  max-width: none;
+  margin: 0 auto;
+  padding: clamp(68px, 8vw, 108px) 0 clamp(90px, 10vw, 140px);
+}
+
+.faq-page main > .muted {
+  margin: 0 0 18px;
+  color: var(--faq-gold);
+  font-size: .74rem;
+  font-weight: 300;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.faq-page main > p:not(.muted) {
+  max-width: 760px;
+  margin: 0 0 18px;
+  color: #46505c;
+  font-size: clamp(1rem, 1.3vw, 1.12rem);
+  line-height: 1.75;
+}
+
+.faq-page main > p:not(.muted) strong {
+  color: var(--faq-ink);
+  font-weight: 400;
+}
+
+.faq-page main > section:not(.card) {
+  margin: clamp(48px, 6vw, 72px) 0 24px;
+  padding: clamp(26px, 3vw, 38px);
+  border: 1px solid var(--faq-line);
+  border-radius: 22px;
+  background: #fcfbf8;
+}
+
+.faq-page main > section:not(.card) h2 {
+  margin: 0 0 22px;
+  color: var(--faq-ink);
+  font: 300 clamp(1.8rem, 2.6vw, 2.35rem)/1 "Cormorant Garamond", serif;
+}
+
+.faq-page .toc-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 34px;
+  margin: 0;
+}
+
+.faq-page .toc-list li {
+  margin: 0;
+  border-top: 1px solid var(--faq-line);
+}
+
+.faq-page .toc-list a {
+  display: block;
+  padding: 15px 0;
+  color: #3e4854;
+  font-size: .96rem;
+  line-height: 1.45;
+}
+
+.faq-page main > .card {
+  margin: 0;
+  padding: clamp(30px, 4vw, 48px) 0;
+  border: 0;
+  border-top: 1px solid var(--faq-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  scroll-margin-top: 100px;
+}
+
+.faq-page main > .card:last-child {border-bottom:1px solid var(--faq-line)}
+
+.faq-page main > .card h2 {
+  margin: 0 0 18px;
+  color: var(--faq-ink);
+  font: 300 clamp(1.75rem, 2.7vw, 2.4rem)/1.08 "Cormorant Garamond", serif;
+  letter-spacing: -.02em;
+}
+
+.faq-page main > .card p,
+.faq-page main > .card li {
+  max-width: 800px;
+  color: #4d5661;
+  font-size: clamp(.98rem, 1.2vw, 1.08rem);
+  line-height: 1.75;
+}
+
+.faq-page main > .card p {
+  margin: 0 0 1.1rem;
+}
+
+.faq-page main > .card p:last-child,
+.faq-page main > .card ul:last-child {
+  margin-bottom: 0;
+}
+
+.faq-page .gold,
+.faq-page .gold-link {
+  color: #806520;
+  text-decoration-color: rgba(128, 101, 32, 0.4);
+  text-underline-offset: 4px;
+}
+
+.faq-page .gold-link {
+  text-decoration: none;
+}
+
+.faq-page .faq-label {
+  margin: 22px 0 10px;
+  color: var(--faq-muted);
+  font: 300 0.78rem/1.4 "Sarabun", sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.faq-page .faq-list {
+  margin: 0 0 20px;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.faq-page .faq-list li {
+  margin: 8px 0;
+}
+
+.faq-page .faq-list li::marker {
+  color: var(--faq-gold);
+  font-size: 0.65em;
+}
+
+.faq-page .faq-related-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #806520;
+  font-weight: 400;
+  text-decoration: underline;
+  text-decoration-color: rgba(128, 101, 32, 0.4);
+  text-underline-offset: 4px;
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+.faq-page .faq-related-link:hover,
+.faq-page .faq-related-link:focus-visible {
+  color: #5f4915;
+  text-decoration-color: currentColor;
+}
+
+.faq-page .faq-related-link span {
+  transition: transform 0.2s ease;
+}
+
+.faq-page .faq-related-link:hover span,
+.faq-page .faq-related-link:focus-visible span {
+  transform: translateX(3px);
+}
+
+.faq-page .faq-cta {
+  width: min(100% - 48px, 1152px);
+  margin: 0 auto clamp(64px, 8vw, 104px);
+  padding: clamp(42px, 6vw, 76px);
+  border-radius: 28px;
+  background: #0d1723;
+  color: #f8f6f1;
+  text-align: left;
+}
+
+.faq-page .faq-cta h2 {
+  max-width: 760px;
+  margin: 0 0 16px;
+  color: inherit;
+  font: 300 clamp(2.8rem, 5vw, 5rem)/.94 "Cormorant Garamond", serif;
+  letter-spacing: -.045em;
+}
+
+.faq-page .faq-cta p {
+  max-width: 620px;
+  margin: 0 0 28px;
+  color: rgba(248,246,241,.7);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.faq-page .faq-cta__button {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  padding: 12px 22px;
+  border: 1px solid rgba(248,246,241,.72);
+  border-radius: 999px;
+  color: #f8f6f1;
+  font-size: .88rem;
+  text-decoration: none;
+  transition: background-color 200ms ease, color 200ms ease, transform 200ms ease;
+}
+
+.faq-page .faq-cta__button:hover {background:#f8f6f1;color:#0d1723;transform:translateY(-2px)}
+
+.faq-page .faq-cta__button:focus-visible,
+.faq-page main a:focus-visible {
+  outline: 2px solid var(--faq-gold);
+  outline-offset: 4px;
+}
+
+@media (max-width: 700px) {
+  .faq-page .hero-banner {min-height:260px;padding-inline:20px}
+  .faq-page .hero-banner__title {padding:42px 0 46px}
+  .faq-page .hero-banner h1 {font-size:clamp(3.35rem,16vw,4.8rem)}
+  .faq-page main {width:min(100% - 40px, 980px);padding-top:58px}
+  .faq-page .toc-list {grid-template-columns:1fr}
+  .faq-page .faq-cta {width:calc(100% - 40px);padding:38px 26px;border-radius:22px}
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faq-page * {scroll-behavior:auto!important}
+  .faq-page .faq-related-link span {transform:none;transition:none}
+}

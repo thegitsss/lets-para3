@@ -365,7 +365,6 @@ function buildUnsubscribeToken(user) {
 function buildApprovalEmailHtml(user, opts = {}) {
   const loginUrl = LOGIN_URL;
   const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
 
@@ -390,11 +389,6 @@ function buildApprovalEmailHtml(user, opts = {}) {
                   </td>
                 </tr>
               </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Welcome to Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
             </td>
           </tr>
           <tr>
@@ -476,7 +470,6 @@ function buildApprovalEmailHtml(user, opts = {}) {
 function buildAttorneyApprovalEmailHtml(user, opts = {}) {
   const dashboardUrl = ATTORNEY_DASHBOARD_URL;
   const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const contactUrl = `${ASSET_BASE_URL}/contact.html`;
   const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
   const token = buildUnsubscribeToken(user);
@@ -503,11 +496,6 @@ function buildAttorneyApprovalEmailHtml(user, opts = {}) {
                   </td>
                 </tr>
               </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Welcome to Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
             </td>
           </tr>
           <tr>
@@ -580,7 +568,6 @@ function buildAttorneyApprovalEmailHtml(user, opts = {}) {
 
 function buildDenialEmailHtml(user, opts = {}) {
   const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
   const friendlyName = escapeEmailHtml(formatFullName(user) || "there");
@@ -606,11 +593,6 @@ function buildDenialEmailHtml(user, opts = {}) {
                   </td>
                 </tr>
               </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
             </td>
           </tr>
           <tr>
@@ -657,7 +639,6 @@ function buildDenialEmailHtml(user, opts = {}) {
 function buildCompleteProfileEmailHtml(user, opts = {}) {
   const profileSettingsUrl = `${ASSET_BASE_URL}/profile-settings.html`;
   const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
   const friendlyName = escapeEmailHtml(formatFullName(user) || "there");
@@ -683,11 +664,6 @@ function buildCompleteProfileEmailHtml(user, opts = {}) {
                   </td>
                 </tr>
               </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
             </td>
           </tr>
           <tr>
@@ -805,7 +781,6 @@ function buildLaunchEmailFooter({
 function buildAttorneyLaunchEmailHtml(user, opts = {}) {
   const loginUrl = LOGIN_URL;
   const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const contactUrl = `${ASSET_BASE_URL}/contact.html`;
   const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
   const token = buildUnsubscribeToken(user);
@@ -832,11 +807,6 @@ function buildAttorneyLaunchEmailHtml(user, opts = {}) {
                   </td>
                 </tr>
               </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
             </td>
           </tr>
           <tr>
@@ -899,7 +869,6 @@ function buildAttorneyLaunchEmailHtml(user, opts = {}) {
 function buildAttorneyLaunchSetupEmailHtml(user, opts = {}) {
   const loginUrl = LOGIN_URL;
   const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const contactUrl = `${ASSET_BASE_URL}/contact.html`;
   const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
   const token = buildUnsubscribeToken(user);
@@ -926,11 +895,6 @@ function buildAttorneyLaunchSetupEmailHtml(user, opts = {}) {
                   </td>
                 </tr>
               </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
             </td>
           </tr>
           <tr>
@@ -993,7 +957,6 @@ function buildAttorneyLaunchSetupEmailHtml(user, opts = {}) {
 function buildAttorneyFirstMatterEmailHtml(user, opts = {}) {
   const createCaseUrl = CREATE_CASE_URL;
   const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
   const contactUrl = `${ASSET_BASE_URL}/contact.html`;
   const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
   const token = buildUnsubscribeToken(user);
@@ -1020,11 +983,6 @@ function buildAttorneyFirstMatterEmailHtml(user, opts = {}) {
                   </td>
                 </tr>
               </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
             </td>
           </tr>
           <tr>

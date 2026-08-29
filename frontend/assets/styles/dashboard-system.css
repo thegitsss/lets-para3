@@ -348,52 +348,68 @@ body.lpc-role-dashboard .lpc-empty-copy {
   font-size: 0.86rem;
 }
 
-/* Stripe-like product density: compact vertical rhythm without crowding. */
+/* Stripe-like page rhythm: compact navigation, generous content whitespace,
+   and quiet hairlines between the major bands of work. */
 body.lpc-role-dashboard .main {
-  padding: 28px 40px 40px;
+  padding: 28px clamp(40px, 4.25vw, 72px) 88px;
 }
 
 body.lpc-role-dashboard .topbar {
   min-height: 56px;
-  margin-bottom: 1.25rem;
+  margin-bottom: 2rem;
 }
 
 body.lpc-role-dashboard :where(.command-header, #paralegalHomeView > header) {
-  margin-bottom: 1.5rem;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--lpc-border-subtle);
 }
 
 body.lpc-role-dashboard .home-layout {
-  gap: 1.5rem;
+  gap: 2.5rem;
 }
 
 body.lpc-role-dashboard .home-main {
-  gap: 1.1rem;
+  gap: 2rem;
+}
+
+body.lpc-role-dashboard .view-home.home-compact .home-layout {
+  gap: 2.5rem;
+}
+
+body.lpc-role-dashboard .view-home.home-compact .command-header {
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.25rem;
+}
+
+body.lpc-role-dashboard .view-home.home-compact .home-main {
+  gap: 2rem;
 }
 
 body.lpc-role-dashboard :where(.summary, .side-by-side-panels) {
-  gap: 1rem;
-  margin-bottom: 1.25rem;
+  gap: 1.25rem;
+  margin-bottom: 2.5rem;
 }
 
 body.lpc-role-dashboard :where(.ledger-shell, .status-rail-shell, .view-billing .panel) {
-  padding: 1rem 1.1rem;
+  padding: 1.25rem 1.4rem;
 }
 
 body.lpc-role-dashboard .view-billing .panel {
-  margin-bottom: 0.9rem;
+  margin-bottom: 1.5rem;
 }
 
 body.lpc-role-dashboard :where(.info-box, .lpc-priority-item) {
   min-height: auto;
-  padding: 0.85rem 1rem;
+  padding: 1.1rem 1.25rem;
 }
 
 body.lpc-role-dashboard .cases-apps-grid {
-  gap: 1.5rem;
+  gap: 2.5rem;
 }
 
 body.lpc-role-dashboard .cases-column {
-  padding-right: 1.5rem;
+  padding-right: 2.5rem;
 }
 
 @media (max-width: 720px) {
@@ -507,8 +523,8 @@ body.lpc-role-dashboard .action-queue {
 }
 
 body.lpc-role-dashboard :where(.action-queue .ledger-header, .lpc-priority-header) {
-  min-height: 48px;
-  padding: 0.75rem 1rem;
+  min-height: 56px;
+  padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--lpc-border-subtle);
 }
 
@@ -517,13 +533,13 @@ body.lpc-role-dashboard .queue-list {
 }
 
 body.lpc-role-dashboard .queue-item {
-  min-height: 62px;
-  padding: 0.75rem 1rem;
+  min-height: 76px;
+  padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--lpc-border-subtle);
 }
 
 body.lpc-role-dashboard .queue-item:last-child {
-  padding-bottom: 0.75rem;
+  padding-bottom: 1rem;
 }
 
 body.lpc-role-dashboard :where(.queue-title, .lpc-priority-item strong) {
@@ -548,7 +564,7 @@ body.lpc-role-dashboard .summary {
 
 body.lpc-role-dashboard .summary .info-box {
   min-width: 0;
-  min-height: 96px;
+  min-height: 120px;
   aspect-ratio: auto;
   align-items: flex-start;
   text-align: left;
@@ -569,8 +585,8 @@ body.lpc-role-dashboard .case-panels > section {
 
 body.lpc-role-dashboard .case-panels :where(.case-card, .dashboard-card) {
   width: 100%;
-  min-height: 112px;
-  padding: 1rem !important;
+  min-height: 140px;
+  padding: 1.25rem !important;
 }
 
 body.lpc-role-dashboard :where(.case-panels h2, .case-panels .card-title) {
@@ -610,8 +626,8 @@ body.lpc-role-dashboard .view-home .status-item {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
-  min-height: 52px;
-  padding: 0.7rem 1rem;
+  min-height: 64px;
+  padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--lpc-border-subtle);
 }
 
@@ -634,7 +650,7 @@ body.lpc-role-dashboard .view-home .message-box .status-subtext {
 
 body.lpc-role-dashboard .view-home .mini-deadlines {
   margin: 0 !important;
-  padding: 0.85rem 1rem 1rem;
+  padding: 1rem 1.25rem 1.25rem;
 }
 
 body.lpc-role-dashboard .view-home .mini-deadlines .section-title {
@@ -669,37 +685,6 @@ html.theme-mountain-dark {
   --lpc-danger: #ef9a9a;
   --lpc-success: #85d7ad;
   --lpc-shadow-panel: 0 22px 50px rgba(0, 0, 0, 0.32);
-}
-
-/* Shared role-dashboard typography: Sarabun for product UI, with narrow brand/name exceptions. */
-body.lpc-role-dashboard,
-body.lpc-role-dashboard :where(main, aside, nav, header, footer, section, article, div, span, p, a, button, input, select, textarea, option, label, legend, summary, h1, h2, h3, h4, h5, h6, table, thead, tbody, tr, li, td, th, small, strong, b, em, time) {
-  font-family: var(--font-sans, "Sarabun", sans-serif) !important;
-}
-
-body.lpc-role-dashboard {
-  font-weight: 400 !important;
-}
-
-body.lpc-role-dashboard :where(p, li, td, th, label, input, select, textarea) {
-  font-weight: 400 !important;
-}
-
-body.lpc-role-dashboard :where(h1, h2, h3, h4, h5, h6) {
-  font-weight: 600 !important;
-  letter-spacing: -0.012em;
-}
-
-body.lpc-role-dashboard h1 { line-height: 1.18; }
-body.lpc-role-dashboard h2 { line-height: 1.24; }
-body.lpc-role-dashboard :where(h3, h4, h5, h6) { line-height: 1.3; }
-
-body.lpc-role-dashboard :where(button, [role="button"], summary) {
-  font-weight: 600 !important;
-}
-
-body.lpc-role-dashboard nav a {
-  font-weight: 600 !important;
 }
 
 body.lpc-role-dashboard .sidebar nav a,
@@ -756,60 +741,6 @@ body.lpc-role-dashboard .sidebar .sidebar-nav-icon {
 
 body.lpc-role-dashboard .sidebar :where(nav a.active, nav a:hover, nav a:focus, .sidebar-link:hover, .sidebar-link:focus) .sidebar-nav-icon {
   opacity: 1;
-}
-
-body.lpc-role-dashboard :where(
-  .command-actions button,
-  .view-cases .add-btn,
-  .filter-tab,
-  .lpc-saved-view-button,
-  .tour-btn,
-  .sidebar-link,
-  .profile-dropdown a,
-  .profile-dropdown button
-) {
-  font-size: 0.9rem !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.005em;
-}
-
-body.lpc-role-dashboard :where(
-  small,
-  .muted,
-  .queue-meta,
-  .matter-meta,
-  .case-subinfo,
-  .info-label,
-  .lpc-saved-view-status,
-  [class*="subtext"],
-  [class*="eyebrow"]
-) {
-  font-weight: 400 !important;
-}
-
-body.lpc-role-dashboard :where(strong, b) {
-  font-weight: 400 !important;
-}
-
-body.lpc-role-dashboard :where(
-  .logo,
-  #user-name-heading,
-  #headerName,
-  #clusterName,
-  .lpc-shared-header .user-chip strong,
-  .lpc-brand-name
-) {
-  font-family: "Cormorant Garamond", Georgia, serif !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.01em;
-}
-
-body.lpc-role-dashboard .logo {
-  font-size: 1.7rem;
-}
-
-body.lpc-role-dashboard :where(#user-name-heading, #headerName, #clusterName) {
-  font-size: 1em;
 }
 
 .lpc-saved-view-bar {
@@ -901,4 +832,311 @@ body.lpc-role-dashboard :where(#user-name-heading, #headerName, #clusterName) {
   .lpc-saved-view-field select { width: 100%; }
   .lpc-saved-view-status { width: 100%; margin-left: 0; }
   .lpc-priority-item { grid-template-columns: 1fr; }
+}
+
+/* Attorney home: an operational brief built from rows and dividers instead of
+   a wall of cards. All existing data hooks and actions remain in place. */
+body.attorney-dashboard .view-home .command-header {
+  align-items: flex-start;
+}
+
+body.attorney-dashboard .view-home .command-title h1 {
+  font-size: clamp(1.9rem, 2.5vw, 2.2rem);
+}
+
+body.attorney-dashboard .view-home .command-summary {
+  margin: 0.35rem 0 0;
+  color: var(--lpc-text-secondary);
+  font-size: 0.9rem;
+}
+
+body.attorney-dashboard .view-home .command-summary #user-name-heading {
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+body.attorney-dashboard .view-home .command-create-matter {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--lpc-text-primary);
+  border-radius: var(--lpc-radius-control);
+  background: var(--lpc-text-primary);
+  color: #fff;
+  font-size: 0.86rem;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+body.attorney-dashboard .view-home .command-create-matter:hover,
+body.attorney-dashboard .view-home .command-create-matter:focus-visible {
+  background: #30384f;
+  outline: 2px solid rgba(26, 31, 54, 0.2);
+  outline-offset: 2px;
+}
+
+body.attorney-dashboard .view-home .home-main > .action-queue { order: 1; }
+body.attorney-dashboard .view-home .home-main > .ledger-shell:not(.weekly-notes) { order: 2; }
+body.attorney-dashboard .view-home .home-main > .onboarding-attention-card { order: 3; }
+body.attorney-dashboard .view-home .home-main > .weekly-notes { order: 4; }
+
+body.attorney-dashboard .view-home :where(.action-queue, .ledger-shell) {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible;
+}
+
+body.attorney-dashboard .view-home :where(.action-queue, .ledger-shell) > .ledger-header {
+  min-height: auto;
+  padding: 0 0 1rem;
+  border-bottom: 1px solid var(--lpc-border-subtle);
+}
+
+body.attorney-dashboard .view-home .ledger-title {
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+body.attorney-dashboard .view-home .queue-item {
+  min-height: 76px;
+  padding: 1rem 0;
+}
+
+body.attorney-dashboard .view-home .queue-action {
+  border: 0;
+  border-radius: 0;
+  padding: 0.4rem 0;
+  color: var(--lpc-text-primary);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+}
+
+body.attorney-dashboard .view-home .queue-action:hover,
+body.attorney-dashboard .view-home .queue-action:focus-visible {
+  color: var(--lpc-text-primary);
+  text-decoration-color: currentColor;
+  outline: none;
+}
+
+body.attorney-dashboard .view-home .case-ledger {
+  gap: 0;
+  padding: 0;
+}
+
+body.attorney-dashboard .view-home .matter-row {
+  min-height: 72px;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--lpc-border-subtle);
+}
+
+body.attorney-dashboard .view-home .matter-row::before {
+  inset: 0 -0.75rem;
+  border-radius: 6px;
+}
+
+body.attorney-dashboard .view-home .onboarding-attention-card {
+  margin: 0;
+  padding: 1.25rem 0;
+  border: 0 !important;
+  border-top: 1px solid var(--lpc-border-subtle) !important;
+  border-bottom: 1px solid var(--lpc-border-subtle) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.attorney-dashboard .view-home .onboarding-attention-checklist {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+}
+
+body.attorney-dashboard .view-home .onboarding-attention-check {
+  min-height: 36px;
+  padding: 0;
+}
+
+body.attorney-dashboard .view-home .onboarding-attention-check:hover,
+body.attorney-dashboard .view-home .onboarding-attention-check:focus-visible {
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+body.attorney-dashboard .view-home .onboarding-attention-skip {
+  border: 0;
+  border-radius: 0;
+  padding-inline: 0.35rem;
+}
+
+body.attorney-dashboard .view-home .status-rail-shell {
+  padding: 0 0 0 1.5rem !important;
+  border: 0 !important;
+  border-left: 1px solid var(--lpc-border-subtle) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.attorney-dashboard .view-home .status-item {
+  min-height: 64px;
+  padding: 1rem 0;
+}
+
+body.attorney-dashboard .view-home .mini-deadlines {
+  padding: 1.25rem 0 !important;
+}
+
+body.attorney-dashboard .view-home .weekly-notes {
+  margin-top: 0;
+  padding-top: 0.5rem !important;
+}
+
+body.attorney-dashboard .view-home .weekly-notes-grid:not(.month-view) {
+  gap: 0;
+}
+
+body.attorney-dashboard .view-home .weekly-notes-grid:not(.month-view) .weekly-note-day {
+  padding: 0.75rem;
+  border: 0;
+  border-left: 1px solid var(--lpc-border-subtle);
+  border-radius: 0;
+}
+
+body.attorney-dashboard .view-home .weekly-notes-grid:not(.month-view) .weekly-note-day:first-child {
+  border-left: 0;
+}
+
+/* A balanced middle ground: a few purposeful surfaces, varied information
+   shapes, and no repeated stack of full-width ruled rows. */
+body.attorney-dashboard .view-home .home-panel > .action-queue {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.24fr) minmax(0, 1fr);
+  align-items: stretch;
+  margin: 0 0 2.75rem !important;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--lpc-surface-subtle) !important;
+}
+
+body.attorney-dashboard .view-home .home-panel > .action-queue > .ledger-header {
+  min-height: 100%;
+  align-items: flex-start;
+  padding: 1.25rem;
+  border: 0;
+  border-right: 1px solid var(--lpc-border-subtle);
+}
+
+body.attorney-dashboard .view-home .home-panel > .action-queue .queue-item {
+  min-height: 82px;
+  padding: 1.15rem 1.25rem;
+}
+
+body.attorney-dashboard .view-home .case-ledger {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem 2rem;
+  padding-top: 1.25rem;
+}
+
+body.attorney-dashboard .view-home .matter-row {
+  min-height: 112px;
+  align-content: start;
+  padding: 1rem 0;
+  border-top: 2px solid var(--lpc-border-subtle);
+  border-bottom: 0;
+}
+
+body.attorney-dashboard .view-home .matter-row::before {
+  inset: 0 -0.65rem;
+}
+
+body.attorney-dashboard .view-home .onboarding-attention-card {
+  padding: 1.25rem !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--lpc-surface-subtle) !important;
+}
+
+body.attorney-dashboard .view-home .status-rail-shell {
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+body.attorney-dashboard .view-home .status-overview-title {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+}
+
+body.attorney-dashboard .view-home .status-rail {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem 1rem !important;
+}
+
+body.attorney-dashboard .view-home .status-item {
+  display: flex;
+  min-height: 88px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  padding: 0.9rem 0 0;
+  border-top: 2px solid var(--lpc-border-subtle);
+  border-bottom: 0;
+}
+
+body.attorney-dashboard .view-home .status-item .status-value {
+  order: -1;
+  font-size: 1.2rem;
+  text-align: left;
+}
+
+body.attorney-dashboard .view-home .status-item .status-subtext {
+  order: -1;
+  text-align: left;
+}
+
+body.attorney-dashboard .view-home .mini-deadlines {
+  margin-top: 1.5rem !important;
+  padding: 1.25rem 0 0 !important;
+  border-top: 1px solid var(--lpc-border-subtle);
+}
+
+@media (max-width: 900px) {
+  body.attorney-dashboard .view-home .status-rail-shell {
+    padding: 1.5rem 0 0 !important;
+    border-left: 0 !important;
+    border-top: 1px solid var(--lpc-border-subtle) !important;
+  }
+
+  body.attorney-dashboard .view-home .onboarding-attention-checklist {
+    grid-template-columns: 1fr;
+  }
+
+  body.attorney-dashboard .view-home .case-ledger {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  body.attorney-dashboard .view-home .home-panel > .action-queue {
+    grid-template-columns: 1fr;
+  }
+
+  body.attorney-dashboard .view-home .home-panel > .action-queue > .ledger-header {
+    min-height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--lpc-border-subtle);
+  }
 }

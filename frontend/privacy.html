@@ -9,13 +9,15 @@
   <link rel="icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <link rel="stylesheet" href="assets/styles/styles.css" />
-  <link rel="stylesheet" href="assets/styles/hero-pages.css?v=20260729-white-footer" />
-  <link rel="stylesheet" href="assets/styles/legal-documents.css?v=20260814" />
+  <link rel="stylesheet" href="assets/styles/hero-pages.css?v=20260826-uniform-heroes" />
+  <link rel="stylesheet" href="assets/styles/public-site-chrome.css?v=20260828-phase8" />
+  <link rel="stylesheet" href="assets/styles/legal-documents.css?v=20260828-shared-legal" />
 </head>
 <body class="utility-page utility-page--inset">
   <a class="skip-link" href="#main">Skip to main content</a>
-  <header class="utility-header" data-utility-header>
+  <header class="utility-header" data-utility-header data-public-header>
     <div class="utility-header__inner">
       <nav class="utility-header__nav" aria-label="Primary navigation">
         <a href="index.html#how">How It Works</a>
@@ -27,7 +29,7 @@
       <div class="utility-header__actions">
         <a class="utility-header__signin" href="login.html" data-utility-auth>Sign In</a>
         <button class="utility-header__logout" type="button" data-utility-logout hidden>Log Out</button>
-        <a class="utility-header__button" href="signup.html" data-utility-signup>Get Started</a>
+        <a class="utility-header__button" href="signup.html" data-utility-signup>Create an account</a>
       </div>
       <button class="utility-header__menu" type="button" aria-expanded="false" aria-controls="utilityMenu" data-utility-menu-toggle>Menu</button>
     </div>
@@ -38,23 +40,24 @@
       <a href="browse-paralegals.html">Browse Paralegals</a>
       <a href="login.html" data-utility-auth>Sign In</a>
       <button type="button" data-utility-logout hidden>Log Out</button>
-      <a href="signup.html" data-utility-signup>Get Started</a>
+      <a href="signup.html" data-utility-signup>Create an account</a>
     </nav>
   </header>
 
-  <section class="hero-banner utility-hero" aria-labelledby="privacy-title">
+  <section class="hero-banner utility-hero privacy-hero" aria-labelledby="privacy-title">
     <div class="utility-hero__inner">
       <div class="utility-hero__copy">
-        <p class="utility-hero__eyebrow">Privacy &amp; data</p>
-        <h1 id="privacy-title">Privacy Policy</h1>
+        <div class="privacy-hero__heading-row">
+          <h1 id="privacy-title">Privacy Policy</h1>
+          <p class="utility-hero__meta">Effective August 15, 2026</p>
+        </div>
         <p class="utility-hero__description">How Let’s-ParaConnect collects, uses, discloses, retains, and protects information.</p>
-        <p class="utility-hero__meta">Effective August 15, 2026 · Version 2026-08-15</p>
       </div>
-      <div class="utility-hero__art" data-matter-field-host aria-hidden="true"></div>
     </div>
+    <div class="utility-hero__art" data-matter-field-host aria-hidden="true"></div>
   </section>
 
-  <main id="main" tabindex="-1" aria-labelledby="privacy-title">
+  <main class="legal-document" id="main" tabindex="-1" aria-labelledby="privacy-title">
     <p>
       This Privacy Policy describes how Let’s-ParaConnect, Inc. (“Let’s-ParaConnect,” “LPC,” “we,” “us,” or “our”)
       handles personal information when you visit, create an account, or use the Let’s-ParaConnect platform and related support services (the “Platform”).
@@ -67,13 +70,13 @@
         <li><a href="#information">Information we collect</a></li>
         <li><a href="#use">How we use information</a></li>
         <li><a href="#disclosure">How we disclose information</a></li>
+        <li><a href="#matter-assistant">Matter-workspace LPC Assistant</a></li>
         <li><a href="#ai-support">AI-assisted support</a></li>
         <li><a href="#cookies">Cookies and performance data</a></li>
         <li><a href="#retention">Retention and account deactivation</a></li>
         <li><a href="#security">Security</a></li>
         <li><a href="#choices">Your choices and privacy requests</a></li>
         <li><a href="#children">Age restrictions</a></li>
-        <li><a href="#international">Processing in the United States</a></li>
         <li><a href="#changes">Changes to this policy</a></li>
         <li><a href="#contact">Contact us</a></li>
       </ol>
@@ -130,8 +133,16 @@
       <p>We may use and disclose aggregated or de-identified statistics that do not reasonably identify an individual.</p>
     </section>
 
+    <section id="matter-assistant" class="card">
+      <h2>5. Matter-workspace LPC Assistant</h2>
+      <p>When a signed-in user chooses the LPC Assistant to ask about a Matter workspace, LPC processes the user’s prompt, relevant Assistant conversation history, page and account role, and read-only Matter information the user is authorized to access. Depending on the question, that context may include Matter titles, status and deadlines; participant, application, and invitation information; tasks; file names, review status, and revision notes; and completion, payment, or payout status.</p>
+      <p>LPC retrieves this authorized context from LPC’s systems and sends the prompt and relevant context to OpenAI, acting as LPC’s AI service provider, so the Assistant can generate an answer. File contents are not sent merely because a file exists in the workspace. However, text a user types or pastes into the Assistant is transmitted as written. Users should submit only information they are authorized to process through the Matter workspace.</p>
+      <p>LPC configures these OpenAI API requests with <code>store: false</code>. OpenAI may still retain API data for abuse monitoring or other purposes under its service terms and applicable account controls, and states that business and API inputs and outputs are not used to train its models by default. Other LPC service providers may process this information as necessary for hosting, databases, storage, security, and operation of the Platform under their applicable agreements with LPC.</p>
+      <p>The LPC Assistant provides workspace information only. It does not provide legal advice or make decisions. AI responses can be incomplete or wrong, so users should verify important information against the Matter workspace.</p>
+    </section>
+
     <section id="ai-support" class="card">
-      <h2>5. AI-assisted support</h2>
+      <h2>6. AI-assisted support</h2>
       <p>
         When you choose LPC’s AI-assisted support, LPC sends the text you enter, the active support-chat history, the page and account role you are using, and limited facts you are authorized to access to OpenAI so it can generate a response. LPC excludes known sensitive fields such as passwords, payment credentials, storage keys, and document contents from the structured account context supplied to the model. Your own message is sent as written, so do not enter client-confidential or privileged matter content, passwords, payment details, or documents in the support assistant.
       </p>
@@ -142,42 +153,37 @@
     </section>
 
     <section id="cookies" class="card">
-      <h2>6. Cookies and performance data</h2>
+      <h2>7. Cookies and performance data</h2>
       <p>LPC uses essential cookies to establish authenticated sessions, protect requests, support sign-in flows, and remember user preferences. Blocking essential cookies can prevent account features from working.</p>
       <p>For service-performance monitoring, the Platform measures Core Web Vitals (loading speed, interaction responsiveness, and visual stability), the page path without query parameters, a broad mobile or desktop classification, navigation type, and general connection class. Performance samples do not include an account identifier, session identifier, full URL, form contents, message contents, or interaction recordings. Individual samples are automatically removed from the active database after approximately 35 days and are used in aggregate to find and correct reliability and usability problems.</p>
     </section>
 
     <section id="retention" class="card">
-      <h2>7. Retention and account deactivation</h2>
+      <h2>8. Retention and account deactivation</h2>
       <p>We retain information for as long as reasonably necessary to provide the Platform, complete transactions, maintain financial and audit records, meet legal obligations, resolve disputes, enforce agreements, prevent fraud, and protect Platform integrity. Retention depends on the record type and the reason it is needed.</p>
-      <p>Support-chat conversations and associated support messages remain in the active database for up to 183 days after the conversation’s last message. Starting or restarting a support chat resets the assistant’s active conversational context but does not immediately delete earlier records. The scheduled cleanup removes eligible conversation and message records.</p>
+      <p>Assistant conversations and associated messages—including Matter-workspace LPC Assistant and support-assistant messages—remain in the active database for up to 183 days after the conversation’s last message. Starting or restarting an Assistant conversation resets its active conversational context but does not immediately delete earlier records. The scheduled cleanup removes eligible conversation and message records.</p>
       <p>Self-serve account deactivation disables access and removes the account from active participation. It does not erase completed matters, transaction records, audit evidence, or records LPC must retain. Personal profile files that are no longer referenced are placed into a durable deletion process. Deleted information can remain temporarily in encrypted backups and security logs until those systems rotate or the applicable retention period ends.</p>
     </section>
 
     <section id="security" class="card">
-      <h2>8. Security</h2>
+      <h2>9. Security</h2>
       <p>LPC uses administrative, technical, and organizational safeguards designed to protect information, including access controls, encryption in transit, private object storage, file validation, session controls, and security monitoring. No system can guarantee absolute security. Protect your credentials, use multi-factor authentication when available, and promptly report suspected unauthorized access through our <a href="contact.html">contact form</a>.</p>
     </section>
 
     <section id="choices" class="card">
-      <h2>9. Your choices and privacy requests</h2>
+      <h2>10. Your choices and privacy requests</h2>
       <p>You can update profile and account information, manage notification preferences, control certain profile visibility, review active sessions, and deactivate an eligible account from Account Settings. Depending on where you live, applicable law may provide rights to request access, correction, deletion, portability, or restriction of certain personal information, or to appeal a privacy-request decision.</p>
       <p>Submit a request through the <a href="contact.html">LPC contact form</a> and identify it as a privacy request. We may need to verify your identity and authority before acting. We will respond as required by applicable law. Some information may be exempt from a request or retained for legal, security, transactional, or other permitted reasons.</p>
     </section>
 
     <section id="children" class="card">
-      <h2>10. Age restrictions</h2>
+      <h2>11. Age restrictions</h2>
       <p>The Platform is for professional use and is not directed to anyone under 18. LPC does not knowingly permit a person under 18 to create an account. Contact us if you believe a minor has provided personal information through the Platform.</p>
-    </section>
-
-    <section id="international" class="card">
-      <h2>11. Processing in the United States</h2>
-      <p>LPC is based in the United States. If you access the Platform from another jurisdiction, your information may be transferred to and processed in the United States and in locations where LPC’s service providers operate, subject to applicable safeguards and law.</p>
     </section>
 
     <section id="changes" class="card">
       <h2>12. Changes to this policy</h2>
-      <p>We may update this Privacy Policy as the Platform, vendors, or legal requirements change. The effective date and version at the top identify the current policy. LPC may notify account holders of material changes and may require a new acknowledgement before further account use.</p>
+      <p>We may update this Privacy Policy as the Platform, vendors, or legal requirements change. The effective date at the top identifies the current policy. LPC may notify account holders of material changes and may require a new acknowledgement before further account use.</p>
     </section>
 
     <section id="contact" class="card">
@@ -185,7 +191,6 @@
       <p>For privacy questions or requests, use the <a href="contact.html">LPC contact form</a> or write to:</p>
       <address>
         Let’s-ParaConnect, Inc.<br />
-        Attn: Privacy<br />
         16192 Coastal Highway<br />
         Lewes, Delaware 19958<br />
         United States
@@ -193,11 +198,11 @@
     </section>
   </main>
 
-  <footer class="home-footer">
+  <footer class="home-footer" data-public-footer>
     <div class="home-footer__top">
       <div class="home-footer__brand">
         <a class="home-brand" href="index.html">Let<span class="home-brand__apostrophe">’</span>s-ParaConnect</a>
-        <p>Project-based legal support for attorneys and independent paralegals.</p>
+        <p>Matter-based legal support for attorneys and independent paralegals.</p>
       </div>
       <nav aria-label="Footer navigation">
         <a href="attorney-faq.html">For Attorneys</a>
@@ -205,7 +210,7 @@
         <a href="contact.html">Contact</a>
         <a href="privacy.html" aria-current="page">Privacy</a>
         <a href="terms.html">Terms</a>
-        <a href="paralegal-admission.html">Paralegal Admission</a>
+        <a href="paralegal-admission.html">Our Vetting Process</a>
         <a href="accessibility.html">Accessibility</a>
       </nav>
     </div>
@@ -217,8 +222,10 @@
       </button>
     </div>
   </footer>
+  <script src="assets/scripts/public-site-chrome.js?v=20260827-mobile-footer-alignment"></script>
   <script src="assets/scripts/utility-header.js" defer></script>
   <script src="assets/scripts/public-matter-field.js" defer></script>
-  <script src="assets/scripts/accessibility-toggle.js"></script>
+  <script src="assets/scripts/legal-documents.js?v=20260828-hero-parallax" defer></script>
+  <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
 </html>

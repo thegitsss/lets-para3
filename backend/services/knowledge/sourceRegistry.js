@@ -101,8 +101,8 @@ const SOURCE_REGISTRY = Object.freeze([
         tags: ["approval", "admissions"],
         content: {
           summary:
-            "Attorney and paralegal accounts are reviewed before approval. Use this when explaining LPC's standards and access model without implying guaranteed outcomes.",
-          statement: "Both attorney and paralegal accounts are reviewed before they are approved.",
+            "Attorney and paralegal applications are reviewed before platform access is granted. Use this when explaining LPC's standards and access model without implying guaranteed outcomes.",
+          statement: "Both attorney and paralegal applications are reviewed before platform access is granted.",
           supportingPoints: [
             "Approval should be described as intentional and quality-protective, not arbitrary.",
             "Do not promise approval outcomes or timelines in marketing copy.",
@@ -113,8 +113,8 @@ const SOURCE_REGISTRY = Object.freeze([
             sourceKey: "platform_faq_core",
             label: "frontend/attorney-faq.html",
             filePath: "frontend/attorney-faq.html",
-            locator: "Approved paralegal profiles",
-            excerpt: "Platform access is approval-based, and profiles are reviewed before approval.",
+            locator: "Vetted paralegals",
+            excerpt: "Every paralegal completes LPC’s application and eligibility review before joining the platform.",
           },
         ],
       },
@@ -393,9 +393,9 @@ const SOURCE_REGISTRY = Object.freeze([
         content: {
           audience: "paralegals",
           summary:
-            "Use this value card when explaining LPC to paralegals: approved profiles can pursue project-based support work with choice, fit, and a workflow that supports remote collaboration.",
+            "Use this value card when explaining LPC to paralegals: vetted paralegals can pursue clearly scoped matter work with choice, fit, and a workflow that supports remote collaboration.",
           statement:
-            "Approved paralegal profiles can connect with attorneys seeking project-based support work, choose which matters to pursue, and use LPC’s workflow for remote collaboration.",
+            "Vetted paralegals can connect with attorneys seeking support on clearly scoped matters, choose which matters to pursue, and use LPC’s workflow for remote collaboration.",
           supportingPoints: [
             "Use this to explain value without implying guaranteed volume.",
             "Keep the language tied to approval, fit, and choice.",
@@ -408,7 +408,7 @@ const SOURCE_REGISTRY = Object.freeze([
             filePath: "frontend/paralegal-faq.html",
             locator: "Questions 1 and 4",
             excerpt:
-              "approved paralegal profiles can connect with attorneys seeking project-based support work ... You have full control over which matters you apply to.",
+              "Once your application is approved and your profile is complete, you may begin applying to open matters ... You have full control over which matters you apply to.",
           },
         ],
       },
@@ -475,7 +475,7 @@ const SOURCE_REGISTRY = Object.freeze([
   },
   {
     sourceKey: "paralegal_admission",
-    title: "Paralegal Admission Page",
+    title: "Our Vetting Process Page",
     filePath: "frontend/paralegal-admission.html",
     items: [
       {
@@ -489,9 +489,9 @@ const SOURCE_REGISTRY = Object.freeze([
         tags: ["admissions", "application_review"],
         content: {
           summary:
-            "Paralegal applications are reviewed as a whole using the legal-support experience, completeness, consistency, and attorney-directed work described in the submitted materials.",
+            "Paralegal applications are reviewed as a whole using the legal-support experience, completeness, consistency, location, and attorney-directed work described in the submitted materials.",
           statement:
-            "LPC reviews submitted application materials for completeness, internal consistency, described legal-support experience, alignment with attorney-directed project work, and current platform requirements.",
+            "LPC reviews submitted application materials for completeness, internal consistency, U.S. location, at least one year of professional paralegal experience, alignment with attorney-directed matter work, and current platform requirements.",
           supportingPoints: [
             "Do not describe application review as independent credential authentication, a background check, or an endorsement.",
           ],
@@ -503,7 +503,7 @@ const SOURCE_REGISTRY = Object.freeze([
             filePath: "frontend/paralegal-admission.html",
             locator: "Admissions review section",
             excerpt:
-              "LPC reviews each submitted application as a whole ... whether the résumé and profile are complete and internally consistent, and whether the submitted information supports attorney-directed project work.",
+              "LPC reviews each submitted application as a whole. The review considers whether the application and required résumé are complete and internally consistent, whether the applicant meets LPC’s location and experience requirements, and whether the submitted information supports attorney-directed matter work.",
           },
         ],
       },

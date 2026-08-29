@@ -7,13 +7,14 @@ import { normalizeHttpNavigationUrl } from "./utils/navigation-url.js";
 const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
 const ATTORNEY_ONBOARDING_MODAL_SEEN_KEY = "lpc_attorney_onboarding_modal_seen";
 
-const DEFAULT_AVATAR_DATA = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-  `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>
-    <rect width='220' height='220' rx='110' fill='#f1f5f9'/>
-    <circle cx='110' cy='90' r='46' fill='#cbd5e1'/>
-    <path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/>
-  </svg>`
-)}`;
+const DEFAULT_AVATAR_DATA = "/assets/avatar-placeholder.svg";
+const initialSettingsTasks = [];
+
+function trackInitialSettingsTask(task) {
+  const trackedTask = Promise.resolve(task);
+  initialSettingsTasks.push(trackedTask);
+  return trackedTask;
+}
 
 function escapeHTML(value = "") {
   return String(value)
@@ -167,6 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
     /* noop */
   }
   const navItems = {
+    navSettings: "settingsDirectorySection",
     navProfile: "profileSection",
     navSecurity: "securitySection",
     navPreferences: "preferencesSection",
@@ -179,23 +181,58 @@ document.addEventListener("DOMContentLoaded", () => {
   const topLevelSections = Object.values(navItems)
     .map((id) => document.getElementById(id))
     .filter(Boolean);
-  const hashSectionMap = {
-    "#securitysection": "securitySection",
-    "#security": "securitySection",
-    "#profilesection": "profileSection",
-    "#profile": "profileSection",
-    "#preferencessection": "preferencesSection",
-    "#preferences": "preferencesSection",
-    "#deletesection": "deleteSection",
-    "#delete": "deleteSection",
+  const hashRouteMap = {
+    "#settings": { sectionId: "settingsDirectorySection" },
+    "#securitysection": { sectionId: "securitySection" },
+    "#security": { sectionId: "securitySection" },
+    "#security:closure": { sectionId: "securitySection", targetId: "accountClosureHeading" },
+    "#profilesection": { sectionId: "profileSection" },
+    "#profile": { sectionId: "profileSection" },
+    "#profile:personal": { sectionId: "profileSection", targetId: "attorneyPersonalHeading" },
+    "#profile:public": { sectionId: "profileSection", targetId: "attorneyProfessionalHeading" },
+    "#profile:firm": { sectionId: "profileSection", targetId: "attorneyFirmName" },
+    "#profile:notifications": { sectionId: "profileSection", targetId: "attorneyNotificationsHeading" },
+    "#preferencessection": { sectionId: "preferencesSection" },
+    "#preferences": { sectionId: "preferencesSection" },
+    "#deletesection": { sectionId: "deleteSection" },
+    "#delete": { sectionId: "deleteSection" },
   };
   const syncActiveNav = (sectionId) => {
-    const activeNavId = sectionToNav[sectionId] || "navProfile";
+    const activeNavId = sectionToNav[sectionId] || (isAttorneyRole() ? "navSettings" : "navProfile");
     document.querySelectorAll(".settings-item").forEach((el) => {
       el.classList.toggle("active", el.id === activeNavId);
     });
   };
-  const setActiveSection = (sectionId) => {
+  const syncSettingsHeader = (sectionId) => {
+    const isDirectory = sectionId === "settingsDirectorySection";
+    const title = document.getElementById("accountSettingsTitle");
+    const subtitle = document.getElementById("accountSettingsSubtitle");
+    if (title) title.textContent = isDirectory ? "Settings" : "Account settings";
+    if (subtitle) {
+      subtitle.textContent = isDirectory
+        ? "Manage your attorney account and preferences."
+        : "Manage your profile, security, and preferences.";
+    }
+    document.body.classList.toggle("settings-directory-active", isDirectory);
+  };
+  const focusSettingsTarget = (targetId = "") => {
+    const main = document.getElementById("main");
+    window.requestAnimationFrame(() => {
+      if (!targetId) {
+        if (window.matchMedia("(min-width: 961px)").matches && main) main.scrollTo({ top: 0 });
+        else window.scrollTo({ top: 0 });
+        return;
+      }
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      target.scrollIntoView({ block: "start" });
+      if (!target.matches("input, select, textarea, button, a[href], [tabindex]")) {
+        target.setAttribute("tabindex", "-1");
+      }
+      target.focus({ preventScroll: true });
+    });
+  };
+  const setActiveSection = (sectionId, { targetId = "" } = {}) => {
     topLevelSections.forEach((sec) => {
       sec.classList.remove("active");
       sec.classList.add("hidden");
@@ -213,13 +250,24 @@ document.addEventListener("DOMContentLoaded", () => {
       section.style.display = "block";
     }
     syncActiveNav(sectionId);
+    syncSettingsHeader(sectionId);
+    focusSettingsTarget(targetId);
     scheduleProfileScrollIndicatorUpdate();
   };
 
   const applySectionFromHash = (hashValue = window.location.hash) => {
-    const requestedSection = hashSectionMap[String(hashValue || "").trim().toLowerCase()] || "";
-    if (!requestedSection) return false;
-    setActiveSection(requestedSection);
+    const normalizedHash = String(hashValue || "").trim().toLowerCase();
+    const route = hashRouteMap[normalizedHash] || (
+      !normalizedHash
+        ? { sectionId: isAttorneyRole() ? "settingsDirectorySection" : "profileSection" }
+        : null
+    );
+    if (!route) return false;
+    if (route.sectionId === "settingsDirectorySection" && !isAttorneyRole()) {
+      setActiveSection("profileSection");
+      return true;
+    }
+    setActiveSection(route.sectionId, { targetId: route.targetId || "" });
     return true;
   };
 
@@ -230,11 +278,21 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!btn) return;
 
     btn.addEventListener("click", () => {
-      setActiveSection(sectionId);
-      const nextHash = `#${sectionId}`;
-      if (window.location.hash !== nextHash) {
-        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
+      const nextHash = sectionId === "settingsDirectorySection"
+        ? ""
+        : sectionId === "profileSection"
+        ? "#profile"
+        : sectionId === "securitySection"
+        ? "#security"
+        : sectionId === "preferencesSection"
+        ? "#preferences"
+        : `#${sectionId}`;
+      const nextUrl = `${window.location.pathname}${window.location.search}${nextHash}`;
+      const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (currentUrl !== nextUrl) {
+        window.history.pushState(null, "", nextUrl);
       }
+      setActiveSection(sectionId);
     });
   });
 
@@ -247,17 +305,40 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  const initialNav = document.querySelector(".settings-item.active");
-  const requestedHashSection = hashSectionMap[String(window.location.hash || "").trim().toLowerCase()] || "";
-  const initialSectionId = requestedHashSection || (
-    initialNav && navItems[initialNav.id]
-      ? navItems[initialNav.id]
-      : navItems.navProfile
-  );
-  setActiveSection(initialSectionId);
-  window.addEventListener("hashchange", () => {
-    applySectionFromHash();
-  });
+  const filterSettingsDirectory = () => {
+    const search = document.getElementById("settingsDirectorySearch");
+    const empty = document.getElementById("settingsDirectoryEmpty");
+    const groups = Array.from(document.querySelectorAll("[data-settings-group]"));
+    if (!search || !groups.length) return;
+    const applyFilter = () => {
+      const query = String(search.value || "").trim().toLocaleLowerCase();
+      let visibleCount = 0;
+      groups.forEach((group) => {
+        const groupName = String(group.dataset.settingsGroup || "").toLocaleLowerCase();
+        let groupVisibleCount = 0;
+        group.querySelectorAll("[data-settings-destination]").forEach((destination) => {
+          const searchableText = `${groupName} ${destination.textContent || ""}`.toLocaleLowerCase();
+          const matches = !query || searchableText.includes(query);
+          destination.hidden = !matches;
+          if (matches) {
+            visibleCount += 1;
+            groupVisibleCount += 1;
+          }
+        });
+        group.hidden = groupVisibleCount === 0;
+      });
+      if (empty) empty.hidden = visibleCount !== 0;
+    };
+    search.addEventListener("input", applyFilter);
+    applyFilter();
+  };
+
+  filterSettingsDirectory();
+  applySectionFromHash();
+  const syncRoute = () => applySectionFromHash();
+  window.__syncProfileSettingsRoute = syncRoute;
+  window.addEventListener("hashchange", syncRoute);
+  window.addEventListener("popstate", syncRoute);
   bindProfileScrollIndicator();
   const stepToRun = String(requestedOnboardingStep || "").toLowerCase();
   if (stepToRun) {
@@ -348,6 +429,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const fontSizeSelect = document.getElementById("fontSizePreference");
   const hideProfileToggle = document.getElementById("paralegalHideProfile");
   statePreferenceSelect = document.getElementById("statePreference");
+  const normalizeSelectableTheme = (value) => (String(value || "").toLowerCase() === "dark" ? "dark" : "light");
 
   const updateThemePreview = (value) => {
     if (!themePreviewButtons.length) return;
@@ -379,7 +461,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function persistThemePreference(themeValue, fontSizeValue) {
     try {
       const payload = {
-        theme: themeValue || themeSelect?.value,
+        theme: normalizeSelectableTheme(themeValue || themeSelect?.value),
         fontSize: fontSizeValue || fontSizeSelect?.value,
         email: emailToggle ? !!emailToggle.checked : false,
         state: statePreferenceSelect ? statePreferenceSelect.value : undefined
@@ -398,28 +480,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const applyThemeSelection = (value) => {
     if (!value) return;
+    const normalizedValue = normalizeSelectableTheme(value);
     if (themeSelect) {
-      themeSelect.value = value;
+      themeSelect.value = normalizedValue;
     }
-    updateThemePreview(value);
+    updateThemePreview(normalizedValue);
     if (typeof window.applyThemePreference === "function") {
-      window.applyThemePreference(value);
+      window.applyThemePreference(normalizedValue);
     }
     if (currentUser) {
       currentUser.preferences = {
         ...(currentUser.preferences || {}),
-        theme: value
+        theme: normalizedValue
       };
     }
-    persistThemePreference(value, fontSizeSelect?.value);
+    persistThemePreference(normalizedValue, fontSizeSelect?.value);
   };
 
   const fontSizeMap = {
-    xs: "14px",
-    sm: "15px",
-    md: "16px",
-    lg: "17px",
-    xl: "20px"
+    xs: "15px",
+    sm: "16px",
+    md: "17px",
+    lg: "20px",
+    xl: "22px"
   };
 
   const applyFontSizeSelection = (value, options = {}) => {
@@ -498,7 +581,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const prefs = await res.json();
       if (emailToggle) emailToggle.checked = !!prefs.email;
       if (themeSelect) {
-        const resolvedTheme = prefs.theme;
+        const resolvedTheme = normalizeSelectableTheme(prefs.theme);
         if (resolvedTheme) {
           themeSelect.value = resolvedTheme;
           updateThemePreview(resolvedTheme);
@@ -528,13 +611,13 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Failed to load preferences", err);
     }
   }
-  loadPreferences();
+  trackInitialSettingsTask(loadPreferences());
 
   const prefBtn = document.getElementById("savePreferencesBtn");
   if (prefBtn) {
     prefBtn.addEventListener("click", async () => {
       const email = emailToggle ? emailToggle.checked : false;
-      const theme = themeSelect ? themeSelect.value : "mountain";
+      const theme = normalizeSelectableTheme(themeSelect?.value);
       const fontSize = fontSizeSelect ? fontSizeSelect.value : "md";
       const hideProfile = hideProfileToggle ? !!hideProfileToggle.checked : undefined;
       const state = statePreferenceSelect ? statePreferenceSelect.value : "";
@@ -770,7 +853,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  loadTwoFactorStatus();
+  trackInitialSettingsTask(loadTwoFactorStatus());
 
   authenticatorCancelBtn?.addEventListener("click", () => {
     closeAuthenticatorSetup();
@@ -948,7 +1031,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  loadPasskeys();
+  trackInitialSettingsTask(loadPasskeys());
 
   // --- SESSION HISTORY ---
   const sessionHistoryList = document.getElementById("sessionHistoryList");
@@ -1057,7 +1140,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  loadSessionHistory();
+  trackInitialSettingsTask(loadSessionHistory());
 
   document.getElementById("revokeOtherSessionsBtn")?.addEventListener("click", async (event) => {
     const button = event.currentTarget;
@@ -1151,7 +1234,7 @@ document.addEventListener("DOMContentLoaded", () => {
       container.innerHTML = "<p class='muted'>Unable to load blocked users.</p>";
     }
   }
-  loadBlockedUsers();
+  trackInitialSettingsTask(loadBlockedUsers());
 
   // --- STRIPE CONNECT ---
   const connectStripeBtn = document.getElementById("connectStripeBtn");
@@ -1295,10 +1378,15 @@ attorneySettingsSection?.classList.add("hidden");
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
-    localStorage.removeItem("lpc_edit_profile_prefill");
-  } catch {}
-  await window.checkSession();
-  await loadSettings();
+    try {
+      localStorage.removeItem("lpc_edit_profile_prefill");
+    } catch {}
+    await window.checkSession();
+    await loadSettings();
+    await Promise.allSettled(initialSettingsTasks);
+  } finally {
+    window.__markAccountSettingsLayoutReady?.();
+  }
 });
 
 let settingsState = {
@@ -1343,6 +1431,9 @@ let profileDraftPersistenceBound = false;
 let applyingProfileDraft = false;
 let profileDraftWriteTimer = null;
 let profileScrollIndicatorBound = false;
+let attorneySavedSnapshot = "";
+let attorneySaveStateBound = false;
+let attorneySaveInFlight = false;
 
 function updateProfileScrollIndicator() {
   const indicator = document.getElementById("paralegalScrollIndicator");
@@ -2068,6 +2159,7 @@ function initAttorneySettings(user = {}) {
   seedSettingsState(user);
   showAttorneySettings();
   hydrateAttorneyProfileForm(user);
+  initializeAttorneySaveState();
   bindAttorneyPracticeEditor();
   bindAttorneySaveButton();
   bindAttorneyPublicationsToggle();
@@ -3526,6 +3618,114 @@ function hydrateAttorneyProfileForm(user = {}) {
   updateAttorneyAvatarPreview(user);
 }
 
+function getAttorneyFormSnapshot() {
+  return JSON.stringify({
+    firstName: document.getElementById("attorneyFirstName")?.value || "",
+    lastName: document.getElementById("attorneyLastName")?.value || "",
+    linkedInURL: document.getElementById("attorneyLinkedIn")?.value || "",
+    lawFirm: document.getElementById("attorneyFirmName")?.value || "",
+    firmWebsite: document.getElementById("attorneyFirmWebsite")?.value || "",
+    practiceAreas: collectAttorneyPracticeAreas(),
+    practiceDescription: document.getElementById("attorneyPracticeDescription")?.value || "",
+    publications: document.getElementById("attorneyPublications")?.value || "",
+  });
+}
+
+function setAttorneySaveStatus(message = "", state = "") {
+  const status = document.getElementById("attorneySaveStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.hidden = !message;
+  if (state) status.dataset.state = state;
+  else delete status.dataset.state;
+}
+
+function updateAttorneySaveState() {
+  const saveBtn = document.getElementById("saveAttorneyProfile");
+  if (!saveBtn || !attorneySavedSnapshot) return;
+  const dirty = getAttorneyFormSnapshot() !== attorneySavedSnapshot;
+  saveBtn.disabled = attorneySaveInFlight || !dirty;
+  saveBtn.closest(".attorney-actions")?.classList.toggle("has-unsaved-changes", dirty);
+  if (dirty && document.getElementById("attorneySaveStatus")?.dataset.state === "success") {
+    setAttorneySaveStatus("Unsaved changes", "pending");
+  }
+}
+
+function markAttorneyProfileSaved() {
+  attorneySavedSnapshot = getAttorneyFormSnapshot();
+  updateAttorneySaveState();
+}
+
+function initializeAttorneySaveState() {
+  const root = document.getElementById("attorneySettings");
+  if (!root) return;
+  attorneySavedSnapshot = getAttorneyFormSnapshot();
+  if (!attorneySaveStateBound) {
+    const handleChange = (event) => {
+      if (event.target.closest("#attorneyNotificationToggles") || event.target.id === "attorneyAvatarInput") return;
+      setTimeout(updateAttorneySaveState, 0);
+    };
+    root.addEventListener("input", handleChange);
+    root.addEventListener("change", handleChange);
+    root.addEventListener("click", (event) => {
+      if (event.target.closest("#attorneyPracticeDropdown")) handleChange(event);
+    });
+    attorneySaveStateBound = true;
+  }
+  updateAttorneySaveState();
+}
+
+function clearAttorneyFieldErrors() {
+  document.querySelectorAll("#attorneySettings .field-error").forEach((error) => {
+    error.textContent = "";
+    error.hidden = true;
+  });
+  document.querySelectorAll("#attorneySettings [aria-invalid='true']").forEach((field) => {
+    field.removeAttribute("aria-invalid");
+  });
+}
+
+function setAttorneyFieldError(inputId, errorId, message) {
+  const input = document.getElementById(inputId);
+  const error = document.getElementById(errorId);
+  input?.setAttribute("aria-invalid", "true");
+  if (error) {
+    error.textContent = message;
+    error.hidden = false;
+  }
+  input?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+  input?.focus?.({ preventScroll: true });
+}
+
+function validateAttorneyProfile() {
+  clearAttorneyFieldErrors();
+  const first = document.getElementById("attorneyFirstName")?.value.trim() || "";
+  if (!first) {
+    setAttorneyFieldError("attorneyFirstName", "attorneyFirstNameError", "Enter your first name.");
+    return false;
+  }
+  const last = document.getElementById("attorneyLastName")?.value.trim() || "";
+  if (!last) {
+    setAttorneyFieldError("attorneyLastName", "attorneyLastNameError", "Enter your last name.");
+    return false;
+  }
+  const linkedInInput = document.getElementById("attorneyLinkedIn");
+  try {
+    normalizeHttpUrlInput(linkedInInput?.value, { fieldLabel: "LinkedIn URL", requiredHost: "linkedin.com" });
+  } catch (error) {
+    setAttorneyFieldError("attorneyLinkedIn", "attorneyLinkedInError", error.message);
+    return false;
+  }
+  const firmWebsiteInput = document.getElementById("attorneyFirmWebsite");
+  try {
+    normalizeHttpUrlInput(firmWebsiteInput?.value, { fieldLabel: "firm website" });
+  } catch (error) {
+    setAttorneyFieldError("attorneyFirmWebsite", "attorneyFirmWebsiteError", error.message);
+    return false;
+  }
+  return true;
+}
+
 function syncPracticeAreasInput(inputId, values = []) {
   const input = document.getElementById(inputId);
   if (!input) return;
@@ -3735,10 +3935,6 @@ function renderPracticeAreasDropdown({
     buildOption(label, false);
   });
 
-  const findOptionCheckbox = (value) => {
-    return panel.querySelector(`.dropdown-option input[type="checkbox"][value="${CSS.escape(value)}"]`);
-  };
-
   const updatePracticeDropdownLabel = () => {
     const selectedValues = collectPracticeAreasFromPanel(panelId);
     syncPracticeAreasInput(inputId, selectedValues);
@@ -3756,23 +3952,6 @@ function renderPracticeAreasDropdown({
       const chip = document.createElement("span");
       chip.className = "chip";
       chip.textContent = value;
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "chip-remove";
-      remove.setAttribute("aria-label", `Remove ${value}`);
-      remove.textContent = "×";
-      remove.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const cb = findOptionCheckbox(value);
-        if (cb) {
-          cb.checked = false;
-          const opt = cb.closest(".dropdown-option");
-          if (opt) opt.classList.remove("selected");
-          updatePracticeDropdownLabel();
-          syncAllOptionClasses();
-        }
-      });
-      chip.appendChild(remove);
       summary.appendChild(chip);
     });
     if (selectedValues.length > chips.length) {
@@ -3799,10 +3978,12 @@ function renderPracticeAreasDropdown({
   if (!toggle.dataset.bound) {
     toggle.addEventListener("click", () => {
       panel.classList.toggle("open");
+      toggle.setAttribute("aria-expanded", panel.classList.contains("open") ? "true" : "false");
     });
     document.addEventListener("click", (e) => {
       if (!panel.contains(e.target) && !toggle.contains(e.target)) {
         panel.classList.remove("open");
+        toggle.setAttribute("aria-expanded", "false");
       }
     });
     toggle.dataset.bound = "true";
@@ -4150,35 +4331,26 @@ function updateAttorneyPracticeCount() {
   counter.textContent = `${length} / 4000 characters`;
 }
 async function handleAttorneyProfileSave() {
+  if (attorneySaveInFlight) return;
   const saveBtn =
     document.getElementById("saveAttorneyProfile") || document.getElementById("attorneyProfileSaveBtn");
   const originalLabel = saveBtn?.textContent || "";
+  if (!validateAttorneyProfile()) {
+    setAttorneySaveStatus("Review the highlighted field.", "error");
+    return;
+  }
+  attorneySaveInFlight = true;
   if (saveBtn) {
     saveBtn.disabled = true;
     saveBtn.textContent = "Saving…";
   }
+  setAttorneySaveStatus("Saving changes…", "pending");
   try {
-    const hadStagedPhoto = Boolean(settingsState.stagedProfilePhotoFile);
     const preservedPhoto =
       currentUser?.profileImage ||
       currentUser?.avatarURL ||
       settingsState.profileImage ||
-      settingsState.stagedProfilePhotoUrl ||
       "";
-    if (settingsState.stagedProfilePhotoFile) {
-      try {
-        const uploadPayload = await uploadProfilePhotoFile(
-          settingsState.stagedProfilePhotoFile,
-          settingsState.stagedProfilePhotoOriginalFile,
-          settingsState.stagedProfilePhotoIsEdit
-        );
-        applyProfilePhotoUploadResult(uploadPayload, { suppressToast: true });
-      } catch (err) {
-        console.error("Unable to upload profile photo", err);
-        showToast("Unable to upload photo. Please try again.", "err");
-        return;
-      }
-    }
     const payload = collectAttorneyPayload();
     const res = await secureFetch("/api/users/me", {
       method: "PATCH",
@@ -4214,36 +4386,22 @@ async function handleAttorneyProfileSave() {
     };
     hydrateAttorneyProfileForm(updatedUser);
     updatePhotoReviewStatus(updatedUser);
+    markAttorneyProfileSaved();
+    setAttorneySaveStatus("Changes saved.", "success");
     showToast("Profile updated!", "ok");
-    if (hadStagedPhoto) {
-      try {
-        const verifyRes = await secureFetch("/api/users/me", {
-          headers: { Accept: "application/json" },
-          noRedirect: true
-        });
-        if (verifyRes.ok) {
-          const verifiedUser = await verifyRes.json().catch(() => ({}));
-          currentUser = mergeSessionPreferences({ ...(currentUser || {}), ...(verifiedUser || {}) });
-          persistSession({ user: currentUser });
-          window.updateSessionUser?.(currentUser);
-          applyAvatar(currentUser);
-          updateAttorneyAvatarPreview(currentUser);
-        }
-      } catch (err) {
-        console.warn("Unable to verify profile photo save", err);
-      }
-    }
     if (getAttorneyOnboardingStep() === "profile" && isAttorneyRole()) {
       clearAttorneyOnboardingStep();
     }
   } catch (err) {
     console.error("Failed to save attorney profile", err);
+    setAttorneySaveStatus(err?.message || "Unable to save changes.", "error");
     showToast(err?.message || "Unable to save profile right now.", "err");
   } finally {
+    attorneySaveInFlight = false;
     if (saveBtn) {
-      saveBtn.disabled = false;
-      saveBtn.textContent = originalLabel || "Save profile";
+      saveBtn.textContent = originalLabel || "Save changes";
     }
+    updateAttorneySaveState();
   }
 }
 
@@ -4906,9 +5064,9 @@ function applyUnifiedRoleStyling(user = {}) {
   const sidebarLogo = document.querySelector(".sidebar .logo");
 
   if (title) {
-    title.textContent = "Account Settings";
+    title.textContent = "Account settings";
   }
-  if (sidebarLogo) {
+  if (sidebarLogo && !sidebarLogo.classList.contains("sidebar-profile-host")) {
     const defaultText = sidebarLogo.dataset.defaultText || sidebarLogo.textContent;
     if (!sidebarLogo.dataset.defaultText) sidebarLogo.dataset.defaultText = defaultText;
     sidebarLogo.textContent = isParalegal ? "Account Settings" : defaultText;
@@ -4934,6 +5092,7 @@ function applyUnifiedRoleStyling(user = {}) {
   } else {
     showParalegalSettings();
   }
+  window.__syncProfileSettingsRoute?.();
 }
 
 function enforceUnifiedRoleStyling(user = {}) {
@@ -5036,9 +5195,9 @@ async function loadSettings() {
     const titleEl = document.getElementById("accountSettingsTitle");
     const subtitleEl = document.getElementById("accountSettingsSubtitle");
 
-    if (titleEl) titleEl.textContent = "Account Settings";
+    if (titleEl) titleEl.textContent = "Account settings";
     if (currentUser?.role === "attorney") {
-      if (subtitleEl) subtitleEl.textContent = "";
+      if (subtitleEl) subtitleEl.textContent = "Manage your profile, security, and preferences.";
     }
     enforceUnifiedRoleStyling(user);
     applyAvatar(user);
@@ -5047,6 +5206,11 @@ async function loadSettings() {
     const role = (currentUser?.role || "").toLowerCase();
 
     if (role === "attorney") {
+      const draft = readProfileSettingsDraft(user);
+      if (draft) applyProfileSettingsDraft(draft, user);
+      else syncCluster(user);
+      updateAttorneySaveState();
+      scheduleProfileScrollIndicatorUpdate();
       return;
     }
   } catch (err) {
@@ -5880,9 +6044,9 @@ const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 const PROFILE_PHOTO_ALLOWED_MIMES = new Set(["image/jpeg", "image/jpg", "image/png"]);
 const PROFILE_PHOTO_ALLOWED_EXT = /\.(jpe?g|png)$/i;
 const PROFILE_PHOTO_CROPPER_TEMPLATE =
-  '<cropper-canvas background>' +
+  '<cropper-canvas>' +
   '<cropper-image scalable translatable initial-center-size="contain"></cropper-image>' +
-  '<cropper-selection initial-coverage="1" initial-aspect-ratio="1" aspect-ratio="1" outlined precise>' +
+  '<cropper-selection initial-coverage="1" initial-aspect-ratio="1" aspect-ratio="1" precise>' +
   '<cropper-handle action="move" theme-color="rgba(255, 255, 255, 0.28)"></cropper-handle>' +
   '</cropper-selection>' +
   '</cropper-canvas>';
@@ -5906,6 +6070,63 @@ let cropperBaseScale = 1;
 let cropperTransformHandler = null;
 let cropperReady = false;
 let cropperLoadRetries = 0;
+let cropperLoadTimer = null;
+let cropperFetchController = null;
+let cropperError = null;
+let cropperErrorText = null;
+let cropperAvatarPreview = null;
+let cropperPreviewTimer = null;
+let cropperRetryAction = null;
+let cropperSaveInFlight = false;
+let cropperReturnFocus = null;
+let cropperOpenVersion = 0;
+
+function clearCropperLoadTimer() {
+  if (cropperLoadTimer) clearTimeout(cropperLoadTimer);
+  cropperLoadTimer = null;
+}
+
+function hideCropperError() {
+  if (cropperError) cropperError.hidden = true;
+  cropperRetryAction = null;
+}
+
+function showCropperError(message, retryAction = null, { preserveCropper = false } = {}) {
+  clearCropperLoadTimer();
+  setCropperLoading(false);
+  if (!preserveCropper) cropperReady = false;
+  if (cropperZoom) cropperZoom.disabled = !preserveCropper;
+  if (cropperSaveBtn) cropperSaveBtn.disabled = true;
+  if (cropperErrorText && message) cropperErrorText.textContent = message;
+  if (cropperError) cropperError.hidden = false;
+  cropperRetryAction = typeof retryAction === "function" ? retryAction : null;
+}
+
+function beginCropperLoadDeadline(retryAction) {
+  clearCropperLoadTimer();
+  cropperLoadTimer = setTimeout(() => {
+    destroyActiveCropperInstance();
+    showCropperError("The photo took too long to load. Try again or choose another photo.", retryAction);
+  }, 12000);
+}
+
+function scheduleCropperAvatarPreview() {
+  if (!activeCropperSelection || !cropperAvatarPreview) return;
+  if (cropperPreviewTimer) clearTimeout(cropperPreviewTimer);
+  const selection = activeCropperSelection;
+  cropperPreviewTimer = setTimeout(async () => {
+    cropperPreviewTimer = null;
+    if (selection !== activeCropperSelection) return;
+    try {
+      const canvas = await selection.$toCanvas({ width: 72, height: 72 });
+      if (selection === activeCropperSelection && cropperAvatarPreview) {
+        cropperAvatarPreview.src = canvas.toDataURL("image/jpeg", 0.86);
+      }
+    } catch (error) {
+      console.debug("[profile-settings] crop preview unavailable", error);
+    }
+  }, 80);
+}
 
 function getCropperConstructor() {
   const cropperGlobal = globalThis.Cropper;
@@ -5941,15 +6162,57 @@ function setCropperZoom(targetZoom) {
 }
 
 function proposedCropperImageCoversSelection(matrix) {
-  const cropperCanvas = activeCropper?.getCropperCanvas?.();
-  if (!cropperCanvas || !activeCropperImage || !activeCropperSelection) return false;
-  const clone = activeCropperImage.cloneNode();
-  clone.style.transform = `matrix(${matrix.join(", ")})`;
-  clone.style.opacity = "0";
-  clone.setAttribute("aria-hidden", "true");
-  cropperCanvas.appendChild(clone);
-  const imageRect = clone.getBoundingClientRect();
-  clone.remove();
+  if (!activeCropperImage || !activeCropperSelection || !Array.isArray(matrix)) return false;
+  const proposedMatrix = matrix.slice(0, 6).map(Number);
+  const currentTransform = activeCropperImage.$getTransform?.();
+  const currentMatrix = Array.isArray(currentTransform) ? currentTransform.slice(0, 6).map(Number) : [];
+  const width = activeCropperImage.offsetWidth;
+  const height = activeCropperImage.offsetHeight;
+  if (
+    proposedMatrix.length !== 6 ||
+    currentMatrix?.length !== 6 ||
+    !proposedMatrix.every(Number.isFinite) ||
+    !currentMatrix.every(Number.isFinite) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return false;
+  }
+
+  const transformOrigin = getComputedStyle(activeCropperImage).transformOrigin.split(" ");
+  const parsedOriginX = Number.parseFloat(transformOrigin[0]);
+  const parsedOriginY = Number.parseFloat(transformOrigin[1]);
+  const originX = Number.isFinite(parsedOriginX) ? parsedOriginX : width / 2;
+  const originY = Number.isFinite(parsedOriginY) ? parsedOriginY : height / 2;
+  const getTransformedBounds = ([a, b, c, d, e, f]) => {
+    const corners = [
+      [0, 0],
+      [width, 0],
+      [width, height],
+      [0, height],
+    ].map(([x, y]) => ({
+      x: originX + a * (x - originX) + c * (y - originY) + e,
+      y: originY + b * (x - originX) + d * (y - originY) + f,
+    }));
+    return {
+      top: Math.min(...corners.map((corner) => corner.y)),
+      right: Math.max(...corners.map((corner) => corner.x)),
+      bottom: Math.max(...corners.map((corner) => corner.y)),
+      left: Math.min(...corners.map((corner) => corner.x)),
+    };
+  };
+
+  const currentBounds = getTransformedBounds(currentMatrix);
+  const proposedBounds = getTransformedBounds(proposedMatrix);
+  const currentRect = activeCropperImage.getBoundingClientRect();
+  const layoutLeft = currentRect.left - currentBounds.left;
+  const layoutTop = currentRect.top - currentBounds.top;
+  const imageRect = {
+    top: layoutTop + proposedBounds.top,
+    right: layoutLeft + proposedBounds.right,
+    bottom: layoutTop + proposedBounds.bottom,
+    left: layoutLeft + proposedBounds.left,
+  };
   const selectionRect = activeCropperSelection.getBoundingClientRect();
   const tolerance = 0.75;
   return (
@@ -5972,6 +6235,7 @@ function bindCropperTransformBoundary() {
       return;
     }
     syncCropperZoomFromMatrix(matrix);
+    scheduleCropperAvatarPreview();
   };
   activeCropperImage.addEventListener("transform", cropperTransformHandler);
 }
@@ -6010,7 +6274,9 @@ async function initializePhotoCropper() {
   if (cropperZoom) cropperZoom.disabled = false;
   cropperReady = true;
   if (cropperSaveBtn) cropperSaveBtn.disabled = false;
+  clearCropperLoadTimer();
   setCropperLoading(false);
+  scheduleCropperAvatarPreview();
 }
 
 async function canDecodeImageFile(file) {
@@ -6049,12 +6315,22 @@ function initAvatarUploaders() {
     const input = document.getElementById(config.inputId);
     if (!frame || !input) return;
 
+    const activateFrame = () => {
+      cropperReturnFocus = frame;
+      const isAttorneyFrame = config.frameId === "attorneyAvatarFrame";
+      const existingPhoto = getDisplayProfileImage(currentUser || {}, { allowPending: true });
+      if (isAttorneyFrame && existingPhoto && existingPhoto !== DEFAULT_AVATAR_DATA) {
+        openExistingPhotoEditor(config);
+        return;
+      }
+      input.click();
+    };
     frame.style.cursor = "pointer";
-    frame.addEventListener("click", () => input.click());
+    frame.addEventListener("click", activateFrame);
     frame.addEventListener("keydown", (evt) => {
       if (evt.key === "Enter" || evt.key === " ") {
         evt.preventDefault();
-        input.click();
+        activateFrame();
       }
     });
 
@@ -6084,8 +6360,8 @@ function updateAvatarRemoveButton(user = currentUser || {}) {
     editBtn.disabled = !hasPhoto;
   }
   if (attorneyEditBtn) {
-    attorneyEditBtn.classList.toggle("hidden", !hasPhoto);
-    attorneyEditBtn.disabled = !hasPhoto;
+    attorneyEditBtn.classList.remove("hidden");
+    attorneyEditBtn.disabled = false;
   }
 }
 
@@ -6166,6 +6442,15 @@ function bindAvatarRemoval() {
     if (!button || button.dataset.bound === "true") return;
     button.dataset.bound = "true";
     button.addEventListener("click", async () => {
+      const confirmed = await confirmAction(
+        "This removes the photo from your account, public profile, and navigation avatar.",
+        {
+          title: "Remove profile photo?",
+          confirmLabel: "Remove photo",
+          tone: "danger",
+        }
+      );
+      if (!confirmed) return;
       if (settingsState.stagedProfilePhotoFile) {
         clearStagedProfilePhoto();
         applyAvatar(currentUser || {});
@@ -6230,7 +6515,8 @@ function bindAvatarEditing() {
   if (attorneyEditBtn && attorneyEditBtn.dataset.bound !== "true") {
     attorneyEditBtn.dataset.bound = "true";
     attorneyEditBtn.addEventListener("click", () => {
-      if (attorneyConfig) openExistingPhotoEditor(attorneyConfig);
+      cropperReturnFocus = attorneyEditBtn;
+      document.getElementById(attorneyConfig?.inputId || "attorneyAvatarInput")?.click();
     });
   }
 }
@@ -6266,6 +6552,11 @@ async function handleAvatarUpload(config) {
 
   if (getCropperConstructor() && cropperModal && cropperImage) {
     openPhotoCropper(file, config);
+  } else if (config.frameId === "attorneyAvatarFrame" && cropperModal) {
+    cropperConfig = config;
+    cropperFile = file;
+    revealPhotoCropper();
+    showCropperError("The photo editor is unavailable. Refresh the page or choose another photo.");
   } else {
     stagePhotoDirect(file, config);
   }
@@ -6292,10 +6583,27 @@ function initPhotoCropperModal() {
   cropperModalCard = cropperModal?.querySelector(".photo-crop-card");
   cropperLoading = document.getElementById("photoCropLoading");
   cropperLoadingText = document.getElementById("photoCropLoadingText");
+  cropperError = document.getElementById("photoCropError");
+  cropperErrorText = document.getElementById("photoCropErrorText");
+  cropperAvatarPreview = document.getElementById("photoCropAvatarPreview");
+  const closeBtn = document.getElementById("photoCropClose");
+  const retryBtn = document.getElementById("photoCropTryAgain");
+  const chooseAnotherBtn = document.getElementById("photoCropChooseAnother");
   if (!cropperModal || !cropperImage || !saveBtn) return;
   saveBtn.disabled = true;
 
   cancelBtn?.addEventListener("click", closePhotoCropper);
+  closeBtn?.addEventListener("click", closePhotoCropper);
+  retryBtn?.addEventListener("click", () => {
+    const retry = cropperRetryAction;
+    hideCropperError();
+    if (retry) retry();
+  });
+  chooseAnotherBtn?.addEventListener("click", () => {
+    const inputId = cropperConfig?.inputId;
+    closePhotoCropper();
+    if (inputId) setTimeout(() => document.getElementById(inputId)?.click(), 0);
+  });
   cropperModalCard?.addEventListener("mousedown", (event) => event.stopPropagation());
   cropperModal.addEventListener("mousedown", (event) => {
     if (event.target === cropperModal) closePhotoCropper();
@@ -6326,6 +6634,7 @@ function initPhotoCropperModal() {
     activeCropperImage.$move(...movement);
   });
   saveBtn.addEventListener("click", () => {
+    if (cropperSaveInFlight) return;
     if (!cropperReady || !activeCropper) {
       showToast("Image is still loading. Please wait a moment and try again.", "err");
       return;
@@ -6348,6 +6657,8 @@ function setCropperLoading(isLoading, text = "") {
 
 function openPhotoCropper(file, config) {
   if (!cropperModal || !cropperImage) return;
+  cropperOpenVersion += 1;
+  hideCropperError();
   cropperConfig = config;
   cropperFile = file;
   cropperOriginalFile = file;
@@ -6371,6 +6682,7 @@ function openPhotoCropper(file, config) {
 
 function openPhotoCropperFromUrl(url, config, isObjectUrl = false, options = {}) {
   if (!cropperModal || !cropperImage) return;
+  hideCropperError();
   cropperConfig = config;
   cropperFile = null;
   cropperOriginalFile = null;
@@ -6379,7 +6691,30 @@ function openPhotoCropperFromUrl(url, config, isObjectUrl = false, options = {})
   loadCropperImage(url, isObjectUrl);
 }
 
-function openExistingPhotoEditor(config) {
+async function fetchProfilePhotoBlob(url, { authenticated = false } = {}) {
+  cropperFetchController?.abort();
+  const controller = new AbortController();
+  cropperFetchController = controller;
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const request = authenticated
+      ? secureFetch(url, { signal: controller.signal, noRedirect: true })
+      : fetch(url, { credentials: "include", signal: controller.signal });
+    const response = await request;
+    if (!response.ok) throw new Error("Unable to load profile photo.");
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType && !contentType.startsWith("image/")) {
+      throw new Error("Profile photo unavailable.");
+    }
+    return await response.blob();
+  } finally {
+    clearTimeout(timeout);
+    if (cropperFetchController === controller) cropperFetchController = null;
+  }
+}
+
+async function openExistingPhotoEditor(config) {
+  const openVersion = ++cropperOpenVersion;
   const source = getOriginalPhotoSource(currentUser || {}, { allowPending: true });
   const fallbackUrl = getDisplayProfileImage(currentUser || {}, { allowPending: true });
   const primaryUrl =
@@ -6395,51 +6730,38 @@ function openExistingPhotoEditor(config) {
   }
 
   if (cropperModal) {
+    cropperConfig = config;
+    hideCropperError();
     revealPhotoCropper();
     setCropperLoading(true, "Loading photo…");
   }
 
   const openFromBlob = (blob, originalUrl) => {
+    if (openVersion !== cropperOpenVersion || !cropperModal?.classList.contains("show")) return false;
     const objectUrl = URL.createObjectURL(blob);
     openPhotoCropperFromUrl(objectUrl, config, true, { originalUrl });
+    return true;
   };
 
-  const tryDirect = (targetUrl, allowFallback) => {
+  const tryDirect = async (targetUrl, allowFallback) => {
+    if (openVersion !== cropperOpenVersion || !cropperModal?.classList.contains("show")) return false;
     if (targetUrl.startsWith("data:")) {
       openPhotoCropperFromUrl(targetUrl, config, false, { originalUrl: targetUrl });
-      return;
+      return true;
     }
     if (targetUrl.startsWith("blob:")) {
       openPhotoCropperFromUrl(targetUrl, config, true, { originalUrl: targetUrl });
-      return;
+      return true;
     }
-    let fetchOptions = undefined;
     try {
-      const parsed = new URL(targetUrl, window.location.href);
-      if (parsed.origin === window.location.origin) {
-        fetchOptions = { credentials: "include" };
+      const blob = await fetchProfilePhotoBlob(targetUrl);
+      return openFromBlob(blob, targetUrl);
+    } catch (error) {
+      if (allowFallback && fallbackUrl && fallbackUrl !== targetUrl) {
+        return tryDirect(fallbackUrl, false);
       }
-    } catch (_) {
-      fetchOptions = { credentials: "include" };
+      return false;
     }
-    fetch(targetUrl, fetchOptions)
-      .then((res) => {
-        if (!res.ok) throw new Error("Unable to load profile photo.");
-        const contentType = res.headers.get("content-type") || "";
-        if (contentType && !contentType.startsWith("image/")) {
-          throw new Error("Profile photo unavailable.");
-        }
-        return res.blob();
-      })
-      .then((blob) => openFromBlob(blob, targetUrl))
-      .catch(() => {
-        if (allowFallback && fallbackUrl && fallbackUrl !== targetUrl) {
-          tryDirect(fallbackUrl, false);
-          return;
-        }
-        showToast("Unable to load the original photo. Please re-upload the image.", "err");
-        closePhotoCropper();
-      });
   };
 
   if (primaryUrl.startsWith("data:") || primaryUrl.startsWith("blob:")) {
@@ -6450,23 +6772,26 @@ function openExistingPhotoEditor(config) {
   const originalUrl = source?.value || fallbackUrl || "";
   const allowFallback = Boolean(source?.value && fallbackUrl && fallbackUrl !== primaryUrl);
   const sourceParam = encodeURIComponent(primaryUrl);
-  secureFetch(`/api/uploads/profile-photo/original?source=${sourceParam}`)
-    .then((res) => {
-      if (!res.ok) throw new Error("Unable to load profile photo.");
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType && !contentType.startsWith("image/")) {
-        throw new Error("Profile photo unavailable.");
-      }
-      return res.blob();
-    })
-    .then((blob) => openFromBlob(blob, originalUrl || primaryUrl))
-    .catch(() => {
-      tryDirect(primaryUrl, allowFallback);
-    });
+  try {
+    const blob = await fetchProfilePhotoBlob(
+      `/api/uploads/profile-photo/original?source=${sourceParam}`,
+      { authenticated: true }
+    );
+    openFromBlob(blob, originalUrl || primaryUrl);
+  } catch (error) {
+    const loaded = await tryDirect(primaryUrl, allowFallback);
+    if (!loaded && openVersion === cropperOpenVersion && cropperModal?.classList.contains("show")) {
+      showCropperError(
+        "The saved photo could not be loaded. Try again or choose another JPEG or PNG.",
+        () => void openExistingPhotoEditor(config)
+      );
+    }
+  }
 }
 
 function loadCropperImage(url, isObjectUrl) {
   if (!cropperModal || !cropperImage) return;
+  hideCropperError();
   cropperReady = false;
   if (cropperSaveBtn) cropperSaveBtn.disabled = true;
   if (cropperZoom) {
@@ -6480,9 +6805,18 @@ function loadCropperImage(url, isObjectUrl) {
   revealPhotoCropper();
   setCropperLoading(true, "Loading photo…");
   destroyActiveCropperInstance();
+  const retryConfig = cropperConfig;
+  const retryFile = cropperFile;
+  const retry = () => {
+    if (retryFile && retryConfig) {
+      openPhotoCropper(retryFile, retryConfig);
+    } else if (retryConfig) {
+      void openExistingPhotoEditor(retryConfig);
+    }
+  };
+  beginCropperLoadDeadline(retry);
   cropperImage.onerror = () => {
     const fallbackFile = cropperFile;
-    const fallbackConfig = cropperConfig;
     if (fallbackFile && cropperLoadRetries === 0) {
       cropperLoadRetries += 1;
       loadCropperImage(URL.createObjectURL(fallbackFile), true);
@@ -6490,38 +6824,17 @@ function loadCropperImage(url, isObjectUrl) {
     }
     if (cropperZoom) cropperZoom.disabled = true;
     if (cropperSaveBtn) cropperSaveBtn.disabled = true;
-    setCropperLoading(false);
-    showToast("Unable to open the crop editor for this image. We'll add it without cropping.", "err");
-    closePhotoCropper();
-    if (fallbackFile && fallbackConfig) {
-      stagePhotoDirect(fallbackFile, fallbackConfig);
-    }
+    showCropperError("This photo could not be opened. Try again or choose another JPEG or PNG.", retry);
   };
   cropperImage.onload = () => {
     try {
       void initializePhotoCropper().catch((error) => {
         console.error("Unable to initialize cropper", error);
-        const fallbackFile = cropperFile;
-        const fallbackConfig = cropperConfig;
-        closePhotoCropper();
-        if (fallbackFile && fallbackConfig) {
-          showToast("Crop editor unavailable. Photo was added without cropping.", "err");
-          stagePhotoDirect(fallbackFile, fallbackConfig);
-        } else {
-          showToast("Unable to open the crop editor right now.", "err");
-        }
+        showCropperError("The photo editor could not start. Try again or choose another photo.", retry);
       });
     } catch (err) {
       console.error("Unable to initialize cropper", err);
-      const fallbackFile = cropperFile;
-      const fallbackConfig = cropperConfig;
-      closePhotoCropper();
-      if (fallbackFile && fallbackConfig) {
-        showToast("Crop editor unavailable. Photo was added without cropping.", "err");
-        stagePhotoDirect(fallbackFile, fallbackConfig);
-      } else {
-        showToast("Unable to open the crop editor right now.", "err");
-      }
+      showCropperError("The photo editor could not start. Try again or choose another photo.", retry);
     }
   };
   cropperImage.src = url;
@@ -6536,6 +6849,7 @@ function revealPhotoCropper() {
   if (wasHidden) {
     activateDialogFocus(cropperModal, {
       initialFocus: document.getElementById("photoCropCancel"),
+      returnFocus: cropperReturnFocus,
       onEscape: closePhotoCropper,
     });
   }
@@ -6543,15 +6857,23 @@ function revealPhotoCropper() {
 
 function closePhotoCropper() {
   if (!cropperModal) return;
+  cropperOpenVersion += 1;
+  cropperFetchController?.abort();
+  cropperFetchController = null;
   cropperModal.classList.remove("show");
   cropperModal.setAttribute("aria-hidden", "true");
   cropperModal.setAttribute("inert", "");
   deactivateDialogFocus(cropperModal);
+  cropperReturnFocus = null;
   setCropperLoading(false);
   destroyPhotoCropper();
 }
 
 function destroyPhotoCropper() {
+  clearCropperLoadTimer();
+  if (cropperPreviewTimer) clearTimeout(cropperPreviewTimer);
+  cropperPreviewTimer = null;
+  hideCropperError();
   destroyActiveCropperInstance();
   if (cropperImage) {
     cropperImage.onerror = null;
@@ -6564,7 +6886,9 @@ function destroyPhotoCropper() {
   }
   if (cropperSaveBtn) {
     cropperSaveBtn.disabled = true;
+    cropperSaveBtn.textContent = "Save photo";
   }
+  if (cropperAvatarPreview) cropperAvatarPreview.removeAttribute("src");
   cropperBaseScale = 1;
   cropperReady = false;
   cropperLoadRetries = 0;
@@ -6593,9 +6917,14 @@ function destroyActiveCropperInstance() {
 
 async function applyCroppedPhoto() {
   if (!activeCropperSelection || !cropperConfig) return;
-  const preview = document.getElementById(cropperConfig.previewId);
-  const initials = document.getElementById(cropperConfig.initialsId);
-  const frame = document.getElementById(cropperConfig.frameId);
+  const activeConfig = cropperConfig;
+  const preview = document.getElementById(activeConfig.previewId);
+  const initials = document.getElementById(activeConfig.initialsId);
+  const frame = document.getElementById(activeConfig.frameId);
+  const isAttorneyPhoto = activeConfig.frameId === "attorneyAvatarFrame";
+  const originalFile = cropperOriginalFile;
+  const originalUrl = cropperOriginalUrl;
+  const sourceFile = cropperFile;
   if (cropperSaveBtn) cropperSaveBtn.disabled = true;
   let canvas = null;
   try {
@@ -6622,10 +6951,39 @@ async function applyCroppedPhoto() {
     showToast("Unable to process this image. Please choose a JPG or PNG file.", "err");
     return;
   }
-  const name = cropperFile?.name ? cropperFile.name.replace(/\.[^.]+$/, ".jpg") : "profile-photo.jpg";
+  const name = sourceFile?.name ? sourceFile.name.replace(/\.[^.]+$/, ".jpg") : "profile-photo.jpg";
   const file = new File([blob], name, { type: "image/jpeg" });
   const previewUrl = canvas.toDataURL("image/jpeg", 0.92);
-  const editedExistingPhoto = !cropperFile && Boolean(cropperOriginalUrl);
+  const editedExistingPhoto = !sourceFile && Boolean(originalUrl);
+
+  if (isAttorneyPhoto) {
+    cropperSaveInFlight = true;
+    if (cropperSaveBtn) cropperSaveBtn.textContent = "Saving…";
+    hideCropperError();
+    setCropperLoading(true, "Saving photo…");
+    try {
+      const payload = await uploadProfilePhotoFile(file, originalFile, editedExistingPhoto);
+      applyProfilePhotoUploadResult(payload, { suppressToast: true });
+      setAttorneySaveStatus("Profile photo saved.", "success");
+      showToast("Profile photo updated!", "ok");
+      closePhotoCropper();
+    } catch (error) {
+      console.error("Unable to upload profile photo", error);
+      showCropperError(
+        error?.message || "The photo could not be saved. Check your connection and try again.",
+        () => void applyCroppedPhoto(),
+        { preserveCropper: true }
+      );
+    } finally {
+      cropperSaveInFlight = false;
+      if (cropperSaveBtn) {
+        cropperSaveBtn.textContent = "Save photo";
+        cropperSaveBtn.disabled = !cropperReady;
+      }
+      if (cropperModal?.classList.contains("show") && cropperError?.hidden) setCropperLoading(false);
+    }
+    return;
+  }
 
   updateAvatarPreview(preview, frame, initials, previewUrl);
   settingsState.stagedProfilePhotoFile = file;
@@ -6634,12 +6992,12 @@ async function applyCroppedPhoto() {
   if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:") && settingsState.stagedProfilePhotoOriginalUrl !== cropperOriginalUrl) {
     URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
   }
-  if (cropperOriginalFile) {
-    settingsState.stagedProfilePhotoOriginalFile = cropperOriginalFile;
+  if (originalFile) {
+    settingsState.stagedProfilePhotoOriginalFile = originalFile;
     settingsState.stagedProfilePhotoOriginalUrl = "";
-  } else if (cropperOriginalUrl) {
+  } else if (originalUrl) {
     settingsState.stagedProfilePhotoOriginalFile = null;
-    settingsState.stagedProfilePhotoOriginalUrl = cropperOriginalUrl;
+    settingsState.stagedProfilePhotoOriginalUrl = originalUrl;
   } else {
     settingsState.stagedProfilePhotoOriginalFile = null;
     settingsState.stagedProfilePhotoOriginalUrl = "";

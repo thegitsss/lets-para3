@@ -14,7 +14,7 @@ const IncidentApproval = require("../models/IncidentApproval");
 const IncidentArtifact = require("../models/IncidentArtifact");
 const IncidentNotification = require("../models/IncidentNotification");
 const AuthSession = require("../models/AuthSession");
-const { applyCurrentLegalAcceptance } = require("../utils/legalDocuments");
+const { recordSignupPolicyAcknowledgement } = require("../utils/legalDocuments");
 const { csrfCookieName, csrfTokenMiddleware, respondToCsrfError } = require("../utils/csrf");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
@@ -72,7 +72,7 @@ async function createAdmin() {
     status: "approved",
     state: "CA",
   });
-  applyCurrentLegalAcceptance(admin, { source: "signup" });
+  recordSignupPolicyAcknowledgement(admin);
   return admin.save();
 }
 

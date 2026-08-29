@@ -126,8 +126,6 @@ async function verifyProjectedSessionPersistence(page) {
       state: "CA",
       stateExperience: ["CA"],
       availabilityDetails: { status: "unavailable", nextAvailable: "2026-09-01" },
-      legalAcceptanceRequired: true,
-      legalAcceptance: { termsVersion: "private-version" },
       preferences: { theme: "dark", fontSize: "lg", hideProfile: true },
       onboarding: { paralegalTourCompleted: true, privateFlag: true },
     };
@@ -141,7 +139,6 @@ async function verifyProjectedSessionPersistence(page) {
     status: "approved",
     firstName: "Avery",
     lastName: "Morgan",
-    legalAcceptanceRequired: true,
     preferences: { theme: "dark", fontSize: "lg" },
     onboarding: { paralegalTourCompleted: true },
   });

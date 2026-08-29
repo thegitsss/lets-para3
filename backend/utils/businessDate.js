@@ -59,6 +59,20 @@ function addCalendarDays(value, days) {
   return next.toISOString().slice(0, 10);
 }
 
+function startOfWeekDateOnly(value, weekStartsOn = 1) {
+  const dateOnly = normalizeDateOnly(value);
+  const startDay = Number(weekStartsOn);
+  if (!dateOnly || !Number.isInteger(startDay) || startDay < 0 || startDay > 6) return "";
+  const date = dateOnlyToUtcDate(dateOnly);
+  const offset = (date.getUTCDay() - startDay + 7) % 7;
+  return addCalendarDays(dateOnly, -offset);
+}
+
+function endOfWeekDateOnly(value, weekStartsOn = 1) {
+  const start = startOfWeekDateOnly(value, weekStartsOn);
+  return start ? addCalendarDays(start, 6) : "";
+}
+
 function formatDateOnly(value, locale = "en-US", options = {}) {
   const dateOnly = normalizeDateOnly(value);
   if (!dateOnly) return "";
@@ -100,9 +114,11 @@ module.exports = {
   addCalendarDays,
   dateOnlyFromZonedInstant,
   dateOnlyToUtcDate,
+  endOfWeekDateOnly,
   formatDateOnly,
   normalizeDateOnly,
   parseDateOnlyParts,
   parseMatterDeadline,
   resolveMatterDeadlineDate,
+  startOfWeekDateOnly,
 };

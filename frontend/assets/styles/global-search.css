@@ -36,7 +36,7 @@
 .lpc-global-search-host.is-search-open .lpc-global-search-trigger {
   gap: 10px;
   border-color: var(--line, rgba(0, 0, 0, 0.08));
-  background: rgba(255, 255, 255, 0.58);
+  background: transparent;
 }
 
 .lpc-global-search-host:hover .lpc-global-search-trigger-label,
@@ -48,7 +48,7 @@
 
 .lpc-global-search-trigger:hover,
 .lpc-global-search-trigger:focus-visible {
-  background: rgba(255, 255, 255, 0.78);
+  background: transparent;
   border-color: rgba(100, 116, 139, 0.38);
   outline: none;
 }
@@ -128,7 +128,7 @@
   max-width: 112px;
   gap: 8px;
   border-color: var(--line, rgba(0, 0, 0, 0.08));
-  background: rgba(255, 255, 255, 0.58);
+  background: transparent;
   outline: none;
 }
 
@@ -186,7 +186,7 @@ body.theme-mountain-dark .lpc-global-search-trigger:hover,
 body.theme-mountain-dark .lpc-global-search-trigger:focus-visible,
 body.theme-dark .lpc-global-search-trigger:hover,
 body.theme-dark .lpc-global-search-trigger:focus-visible {
-  background: rgba(255, 255, 255, 0.16);
+  background: transparent;
   border-color: rgba(255, 255, 255, 0.52);
 }
 

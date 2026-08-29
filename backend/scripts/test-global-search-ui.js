@@ -307,19 +307,21 @@ async function captureVisualComparison(browser) {
             regular: styleFor(viewerRole === "attorney" ? ".queue-meta" : ".info-label"),
             logo: styleFor(".logo"),
             userName: styleFor("#user-name-heading"),
-            brand: styleFor(".lpc-brand-name"),
+            footer: styleFor(".sidebar-footer"),
+            tourBrand: styleFor(".tour-title .lpc-brand-name"),
           };
         }, target.role);
-        Object.entries({ body: typography.body, heading: typography.heading, button: typography.button, regular: typography.regular }).forEach(([name, style]) => {
+        Object.entries({ body: typography.body, button: typography.button, regular: typography.regular, footer: typography.footer }).forEach(([name, style]) => {
           assert.match(style?.family || "", /Sarabun/i, `${target.role} ${name} typography must use Sarabun`);
         });
-        Object.entries({ logo: typography.logo, userName: typography.userName, brand: typography.brand }).forEach(([name, style]) => {
+        Object.entries({ heading: typography.heading, logo: typography.logo, userName: typography.userName, tourBrand: typography.tourBrand }).forEach(([name, style]) => {
+          if (!style) return;
           assert.match(style?.family || "", /Cormorant Garamond/i, `${target.role} ${name} typography must use Cormorant Garamond`);
         });
-        assert.ok(typography.heading.weight >= 600, `${target.role} heading typography: ${JSON.stringify(typography.heading)}`);
-        assert.ok(typography.button.weight >= 600, `${target.role} button typography: ${JSON.stringify(typography.button)}`);
+        assert.ok(typography.heading.weight >= 300 && typography.heading.weight <= 400, `${target.role} heading typography: ${JSON.stringify(typography.heading)}`);
+        assert.ok(typography.button.weight >= 200 && typography.button.weight <= 400, `${target.role} button typography: ${JSON.stringify(typography.button)}`);
         assert.ok(typography.button.size >= 14, `${target.role} button typography: ${JSON.stringify(typography.button)}`);
-        assert.ok(typography.regular.weight >= 400, `${target.role} regular typography: ${JSON.stringify(typography.regular)}`);
+        assert.ok(typography.regular.weight >= 200 && typography.regular.weight <= 400, `${target.role} regular typography: ${JSON.stringify(typography.regular)}`);
       }
       const output = `/tmp/lpc-prompt1-${target.role}-${variant}.png`;
       await page.screenshot({ path: output, fullPage: true });

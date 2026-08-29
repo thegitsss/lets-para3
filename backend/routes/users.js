@@ -243,8 +243,9 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
     notificationPrefs: src.notificationPrefs || null,
     preferences: {
       theme:
-        (src.preferences && typeof src.preferences === "object" && src.preferences.theme) ||
-        "mountain",
+        String(src.preferences && typeof src.preferences === "object" ? src.preferences.theme || "" : "").toLowerCase() === "dark"
+          ? "dark"
+          : "light",
       fontSize:
         (src.preferences && typeof src.preferences === "object" && src.preferences.fontSize) ||
         "md",

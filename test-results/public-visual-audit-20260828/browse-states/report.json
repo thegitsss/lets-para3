@@ -1,0 +1,197 @@
+{
+  "mobile320": {
+    "specialty": {
+      "panel": {
+        "x": -10.8125,
+        "y": 326,
+        "w": 318,
+        "h": 254.1875,
+        "bottom": 580.1875
+      },
+      "input": {
+        "x": 4.1875,
+        "y": 426,
+        "w": 288,
+        "h": 36.59375,
+        "bottom": 462.59375
+      },
+      "list": {
+        "x": 4.1875,
+        "y": 467.59375,
+        "w": 224,
+        "h": 168,
+        "bottom": 635.59375
+      },
+      "count": 42,
+      "docOverflow": 0
+    },
+    "state": {
+      "panel": {
+        "x": -10.8125,
+        "y": 326,
+        "w": 318,
+        "h": 254.1875,
+        "bottom": 580.1875
+      },
+      "input": {
+        "x": 4.1875,
+        "y": 471.59375,
+        "w": 288,
+        "h": 36.59375,
+        "bottom": 508.1875
+      },
+      "list": {
+        "x": 4.1875,
+        "y": 513.1875,
+        "w": 224,
+        "h": 168,
+        "bottom": 681.1875
+      },
+      "count": 51,
+      "docOverflow": 0
+    },
+    "blocker": {
+      "url": "http://127.0.0.1:5050/browse-paralegals.html",
+      "ariaHidden": "false",
+      "inert": false,
+      "bodyClass": "browse-jobs-page browse-paralegals-page public-site-chrome loaded auth-locked auth-blocker-ready",
+      "text": "Create an account to interact Sign in to filter, open profiles, or send inquiries. Sign In Create Account",
+      "card": {
+        "x": -16,
+        "y": 286.421875,
+        "w": 352,
+        "h": 271.15625
+      }
+    }
+  },
+  "mobile": {
+    "specialty": {
+      "panel": {
+        "x": 40.390625,
+        "y": 326,
+        "w": 334,
+        "h": 254.1875,
+        "bottom": 580.1875
+      },
+      "input": {
+        "x": 55.390625,
+        "y": 426,
+        "w": 304,
+        "h": 36.59375,
+        "bottom": 462.59375
+      },
+      "list": {
+        "x": 55.390625,
+        "y": 467.59375,
+        "w": 224,
+        "h": 168,
+        "bottom": 635.59375
+      },
+      "count": 42,
+      "docOverflow": 0
+    },
+    "state": {
+      "panel": {
+        "x": 40.390625,
+        "y": 326,
+        "w": 334,
+        "h": 254.1875,
+        "bottom": 580.1875
+      },
+      "input": {
+        "x": 55.390625,
+        "y": 471.59375,
+        "w": 304,
+        "h": 36.59375,
+        "bottom": 508.1875
+      },
+      "list": {
+        "x": 55.390625,
+        "y": 513.1875,
+        "w": 224,
+        "h": 168,
+        "bottom": 681.1875
+      },
+      "count": 51,
+      "docOverflow": 0
+    },
+    "blocker": {
+      "url": "http://127.0.0.1:5050/browse-paralegals.html",
+      "ariaHidden": "false",
+      "inert": false,
+      "bodyClass": "browse-jobs-page browse-paralegals-page public-site-chrome loaded auth-locked auth-blocker-ready",
+      "text": "Create an account to interact Sign in to filter, open profiles, or send inquiries. Sign In Create Account",
+      "card": {
+        "x": -16,
+        "y": 313.421875,
+        "w": 422,
+        "h": 217.15625
+      }
+    }
+  },
+  "desktop": {
+    "specialty": {
+      "panel": {
+        "x": 949,
+        "y": 372,
+        "w": 334,
+        "h": 254.1875,
+        "bottom": 626.1875
+      },
+      "input": {
+        "x": 964,
+        "y": 472,
+        "w": 304,
+        "h": 36.59375,
+        "bottom": 508.59375
+      },
+      "list": {
+        "x": 964,
+        "y": 513.59375,
+        "w": 224,
+        "h": 168,
+        "bottom": 681.59375
+      },
+      "count": 42,
+      "docOverflow": 0
+    },
+    "state": {
+      "panel": {
+        "x": 949,
+        "y": 372,
+        "w": 334,
+        "h": 254.1875,
+        "bottom": 626.1875
+      },
+      "input": {
+        "x": 964,
+        "y": 517.59375,
+        "w": 304,
+        "h": 36.59375,
+        "bottom": 554.1875
+      },
+      "list": {
+        "x": 964,
+        "y": 559.1875,
+        "w": 224,
+        "h": 168,
+        "bottom": 727.1875
+      },
+      "count": 51,
+      "docOverflow": 0
+    },
+    "blocker": {
+      "url": "http://127.0.0.1:5050/browse-paralegals.html",
+      "ariaHidden": "false",
+      "inert": false,
+      "bodyClass": "browse-jobs-page browse-paralegals-page public-site-chrome loaded auth-locked auth-blocker-ready",
+      "text": "Create an account to interact Sign in to filter, open profiles, or send inquiries. Sign In Create Account",
+      "card": {
+        "x": 441,
+        "y": 341.421875,
+        "w": 484,
+        "h": 217.15625
+      }
+    }
+  }
+}

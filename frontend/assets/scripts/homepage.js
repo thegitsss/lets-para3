@@ -34,6 +34,36 @@
   window.addEventListener("scroll", syncHeaderSurface, { passive: true });
   window.addEventListener("resize", syncHeaderSurface);
 
+  const editorialDetails = document.querySelector(".editorial-hero__details");
+  let editorialParallaxFrame = 0;
+  const syncEditorialParallax = () => {
+    editorialParallaxFrame = 0;
+    if (!editorialDetails) return;
+    const motionDisabled = reducedMotion.matches || document.body.classList.contains("accessibility-mode");
+    const progress = motionDisabled ? 0 : clamp(window.scrollY / Math.max(1, window.innerHeight * 0.52));
+    editorialDetails.style.setProperty("--editorial-copy-x", `${(24 * progress).toFixed(1)}px`);
+    editorialDetails.style.setProperty("--editorial-copy-y", `${(145 * progress).toFixed(1)}px`);
+    editorialDetails.style.setProperty("--editorial-actions-x", `${(-34 * progress).toFixed(1)}px`);
+    editorialDetails.style.setProperty("--editorial-actions-y", `${(245 * progress).toFixed(1)}px`);
+    editorialDetails.style.setProperty("--editorial-note-x", `${(44 * progress).toFixed(1)}px`);
+    editorialDetails.style.setProperty("--editorial-note-y", `${(345 * progress).toFixed(1)}px`);
+    editorialDetails.style.setProperty("--editorial-copy-rotate", `${(0.7 * progress).toFixed(2)}deg`);
+    editorialDetails.style.setProperty("--editorial-actions-rotate", `${(-1.3 * progress).toFixed(2)}deg`);
+    editorialDetails.style.setProperty("--editorial-depth-scale", (1 + (progress * 0.075)).toFixed(4));
+  };
+  const scheduleEditorialParallax = () => {
+    if (editorialParallaxFrame) return;
+    editorialParallaxFrame = window.requestAnimationFrame(syncEditorialParallax);
+  };
+  window.addEventListener("scroll", scheduleEditorialParallax, { passive: true });
+  window.addEventListener("resize", scheduleEditorialParallax, { passive: true });
+  reducedMotion.addEventListener("change", scheduleEditorialParallax);
+  new MutationObserver(scheduleEditorialParallax).observe(document.body, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+  syncEditorialParallax();
+
   const lazyScrollMedia = window.matchMedia("(min-width: 900px) and (pointer: fine) and (prefers-reduced-motion: no-preference)");
   let lazyScrollFrame = 0;
   let lazyScrollPosition = window.scrollY;
@@ -102,12 +132,13 @@
       this.canvas = canvas;
       this.context = canvas.getContext("2d", { alpha: true });
       this.mode = canvas.dataset.matterField || "hero";
-      this.section = canvas.closest("section");
+      this.section = canvas.closest("[data-matter-field-host]") || canvas.closest("section");
       this.width = 0;
       this.height = 0;
       this.introStartTime = null;
       this.nodes = [];
       this.frameId = 0;
+      this.parallaxFrameId = 0;
       this.isVisible = !("IntersectionObserver" in window);
       this.pointer = { x: 0, y: 0, targetX: 0, targetY: 0 };
 
@@ -116,6 +147,8 @@
       this.resize = this.resize.bind(this);
       this.animate = this.animate.bind(this);
       this.syncAnimation = this.syncAnimation.bind(this);
+      this.syncParallax = this.syncParallax.bind(this);
+      this.scheduleParallax = this.scheduleParallax.bind(this);
       this.onPointerMove = this.onPointerMove.bind(this);
 
       if ("ResizeObserver" in window) {
@@ -137,7 +170,10 @@
 
       reducedMotion.addEventListener("change", this.syncAnimation);
       document.addEventListener("visibilitychange", this.syncAnimation);
-      this.accessibilityObserver = new MutationObserver(this.syncAnimation);
+      this.accessibilityObserver = new MutationObserver(() => {
+        this.syncAnimation();
+        this.scheduleParallax();
+      });
       this.accessibilityObserver.observe(document.body, { attributes: true, attributeFilter: ["class"] });
 
       if (this.mode === "hero" && window.matchMedia("(pointer: fine)").matches) {
@@ -148,7 +184,34 @@
         }, { passive: true });
       }
 
+      if (["paths", "closing"].includes(this.mode)) {
+        window.addEventListener("scroll", this.scheduleParallax, { passive: true });
+        window.addEventListener("resize", this.scheduleParallax, { passive: true });
+        reducedMotion.addEventListener("change", this.scheduleParallax);
+        this.syncParallax();
+      }
+
       this.syncAnimation();
+    }
+
+    scheduleParallax() {
+      if (this.parallaxFrameId) return;
+      this.parallaxFrameId = window.requestAnimationFrame(this.syncParallax);
+    }
+
+    syncParallax() {
+      this.parallaxFrameId = 0;
+      if (!["paths", "closing"].includes(this.mode)) return;
+      const motionDisabled = reducedMotion.matches || document.body.classList.contains("accessibility-mode");
+      if (motionDisabled) {
+        this.canvas.style.setProperty("--paths-field-y", "0px");
+        return;
+      }
+      const rect = this.section.getBoundingClientRect();
+      const viewportHeight = Math.max(1, window.innerHeight);
+      const progress = clamp((viewportHeight - rect.top) / (viewportHeight + rect.height));
+      const centered = (progress - 0.5) * 2;
+      this.canvas.style.setProperty("--paths-field-y", `${(centered * 220).toFixed(1)}px`);
     }
 
     onPointerMove(event) {
@@ -244,13 +307,17 @@
         const route = random();
         const featured = index < labels.length;
 
-        if (this.mode === "closing") {
+        if (["closing", "paths"].includes(this.mode)) {
           const closingRadiusX = this.width * (0.3 + random() * 0.19);
-          const closingRadiusY = this.height * (0.28 + random() * 0.22);
+          const pathsFieldHeight = Math.min(this.height, Math.max(620, window.innerHeight));
+          const isParallaxField = this.mode === "paths";
+          const closingRadiusY = isParallaxField
+            ? pathsFieldHeight * (0.2 + random() * 0.24)
+            : this.height * (0.28 + random() * 0.22);
           return {
             angle,
             baseX: this.width * 0.5 + Math.cos(angle) * closingRadiusX,
-            baseY: this.height * 0.5 + Math.sin(angle) * closingRadiusY,
+            baseY: (isParallaxField ? pathsFieldHeight * 0.5 : this.height * 0.5) + Math.sin(angle) * closingRadiusY,
             radius: 0.7 + random() * 1.7,
             phase: random() * Math.PI * 2,
             speed: 0.18 + random() * 0.4,
@@ -382,6 +449,8 @@
 
     renderClosing(time) {
       const context = this.context;
+      const isPathsField = this.mode === "paths";
+      const isMobilePathsField = isPathsField && this.width <= 640;
       const positions = this.nodes.map((node) => ({
         x: node.baseX + Math.sin(time * node.speed + node.phase) * 7,
         y: node.baseY + Math.cos(time * node.speed * 0.8 + node.phase) * 5,
@@ -392,8 +461,10 @@
         context.beginPath();
         context.moveTo(position.x, position.y);
         context.lineTo(next.x, next.y);
-        context.strokeStyle = `rgba(77, 89, 107, ${index % 4 === 0 ? 0.11 : 0.045})`;
-        context.lineWidth = 0.65;
+        context.strokeStyle = isPathsField
+          ? `rgba(100, 149, 237, ${index % 4 === 0 ? (isMobilePathsField ? 0.52 : 0.34) : (isMobilePathsField ? 0.3 : 0.17)})`
+          : `rgba(77, 89, 107, ${index % 4 === 0 ? 0.11 : 0.045})`;
+        context.lineWidth = isMobilePathsField ? 0.9 : 0.65;
         context.stroke();
       });
 
@@ -403,13 +474,19 @@
           context.save();
           context.font = '200 9px "Sarabun", sans-serif';
           context.textAlign = "center";
-          context.fillStyle = "rgba(128, 101, 44, 0.52)";
+          context.fillStyle = isPathsField
+            ? `rgba(76, 124, 211, ${isMobilePathsField ? 0.86 : 0.72})`
+            : "rgba(128, 101, 44, 0.52)";
           context.fillText(node.label, position.x, position.y + 17);
           context.restore();
         }
         context.beginPath();
         context.arc(position.x, position.y, node.radius, 0, Math.PI * 2);
-        context.fillStyle = index % 5 === 0 ? "rgba(180, 151, 90, 0.55)" : "rgba(58, 72, 92, 0.28)";
+        context.fillStyle = isPathsField
+          ? (index % 5 === 0
+            ? `rgba(100, 149, 237, ${isMobilePathsField ? 0.96 : 0.88})`
+            : `rgba(100, 149, 237, ${isMobilePathsField ? 0.76 : 0.58})`)
+          : (index % 5 === 0 ? "rgba(180, 151, 90, 0.55)" : "rgba(58, 72, 92, 0.28)");
         context.fill();
       });
 
@@ -418,7 +495,7 @@
     render(time) {
       if (!this.context || !this.width || !this.height) return;
       this.context.clearRect(0, 0, this.width, this.height);
-      if (this.mode === "closing") this.renderClosing(time);
+      if (["closing", "paths"].includes(this.mode)) this.renderClosing(time);
       else this.renderHero(time);
     }
   }
@@ -514,11 +591,6 @@
     revealTargets.forEach((element) => revealObserver.observe(element));
   }
 
-  const startHeroMotion = () => window.requestAnimationFrame(() => {
-    window.requestAnimationFrame(() => document.body.classList.add("home-motion-ready"));
-  });
-  (document.fonts?.ready || Promise.resolve()).then(startHeroMotion, startHeroMotion);
-
   const setMobileNav = (open) => {
     if (!header || !mobileToggle || !mobileNav) return;
     header.classList.toggle("is-open", open);
@@ -526,13 +598,14 @@
     mobileToggle.setAttribute("aria-expanded", String(open));
     mobileToggle.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
     mobileNav.setAttribute("aria-hidden", String(!open));
+    mobileNav.toggleAttribute("inert", !open);
 
-    if (open) {
-      mobileNav.querySelector("a")?.focus();
-    } else if (document.activeElement && mobileNav.contains(document.activeElement)) {
+    if (!open && document.activeElement && mobileNav.contains(document.activeElement)) {
       mobileToggle.focus();
     }
   };
+
+  setMobileNav(false);
 
   mobileToggle?.addEventListener("click", () => {
     setMobileNav(mobileToggle.getAttribute("aria-expanded") !== "true");
@@ -562,6 +635,11 @@
   const mobileWorkflowQuery = window.matchMedia("(max-width: 640px)");
   const desktopRail = desktopCanvas?.querySelector(".matter-rail");
   const desktopWorkflowStatus = desktopCanvas?.querySelector(".product-topbar .status-chip");
+  const mobileWorkflowStage = document.querySelector("[data-mobile-workflow-stage]");
+  const mobileWorkflowStageHeading = document.querySelector(".workflow-mobile-stage__heading");
+  const mobileWorkflowStageNumber = mobileWorkflowStageHeading?.querySelector(".workflow-mobile-stage__number");
+  const mobileWorkflowStageTitle = mobileWorkflowStageHeading?.querySelector("h3");
+  const mobileWorkflowStageCopy = mobileWorkflowStageHeading?.querySelector("p");
   const workflowStatusLabels = {
     1: "Accepting Applications",
     2: "Applications Received",
@@ -583,6 +661,35 @@
 
   ["1", "2", "3", "4", "5", "6"].forEach(stateForMobile);
 
+  if (mobileWorkflowStage && !mobileWorkflowStage.childElementCount) {
+    desktopStates.forEach((source) => {
+      const clone = source.cloneNode(true);
+      const frame = document.createElement("div");
+      frame.className = "workflow-mobile-stage__frame";
+      while (clone.firstChild) frame.appendChild(clone.firstChild);
+      clone.appendChild(frame);
+      clone.classList.toggle("is-active", source.dataset.state === "1");
+      clone.setAttribute("aria-hidden", String(source.dataset.state !== "1"));
+      mobileWorkflowStage.appendChild(clone);
+    });
+  }
+
+  const fitMobileWorkflowState = () => {
+    if (!mobileWorkflowQuery.matches || !mobileWorkflowStage) return;
+    const panel = mobileWorkflowStage.querySelector(".workflow-state.is-active");
+    const frame = panel?.querySelector(".workflow-mobile-stage__frame");
+    if (!panel || !frame) return;
+    frame.style.setProperty("--mobile-workflow-scale", "1");
+    const availableHeight = Math.max(1, panel.clientHeight - 20);
+    const naturalHeight = Math.max(1, frame.scrollHeight);
+    frame.style.setProperty(
+      "--mobile-workflow-scale",
+      Math.min(1, availableHeight / naturalHeight).toFixed(3),
+    );
+  };
+
+  window.addEventListener("resize", () => window.requestAnimationFrame(fitMobileWorkflowState));
+
   const updateRail = (rail, state) => {
     if (!rail) return;
     rail.dataset.matterRail = state;
@@ -602,6 +709,23 @@
       desktopWorkflowStatus.textContent = workflowStatusLabels[state] || "Matter active";
     }
     if (workflowMobileCount) workflowMobileCount.textContent = `Step ${state} of ${chapters.length}`;
+    if (mobileWorkflowStage) {
+      mobileWorkflowStage.querySelectorAll(".workflow-state").forEach((panel) => {
+        const isActive = panel.dataset.state === state;
+        panel.classList.toggle("is-active", isActive);
+        panel.setAttribute("aria-hidden", String(!isActive));
+      });
+      window.requestAnimationFrame(fitMobileWorkflowState);
+    }
+    const activeChapter = chapters.find((chapter) => chapter.dataset.workflowChapter === state);
+    if (activeChapter && mobileWorkflowStageHeading) {
+      if (mobileWorkflowStageNumber) mobileWorkflowStageNumber.textContent = String(state).padStart(2, "0");
+      if (mobileWorkflowStageTitle) mobileWorkflowStageTitle.textContent = activeChapter.querySelector("h3")?.textContent || "";
+      if (mobileWorkflowStageCopy) mobileWorkflowStageCopy.textContent = activeChapter.querySelector("p")?.textContent || "";
+      mobileWorkflowStageHeading.classList.remove("is-changing");
+      void mobileWorkflowStageHeading.offsetWidth;
+      mobileWorkflowStageHeading.classList.add("is-changing");
+    }
     desktopStates.forEach((panel) => {
       const isActive = panel.dataset.state === state;
       panel.classList.toggle("is-active", isActive);
@@ -680,7 +804,6 @@
 
     const syncWorkflowState = () => {
       workflowFrame = 0;
-      if (mobileWorkflowQuery.matches) return;
       const activationLine = window.innerHeight * 0.48;
       const direction = window.scrollY >= previousWorkflowScrollY ? "down" : "up";
       previousWorkflowScrollY = window.scrollY;
@@ -730,23 +853,10 @@
     {
       selector: ".assistant-showcase",
       progressMode: "lower-third-section",
-      exitStart: 0.985,
+      exitStart: 0.98,
       exitEnd: 1,
       layers: [
-        [".assistant-showcase__intro", "rise", 0, 0.16],
-        [".assistant-stage", "depth", 0.02, 0.20],
-        [".assistant-workspace__topbar", "rise", 0.08, 0.22],
-        [".assistant-workspace__matter > .interface-label", "rise", 0.12, 0.25],
-        [".assistant-workspace__matter > h3", "rise", 0.15, 0.28],
-        [".assistant-workspace__matter > div:nth-of-type(1)", "rise", 0.18, 0.31],
-        [".assistant-workspace__matter > div:nth-of-type(2)", "rise", 0.21, 0.34],
-        [".assistant-workspace__matter > div:nth-of-type(3)", "rise", 0.24, 0.38],
-        [".assistant-workspace__activity", "rise", 0.27, 0.41],
-        [".assistant-preview__header", "lateral-right", 0.18, 0.32],
-        [".assistant-message--user", "lateral-right", 0.25, 0.39],
-        [".assistant-message--assistant", "rise", 0.33, 0.52],
-        [".assistant-preview__suggestions", "rise", 0.42, 0.58],
-        [".assistant-preview__composer", "rise", 0.46, 0.62],
+        [".assistant-preview", "assistant-float", 0.64, 0.86],
       ],
     },
     {
@@ -781,7 +891,6 @@
         [".fee-card__row:nth-of-type(1)", "rise", 0.07, 0.16],
         [".fee-card__row:nth-of-type(2)", "rise", 0.08, 0.17],
         [".fee-card__row:nth-of-type(3)", "rise", 0.09, 0.18],
-        [".home-faq", "rise", 0.32, 0.48],
       ],
     },
     {
@@ -800,6 +909,7 @@
     "lateral-right": { x: 0, y: 64, scale: 0.975, rotate: 0, exitX: 0, exitY: -28 },
     depth: { x: 0, y: 110, scale: 0.92, rotate: 2.4, exitX: 0, exitY: -62 },
     card: { x: 0, y: 86, scale: 0.94, rotate: 0, exitX: 0, exitY: -48 },
+    "assistant-float": { x: 0, y: 56, scale: 0.975, rotate: 0, exitX: 0, exitY: 0 },
   };
   let cinematicScenes = [];
   let cinematicFrame = 0;
@@ -839,6 +949,16 @@
       element.style.removeProperty("--paths-attorney-scale");
       element.style.removeProperty("--paths-paralegal-x");
       element.style.removeProperty("--paths-paralegal-scale");
+      element.style.removeProperty("--assistant-launch-progress");
+      element.style.removeProperty("--assistant-launch-scale");
+      element.style.removeProperty("--assistant-chat-progress");
+      element.style.removeProperty("--assistant-chat-x");
+      element.style.removeProperty("--assistant-chat-scale");
+      element.style.removeProperty("--assistant-chat-clip");
+      element.style.removeProperty("--assistant-workspace-scale");
+      element.style.removeProperty("--assistant-workspace-dim");
+      element.style.removeProperty("--assistant-deadline-highlight");
+      element.style.removeProperty("--assistant-assigned-highlight");
       layers.forEach(({ element: layer }) => {
         layer.removeAttribute("data-motion-layer");
         layer.style.removeProperty("--motion-layer-progress");
@@ -861,12 +981,13 @@
     cinematicScenes.forEach((scene) => {
       const top = scene.top;
       const height = scene.height;
-      const progress = scene.progressMode === "lower-third-section"
+      const targetProgress = scene.progressMode === "lower-third-section"
         ? clamp(
           (scrollPosition - (top - (viewportHeight * (2 / 3)))) /
           Math.max(1, (top + height - viewportHeight) - (top - (viewportHeight * (2 / 3))))
         )
         : clamp((scrollPosition + viewportHeight - top) / (height + viewportHeight));
+      const progress = targetProgress;
       const progressValue = Number(progress.toFixed(4));
       if (scene.progress === progressValue) return;
       scene.progress = progressValue;
@@ -877,11 +998,26 @@
       scene.element.style.setProperty("--motion-exit", exit.toFixed(4));
       scene.element.style.setProperty("--motion-reveal-inset", `${((1 - enter) * 100).toFixed(2)}%`);
       if (scene.kind === "horizontal-paths") {
-        const horizontalProgress = smoothProgress(0.34, 0.60, progress);
+        const horizontalProgress = smoothProgress(0.40, 0.64, progress);
         scene.element.style.setProperty("--paths-attorney-x", `${(-104 * horizontalProgress).toFixed(3)}%`);
         scene.element.style.setProperty("--paths-attorney-scale", (1 - (horizontalProgress * 0.035)).toFixed(4));
         scene.element.style.setProperty("--paths-paralegal-x", `${(104 * (1 - horizontalProgress)).toFixed(3)}%`);
         scene.element.style.setProperty("--paths-paralegal-scale", (0.965 + (horizontalProgress * 0.035)).toFixed(4));
+      }
+      if (scene.kind === "assistant-sequence") {
+        const launcherProgress = smoothProgress(0.22, 0.29, progress);
+        const chatProgress = smoothProgress(0.28, 0.38, progress);
+        const deadlineHighlight = smoothProgress(0.41, 0.49, progress);
+        scene.element.style.setProperty("--assistant-launch-progress", launcherProgress.toFixed(4));
+        scene.element.style.setProperty("--assistant-launch-scale", (1 + (launcherProgress * 0.16)).toFixed(4));
+        scene.element.style.setProperty("--assistant-chat-progress", chatProgress.toFixed(4));
+        scene.element.style.setProperty("--assistant-chat-x", `${((1 - chatProgress) * 100).toFixed(2)}%`);
+        scene.element.style.setProperty("--assistant-chat-scale", "1");
+        scene.element.style.setProperty("--assistant-chat-clip", "0%");
+        scene.element.style.setProperty("--assistant-workspace-scale", "1");
+        scene.element.style.setProperty("--assistant-workspace-dim", (chatProgress * 0.08).toFixed(4));
+        scene.element.style.setProperty("--assistant-deadline-highlight", deadlineHighlight.toFixed(4));
+        scene.element.style.setProperty("--assistant-assigned-highlight", "0");
       }
       scene.layers.forEach((layer) => {
         const layerProgress = smoothProgress(layer.start, layer.end, progress);
@@ -900,6 +1036,7 @@
         layer.element.style.setProperty("--motion-layer-opacity", opacity.toFixed(4));
       });
     });
+
   };
 
   const scheduleCinematicMotion = () => {
@@ -960,7 +1097,6 @@
 
   const resolveDashboard = (user) => {
     if (String(user?.status || "").toLowerCase() !== "approved") return "";
-    if (user?.legalAcceptanceRequired === true) return "legal-acceptance.html";
     const role = String(user?.role || "").toLowerCase();
     if (role === "admin") return "admin-dashboard.html";
     if (role === "director") return "director-portal.html";

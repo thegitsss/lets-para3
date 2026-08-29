@@ -139,7 +139,7 @@ test("paralegal critical product surfaces render accessibly without overflow or 
   for (const surface of surfaces) {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(surface.url, { waitUntil: "domcontentloaded" });
-    await expect(page).not.toHaveURL(/login\.html|legal-acceptance\.html/);
+    await expect(page).not.toHaveURL(/login\.html/);
     await expect(page.locator("main#main")).toBeVisible();
     await expect(page.getByRole("heading", { name: surface.heading, exact: true }).first()).toBeVisible();
     await page.waitForTimeout(200);
@@ -314,7 +314,7 @@ function assistantReply({
   };
 }
 
-test("paralegal drawer renders a concise manager answer, one action, and working feedback", async ({ page }) => {
+test("paralegal drawer renders a concise manager answer, one action, and working feedback", async ({ page, browserName }) => {
   const userMessage = {
     id: "p6-paralegal-user",
     conversationId: "p6-paralegal-conversation",
@@ -393,6 +393,7 @@ test("paralegal drawer renders a concise manager answer, one action, and working
   await expect(answer.locator(".support-suggested-reply")).toHaveText("Where is my latest payout?");
   await expect(answer.getByRole("button", { name: "Helpful", exact: true })).toBeVisible();
   await expect(answer.getByRole("button", { name: "Not helpful", exact: true })).toBeVisible();
+  await page.screenshot({ path: `/tmp/lpc-paralegal-assistant-${browserName}.png`, fullPage: true });
 
   await answer.getByRole("button", { name: "Helpful", exact: true }).click();
   await expect(answer.getByRole("button", { name: "Helpful", exact: true })).toHaveAttribute(

@@ -145,10 +145,8 @@ function getUnreadCount(list = []) {
   return list.filter((item) => item?.read === false).length;
 }
 
-function getAvatarFallback(name = "") {
-  const letter = (name || "?").trim().charAt(0).toUpperCase() || "?";
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="#eef1f7"/><text x="50%" y="56%" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#5c6477">${letter}</text></svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+function getAvatarFallback() {
+  return "/assets/avatar-placeholder.svg";
 }
 
 
@@ -195,7 +193,7 @@ function getNotificationAvatar(item = {}, actorName = "") {
     Boolean(item.payload?.actorName) ||
     Boolean(item.payload?.paralegalName);
   if (!hasActor) return ADMIN_NOTIFICATION_IMAGE;
-  return getAvatarFallback(actorName);
+  return getAvatarFallback();
 }
 
 function formatNotificationMessage(item = {}) {
@@ -913,7 +911,7 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
   avatar.addEventListener(
     "error",
     () => {
-      avatar.src = getAvatarFallback(actorName);
+      avatar.src = getAvatarFallback();
     },
     { once: true }
   );

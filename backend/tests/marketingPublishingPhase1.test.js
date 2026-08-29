@@ -14,6 +14,7 @@ const User = require("../models/User");
 const adminKnowledgeRouter = require("../routes/adminKnowledge");
 const adminMarketingRouter = require("../routes/adminMarketing");
 const { createAuthSession } = require("../services/authSessionService");
+const { getPublishingStatusCounts } = require("../services/marketing/publishingCycleService");
 const { ensurePublishingSettings } = require("../services/marketing/publishingSettingsService");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
@@ -257,6 +258,29 @@ describe("Marketing publishing Phase 1", () => {
       })
     );
     expect(overviewRes.body.latestCycles[0].status).toBe("awaiting_approval");
+  });
+
+  test("publishing status counts expose a read-only control-room snapshot without initializing settings", async () => {
+    await MarketingPublishingCycle.create([
+      { triggerSource: "manual", status: "blocked", cycleLabel: "Blocked cycle" },
+      { triggerSource: "manual", status: "awaiting_approval", cycleLabel: "Review cycle" },
+      { triggerSource: "manual", status: "skipped", cycleLabel: "Skipped cycle" },
+    ]);
+
+    const snapshot = await getPublishingStatusCounts();
+
+    expect(snapshot).toEqual({
+      counts: {
+        total: 3,
+        drafted: 0,
+        awaiting_approval: 1,
+        blocked: 1,
+        skipped: 1,
+        ready_to_publish: 0,
+      },
+      openCycleCount: 2,
+    });
+    expect(await MarketingPublishingSettings.countDocuments({})).toBe(0);
   });
 
   test("jr cmo library endpoint returns day context, opportunities, facts, and weekly learning", async () => {

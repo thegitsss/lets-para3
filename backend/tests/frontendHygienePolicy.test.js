@@ -15,6 +15,9 @@ const {
   silentAsyncFailureIssue,
   unboundedCssTransitionIssue,
   generatedCssWrapperIssue,
+  nativeDialogIssue,
+  remoteVisualAssetIssue,
+  duplicatedAvatarFallbackIssue,
 } = require("../scripts/check-frontend-hygiene");
 
 describe("frontend hygiene policy", () => {
@@ -137,6 +140,26 @@ describe("frontend hygiene policy", () => {
     expect(generatedCssWrapperIssue("/// header ///\nheader {}", cssPath)).toBe(true);
     expect(generatedCssWrapperIssue("/* Header */\nheader {}", cssPath)).toBe(false);
     expect(generatedCssWrapperIssue("Absolutely fine", "/repo/frontend/assets/scripts/app.js")).toBe(false);
+  });
+
+  test("rejects every native browser dialog spelling", () => {
+    expect(nativeDialogIssue("window.alert('No')")).toBe(true);
+    expect(nativeDialogIssue("confirm('Delete?')")).toBe(true);
+    expect(nativeDialogIssue("window.prompt('Name')")).toBe(true);
+    expect(nativeDialogIssue("dialogs.confirm(options)")).toBe(false);
+  });
+
+  test("rejects mutable remote visual assets but permits functional vendor scripts", () => {
+    expect(remoteVisualAssetIssue('<img src="https://cdn.example.com/avatar.png">', "/repo/frontend/index.html")).toBe(true);
+    expect(remoteVisualAssetIssue('.hero { background: url("//cdn.example.com/hero.jpg"); }', "/repo/frontend/styles.css")).toBe(true);
+    expect(remoteVisualAssetIssue('<script src="https://js.stripe.com/v3/"></script>', "/repo/frontend/payments.html")).toBe(false);
+    expect(remoteVisualAssetIssue('.hero { background: url("../hero.jpg"); }', "/repo/frontend/styles.css")).toBe(false);
+  });
+
+  test("rejects duplicated generated avatar fallbacks", () => {
+    expect(duplicatedAvatarFallbackIssue("const DEFAULT_AVATAR = `data:image/svg+xml,<svg></svg>`;")).toBe(true);
+    expect(duplicatedAvatarFallbackIssue("function buildAvatar() { return `data:image/svg+xml,${svg}`; }")).toBe(true);
+    expect(duplicatedAvatarFallbackIssue('const DEFAULT_AVATAR = "/assets/avatar-placeholder.svg";')).toBe(false);
   });
 
   test("rejects broken static navigation and accessibility relationships", () => {

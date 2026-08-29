@@ -126,7 +126,6 @@ async function startServer() {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          legalAcceptanceRequired: false,
         },
       });
     } catch (error) {
