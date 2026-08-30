@@ -308,7 +308,10 @@
               lastSessionFailure = "disabled";
               return null;
             }
-            if (res.status === 401) {
+            if (
+              res.status === 401 ||
+              (res.status === 403 && /session expired|invalid token|not authenticated/i.test(String(message || "")))
+            ) {
               lastSessionFailure = "unauthorized";
               return null;
             }
@@ -375,6 +378,36 @@
       } catch (_) {}
     });
   }
+
+  window.addEventListener("storage", (event) => {
+    if (event.key !== "lpc_user" || event.newValue || !event.oldValue) return;
+    cachedUser = null;
+    sessionPromise = null;
+    redirectToLogin();
+  });
+
+  function reauthorizeVisibleSession(source) {
+    fetchSession(true).then((user) => {
+      if (!user && !shouldPreserveStoredSession()) invalidateAndRedirect();
+    }).catch((error) => {
+      console.warn(`[session] ${source} reauthorization failed`, error);
+    });
+  }
+
+  window.addEventListener("lpc:lifecycle-refresh", () => {
+    if (document.visibilityState !== "visible") return;
+    reauthorizeVisibleSession("lifecycle");
+  });
+
+  window.addEventListener("pageshow", (event) => {
+    if (!event.persisted) return;
+    reauthorizeVisibleSession("pageshow");
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    reauthorizeVisibleSession("visibility");
+  });
 
   function invalidateAndRedirect() {
     if (!nukedOnRedirect) {

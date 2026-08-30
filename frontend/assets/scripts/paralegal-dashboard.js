@@ -227,6 +227,8 @@ let appliedQueryHandled = false;
 let appliedHighlightHandled = false;
 let applicationReturnFocus = null;
 let dashboardRefreshInFlight = false;
+let dashboardRefreshGeneration = 0;
+let dashboardRefreshQueuedReason = '';
 let lastDashboardRefreshAt = 0;
 const DASHBOARD_REFRESH_COOLDOWN_MS = 4000;
 let earningsMode = 'month';
@@ -868,14 +870,17 @@ function updateStats(stats = {}) {
   }
 }
 
-async function refreshDashboardFromServer(reason = '') {
-  if (dashboardRefreshInFlight) return;
+async function refreshDashboardFromServer(reason = '', { force = false } = {}) {
+  const generation = ++dashboardRefreshGeneration;
+  if (dashboardRefreshInFlight) {
+    dashboardRefreshQueuedReason = reason || 'queued';
+    return;
+  }
   const now = Date.now();
-  if (now - lastDashboardRefreshAt < DASHBOARD_REFRESH_COOLDOWN_MS) return;
+  if (!force && now - lastDashboardRefreshAt < DASHBOARD_REFRESH_COOLDOWN_MS) return;
   dashboardRefreshInFlight = true;
   lastDashboardRefreshAt = now;
   try {
-    const recommendationRefresh = loadRecommendedMatters();
     const [dashboard, invites, deadlines, threads, unreadCount] = await Promise.all([
       fetchParalegalData({ fresh: true }).catch((err) => {
         console.warn('Paralegal dashboard payload refresh failed', reason || '', err);
@@ -898,6 +903,8 @@ async function refreshDashboardFromServer(reason = '') {
         return unreadMessageCount;
       }),
     ]);
+
+    if (generation !== dashboardRefreshGeneration) return;
 
     updateUnreadDisplay(unreadCount);
     initLatestMessage(Array.isArray(threads) ? threads : []);
@@ -928,7 +935,9 @@ async function refreshDashboardFromServer(reason = '') {
     });
     maybeOpenInviteFromQuery();
     await loadAppliedJobs({ preservePage: true });
-    await recommendationRefresh;
+    if (generation !== dashboardRefreshGeneration) return;
+    await loadRecommendedMatters();
+    if (generation !== dashboardRefreshGeneration) return;
     paralegalPrioritySnapshot = {
       activeCases,
       invites: Array.isArray(invites) ? invites : [],
@@ -944,23 +953,32 @@ async function refreshDashboardFromServer(reason = '') {
     console.warn('Paralegal dashboard refresh failed', reason || '', err);
   } finally {
     dashboardRefreshInFlight = false;
+    if (dashboardRefreshQueuedReason) {
+      const queuedReason = dashboardRefreshQueuedReason;
+      dashboardRefreshQueuedReason = '';
+      queueMicrotask(() => refreshDashboardFromServer(queuedReason, { force: true }));
+    }
   }
 }
 
 function setupDashboardAutoRefresh() {
   window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
-      refreshDashboardFromServer('pageshow');
+      refreshDashboardFromServer('pageshow', { force: true });
     }
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      refreshDashboardFromServer('visible');
+      refreshDashboardFromServer('visible', { force: true });
     }
   });
   window.addEventListener('lpc:notifications-refreshed', () => {
     if (document.visibilityState !== 'visible') return;
-    refreshDashboardFromServer('notifications');
+    refreshDashboardFromServer('notifications', { force: true });
+  });
+  window.addEventListener('lpc:lifecycle-refresh', () => {
+    if (document.visibilityState !== 'visible') return;
+    refreshDashboardFromServer('lifecycle', { force: true });
   });
 }
 

@@ -350,14 +350,14 @@ async function runRoleJourney(browser, role) {
   await baselinePage.goto(`http://matter.test/baseline-case-detail.html?caseId=${matterId}`);
   try {
     await baselinePage.waitForFunction(
-      () => document.querySelector("#caseTitle")?.textContent.includes("Discovery response"),
+      () => [...document.querySelectorAll("#case-select option")]
+        .some((option) => option.textContent.includes("Discovery response")),
       null,
       { timeout: 10_000 }
     );
   } catch (error) {
     const baselineState = await baselinePage.evaluate(() => ({
-      title: document.querySelector("#caseTitle")?.textContent || "",
-      status: document.querySelector("#caseStatusLine")?.textContent || "",
+      selectedMatter: document.querySelector("#case-select")?.selectedOptions?.[0]?.textContent || "",
       listStatus: document.querySelector("#caseListStatus")?.textContent || "",
       url: location.href,
     }));

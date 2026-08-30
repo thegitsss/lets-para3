@@ -20,6 +20,50 @@ const phasePages = [
   { name: "404", url: "/nested/unknown/public-page", main: ".error-card", status: 404 },
 ];
 
+const privacySections = [
+  ["scope", "Scope"],
+  ["information", "Information we collect"],
+  ["use", "How we use information"],
+  ["disclosure", "How we disclose information"],
+  ["matter-assistant", "Matter-workspace LPC Assistant"],
+  ["ai-support", "AI-assisted support"],
+  ["cookies", "Cookies and performance data"],
+  ["retention", "Retention and account deactivation"],
+  ["security", "Security"],
+  ["choices", "Your choices and privacy requests"],
+  ["children", "Age restrictions"],
+  ["changes", "Changes to this policy"],
+  ["contact", "Contact us"],
+  ["international", "Processing in the United States"],
+];
+
+const termsSections = [
+  "Let’s-ParaConnect Platform Overview",
+  "Flat-Fee Matters",
+  "Paralegal Replacement and Early Termination",
+  "Communication Between Attorneys and Paralegals",
+  "Account Registration",
+  "User Profiles",
+  "Let’s-ParaConnect Profiles",
+  "Working Together Outside the Platform",
+  "Paralegals Are Independent Contractors",
+  "Tax Reporting and IRS Forms",
+  "Matter Review and Dispute Resolution",
+  "Account Restrictions and Termination",
+  "Using the Platform",
+  "Content and Use of Platform Content",
+  "Notices Regarding Let’s-ParaConnect",
+  "Electronic Communications",
+  "Indemnification",
+  "Disclaimers and Limitations of Liability",
+  "Choice of Law and Venue",
+  "Waiver of Jury Trial and Class Action",
+  "Termination",
+  "General Terms",
+  "Changes to This Agreement",
+  "Definitions",
+].map((heading, index) => [`section-${index + 1}`, heading]);
+
 async function settle(page) {
   await page.waitForLoadState("load");
   await page.evaluate(() => document.fonts.ready);
@@ -76,22 +120,30 @@ test("Terms and Privacy use the same legal reader without losing sections or anc
   const results = [];
 
   for (const item of [
-    { url: "/privacy.html", count: 14, first: "scope", last: "contact" },
-    { url: "/terms.html", count: 24, first: "section-1", last: "section-24" },
+    { url: "/privacy.html", sections: privacySections },
+    { url: "/terms.html", sections: termsSections },
   ]) {
     await page.goto(item.url, { waitUntil: "domcontentloaded" });
     await settle(page);
     await expect(page.locator("main.legal-document")).toBeVisible();
     await expect(page.locator(".document-toc")).toBeVisible();
-    await expect(page.locator(".legal-document section.card")).toHaveCount(item.count);
-    await expect(page.locator(`.legal-document section.card#${item.first}`)).toHaveCount(1);
-    await expect(page.locator(`.legal-document section.card#${item.last}`)).toHaveCount(1);
+    const sections = page.locator(".legal-document section.card");
+    const tocLinks = page.locator(".document-toc a");
+    await expect(sections).toHaveCount(item.sections.length);
+    await expect(tocLinks).toHaveCount(item.sections.length);
+    for (const [index, [id, heading]] of item.sections.entries()) {
+      await expect(sections.nth(index)).toHaveAttribute("id", id);
+      await expect(sections.nth(index).locator("h2")).toHaveText(`${index + 1}. ${heading}`);
+      await expect(tocLinks.nth(index)).toHaveAttribute("href", `#${id}`);
+      await expect(tocLinks.nth(index)).toHaveText(heading);
+    }
 
     const anchorState = await page.locator(".document-toc a").evaluateAll((links) => links.map((link) => {
       const id = decodeURIComponent(new URL(link.href).hash.slice(1));
       return { id, exists: Boolean(document.getElementById(id)) };
     }));
-    expect(anchorState).toHaveLength(item.count);
+    expect(anchorState).toHaveLength(item.sections.length);
+    expect(new Set(anchorState.map(({ id }) => id)).size).toBe(item.sections.length);
     expect(anchorState.every(({ exists }) => exists)).toBe(true);
 
     results.push(await page.locator("main.legal-document").evaluate((main) => {

@@ -9,7 +9,91 @@ export let CSRF_TOKEN = "";
 const USER_KEY = "lpc_user";
 const SUPPORT_SESSION_USER_KEY = "lpc_support_session_user";
 const LEGACY_TOKEN_KEYS = ["LPC_JWT", "lpc_jwt"];
+const LIFECYCLE_STORAGE_KEY = "lpc_lifecycle_refresh_v1";
+const LIFECYCLE_CHANNEL_NAME = "lpc-lifecycle-refresh-v1";
 let redirectingToLogin = false;
+let lifecycleSequence = 0;
+const lifecycleSourceId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+const seenLifecycleEvents = new Set();
+let lifecycleChannel = null;
+
+function lifecycleDetail(input = {}) {
+  const url = String(input.url || "");
+  let pathname = url;
+  try {
+    pathname = new URL(url, window.location.origin).pathname;
+  } catch {}
+  const caseMatch = pathname.match(/\/api\/(?:cases|messages|disputes)\/([a-f0-9]{24})(?:\/|$)/i) ||
+    pathname.match(/\/api\/uploads\/case\/([a-f0-9]{24})(?:\/|$)/i);
+  const accessMayChange =
+    /^\/api\/cases\/[a-f0-9]{24}\/(?:applicants\/[a-f0-9]{24}\/reject|hire\/[a-f0-9]{24}|invite(?:\/|$)|respond-invite|withdraw|complete|terminate)/i.test(pathname) ||
+    /^\/api\/(?:disputes|blocks)(?:\/|$)/i.test(pathname) ||
+    /^\/api\/account\/(?:sessions|deactivate|delete)(?:\/|$)/i.test(pathname);
+  return {
+    id: String(input.id || `${lifecycleSourceId}:${Date.now()}:${++lifecycleSequence}`),
+    sourceId: String(input.sourceId || lifecycleSourceId),
+    at: Number(input.at || Date.now()),
+    method: String(input.method || "GET").toUpperCase(),
+    url: pathname,
+    caseId: String(input.caseId || caseMatch?.[1] || ""),
+    accessMayChange: input.accessMayChange === true || accessMayChange,
+  };
+}
+
+function dispatchLifecycleRefresh(input = {}) {
+  const detail = lifecycleDetail(input);
+  if (!detail.id || seenLifecycleEvents.has(detail.id)) return false;
+  seenLifecycleEvents.add(detail.id);
+  if (seenLifecycleEvents.size > 200) {
+    const oldest = seenLifecycleEvents.values().next().value;
+    seenLifecycleEvents.delete(oldest);
+  }
+  window.dispatchEvent(new CustomEvent("lpc:lifecycle-refresh", { detail }));
+  return true;
+}
+
+function setupLifecycleSync() {
+  if (typeof window === "undefined" || window.__lpcLifecycleSyncReady) return;
+  window.__lpcLifecycleSyncReady = true;
+  if (typeof BroadcastChannel === "function") {
+    try {
+      lifecycleChannel = new BroadcastChannel(LIFECYCLE_CHANNEL_NAME);
+      lifecycleChannel.addEventListener("message", (event) => dispatchLifecycleRefresh(event.data || {}));
+    } catch {
+      lifecycleChannel = null;
+    }
+  }
+  window.addEventListener("storage", (event) => {
+    if (event.key !== LIFECYCLE_STORAGE_KEY || !event.newValue) return;
+    try {
+      dispatchLifecycleRefresh(JSON.parse(event.newValue));
+    } catch {}
+  });
+}
+
+export function publishLifecycleRefresh(input = {}) {
+  if (typeof window === "undefined") return null;
+  setupLifecycleSync();
+  const detail = lifecycleDetail(input);
+  dispatchLifecycleRefresh(detail);
+  try {
+    lifecycleChannel?.postMessage(detail);
+  } catch {}
+  try {
+    localStorage.setItem(LIFECYCLE_STORAGE_KEY, JSON.stringify(detail));
+  } catch {}
+  return detail;
+}
+
+function shouldPublishLifecycleMutation(url, opts = {}) {
+  if (opts.skipLifecycleSignal === true) return false;
+  const pathname = (() => {
+    try { return new URL(String(url || ""), window.location.origin).pathname; } catch { return String(url || ""); }
+  })();
+  return /^\/api\/(cases|jobs|applications|disputes|blocks|account)(?:\/|$)/.test(pathname);
+}
+
+setupLifecycleSync();
 
 const SESSION_STRING_FIELDS = [
   "id",
@@ -201,11 +285,26 @@ async function isCsrfFailure(response) {
   }
 }
 
-function applyAuthResponseRedirect(response, opts = {}) {
+async function applyAuthResponseRedirect(response, opts = {}) {
   if (opts.noRedirect) return;
   if (response.status === 401) {
     clearSession();
     redirectToLoginOnce();
+    return;
+  }
+  if (response.status === 403) {
+    try {
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) return;
+      const payload = await response.clone().json();
+      const message = String(payload?.error || payload?.msg || "");
+      if (/session expired|invalid token|not authenticated|account has been (?:disabled|deactivated)|account deactivated/i.test(message)) {
+        clearSession();
+        redirectToLoginOnce();
+      }
+    } catch {
+      // A malformed denial is still returned to the caller as-is.
+    }
   }
 }
 
@@ -275,7 +374,11 @@ export async function secureFetch(url, opts = {}) {
     }
   }
 
-  applyAuthResponseRedirect(res, opts);
+  await applyAuthResponseRedirect(res, opts);
+
+  if (isMutation && res.ok && shouldPublishLifecycleMutation(url, opts)) {
+    publishLifecycleRefresh({ url: String(url || ""), method });
+  }
 
   return res;
 }

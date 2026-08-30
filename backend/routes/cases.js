@@ -7928,7 +7928,13 @@ router.get(
     }
     const blockStatus = await getCaseInteractionBlockStatus(doc, req.user);
     const workspaceParticipant = !!req.acl?.isAttorney || !!req.acl?.isParalegal;
-    if (blockStatus.blocked && !workspaceParticipant && !req.acl?.isAdmin) {
+    const matterAttorneyId = normalizeId(doc.attorneyId || doc.attorney);
+    const applicantPairBlocked =
+      role === "paralegal" &&
+      !workspaceParticipant &&
+      matterAttorneyId &&
+      (await isBlockedBetween(matterAttorneyId, req.user.id));
+    if ((blockStatus.blocked || applicantPairBlocked) && !workspaceParticipant && !req.acl?.isAdmin) {
       return res.status(404).json({ error: "Matter not found" });
     }
     const requestedPreEngagementId = doc.preEngagement?.requestedParalegalId

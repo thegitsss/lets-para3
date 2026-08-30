@@ -80,8 +80,9 @@ describe("Recommendation dependency and tab synchronization", () => {
       "utf8"
     );
     expect(dashboard).toMatch(/loadExclusions: \(\) => fetchJson\('\/api\/applications\/recommendation-exclusions'\)/);
-    expect(dashboard).toMatch(/window\.addEventListener\('pageshow',[\s\S]*event\.persisted[\s\S]*refreshDashboardFromServer\('pageshow'\)/);
-    expect(dashboard).toMatch(/document\.addEventListener\('visibilitychange',[\s\S]*refreshDashboardFromServer\('visible'\)/);
+    expect(dashboard).toMatch(/window\.addEventListener\('pageshow',[\s\S]*event\.persisted[\s\S]*refreshDashboardFromServer\('pageshow', \{ force: true \}\)/);
+    expect(dashboard).toMatch(/document\.addEventListener\('visibilitychange',[\s\S]*refreshDashboardFromServer\('visible', \{ force: true \}\)/);
+    expect(dashboard).toMatch(/window\.addEventListener\('lpc:lifecycle-refresh',[\s\S]*refreshDashboardFromServer\('lifecycle', \{ force: true \}\)/);
     expect(dashboard).toMatch(/subscribeRecommendationHistoryChanges\([\s\S]*handleRecommendationHistoryChange/);
     expect(browse).toMatch(/publishRecommendationHistoryChange\(\{/);
   });

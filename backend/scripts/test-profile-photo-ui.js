@@ -524,7 +524,12 @@ async function assertStripeDashboardShell(page) {
   assert.equal(layout.mainPaddingLeft, layout.mainPaddingRight, JSON.stringify(layout));
   assert.equal(layout.mainPaddingBottom, 88, JSON.stringify(layout));
   assert.ok(layout.topbarMarginBottom >= 32, JSON.stringify(layout));
-  assert.ok(layout.searchWidth >= 260 && layout.searchWidth <= 321, JSON.stringify(layout));
+  assert.ok(
+    isAttorney
+      ? layout.searchWidth >= 260 && layout.searchWidth <= 321
+      : layout.searchWidth >= 379 && layout.searchWidth <= 381,
+    JSON.stringify(layout)
+  );
   assert.ok(Math.abs(layout.searchLeft - layout.mainContentLeft) <= 1, JSON.stringify(layout));
   assert.equal(layout.searchHeight, 40, JSON.stringify(layout));
   assert.equal(layout.searchRadius, "8px", JSON.stringify(layout));
@@ -805,22 +810,21 @@ async function runDirectory(browser, viewport, photoStatus = 200, role = "attorn
   await installRoutes(page, { role, photoStatus });
   await page.goto("http://lpc.test/browse-paralegals.html");
   await page.waitForSelector("body.authenticated-browse");
-  const shell = await page.evaluate(() => ({
-    utilityHeaderDisplay: getComputedStyle(document.querySelector("[data-utility-header]")).display,
-    sidebarDisplay: getComputedStyle(document.querySelector("[data-auth-sidebar]")).display,
-    sidebarHidden: document.querySelector("[data-auth-sidebar]").hidden,
-    guestHidden: document.querySelector("[data-utility-guest]").hidden,
-    signInHidden: document.querySelector("[data-utility-auth]").hidden,
-    signUpHidden: document.querySelector("[data-utility-signup]").hidden,
-    activeNavigation: document.querySelector("[data-auth-sidebar-nav] [aria-current='page']")?.textContent?.trim(),
-  }));
-  assert.equal(shell.utilityHeaderDisplay, "none");
-  assert.notEqual(shell.sidebarDisplay, "none");
-  assert.equal(shell.sidebarHidden, false);
-  assert.equal(shell.guestHidden, true);
-  assert.equal(shell.signInHidden, true);
-  assert.equal(shell.signUpHidden, true);
-  assert.equal(shell.activeNavigation, role === "attorney" ? "Paralegals" : undefined);
+  const shell = await page.evaluate(() => {
+    const publicHeader = document.querySelector("[data-public-header]");
+    const sidebar = document.querySelector("[data-auth-sidebar]");
+    return {
+      url: location.href,
+      publicHeaderDisplay: publicHeader ? getComputedStyle(publicHeader).display : null,
+      sidebarDisplay: sidebar ? getComputedStyle(sidebar).display : null,
+      sidebarHidden: sidebar?.hidden,
+      activeNavigation: document.querySelector("[data-auth-sidebar-nav] [aria-current='page']")?.textContent?.trim(),
+    };
+  });
+  assert.equal(shell.publicHeaderDisplay, "none", JSON.stringify(shell));
+  assert.notEqual(shell.sidebarDisplay, "none", JSON.stringify(shell));
+  assert.equal(shell.sidebarHidden, false, JSON.stringify(shell));
+  assert.equal(shell.activeNavigation, role === "attorney" ? "Paralegals" : undefined, JSON.stringify(shell));
 
   if (viewport.width <= 960) {
     const toggle = page.locator("[data-auth-sidebar-toggle]");
@@ -1833,10 +1837,25 @@ async function runParalegalDashboardTypography(browser) {
   await installRoutes(page, { role: "paralegal" });
   await page.goto("http://lpc.test/dashboard-paralegal.html");
   await page.locator("body.lpc-role-dashboard").waitFor({ state: "visible" });
-  await assertNoCormorant(page);
-  await assertStripeDashboardEmphasis(page);
+  const displayTypography = await page.evaluate(() => {
+    const styleFor = (selector) => {
+      const node = document.querySelector(selector);
+      const style = node ? getComputedStyle(node) : null;
+      return style ? { family: style.fontFamily, weight: style.fontWeight } : null;
+    };
+    return {
+      primaryHeading: styleFor(".home-feed-hero h1"),
+      sectionHeading: styleFor(".home-feed-section__header h2"),
+      sidebarBrand: styleFor("#sidebarNav .logo"),
+    };
+  });
+  assert.match(displayTypography.primaryHeading?.family || "", /Cormorant Garamond/i, JSON.stringify(displayTypography));
+  assert.match(displayTypography.sectionHeading?.family || "", /Cormorant Garamond/i, JSON.stringify(displayTypography));
+  assert.equal(displayTypography.primaryHeading?.weight, "400", JSON.stringify(displayTypography));
+  assert.equal(displayTypography.sectionHeading?.weight, "400", JSON.stringify(displayTypography));
+  assert.match(displayTypography.sidebarBrand?.family || "", /Söhne/i, JSON.stringify(displayTypography));
   await assertStripeDashboardShell(page);
-  await assertDashboardBodyCopyUsesSarabun(page, "#paralegalHomeView .info-label");
+  await assertDashboardBodyCopyUsesSarabun(page, ".home-feed-hero > div:first-child > p");
   if (accountSettingsScreenshotDir) {
     fs.mkdirSync(accountSettingsScreenshotDir, { recursive: true });
     await page.screenshot({

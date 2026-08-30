@@ -594,6 +594,12 @@ router.post(
       if (String(application.status || "").toLowerCase() === "withdrawn") {
         return res.json({ success: true, alreadyRevoked: true });
       }
+      if (String(application.status || "").toLowerCase() === "rejected") {
+        return res.status(409).json({
+          error: "This application has already been rejected. Refresh to view its current status.",
+          code: "APPLICATION_CONFLICT",
+        });
+      }
       let caseDoc = null;
       if (application.jobId && mongoose.isValidObjectId(application.jobId)) {
         const job = await Job.findById(application.jobId).select("caseId");

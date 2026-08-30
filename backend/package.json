@@ -49,6 +49,8 @@
     "test:payments": "jest --runInBand tests/paymentOperationService.test.js tests/paymentsPayouts.test.js tests/stripeSafety.test.js tests/webhookHandling.test.js tests/disputesRefunds.test.js tests/jobEscrow.test.js tests/errorHandling.test.js tests/productionOrigin.test.js",
     "test:auth": "jest --runInBand tests/auth.test.js tests/authSecurityIntegration.test.js tests/passkeyService.test.js tests/mfaService.test.js tests/accountDeactivation.test.js tests/productionOrigin.test.js tests/securityEdgeCases.test.js",
     "test:browser:contracts": "node scripts/test-auth-fetch-ui.js && node scripts/test-public-auth-navigation-ui.js && node scripts/test-dialog-ui.js && node scripts/test-global-search-ui.js && node scripts/test-matter-experience-ui.js && node scripts/test-object-context-ui.js && node scripts/test-profile-photo-ui.js",
+    "test:phase3:browser": "node scripts/test-phase3-stale-ui.js",
+    "test:phase3:mobile-dashboard": "node scripts/test-phase3-mobile-attorney-dashboard.js",
     "test:playwright:a11y": "playwright test -c playwright.accessibility.config.js --fail-on-flaky-tests",
     "test:playwright:performance": "playwright test -c playwright.performance.config.js --fail-on-flaky-tests",
     "test:playwright:critical": "npm run test:playwright:support && npm run test:playwright:paralegal-support && npm run test:playwright:director && npm run test:playwright:control-room",

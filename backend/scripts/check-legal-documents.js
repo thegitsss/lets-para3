@@ -24,8 +24,39 @@ const rejectText = (content, pattern, message) => {
   if (pattern.test(content)) failures.push(message);
 };
 
-expectText(terms, new RegExp(`Version ${CURRENT_TERMS_VERSION}`), "Terms version does not match the backend constant.");
-expectText(privacy, new RegExp(`Version ${CURRENT_PRIVACY_VERSION}`), "Privacy version does not match the backend constant.");
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const formatLegalVersionDate = (version) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(version));
+  if (!match) return null;
+  const [, year, month, day] = match;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (
+    date.getUTCFullYear() !== Number(year)
+    || date.getUTCMonth() !== Number(month) - 1
+    || date.getUTCDate() !== Number(day)
+  ) return null;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+};
+const expectEffectiveDate = (content, version, documentName) => {
+  const displayDate = formatLegalVersionDate(version);
+  if (!displayDate) {
+    failures.push(`${documentName} backend version is not a valid YYYY-MM-DD date.`);
+    return;
+  }
+  expectText(
+    content,
+    new RegExp(`<p[^>]*class=["'][^"']*utility-hero__meta[^"']*["'][^>]*>\\s*Effective\\s+${escapeRegExp(displayDate)}\\s*</p>`, "i"),
+    `${documentName} visible effective date does not match backend version ${version}.`
+  );
+};
+
+expectEffectiveDate(terms, CURRENT_TERMS_VERSION, "Terms");
+expectEffectiveDate(privacy, CURRENT_PRIVACY_VERSION, "Privacy");
 expectText(terms, /id="section-24"[\s\S]*24\. Definitions/, "Terms are missing the consolidated general provisions and definitions.");
 expectText(privacy, /AI-assisted support[\s\S]*OpenAI[\s\S]*store: false/i, "Privacy policy is missing the factual AI-support disclosure.");
 expectText(supportDrawer, /AI support uses OpenAI[\s\S]*confidential or privileged matter content/, "The support composer is missing its AI data boundary.");

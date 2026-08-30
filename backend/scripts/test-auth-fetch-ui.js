@@ -68,6 +68,14 @@ async function installHarness(browser, mode) {
         });
         return;
       }
+      if (mode === "expired-session") {
+        await route.fulfill({
+          status: 403,
+          contentType: "application/json",
+          body: JSON.stringify({ msg: "Session expired" }),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -191,6 +199,15 @@ async function run() {
       await page.waitForURL("**/login.html");
       assert.equal(state.mutationCalls, 1);
       assert.equal(await page.evaluate(() => localStorage.getItem("lpc_user")), null, "401 must clear the invalid session");
+      await page.close();
+    }
+
+    {
+      const { page, state } = await installHarness(browser, "expired-session");
+      await postMutation(page).catch(() => null);
+      await page.waitForURL("**/login.html");
+      assert.equal(state.mutationCalls, 1);
+      assert.equal(await page.evaluate(() => localStorage.getItem("lpc_user")), null, "an explicit revoked-session 403 must clear the stale session");
       await page.close();
     }
 

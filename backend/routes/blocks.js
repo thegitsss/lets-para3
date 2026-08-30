@@ -83,8 +83,9 @@ router.post("/", async (req, res) => {
       .populate("attorney", "firstName lastName role");
     if (!caseDoc) return res.status(404).json({ error: "Matter not found." });
 
-    const counterparty = getCaseCounterparty(caseDoc, req.user);
-    if (!counterparty?.counterpartyId) {
+    const screeningApplicant = requesterRole === "attorney" && isObjId(paralegalId);
+    const counterparty = screeningApplicant ? null : getCaseCounterparty(caseDoc, req.user);
+    if (!screeningApplicant && !counterparty?.counterpartyId) {
       return res.status(403).json({ error: BLOCK_NOT_ELIGIBLE_MESSAGE });
     }
     const requesterId = normalizeId(req.user.id || req.user._id);
@@ -97,8 +98,8 @@ router.post("/", async (req, res) => {
       return res.status(403).json({ error: "You do not have access to block users for this Matter." });
     }
 
-    let targetId = counterparty.counterpartyId;
-    let targetRole = counterparty.counterpartyRole;
+    let targetId = counterparty?.counterpartyId || "";
+    let targetRole = counterparty?.counterpartyRole || "";
     let sourceType = "";
     let sourceDisputeId = "";
 
@@ -106,7 +107,11 @@ router.post("/", async (req, res) => {
       const caseParalegalId = normalizeId(caseDoc.paralegal || caseDoc.paralegalId);
       const isAssignedParalegal = caseParalegalId && String(caseParalegalId) === String(paralegalId);
       const applicants = Array.isArray(caseDoc.applicants) ? caseDoc.applicants : [];
-      const isApplicant = applicants.some((entry) => normalizeId(entry?.paralegalId) === String(paralegalId));
+      const activeApplicantStatuses = new Set(["pending", "submitted", "viewed", "shortlisted"]);
+      const isApplicant = applicants.some((entry) =>
+        normalizeId(entry?.paralegalId) === String(paralegalId) &&
+        activeApplicantStatuses.has(String(entry?.status || "pending").toLowerCase())
+      );
       if (!isApplicant || isAssignedParalegal) {
         return res.status(403).json({ error: "Only active applicants can be blocked from the Applicants view." });
       }

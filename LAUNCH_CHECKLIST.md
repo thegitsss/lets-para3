@@ -27,6 +27,7 @@ The latest local evidence snapshot and current NO-GO decision are recorded in `d
 - [x] New signup separately records Terms agreement and Privacy acknowledgement with version, timestamp, and source.
 - [x] AI-assisted support identifies OpenAI at point of use, prohibits confidential/privileged matter content, and is accurately described in the Privacy Policy.
 - [ ] Named qualified counsel approves the exact Terms and Privacy files. Record the approval reference plus the hashes printed by `npm run check:legal` in the production secret store.
+- [ ] Counsel reviews the restored Privacy Policy section “Processing in the United States”; its candidate digest supersedes any earlier unapproved Privacy digest.
 - [ ] Run `npm run certify:legal`; it must confirm the counsel record and document digests.
 - [ ] After deployment, run `npm run verify:production` from the same clean candidate checkout and retain `test-results/release/production-surface.json`; the live Terms and Privacy bytes must match the counsel-approved candidate hashes.
 - [ ] Counsel confirms jurisdiction-specific privacy, marketplace, professional-responsibility, independent-contractor, fee, dispute, waiver, and notice language. Code review is not legal approval.

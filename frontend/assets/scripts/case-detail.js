@@ -2354,6 +2354,35 @@ function removeWorkspaceActions() {
   if (attachmentStaging) emptyNode(attachmentStaging);
 }
 
+function purgeRevokedWorkspaceState(caseId, message = "Your access to this workspace has changed.") {
+  const revokedCaseId = String(caseId || state.activeCaseId || "");
+  state.caseLoadSequence += 1;
+  state.matterSectionSequence += 1;
+  state.workspaceReadable = false;
+  state.pendingRealtime = { messages: false, documents: false, tasks: false };
+  state.pendingAttachments = [];
+  stopCaseStream();
+  stopMessagePolling();
+  stopWorkspacePresence();
+  setWorkspaceEnabled(false, message);
+  removeWorkspaceActions();
+  if (revokedCaseId) {
+    state.messageCacheByCase.delete(revokedCaseId);
+    state.caseDocumentsById.delete(revokedCaseId);
+    state.messageSnapshots.delete(revokedCaseId);
+    state.documentSnapshots.delete(revokedCaseId);
+    state.taskSnapshots.delete(revokedCaseId);
+    [...state.loadedMatterSections].forEach((key) => {
+      if (String(key).startsWith(`${revokedCaseId}:`)) state.loadedMatterSections.delete(key);
+    });
+  }
+  renderPendingAttachment();
+  renderWorkspaceLocked(message);
+  renderSharedDocuments([], revokedCaseId, { emptyMessage: message });
+  setMatterFilesState(message);
+  showMsg(messageStatus, message);
+}
+
 function getWorkspaceState(caseData, caseStateOverride) {
   const caseState = caseStateOverride || resolveCaseState(caseData);
   if (caseState !== CASE_STATES.FUNDED_IN_PROGRESS || !isEscrowFunded(caseData)) {
@@ -5700,6 +5729,7 @@ async function loadCase(caseId, options = {}) {
   } catch (err) {
     if (caseLoadSequence !== state.caseLoadSequence) return;
     if ((err?.status === 403 || err?.status === 404) && getCurrentUserRole() === "paralegal") {
+      purgeRevokedWorkspaceState(caseId);
       if (redirectParalegalCompletionFallback(caseId, state.activeCase?.title || "")) {
         return;
       }
@@ -5955,6 +5985,10 @@ async function refreshCaseRealtime(options = null) {
         messagesOk = true;
       } catch (err) {
         console.warn("Unable to refresh messages", err);
+        if (err?.status === 403 || err?.status === 404) {
+          purgeRevokedWorkspaceState(caseId);
+          return true;
+        }
       }
     }
 
@@ -5968,6 +6002,10 @@ async function refreshCaseRealtime(options = null) {
         documentsOk = true;
       } catch (err) {
         console.warn("Unable to refresh documents", err);
+        if (err?.status === 403 || err?.status === 404) {
+          purgeRevokedWorkspaceState(caseId);
+          return true;
+        }
       }
     }
 
@@ -5980,6 +6018,7 @@ async function refreshCaseRealtime(options = null) {
       } catch (err) {
         console.warn("Unable to refresh case data", err);
         if ((err?.status === 403 || err?.status === 404) && getCurrentUserRole() === "paralegal") {
+          purgeRevokedWorkspaceState(caseId);
           if (redirectParalegalCompletionFallback(caseId, state.activeCase?.title || "")) {
             return true;
           }
@@ -6442,6 +6481,18 @@ function init() {
       return;
     }
     stopWorkspacePresence();
+  });
+  window.addEventListener("pageshow", (event) => {
+    if (!event.persisted || !state.activeCaseId) return;
+    void loadCase(state.activeCaseId, { historyMode: "replace", tab: state.activeMatterTab, suppressStatus: true });
+  });
+  window.addEventListener("lpc:lifecycle-refresh", (event) => {
+    const caseId = state.activeCaseId;
+    const changedCaseId = String(event?.detail?.caseId || "");
+    if (event?.detail?.accessMayChange !== true) return;
+    if (!caseId || (changedCaseId && changedCaseId !== String(caseId))) return;
+    purgeRevokedWorkspaceState(caseId, "Refreshing workspace access…");
+    void loadCase(caseId, { historyMode: "replace", tab: state.activeMatterTab, suppressStatus: true });
   });
   window.addEventListener("beforeunload", () => {
     stopCaseStream();

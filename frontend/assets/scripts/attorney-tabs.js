@@ -1141,6 +1141,8 @@ function renderWeekOverview({ count = 0, deadlines = [] } = {}) {
 }
 
 async function initOverviewPage() {
+  let overviewHydrationGeneration = 0;
+  let lifecycleRefreshTimer = null;
   const messageBox = document.getElementById("messageBox");
   const messageCountSpan = document.getElementById("messageCount");
   const completedJobsList = document.getElementById("completedJobsList");
@@ -1291,6 +1293,7 @@ async function initOverviewPage() {
   }
 
   async function hydrateOverview() {
+    const generation = ++overviewHydrationGeneration;
     try {
       const [
         dashboardResult,
@@ -1309,6 +1312,7 @@ async function initOverviewPage() {
         loadCasesWithFiles(),
         loadArchivedCases(),
       ]);
+      if (generation !== overviewHydrationGeneration) return;
       const dashboard = dashboardResult.status === "fulfilled" ? dashboardResult.value : null;
       const overdueCount = overdueResult.status === "fulfilled" ? overdueResult.value : 0;
       const threads = threadsResult.status === "fulfilled" ? threadsResult.value : [];
@@ -1384,6 +1388,21 @@ async function initOverviewPage() {
       updateOnboardingChecklist();
     }
   }
+
+  const scheduleLifecycleOverviewRefresh = () => {
+    if (document.visibilityState !== "visible" || lifecycleRefreshTimer) return;
+    lifecycleRefreshTimer = window.setTimeout(() => {
+      lifecycleRefreshTimer = null;
+      void Promise.all([
+        hydrateOverview(),
+        refreshOverviewMessages({ force: true }),
+      ]).catch((error) => console.warn("Attorney lifecycle refresh failed", error));
+    }, 0);
+  };
+  window.addEventListener("lpc:lifecycle-refresh", scheduleLifecycleOverviewRefresh);
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) scheduleLifecycleOverviewRefresh();
+  });
 
   setupDashboardViewRouter();
   initHomeTabs();

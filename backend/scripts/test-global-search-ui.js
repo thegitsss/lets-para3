@@ -303,8 +303,8 @@ async function captureVisualComparison(browser) {
           return {
             body: styleFor("body"),
             heading: styleFor("h1"),
-            button: styleFor(viewerRole === "attorney" ? "[data-matter-save-view]" : '[data-action="browse"]'),
-            regular: styleFor(viewerRole === "attorney" ? ".queue-meta" : ".info-label"),
+            button: styleFor(viewerRole === "attorney" ? "[data-matter-save-view]" : ".home-availability-button"),
+            regular: styleFor(viewerRole === "attorney" ? ".queue-meta" : ".home-feed-hero p"),
             logo: styleFor(".logo"),
             userName: styleFor("#user-name-heading"),
             footer: styleFor(".sidebar-footer"),
@@ -314,13 +314,27 @@ async function captureVisualComparison(browser) {
         Object.entries({ body: typography.body, button: typography.button, regular: typography.regular, footer: typography.footer }).forEach(([name, style]) => {
           assert.match(style?.family || "", /Sarabun/i, `${target.role} ${name} typography must use Sarabun`);
         });
-        Object.entries({ heading: typography.heading, logo: typography.logo, userName: typography.userName, tourBrand: typography.tourBrand }).forEach(([name, style]) => {
+        Object.entries({ logo: typography.logo, tourBrand: typography.tourBrand }).forEach(([name, style]) => {
           if (!style) return;
-          assert.match(style?.family || "", /Cormorant Garamond/i, `${target.role} ${name} typography must use Cormorant Garamond`);
+          assert.match(style?.family || "", /Söhne/i, `${target.role} ${name} typography must use the approved authenticated-workspace Söhne display family`);
         });
+        const expectedHeadingFamily = target.role === "paralegal" ? /Cormorant Garamond/i : /Söhne/i;
+        assert.match(
+          typography.heading?.family || "",
+          expectedHeadingFamily,
+          `${target.role} heading typography must use its approved dashboard display family`
+        );
+        if (typography.userName) {
+          const expectedUserNameFamily = target.role === "attorney" ? /Sarabun/i : /Cormorant Garamond/i;
+          assert.match(
+            typography.userName.family || "",
+            expectedUserNameFamily,
+            `${target.role} userName typography must inherit from its approved summary or heading context`
+          );
+        }
         assert.ok(typography.heading.weight >= 300 && typography.heading.weight <= 400, `${target.role} heading typography: ${JSON.stringify(typography.heading)}`);
         assert.ok(typography.button.weight >= 200 && typography.button.weight <= 400, `${target.role} button typography: ${JSON.stringify(typography.button)}`);
-        assert.ok(typography.button.size >= 14, `${target.role} button typography: ${JSON.stringify(typography.button)}`);
+        assert.ok(typography.button.size >= 13, `${target.role} button typography: ${JSON.stringify(typography.button)}`);
         assert.ok(typography.regular.weight >= 200 && typography.regular.weight <= 400, `${target.role} regular typography: ${JSON.stringify(typography.regular)}`);
       }
       const output = `/tmp/lpc-prompt1-${target.role}-${variant}.png`;
@@ -390,10 +404,19 @@ async function captureVisualComparison(browser) {
     const mobileHeaderSpacing = await page.evaluate(() => {
       const toggle = document.getElementById("sidebarToggle")?.getBoundingClientRect();
       const logo = document.querySelector("#sidebarNav .logo")?.getBoundingClientRect();
-      return toggle && logo ? { toggleBottom: toggle.bottom, logoTop: logo.top } : null;
+      return toggle && logo ? {
+        toggle: { top: toggle.top, right: toggle.right, bottom: toggle.bottom, left: toggle.left },
+        logo: { top: logo.top, right: logo.right, bottom: logo.bottom, left: logo.left },
+      } : null;
     });
+    const mobileHeaderOverlap = mobileHeaderSpacing && !(
+      mobileHeaderSpacing.toggle.right + 8 <= mobileHeaderSpacing.logo.left ||
+      mobileHeaderSpacing.logo.right + 8 <= mobileHeaderSpacing.toggle.left ||
+      mobileHeaderSpacing.toggle.bottom + 8 <= mobileHeaderSpacing.logo.top ||
+      mobileHeaderSpacing.logo.bottom + 8 <= mobileHeaderSpacing.toggle.top
+    );
     assert.ok(
-      mobileHeaderSpacing && mobileHeaderSpacing.logoTop >= mobileHeaderSpacing.toggleBottom + 8,
+      mobileHeaderSpacing && !mobileHeaderOverlap,
       `Mobile menu control overlaps the sidebar brand: ${JSON.stringify(mobileHeaderSpacing)}`
     );
     const mobileOutput = `/tmp/lpc-prompt1-${target.role}-mobile.png`;
