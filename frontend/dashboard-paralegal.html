@@ -1108,22 +1108,6 @@
       text-decoration: underline;
     }
 
-    .quick-actions {
-      margin-bottom: 2rem;
-    }
-
-    .quick-actions button {
-      background: var(--accent);
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 8px;
-      font-family: var(--font-sans);
-      font-weight: 200;
-      cursor: pointer;
-      margin-right: 0.5rem;
-    }
-
     .stripe-gate {
       display: flex;
       align-items: center;
@@ -1553,62 +1537,6 @@
       border-color: rgba(182, 164, 122, 0.6);
       background: rgba(182, 164, 122, 0.12);
       box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.22), var(--shadow-md);
-    }
-
-    .activity-card .case-header {
-      cursor: default;
-    }
-
-    .activity-list {
-      list-style: none;
-      padding: 0;
-      margin: 1rem 0 0;
-      display: grid;
-      gap: 0.85rem;
-    }
-
-    .activity-item {
-      border-top: 1px solid var(--line);
-      padding-top: 0.85rem;
-    }
-
-    .activity-item:first-child {
-      border-top: none;
-      padding-top: 0;
-    }
-
-    .activity-row {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .activity-title {
-      font-size: 1rem;
-      font-weight: 300;
-    }
-
-    .activity-link {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    .activity-link:hover {
-      text-decoration: underline;
-      text-decoration-color: var(--accent);
-    }
-
-    .activity-time {
-      font-size: 0.85rem;
-      color: var(--muted);
-      white-space: nowrap;
-    }
-
-    .activity-meta {
-      margin-top: 0.2rem;
-      font-size: 0.9rem;
-      color: var(--muted);
     }
 
     .activity-action {
@@ -3101,6 +3029,979 @@
       box-shadow: var(--focus-ring);
     }
 
+    /* Paralegal home: a white editorial opportunity desk. */
+    .paralegal-home-feed {
+      --desk-gold: #b4975a;
+      --desk-navy: #102c50;
+      --desk-ink: #20232a;
+      --desk-muted: #69778b;
+      max-width: 1240px;
+      margin: -0.5rem auto 0;
+      padding-bottom: 4rem;
+      background: #fff;
+    }
+
+    .home-feed-hero {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 2rem;
+      padding: 0.5rem 0 1.6rem;
+      border-bottom: 1px solid rgba(16, 44, 80, 0.14);
+    }
+
+    .home-feed-kicker,
+    .home-profile-strip__label,
+    .home-pipeline-label {
+      color: var(--desk-gold);
+      font-size: 0.69rem;
+      font-weight: 600;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .home-feed-hero h1 {
+      margin: 0.28rem 0 0;
+      color: var(--desk-ink);
+      font-family: 'Cormorant Garamond', Georgia, serif !important;
+      font-size: clamp(2rem, 2.6vw, 2.45rem);
+      font-weight: 400;
+      letter-spacing: -0.025em;
+      line-height: 1;
+    }
+
+    .home-feed-hero > div:first-child > p {
+      margin: 0.6rem 0 0;
+      color: var(--desk-muted);
+      font-size: 0.92rem;
+    }
+
+    .home-feed-hero__actions {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      margin: 0;
+    }
+
+    .home-availability-button,
+    .home-primary-action {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0.9rem;
+      border-radius: 5px;
+      font: inherit;
+      font-size: 0.84rem;
+      font-weight: 400;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .home-feed-hero__actions .home-availability-button {
+      border: 1px solid rgba(16, 44, 80, 0.16);
+      background: #fff;
+      color: var(--desk-ink);
+      cursor: pointer;
+    }
+
+    .home-feed-hero__actions .home-availability-button:hover {
+      border-color: rgba(16, 44, 80, 0.35);
+      background: #fff;
+      color: var(--desk-ink);
+    }
+
+    .home-availability-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #738b76;
+      box-shadow: 0 0 0 3px rgba(115, 139, 118, 0.12);
+    }
+
+    .home-availability-copy {
+      display: grid;
+      gap: 0.05rem;
+      text-align: left;
+    }
+
+    .home-availability-copy small {
+      color: var(--desk-muted);
+      font-size: 0.62rem;
+      letter-spacing: 0.05em;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .home-availability-copy > span {
+      color: var(--desk-ink);
+      line-height: 1.15;
+    }
+
+    .home-availability-chevron {
+      width: 14px;
+      height: 14px;
+      margin-left: 0.15rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.5;
+    }
+
+    .home-primary-action {
+      border: 1px solid var(--desk-navy);
+      background: var(--desk-navy);
+      color: #fff;
+    }
+
+    .home-primary-action:hover {
+      opacity: 0.92;
+    }
+
+    .home-profile-strip {
+      display: grid;
+      grid-template-columns: minmax(170px, 0.8fr) minmax(0, 3fr) auto;
+      align-items: stretch;
+      border-bottom: 1px solid rgba(16, 44, 80, 0.14);
+      background: #fff;
+    }
+
+    .home-profile-strip__intro {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0.25rem;
+      padding: 1rem 1.25rem 1rem 0;
+      border-right: 1px solid var(--line);
+    }
+
+    .home-profile-strip__intro strong {
+      color: var(--desk-ink);
+      font-size: 0.88rem;
+      font-weight: 500;
+    }
+
+    .home-profile-facts {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin: 0;
+    }
+
+    .home-profile-facts > div {
+      min-width: 0;
+      padding: 0.9rem 1.25rem;
+      border-right: 1px solid var(--line);
+    }
+
+    .home-profile-facts dt {
+      color: var(--desk-muted);
+      font-size: 0.68rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .home-profile-facts dd {
+      margin: 0.25rem 0 0;
+      overflow: hidden;
+      color: var(--desk-ink);
+      font-size: 0.84rem;
+      font-weight: 400;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .home-profile-edit {
+      align-self: center;
+      margin-left: 1.25rem;
+      color: var(--desk-navy);
+      font-size: 0.8rem;
+      font-weight: 500;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .home-returning-overview {
+      display: grid;
+      grid-template-columns: minmax(170px, 0.8fr) minmax(0, 4fr);
+      border-bottom: 1px solid rgba(16, 44, 80, 0.14);
+      background: #fff;
+    }
+
+    .home-returning-overview[hidden] {
+      display: none;
+    }
+
+    .home-returning-overview__intro {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0.25rem;
+      padding: 0.9rem 1.25rem 0.9rem 0;
+      border-right: 1px solid var(--line);
+    }
+
+    .home-returning-overview__intro strong {
+      color: var(--desk-ink);
+      font-size: 0.86rem;
+      font-weight: 500;
+    }
+
+    .home-returning-facts {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin: 0;
+    }
+
+    .home-returning-facts > div {
+      min-width: 0;
+      padding: 0.82rem 1.15rem;
+      border-right: 1px solid var(--line);
+    }
+
+    .home-returning-facts > div:last-child {
+      border-right: 0;
+    }
+
+    .home-returning-facts dt {
+      color: var(--desk-muted);
+      font-size: 0.66rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .home-returning-facts dd {
+      margin: 0.18rem 0 0;
+      overflow: hidden;
+      color: var(--desk-ink);
+      font-size: 0.88rem;
+      font-weight: 500;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .home-action-inbox {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(180px, 0.72fr) minmax(0, 3fr);
+      margin: 1.7rem 0 0 !important;
+      border: 0 !important;
+      border-top: 1px solid rgba(16, 44, 80, 0.16) !important;
+      border-bottom: 1px solid rgba(16, 44, 80, 0.16) !important;
+      border-radius: 0 !important;
+      background: #fff !important;
+      overflow: visible !important;
+    }
+
+    .home-action-inbox::before {
+      position: absolute;
+      inset: -1px auto -1px 0;
+      width: 3px;
+      background: var(--desk-gold);
+      content: '';
+    }
+
+    .home-action-inbox[hidden] {
+      display: none;
+    }
+
+    body.lpc-role-dashboard .home-action-inbox .lpc-priority-header {
+      min-height: 72px;
+      align-items: center;
+      padding: 0.9rem 1.1rem;
+      border-right: 1px solid var(--line);
+      border-bottom: 0;
+    }
+
+    .home-action-inbox .lpc-priority-header h2 {
+      color: var(--desk-gold);
+      font-size: 0.68rem;
+      font-weight: 600 !important;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .home-action-inbox .lpc-priority-header p {
+      display: none;
+    }
+
+    .home-action-inbox .lpc-priority-count {
+      color: var(--desk-muted);
+      font-size: 0.74rem;
+      white-space: nowrap;
+    }
+
+    .home-action-inbox .lpc-priority-list {
+      min-width: 0;
+    }
+
+    body.lpc-role-dashboard .home-action-inbox .lpc-priority-item {
+      min-height: 72px;
+      padding: 0.82rem 1.2rem;
+    }
+
+    body.lpc-role-dashboard .home-action-inbox .lpc-priority-item strong {
+      color: var(--desk-ink);
+      font-size: 0.9rem;
+      font-weight: 500 !important;
+    }
+
+    .home-action-inbox .lpc-priority-action {
+      color: var(--desk-navy);
+      font-size: 0.84rem;
+      font-weight: 500;
+    }
+
+    body.lpc-role-dashboard .home-action-inbox .lpc-priority-item.is-blocking {
+      min-height: 86px;
+      padding-block: 1rem;
+    }
+
+    .home-action-inbox .lpc-priority-item.is-blocking .home-priority-eyebrow {
+      display: block;
+      margin: 0 0 0.25rem;
+      color: var(--desk-gold);
+      font-size: 0.63rem;
+      font-weight: 600 !important;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    body.lpc-role-dashboard .home-action-inbox .lpc-priority-item.is-blocking strong {
+      font-family: 'Cormorant Garamond', Georgia, serif !important;
+      font-size: 1.25rem;
+      font-weight: 500 !important;
+    }
+
+    .home-action-inbox .lpc-priority-item.is-blocking .lpc-priority-action {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.55rem 0.85rem;
+      border: 1px solid var(--desk-navy);
+      border-radius: 5px;
+      background: var(--desk-navy);
+      color: #fff;
+      text-decoration: none;
+    }
+
+    .home-opportunity-grid {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .home-feed-section {
+      padding: 2.35rem 0;
+      border-bottom: 1px solid rgba(16, 44, 80, 0.14);
+    }
+
+    .home-feed-section[hidden] {
+      display: none;
+    }
+
+    .home-feed-section__header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 1.5rem;
+      margin-bottom: 1.15rem;
+    }
+
+    .home-section-heading-copy {
+      max-width: 620px;
+    }
+
+    .home-feed-section__header h2 {
+      margin: 0;
+      color: var(--desk-ink);
+      font-family: 'Cormorant Garamond', Georgia, serif !important;
+      font-size: clamp(1.65rem, 2vw, 1.9rem);
+      font-weight: 400;
+      letter-spacing: -0.018em;
+      line-height: 1.05;
+    }
+
+    .home-feed-section__header p {
+      margin: 0.38rem 0 0;
+      color: var(--desk-muted);
+      font-size: 0.82rem;
+    }
+
+    .home-feed-section__header > a,
+    .home-application-row > a,
+    .home-feed-empty a {
+      color: var(--desk-navy);
+      font-size: 0.82rem;
+      font-weight: 500;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .home-feed-section__header > a:hover,
+    .home-application-row > a:hover,
+    .home-feed-empty a:hover {
+      text-decoration: underline;
+      text-underline-offset: 4px;
+    }
+
+    .home-work-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.2rem;
+    }
+
+    .home-work-list .case-card {
+      min-height: 0;
+      padding: 1.2rem 0 0;
+      border: 0;
+      border-top: 2px solid var(--desk-navy);
+      border-radius: 0;
+      background: #fff !important;
+      box-shadow: none !important;
+    }
+
+    .home-work-list .case-card:only-child {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.5fr);
+      gap: 2rem;
+      padding: 1.2rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .home-work-list .case-card:only-child .case-content {
+      padding: 0 0 0 2rem;
+      border-left: 1px solid var(--line);
+    }
+
+    .home-work-list .case-card:hover {
+      transform: none;
+      box-shadow: none !important;
+    }
+
+    .home-work-list .case-content {
+      display: block;
+      padding-top: 0.8rem;
+    }
+
+    .home-work-signals {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .home-work-signals span {
+      position: relative;
+      padding: 0;
+      background: transparent;
+      color: var(--desk-muted);
+      font-size: 0.75rem;
+    }
+
+    .home-work-signals span:not(:last-child)::after {
+      position: absolute;
+      right: -0.58rem;
+      color: rgba(16, 44, 80, 0.25);
+      content: '·';
+    }
+
+    .home-work-signals span.has-unread {
+      color: #765f2d;
+    }
+
+    .home-work-list .case-actions {
+      margin-top: 1rem;
+    }
+
+    .home-work-list .case-actions [data-action="primary"] {
+      min-height: 36px;
+      border-color: var(--desk-navy);
+      border-radius: 5px;
+      background: var(--desk-navy);
+      color: #fff;
+    }
+
+    .home-work-list .case-actions [data-action="secondary"] {
+      display: none;
+    }
+
+    .home-work-list .case-actions[hidden] {
+      display: none;
+    }
+
+    .home-recommendation-list,
+    .home-application-list {
+      border-top: 1px solid rgba(16, 44, 80, 0.14);
+    }
+
+    .home-recommendation-card {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: minmax(250px, 1.4fr) minmax(250px, 1fr) minmax(140px, auto);
+      align-items: center;
+      gap: 2rem;
+      padding: 1.35rem 0;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      background: #fff;
+    }
+
+    .home-recommendation-card:last-child {
+      border-bottom: 0;
+    }
+
+    .home-recommendation-match {
+      display: block;
+      margin-bottom: 0.52rem;
+      color: var(--desk-gold);
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .home-recommendation-card h3 {
+      margin: 0;
+      color: var(--desk-ink);
+      font-family: 'Cormorant Garamond', Georgia, serif !important;
+      font-size: 1.42rem;
+      font-weight: 500;
+      line-height: 1.05;
+    }
+
+    .home-recommendation-card p {
+      margin: 0.35rem 0 0;
+      color: var(--desk-muted);
+      font-size: 0.82rem;
+    }
+
+    .home-recommendation-meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.45rem 1.25rem;
+      color: var(--desk-muted);
+      font-size: 0.78rem;
+    }
+
+    .home-recommendation-aside {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.75rem;
+    }
+
+    .home-recommendation-pay {
+      color: var(--desk-navy);
+      font-size: 0.98rem;
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .home-recommendation-details {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--desk-navy);
+      font-size: 0.82rem;
+      font-weight: 500;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .home-recommendation-details::after {
+      content: '→';
+      transition: transform 0.15s ease;
+    }
+
+    .home-recommendation-details:hover::after {
+      transform: translateX(3px);
+    }
+
+    .home-application-pipeline {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-bottom: 1.25rem;
+      border-top: 1px solid rgba(16, 44, 80, 0.14);
+      border-bottom: 1px solid rgba(16, 44, 80, 0.14);
+      background: #fff;
+    }
+
+    .home-pipeline-empty {
+      display: none;
+    }
+
+    .home-application-pipeline.is-empty {
+      display: block;
+      margin-bottom: 0;
+      padding: 0.9rem 0;
+    }
+
+    .home-application-pipeline.is-empty .home-pipeline-step {
+      display: none;
+    }
+
+    .home-application-pipeline.is-empty .home-pipeline-empty {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+    }
+
+    .home-pipeline-empty strong {
+      display: block;
+      color: var(--desk-ink);
+      font-size: 0.84rem;
+      font-weight: 500;
+    }
+
+    .home-pipeline-empty span {
+      display: block;
+      margin-top: 0.1rem;
+      color: var(--desk-muted);
+      font-size: 0.78rem;
+    }
+
+    .home-pipeline-empty a {
+      color: var(--desk-navy);
+      font-size: 0.8rem;
+      font-weight: 500;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .home-pipeline-step {
+      position: relative;
+      padding: 0.9rem 1rem;
+      border-right: 1px solid var(--line);
+    }
+
+    .home-pipeline-step:last-child {
+      border-right: 0;
+    }
+
+    .home-pipeline-step:not(:last-child)::after {
+      position: absolute;
+      top: 50%;
+      right: -5px;
+      z-index: 1;
+      width: 9px;
+      height: 9px;
+      border-top: 1px solid rgba(16, 44, 80, 0.2);
+      border-right: 1px solid rgba(16, 44, 80, 0.2);
+      background: #fff;
+      content: '';
+      transform: translateY(-50%) rotate(45deg);
+    }
+
+    .home-pipeline-step strong {
+      display: block;
+      margin-top: 0.2rem;
+      color: var(--desk-ink);
+      font-family: 'Cormorant Garamond', Georgia, serif !important;
+      font-size: 1.55rem;
+      font-weight: 500;
+      line-height: 1;
+    }
+
+    .home-application-row {
+      min-height: 72px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.6fr) minmax(150px, 0.65fr) auto;
+      align-items: center;
+      gap: 1.25rem;
+      padding: 0.9rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .home-application-row:last-child {
+      border-bottom: 0;
+    }
+
+    .home-application-row strong {
+      display: block;
+      color: var(--desk-ink);
+      font-weight: 500;
+    }
+
+    .home-application-row small {
+      color: var(--desk-muted);
+      font-size: 0.79rem;
+    }
+
+    .home-application-status {
+      width: max-content;
+      padding: 0.28rem 0.55rem;
+      border-radius: 999px;
+      background: #f4f5f7;
+      color: var(--desk-muted);
+      font-size: 0.72rem;
+      white-space: nowrap;
+    }
+
+    .home-application-status.is-action {
+      background: rgba(180, 151, 90, 0.14);
+      color: #765f2d;
+    }
+
+    .home-application-status.is-progress,
+    .home-application-status.is-shortlisted {
+      background: rgba(64, 94, 137, 0.09);
+      color: #355374;
+    }
+
+    .home-feed-empty,
+    .home-feed-loading {
+      padding: 1.25rem 0;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      background: #fff;
+    }
+
+    .home-feed-empty {
+      display: grid;
+      grid-template-columns: minmax(180px, 0.65fr) minmax(0, 1.5fr) auto;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .home-feed-empty strong {
+      display: block;
+      color: var(--desk-ink);
+      font-family: 'Cormorant Garamond', Georgia, serif !important;
+      font-size: 1.2rem;
+      font-weight: 500;
+    }
+
+    .home-feed-empty p {
+      margin: 0;
+      color: var(--desk-muted);
+      font-size: 0.82rem;
+    }
+
+    .home-feed-empty--compact {
+      min-height: 60px;
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .home-feed-empty--compact strong {
+      display: inline;
+      margin-right: 0.2rem;
+      font-family: inherit;
+      font-size: inherit;
+      font-weight: 500;
+    }
+
+    @media (max-width: 900px) {
+      .home-feed-hero {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .home-feed-hero__actions {
+        width: 100%;
+      }
+
+      .home-primary-action,
+      .home-availability-button {
+        flex: 1;
+      }
+
+      .home-profile-strip {
+        grid-template-columns: 1fr auto;
+      }
+
+      .home-profile-strip__intro {
+        grid-column: 1 / -1;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .home-profile-facts {
+        grid-column: 1;
+      }
+
+      .home-profile-edit {
+        grid-column: 2;
+        margin: 0 0.85rem;
+      }
+
+      .home-returning-overview {
+        grid-template-columns: 1fr;
+      }
+
+      .home-returning-overview__intro {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .home-action-inbox {
+        grid-template-columns: 1fr;
+      }
+
+      body.lpc-role-dashboard .home-action-inbox .lpc-priority-header {
+        min-height: 0;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .home-work-list {
+        grid-template-columns: 1fr;
+      }
+
+      .home-work-list .case-card:only-child {
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
+      }
+
+      .home-work-list .case-card:only-child .case-content {
+        padding: 0.8rem 0 0;
+        border-top: 1px solid var(--line);
+        border-left: 0;
+      }
+
+      .home-recommendation-card {
+        grid-template-columns: minmax(0, 1.2fr) minmax(200px, 0.9fr) auto;
+        gap: 1.25rem;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .home-profile-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .home-profile-facts {
+        grid-column: 1;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .home-profile-facts > div {
+        padding: 0.75rem 0.55rem;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .home-profile-facts > div:last-child {
+        border-right: 0;
+      }
+
+      .home-profile-facts dd {
+        overflow: visible;
+        line-height: 1.35;
+        text-overflow: clip;
+        white-space: normal;
+      }
+
+      .home-profile-edit {
+        grid-column: 1;
+        margin: 0;
+        padding: 0.85rem 0;
+      }
+
+      .home-returning-facts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .home-returning-facts > div:nth-child(2) {
+        border-right: 0;
+      }
+
+      .home-returning-facts > div:nth-child(-n + 2) {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .home-feed-section__header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+
+      .home-recommendation-card {
+        grid-template-columns: 1fr;
+        gap: 0.9rem;
+      }
+
+      .home-recommendation-aside {
+        align-items: flex-start;
+        flex-direction: row;
+        justify-content: space-between;
+      }
+
+      .home-application-pipeline {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .home-pipeline-step:nth-child(2) {
+        border-right: 0;
+      }
+
+      .home-pipeline-step:nth-child(-n + 2) {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .home-pipeline-step:nth-child(2)::after {
+        display: none;
+      }
+
+      .home-application-row,
+      .home-feed-empty {
+        grid-template-columns: 1fr;
+        gap: 0.65rem;
+      }
+
+      .home-application-pipeline.is-empty .home-pipeline-empty {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.55rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .home-feed-hero__actions {
+        flex-direction: column;
+      }
+
+      .home-primary-action,
+      .home-availability-button {
+        width: 100%;
+      }
+
+      .home-recommendation-meta {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    body.lpc-role-dashboard .paralegal-home-feed .home-feed-hero h1,
+    body.lpc-role-dashboard .paralegal-home-feed .home-feed-hero h1 span,
+    body.lpc-role-dashboard .paralegal-home-feed .home-feed-section__header h2,
+    body.lpc-role-dashboard .paralegal-home-feed .home-recommendation-card h3,
+    body.lpc-role-dashboard .paralegal-home-feed .home-pipeline-step strong,
+    body.lpc-role-dashboard .paralegal-home-feed .home-feed-empty strong {
+      font-family: 'Cormorant Garamond', Georgia, serif !important;
+      font-weight: 400 !important;
+    }
+
+    @media (min-width: 1100px) {
+      body.lpc-product-clean.lpc-role-dashboard .topbar .lpc-global-search-host,
+      body.lpc-product-clean.lpc-role-dashboard .topbar .lpc-global-search-host:hover,
+      body.lpc-product-clean.lpc-role-dashboard .topbar .lpc-global-search-host:focus-within,
+      body.lpc-product-clean.lpc-role-dashboard .topbar .lpc-global-search-host.is-search-open {
+        flex-basis: min(380px, 32vw) !important;
+        width: min(380px, 32vw) !important;
+        max-width: min(380px, 32vw) !important;
+      }
+
+      body.lpc-product-clean.lpc-role-dashboard .topbar .lpc-global-search-trigger-label {
+        max-width: 310px !important;
+      }
+    }
+
   </style>
   <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260820-18" />
   <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
@@ -3170,50 +4071,80 @@
       <span>Your profile photo is under review and visible only to you.</span>
     </div>
 
-    <div id="paralegalHomeView" class="dashboard-view is-active">
-      <header>
-        <h1><span id="welcomeGreeting">Welcome</span><span id="user-name-heading" data-field="name"></span></h1>
+    <div id="paralegalHomeView" class="dashboard-view paralegal-home-feed is-active">
+      <header class="home-feed-hero">
+        <div>
+          <span class="home-feed-kicker">Paralegal workspace</span>
+          <h1><span id="welcomeGreeting">Welcome</span><span id="user-name-heading" data-field="name"></span></h1>
+          <p>Your work, opportunities, and next move in one place.</p>
+        </div>
+        <div class="home-feed-hero__actions">
+          <button class="home-availability-button" type="button" data-action="availability" aria-haspopup="dialog" aria-controls="availabilityModal">
+            <span class="home-availability-dot" aria-hidden="true"></span>
+            <span class="home-availability-copy">
+              <small>Availability</small>
+              <span id="availabilityStatus">Available now</span>
+            </span>
+            <svg class="home-availability-chevron" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m4 6 4 4 4-4"></path>
+            </svg>
+          </button>
+          <a class="home-primary-action" href="browse-jobs.html">Browse Matters</a>
+        </div>
       </header>
 
-      <section class="summary">
-        <a class="info-box info-box-link" id="activeCasesCard" href="dashboard-paralegal.html#cases" aria-label="View active matters">
-          <div class="info-value" data-field="activeCases">
-            <span class="skeleton-line short"></span>
-          </div>
-          <div class="info-label">Active matters</div>
-        </a>
-        <button class="info-box message-box" id="messageBox" type="button" disabled aria-label="No unread messages">
-          <div class="info-value" id="messageCount" data-field="unreadMessages">
-            <span class="skeleton-line short"></span>
-          </div>
-          <div class="info-label" id="messageLabel">No unread messages</div>
-        </button>
-        <div class="info-box">
-          <div class="info-value" data-field="nextDeadline">
-            <span class="skeleton-line medium"></span>
-          </div>
-          <div class="info-label">next deadline</div>
+      <section class="home-profile-strip" aria-labelledby="homeProfileStripTitle">
+        <div class="home-profile-strip__intro">
+          <span class="home-profile-strip__label">Matching profile</span>
+          <strong id="homeProfileStripTitle">How we match you</strong>
         </div>
-        <div class="info-box earnings-card" id="earnedThisMonthCard">
-          <a class="info-box-link earnings-card-link" href="dashboard-paralegal.html#cases-completed" aria-label="View completed matters">
-            <div class="info-value">$<span data-field="earningsValue"><span class="skeleton-line short"></span></span></div>
-            <div class="info-label"><span id="earningsLabelText">earned this month</span></div>
-          </a>
-          <button class="earnings-toggle" id="earningsToggle" type="button" aria-label="Toggle earnings view" aria-pressed="false">▾</button>
-        </div>
+        <dl class="home-profile-facts">
+          <div>
+            <dt>State experience</dt>
+            <dd id="homeProfileStates">Add your states</dd>
+          </div>
+          <div>
+            <dt>Practice areas</dt>
+            <dd id="homeProfilePractices">Add practice areas</dd>
+          </div>
+          <div>
+            <dt>Experience</dt>
+            <dd id="homeProfileExperience">Add experience</dd>
+          </div>
+        </dl>
+        <a class="home-profile-edit" href="profile-settings.html">Edit matching profile</a>
       </section>
 
-      <section class="quick-actions">
-        <div class="section-title">Quick Actions</div>
-        <button type="button" data-action="browse">Browse Matters</button>
-        <button type="button" data-action="availability">Update availability</button>
+      <section class="home-returning-overview" id="homeReturningOverview" aria-labelledby="homeReturningOverviewTitle" hidden>
+        <div class="home-returning-overview__intro">
+          <span class="home-profile-strip__label">Current workload</span>
+          <strong id="homeReturningOverviewTitle">What needs your attention</strong>
+        </div>
+        <dl class="home-returning-facts">
+          <div>
+            <dt>Active Matters</dt>
+            <dd data-field="homeActiveMatters">0</dd>
+          </div>
+          <div>
+            <dt>Next deadline</dt>
+            <dd data-field="homeNextDeadline">—</dd>
+          </div>
+          <div>
+            <dt>Unread messages</dt>
+            <dd data-field="homeUnreadMessages">0</dd>
+          </div>
+          <div>
+            <dt>Expected payouts</dt>
+            <dd data-field="homeExpectedPayouts">$0.00</dd>
+          </div>
+        </dl>
       </section>
 
-      <section class="lpc-priority-shell" id="paralegalPriorityQueue" aria-labelledby="paralegalPriorityTitle">
+      <section class="lpc-priority-shell home-action-inbox" id="paralegalPriorityQueue" aria-labelledby="paralegalPriorityTitle">
         <div class="lpc-priority-header">
           <div>
-            <h2 id="paralegalPriorityTitle">Your next steps</h2>
-            <p>Prioritized from your current Matters, applications, messages, and payout readiness.</p>
+            <h2 id="paralegalPriorityTitle">Next best action</h2>
+            <p>Invitations, messages, deadlines, and account items that need your attention.</p>
           </div>
           <span class="lpc-priority-count" data-paralegal-priority-count aria-live="polite">Loading…</span>
         </div>
@@ -3222,14 +4153,20 @@
         </div>
       </section>
       <div class="availability-hidden" aria-hidden="true">
-        <span id="availabilityStatus">Available now</span>
         <span id="availabilityNext"></span>
         <span id="availabilityNextRow"></span>
         <button type="button" id="updateAvailabilityLink">Update availability</button>
       </div>
 
-      <div class="side-by-side-panels case-panels">
-        <section class="case-list" id="recentActivityList">
+      <section class="home-feed-section home-work-section" id="homeWorkSection" aria-labelledby="homeWorkTitle">
+        <div class="home-feed-section__header">
+          <div class="home-section-heading-copy">
+            <h2 id="homeWorkTitle">Continue working</h2>
+            <p>Pick up where you left off in your active Matters.</p>
+          </div>
+          <a href="dashboard-paralegal.html#cases">View all work</a>
+        </div>
+        <div class="home-work-list" id="assignmentList" aria-live="polite">
           <div class="case-card skeleton-card" aria-hidden="true">
             <div class="case-header">
               <div class="skeleton-stack">
@@ -3238,18 +4175,62 @@
               </div>
             </div>
           </div>
-        </section>
-        <section class="case-list" id="assignmentList">
-          <div class="case-card skeleton-card" aria-hidden="true">
-            <div class="case-header">
-              <div class="skeleton-stack">
-                <div class="skeleton-line long"></div>
-                <div class="skeleton-line medium"></div>
-              </div>
+        </div>
+      </section>
+
+      <div class="home-opportunity-grid" id="homeOpportunityGrid">
+        <section class="home-feed-section" id="recommendedMattersSection" aria-labelledby="recommendedMattersTitle">
+          <div class="home-feed-section__header">
+            <div class="home-section-heading-copy">
+              <h2 id="recommendedMattersTitle">Opportunities selected for you</h2>
+              <p>Eligibility is based on your state experience, practice areas, and years of experience.</p>
             </div>
+            <a href="browse-jobs.html">Browse all matters</a>
+          </div>
+          <div class="home-recommendation-list" id="recommendedMattersList" aria-live="polite">
+            <div class="home-feed-loading"><span class="skeleton-line long"></span></div>
+          </div>
+        </section>
+
+        <section class="home-feed-section" id="homeApplicationsSection" aria-labelledby="homeApplicationsTitle">
+          <div class="home-feed-section__header">
+            <div class="home-section-heading-copy">
+              <h2 id="homeApplicationsTitle">Your opportunity pipeline</h2>
+              <p>Follow each application from submission through selection.</p>
+            </div>
+            <a href="dashboard-paralegal.html#cases">View all applications</a>
+          </div>
+          <div class="home-application-pipeline" id="homeApplicationPipeline" aria-label="Application pipeline">
+            <div class="home-pipeline-step">
+              <span class="home-pipeline-label">Applied</span>
+              <strong data-home-pipeline-count="applied">0</strong>
+            </div>
+            <div class="home-pipeline-step">
+              <span class="home-pipeline-label">Reviewing</span>
+              <strong data-home-pipeline-count="reviewing">0</strong>
+            </div>
+            <div class="home-pipeline-step">
+              <span class="home-pipeline-label">Shortlisted</span>
+              <strong data-home-pipeline-count="shortlisted">0</strong>
+            </div>
+            <div class="home-pipeline-step">
+              <span class="home-pipeline-label">Hired</span>
+              <strong data-home-pipeline-count="hired">0</strong>
+            </div>
+            <div class="home-pipeline-empty" aria-live="polite">
+              <div>
+                <strong>No applications in progress</strong>
+                <span>When you apply to a Matter, its progress will appear here.</span>
+              </div>
+              <a href="browse-jobs.html">Browse Matters</a>
+            </div>
+          </div>
+          <div class="home-application-list" id="homeApplicationsList" aria-live="polite">
+            <div class="home-feed-loading"><span class="skeleton-line medium"></span></div>
           </div>
         </section>
       </div>
+
     </div>
 
     <div id="paralegalCasesView" class="dashboard-view" hidden>
@@ -3437,9 +4418,10 @@
         </div>
       </div>
       <div class="case-content">
+        <div class="home-work-signals" data-field="assignmentSignals"></div>
         <p data-field="assignmentSummary"></p>
         <div class="case-actions">
-          <button type="button" data-action="primary">Open Workspace</button>
+          <button type="button" data-action="primary">Continue working</button>
           <button type="button" data-action="secondary">Preview Matter</button>
         </div>
       </div>

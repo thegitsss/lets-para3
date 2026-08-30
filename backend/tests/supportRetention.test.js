@@ -126,8 +126,12 @@ describe("support conversation retention and active-memory reset", () => {
       path.join(__dirname, "../../frontend/privacy.html"),
       "utf8"
     );
-    expect(privacy).toMatch(/support-chat conversations.*183 days/is);
-    expect(privacy).toMatch(/resets the assistant’s active conversational context but does not immediately delete/is);
-    expect(privacy).toMatch(/cleanup removes eligible conversation and message records/is);
+    const retentionSection = privacy.match(/<section id="retention"[\s\S]*?<\/section>/i)?.[0] || "";
+    expect(retentionSection).toMatch(/Assistant conversations and associated messages/is);
+    expect(retentionSection).toMatch(/support-assistant messages/is);
+    expect(retentionSection).toMatch(/up to 183 days after the conversation’s last message/is);
+    expect(retentionSection).toMatch(/Starting or restarting an Assistant conversation resets its active conversational context/is);
+    expect(retentionSection).toMatch(/does not immediately delete earlier records/is);
+    expect(retentionSection).toMatch(/scheduled cleanup removes eligible conversation and message records/is);
   });
 });

@@ -102,7 +102,9 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
       if (!mongoose.isValidObjectId(caseId)) {
         return res.status(400).json({ error: "Invalid Matter ID" });
       }
-      caseDoc = await Case.findById(caseId).select("attorney attorneyId jobId");
+      caseDoc = await Case.findById(caseId).select(
+        "attorney attorneyId jobId state locationState experiencePreference minimumYearsExperience"
+      );
       if (!caseDoc) {
         return res.status(404).json({ error: "Matter not found" });
       }
@@ -123,9 +125,12 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
     }
 
     const attorneyProfile = await User.findById(req.user._id || req.user.id).select("state");
-    const attorneyState = String(attorneyProfile?.state || "").trim().toUpperCase();
-    if (!attorneyState) {
-      return res.status(400).json({ error: "Attorney profile state is required to create a Matter." });
+    const requestedState = cleanTitle(req.body.state || req.body.locationState || "", 200);
+    const matterState = cleanTitle(caseDoc?.state || caseDoc?.locationState || "", 200);
+    const attorneyState = cleanTitle(attorneyProfile?.state || "", 200);
+    const resolvedState = matterState || requestedState || attorneyState;
+    if (!resolvedState) {
+      return res.status(400).json({ error: "Matter state is required to create a Matter." });
     }
 
     const title = cleanTitle(req.body.title, 150);
@@ -159,12 +164,23 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
       deadlineProvided: false,
       deadlineValid: true,
       attorneyStateRequired: true,
-      attorneyState,
+      attorneyState: resolvedState,
     });
     if (!postingPolicy.ready) {
       return res.status(400).json({ error: "This Matter is not ready to publish.", blockers: postingPolicy.blockers });
     }
 
+    const requestedExperience = cleanText(
+      req.body.experiencePreference || req.body.experience || "",
+      { max: 200 }
+    );
+    const experienceRequirement = resolveExperienceRequirement(
+      {
+        experiencePreference: requestedExperience,
+        minimumYearsExperience: req.body.minimumYearsExperience,
+      },
+      caseDoc
+    );
     const jobPayload = {
       caseId: caseDoc?._id || null,
       attorneyId: req.user._id,
@@ -172,8 +188,10 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
       practiceArea: practiceAreaValue,
       description,
       budget: Math.round(budget),
-      state: attorneyState,
-      locationState: attorneyState,
+      state: resolvedState,
+      locationState: resolvedState,
+      experiencePreference: experienceRequirement.preference,
+      minimumYearsExperience: experienceRequirement.minimumYears,
     };
 
     let job = null;
@@ -227,6 +245,26 @@ function normalizeId(source) {
   return source;
 }
 
+function resolveExperienceRequirement(job = null, caseDoc = null) {
+  const preference = String(
+    caseDoc?.experiencePreference || job?.experiencePreference || ""
+  ).trim();
+  const explicit = Number(
+    caseDoc?.minimumYearsExperience ?? job?.minimumYearsExperience
+  );
+  if (Number.isFinite(explicit) && explicit > 0) {
+    return { preference, minimumYears: Math.min(80, explicit) };
+  }
+  const experienceText = preference
+    ? preference.match(/\d+(?:\.\d+)?/)
+    : String(caseDoc?.briefSummary || "").match(/Experience:\s*(\d+(?:\.\d+)?)/i);
+  const parsed = experienceText ? Number(experienceText[1]) : 0;
+  return {
+    preference,
+    minimumYears: Number.isFinite(parsed) ? Math.min(80, Math.max(0, parsed)) : 0,
+  };
+}
+
 function shapeListing({ job = null, caseDoc = null }) {
   const autoRelistTypes = new Set(["zero_auto", "partial_attorney", "expired_zero", "admin"]);
   const autoRelistFallback =
@@ -244,7 +282,8 @@ function shapeListing({ job = null, caseDoc = null }) {
     normalizeId(job?.attorneyId) || normalizeId(caseDoc?.attorneyId) || normalizeId(caseDoc?.attorney);
   const jobState = job?.state || job?.locationState || "";
   const caseState = caseDoc?.state || caseDoc?.locationState || "";
-  const resolvedState = jobState || caseState;
+  const resolvedState = caseState || jobState;
+  const experienceRequirement = resolveExperienceRequirement(job, caseDoc);
 
   return {
     id: caseDoc?._id || job?.caseId || job?._id,
@@ -262,7 +301,9 @@ function shapeListing({ job = null, caseDoc = null }) {
     budget: typeof job?.budget === "number" ? job.budget : budgetFromCase,
     currency: caseDoc?.currency || "usd",
     state: resolvedState,
-    locationState: job?.locationState || job?.state || caseDoc?.locationState || caseDoc?.state || "",
+    locationState: caseDoc?.locationState || caseDoc?.state || job?.locationState || job?.state || "",
+    experiencePreference: experienceRequirement.preference,
+    minimumYearsExperience: experienceRequirement.minimumYears,
     createdAt: job?.createdAt || caseDoc?.createdAt || new Date(),
     deadlineDate: resolveMatterDeadlineDate(caseDoc),
     deadline: resolveMatterDeadlineDate(caseDoc) || null,
@@ -323,7 +364,7 @@ router.get("/open", ...authenticatedGuards, requireRole("paralegal"), async (req
       Case.find(caseFilter)
         .sort({ createdAt: -1 })
         .limit(limit)
-        .select("title practiceArea details briefSummary totalAmount lockedTotalAmount remainingAmount currency state locationState status applicants attorney attorneyId jobId createdAt deadline deadlineDate tasks relistRequestedAt payoutFinalizedAt payoutFinalizedType")
+        .select("title practiceArea details briefSummary experiencePreference minimumYearsExperience totalAmount lockedTotalAmount remainingAmount currency state locationState status applicants attorney attorneyId jobId createdAt deadline deadlineDate tasks relistRequestedAt payoutFinalizedAt payoutFinalizedType")
         .populate({
           path: "attorney",
           select: "firstName lastName lawFirm firmName profileImage avatarURL",

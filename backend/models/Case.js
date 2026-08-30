@@ -213,6 +213,8 @@ const caseSchema = new Schema(
     details: { type: String, required: true, trim: true, maxlength: 100_000 },
     state: { type: String, trim: true, maxlength: 200, default: "" },
     locationState: { type: String, trim: true, maxlength: 200, default: "" },
+    experiencePreference: { type: String, trim: true, maxlength: 200, default: "" },
+    minimumYearsExperience: { type: Number, min: 0, max: 80, default: 0 },
     tasks: { type: [scopeTaskSchema], default: [] },
     tasksLocked: { type: Boolean, default: false, index: true },
     status: { type: String, enum: CASE_STATUS_ENUM, default: "open", index: true },

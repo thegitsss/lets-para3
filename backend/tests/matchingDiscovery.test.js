@@ -5,6 +5,7 @@ const request = require("supertest");
 
 const User = require("../models/User");
 const Job = require("../models/Job");
+const Case = require("../models/Case");
 
 jest.mock("../utils/stripe", () => ({
   customers: {
@@ -86,6 +87,8 @@ describe("Matching + discovery", () => {
         description: "Assist with client intake and USCIS packet review for a family-based filing.",
         budget: 600,
         state: "CA",
+        experiencePreference: "5+ years",
+        minimumYearsExperience: 5,
         status: "open",
       },
       {
@@ -109,6 +112,13 @@ describe("Matching + discovery", () => {
     expect(Array.isArray(res.body)).toBe(true);
     const titles = res.body.map((job) => job.title).sort();
     expect(titles).toEqual(["Contract review", "Immigration filing support"].sort());
+    expect(res.body.find((job) => job.title === "Immigration filing support")).toEqual(
+      expect.objectContaining({
+        state: "CA",
+        experiencePreference: "5+ years",
+        minimumYearsExperience: 5,
+      })
+    );
   });
 
   test("Non-paralegals are blocked from job discovery", async () => {
@@ -134,5 +144,54 @@ describe("Matching + discovery", () => {
 
     expect(res.status).toBe(403);
     expect(res.body.error).toMatch(/forbidden/i);
+  });
+
+  test("alternate job posting mirrors the linked Matter state and experience minimum", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "samanthasider+attorney@gmail.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      title: "New York injury records review",
+      details: "Organize medical records and prepare a detailed chronology for counsel review.",
+      practiceArea: "personal injury",
+      state: "NY",
+      locationState: "NY",
+      experiencePreference: "5+ years",
+      minimumYearsExperience: 5,
+      totalAmount: 60_000,
+      status: "open",
+    });
+
+    const res = await request(app)
+      .post("/api/jobs")
+      .set("Cookie", authCookieFor(attorney))
+      .send({
+        caseId: String(caseDoc._id),
+        title: caseDoc.title,
+        description: caseDoc.details,
+        practiceArea: caseDoc.practiceArea,
+        budget: 600,
+        state: "CA",
+        experiencePreference: "1+ years",
+        minimumYearsExperience: 1,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(
+      expect.objectContaining({
+        state: "NY",
+        locationState: "NY",
+        experiencePreference: "5+ years",
+        minimumYearsExperience: 5,
+      })
+    );
   });
 });

@@ -17,6 +17,8 @@ const JobSchema = new mongoose.Schema({
   description: { type: String, required: true },
   state: { type: String, trim: true, maxlength: 200, default: "" },
   locationState: { type: String, trim: true, maxlength: 200, default: "" },
+  experiencePreference: { type: String, trim: true, maxlength: 200, default: "" },
+  minimumYearsExperience: { type: Number, min: 0, max: 80, default: 0 },
 
   budget: {
     type: Number,

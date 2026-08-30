@@ -26,6 +26,9 @@ const {
   syncApplicationMirror,
   syncApplicantsCount,
 } = require("../services/applicationService");
+const {
+  getHistoricalRecommendationExclusions,
+} = require("../services/recommendationExclusionService");
 const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = createDevOnlyEmailSet([
   "samanthasider+attorney@gmail.com",
   "samanthasider+56@gmail.com",
@@ -402,6 +405,24 @@ async function createApplicationForJob(jobId, user, coverLetter) {
 
   return application;
 }
+
+// GET /applications/recommendation-exclusions — durable Application-backed
+// identities used only by Home Recommended Matters.
+router.get(
+  "/recommendation-exclusions",
+  ...authenticatedGuards,
+  requireRole("paralegal"),
+  async (req, res) => {
+    try {
+      const exclusions = await getHistoricalRecommendationExclusions(req.user._id || req.user.id);
+      res.set("Cache-Control", "private, no-store");
+      return res.json(exclusions);
+    } catch (err) {
+      runtimeLogger.error("[applications] recommendation exclusions error", err);
+      return res.status(500).json({ error: "Unable to load recommendation history." });
+    }
+  }
+);
 
 // GET /applications/my — paralegal views jobs they've applied to
 router.get("/my", ...authenticatedGuards, requireRole("paralegal"), async (req, res) => {

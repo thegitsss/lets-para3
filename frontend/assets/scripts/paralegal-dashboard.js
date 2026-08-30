@@ -1,5 +1,12 @@
 import { secureFetch } from "./auth.js";
 import {
+  buildHistoricalExclusionSet,
+  createRecommendationStateLoader,
+  isHistoricallyExcluded,
+  shouldHandleRecommendationHistoryChange,
+  subscribeRecommendationHistoryChanges,
+} from "./recommendation-state.mjs";
+import {
   getStripeConnectStatus,
   isStripeConnected,
   startStripeOnboarding,
@@ -118,7 +125,6 @@ const selectors = {
   messageLabel: document.getElementById('messageLabel'),
   deadlineList: document.getElementById('deadlineList'),
   assignmentList: document.getElementById('assignmentList'),
-  recentActivityList: document.getElementById('recentActivityList'),
   assignmentTemplate: document.getElementById('assignmentCardTemplate'),
   toastBanner: document.getElementById('toastBanner'),
   nameHeading: document.getElementById('user-name-heading'),
@@ -143,6 +149,16 @@ const selectors = {
   earningsCard: document.getElementById('earnedThisMonthCard'),
   earningsToggle: document.getElementById('earningsToggle'),
   earningsLabel: document.getElementById('earningsLabelText'),
+  homeWorkSection: document.getElementById('homeWorkSection'),
+  homeApplicationsSection: document.getElementById('homeApplicationsSection'),
+  homeApplicationsList: document.getElementById('homeApplicationsList'),
+  recommendedMattersSection: document.getElementById('recommendedMattersSection'),
+  recommendedMattersList: document.getElementById('recommendedMattersList'),
+  homeProfileStates: document.getElementById('homeProfileStates'),
+  homeProfilePractices: document.getElementById('homeProfilePractices'),
+  homeProfileExperience: document.getElementById('homeProfileExperience'),
+  homeReturningOverview: document.getElementById('homeReturningOverview'),
+  homeApplicationPipeline: document.getElementById('homeApplicationPipeline'),
 };
 
 const recentActivityState = {
@@ -216,6 +232,11 @@ const DASHBOARD_REFRESH_COOLDOWN_MS = 4000;
 let earningsMode = 'month';
 let earningsSnapshot = { month: 0, total: 0 };
 let clusterMenuBound = false;
+let recommendationProfile = {};
+let recommendedJobsCache = [];
+let historicalRecommendationIds = new Set();
+let recommendationViewerId = '';
+let recommendationHistorySubscription = null;
 
 function bindClusterProfileMenu() {
   if (clusterMenuBound) return;
@@ -422,6 +443,354 @@ function formatCaseCompensation(cents = 0) {
   return formatCurrency(value / 100);
 }
 
+function getRecommendationId(job = {}) {
+  return normalizeIdCandidate(
+    job.caseId || job.case_id || job.case || job.id || job._id || job.jobId || job.job_id || ''
+  );
+}
+
+function getRecommendationPay(job = {}) {
+  if (Number(job.remainingAmount) > 0) return Number(job.remainingAmount) / 100;
+  if (Number(job.lockedTotalAmount) > 0) return Number(job.lockedTotalAmount) / 100;
+  if (Number(job.totalAmount) > 0) return Number(job.totalAmount) / 100;
+  if (Number(job.payAmount) > 0) return Number(job.payAmount);
+  if (Number(job.budget) > 0) return Number(job.budget);
+  return 0;
+}
+
+const STATE_CODES = new Map([
+  ['ALABAMA', 'AL'], ['ALASKA', 'AK'], ['ARIZONA', 'AZ'], ['ARKANSAS', 'AR'],
+  ['CALIFORNIA', 'CA'], ['COLORADO', 'CO'], ['CONNECTICUT', 'CT'], ['DELAWARE', 'DE'],
+  ['DISTRICT OF COLUMBIA', 'DC'], ['FLORIDA', 'FL'], ['GEORGIA', 'GA'], ['HAWAII', 'HI'],
+  ['IDAHO', 'ID'], ['ILLINOIS', 'IL'], ['INDIANA', 'IN'], ['IOWA', 'IA'],
+  ['KANSAS', 'KS'], ['KENTUCKY', 'KY'], ['LOUISIANA', 'LA'], ['MAINE', 'ME'],
+  ['MARYLAND', 'MD'], ['MASSACHUSETTS', 'MA'], ['MICHIGAN', 'MI'], ['MINNESOTA', 'MN'],
+  ['MISSISSIPPI', 'MS'], ['MISSOURI', 'MO'], ['MONTANA', 'MT'], ['NEBRASKA', 'NE'],
+  ['NEVADA', 'NV'], ['NEW HAMPSHIRE', 'NH'], ['NEW JERSEY', 'NJ'], ['NEW MEXICO', 'NM'],
+  ['NEW YORK', 'NY'], ['NORTH CAROLINA', 'NC'], ['NORTH DAKOTA', 'ND'], ['OHIO', 'OH'],
+  ['OKLAHOMA', 'OK'], ['OREGON', 'OR'], ['PENNSYLVANIA', 'PA'], ['RHODE ISLAND', 'RI'],
+  ['SOUTH CAROLINA', 'SC'], ['SOUTH DAKOTA', 'SD'], ['TENNESSEE', 'TN'], ['TEXAS', 'TX'],
+  ['UTAH', 'UT'], ['VERMONT', 'VT'], ['VIRGINIA', 'VA'], ['WASHINGTON', 'WA'],
+  ['WEST VIRGINIA', 'WV'], ['WISCONSIN', 'WI'], ['WYOMING', 'WY'],
+]);
+
+const GENERIC_PRACTICE_WORDS = new Set([
+  'and', 'the', 'law', 'legal', 'practice', 'matters', 'matter', 'litigation', 'services', 'support',
+]);
+
+function practiceKey(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function normalizeStateCode(value = '') {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\./g, '')
+    .replace(/\s+/g, ' ');
+  if (!normalized) return '';
+  if (/^[A-Z]{2}$/.test(normalized)) return normalized;
+  if (STATE_CODES.has(normalized)) return STATE_CODES.get(normalized);
+  const trailingCode = normalized.match(/(?:,|\s)\s*([A-Z]{2})$/);
+  return trailingCode ? trailingCode[1] : normalized;
+}
+
+function practiceTokens(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter((token) => token && !GENERIC_PRACTICE_WORDS.has(token));
+}
+
+function getPracticeMatchScore(matterArea = '', profileAreas = []) {
+  const matterTokens = practiceTokens(matterArea);
+  const matterRawKey = practiceKey(matterArea);
+  if (!matterRawKey) return 0;
+  const matterKey = matterTokens.join(' ');
+  return (Array.isArray(profileAreas) ? profileAreas : []).reduce((best, area) => {
+    const profileTokens = practiceTokens(area);
+    const profileRawKey = practiceKey(area);
+    if (!profileRawKey) return best;
+    if (matterRawKey === profileRawKey) return Math.max(best, 8);
+    if (matterRawKey.includes(profileRawKey) || profileRawKey.includes(matterRawKey)) return Math.max(best, 7);
+    if (!matterTokens.length || !profileTokens.length) return best;
+    const profileKey = profileTokens.join(' ');
+    if (matterKey === profileKey) return Math.max(best, 7);
+    const profileSet = new Set(profileTokens);
+    const overlap = matterTokens.filter((token) => profileSet.has(token)).length;
+    return overlap ? Math.max(best, 5 + Math.min(1, overlap / Math.max(matterTokens.length, profileTokens.length))) : best;
+  }, 0);
+}
+
+function getMatterMinimumExperience(job = {}) {
+  const explicit = Number(job.minimumYearsExperience ?? job.minimumExperienceYears);
+  if (Number.isFinite(explicit) && explicit > 0) return Math.min(80, explicit);
+  const preference = String(job.experiencePreference || job.requiredExperience || '');
+  const preferenceMatch = preference.match(/\d+(?:\.\d+)?/);
+  if (preferenceMatch) return Math.min(80, Number(preferenceMatch[0]) || 0);
+  const legacyMatch = String(job.briefSummary || '').match(/Experience:\s*(\d+(?:\.\d+)?)/i);
+  return legacyMatch ? Math.min(80, Number(legacyMatch[1]) || 0) : 0;
+}
+
+function getRecommendationProfile() {
+  const stateValues = [
+    ...(Array.isArray(recommendationProfile.stateExperience) ? recommendationProfile.stateExperience : []),
+    recommendationProfile.state,
+    recommendationProfile.location,
+  ];
+  return {
+    states: new Set(stateValues.map(normalizeStateCode).filter(Boolean)),
+    practiceAreas: Array.isArray(recommendationProfile.practiceAreas) ? recommendationProfile.practiceAreas : [],
+    yearsExperience: Math.max(0, Number(recommendationProfile.yearsExperience) || 0),
+  };
+}
+
+function rankRecommendedMatters(jobs = []) {
+  const profile = getRecommendationProfile();
+  const hasMatchingProfile = profile.states.size > 0 || profile.practiceAreas.length > 0;
+  const ranked = (Array.isArray(jobs) ? jobs : []).map((job) => {
+    const id = getRecommendationId(job);
+    const title = String(job?.title || job?.caseTitle || '').trim().toLowerCase();
+    const minimumYears = getMatterMinimumExperience(job);
+    if (!id || isHistoricallyExcluded(job, historicalRecommendationIds) || title.includes('job not found')) return null;
+    if (minimumYears > profile.yearsExperience) return null;
+    const matterState = normalizeStateCode(
+      job.state || job.locationState || job.location?.state || job.jurisdiction || ''
+    );
+    const stateMatch = Boolean(matterState && profile.states.has(matterState));
+    const practiceScore = getPracticeMatchScore(job.practiceArea, profile.practiceAreas);
+    const practiceMatch = practiceScore > 0;
+    if (!stateMatch && !practiceMatch) return null;
+    const score = (stateMatch ? 5 : 0) + practiceScore + (stateMatch && practiceMatch ? 2 : 0);
+    return { job, score, stateMatch, practiceMatch, minimumYears };
+  }).filter(Boolean);
+  ranked.sort((left, right) => (
+    right.score - left.score ||
+    new Date(right.job?.createdAt || 0) - new Date(left.job?.createdAt || 0)
+  ));
+  return { hasMatchingProfile, ranked };
+}
+
+function getApplicationJobId(application = {}) {
+  const job = application.jobId || application.job || {};
+  return normalizeIdCandidate(
+    job?._id || job?.id || application.jobId || application.job_id || application.caseId || ''
+  );
+}
+
+function syncHomeFeedSectionOrder(hasApplications) {
+  selectors.homeApplicationsSection?.classList.toggle('has-applications', hasApplications);
+}
+
+function renderApplicationPipeline(applications = []) {
+  const counts = { applied: 0, reviewing: 0, shortlisted: 0, hired: 0 };
+  (Array.isArray(applications) ? applications : []).forEach((application) => {
+    const status = getApplicationStatusKey(application);
+    const preEngagement = String(getApplicationPreEngagement(application)?.status || '').toLowerCase();
+    if (status === 'accepted') counts.hired += 1;
+    else if (status === 'shortlisted') counts.shortlisted += 1;
+    else if (status === 'viewed' || ['requested', 'changes_requested'].includes(preEngagement)) counts.reviewing += 1;
+    else if (!['rejected', 'withdrawn'].includes(status)) counts.applied += 1;
+  });
+  document.querySelectorAll('[data-home-pipeline-count]').forEach((node) => {
+    const key = node.getAttribute('data-home-pipeline-count');
+    node.textContent = String(counts[key] || 0);
+  });
+  const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
+  selectors.homeApplicationPipeline?.classList.toggle('is-empty', total === 0);
+  return { counts, total };
+}
+
+function describeHomeApplicationStatus(application = {}) {
+  const preEngagement = getApplicationPreEngagement(application);
+  if (['requested', 'changes_requested'].includes(String(preEngagement?.status || '').toLowerCase())) {
+    return { label: 'Information requested', tone: 'action' };
+  }
+  const status = getApplicationStatusKey(application);
+  const labels = {
+    submitted: 'Submitted',
+    viewed: 'Attorney reviewing',
+    shortlisted: 'Shortlisted',
+    accepted: 'Accepted',
+    rejected: 'Not selected',
+  };
+  return {
+    label: labels[status] || formatApplicationStatus(status),
+    tone: ['viewed', 'shortlisted'].includes(status) ? 'progress' : status,
+  };
+}
+
+function renderHomeApplications(applications = [], allApplications = applications) {
+  const container = selectors.homeApplicationsList;
+  if (!container) return;
+  const pipeline = renderApplicationPipeline(allApplications);
+  const visible = (Array.isArray(applications) ? applications : [])
+    .slice()
+    .sort((left, right) => new Date(right?.createdAt || 0) - new Date(left?.createdAt || 0))
+    .slice(0, 3);
+  syncHomeFeedSectionOrder(visible.length > 0);
+
+  if (!visible.length) {
+    if (pipeline.total === 0) {
+      container.hidden = true;
+      container.innerHTML = '';
+      return;
+    }
+    container.hidden = false;
+    container.innerHTML = `
+      <div class="home-feed-empty home-feed-empty--compact">
+        <p><strong>No applications currently in progress.</strong> Completed outcomes remain summarized in your pipeline.</p>
+        <a href="dashboard-paralegal.html#cases">View history</a>
+      </div>`;
+    return;
+  }
+
+  container.hidden = false;
+  container.innerHTML = visible.map((application) => {
+    const job = application.jobId || application.job || {};
+    const applicationId = normalizeIdCandidate(application._id || application.id || '');
+    const jobId = getApplicationJobId(application);
+    const href = applicationId
+      ? `dashboard-paralegal.html?applicationId=${encodeURIComponent(applicationId)}#cases`
+      : jobId
+        ? `dashboard-paralegal.html?jobId=${encodeURIComponent(jobId)}#cases`
+        : 'dashboard-paralegal.html#cases';
+    const status = describeHomeApplicationStatus(application);
+    const appliedDate = application.createdAt
+      ? new Date(application.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+      : '';
+    return `
+      <article class="home-application-row">
+        <div>
+          <strong>${escapeHtml(job.title || 'Untitled Matter')}</strong>
+          <small>${escapeHtml(job.practiceArea || 'General practice')}${appliedDate ? ` · Applied ${escapeHtml(appliedDate)}` : ''}</small>
+        </div>
+        <span class="home-application-status is-${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span>
+        <a href="${escapeHtml(href)}">View application</a>
+      </article>`;
+  }).join('');
+}
+
+function renderRecommendedMatters(jobs = []) {
+  const container = selectors.recommendedMattersList;
+  if (!container) return;
+  recommendedJobsCache = Array.isArray(jobs) ? jobs : [];
+  const { hasMatchingProfile, ranked } = rankRecommendedMatters(recommendedJobsCache);
+  const visible = ranked.slice(0, 3);
+
+  if (!visible.length) {
+    const emptyAction = hasMatchingProfile
+      ? ''
+      : '<a href="profile-settings.html">Update profile</a>';
+    container.innerHTML = `
+      <div class="home-feed-empty">
+        <strong>${hasMatchingProfile ? 'No matching matters right now' : 'Complete your profile for recommendations'}</strong>
+        <p>${hasMatchingProfile
+          ? 'There are no eligible open Matters matching your state or practice areas right now.'
+          : 'Add state experience and practice areas so Let’s-ParaConnect can identify relevant Matters.'}</p>
+        ${emptyAction}
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = visible.map(({ job, stateMatch, practiceMatch, minimumYears }) => {
+    const id = getRecommendationId(job);
+    const pay = getRecommendationPay(job);
+    const location = job.state || job.locationState || job.location?.state || job.jurisdiction || '';
+    const posted = job.createdAt
+      ? `Posted ${new Date(job.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+      : 'Posted recently';
+    const compensation = pay > 0 ? formatCurrency(pay) : 'Compensation available';
+    const deadlineValue = job.deadlineDate || job.deadline || '';
+    const deadline = deadlineValue ? `Due ${formatMatterDeadline(deadlineValue)}` : 'No deadline listed';
+    const matchReason = stateMatch && practiceMatch
+      ? 'Matches your state and practice areas'
+      : stateMatch
+        ? 'Matches your state experience'
+        : 'Matches your practice areas';
+    return `
+      <article class="home-recommendation-card">
+        <div class="home-recommendation-heading">
+          <span class="home-recommendation-match">${escapeHtml(matchReason)}</span>
+          <h3>${escapeHtml(job.title || 'Untitled Matter')}</h3>
+          <p>${escapeHtml(job.practiceArea || 'General practice')}</p>
+        </div>
+        <div class="home-recommendation-meta">
+          ${location ? `<span>${escapeHtml(location)}</span>` : ''}
+          <span>${escapeHtml(deadline)}</span>
+          <span>${escapeHtml(posted)}</span>
+          ${minimumYears > 0 ? `<span>${escapeHtml(`${minimumYears}+ years required`)}</span>` : ''}
+        </div>
+        <div class="home-recommendation-aside">
+          <strong class="home-recommendation-pay">${escapeHtml(compensation)}</strong>
+          <a class="home-recommendation-details" href="browse-jobs.html?id=${encodeURIComponent(id)}">Details</a>
+        </div>
+      </article>`;
+  }).join('');
+}
+
+function renderRecommendationLoading() {
+  selectors.recommendedMattersSection?.setAttribute('aria-busy', 'true');
+  if (!selectors.recommendedMattersList) return;
+  selectors.recommendedMattersList.innerHTML = `
+    <div class="home-feed-empty">
+      <strong>Checking for matching matters…</strong>
+    </div>`;
+}
+
+function renderRecommendationUnavailable(error) {
+  console.warn('Unable to load recommended matters', error);
+  selectors.recommendedMattersSection?.removeAttribute('aria-busy');
+  if (!selectors.recommendedMattersList) return;
+  selectors.recommendedMattersList.innerHTML = `
+    <div class="home-feed-empty">
+      <strong>Recommendations are unavailable</strong>
+      <p>You can still view every open opportunity on the Matter board.</p>
+    </div>`;
+}
+
+const recommendationStateLoader = createRecommendationStateLoader({
+  loadProfile: () => loadViewerProfile(),
+  loadJobs: () => fetchJson('/api/jobs/open'),
+  loadExclusions: () => fetchJson('/api/applications/recommendation-exclusions'),
+  onLoading: renderRecommendationLoading,
+  onReady: ({ profile, jobs, exclusions }) => {
+    updateProfile(profile || {});
+    historicalRecommendationIds = buildHistoricalExclusionSet(exclusions);
+    const listings = Array.isArray(jobs) ? jobs : Array.isArray(jobs?.items) ? jobs.items : [];
+    selectors.recommendedMattersSection?.removeAttribute('aria-busy');
+    renderRecommendedMatters(listings);
+  },
+  onError: renderRecommendationUnavailable,
+});
+
+function loadRecommendedMatters(options = {}) {
+  return recommendationStateLoader.refresh(options);
+}
+
+function handleRecommendationHistoryChange(payload = {}) {
+  if (!shouldHandleRecommendationHistoryChange(payload, recommendationViewerId)) return;
+  const changedIds = buildHistoricalExclusionSet(payload);
+  changedIds.forEach((id) => historicalRecommendationIds.add(id));
+  renderRecommendedMatters(recommendedJobsCache);
+  void loadRecommendedMatters();
+}
+
+function setupRecommendationHistorySync() {
+  if (recommendationHistorySubscription) return;
+  recommendationHistorySubscription = subscribeRecommendationHistoryChanges(
+    handleRecommendationHistoryChange
+  );
+}
+
 function deriveNextDeadline(events = []) {
   const next = Array.isArray(events) ? events[0] : null;
   if (!next) return '—';
@@ -478,6 +847,7 @@ function updateStats(stats = {}) {
   const totalEarnings = Number(stats.totalEarnings ?? monthEarnings ?? 0);
   const payout30Days = Number(stats.payout30Days ?? 0);
   const nextPayout = stats.nextPayout ?? '—';
+  const expectedPayouts = Number(stats.expectedPayouts ?? 0);
 
   setField('welcomeSubheading', `You have ${activeCases} active assignment${activeCases === 1 ? '' : 's'}`);
   setField('activeCases', activeCases);
@@ -488,6 +858,14 @@ function updateStats(stats = {}) {
   renderEarningsDisplay();
   setField('payout30Days', payoutDisplay);
   setField('nextPayout', nextPayout);
+  setField('homeActiveMatters', activeCases);
+  setField('homeNextDeadline', nextDeadline);
+  setField('homeUnreadMessages', unread);
+  setField('homeExpectedPayouts', formatCurrency(expectedPayouts));
+  const hasNextDeadline = Boolean(nextDeadline && nextDeadline !== '—');
+  if (selectors.homeReturningOverview) {
+    selectors.homeReturningOverview.hidden = !(activeCases > 0 || unread > 0 || hasNextDeadline || expectedPayouts > 0);
+  }
 }
 
 async function refreshDashboardFromServer(reason = '') {
@@ -497,6 +875,7 @@ async function refreshDashboardFromServer(reason = '') {
   dashboardRefreshInFlight = true;
   lastDashboardRefreshAt = now;
   try {
+    const recommendationRefresh = loadRecommendedMatters();
     const [dashboard, invites, deadlines, threads, unreadCount] = await Promise.all([
       fetchParalegalData({ fresh: true }).catch((err) => {
         console.warn('Paralegal dashboard payload refresh failed', reason || '', err);
@@ -536,18 +915,20 @@ async function refreshDashboardFromServer(reason = '') {
         totalEarnings: dashboard?.metrics?.earningsTotal,
         payout30Days: dashboard?.metrics?.earningsLast30Days,
         nextPayout: dashboard?.metrics?.nextPayoutDate,
+        expectedPayouts: dashboard?.metrics?.expectedPayouts,
       });
-      renderAssignments(mapActiveCasesToAssignments(activeCases));
+      renderAssignments(mapActiveCasesToAssignments(activeCases, threads));
     }
 
     renderDeadlines(deadlineEvents);
-    renderRecentActivity({
+    syncRecentActivityState({
       invites: Array.isArray(invites) ? invites : [],
       threads: Array.isArray(threads) ? threads : [],
       deadlines: deadlineEvents,
     });
     maybeOpenInviteFromQuery();
     await loadAppliedJobs({ preservePage: true });
+    await recommendationRefresh;
     paralegalPrioritySnapshot = {
       activeCases,
       invites: Array.isArray(invites) ? invites : [],
@@ -605,51 +986,56 @@ function renderAssignments(assignments = []) {
   if (!container || !selectors.assignmentTemplate) return;
   const usableAssignments = assignments.filter((assignment) => assignment && assignment.caseId);
   if (!usableAssignments.length) {
-    container.removeAttribute("hidden");
+    if (selectors.homeWorkSection) selectors.homeWorkSection.hidden = true;
     container.innerHTML = "";
-    const emptyCard = document.createElement("div");
-    emptyCard.className = "case-card empty-state";
-    emptyCard.innerHTML = `
-      <div class="case-header">
-        <div>
-          <h2>Assignments</h2>
-          <div class="case-subinfo">No assignments yet.</div>
-        </div>
-      </div>
-    `;
-    container.appendChild(emptyCard);
     return;
   }
+  if (selectors.homeWorkSection) selectors.homeWorkSection.hidden = false;
   container.removeAttribute("hidden");
   container.innerHTML = '';
 
-  usableAssignments.forEach((assignment) => {
+  usableAssignments.slice(0, 2).forEach((assignment) => {
     const node = selectors.assignmentTemplate.content.cloneNode(true);
     const card = node.querySelector('.case-card');
     const titleEl = card.querySelector('[data-field="assignmentTitle"]');
     const metaEl = card.querySelector('[data-field="assignmentMeta"]');
     const summaryEl = card.querySelector('[data-field="assignmentSummary"]');
+    const signalsEl = card.querySelector('[data-field="assignmentSignals"]');
     const actions = card.querySelector('.case-actions');
     const primaryBtn = card.querySelector('[data-action="primary"]');
     const secondaryBtn = card.querySelector('[data-action="secondary"]');
 
-    const attorney = assignment.attorney ? `Lead Attorney: ${assignment.attorney}` : '';
-    const due = assignment.due ? `Due: ${assignment.due}` : '';
+    const attorney = assignment.attorney ? `Attorney: ${assignment.attorney}` : '';
+    const practiceArea = assignment.practiceArea || '';
     const statusLabel = assignment.status ? formatStatusLabel(assignment.status) : '';
-    const status = statusLabel ? `Status: ${statusLabel}` : '';
-    const metaParts = [attorney, due, status].filter(Boolean);
+    const metaParts = [attorney, practiceArea, statusLabel].filter(Boolean);
     const caseId = assignment.caseId;
     const eligible = isWorkspaceEligibleCase(assignment);
 
     titleEl.textContent = assignment.title || 'Matter';
     metaEl.textContent = metaParts.join(' · ');
-    summaryEl.textContent = assignment.summary || '';
+    if (signalsEl) {
+      const taskLabel = assignment.tasksTotal > 0
+        ? `${assignment.tasksRemaining} task${assignment.tasksRemaining === 1 ? '' : 's'} remaining`
+        : 'No tasks listed';
+      const messageLabel = assignment.unreadMessages > 0
+        ? `${assignment.unreadMessages} unread message${assignment.unreadMessages === 1 ? '' : 's'}`
+        : 'No unread messages';
+      signalsEl.innerHTML = `
+        <span>${escapeHtml(assignment.due ? `Due ${assignment.due}` : 'No deadline listed')}</span>
+        <span>${escapeHtml(taskLabel)}</span>
+        <span class="${assignment.unreadMessages > 0 ? 'has-unread' : ''}">${escapeHtml(messageLabel)}</span>
+      `;
+    }
+    summaryEl.textContent = assignment.latestActivity || '';
+    summaryEl.hidden = !assignment.latestActivity;
     if (card) card.dataset.caseId = caseId;
     card.classList.add('open');
 
     if (actions) {
       actions.hidden = !eligible;
     }
+    if (primaryBtn) primaryBtn.textContent = 'Continue working';
     if (secondaryBtn) {
       secondaryBtn.hidden = !caseId;
       secondaryBtn.addEventListener('click', (event) => {
@@ -671,15 +1057,29 @@ function renderAssignments(assignments = []) {
   });
 }
 
-function mapActiveCasesToAssignments(activeCases = []) {
+function mapActiveCasesToAssignments(activeCases = [], threads = []) {
+  const threadByCase = new Map(
+    (Array.isArray(threads) ? threads : [])
+      .map((thread) => [String(getCaseId(thread) || ''), thread])
+      .filter(([caseId]) => caseId)
+  );
   return activeCases
     .map((caseItem) => {
       const caseId = getCaseId(caseItem);
       if (!caseId) return null;
+      const thread = threadByCase.get(String(caseId)) || null;
+      const latestActivity = caseItem.latestUpdate
+        ? `Latest update: ${caseItem.latestUpdate}`
+        : caseItem.latestFileName
+          ? `Latest file: ${caseItem.latestFileName}`
+          : thread?.lastMessageSnippet
+            ? `Latest message: ${thread.lastMessageSnippet}`
+            : '';
       return {
         caseId,
         title: caseItem.jobTitle || caseItem.title || 'Matter',
         attorney: caseItem.attorneyName || '',
+        practiceArea: caseItem.practiceArea || '',
         due: caseItem.deadline
           ? formatMatterDeadline(caseItem.deadlineDate || caseItem.deadline)
           : caseItem.dueDate
@@ -688,7 +1088,10 @@ function mapActiveCasesToAssignments(activeCases = []) {
               ? new Date(caseItem.createdAt).toLocaleDateString()
               : '',
         status: caseItem.status || '',
-        summary: caseItem.practiceArea ? `Practice area: ${caseItem.practiceArea}` : '',
+        tasksTotal: Math.max(0, Number(caseItem.tasksTotal) || 0),
+        tasksRemaining: Math.max(0, Number(caseItem.tasksRemaining) || 0),
+        unreadMessages: Math.max(0, Number(thread?.unread) || 0),
+        latestActivity,
         escrowStatus: caseItem.escrowStatus || null,
         escrowIntentId: caseItem.escrowIntentId || null,
         archived: caseItem.archived,
@@ -742,126 +1145,10 @@ function clearInviteQuery() {
   } catch {}
 }
 
-function buildRecentActivityEntries({ invites = [], threads = [], deadlines = [] } = {}) {
-  const entries = [];
-
-  invites.forEach((invite) => {
-    const inviteId = invite?.id || invite?._id;
-    if (!inviteId) return;
-    const inviteStatus = String(invite?.inviteStatus || '').toLowerCase();
-    if (inviteStatus && inviteStatus !== 'pending') return;
-    const invitedAt = invite.inviteInvitedAt || invite.pendingParalegalInvitedAt || invite.createdAt || null;
-    const timestamp = invitedAt ? new Date(invitedAt).getTime() : 0;
-    const attorneyName =
-      invite.attorney?.name ||
-      [invite.attorney?.firstName, invite.attorney?.lastName].filter(Boolean).join(' ').trim() ||
-      '';
-    const title = invite.title || 'Matter invitation';
-    entries.push({
-      type: 'invite',
-      caseId: String(inviteId),
-      timestamp,
-      title,
-      meta: ['Invitation received', attorneyName].filter(Boolean).join(' · '),
-      time: formatActivityDate(invitedAt),
-      href: `dashboard-paralegal.html?inviteCase=${encodeURIComponent(inviteId)}#home`,
-    });
-  });
-
-  (Array.isArray(threads) ? threads : []).forEach((thread) => {
-    const caseId = thread?.caseId || thread?.case?.id || thread?.id || '';
-    const timestamp = getThreadTimestamp(thread);
-    entries.push({
-      type: 'message',
-      caseId: String(caseId),
-      timestamp,
-      title: thread?.title || 'Matter thread',
-      meta: thread?.lastMessageSnippet || 'New message',
-      time: formatActivityDate(timestamp),
-      href: caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : '',
-    });
-  });
-
-  (Array.isArray(deadlines) ? deadlines : []).forEach((event) => {
-    const start = event?.start;
-    if (!start) return;
-    const timestamp = new Date(start).getTime();
-    const caseId = event?.caseId || '';
-    const dueLabel = formatActivityDate(start);
-    entries.push({
-      type: 'deadline',
-      caseId: String(caseId),
-      timestamp,
-      title: event?.title || 'Upcoming deadline',
-      meta: event?.where || 'Deadline reminder',
-      time: dueLabel ? `Due ${dueLabel}` : '',
-      href: caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : '',
-    });
-  });
-
-  return entries.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 3);
-}
-
-function renderRecentActivity({ invites = [], threads = [], deadlines = [] } = {}) {
-  const container = selectors.recentActivityList;
-  if (!container) return;
-
-  recentActivityState.invites = invites;
-  recentActivityState.threads = threads;
-  recentActivityState.deadlines = deadlines;
-
-  const entries = buildRecentActivityEntries({ invites, threads, deadlines });
-  const subtitle = entries.length ? 'Latest updates from your Matters.' : 'No recent activity yet.';
-  const card = document.createElement('div');
-  card.className = `case-card activity-card${entries.length ? '' : ' empty-state'}`;
-  card.innerHTML = `
-    <div class="case-header">
-      <div>
-        <h2>Recent activity</h2>
-        <div class="case-subinfo">${escapeHtml(subtitle)}</div>
-      </div>
-    </div>
-  `;
-
-  if (entries.length) {
-    const list = document.createElement('ul');
-    list.className = 'activity-list';
-    entries.forEach((entry) => {
-      const item = document.createElement('li');
-      item.className = 'activity-item';
-      const time = entry.time ? `<div class="activity-time">${escapeHtml(entry.time)}</div>` : '';
-      const title = entry.href
-        ? `<a class="activity-link" href="${escapeHtml(entry.href)}"${
-            entry.type === 'invite' ? ` data-invite-case-id="${escapeHtml(entry.caseId || '')}"` : ''
-          }>${escapeHtml(entry.title)}</a>`
-        : escapeHtml(entry.title);
-      item.innerHTML = `
-        <div class="activity-row">
-          <div class="activity-title">${title}</div>
-          ${time}
-        </div>
-        <div class="activity-meta">${escapeHtml(entry.meta)}</div>
-      `;
-      list.appendChild(item);
-    });
-    card.appendChild(list);
-  }
-
-  container.innerHTML = '';
-  container.appendChild(card);
-
-  container.querySelectorAll('.activity-link').forEach((link) => {
-    link.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const caseId = String(link.getAttribute('data-invite-case-id') || '').trim();
-      if (!caseId) return;
-      const invite = findInviteByCaseId(caseId);
-      if (!invite) return;
-      event.preventDefault();
-      setInviteQuery(caseId);
-      openInviteOverlay(invite);
-    });
-  });
+function syncRecentActivityState({ invites = [], threads = [], deadlines = [] } = {}) {
+  recentActivityState.invites = Array.isArray(invites) ? invites : [];
+  recentActivityState.threads = Array.isArray(threads) ? threads : [];
+  recentActivityState.deadlines = Array.isArray(deadlines) ? deadlines : [];
 }
 
 let inviteResponseInFlight = false;
@@ -895,7 +1182,7 @@ async function respondToInvite(caseId, action, button) {
       recentActivityState.invites = recentActivityState.invites.filter(
         (invite) => String(invite?.id || invite?._id || '') !== String(caseId)
       );
-      renderRecentActivity({
+      syncRecentActivityState({
         invites: recentActivityState.invites,
         threads: recentActivityState.threads,
         deadlines: recentActivityState.deadlines,
@@ -920,7 +1207,7 @@ async function respondToInvite(caseId, action, button) {
     }
     closeInviteOverlay();
     const invites = await loadInvites();
-    renderRecentActivity({
+    syncRecentActivityState({
       invites,
       threads: recentActivityState.threads,
       deadlines: recentActivityState.deadlines,
@@ -962,7 +1249,7 @@ async function revokeAcceptedInvite(caseId, button) {
     recentActivityState.invites = recentActivityState.invites.filter(
       (invite) => String(invite?.id || invite?._id || '') !== String(caseId)
     );
-    renderRecentActivity({
+    syncRecentActivityState({
       invites: recentActivityState.invites,
       threads: recentActivityState.threads,
       deadlines: recentActivityState.deadlines,
@@ -1604,6 +1891,34 @@ async function initParalegalTour(user, options = {}) {
 }
 
 function updateProfile(profile = {}) {
+  recommendationProfile = { ...recommendationProfile, ...profile };
+  const stateExperience = Array.isArray(profile.stateExperience)
+    ? profile.stateExperience.map((value) => String(value || '').trim()).filter(Boolean)
+    : [];
+  const fallbackState = String(profile.state || profile.location || '').trim();
+  const practices = Array.isArray(profile.practiceAreas)
+    ? profile.practiceAreas.map((value) => String(value || '').trim()).filter(Boolean)
+    : [];
+  const years = Number(profile.yearsExperience);
+  if (selectors.homeProfileStates) {
+    selectors.homeProfileStates.textContent = stateExperience.length
+      ? stateExperience.slice(0, 3).join(', ')
+      : fallbackState || 'Add your states';
+    selectors.homeProfileStates.title = stateExperience.join(', ') || fallbackState;
+  }
+  if (selectors.homeProfilePractices) {
+    const summary = practices.length > 2
+      ? `${practices.slice(0, 2).join(', ')} +${practices.length - 2}`
+      : practices.join(', ');
+    selectors.homeProfilePractices.textContent = summary || 'Add practice areas';
+    selectors.homeProfilePractices.title = practices.join(', ');
+  }
+  if (selectors.homeProfileExperience) {
+    selectors.homeProfileExperience.textContent = Number.isFinite(years) && years >= 0
+      ? `${years} year${years === 1 ? '' : 's'}`
+      : 'Add experience';
+  }
+  if (recommendedJobsCache.length) renderRecommendedMatters(recommendedJobsCache);
   const composedName =
     [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim() || profile.name || 'Paralegal';
   const firstName =
@@ -1723,21 +2038,6 @@ function initLatestMessage(threads = []) {
   setField('latestMessageExcerpt', latest?.lastMessageSnippet || 'No new messages.');
 }
 
-function initQuickActions() {
-  document.querySelectorAll('.quick-actions [data-action]').forEach((button) => {
-    button.addEventListener('click', (event) => {
-      const action = button.dataset.action;
-      if (action === 'browse') {
-        if (button.tagName !== 'A') {
-          event.preventDefault();
-          window.location.href = 'browse-jobs.html';
-        }
-        return;
-      }
-    });
-  });
-}
-
 function escapeHtml(value = '') {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -1755,19 +2055,6 @@ function formatDate(value) {
 
 function formatMatterDeadline(value) {
   return window.LPCBusinessDate?.format(value) || formatDate(value);
-}
-
-function formatActivityDate(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const today = new Date();
-  const isSameDay =
-    date.getFullYear() === today.getFullYear() &&
-    date.getMonth() === today.getMonth() &&
-    date.getDate() === today.getDate();
-  if (isSameDay) return 'Today';
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function formatMultiline(value) {
@@ -2549,6 +2836,7 @@ async function loadAppliedJobs({ preservePage = false } = {}) {
     const visibleApps = apps.filter((app) => isActiveApplication(app));
     appliedAppsCache = visibleApps;
     paralegalPrioritySnapshot.applications = visibleApps;
+    renderHomeApplications(visibleApps, apps);
     appliedPage = preservePage ? appliedPage : 1;
     bindAppliedFilters();
     populateAppliedFilterOptions(visibleApps);
@@ -2557,6 +2845,15 @@ async function loadAppliedJobs({ preservePage = false } = {}) {
     maybeOpenApplicationFromQuery();
   } catch (err) {
     console.error('Failed to load applied jobs', err);
+    renderApplicationPipeline([]);
+    if (selectors.homeApplicationsList) {
+      selectors.homeApplicationsList.innerHTML = `
+        <div class="home-feed-empty">
+          <strong>Applications are unavailable</strong>
+          <p>Your application history could not be loaded. Try again from the full applications view.</p>
+          <a href="dashboard-paralegal.html#cases">Open applications</a>
+        </div>`;
+    }
     container.innerHTML = `
       <div class="case-card empty-state">
         <div class="case-header">
@@ -2947,8 +3244,9 @@ function formatApplicationStatus(value) {
 function renderParalegalPriorityQueue() {
   const list = document.querySelector('[data-paralegal-priority-list]');
   const count = document.querySelector('[data-paralegal-priority-count]');
+  const shell = document.getElementById('paralegalPriorityQueue');
   if (!list) return;
-  const { activeCases = [], invites = [], deadlines = [], applications = [] } = paralegalPrioritySnapshot;
+  const { invites = [], deadlines = [], applications = [] } = paralegalPrioritySnapshot;
   const priorities = [];
   const pendingInvites = invites.filter((invite) => String(invite?.inviteStatus || invite?.status || 'pending').toLowerCase() === 'pending');
   if (pendingInvites.length) {
@@ -2984,10 +3282,12 @@ function renderParalegalPriorityQueue() {
     });
   }
   if (!stripeConnected) {
-    priorities.push({
+    priorities.unshift({
       title: 'Complete payout setup',
-      detail: 'Finish payout verification before a completed Matter reaches payout.',
-      label: 'Open payout settings',
+      detail: 'Required before you can apply to Matters or receive payment.',
+      kicker: 'Account setup required',
+      tone: 'blocking',
+      label: 'Complete setup',
       href: 'profile-settings.html?onboardingStep=payment',
     });
   }
@@ -3012,22 +3312,20 @@ function renderParalegalPriorityQueue() {
     });
   }
   if (!priorities.length) {
-    priorities.push({
-      title: 'All clear',
-      detail: activeCases.length ? 'No invitations, messages, payout blockers, or near-term deadlines need action.' : 'Browse open Matters when you are ready for another opportunity.',
-      label: activeCases.length ? 'View Matters' : 'Browse Matters',
-      href: activeCases.length ? 'dashboard-paralegal.html#cases' : 'browse-jobs.html',
-    });
+    if (shell) shell.hidden = true;
+    list.innerHTML = '';
+    if (count) count.textContent = '';
+    return;
   }
+  if (shell) shell.hidden = false;
   const visible = priorities.slice(0, 5);
   if (count) {
-    count.textContent = priorities[0]?.title === 'All clear'
-      ? 'All clear'
-      : `${visible.length} action${visible.length === 1 ? '' : 's'}`;
+    count.textContent = `${visible.length} action${visible.length === 1 ? '' : 's'}`;
   }
   list.innerHTML = visible.map((item) => `
-    <div class="lpc-priority-item">
+    <div class="lpc-priority-item${item.tone === 'blocking' ? ' is-blocking' : ''}">
       <div>
+        ${item.kicker ? `<span class="home-priority-eyebrow">${escapeHtml(item.kicker)}</span>` : ''}
         <strong>${escapeHtml(item.title)}</strong>
         <span>${escapeHtml(item.detail)}</span>
       </div>
@@ -3038,10 +3336,11 @@ function renderParalegalPriorityQueue() {
 
 async function initDashboard() {
   attachUIHandlers();
-  initQuickActions();
   try {
+    const profilePromise = loadViewerProfile();
+    const recommendationRequest = loadRecommendedMatters({ profilePromise });
     const [profile, , dashboard, invites, deadlines, threads, unreadCount] = await Promise.all([
-      loadViewerProfile().catch(() => ({})),
+      profilePromise.catch(() => ({})),
       loadStripeStatus().catch(() => null),
       fetchParalegalData().catch(() => ({})),
       loadInvites().catch(() => []),
@@ -3062,12 +3361,14 @@ async function initDashboard() {
       totalEarnings: dashboard?.metrics?.earningsTotal,
       payout30Days: dashboard?.metrics?.earningsLast30Days,
       nextPayout: dashboard?.metrics?.nextPayoutDate,
+      expectedPayouts: dashboard?.metrics?.expectedPayouts,
     });
     await loadAppliedJobs();
+    await recommendationRequest;
     renderDeadlines(deadlineEvents);
     initLatestMessage(threads);
-    renderAssignments(mapActiveCasesToAssignments(dashboard?.activeCases || []));
-    renderRecentActivity({ invites, threads, deadlines: deadlineEvents });
+    renderAssignments(mapActiveCasesToAssignments(dashboard?.activeCases || [], threads));
+    syncRecentActivityState({ invites, threads, deadlines: deadlineEvents });
     paralegalPrioritySnapshot = {
       activeCases: dashboard?.activeCases || [],
       invites,
@@ -3080,7 +3381,7 @@ async function initDashboard() {
   } catch (err) {
     console.warn('Paralegal dashboard init failed', err);
     renderAssignments([]);
-    renderRecentActivity({ invites: [], threads: [], deadlines: [] });
+    syncRecentActivityState({ invites: [], threads: [], deadlines: [] });
     renderDeadlines([]);
     initLatestMessage([]);
     loadAppliedJobs();
@@ -3096,6 +3397,8 @@ document.addEventListener('DOMContentLoaded', () => {
 async function bootParalegalDashboard() {
   const user = typeof window.requireRole === 'function' ? await window.requireRole('paralegal') : null;
   if (!user) return;
+  recommendationViewerId = normalizeIdCandidate(user._id || user.id || '');
+  setupRecommendationHistorySync();
   bindClusterProfileMenu();
   applyRoleVisibility(user);
   updateProfile(user || {});
@@ -3134,7 +3437,7 @@ function initAvailabilityModal() {
   const nextRow = document.getElementById("availabilityNextRow");
   const dateRow = document.getElementById("availabilityDateRow");
   const currentSummary = document.getElementById("availabilityCurrentSummary");
-  const quickActionBtn = document.querySelector('.quick-actions [data-action="availability"]');
+  const quickActionBtn = document.querySelector('[data-action="availability"]');
 
   if (!modal) return;
 

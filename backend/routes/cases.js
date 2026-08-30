@@ -1126,6 +1126,14 @@ function buildBriefSummary({ state, employmentType, experience }) {
   return bits.join(" • ");
 }
 
+function minimumYearsFromExperience(value) {
+  const match = String(value || "").match(/\d+(?:\.\d+)?/);
+  if (!match) return 0;
+  const years = Number(match[0]);
+  if (!Number.isFinite(years)) return 0;
+  return Math.min(80, Math.max(0, years));
+}
+
 function summarizeUser(person) {
   if (!person || typeof person !== "object") return null;
   const name = `${person.firstName || ""} ${person.lastName || ""}`.trim() || null;
@@ -1338,6 +1346,9 @@ function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
     practiceArea: doc.practiceArea || "",
     state: stateValue,
     locationState: doc.locationState || stateValue,
+    experience: doc.experiencePreference || "",
+    experiencePreference: doc.experiencePreference || "",
+    minimumYearsExperience: Number(doc.minimumYearsExperience || 0),
     tasks: serializeScopeTasks(doc.tasks),
     tasksLocked: !!doc.tasksLocked,
     status: normalizedStatus,
@@ -3083,6 +3094,8 @@ router.post(
       deadline: parsedDeadline?.legacyDate || null,
       state: normalizedState,
       locationState: normalizedState,
+      experiencePreference: cleanString(experience || "", { len: 200 }),
+      minimumYearsExperience: minimumYearsFromExperience(experience),
       tasks: normalizedTasks,
       briefSummary: buildBriefSummary({ state: normalizedState, employmentType, experience }),
       updates: [
@@ -3102,8 +3115,6 @@ router.post(
     let createdJob = null;
     try {
       const budgetDollars = Math.max(1, Math.round((amountCents || 0) / 100) || 0);
-      const attorneyProfile = await User.findById(req.user.id).select("state");
-      const attorneyState = String(attorneyProfile?.state || "").trim().toUpperCase();
       createdJob = await Job.create({
         caseId: created._id,
         attorneyId: req.user.id,
@@ -3112,8 +3123,10 @@ router.post(
         description: created.details,
         budget: budgetDollars,
         status: "open",
-        state: attorneyState,
-        locationState: attorneyState,
+        state: normalizedState,
+        locationState: normalizedState,
+        experiencePreference: created.experiencePreference || "",
+        minimumYearsExperience: Number(created.minimumYearsExperience || 0),
       });
       created.jobId = createdJob._id;
       await created.save();
@@ -3680,7 +3693,7 @@ router.patch(
   csrfProtection,
   requireCaseAccess(
     "caseId",
-    { project: "title details practiceArea totalAmount lockedTotalAmount currency status briefSummary invites pendingParalegalId pendingParalegalInvitedAt applicants tasks taskRevision tasksLocked hiredAt paralegalId completionClaimStatus" }
+    { project: "title details practiceArea totalAmount lockedTotalAmount currency status briefSummary experiencePreference minimumYearsExperience invites pendingParalegalId pendingParalegalInvitedAt applicants tasks taskRevision tasksLocked hiredAt paralegalId completionClaimStatus jobId" }
   ),
   asyncHandler(async (req, res) => {
     const isAdmin = !!req.acl?.isAdmin;
@@ -3770,6 +3783,12 @@ router.patch(
       doc.briefSummary = cleanString(body.briefSummary, { len: 1000 });
       touched = true;
     }
+    if (typeof body.experience === "string" || typeof body.experiencePreference === "string") {
+      const preference = cleanString(body.experience ?? body.experiencePreference ?? "", { len: 200 });
+      doc.experiencePreference = preference;
+      doc.minimumYearsExperience = minimumYearsFromExperience(preference);
+      touched = true;
+    }
     if (typeof body.deadline !== "undefined") {
       if (!body.deadline) {
         doc.deadlineDate = "";
@@ -3843,6 +3862,17 @@ router.patch(
       doc = saved;
     } else {
       await doc.save();
+    }
+    if (!completionOnlyUpdate && doc.jobId) {
+      await Job.updateOne(
+        { _id: doc.jobId },
+        {
+          $set: {
+            experiencePreference: doc.experiencePreference || "",
+            minimumYearsExperience: Number(doc.minimumYearsExperience || 0),
+          },
+        }
+      );
     }
     await doc.populate([
       { path: "paralegal", select: "firstName lastName email role avatarURL" },

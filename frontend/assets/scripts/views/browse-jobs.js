@@ -1,6 +1,10 @@
 import { secureFetch } from "../auth.js";
 import { getStripeConnectStatus, isStripeConnected, STRIPE_GATE_MESSAGE } from "../utils/stripe-connect.js";
 import { showAlert } from "../utils/dialogs.js";
+import {
+  getRecommendationIdentityIds,
+  publishRecommendationHistoryChange,
+} from "../recommendation-state.mjs";
 
 const jobsGrid = document.getElementById("jobs-grid");
 const pagination = document.getElementById("pagination");
@@ -1273,7 +1277,15 @@ async function submitApplication() {
       throw new Error(message);
     }
     applyStatus.textContent = "";
+    const submittedJob = currentApplyJob;
+    const submittedIds = getRecommendationIdentityIds(submittedJob || {});
     markJobAsApplied(jobId);
+    publishRecommendationHistoryChange({
+      viewerId,
+      caseIds: [submittedJob?.caseId, submittedJob?.contextCaseId].filter(Boolean),
+      jobIds: [submittedJob?.jobId, target?.type === "job" ? jobId : ""].filter(Boolean),
+      matterIds: submittedIds,
+    });
     const submittedTitle = currentApplyJob?.title || "";
     applyConfirmReturnFocus = applyReturnFocus;
     closeApplyModal({ restoreFocus: false });

@@ -49,7 +49,10 @@ describe("attorney and paralegal dashboard upgrade contracts", () => {
     const html = read("frontend/dashboard-paralegal.html");
     const script = read("frontend/assets/scripts/paralegal-dashboard.js");
     expect(html).toMatch(/id="paralegalPriorityQueue"/);
-    expect(html).toMatch(/Prioritized from your current Matters, applications, messages, and payout readiness/);
+    expect(html).toMatch(/id="paralegalPriorityTitle">Next best action/);
+    expect(html).toMatch(/Invitations, messages, deadlines, and account items that need your attention/);
+    expect(html).toMatch(/data-paralegal-priority-count aria-live="polite"/);
+    expect(html).toMatch(/data-paralegal-priority-list aria-live="polite"/);
     expect(script).toMatch(/function renderParalegalPriorityQueue/);
     expect(script).toMatch(/Pre-engagement information required/);
     expect(script).toMatch(/Complete payout setup/);

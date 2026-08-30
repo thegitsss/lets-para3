@@ -168,10 +168,11 @@
     wrap.dataset.lpcGlobalSearch = "";
     const trigger = el("button", "lpc-global-search-trigger");
     trigger.type = "button";
-    trigger.setAttribute("aria-label", "Search");
+    const paralegalSearchLabel = "Search matters, applications, and messages";
+    trigger.setAttribute("aria-label", canSearchProfiles ? "Search" : paralegalSearchLabel);
     trigger.setAttribute("aria-haspopup", "dialog");
     trigger.setAttribute("aria-expanded", "false");
-    const triggerLabel = el("span", "lpc-global-search-trigger-label", "Search");
+    const triggerLabel = el("span", "lpc-global-search-trigger-label", canSearchProfiles ? "Search" : paralegalSearchLabel);
     trigger.append(icon(), triggerLabel);
     wrap.append(trigger);
     const firstLink = host.querySelector("a");
@@ -190,7 +191,7 @@
 
     const form = el("form", "lpc-global-search-form");
     form.setAttribute("role", "search");
-    const label = el("label", "lpc-global-search-visually-hidden", canSearchProfiles ? "Search Matters, paralegal profiles, and actions" : "Search Matters and actions");
+    const label = el("label", "lpc-global-search-visually-hidden", canSearchProfiles ? "Search Matters, paralegal profiles, and actions" : paralegalSearchLabel);
     label.htmlFor = "lpcGlobalSearchInput";
     const inputWrap = el("div", "lpc-global-search-input-wrap");
     const input = el("input", "lpc-global-search-input");
@@ -199,7 +200,7 @@
     input.type = "search";
     input.autocomplete = "off";
     input.maxLength = MAX_QUERY_LENGTH;
-    input.placeholder = canSearchProfiles ? "Search Matters, paralegals, or actions" : "Search Matters or actions";
+    input.placeholder = canSearchProfiles ? "Search Matters, paralegals, or actions" : paralegalSearchLabel;
     inputWrap.append(icon(), input);
     form.append(label, inputWrap);
 
