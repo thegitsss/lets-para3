@@ -21,6 +21,7 @@ const { notifyUser } = require("../utils/notifyUser");
 const { currentStripeMode, pickStripeMode, stripeModeFromLivemode } = require("../utils/stripeMode");
 const { sendOwnerAlert } = require("../utils/opsAlerting");
 const { expectedCaseFunding, validatePaymentIntentForCase } = require("../utils/paymentIntegrity");
+const { reconcileFundingEvidence } = require("../services/fundingEvidenceBackfillService");
 const { createLogger, logPromiseFailure } = require("../utils/logger");
 const logger = createLogger("stripe-webhook");
 
@@ -132,6 +133,52 @@ function buildCaseLink(caseDoc) {
   return id ? `case-detail.html?caseId=${encodeURIComponent(id)}` : "";
 }
 
+const CONFIRMED_REFUND_STATUSES = new Set(["refunded", "partially_refunded"]);
+
+function resolveRefundProjection(currentStatus, eventType, refundObject, expectedTotal) {
+  const current = String(currentStatus || "").toLowerCase();
+  const objectStatus = String(refundObject?.status || "").toLowerCase();
+  const failed = eventType === "refund.failed" || objectStatus === "failed";
+  if (failed) return CONFIRMED_REFUND_STATUSES.has(current) ? current : "refund_failed";
+
+  const succeeded =
+    eventType === "charge.refunded" ||
+    eventType === "refund.succeeded" ||
+    objectStatus === "succeeded";
+  if (!succeeded) return currentStatus;
+  const refundedAmount = Number(refundObject?.amount_refunded ?? refundObject?.amount ?? 0);
+  return refundedAmount >= Number(expectedTotal || 0) ? "refunded" : "partially_refunded";
+}
+
+function resolveTransferProjection(caseDoc, eventType, transfer) {
+  const existingTransferId = String(caseDoc?.payoutTransferId || "");
+  const incomingTransferId = String(transfer?.id || "");
+  const current = String(caseDoc?.payoutStatus || "not_started").toLowerCase();
+  if (existingTransferId && incomingTransferId && existingTransferId !== incomingTransferId) {
+    return { status: "needs_reconciliation", preserveRelease: true, reason: "Stripe transfer reference mismatch" };
+  }
+  if (current === "reversed") {
+    return { status: "reversed", preserveRelease: false, reason: caseDoc.payoutFailureReason || "Stripe transfer was reversed" };
+  }
+  if (current === "failed" && ["transfer.created", "transfer.updated"].includes(eventType)) {
+    return { status: "failed", preserveRelease: false, reason: caseDoc.payoutFailureReason || "Stripe transfer failed" };
+  }
+  if (eventType === "transfer.reversed") {
+    return { status: "reversed", preserveRelease: false, reason: "Stripe transfer was reversed" };
+  }
+  if (eventType === "transfer.failed") {
+    return {
+      status: "failed",
+      preserveRelease: false,
+      reason: String(transfer?.failure_message || transfer?.failure_code || "Stripe transfer failed"),
+    };
+  }
+  if (eventType === "transfer.created") {
+    return { status: "paid", preserveRelease: true, reason: "" };
+  }
+  return { status: current, preserveRelease: true, reason: caseDoc?.payoutFailureReason || "" };
+}
+
 // ----------------------------------------
 // Core webhook endpoint
 // ----------------------------------------
@@ -229,7 +276,9 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
               c.escrowStatus = c.escrowStatus || "awaiting_funding";
             }
           }
-          c.paymentStatus = "succeeded";
+          if (!CONFIRMED_REFUND_STATUSES.has(String(c.paymentStatus || "").toLowerCase())) {
+            c.paymentStatus = "succeeded";
+          }
           c.fundingIntegrityStatus = "verified";
           c.fundingIntegrityFailure = "";
           c.fundingVerifiedAt = new Date();
@@ -240,6 +289,15 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
             c.transitionTo("in progress");
           }
           await c.save();
+          await reconcileFundingEvidence({
+            caseDoc: c,
+            paymentIntent: pi,
+            stripeClient: stripe,
+            PaymentOperation,
+          }).catch(logPromiseFailure(logger, "Funding-evidence reconciliation failed.", {
+            eventId: event.id,
+            caseId: c._id,
+          }));
 
           if (!wasFunded && transferable && hasParalegal) {
             const paralegalId = c.paralegal?._id || c.paralegalId || c.paralegal;
@@ -432,9 +490,13 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
 
         if (caseForRefund) {
           const expected = expectedCaseFunding(caseForRefund);
-          const refundedAmount = Number(obj.amount_refunded ?? obj.amount ?? 0);
-          if (event.type === "refund.failed") {
-            caseForRefund.paymentStatus = "refund_failed";
+          const nextPaymentStatus = resolveRefundProjection(
+            caseForRefund.paymentStatus,
+            event.type,
+            obj,
+            expected.totalAmount
+          );
+          if (nextPaymentStatus === "refund_failed") {
             await sendOwnerAlert("LPC urgent: Stripe refund failed", [
               `Case: ${String(caseForRefund._id)}`,
               `Refund: ${String(obj.id || "unknown")}`,
@@ -442,12 +504,9 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
             ]).catch(logPromiseFailure(logger, "Refund-failure owner alert delivery failed.", {
               eventId: event.id,
             }));
-          } else if (event.type === "charge.refunded" && refundedAmount >= expected.totalAmount) {
-            caseForRefund.paymentStatus = "refunded";
-            caseForRefund.paymentReleased = false;
-          } else if (["refund.succeeded", "charge.refunded"].includes(event.type)) {
-            caseForRefund.paymentStatus = "partially_refunded";
           }
+          caseForRefund.paymentStatus = nextPaymentStatus;
+          if (nextPaymentStatus === "refunded") caseForRefund.paymentReleased = false;
           await caseForRefund.save();
         }
 
@@ -489,20 +548,12 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
         const caseObj = caseId ? await Case.findById(caseId) : null;
 
         if (caseObj) {
-          if (event.type === "transfer.created") {
-            if (!caseObj.payoutTransferId) caseObj.payoutTransferId = tr.id;
-            caseObj.payoutStatus = "paid";
-            caseObj.payoutFailureReason = "";
-            caseObj.paidOutAt = caseObj.paidOutAt || new Date();
-          } else if (event.type === "transfer.reversed") {
-            caseObj.payoutStatus = "reversed";
-            caseObj.paymentReleased = false;
-            caseObj.payoutFailureReason = "Stripe transfer was reversed";
-          } else if (event.type === "transfer.failed") {
-            caseObj.payoutStatus = "failed";
-            caseObj.paymentReleased = false;
-            caseObj.payoutFailureReason = String(tr.failure_message || tr.failure_code || "Stripe transfer failed");
-          }
+          const projection = resolveTransferProjection(caseObj, event.type, tr);
+          if (!caseObj.payoutTransferId && event.type === "transfer.created") caseObj.payoutTransferId = tr.id;
+          caseObj.payoutStatus = projection.status;
+          caseObj.payoutFailureReason = projection.reason;
+          if (!projection.preserveRelease) caseObj.paymentReleased = false;
+          if (projection.status === "paid") caseObj.paidOutAt = caseObj.paidOutAt || new Date();
           await caseObj.save();
 
           if (["transfer.reversed", "transfer.failed"].includes(event.type)) {

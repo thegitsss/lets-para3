@@ -39,6 +39,8 @@ const {
 } = require("../services/paymentLedgerService");
 const { buildCheckoutReturnUrl } = require("../services/paymentReturnUrl");
 const { buildFundingFingerprint, ensureFundingRequestKey } = require("../utils/funding");
+const { getAttorneyPaymentSummary } = require("../services/paymentProjectionService");
+const { reconcileFundingEvidence } = require("../services/fundingEvidenceBackfillService");
 
 // ----------------------------------------
 // Helpers
@@ -546,6 +548,17 @@ async function applyPaymentIntentSnapshot(caseDoc, paymentIntent, { notifyOnSucc
   }
 
   await caseDoc.save();
+
+  if (piStatus === "succeeded" && transferable) {
+    await reconcileFundingEvidence({
+      caseDoc,
+      paymentIntent,
+      stripeClient: stripe,
+      PaymentOperation,
+    }).catch((err) => {
+      runtimeLogger.warn("[payments] funding evidence reconciliation failed", err?.message || err);
+    });
+  }
 
   if (!wasFunded && piStatus === "succeeded" && transferable && hasParalegal && notifyOnSuccess) {
     const paralegalId = caseDoc.paralegal?._id || caseDoc.paralegalId || caseDoc.paralegal;
@@ -2752,52 +2765,7 @@ router.get(
   "/summary",
   requireRole("attorney"),
   asyncHandler(async (req, res) => {
-    const attorneyMatch = buildAttorneyMatch(req.user.id);
-    const [activeCases, pendingCases, completedDocs] = await Promise.all([
-      Case.find({
-        ...attorneyMatch,
-        escrowIntentId: { $nin: [null, ""] },
-        paymentReleased: { $ne: true },
-      })
-        .select("totalAmount lockedTotalAmount")
-        .lean(),
-      Case.find({
-        ...attorneyMatch,
-        paymentReleased: { $ne: true },
-        $and: [
-          { $or: [{ paralegal: { $ne: null } }, { paralegalId: { $ne: null } }] },
-          { $or: [{ escrowIntentId: { $exists: false } }, { escrowIntentId: null }, { escrowIntentId: "" }] },
-        ],
-      })
-        .select("totalAmount lockedTotalAmount")
-        .lean(),
-      Case.find({
-        ...attorneyMatch,
-        paymentReleased: true,
-      })
-        .select("totalAmount lockedTotalAmount feeAttorneyAmount feeAttorneyPct")
-        .lean(),
-    ]);
-
-    const activeEscrow = activeCases.reduce((sum, c) => sum + cents(c.lockedTotalAmount ?? c.totalAmount), 0);
-    const pendingCharges = pendingCases.reduce((sum, c) => sum + cents(c.lockedTotalAmount ?? c.totalAmount), 0);
-    const completedRecords = completedDocs.map((doc) => ({
-      jobAmount: cents(doc.lockedTotalAmount ?? doc.totalAmount),
-      platformFee: computePlatformFee(doc),
-    }));
-    const completedJobsCount = completedRecords.length;
-    const totalJob = completedRecords.reduce((sum, rec) => sum + rec.jobAmount, 0);
-    const totalFee = completedRecords.reduce((sum, rec) => sum + rec.platformFee, 0);
-    const averageJobCost = completedJobsCount ? Math.round(totalJob / completedJobsCount) : 0;
-
-    res.json({
-      totalSpent: totalJob + totalFee,
-      activeEscrow,
-      pendingCharges,
-      averageJobCost,
-      completedJobsCount,
-      pendingJobsCount: pendingCases.length,
-    });
+    res.json(await getAttorneyPaymentSummary(req.user.id));
   })
 );
 
@@ -2810,6 +2778,7 @@ router.get(
     const cases = await Case.find({
       ...attorneyMatch,
       escrowIntentId: { $nin: [null, ""] },
+      escrowStatus: "funded",
       paymentReleased: { $ne: true },
     })
       .populate("paralegal", "firstName lastName email role")

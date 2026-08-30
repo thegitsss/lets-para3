@@ -10,6 +10,7 @@ const Job = require("../models/Job");
 const Application = require("../models/Application");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
+const PaymentOperation = require("../models/PaymentOperation");
 const adminRouter = require("../routes/admin");
 const authRouter = require("../routes/auth");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
@@ -640,6 +641,7 @@ describe("Admin workflows", () => {
         lockedTotalAmount: 100000,
         totalAmount: 100000,
         paymentReleased: true,
+        escrowStatus: "funded",
         stripeMode: "live",
         paidOutAt: new Date("2026-03-10T12:00:00.000Z"),
       },
@@ -654,6 +656,7 @@ describe("Admin workflows", () => {
         lockedTotalAmount: 50000,
         totalAmount: 50000,
         paymentReleased: false,
+        escrowStatus: "funded",
         stripeMode: "test",
         completedAt: new Date("2026-03-11T12:00:00.000Z"),
       },
@@ -679,6 +682,53 @@ describe("Admin workflows", () => {
       transferId: "tr_live_123",
       stripeMode: "live",
     });
+    await Payout.create({
+      paralegalId: paralegal._id,
+      caseId: testCase._id,
+      amountPaid: 41000,
+      transferId: "tr_reversed_123",
+      stripeMode: "test",
+      status: "reversed",
+    });
+
+    await PaymentOperation.create([
+      {
+        operationKey: `funding:${liveCase._id}:pi_live_admin`,
+        caseId: liveCase._id,
+        kind: "funding",
+        fingerprint: "live-funding-evidence",
+        status: "succeeded",
+        amount: 122000,
+        stripePaymentIntentId: "pi_live_admin",
+        stripeChargeId: "ch_live_admin",
+        stripeBalanceTransactionId: "txn_live_admin",
+        grossAmount: 122000,
+        processingFeeAmount: 3838,
+        netAmount: 118162,
+        currency: "usd",
+        stripeMode: "live",
+        livemode: true,
+        evidenceVerifiedAt: new Date(),
+      },
+      {
+        operationKey: `funding:${testCase._id}:pi_test_admin`,
+        caseId: testCase._id,
+        kind: "funding",
+        fingerprint: "test-funding-evidence",
+        status: "succeeded",
+        amount: 61000,
+        stripePaymentIntentId: "pi_test_admin",
+        stripeChargeId: "ch_test_admin",
+        stripeBalanceTransactionId: "txn_test_admin",
+        grossAmount: 61000,
+        processingFeeAmount: 1799,
+        netAmount: 59201,
+        currency: "usd",
+        stripeMode: "test",
+        livemode: false,
+        evidenceVerifiedAt: new Date(),
+      },
+    ]);
 
     await PlatformIncome.create([
       {
@@ -703,7 +753,7 @@ describe("Admin workflows", () => {
 
     expect(analyticsRes.status).toBe(200);
     expect(analyticsRes.body.escrowMetrics.totalEscrowReleased).toBe(100000);
-    expect(analyticsRes.body.escrowMetrics.totalEscrowHeld).toBe(75000);
+    expect(analyticsRes.body.escrowMetrics.totalEscrowHeld).toBe(50000);
     expect(analyticsRes.body.revenueMetrics.platformFeesCollected).toBe(60000);
     expect(analyticsRes.body.payoutMetrics).toEqual({ totalRecorded: 82000, count: 1 });
     expect(analyticsRes.body).not.toHaveProperty("taxSummary");
@@ -721,6 +771,16 @@ describe("Admin workflows", () => {
     expect(payoutsRes.status).toBe(200);
     expect(payoutsRes.body.totalAmount).toBe(82000);
     expect(payoutsRes.body.count).toBe(1);
+
+    const fundingEvidenceRes = await request(app)
+      .get("/api/admin/funding-evidence")
+      .set("Cookie", authCookieFor(admin));
+    expect(fundingEvidenceRes.status).toBe(200);
+    expect(fundingEvidenceRes.body.items).toHaveLength(2);
+    expect(fundingEvidenceRes.body.totalsByMode).toEqual({
+      live: { count: 1, grossAmount: 122000, processingFeeAmount: 3838, netAmount: 118162 },
+      test: { count: 1, grossAmount: 61000, processingFeeAmount: 1799, netAmount: 59201 },
+    });
 
     const incomeRes = await request(app)
       .get("/api/admin/income")

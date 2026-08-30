@@ -24,6 +24,7 @@ const User = require("../models/User");
 const Case = require("../models/Case");
 const AuditLog = require("../models/AuditLog");
 const WebhookEvent = require("../models/WebhookEvent");
+const Payout = require("../models/Payout");
 const paymentsWebhookRouter = require("../routes/paymentsWebhook");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
@@ -333,5 +334,129 @@ describe("Webhook handling", () => {
     const processedRecord = await WebhookEvent.findOne({ eventId: "evt_processing_failure" }).lean();
     expect(processedRecord.status).toBe("processed");
     expect(processedRecord.attempts).toBe(2);
+  });
+
+  test("a delayed refund failure cannot regress a confirmed full refund", async () => {
+    const attorney = await User.create({
+      firstName: "Refund",
+      lastName: "Attorney",
+      email: "refund-ordering-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "NY",
+    });
+    const caseDoc = await Case.create({
+      title: "Refund ordering",
+      details: "Confirmed refunds remain authoritative.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      status: "closed",
+      escrowStatus: "funded",
+      escrowIntentId: "pi_refund_ordering",
+      paymentIntentId: "pi_refund_ordering",
+      paymentStatus: "succeeded",
+      totalAmount: 40000,
+      lockedTotalAmount: 40000,
+      feeAttorneyPct: 22,
+      feeAttorneyAmount: 8800,
+      currency: "usd",
+    });
+    mockStripe.paymentIntents.retrieve.mockResolvedValue({
+      id: "pi_refund_ordering",
+      metadata: { caseId: String(caseDoc._id) },
+    });
+    mockStripe.webhooks.constructEvent
+      .mockReturnValueOnce({
+        id: "evt_refund_succeeded_ordering",
+        type: "refund.succeeded",
+        data: { object: { id: "re_ordering", status: "succeeded", amount: 48800, currency: "usd", payment_intent: "pi_refund_ordering" } },
+      })
+      .mockReturnValueOnce({
+        id: "evt_refund_failed_late",
+        type: "refund.failed",
+        data: { object: { id: "re_ordering", status: "failed", amount: 48800, currency: "usd", payment_intent: "pi_refund_ordering" } },
+      });
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await request(app)
+        .post("/api/payments/webhook")
+        .set("Stripe-Signature", "test-signature")
+        .set("Content-Type", "application/json")
+        .send(Buffer.from(JSON.stringify({})));
+      expect(response.status).toBe(200);
+    }
+    const updated = await Case.findById(caseDoc._id).lean();
+    expect(updated.paymentStatus).toBe("refunded");
+    expect(updated.paymentReleased).toBe(false);
+  });
+
+  test("a delayed transfer.created event cannot regress a reversed payout", async () => {
+    const attorney = await User.create({
+      firstName: "Transfer",
+      lastName: "Attorney",
+      email: "transfer-ordering-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "NY",
+    });
+    const paralegal = await User.create({
+      firstName: "Transfer",
+      lastName: "Paralegal",
+      email: "transfer-ordering-paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "NY",
+    });
+    const caseDoc = await Case.create({
+      title: "Transfer ordering",
+      details: "Reversed payout remains visible.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      status: "completed",
+      escrowStatus: "funded",
+      escrowIntentId: "pi_transfer_ordering",
+      paymentReleased: true,
+      payoutTransferId: "tr_transfer_ordering",
+      payoutStatus: "paid",
+      totalAmount: 40000,
+      lockedTotalAmount: 40000,
+    });
+    await Payout.create({
+      caseId: caseDoc._id,
+      paralegalId: paralegal._id,
+      amountPaid: 32800,
+      transferId: "tr_transfer_ordering",
+      status: "paid",
+    });
+    const transfer = {
+      id: "tr_transfer_ordering",
+      amount: 32800,
+      currency: "usd",
+      transfer_group: `case_${caseDoc._id}`,
+    };
+    mockStripe.webhooks.constructEvent
+      .mockReturnValueOnce({ id: "evt_transfer_reversed_first", type: "transfer.reversed", data: { object: transfer } })
+      .mockReturnValueOnce({ id: "evt_transfer_created_late", type: "transfer.created", data: { object: transfer } });
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await request(app)
+        .post("/api/payments/webhook")
+        .set("Stripe-Signature", "test-signature")
+        .set("Content-Type", "application/json")
+        .send(Buffer.from(JSON.stringify({})));
+      expect(response.status).toBe(200);
+    }
+    const [updatedCase, updatedPayout] = await Promise.all([
+      Case.findById(caseDoc._id).lean(),
+      Payout.findOne({ caseId: caseDoc._id }).lean(),
+    ]);
+    expect(updatedCase.payoutStatus).toBe("reversed");
+    expect(updatedCase.paymentReleased).toBe(false);
+    expect(updatedPayout.status).toBe("reversed");
   });
 });

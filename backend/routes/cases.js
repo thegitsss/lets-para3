@@ -106,6 +106,7 @@ const {
 } = require("../utils/dataEncryption");
 const { createDevOnlyEmailSet } = require("../utils/devOnlyEmailSet");
 const { buildFundingFingerprint, ensureFundingRequestKey } = require("../utils/funding");
+const { reconcileFundingEvidence } = require("../services/fundingEvidenceBackfillService");
 const {
   assertObjectMalwareSafe,
   getObjectMalwareScan,
@@ -171,7 +172,7 @@ const PRACTICE_AREAS = [
 async function claimCaseHire(caseId, paralegalId) {
   const token = crypto.randomUUID();
   const claimedAt = new Date();
-  const caseDoc = await Case.findOneAndUpdate(
+  let caseDoc = await Case.findOneAndUpdate(
     {
       _id: caseId,
       $and: [
@@ -198,6 +199,29 @@ async function claimCaseHire(caseId, paralegalId) {
     },
     { returnDocument: "after" }
   );
+  if (!caseDoc) {
+    caseDoc = await Case.findOneAndUpdate(
+      {
+        _id: caseId,
+        $and: [
+          { $or: [{ paralegal: null }, { paralegal: { $exists: false } }] },
+          { $or: [{ paralegalId: null }, { paralegalId: { $exists: false } }] },
+        ],
+        hiringClaimStatus: "needs_reconciliation",
+        hiringClaimParalegalId: paralegalId,
+        hiringClaimPaymentIntentId: { $nin: [null, ""] },
+      },
+      {
+        $set: {
+          hiringClaimToken: token,
+          hiringClaimedAt: claimedAt,
+          hiringClaimStatus: "claimed",
+          hiringClaimError: "",
+        },
+      },
+      { returnDocument: "after" }
+    );
+  }
   return { acquired: Boolean(caseDoc), caseDoc, token, claimedAt };
 }
 
@@ -6446,9 +6470,11 @@ router.post(
 
     let paymentIntent = null;
     let forceNewFundingKey = false;
-    if (selectedCase.escrowIntentId) {
+    const recoverableFundingIntentId =
+      selectedCase.escrowIntentId || selectedCase.hiringClaimPaymentIntentId || "";
+    if (recoverableFundingIntentId) {
       try {
-        const existing = await stripe.paymentIntents.retrieve(selectedCase.escrowIntentId);
+        const existing = await stripe.paymentIntents.retrieve(recoverableFundingIntentId);
         if (existing?.status === "succeeded") {
           const transferCheck = stripe.isTransferablePaymentIntent(existing, {
             caseId: selectedCase._id,
@@ -6487,7 +6513,7 @@ router.post(
           selectedCase._id,
           hireClaim.token,
           err,
-          { id: selectedCase.escrowIntentId },
+          { id: recoverableFundingIntentId },
           totalCharge
         ).catch(logPromiseFailure(logger, "[case-hire] funding verification reconciliation marker failed", {
           caseId: selectedCase._id,
@@ -6524,6 +6550,7 @@ router.post(
               attorneyId: String(attorney._id),
               paralegalId: String(paralegal._id),
             },
+            expand: ["latest_charge.balance_transaction"],
             description: buildCaseChargeDescription(selectedCase, paralegal),
           },
           { idempotencyKey }
@@ -6734,51 +6761,29 @@ router.post(
     try {
       await selectedCase.save();
     } catch (err) {
-      let compensated = false;
-      try {
-        await stripe.refunds.create(
-          {
-            payment_intent: paymentIntent.id,
-            metadata: { caseId: String(selectedCase._id), action: "hire_persistence_compensation" },
-          },
-          {
-            idempotencyKey: stripe.stripeIdempotencyKey(
-              "hire_persistence_refund",
-              selectedCase._id,
-              paymentIntent.id
-            ),
-          }
-        );
-        compensated = true;
-      } catch (refundErr) {
-        logger.error("[case-hire] Unable to refund after save failure", refundErr?.message || refundErr);
-      }
-      if (compensated) {
-        await resolveFundingIdempotencyKey(selectedCase, totalCharge, {
-          mode: "hire-charge",
-          forceNew: true,
-          targetId: paralegalId,
-        }).catch(logPromiseFailure(logger, "[case-hire] save-failure funding key rotation failed", {
-          caseId: selectedCase._id,
-        }));
-        await releaseCaseHireClaim(selectedCase._id, hireClaim.token).catch(
-          logPromiseFailure(logger, "[case-hire] save-failure claim release failed", {
-            caseId: selectedCase._id,
-          })
-        );
-      } else {
-        await markCaseHireNeedsReconciliation(
-          selectedCase._id,
-          hireClaim.token,
-          err,
-          paymentIntent,
-          totalCharge
-        ).catch(logPromiseFailure(logger, "[case-hire] failed finalization reconciliation marker failed", {
-          caseId: selectedCase._id,
-        }));
-      }
-      return res.status(500).json({ error: "Unable to finalize hire. Please try again." });
+      await markCaseHireNeedsReconciliation(
+        selectedCase._id,
+        hireClaim.token,
+        err,
+        paymentIntent,
+        totalCharge
+      ).catch(logPromiseFailure(logger, "[case-hire] failed finalization reconciliation marker failed", {
+        caseId: selectedCase._id,
+      }));
+      return res.status(500).json({
+        error: "The payment succeeded, but the hire needs reconciliation. Please retry; you will not be charged again.",
+        code: "HIRE_RECONCILIATION_REQUIRED",
+      });
     }
+    await reconcileFundingEvidence({
+      caseDoc: selectedCase,
+      paymentIntent,
+      stripeClient: stripe,
+      PaymentOperation,
+    }).catch(logPromiseFailure(logger, "[case-hire] funding evidence reconciliation failed", {
+      caseId: selectedCase._id,
+      paymentIntentId: paymentIntent.id,
+    }));
     await markJobAssigned(selectedCase);
     await selectedCase.populate([
       { path: "paralegal", select: "firstName lastName email role avatarURL" },

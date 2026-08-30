@@ -14,6 +14,8 @@ const Application = require("../models/Application");
 const AuditLog = require("../models/AuditLog");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
+const PaymentOperation = require("../models/PaymentOperation");
+const { SUCCESSFUL_PAYOUT_MATCH } = require("../services/paymentProjectionService");
 const logger = createLogger("admin");
 const {
   deactivateUserAccount,
@@ -1624,7 +1626,7 @@ User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: 
 User.countDocuments(PENDING_USER_MATCH),
 Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
 Case.aggregate(
-  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: { $ne: true } }, financialStart)).concat([
+  buildApprovedCasePipeline(withCreatedAtFloor({ escrowStatus: "funded", paymentReleased: { $ne: true } }, financialStart)).concat([
     { $group: { _id: null, total: { $sum: CASE_AMOUNT_EXPR } } },
   ])
 ),
@@ -1714,7 +1716,7 @@ User.aggregate([
 { $sort: { "_id.year": 1, "_id.month": 1 } },
 ]),
 Case.aggregate(
-  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: { $ne: true } }, financialStart)).concat([
+  buildApprovedCasePipeline(withCreatedAtFloor({ escrowStatus: "funded", paymentReleased: { $ne: true } }, financialStart)).concat([
     { $group: { _id: null, total: { $sum: CASE_AMOUNT_EXPR } } },
   ])
 ),
@@ -1726,6 +1728,7 @@ Case.aggregate(
       Case.aggregate(
         buildApprovedCasePipeline(withCreatedAtFloor({
           paymentReleased: { $ne: true },
+          escrowStatus: "funded",
           amountForCalc: { $gt: 0 },
         }, financeWindowStart)).concat([
           {
@@ -1738,7 +1741,7 @@ Case.aggregate(
         ])
       ),
       Payout.aggregate([
-        { $match: withCreatedAtFloor({}, financeWindowStart) },
+        { $match: withCreatedAtFloor(SUCCESSFUL_PAYOUT_MATCH, financeWindowStart) },
         {
           $group: {
             _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
@@ -1779,14 +1782,17 @@ Case.aggregate(
     { $group: { _id: null, total: { $sum: CASE_PAYOUT_EXPR }, count: { $sum: 1 } } },
   ])
 ),
-Payout.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
+Payout.aggregate([{ $match: withCreatedAtFloor(SUCCESSFUL_PAYOUT_MATCH, financialStart) }, { $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
 Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
-Case.find(withCreatedAtFloor({ $or: [{ lockedTotalAmount: { $gt: 0 } }, { totalAmount: { $gt: 0 } }] }, financialStart))
+Case.find(withCreatedAtFloor({
+  escrowStatus: "funded",
+  $or: [{ lockedTotalAmount: { $gt: 0 } }, { totalAmount: { $gt: 0 } }],
+}, financialStart))
 .sort({ createdAt: -1 })
 .limit(LEDGER_LIMIT)
 .select("title practiceArea totalAmount lockedTotalAmount paymentStatus paymentReleased createdAt")
 .lean(),
-Payout.find(withCreatedAtFloor({}, financialStart))
+Payout.find(withCreatedAtFloor(SUCCESSFUL_PAYOUT_MATCH, financialStart))
 .sort({ createdAt: -1 })
 .limit(LEDGER_LIMIT)
 .select("caseId amountPaid transferId createdAt")
@@ -2567,13 +2573,55 @@ res.json({ ok: true });
 router.get("/payouts", asyncHandler(async (_req, res) => {
 const financialStart = getFinancialReportingStartDate();
 const [items, summary] = await Promise.all([
-Payout.find(withCreatedAtFloor({}, financialStart)).sort({ createdAt: -1 }).limit(200).lean(),
-Payout.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
+Payout.find(withCreatedAtFloor(SUCCESSFUL_PAYOUT_MATCH, financialStart)).sort({ createdAt: -1 }).limit(200).lean(),
+Payout.aggregate([{ $match: withCreatedAtFloor(SUCCESSFUL_PAYOUT_MATCH, financialStart) }, { $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
 ]);
 res.json({
 totalAmount: summary[0]?.total || 0,
 count: summary[0]?.count || 0,
 items,
+});
+}));
+
+router.get("/funding-evidence", asyncHandler(async (_req, res) => {
+const financialStart = getFinancialReportingStartDate();
+const baseMatch = withCreatedAtFloor({ kind: "funding" }, financialStart);
+const [items, totalsByMode, statusCounts] = await Promise.all([
+PaymentOperation.find(baseMatch)
+.sort({ completedAt: -1, updatedAt: -1 })
+.limit(200)
+.select("caseId operationKey status stripePaymentIntentId stripeChargeId stripeBalanceTransactionId grossAmount processingFeeAmount netAmount currency stripeMode livemode evidenceVerifiedAt lastError completedAt updatedAt")
+.lean(),
+PaymentOperation.aggregate([
+{ $match: { ...baseMatch, status: "succeeded" } },
+{ $group: {
+  _id: "$stripeMode",
+  count: { $sum: 1 },
+  grossAmount: { $sum: "$grossAmount" },
+  processingFeeAmount: { $sum: "$processingFeeAmount" },
+  netAmount: { $sum: "$netAmount" },
+} },
+]),
+PaymentOperation.aggregate([
+{ $match: baseMatch },
+{ $group: { _id: "$status", count: { $sum: 1 } } },
+]),
+]);
+res.json({
+items,
+totalsByMode: totalsByMode.reduce((summary, entry) => {
+  summary[entry._id || "unknown"] = {
+    count: entry.count || 0,
+    grossAmount: entry.grossAmount || 0,
+    processingFeeAmount: entry.processingFeeAmount || 0,
+    netAmount: entry.netAmount || 0,
+  };
+  return summary;
+}, {}),
+statusCounts: statusCounts.reduce((summary, entry) => {
+  summary[entry._id || "unknown"] = entry.count || 0;
+  return summary;
+}, {}),
 });
 }));
 

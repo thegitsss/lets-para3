@@ -1,7 +1,6 @@
 const { createLogger: createRuntimeLogger } = require("../utils/logger");
 const runtimeLogger = createRuntimeLogger("routes:paralegalDashboard");
 const express = require("express");
-const mongoose = require("mongoose");
 const router = express.Router();
 
 const auth = require("../utils/verifyToken");
@@ -9,108 +8,9 @@ const requireRole = require("../middleware/requireRole");
 const { requireApproved } = require("../utils/authz");
 const Application = require("../models/Application");
 const Case = require("../models/Case");
-const Payout = require("../models/Payout");
 const { resolveMatterDeadlineDate } = require("../utils/businessDate");
 const { DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT } = require("../services/platformFeePolicy");
-
-/**
- * Optional helper: compute paralegal earnings based on completed payouts
- */
-async function getParalegalEarnings(paralegalId) {
-  try {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const last30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const paralegalMatch = mongoose.Types.ObjectId.isValid(paralegalId)
-      ? new mongoose.Types.ObjectId(paralegalId)
-      : paralegalId;
-    const totals = await Payout.aggregate([
-      { $match: { paralegalId: paralegalMatch } },
-      {
-        $lookup: {
-          from: "cases",
-          localField: "caseId",
-          foreignField: "_id",
-          as: "caseDoc",
-        },
-      },
-      { $unwind: "$caseDoc" },
-      {
-        $match: {
-          $or: [
-            { "caseDoc.paymentReleased": true },
-            { "caseDoc.status": { $in: ["completed", "closed"] } },
-          ],
-        },
-      },
-      {
-        $facet: {
-          month: [
-            { $match: { createdAt: { $gte: startOfMonth, $lte: now } } },
-            { $group: { _id: null, total: { $sum: "$amountPaid" } } },
-          ],
-          last30: [
-            { $match: { createdAt: { $gte: last30, $lte: now } } },
-            { $group: { _id: null, total: { $sum: "$amountPaid" } } },
-          ],
-          total: [
-            { $group: { _id: null, total: { $sum: "$amountPaid" } } },
-          ],
-        },
-      },
-    ]);
-    const monthTotal = totals[0]?.month?.[0]?.total || 0;
-    const last30Total = totals[0]?.last30?.[0]?.total || 0;
-    const allTimeTotal = totals[0]?.total?.[0]?.total || 0;
-    let withdrawalMonthTotal = 0;
-    let withdrawalLast30Total = 0;
-    let withdrawalAllTimeTotal = 0;
-    const withdrawalCases = await Case.find({
-      withdrawnParalegalId: paralegalMatch,
-      payoutFinalizedAt: { $ne: null },
-      partialPayoutAmount: { $gt: 0 },
-    }).select("partialPayoutAmount payoutFinalizedAt feeParalegalPct");
-
-    if (withdrawalCases.length) {
-      const withdrawalCaseIds = withdrawalCases.map((doc) => doc._id);
-      const payoutCaseIds = await Payout.find({ caseId: { $in: withdrawalCaseIds } })
-        .select("caseId")
-        .lean();
-      const payoutCaseIdSet = new Set(payoutCaseIds.map((p) => String(p.caseId)));
-      const defaultParalegalFeePct = DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT;
-
-      withdrawalCases.forEach((doc) => {
-        if (payoutCaseIdSet.has(String(doc._id))) return;
-        const gross = Number(doc.partialPayoutAmount || 0);
-        if (!Number.isFinite(gross) || gross <= 0) return;
-        const feePct =
-          typeof doc.feeParalegalPct === "number" && Number.isFinite(doc.feeParalegalPct)
-            ? doc.feeParalegalPct
-            : defaultParalegalFeePct;
-        const fee = Math.max(0, Math.round((gross * feePct) / 100));
-        const net = Math.max(0, gross - fee);
-        const paidAt = doc.payoutFinalizedAt ? new Date(doc.payoutFinalizedAt) : null;
-        if (!paidAt || Number.isNaN(paidAt.getTime())) return;
-        withdrawalAllTimeTotal += net;
-        if (paidAt >= startOfMonth && paidAt <= now) {
-          withdrawalMonthTotal += net;
-        }
-        if (paidAt >= last30 && paidAt <= now) {
-          withdrawalLast30Total += net;
-        }
-      });
-    }
-
-    return {
-      month: (monthTotal + withdrawalMonthTotal) / 100,
-      last30: (last30Total + withdrawalLast30Total) / 100,
-      total: (allTimeTotal + withdrawalAllTimeTotal) / 100,
-    };
-  } catch (err) {
-    runtimeLogger.error("Error computing paralegal earnings:", err);
-    return { month: 0, last30: 0 };
-  }
-}
+const { getParalegalEarnings } = require("../services/paymentProjectionService");
 
 function getExpectedPayouts(activeCases = []) {
   const totalCents = (Array.isArray(activeCases) ? activeCases : []).reduce((sum, caseDoc) => {

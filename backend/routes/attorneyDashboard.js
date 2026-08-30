@@ -9,6 +9,7 @@ const { requireApproved } = require("../utils/authz");
 const Job = require("../models/Job");
 const Application = require("../models/Application");
 const Case = require("../models/Case");
+const { getAttorneyPaymentSummary } = require("../services/paymentProjectionService");
 const {
   dateOnlyFromZonedInstant,
   endOfWeekDateOnly,
@@ -24,32 +25,6 @@ const ACTIVE_CASE_STATUSES = Object.freeze([
   "funded_in_progress",
 ]);
 const PENDING_APPLICATION_STATUSES = Object.freeze(["submitted", "viewed", "shortlisted"]);
-
-let Payment = null;
-try {
-  Payment = require("../models/Payment");
-} catch (e) {
-  // Optional: no Payment model yet, escrowTotal will be 0
-}
-
-/**
- * Helper: compute the attorney's active funded total (best-effort)
- */
-async function getEscrowTotal(attorneyId) {
-  if (!Payment) return 0;
-
-  try {
-    const payments = await Payment.find({
-      attorneyId,
-      status: "in_escrow", // adjust if your schema uses something else
-    });
-
-    return payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-  } catch (err) {
-    runtimeLogger.error("Error computing escrowTotal:", err);
-    return 0;
-  }
-}
 
 /**
  * GET /api/attorney/dashboard
@@ -135,7 +110,7 @@ router.get("/", auth, requireApproved, requireRole(["attorney"]), async (req, re
             .limit(3)
             .lean()
         : [],
-      getEscrowTotal(attorneyId),
+      getAttorneyPaymentSummary(attorneyId).then((summary) => summary.activeFunds),
     ]);
 
     const metrics = {
@@ -144,7 +119,7 @@ router.get("/", auth, requireApproved, requireRole(["attorney"]), async (req, re
       openJobs: openJobsCount,
       pendingApplications: pendingApplicationsCount,
       weekDeadlines: weekDeadlinesCount,
-      escrowTotal, // numeric; 0 if Payment model not wired yet
+      escrowTotal,
     };
 
     // 4. Shape the response for the frontend dashboard widgets

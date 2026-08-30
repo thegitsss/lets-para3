@@ -366,6 +366,94 @@ describe("Job posting + escrow", () => {
     expect((await Job.findById(job._id).lean())?.applicantsCount).toBe(0);
   });
 
+  test("a successful hire charge survives a local save failure and retry without another charge", async () => {
+    const attorney = await User.create({
+      firstName: "Ava",
+      lastName: "Recovery",
+      email: "hire-recovery-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "NY",
+      stripeCustomerId: "cus_hire_recovery",
+    });
+    const paralegal = await User.create({
+      firstName: "Parker",
+      lastName: "Recovery",
+      email: "hire-recovery-paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "NY",
+      stripeAccountId: "acct_hire_recovery",
+      stripeOnboarded: true,
+      stripePayoutsEnabled: true,
+    });
+    const caseDoc = await Case.create({
+      title: "Recoverable hire funding",
+      practiceArea: "business law",
+      details: "The successful charge must be reused after a local write interruption.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      status: "open",
+      totalAmount: 40000,
+      lockedTotalAmount: 40000,
+      currency: "usd",
+      tasks: [{ title: "Prepare intake summary", completed: false }],
+      applicants: [{ paralegalId: paralegal._id, status: "pending" }],
+    });
+    const paymentIntent = {
+      id: "pi_hire_recovery",
+      status: "succeeded",
+      amount: 48800,
+      amount_received: 48800,
+      currency: "usd",
+      transfer_group: `case_${caseDoc._id}`,
+      metadata: {
+        caseId: String(caseDoc._id),
+        attorneyId: String(attorney._id),
+        paralegalId: String(paralegal._id),
+      },
+      livemode: false,
+      latest_charge: { id: "ch_hire_recovery", paid: true, captured: true },
+    };
+    stripe.paymentIntents.create.mockResolvedValue(paymentIntent);
+    stripe.paymentIntents.retrieve.mockResolvedValue(paymentIntent);
+
+    const saveSpy = jest.spyOn(Case.prototype, "save").mockImplementationOnce(async function failHireSave() {
+      throw new Error("simulated hire persistence interruption");
+    });
+    const first = await request(app)
+      .post(`/api/cases/${caseDoc._id}/hire/${paralegal._id}`)
+      .set("Cookie", authCookieFor(attorney))
+      .send({});
+    saveSpy.mockRestore();
+
+    expect(first.status).toBe(500);
+    expect(first.body.code).toBe("HIRE_RECONCILIATION_REQUIRED");
+    expect(stripe.paymentIntents.create).toHaveBeenCalledTimes(1);
+    expect(stripe.refunds.create).not.toHaveBeenCalled();
+    const interrupted = await Case.findById(caseDoc._id).lean();
+    expect(interrupted.hiringClaimStatus).toBe("needs_reconciliation");
+    expect(interrupted.hiringClaimPaymentIntentId).toBe("pi_hire_recovery");
+    expect(interrupted.paralegalId).toBeNull();
+
+    const retry = await request(app)
+      .post(`/api/cases/${caseDoc._id}/hire/${paralegal._id}`)
+      .set("Cookie", authCookieFor(attorney))
+      .send({});
+    expect(retry.status).toBe(200);
+    expect(stripe.paymentIntents.create).toHaveBeenCalledTimes(1);
+    expect(stripe.paymentIntents.retrieve).toHaveBeenCalledWith("pi_hire_recovery");
+    expect(stripe.refunds.create).not.toHaveBeenCalled();
+    const recovered = await Case.findById(caseDoc._id).lean();
+    expect(recovered.hiringClaimStatus).toBeNull();
+    expect(recovered.hiringClaimPaymentIntentId).toBe("");
+    expect(String(recovered.paralegalId)).toBe(String(paralegal._id));
+    expect(recovered.status).toBe("in progress");
+    expect(recovered.paymentStatus).toBe("succeeded");
+  });
+
   test("Stripe escrow can be funded in test mode and receipt is returned", async () => {
     // Description: Create an escrow intent, confirm it succeeds, then fetch the receipt.
     // Input values: lockedTotalAmount=40000 cents, Stripe intent status=succeeded.
