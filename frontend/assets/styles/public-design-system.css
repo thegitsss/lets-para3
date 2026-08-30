@@ -39,6 +39,12 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Keep the Let’s-ParaConnect wordmark apostrophe consistent across public pages. */
+.home-brand__apostrophe,
+.utility-header__brand-mark {
+  color: var(--lpc-gold);
+}
+
 body:is(.utility-page, .faq-page, .help-page, .browse-paralegals-page) {
   font-family: "Sarabun", sans-serif;
 }

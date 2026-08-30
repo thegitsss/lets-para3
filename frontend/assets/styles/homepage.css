@@ -1448,7 +1448,7 @@ html.accessibility-mode .js .home-reveal {
 
 .assistant-preview__header strong,
 .assistant-preview__header small { display: block; }
-.assistant-preview__header strong { font-size: 0.78rem; }
+.assistant-preview__header strong { font-size: 0.82rem; }
 .assistant-preview__header small { margin-top: 3px; color: var(--lpc-muted); font-size: 0.58rem; }
 
 .assistant-preview__online {
@@ -1466,7 +1466,7 @@ html.accessibility-mode .js .home-reveal {
   padding: 26px 22px 20px;
 }
 
-.assistant-message { font-size: 0.78rem; line-height: 1.55; }
+.assistant-message { font-size: 0.82rem; line-height: 1.55; }
 
 .assistant-message--user {
   max-width: 78%;
@@ -1499,7 +1499,7 @@ html.accessibility-mode .js .home-reveal {
 .assistant-message--assistant a {
   grid-column: 2;
   color: #806520;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 600;
   text-decoration: none;
 }
@@ -1516,7 +1516,7 @@ html.accessibility-mode .js .home-reveal {
   border: 1px solid var(--lpc-line);
   border-radius: 999px;
   color: #606b78;
-  font-size: 0.56rem;
+  font-size: 0.6rem;
   white-space: nowrap;
 }
 
@@ -1529,7 +1529,7 @@ html.accessibility-mode .js .home-reveal {
   border: 1px solid #cbcfd3;
   border-radius: 14px;
   color: #9299a1;
-  font-size: 0.64rem;
+  font-size: 0.68rem;
 }
 
 .assistant-preview__composer i {
@@ -3542,10 +3542,6 @@ body.accessibility-mode [tabindex]:focus-visible {
     clip-path: inset(var(--motion-reveal-inset, 0%) 0 0);
   }
 
-  .lpc-home.home-cinematic-motion .assistant-preview__header,
-  .lpc-home.home-cinematic-motion .assistant-message,
-  .lpc-home.home-cinematic-motion .assistant-preview__suggestions,
-  .lpc-home.home-cinematic-motion .assistant-preview__composer,
   .lpc-home.home-cinematic-motion .audience-interface__topbar,
   .lpc-home.home-cinematic-motion .audience-metrics,
   .lpc-home.home-cinematic-motion .audience-matter,
@@ -4232,11 +4228,10 @@ body.accessibility-mode [tabindex]:focus-visible {
   .lpc-home.home-cinematic-motion .assistant-preview {
     opacity: var(--assistant-chat-progress, 1);
     clip-path: inset(0 0 0 var(--assistant-chat-clip, 0%) round 22px);
-    transform: translate3d(var(--assistant-chat-x, 0), 0, 0)
+    transform: translateX(var(--assistant-chat-x, 0))
       scale(var(--assistant-chat-scale, 1));
     transform-origin: 100% 18%;
     transition: none;
-    will-change: transform, opacity, clip-path;
   }
 
   .lpc-home.home-cinematic-motion .assistant-workspace {

@@ -3,6 +3,7 @@
   --auth-muted: #647184;
   --auth-line: #d8dee7;
   --auth-gold: #887244;
+  --auth-brand-gold: #b4975a;
   --auth-art: #0d1723;
   --auth-control-height: 50px;
   --auth-control-radius: 8px;
@@ -55,7 +56,7 @@ body.auth-secondary [hidden] { display: none; }
   text-decoration: none;
 }
 
-.auth-secondary__brand-mark { color: var(--auth-gold); }
+.auth-secondary__brand-mark { color: var(--auth-brand-gold); }
 
 .password-recovery-page main.recovery-layout,
 .password-recovery-page main.recovery-layout.container,

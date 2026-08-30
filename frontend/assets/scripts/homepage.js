@@ -211,7 +211,8 @@
       const viewportHeight = Math.max(1, window.innerHeight);
       const progress = clamp((viewportHeight - rect.top) / (viewportHeight + rect.height));
       const centered = (progress - 0.5) * 2;
-      this.canvas.style.setProperty("--paths-field-y", `${(centered * 220).toFixed(1)}px`);
+      const parallaxDistance = this.mode === "paths" ? 320 : 220;
+      this.canvas.style.setProperty("--paths-field-y", `${(centered * parallaxDistance).toFixed(1)}px`);
     }
 
     onPointerMove(event) {
@@ -475,7 +476,7 @@
           context.font = '200 9px "Sarabun", sans-serif';
           context.textAlign = "center";
           context.fillStyle = isPathsField
-            ? `rgba(76, 124, 211, ${isMobilePathsField ? 0.86 : 0.72})`
+            ? `rgba(76, 124, 211, ${isMobilePathsField ? 0.9 : 0.8})`
             : "rgba(128, 101, 44, 0.52)";
           context.fillText(node.label, position.x, position.y + 17);
           context.restore();
@@ -484,8 +485,8 @@
         context.arc(position.x, position.y, node.radius, 0, Math.PI * 2);
         context.fillStyle = isPathsField
           ? (index % 5 === 0
-            ? `rgba(100, 149, 237, ${isMobilePathsField ? 0.96 : 0.88})`
-            : `rgba(100, 149, 237, ${isMobilePathsField ? 0.76 : 0.58})`)
+            ? `rgba(100, 149, 237, ${isMobilePathsField ? 0.96 : 0.92})`
+            : `rgba(100, 149, 237, ${isMobilePathsField ? 0.8 : 0.68})`)
           : (index % 5 === 0 ? "rgba(180, 151, 90, 0.55)" : "rgba(58, 72, 92, 0.28)");
         context.fill();
       });
