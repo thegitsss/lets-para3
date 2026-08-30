@@ -1664,6 +1664,7 @@ font-size:.95rem;
 <p class="small">Marketplace moderation for attorney-created posts.</p>
 </div>
 </div>
+
 </section>
 
 <!-- AI CONTROL ROOM -->
@@ -1829,6 +1830,7 @@ font-size:.95rem;
 </div>
 </div>
 </div>
+
 </section>
 
 <section id="section-approvals-workspace" class="section">
@@ -2873,6 +2875,26 @@ font-size:.95rem;
 </table>
 </div>
 </div>
+
+<div class="panel" id="chargebackPanel" style="margin-top:2rem;">
+<div class="panel-header">
+<div>
+<h2>Stripe Chargebacks</h2>
+<p class="settings-help">Processor disputes and payout holds. These are separate from Matter work-quality disputes.</p>
+</div>
+<button class="btn secondary" type="button" id="refreshChargebacks">Refresh</button>
+</div>
+<div class="table-wrap">
+<table class="ledger-table">
+<thead>
+<tr><th>Matter</th><th>Amount</th><th>Processor fees</th><th>Payout</th><th>Mode</th><th>Processor</th><th>Admin review</th><th>Evidence</th><th>Net exposure</th><th>Actions</th></tr>
+</thead>
+<tbody id="chargebacksBody">
+<tr><td colspan="10" class="pending-empty">Loading chargebacks…</td></tr>
+</tbody>
+</table>
+</div>
+</div>
 </section>
 
 <!-- FINANCE: ACCOUNTING -->
@@ -3391,6 +3413,7 @@ window.loadSalesWorkspace?.(true);
 }
 if(normalizedSection==="finance"){
 window.loadDisputes?.();
+window.loadChargebacks?.();
 }
 requestAnimationFrame(refreshCharts);
 }
@@ -3529,14 +3552,18 @@ return fallback;
 }
 }
 
-function formatCurrencyFromCents(value) {
+function formatCurrencyFromCents(value, currency = "USD") {
 const cents = Number(value);
 if (!Number.isFinite(cents)) return "—";
+try {
 return new Intl.NumberFormat("en-US", {
 style: "currency",
-currency: "USD",
+currency: String(currency || "USD").toUpperCase(),
 minimumFractionDigits: 2,
 }).format(cents / 100);
+} catch {
+return `${String(currency || "USD").toUpperCase()} ${(cents / 100).toFixed(2)}`;
+}
 }
 
 async function loadFinanceCards() {
@@ -3556,6 +3583,92 @@ payoutCountEl.textContent = "Unable to load payouts";
 incomeCountEl.textContent = "Unable to load income";
 }
 }
+
+const chargebacksBody=document.getElementById("chargebacksBody");
+const refreshChargebacks=document.getElementById("refreshChargebacks");
+
+function chargebackCell(value){
+const cell=document.createElement("td");
+cell.textContent=value==null||value===""?"—":String(value);
+return cell;
+}
+
+async function runChargebackAction(operationId,action){
+try{
+await fetchCSRF();
+const res=await secureFetch(`/api/admin/chargebacks/${encodeURIComponent(operationId)}/${action}`,{method:"POST",body:{}});
+const payload=await res.json().catch(()=>({}));
+if(!res.ok)throw new Error(payload?.msg||payload?.error||"Unable to update chargeback review.");
+showAlert(action==="clear-hold"?"The eligible payout hold was cleared.":action==="reconcile"?"Chargeback evidence was reconciled.":"Chargeback review acknowledged.",{title:"Chargeback updated"});
+await loadChargebacks();
+}catch(err){
+showAlert(err?.message||"Unable to update chargeback review.",{title:"Chargeback review"});
+}
+}
+
+async function loadChargebacks(){
+if(!chargebacksBody)return;
+chargebacksBody.replaceChildren();
+const loading=document.createElement("tr");
+const loadingCell=chargebackCell("Loading chargebacks…");
+loadingCell.colSpan=10;
+loading.appendChild(loadingCell);
+chargebacksBody.appendChild(loading);
+const payload=await fetchAdminJSON("/api/admin/chargebacks",{items:[]});
+const items=Array.isArray(payload?.items)?payload.items:[];
+chargebacksBody.replaceChildren();
+if(!items.length){
+const row=document.createElement("tr");
+const cell=chargebackCell("No Stripe chargebacks require review.");
+cell.colSpan=10;
+row.appendChild(cell);
+chargebacksBody.appendChild(row);
+return;
+}
+items.forEach((item)=>{
+const row=document.createElement("tr");
+row.appendChild(chargebackCell(item?.matter?.title||"Unmatched — reconciliation required"));
+row.appendChild(chargebackCell(formatCurrencyFromCents(item.chargebackAmount,item.currency)));
+row.appendChild(chargebackCell(formatCurrencyFromCents(item.processorFees,item.currency)));
+row.appendChild(chargebackCell(item.payoutHold?"Held for admin review":item.payoutPosition==="post_payout"?"Already released":"Not held"));
+row.appendChild(chargebackCell(item.stripeMode||"unknown"));
+row.appendChild(chargebackCell(item.processorStatus||"unknown"));
+row.appendChild(chargebackCell(item.administrativeStatus||"pending_review"));
+row.appendChild(chargebackCell(item.evidenceStatus||"needs_reconciliation"));
+row.appendChild(chargebackCell(formatCurrencyFromCents(item.netExposure,item.currency)));
+const actions=document.createElement("td");
+actions.className="dispute-actions";
+if(item.administrativeStatus==="pending_review"){
+const acknowledge=document.createElement("button");
+acknowledge.type="button";
+acknowledge.className="btn secondary";
+acknowledge.textContent="Acknowledge";
+acknowledge.addEventListener("click",()=>runChargebackAction(item.id,"acknowledge"));
+actions.appendChild(acknowledge);
+}
+if(item.payoutHold&&item.processorStatus==="won"&&item.evidenceStatus==="verified"){
+const clear=document.createElement("button");
+clear.type="button";
+clear.className="btn primary";
+clear.textContent="Clear eligible hold";
+clear.addEventListener("click",()=>runChargebackAction(item.id,"clear-hold"));
+actions.appendChild(clear);
+}
+if(item.evidenceStatus!=="verified"){
+const reconcile=document.createElement("button");
+reconcile.type="button";
+reconcile.className="btn secondary";
+reconcile.textContent="Reconcile evidence";
+reconcile.addEventListener("click",()=>runChargebackAction(item.id,"reconcile"));
+actions.appendChild(reconcile);
+}
+if(!actions.childElementCount)actions.textContent="Reviewed";
+row.appendChild(actions);
+chargebacksBody.appendChild(row);
+});
+}
+window.loadChargebacks=loadChargebacks;
+refreshChargebacks?.addEventListener("click",()=>loadChargebacks());
 
 /* -------- Charts (0 until data) -------- */
 pushChart(document.getElementById("revChart"),{type:"bar",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],backgroundColor:"#b6a47a"}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});

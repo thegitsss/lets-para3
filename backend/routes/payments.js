@@ -41,6 +41,7 @@ const { buildCheckoutReturnUrl } = require("../services/paymentReturnUrl");
 const { buildFundingFingerprint, ensureFundingRequestKey } = require("../utils/funding");
 const { getAttorneyPaymentSummary } = require("../services/paymentProjectionService");
 const { reconcileFundingEvidence } = require("../services/fundingEvidenceBackfillService");
+const { createPayoutTransfer } = require("../services/payoutHoldService");
 
 // ----------------------------------------
 // Helpers
@@ -2082,9 +2083,11 @@ router.post(
               if (charge?.id) {
                 transferPayload.source_transaction = charge.id;
               }
-              transfer = bypassPayouts
-                ? { id: `bypass_${c._id}_${disputeKey}` }
-                : await stripe.transfers.create(transferPayload, {
+              transfer = await createPayoutTransfer({
+                caseId: c._id,
+                stripeClient: stripe,
+                payload: transferPayload,
+                stripeOptions: {
                   idempotencyKey: stripe.stripeIdempotencyKey(
                     "withdrawal_admin_payout",
                     c._id,
@@ -2092,7 +2095,9 @@ router.post(
                     net,
                     c.escrowIntentId
                   ),
-                  });
+                },
+                bypassTransfer: bypassPayouts ? { id: `bypass_${c._id}_${disputeKey}` } : null,
+              });
             } catch (err) {
               await failPaymentOperation(settlementClaim.operation, err).catch(
                 logPromiseFailure(runtimeLogger, "[payments] failed withdrawal dispute operation could not be marked", {
@@ -2587,8 +2592,6 @@ router.post(
     let transfer;
     if (settlementClaim.operation.stripeTransferId) {
       transfer = { id: settlementClaim.operation.stripeTransferId };
-    } else if (bypassPayouts) {
-      transfer = { id: `bypass_${Date.now()}` };
     } else {
       try {
         const transferPayload = {
@@ -2605,15 +2608,21 @@ router.post(
         if (charge?.id) {
           transferPayload.source_transaction = charge.id;
         }
-        transfer = await stripe.transfers.create(transferPayload, {
-          idempotencyKey: stripe.stripeIdempotencyKey(
-            "dispute_payout",
-            c._id,
-            disputeKey,
-            action,
-            payout,
-            c.escrowIntentId
-          ),
+        transfer = await createPayoutTransfer({
+          caseId: c._id,
+          stripeClient: stripe,
+          payload: transferPayload,
+          stripeOptions: {
+            idempotencyKey: stripe.stripeIdempotencyKey(
+              "dispute_payout",
+              c._id,
+              disputeKey,
+              action,
+              payout,
+              c.escrowIntentId
+            ),
+          },
+          bypassTransfer: bypassPayouts ? { id: `bypass_${Date.now()}` } : null,
         });
       } catch (err) {
         await failPaymentOperation(settlementClaim.operation, err, {

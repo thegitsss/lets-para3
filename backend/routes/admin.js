@@ -15,7 +15,14 @@ const AuditLog = require("../models/AuditLog");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
 const PaymentOperation = require("../models/PaymentOperation");
+const FinancialAdjustment = require("../models/FinancialAdjustment");
 const { SUCCESSFUL_PAYOUT_MATCH } = require("../services/paymentProjectionService");
+const {
+  acknowledgeChargeback,
+  clearEligiblePayoutHold,
+  recordChargebackEvent,
+} = require("../services/chargebackService");
+const { maskIdentifier } = require("../services/fundingEvidenceBackfillService");
 const logger = createLogger("admin");
 const {
   deactivateUserAccount,
@@ -2623,6 +2630,134 @@ statusCounts: statusCounts.reduce((summary, entry) => {
   return summary;
 }, {}),
 });
+}));
+
+router.get("/chargebacks", asyncHandler(async (_req, res) => {
+const operations = await PaymentOperation.find({ kind: "chargeback" })
+.sort({ processorEventCreatedAt: -1, createdAt: -1 })
+.limit(200)
+.lean();
+const operationIds = operations.map((operation) => operation._id);
+const caseIds = operations.map((operation) => operation.caseId).filter(Boolean);
+const [cases, exposures] = await Promise.all([
+Case.find({ _id: { $in: caseIds } }).select("title caseNumber status archived paymentReleased").lean(),
+FinancialAdjustment.aggregate([
+{ $match: { paymentOperationId: { $in: operationIds } } },
+{ $group: {
+  _id: "$paymentOperationId",
+  debits: { $sum: { $cond: [{ $eq: ["$direction", "debit"] }, "$amount", 0] } },
+  credits: { $sum: { $cond: [{ $eq: ["$direction", "credit"] }, "$amount", 0] } },
+  processorFees: {
+    $sum: {
+      $cond: [
+        { $in: ["$adjustmentType", ["processor_dispute_fee", "processor_fee_recovery"]] },
+        { $cond: [{ $eq: ["$direction", "debit"] }, "$amount", { $multiply: ["$amount", -1] }] },
+        0,
+      ],
+    },
+  },
+  evidenceCount: { $sum: 1 },
+} },
+]),
+]);
+const casesById = new Map(cases.map((caseDoc) => [String(caseDoc._id), caseDoc]));
+const exposureByOperation = new Map(exposures.map((entry) => [String(entry._id), entry]));
+res.json({
+items: operations.map((operation) => {
+  const caseDoc = casesById.get(String(operation.caseId || "")) || null;
+  const exposure = exposureByOperation.get(String(operation._id)) || {};
+  const debits = exposure.debits || 0;
+  const credits = exposure.credits || 0;
+  return {
+    id: operation._id,
+    matter: caseDoc ? {
+      id: caseDoc._id,
+      title: caseDoc.title || "Untitled Matter",
+      caseNumber: caseDoc.caseNumber || null,
+      status: caseDoc.status,
+      archived: caseDoc.archived === true,
+    } : null,
+    chargebackAmount: operation.amount || 0,
+    currency: operation.currency || "usd",
+    processorFees: exposure.processorFees || 0,
+    payoutPosition: operation.payoutPosition || "unknown",
+    payoutHold: operation.payoutPosition === "pre_payout" &&
+      ["pending_review", "acknowledged"].includes(operation.administrativeStatus),
+    stripeMode: operation.stripeMode || "unknown",
+    processorStatus: operation.processorStatus || "unknown",
+    administrativeStatus: operation.administrativeStatus || "pending_review",
+    evidenceStatus: operation.evidenceStatus || "needs_reconciliation",
+    netExposure: debits - credits,
+    debitEvidence: debits,
+    creditEvidence: credits,
+    evidenceCount: exposure.evidenceCount || 0,
+    disputeRef: maskIdentifier(operation.stripeDisputeId),
+    updatedAt: operation.updatedAt,
+  };
+}),
+});
+}));
+
+router.post("/chargebacks/:operationId/acknowledge", csrfProtection, asyncHandler(async (req, res) => {
+const result = await acknowledgeChargeback(req.params.operationId, req.user.id);
+if (!result.found) return res.status(404).json({ msg: "Chargeback record not found." });
+if (result.changed) {
+  await AuditLog.logFromReq(req, "chargeback.admin.acknowledge", {
+    targetType: "payment",
+    targetId: result.operation.stripeDisputeId,
+    caseId: result.operation.caseId,
+    meta: { operationId: String(result.operation._id) },
+  });
+}
+return res.json({ ok: true, changed: result.changed, administrativeStatus: result.operation.administrativeStatus });
+}));
+
+router.post("/chargebacks/:operationId/clear-hold", csrfProtection, asyncHandler(async (req, res) => {
+const result = await clearEligiblePayoutHold(req.params.operationId, req.user.id);
+if (!result.found) return res.status(404).json({ msg: "Chargeback record not found." });
+if (result.changed) {
+  await AuditLog.logFromReq(req, "chargeback.admin.hold_clear", {
+    targetType: "payment",
+    targetId: result.operation.stripeDisputeId,
+    caseId: result.operation.caseId,
+    meta: { operationId: String(result.operation._id) },
+  });
+}
+return res.json({ ok: true, changed: result.changed, administrativeStatus: result.operation.administrativeStatus });
+}));
+
+router.post("/chargebacks/:operationId/reconcile", csrfProtection, asyncHandler(async (req, res) => {
+const stripe = require("../utils/stripe");
+const operation = await PaymentOperation.findOne({ _id: req.params.operationId, kind: "chargeback" });
+if (!operation) return res.status(404).json({ msg: "Chargeback record not found." });
+if (!operation.stripeDisputeId || !operation.stripeEventId) {
+  return res.status(409).json({ msg: "Chargeback evidence is incomplete and cannot be reconciled automatically." });
+}
+const dispute = await stripe.disputes.retrieve(operation.stripeDisputeId, {
+  expand: ["charge", "balance_transactions"],
+});
+const result = await recordChargebackEvent({
+  event: {
+    id: operation.stripeEventId,
+    type: "charge.dispute.updated",
+    created: Math.floor(new Date(operation.processorEventCreatedAt || operation.createdAt).getTime() / 1000),
+    livemode: dispute.livemode,
+    data: { object: dispute },
+  },
+  dispute,
+  stripeClient: stripe,
+});
+await AuditLog.logFromReq(req, "chargeback.admin.reconcile", {
+  targetType: "payment",
+  targetId: operation.stripeDisputeId,
+  caseId: result.operation.caseId,
+  meta: {
+    operationId: String(result.operation._id),
+    evidenceStatus: result.operation.evidenceStatus,
+    adjustmentCount: result.adjustments.length,
+  },
+});
+return res.json({ ok: true, evidenceStatus: result.operation.evidenceStatus });
 }));
 
 router.get("/income", asyncHandler(async (_req, res) => {

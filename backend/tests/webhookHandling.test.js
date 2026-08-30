@@ -10,14 +10,24 @@ const mockStripe = {
   paymentIntents: {
     retrieve: jest.fn(),
   },
+  charges: {
+    retrieve: jest.fn(),
+  },
+  balanceTransactions: {
+    retrieve: jest.fn(),
+  },
   isTransferablePaymentIntent: jest.fn(() => ({ transferable: true })),
 };
 const mockNotifyUser = jest.fn(async () => ({ ok: true }));
+const mockSendOwnerAlert = jest.fn(async () => ({ ok: true }));
 
 jest.mock("../utils/stripe", () => mockStripe);
 
 jest.mock("../utils/notifyUser", () => ({
   notifyUser: (...args) => mockNotifyUser(...args),
+}));
+jest.mock("../utils/opsAlerting", () => ({
+  sendOwnerAlert: (...args) => mockSendOwnerAlert(...args),
 }));
 
 const User = require("../models/User");
@@ -25,6 +35,8 @@ const Case = require("../models/Case");
 const AuditLog = require("../models/AuditLog");
 const WebhookEvent = require("../models/WebhookEvent");
 const Payout = require("../models/Payout");
+const PaymentOperation = require("../models/PaymentOperation");
+const FinancialAdjustment = require("../models/FinancialAdjustment");
 const paymentsWebhookRouter = require("../routes/paymentsWebhook");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
@@ -41,6 +53,7 @@ const app = (() => {
 beforeAll(async () => {
   await connect();
   await WebhookEvent.init();
+  await FinancialAdjustment.init();
 });
 
 afterAll(async () => {
@@ -51,11 +64,98 @@ beforeEach(async () => {
   await clearDatabase();
   mockStripe.webhooks.constructEvent.mockReset();
   mockStripe.paymentIntents.retrieve.mockReset();
+  mockStripe.charges.retrieve.mockReset();
+  mockStripe.balanceTransactions.retrieve.mockReset();
   mockStripe.isTransferablePaymentIntent.mockClear();
   mockNotifyUser.mockClear();
+  mockSendOwnerAlert.mockClear();
 });
 
 describe("Webhook handling", () => {
+  test("chargeback webhook interruption replays safely without duplicate operations or adjustments", async () => {
+    const [attorney, paralegal] = await User.create([
+      { firstName: "Webhook", lastName: "Attorney", email: "chargeback-webhook-attorney@example.com", password: "Password123!", role: "attorney", status: "approved", state: "CA" },
+      { firstName: "Webhook", lastName: "Paralegal", email: "chargeback-webhook-paralegal@example.com", password: "Password123!", role: "paralegal", status: "approved", state: "CA" },
+    ]);
+    const caseDoc = await Case.create({
+      title: "Webhook chargeback",
+      details: "Chargeback webhook interruption and replay test.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowStatus: "funded",
+      escrowIntentId: "pi_chargeback_webhook",
+      paymentIntentId: "pi_chargeback_webhook",
+      paymentReleased: false,
+      lockedTotalAmount: 40000,
+      totalAmount: 40000,
+      currency: "usd",
+    });
+    const event = {
+      id: "evt_chargeback_interrupted",
+      type: "charge.dispute.created",
+      created: 1_800_000_000,
+      livemode: false,
+      data: {
+        object: {
+          id: "dp_chargeback_interrupted",
+          amount: 48800,
+          currency: "usd",
+          status: "needs_response",
+          livemode: false,
+          charge: "ch_chargeback_interrupted",
+          balance_transactions: ["txn_chargeback_interrupted"],
+        },
+      },
+    };
+    mockStripe.webhooks.constructEvent.mockImplementation(() => event);
+    mockStripe.charges.retrieve.mockResolvedValue({
+      id: "ch_chargeback_interrupted",
+      amount: 48800,
+      amount_refunded: 0,
+      currency: "usd",
+      payment_intent: {
+        id: "pi_chargeback_webhook",
+        metadata: { caseId: String(caseDoc._id) },
+      },
+    });
+    mockStripe.balanceTransactions.retrieve.mockResolvedValue({
+      id: "txn_chargeback_interrupted",
+      amount: -48800,
+      fee: 1500,
+      net: -50300,
+      currency: "usd",
+      created: 1_800_000_000,
+    });
+    const auditSpy = jest.spyOn(AuditLog, "create").mockRejectedValueOnce(new Error("simulated audit interruption"));
+    const first = await request(app)
+      .post("/api/payments/webhook")
+      .set("Stripe-Signature", "test-signature")
+      .set("Content-Type", "application/json")
+      .send(Buffer.from(JSON.stringify({})));
+    expect(first.status).toBe(500);
+    expect((await WebhookEvent.findOne({ eventId: event.id }).lean()).status).toBe("failed");
+
+    const replay = await request(app)
+      .post("/api/payments/webhook")
+      .set("Stripe-Signature", "test-signature")
+      .set("Content-Type", "application/json")
+      .send(Buffer.from(JSON.stringify({})));
+    auditSpy.mockRestore();
+
+    expect(replay.status).toBe(200);
+    expect(await PaymentOperation.countDocuments({ operationKey: "chargeback:dp_chargeback_interrupted" })).toBe(1);
+    expect(await FinancialAdjustment.countDocuments({ stripeDisputeId: "dp_chargeback_interrupted" })).toBe(2);
+    expect((await WebhookEvent.findOne({ eventId: event.id }).lean()).status).toBe("processed");
+    expect(await Case.findById(caseDoc._id).lean()).toEqual(expect.objectContaining({
+      status: "in progress",
+      paymentReleased: false,
+      disputes: [],
+    }));
+  });
+
   test("PaymentIntent succeeded updates case and logs", async () => {
     // Description: Stripe webhook marks case funded and logs the event.
     // Input values: payment_intent.succeeded with metadata.caseId.

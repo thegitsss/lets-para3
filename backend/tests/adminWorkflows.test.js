@@ -4,6 +4,14 @@ const jwt = require("jsonwebtoken");
 const request = require("supertest");
 const { S3Client } = require("@aws-sdk/client-s3");
 
+const mockAdminStripe = {
+  disputes: { retrieve: jest.fn() },
+  charges: { retrieve: jest.fn() },
+  paymentIntents: { retrieve: jest.fn() },
+  balanceTransactions: { retrieve: jest.fn() },
+};
+jest.mock("../utils/stripe", () => mockAdminStripe);
+
 const User = require("../models/User");
 const Case = require("../models/Case");
 const Job = require("../models/Job");
@@ -11,6 +19,8 @@ const Application = require("../models/Application");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
 const PaymentOperation = require("../models/PaymentOperation");
+const FinancialAdjustment = require("../models/FinancialAdjustment");
+const AuditLog = require("../models/AuditLog");
 const adminRouter = require("../routes/admin");
 const authRouter = require("../routes/auth");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
@@ -57,12 +67,226 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await clearDatabase();
+  Object.values(mockAdminStripe).forEach((group) => group.retrieve.mockReset());
   sendEmail.mockClear();
   if (sendEmail.sendWelcomePacket?.mockClear) sendEmail.sendWelcomePacket.mockClear();
   if (sendEmail.sendProfilePhotoRejectedEmail?.mockClear) sendEmail.sendProfilePhotoRejectedEmail.mockClear();
 });
 
 describe("Admin workflows", () => {
+  test("chargeback projection is admin-only and acknowledgment is audited and idempotent", async () => {
+    const [admin, attorney, paralegal] = await User.create([
+      { firstName: "Admin", lastName: "Chargebacks", email: "chargeback-admin@example.com", password: "Password123!", role: "admin", status: "approved", state: "CA" },
+      { firstName: "Attorney", lastName: "Chargebacks", email: "chargeback-attorney-admin-test@example.com", password: "Password123!", role: "attorney", status: "approved", state: "CA" },
+      { firstName: "Paralegal", lastName: "Chargebacks", email: "chargeback-paralegal-admin-test@example.com", password: "Password123!", role: "paralegal", status: "approved", state: "CA" },
+    ]);
+    const caseDoc = await Case.create({
+      title: "Admin chargeback projection",
+      details: "Separate Stripe chargeback administrative projection test.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowStatus: "funded",
+      escrowIntentId: "pi_admin_chargeback",
+      paymentIntentId: "pi_admin_chargeback",
+      lockedTotalAmount: 40000,
+      totalAmount: 40000,
+      currency: "usd",
+    });
+    const operation = await PaymentOperation.create({
+      operationKey: "chargeback:dp_admin_projection",
+      caseId: caseDoc._id,
+      kind: "chargeback",
+      fingerprint: "chargeback-admin-projection",
+      status: "needs_reconciliation",
+      amount: 48800,
+      currency: "usd",
+      stripeObjectId: "dp_admin_projection",
+      stripeDisputeId: "dp_admin_projection",
+      processorStatus: "under_review",
+      processorEventCreatedAt: new Date("2026-08-30T12:00:00.000Z"),
+      administrativeStatus: "pending_review",
+      payoutPosition: "pre_payout",
+      evidenceStatus: "verified",
+      stripeMode: "test",
+    });
+    await FinancialAdjustment.create({
+      idempotencyKey: "chargeback-adjustment:dp_admin_projection:txn_admin:principal:debit",
+      paymentOperationId: operation._id,
+      caseId: caseDoc._id,
+      adjustmentType: "chargeback_principal",
+      direction: "debit",
+      amount: 48800,
+      currency: "usd",
+      stripeDisputeId: "dp_admin_projection",
+      stripeChargeId: "ch_admin_projection",
+      stripeBalanceTransactionId: "txn_admin",
+      stripeEventId: "evt_admin_projection",
+      stripeMode: "test",
+    });
+
+    const denied = await request(app)
+      .get("/api/admin/chargebacks")
+      .set("Cookie", authCookieFor(attorney));
+    expect(denied.status).toBe(403);
+    const deniedAction = await request(app)
+      .post(`/api/admin/chargebacks/${operation._id}/acknowledge`)
+      .set("Cookie", authCookieFor(attorney))
+      .send({});
+    expect(deniedAction.status).toBe(403);
+
+    const projection = await request(app)
+      .get("/api/admin/chargebacks")
+      .set("Cookie", authCookieFor(admin));
+    expect(projection.status).toBe(200);
+    expect(projection.body.items[0]).toEqual(expect.objectContaining({
+      chargebackAmount: 48800,
+      processorFees: 0,
+      payoutPosition: "pre_payout",
+      payoutHold: true,
+      stripeMode: "test",
+      processorStatus: "under_review",
+      administrativeStatus: "pending_review",
+      netExposure: 48800,
+      evidenceStatus: "verified",
+    }));
+    expect(JSON.stringify(projection.body)).not.toMatch(/payment_method|customer|card/i);
+
+    const first = await request(app)
+      .post(`/api/admin/chargebacks/${operation._id}/acknowledge`)
+      .set("Cookie", authCookieFor(admin))
+      .send({});
+    const replay = await request(app)
+      .post(`/api/admin/chargebacks/${operation._id}/acknowledge`)
+      .set("Cookie", authCookieFor(admin))
+      .send({});
+    expect(first.body).toEqual(expect.objectContaining({ ok: true, changed: true, administrativeStatus: "acknowledged" }));
+    expect(replay.body).toEqual(expect.objectContaining({ ok: true, changed: false, administrativeStatus: "acknowledged" }));
+    expect(await AuditLog.countDocuments({ action: "chargeback.admin.acknowledge" })).toBe(1);
+    expect(await FinancialAdjustment.findOne({ paymentOperationId: operation._id }).lean())
+      .toEqual(expect.objectContaining({ amount: 48800, direction: "debit" }));
+  });
+
+  test("only an eligible processor win can be explicitly cleared by an admin", async () => {
+    const [admin, attorney, paralegal] = await User.create([
+      { firstName: "Admin", lastName: "Hold", email: "chargeback-hold-admin@example.com", password: "Password123!", role: "admin", status: "approved", state: "CA" },
+      { firstName: "Attorney", lastName: "Hold", email: "chargeback-hold-attorney@example.com", password: "Password123!", role: "attorney", status: "approved", state: "CA" },
+      { firstName: "Paralegal", lastName: "Hold", email: "chargeback-hold-paralegal@example.com", password: "Password123!", role: "paralegal", status: "approved", state: "CA" },
+    ]);
+    const caseDoc = await Case.create({
+      title: "Eligible chargeback hold",
+      details: "Explicit administrative hold-clear test.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowStatus: "funded",
+      escrowIntentId: "pi_admin_hold",
+      lockedTotalAmount: 40000,
+      totalAmount: 40000,
+      currency: "usd",
+    });
+    const operation = await PaymentOperation.create({
+      operationKey: "chargeback:dp_admin_hold",
+      caseId: caseDoc._id,
+      kind: "chargeback",
+      fingerprint: "chargeback-admin-hold",
+      status: "needs_reconciliation",
+      amount: 48800,
+      currency: "usd",
+      stripeDisputeId: "dp_admin_hold",
+      processorStatus: "won",
+      administrativeStatus: "pending_review",
+      payoutPosition: "pre_payout",
+      evidenceStatus: "verified",
+    });
+    const response = await request(app)
+      .post(`/api/admin/chargebacks/${operation._id}/clear-hold`)
+      .set("Cookie", authCookieFor(admin))
+      .send({});
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(expect.objectContaining({ ok: true, changed: true, administrativeStatus: "hold_cleared" }));
+    expect(await AuditLog.countDocuments({ action: "chargeback.admin.hold_clear" })).toBe(1);
+  });
+
+  test("admin reconciliation fills missing immutable evidence without clearing a hold", async () => {
+    const [admin, attorney, paralegal] = await User.create([
+      { firstName: "Admin", lastName: "Reconcile", email: "chargeback-reconcile-admin@example.com", password: "Password123!", role: "admin", status: "approved", state: "CA" },
+      { firstName: "Attorney", lastName: "Reconcile", email: "chargeback-reconcile-attorney@example.com", password: "Password123!", role: "attorney", status: "approved", state: "CA" },
+      { firstName: "Paralegal", lastName: "Reconcile", email: "chargeback-reconcile-paralegal@example.com", password: "Password123!", role: "paralegal", status: "approved", state: "CA" },
+    ]);
+    const caseDoc = await Case.create({
+      title: "Chargeback reconciliation",
+      details: "Admin fills missing processor evidence without releasing payout.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowStatus: "funded",
+      escrowIntentId: "pi_admin_reconcile",
+      paymentIntentId: "pi_admin_reconcile",
+      lockedTotalAmount: 40000,
+      totalAmount: 40000,
+      currency: "usd",
+    });
+    const operation = await PaymentOperation.create({
+      operationKey: "chargeback:dp_admin_reconcile",
+      caseId: caseDoc._id,
+      kind: "chargeback",
+      fingerprint: "chargeback-admin-reconcile",
+      status: "needs_reconciliation",
+      amount: 48800,
+      currency: "usd",
+      stripeObjectId: "dp_admin_reconcile",
+      stripeDisputeId: "dp_admin_reconcile",
+      stripeEventId: "evt_admin_reconcile",
+      stripeChargeId: "ch_admin_reconcile",
+      stripePaymentIntentId: "pi_admin_reconcile",
+      processorStatus: "under_review",
+      processorEventCreatedAt: new Date("2026-08-30T12:00:00.000Z"),
+      administrativeStatus: "pending_review",
+      payoutPosition: "pre_payout",
+      evidenceStatus: "needs_reconciliation",
+      stripeMode: "test",
+    });
+    mockAdminStripe.disputes.retrieve.mockResolvedValue({
+      id: "dp_admin_reconcile",
+      amount: 48800,
+      currency: "usd",
+      status: "under_review",
+      livemode: false,
+      charge: {
+        id: "ch_admin_reconcile",
+        amount_refunded: 0,
+        currency: "usd",
+        payment_intent: { id: "pi_admin_reconcile", metadata: { caseId: String(caseDoc._id) } },
+      },
+      balance_transactions: [{
+        id: "txn_admin_reconcile",
+        amount: -48800,
+        fee: 1500,
+        net: -50300,
+        currency: "usd",
+      }],
+    });
+
+    const response = await request(app)
+      .post(`/api/admin/chargebacks/${operation._id}/reconcile`)
+      .set("Cookie", authCookieFor(admin))
+      .send({});
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ ok: true, evidenceStatus: "verified" });
+    expect(await FinancialAdjustment.countDocuments({ paymentOperationId: operation._id })).toBe(2);
+    const updated = await PaymentOperation.findById(operation._id).lean();
+    expect(updated.administrativeStatus).toBe("pending_review");
+    expect(updated.evidenceStatus).toBe("verified");
+    expect(await AuditLog.countDocuments({ action: "chargeback.admin.reconcile" })).toBe(1);
+  });
+
   test("Admin cannot approve a profile photo when its retained original fails malware scanning", async () => {
     const priorBucket = process.env.S3_BUCKET;
     const priorRegion = process.env.S3_REGION;

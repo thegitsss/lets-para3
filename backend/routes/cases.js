@@ -107,6 +107,7 @@ const {
 const { createDevOnlyEmailSet } = require("../utils/devOnlyEmailSet");
 const { buildFundingFingerprint, ensureFundingRequestKey } = require("../utils/funding");
 const { reconcileFundingEvidence } = require("../services/fundingEvidenceBackfillService");
+const { createPayoutTransfer } = require("../services/payoutHoldService");
 const {
   assertObjectMalwareSafe,
   getObjectMalwareScan,
@@ -1927,17 +1928,21 @@ async function ensureFundsReleased(req, caseDoc) {
   try {
     if (payoutClaim.operation.stripeTransferId) {
       transfer = { id: payoutClaim.operation.stripeTransferId };
-    } else if (bypassStripe) {
-      transfer = { id: `bypass_${caseDoc._id}` };
     } else {
-      transfer = await stripe.transfers.create(transferPayload, {
-        idempotencyKey: stripe.stripeIdempotencyKey(
-          "case_completion_payout",
-          caseDoc._id,
-          paralegal._id || caseDoc.paralegalId,
-          payout,
-          paymentIntent.id
-        ),
+      transfer = await createPayoutTransfer({
+        caseId: caseDoc._id,
+        stripeClient: stripe,
+        payload: transferPayload,
+        stripeOptions: {
+          idempotencyKey: stripe.stripeIdempotencyKey(
+            "case_completion_payout",
+            caseDoc._id,
+            paralegal._id || caseDoc.paralegalId,
+            payout,
+            paymentIntent.id
+          ),
+        },
+        bypassTransfer: bypassStripe ? { id: `bypass_${caseDoc._id}` } : null,
       });
     }
   } catch (err) {
@@ -2224,17 +2229,21 @@ async function createPartialPayoutTransfer(req, caseDoc, paralegal, grossAmount)
   try {
     if (partialClaim.operation.stripeTransferId) {
       transfer = { id: partialClaim.operation.stripeTransferId };
-    } else if (bypassStripe) {
-      transfer = { id: `bypass_${caseDoc._id}_${paralegal._id}` };
     } else {
-      transfer = await stripe.transfers.create(transferPayload, {
-        idempotencyKey: stripe.stripeIdempotencyKey(
-          "withdrawal_partial_payout",
-          caseDoc._id,
-          paralegal._id,
-          net,
-          paymentIntent.id
-        ),
+      transfer = await createPayoutTransfer({
+        caseId: caseDoc._id,
+        stripeClient: stripe,
+        payload: transferPayload,
+        stripeOptions: {
+          idempotencyKey: stripe.stripeIdempotencyKey(
+            "withdrawal_partial_payout",
+            caseDoc._id,
+            paralegal._id,
+            net,
+            paymentIntent.id
+          ),
+        },
+        bypassTransfer: bypassStripe ? { id: `bypass_${caseDoc._id}_${paralegal._id}` } : null,
       });
     }
   } catch (err) {

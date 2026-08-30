@@ -22,6 +22,7 @@ const { currentStripeMode, pickStripeMode, stripeModeFromLivemode } = require(".
 const { sendOwnerAlert } = require("../utils/opsAlerting");
 const { expectedCaseFunding, validatePaymentIntentForCase } = require("../utils/paymentIntegrity");
 const { reconcileFundingEvidence } = require("../services/fundingEvidenceBackfillService");
+const { recordChargebackEvent } = require("../services/chargebackService");
 const { createLogger, logPromiseFailure } = require("../utils/logger");
 const logger = createLogger("stripe-webhook");
 
@@ -455,6 +456,54 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
             });
           }
         }
+        break;
+      }
+
+      // ------------------------------
+      // Stripe chargebacks (separate from LPC work-quality disputes)
+      // ------------------------------
+      case "charge.dispute.created":
+      case "charge.dispute.updated":
+      case "charge.dispute.closed":
+      case "charge.dispute.funds_withdrawn":
+      case "charge.dispute.funds_reinstated": {
+        const dispute = event.data.object;
+        const result = await recordChargebackEvent({
+          event,
+          dispute,
+          stripeClient: stripe,
+          stripeOptions: stripeAccountOpts(req),
+        });
+        await AuditLog.create({
+          actor: null,
+          actorRole: "system",
+          action: event.type,
+          targetType: "payment",
+          targetId: String(dispute.id),
+          case: result.operation.caseId || null,
+          ip: req.ip,
+          ua: req.headers["user-agent"],
+          method: "POST",
+          path: "/api/webhooks/stripe",
+          meta: {
+            eventId: event.id,
+            processorStatus: result.operation.processorStatus,
+            administrativeStatus: result.operation.administrativeStatus,
+            payoutPosition: result.operation.payoutPosition,
+            evidenceStatus: result.operation.evidenceStatus,
+            stripeMode: result.operation.stripeMode,
+            adjustmentCount: result.adjustments.length,
+            reconciliationReasons: result.reasons,
+          },
+        });
+        await sendOwnerAlert("LPC attention needed: Stripe chargeback review", [
+          `Matter: ${String(result.operation.caseId || "unmatched")}`,
+          `Dispute reference: ${String(dispute.id)}`,
+          `Processor status: ${String(result.operation.processorStatus || "unknown")}`,
+          `Evidence status: ${String(result.operation.evidenceStatus || "unknown")}`,
+        ]).catch(logPromiseFailure(logger, "Chargeback owner alert delivery failed.", {
+          eventId: event.id,
+        }));
         break;
       }
 
