@@ -1,12 +1,7 @@
-const crypto = require("crypto");
 const PaymentOperation = require("../models/PaymentOperation");
+const { operationFingerprint } = require("../utils/paymentOperationFingerprint");
 
 const STALE_PENDING_MS = 10 * 60 * 1000;
-
-function operationFingerprint(value) {
-  const material = typeof value === "string" ? value : JSON.stringify(value || {});
-  return crypto.createHash("sha256").update(material).digest("hex");
-}
 
 async function claimPaymentOperation({ operationKey, caseId, kind, fingerprint, amount = 0, currency = "usd" }) {
   const normalizedFingerprint = operationFingerprint(fingerprint);

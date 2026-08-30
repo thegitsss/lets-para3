@@ -2,7 +2,7 @@
 
 const crypto = require("crypto");
 const { expectedCaseFunding, paymentIntentAmount, validatePaymentIntentForCase } = require("../utils/paymentIntegrity");
-const { operationFingerprint } = require("./paymentOperationService");
+const { operationFingerprint } = require("../utils/paymentOperationFingerprint");
 
 const FUNDING_ID_FIELDS = ["paymentIntentId", "escrowIntentId", "hiringClaimPaymentIntentId"];
 const EVIDENCE_FIELDS = [
@@ -203,8 +203,12 @@ async function inspectFundingCandidate({ caseDoc, operations = [], stripeClient,
         const inferredPaymentIntentId = String(charge?.payment_intent?.id || charge?.payment_intent || "");
         if (inferredPaymentIntentId) ids = [inferredPaymentIntentId];
       }
-    } catch (_error) {
-      return { ...base, action: "review", reasons: ["payment_intent_unmatched"] };
+    } catch (error) {
+      return {
+        ...base,
+        action: "review",
+        reasons: [error?.code === "STRIPE_OBJECT_MODE_MISMATCH" ? "livemode_mismatch" : "payment_intent_unmatched"],
+      };
     }
   }
   if (!ids.length) return { ...base, action: "review", reasons: ["payment_intent_unmatched"] };
@@ -225,8 +229,12 @@ async function inspectFundingCandidate({ caseDoc, operations = [], stripeClient,
       paymentIntent = await stripeClient.paymentIntents.retrieve(paymentIntentId, {
         expand: ["latest_charge.balance_transaction", "charges.data.balance_transaction"],
       });
-    } catch (_error) {
-      return { ...base, action: "review", reasons: ["payment_intent_unmatched"] };
+    } catch (error) {
+      return {
+        ...base,
+        action: "review",
+        reasons: [error?.code === "STRIPE_OBJECT_MODE_MISMATCH" ? "livemode_mismatch" : "payment_intent_unmatched"],
+      };
     }
   }
 
@@ -244,8 +252,12 @@ async function inspectFundingCandidate({ caseDoc, operations = [], stripeClient,
         ...distinctRelatedIds(caseDoc, "relatedChargeIds"),
       ]
     );
-  } catch (_error) {
-    return { ...base, action: "review", reasons: ["charge_unmatched"] };
+  } catch (error) {
+    return {
+      ...base,
+      action: "review",
+      reasons: [error?.code === "STRIPE_OBJECT_MODE_MISMATCH" ? "livemode_mismatch" : "charge_unmatched"],
+    };
   }
   if (chargeResult.reasons.length) return { ...base, action: "review", reasons: chargeResult.reasons };
   const charge = chargeResult.charge;
@@ -263,8 +275,12 @@ async function inspectFundingCandidate({ caseDoc, operations = [], stripeClient,
         .filter(Boolean)
         .concat(distinctRelatedIds(caseDoc, "relatedBalanceTransactionIds"))
     );
-  } catch (_error) {
-    return { ...base, action: "review", reasons: ["balance_transaction_unmatched"] };
+  } catch (error) {
+    return {
+      ...base,
+      action: "review",
+      reasons: [error?.code === "STRIPE_OBJECT_MODE_MISMATCH" ? "livemode_mismatch" : "balance_transaction_unmatched"],
+    };
   }
   if (balanceResult.reasons.length) return { ...base, action: "review", reasons: balanceResult.reasons };
   const balanceTransaction = balanceResult.balanceTransaction;
@@ -403,6 +419,58 @@ function addAmount(target, key, value) {
   target[key] += Number(value || 0);
 }
 
+function classificationForInspection(inspection = {}) {
+  const reasons = Array.isArray(inspection.reasons) ? inspection.reasons : [];
+  if (inspection.action === "unchanged") return "already_complete";
+  if (
+    inspection.action === "update" &&
+    Object.prototype.hasOwnProperty.call(inspection.missing || {}, "processingFeeAmount")
+  ) return "missing_processor_cost_evidence";
+  if (["create", "update"].includes(inspection.action)) return "safely_matched";
+  if (reasons.some((reason) => reason.includes("refunded"))) return "refunded";
+  if (reasons.some((reason) => reason.includes("disputed"))) return "disputed";
+  if (reasons.some((reason) => reason.includes("duplicate"))) return "duplicate_evidence";
+  if (reasons.some((reason) => reason.includes("ambiguous") || reason.includes("multiple_"))) return "ambiguous";
+  if (reasons.some((reason) => reason.includes("livemode") || reason.includes("stripeMode"))) {
+    return "test_live_mode_mismatch";
+  }
+  if (reasons.some((reason) => reason.includes("amount_mismatch") || reason.includes("net_mismatch"))) {
+    return "conflicting_amounts";
+  }
+  if (reasons.some((reason) => reason.includes("balance_transaction") || reason.includes("processingFeeAmount"))) {
+    return "missing_processor_cost_evidence";
+  }
+  if (reasons.some((reason) => reason.includes("unmatched"))) return "missing_stripe_object";
+  if (reasons.some((reason) => reason.includes("conflict"))) return "conflicting_evidence";
+  return "requires_manual_review";
+}
+
+function sanitizedInspectionRecord(inspection = {}) {
+  const evidence = inspection.evidence || {};
+  return {
+    caseRef: inspection.caseRef || "",
+    paymentIntentRef: inspection.paymentIntentRef || "",
+    chargeRef: inspection.chargeRef || "",
+    balanceTransactionRef: inspection.balanceTransactionRef || "",
+    action: inspection.action || "review",
+    classification: classificationForInspection(inspection),
+    reasons: [...new Set(inspection.reasons || [])],
+    stripeMode: evidence.stripeMode || "unknown",
+    currency: evidence.currency || "",
+    grossAmount: Number.isSafeInteger(evidence.grossAmount) ? evidence.grossAmount : null,
+    processingFeeAmount: Number.isSafeInteger(evidence.processingFeeAmount)
+      ? evidence.processingFeeAmount
+      : null,
+    netAmount: Number.isSafeInteger(evidence.netAmount) ? evidence.netAmount : null,
+    refundedAmount: Number(inspection.refundedAmount || 0),
+    resolved: {
+      paymentIntent: Boolean(inspection.chargeRef || inspection.evidence),
+      charge: Boolean(inspection.chargeRef),
+      balanceTransaction: Boolean(inspection.balanceTransactionRef),
+    },
+  };
+}
+
 function duplicateEvidenceGroups(operations = []) {
   const fields = ["stripePaymentIntentId", "stripeChargeId", "stripeBalanceTransactionId"];
   const duplicates = [];
@@ -465,6 +533,8 @@ async function buildFundingEvidenceReport({
     },
     reviewByReason: {},
     reviewItems: [],
+    classifications: {},
+    records: [],
     duplicateEvidence: duplicateEvidenceGroups(operations),
     expectedFieldChanges: {
       creates: { records: 0, fields: [...EVIDENCE_FIELDS, "operationKey", "caseId", "kind", "status", "amount"] },
@@ -484,6 +554,9 @@ async function buildFundingEvidenceReport({
         : "recordedUnknownMode";
     report.counts[recordedModeKey] += intentCount || 1;
     const inspection = await inspectFundingCandidate({ caseDoc, operations, stripeClient });
+    const record = sanitizedInspectionRecord(inspection);
+    report.records.push(record);
+    report.classifications[record.classification] = (report.classifications[record.classification] || 0) + 1;
     addAmount(report.aggregates, "stripeRefundsObserved", inspection.refundedAmount);
     if (inspection.action === "review") {
       report.counts.reviewRequired += 1;
@@ -538,10 +611,12 @@ module.exports = {
   distinctFundingIntentIds,
   distinctRelatedIds,
   fundingOperationKey,
+  classificationForInspection,
   inspectFundingCandidate,
   maskIdentifier,
   operationMatchesEvidence,
   persistInspection,
   reconcileFundingEvidence,
+  sanitizedInspectionRecord,
   validateEvidence,
 };

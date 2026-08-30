@@ -79,6 +79,7 @@
     "backfill:stripe-mode": "node scripts/backfill-stripe-mode.js",
     "backfill:stripe-mode:apply": "node scripts/backfill-stripe-mode.js --apply",
     "backfill:funding-evidence": "node scripts/backfill-funding-evidence.js",
+    "reconcile:funding-evidence:production-dry-run": "node scripts/reconcile-production-funding-evidence.js",
     "backfill:matter-deadlines": "node scripts/backfill-matter-deadlines.js",
     "backfill:matter-deadlines:apply": "node scripts/backfill-matter-deadlines.js --apply",
     "migrate:payment-ledgers": "node scripts/migrate-payment-ledgers.js",
