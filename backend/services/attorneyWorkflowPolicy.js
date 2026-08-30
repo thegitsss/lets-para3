@@ -32,15 +32,15 @@ const ATTORNEY_WORKFLOW_STAGES = Object.freeze({
 
 const ATTORNEY_WORKFLOW_POLICY = Object.freeze({
   [ATTORNEY_WORKFLOW_STAGES.POST_MATTER]: Object.freeze({
-    paymentMethodRequired: true,
+    paymentMethodRequired: false,
     minimumMatterAmountCents: MIN_MATTER_AMOUNT_CENTS,
     label: "Post a matter",
-    timing: "before_posting",
+    timing: "not_required_for_posting",
   }),
   [ATTORNEY_WORKFLOW_STAGES.RECEIVE_APPLICATIONS]: Object.freeze({
-    paymentMethodRequired: true,
+    paymentMethodRequired: false,
     label: "Receive applications",
-    timing: "before_applications",
+    timing: "not_required_for_applications",
   }),
   [ATTORNEY_WORKFLOW_STAGES.INVITE_PARALEGAL]: Object.freeze({
     label: "Invite a paralegal",
@@ -147,7 +147,6 @@ function result(stage, blockers = [], facts = {}, { applicable = true } = {}) {
 function evaluateMatterPosting(input = {}) {
   const blockers = [];
   const amount = Number(input.amountCents);
-  if (input.paymentMethodSaved !== true) blockers.push("saved_payment_method_required");
   if (!hasValue(input.title)) blockers.push("title_required");
   if (!hasValue(input.details)) blockers.push("description_required");
   if (!hasValue(input.practiceArea)) blockers.push("practice_area_required");
@@ -165,7 +164,6 @@ function evaluateApplicationEligibility(input = {}) {
   const blockers = [];
   const status = normalizeCaseStatus(input.caseStatus || input.jobStatus);
   const relisted = status === "paused" && input.relistRequestedAt && input.payoutFinalizedAt;
-  if (input.attorneyPaymentMethodSaved !== true) blockers.push("attorney_payment_method_required");
   if (input.applicantApproved !== true) blockers.push("approved_paralegal_required");
   if (input.partiesBlocked === true) blockers.push("parties_blocked");
   if (input.archived === true || (status && status !== "open" && !relisted)) blockers.push("applications_closed");

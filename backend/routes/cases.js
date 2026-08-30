@@ -1178,21 +1178,6 @@ async function fetchDefaultPaymentMethodId(customerId) {
   return customer?.invoice_settings?.default_payment_method || null;
 }
 
-async function attorneyHasPaymentMethod(attorneyId) {
-  if (!attorneyId) return false;
-  try {
-    const attorney = await User.findById(attorneyId).select("email stripeCustomerId");
-    const attorneyEmail = String(attorney?.email || "").toLowerCase().trim();
-    if (STRIPE_BYPASS_ATTORNEY_EMAILS.has(attorneyEmail)) return true;
-    if (!attorney?.stripeCustomerId) return false;
-    const methodId = await fetchDefaultPaymentMethodId(attorney.stripeCustomerId);
-    return Boolean(methodId);
-  } catch (err) {
-    logger.warn("[cases] Unable to verify attorney payment method", err?.message || err);
-    return false;
-  }
-}
-
 function buildCaseChargeDescription(caseDoc, paralegalDoc) {
   const caseName = caseDoc?.title || caseDoc?.caseTitle || `Case ${caseDoc?._id || ""}`;
   const paralegalName = formatPersonName(paralegalDoc) || "Paralegal";
@@ -3008,16 +2993,6 @@ router.post(
   csrfProtection,
   asyncHandler(async (req, res) => {
     const role = String(req.user?.role || "").toLowerCase();
-    let postingPaymentMethodSaved = role !== "attorney";
-    if (role === "attorney") {
-      const hasPaymentMethod = await attorneyHasPaymentMethod(req.user.id || req.user._id);
-      postingPaymentMethodSaved = hasPaymentMethod;
-      if (isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.POST_MATTER) && !hasPaymentMethod) {
-        return res
-          .status(403)
-          .json({ error: "Connect Stripe and add a payment method before posting a Matter." });
-      }
-    }
     const {
       title,
       practiceArea,
@@ -3069,7 +3044,6 @@ router.post(
 
     const normalizedTasks = normalizeScopeTasks(tasks);
     const postingPolicy = evaluateMatterPosting({
-      paymentMethodSaved: postingPaymentMethodSaved,
       title: safeTitle,
       details: narrative,
       practiceArea: normalizedPractice,
@@ -4680,15 +4654,6 @@ router.post(
     const caseAttorneyId = doc.attorneyId || doc.attorney || null;
     if (caseAttorneyId && (await isBlockedBetween(req.user.id, caseAttorneyId))) {
       return res.status(403).json({ error: BLOCKED_MESSAGE });
-    }
-    const attorneyReady = await attorneyHasPaymentMethod(caseAttorneyId);
-    if (
-      isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.RECEIVE_APPLICATIONS) &&
-      !attorneyReady
-    ) {
-      return res
-        .status(403)
-        .json({ error: "This attorney must connect Stripe before applications can be submitted." });
     }
 
     let jobId = resolveCaseJobId(doc);

@@ -129,7 +129,7 @@ describe("support manager tool permissions", () => {
     }));
   });
 
-  test("joins authoritative posting rules with the attorney's missing payment-method state", async () => {
+  test("keeps missing account payment state separate from publication readiness", async () => {
     const result = await executeSupportManagerTool(
       "get_attorney_workflow_readiness",
       { capability: "posting" },
@@ -154,8 +154,8 @@ describe("support manager tool permissions", () => {
         }),
         paymentMethod: expect.objectContaining({ stateKnown: true, saved: false }),
         requirements: expect.objectContaining({
-          paymentMethodRequiredBeforePosting: true,
-          paymentMethodRequiredBeforeApplications: true,
+          paymentMethodRequiredBeforePosting: false,
+          paymentMethodRequiredBeforeApplications: false,
           paymentMethodRequiredBeforeHiring: true,
           chargeTiming: "charged_when_hire_is_confirmed",
           postHireWorkflow: {
@@ -183,7 +183,11 @@ describe("support manager tool permissions", () => {
       })
     );
     expect(result.stages.post_matter).toEqual(
-      expect.objectContaining({ ready: false, blocker: "saved_payment_method_required" })
+      expect.objectContaining({
+        ready: null,
+        blocker: "matter_context_required",
+        paymentMethodRequired: false,
+      })
     );
   });
 

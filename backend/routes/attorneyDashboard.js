@@ -77,12 +77,7 @@ router.get("/", auth, requireApproved, requireRole(["attorney"]), async (req, re
 
       Job.find({ attorneyId }).select("_id status"),
 
-      Case.find({
-        $or: caseOwnership,
-        archived: { $ne: true },
-        paymentReleased: { $ne: true },
-        status: { $nin: ["completed", "closed", "cancelled"] },
-      })
+      Case.find(activeCaseFilter)
         .populate("paralegalId", "firstName lastName email role")
         .populate("jobId", "title practiceArea")
         .sort({ createdAt: -1 })

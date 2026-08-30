@@ -18,8 +18,8 @@ function workflowResult(overrides = {}) {
     available: true,
     authoritativeWorkflow: true,
     requirements: {
-      paymentMethodRequiredBeforePosting: true,
-      paymentMethodRequiredBeforeApplications: true,
+      paymentMethodRequiredBeforePosting: false,
+      paymentMethodRequiredBeforeApplications: false,
       paymentMethodRequiredBeforeHiring: true,
       chargeTiming: "charged_when_hire_is_confirmed",
       postHireWorkflow: {

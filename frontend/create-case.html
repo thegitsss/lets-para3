@@ -3112,19 +3112,6 @@ body.theme-dark .select-field select{
       return data;
     }
 
-    async function hasDefaultPaymentMethod() {
-      const res = await authorizedFetch("/api/payments/payment-method/default", {
-        headers: { Accept: "application/json" },
-        suppressToast: true,
-      });
-      const { data, text } = await readResponsePayload(res);
-      if (!res.ok) {
-        const message = data?.error || data?.msg || data?.message || (text && !text.includes("<") ? text : "");
-        throw new Error(message || "Unable to verify your payment method.");
-      }
-      return Boolean(data?.hasDefault || data?.paymentMethod);
-    }
-
     function mapPracticeArea(area = "") {
       // Must align exactly with backend PRACTICE_AREAS (lowercase)
       const allowed = [
@@ -3351,19 +3338,6 @@ body.theme-dark .select-field select{
       }
       if (postBtn) postBtn.disabled = true;
       try {
-        if (!isEditing) {
-          const paymentMethodReady = await hasDefaultPaymentMethod();
-          if (!paymentMethodReady) {
-            showToast(
-              "Add a payment method in Payments before posting a Matter.",
-              "dashboard-attorney.html#funds",
-              true,
-              "Open Payments"
-            );
-            if (postBtn) postBtn.disabled = false;
-            return;
-          }
-        }
         const payload = buildPayload(data);
         const created = isEditing && editingCaseId
           ? await updateCase(editingCaseId, payload)

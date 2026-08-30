@@ -581,6 +581,13 @@ function auditManagerReply(
   ) {
     errors.push("workflow_answer_conflicts_with_authoritative_policy");
   }
+  if (
+    workflowEvidence?.result?.requirements?.paymentMethodRequiredBeforePosting === false &&
+    /\b(?:need|required|must have)\b[^.]{0,80}\b(?:before[^.]{0,40}(?:post(?:ing)?|publish(?:ing)?)|to (?:post|publish))\b/i.test(data.reply) &&
+    !/\b(?:do not|don't|don’t|not)\s+(?:need|required)|\b(?:payment method|card)\s+(?:is not|isn't|isn’t)\s+required\b/i.test(data.reply)
+  ) {
+    errors.push("workflow_answer_conflicts_with_authoritative_policy");
+  }
   let repairedAnswer;
   try {
     repairedAnswer = repairUnsupportedSecondaryClaims(data.reply, {
@@ -809,9 +816,15 @@ function buildValidationSafeFallback({
   };
   const prerequisite = prerequisiteByCapability[workflowCapability];
   let prerequisiteReply = "";
-  if (workflowResult && prerequisite && workflowResult.requirements?.[prerequisite[0]] === true) {
+  const paymentMethodRequired = workflowResult && prerequisite
+    ? workflowResult.requirements?.[prerequisite[0]]
+    : null;
+  if (paymentMethodRequired === true) {
     const saved = billingResult?.available === true || workflowResult.paymentMethod?.saved === true;
     prerequisiteReply = `Yes. A saved payment method is required before you can ${prerequisite[1]}.${saved ? " You already have one saved." : ""}`;
+  } else if (paymentMethodRequired === false) {
+    const saved = billingResult?.available === true || workflowResult.paymentMethod?.saved === true;
+    prerequisiteReply = `No. A saved payment method is not required before you can ${prerequisite[1]}.${saved ? " You already have one saved for hiring." : " You will need one when you confirm a hire."}`;
   }
   const fallbackReply = workspaceReply || prerequisiteReply || rendered.reply;
   const hasVerifiedEvidenceFallback = Boolean(workspaceReply || prerequisiteReply) || rendered.ok === true;

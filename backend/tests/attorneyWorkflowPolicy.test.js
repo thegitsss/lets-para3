@@ -56,7 +56,6 @@ describe("attorney executable workflow policy", () => {
     });
     expect(blocked.ready).toBe(false);
     expect(blocked.blockers).toEqual(expect.arrayContaining([
-      "saved_payment_method_required",
       "title_required",
       "description_required",
       "practice_area_required",
@@ -67,7 +66,7 @@ describe("attorney executable workflow policy", () => {
     expect(getAttorneyWorkflowPolicy().post_matter.minimumMatterAmountCents).toBe(40_000);
   });
 
-  test("application policy covers payment, lifecycle, duplication, profile, payout, and blocking", () => {
+  test("application policy covers lifecycle, duplication, profile, payout, and blocking", () => {
     const result = evaluateApplicationEligibility({
       attorneyPaymentMethodSaved: false,
       applicantApproved: false,
@@ -80,7 +79,6 @@ describe("attorney executable workflow policy", () => {
     });
     expect(result.ready).toBe(false);
     expect(result.blockers).toEqual(expect.arrayContaining([
-      "attorney_payment_method_required",
       "approved_paralegal_required",
       "parties_blocked",
       "applications_closed",
@@ -230,7 +228,10 @@ describe("attorney executable workflow policy", () => {
     const root = path.join(__dirname, "..");
     const sources = ["routes/cases.js", "routes/jobs.js", "routes/applications.js", "routes/messages.js", "routes/payments.js"]
       .map((relative) => fs.readFileSync(path.join(root, relative), "utf8"));
-    for (const source of sources) expect(source).toContain("attorneyWorkflowPolicy");
+    for (const source of [sources[0], sources[1], sources[3], sources[4]]) {
+      expect(source).toContain("attorneyWorkflowPolicy");
+    }
+    expect(sources[2]).toContain("paralegalWorkflowPolicy");
     expect(sources[0]).toContain("evaluateCompletionEligibility");
     expect(sources[0]).toContain("evaluateHiringEligibility");
     expect(sources[0]).toContain("evaluateInvitationEligibility");

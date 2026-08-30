@@ -13,23 +13,13 @@ const { requireApproved, requireRole } = require("../utils/authz");
 const applicationsRouter = require("./applications");
 const { cleanTitle, cleanText, cleanBudget } = require("../utils/sanitize");
 const { getBlockedUserIds } = require("../utils/blocks");
-const stripe = require("../utils/stripe");
 const {
-  ATTORNEY_WORKFLOW_STAGES,
   MIN_MATTER_AMOUNT_CENTS,
   evaluateMatterPosting,
-  isAttorneyPaymentMethodRequired,
 } = require("../services/attorneyWorkflowPolicy");
-const { createDevOnlyEmailSet } = require("../utils/devOnlyEmailSet");
 const { resolveMatterDeadlineDate } = require("../utils/businessDate");
 const { protectMutations } = require("../utils/csrf");
 const createApplicationForJob = applicationsRouter?.createApplicationForJob;
-const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = createDevOnlyEmailSet([
-  "samanthasider+attorney@gmail.com",
-  "samanthasider+56@gmail.com",
-  "game4funwithme1+1@gmail.com",
-  "game4funwithme1@gmail.com",
-]);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const PRACTICE_AREAS = [
   "administrative law",
@@ -61,21 +51,6 @@ const authenticatedGuards = [auth, requireApproved];
 
 const mutatingGuards = [...authenticatedGuards, protectMutations];
 
-async function attorneyHasPaymentMethod(attorneyId) {
-  if (!attorneyId) return false;
-  try {
-    const attorney = await User.findById(attorneyId).select("email stripeCustomerId");
-    const attorneyEmail = String(attorney?.email || "").toLowerCase().trim();
-    if (STRIPE_PAYMENT_METHOD_BYPASS_EMAILS.has(attorneyEmail)) return true;
-    if (!attorney?.stripeCustomerId) return false;
-    const customer = await stripe.customers.retrieve(attorney.stripeCustomerId);
-    return Boolean(customer?.invoice_settings?.default_payment_method);
-  } catch (err) {
-    runtimeLogger.warn("[jobs] Unable to verify attorney payment method", err?.message || err);
-    return false;
-  }
-}
-
 async function linkJobToCase(caseDoc, jobId) {
   if (!caseDoc?._id || !jobId) return;
   await Case.updateOne(
@@ -90,12 +65,6 @@ async function linkJobToCase(caseDoc, jobId) {
 // POST /jobs — Attorney posts a job
 router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) => {
   try {
-    const hasPaymentMethod = await attorneyHasPaymentMethod(req.user._id || req.user.id);
-    if (isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.POST_MATTER) && !hasPaymentMethod) {
-      return res
-        .status(403)
-        .json({ error: "Connect Stripe and add a payment method before posting a Matter." });
-    }
     const caseId = req.body?.caseId || null;
     let caseDoc = null;
     if (caseId) {
@@ -156,7 +125,6 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
       return res.status(400).json({ error: err.message });
     }
     const postingPolicy = evaluateMatterPosting({
-      paymentMethodSaved: hasPaymentMethod,
       title,
       details: description,
       practiceArea: practiceAreaValue,

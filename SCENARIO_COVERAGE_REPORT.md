@@ -36,13 +36,13 @@ Ratings describe present test evidence, not production quality: **strong** = dir
 
 | Scenario | Existing tests/evidence | Rating | Missing or contradictory coverage |
 |---|---|---|---|
-| Attorney registration, validation and approval | Auth/registration/admin suites | Partial | No single flow from attorney registration → approval → payment method → first publish → first hire; production currently has two registered attorneys and no active matters |
+| Attorney registration, validation and approval | Auth/registration/admin suites plus `phase2Lifecycle.test.js` approved fixture | Partial | Registration-to-approval is separate from the characterized approved-attorney lifecycle; publication requires no payment method, while hire/funding does |
 | Paralegal registration/approval/profile readiness | Auth, registration, file/profile tests | Partial | No durable fixture characterizing every recommendation field and all readiness combinations |
 | Account disable/delete/session rejection | `accountDeactivation.test.js`, auth/session tests | Strong | Cross-tab already-rendered dashboards and SSE teardown are not browser-tested |
 | Personal-data removal/retained ledger | `dataRemoval.test.js`, automation tests | Strong | External object deletion retry and every reference-holder combination are not exhaustive |
 | Availability updates/public visibility | user/paralegal/public route tests | Partial | No test proves availability is intentionally informational for recommend/apply/invite/hire; regex false-positive for “Unavailable” uncharacterized |
 | Draft create/update/delete after publish | Case draft/create-case/static tests | Partial | Publish success followed by draft-delete failure, duplicate publish and multi-tab draft conflict are missing |
-| Publish Case + Job and posting constraints | `jobEscrow.test.js`, `lifecycleTransitions.test.js` | Strong for happy/validation paths | Cross-record atomicity under intermediate failure and equivalence of both posting routes are incomplete |
+| Publish Case + Job and posting constraints | `phase2Lifecycle.test.js`, `jobEscrow.test.js`, `lifecycleTransitions.test.js` | Strong for happy/validation paths and the no-payment-method publication contract | Cross-record atomicity under intermediate failure and equivalence of both posting routes are incomplete |
 | Edit open matter | lifecycle/Case route tests | Partial | No test asserts every discovery-card field remains synchronized into Job and all role surfaces after edit |
 | Unpublish/cancel | Delete constraints are tested | Missing as a named event | No dedicated unpublish/cancel behavior exists; UI/copy contracts should assert only actual delete/close semantics |
 | Delete never-engaged matter | `lifecycleTransitions.test.js` and route tests | Partial/strong | Failure between Case/Job/Application deletions and stale notification/search links is not characterized |

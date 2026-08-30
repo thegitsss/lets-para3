@@ -274,8 +274,8 @@ describe("attorney assistant Package 6 database-backed integration", () => {
       authoritativeWorkflow: true,
       paymentMethod: expect.objectContaining({ stateKnown: true, saved: true, usable: true }),
       requirements: expect.objectContaining({
-        paymentMethodRequiredBeforePosting: true,
-        paymentMethodRequiredBeforeApplications: true,
+        paymentMethodRequiredBeforePosting: false,
+        paymentMethodRequiredBeforeApplications: false,
         paymentMethodRequiredBeforeHiring: true,
         chargeTiming: "charged_when_hire_is_confirmed",
       }),

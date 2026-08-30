@@ -422,7 +422,7 @@ describe("support manager agent", () => {
       available: true,
       evidenceState: "verified",
       authoritativeWorkflow: true,
-      requirements: { paymentMethodRequiredBeforePosting: true },
+      requirements: { paymentMethodRequiredBeforePosting: false },
     });
     const parse = jest
       .fn()
@@ -443,7 +443,7 @@ describe("support manager agent", () => {
         id: "workflow_answer",
         output: [],
         output_parsed: managerReply({
-          reply: "A saved payment method is required before posting.",
+          reply: "A saved payment method is not required before posting; it is required when hiring.",
           suggestions: [],
           primaryAsk: "posting_readiness",
           activeTask: "EXPLAIN",
@@ -574,7 +574,7 @@ describe("support manager agent", () => {
 
   test("rejects a workflow answer that contradicts the executable payment policy", () => {
     const audit = auditManagerReply(
-      managerReply({ reply: "No—you don’t need a payment method before posting." }),
+      managerReply({ reply: "Yes—you need a payment method before posting." }),
       {
         messageText: "do i need a payment method first?",
         toolOutputs: [
@@ -584,7 +584,7 @@ describe("support manager agent", () => {
               ok: true,
               available: true,
               authoritativeWorkflow: true,
-              requirements: { paymentMethodRequiredBeforePosting: true },
+              requirements: { paymentMethodRequiredBeforePosting: false },
             },
           },
         ],
@@ -599,7 +599,7 @@ describe("support manager agent", () => {
     const answer = validateManagerReply(
       managerReply({
         reply:
-          "Yes. You need a saved payment method before you can post a matter; LPC charges it when you confirm a hire.",
+          "No. You do not need a saved payment method before you can post a matter; one is required when you confirm a hire.",
         suggestions: [],
       }),
       {
@@ -612,7 +612,7 @@ describe("support manager agent", () => {
               available: true,
               authoritativeWorkflow: true,
               requirements: {
-                paymentMethodRequiredBeforePosting: true,
+                paymentMethodRequiredBeforePosting: false,
                 chargeTiming: "charged_when_hire_is_confirmed",
               },
             },
@@ -621,7 +621,7 @@ describe("support manager agent", () => {
       }
     );
 
-    expect(answer?.reply).toMatch(/^Yes\./);
+    expect(answer?.reply).toMatch(/^No\./);
   });
 
   test("derives durable matter memory from verified tool output", () => {
@@ -1082,7 +1082,7 @@ describe("support manager agent", () => {
           available: true,
           authoritativeWorkflow: true,
           paymentMethod: { saved: true },
-          requirements: { paymentMethodRequiredBeforePosting: true },
+          requirements: { paymentMethodRequiredBeforePosting: false },
         }),
         {
           name: "get_billing_snapshot",
@@ -1101,7 +1101,7 @@ describe("support manager agent", () => {
       validationRetries: 2,
       validationFailures: ["platform_requirement_not_distinguished"],
     });
-    expect(result.reply).toMatch(/^Yes\.[\s\S]*required[\s\S]*post a matter[\s\S]*already have one saved/i);
+    expect(result.reply).toMatch(/^No\.[\s\S]*not required[\s\S]*post a matter[\s\S]*already have one saved/i);
   });
 
   test("uses a natural verified fallback for a general hiring-process question", () => {
@@ -1169,7 +1169,7 @@ describe("support manager agent", () => {
 
     const complete = validateManagerReply(
       managerReply({
-        reply: "No—you don’t have a payment method saved. One is required before you can post a matter.",
+        reply: "No—you don’t have a payment method saved. One is not required before you post a matter, but it is required when you hire.",
         suggestions: [],
       }),
       {
@@ -1182,7 +1182,7 @@ describe("support manager agent", () => {
               ok: true,
               available: true,
               authoritativeWorkflow: true,
-              requirements: { paymentMethodRequiredBeforePosting: true },
+              requirements: { paymentMethodRequiredBeforePosting: false },
             },
           },
         ],
@@ -1350,7 +1350,7 @@ describe("support manager agent", () => {
             ok: true,
             available: true,
             authoritativeWorkflow: true,
-            requirements: { paymentMethodRequiredBeforePosting: true },
+            requirements: { paymentMethodRequiredBeforePosting: false },
           }
     );
     const parse = jest
@@ -1367,7 +1367,7 @@ describe("support manager agent", () => {
         id: "compound_final",
         output: [],
         output_parsed: managerReply({
-          reply: "No—you don’t have a payment method saved. One is required before posting.",
+          reply: "No—you don’t have a payment method saved. You do not need one before posting, but one is required when hiring.",
           suggestions: [],
         }),
         usage: {},

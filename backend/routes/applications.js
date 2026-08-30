@@ -12,10 +12,6 @@ const { requireApproved, requireRole } = require("../utils/authz");
 const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
 const stripe = require("../utils/stripe");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
-const {
-  ATTORNEY_WORKFLOW_STAGES,
-  isAttorneyPaymentMethodRequired,
-} = require("../services/attorneyWorkflowPolicy");
 const { evaluateApplicationEligibility } = require("../services/paralegalWorkflowPolicy");
 const { createDevOnlyEmailSet } = require("../utils/devOnlyEmailSet");
 const { buildAuthenticatedProfilePhotoUrl } = require("../services/profilePhotoDelivery");
@@ -29,12 +25,6 @@ const {
 const {
   getHistoricalRecommendationExclusions,
 } = require("../services/recommendationExclusionService");
-const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = createDevOnlyEmailSet([
-  "samanthasider+attorney@gmail.com",
-  "samanthasider+56@gmail.com",
-  "game4funwithme1+1@gmail.com",
-  "game4funwithme1@gmail.com",
-]);
 const PROFILE_PHOTO_REQUIRED_MESSAGE = "Complete your profile before applying.";
 const REAPPLY_BYPASS_EMAILS = createDevOnlyEmailSet(["samanthasider+0@gmail.com"]);
 const authenticatedGuards = [auth, requireApproved];
@@ -88,21 +78,6 @@ async function ensureStripeOnboardedUser(userDoc) {
     runtimeLogger.warn("[applications] stripe onboarding status check failed", err?.message || err);
   }
   return false;
-}
-
-async function attorneyHasPaymentMethod(attorneyId) {
-  if (!attorneyId) return false;
-  try {
-    const attorney = await User.findById(attorneyId).select("email stripeCustomerId");
-    const attorneyEmail = String(attorney?.email || "").toLowerCase().trim();
-    if (STRIPE_PAYMENT_METHOD_BYPASS_EMAILS.has(attorneyEmail)) return true;
-    if (!attorney?.stripeCustomerId) return false;
-    const customer = await stripe.customers.retrieve(attorney.stripeCustomerId);
-    return Boolean(customer?.invoice_settings?.default_payment_method);
-  } catch (err) {
-    runtimeLogger.warn("[applications] Unable to verify attorney payment method", err?.message || err);
-    return false;
-  }
 }
 
 async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
@@ -183,15 +158,6 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     throw err;
   }
   const attorneyId = job.attorneyId?._id || job.attorneyId || null;
-  const attorneyReady = await attorneyHasPaymentMethod(attorneyId);
-  if (
-    isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.RECEIVE_APPLICATIONS) &&
-    !attorneyReady
-  ) {
-    const err = new Error("This attorney must connect Stripe before applications can be submitted.");
-    err.status = 403;
-    throw err;
-  }
   const partiesBlocked = Boolean(attorneyId && (await isBlockedBetween(user._id, attorneyId)));
   if (partiesBlocked) {
     const err = new Error(BLOCKED_MESSAGE);
@@ -283,7 +249,6 @@ async function createApplicationForJob(jobId, user, coverLetter) {
   }
 
   const applicationPolicy = evaluateApplicationEligibility({
-    attorneyPaymentMethodSaved: attorneyReady,
     applicantApproved: String(user.status || "").toLowerCase() === "approved",
     partiesBlocked,
     caseStatus: caseDoc?.status || job.status,

@@ -12,8 +12,8 @@ const {
 
 describe("attorney support capability contract", () => {
   test("keeps payment prerequisites authoritative across every enforced attorney workflow stage", () => {
-    expect(isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.POST_MATTER)).toBe(true);
-    expect(isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.RECEIVE_APPLICATIONS)).toBe(true);
+    expect(isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.POST_MATTER)).toBe(false);
+    expect(isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.RECEIVE_APPLICATIONS)).toBe(false);
     expect(isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.HIRE_AND_FUND)).toBe(true);
   });
 

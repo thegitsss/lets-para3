@@ -99,9 +99,9 @@ describe("Prompt 5 launch-quality UI contracts", () => {
     expect(html).toMatch(/Describe the Matter, its goals, and the expected deliverables/);
     expect(html).toMatch(/parseCompAmount\(value\) >= 400/);
     expect(html).toMatch(/Enter a compensation amount of at least \$400\./);
-    expect(html).toMatch(/Boolean\(data\?\.hasDefault \|\| data\?\.paymentMethod\)/);
-    expect(html).toContain('"Add a payment method in Payments before posting a Matter."');
-    expect(html).toContain('"Open Payments"');
+    expect(html).not.toContain("/api/payments/payment-method/default");
+    expect(html).not.toContain("hasDefaultPaymentMethod");
+    expect(html).not.toContain('"Add a payment method in Payments before posting a Matter."');
     expect(html).not.toContain('"Open Billing"');
   });
 
