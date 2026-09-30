@@ -150,7 +150,6 @@ function auditEvidenceFor(item, viewport) {
 
 for (const viewport of VIEWPORTS) {
   test(`all 17 public surfaces render cleanly at ${viewport.name}`, async ({ page, browserName }) => {
-    test.skip(browserName !== "chromium", "Deterministic Phase 10 visual evidence is captured once in Chromium.");
     test.setTimeout(180_000);
     await mockPublicNetwork(page);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
@@ -201,9 +200,11 @@ for (const viewport of VIEWPORTS) {
         expect(fs.statSync(auditEvidence).size, `${item.name} audit comparison is empty`).toBeGreaterThan(0);
       }
 
-      const screenshotPath = path.join(EVIDENCE_ROOT, "viewports", `${item.name}-${viewport.name}.png`);
-      await page.screenshot({ path: screenshotPath, fullPage: true, animations: "disabled" });
-      expect(fs.statSync(screenshotPath).size, `${item.name} screenshot is empty`).toBeGreaterThan(0);
+      if (browserName === "chromium") {
+        const screenshotPath = path.join(EVIDENCE_ROOT, "viewports", `${item.name}-${viewport.name}.png`);
+        await page.screenshot({ path: screenshotPath, fullPage: true, animations: "disabled" });
+        expect(fs.statSync(screenshotPath).size, `${item.name} screenshot is empty`).toBeGreaterThan(0);
+      }
     }
   });
 }

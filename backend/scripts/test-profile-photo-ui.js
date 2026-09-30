@@ -1379,13 +1379,14 @@ async function runAttorneySettingsLayout(browser, viewport) {
         sidebarWidth: sidebarRect.width,
         leftGutter: settingsRect.left - sidebarRect.right,
         rightGutter: contentRect.right - settingsRect.right,
+        scrollbarGutter: contentRect.width - document.getElementById("main").clientWidth,
         settingsWidth: settingsRect.width,
         availableWidth: contentRect.width,
       };
     });
     assert.ok(Math.abs(shellLayout.sidebarWidth - 230) <= 1, JSON.stringify(shellLayout));
     assert.ok(shellLayout.leftGutter >= 31 && shellLayout.leftGutter <= 69, JSON.stringify(shellLayout));
-    assert.ok(Math.abs(shellLayout.leftGutter - shellLayout.rightGutter) <= 1, JSON.stringify(shellLayout));
+    assert.ok(Math.abs(shellLayout.leftGutter - (shellLayout.rightGutter - shellLayout.scrollbarGutter)) <= 1, JSON.stringify(shellLayout));
     assert.ok(shellLayout.settingsWidth / shellLayout.availableWidth >= 0.88, JSON.stringify(shellLayout));
 
     const scrollMetrics = await page.locator("#main").evaluate((main) => ({

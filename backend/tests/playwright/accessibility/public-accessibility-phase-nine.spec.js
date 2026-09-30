@@ -216,8 +216,7 @@ test("every public mobile header supports keyboard entry, Escape, focus restorat
   }
 });
 
-test("public internal links and hash destinations resolve without deleted-page references", async ({ page, request, browserName }) => {
-  test.skip(browserName !== "chromium", "The runtime link graph is browser-independent.");
+test("public internal links and hash destinations resolve without deleted-page references", async ({ page, request }) => {
   test.setTimeout(120_000);
   await mockPublicBoundaries(page);
   await page.setViewportSize({ width: 1366, height: 900 });
