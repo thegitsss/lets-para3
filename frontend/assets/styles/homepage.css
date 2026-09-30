@@ -865,7 +865,7 @@ html.accessibility-mode .js .home-reveal {
 .applicant-row {
   min-height: 94px;
   display: grid;
-  grid-template-columns: auto minmax(130px, 1fr) minmax(130px, 1fr) auto;
+  grid-template-columns: 34px minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(116px, 0.6fr);
   align-items: center;
   gap: 15px;
   padding: 15px;
