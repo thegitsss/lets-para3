@@ -1,0 +1,73 @@
+/* Shared editorial FAQ layout, matching the homepage palette and typography. */
+.faq-page{--lpc-gold:#6495ed;--lpc-focus:#6495ed;--faq-ink:#27394d;--faq-muted:#596b80;--faq-line:rgba(39,57,77,.16);margin:0;color:var(--faq-ink);background:radial-gradient(ellipse at 4% 0%,#dce6fb,transparent 46%),radial-gradient(ellipse at 100% 100%,#ccd9e5,transparent 50%),#edf0f3;background-attachment:fixed;font:300 18px/1.65 "Sarabun",sans-serif;-webkit-font-smoothing:antialiased}
+.faq-page *,.faq-page *::before,.faq-page *::after{box-sizing:border-box}
+.faq-page :is(h1,h2,p){margin-top:0}
+.faq-page a{color:inherit}
+.faq-page :is(a,summary):focus-visible{outline:2px solid #6495ed;outline-offset:5px}
+.faq-page.public-site-chrome .home-header{background:rgba(237,240,243,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:0;box-shadow:none;transition:background 200ms ease}
+.faq-page.public-site-chrome .home-header.is-past-hero{background:rgba(255,255,255,.78)}
+.faq-page.public-site-chrome .home-header.is-open{background:#fff}
+.faq-page.public-site-chrome .home-footer summary{color:#a8c8ff}
+.faq-page.public-site-chrome > .hero-banner{width:100%;height:auto;margin:0;padding:calc(var(--header-height,72px) + 72px) var(--page-gutter) 64px;background:transparent;border:0}
+.faq-page .hero-banner__title{width:min(100%,1200px);margin:auto;text-align:center}
+.faq-page :is(.faq-hero__eyebrow,.faq-eyebrow){margin-bottom:20px;color:#4775bd;font:400 12px/1.5 "Sarabun",sans-serif;text-transform:uppercase;letter-spacing:.16em}
+.faq-page .hero-banner h1{margin:0;color:#151c25;font:300 clamp(3.6rem,7.4vw,7rem)/1.02 "Cormorant Garamond",serif;letter-spacing:-.045em}
+.faq-page .faq-hero__copy{max-width:500px;margin:24px auto 30px;color:var(--faq-muted);font-size:18px;text-wrap:pretty}
+.faq-role-switch{display:inline-flex;flex-wrap:wrap;justify-content:center;gap:4px;padding:5px;border:1px solid rgba(255,255,255,.8);border-radius:30px;background:rgba(255,255,255,.4)}
+.faq-role-switch a{padding:10px 22px;border-radius:24px;font-size:14px;text-decoration:none}
+.faq-role-switch a[aria-current="page"]{background:#27394d;color:#fff}
+.faq-role-switch a:not([aria-current]):hover{background:#fff}
+.faq-page main{width:100%;max-width:none;margin:0;padding:76px var(--page-gutter) 90px;background:#fff}
+.faq-layout{width:min(100%,1200px);margin:auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:clamp(40px,7vw,110px);align-items:start}
+.faq-guide{position:sticky;top:calc(var(--header-height,72px) + 36px)}
+.faq-guide nav{display:grid;gap:6px}
+.faq-guide nav a{display:flex;gap:12px;align-items:baseline;padding:12px 0;color:var(--faq-ink);font-size:16px;text-decoration:none}
+.faq-guide nav a span{color:#4775bd;font-size:11px;letter-spacing:.08em}
+.faq-guide nav a:hover{color:#4775bd}
+.faq-page .faq-other-role{display:block;margin-top:32px;padding-top:24px;border-top:1px solid var(--faq-line);color:var(--faq-muted);font-size:14px;text-decoration:none}
+.faq-other-role span{color:#4775bd}
+.faq-group{margin:0 0 54px;scroll-margin-top:calc(var(--header-height,72px) + 28px)}
+.faq-group:last-child{margin-bottom:0}
+.faq-group h2{display:flex;align-items:baseline;gap:16px;margin-bottom:24px;color:#151c25;font:300 clamp(2rem,3vw,2.75rem)/1.1 "Cormorant Garamond",serif;letter-spacing:-.025em}
+.faq-group h2 > span{color:#4775bd;font:400 12px/1 "Sarabun",sans-serif;letter-spacing:.1em}
+.faq-item{border-top:1px solid var(--faq-line);scroll-margin-top:calc(var(--header-height,72px) + 28px)}
+.faq-item:last-child{border-bottom:1px solid var(--faq-line)}
+.faq-item > summary{position:relative;padding:23px 38px 23px 0;color:#27394d;font:300 19px/1.45 "Sarabun",sans-serif;cursor:pointer;list-style:none}
+.faq-item > summary::-webkit-details-marker{display:none}
+.faq-item > summary::after{content:"+";position:absolute;right:2px;top:22px;color:#4775bd;font:300 25px/1.1 "Sarabun",sans-serif}
+.faq-item[open] > summary::after{content:"−"}
+.faq-item > summary:hover{color:#4775bd}
+.faq-answer{padding:0 36px 26px 0;color:#526276;font-size:17px;line-height:1.8;overflow-wrap:anywhere}
+.faq-answer p{margin:0 0 16px}
+.faq-answer > :last-child{margin-bottom:0}
+.faq-answer strong{font-weight:500}
+.faq-answer :is(.gold,.gold-link,.faq-related-link){color:#416eaf;text-decoration:underline;text-underline-offset:4px}
+.faq-answer .faq-label{margin:22px 0 8px;color:var(--faq-ink);font-weight:500}
+.faq-list{padding-left:22px;margin:0 0 20px}
+.faq-list li{margin:6px 0}
+.faq-list li::marker{color:#6495ed}
+.faq-page .faq-cta{width:100%;margin:0;padding:74px var(--page-gutter) 80px;background:transparent;text-align:center;border:0;border-radius:0}
+.faq-cta h2{margin:0 auto 18px;max-width:800px;color:#151c25;font:300 clamp(2.5rem,4.5vw,4.4rem)/1.08 "Cormorant Garamond",serif;letter-spacing:-.035em}
+.faq-cta p{max-width:530px;margin:0 auto 28px;color:var(--faq-muted);font-size:18px}
+.faq-page .faq-cta__button{display:inline-flex;justify-content:center;align-items:center;min-height:50px;padding:12px 26px;border:1px solid #27394d;border-radius:999px;background:#27394d;color:#fff;font-size:16px;text-decoration:none}
+.faq-cta__button:hover{background:#1a2b40}
+@media(max-width:850px){
+.faq-page.public-site-chrome > .hero-banner{padding-top:calc(var(--header-height,72px) + 48px);padding-bottom:48px}
+.faq-layout{grid-template-columns:minmax(0,1fr);gap:36px}
+.faq-guide{position:static}
+.faq-guide nav{display:flex;flex-wrap:wrap;gap:8px 24px}
+.faq-guide nav a{padding-block:6px}
+.faq-page .faq-other-role{margin-top:16px;padding-top:16px}
+.faq-page main{padding-top:40px;padding-bottom:56px}
+}
+@media(max-width:480px){
+.faq-page .hero-banner h1{font-size:clamp(2.8rem,12vw,3.6rem)}
+.faq-page .faq-hero__copy{font-size:16px}
+.faq-role-switch a{padding:9px 14px;font-size:13px}
+.faq-guide nav{display:grid;gap:4px}
+.faq-item > summary{font-size:17px}
+.faq-answer{padding-right:0;font-size:16px}
+.faq-group h2{font-size:2rem}
+.faq-page .faq-cta{padding-block:54px}
+}
+@media(prefers-reduced-motion:reduce){.faq-page *{scroll-behavior:auto!important;transition:none!important}}

@@ -179,6 +179,12 @@ const pendingHireSchema = new Schema(
 /** ----------------------------------------
  * Main schema
  * -----------------------------------------*/
+const providerIdentitySchema = new Schema({
+  provider: { type: String, enum: ["google"], required: true },
+  providerAccountId: { type: String, required: true, trim: true, maxlength: 255 },
+  linkedAt: { type: Date, default: Date.now },
+}, { _id: false });
+
 const userSchema = new Schema(
   {
     // Core identity
@@ -203,6 +209,7 @@ const userSchema = new Schema(
     pendingEmailRequestedAt: { type: Date, default: null },
     password: { type: String, required: true, select: false }, // never returned by default
     emailVerified: { type: Boolean, default: false },
+    authProviders: { type: [providerIdentitySchema], default: [], select: false },
     phoneNumber: { type: String, default: null },
     phoneVerified: { type: Boolean, default: false },
 
@@ -350,6 +357,10 @@ const userSchema = new Schema(
  * Indexes
  * -----------------------------------------*/
 userSchema.index({ role: 1, status: 1, createdAt: -1 });
+userSchema.index(
+  { "authProviders.provider": 1, "authProviders.providerAccountId": 1 },
+  { unique: true, partialFilterExpression: { "authProviders.providerAccountId": { $type: "string" } } }
+);
 userSchema.index({ specialties: 1 });
 userSchema.index({ jurisdictions: 1 });
 userSchema.index({ skills: 1 });

@@ -15,6 +15,15 @@ let autoApplyTimer = null;
 let restoreScrollY = null;
 let restoreDropdownAfterFetch = false;
 
+function escapeHTML(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function slugify(value = "") {
   return String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
@@ -37,8 +46,8 @@ function renderStateList(query = "") {
       const id = `state-${slugify(state)}`;
       return `
         <li>
-          <input type="checkbox" id="${id}" value="${state}" ${selectedStates.has(state) ? "checked" : ""}>
-          <label for="${id}">${state}</label>
+          <input type="checkbox" id="${escapeHTML(id)}" value="${escapeHTML(state)}" ${selectedStates.has(state) ? "checked" : ""}>
+          <label for="${escapeHTML(id)}">${escapeHTML(state)}</label>
         </li>`;
     })
     .join("");

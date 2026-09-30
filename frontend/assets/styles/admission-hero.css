@@ -1,0 +1,85 @@
+/* FAQ styling, scoped to the admission header and hero only. */
+.admission-page.public-site-chrome .home-header {
+  --lpc-gold: #6495ed;
+  --lpc-focus: #6495ed;
+  background: rgba(237, 240, 243, .72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 0;
+  box-shadow: none;
+  transition: background 200ms ease;
+}
+
+.admission-page.public-site-chrome .home-header.is-past-hero {
+  background: rgba(255, 255, 255, .78);
+}
+
+.admission-page.public-site-chrome .home-header.is-open {
+  background: #fff;
+}
+
+.admission-page.public-site-chrome > .admission-hero {
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: calc(var(--header-height, 72px) + 72px) var(--page-gutter) 64px;
+  border: 0;
+  background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+    radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+  background-attachment: fixed;
+}
+
+.admission-page .admission-hero .utility-hero__inner {
+  display: block;
+  width: min(100%, 1200px);
+  height: auto;
+  min-height: 0;
+  margin: auto;
+}
+
+.admission-page .admission-hero .utility-hero__copy {
+  display: block;
+  max-width: none;
+  padding: 0;
+  background: none;
+  text-align: center;
+}
+
+.admission-page .admission-hero h1 {
+  max-width: none;
+  margin: 0;
+  color: #151c25;
+  font: 300 clamp(3.6rem, 7.4vw, 7rem)/1.02 "Cormorant Garamond", serif;
+  letter-spacing: -.045em;
+  text-align: center;
+}
+
+.admission-page .admission-hero .utility-hero__description {
+  max-width: 500px;
+  margin: 24px auto 30px;
+  color: #596b80;
+  font: 300 18px/1.65 "Sarabun", sans-serif;
+  text-wrap: pretty;
+}
+
+@media (max-width: 850px) {
+  .admission-page.public-site-chrome > .admission-hero {
+    padding-top: calc(var(--header-height, 72px) + 48px);
+    padding-bottom: 48px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admission-page .admission-hero h1 {
+    font-size: clamp(2.8rem, 12vw, 3.6rem);
+  }
+  .admission-page .admission-hero .utility-hero__description {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admission-page.public-site-chrome .home-header { transition: none; }
+}

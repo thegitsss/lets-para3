@@ -1,0 +1,401 @@
+:root {
+  --auth-ink: #27394d;
+  --auth-muted: #647184;
+  --auth-line: #d8dee7;
+  --auth-gold: #887244;
+  --auth-brand-gold: #b4975a;
+  --auth-art: #0d1723;
+  --auth-control-height: 50px;
+  --auth-control-radius: 8px;
+  --auth-panel-width: 42%;
+}
+
+* { box-sizing: border-box; }
+
+body.auth-secondary {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: #fff;
+  color: var(--auth-ink);
+  font-family: "Sarabun", sans-serif;
+  font-weight: 200;
+}
+
+body.auth-secondary [hidden] { display: none; }
+
+.skip-link {
+  position: fixed;
+  z-index: 1000;
+  top: -52px;
+  left: 12px;
+  padding: 9px 13px;
+  border-radius: 6px;
+  background: var(--auth-ink);
+  color: #fff;
+}
+
+.skip-link:focus { top: 12px; }
+
+.auth-secondary__header {
+  width: var(--auth-panel-width);
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  position: fixed;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  padding: 0 clamp(32px, 3.2vw, 52px);
+}
+
+.auth-secondary__brand {
+  color: var(--auth-ink);
+  font: 300 1.25rem/1 "Cormorant Garamond", serif;
+  letter-spacing: .03em;
+  text-decoration: none;
+}
+
+.auth-secondary__brand-mark { color: var(--auth-brand-gold); }
+
+.password-recovery-page main.recovery-layout,
+.password-recovery-page main.recovery-layout.container,
+.verify-email-page main.verify-email-layout {
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: var(--auth-panel-width) calc(100% - var(--auth-panel-width));
+  position: relative;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    #fff 0 var(--auth-panel-width),
+    var(--auth-art) var(--auth-panel-width) 100%
+  );
+}
+
+.password-recovery-page .recovery-art,
+.verify-email-page .verification-art {
+  width: calc(100% - var(--auth-panel-width));
+  height: 100%;
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  right: 0;
+  overflow: hidden;
+}
+
+.password-recovery-page .auth-matter-field,
+.verify-email-page .auth-matter-field {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  opacity: .72;
+  pointer-events: none;
+}
+
+.recovery-panel,
+.verification-panel {
+  min-width: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+  padding: 112px clamp(34px, 3.2vw, 52px) 72px;
+}
+
+.recovery-panel__inner,
+.verification-panel__inner {
+  width: min(100%, 470px);
+}
+
+.recovery-eyebrow,
+.verification-eyebrow {
+  margin: 0 0 14px;
+  color: var(--auth-gold);
+  font-size: .72rem;
+  font-weight: 400;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+
+body.auth-secondary h1 {
+  max-width: 10ch;
+  margin: 0 0 18px;
+  color: var(--auth-ink);
+  font: 300 var(--lpc-display-auth)/.93 "Cormorant Garamond", serif;
+  letter-spacing: -.025em;
+  text-transform: none;
+}
+
+.recovery-lead,
+.verification-status {
+  max-width: 40ch;
+  margin: 0 0 28px;
+  color: #526174;
+  font-size: 1rem;
+  font-weight: 300;
+  line-height: 1.65;
+}
+
+.password-recovery-page form {
+  display: grid;
+  gap: 16px;
+}
+
+.password-recovery-page .field-row { position: relative; }
+
+.password-recovery-page .field-row label {
+  display: block;
+  margin: 0 0 7px;
+  color: var(--auth-ink);
+  font-size: .86rem;
+  font-weight: 300;
+}
+
+body.auth-secondary input[type="email"],
+body.auth-secondary input[type="password"],
+body.auth-secondary input[type="text"] {
+  width: 100%;
+  min-height: var(--auth-control-height);
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid var(--auth-line);
+  border-radius: var(--auth-control-radius);
+  background: #fff;
+  color: var(--auth-ink);
+  font: 300 1rem/1.3 "Sarabun", sans-serif;
+}
+
+body.password-recovery-page input[type="password"],
+body.password-recovery-page input[type="text"] { padding-right: 126px; }
+
+body.auth-secondary input:focus-visible,
+body.auth-secondary button:focus-visible,
+body.auth-secondary a:focus-visible {
+  outline: 2px solid var(--auth-gold);
+  outline-offset: 3px;
+}
+
+body.auth-secondary button[type="submit"] {
+  width: 100%;
+  min-height: var(--auth-control-height);
+  padding: 0 16px;
+  border: 1px solid var(--auth-ink);
+  border-radius: var(--auth-control-radius);
+  background: var(--auth-ink);
+  color: #fff;
+  cursor: pointer;
+  font: 400 1rem/1.2 "Sarabun", sans-serif;
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: none;
+  transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+
+body.auth-secondary button[type="submit"]:hover {
+  border-color: #1d2b3b;
+  background: #1d2b3b;
+}
+
+body.auth-secondary button[type="submit"]:disabled {
+  opacity: .62;
+  cursor: wait;
+}
+
+.password-recovery-page .toggle-password {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  position: absolute;
+  top: 27px;
+  right: 8px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: #526174;
+  cursor: pointer;
+  font: 300 .86rem/1 "Sarabun", sans-serif;
+}
+
+.password-recovery-page #resetStatus,
+.password-recovery-page #message {
+  min-height: 0;
+  margin: 14px 0 0;
+  color: #526174;
+  line-height: 1.5;
+}
+
+.password-recovery-page #resetStatus:empty,
+.password-recovery-page #message:empty { display: none; }
+
+.password-recovery-page #message[data-state="success"] { color: #3f6653; }
+.password-recovery-page #message[data-state="error"],
+.password-recovery-page #resetStatus:not(:empty) { color: #8d3f37; }
+
+body.auth-secondary .back-link,
+body.auth-secondary .cancel-link,
+body.auth-secondary #verificationAction,
+body.auth-secondary .close-btn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 24px;
+  color: #6f5d3b;
+  font-weight: 300;
+  text-underline-offset: 4px;
+}
+
+.verification-status { margin-bottom: 0; }
+
+.verification-action-row {
+  margin: 32px 0 0;
+  padding-top: 22px;
+  border-top: 1px solid var(--auth-line);
+}
+
+.verification-action-row:has(a[hidden]) { display: none; }
+
+.verification-panel[data-state="success"] .verification-eyebrow { color: #3f6653; }
+.verification-panel[data-state="error"] .verification-eyebrow,
+.recovery-panel[data-state="error"] .recovery-eyebrow { color: #8d3f37; }
+
+.modal {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  z-index: 999;
+  inset: 0;
+  padding: 20px;
+  background: rgba(13, 23, 35, .66);
+}
+
+body.auth-secondary .modal-content {
+  width: min(100%, 400px);
+  padding: 30px;
+  border: 1px solid var(--auth-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: none;
+  text-align: left;
+}
+
+body.auth-secondary .modal-content h2 {
+  margin: 0 0 10px;
+  color: var(--auth-ink);
+  font: 300 2rem/1 "Cormorant Garamond", serif;
+}
+
+body.auth-secondary .modal-content p {
+  margin: 0;
+  color: #526174;
+  line-height: 1.55;
+}
+
+body.auth-secondary .close-btn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: 300 .95rem/1.2 "Sarabun", sans-serif;
+}
+
+@media (max-width: 768px) {
+  .auth-secondary__header {
+    width: 100%;
+    min-height: 76px;
+    position: absolute;
+    padding-inline: 20px;
+  }
+
+  .password-recovery-page main.recovery-layout,
+  .password-recovery-page main.recovery-layout.container,
+  .verify-email-page main.verify-email-layout {
+    min-height: 100svh;
+    display: block;
+    overflow: visible;
+    background: #fff;
+  }
+
+  .password-recovery-page .recovery-art,
+  .verify-email-page .verification-art { display: none; }
+
+  .recovery-panel,
+  .verification-panel {
+    width: 100%;
+    min-height: 100svh;
+    align-items: center;
+    padding: 104px 20px 48px;
+  }
+
+  .recovery-panel__inner,
+  .verification-panel__inner { margin-inline: auto; }
+
+  body.auth-secondary h1 {
+    max-width: 9ch;
+    font-size: clamp(3rem, 13vw, 4rem);
+  }
+}
+
+@media (max-width: 360px) {
+  .recovery-panel,
+  .verification-panel { padding-inline: 18px; }
+
+  body.auth-secondary h1 { font-size: 2.85rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.auth-secondary button[type="submit"] { transition: none; }
+}
+/* Public recovery and verification: a compact card over the existing artwork. */
+body.auth-secondary { min-width: 0; --auth-gold: #385f9e; --auth-brand-gold: #6495ed; background: var(--auth-art); }
+body.auth-secondary .auth-secondary__header { position: absolute; width: 100%; min-height: 72px; padding: 20px clamp(16px, 4vw, 48px); z-index: 3; }
+body.auth-secondary .auth-secondary__brand { color: #f4f7fd; }
+.password-recovery-page main.recovery-layout,
+.password-recovery-page main.recovery-layout.container,
+.verify-email-page main.verify-email-layout {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100dvh; padding: 96px 20px 36px; background: var(--auth-art); overflow: visible;
+}
+.password-recovery-page .recovery-art,
+.verify-email-page .verification-art { display: block; position: fixed; inset: 0; width: 100%; height: 100dvh; pointer-events: none; }
+body.auth-secondary :is(.recovery-panel, .verification-panel) {
+  width: min(100%, 470px); min-height: 0; margin: 0;
+  padding: clamp(24px, 4vw, 40px); border: 1px solid rgba(255,255,255,.65);
+  border-radius: 28px; background: #f9fafc; box-shadow: 0 24px 80px rgba(0,0,0,.22);
+}
+body.auth-secondary :is(.recovery-panel__inner, .verification-panel__inner) { width: 100%; min-width: 0; }
+body.auth-secondary h1 { max-width: none; font: 300 clamp(1.65rem, 4vw, 2rem)/1.2 "Sarabun", sans-serif; margin-bottom: 14px; overflow-wrap: anywhere; }
+body.auth-secondary :is(.recovery-lead, .verification-status) { margin-bottom: 22px; font-size: .95rem; line-height: 1.5; }
+body.auth-secondary :is(.recovery-eyebrow, .verification-eyebrow) { display: none; }
+body.auth-secondary :is(a, button, p) { overflow-wrap: anywhere; }
+body.auth-secondary input { min-width: 0; }
+body.auth-secondary button[type="submit"] { white-space: normal; }
+@media (max-width: 360px) {
+  .password-recovery-page main.recovery-layout, .password-recovery-page main.recovery-layout.container,
+  .verify-email-page main.verify-email-layout { padding-inline: 12px; }
+  body.auth-secondary :is(.recovery-panel, .verification-panel) { padding: 22px 16px; border-radius: 22px; }
+  body.auth-secondary .field-row .toggle-password { position: static; display: block; margin-top: 6px; transform: none; }
+}
+body.auth-secondary :is(.back-link, .cancel-link, .verification-action-row a, .close-btn) { color: #385f9e; }
+
+/* Password recovery shares the login/signup background. */
+body.password-recovery-page {
+  background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+    radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+}
+.password-recovery-page main.recovery-layout,
+.password-recovery-page main.recovery-layout.container { background: transparent; }
+.password-recovery-page .recovery-art { display: none; }
+body.password-recovery-page .auth-secondary__brand { color: var(--auth-ink); }
+body.password-recovery-page .recovery-panel {
+  box-shadow: 0 22px 70px rgba(35, 56, 81, .12);
+}

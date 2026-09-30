@@ -1,4 +1,8 @@
-import { getStoredSession, secureFetch } from "../auth.js";
+import { getSupportMatterContext, clearSupportMatterContext } from "./support-workspace-context.mjs";
+import "../productivity-command-registry.js";
+import { getStoredSession, clearSession } from "../auth.js";
+import { createSupportTransport } from "./support-transport.mjs";
+import { createSupportMutationController } from "./support-mutation-controller.mjs";
 import { buildSupportInlineSegments, isSafeSupportHref } from "./support-message-links.mjs";
 import {
   getAssistantActionLimit,
@@ -6,9 +10,10 @@ import {
   isSupportedEscalationMetadata,
 } from "./support-response-ui.mjs";
 import { startStripeOnboarding } from "./stripe-connect.js";
+import { activateDialogFocus, deactivateDialogFocus } from "./dialog-focus.js";
 
 const SUPPORT_STYLESHEET_ID = "lpc-support-drawer-styles";
-const SUPPORT_STYLESHEET_HREF = "/assets/styles/support-drawer.css";
+const SUPPORT_STYLESHEET_HREF = "/assets/styles/support-drawer.css?v=20260831-side-drawer";
 const SUPPORT_DRAWER_ID = "supportDrawer";
 const SUPPORT_THREAD_ID = "supportThread";
 const SUPPORT_CONTEXT_STORAGE_KEY = "lpc-support-context";
@@ -24,19 +29,17 @@ function getRoleAwareComposerPrompts(role = "") {
   if (normalizedRole === "attorney") {
     return [
       "Ask about billing",
-      "Ask about a case",
+      "Ask about a Matter",
       "Ask about messages",
       "Ask about profile settings",
-      "Describe what's blocking you",
     ];
   }
   if (normalizedRole === "paralegal") {
     return [
       "Ask about a payout",
       "Ask about Stripe onboarding",
-      "Ask about a case",
+      "Ask about a Matter",
       "Ask about messages",
-      "Describe what's blocking you",
     ];
   }
   if (normalizedRole === "admin") {
@@ -45,15 +48,13 @@ function getRoleAwareComposerPrompts(role = "") {
       "Ask about approvals",
       "Ask about a support ticket",
       "Ask about an attorney record",
-      "Describe what's blocking you",
     ];
   }
   return [
     "Ask about billing",
-    "Ask about a case",
+    "Ask about a Matter",
     "Ask about messages",
     "Ask about account settings",
-    "Describe what's blocking you",
   ];
 }
 
@@ -61,18 +62,18 @@ function getRoleAwareQuickPrompts(role = "") {
   const normalizedRole = String(role || "").trim().toLowerCase();
   if (normalizedRole === "attorney") {
     return [
-      "Where is Billing & Payments?",
-      "Where can I see my cases?",
+      "Where are Payments?",
+      "Where can I see my Matters?",
       "I can't send messages",
-      "I need help with a case",
+      "I need help with a Matter",
     ];
   }
   if (normalizedRole === "paralegal") {
     return [
       "Where is my payout?",
-      "Why aren't payouts enabled?",
+      "How do I finish setting up payouts?",
       "I can't send messages",
-      "I need help with a case",
+      "I need help with a Matter",
     ];
   }
   if (normalizedRole === "admin") {
@@ -85,9 +86,9 @@ function getRoleAwareQuickPrompts(role = "") {
   }
   return [
     "Where is billing?",
-    "Where can I see my cases?",
+    "Where can I see my Matters?",
     "I can't send messages",
-    "I need help with a case",
+    "I need help with a Matter",
   ];
 }
 
@@ -102,7 +103,7 @@ function getDrawerSubtitle(role = "") {
 function getDrawerTitle(role = "") {
   const normalizedRole = String(role || "").trim().toLowerCase();
   if (normalizedRole === "attorney") return "Attorney Assistant";
-  if (normalizedRole === "paralegal") return "Paralegal Assistant";
+  if (normalizedRole === "paralegal") return "LPC Assistant";
   if (normalizedRole === "admin") return "Admin Assistant";
   return "LPC Assistant";
 }
@@ -124,6 +125,7 @@ const state = {
   bootstrapped: false,
   stylesReady: false,
   loadingConversation: false,
+  loadFailed: false,
   silentRefreshing: false,
   sending: false,
   restartingConversation: false,
@@ -133,6 +135,9 @@ const state = {
   messages: [],
   error: "",
   failedMessageText: "",
+  restoredMutation: false,
+  optimisticRequestId: "",
+  optimisticMessageIds: new Set(),
   launchers: [],
   lastFocusedLauncher: null,
   drawer: null,
@@ -147,7 +152,6 @@ const state = {
   menuPanel: null,
   restartButton: null,
   closeButton: null,
-  pinButton: null,
   sidebarCollapseTab: null,
   sidebarClassObserver: null,
   composerPrompt: null,
@@ -156,13 +160,116 @@ const state = {
   composerPromptTimer: null,
   composerPromptTransitionTimer: null,
   escalatingMessageId: "",
+  invokingAction: "",
   feedbackSubmittingIds: new Set(),
   pollTimer: null,
   eventSource: null,
   eventSourceConversationId: "",
+  streamFallbackConversationId: "",
   dismissedSuggestedReplyIds: new Set(),
   pageTracked: false,
+  navigationAdapter: null,
 };
+
+let mutationSnapshot = { pending: null, phase: "idle", message: "", busy: false, canRetry: false };
+let supportContentRevision = 0;
+
+function supportInteractionPending() {
+  return Boolean(mutationSnapshot.pending || state.loadingConversation || state.escalatingMessageId || state.invokingAction || state.feedbackSubmittingIds.size);
+}
+const supportMutations = createSupportMutationController({
+  request: (url, options) => supportFetch(url, options),
+  onChange: syncSupportMutation,
+  onResult: applySupportMutationResult,
+});
+
+let scopedSupportUserId = "";
+let scopedSupportRole = "";
+let onSupportSessionLost = null;
+let configuredSupportNavigationAdapter = null;
+const supportTransport = createSupportTransport({
+  onAuthenticationLost() {
+    clearSupportIdentity();
+    if (onSupportSessionLost) onSupportSessionLost();
+    else { clearSession(); window.location.replace("/login.html"); }
+  },
+});
+
+export function configureSupportSession({ onSessionLost, navigationAdapter } = {}) {
+  onSupportSessionLost = typeof onSessionLost === "function" ? onSessionLost : null;
+  configuredSupportNavigationAdapter = typeof navigationAdapter?.resolve === "function" && typeof navigationAdapter?.navigate === "function"
+    ? navigationAdapter : null;
+}
+let supportIdentityRevision = 0;
+let supportRequests = new AbortController();
+
+export function clearSupportIdentity({ preserveMatterContext = false, preservePendingRequest = false } = {}) {
+  supportIdentityRevision += 1;
+  closeSupportDrawer({ restoreFocus: false });
+  stopLiveUpdates();
+  supportMutations.clear({ erase: !preservePendingRequest });
+  supportTransport.clear();
+  supportRequests.abort();
+  supportRequests = new AbortController();
+  scopedSupportUserId = "";
+  scopedSupportRole = "";
+  if (!preserveMatterContext) clearSupportMatterContext();
+  closeSupportDrawer({ restoreFocus: false });
+  stopLiveUpdates();
+  Object.assign(state, {
+    bootstrapped: false, loadingConversation: false, loadFailed: false, silentRefreshing: false, restoredMutation: false,
+    sending: false, restartingConversation: false, loadPromise: null,
+    conversation: null, messages: [], error: "", failedMessageText: "", escalatingMessageId: "", invokingAction: "", navigationAdapter: null,
+  });
+  state.feedbackSubmittingIds.clear();
+  state.dismissedSuggestedReplyIds.clear();
+  if (state.textarea) state.textarea.value = "";
+  try {
+    window.sessionStorage.removeItem(SUPPORT_CONTEXT_STORAGE_KEY);
+    window.sessionStorage.removeItem(SUPPORT_PIN_STORAGE_KEY);
+  } catch (_) { /* Storage may be unavailable. */ }
+  render();
+}
+
+function scopeSupportIdentity() {
+  const userId = getSupportSessionUserId();
+  const role = getSupportRole();
+  if (userId !== scopedSupportUserId || role !== scopedSupportRole) {
+    const priorContext = getSupportMatterContext({ ownerId: userId, role });
+    clearSupportIdentity({ preserveMatterContext: Boolean(priorContext), preservePendingRequest: !scopedSupportUserId });
+    scopedSupportUserId = userId;
+    scopedSupportRole = role;
+  }
+}
+
+async function supportFetch(url, options = {}) {
+  const revision = supportIdentityRevision;
+  scopeSupportIdentity();
+  if (revision !== supportIdentityRevision) throw new DOMException("Account changed", "AbortError");
+  return supportTransport.request(url, {
+    ...options,
+    ownerId: scopedSupportUserId,
+    role: scopedSupportRole,
+    signal: options.signal ? AbortSignal.any([supportRequests.signal, options.signal]) : supportRequests.signal,
+    isCurrent() {
+      scopeSupportIdentity();
+      return revision === supportIdentityRevision;
+    },
+  });
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key !== "lpc_user") return;
+    try {
+      const snapshot = JSON.parse(event.newValue || "null");
+      const user = snapshot?.user || snapshot;
+      const nextUserId = String(user?._id || user?.id || "");
+      if (nextUserId && nextUserId === scopedSupportUserId && user?.role === scopedSupportRole) return;
+    } catch (_) { /* An invalid identity snapshot must fail closed. */ }
+    clearSupportIdentity();
+  });
+}
 
 function getSupportSession() {
   return getStoredSession();
@@ -200,7 +307,10 @@ function persistPinnedSupportDrawer(pinned = false) {
 }
 
 function canPinSupportDrawer() {
-  return typeof window === "undefined" || !window.matchMedia || window.matchMedia("(min-width: 681px)").matches;
+  if (document.body?.classList.contains("av2")) return true;
+  if (typeof window === "undefined" || !window.matchMedia) return true;
+  const isV2Shell = document.body?.classList.contains("lpc-v2");
+  return window.matchMedia(isV2Shell ? "(min-width: 1101px)" : "(min-width: 681px)").matches;
 }
 
 function canCollapseDashboardSidebar() {
@@ -238,45 +348,12 @@ function syncSidebarCollapseTab() {
 }
 
 function ensureSidebarCollapseTab() {
-  if (typeof document === "undefined" || state.sidebarCollapseTab?.isConnected) return;
-  const sidebar = document.querySelector("#sidebarNav.sidebar");
-  if (!(sidebar instanceof HTMLElement)) return;
-  const tab = document.createElement("button");
-  tab.type = "button";
-  tab.className = "support-sidebar-collapse-tab";
-  tab.setAttribute("aria-controls", "sidebarNav");
-  tab.innerHTML = `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="m14.5 6-6 6 6 6"></path>
-    </svg>
-  `;
-  tab.addEventListener("click", () => {
-    if (isCompactSidebarLayout()) {
-      document.body.classList.toggle("nav-open");
-      syncSidebarCollapseTab();
-      return;
-    }
-    if (!canCollapseDashboardSidebar()) return;
-    document.body.classList.toggle("support-sidebar-collapsed");
-    syncSidebarCollapseTab();
-  });
-  document.body.appendChild(tab);
-  state.sidebarCollapseTab = tab;
-  if (typeof MutationObserver !== "undefined") {
-    state.sidebarClassObserver?.disconnect?.();
-    state.sidebarClassObserver = new MutationObserver(syncSidebarCollapseTab);
-    state.sidebarClassObserver.observe(document.body, { attributes: true, attributeFilter: ["class"] });
-  }
-  syncSidebarCollapseTab();
-}
-
-function readSupportSessionMarker() {
-  if (typeof window === "undefined") return "";
-  try {
-    return String(window.sessionStorage.getItem(SUPPORT_SESSION_USER_KEY) || "").trim();
-  } catch (_error) {
-    return "";
-  }
+  if (typeof document === "undefined") return;
+  document.querySelectorAll(".support-sidebar-collapse-tab").forEach((tab) => tab.remove());
+  document.body?.classList.remove("support-sidebar-collapsed");
+  state.sidebarClassObserver?.disconnect?.();
+  state.sidebarClassObserver = null;
+  state.sidebarCollapseTab = null;
 }
 
 function writeSupportSessionMarker(userId = "") {
@@ -290,6 +367,8 @@ function writeSupportSessionMarker(userId = "") {
 }
 
 function isSupportSessionAllowed() {
+  // An existing member session must not turn the sign-in page into a workspace.
+  if (/\/login(?:\.html)?\/?$/i.test(window.location.pathname)) return false;
   const session = getSupportSession();
   const role = String(session?.role || "").toLowerCase();
   const status = String(session?.status || "").toLowerCase();
@@ -299,6 +378,19 @@ function isSupportSessionAllowed() {
 function inferViewName(pathname = "", hash = "", caseId = "") {
   const path = String(pathname || "").toLowerCase();
   const currentHash = String(hash || "").toLowerCase();
+  if (path.includes("attorney-v2")) {
+    if (caseId) return "case-detail";
+    const routeName = currentHash.match(/^#\/(home|matters|tasks|paralegals|payments|settings|help)(?:\/|\?|$)/)?.[1] || "home";
+    return ({ settings: "profile-settings", payments: "billing", help: "help", paralegals: "browse-paralegals", matters: "dashboard-attorney", tasks: "dashboard-attorney" })[routeName] || "dashboard-attorney";
+  }
+  if (path.includes("paralegal-v2")) {
+    const routeName = currentHash.match(/^#\/(home|browse|work|settings|help|profile|matter)(?:\/|\?|$)/)?.[1] || "home";
+    if (routeName === "matter") return "case-detail";
+    if (routeName === "settings") return "profile-settings";
+    if (routeName === "work") return "dashboard-paralegal";
+    if (routeName === "browse") return "browse-jobs";
+    return `paralegal-${routeName}`;
+  }
   if (path.includes("profile-settings")) return "profile-settings";
   if (path.includes("create-case")) return "create-case";
   if (path.includes("dashboard-attorney")) {
@@ -315,7 +407,8 @@ function inferViewName(pathname = "", hash = "", caseId = "") {
 function readSupportContextStore() {
   if (typeof window === "undefined") return { views: [], opens: [] };
   try {
-    const raw = window.localStorage.getItem(SUPPORT_CONTEXT_STORAGE_KEY);
+    window.localStorage.removeItem(SUPPORT_CONTEXT_STORAGE_KEY);
+    const raw = window.sessionStorage.getItem(SUPPORT_CONTEXT_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
     return {
       views: Array.isArray(parsed.views) ? parsed.views : [],
@@ -329,7 +422,7 @@ function readSupportContextStore() {
 function writeSupportContextStore(nextStore = {}) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(SUPPORT_CONTEXT_STORAGE_KEY, JSON.stringify(nextStore));
+    window.sessionStorage.setItem(SUPPORT_CONTEXT_STORAGE_KEY, JSON.stringify(nextStore));
   } catch (_error) {
     // Ignore storage failures.
   }
@@ -406,7 +499,14 @@ function markStylesheetReady(link = null) {
 
 function ensureStylesheet() {
   if (typeof document === "undefined") return Promise.resolve(null);
-  const existing = document.getElementById(SUPPORT_STYLESHEET_ID);
+  const existing = document.getElementById(SUPPORT_STYLESHEET_ID)
+    || Array.from(document.querySelectorAll('link[rel="stylesheet"][href]')).find((link) => {
+      try {
+        return new URL(link.href, document.baseURI).pathname === "/assets/styles/support-drawer.css";
+      } catch (_) {
+        return false;
+      }
+    });
   if (existing) {
     if (existing.dataset.loaded === "true" || existing.sheet) {
       return Promise.resolve(markStylesheetReady(existing));
@@ -441,7 +541,7 @@ function ensureStylesheet() {
 
 function buildLauncherIcon() {
   return `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path>
       <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-2.9 2.7-2.9 4"></path>
       <path d="M12 17h.01"></path>
@@ -477,16 +577,6 @@ function buildMenuIcon() {
   `;
 }
 
-function buildPinIcon() {
-  return `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M6 3h12"></path>
-      <path d="M7 3v6l-2.5 4h15L17 9V3"></path>
-      <path d="M12 13v8"></path>
-    </svg>
-  `;
-}
-
 function buildAssistantMarkIcon() {
   return `
     <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -507,16 +597,12 @@ function buildShieldCheckIcon() {
 
 function buildUtilityIcon(type = "") {
   if (type === "copy") {
-    return `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="6.5" width="9" height="9" rx="2"></rect><path d="M13.5 6.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6.5a2 2 0 0 0 2 2h1.5"></path></svg>`;
+    return `<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="6.5" width="9" height="9" rx="2"></rect><path d="M13.5 6.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6.5a2 2 0 0 0 2 2h1.5"></path></svg>`;
   }
   if (type === "helpful") {
-    return `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.2 8.3 9.1 3a1.5 1.5 0 0 1 2.8.9v3h3.2a2 2 0 0 1 1.9 2.6l-1.5 5A2.2 2.2 0 0 1 13.4 16H6.2"></path><path d="M3 8.3h3.2V16H3z"></path></svg>`;
+    return `<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.2 8.3 9.1 3a1.5 1.5 0 0 1 2.8.9v3h3.2a2 2 0 0 1 1.9 2.6l-1.5 5A2.2 2.2 0 0 1 13.4 16H6.2"></path><path d="M3 8.3h3.2V16H3z"></path></svg>`;
   }
-  return `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6.2 11.7 2.9 5.3a1.5 1.5 0 0 0 2.8-.9v-3h3.2A2 2 0 0 0 17 10.5l-1.5-5A2.2 2.2 0 0 0 13.4 4H6.2"></path><path d="M3 4h3.2v7.7H3z"></path></svg>`;
-}
-
-function buildArrowIcon() {
-  return `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h11"></path><path d="m11 6 4 4-4 4"></path></svg>`;
+  return `<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6.2 11.7 2.9 5.3a1.5 1.5 0 0 0 2.8-.9v-3h3.2A2 2 0 0 0 17 10.5l-1.5-5A2.2 2.2 0 0 0 13.4 4H6.2"></path><path d="M3 4h3.2v7.7H3z"></path></svg>`;
 }
 
 function createDrawerMarkup() {
@@ -525,12 +611,14 @@ function createDrawerMarkup() {
   backdrop.setAttribute("data-support-backdrop", "true");
   backdrop.hidden = !state.stylesReady;
 
-  const drawer = document.createElement("aside");
+  const existingHost = document.querySelector("[data-support-v2-host]");
+  const drawer = existingHost || document.createElement("aside");
   drawer.className = "support-drawer";
   drawer.id = SUPPORT_DRAWER_ID;
   drawer.setAttribute("role", "dialog");
   drawer.setAttribute("aria-modal", "true");
   drawer.setAttribute("aria-hidden", "true");
+  drawer.setAttribute("inert", "");
   drawer.setAttribute("aria-labelledby", "supportDrawerTitle");
   drawer.hidden = !state.stylesReady;
   drawer.innerHTML = `
@@ -552,6 +640,7 @@ function createDrawerMarkup() {
             class="support-drawer-menu-trigger"
             type="button"
             data-support-menu-trigger
+            data-public-action="icon"
             aria-label="Open assistant options"
             aria-expanded="false"
             aria-haspopup="menu"
@@ -559,22 +648,12 @@ function createDrawerMarkup() {
             ${buildMenuIcon()}
           </button>
           <div class="support-drawer-menu-panel" data-support-menu-panel role="menu" hidden>
-            <button class="support-drawer-menu-item" type="button" data-support-restart role="menuitem">
+            <button class="support-drawer-menu-item" type="button" data-support-restart data-public-action="text" role="menuitem">
               Start new conversation
             </button>
           </div>
         </div>
-        <button
-          class="support-drawer-pin"
-          type="button"
-          data-support-pin
-          aria-label="Pin assistant while you browse"
-          aria-pressed="false"
-          title="Pin assistant"
-        >
-          ${buildPinIcon()}
-        </button>
-        <button class="support-drawer-close" type="button" data-support-close aria-label="Close assistant">
+        <button class="support-drawer-close" type="button" data-support-close data-public-action="icon" aria-label="Close assistant">
           ${buildCloseIcon()}
         </button>
       </div>
@@ -587,16 +666,20 @@ function createDrawerMarkup() {
         <div class="support-composer-prompt is-hidden" data-support-composer-prompt aria-hidden="true">
           <span class="support-composer-prompt-text" data-support-composer-prompt-text></span>
         </div>
-        <textarea id="supportComposerInput" data-support-textarea rows="1" aria-label="Ask Assistant a question"></textarea>
-        <button class="support-send" type="submit" data-support-submit aria-label="Send message">
+        <textarea id="supportComposerInput" data-support-textarea rows="1" maxlength="4000" aria-label="Ask Assistant a question"></textarea>
+        <button class="support-send" type="submit" data-support-submit data-public-action="icon" aria-label="Send message">
           ${buildSendIcon()}
         </button>
       </div>
-      <p class="support-composer-hint"><span class="support-composer-hint-icon">${buildShieldCheckIcon()}</span><span>Uses your authorized LPC context. Verify important details.</span></p>
+      <p class="support-composer-hint"><span class="support-composer-hint-icon">${buildShieldCheckIcon()}</span><span>AI can make mistakes. Check important information. <a href="/privacy.html" target="_blank" rel="noopener">Privacy</a></span></p>
     </form>
   `;
 
-  document.body.append(backdrop, drawer);
+  if (existingHost) {
+    existingHost.insertAdjacentElement("beforebegin", backdrop);
+  } else {
+    document.body.append(backdrop, drawer);
+  }
   state.backdrop = backdrop;
   state.drawer = drawer;
   state.thread = drawer.querySelector("[data-support-thread]");
@@ -608,7 +691,6 @@ function createDrawerMarkup() {
   state.menuButton = drawer.querySelector("[data-support-menu-trigger]");
   state.menuPanel = drawer.querySelector("[data-support-menu-panel]");
   state.restartButton = drawer.querySelector("[data-support-restart]");
-  state.pinButton = drawer.querySelector("[data-support-pin]");
   state.closeButton = drawer.querySelector("[data-support-close]");
   state.composerPrompt = drawer.querySelector("[data-support-composer-prompt]");
   state.composerPromptText = drawer.querySelector("[data-support-composer-prompt-text]");
@@ -622,9 +704,6 @@ function createDrawerMarkup() {
   state.restartButton?.addEventListener("click", async () => {
     closeSupportMenu();
     await restartSupportConversation();
-  });
-  state.pinButton?.addEventListener("click", () => {
-    setSupportDrawerPinned(!state.pinned);
   });
   state.closeButton?.addEventListener("click", () => closeSupportDrawer());
   state.form?.addEventListener("submit", async (event) => {
@@ -659,7 +738,7 @@ function createDrawerMarkup() {
       closeSupportMenu({ restoreFocus: true });
       return;
     }
-    if (event.key === "Escape" && state.open) {
+    if (event.key === "Escape" && state.open && !event.defaultPrevented && (!document.body.classList.contains("av2") || state.drawer?.contains(event.target))) {
       event.preventDefault();
       closeSupportDrawer();
     }
@@ -696,7 +775,7 @@ function autoSizeTextarea() {
 function syncComposerState() {
   if (!state.submit || !state.textarea) return;
   const hasText = Boolean(state.textarea.value.trim());
-  state.submit.disabled = state.sending || state.loadingConversation || state.restartingConversation || !hasText;
+  state.submit.disabled = supportInteractionPending() || !hasText;
   state.textarea.disabled = state.loadingConversation || state.restartingConversation;
   state.drawer?.setAttribute(
     "aria-busy",
@@ -704,7 +783,7 @@ function syncComposerState() {
   );
   if (state.restartButton) {
     state.restartButton.disabled =
-      state.loadingConversation || state.sending || state.escalatingMessageId || state.restartingConversation;
+      supportInteractionPending();
     state.restartButton.textContent = state.restartingConversation ? "Starting..." : "Start new conversation";
   }
 }
@@ -815,40 +894,54 @@ function getCurrentPageContext() {
   const params = new URLSearchParams(window.location.search);
   const session = getSupportSession();
   const pathname = window.location.pathname;
-  const search = window.location.search;
   const hash = window.location.hash;
-  const caseId = params.get("caseId") || params.get("highlightCase") || "";
-  const billingPaymentMethod =
-    window.__lpcBillingPaymentMethod && typeof window.__lpcBillingPaymentMethod === "object"
-      ? {
-          brand: String(window.__lpcBillingPaymentMethod.brand || ""),
-          last4: String(window.__lpcBillingPaymentMethod.last4 || ""),
-          exp_month: Number(window.__lpcBillingPaymentMethod.exp_month || 0) || null,
-          exp_year: Number(window.__lpcBillingPaymentMethod.exp_year || 0) || null,
-          type: String(window.__lpcBillingPaymentMethod.type || ""),
-        }
-      : null;
+  const isWorkspaceV2 = /^\/(attorney|paralegal)-v2\.html$/.test(pathname);
+  const v2Route = isWorkspaceV2
+    ? hash.match(/^#\/([^?]+)(?:\?(.*))?$/)
+    : null;
+  const v2Path = String(v2Route?.[1] || "");
+  const v2Query = new URLSearchParams(v2Route?.[2] || "");
+  const v2MatterId = v2Path.match(/^matter\/([^/]+)$/)?.[1] || "";
+  const verifiedMatter = isWorkspaceV2 ? getSupportMatterContext({ ownerId: getSupportSessionUserId(), role: getSupportRole() }) : null;
+  const caseId = isWorkspaceV2 ? verifiedMatter?.caseId || "" : v2MatterId || v2Query.get("matterId") || params.get("caseId") || params.get("highlightCase") || "";
+  const productivity = isWorkspaceV2 ? verifiedMatter || {} : window.LPCProductivityContext && typeof window.LPCProductivityContext === "object"
+    ? window.LPCProductivityContext
+    : {};
+  const panelContext = isWorkspaceV2 ? null : window.LPCContextPanel?.current?.() || null;
+  const commandContext = {
+    role: String(session?.role || ""),
+    caseId: String(productivity.caseId || caseId || ""),
+    availableMatterTabs: Array.isArray(productivity.availableMatterTabs) ? productivity.availableMatterTabs : [],
+  };
+  const permittedCommandCodes = window.LPCProductivityCommands?.listCommands
+    ? window.LPCProductivityCommands.listCommands(commandContext).map((command) => command.code).slice(0, 20)
+    : [];
   const viewName = inferViewName(pathname, hash, caseId);
   const behavior = getSupportBehaviorSnapshot(viewName);
   return {
-    href: window.location.href,
     pathname,
-    search,
+    search: window.location.search,
     hash,
+    href: window.location.href,
     title: document.title,
     label: heading?.textContent?.trim() || "",
     viewName,
     roleHint: String(session?.role || ""),
-    caseId,
-    jobId: params.get("jobId") || "",
-    applicationId: params.get("applicationId") || "",
+    caseId: commandContext.caseId,
+    jobId: isWorkspaceV2 ? "" : v2Query.get("jobId") || params.get("jobId") || "",
+    applicationId: isWorkspaceV2 ? "" : v2Query.get("applicationId") || params.get("applicationId") || "",
     repeatViewCount: behavior.repeatViewCount,
     supportOpenCount: behavior.supportOpenCount,
     recentViewName: behavior.recentViewName,
-    ...(billingPaymentMethod &&
-    (billingPaymentMethod.last4 || billingPaymentMethod.brand || billingPaymentMethod.exp_month || billingPaymentMethod.exp_year)
-      ? { paymentMethod: billingPaymentMethod }
-      : {}),
+    currentTab: String(productivity.currentTab || ""),
+    objectType: isWorkspaceV2 ? verifiedMatter ? "matter" : "" : String(panelContext?.kind || productivity.objectType || ""),
+    objectId: isWorkspaceV2 ? verifiedMatter?.caseId || "" : String(panelContext?.id || productivity.objectId || ""),
+    matterStatus: String(productivity.status || ""),
+    matterRelationship: String(productivity.relationship || ""),
+    matterAttention: String(productivity.attention || ""),
+    matterNextAction: String(productivity.nextAction || ""),
+    availableMatterTabs: commandContext.availableMatterTabs,
+    permittedCommandCodes,
   };
 }
 
@@ -877,7 +970,7 @@ function buildConversationQuery() {
 function formatTicketStatusLabel(value = "") {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) return "";
-  if (normalized === "waiting_on_info") return "Waiting on user";
+  if (normalized === "waiting_on_info") return "Waiting for your reply";
   return normalized
     .split("_")
     .filter(Boolean)
@@ -889,25 +982,34 @@ function getLatestAssistantMessage() {
   return [...state.messages].reverse().find((message) => getMessageVariant(message) === "assistant") || null;
 }
 
-function getLatestTeamReply() {
-  return [...state.messages].reverse().find((message) => getMessageVariant(message) === "team") || null;
+function getLatestSubstantiveAssistantMessage() {
+  return [...state.messages].reverse().find(message => {
+    if (message.loading || !message.id || !String(message.text || "").trim() || getMessageVariant(message) !== "assistant") return false;
+    if (isInitialAssistantGreeting(message, state.messages.indexOf(message))) return false;
+    const metadata = message.metadata || {};
+    return !["welcome", "ticket_status_notice", "support_escalation"].includes(metadata.kind)
+      && !["issue_resolved", "generic_intake"].includes(metadata.primaryAsk)
+      && !["CLARIFY_ONCE", "ESCALATE"].includes(metadata.responseMode)
+      && !metadata.awaitingField && metadata.escalation?.requested !== true;
+  }) || null;
 }
+
 
 function buildSuggestedReplyMessage(option = "") {
   const normalized = String(option || "").trim().toLowerCase();
   if (!normalized) return "";
-  if (normalized === "this case") return "This is happening in this case.";
+  if (normalized === "this case") return "This is happening in this Matter.";
   if (normalized === "across all messages") return "This is happening across all messages.";
   if (normalized === "billing method") return "This is about my billing method.";
-  if (normalized === "case payment") return "This is about a specific case payment.";
+  if (normalized === "case payment") return "This is about a specific Matter payment.";
   if (normalized === "billing") return "I need help with billing.";
   if (normalized === "my applications") return "Where do I see my applications?";
-  if (normalized === "a case") return "I need help with a case.";
-  if (normalized === "browse cases") return "Where can I browse open cases?";
+  if (normalized === "a case") return "I need help with a Matter.";
+  if (normalized === "browse cases") return "Where can I browse open Matters?";
   if (normalized === "messages") return "I need help with messages.";
   if (normalized === "payouts") return "I need help with payouts.";
   if (normalized === "resume application") return "How do I resume my application?";
-  if (normalized === "case payment") return "This is about a specific case payment.";
+  if (normalized === "case payment") return "This is about a specific Matter payment.";
   if (normalized === "billing method") return "This is about my billing method.";
   if (normalized === "profile settings") return "I need help with profile settings.";
   return String(option || "").trim();
@@ -925,9 +1027,6 @@ function appendLocalNotice(text = "") {
   });
 }
 
-function getThreadStatusNotice() {
-  return null;
-}
 
 function delay(ms = 0) {
   return new Promise((resolve) => {
@@ -938,6 +1037,27 @@ function delay(ms = 0) {
 async function navigateFromSupport(href = "") {
   const targetHref = String(href || "").trim();
   if (!targetHref) return;
+  if (state.navigationAdapter) {
+    const destination = state.navigationAdapter.resolve(targetHref);
+    if (!destination) return;
+    if (destination.internal) {
+      state.navigationAdapter.navigate(destination);
+      return;
+    }
+    closeSupportDrawer({ restoreFocus: false });
+    await delay(SUPPORT_NAVIGATION_DELAY_MS);
+    window.location.assign(destination.href);
+    return;
+  }
+  const v2Adapter = window.__LPC_PARALEGAL_V2__?.adaptLegacyDestination;
+  const v2Navigator = window.__LPC_PARALEGAL_V2__?.navigateToDestination;
+  if (typeof v2Adapter === "function" && typeof v2Navigator === "function") {
+    const destination = v2Adapter(targetHref, { caseId: getCurrentPageContext().caseId });
+    if (destination?.internal) {
+      v2Navigator(destination);
+      return;
+    }
+  }
   closeSupportDrawer({ restoreFocus: false });
   await delay(SUPPORT_NAVIGATION_DELAY_MS);
   window.location.assign(targetHref);
@@ -963,13 +1083,30 @@ function removeRedundantActionBubbleReference(text = "", navigation = null) {
     .trim();
 }
 
+function validateSupportCommandNavigation(navigation = null) {
+  if (!navigation || typeof navigation !== "object") return null;
+  const code = String(navigation.commandCode || "").trim();
+  if (!code) return navigation;
+  const isWorkspaceV2 = /^\/(attorney|paralegal)-v2\.html$/.test(window.location.pathname);
+  const productivity = isWorkspaceV2 ? getSupportMatterContext({ ownerId: getSupportSessionUserId(), role: getSupportRole() }) || {} : window.LPCProductivityContext && typeof window.LPCProductivityContext === "object"
+    ? window.LPCProductivityContext
+    : {};
+  const command = window.LPCProductivityCommands?.resolveCommand?.(code, {
+    role: getSupportRole(),
+    caseId: String(productivity.caseId || ""),
+    availableMatterTabs: Array.isArray(productivity.availableMatterTabs) ? productivity.availableMatterTabs : [],
+  });
+  if (!command || command.href !== String(navigation.ctaHref || "")) return null;
+  return { ...navigation, ctaLabel: command.label, ctaHref: command.href };
+}
+
 function appendMessageBubbleContent(bubble, message = {}) {
   const actionHrefs = new Set(
     (Array.isArray(message.metadata?.actions) ? message.metadata.actions : [])
       .map((action) => String(action?.href || "").trim())
       .filter((href) => isSafeSupportHref(href))
   );
-  const navigation = message.metadata?.navigation || null;
+  const navigation = validateSupportCommandNavigation(message.metadata?.navigation || null);
   const navigationHref = String(navigation?.ctaHref || "").trim();
   const actionDuplicatesNavigation = Boolean(navigationHref && actionHrefs.has(navigationHref));
   const segments = buildSupportInlineSegments(
@@ -983,12 +1120,19 @@ function appendMessageBubbleContent(bubble, message = {}) {
   const fragment = document.createDocumentFragment();
   segments.forEach((segment) => {
     if (!segment?.text) return;
-    if (segment.type === "link" && !actionHrefs.has(String(segment.href || "").trim())) {
+    const destination = state.navigationAdapter?.resolve(segment.href);
+    if (segment.type === "link" && (!state.navigationAdapter || destination) && !actionHrefs.has(String(segment.href || "").trim())) {
       const anchor = document.createElement("a");
       anchor.className = "support-inline-link";
-      anchor.href = segment.href;
+      anchor.href = destination?.href || segment.href;
       anchor.textContent = segment.text;
       anchor.setAttribute("data-support-inline-link", "true");
+      if (destination?.internal || window.__LPC_PARALEGAL_V2__?.adaptLegacyDestination?.(segment.href)?.internal) {
+        anchor.addEventListener("click", (event) => {
+          event.preventDefault();
+          void navigateFromSupport(segment.href);
+        });
+      }
       fragment.appendChild(anchor);
       return;
     }
@@ -997,9 +1141,23 @@ function appendMessageBubbleContent(bubble, message = {}) {
   bubble.replaceChildren(fragment);
 }
 
+function retainInteractionFocus(launcher, target) {
+  const revision = supportIdentityRevision;
+  let moved = !launcher || document.activeElement !== launcher;
+  const onFocus = event => {
+    if (event.target !== launcher && event.target !== document.body && event.target !== document.documentElement) moved = true;
+  };
+  document.addEventListener("focusin", onFocus);
+  return () => {
+    document.removeEventListener("focusin", onFocus);
+    if (!moved && state.open && revision === supportIdentityRevision && document.activeElement === document.body) target()?.focus({ preventScroll: true });
+  };
+}
+
 function createMessageElement(message = {}) {
   const item = document.createElement("article");
   const variant = getMessageVariant(message);
+  item.dataset.supportMessageId = String(message.id || "");
   item.className = `support-message support-message--${variant}${message.loading ? " support-message--loading" : ""}${
     message.metadata?.kind === "ticket_status_notice" ? " support-message--status-notice" : ""
   }`;
@@ -1018,12 +1176,11 @@ function createMessageElement(message = {}) {
   bubble.className = "support-message-bubble";
 
   if (message.loading) {
-    const label = document.createElement("span");
-    label.textContent = "Checking that now";
     const dots = document.createElement("span");
     dots.className = "support-loading-dots";
+    dots.setAttribute("aria-label", "Assistant is responding");
     dots.innerHTML = "<span></span><span></span><span></span>";
-    bubble.append(label, dots);
+    bubble.append(dots);
   } else {
     appendMessageBubbleContent(bubble, message);
   }
@@ -1059,25 +1216,48 @@ function createMessageElement(message = {}) {
 }
 
 async function runSupportAction(action = {}) {
+  if (supportInteractionPending()) return;
+  const revision = supportIdentityRevision;
   const actionType = String(action?.type || "").trim().toLowerCase();
   const invokeAction = String(action?.action || "").trim().toLowerCase();
+  const commandCode = String(action?.commandCode || "").trim();
+  if (commandCode) {
+    const command = validateSupportCommandNavigation({ commandCode, ctaHref: String(action?.href || "") });
+    if (!command) return;
+    await navigateFromSupport(command.ctaHref);
+    return;
+  }
   if (actionType === "invoke" && invokeAction === "start_stripe_onboarding") {
+    const restoreFocus = retainInteractionFocus(document.activeElement, () => state.thread?.querySelector('[data-support-invoke="start_stripe_onboarding"]'));
+    state.invokingAction = invokeAction;
+    render();
     try {
-      await startStripeOnboarding();
+      await startStripeOnboarding({
+        request: (url, options) => supportFetch(url, { ...options, timeoutMs: 30000 }),
+        isCurrent: () => revision === supportIdentityRevision,
+      });
     } catch (error) {
+      if (revision !== supportIdentityRevision) return;
       state.error = error?.message || "Unable to start Stripe onboarding.";
       render();
+    } finally {
+      if (revision === supportIdentityRevision) { state.invokingAction = ""; render(); restoreFocus(); }
     }
     return;
   }
   if (actionType === "invoke" && invokeAction === "request_password_reset") {
+    const restoreFocus = retainInteractionFocus(document.activeElement, () => state.thread?.querySelector('[data-support-invoke="request_password_reset"]'));
+    state.invokingAction = invokeAction;
+    render();
     try {
-      const session = getSupportSession();
-      const email = String(session?.user?.email || "").trim();
+      const accountResponse = await supportFetch("/api/users/me", { method: "GET", headers: { Accept: "application/json" } });
+      if (!accountResponse.ok) throw new Error("Unable to load your account email. Please try again.");
+      const account = await accountResponse.json();
+      const email = String(account?.email || account?.user?.email || "").trim();
       if (!email) {
         throw new Error("We couldn't find an email address for this account.");
       }
-      const response = await secureFetch("/api/auth/request-password-reset", {
+      const response = await supportFetch("/api/auth/request-password-reset", {
         method: "POST",
         headers: { Accept: "application/json" },
         body: { email },
@@ -1086,12 +1266,16 @@ async function runSupportAction(action = {}) {
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload?.error || "Couldn't send a reset link right now.");
       }
-      appendLocalNotice("Password reset link sent.");
+      if (revision !== supportIdentityRevision) return;
+      appendLocalNotice("Reset requested. Check your email for a link.");
       state.error = "";
       render();
     } catch (error) {
+      if (revision !== supportIdentityRevision) return;
       state.error = error?.message || "Couldn't send a reset link right now.";
       render();
+    } finally {
+      if (revision === supportIdentityRevision) { state.invokingAction = ""; render(); restoreFocus(); }
     }
     return;
   }
@@ -1112,13 +1296,15 @@ async function copySupportMessage(message = {}) {
   render();
 }
 
-async function submitMessageFeedback(message = {}, rating = "") {
-  if (!state.conversation?.id || !message?.id || state.feedbackSubmittingIds.has(message.id)) return;
+async function submitMessageFeedback(message = {}, rating = "", launcher = document.activeElement) {
+  const revision = supportIdentityRevision;
+  if (!state.conversation?.id || !message?.id || supportInteractionPending()) return;
+  const restoreFocus = retainInteractionFocus(launcher, () => state.thread?.querySelector(`[data-support-message-id="${CSS.escape(String(message.id))}"] [data-support-feedback="${rating}"]`));
   state.feedbackSubmittingIds.add(message.id);
   state.error = "";
   render();
   try {
-    const response = await secureFetch(
+    const response = await supportFetch(
       `/api/support/conversation/${encodeURIComponent(state.conversation.id)}/messages/${encodeURIComponent(
         message.id
       )}/feedback`,
@@ -1132,10 +1318,13 @@ async function submitMessageFeedback(message = {}, rating = "") {
     const payload = await response.json();
     replaceMessageInState(payload.message);
   } catch (error) {
+    if (revision !== supportIdentityRevision) return;
     state.error = error?.message || "Couldn't save that feedback.";
   } finally {
+    if (revision !== supportIdentityRevision) { restoreFocus(); return; }
     state.feedbackSubmittingIds.delete(message.id);
     render();
+    restoreFocus();
   }
 }
 
@@ -1147,23 +1336,37 @@ function createMessageActions(message = {}) {
   bar.className = "support-message-actions";
   actions.slice(0, getAssistantActionLimit(message.metadata)).forEach((action) => {
     const isInvoke = String(action?.type || "").trim().toLowerCase() === "invoke";
-    if (!isInvoke && !isSafeSupportHref(action?.href || "")) return;
+    const invokeAction = String(action?.action || "").trim().toLowerCase();
+    if (isInvoke && !(invokeAction === "request_password_reset" || invokeAction === "start_stripe_onboarding" && getSupportRole() === "paralegal")) return;
+    if (action?.commandCode && !validateSupportCommandNavigation({
+      commandCode: action.commandCode,
+      ctaHref: String(action?.href || ""),
+    })) return;
+    if (!isInvoke && (!isSafeSupportHref(action?.href || "") || (state.navigationAdapter && !state.navigationAdapter.resolve(action?.href || "")))) return;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "support-message-action";
+    button.dataset.publicAction = "secondary";
+    button.dataset.actionShape = "control";
     button.textContent = String(action.label || "Open");
-    button.disabled = state.sending || state.loadingConversation || state.restartingConversation;
+    if (isInvoke) button.dataset.supportInvoke = invokeAction;
+    button.disabled = supportInteractionPending();
     button.addEventListener("click", () => {
-      runSupportAction(action).catch(() => {});
+      runSupportAction(action).catch((error) => {
+        console.error("[support] assistant action rejected", error);
+      });
     });
     bar.appendChild(button);
   });
+
+  if (getLatestSubstantiveAssistantMessage()?.id !== message.id) return bar.childElementCount ? bar : null;
 
   const utilityBar = document.createElement("div");
   utilityBar.className = "support-message-utilities";
   const copyButton = document.createElement("button");
   copyButton.type = "button";
   copyButton.className = "support-message-utility";
+  copyButton.dataset.publicAction = "icon";
   copyButton.setAttribute("aria-label", "Copy");
   copyButton.title = "Copy response";
   copyButton.innerHTML = buildUtilityIcon("copy");
@@ -1177,12 +1380,14 @@ function createMessageActions(message = {}) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "support-message-utility";
+    button.dataset.publicAction = "icon";
     button.setAttribute("aria-label", label);
     button.title = label;
     button.innerHTML = buildUtilityIcon(rating);
+    button.dataset.supportFeedback = rating;
     button.setAttribute("aria-pressed", message.metadata?.feedback?.rating === rating ? "true" : "false");
-    button.disabled = state.feedbackSubmittingIds.has(message.id);
-    button.addEventListener("click", () => submitMessageFeedback(message, rating));
+    button.disabled = supportInteractionPending();
+    button.addEventListener("click", event => submitMessageFeedback(message, rating, event.currentTarget));
     utilityBar.appendChild(button);
   });
   bar.appendChild(utilityBar);
@@ -1208,8 +1413,10 @@ function createSuggestedReplies(message = {}) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "support-suggested-reply";
+    button.dataset.publicAction = "secondary";
+    button.dataset.actionShape = "pill";
     button.textContent = String(option);
-    button.disabled = state.sending || state.loadingConversation || state.restartingConversation;
+    button.disabled = supportInteractionPending();
     button.addEventListener("click", async () => {
       await sendSupportMessage(buildSuggestedReplyMessage(option));
     });
@@ -1237,7 +1444,7 @@ function createEscalationCard(message = {}) {
   copy.className = "support-escalation-copy";
   const title = document.createElement("p");
   title.className = "support-escalation-title";
-  title.textContent = requested ? "Sent to the team for review." : "Need a manual review?";
+  title.textContent = requested ? "Sent to the team for review." : "Need help from the LPC team?";
   copy.appendChild(title);
 
   const reason = document.createElement("p");
@@ -1256,6 +1463,7 @@ function createEscalationCard(message = {}) {
   } else {
     reason.textContent = "";
   }
+  if (reason.textContent) copy.appendChild(reason);
   card.appendChild(copy);
 
   if (requested) {
@@ -1274,8 +1482,10 @@ function createEscalationCard(message = {}) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "support-escalation-button";
-  button.textContent = state.escalatingMessageId === message.id ? "Sending..." : "Send to the team";
-  button.disabled = state.escalatingMessageId === message.id || state.sending || state.loadingConversation;
+  button.dataset.publicAction = "primary";
+  button.dataset.actionShape = "control";
+  button.textContent = state.escalatingMessageId === message.id ? "Sending…" : "Send to the team";
+  button.disabled = supportInteractionPending();
   button.addEventListener("click", async () => {
     await sendEscalationRequest(message.id);
   });
@@ -1284,17 +1494,11 @@ function createEscalationCard(message = {}) {
   return card;
 }
 
-function renderThread() {
+function renderThread(viewport = captureThreadViewport()) {
   if (!state.thread) return;
   state.thread.innerHTML = "";
 
   if (state.loadingConversation && !state.messages.length) {
-    state.thread.appendChild(
-      createMessageElement({
-        sender: "assistant",
-        loading: true,
-      })
-    );
     return;
   }
 
@@ -1306,11 +1510,12 @@ function renderThread() {
     .forEach((message) => {
     state.thread.appendChild(createMessageElement(message));
     });
+  restoreThreadViewport(viewport);
 }
 
 function shouldShowQuickPrompts() {
   if (state.loadingConversation) return false;
-  if (state.error && !state.conversation) return false;
+  if (state.loadFailed || (state.error && !state.conversation)) return false;
   const userMessages = state.messages.filter((message) => message.sender === "user");
   return userMessages.length === 0;
 }
@@ -1333,13 +1538,12 @@ function renderPrompts() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "support-quick-prompt";
+    button.dataset.publicAction = "secondary";
+    button.dataset.actionShape = "pill";
     const label = document.createElement("span");
     label.textContent = promptText;
-    const arrow = document.createElement("span");
-    arrow.className = "support-quick-prompt-arrow";
-    arrow.innerHTML = buildArrowIcon();
-    button.append(label, arrow);
-    button.disabled = state.sending || state.loadingConversation || state.restartingConversation;
+    button.append(label);
+    button.disabled = supportInteractionPending();
     button.addEventListener("click", async () => {
       await sendSupportMessage(promptText);
     });
@@ -1349,37 +1553,59 @@ function renderPrompts() {
 
 function renderStatus() {
   if (!state.status) return;
-  if (!state.error) {
-    state.status.classList.remove("is-visible");
-    state.status.classList.remove("is-info");
+  const copy = state.error || mutationSnapshot.message;
+  if (!copy) {
+    state.status.classList.remove("is-visible", "is-info");
     state.status.textContent = "";
     return;
   }
   state.status.classList.add("is-visible");
-  state.status.classList.remove("is-info");
+  state.status.classList.toggle("is-info", !state.error && ["running", "checking", "pending"].includes(mutationSnapshot.phase));
   const label = document.createElement("span");
-  label.textContent = state.error;
+  label.textContent = copy;
   state.status.replaceChildren(label);
-  if (state.failedMessageText) {
-    const retry = document.createElement("button");
-    retry.type = "button";
-    retry.className = "support-status-retry";
-    retry.textContent = "Retry";
-    retry.disabled = state.sending;
-    retry.addEventListener("click", async () => {
-      const failedText = state.failedMessageText;
-      state.failedMessageText = "";
-      await sendSupportMessage(failedText);
+  function action(text, name, callback, disabled = false) {
+    const button = document.createElement("button");
+    button.type = "button"; button.className = "support-status-retry";
+    button.textContent = text; button.dataset.supportRequestAction = name; button.disabled = disabled;
+    button.addEventListener("click", async () => {
+      const restore = retainInteractionFocus(button, () => state.status?.querySelector(`[data-support-request-action="${name}"]`) || state.status?.querySelector("button") || state.textarea);
+      try { await callback(); } catch (error) { state.error = error?.message || "The request could not be checked."; render(); } finally { restore(); }
     });
-    state.status.appendChild(retry);
+    state.status.appendChild(button);
+  }
+  if (mutationSnapshot.pending) {
+    if (mutationSnapshot.busy) action("Stop waiting", "stop", () => supportMutations.stopWaiting());
+    else if (mutationSnapshot.phase === "failed") action("Return to conversation", "return", async () => {
+      if (supportMutations.dismissFailed()) { state.error = ""; await ensureConversationLoaded(true); }
+    });
+    else {
+      action("Check result", "check", () => supportMutations.check());
+      if (mutationSnapshot.canRetry) action("Retry request", "retry", () => supportMutations.retry());
+    }
+  } else if (state.loadFailed) {
+    action("Try again", "history", () => ensureConversationLoaded(true), state.loadingConversation);
   }
 }
 
-function scrollThreadToBottom() {
-  if (!state.thread || !state.open) return;
-  window.requestAnimationFrame(() => {
-    state.thread.scrollTop = state.thread.scrollHeight;
-  });
+function captureThreadViewport() {
+  if (!state.thread || !state.open) return null;
+  const bounds = state.thread.getBoundingClientRect();
+  const anchor = [...state.thread.children].find(element => element.getBoundingClientRect().bottom > bounds.top + 1);
+  return {
+    follow: state.sending || state.thread.scrollHeight - state.thread.clientHeight - state.thread.scrollTop < 48,
+    top: state.thread.scrollTop,
+    anchorId: anchor?.dataset.supportMessageId || "",
+    offset: anchor ? anchor.getBoundingClientRect().top - bounds.top : 0,
+  };
+}
+
+function restoreThreadViewport(viewport) {
+  if (!viewport || !state.thread || !state.open) return;
+  if (viewport.follow) { state.thread.scrollTop = state.thread.scrollHeight; return; }
+  const anchor = viewport.anchorId ? state.thread.querySelector(`[data-support-message-id="${CSS.escape(viewport.anchorId)}"]`) : null;
+  if (anchor) state.thread.scrollTop += anchor.getBoundingClientRect().top - state.thread.getBoundingClientRect().top - viewport.offset;
+  else state.thread.scrollTop = viewport.top;
 }
 
 function syncLauncherState() {
@@ -1393,15 +1619,16 @@ function syncLauncherState() {
 function render() {
   ensureDrawer();
   if (!state.drawer) return;
+  const viewport = captureThreadViewport();
   renderStatus();
-  renderThread();
+  renderThread(viewport);
   renderPrompts();
   autoSizeTextarea();
   syncComposerState();
   syncComposerPrompt();
   syncLauncherState();
   syncLiveUpdates();
-  scrollThreadToBottom();
+  restoreThreadViewport(viewport);
 }
 
 function closeNotificationPanels() {
@@ -1426,9 +1653,11 @@ function closeProfileMenus() {
   });
 }
 
-async function refreshConversationMessages({ silent = false } = {}) {
+async function refreshConversationMessages({ silent = false, throwOnFailure = false, verifyOnly = false } = {}) {
+  const revision = supportIdentityRevision;
+  const contentRevision = supportContentRevision;
   if (!state.conversation?.id) return null;
-  if (state.sending || state.escalatingMessageId) return state.conversation;
+  if (!verifyOnly && (mutationSnapshot.pending || state.escalatingMessageId || state.feedbackSubmittingIds.size)) return state.conversation;
   if (silent && (state.loadingConversation || state.silentRefreshing)) return state.conversation;
   const targetConversationId = state.conversation.id;
 
@@ -1441,7 +1670,7 @@ async function refreshConversationMessages({ silent = false } = {}) {
   }
 
   try {
-    const messagesRes = await secureFetch(
+    const messagesRes = await supportFetch(
       `/api/support/conversation/${encodeURIComponent(state.conversation.id)}/messages`,
       {
         method: "GET",
@@ -1452,7 +1681,10 @@ async function refreshConversationMessages({ silent = false } = {}) {
       throw new Error("Unable to load support history.");
     }
     const messagesPayload = await messagesRes.json();
-    if (state.conversation?.id !== targetConversationId) {
+    if (!Array.isArray(messagesPayload.messages) || messagesPayload.conversation?.id !== targetConversationId) {
+      throw new Error("Unable to load support history.");
+    }
+    if (verifyOnly || revision !== supportIdentityRevision || contentRevision !== supportContentRevision || state.conversation?.id !== targetConversationId) {
       return state.conversation;
     }
     state.conversation = messagesPayload.conversation || state.conversation;
@@ -1466,10 +1698,13 @@ async function refreshConversationMessages({ silent = false } = {}) {
       state.error = "";
     }
   } catch (error) {
+    if (revision !== supportIdentityRevision) return;
     if (!silent) {
       state.error = error?.message || "Unable to load support history.";
     }
+    if (throwOnFailure) throw error;
   } finally {
+    if (revision !== supportIdentityRevision) return;
     if (silent) {
       state.silentRefreshing = false;
     } else {
@@ -1493,6 +1728,7 @@ function stopLiveUpdates() {
     state.eventSource = null;
   }
   state.eventSourceConversationId = "";
+  state.streamFallbackConversationId = "";
   stopPolling();
 }
 
@@ -1510,7 +1746,9 @@ function syncPolling() {
 
   if (state.pollTimer) return;
   state.pollTimer = window.setInterval(() => {
-    refreshConversationMessages({ silent: true }).catch(() => {});
+    refreshConversationMessages({ silent: true }).catch((error) => {
+      console.warn("[support] conversation poll rejected", error);
+    });
   }, 15000);
 }
 
@@ -1526,7 +1764,7 @@ function syncLiveUpdates() {
     return;
   }
 
-  if (typeof window.EventSource === "undefined") {
+  if (state.streamFallbackConversationId === state.conversation.id || typeof window.EventSource === "undefined") {
     syncPolling();
     return;
   }
@@ -1540,20 +1778,30 @@ function syncLiveUpdates() {
   }
 
   try {
-    const source = new window.EventSource(
-      `/api/support/conversation/${encodeURIComponent(state.conversation.id)}/events`
-    );
+    const revision = supportIdentityRevision;
+    const source = new window.EventSource(supportTransport.boundEventsUrl(
+      `/api/support/conversation/${encodeURIComponent(state.conversation.id)}/events`,
+      { ownerId: scopedSupportUserId, role: scopedSupportRole }
+    ));
     source.addEventListener("conversation.ready", () => {});
     source.addEventListener("conversation.updated", () => {
-      refreshConversationMessages({ silent: true }).catch(() => {});
+      if (state.eventSource !== source || revision !== supportIdentityRevision) return;
+      refreshConversationMessages({ silent: true }).catch((error) => {
+        console.warn("[support] live conversation refresh rejected", error);
+      });
     });
     source.onerror = () => {
+      if (state.eventSource !== source || revision !== supportIdentityRevision) return;
       if (state.eventSource === source) {
         source.close();
         state.eventSource = null;
         state.eventSourceConversationId = "";
       }
+      // Stay on bounded polling for this open drawer. Redraws must not turn
+      // an offline stream plus failed read into a reconnect/request loop.
+      state.streamFallbackConversationId = state.conversation.id;
       syncPolling();
+      void refreshConversationMessages({ silent: true, verifyOnly: true });
     };
     state.eventSource = source;
     state.eventSourceConversationId = state.conversation.id;
@@ -1563,18 +1811,21 @@ function syncLiveUpdates() {
 }
 
 async function ensureConversationLoaded(force = false) {
+  scopeSupportIdentity();
+  const revision = supportIdentityRevision;
   if (!isSupportSessionAllowed()) return null;
   if (state.loadPromise && !force) return state.loadPromise;
   if (state.bootstrapped && !force) return state.conversation;
 
   state.loadingConversation = true;
+  state.loadFailed = false;
   state.error = "";
   render();
 
   state.loadPromise = (async () => {
     try {
       const query = buildConversationQuery();
-      const conversationRes = await secureFetch(
+      const conversationRes = await supportFetch(
         `/api/support/conversation${query ? `?${query}` : ""}`,
         {
           method: "GET",
@@ -1585,14 +1836,40 @@ async function ensureConversationLoaded(force = false) {
         throw new Error("Support isn't available right now. Please try again in a moment.");
       }
       const conversationPayload = await conversationRes.json();
+      if (!conversationPayload.conversation?.id) throw new Error("Support isn't available right now. Please try again in a moment.");
+      if (state.conversation?.id !== conversationPayload.conversation.id) {
+        supportContentRevision++;
+        state.messages = [];
+        state.dismissedSuggestedReplyIds.clear();
+      }
       state.conversation = conversationPayload.conversation;
-      await refreshConversationMessages({ silent: false });
+      await refreshConversationMessages({ silent: false, throwOnFailure: true });
+      if (revision !== supportIdentityRevision) return null;
       await maybeRefreshConversationForAuthSession();
+      if (revision !== supportIdentityRevision) return null;
       state.bootstrapped = true;
       state.error = "";
+      if (!state.restoredMutation) {
+        state.restoredMutation = true;
+        try {
+          supportMutations.restore({ ownerId: scopedSupportUserId, role: scopedSupportRole });
+        } catch (error) {
+          if (revision === supportIdentityRevision) state.error = error?.message || "The earlier request could not be restored.";
+        }
+      }
+      if (mutationSnapshot.pending) await supportMutations.check();
+      if (conversationPayload.recoveryRequest && conversationPayload.recoveryRequest.requestId !== mutationSnapshot.pending?.requestId) {
+        const previous = mutationSnapshot.pending;
+        if (previous?.action === "send" && state.textarea && !state.textarea.value.trim()) state.textarea.value = previous.body.text;
+        supportMutations.adopt(conversationPayload.recoveryRequest, { ownerId: scopedSupportUserId, role: scopedSupportRole }, { replaceInactive: true });
+        if (mutationSnapshot.pending?.requestId === conversationPayload.recoveryRequest.requestId) await supportMutations.check();
+      }
     } catch (error) {
+      if (revision !== supportIdentityRevision) return null;
+      state.loadFailed = true;
       state.error = error?.message || "Support isn't available right now. Please try again in a moment.";
     } finally {
+      if (revision !== supportIdentityRevision) return null;
       state.loadingConversation = false;
       state.loadPromise = null;
       render();
@@ -1630,82 +1907,90 @@ function appendMessageIfMissing(nextMessage = null) {
   state.messages.push(nextMessage);
 }
 
-async function sendSupportMessage(rawText, options = {}) {
-  const text = String(rawText || "").trim();
-  if (!text || state.sending) return;
-  if (!isSupportSessionAllowed()) return;
+function clearOptimisticSupportMessages() {
+  if (state.optimisticMessageIds.size) state.messages = state.messages.filter(message => !state.optimisticMessageIds.has(message?.id));
+  state.optimisticMessageIds.clear();
+  state.optimisticRequestId = "";
+}
 
-  ensureDrawer();
-  await ensureConversationLoaded();
-  if (!state.conversation?.id) {
-    state.error = "Support isn't available right now. Please try again in a moment.";
-    render();
+function syncSupportMutation(next) {
+  if (next.pending?.requestId !== mutationSnapshot.pending?.requestId || (next.phase === "running" && mutationSnapshot.phase !== "running")) supportContentRevision++;
+  mutationSnapshot = next;
+  state.sending = next.busy && next.pending?.action === "send";
+  state.restartingConversation = next.busy && next.pending?.action === "restart";
+  if (next.phase === "running" && next.pending?.action === "send" && state.optimisticRequestId !== next.pending.requestId) {
+    clearOptimisticSupportMessages();
+    const user = createOptimisticMessage({ sender: "user", text: next.pending.body.text });
+    const assistant = createOptimisticMessage({ sender: "assistant", text: "", loading: true });
+    state.optimisticRequestId = next.pending.requestId;
+    state.optimisticMessageIds.add(user.id); state.optimisticMessageIds.add(assistant.id);
+    state.messages.push(user, assistant);
+    if (state.textarea?.value.trim() === next.pending.body.text) state.textarea.value = "";
+    state.error = ""; state.failedMessageText = "";
+  }
+  if (next.phase !== "running" || !next.busy) clearOptimisticSupportMessages();
+  if (!next.busy && next.pending?.action === "send" && state.textarea && !state.textarea.value.trim()) state.textarea.value = next.pending.body.text;
+  render();
+}
+
+function applySupportMutationResult(payload, record) {
+  supportContentRevision++;
+  clearOptimisticSupportMessages();
+  // Outcome receipts describe the original operation. A different current
+  // conversation may already have been started in another tab.
+  const currentId = state.conversation?.id;
+  if (record.action === "send" && state.textarea?.value.trim() === record.body.text) state.textarea.value = "";
+  if (currentId && currentId !== record.conversationId) {
+    state.error = "";
     return;
   }
-
-  const optimisticUser = createOptimisticMessage({ sender: "user", text });
-  const optimisticAssistant = createOptimisticMessage({ sender: "assistant", text: "", loading: true });
-  const previousDraft = state.textarea?.value || "";
-
-  state.sending = true;
-  state.error = "";
-  state.failedMessageText = "";
-  if (state.textarea) {
-    state.textarea.value = "";
+  const existingUpdatedAt = new Date(state.conversation?.updatedAt || 0).getTime();
+  const resultUpdatedAt = new Date(payload.conversation?.updatedAt || 0).getTime();
+  if (record.action === "restart" || resultUpdatedAt >= existingUpdatedAt) state.conversation = payload.conversation;
+  if (record.action === "restart") {
+    state.messages = payload.messages;
+    state.dismissedSuggestedReplyIds.clear();
+  } else {
+    appendMessageIfMissing(payload.userMessage);
+    if (record.action === "escalate") replaceMessageInState(payload.assistantMessage);
+    else appendMessageIfMissing(payload.assistantMessage);
+    appendMessageIfMissing(payload.systemMessage);
+    state.dismissedSuggestedReplyIds.delete(payload.assistantMessage.id);
   }
-  state.messages = [...state.messages, optimisticUser, optimisticAssistant];
-  render();
+  state.bootstrapped = true; state.loadFailed = false; state.error = "";
+  writeSupportSessionMarker(getSupportSessionUserId());
+}
 
+async function sendSupportMessage(rawText, options = {}) {
+  scopeSupportIdentity();
+  const revision = supportIdentityRevision;
+  const text = String(rawText || "").trim();
+  if (!text || mutationSnapshot.pending || state.escalatingMessageId || state.invokingAction || state.feedbackSubmittingIds.size || !isSupportSessionAllowed()) return;
+  if (text.length > 4000) { state.error = "Keep your question within 4,000 characters."; render(); return; }
+  ensureDrawer();
+  await ensureConversationLoaded();
+  if (revision !== supportIdentityRevision || supportInteractionPending()) return;
+  if (!state.conversation?.id || state.loadFailed) {
+    state.error ||= "Support isn't available right now. Please try again in a moment.";
+    render(); return;
+  }
+  const pageContext = getCurrentPageContext();
+  const sourcePage = `${pageContext.pathname || ""}${pageContext.search || ""}${pageContext.hash || ""}`;
   try {
-    const pageContext = getCurrentPageContext();
-    const sourcePage = `${pageContext.pathname || ""}${pageContext.search || ""}${pageContext.hash || ""}`;
-    const response = await secureFetch(
-      `/api/support/conversation/${encodeURIComponent(state.conversation.id)}/messages`,
-      {
-        method: "POST",
-        headers: { Accept: "application/json" },
-        body: {
-          text,
-          sourcePage,
-          pageContext,
-          promptAction: options?.promptAction || null,
-        },
-      }
-    );
-    if (!response.ok) {
-      throw new Error("Your message didn't send. Please try again.");
-    }
-
-    const payload = await response.json();
-    state.conversation = payload.conversation || state.conversation;
-    if (payload.assistantMessage?.id) {
-      state.dismissedSuggestedReplyIds.delete(payload.assistantMessage.id);
-    }
-    state.messages = state.messages.filter(
-      (message) => message.id !== optimisticUser.id && message.id !== optimisticAssistant.id
-    );
-    state.messages.push(payload.userMessage, payload.assistantMessage);
-    if (payload.systemMessage) {
-      appendMessageIfMissing(payload.systemMessage);
-    }
+    await supportMutations.begin({ ownerId: scopedSupportUserId, role: scopedSupportRole, conversationId: state.conversation.id, action: "send", body: { text, sourcePage, pageContext, promptAction: options?.promptAction || null } });
+    if (revision === supportIdentityRevision && mutationSnapshot.phase === "blocked") await ensureConversationLoaded(true);
   } catch (error) {
-    state.messages = state.messages.filter(
-      (message) => message.id !== optimisticUser.id && message.id !== optimisticAssistant.id
-    );
-    state.error = error?.message || "Your message didn't send. Please try again.";
-    state.failedMessageText = text;
-    if (state.textarea && !state.textarea.value.trim()) {
-      state.textarea.value = previousDraft || text;
-    }
-  } finally {
-    state.sending = false;
-    render();
+    if (revision !== supportIdentityRevision) return;
+    state.error = error?.message || "Your request could not be saved. Please try again."; render();
   }
 }
 
 async function sendEscalationRequest(messageId) {
-  if (!messageId || state.escalatingMessageId) return;
+  const revision = supportIdentityRevision;
+  let recoverOther = false;
+  if (!messageId || supportInteractionPending()) return;
   await ensureConversationLoaded();
+  if (revision !== supportIdentityRevision || supportInteractionPending()) return;
   if (!state.conversation?.id) {
     state.error = "Support isn't available right now. Please try again in a moment.";
     render();
@@ -1719,7 +2004,7 @@ async function sendEscalationRequest(messageId) {
   try {
     const pageContext = getCurrentPageContext();
     const sourcePage = `${pageContext.pathname || ""}${pageContext.search || ""}${pageContext.hash || ""}`;
-    const response = await secureFetch(
+    const response = await supportFetch(
       `/api/support/conversation/${encodeURIComponent(state.conversation.id)}/escalate`,
       {
         method: "POST",
@@ -1732,6 +2017,8 @@ async function sendEscalationRequest(messageId) {
       }
     );
     if (!response.ok) {
+      const failure = await response.json().catch(() => ({}));
+      recoverOther = failure.code === "SUPPORT_CONVERSATION_BUSY";
       throw new Error("Couldn't send this to the team right now. Please try again.");
     }
 
@@ -1740,85 +2027,43 @@ async function sendEscalationRequest(messageId) {
     replaceMessageInState(payload.assistantMessage || null);
     appendMessageIfMissing(payload.systemMessage || null);
   } catch (error) {
+    if (revision !== supportIdentityRevision) return;
     state.error = error?.message || "Couldn't send this to the team right now. Please try again.";
   } finally {
+    if (revision !== supportIdentityRevision) return;
     state.escalatingMessageId = "";
     render();
   }
+  if (recoverOther && revision === supportIdentityRevision) await ensureConversationLoaded(true);
 }
 
 async function restartSupportConversation() {
-  if (state.restartingConversation || state.sending || state.loadingConversation) return;
+  const revision = supportIdentityRevision;
+  if (supportInteractionPending()) return;
   await ensureConversationLoaded();
-  if (!state.conversation?.id) {
-    state.error = "Support isn't available right now. Please try again in a moment.";
-    render();
-    return;
+  if (revision !== supportIdentityRevision || supportInteractionPending()) return;
+  if (!state.conversation?.id || state.loadFailed) {
+    state.error ||= "Support isn't available right now. Please try again in a moment.";
+    render(); return;
   }
-
-  state.restartingConversation = true;
   state.error = "";
   stopLiveUpdates();
-  const restartingConversationId = state.conversation.id;
-  state.messages = [];
-  state.dismissedSuggestedReplyIds.clear();
-  render();
-
-  try {
-    await performSupportConversationRestart(restartingConversationId);
-  } catch (error) {
-    state.error = error?.message || "Couldn't start a new conversation right now. Please try again.";
-  } finally {
-    state.restartingConversation = false;
-    render();
-    if (state.textarea) {
-      state.textarea.focus();
-    }
-  }
-}
-
-async function performSupportConversationRestart(conversationId) {
   const pageContext = getCurrentPageContext();
   const sourcePage = `${pageContext.pathname || ""}${pageContext.search || ""}${pageContext.hash || ""}`;
-  const response = await secureFetch(
-    `/api/support/conversation/${encodeURIComponent(conversationId)}/restart`,
-    {
-      method: "POST",
-      headers: { Accept: "application/json" },
-      body: {
-        sourcePage,
-        pageContext,
-      },
-    }
-  );
-  if (!response.ok) {
-    throw new Error("Couldn't start a new conversation right now. Please try again.");
+  try {
+    await supportMutations.begin({ ownerId: scopedSupportUserId, role: scopedSupportRole, conversationId: state.conversation.id, action: "restart", body: { sourcePage, pageContext } });
+    if (revision === supportIdentityRevision && mutationSnapshot.phase === "blocked") await ensureConversationLoaded(true);
+  } catch (error) {
+    if (revision !== supportIdentityRevision) return;
+    state.error = error?.message || "The new conversation request could not be saved."; render();
   }
-
-  const payload = await response.json();
-  state.conversation = payload.conversation || null;
-  state.messages = Array.isArray(payload.messages) ? payload.messages : [];
-  state.dismissedSuggestedReplyIds.clear();
-  state.bootstrapped = true;
-  state.error = "";
-  syncLiveUpdates();
-  writeSupportSessionMarker(getSupportSessionUserId());
-  if (state.textarea) {
-    state.textarea.value = "";
-  }
-  return payload;
 }
 
 async function maybeRefreshConversationForAuthSession() {
   const currentUserId = getSupportSessionUserId();
-  if (!currentUserId) return;
-  if (readSupportSessionMarker() === currentUserId) return;
-  const hasUserHistory = state.messages.some((message) => message?.sender === "user");
-  if (!state.conversation?.id || !hasUserHistory) {
-    writeSupportSessionMarker(currentUserId);
-    return;
-  }
-  await performSupportConversationRestart(state.conversation.id);
+  if (currentUserId) writeSupportSessionMarker(currentUserId);
+  // A new tab is not a request to restart. The server owns inactivity resets;
+  // the explicit Start new conversation action owns manual resets.
 }
 
 async function sendCurrentDraft() {
@@ -1832,9 +2077,7 @@ function syncPinnedSupportDrawer() {
   document.body.classList.toggle("support-drawer-pinned", isPinned);
   state.drawer?.classList.toggle("is-pinned", isPinned);
   state.drawer?.setAttribute("aria-modal", isPinned ? "false" : "true");
-  state.pinButton?.setAttribute("aria-pressed", isPinned ? "true" : "false");
-  state.pinButton?.setAttribute("aria-label", isPinned ? "Unpin assistant" : "Pin assistant while you browse");
-  if (state.pinButton) state.pinButton.title = isPinned ? "Unpin assistant" : "Pin assistant";
+  if (isPinned) deactivateDialogFocus(state.drawer, { restoreFocus: false });
 }
 
 function setSupportDrawerPinned(pinned = false) {
@@ -1843,6 +2086,22 @@ function setSupportDrawerPinned(pinned = false) {
   persistPinnedSupportDrawer(state.pinned);
   if (state.pinned) closeSupportMenu();
   syncPinnedSupportDrawer();
+  if (state.open && !state.pinned && state.drawer) {
+    activateDialogFocus(state.drawer, {
+      initialFocus: document.activeElement instanceof HTMLElement && state.drawer.contains(document.activeElement)
+        ? document.activeElement
+        : state.textarea,
+      returnFocus: state.lastFocusedLauncher,
+      onEscape: () => closeSupportDrawer(),
+    });
+  }
+}
+
+function syncSupportResponsiveState() {
+  syncSidebarCollapseTab();
+  if (!state.open) return;
+  const shouldPin = canPinSupportDrawer();
+  if (state.pinned !== shouldPin) setSupportDrawerPinned(shouldPin);
 }
 
 export function closeSupportDrawer({ restoreFocus = true } = {}) {
@@ -1855,6 +2114,8 @@ export function closeSupportDrawer({ restoreFocus = true } = {}) {
   document.documentElement.classList.remove("support-drawer-open");
   document.body.classList.remove("support-drawer-open");
   state.drawer?.setAttribute("aria-hidden", "true");
+  state.drawer?.setAttribute("inert", "");
+  deactivateDialogFocus(state.drawer, { restoreFocus: false });
   syncPinnedSupportDrawer();
   syncLauncherState();
   if (restoreFocus && state.lastFocusedLauncher?.focus) {
@@ -1862,13 +2123,17 @@ export function closeSupportDrawer({ restoreFocus = true } = {}) {
   }
 }
 
-export async function openSupportDrawer({ launcher = null, focusComposer = true } = {}) {
+export async function openSupportDrawer({ launcher = null, focusComposer = true, promptText = "", submitPrompt = false, navigationAdapter = null } = {}) {
+  scopeSupportIdentity();
+  const revision = supportIdentityRevision;
   if (!isSupportSessionAllowed()) return;
-  if (!state.open) state.pinned = readPinnedSupportDrawer() && canPinSupportDrawer();
+  state.navigationAdapter = navigationAdapter || configuredSupportNavigationAdapter;
+  if (!state.open) state.pinned = canPinSupportDrawer();
   ensureDrawer();
   ensureSidebarCollapseTab();
   if (!state.drawer) return;
   await ensureStylesheet();
+  if (revision !== supportIdentityRevision) return;
   revealDrawerShell();
   state.lastFocusedLauncher = launcher || document.activeElement;
   closeNotificationPanels();
@@ -1879,13 +2144,28 @@ export async function openSupportDrawer({ launcher = null, focusComposer = true 
   document.documentElement.classList.add("support-drawer-open");
   document.body.classList.add("support-drawer-open");
   state.drawer.setAttribute("aria-hidden", "false");
+  state.drawer.removeAttribute("inert");
   syncPinnedSupportDrawer();
   render();
   await ensureConversationLoaded();
+  if (revision !== supportIdentityRevision) return;
   syncLiveUpdates();
   syncComposerPrompt();
+  const normalizedPrompt = String(promptText || "").trim();
+  if (normalizedPrompt && state.textarea) {
+    state.textarea.value = normalizedPrompt;
+    state.textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    if (submitPrompt) await sendSupportMessage(normalizedPrompt);
+  }
   if (focusComposer && state.textarea) {
     state.textarea.focus();
+  }
+  if (!state.pinned) {
+    activateDialogFocus(state.drawer, {
+      initialFocus: focusComposer ? state.textarea : state.closeButton,
+      returnFocus: state.lastFocusedLauncher,
+      onEscape: () => closeSupportDrawer(),
+    });
   }
 }
 
@@ -1893,6 +2173,7 @@ function createLauncher() {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "notification-icon support-launcher";
+  button.dataset.publicAction = "icon";
   button.setAttribute("aria-label", "Open AI help chat");
   button.title = "AI help chat";
   button.setAttribute("aria-controls", SUPPORT_DRAWER_ID);
@@ -1906,6 +2187,31 @@ function createLauncher() {
     await openSupportDrawer({ launcher: button });
   });
   return button;
+}
+
+export function registerSupportLauncher(button) {
+  if (!(button instanceof HTMLElement)) return null;
+  if (!state.launchers.includes(button)) state.launchers.push(button);
+  button.setAttribute("aria-controls", SUPPORT_DRAWER_ID);
+  button.setAttribute("aria-expanded", state.open ? "true" : "false");
+  if (button.dataset.boundSupportLauncher !== "true") {
+    button.dataset.boundSupportLauncher = "true";
+    button.addEventListener("click", async () => {
+      if (state.open) {
+        closeSupportDrawer();
+        return;
+      }
+      await openSupportDrawer({ launcher: button });
+    });
+  }
+  ensureDrawer();
+  syncLauncherState();
+  return button;
+}
+
+export function notifySupportRouteChanged() {
+  state.pageTracked = false;
+  recordCurrentView();
 }
 
 function insertLauncher(root) {
@@ -1930,6 +2236,18 @@ export function scanSupportLaunchers() {
   }
   ensureDrawer();
   ensureSidebarCollapseTab();
+  if (document.documentElement.dataset.lpcSupportExternalLauncher === "true") {
+    document.querySelectorAll(".support-launcher--floating").forEach((launcher) => launcher.remove());
+    state.launchers = state.launchers.filter((launcher) => launcher?.isConnected);
+    syncLauncherState();
+    if (readPinnedSupportDrawer() && !state.open && !state.restoringPinned && canPinSupportDrawer()) {
+      state.restoringPinned = true;
+      void openSupportDrawer({ focusComposer: false }).finally(() => {
+        state.restoringPinned = false;
+      });
+    }
+    return;
+  }
   const roots = [...document.querySelectorAll("[data-notification-center]")];
   if (roots.length) {
     document.querySelectorAll(".support-launcher--floating").forEach((launcher) => launcher.remove());
@@ -1970,5 +2288,5 @@ if (typeof window !== "undefined") {
   window.scanSupportLaunchers = scanSupportLaunchers;
   window.closeSupportDrawer = closeSupportDrawer;
   window.openSupportDrawer = openSupportDrawer;
-  window.addEventListener("resize", syncSidebarCollapseTab);
+  window.addEventListener("resize", syncSupportResponsiveState);
 }
