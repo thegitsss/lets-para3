@@ -1,0 +1,116 @@
+/* Flat working surfaces. Overview destination cards and form boundaries remain distinct. */
+body.admin-live #main>.admin-topbar{margin-bottom:18px}
+body.admin-live .section>header{margin-bottom:16px}
+body.admin-live .section :is(.panel,.admin-review-card,.admin-inbox-layout,.admin-conversation,.admin-message,.admin-facts,.workspace-panel,.ai-room-focus-block,.ai-room-focus-blocks-left){border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
+body.admin-live .section .panel{padding:0;margin-bottom:20px}
+body.admin-live .section .panel .panel{padding:0;margin:12px 0}
+body.admin-live .section .panel-header{margin-bottom:12px;gap:10px}
+body.admin-live .section :is(.admin-review-card,.admin-message){padding:12px 0;margin:0;border-bottom:1px solid var(--line)!important}
+body.admin-live .section :is(.table-wrap,table){border:0!important;border-radius:0!important;box-shadow:none!important}
+body.admin-live .section th{background:transparent;padding:8px 10px;color:var(--muted);font-size:12px;text-transform:none;letter-spacing:0}
+body.admin-live .section td{padding:10px;line-height:1.4}
+body.admin-live .section .admin-facts>div{padding:10px 12px;border-radius:0;background:transparent;border:0;border-bottom:1px solid var(--line)}
+body.admin-live .section :is(.pending-controls,.admin-inline-actions){gap:10px}
+body.admin-live .section .admin-tabs{margin-bottom:14px;gap:18px}
+body.admin-live .section .admin-detail-fold>summary{padding:8px 0}
+body.admin-live .section .admin-calm-options{margin:8px 0}
+body.admin-live .section .admin-empty{min-height:90px;padding:20px 0}
+body.admin-live #adminIdentity{font-size:13px;font-weight:500;min-height:34px;display:inline-flex;align-items:center;color:var(--ink);padding:0 4px}
+body.admin-live #adminSearchOpen kbd{display:none}
+body.admin-menu-mode #adminSimpleMenu{margin:20px auto 32px}
+body.admin-menu-mode #adminSimpleMenu h1{margin-bottom:20px}
+body.admin-menu-mode #adminSimpleMenu>nav{gap:12px}
+body.admin-menu-mode #adminSimpleMenu>nav>a{min-height:145px;padding:18px;gap:8px}
+body.admin-menu-mode .admin-card-count{font-size:36px}
+body.admin-menu-mode .admin-calm-inbox .admin-inbox-layout{max-width:920px}
+body.admin-menu-mode .admin-calm-inbox #adminInboxDetail{padding:0}
+body.admin-menu-mode .admin-calm-inbox .admin-inbox-back{margin-bottom:16px}
+body.admin-menu-mode .admin-calm-inbox .admin-request-name{margin-bottom:12px}
+body.admin-menu-mode .admin-calm-inbox .admin-conversation{margin:12px 0;max-height:360px}
+body.admin-menu-mode .admin-calm-inbox .admin-message{margin:0;padding:10px 0}
+body.admin-menu-mode .admin-calm-inbox .admin-ticket-row{padding:14px 0;gap:4px 16px}
+body.admin-menu-mode .admin-calm-inbox #adminReplyText{margin:8px 0;min-height:90px}
+body.admin-menu-mode .admin-calm-inbox .admin-inquiry-options{margin-top:12px}
+body.admin-menu-mode .admin-dispute-table .admin-dispute-summary>td{padding-top:12px;padding-bottom:12px}
+@media(max-width:760px){body.admin-live .section .panel{padding:0}body.admin-live .section :is(button,input,select,summary){min-height:44px}body.admin-menu-mode #adminSimpleMenu>nav>a{min-height:135px}}
+body.admin-live .section :is(.card,.ai-room-card,.ai-room-card-queue,.ai-room-summary-tile,.ai-room-list-item,.engineering-detail-meta-item,.engineering-ticket-card,.knowledge-detail-meta-item){border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;padding:12px 0}
+body.admin-live .section :is(.ai-room-list-item,.engineering-ticket-card){border-bottom:1px solid var(--line)!important}
+body.admin-live .admin-account-scroll :is(.admin-review-card,.admin-facts){border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;padding:12px 0;margin-bottom:12px}
+body.admin-live .admin-account-scroll .admin-facts>div{background:transparent;border:0;border-bottom:1px solid var(--line);padding:10px}
+/* Inbox: compact toolbar, familiar sender/subject/date rows, deliberate empty state. */
+body.admin-menu-mode .admin-calm-inbox .admin-inbox-layout{max-width:none}
+body.admin-menu-mode .admin-calm-inbox .admin-request-toolbar{display:flex;align-items:center;gap:8px;margin:0;padding:0 0 14px;border-bottom:1px solid var(--line)}
+body.admin-menu-mode .admin-calm-inbox .admin-request-toolbar select{width:auto;min-width:0;min-height:36px;padding:6px 28px 6px 10px;font-size:13px}
+body.admin-menu-mode .admin-calm-inbox #adminInboxSearch{width:250px;max-width:40%;min-height:36px;margin-left:auto;padding:7px 10px;font-size:13px}
+body.admin-menu-mode .admin-calm-inbox #adminInboxListStatus{margin:10px 0;font-size:12px}
+body.admin-menu-mode .admin-mail-columns{display:grid;grid-template-columns:190px minmax(0,1fr) 100px;gap:20px;padding:10px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+body.admin-menu-mode .admin-mail-columns>span:last-child{text-align:right}
+body.admin-menu-mode .admin-calm-inbox .admin-ticket-row{grid-template-columns:190px minmax(0,1fr) 100px;gap:4px 20px;padding:14px 12px;min-height:68px}
+body.admin-menu-mode .admin-calm-inbox .admin-ticket-person{grid-column:1;grid-row:1 / span 2;font-size:14px;align-self:start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+body.admin-menu-mode .admin-calm-inbox .admin-ticket-row>strong{grid-column:2;grid-row:1;font-size:14px;font-weight:500}
+body.admin-menu-mode .admin-calm-inbox .admin-ticket-row>.admin-row-preview{display:block;grid-column:2;grid-row:2;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:13px;color:var(--muted)}
+body.admin-menu-mode .admin-calm-inbox .admin-ticket-meta{grid-column:3;grid-row:1;justify-content:flex-end;white-space:nowrap}
+body.admin-menu-mode .admin-calm-inbox .admin-empty{display:flex;min-height:260px;align-items:center;justify-content:center;gap:12px;text-align:center;border-bottom:1px solid var(--line)}
+body.admin-menu-mode .admin-calm-inbox .admin-empty-icon{display:grid;width:40px;height:40px;border:0;border-radius:0;background:transparent;color:var(--muted)}
+body.admin-menu-mode .admin-calm-inbox .admin-empty strong{font-size:14px;font-weight:500;color:var(--muted)}
+body.admin-menu-mode .admin-calm-inbox #adminInboxDetail{max-width:920px}
+@media(max-width:760px){
+ body.admin-menu-mode .admin-calm-inbox .admin-request-toolbar{flex-wrap:wrap}
+ body.admin-menu-mode .admin-calm-inbox .admin-request-toolbar select{min-height:44px;flex:1}
+ body.admin-menu-mode .admin-calm-inbox #adminInboxSearch{width:100%;max-width:100%;min-height:44px;margin:0;flex-basis:100%}
+ body.admin-menu-mode .admin-mail-columns{display:none}
+ body.admin-menu-mode .admin-calm-inbox .admin-ticket-row{grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:14px 0}
+ body.admin-menu-mode .admin-calm-inbox .admin-ticket-person{grid-column:1;grid-row:1}
+ body.admin-menu-mode .admin-calm-inbox .admin-ticket-meta{grid-column:2;grid-row:1}
+ body.admin-menu-mode .admin-calm-inbox .admin-ticket-row>strong{grid-column:1 / -1;grid-row:2}
+ body.admin-menu-mode .admin-calm-inbox .admin-ticket-row>.admin-row-preview{grid-column:1 / -1;grid-row:3}
+}
+body.admin-menu-mode #section-ai-control-room.visible{display:block}
+body.admin-menu-mode .admin-system-navigation{border:0;margin:0 0 20px}
+body.admin-menu-mode .admin-system-navigation>[data-section]{display:none}
+body.admin-menu-mode #adminSystemView{font-size:14px;min-width:190px;min-height:38px}
+body.admin-menu-mode .admin-system-overview{max-width:800px;margin-bottom:24px}
+body.admin-menu-mode .admin-system-heading{display:flex;align-items:center;justify-content:space-between}
+body.admin-menu-mode .admin-system-overview h2{font-size:16px;font-weight:600;margin:18px 0 10px}
+body.admin-menu-mode #adminSystemConnections{margin:0 0 24px}
+body.admin-menu-mode #adminSystemConnections>div{display:flex;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--line)}
+body.admin-menu-mode #adminSystemConnections dd{margin:0;color:var(--muted)}
+body.admin-menu-mode .admin-system-policy{border-bottom:1px solid var(--line)}
+body.admin-menu-mode .admin-system-policy summary{display:flex;justify-content:space-between;gap:16px;padding:14px 0;cursor:pointer;min-height:44px}
+body.admin-menu-mode .admin-system-policy summary>span:last-child{font-size:13px;color:var(--muted)}
+body.admin-menu-mode .admin-system-policy p{font-size:13px;color:var(--muted);max-width:65ch;margin:0 0 16px}
+body.admin-menu-mode .admin-system-diagnostics>summary{font-size:13px;color:var(--muted);padding:12px 0;cursor:pointer}
+body.admin-menu-mode .admin-system-diagnostics[open]{margin-top:20px}
+body.admin-menu-mode #adminSystemError:empty{display:none}
+body.admin-menu-mode #section-engineering .ai-room-eyebrow,body.admin-menu-mode #section-engineering>header p{display:none}
+body.admin-menu-mode #section-engineering .workspace-grid--engineering-main{gap:20px}
+body.admin-menu-mode #section-engineering .workspace-panel--detail-wide:has(#engineeringDetail>.ai-room-empty:only-child){display:none}
+body.admin-menu-mode #section-engineering .workspace-step-label{display:none}
+body.admin-menu-mode #section-activity-logs .pending-controls{display:flex;flex-wrap:wrap;gap:8px}
+body.admin-menu-mode #section-activity-logs .panel-header h3{display:none}
+body.admin-menu-mode #section-settings .settings-grid{max-width:800px;grid-template-columns:1fr}
+body.admin-menu-mode #section-settings .settings-row{padding:12px 0;border-bottom:1px solid var(--line)}
+body.admin-menu-mode #section-settings .settings-help{font-size:13px;color:var(--muted)}
+
+/* One destination, compact controls, references only when requested. */
+.admin-menu-mode #adminFinanceRecords > .admin-tabs { display:none; }
+.admin-menu-mode .escrow-chart-row { display:block; max-width:640px; }
+.admin-menu-mode .admin-payment-check input[type="search"] { width:100%; min-height:36px; margin:4px 0 8px; }
+.admin-menu-mode .admin-payment-match { display:flex; flex-direction:column; align-items:flex-start; gap:3px; width:100%; padding:10px 0; border:0; border-bottom:1px solid var(--line,#e3e7ef); background:transparent; text-align:left; color:inherit; }
+.admin-menu-mode .admin-payment-match small { color:var(--muted); }
+.admin-menu-mode .admin-record-reference { margin:8px 0; font-size:12px; color:var(--muted); }
+.admin-menu-mode .admin-record-reference code { display:block; overflow-wrap:anywhere; max-width:260px; margin-top:6px; }
+.admin-menu-mode .admin-record-reference summary { cursor:pointer; }
+.admin-menu-mode .admin-payment-check > h2 { font-size:18px; }
+.admin-menu-mode #adminPaymentSelection { font-size:13px; color:var(--muted); }
+.admin-menu-mode .workspace-grid > .admin-detail-fold { grid-column:1 / -1; }
+.admin-menu-mode .admin-matters-table td { overflow-wrap:anywhere; }
+.admin-menu-mode #adminFinanceRecordList .btn { white-space:nowrap; }
+.admin-menu-mode #section-sales-workspace .workspace-panel--form,
+.admin-menu-mode #section-marketing-drafts .workspace-panel--form { max-width:760px; }
+
+.admin-menu-mode .ai-room-empty { border:0; border-radius:0; background:transparent; text-align:left; padding:16px 0; min-height:0; }
+.admin-menu-mode #section-sales-workspace .panel-header p,
+.admin-menu-mode #section-marketing-drafts .panel-header p { display:none; }
+.admin-menu-mode #section-sales-workspace .workspace-grid--sales-top { display:block; }
+.admin-menu-mode #section-sales-workspace .panel[hidden] { display:none!important; }

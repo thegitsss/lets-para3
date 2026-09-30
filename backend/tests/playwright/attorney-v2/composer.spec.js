@@ -1,0 +1,107 @@
+const {test,expect}=require('playwright/test');
+async function mount(page) {
+  await page.route('**/composer-fixture.html',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/assets/styles/attorney-v2.css"><link rel="stylesheet" href="/assets/styles/matter-publication.css"><link rel="stylesheet" href="/assets/styles/attorney-v2-design.css"></head><body class="av2"><main style="padding:24px;width:100%"></main></body></html>'}));
+  await page.goto('/composer-fixture.html');
+  await page.evaluate(async()=>{
+    const {createDraftEditor}=await import('/assets/scripts/attorney-v2/draft-editor.mjs');
+    window.saved=null;window.aiFail=false;window.saveFail=false;window.aiRequests=[];window.publishCalls=0;
+    const persist=v=>{if(window.saveFail)throw Error('offline');return {draft:window.saved={...structuredClone(v),id:'b'.repeat(24),revision:'c'.repeat(64),rawTitle:v.title}};};
+    const api={readDraftDefaults:async()=>({ownerId:'a'.repeat(24),practiceArea:'Contract Law',state:'New York'}),get:async path=>{if(path.endsWith('/options'))return {practiceAreas:['Contract Law']};if(path.startsWith('/api/case-drafts/')&&window.saved)return {draft:window.saved};throw Object.assign(new Error(),{status:404});},createMatterDraft:async v=>persist(v),saveMatterDraft:async(id,v)=>persist(v),publishMatter:async()=>{window.publishCalls++;throw Error('Never publish in layout test');},suggestMatterDraft:async(brief,options)=>{window.aiRequests.push({brief,options});if(window.aiFail)throw Error('offline');return {suggestions:{title:options.current?'Refined summary':'Contract summary',practiceArea:'Contract Law',description:'Summarize the agreement for attorney review.',tasks:['Summarize key clauses']}};}};
+    let controller;
+    window.mountEditor=async(query='')=>{controller?.abort();controller=new AbortController();const view=createDraftEditor({query:new URLSearchParams(query)},{id:'a'.repeat(24)},{api,signal:controller.signal,privateState:{drafts:new Map()}});document.querySelector('main').replaceChildren(view);await view.readiness;};
+    await window.mountEditor();
+  });
+}
+test.beforeEach(async({page})=>mount(page));
+test('Describe generates directly into Shape, saves, resumes, and requires publishing confirmation',async({page})=>{
+  await expect(page.getByRole('heading',{name:'What do you need help with?'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Create a Matter',exact:true})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Draft save status'})).toBeHidden();
+  await page.getByRole('button',{name:'Discovery review',exact:true}).click();
+  await page.getByRole('button',{name:'Build my Matter →',exact:true}).click();
+  await expect(page.locator('#av2-draft-title')).toHaveValue('Contract summary');
+  await expect(page.getByRole('checkbox')).toHaveCount(0);
+  await expect(page.locator('#av2-draft-state')).toHaveValue('New York');
+  await page.locator('#av2-draft-compAmount').fill('800');
+  await expect(page.locator('.av2-compose-fee')).toHaveCount(0);await expect(page.locator('main')).not.toContainText('22%');
+  await page.getByRole('button',{name:'Review Matter →',exact:true}).click();
+  await expect(page.locator('.av2-draft-review')).toContainText('Contract summary');
+  await expect.poll(()=>page.evaluate(()=>window.saved?.compAmount)).toBe('800');
+  await expect(page.getByRole('region',{name:'Draft save status'})).toBeHidden();
+  await page.evaluate(()=>window.mountEditor('draftId='+window.saved.id+'&step=review'));
+  await expect(page.locator('.av2-draft-review')).toContainText('$800 flat fee');
+  await page.getByRole('button',{name:'Publish Matter',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Confirm and publish Matter',exact:true})).toBeVisible();await expect(page.getByLabel('Attorney payment breakdown')).toContainText('Total when you hire $976.00');
+  expect(await page.evaluate(()=>window.publishCalls)).toBe(0);
+});
+test('manual entry remains available after AI failure and mobile does not overflow',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('#av2-compose-brief').fill('Please prepare a contract summary.');
+  await page.evaluate(()=>window.aiFail=true);
+  await page.getByRole('button',{name:'Build my Matter →',exact:true}).click();
+  await expect(page.getByText('AI drafting is unavailable right now. Try again or continue manually.')).toBeVisible();
+  await page.getByRole('button',{name:"I'll enter the details myself",exact:true}).click();
+  await expect(page.locator('#av2-draft-description')).toHaveValue('Please prepare a contract summary.');
+  await page.getByRole('button',{name:'Review Matter →',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Before publishing'})).toBeVisible();
+  await page.getByRole('button',{name:'Review matter',exact:true}).click();
+  await expect(page.locator('#av2-draft-title')).toBeFocused();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+});
+test('refinement previews changes, protects newer edits, and preserves financial and timing choices',async({page})=>{
+  await page.getByRole('button',{name:'Discovery review',exact:true}).click();
+  await page.getByRole('button',{name:'Build my Matter →',exact:true}).click();
+  await page.locator('#av2-draft-compAmount').fill('900');await page.getByRole('button',{name:'Add deadline',exact:true}).click();await page.locator('#av2-draft-deadline').fill('2027-04-15');
+  await page.getByRole('button',{name:'Refine draft',exact:true}).click();
+  await page.locator('#av2-refine-instruction').fill('Make this more concise.');
+  const refine=page.locator('.av2-compose-refine').getByRole('button',{name:'Refine draft',exact:true});
+  await refine.click();await expect(page.getByRole('button',{name:'Use revised draft'})).toBeVisible();
+  await expect(page.locator('#av2-draft-title')).toHaveValue('Contract summary');
+  await page.locator('#av2-draft-title').fill('My title');
+  await page.getByRole('button',{name:'Use revised draft'}).click();
+  await expect(page.getByText('Your draft changed. Refine again to include your latest edits.')).toBeVisible();
+  await refine.click();await page.getByRole('button',{name:'Use revised draft'}).click();
+  await expect(page.locator('#av2-draft-title')).toHaveValue('Refined summary');
+  await expect(page.locator('#av2-draft-compAmount')).toHaveValue('900');
+  await expect(page.locator('#av2-draft-deadline')).toHaveValue('2027-04-15');
+});
+test('requirements autosave, survive remount, and appear in the posting preview',async({page})=>{
+  await page.getByRole('button',{name:'Medical chronology',exact:true}).click();
+  await page.getByRole('button',{name:'Build my Matter →',exact:true}).click();
+  await page.getByRole('button',{name:'+ Add requirement',exact:true}).click();
+  await page.getByRole('textbox',{name:'New requirement'}).fill('Clio proficiency');
+  await page.getByRole('button',{name:'Add',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>window.saved?.requirements)).toEqual(['Clio proficiency']);
+  await page.evaluate(()=>window.mountEditor('draftId='+window.saved.id+'&step=review'));
+  await expect(page.locator('.av2-draft-review')).toContainText('Clio proficiency');
+  await expect(page.getByText('Compensation is still needed.',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Add compensation',exact:true}).click();
+  await expect(page.locator('#av2-draft-compAmount')).toBeFocused();
+  await page.locator('#av2-draft-compAmount').fill('1200');
+  await page.getByRole('button',{name:'Review Matter →',exact:true}).click();
+  await expect(page.locator('.av2-compose-disclosure')).toHaveCount(0);await expect(page.locator('.av2-draft-review')).toContainText('$1,200 flat fee');
+});
+test('failed autosave exposes recovery and never reports Saved',async({page})=>{
+  await page.evaluate(()=>window.saveFail=true);
+  await page.locator('#av2-compose-brief').fill('Prepare a medical chronology.');
+  await expect(page.locator('.av2-compose-save-status')).toHaveText('Saving…');
+  await expect(page.getByRole('region',{name:'Draft save status'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Check saved draft',exact:true})).toBeVisible();
+  await expect(page.locator('.av2-compose-save-status')).toBeHidden();
+  await page.evaluate(()=>window.saveFail=false);
+  await page.getByRole('button',{name:'Check saved draft',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Draft save status'})).toBeVisible();
+  await page.getByRole('region',{name:'Draft save status'}).getByRole('button',{name:'Save draft',exact:true}).click();
+  await expect(page.locator('.av2-compose-save-status')).toHaveText('Saved');
+  await expect(page.getByRole('region',{name:'Draft save status'})).toBeHidden();
+});
+test('mobile Shape and Review stay within the content grid',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.getByRole('button',{name:'Medical chronology',exact:true}).click();
+  await page.getByRole('button',{name:'Build my Matter →',exact:true}).click();
+  await page.locator('#av2-draft-compAmount').fill('1200');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+  await page.getByRole('button',{name:'Review Matter →',exact:true}).click();
+  await expect(page.getByText('You’ll only fund the Matter when you hire a paralegal.',{exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+});

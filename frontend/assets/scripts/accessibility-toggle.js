@@ -51,3 +51,5 @@
     });
   });
 })();
+
+import("./web-vitals-rum.js").catch((error) => console.warn("[performance] RUM module failed to load", error));

@@ -1,3 +1,4 @@
+jest.mock("child_process", () => require("./helpers/incidentGitFixture").isolatedChildProcess(jest.requireActual("child_process")));
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -10,7 +11,6 @@ const { createIncidentFromHelpReport } = require("../services/incidents/intakeSe
 const {
   claimNextIncidentJob,
   runIncidentSchedulerOnce,
-  stopIncidentScheduler,
 } = require("../scheduler/incidentScheduler");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
@@ -59,8 +59,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  stopIncidentScheduler();
-  await closeDatabase();
+  try { await closeDatabase(); }
+  finally { require("./helpers/incidentGitFixture").cleanupIncidentGitFixture(); }
 });
 
 beforeEach(async () => {
@@ -156,7 +156,11 @@ describe("Incident scheduler workflow", () => {
     await runIncidentSchedulerOnce({ maxJobs: 2, workerId: "jest:incident-scheduler" });
 
     const second = await createHelpIncident(attorney);
-    await runIncidentSchedulerOnce({ maxJobs: 1, workerId: "jest:incident-scheduler" });
+    await runIncidentSchedulerOnce({
+      maxJobs: 1,
+      workerId: "jest:incident-scheduler",
+      jobTypes: ["intake_validation"],
+    });
 
     const original = await Incident.findOne({ publicId: first.incident.publicId }).lean();
     const duplicate = await Incident.findOne({ publicId: second.incident.publicId }).lean();
@@ -202,7 +206,7 @@ describe("Incident scheduler workflow", () => {
     const created = await createHelpIncident(paralegal, {
       summary: "Stripe payout failed after withdrawal review",
       description: "My payout is blocked after a withdrawal review and the Stripe release is missing.",
-      pageUrl: "https://www.lets-paraconnect.com/dashboard-paralegal.html#billing",
+      pageUrl: "https://www.lets-paraconnect.com/dashboard-paralegal.html#funds",
       routePath: "/api/payments/payouts",
       featureKey: "payout-status",
     });

@@ -32,7 +32,7 @@ const salesAccountSchema = new Schema(
 
 salesAccountSchema.index(
   { sourceFingerprint: 1 },
-  { unique: true, partialFilterExpression: { sourceFingerprint: { $type: "string", $ne: "" } } }
+  { unique: true, partialFilterExpression: { sourceFingerprint: { $type: "string", $gt: "" } } }
 );
 salesAccountSchema.index({ status: 1, updatedAt: -1 });
 

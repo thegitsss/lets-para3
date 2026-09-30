@@ -2,7 +2,9 @@ const router = require("express").Router();
 
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
+const { csrfProtection } = require("../utils/csrf");
 const MarketingDraftPacket = require("../models/MarketingDraftPacket");
+const { MARKETING_ACTIVE_WORKFLOW_TYPES } = require("../services/marketing/constants");
 const { createBrief, getBriefById, listBriefs } = require("../services/marketing/briefService");
 const { ensureDraftPacketForBrief } = require("../services/marketing/draftService");
 const {
@@ -44,20 +46,6 @@ const {
 } = require("../services/marketing/reviewService");
 const { getJrCmoBriefing } = require("../services/marketing/jrCmoResearchService");
 
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({
-    cookie: {
-      httpOnly: true,
-      sameSite: "strict",
-      secure: process.env.NODE_ENV === "production",
-    },
-  });
-}
-
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 function buildActor(req) {
@@ -67,6 +55,16 @@ function buildActor(req) {
     label: req.user?.email || "Admin",
   };
 }
+
+function hasOnlyBodyFields(req, res, allowedFields) {
+  const unsupported = Object.keys(req.body || {}).filter((field) => !allowedFields.has(field));
+  if (!unsupported.length) return true;
+  res.status(400).json({ error: "Unsupported LinkedIn connection field." });
+  return false;
+}
+
+const LINKEDIN_HINT_FIELDS = new Set(["organizationName", "organizationId", "organizationUrn"]);
+const LINKEDIN_CONNECTION_FIELDS = new Set(["isActive", ...LINKEDIN_HINT_FIELDS]);
 
 router.get(
   "/publishing/channel-connections/linkedin_company/oauth/callback",
@@ -124,7 +122,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const forceRefresh = String(req.query.refresh || "0").trim() === "1";
     const result = forceRefresh
-      ? await prepareFounderDailyLog({ now: new Date(), force: true, allowScheduledCycleCheck: false })
+      ? await prepareFounderDailyLog({ now: new Date(), allowScheduledCycleCheck: false })
       : await getFounderDailyLog({ now: new Date(), refreshIfStale: true });
     res.json({ ok: true, ...result });
   })
@@ -136,7 +134,6 @@ router.post(
   asyncHandler(async (_req, res) => {
     const result = await prepareFounderDailyLog({
       now: new Date(),
-      force: true,
       allowScheduledCycleCheck: false,
     });
     res.json({ ok: true, ...result });
@@ -210,6 +207,7 @@ router.post(
   "/publishing/channel-connections/linkedin_company/oauth/start",
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (!hasOnlyBodyFields(req, res, LINKEDIN_HINT_FIELDS)) return;
     const result = await startLinkedInOAuth({
       actor: buildActor(req),
       hints: req.body || {},
@@ -222,6 +220,7 @@ router.post(
   "/publishing/channel-connections/:channelKey",
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (!hasOnlyBodyFields(req, res, LINKEDIN_CONNECTION_FIELDS)) return;
     const connection = await upsertChannelConnection({
       channelKey: req.params.channelKey,
       payload: req.body || {},
@@ -314,7 +313,7 @@ router.post(
 router.get(
   "/draft-packets",
   asyncHandler(async (_req, res) => {
-    const packets = await MarketingDraftPacket.find({})
+    const packets = await MarketingDraftPacket.find({ workflowType: { $in: MARKETING_ACTIVE_WORKFLOW_TYPES } })
       .sort({ updatedAt: -1, createdAt: -1 })
       .limit(50)
       .lean();

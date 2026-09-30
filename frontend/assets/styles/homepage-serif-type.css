@@ -1,0 +1,203 @@
+/* Homepage Cormorant Garamond: existing responsive sizes plus 1pt. */
+.public-site-chrome .home-brand { font-size: calc(clamp(18.88px, 1.65vw, 23.2px) + 1pt); }
+.public-site-chrome .home-footer a.home-footer__brand { font-size: calc(clamp(18.88px, 1.65vw, 23.2px) + 1pt); }
+@media (max-width: 300px) {
+  .public-site-chrome .home-brand { font-size: calc(14px + 1pt); }
+}
+.product-wordmark { font-size: calc(0.73rem + 1pt); }
+.workflow__intro h2 { font-size: calc(clamp(4rem, 6.2vw, 5.5rem) + 1pt); }
+.paths__heading h2 { font-size: calc(clamp(4rem, 6.2vw, 5.5rem) + 1pt); }
+.workflow-chapter h3 { font-size: calc(clamp(1.45rem, 2vw, 1.9rem) + 1pt); }
+.state-heading h4, .completion-state h4 { font-size: calc(clamp(1.3rem, 2vw, 1.8rem) + 1pt); }
+.assistant-showcase__intro h2 { font-size: calc(clamp(4rem, 7vw, 7.2rem) + 1pt); }
+.assistant-workspace__matter h3 { font-size: calc(2rem + 1pt); }
+.assistant-showcase__intro h2 { font-size: calc(clamp(3.4rem, 4.6vw, 5rem) + 1pt); }
+.path-scene__copy h3 { font-size: calc(clamp(3.4rem, 4.6vw, 5rem) + 1pt); }
+.path-scene__copy h3 { font-size: calc(clamp(3rem, 4.4vw, 4rem) + 1pt); }
+.trust-band h2 { font-size: calc(clamp(1.8rem, 2.3vw, 2.45rem) + 1pt); }
+.clarity-section__intro h2 { font-size: calc(clamp(3.25rem, 4.6vw, 5rem) + 1pt); }
+.fee-card h3 { font-size: calc(clamp(2rem, 2.8vw, 3rem) + 1pt); }
+.fee-card__row > strong { font-size: calc(1.7rem + 1pt); }
+.home-faq > h3 { font-size: calc(clamp(2.6rem, 4vw, 4.6rem) + 1pt); }
+.home-faq summary { font-size: calc(clamp(1.25rem, 1.7vw, 1.65rem) + 1pt); }
+.home-faq__links > a { font-size: calc(clamp(1.65rem, 2.2vw, 2.25rem) + 1pt); }
+.closing-scene h2 { font-size: calc(clamp(3.25rem, 5.2vw, 4.5rem) + 1pt); }
+.role-action strong { font-size: calc(clamp(1.55rem, 2.1vw, 2rem) + 1pt); }
+.assistant-showcase__intro h2, .path-scene__copy h3 { font-size: calc(clamp(3.5rem, 4.4vw, 4.8rem) + 1pt); }
+@media (max-width: 960px) {
+  .workflow__intro h2, .paths__heading h2 { font-size: calc(4rem + 1pt); }
+}
+@media (max-width: 960px) {
+  .workflow-chapter h3 { font-size: calc(clamp(2.75rem, 7vw, 3.25rem) + 1pt); }
+}
+@media (max-width: 640px) {
+  .workflow__intro h2, .paths__heading h2 { font-size: calc(2.75rem + 1pt); }
+}
+@media (max-width: 640px) {
+  .closing-scene h2 { font-size: calc(2.3rem + 1pt); }
+}
+@media (max-width: 640px) {
+  .workflow-chapter h3 { font-size: calc(2.5rem + 1pt); }
+}
+@media (max-width: 640px) {
+  .path-scene__copy h3 { font-size: calc(3rem + 1pt); }
+}
+@media (max-width: 960px) {
+  .assistant-showcase__intro h2 { font-size: calc(clamp(3.6rem, 9vw, 5.5rem) + 1pt); }
+}
+@media (max-width: 640px) {
+  .assistant-showcase__intro h2 { font-size: calc(clamp(3.15rem, 15vw, 4.25rem) + 1pt); }
+}
+.workflow__intro h2 { font-size: calc(clamp(4.2rem, 7.2vw, 7.6rem) + 1pt); }
+.workflow-chapter h3 { font-size: calc(clamp(1.45rem, 2vw, 1.9rem) + 1pt); }
+.paths__heading h2 { font-size: calc(clamp(4.2rem, 7.4vw, 7.8rem) + 1pt); }
+.path-scene__copy h3 { font-size: calc(clamp(3.8rem, 5.8vw, 6.4rem) + 1pt); }
+.assistant-showcase__intro h2 { font-size: calc(clamp(3.8rem, 5.4vw, 6.2rem) + 1pt); }
+@media (max-width: 960px) {
+  .workflow-chapter h3 { font-size: calc(clamp(2rem, 7vw, 2.7rem) + 1pt); }
+}
+@media (max-width: 960px) {
+  .workflow__intro h2 { font-size: calc(clamp(4rem, 12vw, 6.5rem) + 1pt); }
+}
+@media (max-width: 960px) {
+  .paths__heading h2 { font-size: calc(clamp(4rem, 12vw, 6.5rem) + 1pt); }
+}
+@media (max-width: 960px) {
+  .path-scene__copy h3 { font-size: calc(clamp(3.7rem, 10vw, 5.4rem) + 1pt); }
+}
+@media (max-width: 640px) {
+  .workflow__intro h2, .paths__heading h2 { font-size: calc(clamp(3.7rem, 17vw, 5rem) + 1pt); }
+}
+@media (max-width: 640px) {
+  .path-scene__copy h3 { font-size: calc(clamp(3.5rem, 16vw, 4.7rem) + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .assistant-workspace__matter h3 { font-size: calc(1.65rem + 1pt); }
+}
+@media (min-width: 1100px) {
+  .lpc-home .assistant-workspace__matter h3 { font-size: calc(clamp(2.35rem, 3vw, 3.4rem) + 1pt); }
+}
+@media (max-width: 760px) {
+  .clarity-section__intro h2 { font-size: calc(clamp(3rem, 14vw, 4.7rem) + 1pt); }
+}
+@media (min-width: 961px) {
+  .lpc-home .workflow-chapter h3 { font-size: calc(clamp(3rem, 4.5vw, 5.2rem) + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .workflow__intro h2 { font-size: calc(clamp(3.05rem, 14vw, 3.5rem) + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .workflow-chapter h3 { font-size: calc(2.05rem + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .assistant-showcase__intro h2 { font-size: calc(clamp(3rem, 13vw, 3.3rem) + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .path-scene__copy h3 { font-size: calc(clamp(3rem, 14vw, 3.5rem) + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .clarity-section__intro h2 { font-size: calc(clamp(3rem, 13vw, 3.25rem) + 1pt); }
+}
+@media (min-width: 1100px) {
+  .lpc-home .assistant-workspace__matter h3 { font-size: calc(clamp(2.2rem, 3vw, 3.15rem) + 1pt); }
+}
+.lpc-home .home-faq__links > a { font-size: calc(clamp(1.65rem, 2.2vw, 2.25rem) + 1pt); }
+@media (max-width: 760px) {
+  .lpc-home .home-faq__links > a { font-size: calc(1.65rem + 1pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .workflow__intro h2 { font-size: calc(clamp(4.55rem, 7.7vw, 8.15rem) + 1pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .paths__heading h2 { font-size: calc(clamp(4.55rem, 7.9vw, 8.35rem) + 1pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .path-scene__copy h3 { font-size: calc(clamp(4.1rem, 6.2vw, 6.85rem) + 1pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .assistant-showcase__intro h2 { font-size: calc(clamp(4.1rem, 5.85vw, 6.7rem) + 1pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .trust-band h2 { font-size: calc(clamp(2rem, 2.55vw, 2.72rem) + 1pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .clarity-section__intro h2 { font-size: calc(clamp(3.55rem, 5vw, 5.4rem) + 1pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .home-faq > h3 { font-size: calc(clamp(2.85rem, 4.35vw, 5rem) + 1pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .home-faq summary { font-size: calc(clamp(1.4rem, 1.9vw, 1.85rem) + 1pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .home-faq__links > a { font-size: calc(clamp(1.65rem, 2.2vw, 2.25rem) + 1pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .closing-scene h2 { font-size: calc(clamp(3.55rem, 5.65vw, 4.9rem) + 1pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .role-action strong { font-size: calc(clamp(1.72rem, 2.3vw, 2.2rem) + 1pt); }
+}
+@media (min-width: 961px) {
+  .lpc-home .workflow-chapter > div:not(.workflow-mobile-canvas) { container-type: inline-size; }
+  .lpc-home .workflow-chapter h3 { font-size: min(calc(clamp(3.3rem, 4.9vw, 5.65rem) + 1pt), 20cqi); }
+}
+@media (max-width: 640px) {
+  .lpc-home .workflow__intro h2, .lpc-home .paths__heading h2, .lpc-home .assistant-showcase__intro h2, .lpc-home .clarity-section__intro h2 { font-size: calc(clamp(3.3rem, 14vw, 3.65rem) + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .workflow-chapter h3 { font-size: calc(2.25rem + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .path-scene__copy h3 { font-size: calc(clamp(3.25rem, 14.6vw, 3.75rem) + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .trust-band h2 { font-size: calc(2.1rem + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .home-faq > h3 { font-size: calc(3rem + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .home-faq summary { font-size: calc(1.42rem + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .home-faq__links > a { font-size: calc(1.65rem + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .closing-scene h2 { font-size: calc(clamp(3.4rem, 15vw, 4rem) + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .workflow-mobile-stage__heading h3 { font-size: calc(clamp(2.2rem, 10.5vw, 2.8rem) + 1pt); }
+}
+.lpc-home--hybrid :is(.workflow-canvas, .workflow-mobile-canvas, .workflow-mobile-stage__canvas) :is(.state-heading h4, .completion-state h4) { font-size: calc(clamp(1.5rem, 2.15vw, 2rem) + 1pt); }
+.lpc-home--hybrid .fee-card--hybrid h3 { font-size: calc(clamp(2.6rem, 3.6vw, 4.05rem) + 1pt); }
+.lpc-home--hybrid .fee-card--hybrid .fee-card__row > strong { font-size: calc(clamp(4.5rem, 6.1vw, 6.6rem) + 1pt); }
+.lpc-home--hybrid .fee-card--hybrid .fee-card__row > h4 { font-size: calc(clamp(1.65rem, 2.1vw, 2.2rem) + 1pt); }
+@media (max-width: 640px) {
+  .lpc-home--hybrid .fee-card--hybrid h3 { font-size: calc(3rem + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home--hybrid .fee-card--hybrid .fee-card__row > strong { font-size: calc(5.5rem + 1pt); }
+}
+.editorial-hero__qualifier { font-size: calc(clamp(1.32rem, 1.8vw, 1.72rem) + 1pt); }
+@media (max-width: 640px) {
+  .editorial-hero__qualifier { font-size: calc(1.2rem + 1pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home--hybrid .workflow-mobile-stage__canvas :is(.state-heading h4, .completion-state h4) { font-size: calc(1.65rem + 1pt); }
+}
+/* Serif text inheriting sizes from shared interface containers. */
+body.lpc-home--hybrid .product-topbar .product-wordmark { font-size: calc(.86rem + 1pt); }
+@media (min-width: 641px) {
+  .lpc-home .workflow-mobile-stage__heading h3 { font-size: calc(18.72px + 1pt); }
+}
+
+@media (max-width: 300px) {
+  .lpc-home .workflow-chapter h3 { font-size: clamp(1.55rem, 10vw, 1.85rem); }
+}
+
+.lpc-home :is(.workflow-chapter h3, .workflow-mobile-stage__heading h3) {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}

@@ -16,10 +16,11 @@ const Case = require("../models/Case");
 const DirectorOutreachRecord = require("../models/DirectorOutreachRecord");
 const DirectorOutreachEvent = require("../models/DirectorOutreachEvent");
 const DirectorProfile = require("../models/DirectorProfile");
-const PlatformIncome = require("../models/PlatformIncome");
+const retainCommission = require("./helpers/directorCommissionEvidence");
 const User = require("../models/User");
 const adminDirectorsRouter = require("../routes/adminDirectors");
 const directorRouter = require("../routes/directorPortal");
+const { createAuthSession } = require("../services/authSessionService");
 const {
   autoImportDirectorMail,
   processAutomaticDirectorFollowUps,
@@ -40,15 +41,27 @@ const app = (() => {
   return instance;
 })();
 
-function authCookieFor(user) {
+const authCookieCache = new WeakMap();
+
+async function authCookieFor(user) {
+  const cached = authCookieCache.get(user);
+  if (cached) return cached;
+  const authState = await User.findById(user._id).select("+authVersion").lean();
+  const { sessionId } = await createAuthSession(authState, {
+    headers: { "user-agent": "lpc-director-portal-test" },
+  });
   const payload = {
     id: user._id.toString(),
     role: user.role,
     email: user.email,
     status: user.status,
+    av: Number(authState?.authVersion || 0),
+    sid: sessionId,
   };
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "2h" });
-  return `token=${token}`;
+  const cookie = `token=${token}`;
+  authCookieCache.set(user, cookie);
+  return cookie;
 }
 
 function daysAgo(days, hour = 12) {
@@ -116,7 +129,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/outreach")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({
         attorneyName: "Jordan Ellis",
         attorneyEmail: "jordan@example-law.com",
@@ -161,7 +174,7 @@ describe("Director portal", () => {
 
     const duplicate = await request(app)
       .post("/api/director/outreach")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({
         attorneyName: "Jordan Ellis",
         attorneyEmail: "jordan@example-law.com",
@@ -184,7 +197,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/import-today")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({});
 
     expect(res.status).toBe(200);
@@ -214,7 +227,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/import-today")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({});
 
     expect(res.status).toBe(200);
@@ -237,7 +250,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/import-today")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({});
 
     expect(res.status).toBe(200);
@@ -346,7 +359,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/import-replies")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({});
 
     expect(res.status).toBe(200);
@@ -374,7 +387,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/import-replies")
-      .set("Cookie", authCookieFor(director))
+      .set("Cookie", await authCookieFor(director))
       .send({});
 
     expect(res.status).toBe(200);
@@ -425,7 +438,7 @@ describe("Director portal", () => {
 
     const res = await request(app)
       .post("/api/director/outreach")
-      .set("Cookie", authCookieFor(secondDirector))
+      .set("Cookie", await authCookieFor(secondDirector))
       .send({
         attorneyName: "Claimed Attorney",
         attorneyEmail: "claimed@example-law.com",
@@ -465,33 +478,13 @@ describe("Director portal", () => {
       firstOutreachSentAt: new Date("2026-06-01T12:00:00.000Z"),
       stage: "outreach_sent",
     });
-    const caseDoc = await Case.create({
-      attorney: attorney._id,
-      attorneyId: attorney._id,
-      paralegal: paralegal._id,
-      paralegalId: paralegal._id,
-      title: "Contract review",
-      details: "Review documents.",
-      status: "completed",
-      completedAt: new Date("2026-06-20T12:00:00.000Z"),
-      totalAmount: 100000,
-      lockedTotalAmount: 100000,
-      feeAttorneyPct: 22,
-      feeAttorneyAmount: 22000,
-      feeParalegalPct: 18,
-      feeParalegalAmount: 18000,
-    });
-    await PlatformIncome.create({
-      caseId: caseDoc._id,
-      attorneyId: attorney._id,
-      paralegalId: paralegal._id,
-      feeAmount: 40000,
-      stripeMode: "test",
-    });
+    await User.collection.updateOne({ _id: attorney._id }, { $set: { createdAt: new Date("2026-06-02T12:00:00Z"), approvedAt: new Date("2026-06-03T12:00:00Z") } });
+    const { matter: caseDoc } = await retainCommission({ attorney, paralegal, amount: 100000, attorneyFee: 22000, completedAt: new Date("2026-06-20T12:00:00.000Z") });
+    await Case.collection.updateOne({ _id: caseDoc._id }, { $set: { title: "Contract review" } });
 
     const res = await request(app)
       .get("/api/director/records")
-      .set("Cookie", authCookieFor(director));
+      .set("Cookie", await authCookieFor(director));
 
     expect(res.status).toBe(200);
     expect(res.body.records[0]).toEqual(
@@ -543,32 +536,12 @@ describe("Director portal", () => {
       lastReplyAt,
       stage: "outreach_sent",
     });
-    const caseDoc = await Case.create({
-      attorney: attorney._id,
-      attorneyId: attorney._id,
-      paralegal: paralegal._id,
-      paralegalId: paralegal._id,
-      title: "Analytics matter",
-      details: "Review documents.",
-      status: "completed",
-      createdAt: firstMatterPostedAt,
-      completedAt: firstMatterCompletedAt,
-      totalAmount: 100000,
-      lockedTotalAmount: 100000,
-      feeAttorneyPct: 22,
-      feeAttorneyAmount: 22000,
-    });
-    await PlatformIncome.create({
-      caseId: caseDoc._id,
-      attorneyId: attorney._id,
-      paralegalId: paralegal._id,
-      feeAmount: 22000,
-      stripeMode: "test",
-    });
+    const { matter: caseDoc } = await retainCommission({ attorney, paralegal, amount: 100000, attorneyFee: 22000, completedAt: firstMatterCompletedAt });
+    await Case.collection.updateOne({ _id: caseDoc._id }, { $set: { title: "Analytics matter", createdAt: firstMatterPostedAt } });
 
     const res = await request(app)
       .get("/api/director/analytics?days=30")
-      .set("Cookie", authCookieFor(director));
+      .set("Cookie", await authCookieFor(director));
 
     expect(res.status).toBe(200);
     expect(res.body.totals).toEqual(
@@ -622,7 +595,7 @@ describe("Director portal", () => {
 
     const overview = await request(app)
       .get("/api/director/overview?rangeDays=1")
-      .set("Cookie", authCookieFor(director));
+      .set("Cookie", await authCookieFor(director));
     expect(overview.status).toBe(200);
     expect(overview.body.counts.total).toBe(1);
     expect(overview.body.attention).toEqual(
@@ -633,7 +606,7 @@ describe("Director portal", () => {
 
     const records = await request(app)
       .get("/api/director/records?rangeDays=1")
-      .set("Cookie", authCookieFor(director));
+      .set("Cookie", await authCookieFor(director));
     expect(records.status).toBe(200);
     expect(records.body.records).toHaveLength(1);
     expect(records.body.records[0].attorneyEmail).toBe(recentAttorney.email);
@@ -670,6 +643,9 @@ describe("Director portal", () => {
     expect(sendEmail).toHaveBeenCalledTimes(1);
     expect(sendEmail.mock.calls[0][0]).toBe("jordan@example-law.com");
     expect(sendEmail.mock.calls[0][1]).toBe("need help posting your first matter?");
+    expect(sendEmail.mock.calls[0][2]).toContain("https://www.linkedin.com/company/lets-paraconnect/");
+    expect(sendEmail.mock.calls[0][2]).not.toMatch(/facebook|instagram/i);
+    expect(sendEmail.mock.calls[0][3].text).not.toMatch(/facebook|instagram/i);
     expect(sendEmail.mock.calls[0][3]).toEqual(
       expect.objectContaining({
         replyTo: "skyler@lets-paraconnect.com",
@@ -756,38 +732,20 @@ describe("Director portal", () => {
       founderAttentionAt: new Date("2026-06-04T12:00:00.000Z"),
       stage: "founder_attention",
     });
-    const caseDoc = await Case.create({
-      attorney: attorney._id,
-      attorneyId: attorney._id,
-      paralegal: paralegal._id,
-      paralegalId: paralegal._id,
-      title: "Audit matter",
-      details: "Audit docs.",
-      status: "completed",
-      completedAt: new Date("2026-06-20T12:00:00.000Z"),
-      totalAmount: 100000,
-      lockedTotalAmount: 100000,
-      feeAttorneyPct: 22,
-      feeAttorneyAmount: 22000,
-    });
-    await PlatformIncome.create({
-      caseId: caseDoc._id,
-      attorneyId: attorney._id,
-      paralegalId: paralegal._id,
-      feeAmount: 22000,
-      stripeMode: "test",
-    });
+    await User.collection.updateOne({ _id: attorney._id }, { $set: { createdAt: new Date("2026-06-02T12:00:00Z"), approvedAt: new Date("2026-06-03T12:00:00Z") } });
+    const { matter: caseDoc } = await retainCommission({ attorney, paralegal, amount: 100000, attorneyFee: 22000, completedAt: new Date("2026-06-20T12:00:00.000Z") });
+    await Case.collection.updateOne({ _id: caseDoc._id }, { $set: { title: "Audit matter" } });
 
     const overview = await request(app)
       .get("/api/admin/directors/overview")
-      .set("Cookie", authCookieFor(admin));
+      .set("Cookie", await authCookieFor(admin));
     expect(overview.status).toBe(200);
     expect(overview.body.directors).toHaveLength(1);
     expect(overview.body.replies).toHaveLength(1);
 
     const audit = await request(app)
       .get(`/api/admin/directors/records/${record._id}/audit`)
-      .set("Cookie", authCookieFor(admin));
+      .set("Cookie", await authCookieFor(admin));
     expect(audit.status).toBe(200);
     expect(audit.body.commissionAudit[0]).toEqual(
       expect.objectContaining({
@@ -799,13 +757,13 @@ describe("Director portal", () => {
 
     const csv = await request(app)
       .get("/api/admin/directors/records.csv")
-      .set("Cookie", authCookieFor(admin));
+      .set("Cookie", await authCookieFor(admin));
     expect(csv.status).toBe(200);
     expect(csv.text).toContain("Director,Attorney Name,Attorney Email");
     expect(csv.text).toContain("audit@example-law.com");
   });
 
-  test("admin can mark commissionable director attorney records paid and unpaid", async () => {
+  test("admin records and reverses manual commission without erasing history", async () => {
     const admin = await createAdmin();
     const director = await createDirector();
     const attorney = await User.create({
@@ -838,64 +796,47 @@ describe("Director portal", () => {
       commissionEarnedCents: 11000,
       commissionStatus: "accruing",
     });
-    const caseDoc = await Case.create({
-      attorney: attorney._id,
-      attorneyId: attorney._id,
-      paralegal: paralegal._id,
-      paralegalId: paralegal._id,
-      title: "Payable matter",
-      details: "Completed payable matter.",
-      status: "completed",
-      completedAt: new Date(),
-      totalAmount: 100000,
-      lockedTotalAmount: 100000,
-      feeAttorneyPct: 22,
-      feeAttorneyAmount: 22000,
-    });
-    await PlatformIncome.create({
-      caseId: caseDoc._id,
-      attorneyId: attorney._id,
-      paralegalId: paralegal._id,
-      feeAmount: 22000,
-      stripeMode: "test",
-    });
+    await User.collection.updateOne({ _id: attorney._id }, { $set: { createdAt: new Date("2026-06-02T12:00:00Z"), approvedAt: new Date("2026-06-03T12:00:00Z") } });
+    const { matter: caseDoc } = await retainCommission({ attorney, paralegal, amount: 100000, attorneyFee: 22000, completedAt: new Date() });
+    await Case.collection.updateOne({ _id: caseDoc._id }, { $set: { title: "Payable matter" } });
 
+    const review = await request(app).get(`/api/admin/directors/records/${record._id}/audit`).set("Cookie", await authCookieFor(admin));
+    expect(review.status).toBe(200);
+    const paymentId = require("crypto").randomUUID();
     const paid = await request(app)
       .patch(`/api/admin/directors/records/${record._id}/commission-payout`)
-      .set("Cookie", authCookieFor(admin))
-      .send({ paid: true, note: "ACH sent from LPC bank." });
+      .set("Cookie", await authCookieFor(admin))
+      .send({ requestId: paymentId, revision: review.body.record.commissionPayments.revision, action: "payment", amountCents: 11000, currency: "USD", stripeMode: "test", paidDate: "2026-09-01", reference: "Synthetic ACH reference", note: "ACH sent from LPC bank.", reconcileLegacy: false });
 
-    expect(paid.status).toBe(200);
+    expect({ status: paid.status, error: paid.body.error }).toEqual({ status: 200, error: undefined });
     expect(paid.body.record).toEqual(
       expect.objectContaining({
         id: String(record._id),
-        commissionPayoutStatus: "paid",
-        commissionPayoutNote: "ACH sent from LPC bank.",
+        commissionPayments: expect.objectContaining({ state: "paid", paidCents: 11000, outstandingCents: 0 }),
       })
     );
-    expect(paid.body.record.commissionPaidAt).toBeTruthy();
+    expect(paid.body.record.commissionPayments.history[0]).toMatchObject({ paidDate: "2026-09-01", note: "ACH sent from LPC bank." });
 
     const directorView = await request(app)
       .get("/api/director/records?rangeDays=90")
-      .set("Cookie", authCookieFor(director));
+      .set("Cookie", await authCookieFor(director));
     expect(directorView.status).toBe(200);
     expect(directorView.body.records[0]).toEqual(
       expect.objectContaining({
         attorneyEmail: "payable@example-law.com",
-        commissionPayoutStatus: "paid",
+        commissionPayments: expect.objectContaining({ state: "paid", paidCents: 11000 }),
       })
     );
 
     const unpaid = await request(app)
       .patch(`/api/admin/directors/records/${record._id}/commission-payout`)
-      .set("Cookie", authCookieFor(admin))
-      .send({ paid: false });
+      .set("Cookie", await authCookieFor(admin))
+      .send({ requestId: require("crypto").randomUUID(), revision: paid.body.record.commissionPayments.revision, action: "reverse", reverses: paymentId, note: "Correcting synthetic payment entry." });
 
     expect(unpaid.status).toBe(200);
     expect(unpaid.body.record).toEqual(
       expect.objectContaining({
-        commissionPayoutStatus: "unpaid",
-        commissionPaidAt: null,
+        commissionPayments: expect.objectContaining({ state: "unpaid", paidCents: 0, outstandingCents: 11000, history: expect.arrayContaining([expect.objectContaining({ id: paymentId, reversed: true })]) }),
       })
     );
   });

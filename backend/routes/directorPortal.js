@@ -2,6 +2,8 @@ const router = require("express").Router();
 
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
+const { csrfProtection } = require("../utils/csrf");
+const commissionAccount = require("../services/director/commissionAccountBoundary");
 const {
   getDirectorAnalytics,
   getDirectorOverview,
@@ -13,20 +15,6 @@ const {
   updateDirectorRecordState,
 } = require("../services/director/directorPortalService");
 
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({
-    cookie: {
-      httpOnly: true,
-      sameSite: "strict",
-      secure: process.env.NODE_ENV === "production",
-    },
-  });
-}
-
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 router.use(verifyToken, requireApproved, requireRole("director", "admin"));
@@ -34,29 +22,35 @@ router.use(verifyToken, requireApproved, requireRole("director", "admin"));
 router.get(
   "/overview",
   asyncHandler(async (req, res) => {
+    const verify = await commissionAccount.begin(req, res);
     const overview = await getDirectorOverview({ user: req.user, rangeDays: req.query.rangeDays });
-    res.json({ ok: true, ...overview });
+    await verify();
+    res.json({ ok: true, ownerId: String(req.user.id || req.user._id), ...overview });
   })
 );
 
 router.get(
   "/analytics",
   asyncHandler(async (req, res) => {
+    const verify = await commissionAccount.begin(req, res);
     const analytics = await getDirectorAnalytics({ user: req.user, days: req.query.days });
-    res.json({ ok: true, ...analytics });
+    await verify();
+    res.json({ ok: true, ownerId: String(req.user.id || req.user._id), ...analytics });
   })
 );
 
 router.get(
   "/records",
   asyncHandler(async (req, res) => {
+    const verify = await commissionAccount.begin(req, res);
     const records = await listDirectorRecords({
       user: req.user,
       stage: req.query.stage,
       rangeDays: req.query.rangeDays,
       limit: req.query.limit,
     });
-    res.json({ ok: true, records });
+    await verify();
+    res.json({ ok: true, ownerId: String(req.user.id || req.user._id), records });
   })
 );
 

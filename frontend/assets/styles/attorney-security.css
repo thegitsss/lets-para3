@@ -1,0 +1,31 @@
+.av2-security-section { padding: 0 0 28px; margin: 0 0 28px; border-bottom: 1px solid var(--av2-line); }
+.av2-security-section:last-child { border-bottom: 0; }
+.av2-security-password-section { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; }
+.av2-security-password-section > h2 { margin: 0; }
+.av2-security-section > h2 { font-size: 1.125rem; margin: 0 0 16px; font-weight: 600; }
+.av2-security-row { display: flex; justify-content: space-between; align-items: center; gap: 16px 24px; padding: 16px 0; border-bottom: 1px solid var(--av2-line); }
+.av2-security-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.av2-security-row > div { min-width: 0; }
+.av2-security-row > button { flex-shrink: 0; max-width: 100%; overflow-wrap: anywhere; }
+.av2-security-row h3 { font-size: 1rem; font-weight: 600; margin: 0; overflow-wrap: anywhere; }
+.av2-security-row p { margin: 6px 0 0; overflow-wrap: anywhere; line-height: 1.6; }
+.av2-security-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 16px 24px; padding-top: 20px; }
+.av2-security-footer p { flex: 1 1 240px; margin: 0; }
+.av2-security-danger { background: transparent; border: 0; min-height: 44px; color: #a52c32; text-align: left; text-decoration: underline; text-underline-offset: 4px; padding: 8px 0; font: inherit; cursor: pointer; }
+.theme-dark .av2-security-danger { color: #ffb4b4; }
+.av2-security-error { padding: 0 0 20px; }
+.av2-security-error p { color: #a52c32; margin: 0 0 12px; }
+.theme-dark .av2-security-error p { color: #ffb4b4; }
+.av2-security-dialog > p { line-height: 1.6; margin: 0 0 20px; }
+.av2-security-dialog form { display: grid; gap: 18px; }
+.av2-security-dialog form > .av2-actions { margin-top: 0; }
+.av2-security-dialog .av2-account-feedback { padding: 0; }
+.av2-security-password { display: flex; align-items: stretch; min-width: 0; }
+.av2-security-password input { border-radius: 6px 0 0 6px; padding-right: 8px; }
+.av2-security-reveal { flex: 0 0 60px; border: 1px solid var(--av2-muted); border-left: 0; border-radius: 0 6px 6px 0; padding: 8px; font: inherit; background: var(--av2-soft); color: var(--av2-ink); cursor: pointer; }
+.av2-security-qr { display: block; width: 240px; max-width: 100%; margin: 20px auto; background: white; }
+.av2-security-manual { margin: 0 0 20px; }
+.av2-security-manual summary { cursor: pointer; min-height: 44px; padding: 10px 0; color: var(--av2-accent); }
+.av2-security-secret { display: block; padding: 12px; background: var(--av2-soft); overflow-wrap: anywhere; font-size: .9375rem; }
+.av2-security-codes { padding: 20px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--av2-soft); font-size: 1rem; line-height: 1.8; }
+@media(max-width:600px) { .av2-security-row { flex-wrap: wrap; align-items: start; } .av2-security-row > div { flex: 1 1 100%; } .av2-security-row > button { margin-top: 2px; } }

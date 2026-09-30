@@ -8,7 +8,6 @@ const {
   claimNextIncidentJob,
   processClaimedIncidentJob,
   runIncidentSchedulerOnce,
-  stopIncidentScheduler,
 } = require("../scheduler/incidentScheduler");
 const { runIncidentRunnerOnce } = require("../scripts/incident-runner");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
@@ -64,7 +63,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  stopIncidentScheduler();
   await closeDatabase();
 });
 

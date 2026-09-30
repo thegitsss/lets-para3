@@ -1,0 +1,29 @@
+.lpc-invitation-dialog { box-sizing:border-box; inset:0; margin:auto; width:min(36rem,calc(100vw - 32px)); max-width:none; max-height:calc(100dvh - 32px); padding:24px; border:1px solid var(--app-border-soft,#d9dee5); border-radius:8px; color:var(--app-text,#1a2230); background:var(--app-surface,#fff); font:400 1rem/1.5 "Sarabun",sans-serif; overflow:auto; overscroll-behavior:contain; }
+.lpc-invitation-dialog[open] { display:flex; flex-direction:column; gap:16px; }
+.lpc-invitation-dialog [hidden] { display:none !important; }
+.lpc-invitation-dialog::backdrop { background:#0b1b3377; }
+.lpc-invitation-dialog > :not(.lpc-invitation-content) { flex:none; }
+.lpc-invitation-dialog header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; background:transparent; padding:0; border:0; }
+.lpc-invitation-dialog h2 { margin:0; min-width:0; font:500 1.375rem/1.3 "Sarabun",sans-serif; overflow-wrap:anywhere; }
+.lpc-invitation-dialog h3 { margin:0; font:500 1.125rem/1.4 "Sarabun",sans-serif; overflow-wrap:anywhere; }
+.lpc-invitation-dialog p { margin:0; overflow-wrap:anywhere; }
+.lpc-invitation-dialog :focus-visible { outline:2px solid var(--app-text,#1a2230); outline-offset:3px; }
+.lpc-invitation-dialog button,.lpc-invitation-dialog .lpc-invitation-actions a { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; min-height:44px; max-width:100%; padding:10px 14px; border:1px solid var(--app-muted,#596679); border-radius:6px; background:var(--app-surface,#fff); color:var(--app-text,#1a2230); font:400 .875rem/1.4 "Sarabun",sans-serif; text-decoration:none; text-align:center; white-space:normal; overflow-wrap:anywhere; cursor:pointer; }
+.lpc-invitation-dialog button:disabled { opacity:.6; cursor:default; }
+.lpc-invitation-field { display:grid; min-width:0; gap:8px; }
+.lpc-invitation-field input { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:10px 12px; border:1px solid var(--app-muted,#596679); border-radius:6px; color:var(--app-text,#1a2230); background:var(--app-surface,#fff); font:inherit; }
+.lpc-invitation-status { color:var(--app-muted,#596679); }
+.lpc-invitation-status:empty,.lpc-invitation-actions:empty { display:none; }
+.lpc-invitation-content { display:grid; flex:1 1 auto; min-height:0; min-width:0; gap:16px; overflow:auto; overscroll-behavior:contain; }
+.lpc-invitation-content dl { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px 16px; margin:0; }
+.lpc-invitation-content dt,.lpc-invitation-content dd { margin:0; min-width:0; overflow-wrap:anywhere; }
+.lpc-invitation-content dd { text-align:right; font-weight:500; }
+.lpc-invitation-choices { list-style:none; padding:0; margin:0; }
+.lpc-invitation-dialog .lpc-invitation-choices button { width:100%; padding:14px 4px; border:0; border-bottom:1px solid var(--app-border-soft,#d9dee5); border-radius:0; text-align:left; justify-content:flex-start; font:inherit; }
+.lpc-invitation-dialog .lpc-invitation-choices button:hover { background:var(--app-surface-soft,#f4f6f8); }
+.lpc-invitation-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+@media(max-width:480px) { .lpc-invitation-dialog { padding:16px; } }
+/* Profile pages retain their editorial headings; dialog headings use the shared UI face. */
+.lpc-invitation-dialog h2,.lpc-invitation-dialog h3,
+body.lpc-product-clean .lpc-invitation-dialog h2,body.lpc-product-clean .lpc-invitation-dialog h3 { font-family:"Sarabun",sans-serif !important; font-weight:500 !important; }
+.lpc-invitation-dialog .lpc-invitation-choices button:hover { background:color-mix(in srgb,currentColor 8%,transparent); }

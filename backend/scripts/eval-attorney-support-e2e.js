@@ -1,6 +1,6 @@
 const path = require("path");
 
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 process.env.OPENAI_SUPPORT_MANAGER_ENABLED = "true";
 
 const mongoose = require("mongoose");
@@ -126,8 +126,8 @@ function syntheticWorkflowExecutor(fixture) {
         isExpired: false,
       },
       requirements: {
-        paymentMethodRequiredBeforePosting: true,
-        paymentMethodRequiredBeforeApplications: true,
+        paymentMethodRequiredBeforePosting: false,
+        paymentMethodRequiredBeforeApplications: false,
         paymentMethodRequiredBeforeHiring: true,
         chargeTiming: "charged_when_hire_is_confirmed",
         postHireWorkflow: {
@@ -144,8 +144,12 @@ function syntheticWorkflowExecutor(fixture) {
           allScopeTasksCompleteRequired: true,
           verifiedFundingRequired: true,
           paralegalPayoutSetupRequired: true,
-          bankDepositEstimateBusinessDays: { minimum: 3, maximum: 5 },
-          bankDepositTimingDependsOn: ["stripe", "paralegal_bank"],
+          bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+          bankDepositTimingDependsOn: [
+            "stripe_account_country",
+            "stripe_payout_schedule",
+            "financial_institution",
+          ],
         },
       },
       stages: {
@@ -459,8 +463,13 @@ async function main() {
         name: "general paralegal payout timing uses executable workflow policy",
         messageText: "When does the paralegal get paid?",
         expectedTools: ["get_attorney_workflow_readiness"],
-        answerPattern: /(?:complete|completion)[\s\S]*(?:release|payout)[\s\S]*3\s*(?:–|-|to)\s*5\s+business days|(?:release|payout)[\s\S]*(?:complete|completion)[\s\S]*3\s*(?:–|-|to)\s*5\s+business days/i,
-        forbiddenPatterns: [/couldn(?:'|’)t verify/i, /check the matter(?:'|’)s payout status/i, /which matter/i],
+        answerPattern: /(?:complete|completion)[\s\S]*(?:release|payout)[\s\S]*Stripe[\s\S]*(?:estimated arrival|payout schedule)|Stripe[\s\S]*(?:estimated arrival|payout schedule)[\s\S]*(?:complete|completion)[\s\S]*(?:release|payout)/i,
+        forbiddenPatterns: [
+          /\b\d+\s*(?:–|-|to)\s*\d+\s+business days\b/i,
+          /couldn(?:'|’)t verify/i,
+          /check the matter(?:'|’)s payout status/i,
+          /which matter/i,
+        ],
         toolExecutor: syntheticWorkflowExecutor(fixture),
         sentenceLimit: 2,
         dimensions: ["financial", "workflow_policy", "factual_accuracy", "concision"],
@@ -553,10 +562,10 @@ async function main() {
       {
         id: "authorized_navigation",
         name: "billing navigation is exact and uncluttered",
-        messageText: "Where is Billing & Payments?",
+        messageText: "Where is Payments?",
         expectedTools: ["find_navigation_destination"],
         answerPattern: /billing/i,
-        expectedNavigationHref: "dashboard-attorney.html#billing",
+        expectedNavigationHref: "dashboard-attorney.html#funds",
         dimensions: ["navigation", "concision", "ui_relevance"],
         criticalGates: ["privacy_sensitive_fields"],
       },

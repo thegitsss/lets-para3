@@ -5,171 +5,64 @@
   <link rel="stylesheet" href="assets/styles/fonts.css" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Browse Jobs – Let’s-ParaConnect</title>
+  <title>Browse Matters – Let’s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/hero-pages.css" rel="stylesheet" />
-  <script src="assets/scripts/utils/session.js"></script>
+  <link href="assets/styles/global-search.css?v=20260831-3" rel="stylesheet" />
+  <script src="assets/scripts/utils/session.js?v=20260902-1"></script>
+  <script src="assets/scripts/utils/business-date.js"></script>
   <style>
     body.browse-jobs-page {
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
-      color: #1a2230;
-      background: #ffffff !important;
-      --hero-height: 210px;
+      color: var(--clean-ink, #1a2230);
+      background: var(--clean-surface, #ffffff) !important;
       margin: 0;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
 
-    body.auth-guarded .site-header,
-    body.auth-guarded .jobs-shell,
-    body.auth-guarded footer {
+    body.auth-guarded .jobs-shell {
       visibility: hidden;
     }
-
-    .site-header {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      z-index: 50;
-      background: rgba(255, 255, 255, 0.18) !important;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.35) !important;
-      box-shadow: none !important;
-      backdrop-filter: saturate(140%) blur(16px) !important;
-      transition: background 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-      color: #fff !important;
-    }
-
-    .site-header .header-inner {
-      width: min(1200px, 92vw);
-      margin: 0 auto;
-      padding: 22px 0;
-      display: grid;
-      gap: 32px;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
-      position: relative;
-      z-index: 5;
-    }
-
-    .site-header nav ul {
-      list-style: none;
-      display: flex;
-      gap: 28px;
-      margin: 0;
-      padding: 0;
-    }
-
-    .site-header nav a {
-      text-decoration: none;
-      color: #1a2230;
-      font-size: 0.95rem;
-      font-weight: 300;
-      opacity: 0.9;
-    }
-
-    .site-header nav a:hover {
-      opacity: 1;
-    }
-
-    .site-header .brand {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 1.35rem;
-      letter-spacing: 0.05em;
-      color: #1a2230 !important;
-      text-decoration: none;
-      justify-self: center;
-    }
-
-    .site-header .brand .accent-apostrophe {
-      color: #887244;
-    }
-
-    .site-header .header-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 12px;
-      z-index: 6;
-    }
-
-    button,
-    .site-header .pill {
+    button {
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
     }
 
-    .site-header .pill {
-      display: inline-flex;
+    .sidebar-toggle {
+      display: none;
+      width: 44px;
+      height: 44px;
       align-items: center;
-      padding: 8px 14px;
-      border-radius: 999px;
-      border: 1px solid rgba(26, 34, 48, 0.2) !important;
-      text-transform: uppercase;
-      font-size: 0.75rem;
-      letter-spacing: 0.08em;
-      color: #1a2230 !important;
-      text-decoration: none;
-      background: transparent !important;
+      justify-content: center;
+      padding: 0;
+      color: #202124;
+      background: var(--clean-surface, #ffffff);
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      box-shadow: none;
+      cursor: pointer;
     }
 
-    .site-header .signup-pill {
-      border-color: #1a2230 !important;
-    }
-
-    .site-header #returnDashboard {
-      color: #ffffff !important;
-      border: none !important;
-      position: relative;
-    }
-    .site-header #returnDashboard::after {
-      content: "";
-      position: absolute;
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
       inset: 0;
-      border-radius: inherit;
-      border: 1px solid #ffffff;
-      box-sizing: border-box;
-      pointer-events: none;
-      width: 200%;
-      height: 200%;
-      transform: scale(0.5);
-      transform-origin: 0 0;
-    }
-    .site-header.over-image #returnDashboard {
-      color: #1a2230 !important;
-    }
-    .site-header.over-image #returnDashboard::after {
-      border-color: #1a2230;
-    }
-
-    .site-header.over-image {
-      background: rgba(255, 255, 255, 0.95) !important;
-      border-color: rgba(15, 23, 42, 0.08) !important;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
-      color: #1a2230 !important;
-    }
-
-    .site-header.over-image nav a,
-    .site-header.over-image .brand,
-    .site-header.over-image .pill {
-      color: #1a2230;
-      border-color: rgba(26, 34, 48, 0.2);
-    }
-
-    .site-header.over-image .signup-pill {
-      border-color: rgba(26, 34, 48, 0.35) !important;
+      z-index: 1900;
+      background: rgba(15, 23, 42, 0.35);
     }
 
     .jobs-shell {
-      width: min(1100px, 94vw);
-      margin: 60px auto 0;
+      width: min(1100px, calc(100% - 48px));
+      margin: 24px auto 0;
       padding: 0 24px;
+      box-sizing: border-box;
       flex: 1 0 auto;
     }
 
@@ -182,7 +75,7 @@
     aside.filter {
       width: 210px;
       flex-shrink: 0;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       border: 1px solid rgba(26, 34, 48, 0.08);
       border-radius: 18px;
       padding: 0.9rem;
@@ -213,9 +106,9 @@
       padding: 0.45rem 0.6rem;
       border: 1px solid rgba(26, 34, 48, 0.12);
       border-radius: 8px;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       font-size: 0.9rem;
-      color: #475569;
+      color: var(--clean-muted, #475569);
     }
 
     .filter-group select:focus,
@@ -232,7 +125,7 @@
       gap: 0.4rem;
     }
 
-    .slider-field span { font-size: 0.85rem; color: #475569; }
+    .slider-field span { font-size: 0.85rem; color: var(--clean-muted, #475569); }
     input[type="range"] {
       flex: 1;
       accent-color: #0a84ff;
@@ -250,7 +143,7 @@
       border-radius: 999px;
       border: 1px solid #887244;
       background: transparent;
-      color: #887244;
+      color: var(--clean-link, #887244);
       cursor: pointer;
       letter-spacing: 0.04em;
     }
@@ -263,18 +156,22 @@
     .filter-actions #clearFilters {
       border: none;
       background: none;
-      padding: 0;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 12px;
+      margin-inline-start: -12px;
       font-size: 0.85rem;
       letter-spacing: 0.02em;
-      color: #7a8495;
-      text-decoration: none;
+      color: var(--clean-muted, #5f6b7c);
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.16em;
     }
 
     .filter-actions #clearFilters:hover,
     .filter-actions #clearFilters:focus-visible {
-      text-decoration: none;
-      font-weight: 200;
-      color: #5f6b7c;
+      color: var(--clean-ink, #465264);
+      text-decoration-thickness: 2px;
     }
 
     .results {
@@ -297,11 +194,10 @@
       align-items: center;
     }
 
-    .results-header h2 {
+    .results-header h1 {
       margin: 0;
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 2rem;
-      font-weight: 300;
+      font-size: 1.65rem;
+      font-weight: 600;
     }
 
     .results-header p { color: #64748b; margin: 0.2rem 0 0; }
@@ -319,7 +215,7 @@
       border-radius: 999px;
       padding: 0.35rem 0.9rem;
       font-size: 0.95rem;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
     }
@@ -337,7 +233,7 @@
     .job-card {
       border: 1px solid rgba(26, 34, 48, 0.08);
       border-left: 4px solid #887244;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       padding: 1.4rem 1.6rem;
       border-radius: 18px;
       box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
@@ -359,7 +255,7 @@
     }
 
     .job-card .area {
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.95rem;
       margin-bottom: 0.4rem;
     }
@@ -368,7 +264,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 0.65rem;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.9rem;
       margin-bottom: 0.8rem;
     }
@@ -376,7 +272,7 @@
     .partial-completion-note {
       margin-top: 0.35rem;
       margin-bottom: 0.8rem;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.85rem;
     }
 
@@ -389,12 +285,12 @@
     .job-card-footer {
       margin-top: 0.6rem;
       font-size: 0.82rem;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
     }
 
     .flag-button {
       border: 1px solid rgba(26, 34, 48, 0.15);
-      background: #fff;
+      background: var(--clean-surface, #fff);
       color: #8b6a2f;
       width: 28px;
       height: 28px;
@@ -422,7 +318,7 @@
       top: 48px;
       right: 16px;
       width: min(260px, 82vw);
-      background: #ffffff;
+      background: var(--clean-surface, #ffffff);
       border: 1px solid rgba(26, 34, 48, 0.12);
       border-radius: 16px;
       box-shadow: 0 24px 50px rgba(15, 23, 42, 0.16);
@@ -438,7 +334,7 @@
     }
 
     .flag-menu-subtitle {
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.85rem;
       margin-bottom: 10px;
     }
@@ -448,7 +344,7 @@
       align-items: flex-start;
       gap: 8px;
       font-size: 0.92rem;
-      color: #1a2230;
+      color: var(--clean-ink, #1a2230);
       margin-bottom: 8px;
     }
 
@@ -485,8 +381,8 @@
 
     .flag-cancel {
       border: 1px solid #d1d5db;
-      background: #ffffff;
-      color: #6b7280;
+      background: var(--clean-surface, #ffffff);
+      color: var(--clean-muted, #6b7280);
       padding: 6px 14px;
       border-radius: 999px;
       cursor: pointer;
@@ -516,8 +412,9 @@
       font-size: 0.9rem;
       cursor: pointer;
       background: transparent;
-      color: #887244;
+      color: var(--clean-link, #887244);
       letter-spacing: 0.02em;
+      min-height: 44px;
     }
 
     .apply-button { background: #887244; color: #fff; }
@@ -568,7 +465,8 @@
       animation: jobExpandIn 420ms cubic-bezier(.2,.7,.2,1);
       transform-origin: center top;
       position: relative;
-      padding-bottom: 110px;
+      width: 100%;
+      box-sizing: border-box;
     }
     .job-card .pill-label {
       display: inline-flex;
@@ -606,13 +504,13 @@
       height: 30px;
       border-radius: 999px;
       border: 1px solid rgba(26, 34, 48, 0.18);
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       font-size: 0.95rem;
-      background: #fff;
+      background: var(--clean-surface, #fff);
     }
     .apply-info-disclosure summary::-webkit-details-marker {
       display: none;
@@ -650,11 +548,11 @@
       gap: 1rem;
       margin-top: 1rem;
       }
-    .expanded-body .lede { color: #475569; margin: 0 0 0.65rem; line-height: 1.6; }
+    .expanded-body .lede { color: var(--clean-muted, #475569); margin: 0 0 0.65rem; line-height: 1.6; }
     .description-label {
       font-size: 0.95rem;
       letter-spacing: 0.16em;
-      color: #475569;
+      color: var(--clean-muted, #475569);
       margin-top: 0.6rem;
     }
     .expanded-body .main-description {
@@ -666,7 +564,7 @@
     }
     .job-task-list {
       margin: 0.6rem 0 0 1.2rem;
-      color: #475569;
+      color: var(--clean-muted, #475569);
       line-height: 1.6;
       display: grid;
       gap: 6px;
@@ -688,7 +586,7 @@
     }
     .ghost-button {
       border: 1px solid rgba(26, 34, 48, 0.15);
-      background: #fff;
+      background: var(--clean-surface, #fff);
       color: #0f172a;
     }
     .apply-info-title {
@@ -712,21 +610,29 @@
       color: #0f172a;
       line-height: 1.35;
     }
+    .expanded-footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(26, 34, 48, 0.08);
+    }
     .posted-by {
       display: grid;
       grid-template-columns: auto auto 1fr;
       align-items: center;
       gap: 10px;
-      margin-top: 16px;
-      padding-top: 12px;
-      border-top: 1px solid rgba(26, 34, 48, 0.08);
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
     .posted-label {
       grid-column: 1 / -1;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       font-size: 0.78rem;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
     }
     .posted-avatar {
       width: 42px;
@@ -744,20 +650,17 @@
       font-size: 1.1rem;
     }
     .posted-firm {
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.98rem;
       font-family: 'Cormorant Garamond', serif;
       text-decoration: none;
     }
-    .posted-count { color: #475569; font-size: 0.9rem; }
+    .posted-count { color: var(--clean-muted, #475569); font-size: 0.9rem; }
     .expanded-footer-actions {
-      position: absolute;
-      right: 16px;
-      bottom: 16px;
       display: flex;
-      flex-direction: column;
+      flex-wrap: wrap;
       gap: 8px;
-      align-items: flex-end;
+      align-items: center;
     }
     @keyframes jobExpandIn {
       0% { opacity: 0; transform: translateY(18px) scale(.96); box-shadow: 0 12px 32px rgba(10,15,25,0.08); }
@@ -793,7 +696,7 @@
 
     #pagination {
       text-align: center;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.95rem;
       display: flex;
       align-items: center;
@@ -804,8 +707,8 @@
 
     .pagination-btn {
       border: 1px solid rgba(26, 34, 48, 0.2);
-      background: #ffffff;
-      color: #1a2230;
+      background: var(--clean-surface, #ffffff);
+      color: var(--clean-ink, #1a2230);
       padding: 0.35rem 1.1rem;
       border-radius: 999px;
       font-size: 0.85rem;
@@ -837,24 +740,6 @@
       color: #7a8699;
     }
 
-    footer {
-      border-top: 1px solid rgba(26, 34, 48, 0.08);
-      padding: 32px 0;
-      background: #ffffff;
-      text-align: center;
-      color: #6b7280;
-      font-size: 0.85rem;
-      margin-top: auto;
-    }
-
-    footer nav {
-      display: inline-flex;
-      gap: 12px;
-      margin: 0 0 8px;
-    }
-
-    footer a { color: #6b7280; text-decoration: none; }
-
     @media (max-width: 960px) {
       .layout { flex-direction: column; }
       aside.filter {
@@ -873,44 +758,98 @@
       aside.filter.active { transform: translateX(0); }
       .filter-toggle {
         display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
         padding: 0.4rem 1rem;
         border: 1px solid rgba(26, 34, 48, 0.2);
         border-radius: 999px;
         background: transparent;
-        color: #1a2230;
+        color: var(--clean-ink, #1a2230);
         cursor: pointer;
         font-size: 0.9rem;
       }
       .jobs-shell {
-        margin: 52px auto 0;
+        margin: 24px auto 0;
         padding-bottom: 24px;
       }
-      footer {
-        padding: 28px 0 36px;
+    }
+
+    @media (max-width: 900px) {
+      .sidebar-toggle {
+        display: inline-flex;
+        position: fixed;
+        top: 14px;
+        left: 14px;
+        z-index: 2100;
+      }
+
+      body.nav-open .sidebar-backdrop {
+        display: block;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .jobs-shell {
+        width: 100%;
+        margin-top: 16px;
+        padding-inline: 16px;
       }
     }
   </style>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260831-21" />
+  <link rel="stylesheet" href="assets/styles/lpc-product-components.css?v=20260901-1" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260902-5" />
+  <script defer src="assets/scripts/universal-header.js?v=20260831-3"></script>
+  <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
+  <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
 </head>
-<body class="browse-jobs-page">
+<body class="browse-jobs-page dashboard-no-shadows lpc-product-clean lpc-auth-resource-page lpc-static-universal-header lpc-auth-shell-v2">
   <a class="skip-link" href="#main">Skip to main content</a>
-<header class="site-header">
-    <div class="header-inner">
-      <nav aria-label="Primary"></nav>
-      <a class="brand" href="index.html">Let<span class="accent-apostrophe">’</span>s-ParaConnect</a>
-      <div class="header-actions">
-<a class="pill signup-pill" href="dashboard-paralegal.html" id="returnDashboard">RETURN TO DASHBOARD</a>
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open navigation" aria-controls="sidebarNav" aria-expanded="false">
+    <span class="lpc-mobile-menu-icon" aria-hidden="true"></span>
+  </button>
+  <aside class="sidebar" id="sidebarNav" aria-label="Dashboard navigation">
+    <div class="logo sidebar-profile-host">
+      <div class="sidebar-profile-cluster" data-lpc-sidebar-profile>
+        <button class="user-chip lpc-sidebar-profile-trigger" type="button" data-lpc-sidebar-profile-trigger aria-label="Open profile menu" aria-haspopup="true" aria-expanded="false">
+          <img class="globalProfileImage lpc-sidebar-profile-trigger-avatar" src="assets/avatar-placeholder.svg" alt="" />
+          <span class="lpc-sidebar-profile-trigger-details"><strong class="globalProfileName">Member</strong></span>
+          <svg class="lpc-profile-trigger-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"></path></svg>
+        </button>
       </div>
     </div>
-  </header>
-
-  <div class="hero-banner" role="presentation" aria-hidden="true" data-hero-banner></div>
-
+    <script src="assets/scripts/sidebar-first-paint.js?v=20260902-2"></script>
+    <nav>
+      <a href="dashboard-paralegal.html#home" class="lpc-sidebar-nav-link"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"></path><path d="M5 9v11h14V9"></path><path d="M9 20v-6h6v6"></path></svg><span class="lpc-sidebar-nav-label">Home</span></a>
+      <a href="browse-jobs.html" class="active lpc-sidebar-nav-link" aria-current="page"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path><path d="M8 11h6"></path><path d="M11 8v6"></path></svg><span class="lpc-sidebar-nav-label">Browse Matters</span></a>
+      <a href="dashboard-paralegal.html#cases" class="lpc-sidebar-nav-link"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M3 12h18"></path></svg><span class="lpc-sidebar-nav-label">My Matters &amp; Applications</span></a>
+      <div class="lpc-sidebar-section-label">Account</div>
+      <a href="profile-settings.html" class="lpc-sidebar-nav-link lpc-sidebar-nav-link--secondary"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg><span class="lpc-sidebar-nav-label">Profile Settings</span></a>
+      <a href="paralegalhelp.html" class="lpc-sidebar-nav-link lpc-sidebar-nav-link--secondary"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9a2.7 2.7 0 1 1 4.6 1.9c-1.1.9-2.1 1.3-2.1 3.1"></path><path d="M12 18h.01"></path></svg><span class="lpc-sidebar-nav-label">Help</span></a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sidebar-footer">© Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect 2026</div>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+  <div class="browse-page-shell lpc-auth-page-shell">
+  <div class="lpc-universal-header-shell lpc-universal-header-shell--created" role="group" aria-label="Workspace tools" data-lpc-universal-header="true">
+    <div class="lpc-universal-header-controls" data-notification-center="true" aria-label="Search, notifications, and Assistant">
+      <div class="lpc-global-search-host" data-productivity-trigger-host></div>
+      <div class="notification-wrapper"><button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span class="notification-badge" data-notification-badge>0</span></button><div class="notifications-panel notif-panel hidden" role="region" aria-label="Notifications" aria-live="polite" data-notification-panel><div class="notif-header" aria-label="Notifications"></div><div class="notif-scroll" data-notification-list></div><div class="notif-empty" data-notification-empty>Loading…</div><button type="button" class="notif-markall" data-notification-mark>Mark All Read</button></div></div>
+    </div>
+  </div>
   <main id="main" tabindex="-1" class="jobs-shell">
     <div class="layout">
       <aside class="filter" id="filterMenu">
-        <h2>Refine Results</h2>
+        <div class="browse-filter-heading">
+          <h2 id="filterHeading">Filters</h2>
+          <button type="button" id="filterClose" class="browse-filter-close" aria-label="Close filters">Close</button>
+        </div>
         <div class="filter-group">
-          <label for="filterPracticeArea">Practice Area</label>
+          <label for="filterPracticeArea">Practice area</label>
           <select id="filterPracticeArea">
             <option value="">Any</option>
           </select>
@@ -922,18 +861,28 @@
           </select>
         </div>
         <div class="filter-group">
-          <label for="filterMinPay">Minimum Compensation</label>
+          <label for="filterMinPay">Minimum compensation</label>
           <div class="slider-field">
             <input type="range" id="filterMinPay" min="400" max="900" step="25" value="400" />
             <span id="minPayValue">$400</span>
           </div>
         </div>
         <div class="filter-group">
-          <label for="filterMinExp">Experience Required</label>
-          <div class="slider-field">
-            <input type="range" id="filterMinExp" min="0" max="10" step="1" value="0" />
-            <span id="minExpValue">Any</span>
-          </div>
+          <label for="filterDeadline">Deadline</label>
+          <select id="filterDeadline">
+            <option value="">Any deadline</option>
+            <option value="7_days">Next 7 days</option>
+            <option value="30_days">Next 30 days</option>
+            <option value="none">No deadline</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filterPosted">Date posted</label>
+          <select id="filterPosted">
+            <option value="">Any time</option>
+            <option value="7_days">Last 7 days</option>
+            <option value="30_days">Last 30 days</option>
+          </select>
         </div>
         <div class="filter-actions">
           <button type="button" class="primary" id="applyFilters">Update results</button>
@@ -944,108 +893,37 @@
       <section class="results">
         <div class="results-header">
           <div class="title-block">
-            <h2>Curated matters from verified attorneys.</h2>
+            <h1>Browse matters</h1>
             <p>Refine by jurisdiction, practice area, and compensation to match your workflow.</p>
           </div>
           <div class="results-controls">
             <label for="sortBy">Sort by</label>
             <select id="sortBy">
-              <option value="">Recommended</option>
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
+              <option value="newest" selected>Newest first</option>
+              <option value="deadline">Deadline</option>
               <option value="payHigh">Highest pay</option>
               <option value="payLow">Lowest pay</option>
             </select>
-            <button type="button" class="filter-toggle" id="filterToggle">Filters</button>
+            <button type="button" class="filter-toggle" id="filterToggle" aria-controls="filterDialog" aria-haspopup="dialog" aria-expanded="false">Filters <span id="activeFilterCount"></span></button>
           </div>
         </div>
         <div id="jobs-grid" class="jobs-grid">
-          <p class="results-status">Loading available jobs…</p>
+          <p class="results-status">Loading available Matters…</p>
         </div>
         <div id="pagination"></div>
       </section>
     </div>
   </main>
 
-  <footer class="footer">
-    <div class="footer-inner">
-      <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
-      <p>© <script>document.write(new Date().getFullYear());</script> Let’s-ParaConnect. All rights reserved.</p>
-      <nav>
-        <a href="privacy.html">Privacy Policy</a>
-        <span>|</span>
-        <a href="terms.html">Terms</a>
-        <span>|</span>
-        <a href="/paralegal-admission.html">Admissions</a>
-        <span>|</span>
-        <a href="contact.html">Contact</a>
-        <span>|</span>
-        <a href="accessibility.html">Accessibility</a>
-      </nav>
-      <div class="region">United States</div>
-    </div>
-  </footer>
+  </div>
+
+  <dialog id="filterDialog" class="browse-filter-dialog" aria-labelledby="filterHeading"></dialog>
 
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
 
   <script src="assets/scripts/utils/toast.js?v=20260208"></script>
+  <script src="assets/scripts/productivity-command-registry.js"></script>
+  <script src="assets/scripts/global-search.js?v=20260831-2"></script>
   <script type="module" src="assets/scripts/views/browse-jobs.js"></script>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const header = document.querySelector(".site-header");
-      const hero = document.querySelector("[data-hero-banner]");
-      const body = document.body;
-
-      function lockShellStyles() {
-        if (body && !body.classList.contains("shell-locked")) {
-          body.style.backgroundColor = "#ffffff";
-          body.classList.add("shell-locked");
-        }
-        if (header) {
-          header.style.background = "rgba(255, 255, 255, 0.18)";
-          header.style.borderBottom = "1px solid rgba(255, 255, 255, 0.35)";
-          header.style.backdropFilter = "saturate(140%) blur(16px)";
-          header.style.boxShadow = "none";
-        }
-        if (hero && !hero.dataset.heroReady) {
-          hero.style.backgroundImage = "url('hero-mountain.jpg')";
-          hero.style.backgroundSize = "cover";
-          hero.style.backgroundPosition = "center";
-          hero.dataset.heroReady = "true";
-        }
-      }
-
-      function updateHeader() {
-        if (!header || !hero) return;
-        const heroBottom = hero.offsetTop + hero.offsetHeight;
-        const headerBottom = window.scrollY + header.offsetHeight;
-        const offHero = headerBottom >= heroBottom;
-        header.classList.toggle("over-image", offHero);
-      }
-
-      lockShellStyles();
-      let lockTicks = 0;
-      const lockInterval = setInterval(() => {
-        lockShellStyles();
-        lockTicks += 1;
-        if (lockTicks > 20) clearInterval(lockInterval);
-      }, 250);
-      window.addEventListener("scroll", updateHeader, { passive: true });
-      window.addEventListener("resize", updateHeader);
-      if (window.ResizeObserver) {
-        const observer = new ResizeObserver(() => {
-          lockShellStyles();
-          updateHeader();
-        });
-        observer.observe(hero);
-      } else {
-        setTimeout(updateHeader, 150);
-        setTimeout(lockShellStyles, 150);
-      }
-      updateHeader();
-    });
-  </script>
-  <script type="module" src="assets/scripts/hero-parallax.js"></script>
-  <script src="assets/scripts/accessibility-toggle.js"></script>
 </body>
 </html>

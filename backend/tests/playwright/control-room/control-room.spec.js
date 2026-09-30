@@ -1,4 +1,6 @@
 const { test, expect } = require("playwright/test");
+const AxeBuilder = require("@axe-core/playwright").default;
+const { SUPPORTED_VIEWPORTS } = require("../../../playwright.browser-matrix");
 
 function resolveHarnessHeaders() {
   const secret = String(process.env.AI_CONTROL_ROOM_E2E_HARNESS_SECRET || "").trim();
@@ -23,14 +25,82 @@ async function seedHarness(page, data = {}) {
   return response.json();
 }
 
+async function openAdminSection(page, section) {
+  const selector = `[data-section="${section}"]`;
+  const group = page.locator('nav details.admin-nav-group').filter({ has: page.locator(selector) });
+  if (await group.count() && !(await group.evaluate(node => node.open))) {
+    await group.locator('summary').click();
+  }
+  await page.locator('nav').locator(selector).click();
+}
+
 async function openControlRoom(page) {
   await page.goto("/admin-dashboard.html", { waitUntil: "domcontentloaded" });
-  await page.locator('a[data-section="ai-control-room"]').click();
+  await expect(page.locator("body")).not.toHaveClass(/is-loading/, { timeout: 30_000 });
+  await openAdminSection(page, "ai-control-room");
   await expect(page.locator("#section-ai-control-room.visible")).toBeVisible();
+  await expect.poll(() => page.locator("main#main").evaluate((main) => main.scrollTop)).toBe(0);
   await expect(page.locator("#aiRoomCardGrid .ai-room-card").first()).toBeVisible();
   await expect(page.locator("#aiRoomFocusBody")).toBeVisible();
   await expect(page.locator("#aiRoomFounderConsole")).toBeVisible();
 }
+
+test("admin dashboard has no automated WCAG A/AA violations", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/admin-dashboard.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("main#main")).toBeVisible();
+  await page.waitForTimeout(100);
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22a", "wcag22aa"])
+    .analyze();
+  expect(results.violations, JSON.stringify(results.violations.map(({ id, nodes }) => ({ id, targets: nodes.map((node) => node.target) })), null, 2)).toEqual([]);
+});
+
+test("director oversight is accessible, responsive, and backed by the real admin API", async ({ page }) => {
+  const bootstrap = await page.request.post("/api/admin/ai-control-room/dev/e2e/bootstrap-director", {
+    headers: resolveHarnessHeaders(),
+  });
+  expect(bootstrap.ok(), await bootstrap.text()).toBe(true);
+
+  const pageErrors = [];
+  const serverFailures = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("response", (response) => {
+    if (response.status() >= 500) {
+      serverFailures.push(`${response.status()} ${response.request().method()} ${response.url()}`);
+    }
+  });
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/admin-directors.html", { waitUntil: "domcontentloaded" });
+    await expect(page).not.toHaveURL(/login\.html/);
+  await expect(page.locator("main#main")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Director Oversight", exact: true })).toBeVisible();
+  await expect(page.locator("#metricDirectors")).toHaveText("1");
+  await expect(page.locator("#directorList")).toContainText("Drew Harness");
+  await page.waitForTimeout(100);
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22a", "wcag22aa"])
+    .analyze();
+  expect(
+    results.violations,
+    JSON.stringify(results.violations.map(({ id, nodes }) => ({ id, targets: nodes.map((node) => node.target) })), null, 2)
+  ).toEqual([]);
+
+  for (const viewport of SUPPORTED_VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    const layout = await page.evaluate(() => ({
+      viewportWidth: document.documentElement.clientWidth,
+      contentWidth: document.documentElement.scrollWidth,
+    }));
+    expect(layout.contentWidth, viewport.name).toBeLessThanOrEqual(layout.viewportWidth + 1);
+  }
+
+  expect(pageErrors).toEqual([]);
+  expect(serverFailures).toEqual([]);
+});
 
 async function openSecondaryDecisionQueue(page) {
   const consoleRoot = page.locator("#aiRoomFounderConsole");
@@ -157,13 +227,211 @@ test("summary and core founder-operating rendering are wired end-to-end", async 
   await expect(cmoCard).toContainText(/posts ready to publish/i);
 });
 
+test("control room remains readable and navigable across the supported viewport matrix", async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const seeded = await seedHarness(page);
+  await page.goto("/admin-dashboard.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("body")).not.toHaveClass(/is-loading/, { timeout: 30_000 });
+  await expect(page.locator("#section-overview.visible")).toBeVisible();
+  await expect(page.locator('nav [data-section="overview"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#overviewActionStatus")).not.toContainText(/loading|refreshing/i, { timeout: 30_000 });
+  await expect(page.locator("#overviewActionRows")).not.toContainText(/loading/i);
+  await expect(page.locator("#adminFlowTitle")).toHaveText("Review application");
+  const approvalAction = page.locator("#adminFlowBody").getByRole("button", { name: "Approve & next", exact: true });
+  await expect(approvalAction).toBeVisible();
+  expect(await approvalAction.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath("lpc-admin-overview-desktop.png"), fullPage: true });
+
+  await openAdminSection(page, "user-management");
+  await expect(page.locator("#section-user-management.visible")).toBeVisible();
+  await expect(page.locator('nav [data-section="user-management"]')).toHaveAttribute("aria-current", "page");
+  await page.locator('#section-user-management summary').filter({ hasText: 'Registration reporting & outreach' }).click();
+  await expect(page.locator("#massEmailCompleteBtn")).toBeVisible();
+  await expect(page.locator("#massEmailAttorneyLaunchSetupBtn")).toBeVisible();
+  await expect(page.locator("#massEmailAttorneyLaunchBtn")).toBeHidden();
+  await expect(page.locator("#massEmailAttorneyFirstMatterBtn")).toBeHidden();
+  await expect(page.locator("#massEmailCompleteBtn")).toBeDisabled();
+  await expect(page.locator("#massEmailPageSelect")).toBeHidden();
+  const analyticsResponse = await page.request.get("/api/admin/analytics");
+  expect(analyticsResponse.ok()).toBe(true);
+  const analyticsPayload = await analyticsResponse.json();
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const registrationMonths = (analyticsPayload?.userMetrics?.registrationsByMonth || []).map((entry) => entry.month);
+  expect(registrationMonths).toContain(currentMonth);
+  const currentMonthLabel = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${currentMonth}-01T00:00:00.000Z`));
+  await expect.poll(() => page.evaluate(() => window.Chart?.getChart("userMgmtComboChart")?.data?.labels || []))
+    .toContain(currentMonthLabel);
+  await page.screenshot({ path: info.outputPath("lpc-admin-user-management-desktop.png"), fullPage: true });
+
+  await openAdminSection(page, "approvals-workspace");
+  await expect(page.locator("#section-approvals-workspace.visible")).toBeVisible();
+  await expect(page.locator('nav [data-section="approvals-workspace"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#approvalQueueCountLabel")).toContainText(/visible item|no visible/i, { timeout: 30_000 });
+  const visibleApprovalCount = await page.locator("#approvalItemList [data-approval-work-key]").count();
+  expect(Number(await page.locator("#approvalTotalCount").innerText())).toBe(visibleApprovalCount);
+  expect(Number(await page.locator("#approvalPendingCount").innerText())).toBeLessThanOrEqual(visibleApprovalCount);
+  await page.screenshot({ path: info.outputPath("lpc-admin-approvals-desktop.png"), fullPage: true });
+
+  await openAdminSection(page, "finance");
+  await expect(page.locator("#section-escrow.visible")).toBeVisible();
+  await expect(page.locator("#section-disputes.visible")).toBeVisible();
+  await expect(page.locator("#section-revenue")).toBeHidden();
+  await expect(page.locator('nav [data-section="finance"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#disputesBody")).not.toContainText(/loading/i, { timeout: 30_000 });
+  await page.getByRole('group', { name: 'Finance workspace', exact: true }).getByRole('button', { name: 'Reconciliation', exact: true }).click();
+  await expect(page.locator("#section-disputes")).toBeHidden();
+  await expect(page.locator("#escrowReportEmpty")).toBeVisible();
+  await expect(page.locator("#escrowReportChart")).toBeHidden();
+  await page.screenshot({ path: info.outputPath("lpc-admin-finance-desktop.png"), fullPage: true });
+  await page.getByRole('group', { name: 'Finance workspace', exact: true }).getByRole('button', { name: 'Payments & receipts', exact: true }).click();
+  await expect(page.locator("#section-revenue.visible")).toBeVisible();
+  await page.locator('#section-revenue summary').filter({ hasText: 'Totals, activity & receipts' }).click();
+  await expect(page.locator("#receiptsBody")).not.toContainText(/loading/i, { timeout: 30_000 });
+  await expect(page.locator("#revenueTotalValue")).not.toHaveText("—");
+  await page.locator("#section-revenue").scrollIntoViewIfNeeded();
+  await expect(page.locator("#revMainChartEmpty")).toBeVisible();
+  await expect(page.locator("#revMainChart")).toBeHidden();
+  await expect(page.locator("#adminFinanceRecordStatus")).toHaveText("No records match these filters.");
+  await expect(page.locator("#adminFinanceRecordList")).toBeEmpty();
+  await expect(page.locator("#adminFinanceRecordPager")).toBeHidden();
+  await expect(page.locator("#adminFinanceExport")).toBeVisible();
+  await expect(page.locator("#adminFinanceExport")).toBeEnabled();
+  await expect(page.locator("#receiptPageSelect")).toBeHidden();
+  await page.screenshot({ path: info.outputPath("lpc-admin-finance-accounting-desktop.png"), fullPage: true });
+
+  await openAdminSection(page, "posts");
+  await expect(page.locator("#section-posts.visible")).toBeVisible();
+  await expect(page.locator('nav [data-section="posts"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#postsList")).not.toContainText(/loading/i, { timeout: 30_000 });
+  await expect(page.locator("#deadlineChartEmpty")).toBeVisible();
+  await expect(page.locator("#postStateChartEmpty")).toBeVisible();
+  await expect(page.locator("#postCategoryChartEmpty")).toBeVisible();
+  await page.screenshot({ path: info.outputPath("lpc-admin-posts-desktop.png"), fullPage: true });
+
+  await openAdminSection(page, "activity-logs");
+  await expect(page.locator("#section-activity-logs.visible")).toBeVisible();
+  await expect(page.locator('nav [data-section="activity-logs"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.locator('nav [data-section].active')).toHaveCount(1);
+  await expect(page.locator("#auditLogsBody")).not.toContainText(/loading/i, { timeout: 30_000 });
+  await expect(page.locator("#exportAuditLogs")).toHaveText("Export page CSV");
+  await page.screenshot({ path: info.outputPath("lpc-admin-activity-desktop.png"), fullPage: true });
+
+  await openAdminSection(page, "settings");
+  await expect(page.locator("#section-settings.visible")).toBeVisible();
+  await expect(page.locator('nav [data-section="settings"]')).toHaveAttribute("aria-current", "page");
+  await page.screenshot({ path: info.outputPath("lpc-admin-settings-desktop.png"), fullPage: true });
+  await expect(page.locator("#settingMaintenanceMode")).not.toBeChecked();
+  await expect(page.locator("#saveAdminSettings")).toBeDisabled();
+  let settingsWrites = 0;
+  const settingsWriteListener = (request) => {
+    if (request.method() === "PUT" && request.url().endsWith("/api/admin/settings")) settingsWrites += 1;
+  };
+  page.on("request", settingsWriteListener);
+  await page.locator("#settingMaintenanceMode").check();
+  await expect(page.locator("#saveAdminSettings")).toBeEnabled();
+  await page.locator("#saveAdminSettings").click();
+  await expect(page.getByRole("dialog", { name: "Apply platform restrictions?" })).toBeVisible();
+  await page.getByRole("dialog", { name: "Apply platform restrictions?" }).getByRole("button", { name: "Cancel" }).click();
+  await expect(page.locator("#settingsStatus")).toHaveText("Not saved.");
+  expect(settingsWrites).toBe(0);
+  page.off("request", settingsWriteListener);
+  await page.locator("#settingMaintenanceMode").uncheck();
+  await expect(page.locator("#saveAdminSettings")).toBeDisabled();
+
+  await openAdminSection(page, "ai-control-room");
+  await expect(page.locator("#section-ai-control-room.visible")).toBeVisible();
+  await expect(page.locator("#aiRoomCardGrid .ai-room-card").first()).toBeVisible();
+  await expect(page.locator("#aiRoomFocusBody")).toBeVisible();
+  await expect(page.locator("#aiRoomFounderConsole")).toBeVisible();
+  await expect(page.locator('[data-ai-room-card-key="cmo"]')).toContainText(
+    seeded.expectedUi.decisionTitles.cmo,
+    { timeout: 30_000 }
+  );
+  await expect(page.locator("#aiRoomRefreshBadge")).not.toContainText(/loading/i);
+  const headerControlLayout = await page.evaluate(() => {
+    const launcher = document.querySelector("#adminSupportChatHost .support-launcher")?.getBoundingClientRect();
+    const refresh = document.querySelector("#aiRoomRefreshButton")?.getBoundingClientRect();
+    const overlaps = Boolean(
+      launcher &&
+      refresh &&
+      launcher.left < refresh.right &&
+      launcher.right > refresh.left &&
+      launcher.top < refresh.bottom &&
+      launcher.bottom > refresh.top
+    );
+    return { overlaps };
+  });
+  expect(headerControlLayout.overlaps).toBe(false);
+  await openSecondaryDecisionQueue(page);
+  const needsDecisionCount = await readSummaryCount(page, "#aiSummaryUrgent");
+  const queueRemaining = await readDecisionQueueRemaining(page);
+  expect(needsDecisionCount).toBeGreaterThan(0);
+  expect(needsDecisionCount).toBe(queueRemaining);
+  const desktopLayout = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    visibleSummaryTiles: Array.from(document.querySelectorAll("#section-ai-control-room .ai-room-summary-tile"))
+      .filter((node) => node.getBoundingClientRect().width > 0).length,
+    clippedCards: Array.from(document.querySelectorAll("#aiRoomCardGrid .ai-room-card"))
+      .filter((node) => node.getBoundingClientRect().right > window.innerWidth + 1).length,
+  }));
+  expect(desktopLayout.scrollWidth).toBeLessThanOrEqual(desktopLayout.viewport + 1);
+  expect(desktopLayout.visibleSummaryTiles).toBeGreaterThanOrEqual(5);
+  expect(desktopLayout.clippedCards).toBe(0);
+  await page.screenshot({ path: info.outputPath("lpc-control-room-desktop.png"), fullPage: true });
+
+  for (const viewport of SUPPORTED_VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    await page.waitForTimeout(100);
+    const layout = await page.evaluate(() => ({
+      viewport: window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      clippedCards: Array.from(document.querySelectorAll("#aiRoomCardGrid .ai-room-card"))
+        .filter((node) => node.getBoundingClientRect().right > window.innerWidth + 1).length,
+    }));
+    expect(layout.scrollWidth, viewport.name).toBeLessThanOrEqual(layout.viewport + 1);
+    expect(layout.clippedCards, viewport.name).toBe(0);
+    await expect(page.locator("#section-ai-control-room.visible"), viewport.name).toBeVisible();
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(350);
+  await expect(page.locator("#section-ai-control-room.visible")).toBeVisible();
+  const mobileLayout = await page.evaluate(() => {
+    const menu = document.querySelector("#sidebarToggle")?.getBoundingClientRect();
+    return {
+      viewport: window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      menuWidth: menu?.width || 0,
+      menuHeight: menu?.height || 0,
+      clippedCards: Array.from(document.querySelectorAll("#aiRoomCardGrid .ai-room-card"))
+        .filter((node) => node.getBoundingClientRect().right > window.innerWidth + 1).length,
+    };
+  });
+  expect(mobileLayout.scrollWidth).toBeLessThanOrEqual(mobileLayout.viewport + 1);
+  expect(mobileLayout.menuWidth).toBeGreaterThanOrEqual(44);
+  expect(mobileLayout.menuHeight).toBeGreaterThanOrEqual(44);
+  expect(mobileLayout.clippedCards).toBe(0);
+  await page.screenshot({ path: info.outputPath("lpc-control-room-mobile.png"), fullPage: true });
+  await page.locator("#sidebarToggle").click();
+  await expect(page.locator("body")).toHaveClass(/nav-open/);
+  await expect(page.locator("#sidebarToggle")).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator('#sidebarNav [data-section="ai-control-room"]')).toHaveText("Automation");
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("#sidebarNav")?.id || "")).toBe("sidebarNav");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("body")).not.toHaveClass(/nav-open/);
+  await expect(page.locator("#sidebarToggle")).toBeFocused();
+});
+
 test("top founder decisions update optimistically before the real route responds", async ({ page }) => {
   const seeded = await seedHarness(page);
   await openControlRoom(page);
   await openSecondaryDecisionQueue(page);
 
-  const beforeUrgentCount = await readSummaryCount(page, "#aiSummaryUrgent");
-  const beforeRemaining = await readDecisionQueueRemaining(page);
   await page.route(/\/api\/admin\/incidents\/.+\/approvals\/.+\/decision$/, async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 1200));
     await route.continue();
@@ -171,6 +439,10 @@ test("top founder decisions update optimistically before the real route responds
 
   const topDecisionBefore = page.locator(".ai-room-founder-decision-card").first();
   await expect(topDecisionBefore).toContainText(seeded.expectedUi.decisionTitles.cto);
+  const beforeUrgentCount = await readSummaryCount(page, "#aiSummaryUrgent");
+  const beforeRemaining = await readDecisionQueueRemaining(page);
+  expect(beforeUrgentCount).toBeGreaterThan(0);
+  expect(beforeUrgentCount).toBe(beforeRemaining);
 
   const responsePromise = page.waitForResponse((response) => {
     return (

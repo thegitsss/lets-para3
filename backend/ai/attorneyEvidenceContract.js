@@ -130,7 +130,7 @@ function workflowFacts(result = {}) {
     atomicFact("completion.payout_release_trigger", payout.releaseTrigger, { ...policy, claimType: "lifecycle_transition" }),
     atomicFact("completion.resulting_matter_status", payout.resultingMatterStatus, { ...policy, claimType: "lifecycle_transition" }),
     atomicFact("completion.payment_released", payout.paymentReleased, { ...policy, claimType: "lifecycle_transition" }),
-    atomicFact("payout.bank_deposit_estimate_business_days", payout.bankDepositEstimateBusinessDays, { ...policy, claimType: "time_estimate" }),
+    atomicFact("payout.bank_deposit_timing_source", payout.bankDepositTimingSource, policy),
     atomicFact("payout.bank_deposit_timing_dependencies", payout.bankDepositTimingDependsOn, policy),
     atomicFact("account.payment_method_state_known", result.paymentMethod?.stateKnown, { policyOrLiveState: "live_state" }),
     atomicFact("account.payment_method_saved", result.paymentMethod?.saved, { policyOrLiveState: "live_state" }),
@@ -177,7 +177,11 @@ function missingWorkflowFacts(capability, facts) {
     hiring: ["workflow.hiring_sequence", "hiring.charge_timing", "hiring.resulting_matter_status", "hiring.resulting_funding_status"],
     post_hire_workflow: ["hiring.resulting_matter_status", "hiring.resulting_funding_status", "hiring.next_stage", "workspace.participants", "workspace.supports", "workspace.next_stage"],
     payout_release: ["completion.payout_release_trigger", "completion.actor"],
-    deposit_timing: ["completion.payout_release_trigger", "payout.bank_deposit_estimate_business_days"],
+    deposit_timing: [
+      "completion.payout_release_trigger",
+      "payout.bank_deposit_timing_source",
+      "payout.bank_deposit_timing_dependencies",
+    ],
     workspace_access: ["workspace.participants", "workspace.supports"],
     messaging_policy: ["workspace.participants", "workspace.supports"],
     completion: ["completion.actor", "completion.all_scope_tasks_required", "completion.payout_release_trigger"],
@@ -281,7 +285,7 @@ function renderAttorneyEvidenceAnswer({ capability = "", evidenceEnvelopes = [] 
     reply = [first, second].filter(Boolean).join(" ");
   } else if (["payout_release", "deposit_timing", "completion"].includes(normalized)) {
     const trigger = value("completion.payout_release_trigger");
-    const estimate = value("payout.bank_deposit_estimate_business_days");
+    const timingSource = value("payout.bank_deposit_timing_source");
     const dependencies = value("payout.bank_deposit_timing_dependencies");
     if (!trigger) missing.push("completion.payout_release_trigger");
     const release = trigger === "when_attorney_completes_matter"
@@ -289,12 +293,13 @@ function renderAttorneyEvidenceAnswer({ capability = "", evidenceEnvelopes = [] 
       : "The payout-release trigger is not available in the verified policy evidence.";
     let deposit = "";
     if (normalized === "deposit_timing") {
-      const minimum = Number(estimate?.minimum || 0);
-      const maximum = Number(estimate?.maximum || 0);
-      deposit = minimum > 0 && maximum >= minimum
-        ? `Bank deposit is estimated at ${minimum}–${maximum} business days after release${Array.isArray(dependencies) && dependencies.length ? ", depending on Stripe and the paralegal’s bank" : ""}.`
-        : "The current bank-deposit estimate is not available in the verified policy evidence.";
-      if (!(minimum > 0 && maximum >= minimum)) missing.push("payout.bank_deposit_estimate_business_days");
+      const hasStripeTiming = timingSource === "stripe_payout_status_and_estimated_arrival";
+      const hasDependencies = Array.isArray(dependencies) && dependencies.length > 0;
+      deposit = hasStripeTiming && hasDependencies
+        ? "Stripe provides the current payout status and estimated arrival; timing depends on the connected account’s country, payout schedule, and financial institution."
+        : "The source of the current bank-deposit timing is not available in the verified policy evidence.";
+      if (!hasStripeTiming) missing.push("payout.bank_deposit_timing_source");
+      if (!hasDependencies) missing.push("payout.bank_deposit_timing_dependencies");
     }
     reply = [release, deposit].filter(Boolean).join(" ");
   } else if (normalized === "workspace_access" || normalized === "messaging_policy") {

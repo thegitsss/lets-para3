@@ -9,6 +9,8 @@ const Job = require("../models/Job");
 const Application = require("../models/Application");
 const accountRouter = require("../routes/account");
 const authRouter = require("../routes/auth");
+const { addSubscriber: addCaseSubscriber } = require("../utils/caseEvents");
+const { addSubscriber: addNotificationSubscriber } = require("../utils/notificationEvents");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 const app = (() => {
@@ -60,6 +62,52 @@ beforeEach(async () => {
 });
 
 describe("Account deactivation", () => {
+  test("preferences normalize a retired dark appearance without changing account data", async () => {
+    const paralegal = await createApprovedUser({
+      email: "samanthasider+preferences-retired@gmail.com",
+      role: "paralegal",
+    });
+    await User.collection.updateOne(
+      { _id: paralegal._id },
+      { $set: { "preferences.theme": "retired-dashboard-dark" } }
+    );
+
+    const response = await request(app)
+      .get("/api/account/preferences")
+      .set("Cookie", authCookieFor(paralegal));
+
+    expect(response.status).toBe(200);
+    expect(response.body.theme).toBe("dark");
+    const preserved = await User.findById(paralegal._id).lean();
+    expect(preserved.email).toBe("samanthasider+preferences-retired@gmail.com");
+    expect(preserved.role).toBe("paralegal");
+  });
+
+  test("saving the primary state keeps recommendation and legacy profile fields synchronized", async () => {
+    const paralegal = await createApprovedUser({
+      email: "samanthasider+preferences-state@gmail.com",
+      role: "paralegal",
+    });
+    paralegal.location = "CA";
+    await paralegal.save();
+    const signals = [];
+    const stop = addNotificationSubscriber(paralegal._id, { write: (value) => signals.push(String(value)) });
+
+    const response = await request(app)
+      .post("/api/account/preferences")
+      .set("Cookie", authCookieFor(paralegal))
+      .send({ state: "NY" });
+    stop();
+
+    expect(response.status).toBe(200);
+    expect(response.body.state).toBe("NY");
+    expect(response.body.updatedAt).toBeTruthy();
+    const stored = await User.findById(paralegal._id).lean();
+    expect(stored.state).toBe("NY");
+    expect(stored.location).toBe("NY");
+    expect(signals.join("\n")).toContain("account_preferences_refresh");
+  });
+
   test("paralegal cannot deactivate while assigned to an active case", async () => {
     const attorney = await createApprovedUser({
       email: "samanthasider+deactivate-attorney-active@gmail.com",
@@ -139,12 +187,29 @@ describe("Account deactivation", () => {
       status: "assigned",
     });
 
-    const res = await request(app)
-      .delete("/api/account/deactivate")
-      .set("Cookie", authCookieFor(attorney));
+    const paralegalEvents = [];
+    const matterEvents = [];
+    const unsubscribeParalegal = addNotificationSubscriber(paralegal._id, {
+      write: (value) => paralegalEvents.push(String(value)),
+    });
+    const unsubscribeMatter = addCaseSubscriber(caseDoc._id, {
+      write: (value) => matterEvents.push(String(value)),
+    });
+
+    let res;
+    try {
+      res = await request(app)
+        .delete("/api/account/deactivate")
+        .set("Cookie", authCookieFor(attorney));
+    } finally {
+      unsubscribeParalegal();
+      unsubscribeMatter();
+    }
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ ok: true, deactivated: true });
+    expect(paralegalEvents.join("\n")).toContain("account_participation_refresh");
+    expect(matterEvents.join("\n")).toContain("account_participation_refresh");
 
     const refreshedJob = await Job.findOne({ attorneyId: attorney._id }).lean();
     expect(refreshedJob.status).toBe("closed");

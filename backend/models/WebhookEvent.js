@@ -18,6 +18,8 @@ const WebhookEventSchema = new Schema(
   }
 );
 
-WebhookEventSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 });
+// Retain durable delivery receipts beyond Stripe's manual resend window so an old
+// event cannot be replayed as new immediately after the provider stops retaining it.
+WebhookEventSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 400 });
 
 module.exports = mongoose.model("WebhookEvent", WebhookEventSchema);

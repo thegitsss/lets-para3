@@ -151,9 +151,9 @@ incidentReleaseSchema.index({ incidentId: 1, attemptNumber: 1 }, { unique: true 
 incidentReleaseSchema.index({ status: 1, updatedAt: -1 });
 incidentReleaseSchema.index({ productionDeployId: 1 }, { sparse: true });
 
-incidentReleaseSchema.pre("validate", function normalizeDeprecatedPreviewStatus(next) {
+incidentReleaseSchema.pre("validate", function normalizeDeprecatedPreviewStatus() {
   if (this.status !== "preview_passed") {
-    return next();
+    return;
   }
 
   this.status = "preview_blocked";
@@ -180,7 +180,6 @@ incidentReleaseSchema.pre("validate", function normalizeDeprecatedPreviewStatus(
     ];
   }
 
-  return next();
 });
 
 module.exports =

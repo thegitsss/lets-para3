@@ -1,6 +1,25 @@
-import { secureFetch, logout, loadUserHeaderInfo } from "./auth.js";
+import { createLegacyAttorneyHome } from "./legacy-attorney-home.mjs";
+import { createHiring } from "./attorney-v2/hiring.mjs";
+import { createPreEngagement } from "./attorney-v2/pre-engagement.mjs";
+import { createMatterApplications } from "./attorney-v2/matter-applications.mjs";
+import { createMatterExport, createMatterExportBatch } from "./attorney-v2/matter-exports.mjs";
+import { createMatterArchive } from "./attorney-v2/matter-archive.mjs";
+import { createMatterDownloads } from "./attorney-v2/matter-downloads.mjs";
+import { createMatterReceipt } from "./attorney-v2/matter-receipts.mjs";
+import { createMatterInvitations } from "./attorney-v2/matter-invitations.mjs";
+import { createMatterModeration } from "./attorney-v2/matter-moderation.mjs";
+import { createMatterNotes } from "./attorney-v2/matter-notes.mjs";
+import { createApiClient } from "./attorney-v2/api-client.mjs";
+import { createPrivateState } from "./attorney-v2/private-state.mjs";
+import { classifySession } from "./attorney-v2/session-boundary.mjs";
+import { secureFetch, loadUserHeaderInfo } from "./auth.js";
 import { scanNotificationCenters } from "./utils/notifications.js";
-import { initCaseFilesView } from "./case-files-view.js";
+import { mountAttorneySavedViews } from "./attorney-v2/saved-views.mjs";
+import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
+import { confirmAction, showAlert } from "./utils/dialogs.js";
+import { normalizeHttpNavigationUrl } from "./utils/navigation-url.js";
+import { createCurrentDraftInventory } from "./utils/current-draft-inventory.mjs";
+import { safeCurrentMatterReturn } from "./attorney-v2/matter-return.mjs";
 
 const PAGE_ID = window.__ATTORNEY_PAGE__ || "overview";
 const ROLE_SPEC = window.__TAB_ROLE__;
@@ -15,16 +34,8 @@ const HEADER_ONLY_ROUTES = {
   paralegal: new Set(["overview", "case-files", "profile-settings"]),
   attorney: new Set(["create-case", "profile-settings"]),
 };
-const STATUS_LABELS = {
-  pending_review: "Pending Review",
-  approved: "Approved",
-  attorney_revision: "Attorney Revisions",
-};
 const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
 const CASE_VIEW_FILTERS = ["active", "draft", "archived", "inquiries"];
-const CASE_FILE_MAX_BYTES = 20 * 1024 * 1024;
-const PLATFORM_FEE_PCT = 22;
-const HOME_PAGE_SIZE = 5;
 const CASE_PAGE_SIZE = 15;
 const ESCROW_PAGE_SIZE = 5;
 const CASE_POSTED_STORAGE_KEY = "lpc_case_posted_notice";
@@ -34,50 +45,23 @@ const FUNDED_WORKSPACE_STATUSES = new Set([
   "in_progress",
 ]);
 const TERMINAL_CASE_STATUSES = new Set(["completed", "closed"]);
-const CASE_PREVIEW_STORAGE_KEY = "lpc_case_preview_id";
-const CASE_PREVIEW_RECEIPT_KEY = "lpc_case_preview_receipt";
-const PARALEGAL_AVATAR_FALLBACK = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-  "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><rect width='220' height='220' rx='110' fill='#f1f5f9'/><circle cx='110' cy='90' r='46' fill='#cbd5e1'/><path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/></svg>"
-)}`;
+const PARALEGAL_AVATAR_FALLBACK = "/assets/avatar-placeholder.svg";
 const ATTORNEY_AVATAR_FALLBACK = PARALEGAL_AVATAR_FALLBACK;
-function getInitials(name = "", fallback = "A") {
-  const trimmed = String(name || "").trim();
-  if (!trimmed) return fallback;
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  const letters = parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("");
-  return letters || fallback;
-}
-function buildAttorneyInitialsAvatar(name = "") {
-  const initials = getInitials(name, "A");
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><rect width='220' height='220' rx='110' fill='#f1f5f9'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#5b6472' font-family='Georgia, serif' font-size='74' letter-spacing='4'>${initials}</text></svg>`
-  )}`;
-}
 function getProfileImageUrl(user = {}) {
   const role = String(user.role || "").toLowerCase();
   const pending = role === "paralegal" ? user.pendingProfileImage : "";
   const stored = user.profileImage || user.avatarURL;
   if (pending) return pending;
   if (stored) return stored;
-  if (role === "attorney") {
-    const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.name || "Attorney";
-    return buildAttorneyInitialsAvatar(name);
-  }
+  if (role === "attorney") return ATTORNEY_AVATAR_FALLBACK;
   return PARALEGAL_AVATAR_FALLBACK;
 }
 
-const INVITE_AVATAR_FALLBACK = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-  "<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='#f4f4f5'/><stop offset='100%' stop-color='#e5e7eb'/></linearGradient></defs><rect width='96' height='96' rx='48' fill='url(#g)'/><circle cx='48' cy='38' r='18' fill='#d1d5db'/><path d='M20 84c6-18 22-28 28-28s22 10 28 28' fill='none' stroke='#cbd5e1' stroke-width='6' stroke-linecap='round'/></svg>"
-)}`;
+const INVITE_AVATAR_FALLBACK = PARALEGAL_AVATAR_FALLBACK;
 
 const overviewSignals = {
-  unreadCount: 0,
-  unfundedCount: 0,
-  casesCreatedCount: 0,
-  completedCasesCount: 0,
-  pendingReviewCount: 0,
-  overdueCount: 0,
-  applicationsCount: 0,
+  casesCreatedCount: null,
+  overdueCount: null,
 };
 
 const state = {
@@ -90,10 +74,11 @@ const state = {
   casesArchivedPromise: null,
   casesViewFilter: "active",
   casesSearchTerm: "",
-  reviewSelection: null,
-  uploadSelection: null,
-  caseFilter: "all",
   tasks: [],
+  tasksError: "",
+  tasksPage: 1,
+  tasksPages: 1,
+  tasksTotal: 0,
   latestThreadId: null,
   latestThreadCaseId: null,
   threadOverview: new Map(),
@@ -104,29 +89,13 @@ const state = {
     escrowSort: "funded_desc",
     hasPaymentMethod: null,
   },
-  messages: {
-    cases: [],
-    summary: new Map(),
-    messagesByCase: new Map(),
-    activeCaseId: null,
-    activeThreadId: "all",
-    sending: false,
-  },
-  documents: {
-    activeTab: "templates",
-    activeDocId: null,
-    sort: "date",
-    replaceTarget: null,
-  },
-  caseFiles: {
-    selectedCaseId: null,
-    files: [],
-    loading: false,
-    error: "",
-  },
   draftSelection: new Set(),
   archivedSelection: new Set(),
   archivedStatusFilter: "all",
+  matterPracticeFilter: "",
+  matterDeadlineFilter: "",
+  matterUpdatedFilter: "",
+  matterSort: "recent",
   casesPage: {
     active: 0,
     draft: 0,
@@ -142,6 +111,10 @@ const state = {
   },
   localDrafts: [],
 };
+let legacyHome = null;
+let homeAttentionRefreshDeferred = false;
+let currentDraftInventory = null;
+let currentMatterInventory = null;
 
 const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
 const ATTORNEY_ONBOARDING_MODAL_SEEN_KEY = "lpc_attorney_onboarding_modal_seen_case";
@@ -199,8 +172,7 @@ function setCaseOnboardingModalSeen() {
 let openCaseMenu = null;
 let openCaseMenuTrigger = null;
 let caseMenuKeydownBound = false;
-let chatMenuWrapper = null;
-let applicationsActionsBound = false;
+let matterSavedViews = null;
 let homeTabsBound = false;
 let headerDocListenersBound = false;
 const applicantDrawerCache = new Map();
@@ -212,8 +184,14 @@ let applicantReturnOpening = false;
 const caseApplicationCounts = new Map();
 let applicationsCache = [];
 let applicationsPromise = null;
+let applicationsReadEpoch = 0;
+let applicationParentController = null;
+let applicationParentPromise = null;
 let notificationAutoRefreshBound = false;
 let applicantAutoRefreshTimer = null;
+let applicantAutoRefreshEpoch = 0;
+const applicationRefreshInputs = new Set();
+let pendingApplicationParentStatus = null;
 let overviewPollingBound = false;
 const applicantDrawerRequests = new Map();
 
@@ -229,11 +207,10 @@ const dashboardViewState = {
   currentView: "",
   casesInitialized: false,
   casesInitPromise: null,
+  tasksInitialized: false,
+  tasksInitPromise: null,
   billingInitialized: false,
   billingInitPromise: null,
-  caseTabsBound: false,
-  caseFilesPromise: null,
-  caseFilesReady: false,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -267,12 +244,13 @@ async function bootAttorneyExperience() {
   }
 
   const user = sessionUser;
+  weeklyNoteOwnerId = String(user.id || user._id || "");
   await loadUserHeaderInfo();
   applyRoleVisibility(user);
   if (!state.user) {
     state.user = user;
   }
-  bootstrap();
+  await bootstrap();
 }
 
 function applyRoleVisibility(user) {
@@ -325,52 +303,75 @@ async function bootstrap() {
     return;
   }
 
-  switch (pageKey) {
-    case "messages":
-      await initMessagesPage();
-      break;
-    case "documents":
-      await initDocumentsPage();
-      break;
-    case "cases":
-      await initCasesPage();
-      break;
-    case "review":
-      await initReviewPage();
-      break;
-    case "case-files":
-      await initCaseFilesPage();
-      break;
-    case "tasks":
-      await initTasksPage();
-      break;
-    case "overview":
-    default:
-      await initOverviewPage();
-      break;
-  }
+  await initOverviewPage();
 }
 
 function bindNotificationAutoRefresh() {
   if (notificationAutoRefreshBound) return;
   notificationAutoRefreshBound = true;
+  // A background response can arrive after the pointer moves onto a menu button,
+  // before its press or click. Keep that target in place through activation.
+  const finishInput = key => window.setTimeout(() => {
+    applicationRefreshInputs.delete(key);
+    flushApplicationParentStatus();
+  }, 0);
+  const menuTrigger = target => target?.closest?.('[data-cases-wrapper] [data-case-menu-trigger]');
+  document.addEventListener('pointermove', event => {
+    if (menuTrigger(event.target)) applicationRefreshInputs.add(`hover:${event.pointerId}`);
+  }, true);
+  document.addEventListener('pointerout', event => {
+    const trigger = menuTrigger(event.target);
+    if (trigger && trigger !== menuTrigger(event.relatedTarget)) {
+      applicationRefreshInputs.delete(`hover:${event.pointerId}`);
+      flushApplicationParentStatus();
+    }
+  }, true);
+  document.addEventListener('pointercancel', event => {
+    applicationRefreshInputs.delete(`hover:${event.pointerId}`);
+  }, true);
+  // Run after the table's delegated click handler has opened the menu. A
+  // pointer-up timer alone can run before that click reaches the document.
+  document.addEventListener('click', () => {
+    for (const key of applicationRefreshInputs) {
+      if (key.startsWith('hover:')) applicationRefreshInputs.delete(key);
+    }
+    flushApplicationParentStatus();
+  });
+  document.addEventListener('pointerdown', event => {
+    if (event.target.closest('[data-cases-wrapper]')) applicationRefreshInputs.add(`pointer:${event.pointerId}`);
+  }, true);
+  for (const type of ['pointerup', 'pointercancel']) document.addEventListener(type, event => finishInput(`pointer:${event.pointerId}`), true);
+  document.addEventListener('keydown', event => {
+    if (['Enter', ' '].includes(event.key) && event.target.closest('[data-cases-wrapper]')) applicationRefreshInputs.add(`key:${event.key}`);
+  }, true);
+  document.addEventListener('keyup', event => finishInput(`key:${event.key}`), true);
+  window.addEventListener('blur', () => { applicationRefreshInputs.clear(); flushApplicationParentStatus(); });
   window.addEventListener("lpc:notifications-refreshed", (event) => {
     const types = event?.detail?.types;
     if (!Array.isArray(types) || !types.length) return;
     const lowerTypes = new Set(types.map((type) => String(type || "").toLowerCase()));
     if (!lowerTypes.has("application_submitted") && !lowerTypes.has("pre_engagement_submitted")) return;
-    if (applicantReturnContext) return;
     if (applicantAutoRefreshTimer) return;
-    applicantAutoRefreshTimer = window.setTimeout(async () => {
-      applicantAutoRefreshTimer = null;
-      if (applicantReturnContext) return;
+    const ticket = ++applicantAutoRefreshEpoch;
+    const refresh = async () => {
+      if (ticket !== applicantAutoRefreshEpoch) return;
+      let deferred = deferApplicationAutoRefresh();
       try {
-        await refreshApplicationsOverview({ force: true });
+        if (!deferred) deferred = await refreshApplicationsOverview({ force: true }) === false;
       } catch (err) {
         console.warn("Auto-refresh applications failed", err);
+      } finally {
+        if (ticket === applicantAutoRefreshEpoch) applicantAutoRefreshTimer = deferred ? window.setTimeout(refresh, 400) : null;
       }
-    }, 400);
+    };
+    applicantAutoRefreshTimer = window.setTimeout(refresh, 400);
   });
+}
+
+function deferApplicationAutoRefresh() {
+  if (applicantReturnOpening || applicationRefreshInputs.size) return true;
+  return Array.from(document.querySelectorAll('[data-applicants-row]:not(.hidden), .case-actions.open, [role="dialog"], [aria-modal="true"]'))
+    .some(element => element.getClientRects().length && !element.closest('[hidden], [inert]'));
 }
 
 // -------------------------
@@ -389,14 +390,11 @@ function ensureHeaderStyles() {
   .lpc-shared-header .btn.btn-outline:hover{border-color:#b6a47a;color:#b6a47a;background:rgba(182,164,122,0.06)}
   .lpc-shared-header .user-chip{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:none;cursor:pointer;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color .2s ease, box-shadow .2s ease}
   .lpc-shared-header .user-chip img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:none;object-fit:cover}
-  .lpc-shared-header .user-chip strong{display:block;font-family:var(--font-serif);font-weight:500;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lpc-shared-header .user-chip strong{display:block;font-family:var(--font-serif);font-weight: 600;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lpc-shared-header .user-chip span{font-size:.85rem;color:#6b6b6b;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   body.theme-dark .lpc-shared-header .user-chip{background:rgba(15,23,42,0.4);border-color:transparent;box-shadow:none}
   body.theme-dark .lpc-shared-header .user-chip strong{color:#fff}
   body.theme-dark .lpc-shared-header .user-chip span{color:rgba(255,255,255,0.8)}
-  body.theme-mountain .lpc-shared-header .user-chip{background:rgba(255,255,255,0.65);border-color:transparent;box-shadow:none}
-  body.theme-mountain .lpc-shared-header .user-chip strong{color:#1b1b1b}
-  body.theme-mountain .lpc-shared-header .user-chip span{color:#6b6b6b}
   .lpc-shared-header .profile-dropdown{position:absolute;right:0;top:calc(100% + 10px);background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:16px;box-shadow:0 18px 30px rgba(0,0,0,0.12);display:none;flex-direction:column;min-width:200px;z-index:9999;pointer-events:auto;overflow:visible;color:var(--ink,#1a1a1a)}
   .lpc-shared-header .profile-dropdown.show{display:flex;pointer-events:auto;overflow:visible}
   .lpc-shared-header .profile-dropdown button,
@@ -406,9 +404,7 @@ function ensureHeaderStyles() {
   .lpc-shared-header .profile-dropdown .logout-btn{color:#b91c1c;background:rgba(185,28,28,0.08);border:1px solid rgba(185,28,28,0.2)}
   .lpc-shared-header .profile-dropdown .logout-btn:hover{background:rgba(185,28,28,0.15);color:#991b1b}
   body.theme-dark .lpc-shared-header .profile-dropdown button:hover,
-  body.theme-dark .lpc-shared-header .profile-dropdown a:hover,
-  body.theme-mountain-dark .lpc-shared-header .profile-dropdown button:hover,
-  body.theme-mountain-dark .lpc-shared-header .profile-dropdown a:hover{background:rgba(255,255,255,0.06)}
+  body.theme-dark .lpc-shared-header .profile-dropdown a:hover{background:rgba(255,255,255,0.06)}
   body.theme-dark .lpc-shared-header .profile-dropdown .logout-btn{border-top-color:rgba(255,255,255,0.08)}
   `;
   document.head.appendChild(style);
@@ -464,7 +460,7 @@ async function initHeader(options = {}) {
     <div class="lpc-shared-header">
       <div class="header-controls" data-notification-center>
         <div class="notification-wrapper">
-          <button class="notification-icon" aria-label="View notifications" data-notification-toggle>
+          <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 01-3.46 0" />
@@ -482,7 +478,6 @@ async function initHeader(options = {}) {
           <img id="headerAvatar" src="${ATTORNEY_AVATAR_FALLBACK}" alt="Attorney avatar" />
           <div>
             <strong id="headerName">Attorney</strong>
-            <span id="headerRole">Member</span>
           </div>
           <div class="profile-dropdown" id="profileDropdown" aria-hidden="true">
             <a href="profile-settings.html" data-account-settings>Account Settings</a>
@@ -505,25 +500,10 @@ async function initHeader(options = {}) {
   enhanceSharedHeaderNotificationScroll();
 }
 
-async function triggerLogout(evt) {
-  evt?.preventDefault?.();
-  if (typeof window.logoutUser === "function") {
-    await window.logoutUser(evt);
-    return;
-  }
-  try {
-    await logout("login.html");
-  } catch {
-    window.location.href = "login.html";
-  }
-}
-
 function bindHeaderEvents() {
   const profileTrigger = document.getElementById("headerUser");
   const profileMenu = document.getElementById("profileDropdown");
   const settingsBtn = profileMenu?.querySelector("[data-account-settings]");
-  const notifToggle = document.querySelector("[data-notification-toggle]");
-  const notifPanel = document.querySelector("[data-notification-panel]");
 
   if (profileTrigger && profileMenu) {
     const setProfileMenuOpen = (open) => {
@@ -560,11 +540,6 @@ function bindHeaderEvents() {
   if (!headerDocListenersBound) {
     headerDocListenersBound = true;
     document.addEventListener("click", (evt) => {
-      const target = evt.target.closest("[data-logout]");
-      if (target) {
-        triggerLogout(evt);
-        return;
-      }
       const menu = document.getElementById("profileDropdown");
       const trigger = document.getElementById("headerUser");
       if (menu && trigger && !menu.contains(evt.target) && !trigger.contains(evt.target)) {
@@ -604,21 +579,13 @@ function applyUserToHeader(user = {}) {
   const current = state.user;
   const name = [current.firstName, current.lastName].filter(Boolean).join(" ") || current.name || "Attorney";
   const avatar = getProfileImageUrl(current);
-  const roleLabel = (current.role || "Attorney").replace(/\b\w/g, (c) => c.toUpperCase());
-  const isParalegal = String(current.role || "").toLowerCase() === "paralegal";
-  const isPendingPhoto =
-    isParalegal &&
-    (String(current.profilePhotoStatus || "").toLowerCase() === "pending_review" || current.pendingProfileImage);
-  const roleText = isPendingPhoto ? `${roleLabel} • PENDING` : roleLabel;
   const nameEl = document.getElementById("headerName");
   const avatarEl = document.getElementById("headerAvatar");
-  const roleEl = document.getElementById("headerRole");
   const heading = document.getElementById("user-name-heading");
   if (nameEl) nameEl.textContent = name;
   if (avatarEl) avatarEl.src = avatar;
-  if (roleEl) roleEl.textContent = roleText;
   if (heading) heading.textContent = current.firstName || heading.textContent;
-  updateWelcomeGreeting(current);
+  updateWelcomeGreeting();
   updateOnboardingChecklist();
   if (current.profileImage) {
     const avatarNode = document.querySelector("#user-avatar");
@@ -639,7 +606,7 @@ function getStoredUserSnapshot() {
   }
 }
 
-function updateWelcomeGreeting(user) {
+function updateWelcomeGreeting() {
   const greetingEl = document.getElementById("welcomeGreeting");
   if (!greetingEl) return;
   greetingEl.textContent = "Welcome";
@@ -661,50 +628,6 @@ function handleLocalUserUpdate(event) {
 
 window.addEventListener("storage", handleStoredUserUpdate);
 window.addEventListener("lpc:user-updated", handleLocalUserUpdate);
-
-async function markNotificationsRead(options = {}) {
-  try {
-    const normalizedCase = options.caseId ? String(options.caseId) : "";
-    const normalizedType = options.type ? String(options.type) : "";
-    if (!normalizedCase && !normalizedType) {
-      await secureFetch("/api/notifications/read-all", { method: "POST" });
-      window.refreshNotificationCenters?.();
-      return;
-    }
-    const res = await secureFetch("/api/notifications", {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      credentials: "include",
-    });
-    if (!res.ok) throw new Error("Unable to load notifications");
-    const items = await res.json().catch(() => []);
-    const targets = (Array.isArray(items) ? items : []).filter((item) => {
-      if (!item) return false;
-      if (normalizedType && String(item.type || "") !== normalizedType) return false;
-      if (normalizedCase) {
-        const payloadCase =
-          item.caseId ||
-          item.payload?.caseId ||
-          item.payload?.caseID ||
-          item.payload?.case?.id ||
-          item.payload?.case;
-        if (String(payloadCase || "") !== normalizedCase) return false;
-      }
-      return true;
-    });
-    await Promise.all(
-      targets.map((item) =>
-        secureFetch(`/api/notifications/${item._id || item.id}/read`, {
-          method: "POST",
-          credentials: "include",
-        })
-      )
-    );
-    window.refreshNotificationCenters?.();
-  } catch (err) {
-    console.warn("Notifications mark read failed", err);
-  }
-}
 
 function isAttorneyProfileComplete(user = {}) {
   if (!user || typeof user !== "object") return false;
@@ -734,7 +657,7 @@ function isAttorneyProfileComplete(user = {}) {
 function getAttorneyOnboardingProgress() {
   const profileDone = isAttorneyProfileComplete(state.user || {});
   const paymentDone = state.billing.hasPaymentMethod === true;
-  const caseDone = (state.cases?.length || 0) > 0 || (state.casesArchived?.length || 0) > 0;
+  const caseDone = legacyHome?.state.inventory.phase === "ready" && legacyHome.state.inventory.value.postedCount > 0;
   return { profileDone, paymentDone, caseDone };
 }
 
@@ -749,22 +672,22 @@ function getOnboardingAttentionCopy(step) {
   if (step === "profile") {
     return {
       title: "Finish your profile",
-      text: "Add your profile details so everything is ready before you post your first case.",
+      text: "Add your profile details so everything is ready before you post your first Matter.",
       cta: "Open profile",
     };
   }
   if (step === "payment") {
     return {
       title: "Add a payment method",
-      text: "Add your payment method now so you can fund a case when you're ready.",
-      cta: "Open billing",
+      text: "Add your payment method now so you can fund a Matter when you're ready.",
+      cta: "Open payments",
     };
   }
   if (step === "case") {
     return {
-      title: "Post your first case",
-      text: "Create your first case to start receiving paralegal interest and move work forward.",
-      cta: "Create case",
+      title: "Post your first Matter",
+      text: "Create your first Matter to start receiving paralegal interest and move work forward.",
+      cta: "Create Matter",
     };
   }
   return { title: "", text: "", cta: "Open step" };
@@ -847,6 +770,7 @@ function skipAttorneyOnboardingFlow() {
   } catch {}
   updateCaseOnboardingSkipButton();
   updateOnboardingChecklist();
+  renderNeedsAttentionQueue();
 }
 
 function openOnboardingStepWithPopup(step) {
@@ -885,20 +809,18 @@ function updateOnboardingAttentionCard(progress = getAttorneyOnboardingProgress(
   const titleEl = card.querySelector("[data-onboarding-attention-title]");
   const textEl = card.querySelector("[data-onboarding-attention-text]");
   const ctaEl = card.querySelector("[data-onboarding-attention-action]");
-  const skipBtn = card.querySelector("[data-onboarding-attention-skip]");
-  const checkItems = Array.from(card.querySelectorAll("[data-onboarding-check-step]"));
+  const progressCopyEl = card.querySelector("[data-onboarding-progress-copy]");
+  const progressEl = card.querySelector(".onboarding-attention-progress");
+  const progressBarEl = card.querySelector("[data-onboarding-progress-bar]");
   const doneByStep = {
     profile: Boolean(progress.profileDone),
     payment: Boolean(progress.paymentDone),
     case: Boolean(progress.caseDone),
   };
-  checkItems.forEach((item) => {
-    const key = String(item.dataset.onboardingCheckStep || "").toLowerCase();
-    const done = Boolean(doneByStep[key]);
-    item.classList.toggle("is-complete", done);
-    const input = item.querySelector('input[type="checkbox"]');
-    if (input) input.checked = done;
-  });
+  const completedCount = Object.values(doneByStep).filter(Boolean).length;
+  if (progressCopyEl) progressCopyEl.textContent = `${completedCount} of 3 complete`;
+  if (progressEl) progressEl.setAttribute("aria-valuenow", String(completedCount));
+  if (progressBarEl) progressBarEl.style.width = `${(completedCount / 3) * 100}%`;
 
   if (!onboardingAttentionHydrated) {
     clearOnboardingAttentionCompleteTimer();
@@ -924,13 +846,12 @@ function updateOnboardingAttentionCard(progress = getAttorneyOnboardingProgress(
     clearOnboardingAttentionCompleteTimer();
     clearOnboardingCompleteNoticeSeen();
     card.classList.remove("is-static", "is-complete");
-    if (ctaEl) ctaEl.hidden = true;
-    if (skipBtn) skipBtn.hidden = false;
-    checkItems.forEach((item) => {
-      item.setAttribute("tabindex", "0");
-      item.setAttribute("aria-disabled", "false");
-    });
     const copy = getOnboardingAttentionCopy(step);
+    if (ctaEl) {
+      ctaEl.hidden = false;
+      ctaEl.textContent = copy.cta;
+      ctaEl.setAttribute("aria-label", `${copy.cta}: ${copy.title}`);
+    }
     if (titleEl) titleEl.textContent = copy.title;
     if (textEl) {
       textEl.hidden = false;
@@ -951,11 +872,6 @@ function updateOnboardingAttentionCard(progress = getAttorneyOnboardingProgress(
     textEl.textContent = "Everything is set. You're ready to work with confidence.";
   }
   if (ctaEl) ctaEl.hidden = true;
-  if (skipBtn) skipBtn.hidden = true;
-  checkItems.forEach((item) => {
-    item.setAttribute("tabindex", "-1");
-    item.setAttribute("aria-disabled", "true");
-  });
 
   if (!transitionedToComplete || getOnboardingCompleteNoticeSeen()) {
     card.hidden = true;
@@ -1009,7 +925,11 @@ function setupOnboardingChecklist() {
       ref.action.textContent = actionText;
     }
     if (ref.action && onClick) {
-      ref.action.onclick = onClick;
+      if (ref.action.__lpcStepClickHandler) {
+        ref.action.removeEventListener("click", ref.action.__lpcStepClickHandler);
+      }
+      ref.action.__lpcStepClickHandler = onClick;
+      ref.action.addEventListener("click", onClick);
     }
   };
 
@@ -1018,9 +938,9 @@ function setupOnboardingChecklist() {
   };
   const goToBilling = () => {
     if (typeof showDashboardView === "function") {
-      showDashboardView("billing");
+      showDashboardView("funds");
     } else {
-      window.location.hash = "billing";
+      window.location.hash = "funds";
     }
     setTimeout(() => {
       const target = document.getElementById("addPaymentMethodBtn") || document.getElementById("replacePaymentMethodBtn");
@@ -1057,7 +977,7 @@ function setupOnboardingChecklist() {
     });
     setStep("case", caseDone, {
       statusText: caseDone ? "Complete" : "Next",
-      actionText: caseDone ? "View" : "New case",
+      actionText: caseDone ? "View" : "New Matter",
       onClick: caseDone ? goToCaseList : goToCases,
     });
     updateOnboardingAttentionCard(progress);
@@ -1119,6 +1039,11 @@ function showCaseOnboardingModal() {
   overlay.setAttribute("aria-hidden", "false");
   modal.classList.add("is-active");
   modal.setAttribute("aria-hidden", "false");
+  modal.removeAttribute("inert");
+  activateDialogFocus(modal, {
+    initialFocus: modal.querySelector("[data-case-onboarding-continue]"),
+    onEscape: hideCaseOnboardingModal,
+  });
   setCaseOnboardingModalSeen();
 }
 
@@ -1130,6 +1055,8 @@ function hideCaseOnboardingModal() {
   overlay.setAttribute("aria-hidden", "true");
   modal.classList.remove("is-active");
   modal.setAttribute("aria-hidden", "true");
+  modal.setAttribute("inert", "");
+  deactivateDialogFocus(modal);
   document.body.style.overflow = caseOnboardingBodyOverflow;
   window.scrollTo({ top: caseOnboardingScrollY, left: 0, behavior: "instant" });
 }
@@ -1164,26 +1091,19 @@ function maybePromptCaseOnboarding() {
 // Overview Page
 // -------------------------
 async function initOverviewPage() {
+  let lifecycleRefreshTimer = null;
   const messageBox = document.getElementById("messageBox");
-  const messageCountSpan = document.getElementById("messageCount");
-  const messageLabelSpan = document.getElementById("messageLabel");
-  const completedJobsList = document.getElementById("completedJobsList");
   const messageSnippet = document.getElementById("messageSnippet");
   const messagePreviewSender = document.getElementById("messagePreviewSender");
   const messagePreviewText = document.getElementById("messagePreviewText");
   const messagePreviewLink = document.getElementById("messagePreviewLink");
-  const deadlineList = document.getElementById("deadlineList");
   const escrowDetails = document.getElementById("escrowDetails");
-  const caseCards = document.getElementById("caseCards");
   const homeView = document.querySelector(".view-home");
   const quickButtons = document.querySelectorAll("[data-quick-link]");
   const weeklyNotesGrid = document.getElementById("weeklyNotesGrid");
   const weeklyNotesRange = document.getElementById("weeklyNotesRange");
   const onboardingAttentionCard = document.getElementById("attorneyOnboardingAttentionCard");
-  const onboardingAttentionSkip = onboardingAttentionCard?.querySelector("[data-onboarding-attention-skip]");
-  const onboardingAttentionSteps = Array.from(
-    onboardingAttentionCard?.querySelectorAll("[data-onboarding-check-step]") || []
-  );
+  const onboardingAttentionAction = onboardingAttentionCard?.querySelector("[data-onboarding-attention-action]");
   const caseOnboardingSkipBtn = document.getElementById("caseOnboardingSkipBtn");
   const attentionList = document.getElementById("attorneyNeedsAttentionList");
   setupOnboardingChecklist();
@@ -1201,23 +1121,17 @@ async function initOverviewPage() {
     event?.stopPropagation?.();
     skipAttorneyOnboardingFlow();
   };
-  onboardingAttentionSteps.forEach((node) => {
-    node.addEventListener("click", () => {
-      handleOnboardingStepOpen(node.dataset.onboardingCheckStep);
-    });
-    node.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      handleOnboardingStepOpen(node.dataset.onboardingCheckStep);
-    });
+  onboardingAttentionAction?.addEventListener("click", () => {
+    handleOnboardingStepOpen(onboardingAttentionCard?.dataset.step);
   });
-  onboardingAttentionSkip?.addEventListener("click", handleSkipOnboarding);
   caseOnboardingSkipBtn?.addEventListener("click", handleSkipOnboarding);
   attentionList?.addEventListener("click", (event) => {
     const action = event.target?.closest?.("[data-attention-action]");
     if (!action) return;
     const actionKey = String(action.dataset.attentionAction || "").toLowerCase();
-    if (actionKey === "messages") {
+    if (actionKey === "refresh") {
+      event.preventDefault(); void hydrateOverview();
+    } else if (actionKey === "messages") {
       event.preventDefault();
       goToMessages(state.latestThreadCaseId);
     }
@@ -1233,33 +1147,29 @@ async function initOverviewPage() {
     messageBox.addEventListener("click", () => {
       goToMessages(state.latestThreadCaseId);
     });
-    messageBox.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        goToMessages(state.latestThreadCaseId);
-      }
-    });
   }
 
-  function updateMessageBubble(count = 0) {
-    if (messageCountSpan) {
-      messageCountSpan.textContent = String(count);
-      messageCountSpan.classList.remove("is-muted");
-      if (messageCountSpan.parentElement) {
-        messageCountSpan.parentElement.hidden = count === 0;
-      }
-    }
-    if (messageLabelSpan) {
-      messageLabelSpan.textContent =
-        count === 0 ? "Caught up" : count === 1 ? "message waiting" : "messages waiting";
-    }
-    updateOverviewSignals({ unreadCount: count });
-  }
-
-  updateMessageBubble(0);
-  fetchUnreadMessages().catch(() => {});
-  loadCompletedJobs(completedJobsList).catch(() => {});
-  hydrateOverview().catch(() => {});
+  const homeApi = createApiClient({ onAuthenticationLost: () => { legacyHome?.clear(); clearCaseNoteAccess(); } });
+  legacyHome = createLegacyAttorneyHome({
+    api: homeApi, ownerId: String(state.user?.id || state.user?._id || ""),
+    onReviewMatter: caseId => openCaseNoteModal(caseId, "review"),
+    onChange(sources) {
+      const value = key => sources[key].phase === "ready" ? sources[key].value : null;
+      const inventory = value("inventory"), messages = value("messages");
+      state.billing.hasPaymentMethod = value("payment")?.hasPaymentMethod ?? null;
+      onboardingAttentionHydrated = sources.inventory.phase === "ready" && sources.payment.phase === "ready";
+      overviewSignals.casesCreatedCount = inventory?.postedCount ?? null;
+      overviewSignals.overdueCount = value("overdue");
+      updateOnboardingChecklist();
+      updateMessagePreviewUI({ threads: messages?.threads || [], messageSnippet, messagePreviewSender, messagePreviewText });
+      renderNeedsAttentionQueue();
+    },
+  });
+  document.querySelector('[data-home-refresh]')?.addEventListener('click', () => void hydrateOverview());
+  // Start the requested view before independent Home and weekly-note reads.
+  setupDashboardViewRouter();
+  initHomeTabs();
+  void hydrateOverview();
   setupWeeklyNoteModal();
   void initWeeklyNotes(weeklyNotesGrid, weeklyNotesRange);
   startOverviewPolling();
@@ -1277,41 +1187,13 @@ async function initOverviewPage() {
     goToMessages(state.latestThreadCaseId);
   });
 
-  async function fetchUnreadMessages() {
-    try {
-      const res = await secureFetch("/api/messages/unread-count", { headers: { Accept: "application/json" }, noRedirect: true });
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      updateMessageBubble(data.count || 0);
-    } catch (err) {
-      console.warn("Message count fallback", err?.message);
-    }
-  }
-
   function shouldPollOverview() {
     return document.visibilityState === "visible" && (!homeView || !homeView.hasAttribute("hidden"));
   }
 
   async function refreshOverviewMessages({ force = false } = {}) {
     if (!force && !shouldPollOverview()) return;
-    await fetchUnreadMessages();
-    const threads = await fetchThreadsOverview(200);
-    const threadByCase = new Map();
-    (threads || []).forEach((thread) => {
-      const id = thread?.caseId || thread?.case?.id || thread?.id || "";
-      if (id) threadByCase.set(String(id), thread);
-    });
-    state.threadOverview = threadByCase;
-    if (caseCards && Array.isArray(state.overview.cases) && state.overview.cases.length) {
-      renderCaseCards(caseCards, state.overview.cases, threadByCase);
-    }
-    updateMessagePreviewUI({
-      threads,
-      messageSnippet,
-      messagePreviewSender,
-      messagePreviewText,
-      eligibleCaseIds: state.overview.eligibleCaseIds,
-    });
+    await legacyHome.refresh(["messages"]);
   }
 
   function startOverviewPolling() {
@@ -1328,61 +1210,19 @@ async function initOverviewPage() {
   }
 
   async function hydrateOverview() {
-    try {
-      const [dashboard, overdueCount, events, threads, apps, hasPaymentMethod] = await Promise.all([
-        fetchDashboardData(),
-        fetchOverdueCount(),
-        fetchUpcomingEvents(),
-        fetchThreadsOverview(200),
-        loadApplicationsForMyJobs(),
-        hasDefaultPaymentMethod(),
-        loadCasesWithFiles(),
-        loadArchivedCases(),
-      ]);
-      state.billing.hasPaymentMethod = hasPaymentMethod;
-      onboardingAttentionHydrated = true;
-      updateOnboardingChecklist();
-      applyApplicationsToCases(apps || []);
-      const eligibleCaseIds = new Set(
-        filterWorkspaceEligibleCases(state.cases).map((item) => String(item.id || item._id || ""))
-      );
-      const threadByCase = new Map();
-      (threads || []).forEach((thread) => {
-        const id = thread?.caseId || thread?.case?.id || thread?.id || "";
-        if (id) threadByCase.set(String(id), thread);
-      });
-      state.threadOverview = threadByCase;
-      const filteredCaseCards = (dashboard?.activeCases || []).filter((item) => {
-        const id = item?.caseId || item?.id || item?._id;
-        return id && eligibleCaseIds.has(String(id));
-      });
-      state.overview.cases = filteredCaseCards;
-      state.overview.eligibleCaseIds = eligibleCaseIds;
-      updateMetrics(dashboard?.metrics, overdueCount);
-      renderCaseCards(caseCards, filteredCaseCards, threadByCase);
-      renderEscrowPanel(escrowDetails, dashboard?.metrics);
-      renderDeadlines(deadlineList, events);
-      updateMessagePreviewUI({
-        threads,
-        messageSnippet,
-        messagePreviewSender,
-        messagePreviewText,
-        eligibleCaseIds,
-      });
-      renderApplications(apps || [], hasPaymentMethod);
-      updateOverviewSignals(
-        buildOverviewSignals({ cases: state.cases, archivedCases: state.casesArchived, apps, overdueCount })
-      );
-    } catch (err) {
-      console.warn("Overview hydration failed", err);
-      if (deadlineList) deadlineList.innerHTML = `<div class="info-line" style="color:var(--muted);">Unable to load deadlines.</div>`;
-      onboardingAttentionHydrated = true;
-      updateOnboardingChecklist();
-    }
+    await legacyHome.refresh();
+    renderEscrowPanel(escrowDetails);
   }
 
-  setupDashboardViewRouter();
-  initHomeTabs();
+  const scheduleLifecycleOverviewRefresh = () => {
+    if (document.visibilityState !== "visible" || lifecycleRefreshTimer) return;
+    lifecycleRefreshTimer = window.setTimeout(() => {
+      lifecycleRefreshTimer = null;
+      void hydrateOverview();
+    }, 0);
+  };
+  window.addEventListener("lpc:lifecycle-refresh", scheduleLifecycleOverviewRefresh);
+
 }
 
 async function initWeeklyNotes(grid, rangeEl) {
@@ -1394,7 +1234,7 @@ async function initWeeklyNotes(grid, rangeEl) {
   const toggleBtn = document.getElementById("weeklyNotesToggle");
   const monthHeader = document.getElementById("weeklyNotesMonthHeader");
   const cache = new Map();
-  const saveTimers = new Map();
+  let renderGeneration = 0;
   const state = {
     mode: "week",
     weekStart: getWeekStart(new Date()),
@@ -1405,14 +1245,19 @@ async function initWeeklyNotes(grid, rangeEl) {
     if (rangeEl) rangeEl.textContent = label;
   };
 
-  const scheduleSave = (weekKey, notes) => {
-    const existing = saveTimers.get(weekKey);
-    if (existing) window.clearTimeout(existing);
-    const timer = window.setTimeout(() => {
-      saveTimers.delete(weekKey);
-      void persistWeeklyNotes(weekKey, notes);
-    }, 500);
-    saveTimers.set(weekKey, timer);
+  const saveDay = async (weekKey, notes, index, value) => {
+    const next = [...notes]; next[index] = value;
+    const saved = await persistWeeklyNotes(weekKey, next);
+    notes.splice(0, 7, ...saved);
+    render();
+    return saved[index];
+  };
+  const reviewDay = async (weekKey, notes, index) => {
+    const saved = await fetchWeeklyNoteSnapshot(weekKey);
+    return { note: saved.notes[index], accept: () => {
+      weeklyNoteSnapshots.set(weekKey, saved);
+      notes.splice(0, 7, ...saved.notes);
+    } };
   };
 
   const loadWeekNotes = async (weekStart) => {
@@ -1425,8 +1270,10 @@ async function initWeeklyNotes(grid, rangeEl) {
 
   const updateControls = () => {
     if (toggleBtn) {
-      toggleBtn.textContent = state.mode === "week" ? "Full Month" : "Week View";
-      toggleBtn.classList.toggle("is-active", state.mode === "month");
+      const monthViewOpen = state.mode === "month";
+      toggleBtn.classList.toggle("is-active", monthViewOpen);
+      toggleBtn.setAttribute("aria-expanded", String(monthViewOpen));
+      toggleBtn.setAttribute("aria-label", monthViewOpen ? "Return to weekly view" : "Show month view");
     }
     const prevLabel = state.mode === "week" ? "Previous week" : "Previous month";
     const nextLabel = state.mode === "week" ? "Next week" : "Next month";
@@ -1438,7 +1285,7 @@ async function initWeeklyNotes(grid, rangeEl) {
     }
   };
 
-  const renderDayCard = ({ date, note, isOutsideMonth, onSave, showWeekday = true, dateFormat = {} }) => {
+  const renderDayCard = ({ date, note, isOutsideMonth, onSave, onReview, showWeekday = true, dateFormat = {} }) => {
     const day = document.createElement("div");
     day.className = "weekly-note-day";
     if (isSameDay(date, new Date())) day.classList.add("is-today");
@@ -1462,16 +1309,9 @@ async function initWeeklyNotes(grid, rangeEl) {
     let currentNote = note || "";
 
     if (!modalReady) {
-      const textarea = document.createElement("textarea");
-      textarea.className = "weekly-note-input";
-      textarea.rows = 3;
-      textarea.placeholder = "";
-      textarea.value = currentNote;
-      textarea.addEventListener("input", () => {
-        currentNote = textarea.value;
-        onSave(currentNote);
-      });
-      day.append(header, textarea);
+      const text = document.createElement("p");
+      text.textContent = "The note editor is unavailable. Reload this page to try again.";
+      day.append(header, text);
       return day;
     }
 
@@ -1493,10 +1333,10 @@ async function initWeeklyNotes(grid, rangeEl) {
       openWeeklyNoteModal({
         date,
         note: currentNote,
-        onSave: (value) => {
-          currentNote = value;
-          updateBody(value);
-          onSave(value);
+        onReview,
+        onSave: async (value) => {
+          currentNote = await onSave(value);
+          updateBody(currentNote);
         },
       });
     };
@@ -1513,13 +1353,15 @@ async function initWeeklyNotes(grid, rangeEl) {
     return day;
   };
 
-  const renderWeek = async () => {
+  const renderWeek = async (ticket) => {
     const start = getWeekStart(state.weekStart);
     state.weekStart = start;
     const weekKey = formatDateKey(start);
     const notes = await loadWeekNotes(start);
+    if (ticket !== renderGeneration) return;
 
-    const end = addDays(start, 6);
+    const visibleDayCount = window.matchMedia("(max-width: 900px)").matches ? 5 : 7;
+    const end = addDays(start, visibleDayCount - 1);
     const startLabel = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
     const endLabel = end.toLocaleDateString(undefined, { month: "short", day: "numeric" });
     updateRangeLabel(`${startLabel}–${endLabel}`);
@@ -1531,7 +1373,7 @@ async function initWeeklyNotes(grid, rangeEl) {
       monthHeader.setAttribute("aria-hidden", "true");
     }
 
-    for (let i = 0; i < 7; i += 1) {
+    for (let i = 0; i < visibleDayCount; i += 1) {
       const date = addDays(start, i);
       const day = renderDayCard({
         date,
@@ -1539,16 +1381,14 @@ async function initWeeklyNotes(grid, rangeEl) {
         isOutsideMonth: false,
         showWeekday: true,
         dateFormat: { month: "short", day: "numeric" },
-        onSave: (value) => {
-          notes[i] = value;
-          scheduleSave(weekKey, notes);
-        },
+        onSave: (value) => saveDay(weekKey, notes, i, value),
+        onReview: () => reviewDay(weekKey, notes, i),
       });
       grid.appendChild(day);
     }
   };
 
-  const renderMonth = async () => {
+  const renderMonth = async (ticket) => {
     const compactMonth = window.matchMedia("(max-width: 900px)").matches;
     const monthStart = getMonthStart(state.monthDate);
     const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
@@ -1584,6 +1424,7 @@ async function initWeeklyNotes(grid, rangeEl) {
       weeks.push(new Date(cursor));
     }
     await Promise.all(weeks.map((weekStart) => loadWeekNotes(weekStart)));
+    if (ticket !== renderGeneration) return;
 
     for (let cursor = new Date(calendarStart); cursor <= calendarEnd; cursor = addDays(cursor, 1)) {
       const weekStart = getWeekStart(cursor);
@@ -1596,28 +1437,34 @@ async function initWeeklyNotes(grid, rangeEl) {
         isOutsideMonth: cursor.getMonth() !== monthStart.getMonth(),
         showWeekday: compactMonth,
         dateFormat: compactMonth ? { month: "short", day: "numeric" } : { day: "numeric" },
-        onSave: (value) => {
-          notes[idx] = value;
-          scheduleSave(weekKey, notes);
-        },
+        onSave: (value) => saveDay(weekKey, notes, idx, value),
+        onReview: () => reviewDay(weekKey, notes, idx),
       });
       grid.appendChild(day);
     }
   };
 
   const render = () => {
-    if (state.mode === "month") return void renderMonth();
-    return void renderWeek();
+    const ticket = ++renderGeneration;
+    void (state.mode === "month" ? renderMonth(ticket) : renderWeek(ticket)).catch(() => {
+      if (ticket !== renderGeneration) return;
+      const message = document.createElement("p"); message.setAttribute("role", "alert");
+      message.textContent = "Weekly notes couldn’t be loaded. Retry to load the saved notes.";
+      const retry = document.createElement("button"); retry.type = "button"; retry.className = "btn secondary"; retry.textContent = "Retry weekly notes";
+      retry.addEventListener("click", render);
+      grid.replaceChildren(message, retry);
+    });
   };
+  window.addEventListener("pagehide", () => { renderGeneration += 1; cache.clear(); grid.replaceChildren(); });
+  window.addEventListener("pageshow", (event) => { if (event.persisted) render(); });
+  window.addEventListener("lpc:weekly-notes-access-lost", () => { renderGeneration += 1; cache.clear(); });
 
   let lastCompact = window.matchMedia("(max-width: 900px)").matches;
   window.addEventListener("resize", () => {
     const isCompact = window.matchMedia("(max-width: 900px)").matches;
-    if (isCompact !== lastCompact && state.mode === "month") {
+    if (isCompact !== lastCompact) {
       lastCompact = isCompact;
       render();
-    } else if (isCompact !== lastCompact) {
-      lastCompact = isCompact;
     }
   });
 
@@ -1663,6 +1510,14 @@ let weeklyNoteSaveBtn = null;
 let weeklyNoteCancelBtn = null;
 let weeklyNoteModalBound = false;
 let weeklyNoteModalOnSave = null;
+let weeklyNoteModalOnReview = null;
+let weeklyNoteModalBusy = false;
+let weeklyNoteModalOriginal = "";
+let weeklyNoteModalFeedback = null;
+const weeklyNoteSnapshots = new Map();
+let weeklyNoteEpoch = 0;
+let weeklyNoteOwnerId = "";
+let weeklyNoteOwnerCheck = null;
 
 let statusHistoryModalRef = null;
 let statusHistoryBodyRef = null;
@@ -1677,11 +1532,13 @@ function ensureWeeklyNoteModal() {
   modal.setAttribute("role", "dialog");
   modal.setAttribute("aria-modal", "true");
   modal.setAttribute("aria-labelledby", "weeklyNoteModalTitle");
+  modal.setAttribute("aria-hidden", "true");
+  modal.setAttribute("inert", "");
   modal.innerHTML = `
     <div class="note-modal-card">
       <h3 id="weeklyNoteModalTitle" style="font-family:var(--font-serif);font-weight:300;">Weekly Note</h3>
       <div class="weekly-note-modal-date" id="weeklyNoteModalDate"></div>
-      <textarea id="weeklyNoteModalTextarea" placeholder="Add a note for this day."></textarea>
+      <textarea id="weeklyNoteModalTextarea" aria-labelledby="weeklyNoteModalTitle weeklyNoteModalDate"></textarea>
       <div class="note-modal-actions">
         <button type="button" class="btn secondary" data-weekly-note-cancel>Cancel</button>
         <button type="button" class="btn primary" data-weekly-note-save>Save Note</button>
@@ -1706,17 +1563,71 @@ function setupWeeklyNoteModal() {
   weeklyNoteSaveBtn = weeklyNoteModalRef.querySelector("[data-weekly-note-save]");
   weeklyNoteCancelBtn = weeklyNoteModalRef.querySelector("[data-weekly-note-cancel]");
 
+  weeklyNoteTextarea?.setAttribute("maxlength", "2000");
+  weeklyNoteTextarea?.setAttribute("aria-labelledby", "weeklyNoteModalTitle weeklyNoteModalDate");
+  weeklyNoteModalFeedback = document.createElement("div");
+  weeklyNoteModalFeedback.setAttribute("role", "status");
+  weeklyNoteTextarea?.after(weeklyNoteModalFeedback);
+  const checkStoredOwner = (value) => {
+    let owner;
+    try { const user = typeof value === "string" ? JSON.parse(value) : value; owner = String(user?.id || user?._id || ""); } catch { owner = ""; }
+    if (!owner || owner !== weeklyNoteOwnerId) clearWeeklyNoteAccess();
+  };
+  window.addEventListener("storage", (event) => { if (event.key === "lpc_user") checkStoredOwner(event.newValue); });
+  window.addEventListener("lpc:user-updated", (event) => checkStoredOwner(event.detail));
+  window.addEventListener("focus", () => { if (document.visibilityState === "visible") void verifyWeeklyNoteOwner().catch(() => { /* Verification already cleared private notes. */ }); });
+  window.addEventListener("beforeunload", (event) => {
+    if (weeklyNoteModalRef?.classList.contains("hidden")) return;
+    if (weeklyNoteModalBusy || weeklyNoteTextarea?.value !== weeklyNoteModalOriginal) { event.preventDefault(); event.returnValue = ""; }
+  });
+  window.addEventListener("pagehide", () => {
+    weeklyNoteModalBusy = false; weeklyNoteSnapshots.clear(); weeklyNoteEpoch += 1; weeklyNoteOwnerCheck = null;
+    if (weeklyNoteTextarea) weeklyNoteTextarea.value = "";
+    weeklyNoteModalOriginal = ""; weeklyNoteModalFeedback?.replaceChildren(); closeWeeklyNoteModal();
+  });
   weeklyNoteCancelBtn?.addEventListener("click", closeWeeklyNoteModal);
   weeklyNoteModalRef.addEventListener("click", (event) => {
     if (event.target === weeklyNoteModalRef) {
       closeWeeklyNoteModal();
     }
   });
-  weeklyNoteSaveBtn?.addEventListener("click", () => {
-    if (!weeklyNoteModalOnSave) return;
-    const value = weeklyNoteTextarea?.value?.trim() || "";
-    weeklyNoteModalOnSave(value);
-    closeWeeklyNoteModal();
+  weeklyNoteSaveBtn?.addEventListener("click", async () => {
+    if (!weeklyNoteModalOnSave || weeklyNoteModalBusy) return;
+    const value = weeklyNoteTextarea?.value || "";
+    weeklyNoteModalBusy = true; weeklyNoteSaveBtn.disabled = true; weeklyNoteCancelBtn.disabled = true; weeklyNoteTextarea.disabled = true;
+    weeklyNoteModalFeedback.textContent = "Saving note…";
+    try {
+      await weeklyNoteModalOnSave(value);
+      weeklyNoteModalBusy = false; closeWeeklyNoteModal();
+    } catch (error) {
+      if (weeklyNoteModalRef.classList.contains("hidden")) return;
+      weeklyNoteModalFeedback.textContent = error.status === 409 ? "These notes changed elsewhere. Your edit is still here. Review the saved note before trying again." : "Saving wasn’t confirmed. Your edit is still here. Review the saved note before trying again.";
+      const review = document.createElement("button"); review.type = "button"; review.className = "btn secondary"; review.style.minHeight = "44px"; review.textContent = "Review saved note";
+      review.addEventListener("click", async () => {
+        if (!weeklyNoteModalOnReview || weeklyNoteModalBusy) return;
+        review.disabled = true; weeklyNoteModalBusy = true;
+        try {
+          const saved = await weeklyNoteModalOnReview();
+          if (weeklyNoteModalRef.classList.contains("hidden")) return;
+          const label = document.createElement("p"); label.textContent = "Saved note for this day (other days will keep their latest saved notes):";
+          const text = document.createElement("p"); Object.assign(text.style, { whiteSpace: "pre-wrap", overflowWrap: "anywhere", maxHeight: "180px", overflowY: "auto" }); text.tabIndex = 0; text.setAttribute("aria-label", "Saved note"); text.textContent = saved.note || "No saved note.";
+          const choose = (title, replace) => {
+            const control = document.createElement("button"); control.type = "button"; control.className = "btn secondary"; control.style.minHeight = "44px"; control.textContent = title;
+            control.addEventListener("click", () => {
+              saved.accept(); if (replace) weeklyNoteTextarea.value = saved.note;
+              weeklyNoteModalFeedback.textContent = "Review your note above, then select Save Note.";
+              weeklyNoteSaveBtn.disabled = false; weeklyNoteTextarea.focus();
+            }); return control;
+          };
+          const choices = document.createElement("div"); choices.className = "note-modal-actions"; choices.append(choose("Use saved note", true), choose("Keep my edit", false));
+          weeklyNoteModalFeedback.replaceChildren(label, text, choices); text.focus();
+        } catch { if (!weeklyNoteModalRef.classList.contains("hidden")) { review.disabled = false; review.textContent = "Retry reviewing saved note"; } }
+        finally { weeklyNoteModalBusy = false; }
+      });
+      weeklyNoteModalFeedback.append(review);
+    } finally {
+      weeklyNoteModalBusy = false; weeklyNoteCancelBtn.disabled = false; weeklyNoteTextarea.disabled = false;
+    }
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && weeklyNoteModalRef && !weeklyNoteModalRef.classList.contains("hidden")) {
@@ -1725,10 +1636,11 @@ function setupWeeklyNoteModal() {
   });
 }
 
-function openWeeklyNoteModal({ date, note, onSave }) {
+function openWeeklyNoteModal({ date, note, onSave, onReview }) {
   setupWeeklyNoteModal();
   if (!weeklyNoteModalRef) return;
-  weeklyNoteModalOnSave = onSave;
+  weeklyNoteModalOnSave = onSave; weeklyNoteModalOnReview = onReview;
+  weeklyNoteModalOriginal = note || ""; weeklyNoteModalFeedback.replaceChildren(); weeklyNoteSaveBtn.disabled = false;
   if (weeklyNoteModalTitle) {
     weeklyNoteModalTitle.textContent = "Weekly Note";
   }
@@ -1743,15 +1655,22 @@ function openWeeklyNoteModal({ date, note, onSave }) {
     weeklyNoteTextarea.value = note || "";
   }
   weeklyNoteModalRef.classList.remove("hidden");
-  weeklyNoteModalRef.removeAttribute("aria-hidden");
-  weeklyNoteTextarea?.focus();
+  weeklyNoteModalRef.setAttribute("aria-hidden", "false");
+  weeklyNoteModalRef.removeAttribute("inert");
+  activateDialogFocus(weeklyNoteModalRef, {
+    initialFocus: weeklyNoteTextarea,
+    onEscape: closeWeeklyNoteModal,
+  });
 }
 
 function closeWeeklyNoteModal() {
-  if (!weeklyNoteModalRef) return;
+  if (!weeklyNoteModalRef || weeklyNoteModalBusy) return;
   weeklyNoteModalRef.classList.add("hidden");
+  weeklyNoteModalRef.setAttribute("aria-hidden", "true");
+  weeklyNoteModalRef.setAttribute("inert", "");
+  deactivateDialogFocus(weeklyNoteModalRef);
   weeklyNoteModalRef.removeAttribute("aria-busy");
-  weeklyNoteModalOnSave = null;
+  weeklyNoteModalOnSave = null; weeklyNoteModalOnReview = null;
 }
 
 function initStatusHistoryModal() {
@@ -1775,6 +1694,9 @@ function initStatusHistoryModal() {
 function closeStatusHistoryModal() {
   if (!statusHistoryModalRef) return;
   statusHistoryModalRef.classList.add("hidden");
+  statusHistoryModalRef.setAttribute("aria-hidden", "true");
+  statusHistoryModalRef.setAttribute("inert", "");
+  deactivateDialogFocus(statusHistoryModalRef);
   statusHistoryModalRef.removeAttribute("aria-busy");
 }
 
@@ -1802,6 +1724,12 @@ async function openStatusHistoryModal(caseId) {
   if (!statusHistoryModalRef || !statusHistoryBodyRef) return;
   statusHistoryBodyRef.innerHTML = `<div class="info-line">Loading status history…</div>`;
   statusHistoryModalRef.classList.remove("hidden");
+  statusHistoryModalRef.setAttribute("aria-hidden", "false");
+  statusHistoryModalRef.removeAttribute("inert");
+  activateDialogFocus(statusHistoryModalRef, {
+    initialFocus: statusHistoryModalRef.querySelector("[data-status-history-close]"),
+    onEscape: closeStatusHistoryModal,
+  });
   statusHistoryModalRef.setAttribute("aria-busy", "true");
   try {
     const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/status-history`, {
@@ -1830,6 +1758,7 @@ async function openStatusHistoryModal(caseId) {
         </ul>
       `;
     }
+    if (payload.complete === false) statusHistoryBodyRef.insertAdjacentHTML("afterbegin", `<p class="info-line">Some history could not be loaded. The events below are incomplete. Close and reopen to try again.</p>`);
   } catch (err) {
     statusHistoryBodyRef.innerHTML = `<div class="info-line">${sanitize(
       err?.message || "Unable to load status history."
@@ -1883,42 +1812,72 @@ function isSameDay(a, b) {
   );
 }
 
-async function fetchWeeklyNotes(weekStart) {
-  try {
-    const res = await secureFetch(`/api/users/me/weekly-notes?weekStart=${encodeURIComponent(weekStart)}`, {
-      headers: { Accept: "application/json" },
-      noRedirect: true,
-    });
-    if (!res.ok) throw new Error("Unable to load weekly notes.");
-    const payload = await res.json().catch(() => ({}));
-    const notes = Array.isArray(payload.notes) ? payload.notes : [];
-    return normalizeWeeklyNotes(notes);
-  } catch (err) {
-    console.warn("Weekly notes load failed", err);
-    return Array(7).fill("");
-  }
-}
-
-async function persistWeeklyNotes(weekStart, notes = []) {
-  try {
-    const res = await secureFetch("/api/users/me/weekly-notes", {
-      method: "PUT",
-      headers: { Accept: "application/json" },
-      body: { weekStart, notes },
-    });
-    if (!res.ok) throw new Error("Unable to save weekly notes.");
-  } catch (err) {
-    console.warn("Weekly notes save failed", err);
-  }
-}
-
-function normalizeWeeklyNotes(notes = []) {
-  const normalized = Array(7).fill("");
-  notes.forEach((note, idx) => {
-    if (idx >= normalized.length) return;
-    normalized[idx] = String(note || "");
+async function fetchWeeklyNoteSnapshot(weekStart) {
+  await verifyWeeklyNoteOwner();
+  const epoch = weeklyNoteEpoch;
+  const res = await secureFetch(`/api/users/me/weekly-notes?weekStart=${encodeURIComponent(weekStart)}`, {
+    headers: { Accept: "application/json" }, noRedirect: true, cache: "no-store",
   });
-  return normalized;
+  if (!res.ok) {
+    if ([401, 403].includes(res.status)) clearWeeklyNoteAccess();
+    throw Object.assign(new Error("Unable to load weekly notes."), { status: res.status });
+  }
+  const payload = await res.json();
+  if (epoch !== weeklyNoteEpoch) throw new Error("Weekly notes session changed.");
+  return validateWeeklyNoteSnapshot(payload, weekStart);
+}
+function validateWeeklyNoteSnapshot(payload, weekStart) {
+  if (payload?.weekStart !== weekStart || typeof payload.revision !== "string" || !payload.revision || !Array.isArray(payload.notes) || payload.notes.length !== 7 || payload.notes.some((note) => typeof note !== "string" || note.length > 2000)) throw new Error("Unable to verify weekly notes.");
+  return { notes: [...payload.notes], revision: payload.revision };
+}
+async function fetchWeeklyNotes(weekStart) {
+  const snapshot = await fetchWeeklyNoteSnapshot(weekStart);
+  weeklyNoteSnapshots.set(weekStart, snapshot);
+  return [...snapshot.notes];
+}
+async function persistWeeklyNotes(weekStart, notes = []) {
+  await verifyWeeklyNoteOwner();
+  const epoch = weeklyNoteEpoch;
+  const snapshot = weeklyNoteSnapshots.get(weekStart);
+  if (!snapshot) throw new Error("Load the saved notes before saving.");
+  const res = await secureFetch("/api/users/me/weekly-notes", {
+    method: "PUT", headers: { Accept: "application/json" }, noRedirect: true,
+    body: { weekStart, notes, revision: snapshot.revision },
+  });
+  if (!res.ok) {
+    if ([401, 403].includes(res.status)) clearWeeklyNoteAccess();
+    throw Object.assign(new Error("Unable to save weekly notes."), { status: res.status });
+  }
+  const payload = await res.json();
+  if (epoch !== weeklyNoteEpoch) throw new Error("Weekly notes session changed.");
+  const saved = validateWeeklyNoteSnapshot(payload, weekStart);
+  weeklyNoteSnapshots.set(weekStart, saved);
+  return [...saved.notes];
+}
+
+async function verifyWeeklyNoteOwner() {
+  if (weeklyNoteOwnerCheck) return weeklyNoteOwnerCheck;
+  const epoch = weeklyNoteEpoch;
+  weeklyNoteOwnerCheck = (async () => {
+    try {
+      const res = await secureFetch("/api/auth/me", { noRedirect: true, cache: "no-store" });
+      if (!res.ok) throw new Error("Unable to verify the notes account.");
+      const payload = await res.json(); const user = payload?.user || payload;
+      if (epoch !== weeklyNoteEpoch || !weeklyNoteOwnerId || String(user?.id || user?._id || "") !== weeklyNoteOwnerId || user?.status !== "approved" || user?.disabled || user?.deleted) throw new Error("The notes account changed.");
+    } catch (error) { if (epoch === weeklyNoteEpoch) clearWeeklyNoteAccess(); throw error; }
+    finally { if (epoch === weeklyNoteEpoch) weeklyNoteOwnerCheck = null; }
+  })();
+  return weeklyNoteOwnerCheck;
+}
+
+function clearWeeklyNoteAccess() {
+  weeklyNoteEpoch += 1; weeklyNoteSnapshots.clear(); weeklyNoteModalBusy = false; weeklyNoteOwnerCheck = null;
+  if (weeklyNoteTextarea) weeklyNoteTextarea.value = "";
+  weeklyNoteModalOriginal = ""; weeklyNoteModalFeedback?.replaceChildren(); closeWeeklyNoteModal();
+  const message = document.createElement("p"); message.setAttribute("role", "alert");
+  message.textContent = "Private notes are no longer available to this account.";
+  document.getElementById("weeklyNotesGrid")?.replaceChildren(message);
+  window.dispatchEvent(new Event("lpc:weekly-notes-access-lost"));
 }
 
 function setupDashboardViewRouter() {
@@ -1979,8 +1938,11 @@ function showDashboardView(target, { skipHash = false, caseFilter = null } = {})
         }
       });
     }
-    if (target === "billing") {
+    if (target === "funds") {
       void ensureBillingViewReady();
+    }
+    if (target === "tasks") {
+      void ensureTasksViewReady();
     }
     return;
   }
@@ -2018,9 +1980,29 @@ function showDashboardView(target, { skipHash = false, caseFilter = null } = {})
       maybeOpenApplicantsCaseFromQuery();
       maybePromptCaseOnboarding();
     });
-  } else if (target === "billing") {
+  } else if (target === "funds") {
     void ensureBillingViewReady();
+  } else if (target === "tasks") {
+    void ensureTasksViewReady();
   }
+}
+
+function ensureTasksViewReady() {
+  if (dashboardViewState.tasksInitialized) return Promise.resolve();
+  if (dashboardViewState.tasksInitPromise) return dashboardViewState.tasksInitPromise;
+  dashboardViewState.tasksInitPromise = initTasksPage()
+    .then(() => {
+      dashboardViewState.tasksInitialized = true;
+    })
+    .catch((err) => {
+      console.warn("Tasks view init failed", err);
+      state.tasksError = "Tasks could not be loaded. Try again.";
+      renderTasks();
+    })
+    .finally(() => {
+      dashboardViewState.tasksInitPromise = null;
+    });
+  return dashboardViewState.tasksInitPromise;
 }
 
 function ensureCasesViewReady() {
@@ -2028,7 +2010,6 @@ function ensureCasesViewReady() {
   if (dashboardViewState.casesInitPromise) return dashboardViewState.casesInitPromise;
   dashboardViewState.casesInitPromise = (async () => {
     await initCasesPage();
-    bindCaseViewTabs();
     dashboardViewState.casesInitialized = true;
   })()
     .catch((err) => {
@@ -2048,7 +2029,7 @@ function ensureBillingViewReady() {
     dashboardViewState.billingInitialized = true;
   })()
     .catch((err) => {
-      console.warn("Billing view init failed", err);
+      console.warn("Payments view init failed", err);
     })
     .finally(() => {
       dashboardViewState.billingInitPromise = null;
@@ -2056,49 +2037,19 @@ function ensureBillingViewReady() {
   return dashboardViewState.billingInitPromise;
 }
 
-function bindCaseViewTabs() {
-  if (dashboardViewState.caseTabsBound) return;
-  const viewButtons = document.querySelectorAll("[data-case-view]");
-  if (!viewButtons.length) return;
-  const sections = {
-    cases: document.getElementById("casesViewSection"),
-    files: document.getElementById("caseFilesSection"),
-  };
-  viewButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const targetView = btn.dataset.caseView;
-      if (!targetView || btn.classList.contains("active")) return;
-      viewButtons.forEach((node) => {
-        const active = node === btn;
-        node.classList.toggle("active", active);
-        node.setAttribute("aria-selected", active ? "true" : "false");
-      });
-      Object.entries(sections).forEach(([key, node]) => {
-        if (!node) return;
-        node.classList.toggle("hidden", key !== targetView);
-      });
-      if (targetView === "files") {
-        void ensureCaseFilesEmbedReady();
-      }
-    });
-  });
-  dashboardViewState.caseTabsBound = true;
-}
-
-function setCaseFilter(filterKey, { render = true, syncHash = true } = {}) {
+function setCaseFilter(filterKey, { render = true, syncHash = true, markSavedView = true } = {}) {
   const key = (filterKey || "").toLowerCase();
   if (!CASE_VIEW_FILTERS.includes(key)) return;
   const tabs = document.querySelectorAll("[data-case-filter]");
   const tables = document.querySelectorAll("[data-case-table]");
   if (!tabs.length || !tables.length) return;
   state.casesViewFilter = key;
-  if (state.casesPage) {
-    state.casesPage[key] = 0;
-  }
+  if (markSavedView) matterSavedViews?.markCustom();
   tabs.forEach((btn) => {
     const active = btn.dataset.caseFilter === key;
     btn.classList.toggle("active", active);
     btn.setAttribute("aria-selected", active ? "true" : "false");
+    btn.tabIndex = active ? 0 : -1;
   });
   tables.forEach((table) => {
     table.classList.toggle("hidden", table.dataset.caseTable !== key);
@@ -2114,76 +2065,16 @@ function setCaseFilter(filterKey, { render = true, syncHash = true } = {}) {
   }
 }
 
-function ensureCaseFilesEmbedReady() {
-  if (dashboardViewState.caseFilesReady) return Promise.resolve();
-  if (dashboardViewState.caseFilesPromise) return dashboardViewState.caseFilesPromise;
-  dashboardViewState.caseFilesPromise = initCaseFilesView({
-    containerId: "caseFilesEmbedContainer",
-    filters: [
-      { id: "caseFilesEmbedFilterAll", fn: (files) => files },
-      { id: "caseFilesEmbedFilterApproved", fn: (files) => files.filter((f) => f.status === "approved") },
-      { id: "caseFilesEmbedFilterPending", fn: (files) => files.filter((f) => f.status === "pending_review") },
-      { id: "caseFilesEmbedFilterRevisions", fn: (files) => files.filter((f) => f.status === "attorney_revision") },
-    ],
-    emptyCopy: "Awaiting paralegal submissions.",
-    emptySubtext: "Once files arrive, they’ll show up here automatically.",
-    gatedCopy: "Fund a case to unlock file review.",
-    unauthorizedCopy: "You need an attorney account to view these files.",
-  })
-    .then(() => {
-      dashboardViewState.caseFilesReady = true;
-    })
-    .catch((err) => {
-      console.warn("Case files embed failed", err);
-    })
-    .finally(() => {
-      dashboardViewState.caseFilesPromise = null;
-    });
-  return dashboardViewState.caseFilesPromise;
-}
-
-async function loadCompletedJobs(container) {
-  if (!container) return;
-  try {
-    await Promise.all([loadCasesWithFiles(), loadArchivedCases()]);
-    const completed = getCompletedDashboardCases();
-    if (!completed.length) {
-      container.innerHTML = '<p class="info-line" style="color:var(--muted);">No completed jobs yet.</p>';
-      return;
-    }
-    container.innerHTML = completed.map((job) => renderCompletedJobCard(job)).join("");
-  } catch (err) {
-    console.warn("Unable to load completed jobs", err);
-    container.innerHTML = '<p class="info-line" style="color:var(--muted);">Unable to load completed jobs.</p>';
-  }
-}
-
-function renderCompletedJobCard(job) {
-  const summary = sanitize(job.briefSummary || job.title || "Completed case");
-  const completedAt = job.completedAt ? new Date(job.completedAt).toLocaleDateString() : "Date unavailable";
-  const caseId = job.id || job._id;
-  const archiveLink = caseId
-    ? `<a href="/api/cases/${encodeURIComponent(caseId)}/archive/download" target="_blank" rel="noopener">Download Archive</a>`
-    : '<span class="muted">Archive unavailable</span>';
-  return `
-    <div class="completed-job-card">
-      <div class="info-line"><strong>${summary}</strong></div>
-      <div class="info-line" style="color:var(--muted);">Completed ${completedAt}</div>
-      <div class="downloads">${archiveLink}</div>
-    </div>
-  `;
-}
-
 function goToMessages(caseId) {
   if (!caseId) {
-    notifyMessages("Open an active case to view messages.", "info");
+    window.location.hash = "cases";
     return;
   }
-  const target = `case-detail.html?caseId=${encodeURIComponent(caseId)}#case-messages`;
+  const target = `case-detail.html?caseId=${encodeURIComponent(caseId)}&tab=messages`;
   window.location.href = target;
 }
 // -------------------------
-// Billing Page
+// Payments view
 // -------------------------
 async function initBillingPage() {
   const activeBody = document.getElementById("activeEscrowsBody");
@@ -2196,6 +2087,17 @@ async function initBillingPage() {
   activeBody?.addEventListener("click", onActiveEscrowAction);
   document.querySelector(".escrow-table thead")?.addEventListener("click", onEscrowSortHeaderClick);
   document.querySelector("[data-escrow-pagination]")?.addEventListener("click", onEscrowPaginationClick);
+  document.querySelector('[data-escrow-refresh]')?.addEventListener('click', () => loadActiveEscrows(true));
+  const scroll = document.querySelector('[data-escrow-scroll]');
+  scroll?.addEventListener('keydown', event => {
+    if (event.target !== scroll || event.altKey || event.ctrlKey || event.metaKey || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || scroll.scrollWidth <= scroll.clientWidth) return;
+    event.preventDefault();
+    const left = event.key === 'Home' ? 0 : event.key === 'End' ? scroll.scrollWidth : scroll.scrollLeft + (event.key === 'ArrowLeft' ? -120 : 120);
+    scroll.scrollTo({ left, behavior: 'instant' });
+  });
+  scroll?.addEventListener('focusin', event => {
+    if (event.target !== scroll && scroll.scrollWidth > scroll.clientWidth) event.target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+  });
 
   await loadActiveEscrows();
 }
@@ -2203,25 +2105,42 @@ async function initBillingPage() {
 async function loadActiveEscrows(force = false) {
   const body = document.getElementById("activeEscrowsBody");
   if (!body) return;
-  if (force) body.innerHTML = `<tr><td colspan="6" class="empty-state">Refreshing activity…</td></tr>`;
+  const ownerId = String(state.user?.id || state.user?._id || ''), generation = (state.billing.generation || 0) + 1;
+  state.billing.generation = generation; state.billing.controller?.abort();
+  const controller = new AbortController(); state.billing.controller = controller;
+  const refresh = document.querySelector('[data-escrow-refresh]');
+  if (refresh) refresh.disabled = true;
+  const abort = () => controller.abort(), timer = setTimeout(abort, 30000);
+  window.addEventListener('pagehide', abort, { once: true });
+  state.billing.escrows = []; state.billing.escrowsLoaded = false;
+  body.innerHTML = `<tr><td colspan="6" class="empty-state">${force ? 'Refreshing activity…' : 'Loading activity…'}</td></tr>`;
   try {
-    const res = await secureFetch("/api/payments/escrow/active", { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const payload = await res.json().catch(() => []);
-    const items = Array.isArray(payload?.items) ? payload.items : Array.isArray(payload) ? payload : [];
+    if (!/^[a-f0-9]{24}$/i.test(ownerId)) throw Error('Missing payment owner');
+    const api = createApiClient({ onAuthenticationLost: () => { state.billing.escrows = []; state.billing.escrowsLoaded = false; body.replaceChildren(); } });
+    const items = [], seen = new Set(); let cursor = null, revision, count;
+    do {
+      const payload = await api.readPaymentActivity({ ownerId, signal: controller.signal, limit: 500, ...(cursor !== null ? { cursor, revision } : {}) });
+      if (controller.signal.aborted || generation !== state.billing.generation) return;
+      if (payload?.ownerId !== ownerId || !/^[a-f0-9]{64}$/.test(payload.revision || '') || revision && payload.revision !== revision || !Number.isSafeInteger(payload.count) || payload.count < 0 || payload.count > 10000 || count !== undefined && payload.count !== count || !Array.isArray(payload.items) || payload.items.length > 500) throw Error('Unverified payment page');
+      revision = payload.revision; count = payload.count;
+      for (const item of payload.items) {
+        if (!item || !/^[a-f0-9]{24}$/i.test(item.caseId) || seen.has(item.caseId) || typeof item.caseName !== 'string' || !['active', 'needs_review'].includes(item.status) || item.amountHeld !== null && (!Number.isSafeInteger(item.amountHeld) || item.amountHeld < 0) || item.currency !== null && !/^[A-Z]{3}$/.test(item.currency) || item.fundedAt !== null && (!item.fundedAt || !Number.isFinite(new Date(item.fundedAt).getTime()))) throw Error('Unverified payment record');
+        const knownCurrency = item.currency && Intl.supportedValuesOf('currency').includes(item.currency) && new Intl.NumberFormat('en-US', { style: 'currency', currency: item.currency }).resolvedOptions().maximumFractionDigits === 2;
+        if (item.currency !== null && !knownCurrency || item.status === 'active' && (!knownCurrency || !Number.isSafeInteger(item.amountHeld) || item.amountHeld <= 0 || !item.fundedAt) || item.status === 'needs_review' && item.amountHeld !== null) throw Error('Contradictory payment record');
+        seen.add(item.caseId); items.push(item);
+      }
+      if (payload.nextCursor !== null && (payload.nextCursor !== String(items.length) || !payload.items.length || items.length >= count) || payload.nextCursor === null && items.length !== count) throw Error('Incomplete payment pages');
+      cursor = payload.nextCursor;
+    } while (cursor !== null);
     state.billing.escrows = items;
     state.billing.escrowsLoaded = true;
     state.billing.escrowPage = 0;
     renderActiveEscrows(body, items);
   } catch (err) {
-    console.warn("Unable to load escrow activity", err);
-    if (state.billing.escrowsLoaded) {
-      renderActiveEscrows(body, state.billing.escrows);
-    } else {
-      state.billing.escrows = [];
-      renderActiveEscrows(body, [], { errorMessage: "Unable to load payment activity right now." });
-    }
-  }
+    if (generation !== state.billing.generation) return;
+    state.billing.escrows = []; state.billing.escrowsLoaded = false;
+    renderActiveEscrows(body, [], { errorMessage: 'Payment activity could not be verified. Refresh to try again.' });
+  } finally { clearTimeout(timer); window.removeEventListener('pagehide', abort); if (refresh && generation === state.billing.generation) refresh.disabled = false; }
 }
 
 function renderActiveEscrows(body, escrows = [], options = {}) {
@@ -2233,7 +2152,7 @@ function renderActiveEscrows(body, escrows = [], options = {}) {
     return;
   }
   if (!escrows.length) {
-    body.innerHTML = `<tr><td colspan="6" class="empty-state">No active payments.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="empty-state">No active funded Matters.</td></tr>`;
     updateEscrowSortHeaders();
     updateEscrowPagination(0);
     return;
@@ -2250,7 +2169,7 @@ function renderActiveEscrows(body, escrows = [], options = {}) {
     .map((record) => {
       const caseId = parseCaseId(record);
       const title = sanitize(record.caseTitle || record.caseName || record.title || "Matter");
-      const caseHref = caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "";
+      const caseHref = caseId ? `/attorney-v2.html#/matters/${caseId}/financials` : "";
       const paralegalName = sanitize(
         record.paralegalName ||
           (record.paralegal && [record.paralegal.firstName, record.paralegal.lastName].filter(Boolean).join(" ")) ||
@@ -2260,18 +2179,13 @@ function renderActiveEscrows(body, escrows = [], options = {}) {
       const paralegalHref = paralegalId
         ? buildParalegalProfileUrl(paralegalId, { returnTo: buildBillingReturnUrl() })
         : "";
-      const fundedDate = formatDisplayDate(record.fundedAt || record.createdAt || record.updatedAt);
+      const fundedDate = formatDisplayDate(record.fundedAt);
       const caseStatus = sanitize(formatActiveEscrowCaseStatus(record));
       const status = sanitize(formatActiveEscrowPaymentStatus(record));
-      const amount = formatCurrency(
-        normalizeAmountToCents(
-          record.amountHeld ??
-            record.amount ??
-            record.lockedTotalAmount ??
-            record.totalAmount ??
-            record.budget
-        )
-      );
+      let amount = 'Not confirmed';
+      if (Number.isSafeInteger(record.amountHeld) && record.amountHeld >= 0 && record.currency) {
+        try { amount = new Intl.NumberFormat('en-US', { style: 'currency', currency: record.currency }).format(record.amountHeld / 100); } catch { /* Preserve the unconfirmed amount. */ }
+      }
       return `
         <tr data-case-id="${caseId || ""}">
           <td>${
@@ -2434,20 +2348,17 @@ function compareStrings(left, right) {
 function formatActiveEscrowCaseStatus(record = {}) {
   if (record.archived === true) return "Archived";
   const normalized = normalizeCaseStatus(record.caseStatus || "");
-  if (normalized === "paused") return "Paused";
-  if (normalized === "archived") return "Archived";
-  return "Active";
+  return ({ paused: 'Paused', archived: 'Archived', open: 'Posted', completed: 'Completed', closed: 'Closed', disputed: 'Disputed', 'in progress': 'In progress' })[normalized] || 'Status unavailable';
 }
 
 function formatActiveEscrowPaymentStatus(record = {}) {
   const statusRaw = String(record.status || record.escrowStatus || "").toLowerCase();
-  if (statusRaw.includes("pending") || statusRaw === "awaiting_release") {
-    return "Pending Approval";
-  }
+  const confirmed = { active: 'Funds recorded', needs_review: 'Needs review', pending: 'Funding pending', funding_needed: 'Funding needed', settled: 'Settled' };
+  if (confirmed[statusRaw]) return confirmed[statusRaw];
   if (statusRaw) {
     return statusRaw.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
   }
-  return "In Progress";
+  return "Status unavailable";
 }
 
 function parseEscrowSort(sortValue = "") {
@@ -2508,23 +2419,17 @@ function parseParalegalId(entry = {}) {
 }
 
 function buildBillingReturnUrl() {
-  return "dashboard-attorney.html#billing";
+  return "dashboard-attorney.html#funds";
 }
 
-function getUniqueCaseRecords(records = []) {
-  const unique = new Map();
-  records.forEach((item) => {
-    const key = parseCaseId(item);
-    if (!key || unique.has(String(key))) return;
-    unique.set(String(key), item);
-  });
-  return Array.from(unique.values());
-}
+
 
 function getCaseEntryById(caseId) {
   const key = String(caseId || "");
   if (!key) return null;
   return (
+    currentMatterInventory?.state.result?.items.find((item) => String(parseCaseId(item)) === key) ||
+    currentDraftInventory?.state.result?.items.find((item) => !item.localDraft && String(parseCaseId(item)) === key) ||
     state.caseLookup.get(key) ||
     state.cases.find((item) => String(parseCaseId(item)) === key) ||
     state.casesArchived.find((item) => String(parseCaseId(item)) === key) ||
@@ -2556,199 +2461,8 @@ function formatDisplayDate(raw) {
 }
 
 // -------------------------
-// Review Page
-// -------------------------
-async function initReviewPage() {
-  const container = document.getElementById("reviewContainer");
-  if (!container) return;
-
-  await loadCasesWithFiles();
-  renderReviewList(container);
-  bindReviewActions(container);
-
-  const revisionModal = document.getElementById("revisionModal");
-  const uploadModal = document.getElementById("uploadModal");
-  revisionModal?.querySelector("[data-close-revision]")?.addEventListener("click", () => toggleModal(revisionModal, false));
-  revisionModal?.querySelector("[data-submit-revision]")?.addEventListener("click", submitRevisionRequest);
-  uploadModal?.querySelector("[data-close-upload]")?.addEventListener("click", () => toggleModal(uploadModal, false));
-  uploadModal?.querySelector("[data-submit-upload]")?.addEventListener("click", submitRevisionUpload);
-}
-
-function renderReviewList(container) {
-  const cases = state.cases.filter(
-    (c) => Array.isArray(c.files) && c.files.some((file) => file.status !== "approved")
-  );
-  if (!cases.length) {
-    container.innerHTML = `<p style="color:var(--muted);font-size:.95rem;">No submissions are awaiting review.</p>`;
-    return;
-  }
-  container.innerHTML = cases
-    .map((caseItem) => {
-      const reviewFiles = (caseItem.files || []).filter((file) => file.status !== "approved");
-      const files = reviewFiles.map((file) => renderReviewItem(caseItem, file)).join("");
-      return `
-        <section class="case-review" data-case-id="${caseItem.id}">
-          <h2 class="case-title">${sanitize(caseItem.title || "Untitled Matter")}</h2>
-          ${files || `<p style="color:var(--muted);font-size:.9rem;">All documents are approved.</p>`}
-        </section>
-      `;
-    })
-    .join("");
-}
-
-function renderReviewItem(caseItem, file) {
-  const statusLabel = STATUS_LABELS[file.status] || file.status;
-  const submitted = file.uploadedAt ? new Date(file.uploadedAt).toLocaleDateString() : "Unknown date";
-  const actions =
-    file.status === "approved"
-      ? `
-        <button class="btn secondary" type="button" data-review-action="view" data-case-id="${caseItem.id}" data-file-id="${file.id}" data-file-key="${file.key}" data-file-name="${sanitize(file.filename)}" data-file-download="${sanitize(sanitizeDownloadPath((file.downloadUrl && file.downloadUrl[0]) || ""))}">View</button>
-        <button class="btn secondary" type="button" data-review-action="download" data-case-id="${caseItem.id}" data-file-id="${file.id}" data-file-key="${file.key}" data-file-name="${sanitize(file.filename)}" data-file-download="${sanitize(sanitizeDownloadPath((file.downloadUrl && file.downloadUrl[0]) || ""))}">Download</button>
-        <button class="btn secondary" type="button" data-review-action="print" data-case-id="${caseItem.id}" data-file-id="${file.id}" data-file-key="${file.key}" data-file-name="${sanitize(file.filename)}" data-file-download="${sanitize(sanitizeDownloadPath((file.downloadUrl && file.downloadUrl[0]) || ""))}">Print</button>
-      `
-      : `
-        <button class="btn secondary" type="button" data-review-action="view" data-case-id="${caseItem.id}" data-file-id="${file.id}" data-file-key="${file.key}" data-file-name="${sanitize(file.filename)}" data-file-download="${sanitize(sanitizeDownloadPath((file.downloadUrl && file.downloadUrl[0]) || ""))}">View</button>
-        <button class="btn secondary" type="button" data-review-action="download" data-case-id="${caseItem.id}" data-file-id="${file.id}" data-file-key="${file.key}" data-file-name="${sanitize(file.filename)}" data-file-download="${sanitize(sanitizeDownloadPath((file.downloadUrl && file.downloadUrl[0]) || ""))}">Download</button>
-        <button class="btn primary" type="button" data-review-action="approve" data-case-id="${caseItem.id}" data-file-id="${file.id}">Approve</button>
-        <button class="btn secondary" type="button" data-review-action="revision" data-case-id="${caseItem.id}" data-file-id="${file.id}">Request Revisions</button>
-        <button class="btn secondary" type="button" data-review-action="upload" data-case-id="${caseItem.id}" data-file-id="${file.id}">Upload Revised Version</button>
-      `;
-
-  return `
-    <div class="review-item" data-file-id="${file.id}">
-      <div class="review-info">
-        <h3>${sanitize(file.filename || file.original || "Document")}</h3>
-        <p>Uploaded ${submitted} · Status: ${statusLabel}</p>
-      </div>
-      <div class="review-actions">
-        ${actions}
-      </div>
-    </div>
-  `;
-}
-
-function bindReviewActions(container) {
-  container.addEventListener("click", async (event) => {
-    const btn = event.target.closest("[data-review-action]");
-    if (!btn) return;
-    const action = btn.getAttribute("data-review-action");
-    const caseId = btn.getAttribute("data-case-id");
-    const fileId = btn.getAttribute("data-file-id");
-    const fileKey = btn.getAttribute("data-file-key");
-    const fileName = btn.getAttribute("data-file-name");
-    const directDownload = btn.getAttribute("data-file-download");
-    if (!caseId || !fileId) return;
-
-    state.reviewSelection = { caseId, fileId, fileKey, fileName, downloadUrl: directDownload };
-
-    try {
-      if (action === "view") {
-        await openReviewFile(caseId, fileKey, directDownload, "view", fileName);
-      } else if (action === "download") {
-        await openReviewFile(caseId, fileKey, directDownload, "download", fileName);
-      } else if (action === "print") {
-        await openReviewFile(caseId, fileKey, directDownload, "print", fileName);
-      } else if (action === "approve") {
-        await updateFileStatus(caseId, fileId, { status: "approved" });
-      } else if (action === "revision") {
-        toggleModal(document.getElementById("revisionModal"), true);
-      } else if (action === "upload") {
-        const uploadInput = document.getElementById("revisedFile");
-        if (uploadInput) uploadInput.value = "";
-        state.uploadSelection = { caseId, fileId };
-        toggleModal(document.getElementById("uploadModal"), true);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Unable to complete that action. Please try again.");
-    }
-  });
-}
-
-async function updateFileStatus(caseId, fileId, body) {
-  const res = await secureFetch(`/api/cases/${caseId}/files/${fileId}/status`, {
-    method: "PATCH",
-    body,
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) throw new Error("Status update failed");
-  const payload = await res.json();
-  if (payload?.file) {
-    mergeUpdatedFile(caseId, payload.file);
-    renderReviewList(document.getElementById("reviewContainer"));
-    renderCaseFilesList();
-  }
-}
-
-async function submitRevisionRequest() {
-  const modal = document.getElementById("revisionModal");
-  const notesEl = document.getElementById("revisionNotes");
-  if (!state.reviewSelection || !notesEl) return;
-  try {
-    const res = await secureFetch(`/api/cases/${state.reviewSelection.caseId}/files/${state.reviewSelection.fileId}/revision-request`, {
-      method: "POST",
-      body: { notes: notesEl.value },
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) throw new Error("Revision request failed");
-    const payload = await res.json();
-    if (payload?.file) {
-      mergeUpdatedFile(state.reviewSelection.caseId, payload.file);
-      renderReviewList(document.getElementById("reviewContainer"));
-      renderCaseFilesList();
-    }
-  } catch (err) {
-    console.error(err);
-    alert("Unable to send revision request.");
-  } finally {
-    notesEl.value = "";
-    toggleModal(modal, false);
-  }
-}
-
-async function submitRevisionUpload() {
-  const modal = document.getElementById("uploadModal");
-  const fileInput = document.getElementById("revisedFile");
-  if (!state.uploadSelection || !fileInput || !fileInput.files?.length) {
-    alert("Please choose a file to upload.");
-    return;
-  }
-  const file = fileInput.files[0];
-  try {
-    const key = await uploadToS3(file, state.uploadSelection.caseId);
-    const res = await secureFetch(`/api/cases/${state.uploadSelection.caseId}/files/${state.uploadSelection.fileId}/replace`, {
-      method: "POST",
-      body: { key, original: file.name, mime: file.type, size: file.size },
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) throw new Error("Replace failed");
-    const payload = await res.json();
-    if (payload?.file) {
-      mergeUpdatedFile(state.uploadSelection.caseId, payload.file);
-      renderReviewList(document.getElementById("reviewContainer"));
-      renderCaseFilesList();
-    }
-  } catch (err) {
-    console.error(err);
-    alert("Unable to upload revised version.");
-  } finally {
-    toggleModal(modal, false);
-    state.uploadSelection = null;
-  }
-}
-
-// -------------------------
 // Case Files Page
 // -------------------------
-function getCaseFileQueryId() {
-  try {
-    const params = new URLSearchParams(window.location.search || "");
-    return params.get("caseId");
-  } catch {
-    return null;
-  }
-}
-
 function getArchiveHighlightCaseId() {
   try {
     const params = new URLSearchParams(window.location.search || "");
@@ -2793,291 +2507,6 @@ function maybeHighlightArchivedCase() {
   clearArchiveHighlightCaseId();
 }
 
-function getAvailableCaseOptions() {
-  return [...state.cases, ...state.casesArchived];
-}
-
-function setupCaseFilesUploadUI() {
-  const cases = getAvailableCaseOptions();
-  if (!state.caseFiles.selectedCaseId) {
-    const queryId = getCaseFileQueryId();
-    if (queryId && cases.some((item) => String(item.id) === String(queryId))) {
-      state.caseFiles.selectedCaseId = queryId;
-    } else if (cases.length) {
-      state.caseFiles.selectedCaseId = String(cases[0].id);
-    } else {
-      state.caseFiles.selectedCaseId = null;
-    }
-  }
-
-  const host = document.querySelector(".main") || document.body;
-  if (!host) return;
-
-  let uploadWrapper = document.getElementById("caseFilesUploadWrapper");
-  if (!uploadWrapper) {
-    uploadWrapper = document.createElement("div");
-    uploadWrapper.id = "caseFilesUploadWrapper";
-    uploadWrapper.innerHTML = `
-      <div>
-        <select id="caseFileCaseSelect"></select>
-        <input type="file" id="caseFileInput" />
-        <button type="button" class="btn primary" id="caseFileUploadBtn">Upload</button>
-      </div>
-    `;
-    const filtersBlock = document.querySelector(".filters");
-    host.insertBefore(uploadWrapper, filtersBlock || host.firstChild);
-  }
-
-  let listHost = document.getElementById("caseFilesList");
-  if (!listHost) {
-    listHost = document.createElement("div");
-    listHost.id = "caseFilesList";
-    const container = document.getElementById("caseFilesContainer");
-    host.insertBefore(listHost, container || null);
-  }
-
-  const caseSelect = document.getElementById("caseFileCaseSelect");
-  if (caseSelect) {
-    caseSelect.innerHTML = "";
-    if (!cases.length) {
-      const option = document.createElement("option");
-      option.value = "";
-      option.textContent = "No cases available";
-      caseSelect.appendChild(option);
-      caseSelect.disabled = true;
-      state.caseFiles.selectedCaseId = null;
-    } else {
-      cases.forEach((caseItem) => {
-        const option = document.createElement("option");
-        option.value = String(caseItem.id);
-        option.textContent = caseItem.title || "Untitled Matter";
-        caseSelect.appendChild(option);
-      });
-      caseSelect.disabled = false;
-      if (state.caseFiles.selectedCaseId) {
-        caseSelect.value = String(state.caseFiles.selectedCaseId);
-      }
-    }
-    if (!caseSelect.dataset.bound) {
-      caseSelect.dataset.bound = "true";
-      caseSelect.addEventListener("change", () => {
-        state.caseFiles.selectedCaseId = caseSelect.value || null;
-        refreshCaseFilesList();
-      });
-    }
-  }
-
-  const uploadBtn = document.getElementById("caseFileUploadBtn");
-  if (uploadBtn && !uploadBtn.dataset.bound) {
-    uploadBtn.dataset.bound = "true";
-    uploadBtn.addEventListener("click", handleCaseFileUpload);
-  }
-}
-
-async function refreshCaseFilesList() {
-  const caseId = state.caseFiles.selectedCaseId;
-  if (!caseId) {
-    state.caseFiles.files = [];
-    state.caseFiles.loading = false;
-    state.caseFiles.error = "";
-    renderModernCaseFilesList();
-    return;
-  }
-  state.caseFiles.loading = true;
-  state.caseFiles.error = "";
-  renderModernCaseFilesList();
-  try {
-    const res = await secureFetch(`/api/uploads/case/${encodeURIComponent(caseId)}`, {
-      headers: { Accept: "application/json" },
-      noRedirect: true,
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(payload?.msg || payload?.error || "Unable to load files.");
-    }
-    state.caseFiles.files = Array.isArray(payload.files) ? payload.files : [];
-  } catch (err) {
-    state.caseFiles.files = [];
-    state.caseFiles.error = err?.message || "Unable to load files.";
-  } finally {
-    state.caseFiles.loading = false;
-    renderModernCaseFilesList();
-  }
-}
-
-function renderModernCaseFilesList() {
-  const listHost = document.getElementById("caseFilesList");
-  if (!listHost) return;
-  const caseId = state.caseFiles.selectedCaseId;
-  if (!caseId) {
-    listHost.innerHTML = `<p style="color:var(--muted);font-size:.95rem;">Select a matter to view its files.</p>`;
-    return;
-  }
-  if (state.caseFiles.loading) {
-    listHost.innerHTML = `<p style="color:var(--muted);font-size:.95rem;">Loading files…</p>`;
-    return;
-  }
-  if (state.caseFiles.error) {
-    listHost.innerHTML = `<p style="color:#b91c1c;font-size:.95rem;">${sanitize(state.caseFiles.error)}</p>`;
-    return;
-  }
-  if (!state.caseFiles.files.length) {
-    listHost.innerHTML = `<p style="color:var(--muted);font-size:.95rem;">No files uploaded yet.</p>`;
-    return;
-  }
-  listHost.innerHTML = state.caseFiles.files
-    .map((file) => {
-      const safeName = sanitize(file.originalName || "Document");
-      const uploadedAt = file.createdAt ? new Date(file.createdAt).toLocaleString() : "Unknown date";
-      const sizeText = formatBytes(file.size);
-      return `
-        <div class="case-file-row">
-          <div>
-            <div class="file-name">${safeName}</div>
-            <div class="file-meta">${sanitize(uploadedAt)}${sizeText ? ` · ${sanitize(sizeText)}` : ""}</div>
-          </div>
-          <a class="btn secondary" href="/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(file.id)}/download">Download</a>
-        </div>
-      `;
-    })
-    .join("");
-}
-
-async function handleCaseFileUpload() {
-  const caseId = state.caseFiles.selectedCaseId;
-  if (!caseId) {
-    notifyCases("Select a matter before uploading.", "error");
-    return;
-  }
-  const input = document.getElementById("caseFileInput");
-  const btn = document.getElementById("caseFileUploadBtn");
-  if (!input || !input.files || !input.files.length) {
-    notifyCases("Choose a file to upload.", "error");
-    return;
-  }
-  const file = input.files[0];
-  if (!file || file.size <= 0) {
-    notifyCases("Selected file is empty.", "error");
-    return;
-  }
-  if (file.size > CASE_FILE_MAX_BYTES) {
-    notifyCases("Files must be 20MB or less.", "error");
-    return;
-  }
-  btn.disabled = true;
-  const originalText = btn.textContent || "Upload";
-  btn.textContent = "Uploading…";
-  try {
-    const form = new FormData();
-    form.append("file", file);
-    const res = await secureFetch(`/api/uploads/case/${encodeURIComponent(caseId)}`, {
-      method: "POST",
-      body: form,
-      noRedirect: true,
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(payload?.msg || payload?.error || "Upload failed.");
-    }
-    input.value = "";
-    notifyCases("File uploaded.", "info");
-    await refreshCaseFilesList();
-  } catch (err) {
-    console.error(err);
-    notifyCases(err?.message || "Unable to upload file.", "error");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
-  }
-}
-
-function formatBytes(bytes) {
-  const value = Number(bytes);
-  if (!Number.isFinite(value) || value <= 0) return "";
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  if (value < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-}
-
-async function initCaseFilesPage() {
-  await loadCasesWithFiles();
-  await loadArchivedCases();
-  setupCaseFilesUploadUI();
-  await refreshCaseFilesList();
-  const filters = document.querySelectorAll(".filters button");
-  filters.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      filters.forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      state.caseFilter = btn.getAttribute("data-filter") || "all";
-      renderCaseFilesList();
-    });
-  });
-  renderCaseFilesList();
-
-  const container = document.getElementById("caseFilesContainer");
-  container?.addEventListener("click", async (event) => {
-    const target = event.target.closest("[data-file-action]");
-    if (!target) return;
-    const action = target.getAttribute("data-file-action");
-    const caseId = target.getAttribute("data-case-id");
-    const fileKey = target.getAttribute("data-file-key");
-    const fileName = target.getAttribute("data-file-name");
-    if (!caseId || !fileKey) return;
-    try {
-      await openFile(caseId, fileKey, action, fileName);
-    } catch (err) {
-      console.warn(err);
-      alert("Unable to open the file.");
-    }
-  });
-}
-
-function renderCaseFilesList() {
-  const container = document.getElementById("caseFilesContainer");
-  if (!container) return;
-  const cases = [...state.cases, ...state.casesArchived];
-  if (!cases.length) {
-    container.innerHTML = `<p style="color:var(--muted);font-size:.95rem;">You have not attached any files to your cases.</p>`;
-    return;
-  }
-  container.innerHTML = cases
-    .map((caseItem) => {
-      const files = (caseItem.files || []).filter((file) => {
-        if (state.caseFilter === "all") return true;
-        return file.status === state.caseFilter;
-      });
-      const rows = files.length
-        ? files
-            .map(
-              (file) => `
-        <div class="file-item" data-file-id="${file.id}">
-          <div class="file-info">
-            <h3 class="file-name" data-file-action="view" data-case-id="${caseItem.id}" data-file-key="${file.key}" data-file-name="${sanitize(file.filename)}">${sanitize(file.filename || file.original || "Document")}</h3>
-            <p>${sanitize(file.uploadedByRole || "Contributor")} · ${file.uploadedAt ? new Date(file.uploadedAt).toLocaleDateString() : "Unknown"} · Status: ${STATUS_LABELS[file.status] || file.status}</p>
-          </div>
-          <div class="file-actions">
-            <button class="btn secondary" type="button" data-file-action="view" data-case-id="${caseItem.id}" data-file-key="${file.key}" data-file-name="${sanitize(file.filename)}">View</button>
-            <button class="btn secondary" type="button" data-file-action="download" data-case-id="${caseItem.id}" data-file-key="${file.key}" data-file-name="${sanitize(file.filename)}">Download</button>
-            <button class="btn secondary" type="button" data-file-action="print" data-case-id="${caseItem.id}" data-file-key="${file.key}" data-file-name="${sanitize(file.filename)}">Print</button>
-          </div>
-        </div>`
-            )
-            .join("")
-        : `<p style="color:var(--muted);font-size:.9rem;">No files match this filter.</p>`;
-
-      return `
-        <div class="case-block">
-          <h2>${sanitize(caseItem.title || "Untitled Matter")}</h2>
-          ${rows}
-        </div>
-      `;
-    })
-    .join("");
-}
-
-// -------------------------
 // Tasks Page
 // -------------------------
 async function initTasksPage() {
@@ -3087,23 +2516,48 @@ async function initTasksPage() {
   bindTaskEvents();
 }
 
-async function loadTasks() {
+async function loadTasks({ append = false } = {}) {
+  const container = document.getElementById("taskColumns");
+  container?.setAttribute("aria-busy", "true");
+  let loaded = false;
   try {
-    const res = await secureFetch("/api/checklist?status=all&limit=200", { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("Task fetch failed");
+    const page = append ? state.tasksPage + 1 : 1;
+    const res = await secureFetch(`/api/checklist?status=all&limit=100&page=${page}`, { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error("Tasks could not be loaded. Try again.");
     const payload = await res.json();
-    state.tasks = Array.isArray(payload.items) ? payload.items : [];
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    state.tasks = append ? [...state.tasks, ...items] : items;
+    state.tasksPage = Number(payload.page) || page;
+    state.tasksPages = Math.max(1, Number(payload.pages) || 1);
+    state.tasksTotal = Math.max(state.tasks.length, Number(payload.total) || 0);
+    state.tasksError = "";
+    loaded = true;
   } catch (err) {
     console.warn("Unable to load tasks", err);
-    state.tasks = [];
+    if (append) {
+      notifyTasks("More tasks could not be loaded. Try again.", "error");
+    } else {
+      state.tasks = [];
+      state.tasksPage = 1;
+      state.tasksPages = 1;
+      state.tasksTotal = 0;
+      state.tasksError = err?.message || "Tasks could not be loaded. Try again.";
+    }
+  } finally {
+    container?.setAttribute("aria-busy", "false");
   }
+  return loaded;
 }
 
 function renderTasks() {
   const container = document.getElementById("taskColumns");
   if (!container) return;
+  if (state.tasksError) {
+    container.innerHTML = `<section class="task-column"><h2>Tasks unavailable</h2><p class="task-empty">${sanitize(state.tasksError)}</p><button type="button" class="task-button" data-retry-tasks>Try again</button></section>`;
+    return;
+  }
   if (!state.tasks.length) {
-    container.innerHTML = `<section class="task-column"><h2>To Do</h2><p style="color:var(--muted);font-size:0.9rem;">No tasks yet.</p></section>`;
+    container.innerHTML = `<section class="task-column"><h2>To do</h2><p class="task-empty">No tasks yet. Create one when you need a private reminder.</p></section>`;
     return;
   }
   const now = new Date();
@@ -3117,30 +2571,35 @@ function renderTasks() {
     else todo.push(task);
   });
   container.innerHTML = `
-    ${renderTaskColumn("To Do", todo)}
-    ${renderTaskColumn("In Progress", inProgress)}
-    ${renderTaskColumn("Review", done)}
+    ${renderTaskColumn("To do", todo)}
+    ${renderTaskColumn("Due soon", inProgress)}
+    ${renderTaskColumn("Completed", done)}
+    ${state.tasksPage < state.tasksPages
+      ? `<div class="task-load-more"><button type="button" class="task-button" data-load-more-tasks>Show more tasks (${state.tasksTotal - state.tasks.length} remaining)</button></div>`
+      : ""}
   `;
 }
 
 function renderTaskColumn(title, tasks) {
   if (!tasks.length) {
-    return `<section class="task-column"><h2>${title}</h2><p style="color:var(--muted);font-size:0.85rem;">No tasks.</p></section>`;
+    return `<section class="task-column"><h2>${title}</h2><p class="task-empty">No tasks.</p></section>`;
   }
   const map = state.caseLookup;
   const rows = tasks
     .map((task) => {
       const caseTitle = map.get(String(task.caseId))?.title || "";
-      const due = task.due ? new Date(task.due).toLocaleDateString() : "No due date";
+      const dueDate = task.due ? new Date(task.due) : null;
+      const due = dueDate && Number.isFinite(dueDate.getTime()) ? dueDate.toLocaleDateString() : "No due date";
+      const notes = task.notes ? `<span class="task-card-notes">${sanitize(task.notes)}</span>` : "";
       return `
-        <article class="task-card" data-task-id="${task.id}">
-          <h3>${sanitize(task.title)}</h3>
-          <p>${sanitize(task.notes || "")}</p>
-          <div class="task-meta">
+        <button type="button" class="task-card" data-task-id="${task.id}" aria-label="Open task: ${sanitize(task.title || "Task")}">
+          <span class="task-card-title">${sanitize(task.title)}</span>
+          ${notes}
+          <span class="task-meta">
             <span>Due: ${due}</span>
-            <span>${sanitize(caseTitle)}</span>
-          </div>
-        </article>
+            <span>${sanitize(caseTitle || "Private task")}</span>
+          </span>
+        </button>
       `;
     })
     .join("");
@@ -3150,7 +2609,22 @@ function renderTaskColumn(title, tasks) {
 function bindTaskEvents() {
   const container = document.getElementById("taskColumns");
   const modal = document.getElementById("taskDetailModal");
-  container?.addEventListener("click", (event) => {
+  container?.addEventListener("click", async (event) => {
+    const retry = event.target.closest("[data-retry-tasks]");
+    if (retry) {
+      retry.disabled = true;
+      await loadTasks();
+      renderTasks();
+      return;
+    }
+    const loadMore = event.target.closest("[data-load-more-tasks]");
+    if (loadMore) {
+      loadMore.disabled = true;
+      const loaded = await loadTasks({ append: true });
+      if (loaded) renderTasks();
+      else loadMore.disabled = false;
+      return;
+    }
     const card = event.target.closest(".task-card");
     if (!card) return;
     const id = card.getAttribute("data-task-id");
@@ -3159,32 +2633,75 @@ function bindTaskEvents() {
     openTaskModal(task);
   });
 
-  modal?.querySelector("[data-close-task-modal]")?.addEventListener("click", () => toggleModal(modal, false));
+  modal?.querySelectorAll("[data-close-task-modal]").forEach((button) => {
+    button.addEventListener("click", () => toggleModal(modal, false));
+  });
+  modal?.addEventListener("click", (event) => {
+    if (event.target === modal) toggleModal(modal, false);
+  });
   modal?.querySelector("[data-toggle-task]")?.addEventListener("click", async () => {
     const taskId = modal?.getAttribute("data-task-id");
     if (!taskId) return;
+    const button = modal.querySelector("[data-toggle-task]");
+    button.disabled = true;
     try {
       const res = await secureFetch(`/api/checklist/${taskId}/toggle`, { method: "POST" });
-      if (!res.ok) throw new Error("toggle failed");
+      if (!res.ok) throw new Error(await readTaskApiError(res, "Unable to update task."));
       await loadTasks();
       renderTasks();
       toggleModal(modal, false);
       notifyTasks("Task updated.", "success");
     } catch (err) {
       console.error(err);
-      notifyTasks("Unable to update task.", "error");
+      notifyTasks(err?.message || "Unable to update task.", "error");
+    } finally {
+      button.disabled = false;
     }
   });
+  modal?.querySelector("[data-delete-task]")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const taskId = modal?.getAttribute("data-task-id");
+    if (!taskId) return;
+    if (button.dataset.confirming !== "true") {
+      button.dataset.confirming = "true";
+      button.textContent = "Confirm delete";
+      notifyTasks("Select Confirm delete to remove this task.", "info");
+      button.focus();
+      return;
+    }
+    button.disabled = true;
+    try {
+      const res = await secureFetch(`/api/checklist/${taskId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await readTaskApiError(res, "Unable to delete task."));
+      await loadTasks();
+      renderTasks();
+      toggleModal(modal, false);
+      notifyTasks("Task deleted.", "success");
+    } catch (err) {
+      console.error(err);
+      notifyTasks(err?.message || "Unable to delete task.", "error");
+    } finally {
+      button.disabled = false;
+      button.dataset.confirming = "false";
+      button.textContent = "Delete task";
+    }
+  });
+}
+
+async function readTaskApiError(response, fallback) {
+  const payload = await response.json().catch(() => ({}));
+  return String(payload?.error || payload?.message || fallback).slice(0, 240);
 }
 
 function openTaskModal(task) {
   const modal = document.getElementById("taskDetailModal");
   if (!modal) return;
   modal.setAttribute("data-task-id", task.id);
-  const caseTitle = state.caseLookup.get(String(task.caseId))?.title || "Unassigned case";
+  const caseTitle = state.caseLookup.get(String(task.caseId))?.title || "Unassigned Matter";
   const notesEl = document.getElementById("taskDetailNotes");
   const metaEl = document.getElementById("taskDetailMeta");
   const toggleBtn = modal.querySelector("[data-toggle-task]");
+  const deleteBtn = modal.querySelector("[data-delete-task]");
   document.getElementById("taskDetailTitle").textContent = task.title || "Task";
   if (notesEl) notesEl.textContent = task.notes || "No additional notes.";
   if (metaEl) {
@@ -3193,6 +2710,10 @@ function openTaskModal(task) {
   }
   if (toggleBtn) {
     toggleBtn.textContent = task.done ? "Mark Incomplete" : "Mark Complete";
+  }
+  if (deleteBtn) {
+    deleteBtn.dataset.confirming = "false";
+    deleteBtn.textContent = "Delete task";
   }
   toggleModal(modal, true);
 }
@@ -3207,7 +2728,12 @@ function setupTaskCreation() {
     form.reset();
     toggleModal(modal, true);
   });
-  modal.querySelector("[data-close-task-create]")?.addEventListener("click", () => toggleModal(modal, false));
+  modal.querySelectorAll("[data-close-task-create]").forEach((button) => {
+    button.addEventListener("click", () => toggleModal(modal, false));
+  });
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) toggleModal(modal, false);
+  });
   form?.addEventListener("submit", submitTaskCreate);
 }
 
@@ -3218,7 +2744,7 @@ function populateTaskCaseOptions() {
   const options = [
     `<option value="">Select a matter (optional)</option>`,
     ...combinedCases.map(
-      (caseItem) => `<option value="${caseItem.id}">${sanitize(caseItem.title || "Matter")}</option>`
+      (caseItem) => `<option value="${sanitize(caseItem.id)}">${sanitize(caseItem.title || "Matter")}</option>`
     ),
   ];
   select.innerHTML = options.join("");
@@ -3229,13 +2755,17 @@ async function submitTaskCreate(event) {
   const form = event.target;
   const modal = document.getElementById("taskCreateModal");
   const submitBtn = form.querySelector('button[type="submit"]');
-  const title = form.title.value.trim();
-  const caseId = form.caseId.value;
-  const due = form.due.value;
-  const notes = form.notes.value.trim();
+  const titleInput = form.elements.namedItem("title");
+  const caseInput = form.elements.namedItem("caseId");
+  const dueInput = form.elements.namedItem("due");
+  const notesInput = form.elements.namedItem("notes");
+  const title = String(titleInput?.value || "").trim();
+  const caseId = String(caseInput?.value || "");
+  const due = String(dueInput?.value || "");
+  const notes = String(notesInput?.value || "").trim();
   if (!title) {
     notifyTasks("Task title is required.", "error");
-    form.title.focus();
+    titleInput?.focus();
     return;
   }
   const defaultText = submitBtn?.textContent || "Create Task";
@@ -3254,7 +2784,7 @@ async function submitTaskCreate(event) {
       body: payload,
       headers: { Accept: "application/json" },
     });
-    if (!res.ok) throw new Error("Unable to create task.");
+    if (!res.ok) throw new Error(await readTaskApiError(res, "Unable to create task."));
     form.reset();
     toggleModal(modal, false);
     await loadTasks();
@@ -3313,16 +2843,20 @@ async function initCasesPage() {
   const searchInput = document.querySelector("[data-cases-search]");
   const tabs = document.querySelectorAll("[data-case-filter]");
 
-  try {
-    await Promise.all([loadCasesWithFiles(), loadArchivedCases(), loadApplicationsForMyJobs(), loadCaseDrafts()]);
-  } catch (err) {
-    console.warn("Unable to load cases", err);
-  }
+  // Drawer compatibility caches are independent of the complete Home and Matter
+  // inventories. A pending cache must not block list rows or controls.
+  void Promise.all([loadCasesWithFiles(), loadArchivedCases(), loadApplicationsForMyJobs()])
+    .catch((err) => console.warn("Unable to load Matter summaries", err));
+  setupMatterProductivityFilters();
+  setupMatterSavedViews();
+  void loadCaseDrafts();
   renderCasesView();
 
   searchInput?.addEventListener("input", (event) => {
+    matterSavedViews?.markCustom();
     state.casesSearchTerm = event.target.value.trim().toLowerCase();
-    state.casesPage[state.casesViewFilter] = 0;
+    resetMatterPages();
+    writeMatterFilterStateToUrl();
     renderCasesView();
   });
 
@@ -3332,10 +2866,38 @@ async function initCasesPage() {
       if (!target || target === state.casesViewFilter) return;
       setCaseFilter(target);
     });
+    tab.addEventListener("keydown", (event) => {
+      if (event.altKey || event.ctrlKey || event.metaKey || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const index = Array.from(tabs).indexOf(tab);
+      const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 :
+        (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+      const next = tabs[nextIndex];
+      setCaseFilter(next.dataset.caseFilter);
+      next.focus();
+    });
   });
 
   wrapper.addEventListener("click", onCasesTableClick);
   wrapper.addEventListener("click", onCasesPaginationClick);
+  wrapper.addEventListener("click", (event) => {
+    const matterRefresh = event.target.closest('[data-matters-retry], [data-matters-refresh], [data-matters-last-page]');
+    if (matterRefresh) {
+      if (matterRefresh.hasAttribute('data-matters-last-page')) {
+        state.casesPage[state.casesViewFilter] = Math.max(0, (currentMatterInventory?.state.result?.pages || 1) - 1);
+        writeMatterFilterStateToUrl();
+      }
+      void refreshCurrentMattersFrom(matterRefresh);
+    }
+    const retry = event.target.closest('[data-drafts-retry], [data-drafts-refresh]');
+    if (retry) void refreshDraftInventoryFrom(retry);
+    const last = event.target.closest('[data-drafts-last-page]');
+    if (last) {
+      state.casesPage.draft = Math.max(0, (currentDraftInventory?.state.result?.pages || 1) - 1);
+      writeMatterFilterStateToUrl();
+      void refreshDraftInventoryFrom(last);
+    }
+  });
   wrapper.addEventListener("change", onDraftSelectionChange);
   wrapper.addEventListener("change", onArchivedSelectionChange);
   document.addEventListener("click", (evt) => {
@@ -3368,26 +2930,161 @@ async function initCasesPage() {
     archivedStatusFilter.value = state.archivedStatusFilter || "all";
     archivedStatusFilter.addEventListener("change", (event) => {
       state.archivedStatusFilter = event.target.value || "all";
-      if (state.casesPage) {
-        state.casesPage.archived = 0;
-      }
+      matterSavedViews?.markCustom();
+      if (state.casesPage) state.casesPage.archived = 0;
+      writeMatterFilterStateToUrl();
       renderCasesView();
     });
   }
   setupCaseNoteModal();
-  window.addEventListener("lpc-case-notes-updated", async (event) => {
-    const targetId = event?.detail?.caseId;
-    if (!targetId) return;
-    try {
-      const payload = await fetchCaseNote(targetId);
-      applyNoteToState(targetId, payload);
-      renderCasesView();
-    } catch (err) {
-      console.warn("External note refresh failed", err);
-    }
-  });
 
   showCasePostedPopup();
+}
+
+function readMatterFilterStateFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const deadline = String(params.get("matterDeadline") || "");
+  const updated = String(params.get("matterUpdated") || "");
+  const sort = String(params.get("matterSort") || "recent");
+  state.archivedStatusFilter = ["completed", "paused", "archived"].includes(params.get("archiveStatus")) ? params.get("archiveStatus") : "all";
+  const search = document.querySelector("[data-cases-search]");
+  if (search) search.value = String(params.get("q") || "").slice(0, 200);
+  state.casesSearchTerm = String(search?.value || "").trim().toLowerCase();
+  state.matterPracticeFilter = String(params.get("matterPractice") || "").slice(0, 120);
+  state.matterDeadlineFilter = ["overdue", "7_days", "none"].includes(deadline) ? deadline : "";
+  state.matterUpdatedFilter = ["7_days", "30_days"].includes(updated) ? updated : "";
+  state.matterSort = ["recent", "deadline", "status", "alphabetical"].includes(sort) ? sort : "recent";
+  for (const view of CASE_VIEW_FILTERS) {
+    const page = params.get(`${view}Page`);
+    state.casesPage[view] = /^[1-9]\d{0,6}$/.test(page || '') && Number(page) <= 1000000 ? Number(page) - 1 : 0;
+  }
+}
+
+function writeMatterFilterStateToUrl() {
+  const url = new URL(window.location.href);
+  const values = {
+    q: String(document.querySelector("[data-cases-search]")?.value || ""),
+    archiveStatus: state.archivedStatusFilter === "all" ? "" : state.archivedStatusFilter,
+    matterPractice: state.matterPracticeFilter,
+    matterDeadline: state.matterDeadlineFilter,
+    matterUpdated: state.matterUpdatedFilter,
+    matterSort: state.matterSort === "recent" ? "" : state.matterSort,
+    ...Object.fromEntries(CASE_VIEW_FILTERS.map(view => [`${view}Page`, state.casesPage[view] ? state.casesPage[view] + 1 : ''])),
+  };
+  Object.entries(values).forEach(([key, value]) => {
+    if (value) url.searchParams.set(key, value);
+    else url.searchParams.delete(key);
+  });
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+function populateMatterPracticeFilter(select) {
+  if (!select) return;
+  const areas = [...new Set([
+    ...(state.cases || []),
+    ...(state.casesArchived || []),
+    ...(state.localDrafts || []),
+  ].map((item) => String(item?.practiceArea || "").trim()).filter(Boolean).concat(currentDraftInventory?.state.result?.practices || [], currentMatterInventory?.state.result?.practices || []))].sort((left, right) => left.localeCompare(right));
+  if (state.matterPracticeFilter && !areas.includes(state.matterPracticeFilter)) areas.push(state.matterPracticeFilter);
+  select.replaceChildren(new Option("All practice areas", ""));
+  areas.forEach((area) => select.add(new Option(area, area)));
+  select.value = areas.includes(state.matterPracticeFilter) ? state.matterPracticeFilter : "";
+  if (state.matterPracticeFilter && !select.value) state.matterPracticeFilter = "";
+}
+
+function resetMatterPages() {
+  Object.keys(state.casesPage || {}).forEach((key) => { state.casesPage[key] = 0; });
+}
+
+function setupMatterProductivityFilters() {
+  readMatterFilterStateFromUrl();
+  const practice = document.querySelector("[data-matter-practice-filter]");
+  const deadline = document.querySelector("[data-matter-deadline-filter]");
+  const updated = document.querySelector("[data-matter-updated-filter]");
+  const sort = document.querySelector("[data-matter-sort]");
+  const reset = document.querySelector("[data-matter-filter-reset]");
+  const menu = document.querySelector("[data-matter-filter-menu]");
+  populateMatterPracticeFilter(practice);
+  if (deadline) deadline.value = state.matterDeadlineFilter;
+  if (updated) updated.value = state.matterUpdatedFilter;
+  if (sort) sort.value = state.matterSort;
+  const apply = () => {
+    matterSavedViews?.markCustom();
+    state.matterPracticeFilter = String(practice?.value || "");
+    state.matterDeadlineFilter = String(deadline?.value || "");
+    state.matterUpdatedFilter = String(updated?.value || "");
+    state.matterSort = String(sort?.value || "recent");
+    resetMatterPages();
+    writeMatterFilterStateToUrl();
+    renderCasesView();
+  };
+  [practice, deadline, updated, sort].forEach((control) => control?.addEventListener("change", apply));
+  reset?.addEventListener("click", () => {
+    if (practice) practice.value = "";
+    if (deadline) deadline.value = "";
+    if (updated) updated.value = "";
+    if (sort) sort.value = "recent";
+    apply();
+  });
+  document.addEventListener("click", (event) => {
+    if (menu?.open && !menu.contains(event.target)) menu.open = false;
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !menu?.open) return;
+    menu.open = false;
+    menu.querySelector("summary")?.focus();
+  });
+
+}
+
+function setupMatterSavedViews() {
+  const search = document.querySelector("[data-cases-search]");
+  const practice = document.querySelector("[data-matter-practice-filter]");
+  const deadline = document.querySelector("[data-matter-deadline-filter]");
+  const updated = document.querySelector("[data-matter-updated-filter]");
+  const sort = document.querySelector("[data-matter-sort]");
+
+  matterSavedViews = mountAttorneySavedViews({
+    api: caseNoteApi, privateState: caseNoteState, ownerId: String(state.user?.id || state.user?._id || ""), signal: new AbortController().signal,
+    host: document.querySelector("[data-attorney-saved-view-host]"),
+    picker: document.querySelector("[data-matter-saved-view]"),
+    saveButton: document.querySelector("[data-matter-save-view]"),
+    deleteButton: document.querySelector("[data-matter-delete-view]"),
+    status: document.querySelector("[data-matter-saved-view-status]"),
+    builtIns: [
+      { id: "active", name: "Active matters", filters: { view: "active", sort: "recent" } },
+      { id: "deadlines", name: "Upcoming deadlines", filters: { view: "active", deadline: "7_days", sort: "deadline" } },
+      { id: "applicants", name: "Applicant review", filters: { view: "inquiries", sort: "recent" } },
+    ],
+    getState: () => ({
+      view: state.casesViewFilter,
+      archiveStatus: state.archivedStatusFilter,
+      search: String(search?.value || ""),
+      practice: state.matterPracticeFilter,
+      deadline: state.matterDeadlineFilter,
+      updated: state.matterUpdatedFilter,
+      sort: state.matterSort,
+    }),
+    applyState: (filters = {}) => {
+      state.archivedStatusFilter = filters.archiveStatus || "all";
+      const archive = document.querySelector("[data-archived-status-filter]");
+      if (archive) archive.value = state.archivedStatusFilter;
+      if (search) search.value = String(filters.search || "");
+      state.casesSearchTerm = String(filters.search || "").trim().toLowerCase();
+      state.matterPracticeFilter = String(filters.practice || "");
+      state.matterDeadlineFilter = String(filters.deadline || "");
+      state.matterUpdatedFilter = String(filters.updated || "");
+      state.matterSort = String(filters.sort || "recent");
+      populateMatterPracticeFilter(practice);
+      if (deadline) deadline.value = state.matterDeadlineFilter;
+      if (updated) updated.value = state.matterUpdatedFilter;
+      if (sort) sort.value = state.matterSort;
+      setCaseFilter(String(filters.view || "active"), { render: false, markSavedView: false });
+      resetMatterPages();
+      writeMatterFilterStateToUrl();
+      renderCasesView();
+    },
+  });
 }
 
 function showCasePostedPopup() {
@@ -3416,6 +3113,9 @@ function showCasePostedPopup() {
   const close = () => {
     overlay.classList.remove("is-active");
     modal.classList.remove("is-active");
+    modal.setAttribute("aria-hidden", "true");
+    modal.setAttribute("inert", "");
+    deactivateDialogFocus(modal);
     overlay.setAttribute("aria-hidden", "true");
   };
   if (!modal.dataset.bound) {
@@ -3423,18 +3123,17 @@ function showCasePostedPopup() {
     modal.querySelector("#casePostedCloseBtn")?.addEventListener("click", close);
     modal.querySelector("#casePostedConfirmBtn")?.addEventListener("click", close);
     overlay.addEventListener("click", close);
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key === "Escape") close();
-      },
-      { once: true }
-    );
   }
 
   overlay.classList.add("is-active");
   modal.classList.add("is-active");
+  modal.setAttribute("aria-hidden", "false");
+  modal.removeAttribute("inert");
   overlay.setAttribute("aria-hidden", "false");
+  activateDialogFocus(modal, {
+    initialFocus: modal.querySelector("#casePostedConfirmBtn"),
+    onEscape: close,
+  });
 }
 
 async function loadArchivedCases(force = false) {
@@ -3446,7 +3145,7 @@ async function loadArchivedCases(force = false) {
   state.casesArchivedPromise = (async () => {
     try {
       const res = await secureFetch(url, { headers: { Accept: "application/json" } });
-      if (!res.ok) throw new Error("Archived case fetch failed");
+      if (!res.ok) throw new Error("Archived Matter fetch failed");
       const data = await res.json();
       state.casesArchived = Array.isArray(data) ? data : [];
       buildCaseLookup();
@@ -3454,6 +3153,7 @@ async function loadArchivedCases(force = false) {
       console.error(err);
       state.casesArchived = [];
     } finally {
+      if (force && currentMatterInventory) await loadCurrentMatters({ force: true });
       state.casesArchivedPromise = null;
     }
     return state.casesArchived;
@@ -3462,6 +3162,9 @@ async function loadArchivedCases(force = false) {
 }
 
 function renderCasesView() {
+  if (currentDraftInventory) void loadCaseDrafts();
+  if (state.casesViewFilter !== 'draft') void loadCurrentMatters();
+  const focused = document.activeElement, focusedCase = focused?.closest?.('[data-case-id]')?.dataset.caseId;
   if (state.casesViewFilter !== "draft" && state.draftSelection.size) {
     state.draftSelection.clear();
   }
@@ -3471,77 +3174,42 @@ function renderCasesView() {
   pruneDraftSelection();
   pruneArchivedSelection();
   state.localDrafts = readLocalDrafts();
-  const totals = computeCaseCounts();
-  Object.entries(totals).forEach(([key, count]) => {
-    const target = document.querySelector(`[data-case-count="${key}"]`);
-    if (target) target.textContent = String(count);
-  });
-
+  updateCurrentMatterCounts();
   CASE_VIEW_FILTERS.forEach((key) => {
     const body = document.querySelector(`[data-table-body="${key}"]`);
     if (!body) return;
-    const records = getCasesByFilter(key, { applySearch: key === state.casesViewFilter });
-    const totalCount = records.length;
-    const pageIndex = Math.max(0, state.casesPage?.[key] ?? 0);
-    const totalPages = Math.max(1, Math.ceil(totalCount / CASE_PAGE_SIZE));
-    const safeIndex = Math.min(pageIndex, totalPages - 1);
-    if (safeIndex !== pageIndex) {
-      state.casesPage[key] = safeIndex;
-    }
-    const start = safeIndex * CASE_PAGE_SIZE;
-    const pageItems = records.slice(start, start + CASE_PAGE_SIZE);
-    if (!pageItems.length) {
-      const searchActive = state.casesSearchTerm && key === state.casesViewFilter;
-      const message = searchActive ? "No cases match your search." : "No cases in this category.";
-      const span = 7;
-      body.innerHTML = `<tr><td colspan="${span}" class="empty-row">${message}</td></tr>`;
-      updateCasesPagination(key, 0);
-      return;
-    }
-    body.innerHTML = pageItems.map((item) => renderCaseRow(item, key)).join("");
-    updateCasesPagination(key, totalCount);
+    if (key === 'draft') renderDraftInventory(body);
+    else if (key === state.casesViewFilter) renderCurrentMatterInventory(body, key);
+    else { body.replaceChildren(); updateCasesPagination(key, 0); }
   });
+  updateMatterFilterSummary();
   maybeHighlightArchivedCase();
+  if (focusedCase && !focused.isConnected) focusApplicationParent(focusedCase);
 }
 
-function computeCaseCounts() {
-  const counts = {
-    active: 0,
-    draft: Array.isArray(state.localDrafts) ? state.localDrafts.length : 0,
-    archived: getArchivedBucketCases().length,
-    inquiries: 0,
-  };
-  state.cases.forEach((item) => {
-    const bucket = categorizeCase(item);
-    if (bucket === "archived") return;
-    if (counts[bucket] !== undefined) counts[bucket] += 1;
-  });
-  return counts;
+function updateCurrentMatterCounts() {
+  const result = state.casesViewFilter === 'draft' ? currentDraftInventory?.state.result : currentMatterInventory?.state.result;
+  for (const view of CASE_VIEW_FILTERS) {
+    const count = result?.counts[view === 'inquiries' ? 'applications' : view];
+    const target = document.querySelector(`[data-case-count="${view}"]`);
+    if (!target) continue;
+    target.textContent = count == null ? '—' : String(count);
+    if (count == null) target.setAttribute('aria-label', 'Count unavailable');
+    else target.removeAttribute('aria-label');
+  }
 }
 
-function getCasesByFilter(filterKey, { applySearch = false } = {}) {
-  let source = state.cases;
-  if (filterKey === "archived") {
-    source = getArchivedBucketCases();
-  } else {
-    source = source.filter((item) => categorizeCase(item) === filterKey);
-  }
-  if (filterKey === "draft" && Array.isArray(state.localDrafts) && state.localDrafts.length) {
-    source = [...state.localDrafts, ...source];
-  }
-  let records = [...source];
-  records.sort((a, b) => {
-    const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
-    const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
-    return bTime - aTime;
-  });
-  if (applySearch && state.casesSearchTerm) {
-    records = records.filter((item) => matchesCaseSearch(item, state.casesSearchTerm));
-  }
-  if (filterKey === "archived") {
-    records = applyArchivedStatusFilter(records);
-  }
-  return records;
+function getCasesByFilter(view) {
+  if (view === 'draft') return currentDraftInventory?.state.result?.items || [];
+  return view === state.casesViewFilter ? currentMatterInventory?.state.result?.items || [] : [];
+}
+
+function updateMatterFilterSummary() {
+  const count = [state.matterPracticeFilter, state.matterDeadlineFilter, state.matterUpdatedFilter, state.matterSort !== "recent" ? state.matterSort : ""].filter(Boolean).length;
+  const badge = document.querySelector("[data-matter-filter-count]");
+  const summary = document.querySelector("[data-matter-filter-summary]");
+  if (badge) badge.textContent = count ? `(${count})` : "";
+  if (summary) summary.textContent = count ? `${count} active filter${count === 1 ? "" : "s"}` : "No active filters";
 }
 
 function updateCasesPagination(filterKey, totalCount) {
@@ -3568,28 +3236,13 @@ function updateCasesPagination(filterKey, totalCount) {
   pagination.style.display = totalCount > CASE_PAGE_SIZE ? "flex" : "none";
 }
 
-function applyArchivedStatusFilter(records = []) {
-  const filter = state.archivedStatusFilter || "all";
-  if (filter === "all") return records;
-  return records.filter((item) => {
-    const status = normalizeCaseStatus(item?.status);
-    const isCompleted = isCompletedDashboardCase(item);
-    const isPaused = status === "paused";
-    const isArchived = isArchivedBucketCase(item) && !isCompleted && !isPaused;
-    if (filter === "completed") return isCompleted;
-    if (filter === "paused") return isPaused;
-    if (filter === "archived") return isArchived;
-    return true;
-  });
-}
-
 function onCasesPaginationClick(event) {
   const button = event.target.closest("[data-page-action]");
   if (!button) return;
   const action = button.dataset.pageAction;
   const target = button.dataset.pageTarget;
   if (!target || !state.casesPage) return;
-  const total = getCasesByFilter(target, { applySearch: target === state.casesViewFilter }).length;
+  const total = (target === 'draft' ? currentDraftInventory : currentMatterInventory)?.state.result?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / CASE_PAGE_SIZE));
   const current = Math.max(0, state.casesPage[target] ?? 0);
   let nextIndex = current;
@@ -3597,36 +3250,9 @@ function onCasesPaginationClick(event) {
   if (action === "next") nextIndex = Math.min(totalPages - 1, current + 1);
   if (nextIndex === current) return;
   state.casesPage[target] = nextIndex;
-  renderCasesView();
-}
-
-function categorizeCase(item) {
-  if (item.localDraft) return "draft";
-  if (isArchivedBucketCase(item)) return "archived";
-  const status = String(item.status || "").toLowerCase();
-  const applicantCount = Number(
-    item.applicantsCount ?? (Array.isArray(item.applicants) ? item.applicants.length : item.applicants) ?? 0
-  );
-  if (!item.paralegal && applicantCount > 0) return "inquiries";
-  if (status === "draft") return "draft";
-  return "active";
-}
-
-function matchesCaseSearch(item, term) {
-  if (!term) return true;
-  const haystack = [
-    item.title,
-    item.practiceArea,
-    item.details,
-    item.paralegal?.name,
-    item.paralegal?.firstName,
-    item.paralegal?.lastName,
-    item.internalNotes?.note,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(term);
+  writeMatterFilterStateToUrl();
+  if (target === 'draft') renderCasesView();
+  else void refreshCurrentMattersFrom(button);
 }
 
 function extractApplicantState(rawLocation = "") {
@@ -3769,27 +3395,25 @@ function formatApplicantConflictsResponse(type = "") {
 
 function buildApplicantDrawerRow(applicant, index, caseId) {
   const avatar = applicant.avatar
-    ? `<img src="${sanitize(applicant.avatar)}" alt="${sanitize(applicant.name)} profile photo" />`
+    ? `<img src="${sanitize(applicant.avatar)}" alt="" />`
     : `<span>${sanitize((applicant.name || "P")[0] || "P")}</span>`;
   const appliedText = formatApplicantDate(applicant.appliedAt);
-  const stateText = applicant.state || "—";
-  const experienceText = formatApplicantExperience(applicant.yearsExperience);
-  const metaParts = [appliedText, stateText, experienceText].filter(Boolean);
+  const metaParts = [appliedText].filter(Boolean);
   const metaHtml = metaParts.map((part) => `<span>${sanitize(part)}</span>`).join('<span class="dot">•</span>');
   const preEngagementLabel = formatApplicantPreEngagementStatus(applicant.preEngagement);
   return `
-    <div class="applicant-card" data-applicant-row data-case-id="${sanitize(caseId)}" data-applicant-index="${index}">
-      <div class="applicant-card-top">
-        <div class="applicant-avatar">${avatar}</div>
-        <div class="applicant-card-info">
-          <div class="applicant-card-name">
-            <span class="applicant-name legacy-font">${sanitize(applicant.name)}</span>
-          </div>
-          <div class="applicant-card-meta">${metaHtml}</div>
-          ${preEngagementLabel ? `<div class="applicant-preengagement-flag">${sanitize(preEngagementLabel)}</div>` : ""}
-        </div>
-      </div>
-    </div>
+    <button type="button" class="applicant-card" data-applicant-row data-case-id="${sanitize(caseId)}" data-applicant-index="${index}" aria-pressed="false">
+      <span class="applicant-card-top">
+        <span class="applicant-avatar">${avatar}</span>
+        <span class="applicant-card-info">
+          <span class="applicant-card-name">
+            <span class="applicant-name applicant-name--serif">${sanitize(applicant.name)}</span>
+          </span>
+          <span class="applicant-card-meta">${metaHtml}</span>
+          ${preEngagementLabel ? `<span class="applicant-preengagement-flag">${sanitize(preEngagementLabel)}</span>` : ""}
+        </span>
+      </span>
+    </button>
   `;
 }
 
@@ -3804,7 +3428,6 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
   const resumeIsHttp = isHttpUrl(resumeURL);
   const resumeKey = resumeIsHttp ? "" : normalizeDocKey(resumeURL);
   const linkedInURL = applicant.linkedInURL || "";
-  const casePractice = titleCaseWords(caseItem?.practiceArea || caseItem?.field || "");
   const locationLabel = applicant.state || extractApplicantState(applicant.location) || "—";
   const experienceShort = formatApplicantExperience(applicant.yearsExperience);
   const experienceLong =
@@ -3815,11 +3438,7 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
   const iconAvailable = `<svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="6" stroke="currentColor" stroke-width="1.6" fill="none"/></svg>`;
   const iconBriefcase = `<svg viewBox="0 0 24 24" focusable="false"><path d="M9 7V6a3 3 0 0 1 6 0v1" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><rect x="4" y="7" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M4 12h16" stroke="currentColor" stroke-width="1.6" fill="none"/></svg>`;
   const iconPin = `<svg viewBox="0 0 24 24" focusable="false"><path d="M12 22s6-6.4 6-11a6 6 0 1 0-12 0c0 4.6 6 11 6 11Z" stroke="currentColor" stroke-width="1.6" fill="none"/><circle cx="12" cy="11" r="2.5" stroke="currentColor" stroke-width="1.6" fill="none"/></svg>`;
-  const detailMeta = [locationLabel, casePractice, experienceShort !== "—" ? experienceShort : ""]
-    .filter(Boolean)
-    .join(" • ");
   const profileDetails = [];
-  if (casePractice) profileDetails.push(`Practice area: ${casePractice}`);
   if (applicant.specialties?.length) {
     profileDetails.push(`Specialties: ${applicant.specialties.join(", ")}`);
   }
@@ -3839,14 +3458,14 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
   const coverLabel = acceptedInvitation ? "Accepted invitation" : "Cover note";
   const safeProfileLink = sanitizeUrl(profileLink);
   const safeResumeUrl = sanitizeUrl(resumeURL);
-  const safeLinkedInUrl = sanitizeUrl(linkedInURL);
+  const safeLinkedInUrl = sanitizeUrl(linkedInURL, { requiredHost: "linkedin.com" });
   const profileMarkup = safeProfileLink
     ? `<a href="${sanitize(safeProfileLink)}" class="applicant-side-btn">View full profile</a>`
     : `<span class="applicant-side-btn muted" aria-disabled="true">Profile unavailable</span>`;
   const resumeMarkup = resumeURL
     ? resumeIsHttp && safeResumeUrl
       ? `<a href="${sanitize(safeResumeUrl)}" target="_blank" rel="noopener" class="applicant-side-btn">Résumé</a>`
-      : `<a href="#" data-applicant-doc data-doc-key="${sanitize(resumeKey)}" class="applicant-side-btn">Résumé</a>`
+      : `<button type="button" data-applicant-doc data-doc-key="${sanitize(resumeKey)}" class="applicant-side-btn">Résumé</button>`
     : `<span class="applicant-side-btn muted" aria-disabled="true">No résumé</span>`;
   const linkedInMarkup = safeLinkedInUrl
     ? `<a href="${sanitize(safeLinkedInUrl)}" target="_blank" rel="noopener" class="applicant-side-btn">LinkedIn</a>`
@@ -3919,8 +3538,7 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
             ` : ""}
             ${preEngagement.status === "submitted" ? `
               <div class="applicant-preengagement-actions">
-                <button type="button" class="applicant-detail-chip hire-primary" data-preengagement-review-action="approve" data-case-id="${sanitize(caseId)}" data-paralegal-id="${sanitize(applicant.paralegalId)}">Approve and continue</button>
-                <button type="button" class="applicant-detail-chip" data-preengagement-review-action="request_changes" data-case-id="${sanitize(caseId)}" data-paralegal-id="${sanitize(applicant.paralegalId)}">Request changes</button>
+                <button type="button" class="applicant-detail-chip hire-primary" data-preengagement-review-action="approve" data-case-id="${sanitize(caseId)}" data-paralegal-id="${sanitize(applicant.paralegalId)}">Review response</button>
               </div>
             ` : ""}
           </div>
@@ -3943,7 +3561,7 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
       </div>
       <aside class="applicant-detail-side">
         <div class="applicant-side-card">
-          <div class="applicant-side-name">${sanitize(applicant.name || "Applicant")}</div>
+
           <div class="applicant-side-meta">
             <div><span class="icon" aria-hidden="true">${iconAvailable}</span>${sanitize(availabilityLabel)}</div>
             <div><span class="icon" aria-hidden="true">${iconBriefcase}</span>${sanitize(experienceLong)}</div>
@@ -3971,7 +3589,7 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
 }
 
 function renderCaseRow(item, filterKey = "active") {
-  let client = item.paralegal?.name || item.paralegalNameSnapshot || "Awaiting hire";
+  let client = item.paralegal?.name || item.paralegalNameSnapshot || "";
   const pendingInvites = Array.isArray(item.invites)
     ? item.invites.filter((invite) => String(invite?.status || "pending").toLowerCase() === "pending")
     : [];
@@ -3988,10 +3606,7 @@ function renderCaseRow(item, filterKey = "active") {
     client = "Invitation Sent";
   }
   const practice = titleCaseWords(item.practiceArea || item.field || "General");
-  const created = formatCaseDate(item.createdAt || item.updatedAt);
-  const updated = formatCaseDate(item.updatedAt || item.completedAt || item.createdAt);
-  const displayedDate =
-    filterKey === "draft" ? updated : filterKey === "archived" ? updated : created;
+  const displayedDate = formatCaseDate(item.updatedAt || item.completedAt || item.createdAt);
   const normalizedStatus = normalizeCaseStatus(item.status);
   const isCompletedStatus = normalizedStatus === "completed" || normalizedStatus === "closed";
   const isManualArchived =
@@ -4048,29 +3663,50 @@ function renderCaseRow(item, filterKey = "active") {
       : "";
   const applicantsToggle =
     filterKey === "inquiries"
-      ? `<button type="button" class="applicant-toggle" data-applicants-toggle data-case-id="${sanitize(
+      ? `<button type="button" class="matter-primary-action applicant-toggle" data-applicants-toggle data-case-id="${sanitize(
           caseId
         )}" aria-expanded="${shouldOpenDrawer ? "true" : "false"}"${
           caseId ? "" : ' disabled aria-disabled="true"'
-        }>Applicants (${applicantCount || 0})</button>`
+        }>Review ${applicantCount || 0} applicant${applicantCount === 1 ? "" : "s"}</button>`
       : "";
-  const actionsCell = `
-      <td class="actions">
-        <div class="case-actions-inline">
-          ${applicantsToggle}
-          ${renderCaseMenu(item)}
-        </div>
-      </td>`;
+  const retainedDraft = !item.localDraft && normalizedStatus === "draft" && !item.archived;
+  const titleMarkup = item.localDraft || retainedDraft
+    ? `<a href="${sanitize(currentDraftEditorHref(caseId, retainedDraft))}">${sanitize(item.title || "Untitled Matter")}</a>`
+    : canOpenDetail || previewOnly
+    ? `<button type="button" class="case-title-trigger" data-case-action="details" data-case-id="${sanitize(caseId)}">${sanitize(
+        item.title || "Untitled Matter"
+      )}</button>`
+    : `<span>${sanitize(item.title || "Untitled Matter")}</span>`;
+  const primaryAction = item.localDraft || retainedDraft
+    ? `<a class="matter-primary-action" href="${sanitize(currentDraftEditorHref(caseId, retainedDraft))}">Continue draft</a>`
+    : applicantsToggle ||
+      `<button type="button" class="matter-primary-action" data-case-action="${
+        canViewWorkspace ? "workspace" : "details"
+      }" data-case-id="${sanitize(caseId)}">${
+        canViewWorkspace ? "Continue work" : filterKey === "archived" || normalizedStatus === "draft" ? "View record" : "Open matter"
+      }</button>`;
+  const nextAction = ["flagged", "resolution_requested"].includes(moderationStatus)
+    ? "Review the requested changes"
+    : "";
+  const dateLabel = filterKey === "draft" ? "Edited" : "Updated";
+  const dateMeta = displayedDate === "—" ? "" : `<span class="matter-meta-item">${dateLabel} ${sanitize(displayedDate)}</span>`;
+  const statusMarkup = filterKey === "draft" && statusKey === "draft" ? "" : `<span class="status ${statusClass}">${statusText}</span>`;
+  const rowStatus = statusMarkup + moderationBadge + withdrawalBadge;
+  const deadlineMeta = item.deadline
+    ? `<span class="matter-meta-item matter-meta-deadline">Due ${sanitize(formatCaseDate(item.deadline))}</span>`
+    : "";
+  const paralegalMeta = filterKey === "draft" || !client ? "" : `<span class="matter-meta-item">${sanitize(client)}</span>`;
+  const amountMeta = amountDisplay === "—" ? "" : `<span class="matter-meta-item">${sanitize(amountDisplay)}</span>`;
   const drawerRow =
     filterKey === "inquiries"
       ? `
     <tr class="applicant-drawer-row${shouldOpenDrawer ? "" : " hidden"}" data-applicants-row data-case-id="${sanitize(
           caseId
         )}">
-      <td colspan="8">
+      <td colspan="3">
         <div class="applicant-drawer" data-applicants-drawer data-case-id="${sanitize(caseId)}">
           <div class="applicant-drawer-header">
-            <div class="applicant-drawer-title">Applicants for ${sanitize(item.title || "Matter")}</div>
+            <div class="applicant-drawer-title">Applicants</div>
             <button type="button" class="applicant-drawer-close" data-applicants-close aria-label="Close applicants">Close</button>
           </div>
           <div class="applicant-drawer-body">
@@ -4088,22 +3724,27 @@ function renderCaseRow(item, filterKey = "active") {
     </tr>`
       : "";
   return `
-    <tr data-case-id="${sanitize(caseId)}">
-      <td class="case-title-cell">${
-        item.localDraft
-          ? `<a href="create-case.html?draftId=${encodeURIComponent(caseId)}#description">${sanitize(item.title || "Untitled Matter")}</a>`
-          : previewOnly
-          ? `<button type="button" class="case-title-trigger" data-case-action="details" data-case-id="${sanitize(caseId)}">${sanitize(item.title || "Untitled Matter")}</button>`
-          : canOpenDetail
-          ? `<a href="case-detail.html?caseId=${encodeURIComponent(caseId)}">${sanitize(item.title || "Untitled Matter")}</a>`
-          : `<span>${sanitize(item.title || "Untitled Matter")}</span>`
-      }</td>
-      <td class="case-paralegal-cell">${filterKey === "draft" ? '<span class="muted">—</span>' : sanitize(client)}</td>
-      <td class="case-field-cell">${sanitize(practice)}</td>
-      <td class="case-status-cell"><span class="status ${statusClass}">${statusText}</span>${moderationBadge}${withdrawalBadge}</td>
-      <td class="case-amount-cell">${sanitize(amountDisplay)}</td>
-      <td class="case-date-cell">${displayedDate}</td>
-      ${actionsCell}
+    <tr class="matter-queue-row" data-case-id="${sanitize(caseId)}">
+      <td class="matter-identity"${rowStatus || nextAction ? "" : ' colspan="2"'}>
+        <div class="matter-title-line">${titleMarkup}</div>
+        <div class="matter-meta" aria-label="Matter details">
+          <span class="matter-meta-item">${sanitize(practice)}</span>
+          ${paralegalMeta}
+          ${amountMeta}
+          ${deadlineMeta}
+          ${dateMeta}
+        </div>
+      </td>
+      ${rowStatus || nextAction ? `<td class="matter-next-step">
+        <div class="matter-status-line">${rowStatus}</div>
+        ${nextAction ? `<span class="matter-next-copy">${sanitize(nextAction)}</span>` : ""}
+      </td>` : ""}
+      <td class="actions matter-row-actions">
+        <div class="matter-action-controls">
+          ${primaryAction}
+          ${renderCaseMenu(item)}
+        </div>
+      </td>
     </tr>
     ${drawerRow}
   `;
@@ -4131,16 +3772,14 @@ function renderCaseMenu(item) {
     !hasAssigned &&
     !hasInvites &&
     !applicantsCount &&
-    (statusKey === "open" || statusKey === "draft" || !statusKey);
+    statusKey === "open";
   const moderationStatus = String(item?.moderationStatus || "none").toLowerCase();
-  const canMarkFlagResolved = item?.canMarkFlagResolved === true;
   if (item.localDraft) {
     return `
     <div class="case-actions" data-case-id="${baseCaseId}">
-      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}" data-case-menu-trigger>⋯</button>
-      <div class="case-menu" id="${menuId}" role="menu" style="width: 180px; min-width: 180px;">
-        <button type="button" class="menu-item" data-case-action="resume-draft" data-case-id="${baseCaseId}">Resume Draft</button>
-        <button type="button" class="menu-item danger" data-case-action="discard-draft" data-case-id="${baseCaseId}">Delete Matter</button>
+      <button class="menu-trigger" type="button" aria-label="More actions for ${sanitize(item.title || "Untitled Matter")}" aria-expanded="false" aria-controls="${menuId}" data-case-menu-trigger>⋯</button>
+      <div class="case-menu" id="${menuId}" role="group" aria-label="Matter actions">
+        <button type="button" class="menu-item danger" data-case-action="discard-draft" data-case-id="${baseCaseId}">Delete draft</button>
       </div>
     </div>
     `;
@@ -4156,23 +3795,12 @@ function renderCaseMenu(item) {
       `<button type="button" class="menu-item" data-case-action="details" data-case-id="${baseCaseId}">View Details</button>`
     );
   }
-  if (moderationStatus === "flagged") {
-    if (canMarkFlagResolved) {
-      parts.push(
-        `<button type="button" class="menu-item" data-case-action="flag-resolved" data-case-id="${baseCaseId}">Flag resolved</button>`
-      );
-    } else {
-      parts.push(
-        `<span class="menu-item" aria-disabled="true">Edit matter to resolve flag</span>`
-      );
-    }
-  } else if (moderationStatus === "resolution_requested") {
-    parts.push(
-      `<span class="menu-item" aria-disabled="true">Awaiting admin review</span>`
-    );
+  if (["flagged", "resolution_requested"].includes(moderationStatus)) {
+    parts.push(`<button type="button" class="menu-item" data-case-action="flag-resolved" data-case-id="${baseCaseId}">Review admin edit request</button>`);
   }
   parts.push(
-    `<button type="button" class="menu-item" data-case-action="status-history" data-case-id="${baseCaseId}">View Status History</button>`
+    `<button type="button" class="menu-item" data-case-action="status-history" data-case-id="${baseCaseId}">View Status History</button>`,
+    `<button type="button" class="menu-item" data-case-action="edit-note" data-case-id="${baseCaseId}">Edit Matter note</button>`
   );
   if (!previewOnly && canOpenDetail && !canViewWorkspace) {
     parts.push(
@@ -4190,19 +3818,12 @@ function renderCaseMenu(item) {
       `<button type="button" class="menu-item" data-case-action="view-invited" data-case-id="${baseCaseId}">View Invited Paralegals</button>`
     );
   }
-  if (hasDeliverables(item) && !item.archived) {
-    parts.push(
-      `<button type="button" class="menu-item" data-case-action="download" data-case-id="${baseCaseId}">Download Files</button>`
-    );
-  }
-  if (isFinal) {
-    parts.push(
-      `<button type="button" class="menu-item" data-case-action="download-receipt" data-case-id="${baseCaseId}">Download Receipt</button>`
-    );
-  }
+  parts.push(`<button type="button" class="menu-item" data-case-action="application-review" data-case-id="${baseCaseId}">Review applications</button>`);
+  parts.push(`<button type="button" class="menu-item" data-case-action="download" data-case-id="${baseCaseId}">Download Files</button>`);
+  parts.push(`<button type="button" class="menu-item" data-case-action="download-receipt" data-case-id="${baseCaseId}">View receipt</button>`);
   if (item.archived) {
     parts.push(
-      `<button type="button" class="menu-item" data-case-action="download-archive" data-case-id="${baseCaseId}">Download Matter</button>`
+      `<button type="button" class="menu-item" data-case-action="download-archive" data-case-id="${baseCaseId}">Review archive download</button>`
     );
     if (!isFinal) {
       parts.push(
@@ -4214,6 +3835,7 @@ function renderCaseMenu(item) {
       `<button type="button" class="menu-item danger" data-case-action="archive" data-case-id="${baseCaseId}">Archive Matter</button>`
     );
   }
+  if (isFinal || (!item.archived && hasAssigned)) parts.push(`<button type="button" class="menu-item" data-case-action="archive-status" data-case-id="${baseCaseId}">View archive status</button>`);
   if (canDelete) {
     parts.push(
       `<button type="button" class="menu-item danger" data-case-action="delete-case" data-case-id="${baseCaseId}">Delete Matter</button>`
@@ -4224,8 +3846,8 @@ function renderCaseMenu(item) {
   }
   return `
     <div class="case-actions" data-case-id="${baseCaseId}">
-      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}" data-case-menu-trigger>⋯</button>
-      <div class="case-menu" id="${menuId}" role="menu" style="width: 180px; min-width: 180px;">
+      <button class="menu-trigger" type="button" aria-label="More actions for ${sanitize(item.title || "Untitled Matter")}" aria-expanded="false" aria-controls="${menuId}" data-case-menu-trigger>⋯</button>
+      <div class="case-menu" id="${menuId}" role="group" aria-label="Matter actions">
         ${parts.join("")}
       </div>
     </div>
@@ -4282,7 +3904,7 @@ function closeOtherApplicantsDrawers(activeCaseId, contextEl) {
 function renderApplicantsInDrawer(caseId, applicants = [], drawerEl) {
   const body = drawerEl?.querySelector("[data-applicants-body]");
   if (!body) return;
-  const visible = applicants.filter((applicant) => !["accepted", "rejected"].includes(applicant.status));
+  const visible = applicants.filter((applicant) => !["accepted", "rejected", "withdrawn"].includes(applicant.status));
   if (!visible.length) {
     body.innerHTML = `<div class="applicant-card empty-card">No applications yet.</div>`;
     const detail = drawerEl.querySelector("[data-applicant-detail]");
@@ -4293,7 +3915,16 @@ function renderApplicantsInDrawer(caseId, applicants = [], drawerEl) {
     return;
   }
   body.innerHTML = visible.map((applicant, index) => buildApplicantDrawerRow(applicant, index, caseId)).join("");
-  drawerEl.querySelectorAll("[data-applicant-row]").forEach((row) => row.classList.remove("is-active"));
+  body.querySelectorAll(".applicant-avatar img").forEach((img) => {
+    const fallback = () => {
+      const initial = document.createElement("span");
+      initial.textContent = visible[Number(img.closest("[data-applicant-index]")?.dataset.applicantIndex)]?.name?.[0] || "P";
+      img.parentElement?.replaceChildren(initial);
+    };
+    img.addEventListener("error", fallback, { once: true });
+    if (img.complete && !img.naturalWidth) fallback();
+  });
+  drawerEl.querySelectorAll("[data-applicant-row]").forEach((row) => { row.classList.remove("is-active"); row.setAttribute("aria-pressed", "false"); });
   showApplicantDetail(caseId, 0, drawerEl);
 }
 
@@ -4362,13 +3993,13 @@ async function loadApplicantsForDrawer(caseId, drawerEl) {
 function showApplicantDetail(caseId, index, drawerEl) {
   if (!drawerEl || !caseId) return;
   const applicants = (applicantDrawerCache.get(caseId) || []).filter(
-    (entry) => !["accepted", "rejected"].includes(entry.status)
+    (entry) => !["accepted", "rejected", "withdrawn"].includes(entry.status)
   );
   const applicant = applicants[index];
   if (!applicant) return;
-  drawerEl.querySelectorAll("[data-applicant-row]").forEach((row) => row.classList.remove("is-active"));
+  drawerEl.querySelectorAll("[data-applicant-row]").forEach((row) => { row.classList.remove("is-active"); row.setAttribute("aria-pressed", "false"); });
   const activeRow = drawerEl.querySelector(`[data-applicant-row][data-applicant-index="${index}"]`);
-  if (activeRow) activeRow.classList.add("is-active");
+  if (activeRow) { activeRow.classList.add("is-active"); activeRow.setAttribute("aria-pressed", "true"); }
   const detail = drawerEl.querySelector("[data-applicant-detail]");
   if (!detail) return;
   detail.innerHTML = buildApplicantDetail(applicant, { caseId });
@@ -4378,7 +4009,7 @@ function showApplicantDetail(caseId, index, drawerEl) {
 function showApplicantDetailById(caseId, applicantId, drawerEl) {
   if (!drawerEl || !caseId || !applicantId) return;
   const applicants = (applicantDrawerCache.get(caseId) || []).filter(
-    (entry) => !["accepted", "rejected"].includes(entry.status)
+    (entry) => !["accepted", "rejected", "withdrawn"].includes(entry.status)
   );
   const index = applicants.findIndex((applicant) => String(applicant.paralegalId) === String(applicantId));
   if (index < 0) return;
@@ -4402,75 +4033,23 @@ async function openApplicantDocument(key) {
     if (!res.ok || !payload?.url) {
       throw new Error(payload?.msg || payload?.error || "Document unavailable.");
     }
-    window.open(payload.url, "_blank", "noopener");
+    const documentUrl = normalizeHttpNavigationUrl(payload.url);
+    if (!documentUrl) throw new Error("The document destination is invalid.");
+    window.open(documentUrl, "_blank", "noopener");
   } catch (err) {
     notifyCases(err?.message || "Unable to open document.", "error");
   }
 }
 
-function updateApplicantPreEngagement(caseId, paralegalId, preEngagement) {
-  const applicants = applicantDrawerCache.get(caseId) || [];
-  const next = applicants.map((entry) =>
-    String(entry?.paralegalId || "") === String(paralegalId || "")
-      ? { ...entry, preEngagement: preEngagement || null }
-      : entry
-  );
-  applicantDrawerCache.set(caseId, next);
-}
-
-async function reviewApplicantPreEngagement(caseId, paralegalId, action, button) {
-  if (!caseId || !paralegalId) return;
-  const originalLabel = button?.textContent || "Approve and continue";
-  if (button) {
-    button.disabled = true;
-    button.textContent = action === "approve" ? "Approving..." : "Requesting...";
-  }
-  try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/pre-engagement/review`, {
-      method: "POST",
-      body: { action },
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(payload?.error || "Unable to review pre-engagement.");
-    }
-    updateApplicantPreEngagement(caseId, paralegalId, payload?.preEngagement || null);
-    const drawerEl = getDrawerElement(caseId, document.querySelector(`[data-applicants-toggle][data-case-id="${caseId}"]`));
-    if (drawerEl) {
-      renderApplicantsInDrawer(caseId, applicantDrawerCache.get(caseId) || [], drawerEl);
-      showApplicantDetailById(caseId, paralegalId, drawerEl);
-    }
-    notifyCases(
-      action === "approve" ? "Pre-engagement approved." : "Changes requested for pre-engagement.",
-      "success"
-    );
-    if (action === "approve") {
-      const applicants = applicantDrawerCache.get(caseId) || [];
-      const approvedApplicant = applicants.find(
-        (entry) => String(entry?.paralegalId || "") === String(paralegalId)
-      );
-      await handleHireFromApplications({
-        caseId,
-        paralegalId,
-        paralegalName: approvedApplicant?.name || "Paralegal",
-        button,
-        skipPreEngagementStep: true,
-      });
-    }
-  } catch (err) {
-    notifyCases(err?.message || "Unable to review pre-engagement.", "error");
-    if (button) {
-      button.disabled = false;
-      button.textContent = originalLabel;
-    }
-  }
+async function reviewApplicantPreEngagement(caseId, paralegalId) {
+  await openCaseNoteModal(caseId, "preengagement", null, paralegalId);
 }
 
 function pruneArchivedSelection() {
   if (!state.archivedSelection) state.archivedSelection = new Set();
   if (!state.archivedSelection.size) return;
   const valid = new Set(
-    getArchivedBucketCases()
+    getCasesByFilter('archived')
       .filter((item) => canDeleteCase(item))
       .map((item) => String(parseCaseId(item)))
       .filter(Boolean)
@@ -4480,48 +4059,200 @@ function pruneArchivedSelection() {
   });
 }
 
-async function loadCaseDrafts() {
+function currentMatterTargetId() {
+  const target = state.casesViewFilter === 'archived' && !state.archiveHighlightApplied ? state.archiveHighlightCaseId :
+    state.casesViewFilter === 'inquiries' ? getApplicantContextFromQuery()?.caseId || getApplicantsCaseContextFromQuery()?.caseId : '';
+  return /^[a-f0-9]{24}$/i.test(target || '') ? target.toLowerCase() : '';
+}
+
+function currentMatterFilters() {
+  return {
+    ...currentDraftFilters(),
+    view: state.casesViewFilter === 'inquiries' ? 'applications' : state.casesViewFilter,
+    archiveStatus: state.casesViewFilter === 'archived' ? state.archivedStatusFilter : 'all',
+    page: (state.casesPage[state.casesViewFilter] || 0) + 1,
+    targetId: currentMatterTargetId(),
+  };
+}
+
+function loadCurrentMatters(options, control = document.activeElement?.closest('[data-matters-refresh], [data-page-action]')) {
+  if (state.casesViewFilter === 'draft') return Promise.resolve();
+  if (!currentMatterInventory) currentMatterInventory = createCurrentDraftInventory({
+    ownerId: String(state.user?.id || state.user?._id || ''),
+    read: (filters, options) => caseNoteApi.readMatterInventory(filters, options),
+    verifyOwner: verifyCaseNoteOwner,
+    onChange: () => {
+      buildCaseLookup();
+      queueMicrotask(() => {
+        if (state.casesViewFilter === 'draft') return;
+        const view = state.casesViewFilter, body = document.querySelector(`[data-table-body="${view}"]`);
+        const focused = document.activeElement, focusedCase = body?.contains(focused) ? focused.closest('[data-case-id]')?.dataset.caseId : '';
+        updateCurrentMatterCounts();
+        populateMatterPracticeFilter(document.querySelector('[data-matter-practice-filter]'));
+        if (body) renderCurrentMatterInventory(body, view);
+        if (dashboardViewState.currentView === 'cases') { maybeOpenApplicantFromQuery(); maybeOpenApplicantsCaseFromQuery(); }
+        pruneArchivedSelection();
+        if (focusedCase && !focused.isConnected && dashboardViewState.currentView === 'cases') focusApplicationParent(focusedCase);
+      });
+    },
+  });
+  const read = () => currentMatterInventory.load(currentMatterFilters(), options);
+  // Background reads temporarily disable the persistent refresh and pager
+  // controls. Preserve their focus with the same departure guards as an explicit read.
+  return control ? readCurrentMattersFrom(control, read) : read();
+}
+
+function refreshCurrentMattersFrom(control) {
+  return loadCurrentMatters({ force: true }, control);
+}
+
+async function readCurrentMattersFrom(control, read) {
+  const view = state.casesViewFilter;
+  let departed = false;
+  const track = event => { if (event.target !== control && event.target !== document.body) departed = true; };
+  document.addEventListener('focusin', track); document.addEventListener('pointerdown', track);
   try {
-    const res = await secureFetch("/api/case-drafts?limit=200", {
-      headers: { Accept: "application/json" },
-      noRedirect: true,
-    });
-    if (!res.ok) throw new Error("Draft fetch failed");
-    const payload = await res.json().catch(() => ({}));
-    const items = Array.isArray(payload?.items) ? payload.items : [];
-    state.localDrafts = items.map((item) => ({
-      id: item.id,
-      title: item.title || "Untitled Matter",
-      practiceArea: item.practiceArea || "",
-      details: item.description || "",
-      state: item.state || "",
-      status: "draft",
-      createdAt: item.createdAt || item.updatedAt || new Date().toISOString(),
-      updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
-      localDraft: true,
-    }));
-  } catch (err) {
-    console.warn("Unable to load drafts", err);
-    state.localDrafts = [];
+    await read();
+    if (!departed && state.casesViewFilter === view && dashboardViewState.currentView === 'cases') {
+      const pagination = control.matches('[data-page-action]') && currentMatterInventory?.state.result;
+      const target = pagination && !control.disabled ? control : pagination && document.querySelector(`[data-case-pagination="${view}"] [data-page-action]:not(:disabled)`) || document.querySelector(currentMatterInventory?.state.result ? `[data-matters-refresh="${view}"]` : '[data-matters-retry]');
+      if (target?.getClientRects().length) target.focus();
+    }
+  } finally { document.removeEventListener('focusin', track); document.removeEventListener('pointerdown', track); }
+}
+
+function renderCurrentMatterInventory(body, view) {
+  const inventory = currentMatterInventory?.state;
+  const loading = !inventory || ['idle', 'loading'].includes(inventory.phase);
+  body.setAttribute('aria-busy', String(loading));
+  const refresh = document.querySelector(`[data-matters-refresh="${view}"]`);
+  if (refresh) { refresh.disabled = loading; refresh.hidden = !inventory?.result; }
+  if (!inventory?.result) {
+    body.innerHTML = `<tr><td colspan="3" class="empty-row"><div role="status">${loading ? 'Loading matters…' : 'Matters couldn’t be loaded.'}</div>${loading ? '' : '<button type="button" class="matter-primary-action" data-matters-retry>Retry matters</button>'}</td></tr>`;
+    updateCasesPagination(view, 0); return;
   }
+  const {items, total, page, pages} = inventory.result;
+  if (page > pages) {
+    body.innerHTML = '<tr><td colspan="3" class="empty-row"><div role="status">This page is no longer available. Your matters may have changed.</div><button type="button" class="matter-primary-action" data-matters-last-page>Go to the last page</button></td></tr>';
+    updateCasesPagination(view, 0); return;
+  }
+  if (state.casesPage[view] !== page - 1) { state.casesPage[view] = page - 1; writeMatterFilterStateToUrl(); }
+  const filtered = Boolean(state.casesSearchTerm || state.matterPracticeFilter || state.matterDeadlineFilter || state.matterUpdatedFilter || (view === 'archived' && state.archivedStatusFilter !== 'all'));
+  const message = filtered ? 'No matters match these filters. Reset filters to see more.' : view === 'inquiries' ? 'No applications to review.' : 'No matters in this category yet.';
+  body.innerHTML = items.length ? items.map(item => renderCaseRow(item, view)).join('') : `<tr><td colspan="3" class="empty-row"><div role="status">${message}</div></td></tr>`;
+  const target = currentMatterTargetId();
+  if (target && !items.some(item => String(parseCaseId(item)) === target)) body.insertAdjacentHTML('afterbegin', '<tr><td colspan="3" class="empty-row"><div role="status">The linked Matter isn’t in this view.</div></td></tr>');
+  updateCasesPagination(view, total);
+  maybeHighlightArchivedCase();
+}
+
+function currentDraftFilters() {
+  return {
+    view: 'draft', search: state.casesSearchTerm, practice: state.matterPracticeFilter,
+    deadline: state.matterDeadlineFilter, updated: state.matterUpdatedFilter,
+    sort: state.matterSort, archiveStatus: 'all', page: (state.casesPage.draft || 0) + 1, targetId: '',
+  };
+}
+
+function currentDraftEditorHref(draftId, retained = false) {
+  const returnTo = safeCurrentMatterReturn(`/dashboard-attorney.html${window.location.search}#cases:draft`) || '/dashboard-attorney.html#cases:draft';
+  return `create-case.html?${new URLSearchParams({ [retained ? 'caseDraftId' : 'draftId']: draftId, returnTo })}#description`;
+}
+
+async function refreshDraftInventoryFrom(control) {
+  let departed = false;
+  const track = event => { if (event.target !== control && event.target !== document.body) departed = true; };
+  document.addEventListener('focusin', track);
+  document.addEventListener('pointerdown', track);
+  try {
+    await loadCaseDrafts({ force: true });
+    if (!departed && state.casesViewFilter === 'draft' && dashboardViewState.currentView === 'cases') {
+      const target = document.querySelector(currentDraftInventory?.state.result ? '[data-drafts-refresh]' : '[data-drafts-retry]');
+      if (target?.getClientRects().length) target.focus();
+    }
+  } finally {
+    document.removeEventListener('focusin', track);
+    document.removeEventListener('pointerdown', track);
+  }
+}
+
+function loadCaseDrafts(options) {
+  if (!currentDraftInventory) currentDraftInventory = createCurrentDraftInventory({
+    ownerId: String(state.user?.id || state.user?._id || ''),
+    read: (filters, options) => caseNoteApi.readMatterInventory(filters, options),
+    verifyOwner: verifyCaseNoteOwner,
+    onChange: (value) => {
+      state.localDrafts = value.result?.items.filter(item => item.localDraft) || [];
+      buildCaseLookup();
+      queueMicrotask(() => {
+        populateMatterPracticeFilter(document.querySelector('[data-matter-practice-filter]'));
+        updateCurrentMatterCounts();
+        const body = document.querySelector('[data-table-body="draft"]');
+        const focused = document.activeElement;
+        const focusedCase = body?.contains(focused) ? focused?.closest?.('[data-case-id]')?.dataset.caseId : '';
+        if (body) renderDraftInventory(body);
+        if (focusedCase && !focused.isConnected && state.casesViewFilter === 'draft' && dashboardViewState.currentView === 'cases') focusApplicationParent(focusedCase);
+        pruneDraftSelection();
+      });
+    },
+  });
+  return currentDraftInventory.load(currentDraftFilters(), options);
+}
+
+function renderDraftInventory(body) {
+  const inventory = currentDraftInventory?.state;
+  const loading = !inventory || inventory.phase === 'loading' || inventory.phase === 'idle';
+  body.setAttribute('aria-busy', String(loading));
+  const refresh = document.querySelector('[data-drafts-refresh]');
+  if (refresh) { refresh.disabled = loading; refresh.hidden = !inventory?.result; }
+  if (!inventory?.result) {
+    body.innerHTML = `<tr><td colspan="3" class="empty-row"><div role="status">${loading ? 'Loading drafts…' : 'Drafts couldn’t be loaded.'}</div>${loading ? '' : '<button type="button" class="matter-primary-action" data-drafts-retry>Retry drafts</button>'}</td></tr>`;
+    updateCasesPagination('draft', 0);
+    return;
+  }
+  const { items, total, page, pages } = inventory.result;
+  if (page > pages) {
+    body.innerHTML = '<tr><td colspan="3" class="empty-row"><div role="status">This page is no longer available. Your drafts may have changed.</div><button type="button" class="matter-primary-action" data-drafts-last-page>Go to the last page</button></td></tr>';
+    updateCasesPagination('draft', 0);
+    return;
+  }
+  const filtered = Boolean(state.casesSearchTerm || state.matterPracticeFilter || state.matterDeadlineFilter || state.matterUpdatedFilter);
+  body.innerHTML = items.length ? items.map(item => renderCaseRow(item, 'draft')).join('') : `<tr><td colspan="3" class="empty-row"><div role="status">${filtered ? 'No drafts match these filters. Reset filters to see more.' : 'No unfinished drafts.'}</div></td></tr>`;
+  updateCasesPagination('draft', total);
 }
 
 function readLocalDrafts() {
   return Array.isArray(state.localDrafts) ? state.localDrafts : [];
 }
 
-async function removeLocalDraft(draftId) {
+const pendingDraftDeletions = new Set();
+async function removeLocalDraft(draftId, { skipConfirm = false } = {}) {
   if (!draftId) return;
-  const res = await secureFetch(`/api/case-drafts/${encodeURIComponent(draftId)}`, {
-    method: "DELETE",
-    headers: { Accept: "application/json" },
-    noRedirect: true,
-  });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(payload?.error || "Unable to delete draft.");
-  }
-  state.localDrafts = readLocalDrafts().filter((item) => String(item.id) !== String(draftId));
+  const key = String(draftId), ownerId = String(state.user?.id || state.user?._id || "");
+  if (pendingDraftDeletions.has(key)) throw new Error("Deletion is already being checked for this draft.");
+  pendingDraftDeletions.add(key);
+  try {
+    const draft = readLocalDrafts().find((item) => String(item.id) === key);
+    if (!skipConfirm && !await confirmAction(`Permanently remove “${draft?.title || "Untitled draft"}”? This cannot be undone.`, {
+      title: "Delete this draft?", confirmLabel: "Delete draft", tone: "danger",
+    })) return;
+    const revision = draft?.revision;
+    if (!/^[a-f0-9]{64}$/.test(revision || "")) throw new Error("Refresh your drafts before deleting this draft.");
+    if (!ownerId || await verifyCaseNoteOwner() !== ownerId) throw new Error("Your account changed. Reload Matters before continuing.");
+    let res, payload;
+    try {
+      res = await secureFetch(`/api/case-drafts/${encodeURIComponent(draftId)}`, {
+        method: "DELETE", body: { revision, expectedOwnerId: ownerId }, headers: { Accept: "application/json" }, noRedirect: true,
+      });
+      payload = await res.json().catch(() => null);
+    } catch { throw new Error("Draft deletion was not confirmed. Reload Matters to check before trying again."); }
+    if (!res.ok || payload?.success !== true) throw new Error(!res.ok && typeof payload?.error === "string" ? payload.error : "Draft deletion was not confirmed. Reload Matters to check before trying again.");
+    if (await verifyCaseNoteOwner() !== ownerId) throw new Error("Your account changed. Reload Matters before continuing.");
+    await loadCaseDrafts({ force: true });
+  } catch (error) {
+    if (error?.message === "account_changed") throw new Error("Your account changed. Reload Matters before continuing.");
+    throw error;
+  } finally { pendingDraftDeletions.delete(key); }
 }
 
 function pruneDraftSelection() {
@@ -4612,108 +4343,191 @@ function syncArchivedBulkUI() {
   }
 }
 
-function hasDeliverables(item) {
-  return (
-    (Array.isArray(item.downloadUrl) && item.downloadUrl.length > 0) ||
-    (Array.isArray(item.files) && item.files.length > 0)
-  );
-}
-
-function canEditCaseNotes() {
-  const role = String(state.user?.role || "").toLowerCase();
-  return role === "attorney" || role === "admin";
-}
-
 let caseNoteModalRef = null;
-let caseNoteTextarea = null;
-let caseNoteSaveBtn = null;
-let caseNoteCancelBtn = null;
-let caseNoteTargetId = null;
-let caseNoteSaving = false;
+let caseNoteHost = null;
+let caseNoteController = null;
+let caseNoteOwnerId = "";
+let caseNoteEpoch = 0;
+let caseNoteApplicationId = "";
+let caseNoteEngagementReturn = null;
+const caseNoteState = createPrivateState();
+const caseNoteApi = createApiClient({ onAuthenticationLost: () => clearCaseNoteAccess() });
 
+function clearCaseNoteAccess() {
+  legacyHome?.clear();
+  applicationsCache = [];
+  applicationRefreshInputs.clear();
+  applicantAutoRefreshEpoch++; window.clearTimeout(applicantAutoRefreshTimer); applicantAutoRefreshTimer = null;
+  currentDraftInventory?.clear();
+  currentMatterInventory?.clear();
+  applicationsReadEpoch += 1; applicationParentController?.abort(); applicationParentController = null; applicationParentPromise = null;
+  document.querySelector("[data-cases-wrapper]")?.removeAttribute("aria-busy"); setApplicationParentStatus();
+  matterSavedViews?.clear();
+  caseNoteState.clear(); caseNoteApi.clear(); caseNoteOwnerId = ""; closeCaseNoteModal(false); closeCaseInvitesModal();
+  [state.cases, state.casesArchived, [...state.caseLookup.values()]].forEach((items) => items.forEach((item) => { delete item.internalNotes; }));
+}
+async function verifyCaseNoteOwner() {
+  const expected = String(state.user?.id || state.user?._id || "");
+  try {
+    const session = classifySession(await caseNoteApi.get("/api/auth/me"));
+    if (session.state !== "ready" || session.identity.id !== expected || (caseNoteOwnerId && caseNoteOwnerId !== expected)) throw new Error("account_changed");
+    caseNoteOwnerId = expected;
+    return expected;
+  } catch (error) { clearCaseNoteAccess(); throw error; }
+}
 function setupCaseNoteModal() {
+  if (caseNoteHost) return;
   caseNoteModalRef = document.getElementById("caseNoteModal");
   if (!caseNoteModalRef) return;
-  caseNoteTextarea = document.getElementById("caseNoteTextarea") || caseNoteModalRef.querySelector("textarea");
-  caseNoteSaveBtn = caseNoteModalRef.querySelector("[data-note-save]");
-  caseNoteCancelBtn = caseNoteModalRef.querySelector("[data-note-cancel]");
-  caseNoteCancelBtn?.addEventListener("click", closeCaseNoteModal);
-  caseNoteModalRef.addEventListener("click", (event) => {
-    if (event.target === caseNoteModalRef) {
-      closeCaseNoteModal();
-    }
-  });
-  caseNoteSaveBtn?.addEventListener("click", async () => {
-    if (!caseNoteTargetId || caseNoteSaving) return;
-    const note = caseNoteTextarea?.value?.trim() || "";
-    await persistCaseNote(caseNoteTargetId, note);
-  });
+  caseNoteHost = caseNoteModalRef.querySelector("[data-case-note-host]");
+  caseNoteModalRef.querySelector("[data-note-cancel]")?.addEventListener("click", closeCaseNoteModal);
+  caseNoteModalRef.addEventListener("click", (event) => { if (event.target === caseNoteModalRef) closeCaseNoteModal(); });
+  const checkIdentity = (value) => {
+    if (!caseNoteOwnerId) return;
+    try { const user = typeof value === "string" ? JSON.parse(value) : value; if (String(user?.id || user?._id || "") !== caseNoteOwnerId || user?.role !== "attorney") clearCaseNoteAccess(); }
+    catch { clearCaseNoteAccess(); }
+  };
+  window.addEventListener("storage", (event) => { if (event.key === "lpc_user") checkIdentity(event.newValue); });
+  window.addEventListener("lpc:user-updated", (event) => checkIdentity(event.detail));
+  const verify = () => { if (caseNoteOwnerId && document.visibilityState === "visible") void verifyCaseNoteOwner().catch(() => { /* Verification already cleared confidential notes and closed the editor. */ }); };
+  window.addEventListener("focus", verify);
+  document.addEventListener("visibilitychange", verify);
+  window.setInterval(verify, 60000);
+  window.addEventListener("beforeunload", (event) => { if (caseNoteState.hasUnsaved()) { event.preventDefault(); event.returnValue = ""; } });
+  window.addEventListener("pagehide", clearCaseNoteAccess);
 }
-
-function closeCaseNoteModal() {
+function focusApplicationParent(caseId) {
+  const candidates = [
+    ...(caseId ? document.querySelectorAll(`.case-actions[data-case-id="${caseId}"] [data-case-menu-trigger]`) : []),
+    document.querySelector(`[data-case-filter="${state.casesViewFilter}"]`),
+    document.querySelector('[data-cases-search]'),
+  ];
+  candidates.find(control => control?.isConnected && control.getClientRects().length && !control.closest('[inert]'))?.focus();
+}
+function closeCaseNoteModal(restoreFocus = true) {
+  const engagementReturn = caseNoteEngagementReturn; caseNoteEngagementReturn = null;
+  const returnCaseId = caseNoteApplicationId, wasOpen = caseNoteModalRef && !caseNoteModalRef.classList.contains("hidden");
+  caseNoteApplicationId = "";
+  caseNoteEpoch += 1; caseNoteController?.abort(); caseNoteController = null;
+  caseNoteHost?.replaceChildren();
   if (caseNoteModalRef) {
-    caseNoteModalRef.classList.add("hidden");
-    caseNoteModalRef.removeAttribute("aria-busy");
-  }
-  caseNoteTargetId = null;
-}
-
-async function openCaseNoteModal(caseId) {
-  if (!caseId || !caseNoteModalRef) return;
-  caseNoteTargetId = caseId;
-  caseNoteModalRef.classList.remove("hidden");
-  caseNoteModalRef.removeAttribute("aria-hidden");
-  if (caseNoteTextarea) {
-    caseNoteTextarea.value = "";
-    caseNoteTextarea.focus();
-  }
-  try {
-    const payload = await fetchCaseNote(caseId);
-    if (caseNoteTextarea && payload?.note) {
-      caseNoteTextarea.value = payload.note;
+    caseNoteModalRef.classList.add("hidden"); caseNoteModalRef.setAttribute("aria-hidden", "true"); caseNoteModalRef.setAttribute("inert", "");
+    deactivateDialogFocus(caseNoteModalRef, { restoreFocus: restoreFocus !== false && !returnCaseId }); caseNoteModalRef.removeAttribute("aria-busy");
+    if (wasOpen && returnCaseId && restoreFocus !== false) {
+      const selector = engagementReturn?.mode === "preengagement" ? '[data-preengagement-review-action]' : '[data-hire-paralegal]';
+      const control = engagementReturn && document.querySelector(`[data-applicants-drawer][data-case-id="${returnCaseId}"] ${selector}[data-paralegal-id="${engagementReturn.applicantId}"]`);
+      if (control?.isConnected && control.getClientRects().length && !control.closest('[inert]')) control.focus(); else focusApplicationParent(returnCaseId);
     }
-  } catch (err) {
-    notifyCases(err?.message || "Unable to load notes.", "error");
   }
+  if (homeAttentionRefreshDeferred) { homeAttentionRefreshDeferred = false; renderNeedsAttentionQueue(); }
 }
-
-async function fetchCaseNote(caseId) {
-  const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/notes`, {
-    headers: { Accept: "application/json" },
-    noRedirect: true,
-  });
-  if (!res.ok) throw new Error("Unable to load notes.");
-  return res.json();
+function flushApplicationParentStatus() {
+  if (applicationRefreshInputs.size || !pendingApplicationParentStatus) return;
+  const { message, retryOwnerId, caseId } = pendingApplicationParentStatus;
+  setApplicationParentStatus(message, retryOwnerId, caseId);
+  repositionOpenCaseMenu();
 }
-
-async function persistCaseNote(caseId, note) {
-  caseNoteSaving = true;
-  if (caseNoteSaveBtn) {
-    caseNoteSaveBtn.disabled = true;
-    caseNoteSaveBtn.textContent = "Saving…";
+function setApplicationParentStatus(message = "", retryOwnerId = "", caseId = "") {
+  // This status sits above the Matter rows. Changing its height while targeting
+  // a menu or pressing a control moves it before the native click finishes.
+  if (applicationRefreshInputs.size) {
+    pendingApplicationParentStatus = { message, retryOwnerId, caseId };
+    return;
   }
+  pendingApplicationParentStatus = null;
+  const summary = document.querySelector('[data-application-parent-status]');
+  if (!summary) return;
+  summary.hidden = !message;
+  if (!message) { summary.replaceChildren(); return; }
+  let label = summary.querySelector('[data-application-parent-message]');
+  if (!label) { label = document.createElement('span'); label.dataset.applicationParentMessage = ''; summary.append(label); }
+  label.textContent = message;
+  let retry = summary.querySelector('button');
+  if (retryOwnerId) {
+    if (!retry) {
+      retry = document.createElement('button'); retry.type = 'button'; retry.className = 'matter-filter-reset'; retry.textContent = 'Retry';
+      retry.addEventListener('click', () => { retry.focus(); void refreshApplicationParent(retry.dataset.ownerId, retry.dataset.caseId); });
+      summary.append(document.createTextNode(' '), retry);
+    }
+    retry.dataset.ownerId = retryOwnerId; retry.dataset.caseId = caseId; retry.disabled = false;
+  } else if (retry) retry.disabled = true;
+}
+function refreshApplicationParent(ownerId, caseId = "", { refreshInventory = true } = {}) {
+  applicationParentController?.abort();
+  const controller = new AbortController(), ticket = ++applicationsReadEpoch;
+  applicationParentController = controller; applicationsPromise = null;
+  const retryFocused = !!document.activeElement?.closest?.("[data-application-parent-status]");
+  const wrapper = document.querySelector("[data-cases-wrapper]"); wrapper?.setAttribute("aria-busy", "true");
+  setApplicationParentStatus("Updating applications…");
+  const pending = (async () => {
   try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/notes`, {
-      method: "PUT",
-      headers: { Accept: "application/json" },
-      body: { note },
-    });
-    if (!res.ok) throw new Error("Unable to save note.");
-    const payload = await res.json();
-    applyNoteToState(caseId, payload);
-    renderCasesView();
-    closeCaseNoteModal();
-    notifyCases("Note updated.", "success");
-  } catch (err) {
-    console.warn("Note save failed", err);
-    notifyCases(err?.message || "Unable to save note.", "error");
+    const options = { ownerId, signal: controller.signal };
+    const [apps, updatedMatter] = await Promise.all([caseNoteApi.readReceivedApplications(options), caseId ? caseNoteApi.readWorkspaceMatter(caseId, options) : null]);
+    if (controller.signal.aborted || ticket !== applicationsReadEpoch || caseNoteOwnerId !== ownerId) return;
+    if (!Array.isArray(apps) || apps.some(app => !app || typeof app !== 'object' || !['submitted', 'viewed', 'shortlisted'].includes(app.status))) throw new Error('invalid_applications');
+    if (caseId) {
+      if (String(updatedMatter?._id || updatedMatter?.id || "") !== caseId || ![updatedMatter.attorney, updatedMatter.attorneyId].some(value => String(value?._id || value?.id || value || "") === ownerId) || typeof updatedMatter.status !== 'string') throw new Error('invalid_matter');
+      for (const collection of [state.cases, state.casesArchived]) {
+        const index = collection.findIndex(item => String(item._id || item.id) === caseId);
+        if (index >= 0) collection[index] = updatedMatter;
+      }
+      buildCaseLookup(); applicantDrawerCache.delete(caseId);
+    }
+    applicationsCache = apps;
+    if (refreshInventory) await loadCurrentMatters({ force: true });
+    if (controller.signal.aborted || ticket !== applicationsReadEpoch || caseNoteOwnerId !== ownerId) return;
+    applyApplicationsToCases(apps);
+    if (caseId) renderCasesView();
+    void legacyHome?.refresh(["applications", "inventory"]);
+    setApplicationParentStatus();
+    if (retryFocused && document.activeElement === document.body) focusApplicationParent();
+    return apps;
+  } catch (error) {
+    if (!controller.signal.aborted && ticket === applicationsReadEpoch && caseNoteOwnerId === ownerId) {
+      setApplicationParentStatus(caseId ? 'Matter and applications could not be refreshed.' : 'Applications could not be refreshed.', ownerId, caseId);
+      if (retryFocused && document.activeElement === document.body) document.querySelector('[data-application-parent-status] button')?.focus();
+    }
   } finally {
-    caseNoteSaving = false;
-    if (caseNoteSaveBtn) {
-      caseNoteSaveBtn.disabled = false;
-      caseNoteSaveBtn.textContent = "Save Note";
+    if (applicationParentController === controller) {
+      applicationParentController = null; applicationParentPromise = null; wrapper?.removeAttribute("aria-busy");
+      if ((pendingApplicationParentStatus?.message ?? document.querySelector("[data-application-parent-status]")?.textContent) === "Updating applications…") setApplicationParentStatus();
     }
   }
+  return null;
+  })();
+  applicationParentPromise = pending;
+  return pending;
+}
+
+async function openCaseNoteModal(caseId, mode = "notes", exportIds = null, applicantId = "") {
+  if (!caseNoteHost) setupCaseNoteModal();
+  if (!/^[a-f0-9]{24}$/i.test(caseId || "") || !caseNoteHost) return;
+  closeCaseNoteModal(false); const ticket = caseNoteEpoch;
+  const engagement = ["hiring", "preengagement"].includes(mode);
+  if (engagement && !/^[a-f0-9]{24}$/i.test(applicantId)) return;
+  caseNoteApplicationId = mode === "applications" || engagement ? caseId : "";
+  if (engagement) caseNoteEngagementReturn = { mode, applicantId };
+  caseNoteModalRef.classList.remove("hidden"); caseNoteModalRef.setAttribute("aria-hidden", "false"); caseNoteModalRef.removeAttribute("inert");
+  caseNoteModalRef.querySelector("#caseNoteModalTitle").textContent = mode === "hiring" ? "Review hire" : mode === "preengagement" ? "Review pre-engagement" : mode === "applications" ? "Review applications" : mode === "export" ? "Download Matter archive" : mode === "receipt" ? "Receipt" : mode === "downloads" ? "Files for download" : mode === "archive" ? "Archive and restore" : mode === "review" ? "Review admin edit request" : "Edit Matter Note";
+  caseNoteModalRef.querySelector("#caseNoteModalTitle").setAttribute("aria-level", mode === "export" ? "1" : "3");
+  caseNoteHost.textContent = "Checking access to your Matter…";
+  activateDialogFocus(caseNoteModalRef, { initialFocus: caseNoteModalRef.querySelector("[data-note-cancel]"), onEscape: closeCaseNoteModal });
+  try {
+    const ownerId = await verifyCaseNoteOwner(); if (ticket !== caseNoteEpoch) return;
+    caseNoteController = new AbortController();
+    const options = { api: caseNoteApi, signal: caseNoteController.signal, ownerId, privateState: caseNoteState, current: true, autoReview: true };
+    let assignmentRefreshed = false;
+    const editor = mode === "hiring" ? createHiring(caseId, { applicantId }, { ...options, onRequirements: () => void openCaseNoteModal(caseId, "preengagement", null, applicantId), onReviewed: value => {
+      if (value.assigned && !assignmentRefreshed) { assignmentRefreshed = true; void refreshApplicationParent(ownerId, caseId); }
+    } }) : mode === "preengagement" ? createPreEngagement(caseId, { applicantId }, { ...options, onContinue: () => void openCaseNoteModal(caseId, "hiring", null, applicantId), onRecorded: () => { void refreshApplicationParent(ownerId, caseId); } }) : mode === "applications" ? createMatterApplications(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId, applicantId, current: true, privateState: caseNoteState, onDecisionRecorded: () => { void refreshApplicationParent(ownerId); } }) : mode === "export" ? (exportIds ? createMatterExportBatch(exportIds, { api: caseNoteApi, signal: caseNoteController.signal, ownerId }) : createMatterExport(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId })) : mode === "receipt" ? createMatterReceipt(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId, current: true, onTitleChange: title => { caseNoteModalRef.querySelector("#caseNoteModalTitle").textContent = title; } }) : mode === "downloads" ? createMatterDownloads(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId }) : mode === "archive" ? createMatterArchive(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId, privateState: caseNoteState, current: true, onNavigate: closeCaseNoteModal, onRecorded: async () => {
+      await Promise.all([loadCasesWithFiles(true), loadArchivedCases(true)]); renderCasesView();
+    } }) : mode === "review" ? createMatterModeration(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId, privateState: caseNoteState, current: true, openNotes: () => void openCaseNoteModal(caseId), onRecorded: () => {
+      void Promise.all([loadCasesWithFiles(true), loadArchivedCases(true)]).then(() => renderCasesView()).catch(error => console.warn("Matter refresh after review failed", error));
+    } }) : createMatterNotes(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId, privateState: caseNoteState, onSaved: (payload) => applyNoteToState(caseId, payload) });
+    caseNoteHost.replaceChildren(editor);
+    await editor.readiness;
+    if (ticket === caseNoteEpoch && !engagement) editor.querySelector("textarea:not(:disabled)")?.focus();
+  } catch { notifyCases("Matter controls are unavailable until your sign-in is verified.", "error"); }
 }
 
 function applyNoteToState(caseId, payload) {
@@ -4741,40 +4555,6 @@ let casePreviewFields = null;
 let casePreviewTargetId = null;
 let casePreviewSetup = false;
 let casePreviewFromQueryHandled = false;
-const CASE_EDIT_PREFILL_KEY = "lpc_case_edit_prefill";
-
-function cacheCaseEditPrefill(caseId, payload = {}) {
-  if (!caseId) return;
-  try {
-    sessionStorage.setItem(CASE_EDIT_PREFILL_KEY, JSON.stringify({ caseId: String(caseId), payload }));
-  } catch {}
-}
-
-function buildCaseEditPrefill(entry = {}) {
-  const summary = String(entry.briefSummary || "");
-  const experience = extractSummaryValue(summary, "Experience") || entry.experience || "Not specified";
-  const location =
-    entry.locationState || entry.state || extractSummaryValue(summary, "State") || "";
-  const rawDetails = String(entry.details || entry.description || "").trim();
-  const practiceArea = titleCaseWords(entry.practiceArea || entry.field || "");
-  const tasks = Array.isArray(entry.tasks) ? entry.tasks : [];
-  const taskTitles = tasks
-    .map((task) => (typeof task === "string" ? task : task?.title))
-    .map((title) => String(title || "").trim())
-    .filter(Boolean);
-
-  return {
-    title: entry.title || "",
-    practiceArea,
-    state: location || entry.state || entry.locationState || "",
-    locationState: location || entry.locationState || entry.state || "",
-    totalAmount: entry.lockedTotalAmount ?? entry.totalAmount ?? 0,
-    deadline: entry.deadline || null,
-    experience,
-    details: rawDetails,
-    tasks: taskTitles.map((title) => ({ title })),
-  };
-}
 
 function canEditCaseEntry(entry) {
   if (!entry) return false;
@@ -4815,12 +4595,6 @@ function setupCasePreviewModal() {
     btn.addEventListener("click", () => {
       const caseId = casePreviewTargetId || casePreviewModalRef?.dataset?.caseId;
       if (!caseId) return;
-      const payload = casePreviewModalRef?.dataset?.editPayload
-        ? JSON.parse(casePreviewModalRef.dataset.editPayload)
-        : null;
-      if (payload) {
-        cacheCaseEditPrefill(caseId, payload);
-      }
       window.location.href = `create-case.html?caseId=${encodeURIComponent(caseId)}#details`;
     });
   });
@@ -4839,6 +4613,9 @@ function setupCasePreviewModal() {
 function closeCasePreviewModal() {
   if (casePreviewModalRef) {
     casePreviewModalRef.classList.add("hidden");
+    casePreviewModalRef.setAttribute("aria-hidden", "true");
+    casePreviewModalRef.setAttribute("inert", "");
+    deactivateDialogFocus(casePreviewModalRef);
     casePreviewModalRef.removeAttribute("aria-busy");
   }
   if (casePreviewFields?.receipt) {
@@ -4848,7 +4625,6 @@ function closeCasePreviewModal() {
   casePreviewTargetId = null;
   if (casePreviewModalRef) {
     delete casePreviewModalRef.dataset.caseId;
-    delete casePreviewModalRef.dataset.editPayload;
   }
 }
 
@@ -4860,12 +4636,7 @@ function getCasePreviewQueryId() {
   } catch {
     /* ignore */
   }
-  try {
-    const stored = sessionStorage.getItem(CASE_PREVIEW_STORAGE_KEY);
-    return stored || null;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 function clearCasePreviewQuery() {
@@ -4876,32 +4647,7 @@ function clearCasePreviewQuery() {
       window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
     }
   } catch {}
-  try {
-    sessionStorage.removeItem(CASE_PREVIEW_STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
   casePreviewFromQueryHandled = false;
-}
-
-function getCasePreviewReceipt(caseId) {
-  try {
-    const raw = sessionStorage.getItem(CASE_PREVIEW_RECEIPT_KEY);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
-    if (!payload || String(payload.caseId) !== String(caseId)) return null;
-    return String(payload.receiptUrl || "").trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-function clearCasePreviewReceipt() {
-  try {
-    sessionStorage.removeItem(CASE_PREVIEW_RECEIPT_KEY);
-  } catch {
-    /* ignore */
-  }
 }
 
 function extractSummaryValue(summary, label) {
@@ -4926,6 +4672,8 @@ function titleCaseWords(value) {
 let caseInvitesModalRef = null;
 let caseInvitesListRef = null;
 let caseInvitesSetup = false;
+let caseInvitesController = null;
+let caseInvitesEpoch = 0;
 
 function setupCaseInvitesModal() {
   if (caseInvitesSetup) return;
@@ -4949,8 +4697,13 @@ function setupCaseInvitesModal() {
 }
 
 function closeCaseInvitesModal() {
+  caseInvitesEpoch += 1; caseInvitesController?.abort(); caseInvitesController = null;
+  caseInvitesListRef?.replaceChildren();
   if (caseInvitesModalRef) {
     caseInvitesModalRef.classList.add("hidden");
+    caseInvitesModalRef.setAttribute("aria-hidden", "true");
+    caseInvitesModalRef.setAttribute("inert", "");
+    deactivateDialogFocus(caseInvitesModalRef);
     caseInvitesModalRef.removeAttribute("aria-busy");
   }
 }
@@ -4980,8 +4733,8 @@ function getApplicantContextFromQuery() {
   const openApplicant = params.get("openApplicant") === "1";
   const continueHire = params.get("continueHire") === "1";
   if (!returnFromProfile && !openApplicant) return null;
-  if (!caseId || !applicantId) return null;
-  return { caseId, applicantId, continueHire };
+  if (!/^[a-f0-9]{24}$/i.test(caseId) || !/^[a-f0-9]{24}$/i.test(applicantId)) return null;
+  return { caseId, applicantId, continueHire, applicationHistory: params.get("applicationHistory") === "1" };
 }
 
 function getApplicantReturnContext() {
@@ -5007,6 +4760,7 @@ function clearApplicantReturnQuery() {
     url.searchParams.delete("returnFromProfile");
     url.searchParams.delete("openApplicant");
     url.searchParams.delete("continueHire");
+    url.searchParams.delete("applicationHistory");
     const nextQuery = url.searchParams.toString();
     const nextUrl = `${url.pathname}${nextQuery ? `?${nextQuery}` : ""}${url.hash}`;
     window.history.replaceState({}, "", nextUrl);
@@ -5017,20 +4771,35 @@ async function openApplicantFromQuery({ setFilter = true } = {}) {
   if (applicantReturnOpening) return;
   const context = getApplicantReturnContext();
   if (!context) return;
-  const { caseId, applicantId, continueHire } = context;
+  const { caseId, applicantId, continueHire, applicationHistory } = context;
   applicantReturnContext = context;
+  if (applicationHistory) {
+    applicantReturnOpening = true;
+    try {
+      await openCaseNoteModal(caseId, "applications", null, applicantId);
+      applicantReturnResolved = true;
+      clearApplicantReturnQuery();
+    } finally { applicantReturnOpening = false; }
+    return;
+  }
   if (setFilter) {
     setCaseFilter("inquiries", { render: false });
   }
   const toggleBtn = document.querySelector(`[data-applicants-toggle][data-case-id="${caseId}"]`);
-  if (!toggleBtn) return;
+  if (!toggleBtn) {
+    if (continueHire) {
+      clearApplicantReturnQuery(); applicantReturnContext = { caseId, applicantId, continueHire: false }; applicantReturnResolved = true;
+      await handleHireFromApplications({ caseId, paralegalId: applicantId });
+    }
+    return;
+  }
   const drawerRow = getDrawerRow(caseId, toggleBtn);
   const drawerEl = getDrawerElement(caseId, toggleBtn);
   if (!drawerEl) return;
-  const applicants = (applicantDrawerCache.get(caseId) || []).filter(
-    (entry) => !["accepted", "rejected"].includes(entry.status)
+  let applicants = (applicantDrawerCache.get(caseId) || []).filter(
+    (entry) => !["accepted", "rejected", "withdrawn"].includes(entry.status)
   );
-  const targetIndex = applicants.findIndex((applicant) => String(applicant.paralegalId) === String(applicantId));
+  let targetIndex = applicants.findIndex((applicant) => String(applicant.paralegalId) === String(applicantId));
   const activeRow =
     targetIndex >= 0
       ? drawerEl.querySelector(`[data-applicant-row][data-applicant-index="${targetIndex}"].is-active`)
@@ -5042,7 +4811,7 @@ async function openApplicantFromQuery({ setFilter = true } = {}) {
     !drawerRow.classList.contains("hidden") &&
     activeRow &&
     detail &&
-    !detail.classList.contains("hidden")
+    !detail.classList.contains("hidden") && !continueHire
   ) {
     return;
   }
@@ -5053,6 +4822,8 @@ async function openApplicantFromQuery({ setFilter = true } = {}) {
     } else if (!drawerEl.querySelector("[data-applicant-row]") && !drawerEl.querySelector(".empty-card")) {
       renderApplicantsInDrawer(caseId, applicantDrawerCache.get(caseId) || [], drawerEl);
     }
+    applicants = (applicantDrawerCache.get(caseId) || []).filter(entry => !["accepted", "rejected", "withdrawn"].includes(entry.status));
+    targetIndex = applicants.findIndex(entry => String(entry.paralegalId) === String(applicantId));
     if (drawerRow) {
       openApplicantsDrawer(drawerRow, toggleBtn, { skipAnimation: true });
     }
@@ -5066,7 +4837,7 @@ async function openApplicantFromQuery({ setFilter = true } = {}) {
     if (setFilter) {
       clearApplicantReturnQuery();
     }
-    if (continueHire && targetIndex >= 0) {
+    if (continueHire) {
       clearApplicantReturnQuery();
       applicantReturnContext = { caseId, applicantId, continueHire: false };
       const applicant = applicants[targetIndex] || null;
@@ -5090,6 +4861,7 @@ function restoreApplicantDrawerFromQuery() {
 }
 
 function maybeOpenApplicantFromQuery() {
+  if (currentMatterInventory?.state.phase !== 'ready') return;
   if (applicantReturnResolved) return;
   if (applicantReturnHandled) return;
   const context = getApplicantContextFromQuery();
@@ -5103,7 +4875,7 @@ function getApplicantsCaseContextFromQuery() {
   const params = new URLSearchParams(window.location.search);
   const openApplicants = params.get("openApplicants") === "1";
   const caseId = params.get("caseId") || "";
-  if (!openApplicants || !caseId) return null;
+  if (!openApplicants || !/^[a-f0-9]{24}$/i.test(caseId)) return null;
   return { caseId };
 }
 
@@ -5140,6 +4912,7 @@ async function openApplicantsForCase(caseId) {
 }
 
 function maybeOpenApplicantsCaseFromQuery() {
+  if (currentMatterInventory?.state.phase !== 'ready') return;
   if (applicantsCaseHandled) return;
   const context = getApplicantsCaseContextFromQuery();
   if (!context) return;
@@ -5149,24 +4922,6 @@ function maybeOpenApplicantsCaseFromQuery() {
   });
 }
 
-function formatInvitedDate(value) {
-  const formatted = formatCaseDate(value);
-  return formatted && formatted !== "—" ? `Invited ${formatted}` : "Invitation date unavailable";
-}
-
-function formatInviteStatus(value) {
-  const status = String(value || "").trim();
-  if (!status) return "";
-  return titleCaseWords(status.replace(/_/g, " "));
-}
-
-function getInviteDisplayName(profile = {}) {
-  const name =
-    profile.name ||
-    [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim();
-  return name || "Invited paralegal";
-}
-
 function getApplicantDisplayName(profile = {}, snapshot = {}) {
   const name =
     profile.name ||
@@ -5174,158 +4929,42 @@ function getApplicantDisplayName(profile = {}, snapshot = {}) {
   return name || snapshot.name || "Paralegal";
 }
 
-function formatAppliedDate(value) {
-  const formatted = formatCaseDate(value);
-  return formatted && formatted !== "—" ? `Applied ${formatted}` : "Applied recently";
-}
-
-function shouldFetchInviteDetails(invite = {}) {
-  const profile = invite.profile || {};
-  const hasName = Boolean(profile.name || profile.firstName || profile.lastName);
-  const hasAvatar = Boolean(profile.profileImage || profile.avatarURL);
-  return !hasName || !hasAvatar;
-}
-
-async function fetchInviteDetails(caseId) {
-  try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/invites`, {
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) return null;
-    const payload = await res.json().catch(() => ({}));
-    const invites = Array.isArray(payload?.invites) ? payload.invites : [];
-    return invites.map((invite) => ({
-      profile: invite?.paralegal || {},
-      id: invite?.paralegal?.id || invite?.paralegal?._id || "",
-      invitedAt: invite?.invitedAt || null,
-      respondedAt: invite?.respondedAt || null,
-      status: invite?.status || "",
-    }));
-  } catch {
-    return null;
-  }
-}
-
-function hydrateInviteEntry(entry, invitees = []) {
-  if (!entry || !Array.isArray(invitees)) return;
-  entry.invites = invitees
-    .filter((invite) => invite?.id)
-    .map((invite) => ({
-      paralegalId: invite.id,
-      status: invite.status || "pending",
-      invitedAt: invite.invitedAt || null,
-      respondedAt: invite.respondedAt || null,
-    }));
-}
-
 async function openCaseInvites(caseId) {
-  if (!caseId) return;
+  if (!/^[a-f0-9]{24}$/i.test(caseId || "")) return;
   if (dashboardViewState.currentView !== "cases") {
-    try {
-      window.location.hash = "cases";
-    } catch {}
+    window.location.hash = "cases";
     showDashboardView("cases", { skipHash: true });
   }
   setupCaseInvitesModal();
   if (!caseInvitesModalRef || !caseInvitesListRef) return;
+  closeCaseInvitesModal();
+  const ticket = ++caseInvitesEpoch;
+  const controller = new AbortController(); caseInvitesController = controller;
   caseInvitesModalRef.classList.remove("hidden");
-  caseInvitesModalRef.setAttribute("aria-busy", "true");
-  caseInvitesListRef.innerHTML = `<p class="muted">Loading invited paralegals…</p>`;
-
-  let entry = state.caseLookup.get(String(caseId));
-  if (!entry) {
-    await loadCasesWithFiles();
-    entry = state.caseLookup.get(String(caseId));
-  }
-  if (!entry) {
-    await loadArchivedCases();
-    entry = state.caseLookup.get(String(caseId));
-  }
-
-  let invitees = Array.isArray(entry?.invites)
-    ? entry.invites.map((invite) => ({
-        profile: invite?.profile || {},
-        id: invite?.paralegalId || "",
-        invitedAt: invite?.invitedAt || null,
-        respondedAt: invite?.respondedAt || null,
-        status: invite?.status || "pending",
-      }))
-    : [];
-  if (!invitees.length && (entry?.pendingParalegal || entry?.pendingParalegalId)) {
-    const pendingProfile =
-      entry.pendingParalegal && typeof entry.pendingParalegal === "object" ? entry.pendingParalegal : null;
-    const pendingId =
-      entry.pendingParalegalId ||
-      pendingProfile?.id ||
-      pendingProfile?._id ||
-      (typeof entry.pendingParalegal === "string" ? entry.pendingParalegal : "");
-    invitees.push({
-      profile: pendingProfile || {},
-      id: pendingId,
-      invitedAt: entry.pendingParalegalInvitedAt,
-      respondedAt: null,
-      status: "pending",
-    });
-  }
-
-  if (invitees.length && invitees.some(shouldFetchInviteDetails)) {
-    const fresh = await fetchInviteDetails(caseId);
-    if (Array.isArray(fresh) && fresh.length) {
-      invitees = fresh;
-      hydrateInviteEntry(entry, fresh);
-    }
-  }
-
-  if (!invitees.length) {
-    caseInvitesListRef.innerHTML = `<p class="muted">No invited paralegals yet.</p>`;
-    caseInvitesModalRef.removeAttribute("aria-busy");
-    return;
-  }
-
-  const itemsHtml = [];
-  for (const invite of invitees) {
-    const profile = invite.profile || {};
-    const id = invite.id || profile.id || profile._id || "";
-    const name = getInviteDisplayName(profile);
-    const avatar = profile.profileImage || profile.avatarURL || INVITE_AVATAR_FALLBACK;
-    const link = buildParalegalProfileUrl(id);
-    const statusLabel = formatInviteStatus(invite.status);
-    itemsHtml.push(`
-      <div class="case-invite-item">
-        <img src="${sanitize(avatar)}" alt="${sanitize(name)} profile photo" />
-        <div class="case-invite-meta">
-          ${sanitizeUrl(link) ? `<a href="${sanitize(sanitizeUrl(link))}">${sanitize(name)}</a>` : `<span>${sanitize(name)}</span>`}
-          <span class="case-invite-date">${sanitize(formatInvitedDate(invite.invitedAt))}</span>
-          ${statusLabel ? `<span class="case-invite-date">${sanitize(statusLabel)}</span>` : ""}
-        </div>
-      </div>
-    `);
-  }
-
-  caseInvitesListRef.innerHTML = itemsHtml.join("");
-  caseInvitesModalRef.removeAttribute("aria-busy");
-}
-
-function openCaseApplications(caseId) {
-  if (!caseId) return;
+  caseInvitesModalRef.setAttribute("aria-hidden", "false");
+  caseInvitesModalRef.removeAttribute("inert");
+  activateDialogFocus(caseInvitesModalRef, {
+    initialFocus: caseInvitesModalRef.querySelector("[data-case-invites-close]"),
+    onEscape: closeCaseInvitesModal,
+  });
+  caseInvitesListRef.textContent = "Loading invited paralegals…";
   try {
-    const url = new URL(window.location.href);
-    url.searchParams.set("openApplicants", "1");
-    url.searchParams.set("caseId", caseId);
-    const nextQuery = url.searchParams.toString();
-    const nextUrl = `${url.pathname}${nextQuery ? `?${nextQuery}` : ""}#cases:inquiries`;
-    window.history.replaceState({}, "", nextUrl);
-  } catch {}
-  if (window.location.hash !== "#cases:inquiries") {
-    window.location.hash = "cases:inquiries";
-  } else {
-    showDashboardView("cases", { skipHash: true, caseFilter: "inquiries" });
+    const ownerId = await verifyCaseNoteOwner();
+    if (controller.signal.aborted || ticket !== caseInvitesEpoch) return;
+    const panel = createMatterInvitations(caseId, { api: caseNoteApi, signal: controller.signal, ownerId, current: true });
+    caseInvitesListRef.replaceChildren(panel);
+    await panel.readiness;
+  } catch (error) {
+    if (!controller.signal.aborted && ticket === caseInvitesEpoch) caseInvitesListRef.textContent = "Invitations could not be loaded. Close this dialog and try again.";
   }
 }
+
+
 
 async function openCasePreview(caseId, options = {}) {
   if (!caseId) return;
   const keepView = Boolean(options.keepView);
+  const receiptUrl = normalizeHttpNavigationUrl(options.receiptUrl || "");
   if (!keepView && dashboardViewState.currentView !== "cases") {
     try {
       window.location.hash = "cases";
@@ -5337,6 +4976,12 @@ async function openCasePreview(caseId, options = {}) {
   casePreviewTargetId = String(caseId);
   if (casePreviewModalRef) casePreviewModalRef.dataset.caseId = casePreviewTargetId;
   casePreviewModalRef.classList.remove("hidden");
+  casePreviewModalRef.setAttribute("aria-hidden", "false");
+  casePreviewModalRef.removeAttribute("inert");
+  activateDialogFocus(casePreviewModalRef, {
+    initialFocus: casePreviewModalRef.querySelector("[data-case-preview-close]"),
+    onEscape: closeCasePreviewModal,
+  });
   casePreviewModalRef.setAttribute("aria-busy", "true");
 
   let entry = state.caseLookup.get(casePreviewTargetId);
@@ -5361,7 +5006,9 @@ async function openCasePreview(caseId, options = {}) {
           if (key) state.caseLookup.set(String(key), entry);
         }
       }
-    } catch {}
+    } catch (error) {
+      console.warn("[attorney] Matter preview fallback request rejected", error);
+    }
   }
   if (!entry) {
     if (casePreviewFields.title) casePreviewFields.title.textContent = "Matter Details";
@@ -5412,7 +5059,6 @@ async function openCasePreview(caseId, options = {}) {
       : `<p class="case-preview-empty">No tasks listed.</p>`;
   }
   if (casePreviewFields.receipt) {
-    const receiptUrl = getCasePreviewReceipt(casePreviewTargetId);
     if (receiptUrl) {
       casePreviewFields.receipt.href = receiptUrl;
       casePreviewFields.receipt.hidden = false;
@@ -5420,12 +5066,6 @@ async function openCasePreview(caseId, options = {}) {
       casePreviewFields.receipt.hidden = true;
       casePreviewFields.receipt.removeAttribute("href");
     }
-    clearCasePreviewReceipt();
-  }
-
-  const editPayload = buildCaseEditPrefill(entry);
-  if (casePreviewModalRef) {
-    casePreviewModalRef.dataset.editPayload = JSON.stringify(editPayload);
   }
 
   const editBtn = casePreviewModalRef?.querySelector("[data-case-preview-edit]");
@@ -5486,12 +5126,12 @@ function onCasesTableClick(event) {
   if (drawerClose) {
     const drawerRow = drawerClose.closest("[data-applicants-row]");
     if (drawerRow) {
-      drawerRow.classList.add("hidden");
       const caseId = drawerRow.getAttribute("data-case-id") || "";
       const toggleBtn = drawerRow
         .closest("tbody")
         ?.querySelector(`[data-applicants-toggle][data-case-id="${caseId}"]`);
-      if (toggleBtn) toggleBtn.setAttribute("aria-expanded", "false");
+      closeApplicantsDrawer(drawerRow, toggleBtn);
+      toggleBtn?.focus();
     }
     return;
   }
@@ -5627,10 +5267,14 @@ async function onDraftBulkAction(event) {
   if (!ids.length) return;
   try {
     if (action === "delete") {
-      const confirmed = window.confirm(`Delete ${ids.length} draft${ids.length === 1 ? "" : "s"}? This cannot be undone.`);
+      const confirmed = await confirmAction("This cannot be undone.", {
+        title: `Delete ${ids.length} draft${ids.length === 1 ? "" : "s"}?`,
+        confirmLabel: ids.length === 1 ? "Delete draft" : "Delete drafts",
+        tone: "danger",
+      });
       if (!confirmed) return;
       for (const id of ids) {
-        await removeLocalDraft(id);
+        await removeLocalDraft(id, { skipConfirm: true });
       }
       notifyCases("Drafts deleted.", "success");
     }
@@ -5650,20 +5294,19 @@ async function onArchivedBulkAction(event) {
   if (!ids.length) return;
   try {
     if (action === "download") {
-      ids.forEach((id) => {
-        window.open(`/api/cases/${encodeURIComponent(id)}/archive/download`, "_blank");
-      });
-      notifyCases("Download started for selected cases.", "success");
+      await openCaseNoteModal(ids[0], "export", ids);
     } else if (action === "delete") {
       const deletableIds = ids.filter((id) => canDeleteCase(getCaseEntryById(id)));
       if (deletableIds.length !== ids.length) {
         syncArchivedBulkUI();
-        notifyCases("Some selected cases can no longer be deleted.", "error");
+        notifyCases("Some selected Matters can no longer be deleted.", "error");
         return;
       }
-      const confirmed = window.confirm(
-        `Delete ${deletableIds.length} case${deletableIds.length === 1 ? "" : "s"}? This cannot be undone.`
-      );
+      const confirmed = await confirmAction("This permanently removes the selected Matter records and cannot be undone.", {
+        title: `Delete ${deletableIds.length} Matter${deletableIds.length === 1 ? "" : "s"}?`,
+        confirmLabel: deletableIds.length === 1 ? "Delete Matter" : "Delete Matters",
+        tone: "danger",
+      });
       if (!confirmed) return;
       for (const id of deletableIds) {
         await deleteArchivedCase(id, { skipConfirm: true, silent: true });
@@ -5685,8 +5328,8 @@ function positionCaseMenu(wrapper) {
   if (!trigger || !menu) return;
 
   const rect = trigger.getBoundingClientRect();
-  menu.style.minWidth = "180px";
-  menu.style.width = "180px";
+  menu.style.minWidth = "0";
+  menu.style.width = "min(18rem, calc(100vw - 16px))";
   menu.style.visibility = "hidden";
   menu.style.display = "block";
   menu.style.position = "fixed";
@@ -5749,10 +5392,11 @@ function resetCaseMenuStyles(wrapper) {
 }
 
 async function handleCaseAction(action, caseId) {
+  if (action === "application-review") { await openCaseNoteModal(caseId, "applications"); return; }
   if (!caseId) return;
   try {
     if (action === "resume-draft") {
-      window.location.href = `create-case.html?draftId=${encodeURIComponent(caseId)}#description`;
+      window.location.href = currentDraftEditorHref(caseId);
       return;
     } else if (action === "discard-draft") {
       await removeLocalDraft(caseId);
@@ -5762,6 +5406,7 @@ async function handleCaseAction(action, caseId) {
       await openCasePreview(caseId);
       return;
     } else if (action === "details") {
+      if (window.LPCContextPanel?.openMatter?.(caseId, { historyMode: "push" })) return;
       await openCasePreview(caseId);
     } else if (action === "open-case-detail") {
       const entry = state.caseLookup.get(String(caseId));
@@ -5777,7 +5422,7 @@ async function handleCaseAction(action, caseId) {
         return;
       }
       if (!isWorkspaceEligibleCase(entry)) {
-        notifyCases("Workspace unlocks after a paralegal is hired and the case is funded.", "info");
+        notifyCases("Workspace unlocks after a paralegal is hired and the Matter is funded.", "info");
         return;
       }
       window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
@@ -5791,10 +5436,6 @@ async function handleCaseAction(action, caseId) {
       }
       goToMessages(caseId);
     } else if (action === "edit-case") {
-      const entry = state.caseLookup.get(String(caseId));
-      if (entry) {
-        cacheCaseEditPrefill(caseId, buildCaseEditPrefill(entry));
-      }
       window.location.href = `create-case.html?caseId=${encodeURIComponent(caseId)}#details`;
       return;
     } else if (action === "status-history") {
@@ -5804,38 +5445,19 @@ async function handleCaseAction(action, caseId) {
       openCaseNoteModal(caseId);
       return;
     } else if (action === "flag-resolved") {
-      const confirmed = window.confirm(
-        "Mark this flagged post as resolved? This will notify admin to review and clear the flag if appropriate."
-      );
-      if (!confirmed) return;
-      const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/flags/mark-resolved`, {
-        method: "POST",
-        headers: { Accept: "application/json" },
-        body: {},
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(payload?.error || "Unable to mark this flag as resolved.");
-      }
-      await loadCasesWithFiles(true);
-      await loadArchivedCases(true);
-      renderCasesView();
-      notifyCases("Admin has been notified that this flag is resolved.", "success");
+      await openCaseNoteModal(caseId, "review");
       return;
     } else if (action === "download") {
-      await downloadCaseDeliverables(caseId);
+      await openCaseNoteModal(caseId, "downloads");
+      return;
     } else if (action === "download-receipt") {
-      window.open(`/api/payments/receipt/attorney/${encodeURIComponent(caseId)}`, "_blank");
+      await openCaseNoteModal(caseId, "receipt");
+      return;
     } else if (action === "download-archive") {
-      window.open(`/api/cases/${encodeURIComponent(caseId)}/archive/download`, "_blank");
-    } else if (action === "archive") {
-      await toggleCaseArchive(caseId, true);
-      renderCasesView();
-      notifyCases("Matter archived.");
-    } else if (action === "restore") {
-      await toggleCaseArchive(caseId, false);
-      renderCasesView();
-      notifyCases("Matter restored.");
+      await openCaseNoteModal(caseId, "export");
+    } else if (action === "archive" || action === "restore" || action === "archive-status") {
+      await openCaseNoteModal(caseId, "archive");
+      return;
     } else if (action === "delete-case") {
       const entry = getCaseEntryById(caseId);
       if (!canDeleteCase(entry)) {
@@ -5851,122 +5473,46 @@ async function handleCaseAction(action, caseId) {
   }
 }
 
-async function downloadCaseDeliverables(caseId) {
-  const entry = state.caseLookup.get(String(caseId));
-  if (!entry) throw new Error("Matter not found");
-  if (Array.isArray(entry.downloadUrl) && entry.downloadUrl.length) {
-    window.open(sanitizeDownloadPath(entry.downloadUrl[0]), "_blank");
-    return;
-  }
-  const file = Array.isArray(entry.files) ? entry.files[0] : null;
-  if (file?.key) {
-    const url = await getSignedUrl(caseId, file.key);
-    if (url) {
-      window.open(url, "_blank");
-      return;
-    }
-  }
-  throw new Error("No files available to download yet.");
-}
-
-async function toggleCaseArchive(caseId, archived) {
-  const archiveUrl = `/api/cases/${encodeURIComponent(caseId)}/archive`;
-  const caseUrl = `/api/cases/${encodeURIComponent(caseId)}`;
-  const entry = state.caseLookup.get(String(caseId));
-
-  if (archived && hasAssignedParalegal(entry)) {
-    throw new Error("Matters with a hired paralegal cannot be archived.");
-  }
-
-  // Ensure a valid status before unarchiving to avoid enum errors.
-  if (!archived) {
-    if (isFinalCase(entry)) {
-      throw new Error("Completed cases cannot be restored.");
-    }
-    try {
-      await secureFetch(caseUrl, {
-        method: "PATCH",
-        headers: { Accept: "application/json" },
-        body: { status: "open" },
-      });
-    } catch (err) {
-      console.warn("Pre-unarchive status normalization failed", err);
-    }
-  }
-
-  const attemptArchiveToggle = async (body) => {
-    const res = await secureFetch(archiveUrl, {
-      method: "PATCH",
-      body,
-      headers: { Accept: "application/json" },
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(payload.error || "Unable to update case.");
-    }
-    return payload;
-  };
-
-  try {
-    const payload = await attemptArchiveToggle(archived ? { archived } : { archived, status: "open" });
-    if (!archived && payload && !payload.status) payload.status = "open";
-    syncCaseCollections(payload);
-    return;
-  } catch (err) {
-    const message = String(err?.message || "").toLowerCase();
-    const draftError = message.includes("draft");
-    if (!archived && draftError) {
-      // Final fallback: direct case PATCH to clear archived flag with a safe status.
-      try {
-        const res = await secureFetch(caseUrl, {
-          method: "PATCH",
-          headers: { Accept: "application/json" },
-          body: { archived: false, status: "open" },
-        });
-        const payload = await res.json().catch(() => ({}));
-        if (res.ok) {
-          payload.status = payload.status || "open";
-          syncCaseCollections(payload);
-          return;
-        }
-      } catch (innerErr) {
-        console.warn("Direct unarchive fallback failed", innerErr);
-      }
-    }
-    throw err;
-  }
-}
-
+const pendingMatterDeletions = new Set();
 async function deleteArchivedCase(caseId, { skipConfirm = false, silent = false } = {}) {
   if (!caseId) return;
-  if (!skipConfirm) {
-    const confirmed = window.confirm("Permanently delete this case? This cannot be undone.");
-    if (!confirmed) return;
-  }
-  await ensureCaseOpenForDelete(caseId);
-  const attemptDelete = async () => {
-    const response = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, {
-      method: "DELETE",
-      headers: { Accept: "application/json" },
-    });
-    const payload =
-      response.status === 204
-        ? {}
-        : await response.json().catch(() => ({}));
-    return { response, payload };
-  };
-
-  let { response: res, payload } = await attemptDelete();
-  if (!res.ok) {
-    await loadArchivedCases(true);
-    await ensureCaseOpenForDelete(caseId, true);
-    ({ response: res, payload } = await attemptDelete());
-  }
-  if (!res.ok) {
-    throw new Error(payload.error || "Unable to delete case.");
-  }
-  removeCaseFromState(caseId);
-  if (!silent) notifyCases("Matter deleted.", "success");
+  const key = String(caseId), ownerId = String(state.user?.id || state.user?._id || "");
+  if (pendingMatterDeletions.has(key)) throw new Error("Deletion is already being checked for this Matter.");
+  pendingMatterDeletions.add(key);
+  try {
+    if (!skipConfirm) {
+      const title = getCaseEntryById(key)?.title || "Untitled Matter";
+      const confirmed = await confirmAction(`Permanently remove “${title}”? This cannot be undone.`, {
+        title: "Delete this Matter?", confirmLabel: "Delete Matter", tone: "danger",
+      });
+      if (!confirmed) return;
+    }
+    if (!ownerId || await verifyCaseNoteOwner() !== ownerId) throw new Error("Your account changed. Reload Matters before continuing.");
+    let response, payload;
+    try {
+      response = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, {
+        method: "DELETE", body: { expectedOwnerId: ownerId }, headers: { Accept: "application/json" },
+      });
+      payload = response.status === 204 ? null : await response.json().catch(() => null);
+    } catch {
+      throw new Error("Deletion was not confirmed. Reload Matters to check before trying again.");
+    }
+    // A failed or unreadable acknowledgement may follow a committed deletion.
+    // Never retry the mutation, or infer success from absence in a partial list.
+    if (!response.ok || (response.status !== 204 && payload?.ok !== true)) {
+      throw new Error(!response.ok && typeof payload?.error === "string" ? payload.error : "Deletion was not confirmed. Reload Matters to check before trying again.");
+    }
+    if (await verifyCaseNoteOwner() !== ownerId) throw new Error("Your account changed. Reload Matters before continuing.");
+    removeCaseFromState(caseId);
+    // A confirmed deletion belongs to this account. Follow-up list reads must
+    // not delay its acknowledgement.
+    if (!silent) notifyCases("Matter deleted.", "success");
+    if (currentMatterInventory) await loadCurrentMatters({ force: true });
+    if (currentDraftInventory) await loadCaseDrafts({ force: true });
+  } catch (error) {
+    if (error?.message === "account_changed") throw new Error("Your account changed. Reload Matters before continuing.");
+    throw error;
+  } finally { pendingMatterDeletions.delete(key); }
 }
 
 function removeCaseFromState(caseId) {
@@ -5979,31 +5525,6 @@ function removeCaseFromState(caseId) {
   prune(state.casesArchived);
   state.caseLookup.delete(id);
   state.archivedSelection?.delete(id);
-  buildCaseLookup();
-}
-
-async function ensureCaseOpenForDelete(_caseId, _suppressErrors = false) {
-  // Deletion no longer requires status or archive normalization.
-}
-
-function syncCaseCollections(updatedCase) {
-  if (!updatedCase) return;
-  const nextId = String(updatedCase.id || updatedCase._id || "");
-  const existing =
-    state.caseLookup.get(nextId) ||
-    state.cases.find((item) => String(item.id || item._id || item.caseId || "") === nextId) ||
-    state.casesArchived.find((item) => String(item.id || item._id || item.caseId || "") === nextId) ||
-    null;
-  const normalized = Object.assign({}, existing || {}, updatedCase);
-  normalized.id = String(normalized.id || normalized._id);
-  const removeFromList = (list) => {
-    const idx = list.findIndex((item) => String(item.id) === String(normalized.id));
-    if (idx >= 0) list.splice(idx, 1);
-  };
-  removeFromList(state.cases);
-  removeFromList(state.casesArchived);
-  if (isArchivedBucketCase(normalized)) state.casesArchived.push(normalized);
-  else state.cases.push(normalized);
   buildCaseLookup();
 }
 
@@ -6021,6 +5542,8 @@ function getStatusClass(status) {
 
 function formatCaseDate(value) {
   if (!value) return "—";
+  const businessDate = window.LPCBusinessDate?.format(value);
+  if (businessDate) return businessDate;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -6035,10 +5558,6 @@ function resolveCaseBudgetCents(item) {
       item?.budget ??
       0
   );
-}
-
-function isEscrowFundedCase(item) {
-  return !!item?.escrowIntentId && String(item?.escrowStatus || "").toLowerCase() === "funded";
 }
 
 function isDisputeWindowActiveCase(item) {
@@ -6083,942 +5602,18 @@ function notifyCases(message, type = "info") {
   if (helper?.show) {
     helper.show(message, { targetId: "toastBanner", type });
   } else {
-    alert(message);
+    void showAlert(message, { title: type === "error" ? "Action unavailable" : "Notice" });
   }
 }
 
-// -------------------------
-// Messages Page
-// -------------------------
-let chatCountdownTimer = null;
 
-async function initMessagesPage() {
-  const casesPane = document.querySelector("[data-message-cases]");
-  if (!casesPane) return;
-
-  setupChatMenu();
-  markNotificationsRead({ type: "message" });
-  casesPane.addEventListener("click", onMessageCaseClick);
-  document.querySelector("[data-message-threads]")?.addEventListener("click", onMessageThreadClick);
-
-  const sendBtn = document.querySelector("[data-chat-send]");
-  const chatInput = document.querySelector("[data-chat-input]");
-  sendBtn?.addEventListener("click", sendCurrentMessage);
-  chatInput?.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      sendCurrentMessage();
-    }
-  });
-
-  try {
-    await Promise.all([loadCasesWithFiles(), loadArchivedCases(), loadThreadSummary()]);
-  } catch (err) {
-    console.warn("Unable to load conversations", err);
-  }
-  state.messages.cases = filterWorkspaceEligibleCases(state.cases);
-  renderMessageCases();
-
-  const firstCase = state.messages.cases[0];
-  if (firstCase) {
-    await selectMessageCase(firstCase.id);
-  } else {
-    renderMessageThreads(null);
-    renderChatMessages();
-  }
-}
-
-async function loadThreadSummary() {
-  try {
-    const res = await secureFetch("/api/messages/threads?limit=200", { headers: { Accept: "application/json" }, noRedirect: true });
-    const payload = await res.json().catch(() => ({}));
-    const threads = Array.isArray(payload?.threads) ? payload.threads : [];
-    state.messages.summary = new Map();
-    threads.forEach((thread) => {
-      if (!thread || !thread.id) return;
-      state.messages.summary.set(String(thread.id), thread);
-    });
-  } catch (err) {
-    console.warn("Unable to load thread summaries", err);
-    state.messages.summary = new Map();
-  }
-}
-
-function renderMessageCases() {
-  const container = document.querySelector("[data-message-cases]");
-  if (!container) return;
-  const list = state.messages.cases;
-  if (!list.length) {
-    container.innerHTML = `<div class="messages-placeholder" role="status">You have no active matters yet.</div>`;
-    return;
-  }
-  const activeId = state.messages.activeCaseId;
-  container.innerHTML = list
-    .map((item) => {
-      const id = String(item.id);
-      const summary = state.messages.summary.get(id);
-      const snippet = formatSnippet(summary?.lastMessageSnippet || "");
-      const unread = Number(summary?.unread || 0);
-      const badge = unread > 0 ? `<span style="font-weight:600;color:var(--accent);">${unread}</span>` : "";
-      const snippetText = snippet || "No recent messages.";
-      return `
-        <div class="case-item${id === activeId ? " active" : ""}" data-message-case="${id}">
-          <div>${sanitize(item.title || "Untitled Matter")}</div>
-          <div class="case-label">
-            <span>${sanitize(snippetText)}</span>
-            ${badge}
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-}
-
-function onMessageCaseClick(event) {
-  const target = event.target.closest("[data-message-case]");
-  if (!target) return;
-  const caseId = target.getAttribute("data-message-case");
-  selectMessageCase(caseId);
-}
-
-async function selectMessageCase(caseId) {
-  if (!caseId) return;
-  state.messages.activeCaseId = String(caseId);
-  state.messages.activeThreadId = "all";
-  renderMessageCases();
-  try {
-    await ensureCaseMessages(caseId);
-    renderMessageThreads(caseId);
-    renderChatMessages();
-    await markNotificationsRead({ caseId: String(caseId) });
-  } catch (err) {
-    console.warn(err);
-    notifyMessages(err.message || "Unable to load messages for that matter.", "error");
-  }
-}
-
-async function ensureCaseMessages(caseId, force = false) {
-  const key = String(caseId);
-  if (!force && state.messages.messagesByCase.has(key)) {
-    return state.messages.messagesByCase.get(key);
-  }
-  const res = await secureFetch(`/api/messages/${encodeURIComponent(caseId)}?limit=200`, { headers: { Accept: "application/json" } });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(payload.error || "Unable to load conversation.");
-  }
-  const items = Array.isArray(payload.messages) ? payload.messages : [];
-  const normalized = items.map(normalizeMessageRecord);
-  state.messages.messagesByCase.set(key, normalized);
-  await markMessagesRead(caseId, normalized);
-  return normalized;
-}
-
-function normalizeUserId(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value;
-  return String(value.id || value._id || value.userId || "");
-}
-
-function getCurrentUserId() {
-  const fromState = normalizeUserId(state.user);
-  if (fromState) return fromState;
-  const cached = window.getStoredUser?.();
-  const cachedId = normalizeUserId(cached);
-  if (cachedId) return cachedId;
-  try {
-    const stored = localStorage.getItem("lpc_user");
-    return normalizeUserId(stored ? JSON.parse(stored) : null);
-  } catch (_) {}
-  return "";
-}
-
-function normalizeMessageRecord(msg = {}) {
-  const senderObj = msg.senderId && typeof msg.senderId === "object" ? msg.senderId : null;
-  const senderId = normalizeUserId(senderObj || msg.senderId);
-  const baseName = senderObj
-    ? [senderObj.firstName, senderObj.lastName].filter(Boolean).join(" ").trim() || senderObj.name || ""
-    : "";
-  const roleLabel =
-    msg.senderRole === "system"
-      ? "System"
-      : msg.senderRole === "admin"
-      ? "Admin"
-      : msg.senderRole === "paralegal"
-      ? "Paralegal"
-      : "Attorney";
-  const senderName = baseName || roleLabel;
-  const currentUserId = getCurrentUserId();
-  const isSelf = senderId && currentUserId && String(senderId) === String(currentUserId);
-  return {
-    id: msg._id || msg.id || `${Date.now()}-${Math.random()}`,
-    text: msg.text || msg.content || "",
-    senderId,
-    senderName: isSelf ? "You" : senderName,
-    senderRole: msg.senderRole || senderObj?.role || "",
-    createdAt: msg.createdAt || msg.updatedAt || new Date().toISOString(),
-    isSelf,
-  };
-}
-
-function renderMessageThreads(caseId) {
-  const container = document.querySelector("[data-message-threads]");
-  if (!container) return;
-  if (!caseId) {
-    container.innerHTML = `<div class="messages-placeholder" role="status">Select a matter to view conversations.</div>`;
-    return;
-  }
-  const messages = state.messages.messagesByCase.get(String(caseId)) || [];
-  if (!messages.length) {
-    container.innerHTML = `<p style="color:var(--muted);font-size:.9rem;">No messages yet. Start the conversation below.</p>`;
-    const chatInput = document.querySelector("[data-chat-input]");
-    const sendBtn = document.querySelector("[data-chat-send]");
-    if (chatInput) chatInput.disabled = false;
-    if (sendBtn) sendBtn.disabled = false;
-    return;
-  }
-  const threads = buildThreadsFromMessages(messages);
-  if (!threads.some((entry) => entry.id === state.messages.activeThreadId)) {
-    state.messages.activeThreadId = "all";
-  }
-  container.innerHTML = threads
-    .map((entry) => {
-      const active = entry.id === state.messages.activeThreadId ? " active" : "";
-      return `
-        <div class="thread-item${active}" data-message-thread="${entry.id}">
-          <div>
-            <strong>${sanitize(entry.title)}</strong>
-            <div class="thread-meta">${sanitize(entry.snippet || "No messages yet.")}</div>
-          </div>
-          <button type="button" class="reply-btn" data-thread-reply="${entry.id}">Reply</button>
-        </div>
-      `;
-    })
-    .join("");
-}
-
-function buildThreadsFromMessages(messages = []) {
-  const groups = new Map();
-  messages.forEach((msg) => {
-    const key = msg.isSelf ? "self" : msg.senderId || `${msg.senderRole}-${msg.senderName}`;
-    const existing = groups.get(key) || {
-      id: key,
-      title: msg.isSelf ? "You" : msg.senderName || "Paralegal",
-      snippet: "",
-      updatedAt: null,
-    };
-    if (!existing.updatedAt || new Date(msg.createdAt) > new Date(existing.updatedAt || 0)) {
-      existing.snippet = msg.text;
-      existing.updatedAt = msg.createdAt;
-    }
-    groups.set(key, existing);
-  });
-  const latest = messages[messages.length - 1];
-  const allEntry = {
-    id: "all",
-    title: "All messages",
-    snippet: latest?.text || "Start the conversation.",
-    updatedAt: latest?.createdAt || null,
-  };
-  return [
-    allEntry,
-    ...Array.from(groups.values()).sort(
-      (a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)
-    ),
-  ];
-}
-
-function onMessageThreadClick(event) {
-  const reply = event.target.closest("[data-thread-reply]");
-  if (reply) {
-    event.stopPropagation();
-    state.messages.activeThreadId = reply.dataset.threadReply;
-    const input = document.querySelector("[data-chat-input]");
-    input?.focus();
-    renderMessageThreads(state.messages.activeCaseId);
-    renderChatMessages();
-    return;
-  }
-  const target = event.target.closest("[data-message-thread]");
-  if (!target) return;
-  state.messages.activeThreadId = target.dataset.messageThread;
-  renderMessageThreads(state.messages.activeCaseId);
-  renderChatMessages();
-}
-
-function renderChatMessages() {
-  const body = document.querySelector("[data-chat-body]");
-  const chatTitle = document.getElementById("chatTitle");
-  if (!body) return;
-  const caseId = state.messages.activeCaseId;
-  if (!caseId) {
-    body.innerHTML = `<p style="color:var(--muted);">Select a matter to view messages.</p>`;
-    setComposerLock(true);
-    if (chatCountdownTimer) {
-      clearInterval(chatCountdownTimer);
-      chatCountdownTimer = null;
-    }
-    chatTitle.textContent = "Chat";
-    return;
-  }
-  const caseEntry = state.caseLookup.get(String(caseId));
-  const readOnly = !!caseEntry?.readOnly;
-  const purgeAt = caseEntry?.purgeScheduledFor ? new Date(caseEntry.purgeScheduledFor) : null;
-  chatTitle.textContent = caseEntry?.title || "Chat";
-  const messages = state.messages.messagesByCase.get(String(caseId)) || [];
-  const filterId = state.messages.activeThreadId;
-  let visible = messages;
-  if (filterId && filterId !== "all") {
-    visible = messages.filter((msg) => {
-      const key = msg.isSelf ? "self" : msg.senderId || `${msg.senderRole}-${msg.senderName}`;
-      return key === filterId;
-    });
-  }
-  if (!visible.length) {
-    body.innerHTML = `<p style="color:var(--muted);">No messages yet. Start the conversation.</p>`;
-  } else {
-    body.innerHTML = visible
-      .map(
-        (msg) => `
-        <div class="chat-msg ${msg.isSelf ? "you" : "them"}">
-          <div>${sanitize(msg.text || "")}</div>
-          <span class="meta">${sanitize(msg.senderName || (msg.isSelf ? "You" : "Paralegal"))} · ${formatChatTimestamp(msg.createdAt)}</span>
-        </div>
-      `
-      )
-      .join("");
-    body.scrollTop = body.scrollHeight;
-  }
-  if (readOnly) {
-    const countdownText = purgeAt ? formatAutoDelete(purgeAt) : "--:--";
-    body.innerHTML =
-      `<p style="color:var(--muted);font-size:.85rem;margin-bottom:.6rem;">Matter archived. Auto-delete in <span data-chat-countdown>${countdownText}</span>.</p>` +
-      body.innerHTML;
-    const countdownNode = body.querySelector("[data-chat-countdown]");
-    if (countdownNode && purgeAt) startChatCountdown(countdownNode, purgeAt);
-  } else if (chatCountdownTimer) {
-    clearInterval(chatCountdownTimer);
-    chatCountdownTimer = null;
-  }
-  setComposerLock(readOnly);
-}
-
-function setComposerLock(readOnly) {
-  const chatInput = document.querySelector("[data-chat-input]");
-  const sendBtn = document.querySelector("[data-chat-send]");
-  if (chatInput) {
-    const disable = readOnly || !state.messages.activeCaseId;
-    chatInput.disabled = disable;
-    chatInput.placeholder = disable ? "Matter archived. Messaging disabled." : "Type a message...";
-    if (disable) chatInput.value = "";
-  }
-  if (sendBtn) {
-    const disable = readOnly || state.messages.sending || !state.messages.activeCaseId;
-    sendBtn.disabled = disable;
-    sendBtn.textContent = readOnly ? "Locked" : "Send";
-  }
-}
-
-function getLatestMessageTimestamp(messages = []) {
-  let latest = 0;
-  messages.forEach((msg) => {
-    const stamp = msg?.createdAt || msg?.updatedAt || msg?.created;
-    if (!stamp) return;
-    const time = new Date(stamp).getTime();
-    if (!Number.isNaN(time)) {
-      latest = Math.max(latest, time);
-    }
-  });
-  return latest ? new Date(latest).toISOString() : null;
-}
-
-async function markMessagesRead(caseId, messages = []) {
-  const upTo = getLatestMessageTimestamp(messages);
-  if (!caseId || !upTo) return;
-  try {
-    await secureFetch(`/api/messages/${encodeURIComponent(caseId)}/read`, {
-      method: "POST",
-      body: { upTo },
-      headers: { Accept: "application/json" },
-      noRedirect: true,
-    });
-  } catch (err) {
-    console.warn("Unable to mark messages read", err);
-  }
-}
-
-function startChatCountdown(node, targetDate) {
-  if (!node || !targetDate) return;
-  const update = () => {
-    const diff = targetDate.getTime() - Date.now();
-    if (diff <= 0) {
-      node.textContent = "00:00";
-      clearInterval(chatCountdownTimer);
-      chatCountdownTimer = null;
-      return;
-    }
-    node.textContent = formatAutoDelete(targetDate);
-  };
-  update();
-  clearInterval(chatCountdownTimer);
-  chatCountdownTimer = setInterval(update, 60 * 1000);
-}
-
-function formatAutoDelete(targetDate) {
-  const diff = Math.max(0, targetDate.getTime() - Date.now());
-  const totalMinutes = Math.floor(diff / 60000);
-  const totalHours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  const days = Math.floor(totalHours / 24);
-  const hours = totalHours % 24;
-  if (days > 0) {
-    return `${days}d ${String(hours).padStart(2, "0")}h`;
-  }
-  return `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-}
-
-async function sendCurrentMessage() {
-  if (state.messages.sending) return;
-  const chatInput = document.querySelector("[data-chat-input]");
-  if (!chatInput) return;
-  const value = chatInput.value.trim();
-  if (!value || !state.messages.activeCaseId) return;
-  const caseEntry = state.caseLookup.get(String(state.messages.activeCaseId));
-  if (caseEntry?.readOnly) {
-    notifyMessages("This case is archived. Messaging is disabled.", "error");
-    return;
-  }
-  const sendBtn = document.querySelector("[data-chat-send]");
-  state.messages.sending = true;
-  if (sendBtn) sendBtn.disabled = true;
-  try {
-    const res = await secureFetch(`/api/messages/${encodeURIComponent(state.messages.activeCaseId)}`, {
-      method: "POST",
-      body: { content: value },
-      headers: { Accept: "application/json" },
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(payload.error || "Unable to send message.");
-    }
-    chatInput.value = "";
-    await ensureCaseMessages(state.messages.activeCaseId, true);
-    await loadThreadSummary();
-    renderMessageCases();
-    renderMessageThreads(state.messages.activeCaseId);
-    renderChatMessages();
-    await markMessagesRead(
-      state.messages.activeCaseId,
-      state.messages.messagesByCase.get(String(state.messages.activeCaseId))
-    );
-    notifyMessages("Message sent.", "success");
-  } catch (err) {
-    console.warn(err);
-    notifyMessages(err.message || "Unable to send message.", "error");
-  } finally {
-    state.messages.sending = false;
-    if (sendBtn) sendBtn.disabled = false;
-  }
-}
-
-function setupChatMenu() {
-  chatMenuWrapper = document.getElementById("chatActions");
-  if (!chatMenuWrapper) return;
-  const trigger = chatMenuWrapper.querySelector(".chat-menu-trigger");
-  const menu = chatMenuWrapper.querySelector(".chat-menu");
-  if (trigger) {
-    trigger.addEventListener("click", (event) => {
-      event.stopPropagation();
-      const open = chatMenuWrapper.classList.contains("open");
-      closeChatMenu();
-      if (!open) {
-        chatMenuWrapper.classList.add("open");
-        trigger.setAttribute("aria-expanded", "true");
-      }
-    });
-  }
-  if (menu) {
-    menu.addEventListener("click", (event) => {
-      const btn = event.target.closest("[data-chat-action]");
-      if (!btn) return;
-      handleChatAction(btn.dataset.chatAction);
-      closeChatMenu();
-    });
-  }
-  document.addEventListener("click", (event) => {
-    if (chatMenuWrapper && !chatMenuWrapper.contains(event.target)) {
-      closeChatMenu();
-    }
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeChatMenu();
-  });
-}
-
-function closeChatMenu() {
-  if (!chatMenuWrapper) return;
-  const trigger = chatMenuWrapper.querySelector(".chat-menu-trigger");
-  chatMenuWrapper.classList.remove("open");
-  trigger?.setAttribute("aria-expanded", "false");
-}
-
-function handleChatAction(action) {
-  const caseId = state.messages.activeCaseId;
-  if (!caseId) return;
-  if (action === "print") {
-    try {
-      const transcript = buildConversationTranscript(caseId);
-      const popup = window.open("", "_blank", "noopener");
-      if (popup) {
-        popup.document.write(`<pre style="font-family:monospace;white-space:pre-wrap;">${sanitize(transcript)}</pre>`);
-        popup.document.close();
-        popup.focus();
-        popup.print();
-      }
-    } catch (err) {
-      console.warn(err);
-      notifyMessages(err.message || "Unable to print conversation.", "error");
-    }
-  } else if (action === "download") {
-    try {
-      downloadConversation(caseId);
-    } catch (err) {
-      console.warn(err);
-      notifyMessages(err.message || "Unable to download conversation.", "error");
-    }
-  }
-}
-
-function downloadConversation(caseId) {
-  const messages = state.messages.messagesByCase.get(String(caseId)) || [];
-  if (!messages.length) throw new Error("No conversation available.");
-  const caseEntry = state.caseLookup.get(String(caseId));
-  const lines = messages.map((msg) => {
-    const label = msg.isSelf ? "You" : msg.senderName || "Paralegal";
-    return `[${formatChatTimestamp(msg.createdAt)}] ${label}: ${msg.text}`;
-  });
-  const blob = new Blob([lines.join("\\n")], { type: "text/plain" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  const safeTitle = (caseEntry?.title || "conversation").replace(/[^a-z0-9-_]/gi, "_");
-  link.download = `${safeTitle}_messages.txt`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(link.href), 500);
-}
-
-function buildConversationTranscript(caseId) {
-  const messages = state.messages.messagesByCase.get(String(caseId)) || [];
-  if (!messages.length) throw new Error("No conversation available.");
-  const caseEntry = state.caseLookup.get(String(caseId));
-  const header = `Conversation for ${caseEntry?.title || "Matter"}\\n`;
-  const lines = messages.map((msg) => {
-    const label = msg.isSelf ? "You" : msg.senderName || "Paralegal";
-    return `[${formatChatTimestamp(msg.createdAt)}] ${label}: ${msg.text}`;
-  });
-  return `${header}\\n${lines.join("\\n")}`;
-}
-
-function formatSnippet(text) {
-  if (!text) return "";
-  const trimmed = text.trim();
-  if (trimmed.length <= 60) return trimmed;
-  return `${trimmed.slice(0, 57)}…`;
-}
-
-function formatChatTimestamp(raw) {
-  if (!raw) return "";
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString();
-}
-
-function notifyMessages(message, type = "info") {
-  const helper = window.toastUtils;
-  if (helper?.show) {
-    helper.show(message, { targetId: "toastBanner", type });
-  } else {
-    alert(message);
-  }
-}
-
-// -------------------------
-// Documents Page
-// -------------------------
-async function initDocumentsPage() {
-  const listPane = document.querySelector("[data-doc-list]");
-  if (!listPane) return;
-  try {
-    await Promise.all([loadCasesWithFiles(), loadArchivedCases()]);
-  } catch (err) {
-    console.warn("Unable to load documents", err);
-  }
-  state.documents.activeDocId = null;
-  state.documents.activeTab = "templates";
-  state.documents.sort = document.querySelector("[data-doc-sort]")?.value || "date";
-  bindDocumentEvents();
-  setDocumentTab(state.documents.activeTab);
-}
-
-function bindDocumentEvents() {
-  document.querySelectorAll("[data-doc-tab]").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      const current = tab.dataset.docTab || "templates";
-      setDocumentTab(current);
-    });
-  });
-  document.querySelector("[data-doc-sort]")?.addEventListener("change", (event) => {
-    state.documents.sort = event.target.value;
-    renderDocumentGroups();
-  });
-  document.querySelector("[data-doc-upload]")?.addEventListener("click", () => triggerDocumentUpload());
-  document.querySelector("[data-doc-new]")?.addEventListener("click", () => triggerDocumentUpload());
-  document.querySelector("[data-doc-refresh]")?.addEventListener("click", async () => {
-    await refreshDocuments();
-  });
-  document.querySelector("[data-doc-upload-input]")?.addEventListener("change", handleDocumentUpload);
-  document.querySelector("[data-doc-replace-input]")?.addEventListener("change", handleDocumentReplace);
-  document.querySelector("[data-doc-list]")?.addEventListener("click", onDocumentListClick);
-  document.querySelector(".right-panel")?.addEventListener("click", onDocumentPreviewAction);
-}
-
-function setDocumentTab(tab) {
-  state.documents.activeTab = tab;
-  document.querySelectorAll("[data-doc-tab]").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.docTab === tab);
-  });
-  const standard = document.getElementById("standardContent");
-  const archive = document.getElementById("archiveContent");
-  if (tab === "archive") {
-    standard?.classList.add("hidden");
-    archive?.classList.remove("hidden");
-    renderArchiveList();
-  } else {
-    standard?.classList.remove("hidden");
-    archive?.classList.add("hidden");
-    renderDocumentGroups();
-  }
-}
-
-function getDocumentInventory({ includeArchived = false } = {}) {
-  const collection = includeArchived ? state.casesArchived : state.cases;
-  const docs = [];
-  collection.forEach((caseItem) => {
-    const files = Array.isArray(caseItem.files) ? caseItem.files : [];
-    files.forEach((file) => {
-      const fileId = String(file.id || file._id || file.key || `${caseItem.id}-${file.filename}`);
-      docs.push({
-        id: `${caseItem.id}-${fileId}`,
-        caseId: caseItem.id,
-        caseTitle: caseItem.title || "Matter",
-        file,
-      });
-    });
-  });
-  return docs;
-}
-
-function renderDocumentGroups() {
-  const container = document.querySelector("[data-doc-groups]");
-  if (!container) return;
-  const list = getFilteredDocuments();
-  if (!list.length) {
-    container.innerHTML = `<p style="color:var(--muted);font-size:.9rem;">No documents found for this view.</p>`;
-    renderDocumentPreview(null);
-    return;
-  }
-
-  const groups = new Map();
-  list.forEach((item) => {
-    const bucket = item.caseTitle || "Matter";
-    if (!groups.has(bucket)) groups.set(bucket, []);
-    groups.get(bucket).push(item);
-  });
-
-  const orderedGroups = Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
-  container.innerHTML = orderedGroups
-    .map(([caseTitle, entries]) => {
-      const items = entries
-        .map((doc) => {
-          const active = doc.id === state.documents.activeDocId ? " active" : "";
-          const uploadedLabel = formatCaseDate(doc.file.uploadedAt || doc.file.createdAt || doc.file.updatedAt);
-          return `
-            <div class="template-item${active}" data-doc-file="${doc.id}" data-doc-case="${doc.caseId}" data-doc-file-id="${doc.file.id || doc.file._id || ""}" data-doc-file-key="${doc.file.key || ""}">
-              <div>
-                <strong>${sanitize(doc.file.filename || doc.file.original || "Document")}</strong>
-                <span>${sanitize(doc.file.status || "pending_review")}</span>
-              </div>
-              <span>${uploadedLabel}</span>
-            </div>
-          `;
-        })
-        .join("");
-      return `
-        <div class="group-header">
-          <span>${sanitize(caseTitle)}</span>
-          <span style="font-size:.85rem;color:var(--muted);">${entries.length} file${entries.length === 1 ? "" : "s"}</span>
-        </div>
-        ${items}
-      `;
-    })
-    .join("");
-
-  if (!state.documents.activeDocId && list.length) {
-    selectDocument(list[0].id);
-  } else if (state.documents.activeDocId) {
-    const current = list.find((entry) => entry.id === state.documents.activeDocId);
-    renderDocumentPreview(current || null);
-  }
-}
-
-function getFilteredDocuments() {
-  const tab = state.documents.activeTab || "templates";
-  let docs = getDocumentInventory({ includeArchived: false });
-  if (tab === "fields") {
-    docs = docs.filter((entry) => (entry.file.status || "").toLowerCase() === "pending_review");
-  } else if (tab === "forms") {
-    docs = docs.filter((entry) => (entry.file.status || "").toLowerCase() === "approved");
-  }
-  return sortDocuments(docs);
-}
-
-function sortDocuments(docs) {
-  const sort = state.documents.sort || "date";
-  if (sort === "alpha") {
-    return docs.sort((a, b) => (a.file.filename || "").localeCompare(b.file.filename || ""));
-  }
-  if (sort === "case") {
-    return docs.sort((a, b) => (a.caseTitle || "").localeCompare(b.caseTitle || ""));
-  }
-  return docs.sort(
-    (a, b) =>
-      new Date(b.file.uploadedAt || b.file.createdAt || 0).getTime() -
-      new Date(a.file.uploadedAt || a.file.createdAt || 0).getTime()
-  );
-}
-
-function onDocumentListClick(event) {
-  const card = event.target.closest("[data-doc-file]");
-  if (!card) return;
-  const docId = card.getAttribute("data-doc-file");
-  selectDocument(docId);
-}
-
-function selectDocument(docId) {
-  if (!docId) return;
-  state.documents.activeDocId = docId;
-  document.querySelectorAll("[data-doc-file]").forEach((node) => {
-    node.classList.toggle("active", node.getAttribute("data-doc-file") === docId);
-  });
-  const doc = findDocumentById(docId);
-  renderDocumentPreview(doc);
-}
-
-function findDocumentById(docId) {
-  const allDocs = [...getDocumentInventory({ includeArchived: false }), ...getDocumentInventory({ includeArchived: true })];
-  return allDocs.find((entry) => entry.id === docId) || null;
-}
-
-function renderDocumentPreview(doc) {
-  const title = document.getElementById("templateTitle");
-  const meta = document.querySelector("[data-doc-meta]");
-  const preview = document.querySelector("[data-doc-preview]");
-  const table = document.getElementById("placeholderBody");
-  if (!meta || !preview || !table) return;
-  if (!doc) {
-    if (title) title.textContent = "Select a document";
-    meta.innerHTML = `<span>Select a file from the list to view details.</span>`;
-    preview.textContent = "No document selected.";
-    table.innerHTML = `
-      <tr><td>Status</td><td>—</td></tr>
-      <tr><td>Version</td><td>—</td></tr>
-      <tr><td>Uploaded</td><td>—</td></tr>
-    `;
-    return;
-  }
-  const file = doc.file || {};
-  const caseTitle = state.caseLookup.get(String(doc.caseId))?.title || doc.caseTitle || "Matter";
-  if (title) title.textContent = file.filename || file.original || "Document";
-  const uploaded = formatCaseDate(file.uploadedAt || file.createdAt || file.updatedAt);
-  meta.innerHTML = `
-    <span>${sanitize(caseTitle)}</span>
-    <span>Uploaded ${uploaded || "—"}</span>
-    <a href="#" data-doc-download>Download</a>
-    <a href="#" data-doc-replace>Replace</a>
-  `;
-  preview.textContent = file.original || file.filename || "Preview not available.";
-  const rows = [
-    ["Status", formatCaseStatus(file.status || "pending_review")],
-    ["Version", file.version || 1],
-    ["Size", formatFileSize(file.size)],
-  ];
-  table.innerHTML = rows
-    .map((row) => `<tr><td>${sanitize(row[0])}</td><td>${sanitize(String(row[1] ?? "—"))}</td></tr>`)
-    .join("");
-}
-
-async function triggerDocumentUpload() {
-  const input = document.querySelector("[data-doc-upload-input]");
-  if (input) {
-    input.value = "";
-    input.click();
-  }
-}
-
-async function handleDocumentUpload(event) {
-  const files = Array.from(event.target.files || []);
-  if (!files.length) return;
-  const active = state.documents.activeDocId ? findDocumentById(state.documents.activeDocId) : null;
-  const targetCaseId = active?.caseId || state.cases[0]?.id;
-  if (!targetCaseId) {
-    notifyDocuments("Select a matter before uploading.", "error");
-    return;
-  }
-  try {
-    await uploadDocumentsToCase(targetCaseId, files);
-    await refreshDocuments(true);
-    notifyDocuments("Document uploaded.", "success");
-  } catch (err) {
-    console.warn(err);
-    notifyDocuments(err.message || "Unable to upload document.", "error");
-  }
-}
-
-async function uploadDocumentsToCase(caseId, files) {
-  for (const file of files) {
-    const key = await uploadToS3(file, caseId);
-    await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/files`, {
-      method: "POST",
-      body: { key, original: file.name, mime: file.type, size: file.size },
-      headers: { Accept: "application/json" },
-    });
-  }
-}
-
-function onDocumentPreviewAction(event) {
-  const downloadBtn = event.target.closest("[data-doc-download]");
-  if (downloadBtn) {
-    event.preventDefault();
-    downloadSelectedDocument();
-    return;
-  }
-  const replaceBtn = event.target.closest("[data-doc-replace]");
-  if (replaceBtn) {
-    event.preventDefault();
-    const doc = findDocumentById(state.documents.activeDocId);
-    if (!doc) return;
-    state.documents.replaceTarget = doc;
-    const input = document.querySelector("[data-doc-replace-input]");
-    if (input) {
-      input.value = "";
-      input.click();
-    }
-  }
-}
-
-async function downloadSelectedDocument() {
-  const doc = findDocumentById(state.documents.activeDocId);
-  if (!doc) return;
-  try {
-    if (Array.isArray(doc.file.downloadUrl) && doc.file.downloadUrl.length) {
-      window.open(sanitizeDownloadPath(doc.file.downloadUrl[0]), "_blank");
-      return;
-    }
-    if (doc.file.key) {
-      const opened = await openFile(doc.caseId, doc.file.key, "download", doc.file.filename || doc.file.original);
-      if (!opened) return;
-      return;
-    }
-    throw new Error("Download link unavailable.");
-  } catch (err) {
-    console.warn(err);
-    notifyDocuments(err.message || "Unable to download document.", "error");
-  }
-}
-
-async function handleDocumentReplace(event) {
-  const file = event.target.files?.[0];
-  if (!file || !state.documents.replaceTarget) return;
-  const target = state.documents.replaceTarget;
-  try {
-    const key = await uploadToS3(file, target.caseId);
-    const fileId = target.file.id || target.file._id;
-    if (!fileId) {
-      throw new Error("File identifier missing.");
-    }
-    await secureFetch(`/api/cases/${encodeURIComponent(target.caseId)}/files/${encodeURIComponent(fileId)}/replace`, {
-      method: "POST",
-      body: { key, original: file.name, mime: file.type, size: file.size },
-      headers: { Accept: "application/json" },
-    });
-    await refreshDocuments(true);
-    notifyDocuments("Document replaced.", "success");
-  } catch (err) {
-    console.warn(err);
-    notifyDocuments(err.message || "Unable to replace document.", "error");
-  } finally {
-    state.documents.replaceTarget = null;
-  }
-}
-
-async function refreshDocuments(force = false) {
-  await Promise.all([loadCasesWithFiles(true), loadArchivedCases(true)]);
-  state.documents.activeDocId = null;
-  renderDocumentGroups();
-  renderArchiveList();
-}
-
-function renderArchiveList() {
-  const list = document.getElementById("archiveList");
-  const empty = document.getElementById("archiveEmpty");
-  if (!list || !empty) return;
-  const docs = getDocumentInventory({ includeArchived: true });
-  if (!docs.length) {
-    empty.classList.remove("hidden");
-    list.innerHTML = "";
-    return;
-  }
-  empty.classList.add("hidden");
-  list.innerHTML = docs
-    .map(
-      (doc) => `
-      <li>
-        <span>${sanitize(doc.file.filename || doc.file.original || "Document")} — ${sanitize(doc.caseTitle || "Matter")}</span>
-        <span style="color:var(--muted);">${formatCaseDate(doc.file.uploadedAt || doc.file.createdAt)}</span>
-      </li>
-    `
-    )
-    .join("");
-}
-
-function formatFileSize(bytes) {
-  if (!Number.isFinite(Number(bytes)) || Number(bytes) <= 0) return "—";
-  const units = ["B", "KB", "MB", "GB"];
-  let value = Number(bytes);
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value.toFixed(1)} ${units[unit]}`;
-}
-
-function notifyDocuments(message, type = "info") {
-  const helper = window.toastUtils;
-  if (helper?.show) {
-    helper.show(message, { targetId: "toastBanner", type });
-  } else {
-    alert(message);
-  }
-}
 
 function notifyTasks(message, type = "info") {
   const helper = window.toastUtils;
   if (helper?.show) {
     helper.show(message, { targetId: "toastBanner", type });
   } else {
-    alert(message);
+    void showAlert(message, { title: type === "error" ? "Action unavailable" : "Notice" });
   }
 }
 
@@ -7043,9 +5638,7 @@ function isFinalCase(caseItem) {
   return status === "completed";
 }
 
-function isCompletedDashboardCase(caseItem) {
-  return isFinalCase(caseItem);
-}
+
 
 function hasAssignedParalegal(caseItem) {
   if (!caseItem) return false;
@@ -7055,12 +5648,19 @@ function hasAssignedParalegal(caseItem) {
 function canDeleteCase(caseItem) {
   if (!caseItem) return false;
   const statusKey = normalizeCaseStatus(caseItem?.status);
-  const isArchivedFinalCase =
-    caseItem.archived === true && (caseItem.paymentReleased === true || ["completed", "closed"].includes(statusKey));
-  if (hasAssignedParalegal(caseItem) && !isArchivedFinalCase) return false;
+  if (statusKey !== "open") return false;
+  if (hasAssignedParalegal(caseItem) || caseItem?.hiredAt) return false;
   const escrowStatus = String(caseItem?.escrowStatus || "").toLowerCase();
-  const escrowFunded = escrowStatus === "funded" || caseItem.paymentReleased === true;
-  if (escrowFunded && !isArchivedFinalCase) return false;
+  const hasFinancialHistory = Boolean(
+    escrowStatus === "funded" ||
+    caseItem?.escrowIntentId ||
+    caseItem?.paymentIntentId ||
+    caseItem?.paymentReleased ||
+    caseItem?.payoutTransferId ||
+    caseItem?.payoutFinalizedAt
+  );
+  if (hasFinancialHistory) return false;
+  if (Array.isArray(caseItem?.disputes) && caseItem.disputes.length) return false;
   return true;
 }
 
@@ -7091,16 +5691,7 @@ function shouldOpenCasePreviewOnly(caseItem, { filterKey = state.casesViewFilter
   return isArchivedBucketCase(caseItem) || caseItem.archived === true;
 }
 
-function getArchivedBucketCases({ cases = state.cases, archivedCases = state.casesArchived } = {}) {
-  return getUniqueCaseRecords([
-    ...(Array.isArray(archivedCases) ? archivedCases : []),
-    ...(Array.isArray(cases) ? cases.filter((item) => isArchivedBucketCase(item)) : []),
-  ]);
-}
 
-function getCompletedDashboardCases({ cases = state.cases, archivedCases = state.casesArchived } = {}) {
-  return getArchivedBucketCases({ cases, archivedCases }).filter((item) => isCompletedDashboardCase(item));
-}
 
 function isWorkspaceEligibleCase(caseItem) {
   if (!caseItem) return false;
@@ -7124,12 +5715,9 @@ function canOpenCaseDetail(caseItem) {
   return isWorkspaceEligibleCase(caseItem);
 }
 
-function filterWorkspaceEligibleCases(list = []) {
-  if (!Array.isArray(list) || !list.length) return [];
-  return list.filter((item) => isWorkspaceEligibleCase(item));
-}
 
-async function loadCasesWithFiles(force = false) {
+
+async function loadCasesWithFiles(force = false, { refreshInventories = true } = {}) {
   if (force) state.casesPromise = null;
   if (state.casesPromise) {
     await state.casesPromise;
@@ -7139,15 +5727,17 @@ async function loadCasesWithFiles(force = false) {
   state.casesPromise = (async () => {
     try {
       const res = await secureFetch(url, { headers: { Accept: "application/json" } });
-      if (!res.ok) throw new Error("Case fetch failed");
+      if (!res.ok) throw new Error("Matter fetch failed");
       const data = await res.json();
       state.cases = Array.isArray(data) ? data : [];
       buildCaseLookup();
+      if (force && refreshInventories && currentDraftInventory) await loadCaseDrafts({ force: true });
       applyApplicationCountsToCases({ render: dashboardViewState.casesInitialized });
     } catch (err) {
       console.error(err);
       state.cases = [];
     } finally {
+      if (force && refreshInventories && currentMatterInventory) await loadCurrentMatters({ force: true });
       state.casesPromise = null;
     }
     return state.cases;
@@ -7157,7 +5747,7 @@ async function loadCasesWithFiles(force = false) {
 
 function buildCaseLookup() {
   state.caseLookup.clear();
-  const combined = [...(state.cases || []), ...(state.casesArchived || [])];
+  const combined = [...(state.cases || []), ...(state.casesArchived || []), ...(currentDraftInventory?.state.result?.items.filter(item => !item.localDraft) || []), ...(currentMatterInventory?.state.result?.items || [])];
   combined.forEach((c) => {
     const primaryId = parseCaseId(c);
     if (primaryId) state.caseLookup.set(String(primaryId), c);
@@ -7166,61 +5756,11 @@ function buildCaseLookup() {
   });
 }
 
-function mergeUpdatedFile(caseId, file) {
-  const caseEntry = state.cases.find((c) => String(c.id) === String(caseId));
-  if (!caseEntry) return;
-  const idx = (caseEntry.files || []).findIndex((f) => String(f.id || f.key) === String(file.id || file.key));
-  if (idx >= 0) caseEntry.files[idx] = file;
-  else caseEntry.files = [...(caseEntry.files || []), file];
-}
-
-async function openFile(caseId, key, mode, fileName) {
-  if (!key) throw new Error("Missing key");
-  const url = await getSignedUrl(caseId, key);
-  if (!url) {
-    notifyCases(MISSING_DOCUMENT_MESSAGE, "info");
-    return false;
-  }
-  if (mode === "download") {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName || "document";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    return true;
-  } else if (mode === "print") {
-    const win = window.open(url, "_blank");
-    if (win) {
-      win.addEventListener("load", () => win.print());
-    }
-    return true;
-  } else {
-    window.open(url, "_blank");
-    return true;
-  }
-}
-
-async function openReviewFile(caseId, fileKey, downloadUrl, mode, fileName) {
-  if (fileKey) {
-    const opened = await openFile(caseId, fileKey, mode, fileName);
-    if (!opened) return false;
-    return true;
-  }
-  if (downloadUrl && downloadUrl !== "#" && downloadUrl !== "undefined") {
-    if (mode === "print") {
-      const win = window.open(downloadUrl, "_blank");
-      win?.addEventListener("load", () => win.print());
-    } else {
-      window.open(downloadUrl, "_blank");
-    }
-    return true;
-  }
-  throw new Error("Download link unavailable for this file.");
-}
-
 async function removeApplicantFromCase(caseId, paralegalId, drawerEl) {
-  const confirmed = window.confirm("Remove this applicant? They will be notified and unable to reapply unless relisted.");
+  const confirmed = await confirmAction(
+    "They will be notified and unable to reapply unless this Matter is relisted.",
+    { title: "Remove this applicant?", confirmLabel: "Remove applicant", tone: "danger" }
+  );
   if (!confirmed) return;
   try {
     await secureFetch(
@@ -7235,7 +5775,7 @@ async function removeApplicantFromCase(caseId, paralegalId, drawerEl) {
     await loadArchivedCases(true);
     const cachedApplicants = applicantDrawerCache.get(caseId) || [];
     const visibleCount = cachedApplicants.filter(
-      (entry) => !["accepted", "rejected"].includes(entry.status)
+      (entry) => !["accepted", "rejected", "withdrawn"].includes(entry.status)
     ).length;
     updateCaseApplicantCount(caseId, visibleCount);
     renderCasesView();
@@ -7245,8 +5785,13 @@ async function removeApplicantFromCase(caseId, paralegalId, drawerEl) {
 }
 
 async function blockApplicantFromCase(caseId, paralegalId, paralegalName, drawerEl) {
-  const confirmed = window.confirm(
-    `Block ${paralegalName || "this applicant"} from future interaction? They will no longer be able to apply, be invited, be hired, or message you on Let's ParaConnect. They will not be notified.`
+  const confirmed = await confirmAction(
+    "They will no longer be able to apply, be invited, be hired, or message you. They will not be notified.",
+    {
+      title: `Block ${paralegalName || "this applicant"}?`,
+      confirmLabel: "Block applicant",
+      tone: "danger",
+    }
   );
   if (!confirmed) return;
   try {
@@ -7262,7 +5807,7 @@ async function blockApplicantFromCase(caseId, paralegalId, paralegalName, drawer
     await loadArchivedCases(true);
     const cachedApplicants = applicantDrawerCache.get(caseId) || [];
     const visibleCount = cachedApplicants.filter(
-      (entry) => !["accepted", "rejected"].includes(entry.status)
+      (entry) => !["accepted", "rejected", "withdrawn"].includes(entry.status)
     ).length;
     updateCaseApplicantCount(caseId, visibleCount);
     renderCasesView();
@@ -7271,53 +5816,23 @@ async function blockApplicantFromCase(caseId, paralegalId, paralegalName, drawer
   }
 }
 
-async function getSignedUrl(caseId, key) {
-  const res = await secureFetch(`/api/cases/${caseId}/files/signed-get?key=${encodeURIComponent(key)}`, {
-    headers: { Accept: "application/json" },
-    noRedirect: true,
-  });
-  if (res.status === 401) {
-    throw new Error("Session expired. Please sign in again.");
-  }
-  if (res.status === 404) {
-    return null;
-  }
-  if (!res.ok) {
-    const payload = await res.json().catch(() => ({}));
-    throw new Error(payload?.error || payload?.msg || "Unable to sign file");
-  }
-  const data = await res.json();
-  return data?.url || null;
-}
-
-async function uploadToS3(file, caseId) {
-  const ext = (file.name.split(".").pop() || "bin").toLowerCase();
-  const body = {
-    contentType: file.type || "application/octet-stream",
-    ext,
-    folder: "cases",
-    caseId,
-    size: file.size,
-  };
-  const presignRes = await secureFetch("/api/uploads/presign", {
-    method: "POST",
-    body,
-    headers: { Accept: "application/json" },
-  });
-  if (!presignRes.ok) throw new Error("Presign failed");
-  const { url, key } = await presignRes.json();
-  const uploadRes = await fetch(url, {
-    method: "PUT",
-    headers: { "Content-Type": file.type || "application/octet-stream" },
-    body: file,
-  });
-  if (!uploadRes.ok) throw new Error("S3 upload failed");
-  return key;
-}
-
 function toggleModal(modal, show) {
   if (!modal) return;
   modal.classList.toggle("hidden", !show);
+  modal.setAttribute("aria-hidden", show ? "false" : "true");
+  if (show) {
+    modal.removeAttribute("inert");
+    const initialFocus =
+      modal.querySelector("[autofocus]") ||
+      modal.querySelector("input, textarea, select, button, [href], [tabindex]:not([tabindex='-1'])");
+    activateDialogFocus(modal, {
+      initialFocus,
+      onEscape: () => toggleModal(modal, false),
+    });
+    return;
+  }
+  modal.setAttribute("inert", "");
+  deactivateDialogFocus(modal);
 }
 
 function sanitize(str) {
@@ -7330,22 +5845,12 @@ function sanitize(str) {
     .replace(/'/g, "&#39;");
 }
 
-function sanitizeUrl(rawUrl) {
-  if (!rawUrl) return "";
-  try {
-    const url = new URL(String(rawUrl), window.location.origin);
-    const protocol = url.protocol.toLowerCase();
-    if (protocol === "http:" || protocol === "https:" || protocol === "mailto:") {
-      return url.href;
-    }
-  } catch {}
-  return "";
-}
-
-function sanitizeDownloadPath(path) {
-  if (!path) return "#";
-  if (/^https?:/i.test(path)) return path;
-  return path.startsWith("/") ? path : `/${path}`;
+function sanitizeUrl(rawUrl, { requiredHost = "" } = {}) {
+  const required = String(requiredHost || "").trim().toLowerCase();
+  return normalizeHttpNavigationUrl(rawUrl, {
+    allowedHosts: required ? [required] : [],
+    allowSubdomains: Boolean(required),
+  });
 }
 
 function formatCurrency(amountCents = 0) {
@@ -7353,115 +5858,32 @@ function formatCurrency(amountCents = 0) {
   return dollars.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
-async function fetchDashboardData() {
-  const res = await secureFetch("/api/attorney/dashboard", { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error("Dashboard fetch failed");
-  return res.json();
-}
-
-async function fetchOverdueCount() {
-  try {
-    const res = await secureFetch("/api/checklist?overdue=true&limit=1", { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("Checklist fetch failed");
-    const data = await res.json();
-    return data.total || 0;
-  } catch (err) {
-    console.warn("Unable to fetch overdue tasks", err);
-    return 0;
-  }
-}
-
-async function fetchUpcomingEvents(limit = 3) {
-  try {
-    const params = new URLSearchParams({ limit: String(limit) });
-    const res = await secureFetch(`/api/events?${params.toString()}`, { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("Events fetch failed");
-    const data = await res.json();
-    return Array.isArray(data.items) ? data.items : [];
-  } catch (err) {
-    console.warn("Unable to fetch events", err);
-    return [];
-  }
-}
-
-async function fetchThreadsOverview(limit = 10) {
-  try {
-    const res = await secureFetch(`/api/messages/threads?limit=${limit}`, { headers: { Accept: "application/json" }, noRedirect: true });
-    if (!res.ok) throw new Error("Threads fetch failed");
-    const data = await res.json();
-    return Array.isArray(data.threads) ? data.threads : [];
-  } catch (err) {
-    console.warn("Unable to fetch threads", err);
-    return [];
-  }
-}
-
 async function fetchApplicationsForMyJobs() {
-  try {
-    const res = await secureFetch("/api/applications/my-postings", {
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) throw new Error("Unable to load applications");
-    return res.json();
-  } catch (err) {
-    console.warn("Failed to load applications", err);
-    return [];
-  }
+  const ownerId = String(state.user?.id || state.user?._id || "");
+  return caseNoteApi.readReceivedApplications({ ownerId });
 }
 
-async function loadApplicationsForMyJobs({ force = false } = {}) {
+async function loadApplicationsForMyJobs({ force = false, refreshInventory = true } = {}) {
+  if (caseNoteOwnerId) {
+    const result = await (applicationParentPromise || refreshApplicationParent(caseNoteOwnerId, "", { refreshInventory }));
+    if (!Array.isArray(result)) throw new Error("Unable to refresh applications");
+    return result;
+  }
   if (force) applicationsPromise = null;
   if (applicationsPromise) return applicationsPromise;
-  applicationsPromise = (async () => {
+  const ticket = ++applicationsReadEpoch;
+  const pending = (async () => {
     const apps = await fetchApplicationsForMyJobs();
-    applicationsCache = Array.isArray(apps) ? apps : [];
+    if (ticket !== applicationsReadEpoch) return applicationsCache;
+    if (!Array.isArray(apps)) throw new Error('Unable to load applications');
+    applicationsCache = apps;
     applyApplicationsToCases(applicationsCache);
     return applicationsCache;
-  })()
-    .catch((err) => {
-      console.warn("Applications load failed", err);
-      applicationsCache = [];
-      return [];
-    })
-    .finally(() => {
-      applicationsPromise = null;
-    });
-  return applicationsPromise;
-}
-
-function updateMetrics(metrics = {}, overdueCount = 0) {
-  document.querySelectorAll("[data-metric]").forEach((el) => {
-    const key = el.dataset.metric;
-    let text = "--";
-    if (key === "activeCases") {
-      const value = Number(metrics.activeCases || 0);
-      const suffix = value === 1 ? "" : "s";
-      text = `${value} active case${suffix}`;
-      const heading = document.getElementById("activeCasesHeading");
-      if (heading && heading.dataset.static !== "true") {
-        heading.textContent = value > 0 ? `You have ${value} active case${suffix}` : "";
-      }
-    } else if (key === "overdueTasks") {
-      text = `${overdueCount} overdue task${overdueCount === 1 ? "" : "s"}`;
-    } else if (key === "escrowTotal") {
-      text = `${formatCurrency(metrics.escrowTotal || 0)} pending in Stripe`;
-    }
-    el.textContent = text;
+  })().finally(() => {
+    if (applicationsPromise === pending) applicationsPromise = null;
   });
-}
-
-function filterApplicationsForDisplay(apps = []) {
-  return apps.filter((app) => {
-    if (!app?.caseId) return true;
-    const caseEntry = state.caseLookup.get(String(app.caseId));
-    if (!caseEntry) return false;
-    if (hasAssignedParalegal(caseEntry)) return false;
-    const statusKey = normalizeCaseStatus(caseEntry?.status);
-    if (statusKey === "completed") return false;
-    if (caseEntry?.archived === true) return false;
-    if (caseEntry?.paymentReleased === true) return false;
-    return true;
-  });
+  applicationsPromise = pending;
+  return pending;
 }
 
 function extractCaseIdFromApplication(app = {}) {
@@ -7480,8 +5902,9 @@ function extractCaseIdFromApplication(app = {}) {
 }
 
 function applyApplicationsToCases(apps = []) {
+  if (!Array.isArray(apps)) return;
   caseApplicationCounts.clear();
-  if (!Array.isArray(apps) || !apps.length) return;
+  state.cases.forEach(item => { const caseId = parseCaseId(item); if (caseId) caseApplicationCounts.set(String(caseId), 0); });
   apps.forEach((app) => {
     const caseId = extractCaseIdFromApplication(app);
     if (!caseId) return;
@@ -7507,78 +5930,12 @@ function applyApplicationCountsToCases({ render = false } = {}) {
       caseItem.applicantsCount = nextCount;
     }
   });
-  if (render && didChange && dashboardViewState.casesInitialized) {
+  // Complete inventories own their rows and counts; Home summary reconciliation
+  // must not replace an independently loaded list or detach its open controls.
+  if (render && didChange && dashboardViewState.casesInitialized && !currentMatterInventory && !currentDraftInventory) {
     renderCasesView();
     restoreApplicantDrawerFromQuery();
   }
-}
-
-function buildOverviewSignals({ cases = [], apps = [], archivedCases = [], overdueCount = 0 } = {}) {
-  const reviewCaseIds = new Set();
-  let unfundedCount = 0;
-
-  (cases || []).forEach((caseItem) => {
-    const statusKey = normalizeCaseStatus(caseItem?.status);
-    const hasParalegal = !!(caseItem?.paralegal || caseItem?.paralegalId);
-    const escrowFunded = String(caseItem?.escrowStatus || "").toLowerCase() === "funded";
-    const awaitingFunding = hasParalegal && !escrowFunded && statusKey !== "open";
-    if (awaitingFunding) unfundedCount += 1;
-
-    const caseId = String(caseItem?.id || caseItem?._id || caseItem?.caseId || "");
-    (caseItem?.files || []).forEach((file) => {
-      const fileStatus = String(file?.status || "").toLowerCase();
-      if (fileStatus === "pending_review") {
-        reviewCaseIds.add(caseId || String(reviewCaseIds.size));
-      }
-    });
-  });
-
-  const completedCasesCount = getCompletedDashboardCases({ cases, archivedCases }).length;
-
-  const pendingApplications = filterApplicationsForDisplay(Array.isArray(apps) ? apps : []).filter((app) => {
-    const status = String(app?.status || "").toLowerCase();
-    return !status || status === "submitted" || status === "pending";
-  }).length;
-
-  return {
-    unfundedCount,
-    casesCreatedCount: Array.isArray(cases) ? cases.length : 0,
-    completedCasesCount,
-    pendingReviewCount: reviewCaseIds.size,
-    overdueCount,
-    applicationsCount: pendingApplications,
-  };
-}
-
-function updateOverviewSignals(partial = {}) {
-  Object.assign(overviewSignals, partial);
-  const todayMap = {
-    unfunded: overviewSignals.unfundedCount,
-    casesCreated: overviewSignals.casesCreatedCount,
-    completedCases: overviewSignals.completedCasesCount,
-    pendingReviews: overviewSignals.pendingReviewCount,
-    overdue: overviewSignals.overdueCount,
-    applications: overviewSignals.applicationsCount,
-  };
-  document.querySelectorAll("[data-today]").forEach((el) => {
-    const key = el.dataset.today;
-    if (key && Object.prototype.hasOwnProperty.call(todayMap, key)) {
-      el.textContent = String(todayMap[key]);
-    }
-  });
-
-  const queueMap = {
-    unfunded: overviewSignals.unfundedCount,
-    pendingReviews: overviewSignals.pendingReviewCount,
-    applications: overviewSignals.applicationsCount,
-  };
-  document.querySelectorAll("[data-queue]").forEach((el) => {
-    const key = el.dataset.queue;
-    if (key && Object.prototype.hasOwnProperty.call(queueMap, key)) {
-      el.textContent = String(queueMap[key]);
-    }
-  });
-  renderNeedsAttentionQueue();
 }
 
 function pluralizeCount(count, singular, plural = `${singular}s`) {
@@ -7589,61 +5946,21 @@ function pluralizeCount(count, singular, plural = `${singular}s`) {
 function buildNeedsAttentionItems() {
   const items = [];
   const progress = getAttorneyOnboardingProgress();
+  const onboardingGuidanceActive =
+    onboardingAttentionHydrated &&
+    !isAttorneyOnboardingDismissed() &&
+    Boolean(getNextOnboardingStep(progress));
   const hasAnyMatter =
-    Number(overviewSignals.casesCreatedCount || 0) > 0 ||
-    (Array.isArray(state.casesArchived) && state.casesArchived.length > 0);
+    Number(overviewSignals.casesCreatedCount || 0) > 0;
 
-  if (state.billing.hasPaymentMethod === false) {
+  if (!onboardingGuidanceActive && state.billing.hasPaymentMethod === false) {
     items.push({
       key: "payment",
       title: "Add a payment method",
-      meta: "A payment method is required before hiring and funding a paralegal.",
-      actionLabel: "Open billing",
-      href: "#billing",
-      viewTarget: "billing",
-    });
-  }
-
-  if (overviewSignals.applicationsCount > 0) {
-    items.push({
-      key: "applications",
-      title: `${pluralizeCount(overviewSignals.applicationsCount, "application")} ready for review`,
-      meta: "Review interested paralegals while the matter is fresh.",
-      actionLabel: "Review applicants",
-      href: "#cases:inquiries",
-      viewTarget: "cases",
-    });
-  }
-
-  if (overviewSignals.unfundedCount > 0) {
-    items.push({
-      key: "funding",
-      title: `${pluralizeCount(overviewSignals.unfundedCount, "matter")} awaiting funding`,
-      meta: "Funding must be resolved before work can reliably move forward.",
+      meta: "Keep a card ready to fund a Matter when you hire.",
       actionLabel: "Open payments",
-      href: "#billing",
-      viewTarget: "billing",
-    });
-  }
-
-  if (overviewSignals.unreadCount > 0) {
-    items.push({
-      key: "messages",
-      title: `${pluralizeCount(overviewSignals.unreadCount, "message")} waiting`,
-      meta: "Open the latest matter conversation and respond from the workspace.",
-      actionLabel: "Open messages",
-      action: "messages",
-    });
-  }
-
-  if (overviewSignals.pendingReviewCount > 0) {
-    items.push({
-      key: "files",
-      title: `${pluralizeCount(overviewSignals.pendingReviewCount, "matter")} with files to review`,
-      meta: "Review submitted documents so completion and payment can stay on track.",
-      actionLabel: "Open matters",
-      href: "#cases",
-      viewTarget: "cases",
+      href: "#funds",
+      viewTarget: "funds",
     });
   }
 
@@ -7651,14 +5968,14 @@ function buildNeedsAttentionItems() {
     items.push({
       key: "overdue",
       title: `${pluralizeCount(overviewSignals.overdueCount, "overdue task")}`,
-      meta: "Resolve overdue checklist items before they slow down active work.",
-      actionLabel: "Open matters",
-      href: "#cases",
-      viewTarget: "cases",
+      meta: "",
+      actionLabel: "Open tasks",
+      href: "#tasks",
+      viewTarget: "tasks",
     });
   }
 
-  if (!progress.profileDone) {
+  if (!onboardingGuidanceActive && !progress.profileDone) {
     items.push({
       key: "profile",
       title: "Finish your attorney profile",
@@ -7668,7 +5985,7 @@ function buildNeedsAttentionItems() {
     });
   }
 
-  if (!hasAnyMatter && progress.profileDone && state.billing.hasPaymentMethod === true) {
+  if (!onboardingGuidanceActive && legacyHome?.state.inventory.phase === "ready" && !hasAnyMatter && progress.profileDone && state.billing.hasPaymentMethod === true) {
     items.push({
       key: "first-matter",
       title: "Post your first matter",
@@ -7678,23 +5995,38 @@ function buildNeedsAttentionItems() {
     });
   }
 
+  const unavailable = Object.entries(legacyHome?.state || {}).filter(([key, source]) => key !== "inventory" && (source.phase !== "ready" || key === "messages" && source.value.mismatch));
+  if (unavailable.length) items.push({ key: "unavailable", title: unavailable.some(([, source]) => source.phase === "loading") ? "Checking remaining items…" : "Some Home items could not be verified", actionLabel: "Refresh Home", action: "refresh" });
   return items;
 }
 
 function renderNeedsAttentionQueue() {
   const shell = document.getElementById("attorneyNeedsAttention");
   const list = document.getElementById("attorneyNeedsAttentionList");
-  if (!shell || !list) return;
+  if (!shell || !list || !legacyHome) return;
+  if (caseNoteModalRef && !caseNoteModalRef.classList.contains("hidden") && !Object.values(legacyHome.state).every(source => source.phase === "failed")) { homeAttentionRefreshDeferred = true; return; }
+  const focused = list.contains(document.activeElement) ? { text: document.activeElement.textContent, href: document.activeElement.getAttribute("href"), matterId: document.activeElement.closest("[data-home-attention]")?.dataset.homeAttention } : null;
   const items = buildNeedsAttentionItems();
+  const matterNodes = legacyHome?.attentionNodes() || [];
+  const hasMatterItems = matterNodes.length > 0;
+  const progress = getAttorneyOnboardingProgress();
+  const onboardingGuidanceActive =
+    !isAttorneyOnboardingDismissed() && Boolean(getNextOnboardingStep(progress));
+  if (!items.length && !hasMatterItems && onboardingGuidanceActive) {
+    shell.hidden = true;
+    shell.setAttribute("aria-hidden", "true");
+    list.textContent = "";
+    return;
+  }
   shell.hidden = false;
   shell.setAttribute("aria-hidden", "false");
 
-  if (!items.length) {
+  if (!items.length && !hasMatterItems) {
     list.innerHTML = `
       <div class="queue-item">
         <div>
           <div class="queue-title">All clear</div>
-          <div class="queue-meta">No urgent applications, messages, payment blockers, file reviews, or overdue tasks need action right now.</div>
+
         </div>
         <a class="queue-action" href="create-case.html">New matter</a>
       </div>
@@ -7707,38 +6039,41 @@ function renderNeedsAttentionQueue() {
       const title = sanitize(item.title || "Review item");
       const meta = sanitize(item.meta || "");
       const label = sanitize(item.actionLabel || "Open");
-      const href = item.href ? sanitize(item.href) : "#";
-      const actionAttr = item.action ? ` data-attention-action="${sanitize(item.action)}"` : "";
-      const viewAttr = item.viewTarget ? ` data-view-target="${sanitize(item.viewTarget)}"` : "";
+      const actionMarkup = item.href
+        ? `<a class="queue-action" href="${sanitize(item.href)}"${item.viewTarget ? ` data-view-target="${sanitize(item.viewTarget)}"` : ""}>${label}</a>`
+        : item.action
+          ? `<button class="queue-action" type="button" data-attention-action="${sanitize(item.action)}">${label}</button>`
+          : `<span class="queue-action" aria-disabled="true">Unavailable</span>`;
       return `
         <div class="queue-item" data-attention-item="${sanitize(item.key || "")}">
           <div>
             <div class="queue-title">${title}</div>
-            <div class="queue-meta">${meta}</div>
+            ${meta ? `<div class="queue-meta">${meta}</div>` : ""}
           </div>
-          <a class="queue-action" href="${href}"${viewAttr}${actionAttr}>${label}</a>
+          ${actionMarkup}
         </div>
       `;
     })
     .join("");
+  list.append(...matterNodes);
+  if (focused && document.activeElement === document.body) {
+    const replacement = Array.from(list.querySelectorAll("a,button")).find(element => element.textContent === focused.text && element.getAttribute("href") === focused.href && element.closest("[data-home-attention]")?.dataset.homeAttention === focused.matterId);
+    const target = replacement || document.getElementById("attorneyNeedsAttentionTitle");
+    if (target) { if (!replacement) target.tabIndex = -1; target.focus(); }
+  }
 }
 
 async function refreshApplicationsOverview({ force = false } = {}) {
-  await loadCasesWithFiles(force);
-  const [apps, hasPaymentMethod] = await Promise.all([
-    loadApplicationsForMyJobs({ force }),
-    hasDefaultPaymentMethod(),
+  await loadApplicationsForMyJobs({ force, refreshInventory: false });
+  await legacyHome?.refresh(["applications", "inventory", "payment"]);
+  // A person may have opened a panel while these background reads were pending.
+  // Keep that interaction intact, then apply the coalesced update after it closes.
+  if (deferApplicationAutoRefresh()) return false;
+  if (force) await Promise.all([
+    currentDraftInventory?.state.phase === 'ready' ? loadCaseDrafts({ force: true }) : null,
+    currentMatterInventory?.state.phase === 'ready' ? loadCurrentMatters({ force: true }) : null,
   ]);
-  state.billing.hasPaymentMethod = hasPaymentMethod;
-  updateOnboardingChecklist();
-  renderApplications(apps || [], hasPaymentMethod);
-  updateOverviewSignals(
-    buildOverviewSignals({
-      cases: state.cases,
-      apps,
-      overdueCount: overviewSignals.overdueCount,
-    })
-  );
+  return true;
 }
 
 function initHomeTabs() {
@@ -7770,33 +6105,6 @@ function initHomeTabs() {
       if (key) activate(key);
     });
   });
-}
-
-function renderDeadlines(container, events = []) {
-  if (!container) return;
-  const now = new Date();
-  const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const upcoming = (events || [])
-    .map((ev) => {
-      const start = ev?.start ? new Date(ev.start) : null;
-      if (!start || Number.isNaN(start.getTime())) return null;
-      return { ...ev, start };
-    })
-    .filter((ev) => ev && ev.start >= now && ev.start <= weekFromNow)
-    .sort((a, b) => a.start - b.start)
-    .slice(0, 2);
-  if (!upcoming.length) {
-    container.innerHTML = `<div class="info-line" style="color:var(--muted);">No upcoming deadlines this week.</div>`;
-    return;
-  }
-  container.innerHTML = upcoming
-    .map((ev) => {
-      const title = sanitize(ev.title || "Event");
-      const when = ev.start.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-      const where = ev.where ? ` · ${sanitize(ev.where)}` : "";
-      return `<div class="info-line">&bull; ${title}${where} – <strong>${when}</strong></div>`;
-    })
-    .join("");
 }
 
 function updateMessagePreviewUI({
@@ -7837,985 +6145,16 @@ function updateMessagePreviewUI({
   state.latestThreadCaseId = threadCaseId;
 }
 
-function renderEscrowPanel(container, metrics = {}) {
+function renderEscrowPanel(container) {
   if (!container) return;
-  const billingHref = "#billing";
+  const billingHref = "#funds";
   container.innerHTML = `
-    <div class="info-line">&bull; View all invoices and receipts in Billing.</div>
-    <div class="info-line">&bull; Export your history anytime.</div>
     <div class="info-actions" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
-      <a class="pill-btn primary" href="${billingHref}" data-view-target="billing">Open Billing &amp; Payments</a>
-      <a class="pill-btn" href="/api/payments/export/csv">Download Receipts (CSV)</a>
+      <a class="pill-btn primary" href="${billingHref}" data-view-target="funds">Open Payments</a>
     </div>
   `;
 }
 
-function formatApplicationBudget(app = {}) {
-  const value = app.budget ?? app.totalAmount ?? app.paymentAmount ?? "";
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return `$${value.toLocaleString()}`;
-  }
-  if (value && Number.isFinite(+value)) {
-    return `$${Number(value).toLocaleString()}`;
-  }
-  if (typeof value === "string" && value.trim()) {
-    const cleaned = value.trim();
-    if (cleaned.startsWith("$")) return cleaned;
-    const parsed = parseFloat(cleaned.replace(/[^0-9.-]/g, ""));
-    if (Number.isFinite(parsed)) {
-      return `$${parsed.toLocaleString()}`;
-    }
-  }
-  return "—";
-}
-
-function getPrimaryApplication(apps = []) {
-  if (!apps.length) return null;
-  let primary = apps[0];
-  let primaryTime = new Date(primary.createdAt || primary.appliedAt || primary.updatedAt || 0).getTime();
-  if (!Number.isFinite(primaryTime)) primaryTime = 0;
-  apps.slice(1).forEach((app) => {
-    const time = new Date(app.createdAt || app.appliedAt || app.updatedAt || 0).getTime();
-    if (Number.isFinite(time) && time > primaryTime) {
-      primary = app;
-      primaryTime = time;
-    }
-  });
-  return primary;
-}
-
-function renderApplications(apps = [], hasPaymentMethod = true) {
-  const container = document.getElementById("applicationsSection");
-  if (!container) return;
-  const filteredApps = filterApplicationsForDisplay(apps);
-  if (!filteredApps.length) {
-    container.innerHTML = `
-      <div class="case-card empty-state">
-        <div class="case-header">
-          <div>
-            <h2>No applications yet</h2>
-            <div class="case-subinfo">Paralegal applications to your postings will appear here.</div>
-          </div>
-        </div>
-      </div>`;
-    return;
-  }
-  const grouped = new Map();
-  filteredApps.forEach((app, index) => {
-    const caseId = extractCaseIdFromApplication(app);
-    const key = caseId || `app-${index}`;
-    const entry = grouped.get(key) || { caseId, apps: [], latestTimestamp: 0 };
-    entry.apps.push(app);
-    const timestamp = new Date(app.createdAt || app.appliedAt || app.updatedAt || 0).getTime();
-    if (Number.isFinite(timestamp)) {
-      entry.latestTimestamp = Math.max(entry.latestTimestamp, timestamp);
-    }
-    grouped.set(key, entry);
-  });
-
-  container.innerHTML = Array.from(grouped.values())
-    .sort((a, b) => (b.latestTimestamp || 0) - (a.latestTimestamp || 0))
-    .map((group) => {
-      const caseId = group.caseId || "";
-      const caseEntry = caseId ? state.caseLookup.get(String(caseId)) : null;
-      const primaryApp = getPrimaryApplication(group.apps) || group.apps[0] || {};
-      const title = sanitize(caseEntry?.title || primaryApp.jobTitle || primaryApp.caseTitle || "Matter");
-      const practiceRaw =
-        caseEntry?.practiceArea ||
-        caseEntry?.field ||
-        primaryApp.practiceArea ||
-        primaryApp.practice ||
-        "General practice";
-      const practice = sanitize(titleCaseWords(practiceRaw));
-      const amountFromCase = caseEntry ? formatCaseAmount(caseEntry) : "—";
-      const amount = amountFromCase !== "—" ? amountFromCase : formatApplicationBudget(primaryApp);
-      const amountText = amount && amount !== "—" ? sanitize(amount) : "—";
-      const applicantsFromCase = caseEntry
-        ? Number(
-            caseEntry.applicantsCount ??
-              (Array.isArray(caseEntry.applicants) ? caseEntry.applicants.length : caseEntry.applicants) ??
-              0
-          )
-        : 0;
-      const applicantCount = Math.max(group.apps.length, applicantsFromCase);
-      const applicantsLabel = applicantCount === 1 ? "1 applicant" : `${applicantCount} applicants`;
-      const paralegalId =
-        primaryApp?.paralegal?.id ||
-        primaryApp?.paralegal?._id ||
-        primaryApp?.paralegalId ||
-        "";
-      const name = sanitize(
-        `${primaryApp?.paralegal?.firstName || ""} ${primaryApp?.paralegal?.lastName || ""}`.trim() ||
-          "Paralegal"
-      );
-      const statusKey = String(primaryApp?.status || "").toLowerCase();
-      const canHire =
-        !!caseId &&
-        !!paralegalId &&
-        !["accepted", "rejected"].includes(statusKey) &&
-        canHireForCase(caseEntry);
-      const paymentBlocked = hasPaymentMethod === false;
-      const showPaymentGate = paymentBlocked && canHire;
-      let hireDisabledAttr = "";
-      if (showPaymentGate) {
-        hireDisabledAttr = ' disabled aria-disabled="true" title="Add a payment method to hire."';
-      } else if (!canHire) {
-        let reason = "Select an applicant to hire.";
-        if (caseEntry && isRelistHireLocked(caseEntry)) {
-          reason = "Hiring locked until the payout is finalized.";
-        } else if (caseEntry && !canHireForCase(caseEntry)) {
-          reason = "Matter is not ready for hiring.";
-        }
-        hireDisabledAttr = ` disabled aria-disabled="true" title="${sanitize(reason)}"`;
-      }
-      const viewApplicantsHref = caseId
-        ? `dashboard-attorney.html?openApplicants=1&caseId=${encodeURIComponent(caseId)}#cases:inquiries`
-        : "#cases:inquiries";
-      const viewApplicantsAttrs = caseId ? "" : ' aria-disabled="true" tabindex="-1"';
-      return `
-        <div class="case-card applications-summary">
-          <div class="case-header">
-            <div>
-              <h2>${title}</h2>
-              <div class="case-subinfo">${practice}${amountText ? ` • ${amountText}` : ""}</div>
-              <div class="case-subinfo">${applicantsLabel}</div>
-            </div>
-            <div class="case-actions">
-              <button class="chip" type="button" data-hire-paralegal data-case-id="${sanitize(
-                caseId
-              )}" data-paralegal-id="${sanitize(paralegalId)}" data-paralegal-name="${name}"${hireDisabledAttr}>Hire</button>
-              <a class="chip" href="${sanitize(viewApplicantsHref)}" data-view-applicants data-case-id="${sanitize(
-                caseId
-              )}"${viewApplicantsAttrs}>View applicants</a>
-            </div>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-
-  bindApplicationsActions();
-}
-
-function bindApplicationsActions() {
-  if (applicationsActionsBound) return;
-  const container = document.getElementById("applicationsSection");
-  if (!container) return;
-  container.addEventListener("click", (event) => {
-    const viewBtn = event.target.closest("[data-view-applicants]");
-    if (viewBtn) {
-      if (viewBtn.getAttribute("aria-disabled") === "true") {
-        return;
-      }
-      const caseId = viewBtn.dataset.caseId || "";
-      if (!caseId) return;
-      event.preventDefault();
-      openCaseApplications(caseId);
-      return;
-    }
-    const hireBtn = event.target.closest("[data-hire-paralegal]");
-    if (!hireBtn) return;
-    if (hireBtn.hasAttribute("disabled") || hireBtn.getAttribute("aria-disabled") === "true") {
-      return;
-    }
-    event.preventDefault();
-    const caseId = hireBtn.dataset.caseId || "";
-    const paralegalId = hireBtn.dataset.paralegalId || "";
-    const paralegalName = hireBtn.dataset.paralegalName || "Paralegal";
-    if (!caseId || !paralegalId) return;
-    handleHireFromApplications({ caseId, paralegalId, paralegalName, button: hireBtn });
-  });
-  applicationsActionsBound = true;
-}
-
-async function handleHireFromApplications({ caseId, paralegalId, paralegalName, button, skipPreEngagementStep = false }) {
-  if (button) {
-    button.classList.add("is-pressed");
-    window.setTimeout(() => button.classList.remove("is-pressed"), 180);
-  }
-  let caseDetails;
-  try {
-    caseDetails = await getCaseForHire(caseId);
-  } catch (err) {
-    notifyCases(err?.message || "Unable to load matter details.", "error");
-    return;
-  }
-  if (!canHireForCase(caseDetails)) {
-    if (isRelistHireLocked(caseDetails)) {
-      if (!caseDetails?.payoutFinalizedAt) {
-        notifyCases("Payout must be finalized before hiring a new paralegal.", "error");
-      } else {
-        const deadlineText = caseDetails?.disputeDeadlineAt
-          ? new Date(caseDetails.disputeDeadlineAt).toLocaleString()
-          : "after the 24-hour hold ends";
-        notifyCases(`Hiring is locked until ${deadlineText}.`, "error");
-      }
-      return;
-    }
-    if (normalizeCaseStatus(caseDetails?.status) === "paused" && !caseDetails?.relistRequestedAt) {
-      notifyCases("Relist the case before hiring a new paralegal.", "error");
-      return;
-    }
-    if (hasAssignedParalegal(caseDetails)) {
-      notifyCases("A paralegal is already hired for this case.", "error");
-      return;
-    }
-    const fallbackAmount = resolveCaseBudgetCents(caseDetails);
-    if (!Number.isFinite(fallbackAmount) || fallbackAmount <= 0) {
-      notifyCases("Remaining case balance is $0. Hiring is unavailable.", "error");
-      return;
-    }
-    notifyCases("Hiring is unavailable for this case right now.", "error");
-    return;
-  }
-  const amountCents = resolveCaseBudgetCents(caseDetails);
-  if (!Number.isFinite(amountCents) || amountCents <= 0) {
-    notifyCases("Payment amount is unavailable for this case.", "error");
-    return;
-  }
-
-  const reuseEscrow = isRelistedCase(caseDetails) && isEscrowFundedCase(caseDetails);
-  if (!reuseEscrow) {
-    const paymentReady = await hasDefaultPaymentMethod();
-    if (!paymentReady) {
-      state.billing.hasPaymentMethod = false;
-      notifyCases("Add a payment method to hire before hiring.", "error");
-      return;
-    }
-  }
-
-  openHireConfirmModal({
-    paralegalName,
-    amountCents,
-    feePct: PLATFORM_FEE_PCT,
-    reuseEscrow,
-    skipPreEngagementStep,
-    existingPreEngagement:
-      !skipPreEngagementStep &&
-      caseDetails?.preEngagement &&
-      String(caseDetails.preEngagement.requestedParalegalId || "") === String(paralegalId || "") &&
-      String(caseDetails.preEngagement.status || "").toLowerCase() === "requested"
-        ? caseDetails.preEngagement
-        : null,
-    continueHref: `case-detail.html?caseId=${encodeURIComponent(caseId)}`,
-    onSendPreEngagement: async ({ preEngagement } = {}) => {
-      await savePreEngagementDraft(caseId, paralegalId, preEngagement);
-      await refreshApplicationsOverview({ force: true });
-    },
-    onConfirm: async ({ preEngagement } = {}) => {
-      const originalText = button?.textContent || "Hire";
-      if (button) {
-        button.textContent = "Processing...";
-        button.setAttribute("disabled", "disabled");
-      }
-      try {
-        void preEngagement;
-        await hireParalegal(caseId, paralegalId);
-        await refreshApplicationsOverview({ force: true });
-      } catch (err) {
-        if (button) {
-          button.removeAttribute("disabled");
-          button.textContent = originalText;
-        }
-        throw err;
-      }
-    },
-  });
-}
-
-async function hasDefaultPaymentMethod() {
-  try {
-    const res = await secureFetch("/api/payments/payment-method/default", {
-      headers: { Accept: "application/json" },
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) return false;
-    return !!payload?.paymentMethod;
-  } catch {
-    return false;
-  }
-}
-
-async function getCaseForHire(caseId) {
-  const existing = state.caseLookup.get(String(caseId));
-  if (existing) return existing;
-  const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, { headers: { Accept: "application/json" } });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(payload?.error || "Unable to load matter details.");
-  }
-  return payload;
-}
-
-const DEFAULT_HIRE_ERROR = "Unable to hire paralegal.";
-
-function formatHireErrorMessage(message) {
-  if (!message || typeof message !== "string") return DEFAULT_HIRE_ERROR;
-  const normalized = message.toLowerCase();
-  if (normalized.includes("stripe") && normalized.includes("connect")) {
-    return "This paralegal must connect Stripe before you can hire them.";
-  }
-  if (
-    normalized.includes("stripe") &&
-    (normalized.includes("onboard") || normalized.includes("onboarding") || normalized.includes("payout"))
-  ) {
-    return "This paralegal must complete Stripe onboarding before you can hire them.";
-  }
-  return message;
-}
-
-async function hireParalegal(caseId, paralegalId) {
-  const res = await secureFetch(
-    `/api/cases/${encodeURIComponent(caseId)}/hire/${encodeURIComponent(paralegalId)}`,
-    { method: "POST", body: {} }
-  );
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(payload?.error || DEFAULT_HIRE_ERROR);
-  return payload;
-}
-
-async function savePreEngagementDraft(caseId, paralegalId, preEngagement) {
-  const formData = new FormData();
-  formData.set(
-    "confidentialityAgreementRequired",
-    preEngagement?.confidentialityAgreementSelected ? "true" : "false"
-  );
-  formData.set(
-    "conflictsCheckRequired",
-    preEngagement?.conflictsCheckSelected ? "true" : "false"
-  );
-  formData.set("conflictsDetails", String(preEngagement?.conflictsDetails || ""));
-  if (preEngagement?.confidentialityFile) {
-    formData.append(
-      "confidentialityFile",
-      preEngagement.confidentialityFile,
-      preEngagement.confidentialityFileName || preEngagement.confidentialityFile.name || "confidentiality-agreement"
-    );
-  }
-  const res = await secureFetch(
-    `/api/cases/${encodeURIComponent(caseId)}/pre-engagement/${encodeURIComponent(paralegalId)}/request`,
-    { method: "POST", body: formData }
-  );
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(payload?.error || "Unable to save pre-engagement requirements.");
-  }
-  return payload;
-}
-
-function ensureHireModalStyles() {
-  if (document.getElementById("hire-confirm-styles")) return;
-  const style = document.createElement("style");
-  style.id = "hire-confirm-styles";
-  style.textContent = `
-    .hire-confirm-overlay{position:fixed;inset:0;background:rgba(15,23,42,.4);display:flex;align-items:center;justify-content:center;z-index:1500;opacity:0;visibility:hidden;transition:opacity .16s ease,visibility .16s ease}
-    .hire-confirm-overlay.is-visible{opacity:1;visibility:visible}
-    .hire-confirm-overlay.is-closing{pointer-events:none}
-    .hire-confirm-modal{background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:var(--radius,18px);padding:28px;max-width:580px;width:min(94%,580px);box-shadow:0 24px 50px rgba(0,0,0,.2);display:grid;gap:16px;font-family:'Cormorant Garamond',serif;font-weight:300;color:var(--ink,#1a1a1a);font-size:1.05rem;opacity:0;transform:translateY(10px) scale(.985);transition:opacity .16s ease,transform .16s ease}
-    .hire-confirm-overlay.is-visible .hire-confirm-modal{opacity:1;transform:translateY(0) scale(1)}
-    .hire-confirm-stage{transition:opacity .18s ease,transform .18s ease}
-    .hire-confirm-stage.is-leaving,.hire-confirm-stage.is-entering{opacity:0;transform:translateY(8px)}
-    .hire-confirm-modal button,
-    .hire-confirm-modal a{font-family:'Cormorant Garamond',serif}
-    .hire-confirm-modal p{font-weight:300;color:var(--muted,#666)}
-    .hire-confirm-title{font-weight:300;font-size:1.6rem;letter-spacing:0.01em;text-align:center}
-    .hire-pre-helper{margin:0 0 16px;color:var(--muted,#666);line-height:1.5}
-    .hire-pre-options{display:grid;gap:10px;margin-bottom:14px}
-    .hire-pre-option{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:var(--radius,14px);background:var(--panel,#fff);cursor:pointer;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease}
-    .hire-pre-option:hover{border-color:rgba(182,164,122,.65);box-shadow:0 10px 24px rgba(15,23,42,.06)}
-    .hire-pre-option.is-selected{border-color:rgba(182,164,122,.85);background:#faf7ef}
-    .hire-pre-option input{margin-top:3px}
-    .hire-pre-option-copy{display:grid;gap:2px}
-    .hire-pre-option-copy strong{font-size:1rem;font-weight:400;color:var(--ink,#1a1a1a)}
-    .hire-pre-reveal{display:grid;gap:10px;margin-top:12px;padding:12px;border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:var(--radius,14px);background:#fbfbfa}
-    .hire-pre-reveal label{font-size:0.9rem;font-weight:400;color:var(--ink,#1a1a1a)}
-    .hire-pre-upload{display:grid;gap:8px}
-    .hire-pre-upload input[type="file"]{display:none}
-    .hire-pre-upload-trigger{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:1px solid var(--line,rgba(0,0,0,0.12));border-radius:999px;background:var(--panel,#fff);color:var(--ink,#1a1a1a);font-weight:400;cursor:pointer;width:max-content}
-    .hire-pre-upload-name{font-size:0.9rem;color:var(--muted,#666)}
-    .hire-pre-reveal textarea{border:1px solid var(--line,rgba(0,0,0,0.12));border-radius:12px;padding:10px;font:inherit;min-height:104px;resize:vertical;background:var(--panel,#fff);color:var(--ink,#1a1a1a)}
-    .hire-pre-reveal textarea.is-invalid{border-color:rgba(185,28,28,.45);background:rgba(254,242,242,.55)}
-    .hire-pre-upload-trigger.is-invalid{border-color:rgba(185,28,28,.45);color:#991b1b;background:rgba(254,242,242,.55)}
-    .hire-pre-field-help{font-size:0.85rem;color:#991b1b;margin-top:-2px}
-    .hire-confirm-summary{border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:var(--radius,14px);padding:14px 18px;display:grid;gap:12px;background:var(--panel,#fff)}
-    .hire-confirm-row{display:flex;justify-content:space-between;gap:16px;align-items:baseline}
-    .hire-confirm-row span{text-transform:uppercase;font-size:0.75rem;letter-spacing:0.08em;color:var(--muted,#666);font-weight:300}
-    .hire-confirm-row strong{font-size:1.3rem;font-weight:300;color:var(--ink,#1a1a1a)}
-    .hire-confirm-total strong{font-weight:400}
-    .hire-confirm-help{display:flex;justify-content:flex-end;margin-top:-6px}
-    .hire-confirm-info{width:26px;height:26px;border-radius:50%;border:1px solid var(--line,rgba(0,0,0,0.08));background:var(--panel,#fff);color:var(--muted,#666);font-size:0.8rem;font-weight:250;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0;transition:border-color .2s ease,color .2s ease,transform .15s ease}
-    .hire-confirm-info:hover,
-    .hire-confirm-info:focus-visible{border-color:var(--accent,#b6a47a);color:var(--ink,#1a1a1a);transform:translateY(-1px)}
-    .hire-confirm-tooltip{position:absolute;right:0;bottom:calc(100% + 10px);width:min(320px,80vw);padding:12px 14px;border-radius:12px;background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));box-shadow:0 18px 40px rgba(0,0,0,.18);font-size:0.9rem;line-height:1.45;color:var(--ink,#1a1a1a);opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .15s ease,transform .15s ease;z-index:2}
-    .hire-confirm-info:hover .hire-confirm-tooltip,
-    .hire-confirm-info:focus-visible .hire-confirm-tooltip{opacity:1;pointer-events:auto;transform:translateY(0)}
-    .hire-confirm-error{border:1px solid rgba(185,28,28,.4);background:rgba(254,242,242,.9);color:#991b1b;border-radius:10px;padding:8px 10px;font-size:0.9rem}
-    .hire-confirm-error a{color:inherit;text-decoration:underline;font-weight:400}
-    .hire-confirm-error a:hover{color:var(--ink,#1a1a1a)}
-    .hire-confirm-success{border:1px solid rgba(22,163,74,.35);background:rgba(240,253,244,.9);color:#166534;border-radius:10px;padding:8px 10px;font-size:0.9rem}
-    .hire-confirm-terms-link{color:var(--accent,#b6a47a);font-weight:600;text-decoration:none}
-    .hire-confirm-terms-link:hover{color:var(--ink,#1a1a1a)}
-    .hire-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:4px;flex-wrap:wrap}
-    .hire-confirm-actions[hidden]{display:none}
-    @media (prefers-reduced-motion: reduce){
-      .hire-confirm-overlay,.hire-confirm-modal{transition:none}
-    }
-  `;
-  document.head.appendChild(style);
-}
-
-function openHireConfirmModal({
-  paralegalName,
-  amountCents,
-  feePct,
-  continueHref,
-  onConfirm,
-  onSendPreEngagement,
-  reuseEscrow = false,
-  skipPreEngagementStep = false,
-  existingPreEngagement = null,
-}) {
-  ensureHireModalStyles();
-  const safeName = sanitize(paralegalName || "Paralegal");
-  const feeNote =
-    "The platform fee supports tools that enable attorneys and paralegals to collaborate, including secure workspace, messaging, document sharing, case workflow tools, payment processing, identity verification, and platform administration. The platform fee is not a fee for legal services.";
-  const feeRate = Number(feePct || 0);
-  const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
-  const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
-  const normalizedExistingPreEngagement =
-    existingPreEngagement &&
-    typeof existingPreEngagement === "object" &&
-    String(existingPreEngagement.status || "").toLowerCase() === "requested"
-      ? {
-          status: "requested",
-          confidentialityAgreementRequired: !!existingPreEngagement.confidentialityAgreementRequired,
-          conflictsCheckRequired: !!existingPreEngagement.conflictsCheckRequired,
-          conflictsDetails: String(existingPreEngagement.conflictsDetails || ""),
-          confidentialityDocument: existingPreEngagement.confidentialityDocument || null,
-        }
-      : null;
-  const preEngagementState = {
-    confidentialityAgreement: !!normalizedExistingPreEngagement?.confidentialityAgreementRequired,
-    conflictsCheck: !!normalizedExistingPreEngagement?.conflictsCheckRequired,
-    none: !normalizedExistingPreEngagement,
-    confidentialityFile: null,
-    fileName: String(normalizedExistingPreEngagement?.confidentialityDocument?.name || ""),
-    conflictsDetails: String(normalizedExistingPreEngagement?.conflictsDetails || ""),
-    confidentialityTouched: false,
-    conflictsTouched: false,
-    submitError: "",
-    submitting: false,
-  };
-  const summaryMarkup = reuseEscrow
-    ? `
-        <div class="hire-confirm-row">
-          <span>Remaining balance</span>
-          <strong>${sanitize(formatCurrency(amountCents))}</strong>
-        </div>
-        <div class="hire-confirm-row hire-confirm-total">
-          <span>New charge</span>
-          <strong>${sanitize(formatCurrency(0))}</strong>
-        </div>
-      `
-    : `
-        <div class="hire-confirm-row">
-          <span>Matter amount</span>
-          <strong>${sanitize(formatCurrency(amountCents))}</strong>
-        </div>
-        <div class="hire-confirm-row">
-          <span>Platform fee (${feeRate}%)</span>
-          <strong>${sanitize(formatCurrency(feeCents))}</strong>
-        </div>
-        <div class="hire-confirm-row hire-confirm-total">
-          <span>Total charge</span>
-          <strong>${sanitize(formatCurrency(totalCents))}</strong>
-        </div>
-      `;
-  const infoMarkup = reuseEscrow
-    ? ""
-    : `
-        <div class="hire-confirm-help">
-          <button class="hire-confirm-info" type="button" aria-label="${sanitize(feeNote)}">
-            ?
-            <span class="hire-confirm-tooltip" aria-hidden="true">${sanitize(feeNote)}</span>
-          </button>
-        </div>
-      `;
-  const copy = `You’re about to hire ${safeName}. Your payment will be processed through Stripe upon confirmation. You can review the <a class="hire-confirm-terms-link" href="terms.html#payments">payment terms here</a>.`;
-  const successCopy = reuseEscrow ? "Matter ready. Work can begin." : "Matter funded. Work can begin.";
-  const overlay = document.createElement("div");
-  overlay.className = "hire-confirm-overlay";
-  overlay.innerHTML = `
-    <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
-      <div class="hire-confirm-stage" data-hire-stage></div>
-    </div>
-  `;
-  const stageEl = overlay.querySelector("[data-hire-stage]");
-
-  const close = () => {
-    if (overlay.classList.contains("is-closing")) return;
-    overlay.classList.add("is-closing");
-    overlay.classList.remove("is-visible");
-    const removeOverlay = () => {
-      overlay.removeEventListener("transitionend", handleTransitionEnd);
-      overlay.remove();
-    };
-    const handleTransitionEnd = (event) => {
-      if (event.target === overlay) removeOverlay();
-    };
-    overlay.addEventListener("transitionend", handleTransitionEnd);
-    window.setTimeout(removeOverlay, 200);
-  };
-  const canClose = () => {
-    const successEl = stageEl?.querySelector("[data-hire-success]");
-    if (successEl && !successEl.hidden) return true;
-    const confirmBtn = stageEl?.querySelector("[data-hire-confirm]");
-    if (!confirmBtn) return true;
-    return !confirmBtn.disabled;
-  };
-  const buildPreEngagementDraft = () => {
-    const hasRequirements = preEngagementState.confidentialityAgreement || preEngagementState.conflictsCheck;
-    if (!hasRequirements || preEngagementState.none) return null;
-    return {
-      confidentialityAgreementSelected: !!preEngagementState.confidentialityAgreement,
-      conflictsCheckSelected: !!preEngagementState.conflictsCheck,
-      confidentialityFile: preEngagementState.confidentialityAgreement ? preEngagementState.confidentialityFile || null : null,
-      confidentialityFileName: preEngagementState.confidentialityAgreement ? preEngagementState.fileName || "" : "",
-      conflictsDetails: preEngagementState.conflictsCheck ? String(preEngagementState.conflictsDetails || "") : "",
-    };
-  };
-  const getPreEngagementValidation = () => {
-    const requiresConfidentiality = !!preEngagementState.confidentialityAgreement;
-    const requiresConflicts = !!preEngagementState.conflictsCheck;
-    const missingConfidentialityFile = requiresConfidentiality && !preEngagementState.confidentialityFile;
-    const missingConflictsDetails =
-      requiresConflicts && !String(preEngagementState.conflictsDetails || "").trim();
-    return {
-      missingConfidentialityFile,
-      missingConflictsDetails,
-      showConfidentialityError: missingConfidentialityFile && preEngagementState.confidentialityTouched,
-      showConflictsError: missingConflictsDetails && preEngagementState.conflictsTouched,
-      hasErrors: missingConfidentialityFile || missingConflictsDetails,
-    };
-  };
-  const getPreEngagementPrimaryLabel = () => {
-    if (preEngagementState.none || (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck)) {
-      return "Next: Fund and Hire";
-    }
-    return normalizedExistingPreEngagement ? "Update and resend" : `Send to ${safeName}`;
-  };
-  const renderPreEngagementStep = () => `
-    ${(() => {
-      const validation = getPreEngagementValidation();
-      return `
-    <div data-hire-step="pre-engagement">
-      <div class="hire-confirm-title" id="hireConfirmTitle">Pre-Engagement</div>
-      ${
-        normalizedExistingPreEngagement
-          ? `<div class="hire-confirm-success">Sent to ${safeName}. Awaiting completion from the paralegal.</div>`
-          : ""
-      }
-      <p class="hire-pre-helper">${
-        normalizedExistingPreEngagement
-          ? `Sent to ${safeName}. Awaiting completion from the paralegal.`
-          : "Before moving forward, you may require pre-engagement items for this paralegal."
-      }</p>
-      <div class="hire-pre-options">
-        <label class="hire-pre-option${preEngagementState.confidentialityAgreement ? " is-selected" : ""}">
-          <input type="checkbox" data-pre-option="confidentiality"${preEngagementState.confidentialityAgreement ? " checked" : ""}>
-          <span class="hire-pre-option-copy">
-            <strong>Confidentiality agreement</strong>
-          </span>
-        </label>
-        <label class="hire-pre-option${preEngagementState.conflictsCheck ? " is-selected" : ""}">
-          <input type="checkbox" data-pre-option="conflicts"${preEngagementState.conflictsCheck ? " checked" : ""}>
-          <span class="hire-pre-option-copy">
-            <strong>Conflicts check</strong>
-          </span>
-        </label>
-        <label class="hire-pre-option${preEngagementState.none ? " is-selected" : ""}">
-          <input type="checkbox" data-pre-option="none"${preEngagementState.none ? " checked" : ""}>
-          <span class="hire-pre-option-copy">
-            <strong>None</strong>
-          </span>
-        </label>
-      </div>
-      ${
-        preEngagementState.confidentialityAgreement
-          ? `
-            <div class="hire-pre-reveal">
-              <div class="hire-pre-upload">
-                <label>Upload confidentiality agreement</label>
-                <label class="hire-pre-upload-trigger${validation.showConfidentialityError ? " is-invalid" : ""}" for="hirePreConfidentialityUpload">Choose file</label>
-                <input id="hirePreConfidentialityUpload" type="file" data-pre-confidentiality-upload>
-                <div class="hire-pre-upload-name">${sanitize(preEngagementState.fileName || "No file selected")}</div>
-                ${
-                  validation.showConfidentialityError
-                    ? `<div class="hire-pre-field-help">Upload a confidentiality agreement to continue.</div>`
-                    : ""
-                }
-              </div>
-            </div>
-          `
-          : ""
-      }
-      ${
-        preEngagementState.conflictsCheck
-          ? `
-            <div class="hire-pre-reveal">
-              <label for="hirePreConflictsDetails">Conflicts check details</label>
-              <textarea id="hirePreConflictsDetails" class="${validation.showConflictsError ? "is-invalid" : ""}" data-pre-conflicts-details placeholder="Enter the names, parties, or details the paralegal should review for conflicts.">${sanitize(
-                preEngagementState.conflictsDetails
-              )}</textarea>
-              ${
-                validation.showConflictsError
-                  ? `<div class="hire-pre-field-help">Enter conflicts check details to continue.</div>`
-                  : ""
-              }
-            </div>
-          `
-          : ""
-      }
-      <div class="hire-confirm-error"${preEngagementState.submitError ? "" : " hidden"} data-pre-error>${sanitize(
-        preEngagementState.submitError || ""
-      )}</div>
-      <div class="hire-confirm-actions">
-        <button class="btn secondary" type="button" data-hire-cancel${preEngagementState.submitting ? " disabled aria-disabled=\"true\"" : ""}>Cancel</button>
-        <button class="btn primary" type="button" data-pre-next${validation.hasErrors || preEngagementState.submitting ? " disabled aria-disabled=\"true\"" : ""}>${sanitize(
-          preEngagementState.submitting ? "Sending..." : getPreEngagementPrimaryLabel()
-        )}</button>
-      </div>
-    </div>
-  `;})()}
-  `;
-  const renderFundHireStep = () => `
-    <div data-hire-step="fund-hire">
-      <div class="hire-confirm-title" id="hireConfirmTitle">Confirm &amp; Hire</div>
-      <p>${copy}</p>
-      <div class="hire-confirm-summary">
-        ${summaryMarkup}
-      </div>
-      ${infoMarkup}
-      <div class="hire-confirm-error" data-hire-error hidden></div>
-      <div class="hire-confirm-success" data-hire-success hidden>${successCopy}</div>
-      <div class="hire-confirm-actions" data-hire-actions>
-        <button class="btn secondary" type="button" data-hire-back>Back</button>
-        <button class="btn secondary" type="button" data-hire-cancel>Cancel</button>
-        <button class="btn primary" type="button" data-hire-confirm>Confirm Hire</button>
-        <a class="btn primary" href="${sanitize(continueHref || "#")}" data-hire-continue hidden>Continue to case</a>
-      </div>
-    </div>
-  `;
-  const renderPreEngagementSentStep = () => `
-    <div data-hire-step="pre-engagement-sent">
-      <div class="hire-confirm-title" id="hireConfirmTitle">${normalizedExistingPreEngagement ? "Pre-Engagement Updated" : "Pre-Engagement Sent"}</div>
-      <p>${normalizedExistingPreEngagement ? `Updated pre-engagement requirements for ${safeName} have been saved. Hiring and funding will continue after the paralegal completes the requested items and you review them.` : `Pre-engagement requirements for ${safeName} have been sent. Hiring and funding will continue after the paralegal completes the requested items and you review them.`}</p>
-      <div class="hire-confirm-success">${normalizedExistingPreEngagement ? "Pre-engagement requirements updated successfully." : "Pre-engagement requirements sent successfully."}</div>
-      <div class="hire-confirm-actions">
-        <button class="btn secondary" type="button" data-hire-close>Close</button>
-      </div>
-    </div>
-  `;
-  const transitionStage = (html, bindFn) => {
-    if (!stageEl) return;
-    stageEl.classList.add("is-leaving");
-    window.setTimeout(() => {
-      stageEl.innerHTML = html;
-      bindFn?.();
-      stageEl.classList.remove("is-leaving");
-      stageEl.classList.add("is-entering");
-      window.requestAnimationFrame(() => {
-        stageEl.classList.remove("is-entering");
-      });
-    }, 140);
-  };
-  const bindCancel = () => {
-    stageEl?.querySelector("[data-hire-cancel]")?.addEventListener("click", () => {
-      if (canClose()) close();
-    });
-  };
-  const bindPreEngagementSentStep = () => {
-    stageEl?.querySelector("[data-hire-close]")?.addEventListener("click", () => {
-      close();
-    });
-  };
-  const bindPreEngagementStep = () => {
-    bindCancel();
-    stageEl?.querySelectorAll("[data-pre-option]").forEach((input) => {
-      input.addEventListener("change", (event) => {
-        const option = event.target?.dataset?.preOption || "";
-        const checked = !!event.target?.checked;
-        if (option === "none") {
-          preEngagementState.submitError = "";
-          preEngagementState.none = checked || (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck);
-          if (preEngagementState.none) {
-            preEngagementState.confidentialityAgreement = false;
-            preEngagementState.conflictsCheck = false;
-            preEngagementState.confidentialityFile = null;
-            preEngagementState.fileName = "";
-            preEngagementState.confidentialityTouched = false;
-            preEngagementState.conflictsTouched = false;
-          }
-        } else if (option === "confidentiality") {
-          preEngagementState.submitError = "";
-          preEngagementState.confidentialityAgreement = checked;
-          if (checked) preEngagementState.none = false;
-          if (!checked) {
-            preEngagementState.confidentialityFile = null;
-            preEngagementState.fileName = "";
-            preEngagementState.confidentialityTouched = false;
-          }
-        } else if (option === "conflicts") {
-          preEngagementState.submitError = "";
-          preEngagementState.conflictsCheck = checked;
-          if (checked) preEngagementState.none = false;
-          if (!checked) preEngagementState.conflictsTouched = false;
-        }
-        if (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck) {
-          preEngagementState.none = true;
-        }
-        transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-      });
-    });
-    stageEl?.querySelector("[data-pre-confidentiality-upload]")?.addEventListener("click", () => {
-      preEngagementState.confidentialityTouched = true;
-    });
-    stageEl?.querySelector("[data-pre-confidentiality-upload]")?.addEventListener("change", (event) => {
-      const file = event.target?.files?.[0] || null;
-      preEngagementState.confidentialityTouched = true;
-      preEngagementState.submitError = "";
-      preEngagementState.confidentialityFile = file;
-      preEngagementState.fileName = file?.name || "";
-      transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-    });
-    stageEl?.querySelector("[data-pre-conflicts-details]")?.addEventListener("blur", () => {
-      preEngagementState.conflictsTouched = true;
-      transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-    });
-    stageEl?.querySelector("[data-pre-conflicts-details]")?.addEventListener("input", (event) => {
-      preEngagementState.conflictsTouched = true;
-      preEngagementState.submitError = "";
-      preEngagementState.conflictsDetails = event.target?.value || "";
-    });
-    stageEl?.querySelector("[data-pre-next]")?.addEventListener("click", async () => {
-      const draft = buildPreEngagementDraft();
-      if (draft) {
-        preEngagementState.submitError = "";
-        preEngagementState.submitting = true;
-        transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-        try {
-          await onSendPreEngagement?.({ preEngagement: draft });
-          transitionStage(renderPreEngagementSentStep(), bindPreEngagementSentStep);
-        } catch (err) {
-          preEngagementState.submitting = false;
-          preEngagementState.submitError = formatHireErrorMessage(err?.message) || "Unable to save pre-engagement requirements.";
-          transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-        }
-        return;
-      }
-      transitionStage(renderFundHireStep(), bindFundHireStep);
-    });
-  };
-  const bindFundHireStep = () => {
-    bindCancel();
-    const errorEl = stageEl?.querySelector("[data-hire-error]");
-    const successEl = stageEl?.querySelector("[data-hire-success]");
-    const continueEl = stageEl?.querySelector("[data-hire-continue]");
-    const confirmBtn = stageEl?.querySelector("[data-hire-confirm]");
-    const cancelBtn = stageEl?.querySelector("[data-hire-cancel]");
-    const backBtn = stageEl?.querySelector("[data-hire-back]");
-    if (skipPreEngagementStep && backBtn) {
-      backBtn.hidden = true;
-    } else {
-      backBtn?.addEventListener("click", () => {
-        if (confirmBtn?.disabled) return;
-        transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-      });
-    }
-    const setLoading = (isLoading) => {
-      if (confirmBtn) {
-        confirmBtn.disabled = isLoading;
-        const loadingLabel = reuseEscrow ? "Assigning..." : "Charging...";
-        confirmBtn.textContent = isLoading ? loadingLabel : "Confirm Hire";
-      }
-      if (cancelBtn) cancelBtn.disabled = isLoading;
-      if (backBtn) backBtn.disabled = isLoading;
-    };
-    if (errorEl) {
-      errorEl.addEventListener("click", (event) => {
-        const link = event.target?.closest?.("a");
-        if (!link) return;
-        close();
-      });
-    }
-    const showError = (message) => {
-      if (!errorEl) return;
-      if (!message) {
-        errorEl.hidden = true;
-        errorEl.textContent = "";
-        return;
-      }
-      const safe = sanitize(message);
-      const phrase = "update your payment method";
-      if (safe.toLowerCase().includes(phrase)) {
-        const linked = safe.replace(
-          new RegExp(phrase, "i"),
-          `<a href="dashboard-attorney.html#billing">update your payment method</a>`
-        );
-        errorEl.innerHTML = linked;
-      } else {
-        errorEl.textContent = safe;
-      }
-      errorEl.hidden = false;
-    };
-    const showSuccess = () => {
-      if (successEl) successEl.hidden = false;
-      if (confirmBtn) confirmBtn.hidden = true;
-      if (backBtn) backBtn.hidden = true;
-      if (cancelBtn) {
-        cancelBtn.disabled = false;
-        cancelBtn.textContent = "Close";
-      }
-      if (continueEl) continueEl.hidden = false;
-    };
-    confirmBtn?.addEventListener("click", async () => {
-      showError("");
-      setLoading(true);
-      try {
-        await onConfirm?.({ preEngagement: buildPreEngagementDraft() });
-        showSuccess();
-      } catch (err) {
-        showError(formatHireErrorMessage(err?.message));
-        setLoading(false);
-      }
-    });
-  };
-
-  overlay.addEventListener("click", (event) => {
-    if (event.target === overlay && canClose()) close();
-  });
-  document.addEventListener(
-    "keydown",
-    (event) => {
-      if (event.key === "Escape" && canClose()) close();
-    },
-    { once: true }
-  );
-  document.body.appendChild(overlay);
-  if (skipPreEngagementStep) {
-    stageEl.innerHTML = renderFundHireStep();
-    bindFundHireStep();
-  } else {
-    stageEl.innerHTML = renderPreEngagementStep();
-    bindPreEngagementStep();
-  }
-  window.requestAnimationFrame(() => overlay.classList.add("is-visible"));
-}
-
-function renderCaseCards(container, cases = [], threadsByCase = new Map()) {
-  if (!container) return;
-  const homeView = document.querySelector(".view-home");
-  if (homeView) {
-    homeView.classList.toggle("home-compact", cases.length <= 2);
-  }
-  const pageCases = cases.slice(0, HOME_PAGE_SIZE);
-  if (!cases.length) {
-    container.hidden = false;
-    container.innerHTML = `
-      <div class="matter-row">
-        <div class="matter-main">
-          <div class="matter-title">No recent matters</div>
-          <div class="matter-meta">Your latest matters will appear here.</div>
-        </div>
-      </div>
-    `;
-    return;
-  }
-  container.hidden = false;
-  container.innerHTML = pageCases
-    .map((c) => {
-      return buildMatterRowMarkup(c, threadsByCase);
-    })
-    .join("");
-
-  bindMatterRowHandlers(container);
-}
-
-function buildMatterRowMarkup(caseItem, threadsByCase) {
-  const caseId = String(caseItem.caseId || caseItem.id || "");
-  const title = sanitize(caseItem.jobTitle || "Untitled Matter");
-  const paralegalName = caseItem.paralegalName || "Unassigned";
-  const paralegal = sanitize(paralegalName);
-  const paralegalId = parseParalegalId(caseItem);
-  const paralegalHref =
-    paralegalId && paralegalName !== "Unassigned"
-      ? buildParalegalProfileUrl(paralegalId, { returnTo: "dashboard-attorney.html#home" })
-      : "";
-  const practice = sanitize(caseItem.practiceArea || "General");
-  const rawStatus = normalizeCaseStatus(caseItem.status);
-  const status = rawStatus
-    ? rawStatus.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
-    : "Open";
-  const created = caseItem.createdAt ? new Date(caseItem.createdAt).toLocaleDateString() : "";
-  const metaParts = [
-    `<span>${practice}</span>`,
-    paralegalHref
-      ? `<a class="matter-inline-link" href="${sanitize(paralegalHref)}">${paralegal}</a>`
-      : `<span>${paralegal}</span>`,
-    `<span>${sanitize(status)}</span>`,
-    created ? `<span>Created ${sanitize(created)}</span>` : "",
-  ].filter(Boolean);
-  const thread = threadsByCase.get(caseId);
-  const unread = Number(thread?.unread || 0);
-  const rawMessageLabel =
-    unread > 0
-      ? `${unread} new message${unread === 1 ? "" : "s"}${
-          paralegal && paralegal !== "Unassigned" ? ` from ${paralegal}` : ""
-        }`
-      : "";
-  const messageLabel = rawMessageLabel.replace(/^\s*\u{1F4AC}\s*/u, "");
-  return `
-    <div class="matter-row" data-case-id="${caseId}">
-      <div class="matter-main">
-        <div class="matter-title">
-          <button type="button" class="matter-title-link" data-case-link="view" data-case-id="${caseId}">${title}</button>
-        </div>
-        <div class="matter-meta">${metaParts.join('<span class="matter-meta-separator" aria-hidden="true">•</span>')}</div>
-        ${messageLabel ? `<button type="button" class="matter-message" data-case-link="view" data-case-id="${caseId}">${messageLabel}</button>` : ""}
-      </div>
-      <button type="button" class="matter-view" data-case-link="view" data-case-id="${caseId}">View →</button>
-    </div>
-  `;
-}
-
-function bindMatterRowHandlers(container) {
-  if (!container) return;
-  container.querySelectorAll(".matter-row").forEach((row) => {
-    row.addEventListener("click", (evt) => {
-      if (evt.target.closest("[data-case-link]") || evt.target.closest("a")) return;
-      const caseId = row.getAttribute("data-case-id");
-      if (caseId) {
-        const entry = state.caseLookup.get(String(caseId));
-        if (isWorkspaceEligibleCase(entry)) {
-          window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
-        } else {
-          void openCasePreview(caseId);
-        }
-      }
-    });
-  });
-
-  container.querySelectorAll("[data-case-link]").forEach((btn) => {
-    btn.addEventListener("click", (evt) => {
-      evt.stopPropagation();
-      const caseId = btn.getAttribute("data-case-id");
-      if (!caseId) return;
-      const entry = state.caseLookup.get(String(caseId));
-      if (isWorkspaceEligibleCase(entry)) {
-        window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
-      } else {
-        void openCasePreview(caseId);
-      }
-    });
-  });
+async function handleHireFromApplications({ caseId, paralegalId }) {
+  await openCaseNoteModal(caseId, "hiring", null, paralegalId);
 }

@@ -20,7 +20,6 @@ const {
   claimNextIncidentJob,
   processClaimedIncidentJob,
   runIncidentSchedulerOnce,
-  stopIncidentScheduler,
 } = require("../scheduler/incidentScheduler");
 const { runIncidentRunnerOnce } = require("../scripts/incident-runner");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
@@ -478,9 +477,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  stopIncidentScheduler();
   restorePhase7BEnv();
-  await closeDatabase();
+  try { await closeDatabase(); }
+  finally { require("./helpers/incidentGitFixture").cleanupIncidentGitFixture(); }
 });
 
 beforeEach(async () => {
@@ -852,7 +851,7 @@ describe("Incident release runner", () => {
       const releaseCandidate = await createVerifiedReleaseCandidateIncident(attorney);
       await IncidentPatch.updateOne(
         { incidentId: releaseCandidate._id },
-        { $set: { filesTouched: ["frontend/assets/scripts/views/help.js"] } }
+        { $set: { filesTouched: ["frontend/assets/scripts/help-incident-intake.js"] } }
       );
 
       await runIncidentRunnerOnce({
@@ -1469,3 +1468,4 @@ describe("Incident release runner", () => {
     expect(updatedIncident.orchestration.nextJobType).toBe("none");
   });
 });
+jest.mock("child_process", () => require("./helpers/incidentGitFixture").isolatedChildProcess(jest.requireActual("child_process")));

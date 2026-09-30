@@ -5,8 +5,14 @@ const Message = require("../../models/Message");
 const Payout = require("../../models/Payout");
 const User = require("../../models/User");
 const stripe = require("../../utils/stripe");
+const { projectPayoutReadiness } = require("../paralegalReadinessService");
 const { normalizeCaseStatus } = require("../../utils/caseState");
 const { BLOCKED_MESSAGE, isBlockedBetween } = require("../../utils/blocks");
+const {
+  dateOnlyFromZonedInstant,
+  dateOnlyToUtcDate,
+  resolveMatterDeadlineDate,
+} = require("../../utils/businessDate");
 const {
   EVIDENCE_STATES,
   evaluateWorkspaceAccess,
@@ -23,6 +29,7 @@ const SUPPORT_CASE_FIELDS = [
   "updatedAt",
   "createdAt",
   "deadline",
+  "deadlineDate",
   "pausedReason",
   "readOnly",
   "paralegalAccessRevokedAt",
@@ -195,7 +202,7 @@ function buildCaseSnapshotFromDoc(caseDoc, user, overrides = {}) {
 
   if (!accessible) {
     blockers.push("case_access_denied");
-    nextSteps.push("If this is a different case, tell me which one. If not, I can send this to the team for review.");
+    nextSteps.push("If this is a different Matter, tell me which one. If not, I can send this to the team for review.");
   }
   if (roleOnCase === "withdrawn_paralegal") {
     blockers.push("withdrawn_from_case");
@@ -212,7 +219,7 @@ function buildCaseSnapshotFromDoc(caseDoc, user, overrides = {}) {
     status: String(caseDoc.status || ""),
     normalizedStatus: normalizeCaseStatus(caseDoc.status),
     pausedReason: String(caseDoc.pausedReason || ""),
-    deadline: asDate(caseDoc.deadline),
+    deadline: resolveMatterDeadlineDate(caseDoc) || null,
     readOnly: caseDoc.readOnly === true,
     paralegalAccessRevokedAt: asDate(caseDoc.paralegalAccessRevokedAt),
     paymentReleased: caseDoc.paymentReleased === true,
@@ -600,37 +607,30 @@ async function getStripeConnectSnapshot(user = {}) {
       }
     : stored;
 
-  const blockers = [];
+  const readiness = projectPayoutReadiness({
+    ...snapshot,
+    evidenceState: stored.accountId && !live ? "temporarily_unavailable" : "verified",
+  });
   const nextSteps = [];
-
-  if (!snapshot.accountId) {
-    blockers.push("missing_stripe_account");
+  if (!readiness.accountPresent || !readiness.detailsSubmitted) {
     nextSteps.push("Return to Stripe onboarding and complete any remaining identity or bank details.");
-  } else {
-    if (!snapshot.detailsSubmitted) {
-      blockers.push("stripe_details_missing");
-      nextSteps.push("Return to Stripe onboarding and complete any remaining identity or bank details.");
-    }
-    if (!snapshot.chargesEnabled) {
-      blockers.push("stripe_charges_disabled");
-    }
-    if (!snapshot.payoutsEnabled) {
-      blockers.push("stripe_payouts_disabled");
-      nextSteps.push("Finish any remaining Stripe requirements before payouts can be enabled.");
-    }
+  }
+  if (!readiness.payoutsEnabled) {
+    nextSteps.push("Finish any remaining Stripe requirements before payouts can be enabled.");
   }
 
   return {
     accountId: snapshot.accountId,
-    source: snapshot.source,
-    onboardingComplete: snapshot.onboardingComplete,
-    detailsSubmitted: snapshot.detailsSubmitted,
-    chargesEnabled: snapshot.chargesEnabled,
-    payoutsEnabled: snapshot.payoutsEnabled,
-    connected: snapshot.connected,
+    source: readiness.source,
+    evidenceState: readiness.evidenceState,
+    onboardingComplete: readiness.ready,
+    detailsSubmitted: readiness.detailsSubmitted,
+    chargesEnabled: readiness.chargesEnabled,
+    payoutsEnabled: readiness.payoutsEnabled,
+    connected: readiness.ready,
     bankName: snapshot.bankName,
     bankLast4: snapshot.bankLast4,
-    blockers: uniqueStrings(blockers),
+    blockers: readiness.blockers,
     nextSteps: uniqueStrings(nextSteps),
   };
 }
@@ -765,7 +765,7 @@ async function getCaseSnapshot(user = {}, pageContext = {}) {
       }
       return buildBaseCaseSnapshot({
         clarificationNeeded: true,
-        clarificationPrompt: "Is this happening in a specific case or across all messages?",
+        clarificationPrompt: "Is this happening in a specific Matter or across all messages?",
       });
     }
     if (["case_posting", "workspace_access"].includes(supportCategory)) {
@@ -785,11 +785,11 @@ async function getCaseSnapshot(user = {}, pageContext = {}) {
       requestedCaseId,
       reason: "invalid_case_id",
       blockers: ["invalid_case_context"],
-      nextSteps: ["Tell me which case this is about, or I can send this to the team for review."],
+      nextSteps: ["Tell me which Matter this is about, or I can send this to the team for review."],
       clarificationNeeded: pageContext.supportCategory === "messaging",
       clarificationPrompt:
         pageContext.supportCategory === "messaging"
-          ? "Is this happening in a specific case or across all messages?"
+          ? "Is this happening in a specific Matter or across all messages?"
           : "",
     });
   }
@@ -800,11 +800,11 @@ async function getCaseSnapshot(user = {}, pageContext = {}) {
       requestedCaseId,
       reason: "case_not_found",
       blockers: ["case_not_found"],
-      nextSteps: ["Tell me the case title or the other participant's name if this is the wrong case."],
+      nextSteps: ["Tell me the Matter title or the other participant's name if this is the wrong Matter."],
       clarificationNeeded: pageContext.supportCategory === "messaging",
       clarificationPrompt:
         pageContext.supportCategory === "messaging"
-          ? "Is this happening in a specific case or across all messages?"
+          ? "Is this happening in a specific Matter or across all messages?"
           : "",
     });
   }
@@ -825,15 +825,38 @@ async function getNextCaseDeadlineSnapshot(user = {}) {
     role === "attorney"
       ? { $or: [{ attorney: userId }, { attorneyId: userId }] }
       : { $or: [{ paralegal: userId }, { paralegalId: userId }] };
-  const caseDoc = await Case.findOne({
-    ...participantQuery,
-    deadline: { $gte: new Date() },
+  const today = dateOnlyFromZonedInstant(new Date(), process.env.BUSINESS_TIME_ZONE || undefined);
+  const activeFilters = {
     archived: { $ne: true },
     status: { $nin: ["completed", "closed", "cancelled", "canceled", "archived"] },
-  })
-    .select(SUPPORT_CASE_FIELDS)
-    .sort({ deadline: 1, updatedAt: -1, _id: 1 })
-    .lean();
+  };
+  const [authoritativeCase, legacyCase] = await Promise.all([
+    Case.findOne({
+      ...participantQuery,
+      ...activeFilters,
+      deadlineDate: { $gte: today },
+    })
+      .select(SUPPORT_CASE_FIELDS)
+      .sort({ deadlineDate: 1, updatedAt: -1, _id: 1 })
+      .lean(),
+    Case.findOne({
+      $and: [
+        participantQuery,
+        activeFilters,
+        { $or: [{ deadlineDate: { $exists: false } }, { deadlineDate: null }, { deadlineDate: "" }] },
+        { deadline: { $gte: dateOnlyToUtcDate(today) } },
+      ],
+    })
+      .select(SUPPORT_CASE_FIELDS)
+      .sort({ deadline: 1, updatedAt: -1, _id: 1 })
+      .lean(),
+  ]);
+  const caseDoc = [authoritativeCase, legacyCase]
+    .filter(Boolean)
+    .sort((left, right) =>
+      resolveMatterDeadlineDate(left).localeCompare(resolveMatterDeadlineDate(right)) ||
+      new Date(right.updatedAt || 0) - new Date(left.updatedAt || 0)
+    )[0] || null;
 
   if (!caseDoc) {
     return buildBaseCaseSnapshot({ reason: "no_upcoming_deadline" });
@@ -918,7 +941,7 @@ async function getAttorneyPendingParalegalSnapshot(user = {}) {
         caseId: String(caseDoc._id),
         title: String(caseDoc.title || "Untitled matter"),
         status: String(caseDoc.status || ""),
-        deadline: asDate(caseDoc.deadline),
+        deadline: resolveMatterDeadlineDate(caseDoc) || null,
         reasons: uniqueStrings(reasons),
         incompleteTaskCount: null,
         taskResponsibilityState: "not_represented",
@@ -941,9 +964,9 @@ function resolveWorkspaceGate(caseDoc, user) {
   if (!caseDoc) {
     return {
       available: null,
-      reason: "Case context is missing.",
+      reason: "Matter context is missing.",
       blockers: ["no_case_context"],
-      nextSteps: ["Tell me whether this is happening in one case or across all messages."],
+      nextSteps: ["Tell me whether this is happening in one Matter or across all messages."],
     };
   }
 
@@ -963,7 +986,7 @@ function resolveWorkspaceGate(caseDoc, user) {
     return {
       available: false,
       canUseWorkspace: false,
-      reason: "Workspace access has been revoked for this case.",
+      reason: "Workspace access has been revoked for this Matter.",
       blockers,
       nextSteps,
       normalizedStatus,
@@ -985,11 +1008,11 @@ function resolveWorkspaceGate(caseDoc, user) {
 
   if (workspacePolicy.blockers.includes("funding_required")) {
     blockers.push("funding_required");
-    nextSteps.push("Workspace access opens once payment is secured and escrow is funded.");
+    nextSteps.push("Workspace access opens once Matter funding is confirmed.");
     return {
       available: false,
       canUseWorkspace: false,
-      reason: "Work begins once payment is secured.",
+      reason: "Work begins once Matter funding is confirmed.",
       blockers,
       nextSteps,
       normalizedStatus,
@@ -1002,18 +1025,18 @@ function resolveWorkspaceGate(caseDoc, user) {
       return {
         available: false,
         canUseWorkspace: false,
-        reason: "Messaging is closed for this case.",
+        reason: "Messaging is closed for this Matter.",
         blockers,
         nextSteps,
         normalizedStatus,
       };
     }
     blockers.push("workspace_not_active");
-    nextSteps.push("Workspace access unlocks once the case is funded and in progress.");
+    nextSteps.push("Workspace access unlocks once the Matter is funded and in progress.");
     return {
       available: false,
       canUseWorkspace: false,
-      reason: "Messaging unlocks once the case is funded and in progress.",
+      reason: "Messaging unlocks once the Matter is funded and in progress.",
       blockers,
       nextSteps,
       normalizedStatus,
@@ -1025,7 +1048,7 @@ function resolveWorkspaceGate(caseDoc, user) {
     return {
       available: true,
       canUseWorkspace: true,
-      reason: "Case is read-only",
+      reason: "Matter is read-only",
       blockers,
       nextSteps,
       normalizedStatus,
@@ -1048,7 +1071,7 @@ async function getWorkspaceAccessSnapshot(user = {}, pageContext = {}, caseSnaps
     return {
       available: snapshot.accessible ? null : false,
       canUseWorkspace: false,
-      reason: snapshot.reason === "access_denied" ? "Unauthorized case access" : "Case context is missing.",
+      reason: snapshot.reason === "access_denied" ? "Unauthorized Matter access" : "Matter context is missing.",
       blockers: snapshot.blockers || [],
       nextSteps: snapshot.nextSteps || [],
     };
@@ -1057,7 +1080,7 @@ async function getWorkspaceAccessSnapshot(user = {}, pageContext = {}, caseSnaps
     return {
       available: false,
       canUseWorkspace: false,
-      reason: "Unauthorized case access",
+      reason: "Unauthorized Matter access",
       blockers: uniqueStrings([...(snapshot.blockers || []), "case_access_denied"]),
       nextSteps: snapshot.nextSteps || [],
     };
@@ -1075,15 +1098,15 @@ async function getMessagingSnapshot(user = {}, pageContext = {}, { caseSnapshot,
       canSend: false,
       reason:
         snapshot.reason === "case_not_found"
-          ? "Case not found."
-          : snapshot.clarificationPrompt || "Is this happening in a specific case or across all messages?",
+          ? "Matter not found."
+          : snapshot.clarificationPrompt || "Is this happening in a specific Matter or across all messages?",
       isBlocked: false,
       totalMessages: 0,
       lastMessageAt: null,
       inferredCase: false,
       clarificationNeeded: snapshot.clarificationNeeded === true || !snapshot.caseId,
       clarificationPrompt:
-        snapshot.clarificationPrompt || "Is this happening in a specific case or across all messages?",
+        snapshot.clarificationPrompt || "Is this happening in a specific Matter or across all messages?",
       blockers: snapshot.blockers || ["no_case_context"],
       nextSteps: snapshot.nextSteps || [],
     };
@@ -1093,7 +1116,7 @@ async function getMessagingSnapshot(user = {}, pageContext = {}, { caseSnapshot,
     return {
       available: false,
       canSend: false,
-      reason: "Unauthorized case access",
+      reason: "Unauthorized Matter access",
       isBlocked: false,
       totalMessages: 0,
       lastMessageAt: null,
@@ -1140,7 +1163,7 @@ async function getMessagingSnapshot(user = {}, pageContext = {}, { caseSnapshot,
 
   return {
     available: workspace.available !== false,
-    canSend: workspace.canUseWorkspace === true && workspace.reason !== "Case is read-only",
+    canSend: workspace.canUseWorkspace === true && workspace.reason !== "Matter is read-only",
     reason: workspace.reason || "",
     isBlocked: false,
     totalMessages,

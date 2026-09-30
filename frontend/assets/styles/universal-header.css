@@ -1,0 +1,286 @@
+/* Shared authenticated header: Search, Create (attorney), Notifications, Assistant. */
+body.lpc-product-clean.theme-dark #sidebarToggle {
+  color: var(--clean-ink, #eef3f9) !important;
+}
+
+body.lpc-product-clean .lpc-auth-page-shell {
+  min-width: 0;
+  height: 100vh;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--clean-surface, #ffffff);
+}
+
+/*
+ * Keep authenticated paralegal surfaces on one visual rail. Page interiors may
+ * use different widths, but their first content edge should not move when the
+ * member switches between Home, Matters, Browse, and Account Settings.
+ */
+body.lpc-auth-shell-v2 {
+  --lpc-member-content-gutter: clamp(24px, 4vw, 60px);
+  --lpc-member-content-anchor: max(
+    var(--lpc-member-content-gutter),
+    calc((100% - 1480px) / 2)
+  );
+}
+
+body.lpc-auth-shell-v2.lpc-role-dashboard .main {
+  padding: 24px var(--lpc-member-content-anchor) 64px;
+}
+
+body.lpc-auth-shell-v2.browse-jobs-page .jobs-shell {
+  width: min(1100px, calc(100% - (2 * var(--lpc-member-content-anchor))));
+  margin: 24px 0 0 var(--lpc-member-content-anchor);
+  padding: 0 0 64px;
+}
+
+body.lpc-auth-shell-v2.lpc-settings-shell .content {
+  padding: 24px var(--lpc-member-content-anchor) 64px;
+}
+
+body.lpc-auth-shell-v2.lpc-settings-shell :is(.page-header, #settingsContent) {
+  width: min(100%, 1080px);
+  margin-inline: 0 auto;
+}
+
+@media (max-width: 760px) {
+  body.lpc-auth-shell-v2 {
+    --lpc-member-content-gutter: 16px;
+    --lpc-member-content-anchor: 16px;
+  }
+
+  body.lpc-auth-shell-v2.lpc-role-dashboard .main {
+    padding: 18px 16px 52px;
+  }
+
+  body.lpc-auth-shell-v2.browse-jobs-page .jobs-shell {
+    width: calc(100% - 32px);
+    margin: 18px 0 0 16px;
+    padding-bottom: 52px;
+  }
+
+
+  body.lpc-auth-shell-v2.lpc-settings-shell .content {
+    padding: 18px 16px 52px;
+  }
+}
+
+body.lpc-product-clean .lpc-auth-page-shell > :where(main, .main, .content, .case-main, .page-shell) {
+  min-height: 0 !important;
+  height: auto !important;
+  flex: 1 1 auto;
+}
+
+/* Legacy page toolbars never enter the first paint. Their controls are moved
+   into the already-reserved shared bar during hydration. */
+body.lpc-product-clean.lpc-static-universal-header :where(
+  .lpc-auth-page-shell > main > .topbar:not(:has(.back-link)),
+  .lpc-auth-page-shell > main > .case-topbar:not(:has(.back-link)),
+  .lpc-auth-page-shell > main > .page-header > .topbar,
+  .browse-page-shell > main > .topbar:not(:has(.back-link))
+) {
+  display: none !important;
+}
+
+body.lpc-product-clean.lpc-auth-resource-page .browse-page-shell {
+  position: relative;
+}
+
+body.lpc-product-clean .lpc-universal-header-shell {
+  width: 100%;
+  min-height: 68px;
+  height: 68px;
+  flex: 0 0 68px;
+  margin: 0;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  position: sticky;
+  top: 0;
+  z-index: 2200;
+  overflow: visible;
+  border: 0 !important;
+  border-bottom: 1px solid var(--clean-border, #e3e8ee) !important;
+  background: var(--clean-surface, #ffffff) !important;
+  box-sizing: border-box;
+}
+
+body.lpc-product-clean .lpc-universal-header-shell--created {
+  margin: 0;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-left: auto;
+  position: relative;
+  z-index: 2100;
+  overflow: visible;
+}
+
+/* The Assistant is hydrated after authentication. Reserve its final tool slot
+   so the utility row does not resize when the launcher becomes interactive. */
+body.lpc-product-clean .lpc-universal-header-controls:not(:has(> .support-launcher))::after {
+  content: "";
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+}
+
+/* Browse Matters is the canonical authenticated utility row. Keep Search
+   compact until hover/focus on every surface, including role dashboards. */
+body.lpc-product-clean .lpc-universal-header-shell .lpc-universal-header-controls {
+  width: auto !important;
+  margin-left: auto !important;
+  justify-content: flex-end !important;
+}
+
+body.lpc-product-clean .lpc-universal-header-shell .lpc-global-search-host:not(:hover):not(:focus-within):not(.is-search-open) {
+  flex: 0 0 46px !important;
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  min-height: 46px !important;
+  max-width: 46px !important;
+}
+
+body.lpc-product-clean .lpc-universal-header-shell .lpc-global-search-host:not(:hover):not(:focus-within):not(.is-search-open) .lpc-global-search-trigger {
+  height: 46px !important;
+  min-height: 46px !important;
+  gap: 0 !important;
+  padding: 0 13px !important;
+  border-color: transparent !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+}
+
+body.lpc-product-clean .lpc-universal-header-shell .lpc-global-search-host:not(:hover):not(:focus-within):not(.is-search-open) .lpc-global-search-trigger-label {
+  max-width: 0 !important;
+  opacity: 0 !important;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls > :where(
+  .lpc-global-search-host,
+  .lpc-quick-create,
+  .notification-wrapper,
+  .support-launcher
+) {
+  flex-shrink: 0;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls > .notification-wrapper {
+  width: 46px;
+  height: 46px;
+  position: relative;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls .notification-icon,
+body.lpc-product-clean .lpc-universal-header-controls .support-launcher {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  padding: 0;
+  color: var(--clean-muted, #53627a);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls :where(.notification-icon, .support-launcher):hover,
+body.lpc-product-clean .lpc-universal-header-controls :where(.notification-icon, .support-launcher):focus-visible {
+  color: var(--clean-ink, #24324a);
+  background: transparent;
+  outline: none;
+  opacity: 1;
+  transform: none;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls :where(.notification-icon, .support-launcher) svg {
+  width: 19px;
+  height: 19px;
+}
+
+/* The account identity belongs exclusively to the shared sidebar. */
+body.lpc-product-clean :where(.topbar, .case-topbar, .page-header, .lpc-universal-header-shell)
+  :where(.user-chip, .user-profile, .profile-menu, [data-profile-toggle]) {
+  display: none !important;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls .lpc-global-search-host {
+  order: 1;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls .lpc-quick-create {
+  order: 2;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls .notification-wrapper {
+  order: 3;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls .support-launcher {
+  order: 4;
+}
+
+@media (max-width: 1024px) {
+  body.lpc-product-clean .sidebar-toggle {
+    z-index: 2300;
+  }
+}
+
+@media (max-width: 700px) {
+  body.lpc-product-clean .lpc-universal-header-shell {
+    min-height: 60px;
+    height: 60px;
+    flex-basis: 60px;
+    margin: 0;
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  body.lpc-product-clean .lpc-universal-header-controls {
+    gap: 0;
+  }
+
+  body.lpc-product-clean .lpc-universal-header-controls:not(:has(> .support-launcher))::after {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+  }
+
+  body.lpc-product-clean .lpc-universal-header-controls :where(
+    .notification-icon,
+    .support-launcher,
+    .lpc-quick-create,
+    .lpc-global-search-host
+  ) {
+    width: 42px;
+    min-width: 42px;
+    max-width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+  }
+
+  body.lpc-product-clean .lpc-universal-header-shell .lpc-global-search-host:not(:hover):not(:focus-within):not(.is-search-open) {
+    flex-basis: 42px !important;
+    width: 42px !important;
+    min-width: 42px !important;
+    max-width: 42px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+  }
+
+  body.lpc-product-clean .lpc-universal-header-shell .lpc-global-search-host:not(:hover):not(:focus-within):not(.is-search-open) .lpc-global-search-trigger {
+    height: 42px !important;
+    min-height: 42px !important;
+    padding-inline: 11px !important;
+  }
+}

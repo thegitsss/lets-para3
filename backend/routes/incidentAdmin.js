@@ -2,6 +2,7 @@ const router = require("express").Router();
 
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
+const { csrfProtection } = require("../utils/csrf");
 const controlRoomService = require("../services/incidents/controlRoomService");
 const { decideIncidentApproval } = require("../services/incidents/releaseService");
 const {
@@ -14,19 +15,6 @@ const {
 } = require("../services/incidents/approvalRecipients");
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({
-    cookie: {
-      httpOnly: true,
-      sameSite: "strict",
-      secure: process.env.NODE_ENV === "production",
-    },
-  });
-}
 
 function requireFounderApprover(req, res, next) {
   const user = req.user || {};

@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-04",
+  "dataPolicy": {
+    "productionData": false,
+    "identities": "synthetic .test addresses only",
+    "stripe": "provider doubles or isolated test mode only; live keys forbidden",
+    "clock": "deterministic and injectable",
+    "cleanup": "fixture-owned records only"
+  },
+  "personas": [
+    {"id": "attorney_owner", "role": "attorney", "status": "approved", "email": "attorney.owner.v2.test@lets-paraconnect.test"},
+    {"id": "attorney_other", "role": "attorney", "status": "approved", "email": "attorney.other.v2.test@lets-paraconnect.test"},
+    {"id": "attorney_pending", "role": "attorney", "status": "pending", "email": "attorney.pending.v2.test@lets-paraconnect.test"},
+    {"id": "attorney_denied", "role": "attorney", "status": "denied", "email": "attorney.denied.v2.test@lets-paraconnect.test"},
+    {"id": "attorney_disabled", "role": "attorney", "status": "approved", "isDisabled": true, "email": "attorney.disabled.v2.test@lets-paraconnect.test"},
+    {"id": "paralegal_candidate", "role": "paralegal", "status": "approved", "readiness": "ready", "email": "paralegal.candidate.v2.test@lets-paraconnect.test"},
+    {"id": "paralegal_unready", "role": "paralegal", "status": "approved", "readiness": "not-ready", "email": "paralegal.unready.v2.test@lets-paraconnect.test"},
+    {"id": "paralegal_assigned", "role": "paralegal", "status": "approved", "readiness": "ready", "email": "paralegal.assigned.v2.test@lets-paraconnect.test"},
+    {"id": "paralegal_former", "role": "paralegal", "status": "approved", "readiness": "ready", "email": "paralegal.former.v2.test@lets-paraconnect.test"},
+    {"id": "admin", "role": "admin", "status": "approved", "email": "admin.v2.test@lets-paraconnect.test"},
+    {"id": "director", "role": "director", "status": "approved", "email": "director.v2.test@lets-paraconnect.test"}
+  ],
+  "fixtureAxes": {
+    "caseStatus": ["open", "in progress", "in_progress", "paused", "completed", "disputed", "closed"],
+    "caseAliases": ["cancelled", "canceled", "assigned", "awaiting_funding", "active", "awaiting_documents", "reviewing", "funded_in_progress"],
+    "applicationStatus": ["submitted", "viewed", "shortlisted", "accepted", "rejected", "withdrawn"],
+    "invitationStatus": ["pending", "accepted", "declined", "expired"],
+    "preEngagementStatus": ["requested", "submitted", "approved", "changes_requested"],
+    "fileReviewStatus": ["pending_review", "approved", "attorney_revision"],
+    "fileSecurityStatus": ["pending", "clean", "blocked", "error", "not_required"],
+    "disputeStatus": ["open", "resolved", "rejected"],
+    "fundingIntegrity": ["pending", "verified", "failed"],
+    "paymentOperationStatus": ["pending", "succeeded", "failed", "needs_reconciliation"],
+    "payoutProcessingStatus": ["not_started", "pending", "paid", "failed", "reversed", "needs_reconciliation"],
+    "payoutFinalizationType": [null, "zero_auto", "partial_attorney", "full", "admin", "expired_zero"],
+    "viewport": [320, 360, 390, 768, 1024, 1366, 1440, 1920]
+  },
+  "scenarios": [
+    {
+      "id": "S00-access-boundary",
+      "actors": ["attorney_owner", "attorney_pending", "attorney_denied", "attorney_disabled", "paralegal_candidate", "admin", "director"],
+      "events": ["direct entry", "refresh", "session expiry", "multi-tab logout", "account switch", "BFCache restore"],
+      "assert": ["approved attorney gets only authorized route", "all others follow current role/status policy", "protected cache clears", "no client role grants access"]
+    },
+    {
+      "id": "S01-onboarding-profile-payment-first-matter",
+      "actors": ["attorney_owner"],
+      "events": ["profile incomplete", "profile saved", "no payment method", "payment method added", "first draft", "first publish", "tour replay/dismiss/complete"],
+      "assert": ["persisted and local state agree", "steps move exactly once", "safe return works", "no live Stripe"]
+    },
+    {
+      "id": "S02-draft-publish",
+      "actors": ["attorney_owner"],
+      "events": ["create draft", "autosave", "resume", "two-tab conflict", "publish", "draft cleanup failure", "duplicate submit"],
+      "assert": ["one authoritative Matter/Job outcome", "draft failure is recoverable", "no duplicate lifecycle mutation"]
+    },
+    {
+      "id": "S03-open-edit-delete",
+      "actors": ["attorney_owner", "attorney_other"],
+      "events": ["edit before application", "first application locks amount", "hire locks scope", "eligible delete", "ineligible delete"],
+      "assert": ["owner-only", "exact locks", "Case/Job projections characterized", "no invented unpublish/expiration"]
+    },
+    {
+      "id": "S04-application-review",
+      "actors": ["attorney_owner", "paralegal_candidate"],
+      "events": ["apply", "view", "star", "shortlist", "unshortlist", "reject", "withdraw"],
+      "assert": ["Application and mirror evidence", "counts/badges", "both-role visibility", "safe historical deep links"]
+    },
+    {
+      "id": "S05-invitation",
+      "actors": ["attorney_owner", "paralegal_candidate", "paralegal_unready"],
+      "events": ["invite", "duplicate invite", "accept", "decline", "revoke", "expire", "accept-vs-revoke"],
+      "assert": ["readiness/block/open Matter gates", "notifications", "candidate projection", "race has one result"]
+    },
+    {
+      "id": "S06-pre-engagement",
+      "actors": ["attorney_owner", "paralegal_candidate"],
+      "events": ["request", "submit", "request changes", "resubmit", "approve", "stale revision"],
+      "assert": ["CAS/revision enforced", "conflict response preserved", "hire locked until eligible"]
+    },
+    {
+      "id": "S07-hire-and-fund",
+      "actors": ["attorney_owner", "paralegal_candidate", "paralegal_assigned"],
+      "events": ["no payment method", "pending-hire return", "funding success", "provider failure", "provider timeout", "duplicate callback", "two-tab hire", "apply-vs-hire"],
+      "assert": ["one assignment and charge", "exact cents", "funding evidence", "winner/loser applications", "unknown outcome does not retry"]
+    },
+    {
+      "id": "S08-active-workspace",
+      "actors": ["attorney_owner", "attorney_other", "paralegal_assigned", "admin"],
+      "events": ["direct link", "tab deep link", "refresh", "Matter switch", "late response", "SSE reconnect", "poll fallback"],
+      "assert": ["authorization", "read/write capability", "stale request isolation", "one stream/poll owner"]
+    },
+    {
+      "id": "S09-messages",
+      "actors": ["attorney_owner", "paralegal_assigned"],
+      "events": ["send", "file message", "edit", "delete", "react", "read", "presence", "two tabs", "more than 100 unread"],
+      "assert": ["thread/summary/count equivalence characterized", "preference/cooldown", "sanitization", "no access after revocation"]
+    },
+    {
+      "id": "S10-files",
+      "actors": ["attorney_owner", "paralegal_assigned"],
+      "events": ["upload", "scan pending", "clean", "blocked", "scan error", "approve", "request revision", "replace", "download", "signed URL expiry"],
+      "assert": ["type/size/ACL", "CaseFile/mirror convergence", "lineage", "attachments never persist locally"]
+    },
+    {
+      "id": "S11-tasks-deadlines",
+      "actors": ["attorney_owner", "paralegal_assigned", "admin"],
+      "events": ["private checklist task", "Case task complete/reopen", "stale task revision", "Case deadline", "legacy deadline", "Event", "reminder/attendee response"],
+      "assert": ["private/shared separation", "role visibility", "date-only/timezone", "Assistant/dashboard equivalence"]
+    },
+    {
+      "id": "S12-completion",
+      "actors": ["attorney_owner", "paralegal_assigned", "admin"],
+      "events": ["blocked incomplete tasks", "task-vs-completion race", "complete", "payout pending", "paid", "archive"],
+      "assert": ["one claim", "exact payout", "workspace access", "all dashboards/notifications/search/Assistant/payment views"]
+    },
+    {
+      "id": "S13-withdrawal-and-relist",
+      "actors": ["attorney_owner", "paralegal_assigned", "paralegal_former", "paralegal_candidate", "admin"],
+      "events": ["withdraw", "zero payout", "partial payout", "reject payout", "expiry", "relist", "hire from remaining verified balance"],
+      "assert": ["former access revoked", "payout finalization evidence", "recreated/open Job metadata", "prior history retained"]
+    },
+    {
+      "id": "S14-dispute",
+      "actors": ["attorney_owner", "paralegal_assigned", "admin"],
+      "events": ["open", "concurrent open", "comment", "completion-vs-dispute", "settlement", "resolved", "rejected"],
+      "assert": ["work-quality dispute separate from chargeback", "access/pause state", "money evidence", "role projections"]
+    },
+    {
+      "id": "S15-payment-integrity",
+      "actors": ["attorney_owner", "paralegal_assigned", "admin"],
+      "events": ["charge", "full/partial/zero payout", "refund", "transfer failure", "reversal", "chargeback", "manual/webhook reconciliation"],
+      "assert": ["Case/Payout/PaymentOperation/PlatformIncome/FinancialAdjustment/webhook/receipt/view equivalence", "exact cents", "no duplicate mutation"]
+    },
+    {
+      "id": "S16-block-and-account-actions",
+      "actors": ["attorney_owner", "paralegal_assigned"],
+      "events": ["qualifying block", "nonqualifying block", "unblock", "deactivate blocked by active work", "deactivate eligible", "data minimization"],
+      "assert": ["canonical/legacy block behavior", "future interaction suppression", "financial/audit retention", "sessions revoked"]
+    },
+    {
+      "id": "S17-global-tools",
+      "actors": ["attorney_owner", "attorney_other", "paralegal_assigned"],
+      "events": ["notification read/clear/SSE", "search", "Assistant context", "safe navigation", "feedback", "restart", "escalate"],
+      "assert": ["role-safe links/evidence", "stale action sanitization", "rate limits", "privacy/retention", "multi-tab convergence"]
+    },
+    {
+      "id": "S18-mixed-version-rollback",
+      "actors": ["attorney_owner", "paralegal_assigned", "admin"],
+      "events": ["attorney V2 with paralegal V1", "attorney V1 with paralegal V2", "rollback mid-session", "in-flight mutation", "legacy redirect"],
+      "assert": ["API compatibility", "no stranded URL", "no duplicate mutation", "authoritative state intact"]
+    }
+  ]
+}

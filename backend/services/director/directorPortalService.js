@@ -1,12 +1,16 @@
+const { createLogger: createRuntimeLogger, logPromiseFailure } = require("../../utils/logger");
+const runtimeLogger = createRuntimeLogger("services:director:directorPortalService");
 const mongoose = require("mongoose");
 
 const Case = require("../../models/Case");
 const DirectorOutreachEvent = require("../../models/DirectorOutreachEvent");
 const DirectorOutreachRecord = require("../../models/DirectorOutreachRecord");
 const DirectorProfile = require("../../models/DirectorProfile");
-const PlatformIncome = require("../../models/PlatformIncome");
 const User = require("../../models/User");
+const { COMMISSION_CAP } = require("./commissionCap");
+const commissionEvidence = require("./commissionEvidence");
 const sendEmail = require("../../utils/email");
+const { removeAngleMarkup } = require("../../utils/sanitize");
 const {
   buildDirectorFollowUpHtml,
   buildDirectorFollowUpText,
@@ -111,7 +115,7 @@ function serializeProfile(profile = {}) {
     status: profile.status || "active",
     outreachSubject: profile.outreachSubject || DIRECTOR_OUTREACH_SUBJECT,
     outreachConfigured: Boolean(String(profile.outreachTemplateText || profile.outreachTemplateHtml || "").trim()),
-    commissionCapMatterCount: profile.commissionCapMatterCount || 50,
+    commissionCapMatterCount: COMMISSION_CAP,
     commissionSharePctOfAttorneyFee: profile.commissionSharePctOfAttorneyFee || 50,
   };
 }
@@ -130,14 +134,19 @@ async function ensureDirectorProfile(user = {}) {
   if (!user.id && !user._id) throw new Error("Director user is required.");
   let profile = await DirectorProfile.findOne({ userId: user.id || user._id });
   if (profile) return profile;
-  profile = await DirectorProfile.create({
-    userId: user.id || user._id,
-    email,
-    zohoEmail: email,
-    displayName: String(user.email || "").split("@")[0] || "Director",
-    activeState: "TX",
-    outreachSubject: DIRECTOR_OUTREACH_SUBJECT,
-  });
+  try {
+    profile = await DirectorProfile.findOneAndUpdate({ userId: user.id || user._id }, { $setOnInsert: {
+      userId: user.id || user._id, email, zohoEmail: email,
+      displayName: String(user.email || "").split("@")[0] || "Director",
+      activeState: "TX", outreachSubject: DIRECTOR_OUTREACH_SUBJECT,
+    } }, { upsert: true, returnDocument: "after", setDefaultsOnInsert: true });
+  } catch (error) {
+    // Another initial request may have inserted the same unique user profile.
+    // Do not hide unrelated write failures or overwrite that profile's settings.
+    if (error.code !== 11000) throw error;
+    profile = await DirectorProfile.findOne({ userId: user.id || user._id });
+    if (!profile) throw error;
+  }
   return profile;
 }
 
@@ -209,7 +218,7 @@ async function upsertRecordFromImport({ profile, item, state = "" } = {}) {
   const record = await DirectorOutreachRecord.findOneAndUpdate(
     { directorUserId: profile.userId, attorneyEmail },
     update,
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
   );
 
   let eventCreated = false;
@@ -234,7 +243,7 @@ async function upsertRecordFromImport({ profile, item, state = "" } = {}) {
 
   if (eventCreated && eventType === "reply_received") {
     await notifyFounderOfReply({ record, item }).catch((err) => {
-      console.warn("[director] founder reply notification failed", err?.message || err);
+      runtimeLogger.warn("[director] founder reply notification failed", err?.message || err);
     });
   }
 
@@ -339,7 +348,7 @@ async function sendDirectorOutreach({ user = {}, attorneyName = "", attorneyEmai
   const subject = String(profile.outreachSubject || DIRECTOR_OUTREACH_SUBJECT).trim() || DIRECTOR_OUTREACH_SUBJECT;
   const text = templateText
     ? renderOutreachTemplate(templateText, normalizedName)
-    : renderOutreachTemplate(templateHtml, normalizedName).replace(/<br\s*\/?>/gi, "\n").replace(/<\/?[^>]+>/g, "");
+    : removeAngleMarkup(renderOutreachTemplate(templateHtml, normalizedName).replace(/<br\s*\/?>/gi, "\n"));
   const html = templateHtml ? renderOutreachTemplate(templateHtml, normalizedName) : textToHtml(text);
   const now = new Date();
 
@@ -367,7 +376,7 @@ async function sendDirectorOutreach({ user = {}, attorneyName = "", attorneyEmai
         updatedAt: now,
       },
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
   );
 
   try {
@@ -428,7 +437,7 @@ async function updateDirectorZohoSyncStatus(profile, payload = {}) {
         zohoLastSyncError: String(payload.error || "").slice(0, 1000),
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 }
 
@@ -466,7 +475,7 @@ async function importDirectorSentMail({
         status: "failed",
         summary: "Sent mail import failed.",
         error: err?.message || String(err),
-      }).catch(() => {});
+      }).catch(logPromiseFailure(runtimeLogger, "[director] sent-mail failure status persistence failed"));
     }
     throw err;
   }
@@ -505,7 +514,7 @@ async function importDirectorInboxReplies({
         status: "failed",
         summary: "Inbox import failed.",
         error: err?.message || String(err),
-      }).catch(() => {});
+      }).catch(logPromiseFailure(runtimeLogger, "[director] inbox failure status persistence failed"));
     }
     throw err;
   }
@@ -571,26 +580,27 @@ async function autoImportDirectorMail({
         status: "failed",
         summary: "Auto-sync failed.",
         error: err?.message || String(err),
-      }).catch(() => {});
+      }).catch(logPromiseFailure(runtimeLogger, "[director] auto-sync failure status persistence failed"));
     }
   }
 
   return result;
 }
 
-async function refreshDirectorRecords({ directorUserId = null } = {}) {
+async function refreshDirectorRecords({ directorUserId = null, deferVerify = false } = {}) {
   const filter = directorUserId ? { directorUserId } : {};
   const records = await DirectorOutreachRecord.find(filter);
-  if (!records.length) return { updated: 0 };
 
   const emails = records.map((record) => record.attorneyEmail).filter(Boolean);
-  const users = await User.find({ email: { $in: emails }, role: "attorney" })
+  const users = await User.find({ $or: [{ email: { $in: emails } }, { _id: { $in: records.map(record => record.registeredUserId).filter(Boolean) } }], role: "attorney" })
     .select("_id email createdAt approvedAt status state location")
     .lean();
   const userByEmail = new Map(users.map((user) => [String(user.email || "").toLowerCase(), user]));
-  const attorneyIds = users.map((user) => user._id);
+  const userById = new Map(users.map(user => [String(user._id), user]));
+  const registeredUser = record => record.registeredUserId ? userById.get(String(record.registeredUserId)) : userByEmail.get(String(record.attorneyEmail || "").toLowerCase());
+  const attorneyIds = [...new Set([...users.map(user => String(user._id)), ...records.map(record => record.registeredUserId ? String(record.registeredUserId) : "").filter(Boolean)])];
   const cases = attorneyIds.length
-    ? await Case.find({ attorney: { $in: attorneyIds } })
+    ? await Case.find({ $or: [{ attorney: { $in: attorneyIds } }, { attorneyId: { $in: attorneyIds } }] })
         .select("_id attorney attorneyId status createdAt completedAt payoutFinalizedAt payoutTransferId feeAttorneyAmount feeAttorneyPct lockedTotalAmount totalAmount")
         .lean()
     : [];
@@ -601,37 +611,38 @@ async function refreshDirectorRecords({ directorUserId = null } = {}) {
     bucket.push(caseDoc);
     casesByAttorney.set(key, bucket);
   });
-  const caseIds = cases.map((caseDoc) => caseDoc._id);
-  const incomeDocs = caseIds.length ? await PlatformIncome.find({ caseId: { $in: caseIds } }).lean() : [];
-  const incomeByCase = new Map(incomeDocs.map((income) => [String(income.caseId), income]));
-
+  // Bind a registration before taking the financial source snapshot. An email
+  // change must not switch a retained referral to a different account.
+  for (const record of records) {
+    const user = registeredUser(record);
+    if (user && !record.registeredUserId) {
+      const bound = await DirectorOutreachRecord.updateOne({ _id: record._id, registeredUserId: null }, { $set: { registeredUserId: user._id } });
+      if (!bound.matchedCount) {
+        const current = await DirectorOutreachRecord.collection.findOne({ _id: record._id }, { projection: { registeredUserId: 1 } });
+        if (String(current?.registeredUserId || "") !== String(user._id)) throw Object.assign(new Error("The referred account changed. Refresh to continue."), { statusCode: 409 });
+      }
+      record.registeredUserId = user._id;
+    }
+  }
+  await commissionEvidence.retainLegacyClaims({ directorUserId });
+  const financial = await commissionEvidence.read({ directorUserId });
+  const isCompleted = caseDoc => Boolean(caseDoc.completedAt || caseDoc.payoutFinalizedAt || caseDoc.payoutTransferId || ["completed", "closed"].includes(String(caseDoc.status || "").toLowerCase()));
   let updated = 0;
   for (const record of records) {
-    if (record.stage === "suppressed") continue;
-    const user = userByEmail.get(String(record.attorneyEmail || "").toLowerCase()) || null;
+    const user = registeredUser(record) || null;
     const userCases = user ? casesByAttorney.get(String(user._id)) || [] : [];
     const postedCase = userCases.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))[0] || null;
-    const completedCases = userCases.filter((caseDoc) => {
-      const status = String(caseDoc.status || "").toLowerCase();
-      return Boolean(caseDoc.completedAt || caseDoc.payoutFinalizedAt || caseDoc.payoutTransferId || status === "completed" || status === "closed");
-    });
-    const commissionCap = 50;
-    const commissionableCases = completedCases
-      .filter((caseDoc) => incomeByCase.has(String(caseDoc._id)) || Number(caseDoc.feeAttorneyAmount || 0) > 0)
-      .slice(0, commissionCap);
-    const commissionEarnedCents = commissionableCases.reduce((sum, caseDoc) => {
-      const income = incomeByCase.get(String(caseDoc._id));
-      const attorneyFee = Number(caseDoc.feeAttorneyAmount || 0) || Math.round(Number(caseDoc.lockedTotalAmount || caseDoc.totalAmount || 0) * (Number(caseDoc.feeAttorneyPct || 22) / 100));
-      const amount = income ? attorneyFee : attorneyFee;
-      return sum + Math.max(0, Math.round(amount * 0.5));
-    }, 0);
-
+    const completedCases = userCases.filter(isCompleted);
+    const projection = financial.records.get(String(record._id));
+    if (!projection) throw Object.assign(new Error("Commission records changed. Refresh to continue."), { statusCode: 409 });
     let nextStage = record.stage;
-    if (record.stage === "follow_up_failed") {
+    if (record.stage === "suppressed") {
+      nextStage = "suppressed";
+    } else if (record.stage === "follow_up_failed") {
       nextStage = "follow_up_failed";
     } else if (record.founderAttentionAt) {
       nextStage = "founder_attention";
-    } else if (commissionableCases.length > 0) {
+    } else if (projection.commissionState === "recorded" && projection.commissionableMatterCount > 0) {
       nextStage = "commission_complete";
     } else if (completedCases.length > 0) {
       nextStage = "matter_completed";
@@ -655,16 +666,15 @@ async function refreshDirectorRecords({ directorUserId = null } = {}) {
     record.firstMatterPostedAt = postedCase?.createdAt || record.firstMatterPostedAt || null;
     record.firstMatterCompletedAt =
       completedCases[0]?.completedAt || completedCases[0]?.payoutFinalizedAt || record.firstMatterCompletedAt || null;
-    record.commissionableMatterCount = commissionableCases.length;
-    record.commissionEarnedCents = commissionEarnedCents;
-    record.commissionStatus =
-      commissionableCases.length >= commissionCap ? "cap_reached" : commissionableCases.length > 0 ? "accruing" : "none";
+    for (const key of ["commissionableMatterCount", "commissionEarnedCents", "commissionStatus", "commissionState", "commissionCurrency", "commissionStripeMode", "commissionCurrencies", "commissionReviewCount"]) record.set(key, projection[key]);
+    record.commissionEvidenceVersion = 1;
     record.stage = nextStage;
     await record.save();
     updated += 1;
   }
 
-  return { updated };
+  if (!deferVerify) await financial.verify();
+  return { updated, commissionAllocation: financial.allocation.byRecord, commissionTotals: financial.allocation.totals, financial };
 }
 
 async function sendAutomaticFollowUp({ record, profile, now = new Date() } = {}) {
@@ -693,7 +703,7 @@ async function sendAutomaticFollowUp({ record, profile, now = new Date() } = {})
         stage: "follow_up_sent",
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!claim) return { sent: false, reason: "not_claimed" };
 
@@ -811,10 +821,16 @@ function serializeRecord(record = {}) {
     registeredAt: record.registeredAt || null,
     firstMatterPostedAt: record.firstMatterPostedAt || null,
     firstMatterCompletedAt: record.firstMatterCompletedAt || null,
-    commissionableMatterCount: record.commissionableMatterCount || 0,
-    commissionEarnedCents: record.commissionEarnedCents || 0,
+    commissionableMatterCount: record.commissionableMatterCount ?? null,
+    commissionEarnedCents: record.commissionEarnedCents ?? null,
+    commissionState: record.commissionState || "needs_review",
+    commissionCurrency: record.commissionCurrency || null,
+    commissionStripeMode: record.commissionStripeMode || null,
+    commissionCurrencies: record.commissionCurrencies || [],
+    commissionReviewCount: record.commissionReviewCount || 0,
     commissionStatus: record.commissionStatus || "none",
     commissionPayoutStatus: record.commissionPayoutStatus || "unpaid",
+    commissionPayments: require('./commissionPayments').present(record.commissionPayments),
     commissionPaidAt: record.commissionPaidAt || null,
     updatedAt: record.updatedAt || null,
   };
@@ -832,12 +848,13 @@ async function listDirectorRecords({ user = {}, state = "", stage = "", rangeDay
   if (normalizedState) filter.state = normalizedState;
   if (stage) filter.stage = stage;
 
-  await refreshDirectorRecords({ directorUserId: role === "director" ? user.id || user._id : null });
+  const refreshed = await refreshDirectorRecords({ directorUserId: role === "director" ? user.id || user._id : null, deferVerify: true });
   const records = await DirectorOutreachRecord.find(filter)
     .sort({ founderAttentionAt: -1, updatedAt: -1 })
     .limit(Math.min(250, Math.max(1, Number(limit) || 100)))
     .lean();
-  return records.map(serializeRecord);
+  await refreshed.financial.verify();
+  return records.map(record => serializeRecord(commissionEvidence.attach(record, refreshed.financial)));
 }
 
 async function updateDirectorRecordState({ user = {}, recordId = "", state = "" } = {}) {
@@ -863,7 +880,7 @@ async function updateDirectorRecordState({ user = {}, recordId = "", state = "" 
       directorUserId: new mongoose.Types.ObjectId(user.id || user._id),
     },
     { $set: { state: normalizedState, updatedAt: new Date() } },
-    { new: true }
+    { returnDocument: "after" }
   ).lean();
   if (!record) {
     const error = new Error("Outreach record not found.");
@@ -878,8 +895,8 @@ async function getDirectorOverview({ user = {}, rangeDays = 7 } = {}) {
   const filter = profile ? { directorUserId: profile.userId } : {};
   const range = buildRecordDateRangeFilter(rangeDays);
   Object.assign(filter, range.filter);
-  await refreshDirectorRecords({ directorUserId: profile?.userId || null });
-  const records = await DirectorOutreachRecord.find(filter).lean();
+  const refreshed = await refreshDirectorRecords({ directorUserId: profile?.userId || null, deferVerify: true });
+  const records = (await DirectorOutreachRecord.find(filter).lean()).map(record => commissionEvidence.attach(record, refreshed.financial));
   const counts = records.reduce(
     (acc, record) => {
       acc.total += 1;
@@ -891,6 +908,9 @@ async function getDirectorOverview({ user = {}, rangeDays = 7 } = {}) {
     },
     { total: 0, byState: {}, commissionEarnedCents: 0, commissionableMatterCount: 0 }
   );
+  Object.assign(counts, commissionEvidence.summarize(records));
+  const lifetime = commissionEvidence.summarize([...refreshed.financial.records.values()]);
+  await refreshed.financial.verify();
   const lastSyncedAt = records.reduce((latest, record) => {
     const values = [
       record.updatedAt,
@@ -915,6 +935,11 @@ async function getDirectorOverview({ user = {}, rangeDays = 7 } = {}) {
   return {
     profile: profile ? serializeProfile(profile) : null,
     counts,
+    commissionLifetime: {
+      ...lifetime,
+      commissionCapMatterCount: COMMISSION_CAP,
+      remainingMatterCount: profile && lifetime.commissionState !== "needs_review" ? Math.max(0, COMMISSION_CAP - lifetime.commissionableMatterCount) : null,
+    },
     attention,
     lastSyncedAt: lastSyncedAt ? new Date(lastSyncedAt) : null,
     range: {
@@ -930,7 +955,7 @@ async function getDirectorAnalytics({ user = {}, days = 14 } = {}) {
   const role = String(user.role || "").toLowerCase();
   const profile = role === "director" ? await ensureDirectorProfile(user) : null;
   const filter = profile ? { directorUserId: profile.userId } : {};
-  await refreshDirectorRecords({ directorUserId: profile?.userId || null });
+  const refreshed = await refreshDirectorRecords({ directorUserId: profile?.userId || null, deferVerify: true });
 
   const { start, end, buckets } = buildDateBuckets({ days });
   const bucketByKey = new Map(buckets.map((bucket) => [bucket.dateKey, bucket]));
@@ -958,10 +983,10 @@ async function getDirectorAnalytics({ user = {}, days = 14 } = {}) {
     increment(record.registeredAt, "registrations");
     increment(record.firstMatterPostedAt, "mattersPosted");
     increment(record.firstMatterCompletedAt, "mattersCompleted");
-    if (record.firstMatterCompletedAt) {
-      increment(record.firstMatterCompletedAt, "commissionableMatters", Number(record.commissionableMatterCount || 0));
-    }
   });
+  for (const entries of refreshed.commissionAllocation.values()) {
+    for (const entry of entries) if (!refreshed.financial.reviewDirectors.has(String(entry.directorUserId))) increment(entry.completedAt, "commissionableMatters");
+  }
 
   const totals = buckets.reduce(
     (acc, bucket) => {
@@ -989,6 +1014,8 @@ async function getDirectorAnalytics({ user = {}, days = 14 } = {}) {
   totals.conversionRatePct = totals.emailsSent ? Math.round((totals.registrations / totals.emailsSent) * 100) : 0;
   totals.replyRatePct = totals.emailsSent ? Math.round((totals.replies / totals.emailsSent) * 100) : 0;
 
+  const lifetime = commissionEvidence.summarize([...refreshed.financial.records.values()]);
+  await refreshed.financial.verify();
   return {
     range: {
       start: buckets[0]?.dateKey || "",
@@ -996,6 +1023,11 @@ async function getDirectorAnalytics({ user = {}, days = 14 } = {}) {
       days: buckets.length,
     },
     totals,
+    commissionLifetime: {
+      ...lifetime,
+      commissionCapMatterCount: COMMISSION_CAP,
+      remainingMatterCount: profile && lifetime.commissionState !== "needs_review" ? Math.max(0, COMMISSION_CAP - lifetime.commissionableMatterCount) : null,
+    },
     series: buckets.map((bucket) => ({
       date: bucket.dateKey,
       emailsSent: bucket.emailsSent,

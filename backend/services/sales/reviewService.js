@@ -18,8 +18,8 @@ async function listSalesApprovalTasks() {
     .lean();
 }
 
-async function approveSalesPacket({ packetId, actor, note = "" } = {}) {
-  const packet = await SalesDraftPacket.findById(packetId);
+async function approveSalesPacket({ packetId, actor, note = "", session = null, afterCommit = null } = {}) {
+  const packet = await SalesDraftPacket.findById(packetId).session(session);
   if (!packet) {
     throw new Error("Sales draft packet not found.");
   }
@@ -29,10 +29,10 @@ async function approveSalesPacket({ packetId, actor, note = "" } = {}) {
     targetType: "sales_draft_packet",
     targetId: String(packet._id),
     approvalState: "pending",
-  }).lean();
+  }).session(session).lean();
 
   packet.approvalState = "approved";
-  await packet.save();
+  await packet.save({ session });
 
   await ApprovalTask.updateMany(
     {
@@ -48,31 +48,36 @@ async function approveSalesPacket({ packetId, actor, note = "" } = {}) {
         decidedAt: new Date(),
         decisionNote: note || "Approved.",
       },
-    }
+    },
+    { session }
   );
 
-  await publishApprovalDecisionEvent({
-    decision: "approved",
-    approvalRecordType: "approval_task",
-    approvalRecordId: pendingTask?._id || String(packet._id),
-    approvalTargetType: "sales_draft_packet",
-    approvalTargetId: String(packet._id),
-    title: `Sales packet approved: ${packet.packetType || "draft packet"}`,
-    summary: note || packet.packetSummary || "Sales packet approved.",
-    actor,
-    related: {
-      approvalTaskId: pendingTask?._id || null,
-      salesAccountId: packet.accountId || null,
-      salesDraftPacketId: packet._id,
-    },
-    service: "sales",
-    sourceSurface: "admin",
-    route: `/api/admin/sales/draft-packets/${packet._id}/approve`,
-    correlationId: `sales:${packet.accountId || packet._id}`,
-    founderVisible: true,
-    publicFacing: true,
-    priority: "normal",
-  });
+  const publishDecision = async () => {
+    await publishApprovalDecisionEvent({
+      decision: "approved",
+      approvalRecordType: "approval_task",
+      approvalRecordId: pendingTask?._id || String(packet._id),
+      approvalTargetType: "sales_draft_packet",
+      approvalTargetId: String(packet._id),
+      title: `Sales packet approved: ${packet.packetType || "draft packet"}`,
+      summary: note || packet.packetSummary || "Sales packet approved.",
+      actor,
+      related: {
+        approvalTaskId: pendingTask?._id || null,
+        salesAccountId: packet.accountId || null,
+        salesDraftPacketId: packet._id,
+      },
+      service: "sales",
+      sourceSurface: "admin",
+      route: `/api/admin/sales/draft-packets/${packet._id}/approve`,
+      correlationId: `sales:${packet.accountId || packet._id}`,
+      founderVisible: true,
+      publicFacing: true,
+      priority: "normal",
+    });
+  };
+  if (afterCommit) afterCommit.push(publishDecision);
+  else await publishDecision();
 
   return packet;
 }

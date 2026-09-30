@@ -156,6 +156,18 @@ const incidentSchema = new Schema(
       immutable: true,
     },
     reporter: { type: reporterSchema, default: () => ({}) },
+    // Only keyed Help intake uses this receipt. Keep replay credentials out of
+    // ordinary operator/reporting reads; the public response is serialized.
+    intakeRequest: {
+      type: new Schema({
+        requestId: { type: String, required: true, immutable: true },
+        fingerprint: { type: String, required: true, immutable: true },
+        encryptedAccessToken: { type: String, required: true, immutable: true },
+      }, { _id: false, strict: true }),
+      default: undefined,
+      select: false,
+      immutable: true,
+    },
     context: { type: contextSchema, default: () => ({}) },
     summary: { type: String, required: true, trim: true },
     originalReportText: { type: String, required: true, immutable: true },
@@ -210,7 +222,7 @@ const incidentSchema = new Schema(
   }
 );
 
-incidentSchema.pre("save", async function captureLpcIncidentState(next) {
+incidentSchema.pre("save", async function captureLpcIncidentState() {
   this.$locals = this.$locals || {};
   this.$locals.lpcWasNew = this.isNew;
   this.$locals.lpcPreviousState = "";
@@ -219,8 +231,6 @@ incidentSchema.pre("save", async function captureLpcIncidentState(next) {
     const previous = await this.constructor.findById(this._id).select("state").lean();
     this.$locals.lpcPreviousState = String(previous?.state || "");
   }
-
-  next();
 });
 
 incidentSchema.post("save", async function publishLpcIncidentEvents(doc) {
@@ -287,6 +297,10 @@ incidentSchema.index({ "classification.riskLevel": 1, state: 1, updatedAt: -1 })
 incidentSchema.index({ approvalState: 1, state: 1, updatedAt: -1 });
 incidentSchema.index({ "classification.clusterKey": 1, state: 1, createdAt: -1 });
 incidentSchema.index({ "reporter.userId": 1, createdAt: -1 });
+incidentSchema.index(
+  { "reporter.userId": 1, "intakeRequest.requestId": 1 },
+  { name: "help_reporter_request_unique", unique: true, partialFilterExpression: { "intakeRequest.requestId": { $type: "string" } } }
+);
 incidentSchema.index({ "context.caseId": 1, createdAt: -1 });
 incidentSchema.index({ "context.jobId": 1, createdAt: -1 });
 incidentSchema.index({ "orchestration.nextJobType": 1, "orchestration.nextJobRunAt": 1 });

@@ -8,16 +8,15 @@ If you have a project, deadline, overflow task, or one-time paralegal need, you 
 
 If you need help getting your first matter posted, I'd be happy to have Samantha, our Founder, assist you.
 
-LPC is solely platform and does not employ attorneys or paralegals. All users are vetted before acceptance. Approval is not guaranteed. Attorneys hire paralegals through the platform for individual matters, and LPC provides a professional workspace for legal professionals to collaborate on a matter-by-matter basis.
+LPC is a technology platform and does not employ attorneys or paralegals. Account access is approval-based, applications are reviewed before acceptance, and approval is not guaranteed. Attorneys hire paralegals through the platform for individual matters, and LPC provides a professional workspace for legal professionals to collaborate on a matter-by-matter basis.
 
 --
 Let's-ParaConnect
 
-Let's-ParaConnect was built to provide a more sustainable way for attorneys and paralegals to work together. Every interaction on the platform is supported by verification and Stripe-processed payments, helping set clear expectations and support for both sides.
+Let's-ParaConnect was built to provide a more sustainable way for attorneys and paralegals to work together. Approval-based access, structured Matter workspaces, and Stripe-processed payments help set clear expectations for both sides.
 
 Connect with us:
 LinkedIn: https://www.linkedin.com/company/lets-paraconnect/
-Facebook: https://www.facebook.com/LetsParaConnect/
 
 16192 Coastal Hwy, Lewes, DE 19958`;
 
@@ -33,14 +32,12 @@ function buildDirectorFollowUpHtml(attorneyName = "there") {
     <p>I noticed you recently created an attorney account with Let's-ParaConnect, but haven’t posted a matter yet.</p>
     <p>If you have a project, deadline, overflow task, or one-time paralegal need, you can post the matter directly through the platform and connect with available paralegals on a project-by-project basis.</p>
     <p>If you need help getting your first matter posted, I’d be happy to have Samantha, our Founder, assist you.</p>
-    <p>LPC is solely platform and does not employ attorneys or paralegals. All users are vetted before acceptance. Approval is not guaranteed. Attorneys hire paralegals through the platform for individual matters, and LPC provides a professional workspace for legal professionals to collaborate on a matter-by-matter basis.</p>
+    <p>LPC is a technology platform and does not employ attorneys or paralegals. Account access is approval-based, applications are reviewed before acceptance, and approval is not guaranteed. Attorneys hire paralegals through the platform for individual matters, and LPC provides a professional workspace for legal professionals to collaborate on a matter-by-matter basis.</p>
     <p>—<br>Let’s-ParaConnect</p>
-    <p>Let's-ParaConnect was built to provide a more sustainable way for attorneys and paralegals to work together. Every interaction on the platform is supported by verification and Stripe-processed payments, helping set clear expectations and support for both sides.</p>
+    <p>Let's-ParaConnect was built to provide a more sustainable way for attorneys and paralegals to work together. Approval-based access, structured Matter workspaces, and Stripe-processed payments help set clear expectations for both sides.</p>
     <p>Connect with us</p>
     <p>
       <a href="https://www.linkedin.com/company/lets-paraconnect/" target="_blank" rel="noopener">LinkedIn</a>
-      &nbsp;|&nbsp;
-      <a href="https://www.facebook.com/LetsParaConnect/" target="_blank" rel="noopener">Facebook</a>
     </p>
     <p>16192 Coastal Hwy, Lewes, DE 19958</p>
   `;

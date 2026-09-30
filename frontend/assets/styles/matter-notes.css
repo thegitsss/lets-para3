@@ -1,0 +1,201 @@
+.matter-notes { color: inherit; min-width: 0; max-width: 100%; margin: 24px 0; overflow-wrap: anywhere; }
+.matter-notes p { line-height: 1.6; }
+.matter-notes label { display: block; font-weight: 600; margin: 20px 0 8px; }
+.matter-notes textarea { display: block; box-sizing: border-box; width: 100%; min-height: 200px; resize: vertical; padding: 14px; border: 1px solid var(--av2-line, #9ca3af); border-radius: 8px; background: var(--av2-bg, #fff); color: inherit; font: inherit; line-height: 1.6; }
+.matter-notes textarea:disabled { opacity: .75; }
+.matter-notes-meta { font-size: .875rem; opacity: .85; margin: 6px 0; }
+.matter-notes-meta:empty { display: none; }
+[data-note-feedback]:empty { margin: 0; }
+[data-moderation-feedback]:empty { margin: 0; }
+.matter-note-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.matter-note-button { box-sizing: border-box; max-width: 100%; min-width: 44px; border: 1px solid var(--av2-line, #9ca3af); border-radius: 7px; padding: 10px 16px; min-height: 44px; font: inherit; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; text-align: start; color: inherit; background: var(--av2-bg, #fff); cursor: pointer; }
+.matter-note-button:disabled { opacity: .55; cursor: default; }
+.matter-note-primary { background: #385d91; border-color: #385d91; color: white; }
+.matter-note-conflict { padding: 16px; border: 1px solid var(--av2-line, #9ca3af); border-radius: 8px; margin: 16px 0; }
+.matter-note-conflict pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; max-height: 340px; overflow: auto; }
+#caseNoteModal .note-modal-card { box-sizing: border-box; max-height: calc(100dvh - 48px); overflow: hidden; width: min(720px, 100%); }
+#caseNoteModal [data-case-note-host] { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 3px; margin: -3px; }
+#caseNoteModalTitle, #caseNoteModal .note-modal-actions { flex-shrink: 0; }
+#caseNoteModal [hidden] { display: none !important; }
+#caseNoteModal .matter-notes { margin: 0; }
+#caseNoteModal .matter-notes > h2 { display: none; }
+#caseNoteModal .matter-notes > h3 { margin: 0 0 10px; }
+
+.av2-matter-management .av2-management-title { margin: 0; font: 600 1.125rem/1.5 var(--font-sans, sans-serif); overflow-wrap: anywhere; }
+#caseNoteModal:has([data-matter-notes], [data-matter-moderation]) .note-modal-actions button { min-width: 44px; min-height: 44px; max-width: 100%; font: inherit; font-size: 1rem !important; white-space: normal; }
+#caseNoteModal:has([data-matter-notes], [data-matter-moderation]) :is(button, textarea) { font: inherit; }
+#caseNoteModal:has([data-matter-notes], [data-matter-moderation]) :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-matter-notes], [data-matter-moderation]) { --av2-bg: #111c2b; --av2-line: #405269; }
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-matter-notes], [data-matter-moderation]) .note-modal-card { background: var(--av2-bg) !important; color: #edf2f8 !important; }
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-matter-notes], [data-matter-moderation]) :is(button, textarea, a.matter-note-button) { background: var(--av2-bg) !important; color: #edf2f8 !important; border-color: var(--av2-line) !important; }
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-matter-notes], [data-matter-moderation]) .matter-note-primary { background: #a9c6ff !important; color: #111c2b !important; border-color: #a9c6ff !important; }
+
+.moderation-feedback-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.matter-moderation a.matter-note-button { display: inline-flex; align-items: center; text-decoration: none; }
+.av2-matter-management .matter-moderation[data-review-status="none"] { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.av2-matter-management .matter-moderation[data-review-status="none"] > h2 { display: none; }
+.av2-matter-management .matter-moderation[data-review-status="none"] :is(.matter-moderation-body p, .matter-note-actions) { margin: 0; }
+.av2-matter-management .matter-moderation[data-review-status="none"] [data-moderation-feedback] { flex-basis: 100%; }
+.av2-matter-management .matter-moderation[data-review-status="none"] [data-moderation-feedback]:empty { display: none; }
+
+.matter-invitation-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
+.matter-invitation { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border: 1px solid var(--av2-line, #9ca3af); border-radius: 8px; }
+.matter-invitation > div { min-width: 0; overflow-wrap: anywhere; }
+.matter-invitation img { flex-shrink: 0; border-radius: 50%; object-fit: cover; }
+.matter-invitation p { margin: 6px 0 0; line-height: 1.5; }
+.matter-invitations .av2-region-body > h3 { overflow-wrap: anywhere; }
+#caseInvitesModal .case-invites-card { box-sizing: border-box; max-height: calc(100dvh - 48px); overflow: hidden; width: min(720px, 100%); }
+#caseInvitesModal .case-preview-header, #caseInvitesModal .note-modal-actions { flex-shrink: 0; }
+#caseInvitesModal [data-case-invites-list] { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 3px; margin: 0 -3px; }
+#caseInvitesModal .matter-invitations { border: 0; padding: 0; }
+#caseInvitesModal .av2-card-heading h2 { display: none; }
+#caseInvitesModal .av2-refresh { border: 1px solid var(--line, #9ca3af); border-radius: 7px; background: var(--panel, #fff); color: inherit; font: inherit; padding: 10px 16px; min-height: 44px; cursor: pointer; }
+#caseInvitesModal .av2-refresh:disabled { opacity: .6; cursor: default; }
+#caseInvitesModal a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+
+.matter-archive a.matter-note-button { display: inline-flex; align-items: center; text-decoration: none; }
+.matter-archive h3, .matter-archive p { overflow-wrap: anywhere; }
+.matter-downloads h3, .matter-downloads h4, .matter-downloads p { overflow-wrap: anywhere; }
+.matter-download-list { display: grid; gap: 12px; list-style: none; margin: 16px 0; padding: 0; }
+.matter-download-file { min-width: 0; padding: 16px; border: 1px solid var(--av2-line, #9ca3af); border-radius: 8px; }
+.matter-download-file h4 { margin: 0 0 8px; font-size: 1rem; line-height: 1.5; }
+.matter-download-file .matter-note-button { margin-top: 12px; }
+.matter-downloads [hidden] { display: none !important; }
+.matter-receipt h2, .matter-receipt h3, .matter-receipt p { overflow-wrap: anywhere; }
+.matter-receipt-details { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 24px; margin: 18px 0; }
+.matter-receipt-details dt, .matter-receipt-details dd { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--av2-line, #9ca3af); overflow-wrap: anywhere; }
+.matter-receipt-details dd { text-align: right; }
+[data-receipt-history] { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--av2-line, #9ca3af); overflow-wrap: anywhere; }
+[data-receipt-history] h3, [data-receipt-history] h4 { margin: 0 0 8px; }
+[data-receipt-history] p { margin: 8px 0 12px; }
+[data-receipt-history] ol { list-style: none; padding: 0; margin: 12px 0; }
+[data-receipt-choice] { padding: 20px 0; border-bottom: 1px solid var(--av2-line, #9ca3af); }
+.matter-receipt [hidden] { display: none !important; }
+/* The current dashboard uses a shared white dialog skin. Keep receipt colors
+   within this dialog and the existing saved theme, including its Close action. */
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-matter-receipt]) {
+  --av2-bg: #111c2b;
+  --av2-line: #405269;
+  --lpc-ui-ink: #edf2f8;
+  --lpc-ui-line-strong: #405269;
+}
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-matter-receipt]) .note-modal-card {
+  background: #111c2b !important;
+  color: #edf2f8 !important;
+}
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-matter-receipt]) :is(h2, h3, p, dt, dd) { color: inherit !important; }
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-matter-receipt]) .note-modal-actions button {
+  background: #111c2b !important;
+  color: #edf2f8 !important;
+  border-color: #405269 !important;
+}
+#caseNoteModal:has([data-matter-receipt]) :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+@media (max-width: 480px) {
+  .matter-receipt-details { grid-template-columns: minmax(0, 1fr); }
+  .matter-receipt-details dt { border-bottom: 0; padding: 12px 0 3px; }
+  .matter-receipt-details dd { text-align: left; padding: 0 0 12px; }
+}
+
+.matter-export-details { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 24px; margin: 20px 0; }
+.matter-export-details dt, .matter-export-details dd { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--border, #dce3ef); overflow-wrap: anywhere; }
+.matter-export-details dd { text-align: right; }
+.matter-export h2 { overflow-wrap: anywhere; }
+.matter-export [hidden] { display: none !important; }
+@media (max-width: 480px) {
+  .matter-export-details { grid-template-columns: minmax(0, 1fr); }
+  .matter-export-details dt { border-bottom: 0; padding-bottom: 0; }
+  .matter-export-details dd { text-align: left; padding-top: 2px; }
+}
+.matter-applications { min-width: 0; overflow-wrap: anywhere; }
+.matter-applications [hidden] { display: none !important; }
+.matter-applications .av2-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
+.matter-applications button { min-height: 44px; padding: 8px 12px; font: inherit; color: inherit; background: transparent; border: 1px solid var(--av2-line, #9ca3af); border-radius: 6px; }
+.matter-applications .av2-notice { padding: 12px 14px; border-inline-start: 3px solid var(--av2-accent, #334b79); }
+.matter-application { border-block-start: 1px solid var(--av2-line, #9ca3af); padding-block: 18px; }
+.matter-application summary { cursor: pointer; min-height: 44px; line-height: 1.5; }
+.matter-application summary strong { margin-inline-end: 16px; }
+.matter-application summary span:last-child { display: block; margin-block-start: 6px; }
+.matter-application-body { padding: 8px 0 0; line-height: 1.65; }
+.matter-application-body h3 { margin-block: 22px 8px; font-size: 1.05rem; }
+.matter-application-letter { white-space: pre-wrap; }
+.matter-applications [data-pre-engagement] { margin-block-start: 24px; border-block-start: 1px solid var(--av2-line, #9ca3af); padding-block-start: 8px; }
+.matter-applications [data-pre-engagement] fieldset { min-width: 0; margin-block: 18px; padding: 16px; border: 1px solid var(--av2-line, #9ca3af); }
+.matter-applications [data-pre-engagement] legend { padding-inline: 6px; font-weight: 600; }
+.matter-applications [data-pre-engagement] label { display: block; min-height: 44px; margin-block: 12px; }
+.matter-applications [data-pre-engagement] input[type="checkbox"] { width: 20px; height: 20px; margin-inline-end: 8px; vertical-align: middle; accent-color: var(--av2-accent, #334b79); }
+.matter-applications [data-pre-engagement] input[type="file"], .matter-applications [data-pre-engagement] textarea { display: block; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; min-height: 44px; font: inherit; color: inherit; }
+.matter-applications [data-pre-engagement] textarea { resize: vertical; padding: 10px; line-height: 1.6; border: 1px solid var(--av2-line, #9ca3af); background: var(--av2-bg, #fff); }
+.matter-applications [data-pre-engagement] p { white-space: pre-wrap; }
+.matter-application-body dl > div { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr); gap: 12px; margin-block: 8px; }
+.matter-application-body dd { margin: 0; }
+.matter-applications :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+@media (max-width: 480px) { .matter-application-body dl > div { grid-template-columns: 1fr; gap: 2px; } }
+
+/* A persistent, compact filter row shared by both attorney application views. */
+.matter-application-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-block: 16px; }
+.matter-application-filters label { display: grid; gap: 6px; min-width: 0; flex: 1 1 12rem; font-size: .875rem; }
+.matter-application-filters label:first-child { flex: 2 1 220px; }
+.matter-application-filters input, .matter-application-filters select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; color: inherit; background: var(--av2-bg, #fff); border: 1px solid var(--av2-line, #9ca3af); border-radius: 6px; font: inherit; }
+.matter-applications > .av2-actions > h2 { margin: 0 auto 0 0; min-width: 0; }
+.matter-applications > [role="status"]:empty, .matter-applications > nav:not(:has(button:not([hidden]))) { display: none; }
+/* WebKit's native select can ignore min-height; draw only its disclosure arrow. */
+.matter-application-filters label:has(select) { position: relative; }
+.matter-application-filters label:has(select)::after { content: ""; position: absolute; right: 14px; bottom: calc(max(44px, 2.75rem) / 2 - 3px); width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); pointer-events: none; }
+.matter-application-filters select { appearance: none; height: max(44px, 2.75rem); padding-right: 32px; }
+.matter-application-announcement { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 480px) { .matter-application-filters label:first-child { flex-basis: 100%; } }
+
+/* The shared legacy dialog skin must respect the reviewer's saved theme. */
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-matter-applications]) {
+  --av2-bg: #111c2b;
+  --av2-line: #405269;
+  --av2-accent: #a9c6ff;
+  --lpc-ui-ink: #edf2f8;
+  --lpc-ui-blue: #a9c6ff;
+  --lpc-ui-line-strong: #405269;
+}
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-matter-applications]) .note-modal-card {
+  background: var(--av2-bg) !important;
+  color: var(--lpc-ui-ink) !important;
+  border-color: var(--av2-line) !important;
+}
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-matter-applications]) :is(h2, h3, h4, p, dt, dd, label, a) { color: inherit !important; }
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-matter-applications]) form { background: transparent !important; }
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-matter-applications]) :is(button, input, select, textarea) {
+  background: var(--av2-bg) !important;
+  color: var(--lpc-ui-ink) !important;
+  border-color: var(--av2-line) !important;
+}
+
+/* Selected engagement uses the existing review dialog without duplicating the
+   application profile, history, or a second modal implementation. */
+#caseNoteModal :is([data-hiring], [data-pre-engagement], [data-hiring-return]) { min-width: 0; overflow-wrap: anywhere; line-height: 1.6; }
+#caseNoteModal [data-hiring] [data-hiring-return] { margin-top: 1rem; }
+#caseNoteModal :is([data-hiring], [data-pre-engagement], [data-hiring-return]) :is(h3, h4) { margin: 18px 0 8px; font-size: 1.05rem; line-height: 1.45; }
+#caseNoteModal :is([data-hiring], [data-pre-engagement], [data-hiring-return]) > h3:first-child { margin-top: 0; }
+#caseNoteModal :is([data-hiring], [data-pre-engagement], [data-hiring-return]) p { margin: 8px 0 12px; }
+#caseNoteModal :is([data-hiring], [data-pre-engagement], [data-hiring-return]) [role="status"]:empty { display: none; }
+#caseNoteModal :is([data-hiring], [data-pre-engagement], [data-hiring-return]) .av2-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 14px 0; }
+#caseNoteModal :is([data-hiring], [data-pre-engagement], [data-hiring-return]) :is(button, a) { box-sizing: border-box; display: inline-flex; align-items: center; min-height: 44px; max-width: 100%; padding: 9px 12px; border: 1px solid var(--av2-line, #9ca3af); border-radius: 7px; font: inherit; line-height: 1.4; color: inherit; background: transparent; white-space: normal; overflow-wrap: anywhere; text-align: start; }
+#caseNoteModal :is([data-hiring], [data-pre-engagement], [data-hiring-return]) button { cursor: pointer; }
+#caseNoteModal :is([data-hiring], [data-pre-engagement], [data-hiring-return]) button:disabled { opacity: .6; cursor: default; }
+#caseNoteModal [data-pre-engagement] fieldset { min-width: 0; margin: 18px 0; padding: 14px; border: 1px solid var(--av2-line, #9ca3af); }
+#caseNoteModal [data-pre-engagement] legend { padding: 0 6px; }
+#caseNoteModal [data-pre-engagement] label { display: block; min-height: 44px; margin: 12px 0; }
+#caseNoteModal [data-pre-engagement] input[type="checkbox"] { width: 20px; height: 20px; margin-inline-end: 8px; vertical-align: middle; }
+#caseNoteModal [data-pre-engagement] :is(input[type="file"], textarea) { box-sizing: border-box; display: block; width: 100%; max-width: 100%; min-width: 0; min-height: 44px; color: inherit; font: inherit; }
+#caseNoteModal [data-pre-engagement] textarea { padding: 10px; resize: vertical; line-height: 1.6; background: var(--av2-bg, #fff); border: 1px solid var(--av2-line, #9ca3af); border-radius: 7px; }
+#caseNoteModal:has([data-hiring], [data-pre-engagement]) :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+#caseNoteModal:has([data-hiring], [data-pre-engagement]) .note-modal-actions button { min-height: 44px; font: inherit; white-space: normal; }
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-hiring], [data-pre-engagement]) { --av2-bg: #111c2b; --av2-line: #405269; --lpc-ui-ink: #edf2f8; --lpc-ui-blue: #a9c6ff; --lpc-ui-line-strong: #405269; }
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-hiring], [data-pre-engagement]) .note-modal-card { background: var(--av2-bg) !important; color: var(--lpc-ui-ink) !important; border-color: var(--av2-line) !important; }
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-hiring], [data-pre-engagement]) :is(h2, h3, h4, p, label, a) { color: inherit !important; }
+:is(html.theme-dark, body.theme-dark) #caseNoteModal:has([data-hiring], [data-pre-engagement]) :is(button, input, textarea) { background: var(--av2-bg) !important; color: var(--lpc-ui-ink) !important; border-color: var(--av2-line) !important; }
+
+#caseNoteModal [data-case-note-host] > :is([data-hiring], [data-pre-engagement]) > h3:first-child { display: none; }
+
+#caseNoteModal :is([data-hiring], [data-pre-engagement]) .av2-primary { background: #385d91; border-color: #385d91; color: #fff; }
+:is(html.theme-dark, body.theme-dark) #caseNoteModal :is([data-hiring], [data-pre-engagement]) .av2-primary { background: #a9c6ff !important; border-color: #a9c6ff !important; color: #111c2b !important; }
+
+#caseNoteModal :is([data-hiring], [data-pre-engagement]) > .av2-actions:not(:has(button:not([hidden]))) { display: none; }
+[data-preengagement-editor] > summary { min-height: 44px; padding-block: 10px; box-sizing: border-box; cursor: pointer; }

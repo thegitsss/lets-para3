@@ -1,218 +1,37 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("services:caseLifecycle");
 // backend/services/caseLifecycle.js
 // Utilities for case archives (ZIP generation + scheduled S3 purges).
 
-const { PassThrough } = require("stream");
+const { Transform } = require("stream");
+const { pipeline } = require("stream/promises");
+const os = require("os");
+const crypto = require("crypto");
+const exportContents = require("./matterExportContents");
 const fs = require("fs");
 const path = require("path");
-const archiver = require("archiver");
-const puppeteer = require("puppeteer");
 const {
-  S3Client,
   GetObjectCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
 } = require("@aws-sdk/client-s3");
 const { Upload } = require("@aws-sdk/lib-storage");
 const Case = require("../models/Case");
-const CaseFile = require("../models/CaseFile");
-const Message = require("../models/Message");
-const { decryptMessagePayload, decryptCaseFilePayload } = require("../utils/dataEncryption");
+const { assertObjectMalwareSafe } = require("../utils/fileSecurity");
+const { createS3Client } = require("../utils/s3Client");
+const { launchPuppeteer } = require("../utils/puppeteerBrowser");
 
 const BUCKET = process.env.S3_BUCKET || "";
-const REGION = process.env.S3_REGION || process.env.AWS_REGION || "us-east-1";
-const CREDENTIALS =
-  process.env.S3_ACCESS_KEY && process.env.S3_SECRET_KEY
-    ? {
-        accessKeyId: process.env.S3_ACCESS_KEY,
-        secretAccessKey: process.env.S3_SECRET_KEY,
-      }
-    : undefined;
-
-const s3 = new S3Client({ region: REGION, credentials: CREDENTIALS });
-const PURGE_INTERVAL_MS = Math.max(30_000, Number(process.env.CASE_PURGE_INTERVAL_MS || 60_000));
+const s3 = createS3Client();
 const PURGE_BATCH_LIMIT = Math.max(1, Math.min(10, Number(process.env.CASE_PURGE_BATCH_LIMIT || 3)));
-let purgeWorkerStarted = false;
+let archiverFactoryPromise = null;
 
-function resolvePuppeteerExecutablePath() {
-  const envPath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || "";
-  if (envPath && fs.existsSync(envPath)) return envPath;
-
-  try {
-    const bundled = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
-    if (bundled && fs.existsSync(bundled)) return bundled;
-  } catch {}
-
-  const platform = process.platform;
-  const candidates = [];
-  if (platform === "darwin") {
-    candidates.push(
-      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-      "/Applications/Chromium.app/Contents/MacOS/Chromium"
-    );
-  } else if (platform === "win32") {
-    const programFiles = process.env.PROGRAMFILES || "C:\\\\Program Files";
-    const programFilesX86 = process.env["PROGRAMFILES(X86)"] || "C:\\\\Program Files (x86)";
-    candidates.push(
-      path.join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
-      path.join(programFilesX86, "Google", "Chrome", "Application", "chrome.exe"),
-      path.join(programFiles, "Chromium", "Application", "chrome.exe"),
-      path.join(programFilesX86, "Chromium", "Application", "chrome.exe")
-    );
-  } else {
-    candidates.push(
-      "/usr/bin/google-chrome",
-      "/usr/bin/google-chrome-stable",
-      "/usr/bin/chromium",
-      "/usr/bin/chromium-browser"
-    );
+async function loadArchiverFactory() {
+  if (!archiverFactoryPromise) {
+    archiverFactoryPromise = import("archiver").then((module) => module.ZipArchive);
   }
-
-  return candidates.find((candidate) => fs.existsSync(candidate)) || "";
-}
-
-function normalizeKey(key) {
-  return String(key || "").replace(/^\/+/, "");
-}
-
-function isReceiptKey(key) {
-  const normalized = normalizeKey(key).toLowerCase();
-  return (
-    normalized.includes("/receipt-") ||
-    normalized.includes("receipt-attorney") ||
-    normalized.includes("receipt-payout") ||
-    normalized.includes("receipt-paralegal")
-  );
-}
-
-function isReceiptName(name) {
-  const normalized = String(name || "").toLowerCase();
-  return normalized.includes("receipt");
-}
-
-function safeFilename(input, { fallback = "file" } = {}) {
-  const value = String(input || "")
-    .replace(/[\u0000-\u001F\u007F]/g, "")
-    .replace(/[\\/:*?"<>|]+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
-  if (!value) return fallback;
-  return value.length > 120 ? value.slice(0, 120) : value;
-}
-
-function formatDate(value) {
-  if (!value) return "N/A";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "N/A";
-  return date.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
-}
-
-function formatDateOnly(value) {
-  if (!value) return "N/A";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "N/A";
-  return date.toLocaleDateString("en-US", { dateStyle: "medium" });
-}
-
-function formatAmountDollars(value) {
-  const cents = Number(value || 0);
-  if (!Number.isFinite(cents) || cents <= 0) return "0.00";
-  const dollars = cents / 100;
-  return dollars.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function formatMessageTimestampParts(value) {
-  if (!value) {
-    return { date: "Unknown date", time: "" };
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return { date: "Unknown date", time: "" };
-  }
-  return {
-    date: date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
-    time: date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-  };
-}
-
-function buildPersonName(person, fallback = "") {
-  if (person && typeof person === "object") {
-    const full = `${person.firstName || ""} ${person.lastName || ""}`.trim();
-    if (full) return full;
-  }
-  return fallback || "";
-}
-
-function normalizeMessageText(value) {
-  if (!value) return "";
-  return String(value)
-    .replace(/<[^>]*>/g, "")
-    .replace(/[\u0000-\u001F\u007F]/g, "")
-    .trim();
-}
-
-function getSenderKey(message) {
-  const sender =
-    message?.senderId?._id ||
-    message?.senderId ||
-    message?.userId?._id ||
-    message?.userId ||
-    "";
-  return sender ? String(sender) : "";
-}
-
-function getTimestampMs(value) {
-  if (!value) return null;
-  const time = new Date(value).getTime();
-  return Number.isNaN(time) ? null : time;
-}
-
-function collectAttachmentNames(message) {
-  const names = new Set();
-  if (message?.fileName) names.add(String(message.fileName));
-  if (message?.type === "file" && message?.text) names.add(String(message.text));
-  const content = message?.content;
-  if (content && typeof content === "object") {
-    const candidates = [content.fileName, content.filename, content.name, content.originalName, content.original];
-    for (const candidate of candidates) {
-      if (candidate) names.add(String(candidate));
-    }
-    if (Array.isArray(content.files)) {
-      for (const file of content.files) {
-        const fileName = file?.fileName || file?.filename || file?.name || file?.originalName || file?.original;
-        if (fileName) names.add(String(fileName));
-      }
-    }
-  }
-  return Array.from(names).filter(Boolean);
-}
-
-function ensureUniqueFilename(name, seen) {
-  if (!seen.has(name)) {
-    seen.set(name, 1);
-    return name;
-  }
-  const count = seen.get(name) || 1;
-  seen.set(name, count + 1);
-  const extIndex = name.lastIndexOf(".");
-  if (extIndex > 0) {
-    return `${name.slice(0, extIndex)}-${count}${name.slice(extIndex)}`;
-  }
-  return `${name}-${count}`;
-}
-
-function buildFileMessage(fileDoc) {
-  if (!fileDoc) return null;
-  const fileName =
-    fileDoc.originalName || fileDoc.filename || fileDoc.name || fileDoc.fileName || "Document";
-  return {
-    _id: fileDoc._id,
-    createdAt: fileDoc.createdAt,
-    senderId: fileDoc.userId || null,
-    senderRole: fileDoc.userId?.role || "",
-    type: "file",
-    text: fileName,
-    fileName,
-  };
+  return archiverFactoryPromise;
 }
 
 const EXPORT_LAYOUT = {
@@ -230,14 +49,13 @@ const EXPORT_COLORS = {
 const EXPORT_FONT_NAME = "CormorantGaramondLight";
 const EXPORT_FONT_PATH = path.resolve(__dirname, "..", "assets", "fonts", "CormorantGaramond-Light.ttf");
 const EXPORT_FONT_AVAILABLE = fs.existsSync(EXPORT_FONT_PATH);
-const RECEIPT_LOGO_PATH = path.resolve(__dirname, "..", "..", "frontend", "mountain-favicon.png");
+const RECEIPT_LOGO_PATH = path.resolve(__dirname, "..", "..", "frontend", "Cleanfav.png");
 const RECEIPT_LOGO_AVAILABLE = fs.existsSync(RECEIPT_LOGO_PATH);
 const EXPORT_CACHE = {
   fontDataUri: null,
   receiptLogoDataUri: null,
 };
 const RECEIPT_FONT_WEIGHT = 300;
-const ATTACHMENT_ASSOCIATION_WINDOW_MS = 15 * 60 * 1000;
 
 function escapeHtml(value) {
   return String(value || "")
@@ -254,7 +72,7 @@ function toDataUri(filePath, mimeType) {
     const data = fs.readFileSync(filePath);
     return `data:${mimeType};base64,${data.toString("base64")}`;
   } catch (err) {
-    console.warn("[caseLifecycle] Unable to load asset", filePath, err?.message || err);
+    runtimeLogger.warn("[caseLifecycle] Unable to load asset", filePath, err?.message || err);
     return "";
   }
 }
@@ -264,7 +82,7 @@ function getFontDataUri() {
     return EXPORT_CACHE.fontDataUri;
   }
   if (!EXPORT_FONT_AVAILABLE) {
-    console.warn("[caseLifecycle] Export font not found:", EXPORT_FONT_PATH);
+    runtimeLogger.warn("[caseLifecycle] Export font not found:", EXPORT_FONT_PATH);
     EXPORT_CACHE.fontDataUri = "";
     return EXPORT_CACHE.fontDataUri;
   }
@@ -277,7 +95,7 @@ function getReceiptLogoDataUri() {
     return EXPORT_CACHE.receiptLogoDataUri;
   }
   if (!RECEIPT_LOGO_AVAILABLE) {
-    console.warn("[caseLifecycle] Receipt logo not found:", RECEIPT_LOGO_PATH);
+    runtimeLogger.warn("[caseLifecycle] Receipt logo not found:", RECEIPT_LOGO_PATH);
     EXPORT_CACHE.receiptLogoDataUri = "";
     return EXPORT_CACHE.receiptLogoDataUri;
   }
@@ -295,273 +113,31 @@ function normalizeReceiptLineItems(items) {
     .filter((item) => item.label || item.value);
 }
 
-function buildCaseExportHtml(caseData, messages) {
-  const fontDataUri = getFontDataUri();
-  const bodyFontFamily = '"Times New Roman", Times, serif';
-  const footerFontFamily = fontDataUri ? `'${EXPORT_FONT_NAME}'` : bodyFontFamily;
-  const fontFaceCss = fontDataUri
-    ? `@font-face { font-family: '${EXPORT_FONT_NAME}'; src: url('${fontDataUri}') format('truetype'); font-weight: 300; font-style: normal; }`
-    : "";
-
-  const attorneyName =
-    buildPersonName(caseData.attorney, caseData.attorneyNameSnapshot) ||
-    buildPersonName(caseData.attorneyId) ||
-    "Attorney";
-  const paralegalName =
-    buildPersonName(caseData.paralegal, caseData.paralegalNameSnapshot) ||
-    buildPersonName(caseData.paralegalId) ||
-    "Paralegal";
-
-  const amountCents =
-    typeof caseData.totalAmount === "number"
-      ? caseData.totalAmount
-      : typeof caseData.lockedTotalAmount === "number"
-        ? caseData.lockedTotalAmount
-        : 0;
-  const amountDisplay = formatAmountDollars(amountCents);
-
-  const metadataRows = [
-    ["Title", caseData.title || "Case"],
-    ["Attorney", attorneyName],
-    ["Paralegal", paralegalName],
-    ["Completed", formatDateOnly(caseData.completedAt)],
-    ["Payment", `$${amountDisplay}`],
-  ]
-    .map(
-      ([label, value]) => `<div>${escapeHtml(label)}: ${escapeHtml(value)}</div>`
-    )
-    .join("");
-
-  const messageEntries = [];
-  const pendingAttachments = new Map();
-  const lastMessageBySender = new Map();
-
-  for (const msg of messages || []) {
-    const senderKey = getSenderKey(msg);
-    const senderName = buildPersonName(msg.senderId, "") || (msg.senderRole ? String(msg.senderRole) : "User");
-    const role = String(msg.senderRole || msg.senderId?.role || "").toLowerCase();
-    const roleClass = role.includes("para") ? "paralegal" : "attorney";
-    const rawBody = normalizeMessageText(msg.text || msg.content || msg.transcript || "");
-    const inlineAttachments = collectAttachmentNames(msg);
-    const createdAt = msg.createdAt || null;
-    const createdAtMs = getTimestampMs(createdAt);
-
-    const isFileOnly = msg.type === "file" || (!rawBody && inlineAttachments.length);
-    if (isFileOnly) {
-      const names = inlineAttachments.length ? inlineAttachments : rawBody ? [rawBody] : [];
-      if (names.length) {
-        const attachToPrev = senderKey ? lastMessageBySender.get(senderKey) : null;
-        if (
-          attachToPrev &&
-          createdAtMs !== null &&
-          attachToPrev.createdAtMs !== null &&
-          createdAtMs - attachToPrev.createdAtMs <= ATTACHMENT_ASSOCIATION_WINDOW_MS
-        ) {
-          names.forEach((name) => attachToPrev.attachments.add(name));
-        } else if (senderKey) {
-          const queue = pendingAttachments.get(senderKey) || [];
-          names.forEach((name) =>
-            queue.push({ name, createdAt, createdAtMs, senderName, senderRole: msg.senderRole, senderId: msg.senderId })
-          );
-          pendingAttachments.set(senderKey, queue);
-        } else {
-          messageEntries.push({
-            senderName,
-            roleClass,
-            createdAt,
-            createdAtMs,
-            bodyText: "",
-            attachments: new Set(names),
-          });
-        }
-      }
-      continue;
-    }
-
-    const attachments = new Set(inlineAttachments);
-    if (senderKey && pendingAttachments.has(senderKey)) {
-      const queued = pendingAttachments.get(senderKey) || [];
-      const remaining = [];
-      for (const item of queued) {
-        if (
-          createdAtMs !== null &&
-          item.createdAtMs !== null &&
-          createdAtMs - item.createdAtMs <= ATTACHMENT_ASSOCIATION_WINDOW_MS
-        ) {
-          attachments.add(item.name);
-        } else {
-          remaining.push(item);
-        }
-      }
-      if (remaining.length) pendingAttachments.set(senderKey, remaining);
-      else pendingAttachments.delete(senderKey);
-    }
-
-    let bodyText = rawBody;
-    if (bodyText && attachments.has(bodyText)) bodyText = "";
-
-    const entry = {
-      senderName,
-      roleClass,
-      createdAt,
-      createdAtMs,
-      bodyText,
-      attachments,
-    };
-    if (entry.bodyText || entry.attachments.size) {
-      messageEntries.push(entry);
-      if (senderKey) lastMessageBySender.set(senderKey, entry);
-    }
-  }
-
-  for (const queue of pendingAttachments.values()) {
-    for (const item of queue) {
-      messageEntries.push({
-        senderName: item.senderName || "User",
-        roleClass: String(item.senderRole || "").toLowerCase().includes("para") ? "paralegal" : "attorney",
-        createdAt: item.createdAt,
-        createdAtMs: item.createdAtMs,
-        bodyText: "",
-        attachments: new Set([item.name]),
-      });
-    }
-  }
-
-  const sortedEntries = messageEntries.slice().sort((a, b) => {
-    const aTime = typeof a.createdAtMs === "number" ? a.createdAtMs : Number.POSITIVE_INFINITY;
-    const bTime = typeof b.createdAtMs === "number" ? b.createdAtMs : Number.POSITIVE_INFINITY;
-    return aTime - bTime;
-  });
-
-  const messageItems = [];
-  let lastDateLabel = null;
-  for (const entry of sortedEntries) {
-    const { date, time } = formatMessageTimestampParts(entry.createdAt);
-    const attachmentLine = entry.attachments.size
-      ? Array.from(entry.attachments)
-          .map((name) => `<div class="message-attachment">Document: ${escapeHtml(name)}</div>`)
-          .join("")
-      : "";
-    const metaLine = time
-      ? `${escapeHtml(entry.senderName)} &middot; ${escapeHtml(time)}`
-      : `${escapeHtml(entry.senderName)}`;
-
-    if (date && date !== lastDateLabel) {
-      messageItems.push(`<div class="message-date">${escapeHtml(date)}</div>`);
-      lastDateLabel = date;
-    }
-
-    messageItems.push(`
-      <div class="message ${entry.roleClass}">
-        <div class="meta">${metaLine}</div>
-        ${entry.bodyText ? `<div>${escapeHtml(entry.bodyText)}</div>` : ""}
-        ${attachmentLine}
-      </div>
-    `);
-  }
-
-  const messageHtml =
-    messageItems.length > 0
-      ? messageItems.join("")
-      : `<div class="message"><div>No messages available.</div></div>`;
-
-  return `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <style>
-      ${fontFaceCss}
-      html, body { margin: 0; padding: 0; }
-      body {
-        font-family: ${bodyFontFamily};
-        font-weight: 500;
-        font-size: 14pt;
-        line-height: 1.5;
-        color: ${EXPORT_COLORS.text};
-        background: #ffffff;
-      }
-      .page {
-        max-width: ${EXPORT_LAYOUT.maxWidth}px;
-        margin: ${EXPORT_LAYOUT.marginTop}px auto ${EXPORT_LAYOUT.marginBottom}px auto;
-      }
-      h2 {
-        font-size: 16pt;
-        font-weight: 500;
-        margin: 0 0 18px 0;
-        padding-bottom: 6px;
-        border-bottom: 1px solid ${EXPORT_COLORS.divider};
-        text-align: left;
-      }
-      .messages-heading {
-        text-align: right;
-      }
-      .case-details {
-        margin-bottom: 48px;
-      }
-      .case-details div {
-        margin-bottom: 8px;
-      }
-      .messages {
-        margin-top: 24px;
-        text-align: right;
-      }
-      .message {
-        margin-bottom: 28px;
-        text-align: right;
-        break-inside: avoid;
-        page-break-inside: avoid;
-      }
-      .message-date {
-        margin: 28px 0 14px;
-        font-size: 10pt;
-        font-weight: 500;
-        color: ${EXPORT_COLORS.text};
-        text-align: right;
-        break-inside: avoid;
-        page-break-inside: avoid;
-      }
-      .message .meta {
-        font-size: 10pt;
-        margin-bottom: 4px;
-      }
-      .message-attachment {
-        margin-top: 6px;
-      }
-      .message.attorney {
-        color: ${EXPORT_COLORS.text};
-      }
-      .message.paralegal {
-        color: ${EXPORT_COLORS.paralegal};
-      }
-      footer {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        text-align: center;
-        font-size: 14pt;
-        color: ${EXPORT_COLORS.footer};
-        font-family: ${footerFontFamily};
-        font-weight: 300;
-      }
-    </style>
-  </head>
-  <body>
-    <footer>
-      Let<span style="color:${EXPORT_COLORS.accent};">&#8217;</span>s-ParaConnect
-    </footer>
-    <div class="page">
-      <h2>Case Details</h2>
-      <div class="case-details">
-        ${metadataRows}
-      </div>
-      <h2 class="messages-heading">Messages</h2>
-      <div class="messages">
-        ${messageHtml}
-      </div>
-    </div>
-  </body>
-</html>`;
+function buildCaseExportHtml(contents) {
+  const { summary, messages, documents } = contents;
+  const showDate = value => value ? new Date(value).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }) : "Date unavailable";
+  const showTime = value => value ? new Date(value).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }) + " UTC" : "Date unavailable";
+  const currency = String(summary.currency).toUpperCase();
+  const amount = summary.amount !== null && Intl.supportedValuesOf("currency").includes(currency) && new Intl.NumberFormat("en-US", { style: "currency", currency }).resolvedOptions().maximumFractionDigits === 2 ? new Intl.NumberFormat("en-US", { style: "currency", currency }).format(summary.amount / 100) : "Amount unavailable";
+  const rows = [["Matter title", summary.title], ["Matter status", summary.status || "Not recorded"], ["Attorney", summary.attorneyName], ["Paralegal", summary.paralegalName], ["Practice area", summary.practiceArea || "Not recorded"], ["Completed", showDate(summary.completedAt)], ["Deadline", showDate(summary.deadline)], ["Matter amount", amount]];
+  const byId = new Map(messages.map(message => [message.id, message]));
+  const conversation = messages.map(message => {
+    const parent = byId.get(message.replyTo);
+    const reply = message.replyTo ? `<p class="context">${parent ? `Reply to ${escapeHtml(parent.senderName)} (${escapeHtml(showTime(parent.createdAt))})` : "Reply to a message no longer available"}</p>` : "";
+    return `<article><h3>${escapeHtml(message.senderName)} <span class="role">${escapeHtml(message.senderRole)}</span></h3><p class="context">${escapeHtml(showTime(message.createdAt))}</p>${reply}${message.text ? `<p class="message-text">${escapeHtml(message.text)}</p>` : ""}${message.type === "audio" ? `<p class="context">Audio message${message.transcript ? " — transcript follows" : "; no transcript recorded"}</p>` : ""}${message.transcript ? `<p class="message-text">${escapeHtml(message.transcript)}</p>` : ""}${message.attachments.map(name => `<p class="attachment">Attachment: ${escapeHtml(name)}</p>`).join("")}</article>`;
+  }).join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    html,body{margin:0;padding:0}body{font-family:"Times New Roman",Times,serif;color:#1f1f1f;font-size:12pt;line-height:1.5;overflow-wrap:anywhere}
+    h1{font-size:22pt;font-weight:normal;margin:0 0 24px}h2{font-size:16pt;font-weight:normal;margin:26px 0 12px;border-bottom:1px solid #ddd;padding-bottom:6px;break-after:avoid}h3{font-size:12pt;margin:0;font-weight:bold;break-after:avoid}
+    p{margin:0 0 8px}.details p{margin:0 0 6px}.context,.role{font-size:10pt;color:#555}.role{font-weight:normal;margin-left:8px}.message-text,.scope{white-space:pre-wrap}article{margin-bottom:22px;break-inside:avoid}.attachment{font-size:10pt}li{margin-bottom:8px}table{border-collapse:collapse;width:100%}td{border-bottom:1px solid #ddd;padding:6px 0;vertical-align:top}td:last-child{width:22%;text-align:right}tr{break-inside:avoid}
+  </style></head><body><h1>Matter archive</h1><div class="details">${rows.map(([label,value]) => `<p>${escapeHtml(label)}: ${escapeHtml(value)}</p>`).join("")}</div>
+  ${summary.briefSummary || summary.details ? `<h2>Matter scope</h2>${summary.briefSummary ? `<p class="scope">${escapeHtml(summary.briefSummary)}</p>` : ""}${summary.details && summary.details !== summary.briefSummary ? `<p class="scope">${escapeHtml(summary.details)}</p>` : ""}` : ""}
+  ${summary.tasks.length ? `<h2>Tasks</h2><ul>${summary.tasks.map(task => `<li>${escapeHtml(task.title)}${task.completed === null ? " — completion not recorded" : task.completed ? " — completed" : " — not completed"}</li>`).join("")}</ul>` : ""}
+  <h2>Retained messages (${messages.length})</h2>${conversation || "<p>No retained messages.</p>"}
+  <h2>Documents (${documents.length})</h2>${documents.length ? `<ul>${documents.map(document => `<li>${escapeHtml(document.path)}</li>`).join("")}</ul>` : "<p>No retained documents.</p>"}
+  ${contents.attorneyNotes ? `<h2>Attorney notes</h2><p class="scope">${escapeHtml(contents.attorneyNotes)}</p>` : ""}
+  ${contents.receipts?.length ? `<h2>Receipts (${contents.receipts.length})</h2><ul>${contents.receipts.map(receipt => `<li>${escapeHtml(receipt.path)}</li>`).join("")}</ul>` : ""}
+  <p class="context">Deleted messages and files are not included. Prior file versions are included where their documents are still recorded.</p></body></html>`;
 }
 
 function buildReceiptHtml(payload = {}) {
@@ -572,27 +148,26 @@ function buildReceiptHtml(payload = {}) {
     ? `@font-face { font-family: '${EXPORT_FONT_NAME}'; src: url('${fontDataUri}') format('truetype'); font-weight: ${RECEIPT_FONT_WEIGHT}; font-style: normal; }`
     : "";
   const title = payload.title || "Receipt";
-  const receiptId = payload.receiptId || "N/A";
   const issuedAt = payload.issuedAt || "N/A";
   const partyLabel = payload.partyLabel || "Billed to";
   const partyName = payload.partyName || "N/A";
   const attorneyName = payload.attorneyName || "";
-  const caseTitle = payload.caseTitle || "Case";
-  const paymentMethod = payload.paymentMethod || "On file";
+  const caseTitle = payload.caseTitle || "Untitled Matter";
+  const paymentMethod = payload.paymentMethod === null ? null : payload.paymentMethod || "On file";
   const paymentStatus = payload.paymentStatus || "Paid";
   const totalLabel = payload.totalLabel || "Total";
   const totalAmount = payload.totalAmount || "0.00";
   const lineItems = normalizeReceiptLineItems(payload.lineItems);
 
   const detailRows = [
-    ["Date issued", issuedAt],
+    [payload.dateLabel || "Date issued", issuedAt],
     [partyLabel, partyName],
     ...(attorneyName ? [["Attorney", attorneyName]] : []),
-    ["Case title", caseTitle],
+    ["Matter title", caseTitle],
   ]
     .map(
       ([label, value]) =>
-        `<tr><td class="detail-label">${escapeHtml(label)}</td><td class="detail-value">${value}</td></tr>`
+        `<tr><td class="detail-label">${escapeHtml(label)}</td><td class="detail-value">${escapeHtml(value)}</td></tr>`
     )
     .join("");
 
@@ -609,6 +184,7 @@ function buildReceiptHtml(payload = {}) {
     ["Payment method", paymentMethod],
     ["Payment status", paymentStatus],
   ]
+    .filter(([, value]) => value !== null)
     .map(
       ([label, value]) =>
         `<tr><td class="detail-label">${escapeHtml(label)}</td><td class="detail-value">${escapeHtml(
@@ -641,6 +217,7 @@ function buildReceiptHtml(payload = {}) {
         font-weight: ${RECEIPT_FONT_WEIGHT};
         margin: 0 0 18px 0;
       }
+      .receipt-mode { font-size: 11pt; color: #4b5563; margin: -10px 0 18px; }
       .receipt-header {
         display: flex;
         align-items: center;
@@ -670,6 +247,7 @@ function buildReceiptHtml(payload = {}) {
         letter-spacing: 0.04em;
         text-transform: uppercase;
         margin: 0 0 10px 0;
+        break-after: avoid;
       }
       .detail-id {
         font-size: 10.5pt;
@@ -683,12 +261,14 @@ function buildReceiptHtml(payload = {}) {
         padding: 4px 0;
         vertical-align: top;
       }
-      .detail-label,
+      tr, .receipt-amounts, .receipt-payment { break-inside: avoid; }
+      .detail-label { width: 38%; }
       .item-label {
         width: 62%;
       }
       .detail-value {
         text-align: right;
+        overflow-wrap: anywhere;
       }
       .item-amount {
         text-align: right;
@@ -699,44 +279,16 @@ function buildReceiptHtml(payload = {}) {
         border-top: 1px solid ${EXPORT_COLORS.divider};
         font-weight: ${RECEIPT_FONT_WEIGHT};
       }
-      footer {
-        position: fixed;
-        bottom: 0.8in;
-        left: 0;
-        right: 0;
-        text-align: center;
-        font-size: 14pt;
-        color: ${EXPORT_COLORS.footer};
-        font-family: ${bodyFontFamily};
-        font-weight: ${RECEIPT_FONT_WEIGHT};
-      }
-      .receipt-footer-brand {
-        white-space: nowrap;
-        line-height: 1.1;
-      }
-      .receipt-footer-id {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        text-align: center;
-        font-size: 10pt;
-        color: ${EXPORT_COLORS.footer};
-        line-height: 2;
-      }
     </style>
   </head>
   <body>
-    <footer>
-      <div class="receipt-footer-brand">Let<span style="color:${EXPORT_COLORS.accent};">&#8217;</span>s-ParaConnect</div>
-    </footer>
-    <div class="receipt-footer-id">Receipt ID: ${escapeHtml(receiptId)}</div>
     <div class="page">
       <div class="receipt-header">
         ${logoDataUri ? `<img class="receipt-logo" src="${logoDataUri}" alt="Let’s-ParaConnect" />` : ""}
         <div class="receipt-brand">Let<span style="color:${EXPORT_COLORS.accent};">&#8217;</span>s-ParaConnect</div>
       </div>
       <div class="receipt-title">${escapeHtml(title)}</div>
+      ${payload.testMode === true ? '<p class="receipt-mode">Test record - no money moved</p>' : ""}
 
       <section class="section">
         <div class="section-header">Details</div>
@@ -745,8 +297,8 @@ function buildReceiptHtml(payload = {}) {
         </table>
       </section>
 
-      <section class="section">
-        <div class="section-header">Line items</div>
+      <section class="section receipt-amounts">
+        <div class="section-header">${lineItems.length ? "Line items" : "Amount"}</div>
         <table class="line-items">
           ${lineRows}
           <tr class="total-row">
@@ -756,7 +308,7 @@ function buildReceiptHtml(payload = {}) {
         </table>
       </section>
 
-      <section class="section">
+      <section class="section receipt-payment">
         <div class="section-header">Payment</div>
         <table>
           ${paymentRows}
@@ -768,11 +320,9 @@ function buildReceiptHtml(payload = {}) {
 }
 
 async function renderHtmlToPdf(html, options = {}) {
-  const executablePath = resolvePuppeteerExecutablePath() || undefined;
-  const browser = await puppeteer.launch({
+  const browser = await launchPuppeteer({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    executablePath,
   });
   try {
     const page = await browser.newPage();
@@ -802,14 +352,16 @@ async function renderHtmlToPdf(html, options = {}) {
   }
 }
 
-async function buildCaseExportPdfBuffer(caseData, messages) {
-  const html = buildCaseExportHtml(caseData, messages);
-  return renderHtmlToPdf(html);
+async function buildCaseExportPdfBuffer(contents) {
+  return renderHtmlToPdf(buildCaseExportHtml(contents), { margin: { top: "0.65in", bottom: "0.8in", left: "0.7in", right: "0.7in" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: `<div style="width:100%;text-align:center;font-family:Times,serif;font-size:10pt;color:#555;padding-bottom:12px;">Let’s-ParaConnect · <span class="pageNumber"></span> / <span class="totalPages"></span></div>` });
 }
 
 async function buildReceiptPdfBuffer(payload) {
   const html = buildReceiptHtml(payload);
-  return renderHtmlToPdf(html, { margin: { bottom: "0in" } });
+  // Chromium prints this footer inside the reserved margin on every page.
+  // Keeping it outside document flow prevents overlap and footer-only pages.
+  const footerTemplate = `<div style="width:100%;padding:0 40px 12px;text-align:center;font-family:'Times New Roman',Times,serif;font-size:10pt;color:#777;overflow-wrap:anywhere;"><div style="font-size:14pt;margin-bottom:16px;">Let<span style="color:${EXPORT_COLORS.accent};">&#8217;</span>s-ParaConnect</div><div>Receipt ID: ${escapeHtml(payload.receiptId || "N/A")}</div></div>`;
+  return renderHtmlToPdf(html, { margin: { bottom: "1.2in" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate });
 }
 
 async function uploadPdfToS3({ key, buffer }) {
@@ -839,130 +391,93 @@ function getReceiptKey(caseId, kind) {
   return `cases/${caseId}/receipt-${suffix}-v2.pdf`;
 }
 
-async function appendS3Object(archive, key, name) {
-  if (!key || !name || !BUCKET) return;
-  const normalized = normalizeKey(key);
+async function buildArchiveZipFile(caseDoc, { contents, signal, validate = async () => {} } = {}) {
+  const limits = exportContents.limits;
+  const combinedSignal = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(limits.durationMs)]);
+  const active = () => {
+    combinedSignal.throwIfAborted();
+    if (caseDoc.purgedAt || caseDoc.purgeScheduledFor && new Date(caseDoc.purgeScheduledFor) <= new Date()) throw Object.assign(new Error("The Matter archive retention period has ended."), { publicCode: caseDoc.purgedAt ? "EXPORT_PURGED" : "EXPORT_EXPIRED", status: 410 });
+  };
+  active();
+  const source = contents || await exportContents.read(typeof caseDoc.toObject === "function" ? caseDoc.toObject({ depopulate: false }) : caseDoc);
+  if (source.documents.length && !BUCKET) throw Object.assign(new Error("Document storage is unavailable."), { publicCode: "EXPORT_UNAVAILABLE", status: 503 });
+  if (Buffer.byteLength(JSON.stringify(source)) > 16 * 1024 * 1024) throw Object.assign(new Error("The retained text exceeds the archive preparation limit."), { publicCode: "EXPORT_TOO_LARGE", status: 413 });
+  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "lpc-matter-export-"));
+  const cleanup = () => fs.promises.rm(directory, { recursive: true, force: true });
   try {
-    const res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: normalized }));
-    if (res?.Body) {
-      archive.append(res.Body, { name });
+    const documents = []; let totalBytes = 0;
+    for (const document of source.documents) {
+      active();
+      const head = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: document.key }), { abortSignal: combinedSignal });
+      if (!Number.isSafeInteger(head.ContentLength) || head.ContentLength < 0 || typeof head.ETag !== "string" || !head.ETag) throw Object.assign(new Error("Document metadata could not be verified."), { publicCode: "EXPORT_SOURCE_CHANGED", status: 409 });
+      totalBytes += head.ContentLength;
+      if (totalBytes > limits.bytes) throw Object.assign(new Error("The documents exceed the 250 MB archive preparation limit."), { publicCode: "EXPORT_TOO_LARGE", status: 413 });
+      const versionId = head.VersionId && head.VersionId !== "null" ? head.VersionId : undefined;
+      await assertObjectMalwareSafe({ s3, bucket: BUCKET, key: document.key, versionId, signal: combinedSignal });
+      const object = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: document.key, IfMatch: head.ETag, ...(versionId ? { VersionId: versionId } : {}) }), { abortSignal: combinedSignal });
+      if (!object.Body || typeof object.Body.pipe !== "function" || object.ETag !== head.ETag || object.ContentLength !== head.ContentLength || versionId && object.VersionId !== versionId) {
+        object.Body?.destroy?.(); throw Object.assign(new Error("A document changed while the archive was being prepared."), { publicCode: "EXPORT_SOURCE_CHANGED", status: 409 });
+      }
+      const localPath = path.join(directory, `source-${documents.length}`); let written = 0;
+      const bounded = new Transform({ transform(chunk, _encoding, callback) { written += chunk.length; callback(written > head.ContentLength ? Object.assign(new Error("Document length changed."), { publicCode: "EXPORT_SOURCE_CHANGED", status: 409 }) : null, chunk); } });
+      await pipeline(object.Body, bounded, fs.createWriteStream(localPath, { flags: "wx", mode: 0o600 }), { signal: combinedSignal });
+      if (written !== head.ContentLength) throw Object.assign(new Error("A document download was incomplete."), { publicCode: "EXPORT_SOURCE_CHANGED", status: 409 });
+      await assertObjectMalwareSafe({ s3, bucket: BUCKET, key: document.key, versionId, signal: combinedSignal });
+      documents.push({ ...document, localPath, size: written });
     }
-  } catch (err) {
-    console.warn("[caseLifecycle] Missing S3 object", normalized, err?.message || err);
+    active(); await validate(); active();
+    const pdf = await buildCaseExportPdfBuffer(source);
+    if (!Buffer.isBuffer(pdf) || pdf.subarray(0, 5).toString() !== "%PDF-") throw new Error("Invalid Matter summary PDF");
+    const receiptFiles = [];
+    for (const receipt of source.receipts || []) {
+      active();
+      if (!/^Receipts\/(?:payment-payment|withdrawal-[a-f0-9]{64})\.pdf$/.test(receipt.path)) throw new Error("Invalid receipt export path");
+      const buffer = await buildReceiptPdfBuffer(receipt.payload);
+      if (!Buffer.isBuffer(buffer) || buffer.subarray(0, 5).toString() !== "%PDF-") throw new Error("Invalid receipt PDF");
+      receiptFiles.push({ path: receipt.path, buffer });
+      if (receiptFiles.reduce((sum, file) => sum + file.buffer.length, 0) > 20 * 1024 * 1024) throw Object.assign(new Error("Receipts exceed the download limit."), { publicCode: "EXPORT_TOO_LARGE", status: 413 });
+    }
+    const manifest = { title: source.summary.title, preparedAt: new Date().toISOString(), summaryFile: "Case_Summary.pdf", counts: source.counts, documents: documents.map(({ path: filename, name, category, recordedAt, size }) => ({ path: filename, name, category, recordedAt, size })), receipts: receiptFiles.map(file => file.path), attorneyNotesIncluded: Boolean(source.attorneyNotes), excluded: ["Deleted messages", "Removed files and their retained removal history", ...(source.receipts === undefined ? ["Attorney-only notes and financial receipts"] : [])] };
+    active();
+    const archiver = await loadArchiverFactory(), archive = new archiver({ zlib: { level: 6 } });
+    const zipPath = path.join(directory, "archive.zip");
+    const writing = pipeline(archive, fs.createWriteStream(zipPath, { flags: "wx", mode: 0o600 }), { signal: combinedSignal });
+    archive.on("warning", error => archive.destroy(error));
+    archive.append(pdf, { name: "Case_Summary.pdf" });
+    archive.append(JSON.stringify(manifest, null, 2) + "\n", { name: "Archive_contents.json" });
+    for (const receipt of receiptFiles) archive.append(receipt.buffer, { name: receipt.path });
+    for (const document of documents) archive.file(document.localPath, { name: document.path });
+    try { await Promise.all([writing, archive.finalize()]); }
+    catch (error) { archive.destroy(error); await Promise.allSettled([writing]); throw error; }
+    active(); await validate(); active();
+    const stat = await fs.promises.stat(zipPath);
+    if (stat.size > limits.bytes + 20 * 1024 * 1024) throw Object.assign(new Error("The archive exceeds its preparation limit."), { publicCode: "EXPORT_TOO_LARGE", status: 413 });
+    return { path: zipPath, size: stat.size, readyAt: new Date(), cleanup };
+  } catch (error) {
+    await cleanup().catch(cleanupError => runtimeLogger.error("[caseLifecycle] temporary archive cleanup failed", { error: cleanupError }));
+    throw error;
   }
 }
 
 async function generateArchiveZip(caseDoc) {
-  if (!BUCKET) {
-    throw new Error("S3 bucket is not configured");
+  if (!BUCKET) throw new Error("S3 bucket is not configured");
+  const sourceCase = typeof caseDoc.toObject === "function" ? caseDoc.toObject({ depopulate: false }) : caseDoc;
+  const contents = await exportContents.read(sourceCase);
+  const artifact = await buildArchiveZipFile(caseDoc, { contents, validate: async () => {
+    if ((await exportContents.read(sourceCase)).revision !== contents.revision) throw Object.assign(new Error("The retained documents or messages changed during archive preparation."), { publicCode: "EXPORT_CHANGED", status: 409 });
+  } });
+  const key = `cases/${String(caseDoc._id)}/archive-${crypto.randomUUID()}.zip`;
+  const body = fs.createReadStream(artifact.path);
+  const upload = new Upload({ client: s3, params: { Bucket: BUCKET, Key: key, Body: body, ContentType: "application/zip", ACL: "private" } });
+  try {
+    await upload.done();
+    return { key, readyAt: artifact.readyAt, size: artifact.size };
+  } catch (error) {
+    body.destroy(); await upload.abort().catch(abortError => runtimeLogger.error("[caseLifecycle] archive upload abort failed", { error: abortError }));
+    throw error;
+  } finally {
+    body.destroy(); await artifact.cleanup().catch(error => runtimeLogger.error("[caseLifecycle] temporary archive cleanup failed", { error }));
   }
-  if (!caseDoc || !caseDoc._id) {
-    throw new Error("Case document required");
-  }
-
-  const caseData = typeof caseDoc.toObject === "function" ? caseDoc.toObject({ depopulate: false }) : caseDoc;
-  const caseId = String(caseData._id);
-  const archiveKey = `cases/${caseId}/archive-v2.zip`;
-  const archive = archiver("zip", { zlib: { level: 9 } });
-  const stream = new PassThrough();
-  const upload = new Upload({
-    client: s3,
-    params: {
-      Bucket: BUCKET,
-      Key: archiveKey,
-      Body: stream,
-      ContentType: "application/zip",
-      ACL: "private",
-    },
-  });
-
-  archive.pipe(stream);
-
-  const pipelinePromise = new Promise((resolve, reject) => {
-    stream.on("close", resolve);
-    stream.on("error", reject);
-    archive.on("error", reject);
-  });
-
-  const messages = await Message.find({ caseId })
-    .select("senderId senderRole text content createdAt fileName fileKey transcript")
-    .populate("senderId", "firstName lastName role")
-    .lean();
-
-  const caseFiles = await CaseFile.find({ caseId })
-    .select("originalName storageKey mimeType size createdAt userId")
-    .populate("userId", "firstName lastName role")
-    .lean();
-
-  const decryptedMessages = (messages || []).map((msg) => decryptMessagePayload(msg));
-  const decryptedCaseFiles = (caseFiles || []).map((file) => decryptCaseFilePayload(file));
-
-  const fileMessages = (decryptedCaseFiles || [])
-    .map(buildFileMessage)
-    .filter((entry) => entry && entry.fileName);
-
-  const combinedMessages = [...(decryptedMessages || []), ...fileMessages];
-
-  const sortedMessages = combinedMessages.slice().sort((a, b) => {
-    const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const bTime = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return aTime - bTime;
-  });
-  const exportPdf = await buildCaseExportPdfBuffer(caseData, sortedMessages);
-  archive.append(exportPdf, { name: "Case_Summary.pdf" });
-
-  // Documents
-  const documentEntries = [];
-  if (Array.isArray(caseData.files)) {
-    for (const file of caseData.files) {
-      if (!file?.key) continue;
-      documentEntries.push({
-        key: file.key,
-        name: file.original || file.filename || `document-${Date.now()}`,
-      });
-    }
-  }
-  if (Array.isArray(decryptedCaseFiles)) {
-    for (const file of decryptedCaseFiles) {
-      if (!file?.storageKey) continue;
-      documentEntries.push({
-        key: file.storageKey,
-        name: file.originalName || file.filename || `document-${Date.now()}`,
-      });
-    }
-  }
-  if (Array.isArray(decryptedMessages)) {
-    for (const msg of decryptedMessages) {
-      if (!msg?.fileKey) continue;
-      documentEntries.push({
-        key: msg.fileKey,
-        name: msg.fileName || msg.text || `document-${Date.now()}`,
-      });
-    }
-  }
-  if (documentEntries.length) {
-    const seenNames = new Map();
-    const seenKeys = new Set();
-    for (const entry of documentEntries) {
-      if (!entry?.key || seenKeys.has(entry.key)) continue;
-      if (isReceiptKey(entry.key) || isReceiptName(entry.name)) continue;
-      seenKeys.add(entry.key);
-      const baseName = safeFilename(entry.name || `document-${Date.now()}`);
-      const uniqueName = ensureUniqueFilename(baseName, seenNames);
-      const path = `Documents/${uniqueName}`;
-      // eslint-disable-next-line no-await-in-loop
-      await appendS3Object(archive, entry.key, path);
-    }
-  }
-
-  archive.finalize();
-  await Promise.all([upload.done(), pipelinePromise]);
-
-  return {
-    key: archiveKey,
-    readyAt: new Date(),
-    size: archive.pointer(),
-  };
 }
 
 async function deleteCaseFolder(caseId) {
@@ -1006,7 +521,7 @@ async function purgeExpiredCases(limit = PURGE_BATCH_LIMIT) {
       // eslint-disable-next-line no-await-in-loop
       await deleteCaseFolder(caseId);
     } catch (err) {
-      console.error("[caseLifecycle] purge delete error", caseId, err?.message || err);
+      runtimeLogger.error("[caseLifecycle] purge delete error", caseId, err?.message || err);
       continue;
     }
 
@@ -1023,27 +538,13 @@ async function purgeExpiredCases(limit = PURGE_BATCH_LIMIT) {
   }
 }
 
-function startPurgeWorker() {
-  if (purgeWorkerStarted) return;
-  if (process.env.DISABLE_CASE_PURGER === "true") return;
-  purgeWorkerStarted = true;
-  if (!BUCKET) {
-    console.warn("[caseLifecycle] S3 bucket not configured; purge worker disabled.");
-    return;
-  }
-  setInterval(() => {
-    purgeExpiredCases().catch((err) => {
-      console.error("[caseLifecycle] purge worker error", err);
-    });
-  }, PURGE_INTERVAL_MS);
-}
-
 module.exports = {
   generateArchiveZip,
+  buildArchiveZipFile,
+  buildCaseExportPdfBuffer,
   buildReceiptPdfBuffer,
   uploadPdfToS3,
   getReceiptKey,
   deleteCaseFolder,
   purgeExpiredCases,
-  startPurgeWorker,
 };

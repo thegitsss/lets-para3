@@ -71,6 +71,15 @@ describe("Jr. CMO external research service", () => {
     ]);
   });
 
+  test("does not decode nested entities into markup", () => {
+    const items = parseGoogleNewsRss(
+      '<rss><channel><item><title>&amp;lt;script&amp;gt; update - Example Source</title><link>https://example.com/update</link><source>Example Source</source></item></channel></rss>',
+      "legal industry"
+    );
+    expect(items[0].title).toContain("&lt;script&gt;");
+    expect(items[0].title).not.toContain("<script>");
+  });
+
   test("builds a cautious external day context from risk-leaning headlines", async () => {
     process.env.MARKETING_JR_CMO_EXTERNAL_RESEARCH_ENABLED = "true";
     process.env.MARKETING_JR_CMO_EXTERNAL_RESEARCH_QUERIES = "legal industry";

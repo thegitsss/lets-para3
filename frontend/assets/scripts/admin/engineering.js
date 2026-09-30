@@ -1,4 +1,7 @@
 import { secureFetch } from "../auth.js";
+import { reportAsyncFailure } from "../utils/promise-errors.js";
+
+const reportFailure = reportAsyncFailure("admin-engineering");
 
 const state = {
   overview: null,
@@ -18,6 +21,17 @@ function escapeHTML(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function safeSameOriginUrl(value = "") {
+  try {
+    const url = new URL(String(value).trim(), window.location.origin);
+    if (!['http:', 'https:'].includes(url.protocol.toLowerCase())) return "";
+    if (url.username || url.password || url.origin !== window.location.origin) return "";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "";
+  }
 }
 
 function readJsonOrThrow(res, fallbackMessage) {
@@ -130,6 +144,8 @@ function renderMetaItem(label, value) {
 
 function renderActionButton(action, className = "") {
   if (!action || action.enabled === false) return "";
+  const safeHref = safeSameOriginUrl(action.href);
+  if (action.actionType === "open_source_page" && !safeHref) return "";
   const pending = state.pendingActionKey === `${action.actionType}:${action.incidentId || action.ticketId || action.href || ""}`;
   const attrs = [
     `class="${escapeHTML(getActionButtonClass(action, className))}"`,
@@ -138,7 +154,7 @@ function renderActionButton(action, className = "") {
   ];
   if (action.incidentId) attrs.push(`data-incident-id="${escapeHTML(action.incidentId)}"`);
   if (action.ticketId) attrs.push(`data-ticket-id="${escapeHTML(action.ticketId)}"`);
-  if (action.href) attrs.push(`data-href="${escapeHTML(action.href)}"`);
+  if (safeHref) attrs.push(`data-href="${escapeHTML(safeHref)}"`);
   if (pending) attrs.push("disabled");
   return `<button ${attrs.join(" ")}>${escapeHTML(pending ? "Working..." : action.label || "Open")}</button>`;
 }
@@ -467,6 +483,7 @@ function renderDetail(item) {
       );
     });
   const openForLabel = item.createdAt ? formatDuration(item.createdAt) : "Unknown";
+  const sourcePageUrl = safeSameOriginUrl(sourceContext.pageUrl);
 
   root.innerHTML = `
     <div class="engineering-detail">
@@ -512,14 +529,16 @@ function renderDetail(item) {
           ${renderMetaItem("Feature", sourceContext.featureKey || "Unknown")}
           ${renderMetaItem("Route", sourceContext.routePath || "Unknown")}
           ${renderMetaItem("Reporter", sourceContext.reporterRole || "Unknown")}
-          ${renderMetaItem("Case", sourceContext.caseId || "-")}
-          ${renderMetaItem("Job", sourceContext.jobId || "-")}
+          ${renderMetaItem("Matter ID", sourceContext.caseId || "-")}
+          ${renderMetaItem("Legacy posting ID", sourceContext.jobId || "-")}
         </div>
         <div class="engineering-action-row">
           <button class="btn secondary" type="button" data-engineering-action="open_incident_workspace" data-incident-id="${escapeHTML(getItemIdentifier(item))}">Open Incident Workspace</button>
           ${
-            sourceContext.pageUrl
-              ? `<button class="btn secondary" type="button" data-engineering-action="open_source_page" data-href="${escapeHTML(sourceContext.pageUrl)}">Open Source Page</button>`
+            sourcePageUrl
+              ? `<button class="btn secondary" type="button" data-engineering-action="open_source_page" data-href="${escapeHTML(
+                  sourcePageUrl
+                )}">Open Source Page</button>`
               : ""
           }
         </div>
@@ -716,7 +735,9 @@ async function handleAction(button) {
       return;
     }
     if (actionType === "open_source_page" && href) {
-      window.open(href, "_blank", "noopener");
+      const safeHref = safeSameOriginUrl(href);
+      if (!safeHref) throw new Error("The source page address is not a valid LPC page.");
+      window.open(safeHref, "_blank", "noopener");
     }
   } catch (error) {
     setWorkspaceStatus(error?.message || "Unable to complete the engineering action.", "error");
@@ -736,19 +757,19 @@ function bindEngineeringWorkspace() {
     const selectButton = event.target.closest("[data-engineering-select]");
     if (selectButton) {
       const identifier = selectButton.getAttribute("data-engineering-select") || "";
-      selectEngineeringItem(identifier, true).catch(() => {});
+      selectEngineeringItem(identifier, true).catch(reportFailure);
       return;
     }
 
     const actionButton = event.target.closest("[data-engineering-action]");
     if (actionButton) {
-      handleAction(actionButton).catch(() => {});
+      handleAction(actionButton).catch(reportFailure);
     }
   });
 
   const observer = new MutationObserver(() => {
     if (section.classList.contains("visible")) {
-      loadEngineeringWorkspace().catch(() => {});
+      loadEngineeringWorkspace().catch(reportFailure);
     }
   });
   observer.observe(section, {
@@ -765,5 +786,5 @@ window.openEngineeringItemInAdmin = async (incidentId) => {
 };
 
 if (document.getElementById("section-engineering")?.classList.contains("visible")) {
-  loadEngineeringWorkspace().catch(() => {});
+  loadEngineeringWorkspace().catch(reportFailure);
 }

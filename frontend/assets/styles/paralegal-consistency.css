@@ -1,0 +1,38 @@
+/* LPC typography and finishing details, scoped to the paralegal workspace. */
+:root:has(body.lpc-v2) {
+  --v2-font-sans: "Sarabun";
+  --v2-font-serif: "Cormorant Garamond";
+  --font-sans: "Sarabun";
+  --font-serif: "Cormorant Garamond";
+}
+body.lpc-v2 :is(button,input,select,textarea,pre,code,kbd,samp) { font-family: var(--v2-font-sans); }
+body.lpc-v2 .support-drawer,
+body.lpc-v2 .support-drawer :where(*) { font-family: var(--v2-font-sans); }
+body.lpc-v2 .support-thread:empty::before,
+body.lpc-v2 .support-thread:empty::after { font-family: var(--v2-font-sans); }
+:root body.lpc-v2 .v2-view h1 {
+  font-family: var(--v2-font-serif);
+  font-size: 2.25rem;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -.02em;
+}
+:root.theme-dark body.lpc-v2 .v2-desktop-home-brand { color: var(--v2-ink); }
+body.lpc-v2 :is(.v2-settings-preview-kicker,.v2-matter-kicker) { color: var(--v2-blue-hover); }
+body.lpc-v2 .v2-help .v2-help-kicker { color: var(--v2-blue-hover); }
+:root.theme-dark body.lpc-v2 .v2-help .v2-help-report-status :is(span,small) { color: var(--v2-muted); }
+body.lpc-v2 .v2-matter-file-state > span.is-pending { color: var(--v2-blue-hover); }
+:root.theme-dark body.lpc-v2 :is(.v2-matter-withdraw-action,.v2-matter-dispute-action,.v2-matter-dialog-danger) {
+  color: #f0a6ad;
+  border-color: #f0a6ad;
+}
+body.lpc-v2.v2-sidebar-collapsed .v2-desktop-brand-word { display: none; }
+body.lpc-v2.v2-sidebar-collapsed .v2-desktop-home-brand { font-size: 22px; }
+@media (max-width: 900px) {
+  :root body.lpc-v2 .v2-view h1 { font-size: 2rem; }
+}
+@media (max-width: 400px) {
+  body.lpc-v2 .v2-settings-navigation { flex-wrap: nowrap; column-gap: 8px; }
+  body.lpc-v2 .v2-settings-navigation .v2-settings-tabs { gap: 10px; }
+  body.lpc-v2 .v2-settings-tab { font-size: max(13px, .8125rem); }
+}

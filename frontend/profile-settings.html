@@ -3,10 +3,10 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/global-search.css?v=20260831-3" />
+  <link rel="stylesheet" href="assets/styles/context-panel.css?v=20260812-paralegal-heading" />
   <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
-  <link rel="stylesheet" href="assets/libs/cropper/cropper.main.css" />
   <link rel="preload" as="font" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
-  <link rel="preload" as="font" href="assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" type="font/woff2" crossorigin />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Account Settings – Let’s-ParaConnect</title>
@@ -19,15 +19,12 @@
         const raw = localStorage.getItem("lpc_user");
         if (!raw) return;
         const user = JSON.parse(raw);
-        const theme = String(user?.preferences?.theme || "").toLowerCase();
-        const classes = [];
-        if (theme === "mountain-dark") {
-          classes.push("theme-mountain-dark", "theme-dark");
-        } else if (theme === "dark" || theme === "mountain" || theme === "light") {
-          classes.push(`theme-${theme}`);
-        }
-        classes.forEach((value) => root.classList.add(value));
-        if (theme === "dark" || theme === "mountain-dark") {
+        const role = String(user?.role || "").toLowerCase();
+        if (role === "attorney" || role === "paralegal") root.classList.add(`role-${role}`);
+        const storedTheme = String(user?.preferences?.theme || "").toLowerCase();
+        const theme = storedTheme === "dark" || /dark$/i.test(storedTheme) ? "dark" : "light";
+        root.classList.add(`theme-${theme}`);
+        if (theme === "dark") {
           root.style.backgroundColor = "#0f172a";
           root.style.color = "#f4f6fb";
           root.style.setProperty("--bg", "#0f172a");
@@ -35,19 +32,15 @@
       } catch (_) {}
     })();
   </script>
-  <style>
-    html.js body:not(.sidebar-layout-ready) #sidebarNav {
-      visibility: hidden;
-    }
-  </style>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      document.body.classList.add("sidebar-layout-ready");
-    }, { once: true });
-  </script>
-  <script src="assets/scripts/utils/session.js"></script>
+  <script src="assets/scripts/utils/session.js?v=20260902-1"></script>
   <script src="assets/scripts/auth.js" type="module"></script>
   <style>
+    html.role-paralegal [data-attorney-only],
+    html.role-attorney [data-paralegal-only],
+    html:not(.role-paralegal):not(.role-attorney) [data-paralegal-only],
+    html:not(.role-paralegal):not(.role-attorney) [data-attorney-only] {
+      display: none !important;
+    }
     .skip-link {
       position: absolute;
       left: 12px;
@@ -92,7 +85,7 @@
       --danger: #c0392b;
       --danger-dark: #962d22;
       --radius: 14px;
-      --font-serif: 'Cormorant Garamond', serif;
+      --font-serif: 'Sarabun', sans-serif;
       --font-sans: 'Sarabun', sans-serif;
     }
 
@@ -106,13 +99,6 @@
       --muted: #9aa7c4;
       --line: rgba(255, 255, 255, 0.08);
       --sidebar-text: #f8fbff;
-    }
-
-    body.theme-mountain {
-      --bg: #f8f6f1;
-      --panel: #ffffff;
-      --muted: #7a736a;
-      --sidebar-text: #ffffff;
     }
 
     * {
@@ -153,8 +139,8 @@
       display: none;
       align-items: center;
       justify-content: center;
-      width: 42px;
-      height: 42px;
+      width: 44px;
+      height: 44px;
       border-radius: 12px;
       border: none;
       background: transparent;
@@ -185,22 +171,6 @@
       background: transparent;
       pointer-events: none;
       transition: background 0.3s ease;
-    }
-
-    body.theme-mountain .sidebar,
-    body.theme-mountain-dark .sidebar {
-      background: url('hero-mountain.jpg') center/cover no-repeat;
-    }
-
-    body.theme-mountain .sidebar::before,
-    body.theme-mountain-dark .sidebar::before {
-      background: rgba(0, 0, 0, 0.45);
-    }
-
-    body.theme-mountain .sidebar > *,
-    body.theme-mountain-dark .sidebar > * {
-      position: relative;
-      z-index: 1;
     }
 
     .logo {
@@ -341,7 +311,7 @@
     .onboarding-pulse {
       position: relative;
       box-shadow: 0 0 0 0 rgba(182, 164, 122, 0.35);
-      animation: onboardingPulse 1.6s ease-out infinite;
+      animation: onboardingPulse 1.6s ease-out 2;
     }
 
     .unified-header {
@@ -425,7 +395,7 @@
     .scroll-indicator svg {
       width: 14px;
       height: 14px;
-      animation: scrollCueDrift 1.35s ease-in-out infinite;
+      animation: scrollCueDrift 1.35s ease-in-out 3;
     }
 
     @keyframes scrollCueDrift {
@@ -434,9 +404,7 @@
     }
 
     body.theme-dark .scroll-indicator,
-    body.theme-mountain-dark .scroll-indicator,
-    html.theme-dark .scroll-indicator,
-    html.theme-mountain-dark .scroll-indicator {
+    html.theme-dark .scroll-indicator {
       background: rgba(15, 23, 42, 0.78);
     }
 
@@ -449,21 +417,6 @@
     body.theme-dark .settings-nav button:hover {
       background: rgba(255, 255, 255, 0.12);
       color: #f8fbff;
-    }
-
-    body.theme-mountain .settings-nav button,
-    body.theme-mountain .sidebar-link,
-    body.theme-mountain-dark .settings-nav button,
-    body.theme-mountain-dark .sidebar-link {
-      color: #fff;
-    }
-
-    body.theme-mountain .settings-nav button.active,
-    body.theme-mountain .settings-nav button:hover,
-    body.theme-mountain-dark .settings-nav button.active,
-    body.theme-mountain-dark .settings-nav button:hover {
-      background: rgba(255, 255, 255, 0.18);
-      color: #fff;
     }
 
     body.theme-dark .settings-panel,
@@ -548,7 +501,7 @@
     }
 
     body.theme-dark .slider:before {
-      background: var(--panel);
+      background: #f4f6fb;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
     }
 
@@ -606,14 +559,6 @@
       background: rgba(255, 255, 255, 0.06);
       border-color: rgba(255, 255, 255, 0.12);
       color: var(--muted);
-    }
-
-    body.theme-mountain .sidebar-link:hover,
-    body.theme-mountain .sidebar-link:focus,
-    body.theme-mountain-dark .sidebar-link:hover,
-    body.theme-mountain-dark .sidebar-link:focus {
-      background: rgba(255, 255, 255, 0.2);
-      color: #fff;
     }
 
     .settings-panel h2 {
@@ -846,6 +791,30 @@
       gap: 12px;
     }
 
+    #securitySection .two-factor-security-actions {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    #securitySection .two-factor-security-actions input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    #securitySection .backup-codes-output {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      line-height: 1.75;
+    }
+
     #securitySection .session-row {
       display: grid;
       grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
@@ -997,6 +966,53 @@
       font-family: "SF Mono", "Menlo", "Consolas", monospace;
       font-size: 0.85rem;
       letter-spacing: 0.08em;
+    }
+
+    #securitySection .authenticator-setup,
+    #securitySection .passkey-panel {
+      margin-top: 14px;
+      padding: 16px;
+      border: 1px solid var(--border, #d9e2ec);
+      border-radius: 12px;
+      background: var(--surface-subtle, #f8fafc);
+    }
+
+    #securitySection .authenticator-setup img {
+      display: block;
+      width: 220px;
+      max-width: 100%;
+      height: auto;
+      margin: 12px auto;
+      border: 8px solid #fff;
+      border-radius: 8px;
+    }
+
+    #securitySection .security-inline-fields {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    #securitySection .manual-secret {
+      overflow-wrap: anywhere;
+      user-select: all;
+    }
+
+    #securitySection .passkey-list {
+      display: grid;
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    #securitySection .passkey-list-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid var(--border, #d9e2ec);
+      border-radius: 10px;
+      background: var(--surface, #fff);
     }
 
     #securitySection .security-extras {
@@ -1173,27 +1189,21 @@
     }
 
     html.theme-dark .settings-help-tooltip summary,
-    body.theme-dark .settings-help-tooltip summary,
-    html.theme-mountain-dark .settings-help-tooltip summary,
-    body.theme-mountain-dark .settings-help-tooltip summary {
+    body.theme-dark .settings-help-tooltip summary {
       background: rgba(255, 255, 255, 0.06);
       border-color: rgba(255, 255, 255, 0.12);
       color: var(--muted);
     }
 
     html.theme-dark .settings-help-tooltip-panel,
-    body.theme-dark .settings-help-tooltip-panel,
-    html.theme-mountain-dark .settings-help-tooltip-panel,
-    body.theme-mountain-dark .settings-help-tooltip-panel {
+    body.theme-dark .settings-help-tooltip-panel {
       background: #151b29;
       border-color: rgba(255, 255, 255, 0.12);
       box-shadow: 0 22px 40px rgba(4, 6, 12, 0.5);
     }
 
     html.theme-dark .settings-help-tooltip-panel::after,
-    body.theme-dark .settings-help-tooltip-panel::after,
-    html.theme-mountain-dark .settings-help-tooltip-panel::after,
-    body.theme-mountain-dark .settings-help-tooltip-panel::after {
+    body.theme-dark .settings-help-tooltip-panel::after {
       background: #151b29;
       border-left-color: rgba(255, 255, 255, 0.12);
       border-top-color: rgba(255, 255, 255, 0.12);
@@ -1322,18 +1332,14 @@
     }
 
     html.theme-dark .blocked-users-help-panel,
-    body.theme-dark .blocked-users-help-panel,
-    html.theme-mountain-dark .blocked-users-help-panel,
-    body.theme-mountain-dark .blocked-users-help-panel {
+    body.theme-dark .blocked-users-help-panel {
       background: #151b29;
       border-color: rgba(255, 255, 255, 0.12);
       box-shadow: 0 22px 40px rgba(4, 6, 12, 0.5);
     }
 
     html.theme-dark .blocked-users-help-panel::after,
-    body.theme-dark .blocked-users-help-panel::after,
-    html.theme-mountain-dark .blocked-users-help-panel::after,
-    body.theme-mountain-dark .blocked-users-help-panel::after {
+    body.theme-dark .blocked-users-help-panel::after {
       background: #151b29;
       border-left-color: rgba(255, 255, 255, 0.12);
       border-top-color: rgba(255, 255, 255, 0.12);
@@ -1729,46 +1735,38 @@ label {
       min-width: 120px;
     }
 
-    body.theme-dark .education-modal,
-    body.theme-mountain-dark .education-modal {
+    body.theme-dark .education-modal {
       background: #151b29;
       color: var(--ink);
       box-shadow: 0 26px 60px rgba(4, 6, 12, 0.7);
     }
 
-    body.theme-dark .education-modal-overlay,
-    body.theme-mountain-dark .education-modal-overlay {
+    body.theme-dark .education-modal-overlay {
       background: rgba(5, 8, 14, 0.72);
     }
 
-    body.theme-dark .education-modal-header,
-    body.theme-mountain-dark .education-modal-header {
+    body.theme-dark .education-modal-header {
       border-bottom: 1px solid rgba(255, 255, 255, 0.12);
     }
 
-    body.theme-dark .education-modal-header h3,
-    body.theme-mountain-dark .education-modal-header h3 {
+    body.theme-dark .education-modal-header h3 {
       color: var(--ink);
     }
 
-    body.theme-dark .education-modal-close,
-    body.theme-mountain-dark .education-modal-close {
+    body.theme-dark .education-modal-close {
       color: var(--muted);
     }
 
-    body.theme-dark .education-entry,
-    body.theme-mountain-dark .education-entry {
+    body.theme-dark .education-entry {
       background: rgba(12, 16, 24, 0.9);
       border-color: rgba(255, 255, 255, 0.12);
     }
 
-    body.theme-dark .education-entry-title,
-    body.theme-mountain-dark .education-entry-title {
+    body.theme-dark .education-entry-title {
       color: var(--ink);
     }
 
-    body.theme-dark .education-modal-actions,
-    body.theme-mountain-dark .education-modal-actions {
+    body.theme-dark .education-modal-actions {
       border-top: 1px solid rgba(255, 255, 255, 0.12);
     }
 
@@ -2143,14 +2141,22 @@ input[type="number"],
     }
 
     .switch input {
-      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      display: block;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      opacity: 0;
+      cursor: pointer;
     }
 
     .slider {
       position: absolute;
       cursor: pointer;
       inset: 0;
-      background: #ddd;
+      background: #707b8a;
       transition: 0.2s;
       border-radius: 999px;
     }
@@ -2172,8 +2178,18 @@ input[type="number"],
       background: var(--accent);
     }
 
-    input:checked + .slider:before {
+    .switch input:checked + .slider:before {
+      background: #17243a;
       transform: translateX(22px);
+    }
+
+    .switch input:focus-visible + .slider {
+      outline: 2px solid var(--ink);
+      outline-offset: 3px;
+    }
+
+    .switch input:disabled {
+      cursor: not-allowed;
     }
 
     .switch input:disabled + .slider {
@@ -2347,7 +2363,10 @@ input[type="number"],
     }
 
     body.paralegal-flat #accountSettingsTitle {
-      display: none;
+      display: block;
+      margin: 0;
+      font-size: clamp(1.8rem, 3vw, 2.35rem);
+      line-height: 1.05;
     }
 
     #paralegalSettings {
@@ -2709,9 +2728,22 @@ input[type="number"],
       transform: translateY(-50%);
       border: none;
       background: transparent;
-      padding: 4px;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 8px;
       cursor: pointer;
       color: var(--muted);
+      border-radius: 8px;
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    #paralegalSettings .section-edit-toggle:hover,
+    #paralegalSettings .section-edit-toggle:focus-visible,
+    #paralegalSettings .section-edit-toggle[aria-pressed="true"] {
+      background: rgba(23, 20, 25, 0.06);
+      color: var(--ink);
     }
 
     #paralegalSettings .section-edit-toggle svg {
@@ -3034,9 +3066,7 @@ input[type="number"],
     }
 
     body.theme-dark #paralegalSettings .skill-chip,
-    html.theme-dark #paralegalSettings .skill-chip,
-    body.theme-mountain-dark #paralegalSettings .skill-chip,
-    html.theme-mountain-dark #paralegalSettings .skill-chip {
+    html.theme-dark #paralegalSettings .skill-chip {
       background: rgba(148, 163, 184, 0.18);
       color: var(--ink);
     }
@@ -3141,9 +3171,7 @@ input[type="number"],
     }
 
     html.theme-dark #paralegalSettings .paralegal-doc-row,
-    body.theme-dark #paralegalSettings .paralegal-doc-row,
-    html.theme-mountain-dark #paralegalSettings .paralegal-doc-row,
-    body.theme-mountain-dark #paralegalSettings .paralegal-doc-row {
+    body.theme-dark #paralegalSettings .paralegal-doc-row {
       background: var(--panel);
       border-color: var(--line);
     }
@@ -3272,26 +3300,20 @@ input[type="number"],
     }
 
     html.theme-dark #paralegalSettings .profile-standards-tooltip-panel,
-    body.theme-dark #paralegalSettings .profile-standards-tooltip-panel,
-    html.theme-mountain-dark #paralegalSettings .profile-standards-tooltip-panel,
-    body.theme-mountain-dark #paralegalSettings .profile-standards-tooltip-panel {
+    body.theme-dark #paralegalSettings .profile-standards-tooltip-panel {
       background: var(--panel);
       border-color: var(--line);
       box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
     }
 
     html.theme-dark #paralegalSettings .profile-standards-tooltip-panel p,
-    body.theme-dark #paralegalSettings .profile-standards-tooltip-panel p,
-    html.theme-mountain-dark #paralegalSettings .profile-standards-tooltip-panel p,
-    body.theme-mountain-dark #paralegalSettings .profile-standards-tooltip-panel p {
+    body.theme-dark #paralegalSettings .profile-standards-tooltip-panel p {
       color: #d1d9e6;
       font-weight: 300;
     }
 
     html.theme-dark #paralegalSettings .profile-standards-tooltip-panel::after,
-    body.theme-dark #paralegalSettings .profile-standards-tooltip-panel::after,
-    html.theme-mountain-dark #paralegalSettings .profile-standards-tooltip-panel::after,
-    body.theme-mountain-dark #paralegalSettings .profile-standards-tooltip-panel::after {
+    body.theme-dark #paralegalSettings .profile-standards-tooltip-panel::after {
       border-top-color: var(--panel);
     }
 
@@ -3400,13 +3422,7 @@ input[type="number"],
     body.theme-dark #stateExperienceInput,
     html.theme-dark #skillsInput,
     html.theme-dark #practiceAreasInput,
-    html.theme-dark #stateExperienceInput,
-    body.theme-mountain-dark #skillsInput,
-    body.theme-mountain-dark #practiceAreasInput,
-    body.theme-mountain-dark #stateExperienceInput,
-    html.theme-mountain-dark #skillsInput,
-    html.theme-mountain-dark #practiceAreasInput,
-    html.theme-mountain-dark #stateExperienceInput {
+    html.theme-dark #stateExperienceInput {
       background: transparent;
       border: none;
       box-shadow: none;
@@ -3414,9 +3430,7 @@ input[type="number"],
     }
 
     body.theme-dark #paralegalSettings .language-row .language-level,
-    html.theme-dark #paralegalSettings .language-row .language-level,
-    body.theme-mountain-dark #paralegalSettings .language-row .language-level,
-    html.theme-mountain-dark #paralegalSettings .language-row .language-level {
+    html.theme-dark #paralegalSettings .language-row .language-level {
       background:
         linear-gradient(135deg, rgba(182, 164, 122, 0.18), rgba(0, 0, 0, 0)) padding-box,
         linear-gradient(135deg, rgba(182, 164, 122, 0.38), rgba(255, 255, 255, 0.08)) border-box;
@@ -3431,17 +3445,13 @@ input[type="number"],
     }
 
     body.theme-dark #paralegalSettings .language-row .language-level:focus,
-    html.theme-dark #paralegalSettings .language-row .language-level:focus,
-    body.theme-mountain-dark #paralegalSettings .language-row .language-level:focus,
-    html.theme-mountain-dark #paralegalSettings .language-row .language-level:focus {
+    html.theme-dark #paralegalSettings .language-row .language-level:focus {
       border: 1px solid rgba(243, 227, 178, 0.55);
       box-shadow: 0 0 0 3px rgba(182, 164, 122, 0.22);
     }
 
     body.theme-dark #paralegalSettings .language-row .language-level option,
-    html.theme-dark #paralegalSettings .language-row .language-level option,
-    body.theme-mountain-dark #paralegalSettings .language-row .language-level option,
-    html.theme-mountain-dark #paralegalSettings .language-row .language-level option {
+    html.theme-dark #paralegalSettings .language-row .language-level option {
       background: #111827;
       color: #f8fafc;
     }
@@ -3474,9 +3484,7 @@ input[type="number"],
     }
 
     body.theme-dark #paralegalSettings .state-chip,
-    html.theme-dark #paralegalSettings .state-chip,
-    body.theme-mountain-dark #paralegalSettings .state-chip,
-    html.theme-mountain-dark #paralegalSettings .state-chip {
+    html.theme-dark #paralegalSettings .state-chip {
       background: rgba(148, 163, 184, 0.18);
       color: var(--ink);
     }
@@ -3611,13 +3619,14 @@ input[type="number"],
       color: var(--navy);
       padding: 8px 16px;
       border-radius: 999px;
-      font-weight: 300;
+      min-height: 44px;
+      font-weight: 600;
       cursor: pointer;
     }
 
     .profile-tour-btn.primary {
       background: var(--accent);
-      color: #ffffff;
+      color: #171419;
       border-color: transparent;
     }
 
@@ -3631,6 +3640,11 @@ input[type="number"],
       font-size: 1.1rem;
       cursor: pointer;
       line-height: 1;
+      width: 44px;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .profile-tour-close:hover {
@@ -3788,15 +3802,6 @@ input[type="number"],
     .btn-light {
       font-weight: 200;
     }
-    body.theme-mountain .btn-outline.btn-light{
-      color:#fff;
-      border-color:rgba(255,255,255,0.7);
-      background:rgba(255,255,255,0.08);
-    }
-    body.theme-mountain .btn-outline.btn-light:hover{
-      background:rgba(255,255,255,0.16);
-      color:#fff;
-    }
 
     .toggle-row {
       display: flex;
@@ -3912,25 +3917,19 @@ input[type="number"],
     }
 
     html.theme-dark .toast,
-    body.theme-dark .toast,
-    html.theme-mountain-dark .toast,
-    body.theme-mountain-dark .toast {
+    body.theme-dark .toast {
       border-color: rgba(255, 255, 255, 0.12);
       box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
     }
 
     html.theme-dark .toast[data-toast-type="ok"],
-    body.theme-dark .toast[data-toast-type="ok"],
-    html.theme-mountain-dark .toast[data-toast-type="ok"],
-    body.theme-mountain-dark .toast[data-toast-type="ok"] {
+    body.theme-dark .toast[data-toast-type="ok"] {
       background: #14532d;
       color: #f7fee7;
     }
 
     html.theme-dark .toast[data-toast-type="info"],
-    body.theme-dark .toast[data-toast-type="info"],
-    html.theme-mountain-dark .toast[data-toast-type="info"],
-    body.theme-mountain-dark .toast[data-toast-type="info"] {
+    body.theme-dark .toast[data-toast-type="info"] {
       background: #111827;
       color: #f9fafb;
     }
@@ -4083,8 +4082,8 @@ input[type="number"],
       margin-bottom: 6px;
     }
 
-    .photo-crop-subtitle {
-      color: var(--muted);
+    .photo-crop-card .photo-crop-subtitle {
+      color: #5f6877;
       margin-bottom: 16px;
     }
 
@@ -4138,9 +4137,15 @@ input[type="number"],
       }
     }
 
-    .photo-crop-stage .cropper-container {
+    .photo-crop-stage cropper-canvas {
+      display: block;
       width: 100% !important;
       height: 100% !important;
+    }
+
+    .photo-crop-stage:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
     }
 
     .photo-crop-controls {
@@ -4150,10 +4155,15 @@ input[type="number"],
       margin-top: 16px;
     }
 
-    .photo-crop-controls label {
+    .photo-crop-card .photo-crop-controls label {
       font-size: 0.9rem;
-      color: var(--muted);
+      color: #5f6877;
       min-width: 52px;
+    }
+
+    body.theme-dark .photo-crop-card .photo-crop-subtitle,
+    body.theme-dark .photo-crop-card .photo-crop-controls label {
+      color: #cbd5e1;
     }
 
     .photo-crop-controls input[type="range"] {
@@ -4658,19 +4668,6 @@ input[type="number"],
     transform: none;
   }
 
-  body.theme-mountain.paralegal-flat #dashboardReturnLink,
-  body.theme-mountain-dark.paralegal-flat #dashboardReturnLink {
-    color: var(--sidebar-text);
-    border: none;
-    background: transparent;
-  }
-
-  body.theme-mountain.paralegal-flat #dashboardReturnLink:hover,
-  body.theme-mountain-dark.paralegal-flat #dashboardReturnLink:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff;
-  }
-
   body.attorney-classic .topbar {
     margin-bottom: 1.25rem;
     min-height: 56px;
@@ -4718,9 +4715,7 @@ input[type="number"],
       }
 
       body.theme-dark.paralegal-flat .topbar .lpc-shared-header .user-chip,
-      html.theme-dark body.paralegal-flat .topbar .lpc-shared-header .user-chip,
-      body.theme-mountain-dark.paralegal-flat .topbar .lpc-shared-header .user-chip,
-      html.theme-mountain-dark body.paralegal-flat .topbar .lpc-shared-header .user-chip {
+      html.theme-dark body.paralegal-flat .topbar .lpc-shared-header .user-chip {
         background: #111827 !important;
         background-image: none !important;
         backdrop-filter: none !important;
@@ -4747,27 +4742,69 @@ input[type="number"],
       box-shadow: none !important;
     }
   </style>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260831-21" />
+  <link rel="stylesheet" href="assets/styles/lpc-product-components.css?v=20260901-1" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260902-5" />
+  <script defer src="assets/scripts/universal-header.js?v=20260831-3"></script>
+  <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
+  <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
+  <link rel="stylesheet" href="assets/styles/profile-settings-paralegal-final.css?v=20260902-5" />
+<link rel="stylesheet" href="assets/styles/admin-security.css">
 </head>
-<body class="dashboard-no-shadows">
+<body class="dashboard-no-shadows lpc-product-clean lpc-auth-resource-page lpc-static-universal-header lpc-auth-shell-v2 lpc-settings-shell sidebar-layout-ready settings-layout-ready">
+  <script>
+    if (document.documentElement.classList.contains('role-paralegal')) {
+      document.body.classList.add('paralegal-flat');
+    }
+  </script>
   <a class="skip-link" href="#main">Skip to main content</a>
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
+    <span class="lpc-mobile-menu-icon" aria-hidden="true"></span>
+  </button>
   <aside class="sidebar" id="sidebarNav">
-    <div class="logo">Let’s-ParaConnect</div>
-    <nav class="settings-nav" aria-label="Settings navigation">
-      <button id="navProfile" class="settings-item active" data-target="profileSection">Profile</button>
-      <button id="navSecurity" class="settings-item" data-target="securitySection">Security</button>
-      <button id="navPreferences" class="settings-item" data-target="preferencesSection">Preferences</button>
-      <button id="navHelp" class="settings-item" type="button" data-paralegal-only>Help</button>
+    <div class="logo sidebar-profile-host">
+      <div class="sidebar-profile-cluster" data-lpc-sidebar-profile>
+        <button class="user-chip lpc-sidebar-profile-trigger" type="button" data-lpc-sidebar-profile-trigger aria-label="Open profile menu" aria-haspopup="true" aria-expanded="false">
+          <img class="globalProfileImage lpc-sidebar-profile-trigger-avatar" src="assets/avatar-placeholder.svg" alt="" />
+          <span class="lpc-sidebar-profile-trigger-details"><strong class="globalProfileName">Member</strong></span>
+          <svg class="lpc-profile-trigger-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"></path></svg>
+        </button>
+      </div>
+    </div>
+    <script src="assets/scripts/sidebar-first-paint.js?v=20260902-2"></script>
+    <nav class="paralegal-account-nav" aria-label="Main navigation" data-paralegal-only>
+      <a href="dashboard-paralegal.html#home" class="lpc-sidebar-nav-link"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"></path><path d="M5 9v11h14V9"></path><path d="M9 20v-6h6v6"></path></svg><span class="lpc-sidebar-nav-label">Home</span></a>
+      <a href="browse-jobs.html" class="lpc-sidebar-nav-link"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path><path d="M8 11h6"></path><path d="M11 8v6"></path></svg><span class="lpc-sidebar-nav-label">Browse Matters</span></a>
+      <a href="dashboard-paralegal.html#cases" class="lpc-sidebar-nav-link"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M3 12h18"></path></svg><span class="lpc-sidebar-nav-label">My Matters &amp; Applications</span></a>
+      <div class="lpc-sidebar-section-label">Account</div>
+      <a href="profile-settings.html" class="active lpc-sidebar-nav-link lpc-sidebar-nav-link--secondary" aria-current="page"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg><span class="lpc-sidebar-nav-label">Profile Settings</span></a>
+      <a href="paralegalhelp.html" class="lpc-sidebar-nav-link lpc-sidebar-nav-link--secondary"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9a2.7 2.7 0 1 1 4.6 1.9c-1.1.9-2.1 1.3-2.1 3.1"></path><path d="M12 18h.01"></path></svg><span class="lpc-sidebar-nav-label">Help</span></a>
     </nav>
-    <a class="btn btn-outline btn-light" id="dashboardReturnLink" href="dashboard-attorney.html" style="margin-top:auto;">Return to Dashboard</a>
+    <nav class="settings-nav" aria-label="Settings navigation" data-attorney-only>
+      <button id="navSettings" class="settings-item" type="button" data-target="settingsDirectorySection" data-sidebar-icon="settings" data-attorney-only>Settings</button>
+      <button id="navProfile" class="settings-item active" type="button" data-target="profileSection" data-sidebar-icon="profile">Profile</button>
+      <button id="navSecurity" class="settings-item" type="button" data-target="securitySection" data-sidebar-icon="security">Security</button>
+      <button id="navPreferences" class="settings-item" type="button" data-target="preferencesSection" data-sidebar-icon="preferences">Preferences</button>
+      <button id="navHelp" class="settings-item" type="button" data-sidebar-icon="help">Help</button>
+    </nav>
+    <a class="btn btn-outline btn-light" id="dashboardReturnLink" href="dashboard-attorney.html" style="margin-top:auto;" data-attorney-only>Return to Dashboard</a>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
+  <div class="lpc-auth-page-shell">
+  <div class="lpc-universal-header-shell lpc-universal-header-shell--created" role="group" aria-label="Workspace tools" data-lpc-universal-header="true">
+    <div class="lpc-universal-header-controls" data-notification-center="true" aria-label="Search, notifications, and Assistant">
+      <div class="lpc-global-search-host" data-productivity-trigger-host></div>
+      <div class="notification-wrapper"><button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span class="notification-badge" data-notification-badge>0</span></button><div class="notifications-panel notif-panel hidden" role="region" aria-label="Notifications" aria-live="polite" data-notification-panel><div class="notif-header" aria-label="Notifications"></div><div class="notif-scroll" data-notification-list></div><div class="notif-empty" data-notification-empty>Loading…</div><button type="button" class="notif-markall" data-notification-mark>Mark All Read</button></div></div>
+    </div>
+  </div>
   <main id="main" tabindex="-1" class="content">
     <div class="page-header">
       <section class="unified-header" aria-label="Account settings header">
         <div class="title-block">
           <h1 id="accountSettingsTitle">Account Settings</h1>
-          <p id="accountSettingsSubtitle"></p>
+          <p id="accountSettingsSubtitle">Manage your profile, security, and preferences.</p>
         </div>
       </section>
       <div class="topbar" data-attorney-header>
@@ -4781,132 +4818,274 @@ input[type="number"],
       </div>
     </div>
 
-    <div id="settingsContent">
+    <div id="settingsContent" aria-busy="true">
+      <nav class="account-settings-tabs" aria-label="Account Settings categories" data-paralegal-only>
+        <button type="button" class="active" data-settings-section="profileSection">Profile</button>
+        <button type="button" data-settings-section="securitySection">Security</button>
+        <button type="button" data-settings-section="preferencesSection">Preferences</button>
+      </nav>
+      <section class="settings-section settings-directory" id="settingsDirectorySection" data-attorney-only aria-labelledby="settingsDirectoryHeading">
+        <h2 class="sr-only" id="settingsDirectoryHeading">Attorney settings directory</h2>
+        <div class="settings-directory-search">
+          <label for="settingsDirectorySearch">Search settings</label>
+          <div class="settings-directory-search-field">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <circle cx="8.5" cy="8.5" r="5.25"></circle>
+              <path d="m12.5 12.5 4 4"></path>
+            </svg>
+            <input id="settingsDirectorySearch" type="search" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="settings-directory-groups">
+          <section class="settings-directory-group" data-settings-group="Personal settings">
+            <h3>Personal settings</h3>
+            <div class="settings-directory-grid">
+              <a class="settings-destination" href="#profile:personal" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><circle cx="10" cy="6.25" r="3.25"></circle><path d="M4.25 17c.35-3.3 2.3-5.1 5.75-5.1s5.4 1.8 5.75 5.1"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Personal details</strong><span>Name, email address, and profile photo.</span></span>
+              </a>
+              <a class="settings-destination" href="#securitySection" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><rect x="4.25" y="8.5" width="11.5" height="8" rx="2"></rect><path d="M6.75 8.5V6.25a3.25 3.25 0 0 1 6.5 0V8.5"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Sign-in &amp; security</strong><span>Password, two-step verification, passkeys, and active sessions.</span></span>
+              </a>
+              <a class="settings-destination" href="#profile:notifications" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M15.25 8a5.25 5.25 0 1 0-10.5 0c0 5-2.25 6.25-2.25 6.25h15S15.25 13 15.25 8"></path><path d="M11.75 16.25a2 2 0 0 1-3.5 0"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Communication preferences</strong><span>Choose which matter, message, and account email notifications you receive.</span></span>
+              </a>
+              <a class="settings-destination" href="#preferencesSection" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M3 5.25h14M3 10h14M3 14.75h14"></path><circle cx="7" cy="5.25" r="1.75"></circle><circle cx="13" cy="10" r="1.75"></circle><circle cx="8.5" cy="14.75" r="1.75"></circle></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Display preferences</strong><span>Adjust appearance, text size, primary state, and dashboard guidance.</span></span>
+              </a>
+            </div>
+          </section>
+
+          <section class="settings-directory-group" data-settings-group="Attorney profile">
+            <h3>Attorney profile</h3>
+            <div class="settings-directory-grid">
+              <a class="settings-destination" href="#profile:public" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"></circle><path d="M3.5 10h13M10 3c2 2 3 4.3 3 7s-1 5-3 7c-2-2-3-4.3-3-7s1-5 3-7"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Public profile</strong><span>Manage how you appear to paralegals on LPC.</span></span>
+              </a>
+              <a class="settings-destination" href="#profile:firm" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M3.5 17V6.5L10 3l6.5 3.5V17M7 17v-4h6v4M6.5 8.5h.01M10 8.5h.01M13.5 8.5h.01"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Firm &amp; practice</strong><span>Firm details, website, practice areas, and professional background.</span></span>
+              </a>
+            </div>
+          </section>
+
+          <section class="settings-directory-group" data-settings-group="Payments">
+            <h3>Payments</h3>
+            <div class="settings-directory-grid">
+              <a class="settings-destination" href="dashboard-attorney.html?from=settings&amp;settingsTarget=payment-method#funds" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><rect x="2.75" y="5" width="14.5" height="10" rx="2"></rect><path d="M2.75 8.25h14.5M5.5 12h3"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Payment methods</strong><span>Manage the payment methods used to fund matters.</span></span>
+              </a>
+              <a class="settings-destination" href="dashboard-attorney.html?from=settings&amp;settingsTarget=billing-history#funds" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M5 2.75h8l2.25 2.25v12.25H5zM13 2.75V5h2.25M7.5 9h5M7.5 12h5M7.5 15h3"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Billing history</strong><span>View completed Matter payments and available receipts.</span></span>
+              </a>
+              <a class="settings-destination" href="attorney-faq.html#q8" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"></circle><path d="M12.75 7.25c0-1.3-1.1-2.25-2.65-2.25-1.4 0-2.45.7-2.85 1.8M10 13.75v.1M10 11.5c0-1.7 2.75-1.55 2.75-4.25"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Platform fees</strong><span>Review LPC’s current attorney platform fee and Matter billing disclosures.</span></span>
+              </a>
+            </div>
+          </section>
+
+          <section class="settings-directory-group" data-settings-group="Account">
+            <h3>Account</h3>
+            <div class="settings-directory-grid">
+              <a class="settings-destination" href="#security:closure" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M4 5.5h12M7 5.5V3.75h6V5.5M6 5.5l.75 11h6.5l.75-11M8.5 8.25v5.5M11.5 8.25v5.5"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Account closure</strong><span>Deactivate your account and review how historical records are retained.</span></span>
+              </a>
+              <a class="settings-destination" href="terms.html" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M4.25 2.75h8l3.5 3.5v11H4.25zM12.25 2.75v3.5h3.5M7 10h6M7 13h6"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Legal &amp; agreements</strong><span>Review the Terms of Service and policies associated with your account.</span></span>
+              </a>
+              <a class="settings-destination" href="privacy.html" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M10 2.5 16 5v4.5c0 3.8-2.4 6.6-6 8-3.6-1.4-6-4.2-6-8V5z"></path><path d="M7.5 10 9 11.5l3.5-3.5"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Privacy policy</strong><span>Review how LPC handles personal information, retention, and privacy requests.</span></span>
+              </a>
+            </div>
+          </section>
+        </div>
+        <p class="settings-directory-empty" id="settingsDirectoryEmpty" role="status" hidden>No settings found.</p>
+      </section>
+
       <section class="settings-panel settings-section active" id="profileSection">
 
         <div id="attorneySettings" class="role-settings hidden" data-attorney-settings>
-          <div class="settings-section attorney-settings-inner">
-            <div class="attorney-grid">
-              <div class="avatar-block">
-                <div class="photo-row">
-                  <div class="avatar-frame avatar-frame--large" id="attorneyAvatarFrame" role="button" tabindex="0" aria-label="Upload attorney profile photo">
-                    <img id="attorneyAvatarPreview" alt="Profile photo" hidden />
+          <a class="settings-back-link" href="profile-settings.html" data-attorney-only>Back to settings</a>
+          <div class="attorney-settings-stack">
+            <section class="attorney-settings-panel" id="attorneyPersonalSection" aria-labelledby="attorneyPersonalHeading">
+              <span id="profile:personal" hidden></span>
+              <div class="attorney-panel-header">
+                <h2 id="attorneyPersonalHeading">Personal information</h2>
+                <p>Manage the information attached to your LPC account.</p>
+              </div>
+
+              <div class="attorney-photo-setting">
+                <div class="attorney-photo-label">Profile photo</div>
+                <div class="attorney-photo-value">
+                  <div class="avatar-frame" id="attorneyAvatarFrame" role="button" tabindex="0" aria-label="Edit current profile photo">
+                    <img id="attorneyAvatarPreview" alt="Current profile photo" hidden />
                     <span id="attorneyAvatarInitials">A</span>
+                  </div>
+                  <div class="attorney-photo-copy">
+                    <p>JPEG or PNG. 5 MB maximum.</p>
+                    <div class="avatar-actions">
+                      <button type="button" class="btn btn-outline avatar-edit-btn" id="editAttorneyAvatarBtn">Change photo</button>
+                      <button type="button" class="avatar-remove-btn hidden" id="removeAttorneyAvatarBtn">Remove</button>
+                    </div>
                   </div>
                 </div>
                 <input type="file" id="attorneyAvatarInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden />
-                <div class="avatar-actions">
-                  <button type="button" class="btn btn-outline avatar-edit-btn hidden" id="editAttorneyAvatarBtn">Edit photo</button>
-                  <button type="button" class="btn btn-outline avatar-remove-btn hidden" id="removeAttorneyAvatarBtn">Remove photo</button>
-                </div>
               </div>
 
-              <div class="form-stack">
-                <div class="form-row">
-                  <div class="form-field">
-                    <label for="attorneyFirstName">First name</label>
-                    <input id="attorneyFirstName" type="text" autocomplete="given-name" />
-                  </div>
-                  <div class="form-field">
-                    <label for="attorneyLastName">Last name</label>
-                    <input id="attorneyLastName" type="text" autocomplete="family-name" />
-                  </div>
-                  <div class="form-field">
-                    <label for="attorneyEmail">Email</label>
-                    <input id="attorneyEmail" type="email" autocomplete="email" disabled />
-                  </div>
-                </div>
-
-                <div class="form-row">
-                  <div class="form-field">
-                    <label for="attorneyLinkedIn">LinkedIn</label>
-                    <input id="attorneyLinkedIn" type="text" placeholder="https://www.linkedin.com/in/username" />
-                  </div>
-                </div>
-
-                <div class="form-row">
-                  <div class="form-field">
-                    <label for="attorneyFirmName">Firm Name</label>
-                    <input id="attorneyFirmName" type="text" autocomplete="organization" />
-                  </div>
-                  <div class="form-field">
-                    <label for="attorneyFirmWebsite">Firm Website</label>
-                    <input id="attorneyFirmWebsite" type="text" placeholder="https://yourfirm.com" />
-                  </div>
-                </div>
-
+              <div class="attorney-form-grid attorney-form-grid--names">
                 <div class="form-field">
-                  <label>Field of Law / Practices</label>
+                  <label for="attorneyFirstName">First name</label>
+                  <input id="attorneyFirstName" type="text" autocomplete="given-name" required aria-describedby="attorneyFirstNameError" />
+                  <p class="field-error" id="attorneyFirstNameError" role="alert" hidden></p>
+                </div>
+                <div class="form-field">
+                  <label for="attorneyLastName">Last name</label>
+                  <input id="attorneyLastName" type="text" autocomplete="family-name" required aria-describedby="attorneyLastNameError" />
+                  <p class="field-error" id="attorneyLastNameError" role="alert" hidden></p>
+                </div>
+              </div>
+              <div class="form-field">
+                <label for="attorneyEmail">Email</label>
+                <input id="attorneyEmail" type="email" autocomplete="email" disabled />
+                <p class="field-help">Contact support if you need to change the email for this account.</p>
+              </div>
+            </section>
+
+            <section class="attorney-settings-panel" id="attorneyProfessionalSection" aria-labelledby="attorneyProfessionalHeading">
+              <span id="profile:public" hidden></span>
+              <div class="attorney-panel-header">
+                <h2 id="attorneyProfessionalHeading">Professional profile</h2>
+                <p>This information appears on your public attorney profile.</p>
+              </div>
+
+              <div class="attorney-form-grid">
+                <div class="form-field">
+                  <label for="attorneyLinkedIn">LinkedIn</label>
+                  <input id="attorneyLinkedIn" type="url" inputmode="url" placeholder="https://www.linkedin.com/in/username" aria-describedby="attorneyLinkedInError" />
+                  <p class="field-error" id="attorneyLinkedInError" role="alert" hidden></p>
+                </div>
+                <div class="form-field">
+                  <label for="attorneyFirmName">Firm name</label>
+                  <span id="profile:firm" hidden></span>
+                  <input id="attorneyFirmName" type="text" autocomplete="organization" />
+                </div>
+                <div class="form-field">
+                  <label for="attorneyFirmWebsite">Firm website</label>
+                  <input id="attorneyFirmWebsite" type="url" inputmode="url" placeholder="https://yourfirm.com" aria-describedby="attorneyFirmWebsiteError" />
+                  <p class="field-error" id="attorneyFirmWebsiteError" role="alert" hidden></p>
+                </div>
+                <div class="form-field">
+                  <label id="attorneyPracticeLabel">Field of Law / Practices</label>
                   <div class="dropdown-multiselect narrow">
-                    <button type="button" id="attorneyPracticeDropdownToggle" class="dropdown-toggle">
+                    <button type="button" id="attorneyPracticeDropdownToggle" class="dropdown-toggle" aria-labelledby="attorneyPracticeLabel attorneyPracticeSummary" aria-haspopup="listbox" aria-expanded="false">
                       <span id="attorneyPracticeSummary" class="dropdown-summary">Select fields</span>
                       <span class="dropdown-caret" aria-hidden="true">▾</span>
                     </button>
-                    <div id="attorneyPracticeDropdown" class="dropdown-panel" role="listbox" aria-multiselectable="true">
-                      <!-- options injected via JS -->
-                    </div>
+                    <div id="attorneyPracticeDropdown" class="dropdown-panel" role="listbox" aria-multiselectable="true"></div>
                   </div>
-                  <div class="muted" style="font-size:0.85rem;margin-top:6px;">Select all that apply.</div>
+                  <p class="field-help">Select all that apply.</p>
                 </div>
+              </div>
 
-                <div class="form-field">
-                  <label for="attorneyPracticeDescription">Practice Description</label>
-                  <textarea id="attorneyPracticeDescription" rows="5" placeholder="Briefly describe your practice, areas of focus, or how you collaborate with paralegals."></textarea>
-                  <div id="attorneyPracticeCount" class="muted">0 / 4000 characters</div>
-                </div>
+              <div class="form-field attorney-form-field--wide">
+                <label for="attorneyPracticeDescription">Practice description</label>
+                <textarea id="attorneyPracticeDescription" rows="5" maxlength="4000" placeholder="Briefly describe your practice, areas of focus, or how you collaborate with paralegals."></textarea>
+                <div id="attorneyPracticeCount" class="field-count">0 / 4000 characters</div>
+              </div>
 
-                <div class="form-field">
-                  <label for="attorneyPublications">Publications &amp; Presentations</label>
-                  <textarea id="attorneyPublications" rows="4" placeholder="List publications or presentations, one per line."></textarea>
+              <div class="form-field attorney-form-field--wide">
+                <label for="attorneyPublications">Publications &amp; presentations</label>
+                <textarea id="attorneyPublications" rows="4" aria-describedby="attorneyPublicationsHelp"></textarea>
+                <p class="field-help" id="attorneyPublicationsHelp">Enter one publication or presentation per line.</p>
+              </div>
+            </section>
+
+            <section class="attorney-settings-panel" id="attorneyNotificationsSection" aria-labelledby="attorneyNotificationsHeading">
+              <span id="profile:notifications" hidden></span>
+              <div class="attorney-panel-header">
+                <h2 id="attorneyNotificationsHeading">Notifications</h2>
+                <p>Control email updates about your account and Matters.</p>
+              </div>
+              <div id="attorneyNotificationToggles">
+                <div class="toggle-row">
+                  <div>
+                    <div class="pref-title">Email notifications</div>
+                    <div class="pref-desc">Receive essential account updates in your inbox.</div>
+                  </div>
+                  <label class="switch">
+                    <span class="sr-only">Email notifications</span>
+                    <input type="checkbox" id="attorneyEmailNotifications" />
+                    <span class="slider"></span>
+                  </label>
                 </div>
+                <div class="toggle-row">
+                  <div>
+                    <div class="pref-title">New message alerts</div>
+                    <div class="pref-desc">Email me whenever a hired paralegal replies.</div>
+                  </div>
+                  <label class="switch">
+                    <span class="sr-only">New message alerts</span>
+                    <input type="checkbox" id="attorneyMessageAlerts" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div class="toggle-row">
+                  <div>
+                    <div class="pref-title">Matter updates</div>
+                    <div class="pref-desc">Email me when a paralegal accepts an invite or a Matter changes.</div>
+                  </div>
+                  <label class="switch">
+                    <span class="sr-only">Matter updates</span>
+                    <input type="checkbox" id="attorneyCaseUpdates" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+            </section>
+
+            <div class="attorney-actions" data-attorney-only>
+              <p id="attorneySaveStatus" class="attorney-save-status" role="status" aria-live="polite" hidden></p>
+              <div class="attorney-action-buttons">
+                <button id="attorneyPreviewProfileBtn" class="btn btn-outline" type="button">View profile</button>
+                <button id="saveAttorneyProfile" class="btn btn-primary" type="button" disabled>Save changes</button>
               </div>
             </div>
           </div>
-        </div>
-
-        <div class="settings-section">
-          <h2 class="section-title">Notifications</h2>
-          <p class="section-subtitle">Control how we notify you about account activity and case updates.</p>
-
-          <div id="attorneyNotificationToggles">
-            <div class="toggle-row">
-              <div>
-                <div class="pref-title">Email notifications</div>
-                <div class="pref-desc">Receive essential account updates in your inbox.</div>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="attorneyEmailNotifications" />
-                <span class="slider"></span>
-              </label>
-            </div>
-
-            <div class="toggle-row">
-              <div>
-                <div class="pref-title">New message alerts</div>
-                <div class="pref-desc">Email me whenever a hired paralegal replies.</div>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="attorneyMessageAlerts" />
-                <span class="slider"></span>
-              </label>
-            </div>
-
-            <div class="toggle-row">
-              <div>
-                <div class="pref-title">Matter updates</div>
-                <div class="pref-desc">Email me when a paralegal accepts an invite or a matter changes.</div>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="attorneyCaseUpdates" />
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div class="actions-row" data-attorney-only>
-          <button id="saveAttorneyProfile" class="btn btn-outline" type="button">Save changes</button>
-          <button id="attorneyPreviewProfileBtn" class="btn btn-outline" type="button">View Profile</button>
         </div>
 
       <div id="paralegalSettings" class="role-settings hidden">
@@ -4916,21 +5095,21 @@ input[type="number"],
               <div class="profile-photo-block">
                 <div class="hero-photo-shell">
                   <div class="hero-photo">
-                    <div class="avatar-frame" id="avatarFrame" role="button" tabindex="0" aria-label="Upload profile photo">
+                    <div class="avatar-frame" id="avatarFrame" role="button" tabindex="0" aria-label="Upload profile photo" aria-expanded="false">
                       <img id="avatarPreview" data-avatar alt="Profile photo" />
-                      <span id="avatarInitials">A</span>
+                      <span id="avatarInitials">P</span>
                     </div>
+                  </div>
+                  <div class="avatar-actions hidden" id="avatarPhotoActions" role="menu" aria-label="Profile photo actions">
+                    <button type="button" class="avatar-edit-btn hidden" id="editAvatarBtn" role="menuitem">Edit photo</button>
+                    <button type="button" class="avatar-remove-btn hidden" id="removeAvatarBtn" role="menuitem">Remove photo</button>
                   </div>
                 </div>
                 <div id="photoReviewStatus" class="photo-review-status hidden" role="status" aria-live="polite"></div>
                 <input type="file" id="avatarInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden />
-                <div class="avatar-actions">
-                  <button type="button" class="btn btn-outline avatar-edit-btn hidden" id="editAvatarBtn">Edit photo</button>
-                  <button type="button" class="btn btn-outline avatar-remove-btn hidden" id="removeAvatarBtn">Remove photo</button>
-                </div>
                 <p class="photo-guidelines">
                   Professional headshot required. Neutral background and business attire recommended.
-                  All profile photos are reviewed before they appear on your profile.
+                  Replacing your photo temporarily hides your profile from attorney discovery until the new photo is approved.
                 </p>
                 <div class="profile-meta-stack">
                   <div class="profile-meta-columns">
@@ -4944,41 +5123,21 @@ input[type="number"],
                 </div>
               </div>
 
-              <div class="profile-section-row profile-section-row--highlights">
-                <article class="profile-section section-editable" id="skillsCard" data-edit-section="skills">
-                  <div class="section-header">
-                    <span class="card-header-label">Skills</span>
-                  </div>
-                  <div class="section-display" data-section-display="skills">
-                    <p id="skillsDisplay" class="section-display-text"></p>
-                  </div>
-                  <div class="section-edit" data-section-edit="skills">
-                    <div class="chip-section skills-editor" id="skillsSection">
-                      <div id="skillsChips" class="chip-cloud" aria-live="polite"></div>
-                      <input type="text" id="skillsInput" placeholder="Type a skill and press Enter" />
-                    </div>
-                  </div>
-                </article>
-
-                <article class="profile-section section-editable" id="bestForSection" data-edit-section="bestFor">
-                  <div class="section-header">
-                    <span class="card-header-label">Best For</span>
-                  </div>
-                  <div class="best-for-body">
-                    <div class="section-display" data-section-display="bestFor">
-                      <ul id="bestForDisplay" class="section-display-text best-for-list" aria-label="Best For list"></ul>
-                    </div>
-                  </div>
-                </article>
-              </div>
-
             </aside>
 
             <section class="profile-main">
+              <div class="profile-readiness" id="profileReadiness" role="status" aria-live="polite">
+                <div class="profile-readiness-copy">
+                  <span class="profile-readiness-kicker">Profile readiness</span>
+                  <strong id="profileReadinessTitle">Your profile is ready</strong>
+                  <span id="profileReadinessDetail" hidden></span>
+                </div>
+                <button class="profile-readiness-action" id="profileReadinessAction" type="button" aria-label="Review missing profile information" hidden>Review</button>
+              </div>
               <section class="profile-header" aria-label="Paralegal profile">
                 <div class="profile-header-main">
                   <div class="profile-identity">
-                    <div class="full-name-input">
+                    <div class="full-name-input" data-field-label="Full name">
                       <input type="text" id="fullNameInput" name="fullName" autocomplete="name" required aria-label="Full name" class="profile-name-input" />
                     </div>
                     <div class="full-name-hidden">
@@ -4988,6 +5147,7 @@ input[type="number"],
                     <div class="profile-section section-editable" id="bioSection" data-edit-section="bio">
                       <div class="section-header">
                         <span class="card-header-label">Bio</span>
+                        <button class="section-edit-toggle" type="button" data-edit-toggle="bio" aria-label="Edit bio" aria-pressed="false">Edit</button>
                       </div>
                       <div class="section-display" data-section-display="bio">
                         <p id="bioDisplay" class="section-display-text"></p>
@@ -5003,16 +5163,16 @@ input[type="number"],
               <div class="profile-section-row">
                 <article class="profile-section section-editable" id="practiceAreasCard" data-edit-section="practiceAreas">
                   <div class="section-header">
-                    <span class="card-header-label">Practice Areas</span>
+                    <span class="card-header-label" id="paralegalPracticeLabel">Practice Areas</span>
+                    <button class="section-edit-toggle" type="button" data-edit-toggle="practiceAreas" aria-label="Edit practice areas" aria-pressed="false">Edit</button>
                   </div>
                   <div class="section-display" data-section-display="practiceAreas">
                     <p id="practiceAreasDisplay" class="section-display-text"></p>
                   </div>
                   <div class="section-edit" data-section-edit="practiceAreas">
                     <div class="chip-section" id="practiceSection">
-                      <span class="card-header-label" style="text-align:center; width:100%;">Practice Areas</span>
                       <div class="dropdown-multiselect narrow">
-                        <button type="button" id="paralegalPracticeDropdownToggle" class="dropdown-toggle">
+                        <button type="button" id="paralegalPracticeDropdownToggle" class="dropdown-toggle" aria-labelledby="paralegalPracticeLabel paralegalPracticeSummary">
                           <span id="paralegalPracticeSummary" class="dropdown-summary">Select fields</span>
                           <span class="dropdown-caret" aria-hidden="true">▾</span>
                         </button>
@@ -5027,6 +5187,7 @@ input[type="number"],
                 <article class="profile-section section-editable" id="stateExperienceCard" data-edit-section="stateExperience">
                   <div class="section-header">
                     <span class="card-header-label">State Experience</span>
+                    <button class="section-edit-toggle" type="button" data-edit-toggle="stateExperience" aria-label="Edit state experience" aria-pressed="false">Edit</button>
                   </div>
                   <div class="section-display" data-section-display="stateExperience">
                     <p id="stateExperienceDisplay" class="section-display-text"></p>
@@ -5037,7 +5198,8 @@ input[type="number"],
                       <input
                         type="text"
                         id="stateExperienceInput"
-                        placeholder="Type a state abbreviation (e.g., VA) and press Enter"
+                        placeholder="e.g., VA"
+                        aria-label="State abbreviation"
                         autocomplete="off"
                         aria-describedby="stateExperienceHelp"
                       />
@@ -5047,9 +5209,40 @@ input[type="number"],
                 </article>
               </div>
 
+              <div class="profile-section-row profile-section-row--highlights">
+                <article class="profile-section section-editable" id="skillsCard" data-edit-section="skills">
+                  <div class="section-header">
+                    <span class="card-header-label">Skills</span>
+                    <button class="section-edit-toggle" type="button" data-edit-toggle="skills" aria-label="Edit skills" aria-pressed="false">Edit</button>
+                  </div>
+                  <div class="section-display" data-section-display="skills">
+                    <p id="skillsDisplay" class="section-display-text"></p>
+                  </div>
+                  <div class="section-edit" data-section-edit="skills">
+                    <div class="chip-section skills-editor" id="skillsSection">
+                      <div id="skillsChips" class="chip-cloud" aria-live="polite"></div>
+                      <input type="text" id="skillsInput" placeholder="Type a skill and press Enter" />
+                    </div>
+                  </div>
+                </article>
+
+                <article class="profile-section section-editable" id="bestForSection" data-edit-section="bestFor">
+                  <div class="section-header">
+                    <span class="card-header-label">Best For</span>
+                    <button class="section-edit-toggle" type="button" data-edit-toggle="bestFor" aria-label="Edit best-for entries" aria-pressed="false">Edit</button>
+                  </div>
+                  <div class="best-for-body" role="region" aria-label="Best For entries" tabindex="0">
+                    <div class="section-display" data-section-display="bestFor">
+                      <ul id="bestForDisplay" class="section-display-text best-for-list" aria-label="Best For list"></ul>
+                    </div>
+                  </div>
+                </article>
+              </div>
+
               <article class="profile-section section-editable" id="experienceCard" data-edit-section="experience">
                 <div class="section-header">
                   <span class="card-header-label">Experience</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="experience" aria-label="Edit experience" aria-pressed="false">Edit</button>
                 </div>
                 <div class="section-display" data-section-display="experience">
                   <p id="experienceDisplay" class="section-display-text"></p>
@@ -5063,6 +5256,7 @@ input[type="number"],
               <article class="profile-section section-editable" id="educationCard" data-edit-section="education">
                 <div class="section-header">
                   <span class="card-header-label">Education</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="education" aria-label="Edit education" aria-pressed="false">Edit</button>
                 </div>
                 <div class="section-display" data-section-display="education">
                   <p id="educationDisplay" class="section-display-text"></p>
@@ -5076,6 +5270,7 @@ input[type="number"],
               <article class="profile-section section-editable" id="languagesRow" data-edit-section="languages">
                 <div class="section-header">
                   <span class="card-header-label">Languages</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="languages" aria-label="Edit languages" aria-pressed="false">Edit</button>
                 </div>
                 <div class="section-display" data-section-display="languages">
                   <p id="languagesDisplay" class="section-display-text"></p>
@@ -5106,11 +5301,11 @@ input[type="number"],
           </section>
 
           <div class="btn-row paralegal-actions">
+            <p id="profileSaveStatus" class="profile-save-status" role="status" aria-live="polite">All changes saved.</p>
             <details class="profile-standards-tooltip">
               <summary>Professional Standards</summary>
               <div class="profile-standards-tooltip-panel" role="note" aria-label="Professional standards">
-                <div class="profile-standards-title">Professional Standards</div>
-                <p>Matters posted on Let’s-ParaConnect have a minimum posted amount of <span class="fyi-amount">$400</span> to ensure serious, professional legal work. Attorneys are solely responsible for selecting which paralegal they choose to work with, based on experience, fit, and profile quality.</p>
+                <p>Matters posted on Let’s-ParaConnect have a minimum posted amount of <span class="fyi-amount">$400</span>. The minimum is a posting requirement, not a guarantee of scope, quality, or fit. Attorneys are solely responsible for evaluating the Matter scope and selecting any paralegal they choose to engage.</p>
               </div>
             </details>
             <button class="btn btn-primary" type="button" id="profileSaveBtn">Save changes</button>
@@ -5128,20 +5323,25 @@ input[type="number"],
     </section>
 
     <section id="securitySection" class="settings-section">
+      <div class="attorney-section-page-header focused-settings-header">
+        <a class="settings-back-link" href="profile-settings.html" data-attorney-only>Back to settings</a>
+        <h2>Security</h2>
+        <p>Manage sign-in methods, devices, and account access.</p>
+      </div>
       <div class="security-grid">
         <div class="security-column">
           <div class="settings-block" data-paralegal-only>
             <div class="settings-title-with-help">
-              <h3>Payouts Setup</h3>
+              <h3>Payout Setup</h3>
               <details class="settings-help-tooltip">
                 <summary aria-label="Payout timing information">i</summary>
                 <div class="settings-help-tooltip-panel" role="note">
-                  Please note: first-time payouts through Stripe may take approximately 7-14 days to reach your bank account. Subsequent payouts are typically faster.
+                  Your payout follows Stripe’s processing schedule and your bank’s deposit timing. Check Stripe for the latest status and expected arrival date.
                 </div>
               </details>
             </div>
-            <p class="muted"><strong>Stripe onboarding is required before you can receive payouts on Let’s-ParaConnect.</strong></p>
-            <button id="connectStripeBtn" class="btn btn-primary">Connect Stripe Account →</button>
+            <p class="muted" id="stripeRequirementCopy"><strong>Stripe onboarding is required before you can receive payouts on Let’s-ParaConnect.</strong></p>
+            <button id="connectStripeBtn" class="btn btn-primary" type="button">Connect Stripe Account →</button>
             <p id="stripeStatus" class="muted hidden"></p>
           </div>
 
@@ -5155,11 +5355,11 @@ input[type="number"],
                   <path d="M10 13v1.25"></path>
                 </svg>
               </span>
-              <h3>Change Password</h3>
+              <h3>Change password</h3>
             </div>
-            <label for="currentPassword" class="sr-only">Current password</label>
+            <label for="currentPassword" class="password-field-label">Current password</label>
             <div class="field-group">
-              <input type="password" id="currentPassword" autocomplete="current-password" placeholder="Enter current password">
+              <input type="password" id="currentPassword" autocomplete="current-password">
               <button type="button" class="toggle-visibility" data-toggle-password="currentPassword" aria-label="Show current password">
                 <svg viewBox="0 0 24 24">
                   <path fill="currentColor" d="M12 5c5.5 0 9.6 3.9 11 7-1.4 3.1-5.5 7-11 7S2.4 15.1 1 12c1.4-3.1 5.5-7 11-7zm0 2c-4.3 0-7.7 2.8-9 5 1.3 2.2 4.7 5 9 5s7.7-2.8 9-5c-1.3-2.2-4.7-5-9-5zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z"/>
@@ -5168,9 +5368,9 @@ input[type="number"],
             </div>
             <div class="password-grid">
               <div>
-                <label for="newPassword" class="sr-only">New password</label>
+                <label for="newPassword" class="password-field-label">New password</label>
                 <div class="field-group">
-                  <input type="password" id="newPassword" autocomplete="new-password" placeholder="Enter new password">
+                  <input type="password" id="newPassword" autocomplete="new-password">
                   <button type="button" class="toggle-visibility" data-toggle-password="newPassword" aria-label="Show new password">
                     <svg viewBox="0 0 24 24">
                       <path fill="currentColor" d="M12 5c5.5 0 9.6 3.9 11 7-1.4 3.1-5.5 7-11 7S2.4 15.1 1 12c1.4-3.1 5.5-7 11-7zm0 2c-4.3 0-7.7 2.8-9 5 1.3 2.2 4.7 5 9 5s7.7-2.8 9-5c-1.3-2.2-4.7-5-9-5zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z"/>
@@ -5179,9 +5379,9 @@ input[type="number"],
                 </div>
               </div>
               <div>
-                <label for="confirmPassword" class="sr-only">Confirm password</label>
+                <label for="confirmPassword" class="password-field-label">Confirm password</label>
                 <div class="field-group">
-                  <input type="password" id="confirmPassword" autocomplete="new-password" placeholder="Confirm new password">
+                  <input type="password" id="confirmPassword" autocomplete="new-password">
                   <button type="button" class="toggle-visibility" data-toggle-password="confirmPassword" aria-label="Show confirm password">
                     <svg viewBox="0 0 24 24">
                       <path fill="currentColor" d="M12 5c5.5 0 9.6 3.9 11 7-1.4 3.1-5.5 7-11 7S2.4 15.1 1 12c1.4-3.1 5.5-7 11-7zm0 2c-4.3 0-7.7 2.8-9 5 1.3 2.2 4.7 5 9 5s7.7-2.8 9-5c-1.3-2.2-4.7-5-9-5zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z"/>
@@ -5190,38 +5390,51 @@ input[type="number"],
                 </div>
               </div>
             </div>
-            <button id="savePasswordBtn" class="btn btn-primary">Save Password</button>
+            <button id="savePasswordBtn" class="btn btn-primary" type="button">Save password</button>
           </div>
 
           <div class="settings-block security-card blocked-users-card">
-            <details class="blocked-users-disclosure">
-              <summary>
-                <span class="blocked-users-summary-leading">
-                  <span>Blocked</span>
-                  <button
-                    type="button"
-                    class="blocked-users-summary-inline-help"
-                    aria-label="Blocked users help"
-                    aria-expanded="false"
-                    aria-controls="blockedUsersHelpPanel"
-                  >?</button>
-                  <span id="blockedUsersHelpPanel" class="blocked-users-help-panel hidden" role="tooltip">
-                    Manage active blocks here. Removing a block only restores future interaction. It does not reopen old matters, messages, or prior workflows.
+            <div class="blocked-users-layout">
+              <details class="blocked-users-disclosure">
+                <summary>
+                  <span class="blocked-users-summary-leading">
+                    <span>Blocked</span>
                   </span>
-                </span>
-                <span class="blocked-users-summary-meta">
-                  <span id="blockedUsersSummaryCount">Loading…</span>
-                  <span class="blocked-users-summary-caret" aria-hidden="true">▾</span>
-                </span>
-              </summary>
-              <div class="blocked-users-panel">
-                <div id="blockedUsersList">Loading…</div>
-              </div>
-            </details>
+                  <span class="blocked-users-summary-meta">
+                    <span id="blockedUsersSummaryCount">Loading…</span>
+                    <span class="blocked-users-summary-caret" aria-hidden="true">▾</span>
+                  </span>
+                </summary>
+                <div class="blocked-users-panel">
+                  <div id="blockedUsersList">Loading…</div>
+                </div>
+              </details>
+              <button
+                type="button"
+                class="blocked-users-summary-inline-help"
+                aria-label="Blocked users help"
+                aria-expanded="false"
+                aria-controls="blockedUsersHelpPanel"
+              >?</button>
+              <span id="blockedUsersHelpPanel" class="blocked-users-help-panel hidden" role="tooltip">
+                Manage active blocks here. Removing a block only restores future interaction. It does not reopen old matters, messages, or prior workflows.
+              </span>
+            </div>
           </div>
         </div>
 
         <div class="security-column">
+          <div class="settings-block security-card security-verification-card">
+            <div class="security-card-title">
+              <span class="security-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20"><path fill="currentColor" d="M10 1.5l6.5 2.6v5.2c0 4-2.7 7.6-6.5 8.7-3.8-1.1-6.5-4.7-6.5-8.7V4.1L10 1.5zm0 2.1L5.1 5.1v4.2c0 3 2 5.7 4.9 6.6 2.9-.9 4.9-3.6 4.9-6.6V5.1L10 3.6z"/></svg>
+              </span>
+              <h3>Confirm security changes</h3>
+            </div>
+            <label for="twoFactorCurrentPassword">Current password</label>
+            <input type="password" id="twoFactorCurrentPassword" autocomplete="current-password" maxlength="128">
+            <p class="muted">Used only to confirm changes to two-step verification, backup codes, and passkeys.</p>
+          </div>
           <div class="settings-block security-card" id="twoFactorSection">
             <div class="security-card-title">
               <span class="security-icon" aria-hidden="true">
@@ -5229,7 +5442,7 @@ input[type="number"],
                   <path fill="currentColor" d="M10 1.5l6.5 2.6v5.2c0 4-2.7 7.6-6.5 8.7-3.8-1.1-6.5-4.7-6.5-8.7V4.1L10 1.5zm0 2.1L5.1 5.1v4.2c0 3 2 5.7 4.9 6.6 2.9-.9 4.9-3.6 4.9-6.6V5.1L10 3.6z"/>
                 </svg>
               </span>
-              <h3>Setup 2-Step Verification</h3>
+              <h3>Set up two-step verification</h3>
             </div>
             <div class="two-factor-hero" aria-hidden="true">
               <svg viewBox="0 0 180 120">
@@ -5249,32 +5462,76 @@ input[type="number"],
                   </svg>
                 </span>
                 <div>
-                  <h4>Authenticator app <span class="two-factor-badge">Coming soon</span></h4>
-                  <p>Use an authenticator app to generate verification codes.</p>
+                  <h4>Authenticator app</h4>
+                  <p>Use a time-based code from your authenticator app. Recommended when a passkey is unavailable.</p>
                 </div>
               </div>
               <label class="switch">
-                <input type="checkbox" class="two-factor-toggle" data-two-factor-method="authenticator" aria-label="Enable authenticator app" disabled aria-disabled="true">
+                <input type="checkbox" class="two-factor-toggle" data-two-factor-method="authenticator" aria-label="Enable authenticator app">
                 <span class="slider"></span>
               </label>
             </div>
             <div class="two-factor-option">
               <div class="two-factor-details">
                 <span class="security-icon" aria-hidden="true">
-                  <svg viewBox="0 0 20 20">
-                    <path fill="currentColor" d="M4 3.5h12a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1zm0 2v8h12v-8H4zm2 10h8v1H6v-1z"/>
-                  </svg>
+                  <svg viewBox="0 0 20 20"><path fill="currentColor" d="M2.5 4h15v12h-15V4zm1.8 2v.4l5.7 4.1 5.7-4.1V6H4.3zm11.4 8V8.8L10 12.9 4.3 8.8V14h11.4z"/></svg>
                 </span>
                 <div>
-                  <h4>Phone number <span class="two-factor-badge">Coming soon</span></h4>
-                  <p>Set up SMS verification.</p>
+                  <h4>Email verification</h4>
+                  <p>Send a one-time code to your verified email when you sign in.</p>
                 </div>
               </div>
               <label class="switch">
-                <input type="checkbox" class="two-factor-toggle" data-two-factor-method="sms" aria-label="Enable phone verification" disabled aria-disabled="true">
+                <input type="checkbox" class="two-factor-toggle" data-two-factor-method="email" aria-label="Enable email verification">
                 <span class="slider"></span>
               </label>
             </div>
+            <div class="two-factor-security-actions">
+              <strong>Backup codes</strong>
+              <button type="button" class="btn btn-outline" id="generateBackupCodesBtn">Generate new backup codes</button>
+              <p class="muted">Generating new codes invalidates any previous set.</p>
+              <div id="backupCodesOutput" class="backup-codes-output" hidden aria-live="polite"></div>
+            </div>
+            <div id="authenticatorSetupPanel" class="authenticator-setup" hidden>
+              <h4>Connect your authenticator app</h4>
+              <p class="muted">Scan this QR code, or enter the key manually. Then enter the current six-digit code to confirm setup.</p>
+              <img id="authenticatorQrCode" alt="Authenticator setup QR code">
+              <p>Manual key: <code id="authenticatorManualSecret" class="manual-secret"></code></p>
+              <div class="security-inline-fields">
+                <label for="authenticatorConfirmCode">Six-digit code</label>
+                <input id="authenticatorConfirmCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="123456">
+                <button type="button" class="btn btn-primary" id="authenticatorConfirmBtn">Confirm authenticator</button>
+                <button type="button" class="btn btn-outline" id="authenticatorCancelBtn">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div class="settings-block security-card" id="passkeysSection">
+            <div class="security-card-title">
+              <span class="security-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20"><path fill="currentColor" d="M7.5 11a4.5 4.5 0 1 1 4.2-2.9H18v3h-2v2h-3v2h-3.2A4.5 4.5 0 0 1 7.5 11zm0-2A2.5 2.5 0 1 0 7.5 4a2.5 2.5 0 0 0 0 5z"/></svg>
+              </span>
+              <h3>Passkeys</h3>
+            </div>
+            <p class="muted">Sign in with your device screen lock, fingerprint, face, or security key. Passkeys are phishing-resistant.</p>
+            <div id="passkeyUnsupported" class="notice" hidden>This browser or device does not support passkeys.</div>
+            <div id="passkeyList" class="passkey-list" aria-live="polite"><p class="muted">Loading passkeys…</p></div>
+            <div class="passkey-panel security-inline-fields">
+              <label for="passkeyName">Passkey name</label>
+              <input id="passkeyName" maxlength="80" autocomplete="off" placeholder="For example: Work MacBook">
+              <button type="button" class="btn btn-primary" id="addPasskeyBtn">Add a passkey</button>
+              <p class="muted">Confirm your current password in the security verification card before adding or removing a passkey.</p>
+            </div>
+          </div>
+          <div class="settings-block security-card" id="activeSessionsSection">
+            <div class="security-card-title">
+              <span class="security-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20"><path fill="currentColor" d="M3 3h14v10H3V3zm2 2v6h10V5H5zm2 10h6v2H7v-2z"/></svg>
+              </span>
+              <h3>Active sessions</h3>
+            </div>
+            <p class="muted">Review devices currently signed in to your account.</p>
+            <div id="sessionHistoryList" class="session-list" aria-live="polite"><p class="muted">Loading active sessions…</p></div>
+            <button type="button" class="btn btn-outline" id="revokeOtherSessionsBtn">Sign out other devices</button>
           </div>
         </div>
       </div>
@@ -5282,11 +5539,12 @@ input[type="number"],
       <div class="security-extras">
         <div class="settings-block">
           <div class="settings-title-with-help">
-            <h3>Deactivate My Account</h3>
+            <span id="security:closure" hidden></span>
+            <h3 id="accountClosureHeading">Deactivate account</h3>
             <details class="settings-help-tooltip">
               <summary aria-label="Deactivate account help">?</summary>
               <div class="settings-help-tooltip-panel" role="note">
-                Deactivate your account and remove it from active platform participation. Historical case, dispute, payment, audit, and financial records will be preserved. This is not full erasure. Accounts cannot be deactivated while you are involved in an active matter or while payout, dispute, or other financial obligations remain unresolved.
+                Deactivate your account and remove it from active platform participation. Historical Matter, dispute, payment, audit, and financial records will be preserved. This is not full erasure. Accounts cannot be deactivated while you are involved in an active Matter or while payout, dispute, or other financial obligations remain unresolved.
               </div>
             </details>
           </div>
@@ -5298,39 +5556,66 @@ input[type="number"],
     </section>
 
     <section class="settings-panel settings-section" id="preferencesSection">
-      <h2>Preferences</h2>
+      <div class="focused-settings-header">
+        <a class="settings-back-link" href="profile-settings.html" data-attorney-only>Back to settings</a>
+        <h2>Preferences</h2>
+        <p>Choose how LPC communicates with you and how your workspace appears.</p>
+        <p id="preferencesSaveStatus" class="preferences-save-status" role="status" aria-live="polite">Changes save automatically.</p>
+      </div>
+      <div class="preferences-layout">
+      <section class="preference-group" aria-labelledby="communicationPreferencesHeading" data-paralegal-only>
+        <header class="preference-group-header">
+          <h3 id="communicationPreferencesHeading">Notifications</h3>
+          <p>Choose which account and Matter updates reach your inbox.</p>
+        </header>
+        <div class="preference-group-rows">
       <div class="pref-row">
-        <span>Email notifications</span>
+        <span id="emailNotificationsLabel">Email notifications</span>
         <label class="switch">
-          <input type="checkbox" id="emailNotificationsToggle">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="pref-row" data-attorney-only>
-        <span>Replay attorney tour</span>
-        <button type="button" class="btn btn-outline" id="replayAttorneyTourBtn">Replay</button>
-      </div>
-      <div class="pref-row" data-paralegal-only>
-        <span>New message alerts</span>
-        <label class="switch">
-          <input type="checkbox" id="paralegalMessageAlerts">
+          <input type="checkbox" id="emailNotificationsToggle" aria-labelledby="emailNotificationsLabel">
           <span class="slider"></span>
         </label>
       </div>
       <div class="pref-row" data-paralegal-only>
-        <span>Matter updates</span>
+        <span id="paralegalMessageAlertsLabel">New message alerts</span>
         <label class="switch">
-          <input type="checkbox" id="paralegalCaseUpdates">
+          <input type="checkbox" id="paralegalMessageAlerts" aria-labelledby="paralegalMessageAlertsLabel">
           <span class="slider"></span>
         </label>
       </div>
       <div class="pref-row" data-paralegal-only>
-        <span>Hide profile</span>
+        <span id="paralegalCaseUpdatesLabel">Matter updates</span>
         <label class="switch">
-          <input type="checkbox" id="paralegalHideProfile">
+          <input type="checkbox" id="paralegalCaseUpdates" aria-labelledby="paralegalCaseUpdatesLabel">
           <span class="slider"></span>
         </label>
       </div>
+        </div>
+      </section>
+      <section class="preference-group" aria-labelledby="visibilityPreferencesHeading" data-paralegal-only>
+        <header class="preference-group-header">
+          <h3 id="visibilityPreferencesHeading">Profile visibility</h3>
+          <p>Control whether attorneys can discover your professional profile.</p>
+        </header>
+        <div class="preference-group-rows">
+      <div class="pref-row" data-paralegal-only>
+        <div class="pref-row-copy">
+          <span id="profileVisibilityLabel">Hide profile</span>
+          <p class="muted" id="profileVisibilityHelp">Controls whether attorneys can discover your profile. A profile photo must be approved before your profile can be visible.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="paralegalHideProfile" aria-labelledby="profileVisibilityLabel" aria-describedby="profileVisibilityHelp">
+          <span class="slider"></span>
+        </label>
+      </div>
+        </div>
+      </section>
+      <section class="preference-group preference-group--workspace" aria-labelledby="workspacePreferencesHeading">
+        <header class="preference-group-header">
+          <h3 id="workspacePreferencesHeading">Workspace</h3>
+          <p>Adjust the reading experience and your primary jurisdiction.</p>
+        </header>
+        <div class="preference-group-rows">
       <div class="pref-row">
         <label for="fontSizePreference">Font size</label>
         <select id="fontSizePreference">
@@ -5341,68 +5626,40 @@ input[type="number"],
           <option value="xl">Extra Large</option>
         </select>
       </div>
-      <input type="hidden" id="themePreference" value="mountain" />
-      <div class="theme-preview-grid" role="radiogroup" aria-label="Theme previews">
-        <button type="button" class="theme-preview" data-theme-preview="dark" role="radio" aria-checked="false">
-          <svg class="theme-preview-icon" viewBox="0 0 120 78" aria-hidden="true">
-            <rect x="1" y="1" width="118" height="76" rx="10" fill="#1c2333" stroke="#d1d5db"/>
-            <rect x="8" y="10" width="30" height="58" rx="6" fill="#111827"/>
-            <rect x="46" y="16" width="60" height="8" rx="4" fill="#d9a441"/>
-            <rect x="46" y="30" width="52" height="6" rx="3" fill="#e5e7eb"/>
-            <rect x="46" y="42" width="46" height="6" rx="3" fill="#e5e7eb"/>
-            <rect x="46" y="54" width="38" height="6" rx="3" fill="#e5e7eb"/>
-          </svg>
-          <span>Dark</span>
-        </button>
-        <button type="button" class="theme-preview" data-theme-preview="light" role="radio" aria-checked="false">
-          <svg class="theme-preview-icon" viewBox="0 0 120 78" aria-hidden="true">
-            <rect x="1" y="1" width="118" height="76" rx="10" fill="#ffffff" stroke="#d1d5db"/>
-            <rect x="8" y="10" width="30" height="58" rx="6" fill="#f3f4f6"/>
-            <rect x="46" y="16" width="60" height="8" rx="4" fill="#d9a441"/>
-            <rect x="46" y="30" width="52" height="6" rx="3" fill="#e5e7eb"/>
-            <rect x="46" y="42" width="46" height="6" rx="3" fill="#e5e7eb"/>
-            <rect x="46" y="54" width="38" height="6" rx="3" fill="#e5e7eb"/>
-          </svg>
-          <span>Light</span>
-        </button>
-        <button type="button" class="theme-preview" data-theme-preview="mountain" role="radio" aria-checked="false">
-          <svg class="theme-preview-icon" viewBox="0 0 120 78" aria-hidden="true">
-            <defs>
-              <linearGradient id="mountainGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#0b2a4a"/>
-                <stop offset="100%" stop-color="#2f4b63"/>
-              </linearGradient>
-            </defs>
-            <rect x="1" y="1" width="118" height="76" rx="10" fill="#ffffff" stroke="#d1d5db"/>
-            <rect x="8" y="10" width="30" height="58" rx="6" fill="url(#mountainGradient)"/>
-            <rect x="46" y="16" width="60" height="8" rx="4" fill="#d9a441"/>
-            <rect x="46" y="30" width="52" height="6" rx="3" fill="#e5e7eb"/>
-            <rect x="46" y="42" width="46" height="6" rx="3" fill="#e5e7eb"/>
-            <rect x="46" y="54" width="38" height="6" rx="3" fill="#e5e7eb"/>
-          </svg>
-          <span>Mountain</span>
-        </button>
-        <button type="button" class="theme-preview" data-theme-preview="mountain-dark" role="radio" aria-checked="false">
-          <svg class="theme-preview-icon" viewBox="0 0 120 78" aria-hidden="true">
-            <defs>
-              <linearGradient id="mountainGradientDark" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#0b2a4a"/>
-                <stop offset="100%" stop-color="#2f4b63"/>
-              </linearGradient>
-            </defs>
-            <rect x="1" y="1" width="118" height="76" rx="10" fill="#1c2333" stroke="#d1d5db"/>
-            <rect x="8" y="10" width="30" height="58" rx="6" fill="url(#mountainGradientDark)"/>
-            <rect x="46" y="16" width="60" height="8" rx="4" fill="#d9a441"/>
-            <rect x="46" y="30" width="52" height="6" rx="3" fill="#c7d2fe"/>
-            <rect x="46" y="42" width="46" height="6" rx="3" fill="#c7d2fe"/>
-            <rect x="46" y="54" width="38" height="6" rx="3" fill="#c7d2fe"/>
-          </svg>
-          <span>Mountain Dark</span>
-        </button>
+      <input type="hidden" id="themePreference" value="light" />
+      <div class="pref-row pref-row--appearance">
+        <span>Appearance</span>
+        <div class="theme-preview-grid" role="radiogroup" aria-label="Appearance">
+          <button type="button" class="theme-preview" data-theme-preview="light" role="radio" aria-checked="false">
+            <svg class="theme-preview-icon" viewBox="0 0 120 78" aria-hidden="true">
+              <rect x="1" y="1" width="118" height="76" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+              <rect x="8" y="10" width="30" height="58" rx="6" fill="#f3f4f6"/>
+              <rect x="46" y="16" width="60" height="8" rx="4" fill="#d9a441"/>
+              <rect x="46" y="30" width="52" height="6" rx="3" fill="#e5e7eb"/>
+              <rect x="46" y="42" width="46" height="6" rx="3" fill="#e5e7eb"/>
+              <rect x="46" y="54" width="38" height="6" rx="3" fill="#e5e7eb"/>
+            </svg>
+            <span>Light</span>
+          </button>
+          <button type="button" class="theme-preview" data-theme-preview="dark" role="radio" aria-checked="false">
+            <svg class="theme-preview-icon" viewBox="0 0 120 78" aria-hidden="true">
+              <rect x="1" y="1" width="118" height="76" rx="10" fill="#1c2333" stroke="#d1d5db"/>
+              <rect x="8" y="10" width="30" height="58" rx="6" fill="#111827"/>
+              <rect x="46" y="16" width="60" height="8" rx="4" fill="#d9a441"/>
+              <rect x="46" y="30" width="52" height="6" rx="3" fill="#e5e7eb"/>
+              <rect x="46" y="42" width="46" height="6" rx="3" fill="#e5e7eb"/>
+              <rect x="46" y="54" width="38" height="6" rx="3" fill="#e5e7eb"/>
+            </svg>
+            <span>Dark</span>
+          </button>
+        </div>
       </div>
-      <div class="pref-row">
-        <span>Update State</span>
-        <select id="statePreference">
+      <div class="pref-row pref-row--state">
+        <div class="pref-row-copy">
+          <label for="statePreference">Primary state</label>
+          <p class="muted" id="statePreferenceHelp">Used on your profile and to help you browse Matters by jurisdiction.</p>
+        </div>
+        <select id="statePreference" aria-describedby="statePreferenceHelp">
           <option value="">Select state</option>
           <option value="AL">Alabama</option>
           <option value="AK">Alaska</option>
@@ -5457,12 +5714,24 @@ input[type="number"],
           <option value="WY">Wyoming</option>
         </select>
       </div>
+        </div>
+      </section>
+      <section class="preference-group" aria-labelledby="guidancePreferencesHeading">
+        <header class="preference-group-header">
+          <h3 id="guidancePreferencesHeading">Guidance</h3>
+          <p>Replay the product tour whenever you need a refresher.</p>
+        </header>
+        <div class="preference-group-rows">
+      <div class="pref-row" data-attorney-only>
+        <span>Replay attorney tour</span>
+        <button type="button" class="btn btn-outline" id="replayAttorneyTourBtn">Replay</button>
+      </div>
       <div class="pref-row" data-paralegal-only>
         <span>Replay paralegal tour</span>
         <button type="button" class="btn btn-outline" id="replayParalegalTourBtn">Replay</button>
       </div>
-      <div class="btn-row" style="justify-content:center;margin-top:20px;">
-        <button id="savePreferencesBtn" class="btn btn-primary" type="button">Save Preferences</button>
+        </div>
+      </section>
       </div>
     </section>
 
@@ -5475,44 +5744,53 @@ input[type="number"],
 
     </div>
   </main>
+  </div>
 
   <div id="toastBanner" class="toast" role="status" aria-live="assertive"></div>
 
-  <div class="modal" id="photoCropModal" role="dialog" aria-modal="true" aria-labelledby="photoCropTitle" aria-hidden="true">
+  <div class="modal" id="photoCropModal" role="dialog" aria-modal="true" aria-labelledby="photoCropTitle" aria-hidden="true" inert>
     <div class="modal-card photo-crop-card">
-      <h3 class="photo-crop-title" id="photoCropTitle">Adjust profile photo</h3>
-      <p class="photo-crop-subtitle">Drag to reposition and use zoom to refine the crop.</p>
-      <div class="photo-crop-stage">
-        <img id="photoCropImage" alt="Crop profile photo" />
-        <div class="photo-crop-loading" id="photoCropLoading" aria-live="polite">
+      <header class="photo-crop-header">
+        <div class="photo-crop-header-row">
+          <h2 class="photo-crop-title" id="photoCropTitle">Edit profile photo</h2>
+          <button type="button" class="modal-close photo-crop-close" id="photoCropClose" aria-label="Close photo editor">×</button>
+        </div>
+        <p class="photo-crop-subtitle" id="photoCropInstructions">Drag to reposition and use the slider to zoom.</p>
+      </header>
+      <div class="photo-crop-stage" id="photoCropStage" role="group" tabindex="0" aria-label="Profile photo crop area" aria-describedby="photoCropInstructions">
+        <img id="photoCropImage" alt="Photo being cropped" />
+        <div class="photo-crop-loading" id="photoCropLoading" aria-live="polite" aria-hidden="true">
           <span class="photo-crop-spinner" aria-hidden="true"></span>
           <span id="photoCropLoadingText">Loading photo…</span>
         </div>
+        <div class="photo-crop-error" id="photoCropError" role="alert" hidden>
+          <strong>We couldn’t load this photo.</strong>
+          <p id="photoCropErrorText">Try again or choose another JPEG or PNG.</p>
+          <div class="photo-crop-error-actions">
+            <button type="button" class="btn btn-outline" id="photoCropTryAgain">Try again</button>
+            <button type="button" class="btn btn-outline" id="photoCropChooseAnother">Choose another photo</button>
+          </div>
+        </div>
       </div>
-      <div class="photo-crop-controls">
-        <label for="photoCropZoom">Zoom</label>
-        <input type="range" id="photoCropZoom" min="1" max="3" step="0.01" value="1" />
+      <div class="photo-crop-footer">
+        <div class="photo-crop-controls">
+          <label class="sr-only" for="photoCropZoom">Zoom</label>
+          <div class="photo-crop-range">
+            <span aria-hidden="true">−</span>
+            <input type="range" id="photoCropZoom" min="1" max="3" step="0.01" value="1" />
+            <span aria-hidden="true">+</span>
+          </div>
+        </div>
       </div>
       <div class="photo-crop-actions">
         <button type="button" class="btn btn-outline" id="photoCropCancel">Cancel</button>
-        <button type="button" class="btn btn-primary" id="photoCropSave">Save crop</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
-    <div class="modal-card">
-      <h3 id="deleteModalTitle">Delete account?</h3>
-      <p>Are you sure? This action cannot be undone.</p>
-      <div class="btn-row" style="justify-content:center;">
-        <button class="btn btn-outline" type="button" id="cancelDeleteBtn">Cancel</button>
-        <button class="btn danger-btn" type="button" id="confirmDeleteBtn">Delete account</button>
+        <button type="button" class="btn btn-primary" id="photoCropSave">Save photo</button>
       </div>
     </div>
   </div>
 
   <div class="attorney-onboarding-overlay" id="attorneyOnboardingOverlay" aria-hidden="true"></div>
-  <div class="attorney-onboarding-modal" id="attorneyOnboardingModal" role="dialog" aria-modal="true" aria-labelledby="attorneyOnboardingTitle" aria-hidden="true">
+  <div class="attorney-onboarding-modal" id="attorneyOnboardingModal" role="dialog" aria-modal="true" aria-labelledby="attorneyOnboardingTitle" aria-hidden="true" inert>
     <button type="button" class="attorney-onboarding-close" data-onboarding-close aria-label="Close">×</button>
     <div class="attorney-onboarding-hero" role="presentation"></div>
     <div class="attorney-onboarding-content">
@@ -5526,7 +5804,7 @@ input[type="number"],
   </div>
 
   <div class="education-modal-overlay" id="educationModalOverlay" aria-hidden="true"></div>
-  <div class="education-modal" id="educationModal" role="dialog" aria-modal="true" aria-labelledby="educationModalTitle">
+  <div class="education-modal" id="educationModal" role="dialog" aria-modal="true" aria-labelledby="educationModalTitle" aria-hidden="true" inert>
     <div class="education-modal-header">
       <h3 id="educationModalTitle">Edit education</h3>
       <button type="button" class="education-modal-close" id="educationModalClose" aria-label="Close">&times;</button>
@@ -5542,7 +5820,7 @@ input[type="number"],
   </div>
 
   <div class="profile-tour-overlay" id="profileTourOverlay" aria-hidden="true"></div>
-  <div class="profile-tour-tooltip" id="profileTourTooltip" role="dialog" aria-live="polite">
+  <div class="profile-tour-tooltip" id="profileTourTooltip" role="dialog" aria-live="polite" aria-labelledby="profileTourTitle" aria-describedby="profileTourText" aria-hidden="true" inert>
     <button type="button" class="profile-tour-close" id="profileTourCloseBtn" aria-label="Close tour">&times;</button>
     <div class="profile-tour-title" id="profileTourTitle"></div>
     <p class="profile-tour-text" id="profileTourText"></p>
@@ -5557,61 +5835,12 @@ input[type="number"],
     window.__ATTORNEY_PAGE__ = "profile-settings";
     window.__TAB_ROLE__ = "attorney,paralegal";
   </script>
-  <script src="assets/libs/cropper/cropper.main.js"></script>
-  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
-  <script type="module" src="assets/scripts/profile-settings.js"></script>
-  <script>
-    // Safe, bubble-phase logout handler as a fallback for any [data-logout] trigger
-    document.addEventListener("click", (evt) => {
-      const target = evt.target.closest("[data-logout]");
-      if (!target) return;
-      evt.preventDefault();
-      if (typeof window.logoutUser === "function") {
-        window.logoutUser(evt);
-        return;
-      }
-      // Fallback if helper is unavailable
-      fetch("/api/auth/logout", { method: "POST", credentials: "include" }).finally(() => {
-        ["lpc_user", "lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"].forEach((key) => {
-          try {
-            localStorage.removeItem(key);
-          } catch (_) {}
-          try {
-            sessionStorage.removeItem(key);
-          } catch (_) {}
-        });
-        window.location.href = "login.html";
-      });
-    });
-  </script>
-  <script>
-    (function initSidebarToggle() {
-      const sidebarToggle = document.getElementById('sidebarToggle');
-      const sidebarNav = document.getElementById('sidebarNav');
-      const sidebarBackdrop = document.getElementById('sidebarBackdrop');
-      if (!sidebarNav || !sidebarBackdrop) return;
-      const closeSidebar = () => {
-        document.body.classList.remove('nav-open');
-        sidebarToggle?.setAttribute('aria-expanded', 'false');
-      };
-      const openSidebar = () => {
-        document.body.classList.add('nav-open');
-        sidebarToggle?.setAttribute('aria-expanded', 'true');
-      };
-      sidebarToggle?.addEventListener('click', () => {
-        if (document.body.classList.contains('nav-open')) closeSidebar();
-        else openSidebar();
-      });
-      sidebarBackdrop.addEventListener('click', closeSidebar);
-      sidebarNav.addEventListener('click', (event) => {
-        if (event.target.closest('a') || event.target.closest('button')) {
-          closeSidebar();
-        }
-      });
-      window.addEventListener('resize', () => {
-        if (window.innerWidth > 960) closeSidebar();
-      });
-    })();
-  </script>
+  <script src="assets/libs/cropper/cropper.main.js?v=2.1.1"></script>
+  <script src="/assets/vendor/simplewebauthn-13.3.0.js"></script>
+  <script type="module" src="assets/scripts/profile-settings-role-loader.js?v=20260901-1"></script>
+  <script type="module" src="assets/scripts/profile-settings.js?v=20260902-3"></script>
+  <script src="assets/scripts/context-panel.js?v=20260812-paralegal-heading"></script>
+  <script src="assets/scripts/productivity-command-registry.js"></script>
+  <script src="assets/scripts/global-search.js?v=20260831-2"></script>
 </body>
 </html>

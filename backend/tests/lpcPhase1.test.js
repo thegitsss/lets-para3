@@ -134,6 +134,12 @@ describe("LPC Phase 1 event routing", () => {
     expect(await LpcAction.countDocuments({ actionType: "lifecycle_follow_up", status: "open" })).toBe(1);
   });
 
+  test("the database permits empty event keys but rejects duplicate nonempty keys", async () => {
+    await LpcEvent.collection.insertMany([{ idempotencyKey: "" }, { idempotencyKey: "" }, {}, {}]);
+    await LpcEvent.collection.insertOne({ idempotencyKey: "admin-rehearsal:unique" });
+    await expect(LpcEvent.collection.insertOne({ idempotencyKey: "admin-rehearsal:unique" })).rejects.toMatchObject({ code: 11000 });
+  });
+
   test("dedupes founder alerts across repeated dispute events", async () => {
     const attorney = await createUser({ role: "attorney", status: "approved" });
     const caseDoc = await Case.create({
@@ -250,7 +256,7 @@ describe("LPC Phase 1 event routing", () => {
     }).lean();
     expect(action).toBeTruthy();
     expect(action.metadata.missingFields).toEqual(
-      expect.arrayContaining(["email verification", "accepted terms", "resume", "certificate", "experience history"])
+      ["email verification", "accepted terms", "resume", "admission qualification"]
     );
   });
 

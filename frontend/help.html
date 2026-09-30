@@ -1,763 +1,157 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-
-  <link rel="stylesheet" href="assets/styles/fonts.css" />
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <meta name="theme-color" content="#0B2A4A">
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Help for Attorneys – Let’s-ParaConnect</title>
+  <meta name="theme-color" content="#0b2a4a" />
+  <meta name="description" content="Help for attorneys using Let’s-ParaConnect to post Matters, work with paralegals, and manage payments." />
+  <title>Help for Attorneys | Let’s-ParaConnect</title>
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
+  <link rel="stylesheet" href="assets/styles/public-site-chrome.css?v=20260925-narrow-footer" />
+  <link rel="stylesheet" href="assets/styles/help-pages.css?v=20260828-phase5" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
-  <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
-  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
-
-  <script src="assets/scripts/utils/session.js"></script>
-  <style>
-    .skip-link {
-      position: absolute;
-      left: 12px;
-      top: -40px;
-      background: #1a2230;
-      color: #ffffff;
-      padding: 8px 12px;
-      border-radius: 6px;
-      text-decoration: none;
-      z-index: 10000;
-      font-size: 14px;
-    }
-
-    .skip-link:focus {
-      top: 12px;
-    }
-
-    :root {
-      --bg: #ffffff;
-      --sidebar-bg: #f5f5f5e6;
-      --accent: #b6a47a;
-      --ink: #1a1a1a;
-      --muted: #8a8a8a;
-      --line: rgba(0, 0, 0, 0.08);
-      --panel: #fcfcfc;
-      --sidebar-text: #1a1a1a;
-      --radius: 14px;
-      --font-serif: 'Cormorant Garamond', serif;
-      --font-sans: 'Sarabun', sans-serif;
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      background: var(--bg);
-      color: var(--ink);
-      font-family: var(--font-sans);
-      font-weight: 200;
-      display: flex;
-      height: 100vh;
-      overflow: hidden;
-    }
-    body.theme-light,
-    body.theme-mountain {
-      background: #ffffff;
-    }
-    body.theme-light .sidebar,
-    body.theme-mountain .sidebar {
-      background: var(--sidebar-bg);
-    }
-    body.theme-light .callout,
-    body.theme-mountain .callout {
-      background: #ffffff;
-    }
-
-    .sidebar {
-      width: 240px;
-      background: var(--sidebar-bg);
-      display: flex;
-      flex-direction: column;
-      border-right: 1px solid var(--line);
-      padding: 24px 16px;
-      color: var(--sidebar-text);
-      position: relative;
-      flex-shrink: 0;
-      overflow: hidden;
-      transition: width 0.25s ease, padding 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
-    }
-
-    .sidebar::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: transparent;
-      pointer-events: none;
-      transition: background 0.3s ease;
-    }
-
-    body.theme-mountain .sidebar,
-    body.theme-mountain-dark .sidebar {
-      background: var(--bg) url('hero-mountain.jpg') center/cover no-repeat;
-    }
-
-    body.theme-mountain .sidebar::before,
-    body.theme-mountain-dark .sidebar::before {
-      background: rgba(0, 0, 0, 0.45);
-    }
-
-    body.theme-mountain .sidebar > *,
-    body.theme-mountain-dark .sidebar > * {
-      position: relative;
-      z-index: 1;
-    }
-
-    .logo {
-      font-family: var(--font-serif);
-      font-size: 1.6rem;
-      font-weight: 300;
-      letter-spacing: 0.5px;
-      margin-bottom: 36px;
-      text-align: center;
-    }
-
-    nav {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    nav a {
-      text-decoration: none;
-      color: var(--ink);
-      font-weight: 200;
-      font-size: 0.95rem;
-      padding: 10px 14px;
-      border-radius: var(--radius);
-      transition: background 0.3s ease;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    nav a.active,
-    nav a:hover {
-      background: rgba(0, 0, 0, 0.04);
-    }
-
-    body.theme-dark nav a.active,
-    body.theme-dark nav a:hover {
-      background: rgba(255, 255, 255, 0.12);
-    }
-
-    body.theme-mountain nav a.active,
-    body.theme-mountain nav a:hover,
-    body.theme-mountain-dark nav a.active,
-    body.theme-mountain-dark nav a:hover {
-      background: rgba(255, 255, 255, 0.18);
-    }
-
-    body.theme-mountain nav a,
-    body.theme-mountain-dark nav a {
-      color: #fff;
-    }
-    .sidebar-link{
-      margin-top:1.5rem;
-      width:100%;
-      border:1px solid var(--line);
-      border-radius:var(--radius);
-      padding:0.6rem 1rem;
-      background:transparent;
-      font-family:var(--font-serif);
-      font-weight:300;
-      font-size:1.1rem;
-      cursor:pointer;
-      transition:background .2s ease,color .2s ease;
-      color:var(--sidebar-text);
-    }
-    .sidebar-link:hover,
-    .sidebar-link:focus{
-      background:rgba(0,0,0,0.05);
-      color:var(--accent);
-      outline:none;
-    }
-
-    body.theme-dark .sidebar-link:hover,
-    body.theme-dark .sidebar-link:focus,
-    body.theme-mountain .sidebar-link:hover,
-    body.theme-mountain .sidebar-link:focus,
-    body.theme-mountain-dark .sidebar-link:hover,
-    body.theme-mountain-dark .sidebar-link:focus{
-      color:#fff;
-    }
-
-    body.theme-mountain .sidebar-link,
-    body.theme-mountain-dark .sidebar-link{
-      color:#fff;
-    }
-    .sidebar-bottom{
-      margin-top:auto;
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-    }
-    .sidebar-footer{
-      font-size:0.7rem;
-      color:var(--muted);
-      text-align:center;
-    }
-
-    .sidebar-toggle {
-      display: none;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 56px;
-      border-radius: 0 16px 16px 0;
-      border: 1px solid rgba(26, 26, 26, 0.08);
-      border-left: none;
-      background: linear-gradient(90deg, rgba(182, 164, 122, 0.08) 0%, rgba(255, 255, 255, 0.92) 34%, rgba(255, 255, 255, 0.96) 100%);
-      backdrop-filter: blur(10px);
-      padding: 0;
-      cursor: pointer;
-      position: relative;
-      z-index: 2100;
-      flex: 0 0 auto;
-      box-shadow: none;
-      transition: transform 0.18s ease, background 0.2s ease, border-color 0.2s ease;
-    }
-
-    .sidebar-toggle::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 8px;
-      bottom: 8px;
-      width: 1px;
-      background: rgba(182, 164, 122, 0.24);
-    }
-
-    .sidebar-toggle:hover,
-    .sidebar-toggle:focus-visible {
-      background: linear-gradient(90deg, rgba(182, 164, 122, 0.12) 0%, rgba(255, 255, 255, 0.96) 34%, rgba(255, 255, 255, 0.98) 100%);
-      border-color: rgba(182, 164, 122, 0.4);
-      outline: none;
-    }
-
-    .sidebar-toggle[aria-expanded="true"] {
-      background: linear-gradient(90deg, rgba(182, 164, 122, 0.16) 0%, rgba(255, 255, 255, 0.92) 34%, rgba(255, 255, 255, 0.96) 100%);
-      border-color: rgba(182, 164, 122, 0.45);
-    }
-
-    .sidebar-toggle-glyph {
-      position: relative;
-      width: 14px;
-      height: 10px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    .sidebar-toggle-bar {
-      position: absolute;
-      left: 0;
-      width: 14px;
-      height: 1px;
-      border-radius: 999px;
-      background: rgba(26, 26, 26, 0.56);
-      transform-origin: center;
-      transition:
-        transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
-        opacity 0.28s ease,
-        width 0.28s ease,
-        background 0.2s ease;
-    }
-
-    .sidebar-toggle-bar--top {
-      transform: translateY(-4px);
-    }
-
-    .sidebar-toggle-bar--middle {
-      width: 10px;
-    }
-
-    .sidebar-toggle-bar--bottom {
-      transform: translateY(4px);
-    }
-
-    .sidebar-toggle:hover .sidebar-toggle-glyph,
-    .sidebar-toggle:focus-visible .sidebar-toggle-glyph {
-      transform: scale(1.03);
-    }
-
-    .sidebar-toggle:hover .sidebar-toggle-bar--top,
-    .sidebar-toggle:hover .sidebar-toggle-bar--bottom,
-    .sidebar-toggle:focus-visible .sidebar-toggle-bar--top,
-    .sidebar-toggle:focus-visible .sidebar-toggle-bar--bottom {
-      width: 12px;
-      background: rgba(26, 26, 26, 0.72);
-    }
-
-    .sidebar-toggle:hover .sidebar-toggle-bar--middle,
-    .sidebar-toggle:focus-visible .sidebar-toggle-bar--middle {
-      width: 14px;
-      background: rgba(26, 26, 26, 0.7);
-    }
-
-    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-glyph {
-      transform: rotate(180deg) scale(1.01);
-    }
-
-    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar {
-      width: 14px;
-      background: rgba(26, 26, 26, 0.7);
-    }
-
-    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--top {
-      transform: rotate(45deg);
-    }
-
-    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--middle {
-      opacity: 0;
-      transform: scaleX(0.35);
-    }
-
-    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--bottom {
-      transform: rotate(-45deg);
-    }
-
-    .sidebar-backdrop {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.35);
-      z-index: 1900;
-    }
-
-    main {
-      flex: 1;
-      padding: 60px 40px 80px;
-      overflow-y: auto;
-      overflow-x: hidden;
-      min-height: 100vh;
-      scrollbar-gutter: stable;
-    }
-
-    main > * {
-      width: 100%;
-      max-width: 900px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    .topbar {
-      display: flex;
-      align-items: flex-start;
-      justify-content: flex-start;
-      gap: 12px;
-      min-height: 56px;
-      margin-bottom: 1.25rem;
-    }
-
-    h1, h2 {
-      font-family: var(--font-serif);
-      font-weight: 300;
-      letter-spacing: 0.4px;
-      margin-bottom: 12px;
-    }
-
-    h1 { font-size: 2.2rem; margin-bottom: 24px; }
-    h2 {
-      font-size: 1.6rem;
-      margin-top: 48px;
-      padding-bottom: 6px;
-      border-bottom: 1px solid var(--line);
-    }
-
-    p, ul { margin-bottom: 18px; }
-
-    .muted {
-      color: var(--muted);
-      font-size: 15px;
-      margin-bottom: 30px;
-    }
-
-    section {
-      border-bottom: 1px solid var(--line);
-      padding-bottom: 24px;
-      margin-bottom: 32px;
-    }
-    #help-links {
-      border-bottom: none;
-      padding-bottom: 0;
-      margin-bottom: 0;
-    }
-    section[data-incident-intake-root] {
-      border-bottom: none;
-      padding-bottom: 0;
-      margin-bottom: 24px;
-    }
-    #attorney-help {
-      border-bottom: none;
-      padding-bottom: 0;
-    }
-
-    .lead {
-      color: var(--muted);
-      font-size: 0.95rem;
-      margin-bottom: 18px;
-    }
-
-    section h3 {
-      font-family: var(--font-serif);
-      font-weight: 300;
-      margin-top: 24px;
-      margin-bottom: 12px;
-      letter-spacing: 0.03em;
-      font-size: 1.12rem;
-      text-decoration: underline;
-      text-decoration-thickness: 1px;
-      text-underline-offset: 6px;
-    }
-
-    ul li {
-      margin-bottom: 0.4rem;
-    }
-
-    .callout {
-      border-left: 4px solid var(--accent);
-      background: #ffffff;
-      padding: 14px;
-      margin: 18px 0;
-      font-size: 0.95rem;
-    }
-
-    .btn-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 16px;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.6rem 1rem;
-      border-radius: 10px;
-      text-decoration: none;
-      font-size: 0.9rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      font-family: var(--font-serif);
-      font-weight: 500;
-    }
-
-    .btn-primary {
-      background: #27394d;
-      color: #fff;
-    }
-
-    .btn-outline {
-      border: 1px solid #27394d;
-      color: #27394d;
-    }
-
-.support-email,
-.support-link {
-  color: #000;
-  text-decoration: none;
-  font-weight: 200;
-}
-
-    main a {
-      color: var(--accent);
-      text-decoration: none;
-      font-weight: 200;
-    }
-    main a:hover,
-    main a:focus-visible {
-      color: #9c8a63;
-    }
-
-  @media (max-width: 1024px) {
-    body {
-      flex-direction: column;
-    }
-
-    .sidebar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 260px;
-      height: 100vh;
-      border-right: none;
-      padding-top: 72px;
-      transform: translateX(-110%);
-      transition: transform 0.25s ease;
-      z-index: 2000;
-      box-shadow: 18px 0 40px rgba(0, 0, 0, 0.18);
-    }
-
-    body.nav-open .sidebar {
-      transform: translateX(0);
-    }
-
-    body.nav-open .sidebar-backdrop {
-      display: block;
-    }
-
-    .sidebar-toggle {
-      display: inline-flex;
-      width: 36px;
-      height: 36px;
-      border-radius: 12px;
-      border-left: 1px solid rgba(26, 26, 26, 0.08);
-      background: rgba(255, 255, 255, 0.82);
-    }
-
-    .sidebar-toggle::before {
-      display: none;
-    }
-
-    .sidebar-toggle-glyph {
-      width: 18px;
-      height: 12px;
-    }
-
-    .sidebar-toggle-bar {
-      width: 18px;
-    }
-
-    .sidebar-toggle-bar--top {
-      transform: translateY(-5px);
-    }
-
-    .sidebar-toggle-bar--middle {
-      width: 12px;
-    }
-
-    .sidebar-toggle-bar--bottom {
-      transform: translateY(5px);
-    }
-
-    .sidebar-toggle:hover .sidebar-toggle-bar--top,
-    .sidebar-toggle:hover .sidebar-toggle-bar--bottom,
-    .sidebar-toggle:focus-visible .sidebar-toggle-bar--top,
-    .sidebar-toggle:focus-visible .sidebar-toggle-bar--bottom {
-      width: 16px;
-    }
-
-    .sidebar-toggle:hover .sidebar-toggle-bar--middle,
-    .sidebar-toggle:focus-visible .sidebar-toggle-bar--middle {
-      width: 18px;
-    }
-
-    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--top,
-    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--bottom {
-      width: 18px;
-    }
-
-    main {
-      padding: 28px 20px 60px;
-      min-height: 100vh;
-    }
-  }
-
-  @media (max-width: 720px) {
-    h1 {
-      font-size: 1.9rem;
-      margin-bottom: 18px;
-    }
-
-    h2 {
-      margin-top: 32px;
-    }
-
-    section {
-      padding-bottom: 18px;
-      margin-bottom: 24px;
-    }
-
-    p,
-    ul {
-      margin-bottom: 14px;
-    }
-
-    main {
-      max-width: 100%;
-      overflow-x: hidden;
-    }
-
-    p,
-    li,
-    a {
-      overflow-wrap: anywhere;
-      word-break: break-word;
-    }
-  }
-  </style>
+  <script src="assets/scripts/utils/session.js?v=20260902-1"></script>
+  <script src="assets/scripts/public-site-chrome.js?v=20260924-responsive-fixes" defer></script>
+  <link rel="stylesheet" href="assets/styles/public-page-refresh.css?v=20260925" />
 </head>
-<body>
+<body class="help-page help-page--attorney public-page-refresh" data-public-page="true">
   <a class="skip-link" href="#main">Skip to main content</a>
-  <aside class="sidebar" id="sidebarNav">
-    <div class="logo">Dashboard</div>
-    <nav id="helpNav" aria-label="Primary">
-      <a href="dashboard-attorney.html">Home</a>
-      <a href="dashboard-attorney.html#cases">Matters</a>
-      <a href="dashboard-attorney.html#billing">Funds &amp; Payments</a>
-      <a href="help.html" class="active">Help</a>
-    </nav>
-    <div class="sidebar-bottom">
-      <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-      <div class="sidebar-footer">© Let’s‑ParaConnect 2026</div>
+
+  <header class="home-header" data-home-header data-public-header>
+    <div class="home-header__inner">
+      <a class="home-brand" href="index.html" aria-label="Let’s-ParaConnect home">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+      <nav class="home-nav home-nav--desktop" aria-label="Primary navigation">
+        <a href="index.html#how">How It Works</a>
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      </nav>
+      <div class="home-header__actions">
+        <a class="header-signin" href="login.html" data-auth-action>Sign In</a>
+        <button class="header-signout" type="button" data-logout-action hidden>Log Out</button>
+        <a class="button button--small button--ink" href="signup.html" data-signup-action>Create an account</a>
+        <button class="mobile-nav-toggle" type="button" aria-expanded="false" aria-controls="mobileNav" aria-label="Open navigation" data-mobile-nav-toggle><span aria-hidden="true"></span><span aria-hidden="true"></span></button>
+      </div>
     </div>
-  </aside>
-  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
-  <main id="main" tabindex="-1" aria-labelledby="help-title">
-    <div class="topbar">
-      <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Show menu" aria-controls="sidebarNav" aria-expanded="false">
-        <span class="sidebar-toggle-glyph" aria-hidden="true">
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--top"></span>
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--middle"></span>
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--bottom"></span>
-        </span>
-      </button>
+    <div class="mobile-nav" id="mobileNav" aria-hidden="true" data-mobile-nav>
+      <nav aria-label="Mobile navigation">
+        <a href="index.html#how">How It Works</a>
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      </nav>
+      <div class="mobile-nav__actions">
+        <a href="login.html" data-auth-action>Sign In</a>
+        <button type="button" data-logout-action hidden>Log Out</button>
+        <a class="button button--ink" href="signup.html" data-signup-action>Create an account</a>
+      </div>
     </div>
-    <h1 id="help-title">Help for Attorneys</h1>
-    <p class="muted">Guidance for posting matters, hiring paralegals, and managing payments.</p>
-    <p class="muted">Need a person? <a href="contact.html">Contact Support</a>.</p>
-    <section
-      data-incident-intake-root
-      data-surface="attorney"
-      data-hide-context-pills="true"
-      data-hide-ready-status="true"
-      data-hide-primary-labels="true"
-      data-hide-optional-context-fields="true"
-      aria-label="Structured incident intake"
-    ></section>
+  </header>
 
-    <section id="attorney-help">
-      <h3>Account &amp; access</h3>
-      <p>Forgot your password? <a href="forgot-password.html">Reset it here</a> and check spam or junk if the email doesn’t arrive. If two-factor auth is enabled, watch for autofilled or expired codes. Update your email, profile, or security settings anytime in <a href="profile-settings.html">Settings</a>. If you can’t access your account, contact support.</p>
-      <p>Self-serve account deactivation is available in Settings and removes your account from active platform participation, but it is not full erasure. Attorneys cannot deactivate while involved in an active matter or while escrow, payout, dispute, or other financial obligations remain unresolved.</p>
+  <section class="help-hero" aria-labelledby="help-title">
+    <div class="help-hero__inner">
+      <p class="help-eyebrow">Support center · For attorneys</p>
+      <h1 id="help-title">Help for Attorneys</h1>
+      <p class="help-hero__summary">Guidance for posting matters, hiring paralegals, and managing payments.</p>
+      <nav class="help-role-switch" aria-label="Choose a Help guide">
+        <a href="help.html" aria-current="page">Attorney Help</a>
+        <a href="paralegalhelp.html">Paralegal Help</a>
+      </nav>
+    </div>
+  </section>
 
-      <h3>Posting a matter</h3>
-      <p>To begin, create a new matter by providing a clear description of the work required, including the scope of the assignment, expected timeline, required tasks and deliverables. You may review applications from paralegals who express interest in the matter.</p>
-      <p>All active and completed matters can be accessed at any time through <a href="dashboard-attorney.html#cases">Matters</a>, where each assignment is organized within its own workspace.</p>
+  <main class="help-main" id="main" tabindex="-1" aria-labelledby="help-title">
+    <div class="help-layout">
+      <aside class="help-directory" aria-label="Attorney Help sections">
+        <p class="help-directory__label">In this guide</p>
+        <nav>
+          <a href="#account-access">Account &amp; access</a>
+          <a href="#posting">Posting a Matter</a>
+          <a href="#hiring">Hiring &amp; managing work</a>
+          <a href="#workflow">Workflow</a>
+          <a href="#private-tasks">Private tasks</a>
+          <a href="#payments">Funding &amp; disputes</a>
+          <a href="#report-issue">Report an issue</a>
+          <a href="#resources">Resources</a>
+        </nav>
+        <p class="help-directory__support">Need a person? <a href="contact.html">Contact Support</a>.</p>
+      </aside>
 
-      <h3>Hiring &amp; managing work</h3>
-      <p>Before hiring, attorneys may optionally send pre-engagement requirements to a selected paralegal, including a confidentiality agreement and a conflicts check. If used, the paralegal completes those items inside LPC before hiring and funding move forward.</p>
-      <p>After hiring a paralegal, the matter workspace becomes the central location for communication, file sharing, and progress updates. Attorneys may upload documents, review drafts, and provide guidance as the assignment progresses.</p>
-      <p>When reviewing deliverables, attorneys should evaluate the work against the agreed scope and request any necessary revisions before confirming completion.</p>
+      <div class="help-content">
+        <article class="help-article" aria-label="Attorney Help guide">
+          <section id="account-access">
+            <h2>Account &amp; access</h2>
+            <p>Forgot your password? <a href="forgot-password.html">Reset it here</a> and check spam or junk if the email doesn’t arrive. If two-factor auth is enabled, watch for autofilled or expired codes. Update your email, profile, or security settings anytime in <span class="help-ui-label">Settings</span>. If you can’t access your account, contact support.</p>
+            <p>Self-serve account deactivation is available in Settings and removes your account from active platform participation, but it is not full erasure. Attorneys cannot deactivate while involved in an active Matter or while funding, payout, dispute, or other financial obligations remain unresolved.</p>
+          </section>
 
-      <h3>Workflow</h3>
-      <p>Post a matter or single-scope assignment with a clear description of the work needed, the timeline, and required tasks the paralegal must complete. Once applications begin coming in, review the paralegals who apply and select the one you want to hire. If needed, you may first request optional pre-engagement items such as a confidentiality agreement or conflicts check. After hiring, use the matter workspace to communicate, share files, and review drafts or completed documents. When the final work meets your expectations, confirm completion to release payment and close the matter.</p>
+          <section id="posting">
+            <h2>Posting a matter</h2>
+            <p>To begin, create a new matter by providing a clear description of the work required, including the scope of the assignment, expected timeline, required tasks and deliverables. You may review applications from paralegals who express interest in the matter.</p>
+            <p>All active and completed matters can be accessed at any time through <span class="help-ui-label">Matters</span>, where each assignment is organized within its own workspace.</p>
+          </section>
 
-      <h3>Funding, release, and disputes</h3>
-      <p>During matter creation, attorneys set the matter amount required to hire a paralegal. When selecting a paralegal to hire, the total cost of the matter, including any applicable platform fees, will be displayed for confirmation before funding.</p>
-      <p>Once the matter is funded through Stripe, the matter workspace opens for both the attorney and the assigned paralegal to begin work. Within the workspace, attorneys may communicate with the paralegal, upload reference documents, and review progress as the assignment is completed. Only the attorney may mark tasks as completed and confirm when the matter is finished.</p>
-      <p>When the final deliverable meets the agreed scope of work, the attorney can confirm completion to release the funded payment to the paralegal.</p>
-      <p>If the work does not meet the agreed scope, the attorney may open a dispute before releasing funds by selecting the flag icon within the matter workspace. Opening a dispute temporarily pauses the workspace and payment release while the matter is reviewed. The attorney may then provide additional context explaining the concern so that the issue can be evaluated and resolved appropriately.</p>
-    </section>
+          <section id="hiring">
+            <h2>Hiring &amp; managing work</h2>
+            <p>Before hiring, attorneys may optionally send pre-engagement requirements to a selected paralegal, including a confidentiality agreement and a conflicts check. If used, the paralegal completes those items inside LPC before hiring and funding move forward.</p>
+            <p>After hiring a paralegal, the matter workspace becomes the central location for communication, file sharing, and progress updates. Attorneys may upload documents, review drafts, and provide guidance as the assignment progresses.</p>
+            <p>When reviewing deliverables, attorneys should evaluate the work against the agreed scope and request any necessary revisions before confirming completion.</p>
+          </section>
 
-    <section id="help-links">
-      <h2>Resources</h2>
-      <p>Here are our <a href="privacy.html">Privacy Policy</a>, <a href="terms.html">Terms of Service</a>, <a href="/paralegal-admission.html">Admissions</a>, <a href="contact.html">Contact</a>, and <a href="accessibility.html">Accessibility</a> information.</p>
-    </section>
+          <section id="workflow">
+            <h2>Workflow</h2>
+            <p>Post a matter or single-scope assignment with a clear description of the work needed, the timeline, and required tasks the paralegal must complete. Once applications begin coming in, review the paralegals who apply and select the one you want to hire. If needed, you may first request optional pre-engagement items such as a confidentiality agreement or conflicts check. After hiring, use the matter workspace to communicate, share files, and review drafts or completed documents. When the final work meets your expectations, confirm completion to release payment and close the matter.</p>
+          </section>
 
+          <section id="private-tasks">
+            <h2>Private tasks</h2>
+            <p>Use <span class="help-ui-label">Tasks</span> for your own reminders. You can add a due date and optionally link a reminder to a matter, but private tasks are not visible to the paralegal and never add to or change the agreed matter scope. Matter deliverables remain in the matter workspace.</p>
+          </section>
+
+          <section id="payments">
+            <h2>Funding, release, and disputes</h2>
+            <p>During matter creation, attorneys set the matter amount required to hire a paralegal. When selecting a paralegal to hire, the total cost of the matter, including any applicable platform fees, will be displayed for confirmation before funding.</p>
+            <p>Once the matter is funded through Stripe, the matter workspace opens for both the attorney and the assigned paralegal to begin work. Within the workspace, attorneys may communicate with the paralegal, upload reference documents, and review progress as the assignment is completed. Only the attorney may mark tasks as completed and confirm when the matter is finished.</p>
+            <p>When the final deliverable meets the agreed scope of work, the attorney can confirm completion to release the funded payment to the paralegal.</p>
+            <p>If the work does not meet the agreed scope, the attorney may open a dispute before releasing the payment by selecting the flag icon within the matter workspace. Opening a dispute temporarily pauses the workspace and payment release while the matter is reviewed. The attorney may then provide additional context explaining the concern so that the issue can be evaluated and resolved appropriately.</p>
+          </section>
+        </article>
+
+        <section class="help-report" id="report-issue" aria-label="Report a platform issue">
+          <div data-incident-intake-root data-surface="attorney" data-hide-context-pills="true" data-hide-ready-status="true" data-hide-primary-labels="true" data-hide-optional-context-fields="true" aria-label="Structured incident intake"></div>
+        </section>
+
+        <section class="help-resources" id="resources" aria-labelledby="resources-title">
+          <h2 id="resources-title">Resources</h2>
+          <p>Here are our <a href="privacy.html">Privacy Policy</a>, <a href="terms.html">Terms of Service</a>, <a href="paralegal-admission.html">Admissions</a>, <a href="contact.html">Contact</a>, and <a href="accessibility.html">Accessibility</a> information.</p>
+        </section>
+      </div>
+    </div>
   </main>
-  <script src="assets/scripts/help-incident-intake.js"></script>
-  <script>
-    const logoutBtn = document.getElementById('logoutBtn');
-    const nav = document.getElementById('helpNav');
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebarNav = document.getElementById('sidebarNav');
-    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
-    const closeSidebar = () => {
-      document.body.classList.remove('nav-open');
-      if (sidebarToggle) {
-        sidebarToggle.setAttribute('aria-expanded', 'false');
-        sidebarToggle.setAttribute('aria-label', 'Show menu');
-      }
-    };
-    const openSidebar = () => {
-      document.body.classList.add('nav-open');
-      if (sidebarToggle) {
-        sidebarToggle.setAttribute('aria-expanded', 'true');
-        sidebarToggle.setAttribute('aria-label', 'Hide menu');
-      }
-    };
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', async (event) => {
-        event.preventDefault();
-        try {
-          await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-        } catch {}
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.href = 'index.html';
-      });
-    }
-    if (nav && window.checkSession) {
-      const navItems = {
-        attorney: [
-          { href: 'dashboard-attorney.html', label: 'Home' },
-          { href: 'dashboard-attorney.html#cases', label: 'Matters' },
-          { href: 'dashboard-attorney.html#billing', label: 'Funds & Payments' },
-          { href: 'help.html', label: 'Help', active: true },
-        ],
-        paralegal: [
-          { href: 'contact.html', label: 'Contact Support' },
-          { href: 'dashboard-paralegal.html', label: 'Home' },
-          { href: 'dashboard-paralegal.html#cases', label: 'Cases and Applications' },
-          { href: 'profile-settings.html', label: 'Profile Settings' },
-          { href: 'paralegalhelp.html', label: 'Help', active: true },
-        ],
-        admin: [
-          { href: 'contact.html', label: 'Contact Support' },
-          { href: 'admin-dashboard.html', label: 'Admin Dashboard' },
-          { href: 'help.html', label: 'Help', active: true },
-        ],
-      };
 
-      const renderNav = (role) => {
-        const items = navItems[role] || navItems.attorney;
-        nav.innerHTML = items
-          .map((item) => {
-            const activeClass = item.active ? ' class="active"' : '';
-            return `<a href="${item.href}"${activeClass}>${item.label}</a>`;
-          })
-          .join('');
-      };
+  <footer class="home-footer" data-public-footer>
+    <div class="home-footer__inner">
+      <p class="home-footer__statement"><span>Legal work.</span><span>Clearly connected.</span></p>
+      <nav class="home-footer__directory" aria-label="Footer navigation">
+        <details open><summary>Platform</summary><div class="home-footer__links"><a href="index.html#how">How It Works</a><a href="attorney-faq.html">For Attorneys</a><a href="paralegal-faq.html">For Paralegals</a><a href="browse-paralegals.html">Browse Paralegals</a></div></details>
+        <details open><summary>For Attorneys</summary><div class="home-footer__links"><a href="signup.html?role=attorney">Post a Matter</a><a href="attorney-faq.html">Attorney FAQ</a><a href="contact.html">Contact</a></div></details>
+        <details open><summary>For Paralegals</summary><div class="home-footer__links"><a href="signup.html?role=paralegal">Apply to Join</a><a href="paralegal-faq.html">Paralegal FAQ</a><a href="paralegal-admission.html">Our Application Review</a></div></details>
+        <details open><summary>Legal</summary><div class="home-footer__links"><a href="terms.html">Terms</a><a href="privacy.html">Privacy</a><a href="accessibility.html">Accessibility</a></div></details>
+      </nav>
+      <div class="home-footer__bottom">
+        <a class="home-footer__brand" href="index.html" aria-label="Let’s-ParaConnect home">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+        <p>Copyright © 2026 Let’s-ParaConnect. All rights reserved.</p>
+        <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z"></path></svg><span>Accessibility</span></button>
+      </div>
+    </div>
+  </footer>
 
-      (async () => {
-        try {
-          const session = await window.checkSession(undefined, { redirectOnFail: false });
-          const role = String(session?.role || session?.user?.role || '').toLowerCase();
-          if (role) renderNav(role);
-        } catch {}
-      })();
-    }
-    if (sidebarToggle) {
-      sidebarToggle.addEventListener('click', () => {
-        if (document.body.classList.contains('nav-open')) closeSidebar();
-        else openSidebar();
-      });
-    }
-    if (sidebarBackdrop) {
-      sidebarBackdrop.addEventListener('click', closeSidebar);
-    }
-    if (sidebarNav) {
-      sidebarNav.addEventListener('click', (event) => {
-        if (event.target.closest('a') || event.target.closest('button')) closeSidebar();
-      });
-    }
-    window.addEventListener('resize', () => {
-      if (window.innerWidth > 1024) closeSidebar();
-    });
-    closeSidebar();
-  </script>
+  <script src="assets/scripts/help-incident-intake.js?v=20260828-phase5"></script>
+  <script src="assets/scripts/help-pages.js?v=20260828-phase5"></script>
+  <script src="assets/scripts/accessibility-toggle.js" defer></script>
+  <script type="module" src="assets/scripts/web-vitals-rum.js"></script>
 </body>
 </html>

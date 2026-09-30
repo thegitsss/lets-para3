@@ -1,0 +1,561 @@
+/* Shared authenticated-product components for paralegal V2 surfaces. */
+:root {
+  --lpc-ui-ink: #17233b;
+  --lpc-ui-muted: #65728a;
+  --lpc-ui-line: #dce3ea;
+  --lpc-ui-line-strong: #c8d2dd;
+  --lpc-ui-soft: #f6f8fb;
+  --lpc-ui-blue: #315f9f;
+  --lpc-ui-blue-hover: #284f85;
+  --lpc-ui-navy: #0d263f;
+  --lpc-ui-gold: #9b8354;
+  --lpc-ui-danger: #a63f3f;
+}
+
+body.lpc-product-clean {
+  --lpc-ui-ink: var(--clean-ink, #17233b);
+  --lpc-ui-muted: var(--clean-muted, #65728a);
+  --lpc-ui-line: var(--clean-border, #dce3ea);
+  --lpc-ui-line-strong: var(--clean-border, #c8d2dd);
+  --lpc-ui-soft: var(--clean-hover, #f6f8fb);
+  background: var(--clean-surface, #fff) !important;
+  color: var(--lpc-ui-ink);
+}
+
+body.lpc-product-clean :where(button, input, select, textarea) {
+  font-family: var(--font-sans, "Sarabun", sans-serif);
+}
+
+body.lpc-product-clean :where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--clean-link, var(--lpc-ui-blue)) !important;
+  outline-offset: 2px;
+}
+
+/* Reusable loading, empty, error, badge, and pagination language. */
+body.lpc-product-clean :where(
+  .results-status,
+  .empty-results,
+  .case-files-empty,
+  .private-office-secondary-state,
+  .matter-section-state,
+  .notif-empty
+) {
+  color: var(--lpc-ui-muted);
+  font-size: .9rem;
+  line-height: 1.55;
+}
+
+body.lpc-product-clean :where(.results-status, .empty-results, .case-files-empty) {
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 20px 0;
+  border-top: 1px solid var(--lpc-ui-line);
+}
+
+body.lpc-product-clean :where(
+  .pagination-btn,
+  .completed-page-btn,
+  .applied-page-btn,
+  .lpc-saved-view-button
+) {
+  min-height: 40px;
+  padding: 8px 13px;
+  border: 1px solid var(--lpc-ui-line-strong);
+  border-radius: 3px;
+  color: var(--lpc-ui-ink);
+  background: var(--clean-surface, #fff);
+  box-shadow: none !important;
+  font-size: .82rem;
+  font-weight: 400;
+}
+
+body.lpc-product-clean :where(
+  .pagination-btn,
+  .completed-page-btn,
+  .applied-page-btn,
+  .lpc-saved-view-button
+):hover:not(:disabled) {
+  border-color: #9babbc;
+  color: var(--clean-link, var(--lpc-ui-blue-hover));
+  background: var(--lpc-ui-soft);
+  transform: none;
+}
+
+body.lpc-product-clean :where(.pagination-info, .completed-page-info, .applied-page-info, .applied-count) {
+  color: var(--lpc-ui-muted);
+  font-size: .8rem;
+}
+
+body.lpc-product-clean :where(.status-chip, .pill, .pill-label, .file-status) {
+  border-radius: 999px;
+  box-shadow: none !important;
+}
+
+/* Browse Matters: quiet filter rail and editorial result list. */
+body.browse-jobs-page .jobs-shell {
+  width: min(1240px, calc(100% - 48px));
+  margin-top: 28px;
+  padding: 0 28px 72px;
+}
+
+body.browse-jobs-page .layout {
+  display: grid;
+  grid-template-columns: minmax(210px, 240px) minmax(0, 1fr);
+  gap: 36px;
+}
+
+body.browse-jobs-page.job-expanded .layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body.browse-jobs-page aside.filter {
+  width: auto;
+  padding: 18px 0 22px;
+  border: 0;
+  border-top: 1px solid var(--lpc-ui-line);
+  border-bottom: 1px solid var(--lpc-ui-line);
+  border-radius: 0;
+  background: var(--clean-surface, #fff);
+  box-shadow: none !important;
+}
+
+body.browse-jobs-page .filter h2 {
+  margin: 0 0 18px;
+  color: var(--lpc-ui-ink);
+  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-size: .95rem;
+  font-weight: 500;
+  text-align: left;
+}
+
+body.browse-jobs-page .filter-group { margin-bottom: 17px; }
+
+body.browse-jobs-page .browse-filter-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+body.browse-jobs-page .browse-filter-heading h2 { margin: 0; }
+body.browse-jobs-page .browse-filter-close { display: none; }
+body.browse-jobs-page #filterMenu[hidden] { display: none !important; }
+
+body.browse-jobs-page .browse-filter-dialog {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 24px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--lpc-ui-line-strong);
+  border-radius: 8px;
+  color: var(--lpc-ui-ink);
+  background: var(--clean-surface, #fff);
+}
+
+body.browse-jobs-page .browse-filter-dialog:not([open]) { display: none !important; }
+body.browse-jobs-page .browse-filter-dialog::backdrop { background: rgba(8, 18, 34, .65); }
+
+body.browse-jobs-page .browse-filter-dialog aside.filter {
+  position: static;
+  inset: auto;
+  display: block;
+  width: auto;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+  transform: none;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.browse-jobs-page .browse-filter-dialog .browse-filter-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--lpc-ui-ink);
+  background: transparent;
+  font: inherit;
+  font-size: .875rem;
+  cursor: pointer;
+}
+
+body.browse-jobs-page .browse-filter-dialog .browse-filter-close:hover {
+  background: var(--lpc-ui-soft);
+}
+
+@media (max-width: 960px) {
+  body.browse-jobs-page .layout { display: block; }
+  body.browse-jobs-page .layout > aside.filter { display: none; }
+}
+
+body.browse-jobs-page .filter-group label {
+  margin-bottom: 6px;
+  color: var(--lpc-ui-muted);
+  font-size: .78rem;
+  font-weight: 400;
+}
+
+/* Keep native selection/range behavior with the same readable touch surface
+   in every engine, including WebKit's compact default form widgets. */
+body.browse-jobs-page .filter-group select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 44px;
+  padding: 10px 36px 10px 12px;
+  line-height: 1.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23718096' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 12px center !important;
+  background-size: 16px !important;
+}
+
+body.browse-jobs-page #filterMinPay {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 0;
+  min-height: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+body.browse-jobs-page #filterMinPay::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: #7a879b;
+}
+
+body.browse-jobs-page #filterMinPay::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: #7a879b;
+}
+
+body.browse-jobs-page #filterMinPay::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -8px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--clean-ink, #0d263f);
+}
+
+body.browse-jobs-page #filterMinPay::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--clean-ink, #0d263f);
+}
+
+body.browse-jobs-page :where(.filter-group select, .filter-group input, .results-controls select) {
+  min-height: 42px;
+  border: 1px solid var(--lpc-ui-line-strong);
+  border-radius: 3px;
+  background: var(--clean-surface, #fff);
+  box-shadow: none;
+}
+
+body.browse-jobs-page .filter-actions .primary {
+  border-color: var(--lpc-ui-navy);
+  border-radius: 3px;
+  color: #fff;
+  background: var(--lpc-ui-navy);
+  box-shadow: none;
+}
+
+body.browse-jobs-page .results-header {
+  align-items: flex-end;
+  margin: 0;
+  padding: 0 0 22px;
+  border: 0;
+  border-bottom: 1px solid var(--lpc-ui-line);
+  border-radius: 0;
+  background: var(--clean-surface, #fff);
+  box-shadow: none !important;
+}
+
+body.browse-jobs-page .results-header h1 {
+  color: var(--lpc-ui-ink);
+  font-family: var(--font-sans, "Sarabun", sans-serif);
+  font-size: clamp(1.55rem, 2.4vw, 2rem);
+  font-weight: 400;
+  letter-spacing: -.025em;
+}
+
+body.browse-jobs-page .results-header p {
+  max-width: 620px;
+  color: var(--lpc-ui-muted);
+  font-size: .88rem;
+}
+
+body.browse-jobs-page .jobs-grid {
+  display: grid;
+  gap: 0;
+}
+
+body.browse-jobs-page .job-card {
+  margin: 0;
+  padding: 22px 0;
+  border: 0;
+  border-bottom: 1px solid var(--lpc-ui-line);
+  border-radius: 0;
+  background: var(--clean-surface, #fff);
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+body.browse-jobs-page .job-card:hover {
+  border-bottom-color: var(--lpc-ui-line-strong);
+  background: var(--clean-hover, #fbfcfe);
+}
+
+body.browse-jobs-page :where(.apply-button, .clear-button, .job-actions button, .job-actions a) {
+  min-height: 44px;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+body.browse-jobs-page .apply-button:not(.is-disabled):not(:disabled) {
+  border-color: var(--lpc-ui-blue);
+  color: #fff;
+  background: var(--lpc-ui-blue);
+}
+
+/* My Matters & Applications: one aligned work register, without card shadows. */
+body.lpc-role-dashboard #paralegalCasesView {
+  color: var(--lpc-ui-ink);
+}
+
+body.lpc-role-dashboard #paralegalCasesView .page-header {
+  padding-bottom: 18px;
+}
+
+body.lpc-role-dashboard .cases-apps-grid {
+  gap: 42px;
+}
+
+body.lpc-role-dashboard :where(.cases-column, .apps-column) {
+  padding: 0;
+  border: 0;
+}
+
+body.lpc-role-dashboard .apps-column {
+  border-left: 1px solid var(--lpc-ui-line);
+  padding-left: 42px;
+}
+
+body.lpc-role-dashboard :where(.file-card, .case-card, .dashboard-card) {
+  padding: 18px 0;
+  border: 0;
+  border-bottom: 1px solid var(--lpc-ui-line);
+  border-radius: 0;
+  background: var(--clean-surface, #fff);
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+body.lpc-role-dashboard :where(.file-card, .case-card):hover {
+  background: var(--clean-hover, #fbfcfe);
+}
+
+body.lpc-role-dashboard :where(.file-card, .case-card).is-highlighted {
+  border-color: var(--lpc-ui-blue);
+  background: var(--clean-hover, #f5f8fd);
+  box-shadow: inset 3px 0 0 var(--lpc-ui-blue) !important;
+}
+
+body.lpc-role-dashboard :where(.file-card, .case-card).is-highlighted::after { display: none; }
+
+body.lpc-role-dashboard .applied-controls-panel {
+  margin: 14px 0 18px;
+  padding: 16px;
+  border: 1px solid var(--lpc-ui-line);
+  border-radius: 3px;
+  background: var(--lpc-ui-soft);
+  box-shadow: none;
+}
+
+body.lpc-role-dashboard :where(.applied-controls input, .applied-controls select, .lpc-saved-view-field select) {
+  min-height: 42px;
+  border-color: var(--lpc-ui-line-strong);
+  border-radius: 3px;
+  background: var(--clean-surface, #fff);
+}
+
+/* Matter workspace: stable white register with quiet tab and record hierarchy. */
+body.case-detail-no-topbar .case-workspace {
+  border: 1px solid var(--lpc-ui-line);
+  border-radius: 3px;
+  background: var(--clean-surface, #fff);
+  box-shadow: none !important;
+}
+
+body.case-detail-no-topbar :where(.case-rail-stack, .matter-tabs) {
+  background: var(--clean-surface, #fff);
+}
+
+body.case-detail-no-topbar .matter-tabs button {
+  color: var(--lpc-ui-muted);
+  font-weight: 400;
+}
+
+body.case-detail-no-topbar .matter-tabs button[aria-selected="true"] {
+  color: var(--clean-link, var(--lpc-ui-blue-hover));
+}
+
+body.case-detail-no-topbar .matter-tabs button[aria-selected="true"]::after {
+  background: var(--lpc-ui-blue);
+}
+
+body.case-detail-no-topbar :where(
+  .matter-row-preview,
+  .matter-section-action,
+  .case-action-btn,
+  .case-dispute-button
+) {
+  min-height: 42px;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+body.case-detail-no-topbar :where(.case-overview-summary, .case-participants, .case-overview-hire, .matter-facts) {
+  background: var(--clean-surface, #fff);
+  box-shadow: none !important;
+}
+
+/* Profile/settings: local loading, consistent controls, no page-level reveal effect. */
+body.lpc-product-clean #settingsContent[aria-busy="true"] {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+body.lpc-product-clean #settingsContent[aria-busy="true"] :where(input, select, textarea, button:not(.settings-item)) {
+  pointer-events: none;
+}
+
+body.lpc-product-clean :where(
+  #profileSection,
+  #securitySection,
+  #preferencesSection,
+  #settingsDirectorySection
+) :where(input, select, textarea) {
+  border-radius: 3px !important;
+  box-shadow: none !important;
+}
+
+body.lpc-product-clean :where(.settings-panel, .settings-block, .security-card, .pref-row) {
+  box-shadow: none !important;
+}
+
+/* Canonical legacy-dialog skin. Behavior stays with each existing workflow. */
+body.dashboard-no-shadows :where(
+  .availability-modal,
+  .invite-dialog,
+  .case-modal,
+  .note-modal-card,
+  .job-apply-dialog,
+  .apply-confirm-dialog,
+  .case-complete-modal,
+  .case-dispute-modal,
+  .case-withdraw-modal,
+  .case-reject-modal,
+  .case-flag-modal,
+  .case-payout-modal,
+  .document-preview-modal,
+  .modal-card,
+  .education-modal
+) {
+  border: 1px solid var(--lpc-ui-line-strong) !important;
+  border-radius: 3px !important;
+  color: var(--lpc-ui-ink) !important;
+  background: var(--clean-surface, #fff) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+body.dashboard-no-shadows :where(
+  .availability-modal,
+  .invite-dialog,
+  .case-modal,
+  .note-modal-card,
+  .job-apply-dialog,
+  .apply-confirm-dialog,
+  .case-complete-modal,
+  .case-dispute-modal,
+  .case-withdraw-modal,
+  .case-reject-modal,
+  .case-flag-modal,
+  .case-payout-modal,
+  .document-preview-modal,
+  .modal-card,
+  .education-modal
+) :where(button, input, select, textarea) {
+  border-radius: 3px !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 900px) {
+  body.browse-jobs-page .jobs-shell {
+    width: 100%;
+    padding-inline: 18px;
+  }
+
+  body.browse-jobs-page .layout { display: block; }
+  body.browse-jobs-page aside.filter { padding-inline: 16px; }
+
+  body.lpc-role-dashboard .cases-apps-grid { gap: 28px; }
+  body.lpc-role-dashboard .apps-column {
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid var(--lpc-ui-line);
+    padding-top: 28px;
+  }
+}
+
+@media (max-width: 560px) {
+  body.browse-jobs-page .results-header {
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  body.lpc-product-clean :where(.pagination, .completed-pagination, .applied-pagination) {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.lpc-product-clean *,
+  body.lpc-product-clean *::before,
+  body.lpc-product-clean *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

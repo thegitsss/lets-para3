@@ -1,18 +1,23 @@
 const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 
 const mongoose = require("mongoose");
 const Stripe = require("stripe");
 const Case = require("../models/Case");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
+const { SUPPORTED_STRIPE_API_VERSION } = require("../utils/productionOrigin");
 const {
   currentStripeMode,
   pickStripeMode,
   stripeModeFromSecret,
 } = require("../utils/stripeMode");
+const {
+  MONGO_OPERATION_OPTIONS,
+  requireMongoUri,
+} = require("../utils/mongooseOperationPolicy");
 
-const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2024-06-20";
+const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || SUPPORTED_STRIPE_API_VERSION;
 
 function buildClient(secret) {
   if (!secret) return null;
@@ -53,15 +58,12 @@ async function detectModeFromStripe(caseDoc) {
   return "unknown";
 }
 
-async function run() {
-  if (!process.env.MONGO_URI) {
-    throw new Error("MONGO_URI is required");
-  }
+async function run({ apply = process.argv.includes("--apply") } = {}) {
+  const mongoUri = requireMongoUri(process.env.MONGO_URI);
+  await mongoose.connect(mongoUri, MONGO_OPERATION_OPTIONS);
 
-  await mongoose.connect(process.env.MONGO_URI);
-
-  const limit = Math.max(1, Number(process.env.STRIPE_MODE_BACKFILL_LIMIT || 500));
-  const cases = await Case.find({
+  const limit = Math.max(1, Math.min(1000, Number(process.env.STRIPE_MODE_BACKFILL_LIMIT || 500)));
+  const eligibleMatch = {
     $and: [
       { $or: [{ stripeMode: { $exists: false } }, { stripeMode: "unknown" }] },
       {
@@ -72,13 +74,16 @@ async function run() {
         ],
       },
     ],
-  })
+  };
+  const totalEligible = await Case.countDocuments(eligibleMatch);
+  const cases = await Case.find(eligibleMatch)
     .sort({ updatedAt: -1 })
     .limit(limit)
     .select("_id paymentIntentId escrowIntentId payoutTransferId stripeMode")
     .lean();
 
   let updated = 0;
+  let wouldUpdate = 0;
   let unknown = 0;
 
   for (const caseDoc of cases) {
@@ -87,22 +92,60 @@ async function run() {
       unknown += 1;
       continue;
     }
-    await Promise.all([
-      Case.updateOne({ _id: caseDoc._id }, { $set: { stripeMode: detectedMode } }),
-      Payout.updateOne({ caseId: caseDoc._id }, { $set: { stripeMode: detectedMode } }),
-      PlatformIncome.updateOne({ caseId: caseDoc._id }, { $set: { stripeMode: detectedMode } }),
-    ]);
-    updated += 1;
+    if (!apply) {
+      wouldUpdate += 1;
+      continue;
+    }
+
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await Case.updateOne({ _id: caseDoc._id }, { $set: { stripeMode: detectedMode } }, { session });
+        await Payout.updateOne({ caseId: caseDoc._id }, { $set: { stripeMode: detectedMode } }, { session });
+        await PlatformIncome.updateOne(
+          { caseId: caseDoc._id },
+          { $set: { stripeMode: detectedMode } },
+          { session }
+        );
+      });
+      updated += 1;
+    } finally {
+      await session.endSession();
+    }
   }
 
-  console.log(JSON.stringify({ scanned: cases.length, updated, unknown }, null, 2));
+  const remaining = apply
+    ? await Case.countDocuments(eligibleMatch)
+    : totalEligible;
+  const summary = {
+    mode: apply ? "apply" : "dry-run",
+    scanned: cases.length,
+    wouldUpdate,
+    updated,
+    unknown,
+    remaining,
+  };
+  console.log(JSON.stringify(summary, null, 2));
   await mongoose.connection.close();
+  return summary;
 }
 
-run().catch(async (err) => {
-  console.error(err);
-  try {
-    await mongoose.connection.close();
-  } catch {}
-  process.exit(1);
-});
+if (require.main === module) {
+  run()
+    .then((summary) => {
+      if (summary.unknown > 0 || (summary.mode === "apply" && summary.remaining > 0)) {
+        process.exitCode = 2;
+      }
+    })
+    .catch(async (err) => {
+      console.error(err?.message || err);
+      try {
+        await mongoose.connection.close();
+      } catch (closeError) {
+        console.error("[backfill-stripe-mode] MongoDB close failed:", closeError?.message || closeError);
+      }
+      process.exitCode = 1;
+    });
+}
+
+module.exports = { run };

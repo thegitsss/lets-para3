@@ -11,7 +11,8 @@ Use this for a manual pass through the attorney experience on Let’s-ParaConnec
 
 ## Before You Start
 - [ ] Use a fresh browser session or Incognito window.
-- [ ] If payments are tested, use only approved test payment details.
+- [ ] Record the exact environment and release commit. Never run this checklist against an unidentified build.
+- [ ] Use Stripe test fixtures only when the environment is explicitly configured for Stripe test mode. Never enter test card data in live mode or real payment data in a non-production environment.
 - [ ] Keep notes on anything confusing, broken, slow, or misleading.
 - [ ] If something fails, write down the exact page, action, and error message.
 
@@ -54,63 +55,63 @@ Use this for a manual pass through the attorney experience on Let’s-ParaConnec
 - [ ] Preview/public profile links work if shown.
 - [ ] Notification/settings toggles save correctly if tested.
 
-## 6. Billing / Payment Method
-- [ ] Open the Billing view.
-- [ ] Billing page loads without broken sections.
-- [ ] Add payment method flow opens correctly. (Use test card: 4242 4242 4242 4242 cvc: any 3  digits. date: any future date)
+## 6. Payments / Payment Method
+- [ ] Open the Payments view at `dashboard-attorney.html#funds`.
+- [ ] Payments loads without broken sections.
+- [ ] Add payment method flow opens correctly using an environment-owner-approved Stripe test fixture.
 - [ ] Payment form loads correctly.
 - [ ] Saving a payment method succeeds, or any failure is explained clearly.
 - [ ] Saved payment method summary appears after setup.
-- [ ] Stripe billing portal button works.
-- [ ] Billing page remains usable after refresh.
+- [ ] Stripe payment-method management opens correctly.
+- [ ] Payments remains usable after refresh and a Stripe return preserves the relevant Matter context.
 
-## 7. Create a Case
-- [ ] Create a new case.
-- [ ] Multi-step case flow is understandable.
+## 7. Create a Matter
+- [ ] Create a new Matter.
+- [ ] Multi-step Matter flow is understandable.
 - [ ] Required fields are enforced clearly.
 - [ ] Practice area/state/details/tasks can be entered without layout issues.
 - [ ] Add at least 2-3 tasks successfully.
 - [ ] Step navigation works forward and backward without losing data unexpectedly.
 - [ ] Review step reflects the entered information accurately.
 - [ ] Final submit/post succeeds without confusion.
-- [ ] New case appears in the attorney dashboard afterward.
+- [ ] New Matter appears in the attorney dashboard afterward.
 
-## 8. Drafts / Case Management
+## 8. Drafts / Matter Management
 - [ ] If drafts are available, saving a draft works.
 - [ ] Draft appears in the drafts section.
 - [ ] Re-opening a draft restores the saved information.
-- [ ] Active cases list loads correctly in `dashboard-attorney.html#cases`.
-- [ ] Search/filter on the cases view works if used.
-- [ ] Case row actions menu opens and closes correctly (Active, Drafts, Archive, Inquiries, etc).
+- [ ] Active Matters list loads correctly in `dashboard-attorney.html#cases`.
+- [ ] Search/filter on the Matters view works if used.
+- [ ] Matter row actions menu opens and closes correctly (Active, Drafts, Archive, Inquiries, etc.).
 
 ## 9. Browse Paralegals / Applications
-attn: do not interact with any paralegals on browse-paralegals.html! Clicking and viewing is ok, but do not 'hire' etc.
+Do not send invitations or hire from a shared or live environment unless the test plan explicitly authorizes those writes and identifies the test accounts.
 - [ ] `browse-paralegals.html` loads correctly if used.
 - [ ] Paralegal cards/details are understandable.
 - [ ] Opening a paralegal profile works if used.
-- [ ] Applicant list on an attorney case opens correctly (only seen after a paralegal applies to your case).
+- [ ] Applicant list on an attorney Matter opens correctly (only seen after a paralegal applies to the Matter).
 - [ ] Applicant details render clearly.
 - [ ] Reject/remove applicant works if tested.
 - [ ] Rejected applicants no longer appear as active candidates.
 
 ## 10. Hire + Funding Flow
 - [ ] Hiring is available only when expected.
-- [ ] If no payment method is on file, the product clearly directs the attorney to Billing.
+- [ ] If no payment method is on file, the product clearly directs the attorney to Payments.
 - [ ] After adding payment, the hire/funding flow can be resumed.
 - [ ] Hiring a paralegal succeeds without duplicate or confusing state.
-- [ ] Case status updates appropriately after hire.
+- [ ] Matter status updates appropriately after hire.
 - [ ] Other applicants are handled correctly after a hire.
 
-## 11. Case Workspace
-- [ ] Open the case workspace in `case-detail.html` (only available after a paralegal has been hired.)
-- [ ] Case title, status, task list, and participant info load correctly.
+## 11. Matter Workspace
+- [ ] Open the Matter workspace in `case-detail.html` after a paralegal has been hired.
+- [ ] Matter title, status, task list, and participant information load correctly.
 - [ ] Messaging works in the workspace.
 - [ ] Message sending feels immediate and readable.
 - [ ] File/document section loads correctly.
 - [ ] Uploading a document works if tested.
 - [ ] Download/open actions work for uploaded files if tested.
 - [ ] Task completion/status behavior feels clear.
-- [ ] Refreshing the page preserves the correct case state.
+- [ ] Refreshing the page preserves the correct Matter state.
 
 ## 12. Notifications
 - [ ] Notification dropdown loads on the dashboard.
@@ -121,9 +122,9 @@ attn: do not interact with any paralegals on browse-paralegals.html! Clicking an
 ## 13. Completion / Archive / Payment History
 - [ ] Complete-and-release button is only available when all tasks are checked.
 - [ ] Completion language is clear about what happens next.
-- [ ] Successful completion updates the case status correctly.
+- [ ] Successful completion updates the Matter status correctly.
 - [ ] Archived/completed matter appears in the correct section afterward.
-- [ ] Billing/payment history reflects the completed payment if applicable.
+- [ ] Payment history reflects the completed payment if applicable and does not advertise an invoice record LPC does not create.
 - [ ] Archive or receipt links work if shown.
 
 ## 14. Overall Quality

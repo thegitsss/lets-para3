@@ -1,11 +1,5 @@
 (function(){
-  const FALLBACK_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>
-      <rect width='220' height='220' rx='110' fill='#f1f5f9'/>
-      <circle cx='110' cy='90' r='46' fill='#cbd5e1'/>
-      <path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/>
-    </svg>`
-  )}`;
+  const FALLBACK_AVATAR = "/assets/avatar-placeholder.svg";
   let hydrated = false;
   let stylesInjected = false;
   let pendingStylesInjected = false;
@@ -44,7 +38,7 @@
         box-shadow:0 10px 24px rgba(0,0,0,0.05);
       }
       .pending-approval-banner strong{
-        font-family:'Cormorant Garamond',serif;
+        font-family:'Sarabun',sans-serif;
         font-weight:300;
         font-size:1.05rem;
       }
@@ -81,7 +75,7 @@
         -webkit-backdrop-filter:blur(14px);
         transition:border-color .2s ease, box-shadow .2s ease;
       }
-      #paralegalFloatingCluster .user-profile strong{display:block;font-family:'Cormorant Garamond',serif;font-weight:300;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      #paralegalFloatingCluster .user-profile strong{display:block;font-family:'Sarabun',sans-serif;font-weight:300;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
       #paralegalFloatingCluster .user-profile span{display:block;font-size:0.85rem;color:#6b6b6b;font-weight:200;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
       #paralegalFloatingCluster img{
         width:44px;
@@ -106,7 +100,7 @@
     wrap.style.right = "16px";
     wrap.innerHTML = `
       <div class="notification-wrapper">
-        <button class="notification-icon" aria-label="View notifications" data-notification-toggle>
+        <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
             <path d="M13.73 21a2 2 0 01-3.46 0"></path>
@@ -124,7 +118,6 @@
         <img id="clusterAvatar" class="nav-profile-photo" src="${FALLBACK_AVATAR}" alt="Paralegal avatar" />
         <div>
           <strong id="clusterName">Paralegal</strong>
-          <span id="clusterRole">Paralegal</span>
         </div>
       </div>
     `;

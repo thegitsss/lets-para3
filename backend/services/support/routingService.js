@@ -57,7 +57,7 @@ function suggestRouting({
       ownerKey: "support_ops",
       priority: requesterRole === "attorney" ? "high" : "normal",
       queueLabel: "Workflow support",
-      reason: "The message appears tied to active case, job, or application progress.",
+      reason: "The message appears tied to active Matter or application progress.",
     };
   }
 

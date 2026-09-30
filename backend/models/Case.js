@@ -1,29 +1,32 @@
 // backend/models/Case.js
 const mongoose = require("mongoose");
 const { Schema, Types } = mongoose;
+const { dateOnlyToUtcDate, normalizeDateOnly } = require("../utils/businessDate");
+const {
+  CASE_STATUS_ENUM,
+  CASE_TRANSITIONS,
+  STATUS_IN_PROGRESS,
+  assertCaseLifecycleInvariants,
+  canTransitionCaseStatus,
+  normalizeCaseStatus,
+} = require("../utils/caseState");
 
 /** ----------------------------------------
  * Enums & Helpers
  * -----------------------------------------*/
-const STATUS_IN_PROGRESS = "in progress";
-const LEGACY_STATUS_IN_PROGRESS = "in_progress";
-
-const CASE_STATUS = [
-  "open",            // posted and visible
-  STATUS_IN_PROGRESS, // work underway
-  "paused",          // paused (paralegal withdrawal / admin pause)
-  "completed",       // work marked complete
-  "disputed",        // dispute opened
-  "closed",          // final closed state
-];
-
-const CASE_STATUS_ENUM = [...CASE_STATUS, LEGACY_STATUS_IN_PROGRESS];
-
 const DISPUTE_STATUS = ["open", "resolved", "rejected"];
-const APPLICANT_STATUS = ["pending", "accepted", "rejected"];
+const APPLICANT_STATUS = ["pending", "accepted", "rejected", "withdrawn"];
 const FILE_STATUS = ["pending_review", "approved", "attorney_revision"];
 
-const ZOOM_REGEX = /^https:\/\/.*zoom\.us\/[^\s]+$/i;
+function validZoomLink(value) {
+  if (!value) return true;
+  if (typeof value !== 'string' || value.length > 2000 || /\s/.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password && !url.port
+      && (url.hostname === 'zoom.us' || url.hostname.endsWith('.zoom.us')) && url.pathname.length > 1;
+  } catch { return false; }
+}
 const {
   DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT,
   DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT,
@@ -37,16 +40,9 @@ function cents(n) {
   return Math.max(0, Math.round(Number(n)));
 }
 
-function normalizeCaseStatus(value) {
-  if (!value) return "";
-  const normalized = String(value).trim();
-  if (!normalized) return "";
-  const lower = normalized.toLowerCase();
-  if (lower === LEGACY_STATUS_IN_PROGRESS) return STATUS_IN_PROGRESS;
-  if (["cancelled", "canceled"].includes(lower)) return "closed";
-  if (["assigned", "awaiting_funding"].includes(lower)) return "open";
-  if (["active", "awaiting_documents", "reviewing"].includes(lower)) return STATUS_IN_PROGRESS;
-  return lower;
+function referenceId(value) {
+  const resolved = value?._id || value?.id || value || "";
+  return resolved ? String(resolved) : "";
 }
 
 /** ----------------------------------------
@@ -120,10 +116,14 @@ const applicantSchema = new Schema(
     status: { type: String, enum: APPLICANT_STATUS, default: "pending", index: true },
     starredBy: [{ type: Types.ObjectId, ref: "User" }],
     appliedAt: { type: Date, default: Date.now },
+    withdrawnAt: { type: Date },
+    withdrawalRevision: { type: String, match: /^[a-f0-9]{64}$/ },
+    statusHistory: { type: [new Schema({ from: String, to: String, reason: String, actorId: { type: Types.ObjectId, ref: "User" }, at: Date }, { _id: false })], default: undefined },
     note: { type: String, trim: true, maxlength: 10_000 }, // optional cover note
     resumeURL: { type: String, trim: true, default: "" },
     linkedInURL: { type: String, trim: true, default: "" },
     profileSnapshot: { type: profileSnapshotSchema, default: () => ({}) },
+    requirementConfirmations: {type:[new Schema({requirement:String,meets:Boolean},{_id:false})],default:[]},
   },
   { _id: false }
 );
@@ -134,6 +134,13 @@ const inviteSchema = new Schema(
     status: { type: String, enum: ["pending", "accepted", "declined", "expired"], default: "pending", index: true },
     invitedAt: { type: Date, default: Date.now },
     respondedAt: { type: Date, default: null },
+    syncStatus: {
+      type: String,
+      enum: ["pending", "synced", "needs_reconciliation"],
+      default: "synced",
+    },
+    syncedAt: { type: Date, default: null },
+    syncError: { type: String, trim: true, maxlength: 1000, default: "" },
   },
   { _id: false }
 );
@@ -170,6 +177,7 @@ const preEngagementDocumentSchema = new Schema(
 
 const preEngagementSchema = new Schema(
   {
+    revision: { type: Number, default: 0, min: 0 },
     status: { type: String, enum: ["requested", "submitted", "approved", "changes_requested"], default: "requested" },
     requestedParalegalId: { type: Types.ObjectId, ref: "User", default: null },
     confidentialityAgreementRequired: { type: Boolean, default: false },
@@ -217,12 +225,31 @@ const caseSchema = new Schema(
     details: { type: String, required: true, trim: true, maxlength: 100_000 },
     state: { type: String, trim: true, maxlength: 200, default: "" },
     locationState: { type: String, trim: true, maxlength: 200, default: "" },
+    experiencePreference: { type: String, trim: true, maxlength: 200, default: "" },
+    minimumYearsExperience: { type: Number, min: 0, max: 80, default: 0 },
     tasks: { type: [scopeTaskSchema], default: [] },
+    requirements: { type: [{ type: String, trim: true, maxlength: 200 }], default: [], validate: value => value.length <= 12 },
     tasksLocked: { type: Boolean, default: false, index: true },
+    // Task order/content is locked during an assignment. Preserve earlier
+    // approvals without treating them as work done by a replacement.
+    assignmentCompletedTaskIndexes: { type: [Number], default: undefined },
     status: { type: String, enum: CASE_STATUS_ENUM, default: "open", index: true },
 
     // Timeline
-    deadline: { type: Date, default: null }, // optional target date
+    // deadlineDate is authoritative because a Matter deadline is a calendar date,
+    // not a timezone-specific instant. deadline remains an indexed compatibility
+    // mirror while existing consumers and records are migrated.
+    deadlineDate: {
+      type: String,
+      default: "",
+      trim: true,
+      validate: {
+        validator: (value) => !value || normalizeDateOnly(value) === value,
+        message: "Deadline must use YYYY-MM-DD.",
+      },
+      index: true,
+    },
+    deadline: { type: Date, default: null },
     hiredAt: { type: Date, default: null },  // when a paralegal was hired
     completedAt: { type: Date, default: null },
     pausedReason: {
@@ -235,6 +262,11 @@ const caseSchema = new Schema(
     adminDisputeDeadlineAt: { type: Date, default: null },
     adminDisputeOverdueNotifiedAt: { type: Date, default: null },
     partialPayoutAmount: { type: Number, default: null, min: 0 }, // cents (gross before paralegal fee)
+    withdrawalClaimToken: { type: String, default: "", trim: true, select: false },
+    withdrawalClaimStatus: { type: String, enum: ["claimed", "needs_reconciliation", null], default: null, select: false },
+    withdrawalClaimedAt: { type: Date, default: null, select: false },
+    withdrawalClaimTransferId: { type: String, default: "", trim: true, select: false },
+    withdrawalClaimAmount: { type: Number, default: null, min: 0, select: false },
     payoutFinalizedAt: { type: Date, default: null },
     payoutFinalizedType: {
       type: String,
@@ -242,11 +274,27 @@ const caseSchema = new Schema(
       default: null,
     },
     withdrawnParalegalId: { type: Types.ObjectId, ref: "User", default: null },
+    withdrawalHistory: {
+      type: [new Schema({
+        withdrawnParalegalId: { type: Types.ObjectId, ref: "User", required: true },
+        paralegalNameSnapshot: String,
+        payoutFinalizedAt: Date,
+        payoutFinalizedType: String,
+        partialPayoutAmount: Number,
+        remainingAmount: Number,
+        feeParalegalPct: Number,
+        feeAttorneyPct: Number,
+        payoutTransferId: String,
+        pausedAt: Date,
+      }, { _id: false })],
+      default: [],
+    },
     relistRequestedAt: { type: Date, default: null },
     relistPending: { type: Boolean, default: false },
     remainingAmount: { type: Number, default: null, min: 0 }, // cents remaining for relist
     briefSummary: { type: String, trim: true, maxlength: 1000, default: "" },
     archived: { type: Boolean, default: false, index: true },
+    archiveReceipt: { type: Schema.Types.Mixed, default: null, select: false },
     downloadUrl: [{ type: String, trim: true }],
     readOnly: { type: Boolean, default: false, index: true },
     paralegalAccessRevokedAt: { type: Date, default: null },
@@ -257,8 +305,39 @@ const caseSchema = new Schema(
     purgedAt: { type: Date, default: null },
     fundingRequestKey: { type: String, default: "" },
     fundingRequestFingerprint: { type: String, default: "" },
+    postingSyncStatus: {
+      type: String,
+      enum: ["synced", "needs_reconciliation"],
+      default: "synced",
+      index: true,
+    },
+    postingSyncedAt: { type: Date, default: null },
+    postingSyncError: { type: String, default: "", trim: true, maxlength: 1000 },
+    hiringClaimToken: { type: String, default: "", trim: true },
+    hiringClaimParalegalId: { type: Types.ObjectId, ref: "User", default: null },
+    hiringClaimedAt: { type: Date, default: null },
+    hiringClaimStatus: {
+      type: String,
+      enum: ["claimed", "needs_reconciliation", null],
+      default: null,
+      index: true,
+    },
+    hiringClaimPaymentIntentId: { type: String, default: "", trim: true },
+    hiringClaimAmount: { type: Number, default: 0, min: 0 },
+    hiringClaimError: { type: String, default: "", trim: true, maxlength: 1000 },
+    completionClaimToken: { type: String, default: "", trim: true },
+    completionClaimedAt: { type: Date, default: null },
+    completionClaimStatus: {
+      type: String,
+      enum: ["claimed", "needs_reconciliation", null],
+      default: null,
+      index: true,
+    },
+    completionClaimTransferId: { type: String, default: "", trim: true },
+    completionClaimError: { type: String, default: "", trim: true, maxlength: 1000 },
     paralegalNameSnapshot: { type: String, trim: true, default: "" },
     attorneyNameSnapshot: { type: String, trim: true, default: "" },
+    taskRevision: { type: Number, default: 0, min: 0 },
     preEngagement: { type: preEngagementSchema, default: null },
     terminationReason: { type: String, trim: true, maxlength: 2000, default: "" },
     terminationStatus: { type: String, enum: ["none", "auto_cancelled", "disputed", "resolved"], default: "none", index: true },
@@ -278,13 +357,15 @@ const caseSchema = new Schema(
       default: "",
       trim: true,
       validate: {
-        validator: (v) => !v || ZOOM_REGEX.test(v),
+        validator: validZoomLink,
         message: "zoomLink must be a valid https://*.zoom.us/... URL",
       },
     },
 
     // Applications & files
     applicants: [applicantSchema],
+    // Retains a withdrawal interlock while the canonical Application is synchronizing.
+    withdrawnApplicantIds: { type: [Types.ObjectId], default: undefined, select: false },
     files: [fileSchema],
     disputes: [disputeSchema],
     flags: { type: [flagSchema], default: [] },
@@ -294,6 +375,9 @@ const caseSchema = new Schema(
       default: "none",
       index: true,
     },
+    moderationPostingBaseline: { type: String, default: null },
+    moderationEditRequest: { type: String, maxlength: 2000, default: "" },
+    moderationReviewReceipt: { type: Schema.Types.Mixed, default: null },
     moderationFlaggedAt: { type: Date, default: null },
     moderationFlaggedBy: { type: Types.ObjectId, ref: "User", default: null },
     moderationResolutionRequestedAt: { type: Date, default: null },
@@ -318,9 +402,24 @@ const caseSchema = new Schema(
     paymentIntentId: { type: String, default: null, index: true },
     stripeMode: { type: String, enum: ["live", "test", "unknown"], default: "unknown", index: true },
     escrowStatus: { type: String, default: null, index: true }, // awaiting_funding, funded
-    paymentReleased: { type: Boolean, default: false }, // funds released to paralegal
+    paymentReleased: { type: Boolean, default: false }, // Matter payment release recorded
     paidOutAt: { type: Date, default: null },
     paymentStatus: { type: String, default: "pending", trim: true },
+    fundingIntegrityStatus: {
+      type: String,
+      enum: ["pending", "verified", "failed"],
+      default: "pending",
+      index: true,
+    },
+    fundingIntegrityFailure: { type: String, default: "", trim: true, maxlength: 500 },
+    fundingVerifiedAt: { type: Date, default: null },
+    payoutStatus: {
+      type: String,
+      enum: ["not_started", "pending", "paid", "failed", "reversed", "needs_reconciliation"],
+      default: "not_started",
+      index: true,
+    },
+    payoutFailureReason: { type: String, default: "", trim: true, maxlength: 500 },
 
     // Platform fee snapshots (computed at funding time)
     feeAttorneyPct: { type: Number, default: DEFAULT_ATTORNEY_FEE_PCT, min: 0, max: 100 }, // %
@@ -338,6 +437,8 @@ const caseSchema = new Schema(
       feeParalegalPct: { type: Number, default: null, min: 0, max: 100 }, // %
       payoutAmount: { type: Number, default: null, min: 0 }, // cents (net paid)
       refundAmount: { type: Number, default: null, min: 0 }, // cents
+      refundId: { type: String, default: "", trim: true },
+      transferId: { type: String, default: "", trim: true },
       resolvedAt: { type: Date, default: null },
       disputeId: { type: String, default: null },
     },
@@ -371,7 +472,11 @@ caseSchema.index({ paralegal: 1, createdAt: -1 });
 caseSchema.index({ paralegalId: 1, createdAt: -1 });
 caseSchema.index({ pendingParalegalId: 1, createdAt: -1 });
 caseSchema.index({ "invites.paralegalId": 1, "invites.status": 1, createdAt: -1 });
+caseSchema.index({ "invites.syncStatus": 1, updatedAt: 1 });
+caseSchema.index({ postingSyncStatus: 1, updatedAt: 1 });
+caseSchema.index({ completionClaimStatus: 1, completionClaimedAt: 1 });
 caseSchema.index({ status: 1, createdAt: -1 });
+caseSchema.index({ job: 1 }); // Retained reverse posting links used by discovery.
 caseSchema.index({ "applicants.paralegalId": 1, createdAt: -1 }); // helpful when showing "my applications"
 
 /** ----------------------------------------
@@ -388,18 +493,38 @@ caseSchema.virtual("fileCount").get(function () { return (this.files || []).leng
  * Validation & Hooks
  * -----------------------------------------*/
 // Prevent duplicate applicants for the same paralegal
-caseSchema.pre("validate", function (next) {
+caseSchema.pre("validate", function () {
   if (!this.attorney && this.attorneyId) this.attorney = this.attorneyId;
   if (!this.attorneyId && this.attorney) this.attorneyId = this.attorney;
   if (!this.paralegal && this.paralegalId) this.paralegal = this.paralegalId;
   if (!this.paralegalId && this.paralegal) this.paralegalId = this.paralegal;
-  this.status = normalizeCaseStatus(this.status);
+  if (this.attorney && this.attorneyId && referenceId(this.attorney) !== referenceId(this.attorneyId)) {
+    throw new Error("attorney and attorneyId must reference the same user.");
+  }
+  if (this.paralegal && this.paralegalId && referenceId(this.paralegal) !== referenceId(this.paralegalId)) {
+    throw new Error("paralegal and paralegalId must reference the same user.");
+  }
+  if (this.isNew || this.isSelected("status") || this.isModified("status")) {
+    this.status = normalizeCaseStatus(this.status);
+  }
+  // A partial read cannot establish an omitted deadline alias. Keep the
+  // existing normalization for new/full reads and explicit deadline edits.
+  if (
+    this.isNew ||
+    (this.isSelected("deadlineDate") && this.isSelected("deadline")) ||
+    this.isModified("deadlineDate") ||
+    this.isModified("deadline")
+  ) {
+    const normalizedDeadline = normalizeDateOnly(this.deadlineDate || this.deadline);
+    this.deadlineDate = normalizedDeadline;
+    this.deadline = normalizedDeadline ? dateOnlyToUtcDate(normalizedDeadline) : null;
+  }
 
   if (Array.isArray(this.applicants) && this.applicants.length > 1) {
     const seen = new Set();
     for (const a of this.applicants) {
       const key = String(a.paralegalId);
-      if (key && seen.has(key)) return next(new Error("Duplicate applicant for the same paralegalId."));
+      if (key && seen.has(key)) throw new Error("Duplicate applicant for the same paralegalId.");
       if (key) seen.add(key);
     }
   }
@@ -407,65 +532,66 @@ caseSchema.pre("validate", function (next) {
     const seen = new Set();
     for (const invite of this.invites) {
       const key = String(invite.paralegalId);
-      if (key && seen.has(key)) return next(new Error("Duplicate invite for the same paralegalId."));
+      if (key && seen.has(key)) throw new Error("Duplicate invite for the same paralegalId.");
       if (key) seen.add(key);
     }
   }
-  next();
 });
 
-// Normalize money fields to integer cents and non-negative
-caseSchema.pre("save", function (next) {
-  this.totalAmount = cents(this.totalAmount);
-  if (this.lockedTotalAmount != null) {
-    this.lockedTotalAmount = cents(this.lockedTotalAmount);
+// Normalize loaded or explicitly assigned money fields to integer cents.
+// A partial Case document must not replace unselected persisted amounts with zero.
+caseSchema.pre("save", function () {
+  const normalizeAmount = (path, { optional = false } = {}) => {
+    if (!this.isSelected(path) && !this.isModified(path)) return;
+    const value = this.get(path);
+    if (optional && value == null) return;
+    this.set(path, cents(value));
+  };
+  for (const path of ["totalAmount", "feeAttorneyAmount", "feeParalegalAmount"]) {
+    normalizeAmount(path);
   }
-  if (this.partialPayoutAmount != null) {
-    this.partialPayoutAmount = cents(this.partialPayoutAmount);
+  for (const path of ["lockedTotalAmount", "partialPayoutAmount", "remainingAmount"]) {
+    normalizeAmount(path, { optional: true });
   }
-  if (this.remainingAmount != null) {
-    this.remainingAmount = cents(this.remainingAmount);
-  }
-  this.feeAttorneyAmount = cents(this.feeAttorneyAmount);
-  this.feeParalegalAmount = cents(this.feeParalegalAmount);
   if (this.disputeSettlement) {
-    this.disputeSettlement.grossAmount = cents(this.disputeSettlement.grossAmount);
-    this.disputeSettlement.feeAttorneyAmount = cents(this.disputeSettlement.feeAttorneyAmount);
-    this.disputeSettlement.feeParalegalAmount = cents(this.disputeSettlement.feeParalegalAmount);
-    this.disputeSettlement.payoutAmount = cents(this.disputeSettlement.payoutAmount);
-    this.disputeSettlement.refundAmount = cents(this.disputeSettlement.refundAmount);
+    for (const field of ["grossAmount", "feeAttorneyAmount", "feeParalegalAmount", "payoutAmount", "refundAmount"]) {
+      normalizeAmount(`disputeSettlement.${field}`);
+    }
   }
-  next();
 });
 
 /** ----------------------------------------
  * Methods & Statics
  * -----------------------------------------*/
-// Enforce simple status transitions to avoid accidental jumps
-const ALLOWED_TRANSITIONS = {
-  open: [STATUS_IN_PROGRESS, "closed"],
-  [STATUS_IN_PROGRESS]: ["paused", "completed", "disputed", "closed"],
-  paused: [STATUS_IN_PROGRESS, "disputed", "closed"],
-  completed: ["disputed", "closed"],
-  disputed: ["closed"],
-  closed: [],
-};
-
 caseSchema.methods.canTransitionTo = function (nextStatus) {
-  const target = normalizeCaseStatus(nextStatus);
-  const current = normalizeCaseStatus(this.status);
-  if (!CASE_STATUS.includes(target)) return false;
-  const allowed = ALLOWED_TRANSITIONS[current] || [];
-  return allowed.includes(target);
+  return canTransitionCaseStatus(this.status, nextStatus);
 };
 
-caseSchema.methods.transitionTo = function (nextStatus) {
+caseSchema.methods.transitionTo = function (nextStatus, { enforceInvariants = true } = {}) {
   const target = normalizeCaseStatus(nextStatus);
   if (!this.canTransitionTo(target)) {
-    const allowed = ALLOWED_TRANSITIONS[this.status] || [];
+    const current = normalizeCaseStatus(this.status);
+    const allowed = CASE_TRANSITIONS[current] || [];
     throw new Error(`Invalid status transition from '${this.status}' to '${target}'. Allowed: ${allowed.join(", ") || "none"}`);
   }
+  if (enforceInvariants) assertCaseLifecycleInvariants(this, { status: target });
   this.status = target;
+  return this;
+};
+
+caseSchema.methods.ensureLifecycleStatus = function (nextStatus, { enforceInvariants = true } = {}) {
+  const target = normalizeCaseStatus(nextStatus);
+  const current = normalizeCaseStatus(this.status);
+  if (current === target) {
+    if (enforceInvariants) assertCaseLifecycleInvariants(this, { status: target });
+    this.status = target;
+    return this;
+  }
+  return this.transitionTo(target, { enforceInvariants });
+};
+
+caseSchema.methods.assertLifecycleInvariants = function () {
+  assertCaseLifecycleInvariants(this);
   return this;
 };
 
@@ -506,20 +632,37 @@ caseSchema.methods.acceptApplicant = function (paralegalId) {
 // Create a dispute embedded record
 caseSchema.methods.createDispute = function ({ message, raisedBy, amountRequestedCents }) {
   if (!message || !raisedBy) throw new Error("message and raisedBy are required to create a dispute.");
+  if ((this.disputes || []).some((dispute) => String(dispute?.status || "open").toLowerCase() === "open")) {
+    const error = new Error("An open dispute already exists for this case.");
+    error.code = "OPEN_DISPUTE_EXISTS";
+    throw error;
+  }
+  if (!this.canTransitionTo("disputed")) {
+    const error = new Error(`A dispute cannot be opened while the case is '${normalizeCaseStatus(this.status)}'.`);
+    error.code = "DISPUTE_STATE_INVALID";
+    throw error;
+  }
   const payload = { message: String(message).trim(), raisedBy, status: "open" };
   if (Number.isFinite(amountRequestedCents) && amountRequestedCents > 0) {
-    payload.amountRequestedCents = amountRequestedCents;
+    const amount = Math.round(amountRequestedCents);
+    const available = cents(this.remainingAmount ?? this.lockedTotalAmount ?? this.totalAmount);
+    if (amount > available) {
+      const error = new Error("Requested amount exceeds the funded matter balance.");
+      error.code = "DISPUTE_AMOUNT_EXCEEDS_BALANCE";
+      throw error;
+    }
+    payload.amountRequestedCents = amount;
   }
   this.disputes.push(payload);
-  // Surface status to disputed if not closed
-  if (this.status !== "closed") this.status = "disputed";
+  this.pausedReason = "dispute";
+  this.transitionTo("disputed");
   return this;
 };
 
 // Convenience markers
-caseSchema.methods.markInProgress = function () { return this.transitionTo(STATUS_IN_PROGRESS); };
-caseSchema.methods.markCompleted  = function () { return this.transitionTo("completed"); };
-caseSchema.methods.markClosed     = function () { return this.transitionTo("closed"); };
+caseSchema.methods.markInProgress = function () { return this.ensureLifecycleStatus(STATUS_IN_PROGRESS); };
+caseSchema.methods.markCompleted  = function () { return this.ensureLifecycleStatus("completed"); };
+caseSchema.methods.markClosed     = function () { return this.ensureLifecycleStatus("closed"); };
 
 /** ----------------------------------------
  * Model

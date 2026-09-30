@@ -71,7 +71,7 @@ async function refreshSupportInsights() {
         },
       },
       {
-        new: true,
+        returnDocument: "after",
         upsert: true,
         setDefaultsOnInsert: true,
       }

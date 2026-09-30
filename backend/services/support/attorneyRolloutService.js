@@ -159,7 +159,6 @@ function evaluateAttorneyManagerRollout(user = {}, env = process.env) {
   const rolloutStage = getAttorneyRolloutStage(rolloutPercent);
   const bucket = stableAttorneyRolloutBucket(user);
   const allowlist = parseAllowlist(env.OPENAI_ATTORNEY_MANAGER_ALLOWLIST);
-  const stableKey = stableAttorneyRolloutKey(user);
   const allowlisted = attorneyRolloutIdentityCandidates(user).some((value) => allowlist.has(value));
 
   let eligible = false;

@@ -1,6 +1,7 @@
 // backend/middleware/ensureCaseParticipant.js
 const mongoose = require("mongoose");
 const Case = require("../models/Case");
+const { caseParticipantIdentity, conflictMessage } = require("../utils/caseParticipantIdentity");
 
 const isObjId = (value) => mongoose.Types.ObjectId.isValid(value);
 
@@ -17,7 +18,7 @@ async function evaluateCaseParticipant(req, caseId) {
   }
 
   const caseDoc = await Case.findById(caseId).select(
-    "_id title status escrowStatus escrowIntentId paymentReleased attorney attorneyId paralegal paralegalId withdrawnParalegalId pendingParalegalId invites readOnly tasksLocked hiredAt"
+    "_id title status escrowStatus escrowIntentId paymentReleased attorney attorneyId paralegal paralegalId paralegalAccessRevokedAt withdrawnParalegalId withdrawalHistory pendingParalegalId invites readOnly tasksLocked hiredAt"
   );
   if (!caseDoc) {
     const err = new Error("Case not found");
@@ -32,14 +33,27 @@ async function evaluateCaseParticipant(req, caseId) {
     return { caseDoc, acl: { isAdmin: true, isAttorney: false, isParalegal: false } };
   }
 
-  const isAttorney =
-    (caseDoc.attorney && String(caseDoc.attorney) === uid) ||
-    (caseDoc.attorneyId && String(caseDoc.attorneyId) === uid);
-  const isParalegal =
-    (caseDoc.paralegal && String(caseDoc.paralegal) === uid) ||
-    (caseDoc.paralegalId && String(caseDoc.paralegalId) === uid);
+  const { isAttorney, isParalegal, identityConflict } = caseParticipantIdentity(caseDoc, uid);
+  const baseUrl = String(req.baseUrl || "");
+  const path = String(req.path || "");
+  const allowFinalizedParalegalReceipt =
+    isParalegal &&
+    caseDoc.paralegalAccessRevokedAt &&
+    baseUrl.includes("/payments") &&
+    path.includes("/receipt/paralegal");
+  if (isParalegal && caseDoc.paralegalAccessRevokedAt && !allowFinalizedParalegalReceipt) {
+    const err = new Error("Access denied");
+    err.statusCode = 403;
+    throw err;
+  }
+  if (identityConflict) {
+    throw Object.assign(new Error(conflictMessage), { statusCode: 409, publicCode: "CASE_IDENTITY_CONFLICT" });
+  }
   const isWithdrawnParalegal =
     caseDoc.withdrawnParalegalId && String(caseDoc.withdrawnParalegalId) === uid;
+  const isHistoricalReceiptOwner = req.method === "GET" && baseUrl === "/api/payments" &&
+    /^\/receipt\/paralegal\/[a-f0-9]{24}$/i.test(path) &&
+    (caseDoc.withdrawalHistory || []).some((entry) => String(entry.withdrawnParalegalId) === uid);
   const isPendingParalegal =
     (caseDoc.pendingParalegalId && String(caseDoc.pendingParalegalId) === uid) ||
     (Array.isArray(caseDoc.invites) &&
@@ -51,10 +65,8 @@ async function evaluateCaseParticipant(req, caseId) {
       ));
 
   if (!isAttorney && !isParalegal) {
-    const baseUrl = String(req.baseUrl || "");
-    const path = String(req.path || "");
     const allowWithdrawn =
-      isWithdrawnParalegal &&
+      (isWithdrawnParalegal || isHistoricalReceiptOwner) &&
       (baseUrl.includes("/disputes") ||
         (baseUrl.includes("/payments") && path.includes("/receipt/paralegal")));
     if (allowWithdrawn) {
@@ -98,7 +110,8 @@ function ensureCaseParticipant(paramKey = "caseId") {
       return next();
     } catch (err) {
       if (err.statusCode) {
-        return res.status(err.statusCode).json({ error: err.message });
+        if (err.publicCode) res.set("Cache-Control", "private, no-store");
+        return res.status(err.statusCode).json({ ...(err.publicCode ? { code: err.publicCode } : {}), error: err.message });
       }
       return next(err);
     }

@@ -1,8 +1,11 @@
-import { requireAuth, secureFetch, logoutUser } from "./auth.js";
+import { secureFetch } from "./auth.js";
+import { commissionLabel, commissionCount, commissionMoney, commissionPaymentLabel, commissionAccount } from "./utils/director-financials.mjs";
+import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
 
-requireAuth("admin");
-
-const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+import { createPaymentDialog, paymentHistory } from "./utils/director-payment-dialog.mjs";
+const financialAccount = commissionAccount("admin");
+const paymentDialog = createPaymentDialog({ account: financialAccount, onSaved: async () => { closeAudit(); await loadOverview(); }, onDenied: clearFinancialView });
+let loadSequence = 0, auditSequence = 0;
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -11,10 +14,6 @@ function escapeHTML(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function money(cents) {
-  return currency.format((Number(cents) || 0) / 100);
 }
 
 function date(value) {
@@ -44,20 +43,15 @@ function syncLabel(status) {
   return "Not Synced";
 }
 
-function payoutLabel(record = {}) {
-  const status = String(record.commissionPayoutStatus || "unpaid").toLowerCase();
-  if (status === "paid") return `Paid${record.commissionPaidAt ? ` ${date(record.commissionPaidAt)}` : ""}`;
-  return "Unpaid";
-}
-
 function payoutBadge(record = {}) {
-  const paid = String(record.commissionPayoutStatus || "unpaid").toLowerCase() === "paid";
-  return `<span class="badge ${paid ? "success" : "neutral"}">${escapeHTML(payoutLabel(record))}</span>`;
+  const label = commissionPaymentLabel(record);
+  return label === "—" ? "" : `<span class="badge neutral">${escapeHTML(label)}</span>`;
 }
 
-async function readJsonOrThrow(res, fallback) {
+async function readJsonOrThrow(res, fallback, financial = false) {
   const payload = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(payload?.error || fallback);
+  if (!res.ok) throw Object.assign(new Error(res.status >= 500 ? fallback : payload?.error || fallback), { status: res.status });
+  financialAccount.verify(financial ? payload : undefined);
   return payload;
 }
 
@@ -97,7 +91,7 @@ function renderDirectors(directors = []) {
             <div><dt>Records</dt><dd>${Number(totals.totalRecords || 0).toLocaleString()}</dd></div>
             <div><dt>Replies</dt><dd>${Number(totals.founder_attention || 0).toLocaleString()}</dd></div>
             <div><dt>Failed</dt><dd>${Number(totals.follow_up_failed || 0).toLocaleString()}</dd></div>
-            <div><dt>Unpaid</dt><dd>${money(totals.commissionUnpaidCents || 0)}</dd></div>
+            <div><dt>Unpaid</dt><dd class="commission-value">${escapeHTML(commissionLabel(totals.commissionOutstanding))}</dd></div>
           </dl>
         </article>
       `;
@@ -115,26 +109,27 @@ function recordRow(record = {}, { audit = false } = {}) {
       <td data-label="Stage"><span class="badge${failed ? " danger" : ""}">${escapeHTML(record.stageLabel || record.stage || "—")}</span></td>
       <td data-label="Reply">${date(record.lastReplyAt)}</td>
       <td data-label="Follow-Up">${date(record.followUpSentAt)}${record.lastFollowUpError ? `<br><span>${escapeHTML(record.lastFollowUpError)}</span>` : ""}</td>
-      <td data-label="Commission">${money(record.commissionEarnedCents || 0)}<br>${payoutBadge(record)}</td>
+      <td data-label="Commission" class="commission-value">${escapeHTML(commissionLabel(record))}<br>${payoutBadge(record)}</td>
       <td data-label="Audit">${audit ? `<button type="button" class="text-btn" data-audit-id="${escapeHTML(record.id)}">Audit</button>` : ""}</td>
     </tr>
   `;
 }
 
 function payableRow(record = {}) {
-  const paid = String(record.commissionPayoutStatus || "unpaid").toLowerCase() === "paid";
+  const payment = record.commissionPayments, legacy = payment?.legacyState === "needs_review";
+  const canRecord = !payment?.corrupt && (legacy || payment?.state !== "needs_review" && payment?.groups.some(group => group.outstandingCents > 0));
   return `
     <tr>
       <td data-label="Director">${escapeHTML(record.directorEmail || "—")}</td>
       <td data-label="Attorney">${escapeHTML(record.attorneyName || "—")}<br><span>${escapeHTML(record.attorneyEmail || "")}</span></td>
       <td data-label="State">${escapeHTML(record.state || "—")}</td>
-      <td data-label="Completed">${Number(record.commissionableMatterCount || 0).toLocaleString()}</td>
-      <td data-label="Commission">${money(record.commissionEarnedCents || 0)}</td>
+      <td data-label="Completed">${escapeHTML(commissionCount(record.commissionableMatterCount))}</td>
+      <td data-label="Commission" class="commission-value">${escapeHTML(commissionLabel(record))}</td>
       <td data-label="Payout">
         ${payoutBadge(record)}
         <br>
-        <button type="button" class="text-btn" data-payout-id="${escapeHTML(record.id)}" data-paid="${paid ? "false" : "true"}">
-          ${paid ? "Mark unpaid" : "Mark paid"}
+        <button type="button" class="text-btn" data-payout-id="${escapeHTML(record.id)}" ${canRecord ? "" : "disabled"}>
+          ${legacy ? "Review payment" : "Record payment"}
         </button>
       </td>
       <td data-label="Audit"><button type="button" class="text-btn" data-audit-id="${escapeHTML(record.id)}">Audit</button></td>
@@ -165,17 +160,12 @@ function renderOverview(payload = {}) {
   const failed = payload.failedFollowUps || [];
   const payables = payload.commissionPayables || [];
   const duplicates = payload.duplicates || [];
-  const commission = records.reduce((sum, record) => sum + Number(record.commissionEarnedCents || 0), 0);
-  const unpaidCommission = payables
-    .filter((record) => String(record.commissionPayoutStatus || "unpaid").toLowerCase() !== "paid")
-    .reduce((sum, record) => sum + Number(record.commissionEarnedCents || 0), 0);
-
   document.getElementById("metricDirectors").textContent = String(directors.length);
-  document.getElementById("metricRecords").textContent = String(records.length);
+  document.getElementById("metricRecords").textContent = String(payload.totalRecords ?? records.length);
   document.getElementById("metricReplies").textContent = String(replies.length);
   document.getElementById("metricFailures").textContent = String(failed.length);
-  document.getElementById("metricCommission").textContent = money(commission);
-  document.getElementById("metricUnpaidCommission").textContent = money(unpaidCommission);
+  document.getElementById("metricCommission").textContent = commissionLabel(payload);
+  document.getElementById("metricUnpaidCommission").textContent = commissionLabel(payload.commissionOutstanding);
   document.getElementById("metricDuplicates").textContent = String(duplicates.length);
 
   renderDirectors(directors);
@@ -186,52 +176,48 @@ function renderOverview(payload = {}) {
   renderTable("recordsBody", records, "No records.", { audit: true });
 }
 
-async function updatePayoutStatus(recordId, paid) {
-  if (!recordId) return;
-  setStatus(paid ? "Marking commission paid..." : "Marking commission unpaid...");
-  try {
-    const res = await secureFetch(`/api/admin/directors/records/${encodeURIComponent(recordId)}/commission-payout`, {
-      method: "PATCH",
-      body: { paid },
-      headers: { Accept: "application/json" },
-    });
-    await readJsonOrThrow(res, "Unable to update commission payout.");
-    await loadOverview();
-    setStatus(paid ? "Commission marked paid." : "Commission marked unpaid.");
-  } catch (err) {
-    setStatus(err?.message || "Unable to update commission payout.");
-  }
-}
 
 async function loadOverview() {
-  setStatus("");
+  const sequence = ++loadSequence;
+  setStatus("Loading records…");
   try {
-    const res = await secureFetch("/api/admin/directors/overview", { headers: { Accept: "application/json" } });
-    const payload = await readJsonOrThrow(res, "Unable to load director oversight.");
+    const res = await secureFetch(financialAccount.url("/api/admin/directors/overview"), { headers: { Accept: "application/json" } });
+    const payload = await readJsonOrThrow(res, "Unable to load director oversight.", true);
+    if (sequence !== loadSequence) return;
+    document.getElementById("downloadCsvBtn").disabled = false;
     renderOverview(payload);
     setStatus("");
   } catch (err) {
-    setStatus(err?.message || "Unable to load director oversight.");
+    if (sequence === loadSequence) clearFinancialView(err);
   }
 }
 
-async function openAudit(recordId) {
+async function openAudit(recordId, trigger = document.activeElement) {
   const panel = document.getElementById("auditPanel");
   const body = document.getElementById("auditBody");
   if (!panel || !body || !recordId) return;
+  const sequence = ++auditSequence, returnFocus = trigger;
   panel.hidden = false;
+  panel.removeAttribute("inert");
+  if (!panel.open) panel.showModal();
+  activateDialogFocus(panel, {
+    initialFocus: document.getElementById("closeAuditBtn"),
+    returnFocus,
+    onEscape: closeAudit,
+  });
   body.innerHTML = `<p class="muted">Loading...</p>`;
   try {
-    const res = await secureFetch(`/api/admin/directors/records/${encodeURIComponent(recordId)}/audit`, {
+    const res = await secureFetch(financialAccount.url(`/api/admin/directors/records/${encodeURIComponent(recordId)}/audit`), {
       headers: { Accept: "application/json" },
     });
-    const payload = await readJsonOrThrow(res, "Unable to load commission audit.");
+    const payload = await readJsonOrThrow(res, "Unable to load commission audit.", true);
+    if (sequence !== auditSequence) return;
     const rows = payload.commissionAudit || [];
     body.innerHTML = `
-      <h3>${escapeHTML(payload.record?.attorneyName || payload.record?.attorneyEmail || "Attorney")}</h3>
+      <h3>${escapeHTML(payload.record?.attorneyName || "Attorney")}</h3>
       <p class="muted">${escapeHTML(payload.record?.attorneyEmail || "")}</p>
       <table>
-        <thead><tr><th>Matter</th><th>Status</th><th>Paid</th><th>Attorney Fee</th><th>Director Commission</th></tr></thead>
+        <thead><tr><th>Matter</th><th>Status</th><th>Fee evidence</th><th>Attorney Fee</th><th>Director Commission</th></tr></thead>
         <tbody>
           ${
             rows.length
@@ -239,11 +225,11 @@ async function openAudit(recordId) {
                   .map(
                     (row) => `
                       <tr>
-                        <td>${escapeHTML(row.title || "Matter")}<br><span>${date(row.completedAt || row.createdAt)}</span></td>
-                        <td>${escapeHTML(row.status || "—")}</td>
-                        <td>${row.paid ? "Yes" : "No"}</td>
-                        <td>${money(row.attorneyPlatformFeeCents || 0)}</td>
-                        <td>${money(row.directorCommissionCents || 0)}</td>
+                        <td data-label="Matter">${escapeHTML(row.title || "Matter")}<br><span>${date(row.completedAt || row.createdAt)}</span></td>
+                        <td data-label="Status">${escapeHTML(row.status || "—")}</td>
+                        <td data-label="Fee evidence">${row.commissionReason === "fully_refunded" ? "Fully refunded · slot restored" : row.commissionState === "needs_review" ? "Needs review" : row.paid ? "Recorded" : "—"}</td>
+                        <td data-label="Attorney fee">${escapeHTML(commissionMoney(row.attorneyPlatformFeeCents, row.currency, row.stripeMode, "—"))}</td>
+                        <td data-label="Commission">${escapeHTML(commissionMoney(row.directorCommissionCents, row.currency, row.stripeMode, "—"))}</td>
                       </tr>
                     `
                   )
@@ -252,24 +238,34 @@ async function openAudit(recordId) {
           }
         </tbody>
       </table>
-      <h3>Timeline</h3>
-      <ul class="timeline">
-        ${(payload.events || [])
-          .map((event) => `<li><strong>${escapeHTML(event.eventType)}</strong><span>${date(event.occurredAt)} · ${escapeHTML(event.summary || event.subject || "")}</span></li>`)
-          .join("") || "<li>No events.</li>"}
-      </ul>
+      ${paymentHistory(payload.record, { controls: true })}
+      ${payload.events?.length ? `<h3>Timeline</h3><ul class="timeline">${payload.events
+        .map(event => `<li><strong>${escapeHTML(event.eventType)}</strong><span>${date(event.occurredAt)} · ${escapeHTML(event.summary || event.subject || "")}</span></li>`)
+        .join("")}</ul>` : ""}
     `;
   } catch (err) {
+    if (sequence !== auditSequence) return;
     body.innerHTML = `<p class="muted">${escapeHTML(err?.message || "Unable to load commission audit.")}</p>`;
   }
+}
+
+function closeAudit() {
+  auditSequence++;
+  const panel = document.getElementById("auditPanel");
+  if (!panel) return;
+  if (panel.open) panel.close();
+  panel.hidden = true;
+  panel.setAttribute("inert", "");
+  deactivateDialogFocus(panel);
 }
 
 async function downloadCsv() {
   setStatus("Preparing CSV...");
   try {
-    const res = await secureFetch("/api/admin/directors/records.csv", { headers: { Accept: "text/csv" } });
+    const res = await secureFetch(financialAccount.url("/api/admin/directors/records.csv"), { headers: { Accept: "text/csv" } });
     if (!res.ok) throw new Error("Unable to download CSV.");
     const blob = await res.blob();
+    financialAccount.verify();
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -284,21 +280,38 @@ async function downloadCsv() {
   }
 }
 
+function clearFinancialView(error) {
+  for (const element of document.querySelectorAll('[id^="metric"]')) element.textContent = "—";
+  document.getElementById("directorList").replaceChildren();
+  for (const id of ["commissionPayablesBody", "replyQueueBody", "failedFollowUpsBody", "duplicateBody", "recordsBody"]) {
+    document.getElementById(id).innerHTML = '<tr><td colspan="8">Records unavailable. Refresh to try again.</td></tr>';
+  }
+  document.getElementById("downloadCsvBtn").disabled = true;
+  closeAudit(); paymentDialog.clear(); document.getElementById("auditBody").replaceChildren();
+  setStatus(error?.message || "Records unavailable. Refresh to try again.");
+}
+window.addEventListener("storage", () => { try { financialAccount.verify(); } catch (error) { loadSequence++; clearFinancialView(error); } });
+
 document.getElementById("refreshBtn")?.addEventListener("click", loadOverview);
 document.getElementById("downloadCsvBtn")?.addEventListener("click", downloadCsv);
-document.getElementById("logoutBtn")?.addEventListener("click", logoutUser);
-document.getElementById("closeAuditBtn")?.addEventListener("click", () => {
-  const panel = document.getElementById("auditPanel");
-  if (panel) panel.hidden = true;
+document.getElementById("closeAuditBtn")?.addEventListener("click", closeAudit);
+document.getElementById("auditPanel")?.addEventListener("cancel", event => { event.preventDefault(); closeAudit(); });
+document.getElementById("auditPanel")?.addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) closeAudit();
 });
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-audit-id]");
-  if (button) openAudit(button.getAttribute("data-audit-id")).catch(() => {});
-  const payoutButton = event.target.closest("[data-payout-id]");
-  if (payoutButton) {
-    const paid = payoutButton.getAttribute("data-paid") === "true";
-    updatePayoutStatus(payoutButton.getAttribute("data-payout-id"), paid).catch(() => {});
+  if (button) openAudit(button.getAttribute("data-audit-id"), button).catch((error) => {
+    console.error("[admin-directors] audit detail action rejected", error);
+  });
+  const payoutButton = event.target.closest("[data-payout-id]"), reverseButton = event.target.closest("[data-payment-reverse]");
+  if (payoutButton || reverseButton) {
+    const trigger = payoutButton || reverseButton;
+    paymentDialog.open(trigger.dataset.payoutId || trigger.dataset.paymentRecord, trigger, reverseButton?.dataset.paymentReverse || "").catch(error => setStatus(error.message));
   }
 });
 
-loadOverview();
+loadOverview().then(() => {
+  const recordId = new URLSearchParams(location.search).get("record");
+  if (recordId && /^[a-f0-9]{24}$/i.test(recordId)) return openAudit(recordId, document.getElementById("refreshBtn"));
+}).catch(error => setStatus(error.message));

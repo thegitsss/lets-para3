@@ -3,7 +3,7 @@ const MarketingBrief = require("../../models/MarketingBrief");
 const MarketingDraftPacket = require("../../models/MarketingDraftPacket");
 const MarketingPublishingCycle = require("../../models/MarketingPublishingCycle");
 const {
-  MARKETING_PUBLISHING_CHANNELS,
+  MARKETING_ACTIVE_PUBLISHING_CHANNELS,
   MARKETING_PUBLISHING_CYCLE_STATUSES,
 } = require("./constants");
 const { createBrief, normalizeFacts } = require("./briefService");
@@ -45,6 +45,12 @@ function defaultCycleLabel(date = new Date()) {
 }
 
 function buildChannelPlan(channelKey, cycle = {}, triggerSource = "manual", options = {}) {
+  if (channelKey !== "linkedin_company") {
+    const error = new Error("Unsupported active publishing channel.");
+    error.statusCode = 400;
+    throw error;
+  }
+
   const titleBase = compactText(cycle.cycleLabel || defaultCycleLabel(), 120);
   const targetAudience = compactText(cycle.targetAudience || "approved attorneys and paralegals", 240);
   const objective =
@@ -63,20 +69,6 @@ function buildChannelPlan(channelKey, cycle = {}, triggerSource = "manual", opti
     "Use approved LPC knowledge to generate a premium, restrained social draft.";
   const updateFacts = normalizeFacts(cycle.updateFacts || []);
   const ctaPreference = compactText(cycle.ctaPreference || "", 500);
-
-  if (channelKey === "facebook_page") {
-    return {
-      workflowType: "facebook_page_post",
-      channelKey,
-      title: `${titleBase} Facebook Page`,
-      targetAudience,
-      objective,
-      briefSummary,
-      updateFacts,
-      ctaPreference,
-      triggerSource,
-    };
-  }
 
   return {
     workflowType: "linkedin_company_post",
@@ -126,19 +118,33 @@ async function refreshCycleLifecycle(cycleInput = {}) {
     : [];
   const taskByTargetId = new Map(approvalTasks.map((task) => [String(task.targetId), task]));
 
+  const channelKeys = [
+    ...MARKETING_ACTIVE_PUBLISHING_CHANNELS,
+    ...(facebookBrief || facebookPacket ? ["facebook_page"] : []),
+  ];
   const channelStates = {};
-  for (const channelKey of MARKETING_PUBLISHING_CHANNELS) {
-    const enabled = (cycle.settingsSnapshot?.enabledChannels || []).includes(channelKey);
+  for (const channelKey of channelKeys) {
+    const historical = !MARKETING_ACTIVE_PUBLISHING_CHANNELS.includes(channelKey);
+    const enabled = !historical && (cycle.settingsSnapshot?.enabledChannels || []).includes(channelKey);
     const brief = channelKey === "linkedin_company" ? linkedinBrief : facebookBrief;
     const packet = channelKey === "linkedin_company" ? linkedinPacket : facebookPacket;
     const task = packet?._id ? taskByTargetId.get(String(packet._id)) || null : null;
 
-    const readiness = await buildChannelReadiness(channelKey);
+    const readiness = historical
+      ? {
+          channelKey,
+          status: "retired",
+          note: "Historical Facebook draft retained for audit history; this channel is not an active LPC publishing surface.",
+        }
+      : await buildChannelReadiness(channelKey);
     let status = "blocked";
     let reason = "Channel is not enabled for this cycle.";
     if (cycle.status === "skipped") {
       status = "skipped";
       reason = cycle.skipReason || "Cycle skipped.";
+    } else if (historical) {
+      status = "blocked";
+      reason = "Historical Facebook draft retained read-only; no current approval or publish action is available.";
     } else if (!enabled) {
       status = "blocked";
       reason = "Channel disabled in publishing settings.";
@@ -168,6 +174,7 @@ async function refreshCycleLifecycle(cycleInput = {}) {
     channelStates[channelKey] = {
       channelKey,
       enabled,
+      historical,
       briefId: brief?._id ? String(brief._id) : "",
       packetId: packet?._id ? String(packet._id) : "",
       workflowType: brief?.workflowType || "",
@@ -247,6 +254,10 @@ async function createPublishingCycle({
   linkedinCompanyContentLane = "",
 } = {}) {
   const settingsDoc = await ensurePublishingSettings();
+  const enabledChannels = (settingsDoc.enabledChannels || []).filter((channelKey) =>
+    MARKETING_ACTIVE_PUBLISHING_CHANNELS.includes(channelKey)
+  );
+  if (!enabledChannels.length) enabledChannels.push(...MARKETING_ACTIVE_PUBLISHING_CHANNELS);
   const openCycles = await MarketingPublishingCycle.countDocuments({ status: { $in: OPEN_CYCLE_STATUSES } });
   if (openCycles >= Number(settingsDoc.maxOpenCycles || 1)) {
     const existing = await findOpenCycle(1);
@@ -267,7 +278,7 @@ async function createPublishingCycle({
       cadenceMode: settingsDoc.cadenceMode,
       timezone: settingsDoc.timezone,
       preferredHourLocal: settingsDoc.preferredHourLocal,
-      enabledChannels: settingsDoc.enabledChannels,
+      enabledChannels,
       maxOpenCycles: settingsDoc.maxOpenCycles,
     },
     targetAudience: compactText(targetAudience, 240),
@@ -286,7 +297,7 @@ async function createPublishingCycle({
     String(linkedinCompanyContentLane || "").trim() || chooseNextLinkedInCompanyContentLane(recentLinkedInPackets);
 
   try {
-    for (const channelKey of settingsDoc.enabledChannels || []) {
+    for (const channelKey of enabledChannels) {
       const channelPlan = buildChannelPlan(
         channelKey,
         {
@@ -318,9 +329,6 @@ async function createPublishingCycle({
       if (channelKey === "linkedin_company") {
         cycle.linkedinBriefId = brief._id;
         cycle.linkedinPacketId = packet?._id || null;
-      } else if (channelKey === "facebook_page") {
-        cycle.facebookBriefId = brief._id;
-        cycle.facebookPacketId = packet?._id || null;
       }
     }
   } catch (err) {
@@ -433,6 +441,37 @@ async function getPublishingCycleById(cycleId = "") {
   return refreshCycleLifecycle(cycle);
 }
 
+async function getPublishingStatusCounts() {
+  const groupedStatuses = await MarketingPublishingCycle.aggregate([
+    {
+      $group: {
+        _id: "$status",
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+  const counts = {
+    total: 0,
+    drafted: 0,
+    awaiting_approval: 0,
+    blocked: 0,
+    skipped: 0,
+    ready_to_publish: 0,
+  };
+
+  groupedStatuses.forEach((entry) => {
+    const status = String(entry?._id || "").trim();
+    const count = Number(entry?.count || 0);
+    if (status) counts[status] = count;
+    counts.total += count;
+  });
+
+  return {
+    counts,
+    openCycleCount: OPEN_CYCLE_STATUSES.reduce((sum, status) => sum + Number(counts[status] || 0), 0),
+  };
+}
+
 async function getPublishingOverview() {
   const [settings, cycles] = await Promise.all([
     getPublishingSettings(),
@@ -466,7 +505,9 @@ async function getPublishingOverview() {
     openCycleCount: cycles.filter((cycle) => OPEN_CYCLE_STATUSES.includes(cycle.status)).length,
     latestCycles: cycles.slice(0, 12),
     linkedinCadenceGuidance: summarizeLinkedInCompanyCadence(recentLinkedInPackets),
-    channelReadiness: await Promise.all(MARKETING_PUBLISHING_CHANNELS.map((channelKey) => buildChannelReadiness(channelKey))),
+    channelReadiness: await Promise.all(
+      MARKETING_ACTIVE_PUBLISHING_CHANNELS.map((channelKey) => buildChannelReadiness(channelKey))
+    ),
   };
 }
 
@@ -475,6 +516,7 @@ module.exports = {
   createPublishingCycle,
   getPublishingCycleById,
   getPublishingOverview,
+  getPublishingStatusCounts,
   listPublishingCycles,
   refreshCycleLifecycle,
   runScheduledCycleCreation,

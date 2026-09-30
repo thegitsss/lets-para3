@@ -16,13 +16,22 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
-  <link
-    rel="stylesheet"
-  />
-  <script src="assets/scripts/utils/session.js"></script>
+  <script src="assets/scripts/utils/session.js?v=20260902-1"></script>
+  <link rel="stylesheet" href="assets/styles/global-search.css?v=20260831-3" />
 
   <style>
-    .gold{color:#b4975a;}
+    .skip-link {
+      position: fixed;
+      left: 12px;
+      top: -48px;
+      z-index: 10000;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: #1a2230;
+      color: #ffffff;
+      text-decoration: none;
+    }
+    .skip-link:focus { top: 12px; }
     :root {
       --bg: #f5f5f5;
       --panel: #fcfcfc;
@@ -53,16 +62,6 @@
       line-height: 1.7;
       letter-spacing: 0.25px;
     }
-    .bg-hero-mountain {
-      position: fixed;
-      inset: 0;
-      background: url('hero-mountain.jpg') center/cover no-repeat;
-      opacity: 1;
-      transform: scale(1.01);
-      z-index: 0;
-      pointer-events: none;
-    }
-
     .input-error{
       border-color:#c0392b !important;
       background:rgba(192,57,43,0.04);
@@ -83,29 +82,6 @@
       z-index: 20;
       background: #fff;
       box-shadow: 0 40px 90px rgba(15, 23, 42, 0.25);
-    }
-
-    .page-shell.cutout-active {
-      background: transparent;
-    }
-
-    .page-shell.cutout-active > :not(.invite-cutout-overlay) {
-      position: relative;
-      z-index: 1;
-    }
-
-    .page-shell .invite-cutout-overlay {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 0;
-      display: none;
-    }
-
-    .page-shell.cutout-active .invite-cutout-overlay {
-      display: block;
     }
 
     .topbar {
@@ -236,12 +212,6 @@
       overflow: visible;
     }
 
-    .back-row {
-      display: flex;
-      justify-content: flex-start;
-      margin-bottom: 12px;
-    }
-
     .notification-wrapper {
       position: relative;
     }
@@ -360,14 +330,6 @@
 
     body.theme-dark .user-chip span {
       color: rgba(255, 255, 255, 0.8);
-    }
-
-    body.theme-mountain .user-chip strong {
-      color: #1b1b1b;
-    }
-
-    body.theme-mountain .user-chip span {
-      color: #6b6b6b;
     }
 
     body.viewer-attorney .profile-header-controls .user-chip {
@@ -627,35 +589,6 @@
 
     /* HERO CARD (matches UX layout) */
 
-    .hero-card {
-      background: #ffffff;
-      border-radius: var(--radius-lg);
-      padding: 32px 36px 34px;
-      box-shadow:
-        0 18px 48px rgba(0, 0, 0, 0.08),
-        inset 0 1px 0 rgba(255, 255, 255, 0.55);
-      margin-bottom: 32px;
-      position: relative;
-      overflow: hidden;
-      animation: fadeUp 0.4s ease both;
-      z-index: 50;
-    }
-
-    .hero-eyebrow {
-      font-size: 0.75rem;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 24px;
-    }
-
-    .hero-content {
-      display: grid;
-      grid-template-columns: 220px minmax(0, 1fr);
-      column-gap: 32px;
-      align-items: center;
-    }
-
     .back-link {
       display: inline-flex;
       align-items: center;
@@ -691,6 +624,7 @@
     }
 
     .hero-photo {
+      position: relative;
       width: 240px;
       height: 240px;
       border-radius: 50%;
@@ -706,10 +640,17 @@
       object-fit: cover;
     }
 
-    .hero-main {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+    .profile-avatar-fallback {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: var(--ink);
+      background: #f3f4f6;
+      font-family: var(--font-serif);
+      font-size: 3.25rem;
+      font-weight: 600;
     }
 
     #profileName {
@@ -1144,34 +1085,6 @@
     }
 
     /* MAIN GRID (compact fold) */
-
-    .fold-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-      gap: 18px;
-      margin-bottom: 16px;
-      align-items: start;
-      animation: fadeUp 0.5s ease both;
-      animation-delay: 0.05s;
-    }
-
-    .card {
-      background: #ffffff;
-      border-radius: var(--radius-md);
-      padding: 18px 22px;
-      box-shadow:
-        0 12px 32px rgba(0, 0, 0, 0.06),
-        inset 0 1px 0 rgba(255, 255, 255, 0.6);
-      position: relative;
-      z-index: 40;
-    }
-    .card.compact {
-      padding: 18px 18px;
-      box-shadow:
-        0 12px 30px rgba(0, 0, 0, 0.05),
-        inset 0 1px 0 rgba(255, 255, 255, 0.55);
-      background: #ffffff;
-    }
 
     .card-header-label {
       font-size: 0.8rem;
@@ -1725,27 +1638,52 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260831-21" />
+  <link rel="stylesheet" href="assets/styles/lpc-product-components.css?v=20260901-1" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260831-3" />
+  <script defer src="assets/scripts/universal-header.js?v=20260831-3"></script>
+  <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
+  <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
+  <link rel="stylesheet" href="assets/styles/profile-paralegal.css?v=20260814-1" />
+  <link rel="stylesheet" href="assets/styles/matter-invitations.css" />
+  <link rel="stylesheet" href="assets/styles/profile-engagement.css" />
 </head>
-<body>
-    <div class="bg-hero-mountain" aria-hidden="true"></div>
+<body class="dashboard-no-shadows lpc-product-clean lpc-static-universal-header lpc-auth-shell-v2">
+  <a class="skip-link" href="#main">Skip to main content</a>
   <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
-    <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
+    <span class="lpc-mobile-menu-icon" aria-hidden="true"></span>
   </button>
   <aside class="mobile-sidebar" id="sidebarNav">
-    <div class="logo">Dashboard</div>
+    <div class="logo sidebar-profile-host">
+      <div class="sidebar-profile-cluster" data-lpc-sidebar-profile>
+        <button class="user-chip lpc-sidebar-profile-trigger" type="button" data-lpc-sidebar-profile-trigger aria-label="Open profile menu" aria-haspopup="true" aria-expanded="false">
+          <img class="globalProfileImage lpc-sidebar-profile-trigger-avatar" src="assets/avatar-placeholder.svg" alt="" />
+          <span class="lpc-sidebar-profile-trigger-details"><strong class="globalProfileName">Member</strong></span>
+          <svg class="lpc-profile-trigger-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"></path></svg>
+        </button>
+      </div>
+    </div>
     <nav>
-      <a href="dashboard-paralegal.html">Home</a>
-      <a href="dashboard-paralegal.html#cases">Cases and Applications</a>
-      <a href="profile-settings.html">Profile Settings</a>
-      <a href="paralegalhelp.html">Help</a>
+      <a href="dashboard-paralegal.html" data-profile-mobile-nav="home">Home</a>
+      <a href="browse-jobs.html" data-profile-mobile-nav="browse">Browse Matters</a>
+      <a href="dashboard-paralegal.html#cases" data-profile-mobile-nav="matters">My Matters &amp; Applications</a>
+      <a href="profile-settings.html" data-profile-mobile-nav="settings">Profile Settings</a>
+      <a href="paralegalhelp.html" data-profile-mobile-nav="help">Help</a>
     </nav>
-    <button type="button" class="sidebar-link" id="logoutBtn" data-logout>Log out</button>
-    <div class="sidebar-footer">© Let’s-ParaConnect 2026</div>
+    <div class="sidebar-footer">© Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect 2026</div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
-  <div class="page-shell" id="main" role="main" tabindex="-1">
+  <div class="lpc-auth-page-shell">
+  <div class="lpc-universal-header-shell lpc-universal-header-shell--created" role="group" aria-label="Workspace tools" data-lpc-universal-header="true">
+    <div class="lpc-universal-header-controls" data-notification-center="true" aria-label="Search, notifications, and Assistant">
+      <div class="lpc-global-search-host" data-productivity-trigger-host></div>
+      <div class="notification-wrapper"><button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span class="notification-badge" data-notification-badge>0</span></button><div class="notifications-panel notif-panel hidden" role="region" aria-label="Notifications" aria-live="polite" data-notification-panel><div class="notif-header" aria-label="Notifications"></div><div class="notif-scroll" data-notification-list></div><div class="notif-empty" data-notification-empty>Loading…</div><button type="button" class="notif-markall" data-notification-mark>Mark All Read</button></div></div>
+    </div>
+  </div>
+  <main class="page-shell" id="main" tabindex="-1">
     <div class="topbar">
-      <a id="backBtn" class="back-link" href="#">
+      <a id="backBtn" class="back-link" href="browse-paralegals.html">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M15 6l-6 6 6 6"></path>
         </svg>
@@ -1760,26 +1698,6 @@
             </svg>
             <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
           </button>
-        <div
-          class="notification-dropdown"
-          id="notificationDropdown"
-          style="
-            display: none;
-            width: 320px;
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-            padding: 16px;
-          "
-        >
-            <div style="font-weight: 600; margin-bottom: 8px;">
-              Notifications
-            </div>
-
-            <div id="notificationList" style="font-size: 14px; color: #555;">
-              No new notifications.
-            </div>
-          </div>
           <div id="notificationPanel" class="notif-panel hidden" data-notification-panel>
             <div class="notif-header">Notifications</div>
             <div class="notif-body" id="notifList" data-notification-list></div>
@@ -1788,10 +1706,9 @@
           </div>
         <div class="profile-menu">
           <a class="user-chip" id="userChip" href="/dashboard-paralegal.html" aria-label="Open profile menu">
-            <img id="clusterAvatar" class="nav-profile-photo" src="https://via.placeholder.com/64x64.png?text=PL" alt="Profile" />
+            <img id="clusterAvatar" class="nav-profile-photo" src="assets/avatar-placeholder.svg" alt="Profile" />
             <div>
               <strong id="clusterName">Profile</strong>
-              <span id="clusterRole"></span>
             </div>
           </a>
           <div class="profile-dropdown" id="profileDropdown">
@@ -1807,8 +1724,9 @@
       <aside class="profile-sidebar">
         <div class="profile-photo-block">
           <div class="hero-photo-shell">
-            <div class="hero-photo">
-              <img id="user-avatar" src="" alt="Profile photo" />
+            <div class="hero-photo" data-avatar-wrapper>
+              <img id="user-avatar" data-profile-avatar src="" alt="Profile photo" />
+              <span class="profile-avatar-fallback" data-avatar-fallback aria-hidden="true"></span>
             </div>
           </div>
           <div id="photoReviewStatus" class="photo-review-note hidden" role="status" aria-live="polite"></div>
@@ -1820,8 +1738,8 @@
               </div>
               <div class="meta-column">
                 <div class="profile-docs-stack">
-                  <a href="#" target="_blank" rel="noopener" id="certificateLink" class="doc-chip hidden">Certificate</a>
-                  <a href="#" target="_blank" rel="noopener" id="resumeLink" class="doc-chip hidden">Résumé</a>
+                  <a target="_blank" rel="noopener" id="certificateLink" class="doc-chip hidden">Certificate</a>
+                  <a target="_blank" rel="noopener" id="resumeLink" class="doc-chip hidden">Résumé</a>
                 </div>
               </div>
             </div>
@@ -1830,7 +1748,7 @@
 
         <article class="profile-section" id="educationCard">
           <div class="education-section" id="educationSection">
-            <div class="card-header-label" style="text-align:center;">Education</div>
+            <div class="card-header-label">Education</div>
             <div id="educationList" class="edu-inline">
               <!-- folded education inline -->
             </div>
@@ -1839,25 +1757,25 @@
 
         <article class="profile-section" id="skillsCard">
           <div class="chip-section" id="skillsSection">
-            <span class="card-header-label" style="text-align:center; width:100%;">Skills</span>
+            <span class="card-header-label">Skills</span>
             <div id="skillsList" class="chip-cloud"></div>
           </div>
         </article>
 
         <article class="profile-section hidden" id="stateExperienceRow">
-          <div class="card-header-label" style="text-align:center;">State Experience</div>
+          <div class="card-header-label">State Experience</div>
           <div class="chip-row" id="stateExperienceList"></div>
         </article>
 
         <article class="profile-section" id="languagesRow">
-          <div class="card-header-label" style="text-align:center;">Languages</div>
+          <div class="card-header-label">Languages</div>
           <div class="chip-row" id="languagesList"></div>
         </article>
 
         <article class="profile-section hidden" id="documentsSection">
-          <div class="card-header-label" style="text-align:center;">Documents</div>
+          <div class="card-header-label">Documents</div>
           <div class="doc-buttons">
-            <a href="#" target="_blank" rel="noopener" id="writingSampleLink" class="doc-chip hidden">Writing Sample</a>
+            <a target="_blank" rel="noopener" id="writingSampleLink" class="doc-chip hidden">Writing Sample</a>
           </div>
         </article>
         <div class="joined-meta-corner" aria-hidden="true">
@@ -1896,18 +1814,18 @@
 
         <div class="profile-duo" id="bestForFocusRow">
           <article class="profile-section hidden" id="bestForCard">
-            <div class="card-header-label" style="text-align:center;">Best For</div>
+            <div class="card-header-label">Best For</div>
             <ul id="bestForList" class="best-for-list"></ul>
           </article>
           <article class="profile-section" id="practiceSection">
-            <div class="card-header-label" style="text-align:center;">Practice Areas</div>
+            <div class="card-header-label">Practice Areas</div>
             <div id="practiceList" class="chip-cloud"></div>
           </article>
         </div>
 
         <article class="profile-section" id="experienceCard">
           <div class="experience-section" id="experienceSection">
-            <div class="card-header-label" style="text-align:center;">Experience</div>
+            <div class="card-header-label">Experience</div>
             <div id="experienceList" class="timeline-list">
               <!-- condensed experience timeline -->
             </div>
@@ -1921,13 +1839,14 @@
       <div class="card-title">Fun Facts &amp; Extras</div>
       <p id="funFactsCopy"></p>
     </article>
+  </main>
   </div>
 
   <!-- Modal + toast + scripts stay intact -->
-  <div class="modal-overlay" id="inviteModal" role="dialog" aria-modal="true">
+  <div class="modal-overlay" id="inviteModal" role="dialog" aria-modal="true" aria-labelledby="inviteModalTitle" aria-describedby="inviteModalDescription" aria-hidden="true" inert>
     <div class="invite-modal">
-      <h3>Invite to Matter</h3>
-      <p class="modal-subtitle">Choose the matter to connect with this paralegal.</p>
+      <h3 id="inviteModalTitle">Invite to Matter</h3>
+      <p class="modal-subtitle" id="inviteModalDescription">Choose the matter for your invitation to this paralegal.</p>
       <label>
         <span style="display:block;font-size:0.9rem;color:var(--muted);margin-bottom:6px;">Select a matter</span>
         <select id="inviteCaseSelect"></select>
@@ -1941,15 +1860,14 @@
 
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
 
-  <!-- Hidden file input so existing upload script doesn’t break; no visible button on this page -->
-  <input type="file" id="photoInput" accept="image/png, image/jpeg" style="display:none" />
-
   <script src="assets/scripts/utils/toast.js"></script>
   <script>
     window.__SKIP_NOTIFICATIONS__ = true;
   </script>
   <script type="module" src="assets/scripts/utils/notifications.js"></script>
   <script type="module" src="assets/scripts/profile-paralegal.js"></script>
+  <script src="assets/scripts/productivity-command-registry.js"></script>
+  <script src="assets/scripts/global-search.js?v=20260831-2"></script>
   <script>
     (function bindNotificationToggle() {
       const bind = () => {
@@ -1991,11 +1909,17 @@
     const sidebarBackdrop = document.getElementById('sidebarBackdrop');
     const closeSidebar = () => {
       document.body.classList.remove('nav-open');
-      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
+      if (sidebarToggle) {
+        sidebarToggle.setAttribute('aria-expanded', 'false');
+        sidebarToggle.setAttribute('aria-label', 'Open menu');
+      }
     };
     const openSidebar = () => {
       document.body.classList.add('nav-open');
-      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'true');
+      if (sidebarToggle) {
+        sidebarToggle.setAttribute('aria-expanded', 'true');
+        sidebarToggle.setAttribute('aria-label', 'Close menu');
+      }
     };
     if (sidebarToggle) {
       sidebarToggle.addEventListener('click', () => {
@@ -2011,8 +1935,14 @@
         if (event.target && event.target.tagName === 'A') closeSidebar();
       });
     }
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && document.body.classList.contains('nav-open')) {
+        closeSidebar();
+        sidebarToggle?.focus({ preventScroll: true });
+      }
+    });
     window.addEventListener('resize', () => {
-      if (window.innerWidth > 960) closeSidebar();
+      if (window.innerWidth > 1024) closeSidebar();
     });
   </script>
 </body>

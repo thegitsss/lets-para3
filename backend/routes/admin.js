@@ -1,55 +1,69 @@
+const { letterEmail } = require("../email/layout");
+const accountEmails = require("../email/accountTemplates");
 // backend/routes/admin.js
 const router = require("express").Router();
 const mongoose = require("mongoose");
-const path = require("path");
 const jwt = require("jsonwebtoken");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
+const { csrfProtection, respondToCsrfError } = require("../utils/csrf");
+const { createLogger, logPromiseFailure } = require("../utils/logger");
+const { createS3Client } = require("../utils/s3Client");
 const User = require("../models/User");
 const Case = require("../models/Case");
+const { CASE_STATUS_ENUM } = require("../utils/caseState");
 const Job = require("../models/Job");
-const Application = require("../models/Application");
-const AuditLog = require("../models/AuditLog"); // NOTE: file name fix
-const Payout = require("../models/Payout");
-const PlatformIncome = require("../models/PlatformIncome");
-const Notification = require("../models/Notification");
-const { purgeAttorneyAccount } = require("../services/userDeletion");
+const AuditLog = require("../models/AuditLog");
+const PaymentOperation = require("../models/PaymentOperation");
+const adminPayoutProjection = require("../services/adminPayoutProjection");
+const adminMatterDeletion = require("../services/adminMatterDeletion");
+const adminFinancialReport = require("../services/adminFinancialReport");
+const {
+  acknowledgeChargeback,
+  clearEligiblePayoutHold,
+  recordChargebackEvent,
+} = require("../services/chargebackService");
+const logger = createLogger("admin");
+const { isEmailAddressShape } = require("../utils/emailAddressShape");
+const {
+  deactivateUserAccount,
+  finalizeAccountDataRemoval,
+} = require("../services/userDeletion");
+const { revokeAllUserSessions } = require("../services/authSessionService");
 const sendEmail = require("../utils/email");
-const { sendWelcomePacket, sendProfilePhotoRejectedEmail } = sendEmail;
+const { sendProfilePhotoRejectedEmail } = sendEmail;
 const { notifyUser } = require("../utils/notifyUser");
-const { getAppSettings, normalizeTaxRate, serializeAppSettings } = require("../utils/appSettings");
-const { triageSupportIssue } = require("../ai/supportAgent");
+const { publishNotificationEvent } = require("../utils/notificationEvents");
+const { publishCaseProjectionRefresh } = require("../utils/caseProjectionEvents");
+const { getAppSettings, serializeAppSettings } = require("../utils/appSettings");
+const workspaceRelease = require("../services/workspaceRelease");
 const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
 const { ensureApprovedUserAuthReady } = require("../utils/authReady");
 const { normalizeEmail, sendVerificationEmail } = require("../utils/emailVerification");
+const { assertObjectMalwareSafe, malwareScanRequired } = require("../utils/fileSecurity");
+const { extractPersonalFileKey } = require("../utils/personalFileReference");
+const {
+  buildAuthenticatedProfilePhotoUrl,
+  buildPublicProfilePhotoUrl,
+  extractProfilePhotoKey,
+  hasPhotoReference,
+  resolveProfilePhotoKey,
+} = require("../services/profilePhotoDelivery");
+const {
+  activatePersonalStorageDeletion,
+  cancelPersonalStorageDeletion,
+  collectUserPersonalStorageKeys,
+  stagePersonalStorageDeletion,
+} = require("../services/personalStorageDeletion");
 
-// -----------------------------------------
-// CSRF (enabled in production or when ENABLE_CSRF=true)
-// -----------------------------------------
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-const CSRF_SECURE = process.env.NODE_ENV === "production";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: CSRF_SECURE } });
-}
-
-const APP_BASE_URL = (process.env.APP_BASE_URL || "").replace(/\/$/, "");
 const EMAIL_BASE_URL = (process.env.EMAIL_BASE_URL || "").replace(/\/$/, "");
 const ASSET_BASE_URL = EMAIL_BASE_URL || "https://www.lets-paraconnect.com";
 const LOGIN_URL = `${ASSET_BASE_URL}/login.html`;
-const ATTORNEY_DASHBOARD_URL = `${ASSET_BASE_URL}/dashboard-attorney.html`;
-const APPROVAL_EMAIL_SUBJECT =
-"Welcome to Let’s-ParaConnect";
-const ATTORNEY_APPROVAL_EMAIL_SUBJECT =
-"Welcome to Let’s-ParaConnect";
-const DENIAL_EMAIL_SUBJECT =
-"Your application to join Let's-ParaConnect has been reviewed and was unfortunately not approved.";
-const ATTORNEY_LAUNCH_EMAIL_SUBJECT = "Attorney Launch Begins Today";
+const LINKEDIN_COMPANY_URL = "https://www.linkedin.com/company/lets-paraconnect/";
+const ATTORNEY_LAUNCH_EMAIL_SUBJECT = "Explore Matters on LPC";
 const ATTORNEY_FIRST_MATTER_EMAIL_SUBJECT = "Post Your First Matter on Let’s-ParaConnect";
-const PLATFORM_FEE_PARALEGAL_PERCENT = Number(process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18);
 const CREATE_CASE_URL = `${ASSET_BASE_URL}/create-case.html`;
+const adminS3 = createS3Client();
 
 // -----------------------------------------
 // Helpers
@@ -90,23 +104,12 @@ const { year, month } = group._id;
 return `${year}-${String(month).padStart(2, "0")}`;
 }
 
-function formatFilingDeadline() {
-const now = new Date();
-let year = now.getUTCFullYear();
-let deadline = new Date(Date.UTC(year, 3, 15)); // April (0-indexed month)
-if (deadline <= now) {
-year += 1;
-deadline = new Date(Date.UTC(year, 3, 15));
-}
-return deadline.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-}
-
 function isObjId(id) {
 return mongoose.isValidObjectId(id);
 }
 
 function isEmail(value = "") {
-return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).toLowerCase());
+return isEmailAddressShape(value);
 }
 
 function sanitizeAdminNote(value = "", max = 4000) {
@@ -117,51 +120,15 @@ function isTypoEmailDomain(value = "") {
 return /@[^@\s]+\.con$/i.test(String(value).trim());
 }
 
-const CASE_AMOUNT_EXPR = { $ifNull: ["$lockedTotalAmount", "$totalAmount"] };
-const CASE_PARALEGAL_PCT_EXPR = { $ifNull: ["$feeParalegalPct", PLATFORM_FEE_PARALEGAL_PERCENT] };
-const CASE_PARALEGAL_FEE_EXPR = {
-$ifNull: [
-"$feeParalegalAmount",
-{
-$floor: {
-$add: [
-{ $multiply: [CASE_AMOUNT_EXPR, { $divide: [CASE_PARALEGAL_PCT_EXPR, 100] }] },
-0.5,
-],
-},
-},
-],
-};
-const CASE_PAYOUT_EXPR = { $max: [0, { $subtract: [CASE_AMOUNT_EXPR, CASE_PARALEGAL_FEE_EXPR] }] };
-
-function resolveParalegalFeePct(doc = {}) {
-return typeof doc.feeParalegalPct === "number" && Number.isFinite(doc.feeParalegalPct)
-? doc.feeParalegalPct
-: PLATFORM_FEE_PARALEGAL_PERCENT;
-}
-
-function computeParalegalFeeAmount(baseAmount, doc = {}) {
-if (Number.isFinite(doc.feeParalegalAmount) && doc.feeParalegalAmount >= 0) {
-return doc.feeParalegalAmount;
-}
-const base = Number(baseAmount || 0);
-if (!Number.isFinite(base) || base <= 0) return 0;
-return Math.max(0, Math.round(base * (resolveParalegalFeePct(doc) / 100)));
-}
-
-function computeParalegalPayoutAmount(baseAmount, doc = {}) {
-const base = Number(baseAmount || 0);
-if (!Number.isFinite(base) || base <= 0) return 0;
-const fee = computeParalegalFeeAmount(base, doc);
-return Math.max(0, base - fee);
-}
-
-function toFileViewUrl(value) {
-const raw = String(value || "").trim();
-if (!raw) return raw;
-if (/^https?:\/\//i.test(raw)) return raw;
-if (raw.startsWith("/api/uploads/view")) return raw;
-return `/api/uploads/view?key=${encodeURIComponent(raw)}`;
+function toFileViewUrl(value, ownerId, type) {
+const key = extractPersonalFileKey(value, {
+  ownerId,
+  type,
+  bucket: process.env.S3_BUCKET,
+  region: process.env.S3_REGION,
+  cdnBase: process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL,
+});
+return key ? `/api/uploads/view?key=${encodeURIComponent(key)}` : "";
 }
 
 function buildApprovedCasePipeline(match = {}) {
@@ -206,46 +173,24 @@ function withCreatedAtFloor(match = {}, floor = null) {
   return next;
 }
 
-function stripeModeGroupId(field = "$stripeMode") {
-  return { $ifNull: [field, "unknown"] };
-}
-
-function buildCaseStripeModeAggregate(match = {}, amountExpr = CASE_AMOUNT_EXPR) {
-  return buildApprovedCasePipeline(match).concat([
-    {
-      $group: {
-        _id: stripeModeGroupId(),
-        total: { $sum: amountExpr },
-        count: { $sum: 1 },
-      },
-    },
-  ]);
-}
-
-function buildModelStripeModeAggregate(match = {}, amountField = "$feeAmount") {
-  return [
-    { $match: match },
-    {
-      $group: {
-        _id: stripeModeGroupId(),
-        total: { $sum: amountField },
-        count: { $sum: 1 },
-      },
-    },
-  ];
-}
-
 function pickUserSafe(u) {
 // fields safe to return to admin tools
 const {
 _id, firstName, lastName, email, role, status, bio, about, availability, emailVerified,
 pendingEmail, pendingEmailRequestedAt,
 lastLoginAt, lockedUntil, failedLogins, audit, createdAt, updatedAt,
-specialties, jurisdictions, skills, yearsExperience, languages,
+specialties, jurisdictions, skills, yearsExperience, paralegalQualification, languages,
 avatarURL, timezone, location, state, kycStatus, stripeCustomerId, stripeAccountId,
 barNumber, resumeURL, certificateURL, practiceAreas, experience, education,
-disabled, deleted, deletedAt, profileImage, pendingProfileImage, profilePhotoStatus, linkedInURL,
+disabled, deleted, deletedAt, personalDataStatus, personalDataMinimizedAt,
+profileImage, pendingProfileImage, profilePhotoStatus, linkedInURL,
 } = u;
+const approvedPhotoUrl = profileImage || avatarURL
+  ? buildAuthenticatedProfilePhotoUrl(u)
+  : "";
+const pendingPhotoUrl = pendingProfileImage
+  ? buildAuthenticatedProfilePhotoUrl(u, { variant: "pending" })
+  : "";
 return {
 id: _id,
 firstName,
@@ -261,21 +206,23 @@ emailVerified,
 pendingEmail,
 pendingEmailRequestedAt,
 lastLoginAt, lockedUntil, failedLogins, audit, createdAt, updatedAt,
-specialties, jurisdictions, skills, yearsExperience, languages,
-avatarURL, timezone, location, state, kycStatus, stripeCustomerId, stripeAccountId,
-profileImage,
-pendingProfileImage,
+specialties, jurisdictions, skills, yearsExperience, paralegalQualification, languages,
+avatarURL: approvedPhotoUrl, timezone, location, state, kycStatus, stripeCustomerId, stripeAccountId,
+profileImage: approvedPhotoUrl,
+pendingProfileImage: pendingPhotoUrl,
 profilePhotoStatus,
 barNumber,
 linkedInURL,
-resumeURL: toFileViewUrl(resumeURL),
-certificateURL: toFileViewUrl(certificateURL),
+resumeURL: toFileViewUrl(resumeURL, _id, "resume"),
+certificateURL: toFileViewUrl(certificateURL, _id, "certificate"),
 practiceAreas,
 experience,
 education,
 disabled,
 deleted,
 deletedAt,
+personalDataStatus,
+personalDataMinimizedAt,
 };
 }
 
@@ -308,8 +255,57 @@ const text = String(note).trim();
 return text ? text.slice(0, 1000) : undefined;
 }
 
+function assertOwnedAdmissionKey(user, value, type, label) {
+  const raw = String(value || "").trim();
+  const key = extractPersonalFileKey(value, {
+    ownerId: user?._id,
+    type,
+    bucket: process.env.S3_BUCKET,
+    region: process.env.S3_REGION,
+    cdnBase: process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL,
+  });
+  if (raw && !key) {
+    const error = new Error(`${label} is not stored in the applicant's protected LPC folder.`);
+    error.code = "ADMISSION_FILE_INVALID";
+    error.statusCode = 409;
+    throw error;
+  }
+  return key;
+}
+
+async function assertAdmissionFilesSafe(user) {
+  if (String(user?.role || "").toLowerCase() !== "paralegal") return;
+  const resumeKey = assertOwnedAdmissionKey(user, user.resumeURL, "resume", "Résumé");
+  if (!resumeKey) {
+    const error = new Error("A protected résumé is required before approving this paralegal.");
+    error.code = "ADMISSION_FILE_REQUIRED";
+    error.statusCode = 409;
+    throw error;
+  }
+  const keys = [
+    resumeKey,
+    assertOwnedAdmissionKey(user, user.certificateURL, "certificate", "Certificate"),
+    assertOwnedAdmissionKey(user, user.writingSampleURL, "writingSample", "Writing sample"),
+  ].filter(Boolean);
+  if (!malwareScanRequired()) return;
+  for (const key of keys) {
+    // Every submitted admission artifact must be clean before approval.
+    // eslint-disable-next-line no-await-in-loop
+    await assertObjectMalwareSafe({ s3: adminS3, bucket: process.env.S3_BUCKET, key });
+  }
+}
+
 function escapeRegex(value = "") {
 return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function escapeEmailHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 async function getAttorneyIdsWithPostedMatters(attorneyIds = []) {
@@ -330,403 +326,37 @@ function buildUnsubscribeToken(user) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "180d" });
 }
 
-function buildApprovalEmailHtml(user, opts = {}) {
-  const loginUrl = LOGIN_URL;
-  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
+function buildApprovalEmailHtml(user) {
+  return accountEmails.applicationApproved(user, LOGIN_URL).html;
+}
+
+function buildAttorneyApprovalEmailHtml(user) {
+  return accountEmails.applicationApproved(user, LOGIN_URL).html;
+}
+
+function buildCompleteProfileEmailHtml(user) {
+  const profileSettingsUrl = `${ASSET_BASE_URL}/profile-settings.html`;
+
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
+  const friendlyName = escapeEmailHtml(formatFullName(user) || "there");
 
   const unsubscribeLine = unsubscribeUrl
     ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
     : "Unsubscribe from non-essential emails";
 
-  return `
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr>
-            <td align="center" style="padding:24px 24px 8px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="padding-right:12px;">
-                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
-                  </td>
-                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
-                    Let's-ParaConnect
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Welcome to Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 0;">
-              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:34px;letter-spacing:0.06em;color:#6e6e6e;">
-                Welcome to Let’s-ParaConnect
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:16px 32px 0;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.7;">
-                Hi ${user?.firstName || "there"},
-                <br><br>
-                Thank you for applying to join Let’s-ParaConnect.
-                <br><br>
-                Your application has been reviewed and approved. At this time, we’re onboarding a limited number of paralegals as we open the platform carefully and maintain a high standard across the network.
-                <br><br>
-                You now have access to complete your profile and explore the platform. Attorneys will begin posting work as onboarding continues.
-                <br><br>
-                We’re glad to have you as part of the community.
-                <br><br>
-                —<br>
-                Let’s-ParaConnect
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:24px 32px 16px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td bgcolor="#0a84ff" style="border-radius:999px;">
-                    <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
-                      Login
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 16px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td height="1" style="background:#bfc3c8;line-height:1px;font-size:0;">&nbsp;</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:0 32px 28px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
-                Let's-ParaConnect was built to create a more reliable way for attorneys and paralegals to work together.
-                Every interaction on the platform is supported by verification and Stripe-processed payments, helping set
-                clear expectations and support both sides.
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:26px 32px;background:#ffffff;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#1f1f1f;letter-spacing:-0.01em;">
-                Need help?
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#545454;line-height:1.4;margin-top:8px;">
-                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#545454;text-decoration:none;">help@lets-paraconnect.com</a> or reply to this email.
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#7a7a7a;line-height:1.4;margin-top:14px;">
-                ${unsubscribeLine}. Required account and case notices may still be sent.
-              </div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-  `;
-}
-
-function buildAttorneyApprovalEmailHtml(user, opts = {}) {
-  const dashboardUrl = ATTORNEY_DASHBOARD_URL;
-  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
-  const contactUrl = `${ASSET_BASE_URL}/contact.html`;
-  const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
-  const linkedinUrl = "https://www.linkedin.com/company/lets-paraconnect/";
-  const facebookUrl = "https://www.facebook.com/LetsParaConnect/";
-  const instagramUrl = "https://www.instagram.com/letsparaconnect/";
-  const token = buildUnsubscribeToken(user);
-  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const friendlyName = user?.firstName || formatFullName(user) || "there";
-  const unsubscribeLine = unsubscribeUrl
-    ? `<a href="${unsubscribeUrl}" style="color:#7a7a7a;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
-    : "Unsubscribe from non-essential emails";
-
-  return `
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr>
-            <td align="center" style="padding:24px 24px 8px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="padding-right:12px;">
-                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
-                  </td>
-                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
-                    Let's-ParaConnect
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Welcome to Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 0;">
-              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:34px;letter-spacing:0.02em;color:#6e6e6e;">
-                Welcome to Let&rsquo;s-ParaConnect
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:16px 40px 0;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.01em;color:#1f1f1f;line-height:1.7;text-align:left;">
-                <p style="margin:0 0 18px;">Dear ${friendlyName},</p>
-                <p style="margin:0 0 18px;">Congratulations! We are pleased to inform you that you have been accepted to Let&rsquo;s-ParaConnect.</p>
-                <p style="margin:0 0 18px;">LPC is a platform designed for attorneys and paralegals to connect in a streamlined, efficient, and secure environment. Through LPC, you can easily find, collaborate with, and manage skilled professionals to support your legal work&mdash;whether for case preparation, document drafting, research, or administrative assistance.</p>
-                <p style="margin:0 0 10px;"><strong>What You Can Use LPC For:</strong></p>
-                <ul style="margin:0 0 18px 20px;padding:0;">
-                  <li style="margin:0 0 10px;">Connecting with vetted paralegals</li>
-                  <li style="margin:0 0 10px;">Delegating legal research, drafting, and case support tasks</li>
-                  <li style="margin:0 0 10px;">Managing workflows and improving operational efficiency</li>
-                  <li style="margin:0;">Scaling your practice with flexible, on-demand support</li>
-                </ul>
-                <p style="margin:0 0 10px;"><strong>Next Steps:</strong></p>
-                <ul style="margin:0 0 18px 20px;padding:0;">
-                  <li style="margin:0 0 10px;">Log in to your account using the credentials you provided during sign-up.</li>
-                  <li style="margin:0 0 10px;">Complete your profile.</li>
-                  <li style="margin:0 0 10px;">Explore available paralegal professionals.</li>
-                  <li style="margin:0;">Post your first task or project.</li>
-                </ul>
-                <p style="margin:0 0 18px;">The goal is to help you save time, increase productivity, and focus on delivering the highest quality legal services to your clients.</p>
-                <p style="margin:0 0 18px;">If you have any questions or need assistance getting started, please don&rsquo;t hesitate to contact us.</p>
-                <p style="margin:0 0 18px;">Welcome aboard&mdash;we&rsquo;re excited to have you as part of the platform.</p>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:24px 32px 16px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td bgcolor="#0a84ff" style="border-radius:999px;">
-                    <a href="${dashboardUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 30px;font-family:Georgia, 'Times New Roman', serif;font-size:20px;color:#ffffff;text-decoration:none;">
-                      Go to Your Dashboard
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:18px 40px 28px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.01em;color:#1f1f1f;line-height:1.7;text-align:left;">
-                Warm regards,<br>
-                The Lets-ParaConnect Team
-              </div>
-            </td>
-          </tr>
-          ${buildLaunchEmailFooter({
-            unsubscribeLine,
-            contactUrl,
-            privacyUrl,
-            linkedinUrl,
-            facebookUrl,
-            instagramUrl,
-            backgroundColor: "#f5f7fb",
-          })}
-        </table>
-      </td>
-    </tr>
-  </table>
-  `;
-}
-
-function buildDenialEmailHtml(user, opts = {}) {
-  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
-  const token = buildUnsubscribeToken(user);
-  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const friendlyName = formatFullName(user) || "there";
-
-  const unsubscribeLine = unsubscribeUrl
-    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
-    : "Unsubscribe from non-essential emails";
-
-  return `
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr>
-            <td align="center" style="padding:24px 24px 8px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="padding-right:12px;">
-                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
-                  </td>
-                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
-                    Let's-ParaConnect
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 0;">
-              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:30px;letter-spacing:0.04em;color:#6e6e6e;">
-                Application update
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:16px 40px 28px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;">
-                Hi ${friendlyName},<br><br>
-                Thank you for your interest in joining Let's-ParaConnect.<br><br>
-                Your application has been reviewed and was not approved at this time. Currently, we are only accepting
-                paralegals who have a minimum of one year of professional paralegal experience and who are based in the
-                United States.<br><br>
-                Our team reviews every submission carefully, and if you believe we may have missed important
-                information in your application, you're welcome to reply to this email.<br><br>
-                Thank you again for your interest in the community.
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:26px 32px;background:#ffffff;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#1f1f1f;letter-spacing:-0.01em;">
-                Need help?
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#545454;line-height:1.4;margin-top:8px;">
-                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#545454;text-decoration:none;">help@lets-paraconnect.com</a> or reply to this email.
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#7a7a7a;line-height:1.4;margin-top:14px;">
-                ${unsubscribeLine}. Required account and case notices may still be sent.
-              </div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-  `;
-}
-
-function buildCompleteProfileEmailHtml(user, opts = {}) {
-  const loginUrl = LOGIN_URL;
-  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
-  const token = buildUnsubscribeToken(user);
-  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const friendlyName = formatFullName(user) || "there";
-
-  const unsubscribeLine = unsubscribeUrl
-    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
-    : "Unsubscribe from non-essential emails";
-
-  return `
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr>
-            <td align="center" style="padding:24px 24px 8px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="padding-right:12px;">
-                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
-                  </td>
-                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
-                    Let's-ParaConnect
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 0;">
-              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:30px;letter-spacing:0.04em;color:#6e6e6e;">
-                Complete your profile
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:16px 40px 0;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;">
-                Hi ${friendlyName},<br><br>
-                This is a friendly reminder to complete your profile on Let’s-ParaConnect.
-                A complete, professional profile helps attorneys find and select you more quickly.
-                Please log in and finish your profile details and photo at your earliest convenience.
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:24px 32px 16px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td bgcolor="#0a84ff" style="border-radius:999px;">
-                    <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
-                      Login
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 16px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td height="1" style="background:#bfc3c8;line-height:1px;font-size:0;">&nbsp;</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:0 32px 28px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
-                If you have any questions, reply to this email and we’ll help you get set up.
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td bgcolor="#070300" style="padding:26px 32px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#f6f5f1;letter-spacing:-0.01em;">
-                Need help?
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#f6f5f1;line-height:1.4;margin-top:8px;">
-                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a>
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
-                ${unsubscribeLine}. Required account and case notices may still be sent.
-              </div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-  `;
+  return letterEmail(`<p>Add your profile photo</p>
+<p>Hi ${friendlyName},<br><br>
+                Your Let’s-ParaConnect profile is missing a photo.
+                Adding a clear, professional photo helps attorneys recognize your profile when reviewing applicants.
+                Open Profile Settings to upload one.</p>
+<p><a href="${profileSettingsUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
+                      Open Profile Settings
+                    </a></p>
+<p>If you have any questions, reply to this email and we’ll help you get set up.</p>
+<p>Need help?</p>
+<p>Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a></p>
+<p>${unsubscribeLine}. Required account and Matter notices may still be sent.</p>`);
 }
 
 function userHasUploadedProfilePhoto(user = {}) {
@@ -738,368 +368,119 @@ function buildLaunchEmailFooter({
   contactUrl,
   privacyUrl,
   linkedinUrl,
-  facebookUrl,
-  instagramUrl,
-  linkedinIconUrl = `${ASSET_BASE_URL}/assets/email/linkedin-icon.svg`,
-  facebookIconUrl = `${ASSET_BASE_URL}/assets/email/facebook-icon.svg`,
-  instagramIconUrl = `${ASSET_BASE_URL}/assets/email/instagram-icon.svg`,
-  backgroundColor = "#ffffff",
 } = {}) {
-  return `
-          <tr>
-            <td style="padding:26px 32px;background:${backgroundColor};">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#1f1f1f;letter-spacing:-0.01em;">
-                Need help?
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#545454;line-height:1.4;margin-top:8px;">
-                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#545454;text-decoration:none;">help@lets-paraconnect.com</a> or reply to this email.
-              </div>
-              <table cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;">
-                <tr>
-                  <td style="padding-right:10px;">
-                    <a href="${linkedinUrl}" target="_blank" rel="noopener" aria-label="LinkedIn" style="display:inline-block;text-decoration:none;">
-                      <img src="${linkedinIconUrl}" alt="LinkedIn" width="18" height="18" style="display:block;border:0;width:18px;height:18px;">
-                    </a>
-                  </td>
-                  <td style="padding-right:10px;">
-                    <a href="${facebookUrl}" target="_blank" rel="noopener" aria-label="Facebook" style="display:inline-block;text-decoration:none;">
-                      <img src="${facebookIconUrl}" alt="Facebook" width="18" height="18" style="display:block;border:0;width:18px;height:18px;">
-                    </a>
-                  </td>
-                  <td>
-                    <a href="${instagramUrl}" target="_blank" rel="noopener" aria-label="Instagram" style="display:inline-block;text-decoration:none;">
-                      <img src="${instagramIconUrl}" alt="Instagram" width="18" height="18" style="display:block;border:0;width:18px;height:18px;">
-                    </a>
-                  </td>
-                </tr>
-              </table>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;color:#545454;line-height:1.4;margin-top:12px;">
-                <a href="${contactUrl}" target="_blank" rel="noopener" style="color:#545454;text-decoration:none;">Contact Us</a>
+  return `<p>Need help?</p>
+<p>Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#545454;text-decoration:none;">help@lets-paraconnect.com</a> or reply to this email.</p>
+<p><a href="${contactUrl}" target="_blank" rel="noopener" style="color:#545454;text-decoration:none;">Contact Us</a>
                 &nbsp;&nbsp;|&nbsp;&nbsp;
-                <a href="${privacyUrl}" target="_blank" rel="noopener" style="color:#545454;text-decoration:none;">Privacy Policy</a>
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#7a7a7a;line-height:1.4;margin-top:10px;">
-                &copy; 2026 Let&rsquo;s-ParaConnect
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#7a7a7a;line-height:1.4;margin-top:14px;">
-                ${unsubscribeLine}. Required account and case notices may still be sent.
-              </div>
-            </td>
-          </tr>
-  `;
+                <a href="${privacyUrl}" target="_blank" rel="noopener" style="color:#545454;text-decoration:none;">Privacy Policy</a></p>
+<p>&copy; 2026 Let&rsquo;s-ParaConnect</p>
+<p>${unsubscribeLine}. Required account and Matter notices may still be sent.</p><p><a href="${linkedinUrl}">LinkedIn</a></p>`;
 }
 
-function buildAttorneyLaunchEmailHtml(user, opts = {}) {
+function buildAttorneyLaunchEmailHtml(user) {
   const loginUrl = LOGIN_URL;
-  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
+
   const contactUrl = `${ASSET_BASE_URL}/contact.html`;
   const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
-  const linkedinUrl = "https://www.linkedin.com/company/lets-paraconnect/";
-  const facebookUrl = "https://www.facebook.com/LetsParaConnect/";
-  const instagramUrl = "https://www.instagram.com/letsparaconnect/";
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const friendlyName = user?.firstName || "there";
+  const friendlyName = escapeEmailHtml(user?.firstName || "there");
   const unsubscribeLine = unsubscribeUrl
     ? `<a href="${unsubscribeUrl}" style="color:#7a7a7a;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
     : "Unsubscribe from non-essential emails";
 
-  return `
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr>
-            <td align="center" style="padding:24px 24px 8px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="padding-right:12px;">
-                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
-                  </td>
-                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
-                    Let's-ParaConnect
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 0;">
-              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:30px;letter-spacing:0.04em;color:#6e6e6e;">
-                Attorney launch begins today
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:16px 40px 0;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;text-align:left;">
-                Hi ${friendlyName},<br><br>
-                We are officially opening Let&rsquo;s-ParaConnect to attorneys today. Please log in and complete your Stripe Connect payout setup under Profile Settings &gt; Security so your account is fully ready. We&rsquo;re excited to begin opening the door to project-based opportunities between paralegals and attorneys.
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:24px 32px 16px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td bgcolor="#0a84ff" style="border-radius:999px;">
-                    <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 30px;font-family:Georgia, 'Times New Roman', serif;font-size:20px;color:#ffffff;text-decoration:none;">
+  return letterEmail(`<p>Explore Matters on LPC</p>
+<p>Hi ${friendlyName},<br><br>
+                Browse Matters to find work that fits your experience and availability. You choose which Matters to apply to, and attorneys choose whom to hire.</p><p>Check your profile and Stripe Connect payout setup before pursuing work.</p>
+<p><a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 30px;font-family:Georgia, 'Times New Roman', serif;font-size:20px;color:#ffffff;text-decoration:none;">
                       Log In
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 16px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td height="1" style="background:#bfc3c8;line-height:1px;font-size:0;">&nbsp;</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:0 32px 28px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
-                If you have any questions, reply to this email and we&rsquo;ll help you get set up.
-              </div>
-            </td>
-          </tr>
-          ${buildLaunchEmailFooter({
+                    </a></p>
+<p>If you have any questions, reply to this email and we&rsquo;ll help you get set up.</p>`, { footer: `${buildLaunchEmailFooter({
             unsubscribeLine,
             contactUrl,
             privacyUrl,
-            linkedinUrl,
-            facebookUrl,
-            instagramUrl,
-          })}
-        </table>
-      </td>
-    </tr>
-  </table>
-  `;
+            linkedinUrl: LINKEDIN_COMPANY_URL,
+          })}` });
 }
 
-function buildAttorneyLaunchSetupEmailHtml(user, opts = {}) {
+function buildAttorneyLaunchSetupEmailHtml(user) {
   const loginUrl = LOGIN_URL;
-  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
+
   const contactUrl = `${ASSET_BASE_URL}/contact.html`;
   const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
-  const linkedinUrl = "https://www.linkedin.com/company/lets-paraconnect/";
-  const facebookUrl = "https://www.facebook.com/LetsParaConnect/";
-  const instagramUrl = "https://www.instagram.com/letsparaconnect/";
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const friendlyName = user?.firstName || "there";
+  const friendlyName = escapeEmailHtml(user?.firstName || "there");
   const unsubscribeLine = unsubscribeUrl
     ? `<a href="${unsubscribeUrl}" style="color:#7a7a7a;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
     : "Unsubscribe from non-essential emails";
 
-  return `
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr>
-            <td align="center" style="padding:24px 24px 8px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="padding-right:12px;">
-                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
-                  </td>
-                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
-                    Let's-ParaConnect
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 0;">
-              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:30px;letter-spacing:0.04em;color:#6e6e6e;">
-                Attorney launch begins today
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:16px 40px 0;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;text-align:left;">
-                Hi ${friendlyName},<br><br>
-                We are officially opening Let&rsquo;s-ParaConnect to attorneys today. Please log in to complete your profile and set up Stripe Connect under Profile Settings &gt; Security. We&rsquo;re excited to begin opening the door to project-based opportunities between paralegals and attorneys.
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:24px 32px 16px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td bgcolor="#0a84ff" style="border-radius:999px;">
-                    <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 30px;font-family:Georgia, 'Times New Roman', serif;font-size:20px;color:#ffffff;text-decoration:none;">
+  return letterEmail(`<p>Update your paralegal profile</p>
+<p>Hi ${friendlyName},<br><br>
+                Sign in to add your paralegal profile photo so attorneys can recognize your profile when reviewing applications.</p><p>You can also review your profile details and Stripe Connect payout setup.</p>
+<p><a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 30px;font-family:Georgia, 'Times New Roman', serif;font-size:20px;color:#ffffff;text-decoration:none;">
                       Log In
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 16px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td height="1" style="background:#bfc3c8;line-height:1px;font-size:0;">&nbsp;</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:0 32px 28px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
-                If you have any questions, reply to this email and we&rsquo;ll help you get set up.
-              </div>
-            </td>
-          </tr>
-          ${buildLaunchEmailFooter({
+                    </a></p>
+<p>If you have any questions, reply to this email and we&rsquo;ll help you get set up.</p>`, { footer: `${buildLaunchEmailFooter({
             unsubscribeLine,
             contactUrl,
             privacyUrl,
-            linkedinUrl,
-            facebookUrl,
-            instagramUrl,
-          })}
-        </table>
-      </td>
-    </tr>
-  </table>
-  `;
+            linkedinUrl: LINKEDIN_COMPANY_URL,
+          })}` });
 }
 
-function buildAttorneyFirstMatterEmailHtml(user, opts = {}) {
+function buildAttorneyFirstMatterEmailHtml(user) {
   const createCaseUrl = CREATE_CASE_URL;
-  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
+
   const contactUrl = `${ASSET_BASE_URL}/contact.html`;
   const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
-  const linkedinUrl = "https://www.linkedin.com/company/lets-paraconnect/";
-  const facebookUrl = "https://www.facebook.com/LetsParaConnect/";
-  const instagramUrl = "https://www.instagram.com/letsparaconnect/";
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const friendlyName = user?.firstName || formatFullName(user) || "there";
+  const friendlyName = escapeEmailHtml(user?.firstName || formatFullName(user) || "there");
   const unsubscribeLine = unsubscribeUrl
     ? `<a href="${unsubscribeUrl}" style="color:#7a7a7a;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
     : "Unsubscribe from non-essential emails";
 
-  return `
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr>
-            <td align="center" style="padding:24px 24px 8px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="padding-right:12px;">
-                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
-                  </td>
-                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
-                    Let's-ParaConnect
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 24px 20px;">
-              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 0;">
-              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:30px;letter-spacing:0.04em;color:#6e6e6e;">
-                Post your first matter
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:16px 40px 0;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;text-align:left;">
-                <p style="margin:0 0 18px;">Hi ${friendlyName},</p>
-                <p style="margin:0 0 18px;">Your Let&rsquo;s-ParaConnect account is ready. If you have not posted your first matter yet, this is a good time to get one live and start receiving interest from approved paralegals.</p>
-                <p style="margin:0 0 10px;"><strong>A simple first post can include:</strong></p>
+  return letterEmail(`<p>Create your first Matter</p>
+<div><p style="margin:0 0 18px;">Hi ${friendlyName},</p>
+                <p style="margin:0 0 18px;">Have work you’re ready to delegate? Create your first Matter by describing what you need, when you need it, and the compensation.</p>
+                <p style="margin:0 0 10px;"><strong>Include:</strong></p>
                 <ul style="margin:0 0 18px 20px;padding:0;">
                   <li style="margin:0 0 10px;">A clear scope of work and deadline</li>
                   <li style="margin:0 0 10px;">The practice area and state involved</li>
-                  <li style="margin:0;">Compensation for the matter</li>
+                  <li style="margin:0;">Compensation for the Matter</li>
                 </ul>
-                <p style="margin:0 0 18px;">Once your matter is posted, approved paralegals can review it and apply directly through the platform.</p>
-                <p style="margin:0;">If you need help getting your first matter set up, reply to this email and we&rsquo;ll help.</p>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:24px 32px 16px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td bgcolor="#0a84ff" style="border-radius:999px;">
-                    <a href="${createCaseUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 30px;font-family:Georgia, 'Times New Roman', serif;font-size:20px;color:#ffffff;text-decoration:none;">
+                <p style="margin:0 0 18px;">Once your Matter is published, independent paralegals can apply. You review the applications and decide whom to hire.</p>
+                <p style="margin:0;">If you need help creating your first Matter, reply to this email and we&rsquo;ll help.</p></div>
+<p><a href="${createCaseUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 30px;font-family:Georgia, 'Times New Roman', serif;font-size:20px;color:#ffffff;text-decoration:none;">
                       Post Your First Matter
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          ${buildLaunchEmailFooter({
+                    </a></p>`, { footer: `${buildLaunchEmailFooter({
             unsubscribeLine,
             contactUrl,
             privacyUrl,
-            linkedinUrl,
-            facebookUrl,
-            instagramUrl,
-          })}
-        </table>
-      </td>
-    </tr>
-  </table>
-  `;
+            linkedinUrl: LINKEDIN_COMPANY_URL,
+          })}` });
 }
 
 async function dispatchDecisionEmail(user, status) {
-if (!user?.email) return;
-const role = String(user?.role || "").toLowerCase();
-if (status === "approved") {
-const subject = role === "attorney" ? ATTORNEY_APPROVAL_EMAIL_SUBJECT : APPROVAL_EMAIL_SUBJECT;
-const html = role === "attorney"
-  ? buildAttorneyApprovalEmailHtml(user)
-  : buildApprovalEmailHtml(user);
-await sendEmail(user.email, subject, html);
-return;
-}
-if (status === "denied") {
-const html = buildDenialEmailHtml(user);
-await sendEmail(user.email, DENIAL_EMAIL_SUBJECT, html);
-}
+  if (!user?.email) return;
+  const message = status === "approved" ? accountEmails.applicationApproved(user, LOGIN_URL)
+    : status === "denied" ? accountEmails.applicationDenied(user) : null;
+  if (message) return sendEmail(user.email, message.subject, message.html, { text: message.text, throwOnError: true });
 }
 
 async function sendDecisionEmailSafe(user, status) {
 try {
-await dispatchDecisionEmail(user, status);
+const result=await dispatchDecisionEmail(user, status);
+return result?.disabled?"disabled":result?.accepted?.length?"accepted":"unconfirmed";
 } catch (err) {
-console.warn(`[admin] Failed to send ${status} email to ${user?.email || "unknown"}`, err?.message || err);
+logger.warn("Account-status email delivery failed.", {
+  status: String(status || "unknown").slice(0, 40),
+  name: String(err?.name || "Error").slice(0, 80),
+  code: String(err?.code || "EMAIL_DELIVERY_FAILED").slice(0, 100),
+});
+return "unconfirmed";
 }
 }
 
@@ -1111,6 +492,9 @@ error.statusCode = 400;
 throw error;
 }
 const wasApproved = user.status === "approved";
+  if (!wasApproved && normalized === "approved") {
+    await assertAdmissionFilesSafe(user);
+  }
   const previousStatus = String(user.status || "");
   const cleanNote = sanitizeNote(note);
   user.status = normalized;
@@ -1141,7 +525,7 @@ targetId: user._id,
 meta: { status: normalized, note: cleanNote },
 });
 } catch (err) {
-console.warn("[admin] Failed to log audit event", err?.message || err);
+logger.warn("[admin] Failed to log audit event", err?.message || err);
 }
 
 await publishEventSafe({
@@ -1188,32 +572,23 @@ priority: "normal",
 },
 });
 
-await sendDecisionEmailSafe(user, normalized);
+const delivery=await sendDecisionEmailSafe(user, normalized);
+await AuditLog.logFromReq(req,"admin.user.notification_recorded",{targetType:"user",targetId:user._id,meta:{decision:normalized,delivery}});
 return user;
 }
 
 // All admin routes are protected & admin-only
 router.use(verifyToken, requireApproved, requireRole("admin"));
 
-router.post(
-  "/ai/support-triage-test",
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    const { messageText, userEmail, source, saveIssue } = req.body || {};
-    if (!String(messageText || "").trim()) {
-      return res.status(400).json({ error: "messageText is required" });
-    }
+router.get("/workspace-release", asyncHandler(async (_req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  res.json({ settings: await workspaceRelease.readConfig() });
+}));
 
-    const result = await triageSupportIssue({
-      messageText,
-      userEmail,
-      source: source || "admin_test",
-      saveToDb: Boolean(saveIssue),
-    });
-
-    res.json(result);
-  })
-);
+router.put("/workspace-release", csrfProtection, asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  res.json({ settings: await workspaceRelease.updateConfig(req, req.body) });
+}));
 
 router.get(
   "/settings",
@@ -1239,10 +614,6 @@ router.put(
     if (typeof updates.supportEmail === "string") {
       settings.supportEmail = updates.supportEmail.trim();
     }
-    const normalizedTaxRate = normalizeTaxRate(updates.taxRate);
-    if (normalizedTaxRate !== null) {
-      settings.taxRate = normalizedTaxRate;
-    }
     settings.updatedBy = req.user.id;
     await settings.save();
 
@@ -1257,7 +628,7 @@ const ACTIVE_USER_MATCH = {
 };
 const PENDING_USER_MATCH = { status: "pending", deleted: { $ne: true }, disabled: { $ne: true } };
 
-router.get("/metrics", asyncHandler(async (_req, res) => {
+router.get("/metrics", asyncHandler(async (req, res) => {
 const ACTIVE_CASE_STATUSES = [
   "open",
   "assigned",
@@ -1267,9 +638,10 @@ const ACTIVE_CASE_STATUSES = [
   "in progress",
   "in_progress",
 ];
-const financialStart = getFinancialReportingStartDate();
+res.set("Cache-Control", "private, no-store");
+const report = await adminFinancialReport.begin(req, { from: getFinancialReportingStartDate() });
 
-const [roleAggregation, pendingApprovals, recentUsersRaw, monthlyRegistrationsRaw, caseAggregation, escrowAggregation, revenueAggregation] =
+const [roleAggregation, pendingApprovals, recentUsersRaw, monthlyRegistrationsRaw, caseAggregation] =
 await Promise.all([
 User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
 User.countDocuments(PENDING_USER_MATCH),
@@ -1284,10 +656,7 @@ User.aggregate([
 { $sort: { "_id.year": 1, "_id.month": 1 } },
 ]),
 Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
-Case.aggregate(
-  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: { $ne: true } }, financialStart)).concat([{ $group: { _id: null, total: { $sum: "$totalAmount" } } }])
-),
-PlatformIncome.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$feeAmount" }, count: { $sum: 1 } } }]),
+
 ]);
 
 const roleMap = roleAggregation.reduce((acc, item) => {
@@ -1321,8 +690,9 @@ status: user.status || "",
 createdAt: user.createdAt,
 }));
 
-const escrowHeld = escrowAggregation[0]?.total || 0;
-const totalRevenue = revenueAggregation[0]?.total || 0;
+const escrowHeld = report.value.held.totalAmount;
+const totalRevenue = report.value.incomeTotals.totalAmount;
+await report.verify();
 
 res.json({
 totals: {
@@ -1337,23 +707,9 @@ totalRevenue,
 },
 monthlyRegistrations,
 recentUsers,
+financial: { ownerId: report.value.ownerId, revision: report.value.revision, held: report.value.held, income: report.value.incomeTotals },
 });
 }));
-
-router.get(
-"/pending-paralegals",
-asyncHandler(async (_req, res) => {
-const pending = await User.find({ role: "paralegal", status: "pending", deleted: { $ne: true } })
-    .select("firstName lastName email linkedInURL certificateURL yearsExperience createdAt")
-.sort({ createdAt: 1 })
-.lean();
-const items = pending.map((item) => ({
-  ...item,
-  certificateURL: toFileViewUrl(item.certificateURL),
-}));
-res.json({ items });
-})
-);
 
 router.get(
   "/profile-photos",
@@ -1377,18 +733,28 @@ router.get(
       ];
     }
     const users = await User.find(filter)
-      .select("firstName lastName email profilePhotoStatus pendingProfileImage profileImage avatarURL createdAt")
+      .select(
+        "firstName lastName email role profilePhotoStatus pendingProfileImage profileImage avatarURL createdAt updatedAt " +
+        "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
+      )
       .sort({ updatedAt: -1 })
       .lean();
-    const items = users.map((user) => ({
-      id: user._id,
-      name: formatFullName(user) || user.email || "User",
-      email: user.email || "",
-      status: resolvePhotoStatus(user),
-      pendingProfileImage: user.pendingProfileImage || "",
-      profileImage: user.profileImage || user.avatarURL || "",
-      createdAt: user.createdAt || null,
-    }));
+    const items = users.map((user) => {
+      const approvedUrl = String(user.role || "").toLowerCase() === "paralegal"
+        ? buildPublicProfilePhotoUrl(user)
+        : buildAuthenticatedProfilePhotoUrl(user);
+      return {
+        id: user._id,
+        name: formatFullName(user) || user.email || "User",
+        email: user.email || "",
+        status: resolvePhotoStatus(user),
+        pendingProfileImage: hasPhotoReference(user, "pending")
+          ? buildAuthenticatedProfilePhotoUrl(user, { variant: "pending" })
+          : "",
+        profileImage: hasPhotoReference(user, "approved") ? approvedUrl : "",
+        createdAt: user.createdAt || null,
+      };
+    });
     res.json({ items });
   })
 );
@@ -1399,7 +765,9 @@ router.post(
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
-    const user = await User.findById(id);
+    const user = await User.findById(id).select(
+      "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
+    );
     if (!user) return res.status(404).json({ error: "User not found" });
     const role = String(user.role || "").toLowerCase();
     if (!["paralegal", "attorney"].includes(role)) {
@@ -1408,13 +776,61 @@ router.post(
     if (!user.pendingProfileImage) {
       return res.status(400).json({ error: "No pending profile photo to approve" });
     }
-    user.profileImage = user.pendingProfileImage;
-    user.avatarURL = user.pendingProfileImage;
-    if (user.pendingProfileImageOriginal) {
-      user.profileImageOriginal = user.pendingProfileImageOriginal;
+    const pendingKey = resolveProfilePhotoKey(user, {
+      bucket: process.env.S3_BUCKET,
+      region: process.env.S3_REGION,
+      variant: "pending",
+    });
+    if (!pendingKey) return res.status(400).json({ error: "Pending profile photo is invalid" });
+    const pendingOriginalKey = extractProfilePhotoKey(
+      user.pendingProfileImageOriginalKey || user.pendingProfileImageOriginal,
+      { bucket: process.env.S3_BUCKET, region: process.env.S3_REGION, ownerId: user._id }
+    );
+    try {
+      await assertObjectMalwareSafe({ s3: adminS3, bucket: process.env.S3_BUCKET, key: pendingKey });
+      if (user.pendingProfileImageOriginalKey || user.pendingProfileImageOriginal) {
+        if (!pendingOriginalKey) {
+          return res.status(400).json({ error: "Pending original profile photo is invalid" });
+        }
+        await assertObjectMalwareSafe({
+          s3: adminS3,
+          bucket: process.env.S3_BUCKET,
+          key: pendingOriginalKey,
+        });
+      }
+    } catch (error) {
+      if (error?.statusCode) return res.status(error.statusCode).json({ error: error.message, code: error.code });
+      throw error;
     }
+    const oldApprovedKeys = collectUserPersonalStorageKeys(user).filter(
+      (key) =>
+        key.startsWith(`profile-photos/${user._id}/`) &&
+        key !== pendingKey &&
+        key !== pendingOriginalKey
+    );
+    const storageTaskIds = await stagePersonalStorageDeletion({
+      ownerId: user._id,
+      keys: oldApprovedKeys,
+      reason: "profile_photo_approved_replacement",
+    });
+    const photoVersion = new Date();
+    const approvedUrl = role === "paralegal"
+      ? buildPublicProfilePhotoUrl(user, photoVersion)
+      : buildAuthenticatedProfilePhotoUrl(user, { updatedAt: photoVersion });
+    user.profileImageKey = pendingKey;
+    user.profileImage = approvedUrl;
+    user.avatarURL = approvedUrl;
+    user.profileImageOriginalKey = pendingOriginalKey;
+    user.profileImageOriginal = pendingOriginalKey
+      ? buildAuthenticatedProfilePhotoUrl(user, {
+          variant: "approved-original",
+          updatedAt: photoVersion,
+        })
+      : "";
     user.pendingProfileImage = "";
+    user.pendingProfileImageKey = "";
     user.pendingProfileImageOriginal = "";
+    user.pendingProfileImageOriginalKey = "";
     user.profilePhotoStatus = "approved";
     if (role === "paralegal") {
       user.preferences = {
@@ -1424,21 +840,33 @@ router.post(
         hideProfile: false,
       };
     }
-    await user.save();
+    try {
+      await user.save();
+    } catch (error) {
+      await cancelPersonalStorageDeletion(storageTaskIds).catch(
+        logPromiseFailure(logger, "[admin] approved profile photo cleanup rollback failed")
+      );
+      throw error;
+    }
+    await activatePersonalStorageDeletion(storageTaskIds).catch((error) => {
+      logger.error("[admin] approved profile photo cleanup activation deferred", {
+        errorCode: String(error?.name || error?.code || "STORAGE_TASK_TRANSITION_FAILED"),
+      });
+    });
     try {
       await AuditLog.logFromReq(req, "admin.profile_photo.approved", {
         targetType: "user",
         targetId: user._id,
       });
     } catch (err) {
-      console.warn("[admin] profile photo approval audit failed", err?.message || err);
+      logger.warn("[admin] profile photo approval audit failed", err?.message || err);
     }
     try {
       if (role === "paralegal") {
         await notifyUser(user._id, "profile_photo_approved", {}, { actorUserId: req.user.id });
       }
     } catch (err) {
-      console.warn("[admin] notifyUser profile_photo_approved failed", err);
+      logger.warn("[admin] notifyUser profile_photo_approved failed", err);
     }
     res.json({ ok: true, user: pickUserSafe(user.toObject()), profilePhotoStatus: user.profilePhotoStatus });
   })
@@ -1450,86 +878,99 @@ router.post(
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
-    const user = await User.findById(id);
+    const user = await User.findById(id).select(
+      "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
+    );
     if (!user) return res.status(404).json({ error: "User not found" });
     const role = String(user.role || "").toLowerCase();
     if (!["paralegal", "attorney"].includes(role)) {
       return res.status(400).json({ error: "Only attorney or paralegal profile photos can be reviewed here" });
     }
+    const allPhotoKeys = collectUserPersonalStorageKeys(user).filter((key) =>
+      key.startsWith(`profile-photos/${user._id}/`)
+    );
+    const approvedKeys = [
+      resolveProfilePhotoKey(user, {
+        bucket: process.env.S3_BUCKET,
+        region: process.env.S3_REGION,
+        variant: "approved",
+      }),
+      resolveProfilePhotoKey(user, {
+        bucket: process.env.S3_BUCKET,
+        region: process.env.S3_REGION,
+        variant: "approved-original",
+      }),
+    ].filter(Boolean);
+    const keysToDelete = [];
     if (user.pendingProfileImage) {
+      if (role === "attorney") keysToDelete.push(...allPhotoKeys);
+      else keysToDelete.push(...allPhotoKeys.filter((key) => !approvedKeys.includes(key)));
       user.pendingProfileImage = "";
+      user.pendingProfileImageKey = "";
       user.pendingProfileImageOriginal = "";
-      user.profilePhotoStatus = "rejected";
+      user.pendingProfileImageOriginalKey = "";
+      user.profilePhotoStatus = role === "paralegal" && approvedKeys.length ? "approved" : "rejected";
       if (role === "attorney") {
         user.profileImage = null;
+        user.profileImageKey = "";
         user.avatarURL = "";
         user.profileImageOriginal = "";
+        user.profileImageOriginalKey = "";
       }
     } else if (user.profileImage || user.avatarURL) {
+      keysToDelete.push(...allPhotoKeys);
       user.profileImage = null;
+      user.profileImageKey = "";
       user.avatarURL = "";
       user.pendingProfileImage = "";
+      user.pendingProfileImageKey = "";
       user.profileImageOriginal = "";
+      user.profileImageOriginalKey = "";
       user.pendingProfileImageOriginal = "";
+      user.pendingProfileImageOriginalKey = "";
       user.profilePhotoStatus = "rejected";
     } else {
       return res.status(400).json({ error: "No profile photo to reject" });
     }
-    await user.save();
+    const storageTaskIds = await stagePersonalStorageDeletion({
+      ownerId: user._id,
+      keys: [...new Set(keysToDelete)],
+      reason: "profile_photo_rejected",
+    });
+    try {
+      await user.save();
+    } catch (error) {
+      await cancelPersonalStorageDeletion(storageTaskIds).catch(
+        logPromiseFailure(logger, "[admin] rejected profile photo cleanup rollback failed")
+      );
+      throw error;
+    }
+    await activatePersonalStorageDeletion(storageTaskIds).catch((error) => {
+      logger.error("[admin] rejected profile photo cleanup activation deferred", {
+        errorCode: String(error?.name || error?.code || "STORAGE_TASK_TRANSITION_FAILED"),
+      });
+    });
     try {
       await AuditLog.logFromReq(req, "admin.profile_photo.rejected", {
         targetType: "user",
         targetId: user._id,
       });
     } catch (err) {
-      console.warn("[admin] profile photo rejection audit failed", err?.message || err);
+      logger.warn("[admin] profile photo rejection audit failed", err?.message || err);
     }
     try {
       const profileSettingsUrl = `${ASSET_BASE_URL}/profile-settings.html`;
       await sendProfilePhotoRejectedEmail(user, { profileSettingsUrl });
     } catch (err) {
-      console.warn("[admin] profile photo rejection email failed", err?.message || err);
+      logger.warn("[admin] profile photo rejection email failed", err?.message || err);
     }
     try {
       await notifyUser(user._id, "profile_photo_rejected", {}, { actorUserId: req.user.id });
     } catch (err) {
-      console.warn("[admin] notifyUser profile_photo_rejected failed", err);
+      logger.warn("[admin] notifyUser profile_photo_rejected failed", err);
     }
     res.json({ ok: true, user: pickUserSafe(user.toObject()), profilePhotoStatus: user.profilePhotoStatus });
   })
-);
-
-router.post(
-"/approve/:id",
-csrfProtection,
-asyncHandler(async (req, res) => {
-const { id } = req.params;
-  if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
-  const user = await User.findById(id);
-  if (!user) return res.status(404).json({ error: "User not found" });
-  if (user.role !== "paralegal") return res.status(400).json({ error: "Only paralegals can be approved here" });
-  const updated = await applyUserDecision(req, user, "approved");
-  try {
-    await sendWelcomePacket(updated);
-  } catch (err) {
-    console.warn("[admin] Failed to send welcome packet", err?.message || err);
-  }
-  res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
-})
-);
-
-router.post(
-"/reject/:id",
-csrfProtection,
-asyncHandler(async (req, res) => {
-const { id } = req.params;
-if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
-const user = await User.findById(id);
-if (!user) return res.status(404).json({ error: "User not found" });
-if (user.role !== "paralegal") return res.status(400).json({ error: "Only paralegals can be reviewed here" });
-  const updated = await applyUserDecision(req, user, "denied");
-  res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
-})
 );
 
 router.post(
@@ -1538,10 +979,19 @@ csrfProtection,
 asyncHandler(async (req, res) => {
 const { id } = req.params;
 if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
-const user = await User.findById(id);
+const user = await User.findById(id).select("+authVersion");
 if (!user) return res.status(404).json({ error: "User not found" });
+if (String(user._id) === String(req.user?.id)) {
+  return res.status(409).json({ error: "You cannot suspend your own active admin session." });
+}
 user.disabled = true;
+user.authVersion = Number(user.authVersion || 0) + 1;
 await user.save();
+await revokeAllUserSessions(user._id, "admin_suspended");
+publishNotificationEvent(user._id, "notifications", {
+  at: new Date().toISOString(),
+  type: "account_suspended_refresh",
+});
 const reasonRaw = typeof req.body?.reason === "string" ? req.body.reason : "";
 const messageRaw = typeof req.body?.message === "string" ? req.body.message : "";
 const reason = reasonRaw.trim().slice(0, 2000);
@@ -1557,17 +1007,17 @@ if (reason || message) {
   try {
     await notifyUser(user._id, "account_suspended", payload, { actorUserId: req.user?.id || null });
   } catch (err) {
-    console.warn("[admin] notifyUser account_suspended failed", err?.message || err);
+    logger.warn("[admin] notifyUser account_suspended failed", err?.message || err);
   }
 }
 try {
   await AuditLog.logFromReq(req, "admin.user.suspended", {
     targetType: "user",
     targetId: user._id,
-    meta: { reason: reason || "", message: message || "" },
+    meta: { reasonProvided: Boolean(reason), customMessageProvided: Boolean(message), notificationAttempted: Boolean(reason || message), notification: reason || message ? "Attempted through account notifications; email delivery is not confirmed." : "No account notification requested." },
   });
 } catch (err) {
-  console.warn("[admin] Failed to log suspension", err?.message || err);
+  logger.warn("[admin] Failed to log suspension", err?.message || err);
 }
 res.json({ ok: true, disabled: true });
 })
@@ -1579,17 +1029,23 @@ csrfProtection,
 asyncHandler(async (req, res) => {
 const { id } = req.params;
 if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
-const user = await User.findById(id);
+const user = await User.findById(id).select("+authVersion");
 if (!user) return res.status(404).json({ error: "User not found" });
+if (user.deleted || user.personalDataStatus === "minimized") {
+  return res.status(409).json({ error: "A deactivated or minimized account cannot be re-enabled." });
+}
 user.disabled = false;
+user.authVersion = Number(user.authVersion || 0) + 1;
 await user.save();
+await revokeAllUserSessions(user._id, "admin_reenabled");
+await AuditLog.logFromReq(req,"admin.user.reinstated",{targetType:"user",targetId:user._id,meta:{reason:sanitizeNote(req.body?.reason)}});
 res.json({ ok: true, disabled: false });
 })
 );
 
 router.get(
 "/summary",
-asyncHandler(async (_req, res) => {
+asyncHandler(async (req, res) => {
 const ACTIVE_CASE_STATUSES = [
   "open",
   "assigned",
@@ -1599,21 +1055,13 @@ const ACTIVE_CASE_STATUSES = [
   "in progress",
   "in_progress",
 ];
-const financialStart = getFinancialReportingStartDate();
-const [roleAggregation, pendingUsers, caseAggregation, escrowHeldAgg, escrowReleasedAgg] = await Promise.all([
+res.set("Cache-Control", "private, no-store");
+const report = await adminFinancialReport.begin(req, { from: getFinancialReportingStartDate() });
+const [roleAggregation, pendingUsers, caseAggregation] = await Promise.all([
 User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
 User.countDocuments(PENDING_USER_MATCH),
 Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
-Case.aggregate(
-  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: { $ne: true } }, financialStart)).concat([
-    { $group: { _id: null, total: { $sum: CASE_AMOUNT_EXPR } } },
-  ])
-),
-Case.aggregate(
-  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: true }, financialStart)).concat([
-    { $group: { _id: null, total: { $sum: CASE_AMOUNT_EXPR } } },
-  ])
-),
+
 ]);
 
 const roleMap = roleAggregation.reduce((acc, item) => {
@@ -1632,6 +1080,7 @@ activeCases += item.count;
 }
 });
 
+await report.verify();
 res.json({
 totalUsers,
 pendingUsers,
@@ -1639,403 +1088,63 @@ totalAttorneys: roleMap.attorney || 0,
 totalParalegals: roleMap.paralegal || 0,
 activeCases,
 completedCases,
-totalEscrowHold: escrowHeldAgg[0]?.total || 0,
-totalEscrowReleased: escrowReleasedAgg[0]?.total || 0,
+totalEscrowHold: report.value.held.totalAmount,
+totalEscrowReleased: report.value.payoutTotals.totalAmount,
+financial: { ownerId: report.value.ownerId, revision: report.value.revision, held: report.value.held, payouts: report.value.payoutTotals },
 });
 })
 );
 
-router.get(
-"/analytics",
-asyncHandler(async (_req, res) => {
-const MONTHS_WINDOW = 12;
-const startWindow = startOfMonthWindow(MONTHS_WINDOW);
-const financialStart = getFinancialReportingStartDate();
-const financeWindowStart = financialStart && financialStart > startWindow ? financialStart : startWindow;
-const ACTIVE_CASE_STATUSES = [
-  "open",
-  "assigned",
-  "active",
-  "awaiting_documents",
-  "reviewing",
-  "in progress",
-  "in_progress",
-];
-const COMPLETED_CASE_STATUSES = ["completed", "closed"];
-const LEDGER_LIMIT = 20;
-
-const [
-settings,
-roleAggregation,
-pendingApprovalsCount,
-registrationsAgg,
-escrowHeldAgg,
-escrowReleasedAgg,
-escrowHeldByModeAgg,
-escrowReleasedByModeAgg,
-      escrowHeldByMonthAgg,
-      escrowReleasedByMonthAgg,
-grossVolumeAgg,
-grossVolumeByModeAgg,
-monthlyGrossAgg,
-platformFeeAgg,
-platformFeeByModeAgg,
-monthlyFeesAgg,
-jobsPostedAgg,
-jobsCompletedAgg,
-practiceAgg,
-escrowInProgressCount,
-pendingPayoutAgg,
-pendingPayoutByModeAgg,
-payoutTotalsAgg,
-caseStatusAgg,
-caseLedgerDocs,
-payoutLedgerDocs,
-feeLedgerDocs,
-upcomingPayoutCases,
-recentUsersRaw,
-] = await Promise.all([
-getAppSettings(),
-User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
-User.countDocuments(PENDING_USER_MATCH),
-User.aggregate([
-{ $match: { ...ACTIVE_USER_MATCH, createdAt: { $gte: startWindow } } },
-{ $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } },
-{ $sort: { "_id.year": 1, "_id.month": 1 } },
-]),
-Case.aggregate(
-  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: { $ne: true } }, financialStart)).concat([
-    { $group: { _id: null, total: { $sum: CASE_AMOUNT_EXPR } } },
-  ])
-),
-Case.aggregate(
-  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: true }, financialStart)).concat([
-    { $group: { _id: null, total: { $sum: CASE_AMOUNT_EXPR } } },
-  ])
-),
-Case.aggregate(buildCaseStripeModeAggregate(withCreatedAtFloor({ paymentReleased: { $ne: true } }, financialStart))),
-Case.aggregate(buildCaseStripeModeAggregate(withCreatedAtFloor({ paymentReleased: true }, financialStart))),
-      Case.aggregate(
-        buildApprovedCasePipeline(withCreatedAtFloor({
-          paymentReleased: { $ne: true },
-          amountForCalc: { $gt: 0 },
-        }, financeWindowStart)).concat([
-          {
-            $group: {
-              _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
-              total: { $sum: CASE_AMOUNT_EXPR },
-            },
-          },
-          { $sort: { "_id.year": 1, "_id.month": 1 } },
-        ])
-      ),
-      Payout.aggregate([
-        { $match: withCreatedAtFloor({}, financeWindowStart) },
-        {
-          $group: {
-            _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
-            total: { $sum: "$amountPaid" },
-          },
-        },
-        { $sort: { "_id.year": 1, "_id.month": 1 } },
-      ]),
-Case.aggregate(buildApprovedCasePipeline(withCreatedAtFloor({}, financialStart)).concat([{ $group: { _id: null, total: { $sum: "$totalAmount" }, count: { $sum: 1 } } }])),
-Case.aggregate(buildCaseStripeModeAggregate(withCreatedAtFloor({}, financialStart))),
-Case.aggregate(
-  buildApprovedCasePipeline(withCreatedAtFloor({}, financeWindowStart)).concat([
-    {
-      $group: {
-        _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
-        total: { $sum: CASE_AMOUNT_EXPR },
-      },
-    },
-    { $sort: { "_id.year": 1, "_id.month": 1 } },
-  ])
-),
-PlatformIncome.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$feeAmount" }, count: { $sum: 1 } } }]),
-PlatformIncome.aggregate(buildModelStripeModeAggregate(withCreatedAtFloor({}, financialStart), "$feeAmount")),
-PlatformIncome.aggregate([
-{ $match: withCreatedAtFloor({}, financeWindowStart) },
-{ $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, revenue: { $sum: "$feeAmount" } } },
-{ $sort: { "_id.year": 1, "_id.month": 1 } },
-]),
-Case.aggregate(
-  buildApprovedCasePipeline(withCreatedAtFloor({}, financeWindowStart)).concat([
-    { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } },
-    { $sort: { "_id.year": 1, "_id.month": 1 } },
-  ])
-),
-Case.aggregate(
-  buildApprovedCasePipeline({ completedAt: { $ne: null, $gte: startWindow } }).concat([
-    { $group: { _id: { year: { $year: "$completedAt" }, month: { $month: "$completedAt" } }, count: { $sum: 1 } } },
-    { $sort: { "_id.year": 1, "_id.month": 1 } },
-  ])
-),
-Case.aggregate(
-  buildApprovedCasePipeline({}).concat([
-    { $group: { _id: "$practiceArea", count: { $sum: 1 } } },
-    { $sort: { count: -1 } },
-  ])
-),
-Case.aggregate(
-  buildApprovedCasePipeline({ paymentReleased: { $ne: true }, status: { $in: ACTIVE_CASE_STATUSES } }).concat([{ $count: "count" }])
-),
-Case.aggregate(
-  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: { $ne: true }, status: { $in: COMPLETED_CASE_STATUSES } }, financialStart)).concat([
-    { $group: { _id: null, total: { $sum: CASE_PAYOUT_EXPR }, count: { $sum: 1 } } },
-  ])
-),
-Case.aggregate(
-  buildCaseStripeModeAggregate(
-    withCreatedAtFloor({ paymentReleased: { $ne: true }, status: { $in: COMPLETED_CASE_STATUSES } }, financialStart),
-    CASE_PAYOUT_EXPR
-  )
-),
-Payout.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
-Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
-Case.find(withCreatedAtFloor({ $or: [{ lockedTotalAmount: { $gt: 0 } }, { totalAmount: { $gt: 0 } }] }, financialStart))
-.sort({ createdAt: -1 })
-.limit(LEDGER_LIMIT)
-.select("title practiceArea totalAmount lockedTotalAmount paymentStatus paymentReleased createdAt")
-.lean(),
-Payout.find(withCreatedAtFloor({}, financialStart))
-.sort({ createdAt: -1 })
-.limit(LEDGER_LIMIT)
-.select("caseId amountPaid transferId createdAt")
-.lean(),
-PlatformIncome.find(withCreatedAtFloor({}, financialStart))
-.sort({ createdAt: -1 })
-.limit(LEDGER_LIMIT)
-.select("caseId feeAmount createdAt")
-.lean(),
-Case.find(withCreatedAtFloor({
-  paymentReleased: { $ne: true },
-  paralegal: { $ne: null },
-  $or: [{ lockedTotalAmount: { $gt: 0 } }, { totalAmount: { $gt: 0 } }],
-}, financialStart))
-.sort({ deadline: 1, createdAt: 1 })
-.limit(5)
-.select("deadline totalAmount lockedTotalAmount feeParalegalAmount feeParalegalPct paralegalNameSnapshot paralegal createdAt")
-.populate("paralegal", "firstName lastName")
-.lean(),
-User.find()
-.sort({ createdAt: -1 })
-.limit(10)
-.select("firstName lastName email role status createdAt")
-.lean(),
-]);
-
-const roleMap = roleAggregation.reduce((acc, entry) => {
-if (entry?._id) acc[entry._id] = entry.count;
-return acc;
-}, {});
-const totalUsers = Object.values(roleMap).reduce((sum, value) => sum + value, 0);
-const pendingApprovals = Number(pendingApprovalsCount) || 0;
-const registrationsByMonth = registrationsAgg.map((entry) => ({
-month: formatMonthFromGroup(entry),
-count: entry.count,
-}));
-
-const userMetrics = {
-totalUsers,
-totalAttorneys: roleMap.attorney || 0,
-totalParalegals: roleMap.paralegal || 0,
-pendingApprovals,
-registrationsByMonth,
-};
-
-    const heldByMonth = escrowHeldByMonthAgg.map((entry) => ({
-      month: formatMonthFromGroup(entry),
-      total: entry.total || 0,
-    }));
-    const releasedByMonth = escrowReleasedByMonthAgg.map((entry) => ({
-      month: formatMonthFromGroup(entry),
-      total: entry.total || 0,
-    }));
-    const heldMap = heldByMonth.reduce((acc, entry) => {
-      if (entry.month) acc[entry.month] = entry.total;
-      return acc;
-    }, {});
-    const releasedMap = releasedByMonth.reduce((acc, entry) => {
-      if (entry.month) acc[entry.month] = entry.total;
-      return acc;
-    }, {});
-    const escrowTrendMonths = Array.from(
-      new Set([...heldByMonth.map((e) => e.month), ...releasedByMonth.map((e) => e.month)]).values()
-    )
-      .filter(Boolean)
-      .sort();
-    const escrowTrends = {
-      months: escrowTrendMonths,
-      held: escrowTrendMonths.map((m) => heldMap[m] || 0),
-      released: escrowTrendMonths.map((m) => releasedMap[m] || 0),
-    };
-
-let activeCases = 0;
-let completedCases = 0;
-caseStatusAgg.forEach((item) => {
-if (item?._id === "completed" || item?._id === "closed") {
-completedCases += item.count;
-} else if (ACTIVE_CASE_STATUSES.includes(item?._id)) {
-activeCases += item.count;
+function financialMonths(rows, from) {
+  const selected = rows.filter(row => row.recordedAt && new Date(row.recordedAt) >= from);
+  const totals = adminFinancialReport.aggregate(selected, { unknownAffectsTotal: true });
+  const available = totals.currencies.length <= 1 && !totals.requiresReview && !rows.some(row => !row.recordedAt && !['failed', 'canceled'].includes(row.state));
+  const unit = available && totals.currencies[0] ? { currency: totals.currencies[0].currency, stripeMode: totals.currencies[0].stripeMode } : null;
+  const months = new Map();
+  if (available) for (const row of selected) {
+    if (row.state !== "recorded" || !adminFinancialReport.money(row.amount)) continue;
+    const month = row.recordedAt.slice(0, 7);
+    months.set(month, (months.get(month) || 0) + row.amount);
+    if (!adminFinancialReport.money(months.get(month))) adminFinancialReport.fail(413, "TOTAL_TOO_LARGE");
+  }
+  return { available, unit, totals, entries: [...months].sort(([a], [b]) => a.localeCompare(b)).map(([month, amount]) => ({ month, amount })) };
 }
-});
-
-const escrowInProgress = Array.isArray(escrowInProgressCount) ? escrowInProgressCount[0]?.count || 0 : escrowInProgressCount || 0;
-const escrowMetrics = {
-  totalEscrowHeld: escrowHeldAgg[0]?.total || 0,
-  totalEscrowReleased: escrowReleasedAgg[0]?.total || 0,
-  escrowInProgress,
-  pendingPayouts: pendingPayoutAgg[0]?.total || 0,
-  pendingPayoutCount: pendingPayoutAgg[0]?.count || 0,
-};
-
-const grossVolume = grossVolumeAgg[0]?.total || 0;
-const jobCount = grossVolumeAgg[0]?.count || 0;
-const platformFeeTotals = platformFeeAgg[0] || { total: 0, count: 0 };
-const platformFeesCollected = platformFeeTotals.total || 0;
-const platformFeeCount = platformFeeTotals.count || 0;
-const averageJobValue = jobCount ? Math.round(grossVolume / jobCount) : 0;
-const profitMargin = grossVolume > 0 ? platformFeesCollected / grossVolume : 0;
-const monthlyGrossMap = monthlyGrossAgg.reduce((acc, entry) => {
-acc[formatMonthFromGroup(entry)] = entry.total;
-return acc;
-}, {});
-
-const revenueMetrics = {
-grossVolume,
-platformFeesCollected,
-totalRevenue: platformFeesCollected,
-monthlyRevenue: monthlyFeesAgg.map((entry) => {
-const month = formatMonthFromGroup(entry);
-const gross = monthlyGrossMap[month] || 0;
-const margin = gross > 0 ? Math.round((entry.revenue / gross) * 100) : 0;
-return { month, revenue: entry.revenue, margin };
-}),
-averageJobValue,
-profitMargin,
-platformFeeCount,
-};
-
-const caseMetrics = {
-jobsPostedByMonth: jobsPostedAgg.map((entry) => ({
-month: formatMonthFromGroup(entry),
-count: entry.count,
-})),
-jobsCompletedByMonth: jobsCompletedAgg.map((entry) => ({
-month: formatMonthFromGroup(entry),
-count: entry.count,
-})),
-casesByPracticeArea: practiceAgg.map((entry) => ({
-practiceArea: (entry._id && String(entry._id).trim()) || "Unspecified",
-count: entry.count,
-})),
-activeCases,
-completedCases,
-};
-
-const ledgerEntries = [];
-caseLedgerDocs.forEach((doc) => {
-ledgerEntries.push({
-date: doc.createdAt ? doc.createdAt.toISOString() : new Date().toISOString(),
-category: "Attorney Payment",
-description: doc.title
-? `${doc.title}${doc.practiceArea ? ` – ${doc.practiceArea}` : ""}`
-: "Case payment",
-amount: doc.lockedTotalAmount || doc.totalAmount || 0,
-type: "income",
-status: doc.paymentStatus || (doc.paymentReleased ? "Released" : "Pending"),
-});
-});
-payoutLedgerDocs.forEach((doc) => {
-ledgerEntries.push({
-date: doc.createdAt ? doc.createdAt.toISOString() : new Date().toISOString(),
-category: "Paralegal Payout",
-description: doc.caseId ? `Payout for case ${doc.caseId}` : "Paralegal payout",
-amount: doc.amountPaid || 0,
-type: "expense",
-status: doc.transferId ? "Transferred" : "Pending",
-});
-});
-feeLedgerDocs.forEach((doc) => {
-ledgerEntries.push({
-date: doc.createdAt ? doc.createdAt.toISOString() : new Date().toISOString(),
-category: "Platform Fee",
-description: doc.caseId ? `Fee from case ${doc.caseId}` : "Platform income",
-amount: doc.feeAmount || 0,
-type: "income",
-status: "Recorded",
-});
-});
-
-const ledger = ledgerEntries
-.sort((a, b) => new Date(b.date) - new Date(a.date))
-.slice(0, LEDGER_LIMIT * 2);
-
-const payoutSummary = payoutTotalsAgg[0] || { total: 0, count: 0 };
-let operationalCosts = grossVolume - payoutSummary.total - platformFeesCollected;
-if (operationalCosts < 0) {
-operationalCosts = Math.max(0, Math.round(grossVolume * 0.05));
-}
-const expenses = {
-operationalCosts,
-payoutTotal: payoutSummary.total,
-payoutCount: payoutSummary.count || 0,
-};
-const normalizedTaxRate = normalizeTaxRate(settings?.taxRate);
-const taxRate = normalizedTaxRate !== null ? normalizedTaxRate : 0.22;
-const taxableBase = platformFeesCollected - operationalCosts;
-const estimatedTax = Math.max(0, Math.round(taxableBase * taxRate));
-const taxSummary = {
-grossEarnings: platformFeesCollected,
-deductibleExpenses: operationalCosts + payoutSummary.total,
-estimatedTax,
-taxOwed: estimatedTax,
-taxRate,
-nextFilingDeadline: formatFilingDeadline(),
-};
-
-const upcomingPayouts = upcomingPayoutCases.map((caseDoc) => {
-const rawDate = caseDoc.deadline || caseDoc.createdAt || new Date();
-const recipient =
-caseDoc.paralegalNameSnapshot ||
-[caseDoc.paralegal?.firstName, caseDoc.paralegal?.lastName].filter(Boolean).join(" ") ||
-"Paralegal";
-const baseAmount = Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
-return {
-date: rawDate ? rawDate.toISOString().split("T")[0] : "",
-amount: computeParalegalPayoutAmount(baseAmount, caseDoc),
-recipient,
-};
-});
-
-const recentUsers = recentUsersRaw.map((user) => ({
-id: user._id,
-name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email || "User",
-email: user.email || "",
-role: user.role || "",
-status: user.status || "",
-createdAt: user.createdAt,
+router.get("/analytics", asyncHandler(async (req, res) => {
+  const startWindow = startOfMonthWindow(12), financialStart = getFinancialReportingStartDate();
+  const financeWindowStart = financialStart && financialStart > startWindow ? financialStart : startWindow;
+  const activeStatuses = ["open", "assigned", "active", "awaiting_documents", "reviewing", "in progress", "in_progress"];
+  res.set("Cache-Control", "private, no-store");
+  const report = await adminFinancialReport.begin(req, { from: financialStart }), value = report.value;
+  const [roles, pendingApprovals, registrations, posted, completed, practice, statuses, recent] = await Promise.all([
+    User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
+    User.countDocuments(PENDING_USER_MATCH),
+    User.aggregate([{ $match: { ...ACTIVE_USER_MATCH, createdAt: { $gte: startWindow } } }, { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } }, { $sort: { "_id.year": 1, "_id.month": 1 } }]),
+    Case.aggregate(buildApprovedCasePipeline(withCreatedAtFloor({}, startWindow)).concat([{ $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } }, { $sort: { "_id.year": 1, "_id.month": 1 } }])),
+    Case.aggregate(buildApprovedCasePipeline({ completedAt: { $ne: null, $gte: startWindow } }).concat([{ $group: { _id: { year: { $year: "$completedAt" }, month: { $month: "$completedAt" } }, count: { $sum: 1 } } }, { $sort: { "_id.year": 1, "_id.month": 1 } }])),
+    Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$practiceArea", count: { $sum: 1 } } }, { $sort: { count: -1 } }])),
+    Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
+    User.find(ACTIVE_USER_MATCH).sort({ createdAt: -1 }).limit(10).select("firstName lastName email role status createdAt").lean(),
+  ]);
+  const roleMap = Object.fromEntries(roles.map(row => [row._id, row.count]));
+  const userMetrics = { totalUsers: roles.reduce((sum, row) => sum + row.count, 0), totalAttorneys: roleMap.attorney || 0, totalParalegals: roleMap.paralegal || 0, pendingApprovals, registrationsByMonth: registrations.map(row => ({ month: formatMonthFromGroup(row), count: row.count })) };
+  const caseMetrics = { jobsPostedByMonth: posted.map(row => ({ month: formatMonthFromGroup(row), count: row.count })), jobsCompletedByMonth: completed.map(row => ({ month: formatMonthFromGroup(row), count: row.count })), casesByPracticeArea: practice.map(row => ({ practiceArea: String(row._id || "Unspecified"), count: row.count })), activeCases: statuses.filter(row => activeStatuses.includes(row._id)).reduce((sum, row) => sum + row.count, 0), completedCases: statuses.filter(row => ["completed", "closed"].includes(row._id)).reduce((sum, row) => sum + row.count, 0) };
+  const revenue = financialMonths(value.income, financeWindowStart), funding = financialMonths(value.funding, financeWindowStart), payout = financialMonths(value.payouts, financeWindowStart);
+  const months = [...new Set([...funding.entries, ...payout.entries].map(row => row.month))].sort();
+  const flowUnits = new Set([funding.unit, payout.unit].filter(Boolean).map(unit => `${unit.currency}:${unit.stripeMode}`));
+  const flowAvailable = funding.available && payout.available && flowUnits.size <= 1;
+  const escrowTrends = { months, held: months.map(month => funding.entries.find(row => row.month === month)?.amount || 0), released: months.map(month => payout.entries.find(row => row.month === month)?.amount || 0), basis: "recorded_flows", fundingAvailable: funding.available, payoutAvailable: payout.available, chartAvailable: flowAvailable, unit: flowAvailable ? funding.unit || payout.unit : null };
+  const escrowMetrics = { totalEscrowHeld: value.held.totalAmount, totalEscrowReleased: value.payoutTotals.totalAmount, escrowInProgress: value.matters.filter(row => row.status === "active").length, pendingPayouts: value.pendingTotals.totalAmount, pendingPayoutCount: value.pending.length, held: value.held, pending: value.pendingTotals, payouts: value.payoutTotals };
+  const revenueMetrics = { platformFeesCollected: value.incomeTotals.totalAmount, totalRevenue: value.incomeTotals.totalAmount, platformFeeCount: value.incomeTotals.count, monthlyRevenue: revenue.entries.map(row => ({ month: row.month, revenue: row.amount })), chartAvailable: revenue.available, chartUnit: revenue.unit, ...value.incomeTotals };
+  const payoutMetrics = { totalRecorded: value.payoutTotals.totalAmount, ...value.payoutTotals, revision: value.revision, chartAvailable: payout.available };
+  const ledger = [...value.funding.map(row => ({ ...row, type: "funding", category: "Matter funding" })), ...value.payouts.map(row => ({ ...row, type: "payout", category: "Paralegal payout" })), ...value.income.map(row => ({ ...row, type: "revenue", category: "Platform fee" }))].sort((a, b) => (b.recordedAt || "").localeCompare(a.recordedAt || "") || a.id.localeCompare(b.id)).slice(0, 40).map(row => ({ ...row, date: row.recordedAt, description: row.title || `Matter ${row.caseId}`, status: row.state === "recorded" ? "Recorded" : row.state }));
+  const pendingPayoutQueue = value.pending.slice(0, 5).map(row => ({ caseId: row.caseId, recipient: row.paralegalName || "Name unavailable", matterDeadline: report.source.caseDocs.find(doc => String(doc._id) === row.caseId)?.deadlineDate || null, amount: row.amount, currency: row.currency, stripeMode: row.stripeMode, state: row.state, basis: row.basis }));
+  await report.verify();
+  res.json({ ownerId: value.ownerId, revision: value.revision, from: value.from, userMetrics, caseMetrics, escrowMetrics, revenueMetrics, payoutMetrics, pendingPayoutQueue, ledger, escrowTrends, fundingMetrics: value.fundingTotals, recentUsers: recent.map(user => ({ id: user._id, name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email || "User", email: user.email || "", role: user.role || "", status: user.status || "", createdAt: user.createdAt })) });
 }));
-
-res.json({
-userMetrics,
-escrowMetrics,
-revenueMetrics,
-caseMetrics,
-taxSummary,
-expenses,
-upcomingPayouts,
-ledger,
-recentUsers,
-      escrowTrends,
-});
-})
-);
 
 const listUsersHandler = asyncHandler(async (req, res) => {
 const { status = "pending", role, q } = req.query;
-const { skip, limit, page } = parsePagination(req, { defaultLimit: 25 });
+const { skip, limit, page } = parsePagination(req, { defaultLimit: 25, maxLimit: 200 });
 const audience = String(req.query.audience || "").trim().toLowerCase();
 
 const filter = {};
@@ -2046,7 +1155,8 @@ filter.deleted = true;
 if (String(req.query?.includeDeleted || "").toLowerCase() !== "true") {
 filter.deleted = { $ne: true };
 }
-const normalizedStatus = normalizeUserStatus(status);
+const normalizedStatus = ["all", "suspended"].includes(rawStatus) ? "" : normalizeUserStatus(status);
+if(rawStatus === "suspended") filter.disabled = true;
 if (normalizedStatus) {
 if (normalizedStatus === "denied") {
 filter.status = { $in: ["denied", "rejected"] };
@@ -2067,7 +1177,7 @@ if (postedAttorneyIds.size) {
 }
 }
 if (q && q.trim()) {
-const rx = new RegExp(q.trim(), "i");
+const rx = new RegExp(q.trim().slice(0,200).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 filter.$or = [
 { firstName: rx },
 { lastName: rx },
@@ -2075,10 +1185,11 @@ filter.$or = [
 { specialties: rx },
 { jurisdictions: rx },
 ];
+if (isObjId(q.trim())) filter.$or.push({ _id: q.trim() });
 }
 
 const [items, total] = await Promise.all([
-User.find(filter).select("-password").sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+User.find(filter).select("-password").sort({ createdAt: req.query.sort === "oldest" ? 1 : -1, _id: req.query.sort === "oldest" ? 1 : -1 }).skip(skip).limit(limit).lean(),
 User.countDocuments(filter),
 ]);
 
@@ -2090,12 +1201,23 @@ users: items.map(pickUserSafe),
 
 /**
 * GET /api/admin/pending-users
-* GET /api/admin/users/pending
-* Optional query: ?status=pending|approved|denied&role=attorney|paralegal|admin&q=search&page=&limit=
-* Returns paginated users (password never selected).
-*/
+ * Optional query: ?status=pending|approved|denied&role=attorney|paralegal|admin&q=search&page=&limit=
+ * Returns paginated users (password never selected).
+ */
 router.get("/pending-users", listUsersHandler);
-router.get("/users/pending", listUsersHandler);
+router.get("/users/:id", asyncHandler(async (req,res) => {
+  if(!isObjId(req.params.id)) return res.status(400).json({error:"Invalid user ID"});
+  const user=await User.findById(req.params.id).select("-password").lean();
+  if(!user) return res.status(404).json({error:"User not found"});
+  res.json({user:pickUserSafe(user)});
+}));
+router.get("/users/:id/admission-check",asyncHandler(async(req,res)=>{
+ if(!isObjId(req.params.id))return res.status(400).json({error:"Invalid user ID"});
+ const user=await User.findById(req.params.id);if(!user)return res.status(404).json({error:"Account not found."});
+ try{await assertAdmissionFilesSafe(user);res.json({canApprove:!user.deleted,checkedAt:new Date(),message:user.role==="paralegal"?"Required protected-document checks passed.":"No automated credential verification is performed. Review the applicant’s professional details."});}
+ catch(error){res.json({canApprove:false,code:error.code||"DOCUMENT_CHECK_UNAVAILABLE",message:error.message,checkedAt:new Date()});}
+}));
+
 
 /**
 * GET /api/admin/audit-logs
@@ -2141,12 +1263,20 @@ $or: [{ firstName: rx }, { lastName: rx }, { email: rx }],
   .limit(100)
   .lean();
 actorIds = matches.map((user) => user._id);
-} catch (_) {}
+} catch (error) {
+logger.warn("[admin] audit-log actor search failed", {
+  error: error?.message || String(error),
+});
+}
 const orFilters = [
 { action: rx },
 { path: rx },
 { method: rx },
+{ targetId: rx },
+{ "meta.reason": rx },
+{ "meta.note": rx },
 ];
+if(isObjId(q))orFilters.push({case:q},{actor:q});
 if (actorIds.length) {
 orFilters.push({ actor: { $in: actorIds } });
 }
@@ -2198,25 +1328,6 @@ logs,
 });
 }));
 
-/**
-* PATCH /api/admin/user/:id
-* Body: { status: 'approved' | 'denied', note? }
-* Approve or deny a user, email them, and audit.
-*/
-router.patch("/user/:id", csrfProtection, asyncHandler(async (req, res) => {
-const { id } = req.params;
-const { status, note } = req.body || {};
-if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
-const normalized = normalizeUserStatus(status);
-if (!normalized || normalized === "pending") return res.status(400).json({ msg: "Invalid status" });
-
-const user = await User.findById(id);
-if (!user) return res.status(404).json({ msg: "User not found" });
-
-const updated = await applyUserDecision(req, user, normalized, note);
-res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
-}));
-
 router.patch("/users/:id/role", csrfProtection, asyncHandler(async (req, res) => {
 const { id } = req.params;
 const nextRole = String(req.body?.role || "").trim().toLowerCase();
@@ -2246,7 +1357,7 @@ try {
     meta: { from: currentRole, to: nextRole },
   });
 } catch (err) {
-  console.warn("[admin] Failed to log role change", err?.message || err);
+  logger.warn("[admin] Failed to log role change", err?.message || err);
 }
 
 res.json({ ok: true, user: pickUserSafe(user.toObject()) });
@@ -2276,7 +1387,7 @@ if (nextEmail !== normalizeEmail(user.email) && nextEmail !== normalizeEmail(use
   try {
     await sendVerificationEmail({ user, email: user.pendingEmail });
   } catch (err) {
-    console.warn("[admin] pending email verification send failed", err?.message || err);
+    logger.warn("[admin] pending email verification send failed", err?.message || err);
   }
   try {
     await AuditLog.logFromReq(req, "admin.user.email_changed", {
@@ -2285,25 +1396,10 @@ if (nextEmail !== normalizeEmail(user.email) && nextEmail !== normalizeEmail(use
       meta: { from: previousEmail, pendingTo: nextEmail },
     });
   } catch (err) {
-    console.warn("[admin] Failed to log email change", err?.message || err);
+    logger.warn("[admin] Failed to log email change", err?.message || err);
   }
 }
 res.json({ ok: true, user: pickUserSafe(user.toObject()) });
-}));
-
-/**
-* (Alias) POST /api/admin/approve-user/:id
-* Approve via friendlier endpoint.
-*/
-router.post("/approve-user/:id", csrfProtection, asyncHandler(async (req, res) => {
-const { id } = req.params;
-if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
-
-const user = await User.findById(id);
-if (!user) return res.status(404).json({ msg: "User not found" });
-
-const updated = await applyUserDecision(req, user, "approved");
-res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
 }));
 
 router.post("/users/:id/approve", csrfProtection, asyncHandler(async (req, res) => {
@@ -2343,35 +1439,51 @@ res.set("Content-Type", "text/html").send(html);
 router.post("/bulk-email", csrfProtection, asyncHandler(async (req, res) => {
 const { type, userIds } = req.body || {};
 const normalizedType = String(type || "").trim().toLowerCase();
-if (!["acceptance", "denial", "complete_profile", "attorney_launch", "attorney_launch_setup", "attorney_first_matter"].includes(normalizedType)) {
+if (!["complete_profile", "attorney_launch", "attorney_launch_setup", "attorney_first_matter"].includes(normalizedType)) {
   return res.status(400).json({ msg: "Invalid email type" });
 }
 if (!Array.isArray(userIds) || !userIds.length) {
   return res.status(400).json({ msg: "No users selected" });
 }
-const ids = userIds.filter(isObjId);
-if (!ids.length) {
-  return res.status(400).json({ msg: "No valid user ids" });
+if (userIds.length > 200) {
+  return res.status(400).json({ msg: "Bulk email is limited to 200 recipients per send" });
+}
+const ids = Array.from(new Set(userIds.map((id) => String(id || "").trim())));
+if (!ids.length || ids.some((id) => !isObjId(id))) {
+  return res.status(400).json({ msg: "One or more user ids are invalid" });
 }
 
 const users = await User.find({ _id: { $in: ids } })
-  .select("firstName lastName email role status profileImage avatarURL profilePhotoStatus")
+  .select("firstName lastName email role status profileImage avatarURL profilePhotoStatus disabled deleted notificationPrefs emailPref")
   .lean();
 const emailOpts = {
   throwOnError: true,
 };
 
 let sent = 0;
-let skipped = 0;
+let skipped = Math.max(0, ids.length - users.length);
 const failures = [];
 const attorneyIdsWithPostedMatters = normalizedType === "attorney_first_matter"
   ? await getAttorneyIdsWithPostedMatters(users.map((user) => user?._id).filter(Boolean))
   : new Set();
 for (const user of users) {
   const email = user?.email;
-  if (!email) {
+  const isActiveApprovedUser = String(user?.status || "").toLowerCase() === "approved"
+    && user?.disabled !== true
+    && user?.deleted !== true;
+  const allowsNonEssentialEmail = user?.notificationPrefs?.email !== false
+    && user?.emailPref?.product !== false
+    && (normalizedType === "complete_profile" || user?.emailPref?.marketing !== false);
+  if (!email || !isActiveApprovedUser || !allowsNonEssentialEmail) {
     skipped += 1;
     continue;
+  }
+  if (normalizedType === "complete_profile") {
+    const isApprovedParalegal = String(user?.role || "").toLowerCase() === "paralegal";
+    if (!isApprovedParalegal || userHasUploadedProfilePhoto(user)) {
+      skipped += 1;
+      continue;
+    }
   }
   if (normalizedType === "attorney_launch" || normalizedType === "attorney_launch_setup") {
     const isApprovedParalegal = String(user?.role || "").toLowerCase() === "paralegal"
@@ -2395,25 +1507,14 @@ for (const user of users) {
   }
   let subject = "";
   let html = "";
-  if (normalizedType === "acceptance") {
-    if (String(user?.role || "").toLowerCase() === "attorney") {
-      subject = ATTORNEY_APPROVAL_EMAIL_SUBJECT;
-      html = buildAttorneyApprovalEmailHtml(user);
-    } else {
-      subject = APPROVAL_EMAIL_SUBJECT;
-      html = buildApprovalEmailHtml(user);
-    }
-  } else if (normalizedType === "denial") {
-    subject = DENIAL_EMAIL_SUBJECT;
-    html = buildDenialEmailHtml(user);
-  } else if (normalizedType === "complete_profile") {
-    subject = "Complete your profile on Let’s-ParaConnect";
+  if (normalizedType === "complete_profile") {
+    subject = "Add your profile photo on Let’s-ParaConnect";
     html = buildCompleteProfileEmailHtml(user);
   } else if (normalizedType === "attorney_launch") {
     subject = ATTORNEY_LAUNCH_EMAIL_SUBJECT;
     html = buildAttorneyLaunchEmailHtml(user);
   } else if (normalizedType === "attorney_launch_setup") {
-    subject = ATTORNEY_LAUNCH_EMAIL_SUBJECT;
+    subject = "Update your paralegal profile";
     html = buildAttorneyLaunchSetupEmailHtml(user);
   } else if (normalizedType === "attorney_first_matter") {
     subject = ATTORNEY_FIRST_MATTER_EMAIL_SUBJECT;
@@ -2440,7 +1541,7 @@ try {
     },
   });
 } catch (err) {
-  console.warn("[admin] Failed to log bulk email", err?.message || err);
+  logger.warn("[admin] Failed to log bulk email", err?.message || err);
 }
 
 res.json({ ok: true, total: ids.length, sent, skipped, failed: failures.length, failures });
@@ -2451,34 +1552,22 @@ const { id } = req.params;
 if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
 const user = await User.findById(id);
 if (!user) return res.status(404).json({ msg: "User not found" });
-
-if (String(user.role || "").toLowerCase() === "attorney") {
-  await purgeAttorneyAccount(user._id);
-  try {
-    await AuditLog.logFromReq(req, "admin.user.delete", {
-      targetType: "user",
-      targetId: user._id,
-      meta: { email: user.email || "", role: user.role || "" },
-    });
-  } catch {}
-  return res.json({ ok: true, id });
+if (String(user._id) === String(req.user?.id) || ["admin", "director"].includes(String(user.role || "").toLowerCase())) {
+  return res.status(409).json({ msg: "Operational accounts require a separately approved offboarding procedure." });
 }
-
-user.deleted = true;
-user.deletedAt = new Date();
-user.disabled = true;
-user.status = "denied";
-await user.save();
+if (!user.deleted || !user.disabled) await deactivateUserAccount(user, { now: new Date() });
 
 try {
 await AuditLog.logFromReq(req, "admin.user.delete", {
   targetType: "user",
   targetId: user._id,
-  meta: { email: user.email || "", role: user.role || "" },
+  meta: { role: user.role || "", outcome: "deactivated" },
 });
-} catch {}
+} catch (auditError) {
+  logger.error("[admin] account deactivation audit persistence failed", auditError);
+}
 
-res.json({ ok: true, user: pickUserSafe(user.toObject()) });
+res.json({ ok: true, id, mode: "deactivated" });
 }));
 
 router.post("/users/:id/purge", csrfProtection, asyncHandler(async (req, res) => {
@@ -2486,26 +1575,27 @@ const { id } = req.params;
 if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
 const user = await User.findById(id);
 if (!user) return res.status(404).json({ msg: "User not found" });
-
-if (String(user.role || "").toLowerCase() === "attorney") {
-  await purgeAttorneyAccount(user._id);
-} else {
-  await User.findByIdAndDelete(id);
-
-  try {
-    await Notification.deleteMany({ userId: id });
-  } catch {}
+if (String(user._id) === String(req.user?.id) || ["admin", "director"].includes(String(user.role || "").toLowerCase())) {
+  return res.status(409).json({ msg: "Operational accounts require a separately approved offboarding procedure." });
 }
+const result = await finalizeAccountDataRemoval(user._id, { now: new Date() });
 
 try {
-await AuditLog.logFromReq(req, "admin.user.purge", {
+await AuditLog.logFromReq(req, "admin.user.data_removal.finalized", {
   targetType: "user",
   targetId: id,
-  meta: { email: user.email || "", role: user.role || "" },
+  meta: {
+    role: user.role || "",
+    mode: result.mode,
+    retainedRecordTypes: result.retainedRecordTypes,
+    storageTaskCount: result.storageTaskCount,
+  },
 });
-} catch {}
+} catch (auditError) {
+  logger.error("[admin] account deletion audit persistence failed", auditError);
+}
 
-res.json({ ok: true, id });
+res.json({ ok: true, id, ...result });
 }));
 
 /**
@@ -2516,17 +1606,26 @@ res.json({ ok: true, id });
 router.get("/cases", asyncHandler(async (req, res) => {
 const { status, attorney, paralegal, q } = req.query;
 const { skip, limit, page } = parsePagination(req, { defaultLimit: 25 });
+if (status !== undefined && (typeof status !== "string" || !CASE_STATUS_ENUM.includes(status)) ||
+    attorney !== undefined && (typeof attorney !== "string" || !isObjId(attorney)) ||
+    paralegal !== undefined && (typeof paralegal !== "string" || !isObjId(paralegal))) {
+  return res.status(400).json({ error: "Choose valid Matter filters." });
+}
+if (q !== undefined && (typeof q !== "string" || q.length > 200)) {
+  return res.status(400).json({ error: "Choose a valid Matter search." });
+}
 
 const filter = {};
 if (status) filter.status = status;
 if (attorney && isObjId(attorney)) filter.attorney = attorney;
 if (paralegal && isObjId(paralegal)) filter.paralegal = paralegal;
-if (q && q.trim()) filter.title = new RegExp(q.trim(), "i");
+if (q && q.trim()) filter.title = new RegExp(escapeRegex(q.trim()), "i");
 
 const [items, total] = await Promise.all([
 Case.find(filter)
 .sort({ createdAt: -1 })
 .skip(skip).limit(limit)
+.select("-files -downloadUrl")
 .populate("attorney paralegal", "firstName lastName email role status")
 .lean(),
 Case.countDocuments(filter),
@@ -2538,145 +1637,33 @@ cases: items.map(sanitizeCaseForAdmin),
 });
 }));
 
-/**
-* PATCH /api/admin/assign/:caseId
-* Body: { paralegalId }
-* Manually assign a paralegal to a case (sets status to 'assigned' if applicable).
-*/
-router.patch("/assign/:caseId", csrfProtection, asyncHandler(async (req, res) => {
-const { caseId } = req.params;
-const { paralegalId } = req.body || {};
-if (!isObjId(caseId)) return res.status(400).json({ msg: "Invalid case id" });
-if (!isObjId(paralegalId)) return res.status(400).json({ msg: "Invalid paralegalId" });
-
-const para = await User.findById(paralegalId).lean();
-if (!para || para.role !== "paralegal") {
-return res.status(400).json({ msg: "Invalid paralegalId" });
-}
-
-const c = await Case.findById(caseId);
-if (!c) return res.status(404).json({ msg: "Case not found" });
-
-// Prefer model helpers if present (from upgraded Case model)
-if (typeof c.acceptApplicant === "function") {
-try { c.acceptApplicant(paralegalId); } catch (_) { /* ignore if not applied yet */ }
-}
-c.paralegal = paralegalId;
-if (c.status === "open" && typeof c.transitionTo === "function") {
-if (c.canTransitionTo("assigned")) c.transitionTo("assigned");
-else c.status = "assigned";
-} else if (c.status === "open") {
-c.status = "assigned";
-}
-await c.save();
-
-await AuditLog.logFromReq(req, "admin.case.assign", {
-targetType: "case",
-targetId: c._id,
-caseId: c._id,
-meta: { paralegalId },
-});
-
-const populated = await Case.findById(c._id).populate("attorney paralegal", "firstName lastName email role status").lean();
-res.json({ ok: true, msg: "Paralegal assigned", case: sanitizeCaseForAdmin(populated) });
-}));
-
-/**
-* PATCH /api/admin/cases/:id/status
-* Body: { status }
-* Update a case status as admin (uses Case transition guardrails if available).
-*/
-router.patch("/cases/:id/status", csrfProtection, asyncHandler(async (req, res) => {
-const { id } = req.params;
-const { status } = req.body || {};
-if (!isObjId(id)) return res.status(400).json({ msg: "Invalid case id" });
-const normalizedStatus = typeof status === "string" && status.toLowerCase() === "in_progress" ? "in progress" : status;
-const ALLOWED = ["open", "assigned", "in progress", "in_progress", "completed", "disputed", "closed"];
-if (!ALLOWED.includes(normalizedStatus)) return res.status(400).json({ msg: "Invalid status" });
-
-const c = await Case.findById(id);
-if (!c) return res.status(404).json({ msg: "Case not found" });
-
-if (typeof c.transitionTo === "function") {
-  // prefer safe transitions
-  if (!c.canTransitionTo(normalizedStatus)) {
-    return res.status(400).json({ msg: `Invalid transition from '${c.status}' to '${normalizedStatus}'.` });
-  }
-  c.transitionTo(normalizedStatus);
-} else {
-  c.status = normalizedStatus;
-}
-
-await c.save();
-
-await AuditLog.logFromReq(req, "admin.case.status.update", {
-targetType: "case",
-targetId: c._id,
-caseId: c._id,
-meta: { status },
-});
-
-const populated = await Case.findById(id)
-.populate("attorney paralegal", "firstName lastName email role")
-.lean();
-res.json({ ok: true, msg: "Case updated", case: sanitizeCaseForAdmin(populated) });
+router.get("/cases/:id/deletion", asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { return res.json({ deletion: await adminMatterDeletion.review(req, req.params.id) }); }
+  catch (error) { return res.status(error.status || 503).json({ code: error.publicCode || "ADMIN_MATTER_DELETE_UNAVAILABLE", msg: error.publicCode ? error.message : "The posting could not be verified. Refresh before continuing." }); }
 }));
 
 /**
 * DELETE /api/admin/cases/:id
 * Body: { reason, message }
-* Force-delete a case from the admin posts workflow regardless of normal case-state restrictions.
+* Permanently removes only open postings that were never hired or funded.
 */
 router.delete("/cases/:id", csrfProtection, asyncHandler(async (req, res) => {
 const { id } = req.params;
-if (!isObjId(id)) return res.status(400).json({ msg: "Invalid case id" });
-
-const doc = await Case.findById(id).select(
-  "title attorney attorneyId jobId job"
-).lean();
-if (!doc) return res.status(404).json({ msg: "Case not found" });
+if (!isObjId(id)) return res.status(400).json({ msg: "Invalid Matter ID" });
 
 const reason = sanitizeAdminNote(req.body?.reason || "", 2000);
 const message = sanitizeAdminNote(req.body?.message || "", 4000);
+let result;
+try {
+  result = await adminMatterDeletion.remove(req, id, { reason, message });
+} catch (error) {
+  if (!error.publicCode) logger.error("[admin] posting deletion could not be confirmed", { caseId: id, error: error.name });
+  return res.status(error.status || 503).json({ code: error.publicCode || "ADMIN_MATTER_DELETE_UNCONFIRMED", msg: error.publicCode ? error.message : "Deletion could not be confirmed. Check this posting before trying again." });
+}
+const doc = result.doc;
 const attorneyRef = doc.attorneyId || doc.attorney || null;
-
-const relatedJobIds = [doc.jobId, doc.job].filter(Boolean).map((jobId) => String(jobId));
-try {
-  const extraJobs = await Job.find({ caseId: doc._id }).select("_id").lean();
-  extraJobs.forEach((job) => {
-    const jobId = job?._id ? String(job._id) : "";
-    if (jobId && !relatedJobIds.includes(jobId)) relatedJobIds.push(jobId);
-  });
-} catch (jobListErr) {
-  console.warn("[admin] Unable to load related jobs for force delete", doc._id, jobListErr);
-}
-
-await Case.deleteOne({ _id: doc._id });
-
-try {
-  if (relatedJobIds.length) {
-    await Job.deleteMany({ _id: { $in: relatedJobIds } });
-  } else {
-    await Job.deleteMany({ caseId: doc._id });
-  }
-} catch (jobErr) {
-  console.warn("[admin] Unable to clean up related jobs for deleted case", doc._id, jobErr);
-}
-
-try {
-  if (relatedJobIds.length) {
-    await Application.deleteMany({ jobId: { $in: relatedJobIds } });
-  }
-} catch (appErr) {
-  console.warn("[admin] Unable to clean up applications for deleted case", doc._id, appErr);
-}
-
-await AuditLog.logFromReq(req, "admin.case.force_delete", {
-targetType: "case",
-targetId: doc._id,
-caseId: doc._id,
-meta: { reason, message },
-});
+const affectedParalegalIds = result.recipients;
 
 if (attorneyRef && (reason || message)) {
   try {
@@ -2684,68 +1671,106 @@ if (attorneyRef && (reason || message)) {
       attorneyRef,
       "case_deleted",
       {
-        caseTitle: doc.title || "Case",
+        caseTitle: doc.title || "Untitled Matter",
         reason: reason || "Admin review",
         customNote: message || "",
-        message: `Your case posting "${doc.title || "Case"}" was removed by the platform.`,
+        message: `Your Matter posting "${doc.title || "Untitled Matter"}" was removed by the platform.`,
       },
       { actorUserId: req.user?.id || req.user?._id || null }
     );
   } catch (err) {
-    console.warn("[admin] notifyUser case_deleted failed", err?.message || err);
+    logger.warn("[admin] notifyUser case_deleted failed", err?.message || err);
   }
 }
 
-res.json({ ok: true });
-}));
-
-/**
-* GET /api/admin/metrics
-* Quick admin overview counts.
-*/
-router.get("/metrics", asyncHandler(async (_req, res) => {
-const [users, cases] = await Promise.all([
-User.aggregate([
-{ $group: { _id: { role: "$role", status: "$status" }, count: { $sum: 1 } } },
-]),
-Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
-]);
-
-res.json({ users, cases });
-}));
-
-router.get("/payouts", asyncHandler(async (_req, res) => {
-const financialStart = getFinancialReportingStartDate();
-const [items, summary] = await Promise.all([
-Payout.find(withCreatedAtFloor({}, financialStart)).sort({ createdAt: -1 }).limit(200).lean(),
-Payout.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
-]);
-res.json({
-totalAmount: summary[0]?.total || 0,
-count: summary[0]?.count || 0,
-items,
+publishCaseProjectionRefresh(doc, "matter_deleted_refresh", {
+  additionalUserIds: [...affectedParalegalIds],
+  discovery: true,
 });
+
+res.json({ ok: true, caseId: String(doc._id), ownerId: String(req.user.id || req.user._id) });
 }));
 
-router.get("/income", asyncHandler(async (_req, res) => {
-const financialStart = getFinancialReportingStartDate();
-const [items, summary] = await Promise.all([
-PlatformIncome.find(withCreatedAtFloor({}, financialStart)).sort({ createdAt: -1 }).limit(200).lean(),
-PlatformIncome.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$feeAmount" }, count: { $sum: 1 } } }]),
-]);
-res.json({
-totalAmount: summary[0]?.total || 0,
-count: summary[0]?.count || 0,
-items,
+router.get("/payouts", asyncHandler(async (req, res) => {
+res.set('Cache-Control', 'private, no-store');
+const value = await adminPayoutProjection.read(req, { from: getFinancialReportingStartDate() });
+res.json(value);
+}));
+
+function adminFinancialPage(req, value, rows) {
+  const page = req.query.page === undefined ? 1 : Number(req.query.page), limit = req.query.limit === undefined ? 200 : Number(req.query.limit);
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 500) adminFinancialReport.fail(400, "INVALID");
+  if (req.query.revision !== undefined && req.query.revision !== value.revision) adminFinancialReport.fail(409, "CHANGED");
+  return { ownerId: value.ownerId, revision: value.revision, page, limit, total: rows.length, pages: Math.ceil(rows.length / limit), items: rows.slice((page - 1) * limit, page * limit) };
+}
+router.get("/funding-evidence", asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  const value = await adminFinancialReport.read(req, { from: getFinancialReportingStartDate() });
+  const totalsByMode = {}, currencies = [];
+  for (const group of value.fundingTotals.currencies) {
+    const rows = value.funding.filter(row => row.state === "recorded" && row.currency === group.currency && row.stripeMode === group.stripeMode && (!value.from || row.recordedAt));
+    const total = { currency: group.currency, stripeMode: group.stripeMode, count: rows.length, grossAmount: rows.reduce((sum, row) => sum + row.grossAmount, 0), processingFeeAmount: rows.reduce((sum, row) => sum + row.processingFeeAmount, 0), netAmount: rows.reduce((sum, row) => sum + row.netAmount, 0) };
+    if (![total.grossAmount, total.processingFeeAmount, total.netAmount].every(adminFinancialReport.money)) adminFinancialReport.fail(413, "TOTAL_TOO_LARGE");
+    currencies.push(total);
+  }
+  for (const providerMode of ["test", "live"]) {
+    const groups = currencies.filter(group => group.stripeMode === providerMode);
+    if (groups.length) totalsByMode[providerMode] = groups.length === 1 && groups[0].currency === "USD" ? { count: groups[0].count, grossAmount: groups[0].grossAmount, processingFeeAmount: groups[0].processingFeeAmount, netAmount: groups[0].netAmount } : { count: groups.reduce((sum, group) => sum + group.count, 0), grossAmount: null, processingFeeAmount: null, netAmount: null };
+  }
+  res.json({ ...adminFinancialPage(req, value, value.funding), totalsByMode, currencies, summary: value.fundingTotals, statusCounts: value.fundingTotals.states });
+}));
+
+router.get("/chargebacks", asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.json(await require('../services/adminChargebackReport').read(req));
+}));
+
+router.post("/chargebacks/:operationId/acknowledge", csrfProtection, asyncHandler(async (req, res) => {
+const result = await acknowledgeChargeback(req.params.operationId, req.user.id, { authVersion: Number(req.auth?.payload?.av || 0), sessionId: req.authSessionId || null, ip: req.ip, ua: req.headers["user-agent"] });
+if (!result.found) return res.status(404).json({ msg: "Chargeback record not found." });
+return res.json({ ok: true, changed: result.changed, administrativeStatus: result.operation.administrativeStatus });
+}));
+
+router.post("/chargebacks/:operationId/clear-hold", csrfProtection, asyncHandler(async (req, res) => {
+const result = await clearEligiblePayoutHold(req.params.operationId, req.user.id, { authVersion: Number(req.auth?.payload?.av || 0), sessionId: req.authSessionId || null, ip: req.ip, ua: req.headers["user-agent"] });
+if (!result.found) return res.status(404).json({ msg: "Chargeback record not found." });
+return res.json({ ok: true, changed: result.changed, administrativeStatus: result.operation.administrativeStatus });
+}));
+
+router.post("/chargebacks/:operationId/reconcile", csrfProtection, asyncHandler(async (req, res) => {
+const stripe = require("../utils/stripe");
+if (!/^[a-f0-9]{24}$/i.test(req.params.operationId)) return res.status(400).json({ msg: "Invalid chargeback." });
+const operation = await PaymentOperation.findOne({ _id: req.params.operationId, kind: "chargeback" });
+if (!operation) return res.status(404).json({ msg: "Chargeback record not found." });
+if (!operation.stripeDisputeId || !operation.stripeEventId) {
+  return res.status(409).json({ msg: "Chargeback evidence is incomplete and cannot be reconciled automatically." });
+}
+const result = await recordChargebackEvent({
+  stripeClient: stripe,
+  reconciliation: { operationId: String(operation._id), actorId: req.user.id, authVersion: Number(req.auth?.payload?.av || 0), sessionId: req.authSessionId || null },
+  ip: req.ip,
+  ua: req.headers["user-agent"],
 });
+return res.json({ ok: true, evidenceStatus: result.operation?.evidenceStatus || "needs_review" });
+}));
+
+router.get("/income", asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  const value = await adminFinancialReport.read(req, { from: getFinancialReportingStartDate() });
+  res.json({ ...adminFinancialPage(req, value, value.income), ...value.incomeTotals });
 }));
 
 // -----------------------------------------
 // Fallback error handler (keeps admin routes tidy)
 // -----------------------------------------
 router.use((err, _req, res, _next) => {
-console.error(err);
-res.status(500).json({ msg: "Server error", error: err?.message || "Unknown error" });
+if (respondToCsrfError(err, res, { field: "msg" })) return;
+logger.error(err);
+const status = Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600 ? Number(err.statusCode) : 500;
+res.status(status).json({
+  msg: status < 500 ? err.message : "Server error",
+  ...(err?.code ? { code: err.code } : {}),
+});
 });
 
 module.exports = router;

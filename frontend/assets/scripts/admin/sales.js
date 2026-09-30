@@ -1,4 +1,7 @@
 import { secureFetch } from "../auth.js";
+import { reportAsyncFailure } from "../utils/promise-errors.js";
+
+const reportFailure = reportAsyncFailure("admin-sales");
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -502,12 +505,12 @@ function bindSalesWorkspace() {
       }
     };
     accountList.addEventListener("click", (event) => {
-      selectAccount(event.target).catch(() => {});
+      selectAccount(event.target).catch(reportFailure);
     });
     accountList.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      selectAccount(event.target).catch(() => {});
+      selectAccount(event.target).catch(reportFailure);
     });
   }
   if (packetList && !packetList.dataset.bound) {
@@ -525,25 +528,25 @@ function bindSalesWorkspace() {
       }
     };
     packetList.addEventListener("click", (event) => {
-      selectPacket(event.target).catch(() => {});
+      selectPacket(event.target).catch(reportFailure);
     });
     packetList.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      selectPacket(event.target).catch(() => {});
+      selectPacket(event.target).catch(reportFailure);
     });
   }
   if (accountDetail && !accountDetail.dataset.bound) {
     accountDetail.dataset.bound = "true";
     accountDetail.addEventListener("submit", (event) => {
       if (event.target?.id === "salesInteractionForm") {
-        addSalesInteraction(event).catch(() => {});
+        addSalesInteraction(event).catch(reportFailure);
       }
     });
     accountDetail.addEventListener("click", (event) => {
       const button = event.target.closest("[data-sales-action]");
       if (!button) return;
-      generateSalesPacket(button.getAttribute("data-sales-action")).catch(() => {});
+      generateSalesPacket(button.getAttribute("data-sales-action")).catch(reportFailure);
     });
   }
   if (packetDetail && !packetDetail.dataset.bound) {
@@ -561,5 +564,5 @@ bindSalesWorkspace();
 window.loadSalesWorkspace = loadSalesWorkspace;
 
 if (document.getElementById("section-sales-workspace")?.classList.contains("visible")) {
-  loadSalesWorkspace().catch(() => {});
+  loadSalesWorkspace().catch(reportFailure);
 }

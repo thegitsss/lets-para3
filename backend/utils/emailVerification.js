@@ -1,3 +1,4 @@
+const accountEmails = require("../email/accountTemplates");
 const jwt = require("jsonwebtoken");
 
 const sendEmail = require("./email");
@@ -6,7 +7,7 @@ function normalizeEmail(value = "") {
   return String(value || "").trim().toLowerCase();
 }
 
-function buildEmailVerificationToken({ userId, email, expiresIn = "60m" }) {
+function buildEmailVerificationToken({ userId, email, expiresIn = `${accountEmails.EMAIL_VERIFICATION_MINUTES}m` }) {
   return jwt.sign(
     {
       purpose: "verify-email",
@@ -26,8 +27,11 @@ async function sendVerificationEmail({ user, email }) {
     userId: user._id.toString(),
     email: targetEmail,
   });
-  const verifyUrl = `${process.env.APP_BASE_URL || ""}/verify-email?token=${verifyToken}`;
-  await sendEmail(targetEmail, "Verify your email", `Click to verify: ${verifyUrl}`);
+  const verifyUrl = `${process.env.APP_BASE_URL || ""}/verify-email.html?token=${verifyToken}`;
+  const message = accountEmails.emailVerification(user, verifyUrl);
+  const result = await sendEmail(targetEmail, message.subject, message.html, { text: message.text, throwOnError: true });
+  if (result?.error) throw new Error(result.message || "Verification email delivery failed");
+  return result;
 }
 
 function applyVerifiedEmail(user, verifiedEmail) {

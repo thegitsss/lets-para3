@@ -56,9 +56,9 @@ const COLLECTION_REGISTRY = Object.freeze([
 
 const SOURCE_REGISTRY = Object.freeze([
   {
-    sourceKey: "public_concierge_prompt",
-    title: "Public Concierge Prompt",
-    filePath: "backend/ai/prompts.js",
+    sourceKey: "platform_faq_core",
+    title: "Attorney FAQ Platform Facts",
+    filePath: "frontend/attorney-faq.html",
     items: [
       {
         key: "platform_lpc_core_explainer",
@@ -81,12 +81,12 @@ const SOURCE_REGISTRY = Object.freeze([
         },
         citations: [
           {
-            sourceKey: "public_concierge_prompt",
-            label: "backend/ai/prompts.js",
-            filePath: "backend/ai/prompts.js",
-            locator: "PUBLIC_CONCIERGE_PROMPT",
+            sourceKey: "platform_faq_core",
+            label: "frontend/attorney-faq.html",
+            filePath: "frontend/attorney-faq.html",
+            locator: "What Let’s-ParaConnect is — and isn’t",
             excerpt:
-              "Let's-ParaConnect is a professional platform where attorneys hire approved independent paralegals for project-based legal support.",
+              "A professional platform for project-based support work",
           },
         ],
       },
@@ -101,8 +101,8 @@ const SOURCE_REGISTRY = Object.freeze([
         tags: ["approval", "admissions"],
         content: {
           summary:
-            "Attorney and paralegal accounts are reviewed before approval. Use this when explaining LPC's standards and access model without implying guaranteed outcomes.",
-          statement: "Both attorney and paralegal accounts are reviewed before they are approved.",
+            "Attorney and paralegal applications are reviewed before platform access is granted. Use this when explaining LPC's standards and access model without implying guaranteed outcomes.",
+          statement: "Both attorney and paralegal applications are reviewed before platform access is granted.",
           supportingPoints: [
             "Approval should be described as intentional and quality-protective, not arbitrary.",
             "Do not promise approval outcomes or timelines in marketing copy.",
@@ -110,11 +110,11 @@ const SOURCE_REGISTRY = Object.freeze([
         },
         citations: [
           {
-            sourceKey: "public_concierge_prompt",
-            label: "backend/ai/prompts.js",
-            filePath: "backend/ai/prompts.js",
-            locator: "PUBLIC_CONCIERGE_PROMPT",
-            excerpt: "Both attorney and paralegal accounts are reviewed before they are approved.",
+            sourceKey: "platform_faq_core",
+            label: "frontend/attorney-faq.html",
+            filePath: "frontend/attorney-faq.html",
+            locator: "Approval-based access",
+            excerpt: "Every paralegal completes LPC’s application and eligibility review before joining the platform.",
           },
         ],
       },
@@ -137,11 +137,11 @@ const SOURCE_REGISTRY = Object.freeze([
         },
         citations: [
           {
-            sourceKey: "public_concierge_prompt",
-            label: "backend/ai/prompts.js",
-            filePath: "backend/ai/prompts.js",
-            locator: "PUBLIC_CONCIERGE_PROMPT",
-            excerpt: "All matters posted on LPC require a $400 minimum.",
+            sourceKey: "platform_faq_core",
+            label: "frontend/attorney-faq.html",
+            filePath: "frontend/attorney-faq.html",
+            locator: "Is there a minimum Matter amount?",
+            excerpt: "Matters posted on Let’s-ParaConnect have a minimum compensation amount of $400.",
           },
         ],
       },
@@ -223,13 +223,13 @@ const SOURCE_REGISTRY = Object.freeze([
         tags: ["fee", "attorney", "objection"],
         content: {
           summary:
-            "Use this when an attorney asks how LPC charges for completed work. Keep the explanation factual, restrained, and inclusive of Stripe processing.",
+            "Use this when an attorney asks how LPC charges for a hire. Keep the explanation factual, restrained, and aligned to the total shown at confirmation.",
           objection: "Why is there a platform fee?",
           approvedResponse:
-            "For an initial hire, Let’s-ParaConnect charges the matter amount plus a 22% attorney platform fee through Stripe when the attorney confirms the hire. Stripe processing fees apply as part of the Stripe payment transaction.",
+            "For an initial hire, Let’s-ParaConnect charges the Matter amount plus a 22% attorney platform fee through Stripe when the attorney confirms the hire. No separate Stripe processing line item is added beyond the total displayed at confirmation.",
           supportingPoints: [
             "Keep the fee explanation factual and restrained.",
-            "Do not hide Stripe processing from the explanation.",
+            "Explain that the displayed confirmation total has no separate Stripe processing line item.",
           ],
         },
         citations: [
@@ -239,7 +239,7 @@ const SOURCE_REGISTRY = Object.freeze([
             filePath: "frontend/attorney-faq.html",
             locator: "Question 8",
             excerpt:
-              "For an initial hire, Let’s-ParaConnect charges the matter amount plus a 22% attorney platform fee through Stripe when the attorney confirms the hire. Stripe processing fees apply as part of the Stripe payment transaction.",
+              "For an initial hire, Let’s-ParaConnect charges the Matter amount plus a 22% attorney platform fee through Stripe when the attorney confirms the hire. No separate Stripe processing line item is added beyond the total displayed at confirmation.",
           },
         ],
       },
@@ -355,10 +355,10 @@ const SOURCE_REGISTRY = Object.freeze([
         tags: ["minimum", "objection"],
         content: {
           summary:
-            "Use this response when someone asks why LPC sets a minimum matter amount. The explanation should stay anchored in platform standards and engagement quality.",
+            "Use this response when someone asks about LPC's minimum Matter amount. State the implemented requirement without treating price as a quality guarantee.",
           objection: "Why is there a $400 minimum?",
           approvedResponse:
-            "To maintain the standards of the platform, cases posted on Let’s-ParaConnect have a minimum of $400 and are intended to support focused, professional engagements rather than under-scoped work.",
+            "Matters posted on Let’s-ParaConnect have a minimum compensation amount of $400. The minimum is a posting requirement, not a guarantee of scope, quality, fit, or outcome.",
           supportingPoints: [
             "Use this explanation when the objection is about standards and fit.",
           ],
@@ -370,7 +370,7 @@ const SOURCE_REGISTRY = Object.freeze([
             filePath: "frontend/attorney-faq.html",
             locator: "Question 7",
             excerpt:
-              "cases posted on Let’s-ParaConnect have a minimum of $400 ... and supports focused, professional engagements rather than transactional or under-scoped work",
+              "Matters posted on Let’s-ParaConnect have a minimum compensation amount of $400. The minimum is a posting requirement, not a guarantee that a Matter is adequately scoped or that an engagement will be successful.",
           },
         ],
       },
@@ -393,9 +393,9 @@ const SOURCE_REGISTRY = Object.freeze([
         content: {
           audience: "paralegals",
           summary:
-            "Use this value card when explaining LPC to paralegals: approved profiles can pursue project-based support work with choice, fit, and remote workflow flexibility.",
+            "Use this value card when explaining LPC to paralegals: approved paralegals can pursue clearly scoped matter work with choice and a workflow that supports remote collaboration.",
           statement:
-            "Approved paralegals can connect with attorneys seeking project-based support work, choose which matters to pursue, and work remotely through LPC’s workflow.",
+            "Approved paralegals can connect with attorneys seeking support on clearly scoped matters, choose which matters to pursue, and use LPC’s workflow for remote collaboration.",
           supportingPoints: [
             "Use this to explain value without implying guaranteed volume.",
             "Keep the language tied to approval, fit, and choice.",
@@ -408,7 +408,7 @@ const SOURCE_REGISTRY = Object.freeze([
             filePath: "frontend/paralegal-faq.html",
             locator: "Questions 1 and 4",
             excerpt:
-              "approved paralegal profiles can connect with attorneys seeking project-based support work ... You have full control over which matters you apply to.",
+              "Once your application is approved and your profile is complete, you may begin applying to open matters ... You have full control over which matters you apply to.",
           },
         ],
       },
@@ -445,7 +445,7 @@ const SOURCE_REGISTRY = Object.freeze([
       {
         key: "distinctiveness_remote_project_based",
         collectionKey: "distinctiveness",
-        title: "Remote, Project-Based Engagements",
+        title: "Remote Collaboration for Project-Based Engagements",
         domain: "distinctiveness",
         recordType: "distinctiveness_card",
         audienceScopes: ["sales_safe", "marketing_safe", "public_approved"],
@@ -453,9 +453,9 @@ const SOURCE_REGISTRY = Object.freeze([
         tags: ["remote", "project-based", "distinctiveness"],
         content: {
           summary:
-            "Use this distinctiveness card when emphasizing LPC's remote, project-based operating model and the direct decision-making between attorneys and paralegals.",
+            "Use this distinctiveness card when emphasizing LPC's support for remote, project-based collaboration and the direct decision-making between attorneys and paralegals.",
           statement:
-            "All work on LPC is remote and project-based, with attorneys and paralegals deciding directly whether to work together.",
+            "LPC supports remote collaboration for project-based work, with attorneys and paralegals deciding directly whether to work together.",
           supportingPoints: [
             "Use this as LPC distinctiveness language, not as a broad future promise.",
           ],
@@ -467,7 +467,7 @@ const SOURCE_REGISTRY = Object.freeze([
             filePath: "frontend/paralegal-faq.html",
             locator: "Question 1",
             excerpt:
-              "Attorneys and paralegals decide directly whether to work together. All work is fully remote, flexible, and payments are facilitated through Stripe Connect.",
+              "Attorneys and paralegals decide directly whether to work together. LPC’s workflow supports remote collaboration, and payments are facilitated through Stripe Connect.",
           },
         ],
       },
@@ -475,25 +475,25 @@ const SOURCE_REGISTRY = Object.freeze([
   },
   {
     sourceKey: "paralegal_admission",
-    title: "Paralegal Admission Page",
+    title: "Our Application Review Page",
     filePath: "frontend/paralegal-admission.html",
     items: [
       {
         key: "admissions_holistic_review",
         collectionKey: "admissions_policy",
-        title: "Holistic Paralegal Admission Review",
+        title: "Whole-Application Paralegal Review",
         domain: "admissions_policy",
         recordType: "policy_card",
         audienceScopes: ["internal_ops", "support_safe", "sales_safe", "marketing_safe", "public_approved"],
         freshnessDays: 120,
-        tags: ["admissions", "holistic_review"],
+        tags: ["admissions", "application_review"],
         content: {
           summary:
-            "Paralegal applications are reviewed holistically across experience, supervision, presentation, jurisdictional alignment, platform needs, and overall suitability.",
+            "Paralegal applications are reviewed as a whole using the legal-support experience, completeness, consistency, location, and attorney-directed work described in the submitted materials.",
           statement:
-            "Paralegal applications are reviewed through a holistic evaluation process that considers legal experience, supervision, professional presentation, jurisdictional alignment, platform needs, and overall suitability.",
+            "LPC reviews submitted application materials for completeness, internal consistency, U.S. location, a paralegal certificate, a degree in paralegal studies, or at least one year of experience working in a law firm, alignment with attorney-directed matter work, and current platform requirements.",
           supportingPoints: [
-            "Use holistic review language exactly and avoid oversimplified pass/fail criteria.",
+            "Before paralegal approval, verify the qualification used for admission with the issuing institution, an official verification service, or an independently located law-firm contact. Obtain permission for employment checks and explicit permission before contacting a current employer. Record the source, date, and outcome. Do not describe this limited check as a general background check or endorsement.",
           ],
         },
         citations: [
@@ -503,26 +503,26 @@ const SOURCE_REGISTRY = Object.freeze([
             filePath: "frontend/paralegal-admission.html",
             locator: "Admissions review section",
             excerpt:
-              "Paralegal applications are reviewed through a holistic evaluation process ... LPC considers the clarity and substance of legal experience, supervision by licensed attorneys, professional presentation, jurisdictional alignment, platform needs, and overall suitability.",
+              "LPC reviews each submitted application as a whole. The review considers whether the application and required résumé are complete and internally consistent, whether the applicant meets LPC’s location and qualification requirements, and whether the submitted information supports attorney-directed matter work.",
           },
         ],
       },
       {
         key: "distinctiveness_quality_bar",
         collectionKey: "distinctiveness",
-        title: "Why LPC Maintains an Approval Standard",
+        title: "What Approval-Based Access Means",
         domain: "distinctiveness",
         recordType: "distinctiveness_card",
         audienceScopes: ["sales_safe", "marketing_safe", "public_approved"],
         freshnessDays: 120,
-        tags: ["quality", "distinctiveness"],
+        tags: ["approval", "admissions_truth"],
         content: {
           summary:
-            "Use this distinctiveness card when explaining why LPC keeps admission standards high: to preserve quality, confidence, and reliability for attorneys on the platform.",
+            "Approval-based access means LPC manually reviews submitted application materials before an account may use protected platform workflows.",
           statement:
-            "Admission is intentionally limited in order to preserve quality, confidence, and reliability for attorneys using the platform.",
+            "Platform access requires an LPC approval decision based on the submitted application and current platform requirements.",
           supportingPoints: [
-            "Use this as standards language, not exclusivity hype.",
+            "Paralegal approval requires verification of the qualification used for admission. It is not a general background check, an endorsement, or a promise of work.",
           ],
         },
         citations: [
@@ -532,7 +532,7 @@ const SOURCE_REGISTRY = Object.freeze([
             filePath: "frontend/paralegal-admission.html",
             locator: "Admissions review section",
             excerpt:
-              "Admission is intentionally limited in order to preserve quality, confidence, and reliability for attorneys using the platform.",
+              "Approval is discretionary and depends on the application materials and current platform requirements.",
           },
         ],
       },
@@ -544,15 +544,15 @@ const SOURCE_REGISTRY = Object.freeze([
         recordType: "objection_card",
         audienceScopes: ["support_safe", "sales_safe", "marketing_safe", "public_approved"],
         freshnessDays: 120,
-        tags: ["approval", "quality", "objection"],
+        tags: ["approval", "admissions_truth", "objection"],
         content: {
           summary:
-            "Use this response when someone asks why LPC is approval-based. The answer should stay grounded in quality, confidence, and professional standards rather than exclusivity language.",
+            "Use this response when someone asks why LPC is approval-based. Explain the manual access decision without implying credential authentication, endorsement, scarcity, or guaranteed quality.",
           objection: "Why is LPC approval-based?",
           approvedResponse:
-            "LPC is approval-based to preserve quality, confidence, and reliability for attorneys using the platform, while maintaining a professional standard for applicants.",
+            "LPC uses approval-based access and reviews submitted application materials before granting access to protected workflows. Paralegal approval requires verification of the qualification used for admission. It is not a general background check, an endorsement, or a promise of work.",
           supportingPoints: [
-            "Use quality and standards language, not scarcity theater.",
+            "Describe the actual review boundary and avoid scarcity or quality-guarantee language.",
           ],
         },
         citations: [
@@ -562,16 +562,16 @@ const SOURCE_REGISTRY = Object.freeze([
             filePath: "frontend/paralegal-admission.html",
             locator: "Admissions review section",
             excerpt:
-              "Admission is intentionally limited in order to preserve quality, confidence, and reliability for attorneys using the platform.",
+              "Approval is discretionary and depends on the application materials and current platform requirements.",
           },
         ],
       },
     ],
   },
   {
-    sourceKey: "attorney_support_prompt",
-    title: "Attorney Support Prompt",
-    filePath: "backend/ai/prompts.js",
+    sourceKey: "assistant_response_policy",
+    title: "Assistant Response Policy",
+    filePath: "backend/ai/supportManagerAgent.js",
     items: [
       {
         key: "founder_voice_core_style",
@@ -599,12 +599,12 @@ const SOURCE_REGISTRY = Object.freeze([
         },
         citations: [
           {
-            sourceKey: "attorney_support_prompt",
-            label: "backend/ai/prompts.js",
-            filePath: "backend/ai/prompts.js",
-            locator: "ATTORNEY_SUPPORT_PROMPT",
+            sourceKey: "assistant_response_policy",
+            label: "backend/ai/supportManagerAgent.js",
+            filePath: "backend/ai/supportManagerAgent.js",
+            locator: "buildManagerInstructions",
             excerpt:
-              "Polished, calm, concise, operational, and premium. Do not sound robotic, chatty, salesy, or legalistic.",
+              "The first sentence must answer the question. Most simple replies should be one to three short sentences.",
           },
         ],
       },
@@ -628,12 +628,12 @@ const SOURCE_REGISTRY = Object.freeze([
         },
         citations: [
           {
-            sourceKey: "attorney_support_prompt",
-            label: "backend/ai/prompts.js",
-            filePath: "backend/ai/prompts.js",
-            locator: "ATTORNEY_SUPPORT_PROMPT",
+            sourceKey: "assistant_response_policy",
+            label: "backend/ai/supportManagerAgent.js",
+            filePath: "backend/ai/supportManagerAgent.js",
+            locator: "buildManagerInstructions",
             excerpt:
-              "Do not claim to see live data unless it is explicitly present in the provided context. Never promise approval outcomes, refund outcomes, or admin decisions.",
+              "Never invent records, statuses, counts, dates, fees, people, actions, URLs, or platform rules.",
           },
         ],
       },
@@ -642,7 +642,7 @@ const SOURCE_REGISTRY = Object.freeze([
   {
     sourceKey: "fee_explainer_copy",
     title: "Fee Explainer Copy",
-    filePath: "frontend/assets/scripts/views/case-detail.js",
+    filePath: "frontend/create-case.html",
     items: [
       {
         key: "objection_platform_fee_supports_infrastructure",
@@ -658,7 +658,7 @@ const SOURCE_REGISTRY = Object.freeze([
             "Use this response when someone asks what the platform fee covers. Keep the answer tied to LPC's software infrastructure and platform operations, not legal services.",
           objection: "What does the platform fee support?",
           approvedResponse:
-            "The platform fee supports the tools that enable attorneys and paralegals to collaborate, including secure workspace, messaging, document sharing, workflow tools, payment processing, identity verification, and platform administration.",
+            "The platform fee supports the tools that enable attorneys and paralegals to collaborate, including the Matter workspace, messaging, document sharing, workflow tools, Stripe payment processing, account review, and platform administration.",
           supportingPoints: [
             "Keep the explanation tied to software infrastructure.",
             "Do not imply the fee is for legal services.",
@@ -667,11 +667,11 @@ const SOURCE_REGISTRY = Object.freeze([
         citations: [
           {
             sourceKey: "fee_explainer_copy",
-            label: "frontend/assets/scripts/views/case-detail.js",
-            filePath: "frontend/assets/scripts/views/case-detail.js",
+            label: "frontend/create-case.html",
+            filePath: "frontend/create-case.html",
             locator: "fee explanation copy",
             excerpt:
-              "The platform fee supports tools that enable attorneys and paralegals to collaborate, including secure workspace, messaging, document sharing, case workflow tools, payment processing, identity verification, and platform administration.",
+              "The platform fee supports tools that enable attorneys and paralegals to collaborate, including the Matter workspace, messaging, document sharing, workflow tools, Stripe payment processing, account review, and platform administration.",
           },
         ],
       },

@@ -10,7 +10,6 @@ const {
   claimNextIncidentJob,
   processClaimedIncidentJob,
   runIncidentSchedulerOnce,
-  stopIncidentScheduler,
 } = require("../scheduler/incidentScheduler");
 const { runIncidentRunnerOnce } = require("../scripts/incident-runner");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
@@ -130,8 +129,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  stopIncidentScheduler();
-  await closeDatabase();
+  try { await closeDatabase(); }
+  finally { require("./helpers/incidentGitFixture").cleanupIncidentGitFixture(); }
 });
 
 beforeEach(async () => {
@@ -262,7 +261,7 @@ describe("Incident patch runner", () => {
       summary: "Document search filter issue",
       description: "The documents filter feels wrong and needs a code patch.",
       featureKey: "document-filter",
-      suspectedFiles: ["frontend/assets/scripts/views/documents.js"],
+      suspectedFiles: ["frontend/assets/scripts/case-files-view.js"],
       suspectedRoutes: ["/documents"],
       impactedDomains: ["documents"],
       riskLevel: "low",
@@ -313,3 +312,4 @@ describe("Incident patch runner", () => {
     expect(updatedIncident.orchestration.nextJobType).toBe("patch_execution");
   });
 });
+jest.mock("child_process", () => require("./helpers/incidentGitFixture").isolatedChildProcess(jest.requireActual("child_process")));

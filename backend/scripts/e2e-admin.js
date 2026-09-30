@@ -3,7 +3,8 @@ const cookieParser = require("cookie-parser");
 const http = require("http");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { connectE2eDatabase } = require("./e2e-database-fixture");
+const { MongoMemoryReplSet } = require("mongodb-memory-server");
 
 process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret";
@@ -33,17 +34,17 @@ async function startServer() {
   app.use("/api/admin", adminRouter);
 
   const server = http.createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
+  await new Promise((resolve) => server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, resolve));
   const { port } = server.address();
   return { server, port };
 }
 
 async function main() {
-  const mongo = await MongoMemoryServer.create();
-  await mongoose.connect(mongo.getUri(), { dbName: "e2e" });
+  const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" } });
+  await connectE2eDatabase(mongoose, mongo.getUri());
 
   const { server, port } = await startServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
   try {
     const admin = await User.create({
@@ -63,6 +64,8 @@ async function main() {
       password: "Password123!",
       role: "attorney",
       status: "pending",
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
       state: "CA",
     });
 
@@ -107,6 +110,8 @@ async function main() {
       password: "Password123!",
       role: "attorney",
       status: "pending",
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
       state: "CA",
     });
 

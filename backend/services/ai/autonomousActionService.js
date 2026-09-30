@@ -157,7 +157,7 @@ function validatePayload(payload = {}) {
   };
 }
 
-async function logAction(payload = {}) {
+async function logAction(payload = {}, { session = null } = {}) {
   assertNoDisqualifiers(payload);
   const validated = validatePayload(payload);
 
@@ -175,7 +175,7 @@ async function logAction(payload = {}) {
 
   await assertTargetExists(validated.targetModel, validated.targetId);
 
-  return AutonomousAction.create({
+  const record = {
     agentRole: validated.agentRole,
     actionType: validated.actionType,
     confidenceScore: validated.confidenceScore,
@@ -185,7 +185,9 @@ async function logAction(payload = {}) {
     changedFields: validated.changedFields,
     previousValues: validated.previousValues,
     actionTaken: validated.actionTaken,
-  });
+  };
+  if (session) return (await AutonomousAction.create([record], { session }))[0];
+  return AutonomousAction.create(record);
 }
 
 async function undoAction(actionId) {

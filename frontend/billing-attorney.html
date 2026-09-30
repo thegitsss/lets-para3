@@ -5,8 +5,7 @@
   <link rel="stylesheet" href="assets/styles/fonts.css" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Billing Redirect – Let’s‑ParaConnect</title>
-  <meta http-equiv="refresh" content="0;url=dashboard-attorney.html#billing" />
+  <title>Opening Payments – Let’s‑ParaConnect</title>
   <style>
     .skip-link {
       position: absolute;
@@ -57,18 +56,31 @@
   </style>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
-      if (window.location.pathname.endsWith('billing-attorney.html')) {
-        window.location.replace('dashboard-attorney.html#billing');
-      }
+      if (!window.location.pathname.endsWith('billing-attorney.html')) return;
+      const source = new URL(window.location.href);
+      const rawStatus = String(source.searchParams.get('payment') || source.searchParams.get('checkout') || '')
+        .trim()
+        .toLowerCase();
+      const paymentStatus = rawStatus === 'success'
+        ? 'success'
+        : ['cancel', 'cancelled'].includes(rawStatus)
+          ? 'cancel'
+          : '';
+      const caseId = String(source.searchParams.get('caseId') || '').trim();
+      const target = new URL('dashboard-attorney.html', source);
+      if (paymentStatus) target.searchParams.set('payment', paymentStatus);
+      if (/^[a-f0-9]{24}$/i.test(caseId)) target.searchParams.set('caseId', caseId);
+      target.hash = 'funds';
+      window.location.replace(target.toString());
     });
   </script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
-  <div class="redirect-card" id="main" role="main" tabindex="-1">
-    <h1>Payment tools moved</h1>
-    <p>Billing &amp; Funds now live directly inside your dashboard.</p>
-    <p><a href="dashboard-attorney.html#billing">Go to the dashboard</a></p>
-  </div>
+  <main class="redirect-card" id="main" tabindex="-1" aria-live="polite">
+    <h1>Opening Payments</h1>
+    <p>Your payment status and Matter context will continue with you.</p>
+    <p><a href="dashboard-attorney.html#funds">Continue to Payments</a></p>
+  </main>
 </body>
 </html>

@@ -3,22 +3,9 @@ const http = require("http");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const multer = require("multer");
-const puppeteer = require("puppeteer");
+const { clickVisible, launchPuppeteer } = require("./puppeteerBrowser");
 
-function patchElementHandleClick() {
-  const { ElementHandle } = puppeteer;
-  if (!ElementHandle || ElementHandle.prototype.__safeClickPatched) return;
-  const original = ElementHandle.prototype.click;
-  ElementHandle.prototype.click = async function (...args) {
-    try {
-      return await this.evaluate((el) => el.click());
-    } catch {
-      return original.apply(this, args);
-    }
-  };
-  ElementHandle.prototype.__safeClickPatched = true;
-}
-patchElementHandleClick();
+const VALID_PASSWORD = "Correct-Horse-Battery-Staple-9";
 
 function startStubServer() {
   const app = express();
@@ -32,13 +19,16 @@ function startStubServer() {
   app.use(express.static(frontendDir));
 
   app.get("/api/csrf", (_req, res) => res.json({ csrfToken: "test-csrf" }));
-  app.post("/api/auth/register", upload.any(), (_req, res) => {
-    res.json({ msg: "Registered successfully. Await admin approval." });
+  app.post("/api/auth/register", upload.any(), (req, res) => {
+    if (req.body.turnstileToken !== "test-token") {
+      return res.status(400).json({ error: "The synthetic verification token is missing." });
+    }
+    res.json({ msg: "Registered successfully. Await admin approval.", emailVerified: false, verificationEmailStatus: "sent" });
   });
 
   const server = http.createServer(app);
   return new Promise((resolve) => {
-    server.listen(0, () => {
+    server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, () => {
       const { port } = server.address();
       resolve({ server, port });
     });
@@ -46,6 +36,16 @@ function startStubServer() {
 }
 
 async function gotoSignup(page, baseUrl) {
+  // This validation fixture uses a synthetic token and registration endpoint.
+  // A live Turnstile script can clear that token after navigation and invoke
+  // remote verification, which is outside this local form-validation check.
+  await page.setRequestInterception(true);
+  page.on("request", request => {
+    if (request.url().startsWith("https://challenges.cloudflare.com/turnstile/")) {
+      return request.respond({ status: 200, contentType: "application/javascript", body: "/* Synthetic token supplied by the local E2E fixture. */" });
+    }
+    return request.continue();
+  });
   await page.goto(`${baseUrl}/signup.html`, { waitUntil: "networkidle0" });
   await page.waitForSelector("#signupForm");
   await page.evaluate(() => {
@@ -62,18 +62,11 @@ async function gotoSignup(page, baseUrl) {
   });
 }
 
-async function safeClick(page, selector) {
-  await page.evaluate((sel) => document.querySelector(sel)?.click(), selector);
-}
-
 async function fillStepOne(page, { firstName, lastName, email, password }) {
-  await page.type("#firstName", firstName);
-  await page.type("#lastName", lastName);
+  await page.type("#fullName", `${firstName} ${lastName}`);
   await page.type("#email", email);
   await page.type("#password", password);
-  await page.type("#passwordConfirm", password);
-  await safeClick(page, "#termsAccept");
-  await safeClick(page, "#nextStepBtn");
+  await clickVisible(page, "#nextStepBtn");
   await page.waitForSelector("#stepTwoPanel:not(.hidden-step)");
 }
 
@@ -83,19 +76,20 @@ async function submitAttorneySignup(page, { barNumber, barState, goodStanding = 
     await page.select("#barState", barState);
   }
   if (goodStanding) {
-    await safeClick(page, "#attorneyGoodStanding");
+    await clickVisible(page, "#attorneyGoodStanding");
   }
-  await safeClick(page, "#attorneyPricingAck");
-  await safeClick(page, "#submitBtn");
-  await page.waitForSelector("#msg.show");
-  return page.$eval("#msg", (el) => el.textContent.trim());
+  await page.waitForSelector("#attorneySubmitLegal:not([hidden])");
+  await page.waitForSelector("#attorneyPricingText:not([hidden])");
+  await clickVisible(page, "#submitBtn");
+  await page.waitForFunction(() => document.querySelector("#msg.show") || document.querySelector("#signupConfirmation:not([hidden])"));
+  return page.evaluate(() => (document.querySelector("#signupConfirmation:not([hidden])") || document.querySelector("#msg")).textContent.trim());
 }
 
 async function run() {
   const { server, port } = await startStubServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
-  const browser = await puppeteer.launch({
+  const browser = await launchPuppeteer({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
     protocolTimeout: 120_000,
@@ -131,12 +125,11 @@ async function run() {
       configurePage(page);
       await page.setViewport({ width: 1280, height: 720 });
       await gotoSignup(page, baseUrl);
-      await safeClick(page, "#btnA");
       await fillStepOne(page, {
         firstName: "Test",
         lastName: "Attorney",
         email: "invalidbar@example.com",
-        password: "Password123!",
+        password: VALID_PASSWORD,
       });
       const msg = await submitAttorneySignup(page, {
         barNumber: "CA",
@@ -148,42 +141,19 @@ async function run() {
       await closeContext(context);
     }
 
-    // Test: Pricing acknowledgement is required on attorney signup.
-    // Input values: valid attorney fields without checking pricing acknowledgement.
-    // Expected result: inline pricing validation is shown and submit is blocked.
+    // Pricing and policy disclosures remain visible before the submit action.
     {
       const context = await createContext();
       const page = await context.newPage();
       configurePage(page);
-      await page.setViewport({ width: 1280, height: 720 });
       await gotoSignup(page, baseUrl);
-      await safeClick(page, "#btnA");
-      await fillStepOne(page, {
-        firstName: "Test",
-        lastName: "Attorney",
-        email: "pricingack@example.com",
-        password: "Password123!",
-      });
-      await page.type("#bar", "CA12345");
-      await page.select("#barState", "CA");
-      await safeClick(page, "#attorneyGoodStanding");
-      await safeClick(page, "#submitBtn");
-      await page.waitForSelector("#msg.show");
-      const msg = await page.$eval("#msg", (el) => el.textContent.trim());
-      const inlinePricingError = await page.$eval("#attorneyPricingError", (el) => ({
-        text: el.textContent.trim(),
-        shown: el.classList.contains("show"),
-      }));
-      const pricingInvalid = await page.$eval("#attorneyPricingAck", (el) => el.getAttribute("aria-invalid"));
-      if (!msg.includes("$400 minimum case requirement")) {
-        throw new Error(`Expected pricing acknowledgement message, got: ${msg}`);
-      }
-      if (!inlinePricingError.shown || !inlinePricingError.text.includes("$400 minimum")) {
-        throw new Error(`Expected inline pricing validation, got: ${JSON.stringify(inlinePricingError)}`);
-      }
-      if (pricingInvalid !== "true") {
-        throw new Error(`Expected attorney pricing checkbox to be invalid, got: ${pricingInvalid}`);
-      }
+      await fillStepOne(page, { firstName: "Test", lastName: "Attorney", email: "pricing@example.com", password: VALID_PASSWORD });
+      await page.waitForSelector("#attorneyPricingText:not([hidden])", { visible: true });
+      const pricing = await page.$eval("#attorneyPricingText", el => el.textContent);
+      if (!pricing.includes("$400") || !pricing.includes("22%")) throw new Error("Attorney pricing disclosure is incomplete.");
+      await page.waitForSelector("#attorneySubmitLegal:not([hidden])", { visible: true });
+      const policyLinks = await page.$$eval("#attorneySubmitLegal a", links => links.map(link => link.getAttribute("href")));
+      if (!policyLinks.includes("terms.html") || !policyLinks.includes("privacy.html")) throw new Error("Signup policy links are missing.");
       await closeContext(context);
     }
 
@@ -196,12 +166,11 @@ async function run() {
       configurePage(page);
       await page.setViewport({ width: 1280, height: 720 });
       await gotoSignup(page, baseUrl);
-      await safeClick(page, "#btnA");
       await fillStepOne(page, {
         firstName: "Test",
         lastName: "Attorney",
         email: "missingstate@example.com",
-        password: "Password123!",
+        password: VALID_PASSWORD,
       });
       const msg = await submitAttorneySignup(page, {
         barNumber: "12345",
@@ -233,18 +202,17 @@ async function run() {
       configurePage(page);
       await page.setViewport({ width: 1280, height: 720 });
       await gotoSignup(page, baseUrl);
-      await safeClick(page, "#btnA");
       await fillStepOne(page, {
         firstName: "Valid",
         lastName: "Attorney",
         email: testCase.email,
-        password: "Password123!",
+        password: VALID_PASSWORD,
       });
       const msg = await submitAttorneySignup(page, {
         barNumber: testCase.bar,
         barState: testCase.state,
       });
-      if (!msg.includes("Application submitted")) {
+      if (!msg.includes("Registration received") || !msg.includes("We sent a verification link")) {
         throw new Error(`Expected success message for ${testCase.state}, got: ${msg}`);
       }
       await closeContext(context);

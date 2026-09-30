@@ -1,16 +1,68 @@
-import { secureFetch, fetchCSRF, persistSession, getStoredSession, clearSession } from "./auth.js";
+import { secureFetch, persistSession, getStoredSession, clearSession } from "./auth.js";
 import { startStripeOnboarding } from "./utils/stripe-connect.js";
+import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
+import { confirmAction, showAlert } from "./utils/dialogs.js";
+import { normalizeHttpNavigationUrl } from "./utils/navigation-url.js";
 
 const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
 const ATTORNEY_ONBOARDING_MODAL_SEEN_KEY = "lpc_attorney_onboarding_modal_seen";
 
-const DEFAULT_AVATAR_DATA = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-  `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>
-    <rect width='220' height='220' rx='110' fill='#f1f5f9'/>
-    <circle cx='110' cy='90' r='46' fill='#cbd5e1'/>
-    <path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/>
-  </svg>`
-)}`;
+const DEFAULT_AVATAR_DATA = "/assets/avatar-placeholder.svg";
+const initialSettingsTasks = [];
+const PROFILE_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+let preferenceMutationQueue = Promise.resolve();
+
+function initSettingsSidebarToggle() {
+  const sidebarToggle = document.getElementById("sidebarToggle");
+  const sidebarNav = document.getElementById("sidebarNav");
+  const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+  if (!sidebarToggle || !sidebarNav || !sidebarBackdrop || sidebarToggle.dataset.lpcSidebarBound === "true") return;
+  sidebarToggle.dataset.lpcSidebarBound = "true";
+
+  const setOpen = (open, { restoreFocus = false } = {}) => {
+    document.body.classList.toggle("nav-open", Boolean(open));
+    sidebarToggle.setAttribute("aria-expanded", String(Boolean(open)));
+    sidebarToggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    if (!open && restoreFocus) sidebarToggle.focus({ preventScroll: true });
+  };
+
+  sidebarToggle.addEventListener("click", () => {
+    setOpen(!document.body.classList.contains("nav-open"));
+  });
+  sidebarBackdrop.addEventListener("click", () => setOpen(false));
+  sidebarNav.addEventListener("click", (event) => {
+    if (event.target.closest("a") || event.target.closest("button")) setOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || event.key !== "Escape" || !document.body.classList.contains("nav-open")) return;
+    if (document.querySelector(".profile-dropdown.show, [data-profile-menu].show")) return;
+    setOpen(false, { restoreFocus: true });
+  });
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 1024 && document.body.classList.contains("nav-open")) setOpen(false);
+  });
+}
+
+initSettingsSidebarToggle();
+
+function setPreferencesSaveStatus(message, state = "idle") {
+  const status = document.getElementById("preferencesSaveStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.state = state;
+}
+
+function queuePreferenceMutation(operation) {
+  const scheduled = preferenceMutationQueue.then(operation);
+  preferenceMutationQueue = scheduled.catch(() => undefined);
+  return scheduled;
+}
+
+function trackInitialSettingsTask(task) {
+  const trackedTask = Promise.resolve(task);
+  initialSettingsTasks.push(trackedTask);
+  return trackedTask;
+}
 
 function escapeHTML(value = "") {
   return String(value)
@@ -164,6 +216,7 @@ document.addEventListener("DOMContentLoaded", () => {
     /* noop */
   }
   const navItems = {
+    navSettings: "settingsDirectorySection",
     navProfile: "profileSection",
     navSecurity: "securitySection",
     navPreferences: "preferencesSection",
@@ -176,23 +229,82 @@ document.addEventListener("DOMContentLoaded", () => {
   const topLevelSections = Object.values(navItems)
     .map((id) => document.getElementById(id))
     .filter(Boolean);
-  const hashSectionMap = {
-    "#securitysection": "securitySection",
-    "#security": "securitySection",
-    "#profilesection": "profileSection",
-    "#profile": "profileSection",
-    "#preferencessection": "preferencesSection",
-    "#preferences": "preferencesSection",
-    "#deletesection": "deleteSection",
-    "#delete": "deleteSection",
+  const hashRouteMap = {
+    "#settings": { sectionId: "settingsDirectorySection" },
+    "#securitysection": { sectionId: "securitySection" },
+    "#security": { sectionId: "securitySection" },
+    "#security:closure": { sectionId: "securitySection", targetId: "accountClosureHeading" },
+    "#profilesection": { sectionId: "profileSection" },
+    "#profile": { sectionId: "profileSection" },
+    "#profile:personal": { sectionId: "profileSection", targetId: "attorneyPersonalHeading" },
+    "#profile:public": { sectionId: "profileSection", targetId: "attorneyProfessionalHeading" },
+    "#profile:firm": { sectionId: "profileSection", targetId: "attorneyFirmName" },
+    "#profile:notifications": { sectionId: "profileSection", targetId: "attorneyNotificationsHeading" },
+    "#preferencessection": { sectionId: "preferencesSection" },
+    "#preferences": { sectionId: "preferencesSection" },
+    "#deletesection": { sectionId: "deleteSection" },
+    "#delete": { sectionId: "deleteSection" },
   };
   const syncActiveNav = (sectionId) => {
-    const activeNavId = sectionToNav[sectionId] || "navProfile";
+    const activeNavId = sectionToNav[sectionId] || (isAttorneyRole() ? "navSettings" : "navProfile");
     document.querySelectorAll(".settings-item").forEach((el) => {
       el.classList.toggle("active", el.id === activeNavId);
     });
+    document.querySelectorAll("[data-settings-section]").forEach((el) => {
+      const active = el.dataset.settingsSection === sectionId;
+      el.classList.toggle("active", active);
+      if (active) el.setAttribute("aria-current", "page");
+      else el.removeAttribute("aria-current");
+    });
   };
-  const setActiveSection = (sectionId) => {
+  const syncSettingsHeader = (sectionId) => {
+    const isDirectory = sectionId === "settingsDirectorySection";
+    const title = document.getElementById("accountSettingsTitle");
+    const subtitle = document.getElementById("accountSettingsSubtitle");
+    if (title) title.textContent = isDirectory ? "Settings" : "Account Settings";
+    if (subtitle) {
+      subtitle.textContent = isDirectory
+        ? "Manage your attorney account and preferences."
+        : "Manage your profile, security, and preferences.";
+    }
+    document.body.classList.toggle("settings-directory-active", isDirectory);
+  };
+  if ("scrollRestoration" in window.history) {
+    window.history.scrollRestoration = "manual";
+  }
+  let pendingSettingsScrollFrame = 0;
+  const focusSettingsTarget = (targetId = "") => {
+    const main = document.getElementById("main");
+    const resetSettingsScroll = () => {
+      main?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      if (document.scrollingElement) {
+        document.scrollingElement.scrollTop = 0;
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    };
+    if (pendingSettingsScrollFrame) window.cancelAnimationFrame(pendingSettingsScrollFrame);
+    pendingSettingsScrollFrame = window.requestAnimationFrame(() => {
+      pendingSettingsScrollFrame = 0;
+      if (!targetId) {
+        resetSettingsScroll();
+        return;
+      }
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      target.scrollIntoView({ block: "start" });
+      if (!target.matches("input, select, textarea, button, a[href], [tabindex]")) {
+        target.setAttribute("tabindex", "-1");
+      }
+      target.focus({ preventScroll: true });
+    });
+  };
+  const setActiveSection = (sectionId, { targetId = "" } = {}) => {
+    if (String(currentUser?.role || "").toLowerCase() === "admin") {
+      sectionId = "securitySection";
+      if (targetId === "security:closure") targetId = "";
+    }
+    const section = document.getElementById(sectionId);
+    const sectionChanged = !section?.classList.contains("active") || section?.hidden;
     topLevelSections.forEach((sec) => {
       sec.classList.remove("active");
       sec.classList.add("hidden");
@@ -200,7 +312,6 @@ document.addEventListener("DOMContentLoaded", () => {
       sec.hidden = true;
       sec.style.setProperty("display", "none", "important");
     });
-    const section = document.getElementById(sectionId);
     if (section) {
       section.classList.remove("hidden");
       section.classList.add("active");
@@ -210,13 +321,30 @@ document.addEventListener("DOMContentLoaded", () => {
       section.style.display = "block";
     }
     syncActiveNav(sectionId);
+    syncSettingsHeader(sectionId);
+    if (String(currentUser?.role || "").toLowerCase() === "admin") {
+      const heading = document.getElementById('accountSettingsTitle');
+      if (heading) heading.textContent = 'Admin security';
+      const subtitle = document.getElementById('accountSettingsSubtitle');
+      if (subtitle) subtitle.textContent = 'Manage your sign-in and devices.';
+    }
+    if (sectionChanged || targetId) focusSettingsTarget(targetId);
     scheduleProfileScrollIndicatorUpdate();
   };
 
   const applySectionFromHash = (hashValue = window.location.hash) => {
-    const requestedSection = hashSectionMap[String(hashValue || "").trim().toLowerCase()] || "";
-    if (!requestedSection) return false;
-    setActiveSection(requestedSection);
+    const normalizedHash = String(hashValue || "").trim().toLowerCase();
+    const route = hashRouteMap[normalizedHash] || (
+      !normalizedHash
+        ? { sectionId: isAttorneyRole() ? "settingsDirectorySection" : "profileSection" }
+        : null
+    );
+    if (!route) return false;
+    if (route.sectionId === "settingsDirectorySection" && !isAttorneyRole()) {
+      setActiveSection("profileSection");
+      return true;
+    }
+    setActiveSection(route.sectionId, { targetId: route.targetId || "" });
     return true;
   };
 
@@ -227,11 +355,35 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!btn) return;
 
     btn.addEventListener("click", () => {
-      setActiveSection(sectionId);
-      const nextHash = `#${sectionId}`;
-      if (window.location.hash !== nextHash) {
-        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
+      const nextHash = sectionId === "settingsDirectorySection"
+        ? ""
+        : sectionId === "profileSection"
+        ? "#profile"
+        : sectionId === "securitySection"
+        ? "#security"
+        : sectionId === "preferencesSection"
+        ? "#preferences"
+        : `#${sectionId}`;
+      const nextUrl = `${window.location.pathname}${window.location.search}${nextHash}`;
+      const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (currentUrl !== nextUrl) {
+        window.history.pushState(null, "", nextUrl);
       }
+      setActiveSection(sectionId);
+    });
+  });
+
+  document.querySelectorAll("[data-settings-section]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const sectionId = btn.dataset.settingsSection;
+      if (!sectionId || !sectionToNav[sectionId]) return;
+      const nextHash = sectionId === "profileSection"
+        ? "#profile"
+        : sectionId === "securitySection"
+        ? "#security"
+        : "#preferences";
+      window.history.pushState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
+      setActiveSection(sectionId);
     });
   });
 
@@ -244,17 +396,40 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  const initialNav = document.querySelector(".settings-item.active");
-  const requestedHashSection = hashSectionMap[String(window.location.hash || "").trim().toLowerCase()] || "";
-  const initialSectionId = requestedHashSection || (
-    initialNav && navItems[initialNav.id]
-      ? navItems[initialNav.id]
-      : navItems.navProfile
-  );
-  setActiveSection(initialSectionId);
-  window.addEventListener("hashchange", () => {
-    applySectionFromHash();
-  });
+  const filterSettingsDirectory = () => {
+    const search = document.getElementById("settingsDirectorySearch");
+    const empty = document.getElementById("settingsDirectoryEmpty");
+    const groups = Array.from(document.querySelectorAll("[data-settings-group]"));
+    if (!search || !groups.length) return;
+    const applyFilter = () => {
+      const query = String(search.value || "").trim().toLocaleLowerCase();
+      let visibleCount = 0;
+      groups.forEach((group) => {
+        const groupName = String(group.dataset.settingsGroup || "").toLocaleLowerCase();
+        let groupVisibleCount = 0;
+        group.querySelectorAll("[data-settings-destination]").forEach((destination) => {
+          const searchableText = `${groupName} ${destination.textContent || ""}`.toLocaleLowerCase();
+          const matches = !query || searchableText.includes(query);
+          destination.hidden = !matches;
+          if (matches) {
+            visibleCount += 1;
+            groupVisibleCount += 1;
+          }
+        });
+        group.hidden = groupVisibleCount === 0;
+      });
+      if (empty) empty.hidden = visibleCount !== 0;
+    };
+    search.addEventListener("input", applyFilter);
+    applyFilter();
+  };
+
+  filterSettingsDirectory();
+  applySectionFromHash();
+  const syncRoute = () => applySectionFromHash();
+  window.__syncProfileSettingsRoute = syncRoute;
+  window.addEventListener("hashchange", syncRoute);
+  window.addEventListener("popstate", syncRoute);
   bindProfileScrollIndicator();
   const stepToRun = String(requestedOnboardingStep || "").toLowerCase();
   if (stepToRun) {
@@ -290,15 +465,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const confirm = document.getElementById("confirmPassword")?.value || "";
 
       if (!currentPass) {
-        alert("Enter your current password.");
+        showToast("Enter your current password.", "err");
         return;
       }
       if (newPass !== confirm) {
-        alert("Passwords do not match!");
+        showToast("Passwords do not match.", "err");
         return;
       }
       if (String(newPass).length < 8) {
-        alert("Password must be at least 8 characters.");
+        showToast("Password must be at least 8 characters.", "err");
         return;
       }
 
@@ -309,16 +484,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(data?.error || "Unable to update password.");
+        showToast(data?.error || "Unable to update password.", "err");
         return;
       }
-      alert("Password updated!");
+      showToast("Password updated. Sign in again to protect your account.", "ok");
       const currentInput = document.getElementById("currentPassword");
       const newInput = document.getElementById("newPassword");
       const confirmInput = document.getElementById("confirmPassword");
       if (currentInput) currentInput.value = "";
       if (newInput) newInput.value = "";
       if (confirmInput) confirmInput.value = "";
+      try {
+        window.clearStoredSession?.();
+        localStorage.removeItem("lpc_user");
+      } catch {}
+      window.location.href = "login.html";
     });
   }
 
@@ -328,7 +508,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!inputId) return;
       const input = document.getElementById(inputId);
       if (!input) return;
-      input.type = input.type === "password" ? "text" : "password";
+      const reveal = input.type === "password";
+      input.type = reveal ? "text" : "password";
+      const label = input.labels?.[0]?.textContent.trim() || "Password";
+      btn.setAttribute("aria-label", `${reveal ? "Hide" : "Show"} ${label.toLowerCase()}`);
     });
   });
 
@@ -340,12 +523,39 @@ document.addEventListener("DOMContentLoaded", () => {
   const fontSizeSelect = document.getElementById("fontSizePreference");
   const hideProfileToggle = document.getElementById("paralegalHideProfile");
   statePreferenceSelect = document.getElementById("statePreference");
+  const selectableThemes = new Set(["light", "dark"]);
+  const normalizeSelectableTheme = (value) => {
+    const normalized = String(value || "").toLowerCase();
+    return selectableThemes.has(normalized) ? normalized : "light";
+  };
+  const queueAccountPreferenceWrite = (payload, { successMessage = "Saved", recover = true } = {}) => {
+    setPreferencesSaveStatus("Saving…", "saving");
+    return queuePreferenceMutation(async () => {
+      try {
+        const response = await secureFetch("/api/account/preferences", {
+          method: "POST",
+          suppressToast: true,
+          body: payload,
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data?.error || "Unable to save preference.");
+        setPreferencesSaveStatus(successMessage, "saved");
+        return data;
+      } catch (err) {
+        console.error("Failed to persist account preference", err);
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
+        if (recover) await loadPreferences({ preserveStatus: true });
+        return null;
+      }
+    });
+  };
 
   const updateThemePreview = (value) => {
     if (!themePreviewButtons.length) return;
     themePreviewButtons.forEach((btn) => {
       const isActive = btn.dataset.themePreview === value;
       btn.setAttribute("aria-checked", isActive ? "true" : "false");
+      btn.tabIndex = isActive ? 0 : -1;
       btn.classList.toggle("is-active", isActive);
     });
   };
@@ -368,49 +578,38 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  async function persistThemePreference(themeValue, fontSizeValue) {
-    try {
-      const payload = {
-        theme: themeValue || themeSelect?.value,
-        fontSize: fontSizeValue || fontSizeSelect?.value,
-        email: emailToggle ? !!emailToggle.checked : false,
-        state: statePreferenceSelect ? statePreferenceSelect.value : undefined
-      };
-      await fetch("/api/account/preferences", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload)
-      });
-    } catch (err) {
-      console.error("Failed to persist theme preference", err);
-    }
+  function persistThemePreference(themeValue, fontSizeValue) {
+    return queueAccountPreferenceWrite({
+      theme: normalizeSelectableTheme(themeValue || themeSelect?.value),
+      fontSize: fontSizeValue || fontSizeSelect?.value,
+    }, { successMessage: "Appearance saved" });
   }
 
   const applyThemeSelection = (value) => {
     if (!value) return;
+    const normalizedValue = normalizeSelectableTheme(value);
     if (themeSelect) {
-      themeSelect.value = value;
+      themeSelect.value = normalizedValue;
     }
-    updateThemePreview(value);
+    updateThemePreview(normalizedValue);
     if (typeof window.applyThemePreference === "function") {
-      window.applyThemePreference(value);
+      window.applyThemePreference(normalizedValue);
     }
     if (currentUser) {
       currentUser.preferences = {
         ...(currentUser.preferences || {}),
-        theme: value
+        theme: normalizedValue
       };
     }
-    persistThemePreference(value, fontSizeSelect?.value);
+    persistThemePreference(normalizedValue, fontSizeSelect?.value);
   };
 
   const fontSizeMap = {
-    xs: "14px",
-    sm: "15px",
-    md: "16px",
-    lg: "17px",
-    xl: "20px"
+    xs: "15px",
+    sm: "16px",
+    md: "17px",
+    lg: "20px",
+    xl: "22px"
   };
 
   const applyFontSizeSelection = (value, options = {}) => {
@@ -452,6 +651,20 @@ document.addEventListener("DOMContentLoaded", () => {
       const value = btn.dataset.themePreview;
       applyThemeSelection(value);
     });
+    btn.addEventListener("keydown", (event) => {
+      const buttons = Array.from(themePreviewButtons).filter((item) => !item.disabled);
+      const currentIndex = buttons.indexOf(btn);
+      if (currentIndex < 0) return;
+      let nextIndex = currentIndex;
+      if (["ArrowRight", "ArrowDown"].includes(event.key)) nextIndex = (currentIndex + 1) % buttons.length;
+      else if (["ArrowLeft", "ArrowUp"].includes(event.key)) nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+      else if (event.key === "Home") nextIndex = 0;
+      else if (event.key === "End") nextIndex = buttons.length - 1;
+      else return;
+      event.preventDefault();
+      buttons[nextIndex].focus();
+      buttons[nextIndex].click();
+    });
   });
 
   if (themeSelect) {
@@ -480,16 +693,17 @@ document.addEventListener("DOMContentLoaded", () => {
     bestForList.addEventListener("input", handleBestForListInput);
   }
 
-  async function loadPreferences() {
+  async function loadPreferences({ preserveStatus = false } = {}) {
     try {
       const res = await fetch("/api/account/preferences", {
+        suppressToast: true,
         credentials: "include"
       });
-      if (!res.ok) return;
+      if (!res.ok) throw new Error("Unable to load preferences.");
       const prefs = await res.json();
       if (emailToggle) emailToggle.checked = !!prefs.email;
       if (themeSelect) {
-        const resolvedTheme = prefs.theme;
+        const resolvedTheme = normalizeSelectableTheme(prefs.theme);
         if (resolvedTheme) {
           themeSelect.value = resolvedTheme;
           updateThemePreview(resolvedTheme);
@@ -515,67 +729,25 @@ document.addEventListener("DOMContentLoaded", () => {
       if (statePreferenceSelect) {
         setStatePreferenceValue(stateValue);
       }
+      if (!preserveStatus) setPreferencesSaveStatus("Changes save automatically.", "idle");
     } catch (err) {
       console.error("Failed to load preferences", err);
+      setPreferencesSaveStatus("Preferences could not be loaded. Try refreshing this page.", "error");
     }
   }
-  loadPreferences();
+  trackInitialSettingsTask(loadPreferences());
 
-  const prefBtn = document.getElementById("savePreferencesBtn");
-  if (prefBtn) {
-    prefBtn.addEventListener("click", async () => {
-      const email = emailToggle ? emailToggle.checked : false;
-      const theme = themeSelect ? themeSelect.value : "mountain";
-      const fontSize = fontSizeSelect ? fontSizeSelect.value : "md";
-      const hideProfile = hideProfileToggle ? !!hideProfileToggle.checked : undefined;
-      const state = statePreferenceSelect ? statePreferenceSelect.value : "";
-      const payload = {
-        email,
-        theme,
-        fontSize,
-        state,
-      };
-      if (typeof hideProfile === "boolean") {
-        payload.hideProfile = hideProfile;
-      }
-
-      const res = await fetch("/api/account/preferences", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        showToast(data.error || "Unable to save preferences.", "err");
-        return;
-      }
-
-      if (theme && typeof window.applyThemePreference === "function") {
-        window.applyThemePreference(theme);
-      }
-      if (fontSize && typeof window.applyFontSizePreference === "function") {
-        window.applyFontSizePreference(fontSize);
-      }
+  if (statePreferenceSelect) {
+    statePreferenceSelect.addEventListener("change", async () => {
+      const state = statePreferenceSelect.value;
+      const data = await queueAccountPreferenceWrite({ state }, { successMessage: "Primary state saved" });
+      if (!data) return;
       if (currentUser) {
-        currentUser.notificationPrefs = {
-          ...(currentUser.notificationPrefs || {}),
-          email
-        };
-        currentUser.preferences = {
-          ...(currentUser.preferences || {}),
-          theme,
-          fontSize,
-          ...(typeof hideProfile === "boolean" ? { hideProfile } : {})
-        };
         currentUser.location = state || "";
         currentUser.state = state || "";
         persistSession({ user: mergeSessionPreferences(currentUser) });
       }
       hydrateStatePreference(currentUser || { state });
-      showToast("Preferences saved", "ok");
     });
   }
 
@@ -583,17 +755,15 @@ document.addEventListener("DOMContentLoaded", () => {
   if (deactivateButtons.length) {
     deactivateButtons.forEach((btn) => {
       btn.addEventListener("click", async () => {
-        const confirmed = window.confirm(
-          "Deactivate your account? This will disable sign-in and remove you from active platform participation. Historical case, dispute, payment, audit, and financial records will be preserved. This is not full erasure. Accounts cannot be deactivated while you are involved in an active matter or while payout, dispute, or other financial obligations remain unresolved."
+        const confirmed = await confirmAction(
+          "Sign-in and active platform participation will be disabled. Historical Matter, dispute, payment, audit, and financial records are preserved; this is not full erasure. Deactivation is blocked while active work or financial obligations remain.",
+          { title: "Deactivate your account?", confirmLabel: "Deactivate account", tone: "danger" }
         );
         if (!confirmed) return;
         btn.disabled = true;
         try {
-          const csrfToken = await fetchCSRF().catch(() => "");
-          const res = await fetch("/api/account/deactivate", {
+          const res = await secureFetch("/api/account/deactivate", {
             method: "DELETE",
-            credentials: "include",
-            headers: csrfToken ? { "X-CSRF-Token": csrfToken } : {},
           });
           const data = await res.json().catch(() => ({}));
 
@@ -615,13 +785,13 @@ document.addEventListener("DOMContentLoaded", () => {
           const blockerCopy = Array.isArray(data?.blockers) && data.blockers.length
             ? data.blockers.map((item) => item.message).join("\n")
             : "";
-          alert(blockerCopy || data?.error || "Unable to deactivate account.");
+          showToast(blockerCopy || data?.error || "Unable to deactivate account.", "err");
         } catch (err) {
           if (/session expired|account has been (disabled|deactivated)/i.test(String(err?.message || ""))) {
             redirectAfterDeactivation(err?.message || "This account has been deactivated.");
             return;
           }
-          alert(err?.message || "Unable to deactivate account.");
+          showToast(err?.message || "Unable to deactivate account.", "err");
         } finally {
           btn.disabled = false;
         }
@@ -631,13 +801,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- TWO-STEP VERIFICATION ---
   const twoFactorToggles = Array.from(document.querySelectorAll(".two-factor-toggle"));
+  const twoFactorPasswordInput = document.getElementById("twoFactorCurrentPassword");
+  const generateBackupCodesBtn = document.getElementById("generateBackupCodesBtn");
+  const backupCodesOutput = document.getElementById("backupCodesOutput");
+  const authenticatorSetupPanel = document.getElementById("authenticatorSetupPanel");
+  const authenticatorQrCode = document.getElementById("authenticatorQrCode");
+  const authenticatorManualSecret = document.getElementById("authenticatorManualSecret");
+  const authenticatorConfirmCode = document.getElementById("authenticatorConfirmCode");
+  const authenticatorConfirmBtn = document.getElementById("authenticatorConfirmBtn");
+  const authenticatorCancelBtn = document.getElementById("authenticatorCancelBtn");
+  let authenticatorChallengeId = "";
   let twoFactorUpdating = false;
-
-  const twoFactorLabels = {
-    authenticator: "Authenticator app",
-    sms: "Phone number",
-    email: "Email",
-  };
 
   const setTwoFactorUI = ({ enabled = false, method = "email" } = {}) => {
     const availableMethods = new Set(
@@ -669,18 +843,52 @@ document.addEventListener("DOMContentLoaded", () => {
         method: data?.method || "email",
       });
     } catch (err) {
+      console.warn("[profile-settings] two-step verification status failed", err);
+      twoFactorToggles.forEach((toggle) => {
+        toggle.checked = false;
+        toggle.disabled = true;
+        toggle.setAttribute("aria-disabled", "true");
+      });
+      showToast("Two-step verification status could not be loaded. Try again before changing it.", "err");
     }
   }
 
   const updateTwoFactor = async (enabled, method) => {
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) throw new Error("Enter your current password to change two-step verification.");
     const res = await secureFetch("/api/account/2fa-toggle", {
       method: "POST",
-      body: { enabled, method },
+      body: { enabled, method, currentPassword },
     });
     if (!res.ok) {
       const payload = await res.json().catch(() => ({}));
       throw new Error(payload?.error || "Unable to update 2-step verification.");
     }
+  };
+
+  const closeAuthenticatorSetup = () => {
+    authenticatorChallengeId = "";
+    if (authenticatorSetupPanel) authenticatorSetupPanel.hidden = true;
+    if (authenticatorQrCode) authenticatorQrCode.removeAttribute("src");
+    if (authenticatorManualSecret) authenticatorManualSecret.textContent = "";
+    if (authenticatorConfirmCode) authenticatorConfirmCode.value = "";
+  };
+
+  const beginAuthenticatorSetup = async () => {
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) throw new Error("Enter your current password to set up an authenticator app.");
+    const res = await secureFetch("/api/account/2fa/authenticator/setup", {
+      method: "POST",
+      body: { currentPassword },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || "Unable to start authenticator setup.");
+    authenticatorChallengeId = data.challengeId || "";
+    if (authenticatorQrCode) authenticatorQrCode.src = data.qrDataUrl || "";
+    if (authenticatorManualSecret) authenticatorManualSecret.textContent = data.manualSecret || "";
+    if (authenticatorSetupPanel) authenticatorSetupPanel.hidden = false;
+    authenticatorSetupPanel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    authenticatorConfirmCode?.focus();
   };
 
   if (twoFactorToggles.length) {
@@ -689,6 +897,19 @@ document.addEventListener("DOMContentLoaded", () => {
         if (twoFactorUpdating) return;
         const method = toggle.dataset.twoFactorMethod || "email";
         const enabled = toggle.checked;
+        if (method === "authenticator" && enabled) {
+          twoFactorUpdating = true;
+          try {
+            await beginAuthenticatorSetup();
+            toggle.checked = false;
+          } catch (err) {
+            showToast(err?.message || "Unable to start authenticator setup.", "err");
+            await loadTwoFactorStatus();
+          } finally {
+            twoFactorUpdating = false;
+          }
+          return;
+        }
         if (enabled) {
           twoFactorToggles.forEach((other) => {
             if (other !== toggle) other.checked = false;
@@ -702,9 +923,10 @@ document.addEventListener("DOMContentLoaded", () => {
         twoFactorUpdating = true;
         try {
           await updateTwoFactor(finalEnabled, activeMethod);
+          if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
           await loadTwoFactorStatus();
         } catch (err) {
-          alert(err?.message || "Unable to update 2-step verification.");
+          showToast(err?.message || "Unable to update 2-step verification.", "err");
           await loadTwoFactorStatus();
         } finally {
           twoFactorUpdating = false;
@@ -713,7 +935,185 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  loadTwoFactorStatus();
+  trackInitialSettingsTask(loadTwoFactorStatus());
+
+  authenticatorCancelBtn?.addEventListener("click", () => {
+    closeAuthenticatorSetup();
+    loadTwoFactorStatus();
+  });
+
+  authenticatorConfirmBtn?.addEventListener("click", async () => {
+    const code = String(authenticatorConfirmCode?.value || "").trim();
+    if (!authenticatorChallengeId || !/^\d{6}$/.test(code)) {
+      showToast("Enter the current six-digit code from your authenticator app.", "err");
+      authenticatorConfirmCode?.focus();
+      return;
+    }
+    authenticatorConfirmBtn.disabled = true;
+    try {
+      const res = await secureFetch("/api/account/2fa/authenticator/confirm", {
+        method: "POST",
+        body: { challengeId: authenticatorChallengeId, code },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to confirm authenticator setup.");
+      if (backupCodesOutput) {
+        backupCodesOutput.textContent = [
+          "Authenticator enabled. Save these one-time backup codes now:",
+          "",
+          ...(Array.isArray(data?.backupCodes) ? data.backupCodes : []),
+        ].join("\n");
+        backupCodesOutput.hidden = false;
+      }
+      if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
+      closeAuthenticatorSetup();
+      await loadTwoFactorStatus();
+    } catch (err) {
+      showToast(err?.message || "Unable to confirm authenticator setup.", "err");
+    } finally {
+      authenticatorConfirmBtn.disabled = false;
+    }
+  });
+
+  generateBackupCodesBtn?.addEventListener("click", async () => {
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) {
+      showToast("Enter your current password to generate backup codes.", "err");
+      twoFactorPasswordInput?.focus();
+      return;
+    }
+    if (!(await confirmAction("Any previous backup codes will stop working immediately.", {
+      title: "Generate new backup codes?",
+      confirmLabel: "Generate codes",
+      tone: "danger",
+    }))) return;
+    generateBackupCodesBtn.disabled = true;
+    try {
+      const res = await secureFetch("/api/account/2fa-backup-codes", {
+        method: "POST",
+        body: { currentPassword },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to generate backup codes.");
+      if (backupCodesOutput) {
+        backupCodesOutput.textContent = [
+          "Save these codes now. Each code can be used once:",
+          "",
+          ...(Array.isArray(data?.codes) ? data.codes : []),
+        ].join("\n");
+        backupCodesOutput.hidden = false;
+      }
+      if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
+    } catch (err) {
+      showToast(err?.message || "Unable to generate backup codes.", "err");
+    } finally {
+      generateBackupCodesBtn.disabled = false;
+    }
+  });
+
+  // --- PASSKEYS ---
+  const passkeyList = document.getElementById("passkeyList");
+  const passkeyNameInput = document.getElementById("passkeyName");
+  const addPasskeyBtn = document.getElementById("addPasskeyBtn");
+  const passkeyUnsupported = document.getElementById("passkeyUnsupported");
+  const webAuthnBrowser = window.SimpleWebAuthnBrowser;
+  const passkeysSupported = Boolean(webAuthnBrowser?.browserSupportsWebAuthn?.());
+
+  if (!passkeysSupported) {
+    if (passkeyUnsupported) passkeyUnsupported.hidden = false;
+    if (addPasskeyBtn) addPasskeyBtn.disabled = true;
+  }
+
+  const loadPasskeys = async () => {
+    if (!passkeyList) return;
+    try {
+      const res = await secureFetch("/api/account/passkeys");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to load passkeys.");
+      const passkeys = Array.isArray(data?.passkeys) ? data.passkeys : [];
+      if (!passkeys.length) {
+        passkeyList.innerHTML = '<p class="muted">No passkeys added.</p>';
+        return;
+      }
+      passkeyList.innerHTML = passkeys.map((item) => {
+        const lastUsed = item.lastUsedAt ? `Last used ${new Date(item.lastUsedAt).toLocaleDateString()}` : "Not used yet";
+        return `<div class="passkey-list-item">
+          <div><strong>${escapeHTML(item.name || "Passkey")}</strong><br><span class="muted">${escapeHTML(lastUsed)}</span></div>
+          <button type="button" class="btn btn-outline" data-remove-passkey="${escapeHTML(item.id)}">Remove</button>
+        </div>`;
+      }).join("");
+    } catch (err) {
+      passkeyList.innerHTML = `<p class="muted">${escapeHTML(err?.message || "Unable to load passkeys.")}</p>`;
+    }
+  };
+
+  addPasskeyBtn?.addEventListener("click", async () => {
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) {
+      showToast("Enter your current password to add a passkey.", "err");
+      twoFactorPasswordInput?.focus();
+      return;
+    }
+    addPasskeyBtn.disabled = true;
+    try {
+      const optionsRes = await secureFetch("/api/account/passkeys/registration-options", {
+        method: "POST",
+        body: { currentPassword },
+      });
+      const optionsData = await optionsRes.json().catch(() => ({}));
+      if (!optionsRes.ok) throw new Error(optionsData?.error || "Unable to start passkey setup.");
+      const response = await webAuthnBrowser.startRegistration({ optionsJSON: optionsData.options });
+      const registerRes = await secureFetch("/api/account/passkeys/register", {
+        method: "POST",
+        body: {
+          challengeId: optionsData.challengeId,
+          response,
+          name: String(passkeyNameInput?.value || "").trim() || "Passkey",
+        },
+      });
+      const registerData = await registerRes.json().catch(() => ({}));
+      if (!registerRes.ok) throw new Error(registerData?.error || "Unable to add passkey.");
+      if (passkeyNameInput) passkeyNameInput.value = "";
+      if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
+      await loadPasskeys();
+    } catch (err) {
+      if (err?.name !== "NotAllowedError") showToast(err?.message || "Passkey setup was cancelled or failed.", "err");
+    } finally {
+      addPasskeyBtn.disabled = !passkeysSupported;
+    }
+  });
+
+  passkeyList?.addEventListener("click", async (event) => {
+    const button = event.target instanceof Element ? event.target.closest("[data-remove-passkey]") : null;
+    if (!button) return;
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) {
+      showToast("Enter your current password to remove a passkey.", "err");
+      twoFactorPasswordInput?.focus();
+      return;
+    }
+    if (!(await confirmAction("This passkey will no longer sign in to your account.", {
+      title: "Remove this passkey?",
+      confirmLabel: "Remove passkey",
+      tone: "danger",
+    }))) return;
+    button.disabled = true;
+    try {
+      const res = await secureFetch(`/api/account/passkeys/${encodeURIComponent(button.dataset.removePasskey || "")}`, {
+        method: "DELETE",
+        body: { currentPassword },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to remove passkey.");
+      if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
+      await loadPasskeys();
+    } catch (err) {
+      showToast(err?.message || "Unable to remove passkey.", "err");
+      button.disabled = false;
+    }
+  });
+
+  trackInitialSettingsTask(loadPasskeys());
 
   // --- SESSION HISTORY ---
   const sessionHistoryList = document.getElementById("sessionHistoryList");
@@ -756,17 +1156,12 @@ document.addEventListener("DOMContentLoaded", () => {
       sessionHistoryList.innerHTML = "<p class=\"muted\">No recent sessions.</p>";
       return;
     }
-    const currentUa = navigator.userAgent || "";
-    let activeIndex = sessions.findIndex((item) => item.ua && item.ua === currentUa);
-    if (activeIndex === -1) activeIndex = 0;
-
     sessionHistoryList.innerHTML = sessions
-      .map((item, index) => {
-        const isActive = index === activeIndex;
+      .map((item) => {
+        const isActive = item.current === true;
         const deviceLabel = guessDeviceLabel(item.ua);
-        const locationLabel = item.ip ? `IP ${item.ip}` : "Location unavailable";
-        const statusLabel = isActive ? "Active" : formatRelativeTime(item.createdAt);
-        const actionDisabled = !isActive;
+        const locationLabel = escapeHTML(item.ip ? `IP ${item.ip}` : "Location unavailable");
+        const statusLabel = isActive ? "Current session" : `Active ${formatRelativeTime(item.lastSeenAt || item.createdAt)}`;
         return `
           <div class="session-row">
             <div class="session-device">
@@ -777,7 +1172,7 @@ document.addEventListener("DOMContentLoaded", () => {
               </div>
             </div>
             <div class="session-status">${statusLabel}</div>
-            <button class="session-action" type="button" data-session-action="logout" ${actionDisabled ? "disabled" : ""} aria-label="Sign out of this session">
+            <button class="session-action" type="button" data-session-action="logout" data-session-id="${escapeHTML(item.id || "")}" aria-label="Sign out ${isActive ? "of this session" : deviceLabel}">
               <svg viewBox="0 0 20 20">
                 <path fill="currentColor" d="M6.5 3.5h7a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-7v-1.6h6.4v-7.8H6.5V3.5zm3.4 2.8 3.1 3.1-3.1 3.1-1.1-1.1 1.2-1.2H2.5V8.6h7.1L8.4 7.4l1.1-1.1z"/>
               </svg>
@@ -788,18 +1183,29 @@ document.addEventListener("DOMContentLoaded", () => {
       .join("");
 
     sessionHistoryList.querySelectorAll("[data-session-action=\"logout\"]").forEach((btn) => {
-      if (btn.disabled) return;
       btn.addEventListener("click", async () => {
-        const confirmed = window.confirm("Sign out of this device?");
+        const confirmed = await confirmAction("The selected session will lose access and must sign in again.", {
+          title: "Sign out this device?",
+          confirmLabel: "Sign out device",
+          tone: "danger",
+        });
         if (!confirmed) return;
         try {
-          await secureFetch("/api/auth/logout", { method: "POST" });
-        } catch {}
-        try {
-          window.clearStoredSession?.();
-          localStorage.removeItem("lpc_user");
-        } catch {}
-        window.location.href = "login.html";
+          const res = await secureFetch(`/api/account/sessions/${encodeURIComponent(btn.dataset.sessionId || "")}`, { method: "DELETE" });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data?.error || "Unable to sign out that device.");
+          if (data?.currentSessionRevoked) {
+            try {
+              window.clearStoredSession?.();
+              localStorage.removeItem("lpc_user");
+            } catch {}
+            window.location.href = "login.html";
+            return;
+          }
+          await loadSessionHistory();
+        } catch (err) {
+          showToast(err?.message || "Unable to sign out that device.", "err");
+        }
       });
     });
   };
@@ -816,12 +1222,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  loadSessionHistory();
+  trackInitialSettingsTask(loadSessionHistory());
+
+  document.getElementById("revokeOtherSessionsBtn")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    if (!(await confirmAction("Every session except this one will lose access and must sign in again.", {
+      title: "Sign out all other devices?",
+      confirmLabel: "Sign out devices",
+      tone: "danger",
+    }))) return;
+    button.disabled = true;
+    try {
+      const res = await secureFetch("/api/account/sessions/revoke-others", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to sign out other devices.");
+      await loadSessionHistory();
+    } catch (err) {
+      showToast(err?.message || "Unable to sign out other devices.", "err");
+    } finally {
+      button.disabled = false;
+    }
+  });
 
   // --- BLOCKED USERS ---
   async function requestUnblock(userId, name = "this user") {
-    const confirmed = window.confirm(
-      `Unblock ${name}? Future interaction restrictions will be removed for new activity only. This will not reopen old matters, messages, or prior workflows. This user will not be notified.`
+    const confirmed = await confirmAction(
+      "Future interaction restrictions will be removed for new activity only. Old Matters, messages, and workflows remain closed. This user will not be notified.",
+      { title: `Unblock ${name}?`, confirmLabel: "Unblock user" }
     );
     if (!confirmed) return false;
     await secureFetch(`/api/blocks/${encodeURIComponent(userId)}`, {
@@ -857,7 +1284,7 @@ document.addEventListener("DOMContentLoaded", () => {
           return `
             <div class="blocked-user-row">
               <div class="blocked-user-name">${safeName}</div>
-              <button class="small-btn danger-lite unblock-btn" data-id="${escapeHTML(userId)}" data-name="${encodeURIComponent(
+              <button class="small-btn danger-lite unblock-btn" type="button" data-id="${escapeHTML(userId)}" data-name="${encodeURIComponent(
                 u.name || "User"
               )}">Unblock</button>
             </div>
@@ -889,11 +1316,12 @@ document.addEventListener("DOMContentLoaded", () => {
       container.innerHTML = "<p class='muted'>Unable to load blocked users.</p>";
     }
   }
-  loadBlockedUsers();
+  trackInitialSettingsTask(loadBlockedUsers());
 
   // --- STRIPE CONNECT ---
   const connectStripeBtn = document.getElementById("connectStripeBtn");
   const stripeStatus = document.getElementById("stripeStatus");
+  const stripeRequirementCopy = document.getElementById("stripeRequirementCopy");
   const cachedUser = getCachedUser();
   const cachedRole = String(cachedUser?.role || "").toLowerCase();
   const isParalegal = cachedRole === "paralegal";
@@ -904,7 +1332,9 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const updateStripeStatus = (data = {}) => {
-    const connected = !!data.details_submitted && !!data.payouts_enabled;
+    const readiness = data.readiness && typeof data.readiness === "object" ? data.readiness : null;
+    const connected = readiness?.ready === true;
+    const statusUnavailable = readiness?.evidenceState && readiness.evidenceState !== "verified";
     const bankName = String(data.bank_name || "").trim();
     const bankLast4 = String(data.bank_last4 || "").trim();
     if (stripeStatus) {
@@ -915,12 +1345,27 @@ document.addEventListener("DOMContentLoaded", () => {
         setStripeStatus(bankBits.length
           ? `Stripe connected for payouts (${bankBits.join(" ")})`
           : "Stripe connected for payouts.");
+      } else if (statusUnavailable) {
+        setStripeStatus("Stripe status unavailable.");
       } else {
         setStripeStatus();
       }
     }
+    if (stripeRequirementCopy) {
+      if (connected) {
+        stripeRequirementCopy.textContent = "Your payout account is connected and ready to receive eligible payouts.";
+      } else if (statusUnavailable) {
+        stripeRequirementCopy.textContent = "LPC could not confirm your current payout readiness. Review Stripe before relying on this status.";
+      } else if (readiness?.accountPresent) {
+        stripeRequirementCopy.textContent = "Finish the remaining Stripe requirements before receiving payouts.";
+      } else {
+        stripeRequirementCopy.textContent = "Connect Stripe before applying to Matters or receiving payment.";
+      }
+    }
     if (connectStripeBtn) {
-      connectStripeBtn.textContent = connected ? "Update Stripe Details" : "Connect Stripe Account →";
+      connectStripeBtn.textContent = connected || readiness?.accountPresent
+        ? "Update Stripe Details"
+        : "Connect Stripe Account →";
       connectStripeBtn.disabled = !isParalegal;
       connectStripeBtn.setAttribute("aria-disabled", !isParalegal ? "true" : "false");
       connectStripeBtn.removeAttribute("title");
@@ -938,6 +1383,9 @@ document.addEventListener("DOMContentLoaded", () => {
       updateStripeStatus(data);
     } catch (err) {
       setStripeStatus("Stripe status unavailable.");
+      if (stripeRequirementCopy) {
+        stripeRequirementCopy.textContent = "LPC could not confirm your current payout readiness. Review Stripe before relying on this status.";
+      }
       if (connectStripeBtn) {
         connectStripeBtn.disabled = !isParalegal;
         connectStripeBtn.setAttribute("aria-disabled", !isParalegal ? "true" : "false");
@@ -956,7 +1404,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await startStripeOnboarding();
       } catch (err) {
         console.error("Failed to start Stripe connect flow", err);
-        alert(err?.message || "Unable to connect Stripe right now.");
+        showToast(err?.message || "Unable to connect Stripe right now.", "err");
         refreshStripeStatus();
       }
     });
@@ -970,7 +1418,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-const PREFILL_CACHE_KEY = "lpc_edit_profile_prefill";
 const PROFILE_SETTINGS_DRAFT_KEY = "lpc_profile_settings_draft_v1";
 
 const paralegalSettingsSection = document.getElementById("paralegalSettings");
@@ -1022,7 +1469,7 @@ function showPendingSettingsNotice() {
     content.innerHTML = `
       <section class="settings-panel active">
         <h2>Awaiting approval</h2>
-        <p>Your application is under review. You'll receive an email as soon as an administrator approves your access.</p>
+        <p>Your application is under review. You’ll receive an email when the review is complete.</p>
         <p class="muted">Need help? Contact support and reference your signup email.</p>
       </section>
     `;
@@ -1033,13 +1480,16 @@ paralegalSettingsSection?.classList.add("hidden");
 attorneySettingsSection?.classList.add("hidden");
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const prefill = consumeEditPrefillUser();
-  const cachedUser = prefill || getCachedUser();
-  if (cachedUser) {
-    bootstrapProfileSettings(cachedUser);
+  try {
+    try {
+      localStorage.removeItem("lpc_edit_profile_prefill");
+    } catch {}
+    await window.checkSession();
+    await loadSettings();
+    await Promise.allSettled(initialSettingsTasks);
+  } finally {
+    document.getElementById("settingsContent")?.removeAttribute("aria-busy");
   }
-  await window.checkSession();
-  await loadSettings();
 });
 
 let settingsState = {
@@ -1084,6 +1534,9 @@ let profileDraftPersistenceBound = false;
 let applyingProfileDraft = false;
 let profileDraftWriteTimer = null;
 let profileScrollIndicatorBound = false;
+let attorneySavedSnapshot = "";
+let attorneySaveStateBound = false;
+let attorneySaveInFlight = false;
 
 function updateProfileScrollIndicator() {
   const indicator = document.getElementById("paralegalScrollIndicator");
@@ -1291,7 +1744,6 @@ const educationModalSave = document.getElementById("educationModalSave");
 const educationModalCancel = document.getElementById("educationModalCancel");
 const educationModalClose = document.getElementById("educationModalClose");
 let educationModalBound = false;
-let educationModalOpen = false;
 
 if (addLanguageBtn && languagesEditor) {
   addLanguageBtn.addEventListener("click", () => addLanguageRow());
@@ -1317,15 +1769,9 @@ function getAttorneyInitials(user = {}) {
   return buildInitials(fullName, "A");
 }
 
-function consumeEditPrefillUser() {
-  try {
-    const raw = localStorage.getItem(PREFILL_CACHE_KEY);
-    if (!raw) return null;
-    localStorage.removeItem(PREFILL_CACHE_KEY);
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+function getParalegalInitials(user = {}) {
+  const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.name || "";
+  return buildInitials(fullName, "P");
 }
 
 function getProfileSettingsDraftStorageKey(user = currentUser || getCachedUser() || {}) {
@@ -1336,6 +1782,37 @@ function getProfileSettingsDraftStorageKey(user = currentUser || getCachedUser()
   return `${PROFILE_SETTINGS_DRAFT_KEY}:${role}:${identifier}`;
 }
 
+function getProfileSettingsServerFingerprint(user = currentUser || getCachedUser() || {}) {
+  const role = String(user?.role || "").trim().toLowerCase();
+  const profile = role === "attorney"
+    ? {
+        firstName: user?.firstName || "",
+        lastName: user?.lastName || "",
+        linkedInURL: user?.linkedInURL || "",
+        lawFirm: user?.lawFirm || "",
+        firmWebsite: user?.firmWebsite || "",
+        practiceDescription: user?.practiceDescription || user?.bio || "",
+        publications: user?.publications || [],
+        practiceAreas: user?.practiceAreas || [],
+      }
+    : {
+        firstName: user?.firstName || "",
+        lastName: user?.lastName || "",
+        email: user?.email || "",
+        bio: user?.bio || "",
+        linkedInURL: user?.linkedInURL || "",
+        yearsExperience: user?.yearsExperience || "",
+        practiceAreas: user?.practiceAreas || [],
+        highlightedSkills: user?.highlightedSkills || user?.skills || [],
+        stateExperience: user?.stateExperience || [],
+        bestFor: user?.bestFor || [],
+        experience: user?.experience || [],
+        education: user?.education || [],
+        languages: user?.languages || [],
+      };
+  return JSON.stringify(profile);
+}
+
 function readProfileSettingsDraft(user = currentUser || getCachedUser() || {}) {
   const key = getProfileSettingsDraftStorageKey(user);
   if (!key) return null;
@@ -1343,8 +1820,24 @@ function readProfileSettingsDraft(user = currentUser || getCachedUser() || {}) {
     const raw = sessionStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : null;
+    if (!parsed || typeof parsed !== "object") return null;
+    const savedAt = Number(parsed.savedAt || 0);
+    const age = Date.now() - savedAt;
+    const currentServerFingerprint = getProfileSettingsServerFingerprint(user);
+    const draftServerFingerprint = String(parsed.serverFingerprint || "");
+    if (
+      !Number.isFinite(savedAt) ||
+      savedAt <= 0 ||
+      age < 0 ||
+      age > PROFILE_DRAFT_MAX_AGE_MS ||
+      draftServerFingerprint !== currentServerFingerprint
+    ) {
+      clearProfileSettingsDraft(user);
+      return null;
+    }
+    return parsed;
   } catch {
+    clearProfileSettingsDraft(user);
     return null;
   }
 }
@@ -1412,7 +1905,8 @@ function persistProfileSettingsDraft() {
       key,
       JSON.stringify({
         ...draft,
-        updatedAt: Date.now(),
+        savedAt: Date.now(),
+        serverFingerprint: getProfileSettingsServerFingerprint(),
       })
     );
   } catch {}
@@ -1518,14 +2012,6 @@ function bindProfileDraftPersistence() {
 
   document.addEventListener("input", scheduleFromEvent, true);
   document.addEventListener("change", scheduleFromEvent, true);
-  document.addEventListener(
-    "click",
-    (event) => {
-      if (!currentUser || applyingProfileDraft || !shouldTrack(event.target)) return;
-      setTimeout(() => scheduleProfileSettingsDraftPersist(), 0);
-    },
-    true
-  );
   profileDraftPersistenceBound = true;
 }
 
@@ -1604,7 +2090,7 @@ function bindDocumentFileChooser(triggerId, input, onAfterChoose = null) {
 }
 
 function openProfileDocument(url) {
-  const targetUrl = String(url || "").trim();
+  const targetUrl = normalizeHttpNavigationUrl(url);
   if (!targetUrl) return;
   try {
     window.open(targetUrl, "_blank", "noopener,noreferrer");
@@ -1616,11 +2102,9 @@ function openProfileDocument(url) {
 async function uploadParalegalPdfDocument({
   input,
   endpoint,
-  emptyMessage,
   invalidMessage,
   sizeMessage,
   failureMessage,
-  pendingMessage,
   successMessage,
   onSuccess,
   onFinally,
@@ -1628,13 +2112,13 @@ async function uploadParalegalPdfDocument({
   const file = input?.files?.[0];
   if (!file) return;
   if (!isPdfFile(file)) {
-    alert(invalidMessage);
+    showToast(invalidMessage, "err");
     input.value = "";
     onFinally?.();
     return;
   }
   if (file.size > 10 * 1024 * 1024) {
-    alert(sizeMessage);
+    showToast(sizeMessage, "err");
     input.value = "";
     onFinally?.();
     return;
@@ -1656,7 +2140,7 @@ async function uploadParalegalPdfDocument({
     showToast(successMessage, "ok");
   } catch (err) {
     console.error(`Upload failed for ${endpoint}`, err);
-    alert(err?.message || failureMessage);
+    showToast(err?.message || failureMessage, "err");
   } finally {
     input.value = "";
     onFinally?.();
@@ -1723,7 +2207,7 @@ function updatePhotoReviewStatus(user = {}) {
   statusEl.classList.remove("is-rejected");
   let message = "";
   if (status === "pending_review") {
-    message = "Pending";
+    message = "Your profile is hidden from attorney discovery until your photo is approved.";
   } else if (status === "rejected") {
     message = "Your photo needs a quick update. Please upload a new one that meets our guidelines.";
     statusEl.classList.add("is-rejected");
@@ -1791,11 +2275,52 @@ function updateRequiredFieldMarkers() {
   if (!status.resumeOk) missing.push("Resume");
   if (!status.photoOk) missing.push("Profile photo");
 
+  const readiness = document.getElementById("profileReadiness");
+  const readinessTitle = document.getElementById("profileReadinessTitle");
+  const readinessDetail = document.getElementById("profileReadinessDetail");
+  const readinessAction = document.getElementById("profileReadinessAction");
+  const isReady = missing.length === 0;
+  if (readiness) readiness.dataset.state = isReady ? "ready" : "incomplete";
+  if (readinessTitle) {
+    readinessTitle.textContent = isReady
+      ? "Your profile is ready"
+      : `${missing.length} required ${missing.length === 1 ? "item" : "items"} to finish`;
+  }
+  if (readinessDetail) {
+    readinessDetail.hidden = isReady;
+    readinessDetail.textContent = isReady
+      ? ""
+      : `Add ${missing.join(", ")} before making your profile visible.`;
+  }
+  if (readinessAction) {
+    readinessAction.hidden = isReady;
+    readinessAction.dataset.target = !status.photoOk
+      ? "avatarFrame"
+      : !status.bioOk
+      ? "bioSection"
+      : !status.skillsOk
+      ? "skillsCard"
+      : !status.practiceAreasOk
+      ? "practiceAreasCard"
+      : "settingsResume";
+  }
+
   return {
     ...status,
     ok: status.bioOk && status.skillsOk && status.practiceAreasOk && status.resumeOk && status.photoOk,
     missing,
   };
+}
+
+const profileReadinessAction = document.getElementById("profileReadinessAction");
+if (profileReadinessAction) {
+  profileReadinessAction.addEventListener("click", () => {
+    const target = document.getElementById(profileReadinessAction.dataset.target || "");
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    const editToggle = target.querySelector?.("[data-edit-toggle]");
+    (editToggle || target).focus({ preventScroll: true });
+  });
 }
 
 function bindParalegalRequiredFieldWatchers() {
@@ -1823,6 +2348,7 @@ function initAttorneySettings(user = {}) {
   seedSettingsState(user);
   showAttorneySettings();
   hydrateAttorneyProfileForm(user);
+  initializeAttorneySaveState();
   bindAttorneyPracticeEditor();
   bindAttorneySaveButton();
   bindAttorneyPublicationsToggle();
@@ -1844,15 +2370,23 @@ function initParalegalSettings(user = {}) {
   bindParalegalRequiredFieldWatchers();
   updateRequiredFieldMarkers();
   renderLanguageEditor(user.languages || []);
-  try { loadCertificate(user); } catch {}
-  try { loadResume(user); } catch {}
-  try { loadWritingSample(user); } catch {}
-  try { loadBio(user); } catch {}
-  try { loadEducation(user); } catch {}
-  try { loadAwards(user); } catch {}
-  try { loadSkills(user); } catch {}
-  try { loadLinkedIn(user); } catch {}
-  try { loadNotifications(user); } catch {}
+  [
+    ["certificate", loadCertificate],
+    ["resume", loadResume],
+    ["writing sample", loadWritingSample],
+    ["bio", loadBio],
+    ["education", loadEducation],
+    ["awards", loadAwards],
+    ["skills", loadSkills],
+    ["LinkedIn", loadLinkedIn],
+    ["notifications", loadNotifications],
+  ].forEach(([section, hydrate]) => {
+    try {
+      hydrate(user);
+    } catch (error) {
+      console.error(`[profile] ${section} hydration failed`, error);
+    }
+  });
   syncCluster(user);
   setTimeout(() => initParalegalProfileTour(user), 300);
 }
@@ -1873,7 +2407,6 @@ let onboardingPromise = null;
 
 function normalizeOnboarding(raw = {}) {
   return {
-    paralegalWelcomeDismissed: Boolean(raw?.paralegalWelcomeDismissed),
     paralegalTourCompleted: Boolean(raw?.paralegalTourCompleted),
     paralegalProfileTourCompleted: Boolean(raw?.paralegalProfileTourCompleted),
     attorneyProfileCompleted: Boolean(raw?.attorneyProfileCompleted),
@@ -1939,9 +2472,6 @@ async function updateOnboardingState(updates = {}, { markFirstLoginComplete = fa
   }
 }
 
-function hasCompletedProfileTour(user) {
-  return getCachedOnboarding(user).paralegalProfileTourCompleted;
-}
 
 function markProfileTourCompleted() {
   void updateOnboardingState({ paralegalProfileTourCompleted: true }, { markFirstLoginComplete: true });
@@ -2122,6 +2652,7 @@ async function initParalegalProfileTour(user = {}) {
   };
 
   const clearTour = () => {
+    const returnTarget = activeTourTarget;
     activeRenderToken += 1;
     activeTourTarget = null;
     ensureSidebarVisibleForTarget(null);
@@ -2134,6 +2665,10 @@ async function initParalegalProfileTour(user = {}) {
     overlay.classList.remove("is-active", "spotlight");
     overlay.setAttribute("aria-hidden", "true");
     tooltip.classList.remove("is-active", "arrow-left", "arrow-right", "arrow-top", "arrow-bottom");
+    tooltip.setAttribute("aria-hidden", "true");
+    tooltip.setAttribute("inert", "");
+    deactivateDialogFocus(tooltip, { restoreFocus: false });
+    if (returnTarget instanceof HTMLElement) returnTarget.focus();
     if (forceTour) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -2354,6 +2889,12 @@ async function initParalegalProfileTour(user = {}) {
     overlay.classList.add("is-active", "spotlight");
     overlay.setAttribute("aria-hidden", "false");
     tooltip.classList.add("is-active");
+    tooltip.setAttribute("aria-hidden", "false");
+    tooltip.removeAttribute("inert");
+    activateDialogFocus(tooltip, {
+      initialFocus: nextBtn,
+      onEscape: clearTour,
+    });
     const shouldAutoScroll = allowAutoScroll && step.autoScroll === "smooth";
     if (shouldAutoScroll) {
       target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
@@ -2497,6 +3038,7 @@ function createExperienceRow(entry = {}) {
       container.appendChild(createExperienceRow());
     }
     updateExperienceRemoveButtons(container);
+    markParalegalProfileChanged();
   });
   row.appendChild(removeBtn);
   return row;
@@ -2580,18 +3122,6 @@ function setSectionDisplayText(element, value, fallback) {
   }
 }
 
-function setSectionDisplayList(element, items = [], fallbackItems = []) {
-  if (!element) return;
-  const cleanItems = Array.isArray(items) ? items.filter(Boolean) : [];
-  const useItems = cleanItems.length ? cleanItems : fallbackItems;
-  element.innerHTML = "";
-  useItems.forEach((item) => {
-    const li = document.createElement("li");
-    li.textContent = item;
-    element.appendChild(li);
-  });
-  element.classList.toggle("is-placeholder", !cleanItems.length);
-}
 
 function parseCommaList(value) {
   return String(value || "")
@@ -2616,9 +3146,6 @@ function parseSkillsList(value) {
     });
 }
 
-function formatSkillsValue(value) {
-  return parseSkillsList(value).join(", ");
-}
 
 const MAX_PROFILE_SKILLS = 5;
 const MAX_PROFILE_BEST_FOR = 5;
@@ -2643,6 +3170,7 @@ function renderSkillsChips(values = []) {
       applySkillsInput(updated);
       refreshParalegalSectionDisplays();
       updateRequiredFieldMarkers();
+      markParalegalProfileChanged();
     });
     chip.appendChild(remove);
     container.appendChild(chip);
@@ -2764,6 +3292,7 @@ function renderStateExperienceChips(values = []) {
       const updated = readStateExperienceInput().filter((value) => value !== code);
       renderStateExperienceChips(updated);
       refreshParalegalSectionDisplays();
+      markParalegalProfileChanged();
     });
     chip.appendChild(remove);
     container.appendChild(chip);
@@ -3281,13 +3810,121 @@ function hydrateAttorneyProfileForm(user = {}) {
   updateAttorneyAvatarPreview(user);
 }
 
+function getAttorneyFormSnapshot() {
+  return JSON.stringify({
+    firstName: document.getElementById("attorneyFirstName")?.value || "",
+    lastName: document.getElementById("attorneyLastName")?.value || "",
+    linkedInURL: document.getElementById("attorneyLinkedIn")?.value || "",
+    lawFirm: document.getElementById("attorneyFirmName")?.value || "",
+    firmWebsite: document.getElementById("attorneyFirmWebsite")?.value || "",
+    practiceAreas: collectAttorneyPracticeAreas(),
+    practiceDescription: document.getElementById("attorneyPracticeDescription")?.value || "",
+    publications: document.getElementById("attorneyPublications")?.value || "",
+  });
+}
+
+function setAttorneySaveStatus(message = "", state = "") {
+  const status = document.getElementById("attorneySaveStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.hidden = !message;
+  if (state) status.dataset.state = state;
+  else delete status.dataset.state;
+}
+
+function updateAttorneySaveState() {
+  const saveBtn = document.getElementById("saveAttorneyProfile");
+  if (!saveBtn || !attorneySavedSnapshot) return;
+  const dirty = getAttorneyFormSnapshot() !== attorneySavedSnapshot;
+  saveBtn.disabled = attorneySaveInFlight || !dirty;
+  saveBtn.closest(".attorney-actions")?.classList.toggle("has-unsaved-changes", dirty);
+  if (dirty && document.getElementById("attorneySaveStatus")?.dataset.state === "success") {
+    setAttorneySaveStatus("Unsaved changes", "pending");
+  }
+}
+
+function markAttorneyProfileSaved() {
+  attorneySavedSnapshot = getAttorneyFormSnapshot();
+  updateAttorneySaveState();
+}
+
+function initializeAttorneySaveState() {
+  const root = document.getElementById("attorneySettings");
+  if (!root) return;
+  attorneySavedSnapshot = getAttorneyFormSnapshot();
+  if (!attorneySaveStateBound) {
+    const handleChange = (event) => {
+      if (event.target.closest("#attorneyNotificationToggles") || event.target.id === "attorneyAvatarInput") return;
+      setTimeout(updateAttorneySaveState, 0);
+    };
+    root.addEventListener("input", handleChange);
+    root.addEventListener("change", handleChange);
+    root.addEventListener("click", (event) => {
+      if (event.target.closest("#attorneyPracticeDropdown")) handleChange(event);
+    });
+    attorneySaveStateBound = true;
+  }
+  updateAttorneySaveState();
+}
+
+function clearAttorneyFieldErrors() {
+  document.querySelectorAll("#attorneySettings .field-error").forEach((error) => {
+    error.textContent = "";
+    error.hidden = true;
+  });
+  document.querySelectorAll("#attorneySettings [aria-invalid='true']").forEach((field) => {
+    field.removeAttribute("aria-invalid");
+  });
+}
+
+function setAttorneyFieldError(inputId, errorId, message) {
+  const input = document.getElementById(inputId);
+  const error = document.getElementById(errorId);
+  input?.setAttribute("aria-invalid", "true");
+  if (error) {
+    error.textContent = message;
+    error.hidden = false;
+  }
+  input?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+  input?.focus?.({ preventScroll: true });
+}
+
+function validateAttorneyProfile() {
+  clearAttorneyFieldErrors();
+  const first = document.getElementById("attorneyFirstName")?.value.trim() || "";
+  if (!first) {
+    setAttorneyFieldError("attorneyFirstName", "attorneyFirstNameError", "Enter your first name.");
+    return false;
+  }
+  const last = document.getElementById("attorneyLastName")?.value.trim() || "";
+  if (!last) {
+    setAttorneyFieldError("attorneyLastName", "attorneyLastNameError", "Enter your last name.");
+    return false;
+  }
+  const linkedInInput = document.getElementById("attorneyLinkedIn");
+  try {
+    normalizeHttpUrlInput(linkedInInput?.value, { fieldLabel: "LinkedIn URL", requiredHost: "linkedin.com" });
+  } catch (error) {
+    setAttorneyFieldError("attorneyLinkedIn", "attorneyLinkedInError", error.message);
+    return false;
+  }
+  const firmWebsiteInput = document.getElementById("attorneyFirmWebsite");
+  try {
+    normalizeHttpUrlInput(firmWebsiteInput?.value, { fieldLabel: "firm website" });
+  } catch (error) {
+    setAttorneyFieldError("attorneyFirmWebsite", "attorneyFirmWebsiteError", error.message);
+    return false;
+  }
+  return true;
+}
+
 function syncPracticeAreasInput(inputId, values = []) {
   const input = document.getElementById(inputId);
   if (!input) return;
   input.value = (Array.isArray(values) ? values : [values]).filter(Boolean).join(", ");
 }
 
-function loadAvatarPreview({ preview, frame, initials, url, fallbackText = "" } = {}) {
+function loadAvatarPreview({ preview, frame, initials, url, fallbackText = "", onLoad, onError } = {}) {
   if (!preview) {
     if (initials && fallbackText) initials.textContent = fallbackText;
     return;
@@ -3302,6 +3939,7 @@ function loadAvatarPreview({ preview, frame, initials, url, fallbackText = "" } 
     preview.classList.add("is-loaded");
     frame?.classList.add("has-photo");
     if (initials) initials.style.display = "none";
+    onLoad?.();
   };
 
   const handleError = () => {
@@ -3312,6 +3950,7 @@ function loadAvatarPreview({ preview, frame, initials, url, fallbackText = "" } 
       initials.style.display = "flex";
       if (fallbackText) initials.textContent = fallbackText;
     }
+    onError?.();
   };
 
   preview.addEventListener("load", markLoaded, { once: true });
@@ -3490,10 +4129,6 @@ function renderPracticeAreasDropdown({
     buildOption(label, false);
   });
 
-  const findOptionCheckbox = (value) => {
-    return panel.querySelector(`.dropdown-option input[type="checkbox"][value="${CSS.escape(value)}"]`);
-  };
-
   const updatePracticeDropdownLabel = () => {
     const selectedValues = collectPracticeAreasFromPanel(panelId);
     syncPracticeAreasInput(inputId, selectedValues);
@@ -3511,23 +4146,6 @@ function renderPracticeAreasDropdown({
       const chip = document.createElement("span");
       chip.className = "chip";
       chip.textContent = value;
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "chip-remove";
-      remove.setAttribute("aria-label", `Remove ${value}`);
-      remove.textContent = "×";
-      remove.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const cb = findOptionCheckbox(value);
-        if (cb) {
-          cb.checked = false;
-          const opt = cb.closest(".dropdown-option");
-          if (opt) opt.classList.remove("selected");
-          updatePracticeDropdownLabel();
-          syncAllOptionClasses();
-        }
-      });
-      chip.appendChild(remove);
       summary.appendChild(chip);
     });
     if (selectedValues.length > chips.length) {
@@ -3554,10 +4172,12 @@ function renderPracticeAreasDropdown({
   if (!toggle.dataset.bound) {
     toggle.addEventListener("click", () => {
       panel.classList.toggle("open");
+      toggle.setAttribute("aria-expanded", panel.classList.contains("open") ? "true" : "false");
     });
     document.addEventListener("click", (e) => {
       if (!panel.contains(e.target) && !toggle.contains(e.target)) {
         panel.classList.remove("open");
+        toggle.setAttribute("aria-expanded", "false");
       }
     });
     toggle.dataset.bound = "true";
@@ -3629,7 +4249,7 @@ function bindAttorneyNotificationToggles() {
     emailInput.addEventListener("change", async () => {
       const checked = emailInput.checked;
       try {
-        await saveNotificationPref("email", checked);
+        await saveNotificationPreferenceWithStatus("email", checked);
         settingsState.notificationPrefs.email = checked;
         syncChildren();
         showToast("Notification preference updated", "ok");
@@ -3639,6 +4259,7 @@ function bindAttorneyNotificationToggles() {
         settingsState.notificationPrefs.email = emailInput.checked;
         syncChildren();
         showToast("Unable to update preference right now.", "err");
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
       }
     });
   }
@@ -3649,7 +4270,7 @@ function bindAttorneyNotificationToggles() {
     input.addEventListener("change", async () => {
       const checked = input.checked;
       try {
-        await saveNotificationPref(key, checked);
+        await saveNotificationPreferenceWithStatus(key, checked);
         settingsState.notificationPrefs[key] = checked;
         syncChildren();
         showToast("Notification preference updated", "ok");
@@ -3658,6 +4279,7 @@ function bindAttorneyNotificationToggles() {
         input.checked = !checked;
         syncChildren();
         showToast("Unable to update preference right now.", "err");
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
       }
     });
   });
@@ -3691,16 +4313,15 @@ function bindParalegalNotificationToggles() {
     emailInput.addEventListener("change", async () => {
       const checked = emailInput.checked;
       try {
-        await saveNotificationPref("email", checked);
+        await saveNotificationPreferenceWithStatus("email", checked);
         settingsState.notificationPrefs.email = checked;
         syncChildren();
-        showToast("Notification preference updated", "ok");
       } catch (err) {
         console.error("Unable to update notification preference", err);
         emailInput.checked = !checked;
         settingsState.notificationPrefs.email = emailInput.checked;
         syncChildren();
-        showToast("Unable to update preference right now.", "err");
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
       }
     });
   }
@@ -3711,15 +4332,14 @@ function bindParalegalNotificationToggles() {
     input.addEventListener("change", async () => {
       const checked = input.checked;
       try {
-        await saveNotificationPref(key, checked);
+        await saveNotificationPreferenceWithStatus(key, checked);
         settingsState.notificationPrefs[key] = checked;
         syncChildren();
-        showToast("Notification preference updated", "ok");
       } catch (err) {
         console.error("Unable to update notification preference", err);
         input.checked = !checked;
         syncChildren();
-        showToast("Unable to update preference right now.", "err");
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
       }
     });
   });
@@ -3734,8 +4354,9 @@ function bindParalegalVisibilityToggle() {
   if (!input) return;
   input.addEventListener("change", async () => {
     const checked = input.checked;
+    setPreferencesSaveStatus("Saving…", "saving");
     try {
-      const prefs = await saveProfileVisibility(checked);
+      const prefs = await queuePreferenceMutation(() => saveProfileVisibility(checked));
       if (currentUser) {
         currentUser.preferences = {
           ...(currentUser.preferences || {}),
@@ -3744,11 +4365,11 @@ function bindParalegalVisibilityToggle() {
         persistSession({ user: currentUser });
         window.updateSessionUser?.(currentUser);
       }
-      showToast(checked ? "Profile hidden" : "Profile visible", "ok");
+      setPreferencesSaveStatus("Profile visibility saved", "saved");
     } catch (err) {
       console.error("Unable to update profile visibility", err);
       input.checked = !checked;
-      showToast("Unable to update profile visibility right now.", "err");
+      setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
     }
   });
   paralegalVisibilityBound = true;
@@ -3756,12 +4377,18 @@ function bindParalegalVisibilityToggle() {
 
 function updateParalegalVisibilityLock(user = {}) {
   const toggle = document.getElementById("paralegalHideProfile");
+  const help = document.getElementById("profileVisibilityHelp");
   if (!toggle) return;
   const approved = isParalegalPhotoApproved(user);
   if (!approved) {
     toggle.checked = true;
   }
   toggle.disabled = !approved;
+  if (help) {
+    help.textContent = approved
+      ? "Controls whether attorneys can discover your profile."
+      : "Your profile remains hidden until your profile photo is approved.";
+  }
 }
 
 function hydrateAttorneyNotificationPrefs(user = {}) {
@@ -3905,35 +4532,26 @@ function updateAttorneyPracticeCount() {
   counter.textContent = `${length} / 4000 characters`;
 }
 async function handleAttorneyProfileSave() {
+  if (attorneySaveInFlight) return;
   const saveBtn =
     document.getElementById("saveAttorneyProfile") || document.getElementById("attorneyProfileSaveBtn");
   const originalLabel = saveBtn?.textContent || "";
+  if (!validateAttorneyProfile()) {
+    setAttorneySaveStatus("Review the highlighted field.", "error");
+    return;
+  }
+  attorneySaveInFlight = true;
   if (saveBtn) {
     saveBtn.disabled = true;
     saveBtn.textContent = "Saving…";
   }
+  setAttorneySaveStatus("Saving changes…", "pending");
   try {
-    const hadStagedPhoto = Boolean(settingsState.stagedProfilePhotoFile);
     const preservedPhoto =
       currentUser?.profileImage ||
       currentUser?.avatarURL ||
       settingsState.profileImage ||
-      settingsState.stagedProfilePhotoUrl ||
       "";
-    if (settingsState.stagedProfilePhotoFile) {
-      try {
-        const uploadPayload = await uploadProfilePhotoFile(
-          settingsState.stagedProfilePhotoFile,
-          settingsState.stagedProfilePhotoOriginalFile,
-          settingsState.stagedProfilePhotoIsEdit
-        );
-        applyProfilePhotoUploadResult(uploadPayload, { suppressToast: true });
-      } catch (err) {
-        console.error("Unable to upload profile photo", err);
-        showToast("Unable to upload photo. Please try again.", "err");
-        return;
-      }
-    }
     const payload = collectAttorneyPayload();
     const res = await secureFetch("/api/users/me", {
       method: "PATCH",
@@ -3969,42 +4587,29 @@ async function handleAttorneyProfileSave() {
     };
     hydrateAttorneyProfileForm(updatedUser);
     updatePhotoReviewStatus(updatedUser);
+    markAttorneyProfileSaved();
+    setAttorneySaveStatus("Changes saved.", "success");
     showToast("Profile updated!", "ok");
-    if (hadStagedPhoto) {
-      try {
-        const verifyRes = await secureFetch("/api/users/me", {
-          headers: { Accept: "application/json" },
-          noRedirect: true
-        });
-        if (verifyRes.ok) {
-          const verifiedUser = await verifyRes.json().catch(() => ({}));
-          currentUser = mergeSessionPreferences({ ...(currentUser || {}), ...(verifiedUser || {}) });
-          persistSession({ user: currentUser });
-          window.updateSessionUser?.(currentUser);
-          applyAvatar(currentUser);
-          updateAttorneyAvatarPreview(currentUser);
-        }
-      } catch (err) {
-        console.warn("Unable to verify profile photo save", err);
-      }
-    }
     if (getAttorneyOnboardingStep() === "profile" && isAttorneyRole()) {
       clearAttorneyOnboardingStep();
     }
   } catch (err) {
     console.error("Failed to save attorney profile", err);
+    setAttorneySaveStatus(err?.message || "Unable to save changes.", "error");
     showToast(err?.message || "Unable to save profile right now.", "err");
   } finally {
+    attorneySaveInFlight = false;
     if (saveBtn) {
-      saveBtn.disabled = false;
-      saveBtn.textContent = originalLabel || "Save profile";
+      saveBtn.textContent = originalLabel || "Save changes";
     }
+    updateAttorneySaveState();
   }
 }
 
 async function saveNotificationPref(key, value) {
   const res = await secureFetch("/api/users/me/notification-prefs", {
     method: "PATCH",
+    suppressToast: true,
     body: { [key]: !!value }
   });
   if (!res.ok) {
@@ -4013,9 +4618,16 @@ async function saveNotificationPref(key, value) {
   }
 }
 
+async function saveNotificationPreferenceWithStatus(key, value) {
+  setPreferencesSaveStatus("Saving…", "saving");
+  await queuePreferenceMutation(() => saveNotificationPref(key, value));
+  setPreferencesSaveStatus("Notification preferences saved", "saved");
+}
+
 async function saveProfileVisibility(value) {
   const res = await secureFetch("/api/account/preferences", {
     method: "POST",
+    suppressToast: true,
     body: { hideProfile: !!value }
   });
   const data = await res.json().catch(() => ({}));
@@ -4105,7 +4717,10 @@ function addLanguageRow(entry = {}) {
   removeBtn.type = "button";
   removeBtn.className = "remove-language";
   removeBtn.textContent = "Remove";
-  removeBtn.addEventListener("click", () => row.remove());
+  removeBtn.addEventListener("click", () => {
+    row.remove();
+    markParalegalProfileChanged();
+  });
   row.appendChild(removeBtn);
 
   languagesEditor.appendChild(row);
@@ -4170,7 +4785,10 @@ function addEducationRow(entry = {}) {
   removeBtn.type = "button";
   removeBtn.className = "remove-education";
   removeBtn.textContent = "Remove";
-  removeBtn.addEventListener("click", () => row.remove());
+  removeBtn.addEventListener("click", () => {
+    row.remove();
+    markParalegalProfileChanged();
+  });
   row.appendChild(removeBtn);
 
   educationEditor.appendChild(row);
@@ -4428,11 +5046,13 @@ function openEducationModal() {
   educationModalOverlay.classList.add("is-active");
   educationModalOverlay.setAttribute("aria-hidden", "false");
   educationModal.classList.add("is-active");
-  educationModalOpen = true;
+  educationModal.setAttribute("aria-hidden", "false");
+  educationModal.removeAttribute("inert");
   const firstInput = educationModalList?.querySelector("[data-field='school']");
-  if (firstInput) {
-    setTimeout(() => firstInput.focus(), 0);
-  }
+  activateDialogFocus(educationModal, {
+    initialFocus: firstInput || educationModalClose,
+    onEscape: closeEducationModal,
+  });
 }
 
 function closeEducationModal() {
@@ -4440,7 +5060,9 @@ function closeEducationModal() {
   educationModalOverlay.classList.remove("is-active");
   educationModalOverlay.setAttribute("aria-hidden", "true");
   educationModal.classList.remove("is-active");
-  educationModalOpen = false;
+  educationModal.setAttribute("aria-hidden", "true");
+  educationModal.setAttribute("inert", "");
+  deactivateDialogFocus(educationModal);
 }
 
 function bindEducationModal() {
@@ -4465,12 +5087,8 @@ function bindEducationModal() {
     settingsState.education = entries;
     renderEducationEditor(entries);
     refreshParalegalSectionDisplays();
+    markParalegalProfileChanged();
     closeEducationModal();
-  });
-  document.addEventListener("keydown", (evt) => {
-    if (evt.key === "Escape" && educationModalOpen) {
-      closeEducationModal();
-    }
   });
 }
 
@@ -4516,7 +5134,7 @@ function showToast(message, type = "info") {
       banner.classList.add("show");
       setTimeout(() => banner.classList.remove("show"), 2500);
     } else {
-      console.log(`[toast:${type}] ${message}`);
+      void showAlert(message, { title: type === "err" ? "Action unavailable" : "Notice" });
     }
   }
 }
@@ -4559,7 +5177,7 @@ function bindAttorneyOnboardingModal() {
       const saveBtn = document.getElementById("saveAttorneyProfile") || document.getElementById("attorneyProfileSaveBtn");
       saveBtn?.focus?.();
     } else if (step === "payment") {
-      window.location.href = "dashboard-attorney.html#billing";
+      window.location.href = "dashboard-attorney.html#funds";
     }
   });
   skipBtn?.addEventListener("click", () => {
@@ -4594,6 +5212,11 @@ function showAttorneyOnboardingModal(message, step = "profile", title) {
   overlay.setAttribute("aria-hidden", "false");
   modal.classList.add("is-active");
   modal.setAttribute("aria-hidden", "false");
+  modal.removeAttribute("inert");
+  activateDialogFocus(modal, {
+    initialFocus: modal.querySelector("[data-onboarding-continue]"),
+    onEscape: hideAttorneyOnboardingModal,
+  });
   setAttorneyOnboardingModalSeen(step);
 }
 
@@ -4605,30 +5228,12 @@ function hideAttorneyOnboardingModal() {
   overlay.setAttribute("aria-hidden", "true");
   modal.classList.remove("is-active");
   modal.setAttribute("aria-hidden", "true");
+  modal.setAttribute("inert", "");
+  deactivateDialogFocus(modal);
   document.body.style.overflow = attorneyOnboardingBodyOverflow;
   window.scrollTo({ top: attorneyOnboardingScrollY, left: 0, behavior: "instant" });
 }
 
-function ensureAttorneyBillingCTA() {
-  const stripeBtn = document.getElementById("connectStripeBtn");
-  if (!stripeBtn) return null;
-  const block = stripeBtn.closest(".settings-block");
-  if (!block) return null;
-  let billingBtn = document.getElementById("attorneyBillingSetupBtn");
-  if (!billingBtn) {
-    billingBtn = document.createElement("button");
-    billingBtn.type = "button";
-    billingBtn.id = "attorneyBillingSetupBtn";
-    billingBtn.className = "btn btn-outline";
-    billingBtn.textContent = "Open Billing";
-    block.appendChild(billingBtn);
-  }
-  billingBtn.onclick = () => {
-    setAttorneyOnboardingStep("payment");
-    window.location.href = "dashboard-attorney.html#billing";
-  };
-  return billingBtn;
-}
 
 function runAttorneyOnboardingStep(step, options = {}) {
   const silent = Boolean(options.silent);
@@ -4651,7 +5256,7 @@ function runAttorneyOnboardingStep(step, options = {}) {
       );
       return;
     }
-    window.location.href = "dashboard-attorney.html#billing";
+    window.location.href = "dashboard-attorney.html#funds";
     return;
   }
 
@@ -4675,15 +5280,35 @@ function applyUnifiedRoleStyling(user = {}) {
   const sidebarLogo = document.querySelector(".sidebar .logo");
 
   if (title) {
-    title.textContent = "Account Settings";
+    title.textContent = role === "admin" ? "Admin security" : "Account Settings";
   }
-  if (sidebarLogo) {
+  if (sidebarLogo && !sidebarLogo.classList.contains("sidebar-profile-host")) {
     const defaultText = sidebarLogo.dataset.defaultText || sidebarLogo.textContent;
     if (!sidebarLogo.dataset.defaultText) sidebarLogo.dataset.defaultText = defaultText;
     sidebarLogo.textContent = isParalegal ? "Account Settings" : defaultText;
   }
+  document.body.classList.toggle("admin-security", role === "admin");
+  if (role === "admin") {
+    if (!document.getElementById('adminSecurityBack')) {
+      const heading = document.getElementById('accountSettingsTitle');
+      const back = document.createElement('a');
+      back.id = 'adminSecurityBack'; back.href = 'admin-dashboard.html#overview'; back.textContent = '← Back to admin';
+      heading?.before(back);
+    }
+    document.querySelectorAll('[data-deactivate-account]').forEach(button => {
+      button.disabled = true;
+      button.closest('.settings-block')?.remove();
+    });
+    const back = document.getElementById('dashboardReturnLink');
+    if (back) { back.removeAttribute('data-attorney-only'); back.href='admin-dashboard.html#overview'; back.textContent='Back to admin'; back.hidden=false; back.style.display='block'; }
+    document.getElementById('navProfile')?.setAttribute('hidden', '');
+    document.getElementById('navPreferences')?.setAttribute('hidden', '');
+    if (location.hash !== '#security') location.hash = 'security';
+  }
   document.body.classList.toggle("paralegal-flat", isParalegal);
   document.body.classList.toggle("attorney-classic", role === "attorney");
+  document.documentElement.classList.toggle("role-paralegal", isParalegal);
+  document.documentElement.classList.toggle("role-attorney", role === "attorney");
 
   document.querySelectorAll("[data-paralegal-only]").forEach((el) => {
     if (el.dataset.forceVisible !== undefined) {
@@ -4703,6 +5328,7 @@ function applyUnifiedRoleStyling(user = {}) {
   } else {
     showParalegalSettings();
   }
+  window.__syncProfileSettingsRoute?.();
 }
 
 function enforceUnifiedRoleStyling(user = {}) {
@@ -4727,19 +5353,35 @@ function applyAvatar(user) {
 
   const preview = document.getElementById("avatarPreview");
   const attorneyPreview = document.getElementById("attorneyAvatarPreview");
+  const paralegalInitials = document.getElementById("avatarInitials");
+  const attorneyInitials = document.getElementById("attorneyAvatarInitials");
+  const paralegalFallbackText = getParalegalInitials(user);
+  const attorneyFallbackText = getAttorneyInitials(user);
+  if (paralegalInitials) paralegalInitials.textContent = paralegalFallbackText;
+  if (attorneyInitials) attorneyInitials.textContent = attorneyFallbackText;
   loadAvatarPreview({
     preview,
     frame: document.getElementById("avatarFrame"),
-    initials: document.getElementById("avatarInitials"),
+    initials: paralegalInitials,
     url: cacheBusted,
-    fallbackText: document.getElementById("avatarInitials")?.textContent || "",
+    fallbackText: paralegalFallbackText,
+    onLoad: () => {
+      const editButton = document.getElementById("editAvatarBtn");
+      if (editButton) editButton.textContent = "Edit photo";
+      syncParalegalAvatarFrameAction(true);
+    },
+    onError: () => {
+      const editButton = document.getElementById("editAvatarBtn");
+      if (editButton) editButton.textContent = "Replace photo";
+      syncParalegalAvatarFrameAction(false);
+    },
   });
   loadAvatarPreview({
     preview: attorneyPreview,
     frame: document.getElementById("attorneyAvatarFrame"),
-    initials: document.getElementById("attorneyAvatarInitials"),
+    initials: attorneyInitials,
     url: cacheBusted,
-    fallbackText: document.getElementById("attorneyAvatarInitials")?.textContent || "",
+    fallbackText: attorneyFallbackText,
   });
 
   const cluster = document.getElementById("clusterAvatar");
@@ -4760,7 +5402,7 @@ function renderFallback(sectionId, title) {
 function syncCluster(user = {}) {
   const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.name || "Paralegal";
   const roleLabel = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "Paralegal";
-  const avatar = getDisplayProfileImage(user, { allowPending: true }) || "https://via.placeholder.com/64x64.png?text=PL";
+  const avatar = getDisplayProfileImage(user, { allowPending: true }) || DEFAULT_AVATAR_DATA;
   const avatarEl = document.getElementById("clusterAvatar");
   if (avatarEl) avatarEl.src = avatar;
   document.querySelectorAll(".nav-profile-photo").forEach((el) => {
@@ -4771,6 +5413,28 @@ function syncCluster(user = {}) {
   const roleEl = document.getElementById("clusterRole");
   if (roleEl) roleEl.textContent = roleLabel;
   window.hydrateParalegalCluster?.(user);
+}
+
+function ensureAttorneySettingsStyles() {
+  const styles = [
+    ["assets/styles/profile-settings-attorney-account.css?v=20260820-14", "lpcAttorneyAccountStyles"],
+    ["assets/styles/profile-settings-focused.css?v=20260902-2", "lpcAttorneyFocusedStyles"],
+  ];
+  return Promise.all(styles.map(([href, id]) => new Promise((resolve) => {
+    const existing = document.getElementById(id);
+    if (existing?.sheet) {
+      resolve(existing);
+      return;
+    }
+    const link = existing || document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = href;
+    const finish = () => resolve(link);
+    link.addEventListener("load", finish, { once: true });
+    link.addEventListener("error", finish, { once: true });
+    if (!existing) document.head.appendChild(link);
+  })));
 }
 
 async function loadSettings() {
@@ -4786,14 +5450,21 @@ async function loadSettings() {
         if (sessionUser?.role) {
           user.role = sessionUser.role;
         }
-      } catch (_) {}
+      } catch (error) {
+        console.warn("[profile-settings] session role refresh failed", error);
+      }
     }
     ensureUserStatus(user);
     currentUser = mergeSessionPreferences(user);
     window.currentUser = currentUser;
     persistSession({ user: currentUser });
+    window.updateSessionUser?.(currentUser);
     hydrateStatePreference(user);
     bindProfileDraftPersistence();
+
+    if (String(currentUser?.role || "").toLowerCase() === "attorney") {
+      await ensureAttorneySettingsStyles().catch(() => null);
+    }
 
     if (!hasSettingsAccess(user)) {
       showPendingSettingsNotice();
@@ -4805,7 +5476,7 @@ async function loadSettings() {
 
     if (titleEl) titleEl.textContent = "Account Settings";
     if (currentUser?.role === "attorney") {
-      if (subtitleEl) subtitleEl.textContent = "";
+      if (subtitleEl) subtitleEl.textContent = "Manage your profile, security, and preferences.";
     }
     enforceUnifiedRoleStyling(user);
     applyAvatar(user);
@@ -4814,39 +5485,12 @@ async function loadSettings() {
     const role = (currentUser?.role || "").toLowerCase();
 
     if (role === "attorney") {
-      // Attorney: ONLY attorney UI should show.
-      showAttorneySettings();
-      return; // IMPORTANT → stops all paralegal hydration
-    }
-
-    // Paralegal: ONLY paralegal UI should show.
-    showParalegalSettings();
-    hydrateProfileForm(user);
-
-    setFullNameInputs(user);
-    const emailInput = document.getElementById("emailInput");
-    if (emailInput) emailInput.value = user.email || "";
-    const phoneInput = document.getElementById("phoneInput");
-    if (phoneInput) phoneInput.value = user.phoneNumber || user.phone || "";
-    const lawFirmInput = document.getElementById("lawFirmInput");
-    if (lawFirmInput) lawFirmInput.value = user.lawFirm || "";
-    if (user.role === "paralegal") {
-      const linkedInInput = document.getElementById("linkedInInput");
-      if (linkedInInput) linkedInInput.value = user.linkedInURL || "";
-    const yearsExperienceInput = document.getElementById("yearsExperienceInput");
-    if (yearsExperienceInput) yearsExperienceInput.value = user.yearsExperience ?? "";
-    renderParalegalPracticeAreas(user.practiceAreas || []);
-      const skillValues = user.highlightedSkills || user.skills || [];
-      applySkillsInput(skillValues);
-      bindSkillsInput();
-      applyStateExperienceInput(getDefaultStateExperienceValues(user));
-      bindStateExperienceInput();
-      renderExperienceRows(Array.isArray(user.experience) ? user.experience : []);
-      bindExperienceAddButton();
-      renderEducationEditor(user.education || []);
-      renderLanguageEditor(user.languages || []);
-      updateRoleLineFromExperience();
-      refreshParalegalSectionDisplays();
+      const draft = readProfileSettingsDraft(user);
+      if (draft) applyProfileSettingsDraft(draft, user);
+      else syncCluster(user);
+      updateAttorneySaveState();
+      scheduleProfileScrollIndicatorUpdate();
+      return;
     }
   } catch (err) {
     renderFallback("settingsCertificate", "Certificate");
@@ -4861,25 +5505,13 @@ async function loadSettings() {
     return;
   }
 
-  // Store existing data
-  seedSettingsState(user);
-  updatePhotoReviewStatus(user);
-
-  // Build UI
-  try { await loadCertificate(user); } catch { renderFallback("settingsCertificate", "Certificate"); }
-  try { await loadResume(user); } catch { renderFallback("settingsResume", "Résumé"); }
-  try { await loadWritingSample(user); } catch { renderFallback("settingsWritingSample", "Writing Sample"); }
-  try { await loadBio(user); } catch { renderFallback("settingsBio", "Bio"); }
-  try { await loadEducation(user); } catch { renderFallback("settingsEducation", "Education"); }
-  try { await loadAwards(user); } catch { renderFallback("settingsAwards", "Awards"); }
-  try { await loadSkills(user); } catch { renderFallback("settingsSkills", "Skills"); }
-  try { await loadLinkedIn(user); } catch { renderFallback("settingsLinkedIn", "LinkedIn"); }
-  try { await loadNotifications(user); } catch { renderFallback("settingsNotifications", "Notifications"); }
   const draft = readProfileSettingsDraft(user);
   if (draft) {
     applyProfileSettingsDraft(draft, user);
+    setParalegalProfileDirty(true);
   } else {
     syncCluster(user);
+    setParalegalProfileDirty(false);
   }
   scheduleProfileScrollIndicatorUpdate();
 
@@ -4934,7 +5566,7 @@ function loadCertificate(user) {
     <div class="paralegal-doc-row">
       <div class="paralegal-doc-meta">
         <h3>Upload Certificate (PDF)</h3>
-        <p>Share verified certifications or licenses with attorneys.</p>
+        <p>Share certifications or licenses for attorneys to review.</p>
         <p class="doc-status" id="certificateStatus"></p>
       </div>
       <div class="paralegal-doc-actions">
@@ -4984,6 +5616,7 @@ function loadCertificate(user) {
           if (chooseBtn) chooseBtn.textContent = "Certificate on file";
           const removeBtn = document.getElementById("removeCertificateBtn");
           if (removeBtn) removeBtn.hidden = false;
+          markParalegalProfileChanged();
         },
         onFinally: () => {
           if (status && status.textContent === "Uploading…") {
@@ -4997,8 +5630,12 @@ function loadCertificate(user) {
     });
   }
 
-  document.getElementById("removeCertificateBtn")?.addEventListener("click", () => {
-    const confirmed = window.confirm("Remove certificate? This will update after you save.");
+  document.getElementById("removeCertificateBtn")?.addEventListener("click", async () => {
+    const confirmed = await confirmAction("The certificate will be removed after you save your changes.", {
+      title: "Remove certificate?",
+      confirmLabel: "Remove certificate",
+      tone: "danger",
+    });
     if (!confirmed) return;
     settingsState.pendingCertificateKey = "";
     settingsState.removeCertificate = true;
@@ -5012,6 +5649,7 @@ function loadCertificate(user) {
     if (chooseBtn) chooseBtn.textContent = "Choose File";
     const removeBtn = document.getElementById("removeCertificateBtn");
     if (removeBtn) removeBtn.hidden = true;
+    markParalegalProfileChanged();
   });
 }
 
@@ -5025,7 +5663,7 @@ function loadResume(user) {
     <div class="paralegal-doc-row">
       <div class="paralegal-doc-meta">
         <h3>Résumé (PDF)</h3>
-        <p>Upload a polished résumé so attorneys can verify your expertise.</p>
+        <p>Upload a polished résumé so attorneys can review your experience.</p>
         <p class="doc-status" id="resumeStatus"></p>
       </div>
       <div class="paralegal-doc-actions">
@@ -5087,6 +5725,7 @@ function loadResume(user) {
           const removeBtn = document.getElementById("removeResumeBtn");
           if (removeBtn) removeBtn.hidden = false;
           updateRequiredFieldMarkers();
+          markParalegalProfileChanged();
         },
         onFinally: () => {
           if (status && status.textContent === "Uploading…") {
@@ -5100,8 +5739,12 @@ function loadResume(user) {
     });
   }
 
-  document.getElementById("removeResumeBtn")?.addEventListener("click", () => {
-    const confirmed = window.confirm("Remove résumé? This will update after you save.");
+  document.getElementById("removeResumeBtn")?.addEventListener("click", async () => {
+    const confirmed = await confirmAction("The résumé will be removed after you save your changes.", {
+      title: "Remove résumé?",
+      confirmLabel: "Remove résumé",
+      tone: "danger",
+    });
     if (!confirmed) return;
     settingsState.pendingResumeKey = "";
     settingsState.removeResume = true;
@@ -5116,6 +5759,7 @@ function loadResume(user) {
     const removeBtn = document.getElementById("removeResumeBtn");
     if (removeBtn) removeBtn.hidden = true;
     updateRequiredFieldMarkers();
+    markParalegalProfileChanged();
   });
 
   updateRequiredFieldMarkers();
@@ -5180,6 +5824,7 @@ function loadWritingSample(user) {
           if (chooseBtn) chooseBtn.textContent = "Writing sample on file";
           const removeBtn = document.getElementById("removeWritingSampleBtn");
           if (removeBtn) removeBtn.hidden = false;
+          markParalegalProfileChanged();
         },
         onFinally: () => {
           if (status && status.textContent === "Uploading…") {
@@ -5193,8 +5838,12 @@ function loadWritingSample(user) {
     });
   }
 
-  document.getElementById("removeWritingSampleBtn")?.addEventListener("click", () => {
-    const confirmed = window.confirm("Remove writing sample? This will update after you save.");
+  document.getElementById("removeWritingSampleBtn")?.addEventListener("click", async () => {
+    const confirmed = await confirmAction("The writing sample will be removed after you save your changes.", {
+      title: "Remove writing sample?",
+      confirmLabel: "Remove sample",
+      tone: "danger",
+    });
     if (!confirmed) return;
     settingsState.pendingWritingSampleKey = "";
     settingsState.removeWritingSample = true;
@@ -5208,6 +5857,7 @@ function loadWritingSample(user) {
     if (chooseBtn) chooseBtn.textContent = "Choose File";
     const removeBtn = document.getElementById("removeWritingSampleBtn");
     if (removeBtn) removeBtn.hidden = true;
+    markParalegalProfileChanged();
   });
 }
 
@@ -5220,7 +5870,7 @@ function loadBio(user) {
   if (!section) return;
   section.innerHTML = `
     <h3>Bio</h3>
-    <textarea id="bioInput" style="width:100%;">${user.bio || ""}</textarea>
+    <textarea id="bioInput" style="width:100%;">${escapeHTML(user.bio || "")}</textarea>
   `;
   const bioInput = document.getElementById("bioInput");
   if (bioInput) {
@@ -5241,7 +5891,7 @@ function loadEducation(user) {
   section.innerHTML = `
     <h3>Education</h3>
     <div id="eduList"></div>
-    <button id="addEduBtn">Add Education Entry</button>
+    <button id="addEduBtn" type="button">Add Education Entry</button>
   `;
 
   const list = document.getElementById("eduList");
@@ -5252,10 +5902,10 @@ function loadEducation(user) {
     settingsState.education.forEach((ed, idx) => {
       list.innerHTML += `
         <div class="edu-entry">
-          <input placeholder="Degree" value="${ed.degree || ""}" data-idx="${idx}" data-field="degree">
-          <input placeholder="Institution" value="${ed.institution || ""}" data-idx="${idx}" data-field="institution">
-          <input placeholder="Year" value="${ed.year || ""}" data-idx="${idx}" data-field="year">
-          <input placeholder="Certification" value="${ed.certification || ""}" data-idx="${idx}" data-field="certification">
+          <input placeholder="Degree" value="${escapeHTML(ed.degree || "")}" data-idx="${idx}" data-field="degree">
+          <input placeholder="Institution" value="${escapeHTML(ed.institution || "")}" data-idx="${idx}" data-field="institution">
+          <input placeholder="Year" value="${escapeHTML(ed.year || "")}" data-idx="${idx}" data-field="year">
+          <input placeholder="Certification" value="${escapeHTML(ed.certification || "")}" data-idx="${idx}" data-field="certification">
         </div>
       `;
     });
@@ -5292,7 +5942,7 @@ function loadAwards(user) {
   section.innerHTML = `
     <h3>Awards</h3>
     <div id="awardList"></div>
-    <button id="addAwardBtn">Add Award</button>
+    <button id="addAwardBtn" type="button">Add Award</button>
   `;
 
   const list = document.getElementById("awardList");
@@ -5303,7 +5953,7 @@ function loadAwards(user) {
     settingsState.awards.forEach((a, idx) => {
       list.innerHTML += `
         <div class="award-entry">
-          <input placeholder="Award title" value="${a}" data-idx="${idx}">
+          <input placeholder="Award title" value="${escapeHTML(a)}" data-idx="${idx}">
         </div>
       `;
     });
@@ -5339,7 +5989,7 @@ function loadSkills(user) {
   section.innerHTML = `
     <h3>Highlighted Skills (Top 3–5)</h3>
     <div id="skillsList"></div>
-    <button id="addSkillBtn">Add Skill</button>
+    <button id="addSkillBtn" type="button">Add Skill</button>
   `;
 
   const list = document.getElementById("skillsList");
@@ -5350,7 +6000,7 @@ function loadSkills(user) {
     settingsState.highlightedSkills.forEach((s, idx) => {
       list.innerHTML += `
         <div class="skill-entry">
-          <input placeholder="Skill" value="${s}" data-idx="${idx}">
+          <input placeholder="Skill" value="${escapeHTML(s)}" data-idx="${idx}">
         </div>
       `;
     });
@@ -5385,7 +6035,7 @@ function loadLinkedIn(user) {
   if (!section) return;
   section.innerHTML = `
     <h3>LinkedIn Profile</h3>
-    <input id="linkedInURLInput" type="url" style="width:100%;" value="${user.linkedInURL || ""}">
+    <input id="linkedInURLInput" type="url" style="width:100%;" value="${escapeHTML(user.linkedInURL || "")}">
   `;
   const linkedInInput = document.getElementById("linkedInURLInput");
   if (linkedInInput) {
@@ -5472,10 +6122,21 @@ async function saveSettings() {
   const bioInput = document.getElementById("bioInput");
   const linkedInInput = document.getElementById("linkedInInput");
   const yearsExperienceInput = document.getElementById("yearsExperienceInput");
-  const skillsInput = document.getElementById("skillsInput");
   const resumeKeyInput = document.getElementById("resumeKeyInput");
   const certificateKeyInput = document.getElementById("certificateKeyInput");
   const writingSampleKeyInput = document.getElementById("writingSampleKeyInput");
+  let normalizedLinkedInURL = "";
+  try {
+    normalizedLinkedInURL = normalizeHttpUrlInput(linkedInInput?.value, {
+      fieldLabel: "LinkedIn URL",
+      requiredHost: "linkedin.com",
+    });
+    if (linkedInInput) linkedInInput.value = normalizedLinkedInURL;
+  } catch (error) {
+    showToast(error?.message || "Enter a valid LinkedIn URL.", "err");
+    linkedInInput?.focus();
+    return false;
+  }
   if (settingsState.stagedProfilePhotoFile) {
     try {
       const payload = await uploadProfilePhotoFile(
@@ -5488,7 +6149,7 @@ async function saveSettings() {
     } catch (err) {
       console.error("Unable to upload profile photo", err);
       showToast("Unable to upload photo. Please try again.", "err");
-      return;
+      return false;
     }
   }
   const body = {
@@ -5499,7 +6160,7 @@ async function saveSettings() {
     education: settingsState.education,
     awards: settingsState.awards,
     highlightedSkills: settingsState.highlightedSkills,
-    linkedInURL: settingsState.linkedInURL,
+    linkedInURL: normalizedLinkedInURL || null,
     notificationPrefs: settingsState.notificationPrefs,
     digestFrequency: settingsState.digestFrequency
   };
@@ -5510,7 +6171,7 @@ async function saveSettings() {
     body.lawFirm = lawFirmInput.value || "";
   }
 
-  body.linkedInURL = linkedInInput?.value.trim() || null;
+  body.linkedInURL = normalizedLinkedInURL || null;
   body.yearsExperience = yearsExperienceInput ? Number(yearsExperienceInput.value) || null : null;
   body.practiceAreas = collectParalegalPracticeAreas();
   body.highlightedSkills = readSkillsInput();
@@ -5550,7 +6211,7 @@ async function saveSettings() {
 
   if (!res.ok) {
     showToast("Could not save settings.", "err");
-    return;
+    return false;
   }
 
   const updatedUser = await secureFetch("/api/users/me").then((r) => r.json());
@@ -5584,7 +6245,6 @@ async function saveSettings() {
     ...updatedUser,
     role: updatedUser.role || currentUser?.role || ""
   });
-  localStorage.setItem("lpc_user", JSON.stringify(mergedUser));
   currentUser = mergedUser;
   settingsState.bio = updatedUser.bio || "";
   settingsState.education = updatedUser.education || [];
@@ -5621,27 +6281,27 @@ async function saveSettings() {
   clearProfileSettingsDraft(mergedUser);
 
   applyAvatar?.(mergedUser);
-  updateAvatarRemoveButton(mergedUser);
-  updatePhotoReviewStatus(mergedUser);
-  hydrateProfileForm(mergedUser);
-  renderLanguageEditor(mergedUser.languages || []);
   bootstrapProfileSettings(mergedUser);
   const requiredStatus = isParalegal ? updateRequiredFieldMarkers() : { ok: true, missing: [] };
-  syncCluster?.(mergedUser);
-  window.hydrateParalegalCluster?.(mergedUser);
   try {
     window.dispatchEvent(new CustomEvent("lpc:user-updated", { detail: mergedUser }));
   } catch (_) {}
-  try {
-    localStorage.removeItem(PREFILL_CACHE_KEY);
-  } catch {}
   if (isParalegal && !requiredStatus.ok) {
-    const missingList =
-      Array.isArray(requiredStatus.missing) && requiredStatus.missing.length
-        ? requiredStatus.missing.join(", ")
-        : "your remaining profile fields";
-    showToast(`Settings saved. Complete ${missingList} to finish your profile for attorney review.`, "info");
-    return;
+    const remainingMissing = Array.isArray(requiredStatus.missing)
+      ? requiredStatus.missing.filter((field) => !(uploadedPhotoPendingReview && field === "Profile photo"))
+      : [];
+    if (uploadedPhotoPendingReview && remainingMissing.length === 0) {
+      showToast("Settings saved and profile photo submitted for review.", "ok");
+      return true;
+    }
+    const missingList = remainingMissing.length
+      ? remainingMissing.join(", ")
+      : "your remaining profile fields";
+    const savedMessage = uploadedPhotoPendingReview
+      ? "Settings saved and profile photo submitted for review."
+      : "Settings saved.";
+    showToast(`${savedMessage} Complete ${missingList} to finish your profile for attorney review.`, "info");
+    return true;
   }
 
   showToast(
@@ -5652,6 +6312,7 @@ async function saveSettings() {
       : "Settings saved!",
     "ok"
   );
+  return true;
 }
 
 // -----------------------------
@@ -5670,8 +6331,17 @@ const avatarUploadConfigs = [
 const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 const PROFILE_PHOTO_ALLOWED_MIMES = new Set(["image/jpeg", "image/jpg", "image/png"]);
 const PROFILE_PHOTO_ALLOWED_EXT = /\.(jpe?g|png)$/i;
+const PROFILE_PHOTO_CROPPER_TEMPLATE =
+  '<cropper-canvas>' +
+  '<cropper-image scalable translatable initial-center-size="contain"></cropper-image>' +
+  '<cropper-selection initial-coverage="1" initial-aspect-ratio="1" aspect-ratio="1" precise>' +
+  '<cropper-handle action="move" theme-color="rgba(255, 255, 255, 0.28)"></cropper-handle>' +
+  '</cropper-selection>' +
+  '</cropper-canvas>';
 
 let activeCropper = null;
+let activeCropperImage = null;
+let activeCropperSelection = null;
 let cropperModal = null;
 let cropperImage = null;
 let cropperZoom = null;
@@ -5684,34 +6354,217 @@ let cropperFile = null;
 let cropperOriginalFile = null;
 let cropperOriginalUrl = "";
 let cropperObjectUrl = null;
-let cropperBaseZoom = 1;
-let cropperZoomLock = false;
+let cropperBaseScale = 1;
+let cropperTransformHandler = null;
 let cropperReady = false;
 let cropperLoadRetries = 0;
+let cropperLoadTimer = null;
+let cropperFetchController = null;
+let cropperError = null;
+let cropperErrorText = null;
+let cropperAvatarPreview = null;
+let cropperPreviewTimer = null;
+let cropperRetryAction = null;
+let cropperSaveInFlight = false;
+let cropperReturnFocus = null;
+let cropperOpenVersion = 0;
 
-function getCurrentCropperZoom() {
-  if (!activeCropper) return 1;
-  const data = activeCropper.getImageData();
-  return data?.naturalWidth ? data.width / data.naturalWidth : 1;
+function clearCropperLoadTimer() {
+  if (cropperLoadTimer) clearTimeout(cropperLoadTimer);
+  cropperLoadTimer = null;
 }
 
-function syncCropperBaseZoom({ resetSlider = false } = {}) {
-  if (!activeCropper) return;
-  cropperBaseZoom = getCurrentCropperZoom();
-  if (!cropperZoom) return;
-  cropperZoomLock = true;
+function hideCropperError() {
+  if (cropperError) cropperError.hidden = true;
+  cropperRetryAction = null;
+}
+
+function showCropperError(message, retryAction = null, { preserveCropper = false } = {}) {
+  clearCropperLoadTimer();
+  setCropperLoading(false);
+  if (!preserveCropper) cropperReady = false;
+  if (cropperZoom) cropperZoom.disabled = !preserveCropper;
+  if (cropperSaveBtn) cropperSaveBtn.disabled = true;
+  if (cropperErrorText && message) cropperErrorText.textContent = message;
+  if (cropperError) cropperError.hidden = false;
+  cropperRetryAction = typeof retryAction === "function" ? retryAction : null;
+}
+
+function beginCropperLoadDeadline(retryAction) {
+  clearCropperLoadTimer();
+  cropperLoadTimer = setTimeout(() => {
+    destroyActiveCropperInstance();
+    showCropperError("The photo took too long to load. Try again or choose another photo.", retryAction);
+  }, 12000);
+}
+
+function scheduleCropperAvatarPreview() {
+  if (!activeCropperSelection || !cropperAvatarPreview) return;
+  if (cropperPreviewTimer) clearTimeout(cropperPreviewTimer);
+  const selection = activeCropperSelection;
+  cropperPreviewTimer = setTimeout(async () => {
+    cropperPreviewTimer = null;
+    if (selection !== activeCropperSelection) return;
+    try {
+      const canvas = await selection.$toCanvas({ width: 72, height: 72 });
+      if (selection === activeCropperSelection && cropperAvatarPreview) {
+        cropperAvatarPreview.src = canvas.toDataURL("image/jpeg", 0.86);
+      }
+    } catch (error) {
+      console.debug("[profile-settings] crop preview unavailable", error);
+    }
+  }, 80);
+}
+
+function getCropperConstructor() {
+  const cropperGlobal = globalThis.Cropper;
+  if (typeof cropperGlobal === "function") return cropperGlobal;
+  return typeof cropperGlobal?.default === "function" ? cropperGlobal.default : null;
+}
+
+function getCropperMatrixScale(matrix = []) {
+  const a = Number(matrix[0]);
+  const b = Number(matrix[1]);
+  return Number.isFinite(a) && Number.isFinite(b) ? Math.hypot(a, b) : 1;
+}
+
+function syncCropperZoomFromMatrix(matrix) {
+  if (!cropperZoom || !cropperBaseScale) return;
+  const currentScale = getCropperMatrixScale(matrix || activeCropperImage?.$getTransform?.());
+  const relative = currentScale / cropperBaseScale - 1;
   cropperZoom.min = "0";
   cropperZoom.max = "0.5";
   cropperZoom.step = "0.01";
-  if (resetSlider) {
-    cropperZoom.value = "0";
-  } else {
-    const relative = cropperBaseZoom ? getCurrentCropperZoom() / cropperBaseZoom - 1 : 0;
-    cropperZoom.value = String(Math.min(0.5, Math.max(0, relative)));
+  cropperZoom.value = String(Math.min(0.5, Math.max(0, relative)));
+}
+
+function setCropperZoom(targetZoom) {
+  if (!activeCropperImage || !cropperBaseScale) return;
+  const target = Math.min(0.5, Math.max(0, Number(targetZoom) || 0));
+  const currentScale = getCropperMatrixScale(activeCropperImage.$getTransform());
+  const currentZoom = Math.max(0, currentScale / cropperBaseScale - 1);
+  const factor = (1 + target) / (1 + currentZoom);
+  const delta = factor >= 1 ? factor - 1 : 1 - 1 / factor;
+  activeCropperImage.$zoom(delta);
+  syncCropperZoomFromMatrix();
+}
+
+function proposedCropperImageCoversSelection(matrix) {
+  if (!activeCropperImage || !activeCropperSelection || !Array.isArray(matrix)) return false;
+  const proposedMatrix = matrix.slice(0, 6).map(Number);
+  const currentTransform = activeCropperImage.$getTransform?.();
+  const currentMatrix = Array.isArray(currentTransform) ? currentTransform.slice(0, 6).map(Number) : [];
+  const width = activeCropperImage.offsetWidth;
+  const height = activeCropperImage.offsetHeight;
+  if (
+    proposedMatrix.length !== 6 ||
+    currentMatrix?.length !== 6 ||
+    !proposedMatrix.every(Number.isFinite) ||
+    !currentMatrix.every(Number.isFinite) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return false;
   }
-  requestAnimationFrame(() => {
-    cropperZoomLock = false;
+
+  const transformOrigin = getComputedStyle(activeCropperImage).transformOrigin.split(" ");
+  const parsedOriginX = Number.parseFloat(transformOrigin[0]);
+  const parsedOriginY = Number.parseFloat(transformOrigin[1]);
+  const originX = Number.isFinite(parsedOriginX) ? parsedOriginX : width / 2;
+  const originY = Number.isFinite(parsedOriginY) ? parsedOriginY : height / 2;
+  const getTransformedBounds = ([a, b, c, d, e, f]) => {
+    const corners = [
+      [0, 0],
+      [width, 0],
+      [width, height],
+      [0, height],
+    ].map(([x, y]) => ({
+      x: originX + a * (x - originX) + c * (y - originY) + e,
+      y: originY + b * (x - originX) + d * (y - originY) + f,
+    }));
+    return {
+      top: Math.min(...corners.map((corner) => corner.y)),
+      right: Math.max(...corners.map((corner) => corner.x)),
+      bottom: Math.max(...corners.map((corner) => corner.y)),
+      left: Math.min(...corners.map((corner) => corner.x)),
+    };
+  };
+
+  const currentBounds = getTransformedBounds(currentMatrix);
+  const proposedBounds = getTransformedBounds(proposedMatrix);
+  const currentRect = activeCropperImage.getBoundingClientRect();
+  const layoutLeft = currentRect.left - currentBounds.left;
+  const layoutTop = currentRect.top - currentBounds.top;
+  const imageRect = {
+    top: layoutTop + proposedBounds.top,
+    right: layoutLeft + proposedBounds.right,
+    bottom: layoutTop + proposedBounds.bottom,
+    left: layoutLeft + proposedBounds.left,
+  };
+  const selectionRect = activeCropperSelection.getBoundingClientRect();
+  const tolerance = 0.75;
+  return (
+    imageRect.top <= selectionRect.top + tolerance &&
+    imageRect.right >= selectionRect.right - tolerance &&
+    imageRect.bottom >= selectionRect.bottom - tolerance &&
+    imageRect.left <= selectionRect.left + tolerance
+  );
+}
+
+function bindCropperTransformBoundary() {
+  if (!activeCropperImage) return;
+  cropperTransformHandler = (event) => {
+    const matrix = event.detail?.matrix;
+    if (!Array.isArray(matrix)) return;
+    const relativeZoom = getCropperMatrixScale(matrix) / cropperBaseScale - 1;
+    if (relativeZoom < -0.001 || relativeZoom > 0.501 || !proposedCropperImageCoversSelection(matrix)) {
+      event.preventDefault();
+      syncCropperZoomFromMatrix();
+      return;
+    }
+    syncCropperZoomFromMatrix(matrix);
+    scheduleCropperAvatarPreview();
+  };
+  activeCropperImage.addEventListener("transform", cropperTransformHandler);
+}
+
+async function initializePhotoCropper() {
+  const CropperConstructor = getCropperConstructor();
+  if (!CropperConstructor) throw new Error("Cropper.js 2.x is unavailable.");
+  const cropperInstance = new CropperConstructor(cropperImage, {
+    container: cropperImage.parentElement,
+    template: PROFILE_PHOTO_CROPPER_TEMPLATE,
   });
+  const cropperImageElement = cropperInstance.getCropperImage?.();
+  const cropperSelectionElement = cropperInstance.getCropperSelection?.();
+  if (!cropperImageElement || !cropperSelectionElement || typeof cropperSelectionElement.$toCanvas !== "function") {
+    cropperInstance.destroy();
+    throw new Error("Cropper.js 2.x did not create the required image and selection elements.");
+  }
+  activeCropper = cropperInstance;
+  activeCropperImage = cropperImageElement;
+  activeCropperSelection = cropperSelectionElement;
+  await cropperImageElement.$ready();
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  if (activeCropper !== cropperInstance) return;
+  cropperImageElement.$center("contain");
+  const imageRect = cropperImageElement.getBoundingClientRect();
+  const selectionRect = cropperSelectionElement.getBoundingClientRect();
+  const fitScale = Math.max(
+    selectionRect.width / Math.max(imageRect.width, 1),
+    selectionRect.height / Math.max(imageRect.height, 1)
+  );
+  if (fitScale > 1) cropperImageElement.$scale(fitScale);
+  cropperImageElement.$center();
+  cropperBaseScale = getCropperMatrixScale(cropperImageElement.$getTransform());
+  bindCropperTransformBoundary();
+  syncCropperZoomFromMatrix();
+  if (cropperZoom) cropperZoom.disabled = false;
+  cropperReady = true;
+  if (cropperSaveBtn) cropperSaveBtn.disabled = false;
+  clearCropperLoadTimer();
+  setCropperLoading(false);
+  scheduleCropperAvatarPreview();
 }
 
 async function canDecodeImageFile(file) {
@@ -5721,7 +6574,8 @@ async function canDecodeImageFile(file) {
       const bitmap = await createImageBitmap(file);
       if (bitmap && typeof bitmap.close === "function") bitmap.close();
       return true;
-    } catch (_) {
+    } catch (error) {
+      console.debug("[profile-settings] createImageBitmap decode unavailable; using Image fallback", error);
       // Fall through to Image-based decode check.
     }
   }
@@ -5740,6 +6594,42 @@ async function canDecodeImageFile(file) {
   });
 }
 
+function closeParalegalAvatarActions({ restoreFocus = false } = {}) {
+  const menu = document.getElementById("avatarPhotoActions");
+  const frame = document.getElementById("avatarFrame");
+  if (!menu || !frame) return;
+  const wasOpen = !menu.classList.contains("hidden");
+  menu.classList.add("hidden");
+  frame.setAttribute("aria-expanded", "false");
+  if (restoreFocus && wasOpen) frame.focus();
+}
+
+function toggleParalegalAvatarActions() {
+  const menu = document.getElementById("avatarPhotoActions");
+  const frame = document.getElementById("avatarFrame");
+  if (!menu || !frame) return;
+  const willOpen = menu.classList.contains("hidden");
+  menu.classList.toggle("hidden", !willOpen);
+  frame.setAttribute("aria-expanded", willOpen ? "true" : "false");
+  if (willOpen) {
+    menu.querySelector('[role="menuitem"]:not(:disabled)')?.focus();
+  }
+}
+
+function syncParalegalAvatarFrameAction(hasVisiblePhoto) {
+  const frame = document.getElementById("avatarFrame");
+  if (!frame) return;
+  frame.setAttribute("aria-label", hasVisiblePhoto ? "Open profile photo actions" : "Upload profile photo");
+  if (hasVisiblePhoto) {
+    frame.setAttribute("aria-haspopup", "menu");
+    frame.setAttribute("aria-controls", "avatarPhotoActions");
+    return;
+  }
+  frame.removeAttribute("aria-haspopup");
+  frame.removeAttribute("aria-controls");
+  closeParalegalAvatarActions();
+}
+
 function initAvatarUploaders() {
   bindAvatarRemoval();
   bindAvatarEditing();
@@ -5749,17 +6639,55 @@ function initAvatarUploaders() {
     const input = document.getElementById(config.inputId);
     if (!frame || !input) return;
 
+    const activateFrame = () => {
+      cropperReturnFocus = frame;
+      const isAttorneyFrame = config.frameId === "attorneyAvatarFrame";
+      const existingPhoto = getDisplayProfileImage(currentUser || {}, { allowPending: true });
+      if (
+        !isAttorneyFrame &&
+        frame.classList.contains("has-photo") &&
+        existingPhoto &&
+        existingPhoto !== DEFAULT_AVATAR_DATA
+      ) {
+        toggleParalegalAvatarActions();
+        return;
+      }
+      if (isAttorneyFrame && existingPhoto && existingPhoto !== DEFAULT_AVATAR_DATA) {
+        openExistingPhotoEditor(config);
+        return;
+      }
+      closeParalegalAvatarActions();
+      input.click();
+    };
     frame.style.cursor = "pointer";
-    frame.addEventListener("click", () => input.click());
+    frame.addEventListener("click", activateFrame);
     frame.addEventListener("keydown", (evt) => {
       if (evt.key === "Enter" || evt.key === " ") {
         evt.preventDefault();
-        input.click();
+        activateFrame();
       }
     });
 
     input.addEventListener("change", () => handleAvatarUpload(config));
   });
+
+  if (document.body.dataset.paralegalAvatarActionsBound !== "true") {
+    document.body.dataset.paralegalAvatarActionsBound = "true";
+    document.addEventListener("click", (event) => {
+      const menu = document.getElementById("avatarPhotoActions");
+      const frame = document.getElementById("avatarFrame");
+      if (!menu || menu.classList.contains("hidden")) return;
+      if (menu.contains(event.target) || frame?.contains(event.target)) return;
+      closeParalegalAvatarActions();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      const menu = document.getElementById("avatarPhotoActions");
+      if (!menu || menu.classList.contains("hidden")) return;
+      event.preventDefault();
+      closeParalegalAvatarActions({ restoreFocus: true });
+    });
+  }
 }
 
 function updateAvatarRemoveButton(user = currentUser || {}) {
@@ -5771,6 +6699,8 @@ function updateAvatarRemoveButton(user = currentUser || {}) {
   const pendingUrl = resolvePendingProfileImage(user);
   const stagedUrl = settingsState.stagedProfilePhotoUrl || "";
   const hasPhoto = Boolean(rawUrl || pendingUrl || stagedUrl);
+  const avatarFrame = document.getElementById("avatarFrame");
+  syncParalegalAvatarFrameAction(Boolean(hasPhoto && avatarFrame?.classList.contains("has-photo")));
   if (removeBtn) {
     removeBtn.classList.toggle("hidden", !hasPhoto);
     removeBtn.disabled = !hasPhoto;
@@ -5784,8 +6714,8 @@ function updateAvatarRemoveButton(user = currentUser || {}) {
     editBtn.disabled = !hasPhoto;
   }
   if (attorneyEditBtn) {
-    attorneyEditBtn.classList.toggle("hidden", !hasPhoto);
-    attorneyEditBtn.disabled = !hasPhoto;
+    attorneyEditBtn.classList.remove("hidden");
+    attorneyEditBtn.disabled = false;
   }
 }
 
@@ -5866,6 +6796,16 @@ function bindAvatarRemoval() {
     if (!button || button.dataset.bound === "true") return;
     button.dataset.bound = "true";
     button.addEventListener("click", async () => {
+      if (button.id === "removeAvatarBtn") closeParalegalAvatarActions();
+      const confirmed = await confirmAction(
+        "This removes the photo from your account, public profile, and navigation avatar.",
+        {
+          title: "Remove profile photo?",
+          confirmLabel: "Remove photo",
+          tone: "danger",
+        }
+      );
+      if (!confirmed) return;
       if (settingsState.stagedProfilePhotoFile) {
         clearStagedProfilePhoto();
         applyAvatar(currentUser || {});
@@ -5924,13 +6864,16 @@ function bindAvatarEditing() {
   if (editBtn && editBtn.dataset.bound !== "true") {
     editBtn.dataset.bound = "true";
     editBtn.addEventListener("click", () => {
+      closeParalegalAvatarActions();
+      cropperReturnFocus = document.getElementById("avatarFrame");
       if (paralegalConfig) openExistingPhotoEditor(paralegalConfig);
     });
   }
   if (attorneyEditBtn && attorneyEditBtn.dataset.bound !== "true") {
     attorneyEditBtn.dataset.bound = "true";
     attorneyEditBtn.addEventListener("click", () => {
-      if (attorneyConfig) openExistingPhotoEditor(attorneyConfig);
+      cropperReturnFocus = attorneyEditBtn;
+      document.getElementById(attorneyConfig?.inputId || "attorneyAvatarInput")?.click();
     });
   }
 }
@@ -5964,8 +6907,13 @@ async function handleAvatarUpload(config) {
     return;
   }
 
-  if (typeof Cropper !== "undefined" && cropperModal && cropperImage) {
+  if (getCropperConstructor() && cropperModal && cropperImage) {
     openPhotoCropper(file, config);
+  } else if (config.frameId === "attorneyAvatarFrame" && cropperModal) {
+    cropperConfig = config;
+    cropperFile = file;
+    revealPhotoCropper();
+    showCropperError("The photo editor is unavailable. Refresh the page or choose another photo.");
   } else {
     stagePhotoDirect(file, config);
   }
@@ -5992,10 +6940,27 @@ function initPhotoCropperModal() {
   cropperModalCard = cropperModal?.querySelector(".photo-crop-card");
   cropperLoading = document.getElementById("photoCropLoading");
   cropperLoadingText = document.getElementById("photoCropLoadingText");
+  cropperError = document.getElementById("photoCropError");
+  cropperErrorText = document.getElementById("photoCropErrorText");
+  cropperAvatarPreview = document.getElementById("photoCropAvatarPreview");
+  const closeBtn = document.getElementById("photoCropClose");
+  const retryBtn = document.getElementById("photoCropTryAgain");
+  const chooseAnotherBtn = document.getElementById("photoCropChooseAnother");
   if (!cropperModal || !cropperImage || !saveBtn) return;
   saveBtn.disabled = true;
 
   cancelBtn?.addEventListener("click", closePhotoCropper);
+  closeBtn?.addEventListener("click", closePhotoCropper);
+  retryBtn?.addEventListener("click", () => {
+    const retry = cropperRetryAction;
+    hideCropperError();
+    if (retry) retry();
+  });
+  chooseAnotherBtn?.addEventListener("click", () => {
+    const inputId = cropperConfig?.inputId;
+    closePhotoCropper();
+    if (inputId) setTimeout(() => document.getElementById(inputId)?.click(), 0);
+  });
   cropperModalCard?.addEventListener("mousedown", (event) => event.stopPropagation());
   cropperModal.addEventListener("mousedown", (event) => {
     if (event.target === cropperModal) closePhotoCropper();
@@ -6007,18 +6972,26 @@ function initPhotoCropperModal() {
   });
   if (cropperZoom) {
     cropperZoom.disabled = true;
-    cropperZoom.addEventListener("mousedown", () => syncCropperBaseZoom({ resetSlider: true }));
-    cropperZoom.addEventListener("touchstart", () => syncCropperBaseZoom({ resetSlider: true }), {
-      passive: true,
-    });
     cropperZoom.addEventListener("input", () => {
-      if (activeCropper) {
-        const multiplier = Number(cropperZoom.value);
-        activeCropper.zoomTo(cropperBaseZoom * (1 + multiplier));
-      }
+      setCropperZoom(cropperZoom.value);
     });
   }
+  const cropStage = document.getElementById("photoCropStage");
+  cropStage?.addEventListener("keydown", (event) => {
+    if (!cropperReady || !activeCropperImage) return;
+    const step = event.shiftKey ? 20 : 5;
+    const movement = {
+      ArrowLeft: [-step, 0],
+      ArrowRight: [step, 0],
+      ArrowUp: [0, -step],
+      ArrowDown: [0, step],
+    }[event.key];
+    if (!movement) return;
+    event.preventDefault();
+    activeCropperImage.$move(...movement);
+  });
   saveBtn.addEventListener("click", () => {
+    if (cropperSaveInFlight) return;
     if (!cropperReady || !activeCropper) {
       showToast("Image is still loading. Please wait a moment and try again.", "err");
       return;
@@ -6041,6 +7014,8 @@ function setCropperLoading(isLoading, text = "") {
 
 function openPhotoCropper(file, config) {
   if (!cropperModal || !cropperImage) return;
+  cropperOpenVersion += 1;
+  hideCropperError();
   cropperConfig = config;
   cropperFile = file;
   cropperOriginalFile = file;
@@ -6064,6 +7039,7 @@ function openPhotoCropper(file, config) {
 
 function openPhotoCropperFromUrl(url, config, isObjectUrl = false, options = {}) {
   if (!cropperModal || !cropperImage) return;
+  hideCropperError();
   cropperConfig = config;
   cropperFile = null;
   cropperOriginalFile = null;
@@ -6072,7 +7048,30 @@ function openPhotoCropperFromUrl(url, config, isObjectUrl = false, options = {})
   loadCropperImage(url, isObjectUrl);
 }
 
-function openExistingPhotoEditor(config) {
+async function fetchProfilePhotoBlob(url, { authenticated = false } = {}) {
+  cropperFetchController?.abort();
+  const controller = new AbortController();
+  cropperFetchController = controller;
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const request = authenticated
+      ? secureFetch(url, { signal: controller.signal, noRedirect: true })
+      : fetch(url, { credentials: "include", signal: controller.signal });
+    const response = await request;
+    if (!response.ok) throw new Error("Unable to load profile photo.");
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType && !contentType.startsWith("image/")) {
+      throw new Error("Profile photo unavailable.");
+    }
+    return await response.blob();
+  } finally {
+    clearTimeout(timeout);
+    if (cropperFetchController === controller) cropperFetchController = null;
+  }
+}
+
+async function openExistingPhotoEditor(config) {
+  const openVersion = ++cropperOpenVersion;
   const source = getOriginalPhotoSource(currentUser || {}, { allowPending: true });
   const fallbackUrl = getDisplayProfileImage(currentUser || {}, { allowPending: true });
   const primaryUrl =
@@ -6088,52 +7087,38 @@ function openExistingPhotoEditor(config) {
   }
 
   if (cropperModal) {
-    cropperModal.classList.add("show");
-    cropperModal.setAttribute("aria-hidden", "false");
+    cropperConfig = config;
+    hideCropperError();
+    revealPhotoCropper();
     setCropperLoading(true, "Loading photo…");
   }
 
   const openFromBlob = (blob, originalUrl) => {
+    if (openVersion !== cropperOpenVersion || !cropperModal?.classList.contains("show")) return false;
     const objectUrl = URL.createObjectURL(blob);
     openPhotoCropperFromUrl(objectUrl, config, true, { originalUrl });
+    return true;
   };
 
-  const tryDirect = (targetUrl, allowFallback) => {
+  const tryDirect = async (targetUrl, allowFallback) => {
+    if (openVersion !== cropperOpenVersion || !cropperModal?.classList.contains("show")) return false;
     if (targetUrl.startsWith("data:")) {
       openPhotoCropperFromUrl(targetUrl, config, false, { originalUrl: targetUrl });
-      return;
+      return true;
     }
     if (targetUrl.startsWith("blob:")) {
       openPhotoCropperFromUrl(targetUrl, config, true, { originalUrl: targetUrl });
-      return;
+      return true;
     }
-    let fetchOptions = undefined;
     try {
-      const parsed = new URL(targetUrl, window.location.href);
-      if (parsed.origin === window.location.origin) {
-        fetchOptions = { credentials: "include" };
+      const blob = await fetchProfilePhotoBlob(targetUrl);
+      return openFromBlob(blob, targetUrl);
+    } catch (error) {
+      if (allowFallback && fallbackUrl && fallbackUrl !== targetUrl) {
+        return tryDirect(fallbackUrl, false);
       }
-    } catch (_) {
-      fetchOptions = { credentials: "include" };
+      return false;
     }
-    fetch(targetUrl, fetchOptions)
-      .then((res) => {
-        if (!res.ok) throw new Error("Unable to load profile photo.");
-        const contentType = res.headers.get("content-type") || "";
-        if (contentType && !contentType.startsWith("image/")) {
-          throw new Error("Profile photo unavailable.");
-        }
-        return res.blob();
-      })
-      .then((blob) => openFromBlob(blob, targetUrl))
-      .catch(() => {
-        if (allowFallback && fallbackUrl && fallbackUrl !== targetUrl) {
-          tryDirect(fallbackUrl, false);
-          return;
-        }
-        showToast("Unable to load the original photo. Please re-upload the image.", "err");
-        closePhotoCropper();
-      });
   };
 
   if (primaryUrl.startsWith("data:") || primaryUrl.startsWith("blob:")) {
@@ -6144,23 +7129,26 @@ function openExistingPhotoEditor(config) {
   const originalUrl = source?.value || fallbackUrl || "";
   const allowFallback = Boolean(source?.value && fallbackUrl && fallbackUrl !== primaryUrl);
   const sourceParam = encodeURIComponent(primaryUrl);
-  secureFetch(`/api/uploads/profile-photo/original?source=${sourceParam}`)
-    .then((res) => {
-      if (!res.ok) throw new Error("Unable to load profile photo.");
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType && !contentType.startsWith("image/")) {
-        throw new Error("Profile photo unavailable.");
-      }
-      return res.blob();
-    })
-    .then((blob) => openFromBlob(blob, originalUrl || primaryUrl))
-    .catch(() => {
-      tryDirect(primaryUrl, allowFallback);
-    });
+  try {
+    const blob = await fetchProfilePhotoBlob(
+      `/api/uploads/profile-photo/original?source=${sourceParam}`,
+      { authenticated: true }
+    );
+    openFromBlob(blob, originalUrl || primaryUrl);
+  } catch (error) {
+    const loaded = await tryDirect(primaryUrl, allowFallback);
+    if (!loaded && openVersion === cropperOpenVersion && cropperModal?.classList.contains("show")) {
+      showCropperError(
+        "The saved photo could not be loaded. Try again or choose another JPEG or PNG.",
+        () => void openExistingPhotoEditor(config)
+      );
+    }
+  }
 }
 
 function loadCropperImage(url, isObjectUrl) {
   if (!cropperModal || !cropperImage) return;
+  hideCropperError();
   cropperReady = false;
   if (cropperSaveBtn) cropperSaveBtn.disabled = true;
   if (cropperZoom) {
@@ -6171,16 +7159,21 @@ function loadCropperImage(url, isObjectUrl) {
     cropperObjectUrl = null;
   }
   if (isObjectUrl) cropperObjectUrl = url;
-  cropperModal.classList.add("show");
-  cropperModal.setAttribute("aria-hidden", "false");
+  revealPhotoCropper();
   setCropperLoading(true, "Loading photo…");
-  if (activeCropper) {
-    activeCropper.destroy();
-    activeCropper = null;
-  }
+  destroyActiveCropperInstance();
+  const retryConfig = cropperConfig;
+  const retryFile = cropperFile;
+  const retry = () => {
+    if (retryFile && retryConfig) {
+      openPhotoCropper(retryFile, retryConfig);
+    } else if (retryConfig) {
+      void openExistingPhotoEditor(retryConfig);
+    }
+  };
+  beginCropperLoadDeadline(retry);
   cropperImage.onerror = () => {
     const fallbackFile = cropperFile;
-    const fallbackConfig = cropperConfig;
     if (fallbackFile && cropperLoadRetries === 0) {
       cropperLoadRetries += 1;
       loadCropperImage(URL.createObjectURL(fallbackFile), true);
@@ -6188,92 +7181,72 @@ function loadCropperImage(url, isObjectUrl) {
     }
     if (cropperZoom) cropperZoom.disabled = true;
     if (cropperSaveBtn) cropperSaveBtn.disabled = true;
-    setCropperLoading(false);
-    showToast("Unable to open the crop editor for this image. We'll add it without cropping.", "err");
-    closePhotoCropper();
-    if (fallbackFile && fallbackConfig) {
-      stagePhotoDirect(fallbackFile, fallbackConfig);
-    }
+    showCropperError("This photo could not be opened. Try again or choose another JPEG or PNG.", retry);
   };
   cropperImage.onload = () => {
     try {
-      activeCropper = new Cropper(cropperImage, {
-        aspectRatio: 1,
-        viewMode: 1,
-        dragMode: "move",
-        autoCropArea: 1,
-        background: false,
-        guides: false,
-        center: false,
-        cropBoxMovable: false,
-        cropBoxResizable: false,
-        responsive: true,
-        zoomOnWheel: true,
-        zoomOnTouch: true,
-        ready() {
-          requestAnimationFrame(() => syncCropperBaseZoom({ resetSlider: true }));
-          if (cropperZoom) cropperZoom.disabled = false;
-          cropperReady = true;
-          if (cropperSaveBtn) cropperSaveBtn.disabled = false;
-          setCropperLoading(false);
-        },
-        zoom() {
-          if (!cropperZoom) return;
-          if (cropperZoomLock) return;
-          const data = this.getImageData();
-          const currentZoom = data.naturalWidth ? data.width / data.naturalWidth : 1;
-          const relative = cropperBaseZoom ? currentZoom / cropperBaseZoom - 1 : 0;
-          const clamped = Math.min(0.5, Math.max(0, relative));
-          cropperZoom.value = String(clamped);
-        },
+      void initializePhotoCropper().catch((error) => {
+        console.error("Unable to initialize cropper", error);
+        showCropperError("The photo editor could not start. Try again or choose another photo.", retry);
       });
-      if (cropperZoom) {
-        cropperZoom.disabled = false;
-      }
-      cropperReady = true;
-      if (cropperSaveBtn) cropperSaveBtn.disabled = false;
     } catch (err) {
       console.error("Unable to initialize cropper", err);
-      const fallbackFile = cropperFile;
-      const fallbackConfig = cropperConfig;
-      closePhotoCropper();
-      if (fallbackFile && fallbackConfig) {
-        showToast("Crop editor unavailable. Photo was added without cropping.", "err");
-        stagePhotoDirect(fallbackFile, fallbackConfig);
-      } else {
-        showToast("Unable to open the crop editor right now.", "err");
-      }
+      showCropperError("The photo editor could not start. Try again or choose another photo.", retry);
     }
   };
   cropperImage.src = url;
 }
 
+function revealPhotoCropper() {
+  if (!cropperModal) return;
+  const wasHidden = cropperModal.getAttribute("aria-hidden") !== "false";
+  cropperModal.classList.add("show");
+  cropperModal.setAttribute("aria-hidden", "false");
+  cropperModal.removeAttribute("inert");
+  if (wasHidden) {
+    activateDialogFocus(cropperModal, {
+      initialFocus: document.getElementById("photoCropCancel"),
+      returnFocus: cropperReturnFocus,
+      onEscape: closePhotoCropper,
+    });
+  }
+}
+
 function closePhotoCropper() {
   if (!cropperModal) return;
+  cropperOpenVersion += 1;
+  cropperFetchController?.abort();
+  cropperFetchController = null;
   cropperModal.classList.remove("show");
   cropperModal.setAttribute("aria-hidden", "true");
+  cropperModal.setAttribute("inert", "");
+  deactivateDialogFocus(cropperModal);
+  cropperReturnFocus = null;
   setCropperLoading(false);
   destroyPhotoCropper();
 }
 
 function destroyPhotoCropper() {
-  if (activeCropper) {
-    activeCropper.destroy();
-    activeCropper = null;
-  }
+  clearCropperLoadTimer();
+  if (cropperPreviewTimer) clearTimeout(cropperPreviewTimer);
+  cropperPreviewTimer = null;
+  hideCropperError();
+  destroyActiveCropperInstance();
   if (cropperImage) {
     cropperImage.onerror = null;
     cropperImage.onload = null;
     cropperImage.src = "";
   }
   if (cropperZoom) {
-    cropperZoom.value = "1";
+    cropperZoom.value = "0";
     cropperZoom.disabled = true;
   }
   if (cropperSaveBtn) {
     cropperSaveBtn.disabled = true;
+    cropperSaveBtn.textContent = "Save photo";
   }
-  cropperBaseZoom = 1;
+  if (cropperAvatarPreview) cropperAvatarPreview.removeAttribute("src");
+  cropperBaseScale = 1;
   cropperReady = false;
   cropperLoadRetries = 0;
   if (cropperObjectUrl) {
@@ -6286,27 +7259,88 @@ function destroyPhotoCropper() {
   cropperOriginalUrl = "";
 }
 
+function destroyActiveCropperInstance() {
+  if (activeCropperImage && cropperTransformHandler) {
+    activeCropperImage.removeEventListener("transform", cropperTransformHandler);
+  }
+  cropperTransformHandler = null;
+  if (activeCropper) {
+    activeCropper.destroy();
+    activeCropper = null;
+  }
+  activeCropperImage = null;
+  activeCropperSelection = null;
+}
+
 async function applyCroppedPhoto() {
-  if (!activeCropper || !cropperConfig) return;
-  const preview = document.getElementById(cropperConfig.previewId);
-  const initials = document.getElementById(cropperConfig.initialsId);
-  const frame = document.getElementById(cropperConfig.frameId);
-  const canvas = activeCropper.getCroppedCanvas({
-    width: 600,
-    height: 600,
-    imageSmoothingQuality: "high",
-  });
-  if (!canvas) return;
+  if (!activeCropperSelection || !cropperConfig) return;
+  const activeConfig = cropperConfig;
+  const preview = document.getElementById(activeConfig.previewId);
+  const initials = document.getElementById(activeConfig.initialsId);
+  const frame = document.getElementById(activeConfig.frameId);
+  const isAttorneyPhoto = activeConfig.frameId === "attorneyAvatarFrame";
+  const originalFile = cropperOriginalFile;
+  const originalUrl = cropperOriginalUrl;
+  const sourceFile = cropperFile;
+  if (cropperSaveBtn) cropperSaveBtn.disabled = true;
+  let canvas = null;
+  try {
+    canvas = await activeCropperSelection.$toCanvas({
+      width: 600,
+      height: 600,
+      beforeDraw(context) {
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+      },
+    });
+  } catch (error) {
+    console.error("Unable to render cropped photo", error);
+  }
+  if (!canvas) {
+    if (cropperSaveBtn) cropperSaveBtn.disabled = false;
+    showToast("Unable to process this image. Please choose another JPG or PNG file.", "err");
+    return;
+  }
 
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
   if (!blob) {
+    if (cropperSaveBtn) cropperSaveBtn.disabled = false;
     showToast("Unable to process this image. Please choose a JPG or PNG file.", "err");
     return;
   }
-  const name = cropperFile?.name ? cropperFile.name.replace(/\.[^.]+$/, ".jpg") : "profile-photo.jpg";
+  const name = sourceFile?.name ? sourceFile.name.replace(/\.[^.]+$/, ".jpg") : "profile-photo.jpg";
   const file = new File([blob], name, { type: "image/jpeg" });
   const previewUrl = canvas.toDataURL("image/jpeg", 0.92);
-  const editedExistingPhoto = !cropperFile && Boolean(cropperOriginalUrl);
+  const editedExistingPhoto = !sourceFile && Boolean(originalUrl);
+
+  if (isAttorneyPhoto) {
+    cropperSaveInFlight = true;
+    if (cropperSaveBtn) cropperSaveBtn.textContent = "Saving…";
+    hideCropperError();
+    setCropperLoading(true, "Saving photo…");
+    try {
+      const payload = await uploadProfilePhotoFile(file, originalFile, editedExistingPhoto);
+      applyProfilePhotoUploadResult(payload, { suppressToast: true });
+      setAttorneySaveStatus("Profile photo saved.", "success");
+      showToast("Profile photo updated!", "ok");
+      closePhotoCropper();
+    } catch (error) {
+      console.error("Unable to upload profile photo", error);
+      showCropperError(
+        error?.message || "The photo could not be saved. Check your connection and try again.",
+        () => void applyCroppedPhoto(),
+        { preserveCropper: true }
+      );
+    } finally {
+      cropperSaveInFlight = false;
+      if (cropperSaveBtn) {
+        cropperSaveBtn.textContent = "Save photo";
+        cropperSaveBtn.disabled = !cropperReady;
+      }
+      if (cropperModal?.classList.contains("show") && cropperError?.hidden) setCropperLoading(false);
+    }
+    return;
+  }
 
   updateAvatarPreview(preview, frame, initials, previewUrl);
   settingsState.stagedProfilePhotoFile = file;
@@ -6315,12 +7349,12 @@ async function applyCroppedPhoto() {
   if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:") && settingsState.stagedProfilePhotoOriginalUrl !== cropperOriginalUrl) {
     URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
   }
-  if (cropperOriginalFile) {
-    settingsState.stagedProfilePhotoOriginalFile = cropperOriginalFile;
+  if (originalFile) {
+    settingsState.stagedProfilePhotoOriginalFile = originalFile;
     settingsState.stagedProfilePhotoOriginalUrl = "";
-  } else if (cropperOriginalUrl) {
+  } else if (originalUrl) {
     settingsState.stagedProfilePhotoOriginalFile = null;
-    settingsState.stagedProfilePhotoOriginalUrl = cropperOriginalUrl;
+    settingsState.stagedProfilePhotoOriginalUrl = originalUrl;
   } else {
     settingsState.stagedProfilePhotoOriginalFile = null;
     settingsState.stagedProfilePhotoOriginalUrl = "";
@@ -6329,6 +7363,7 @@ async function applyCroppedPhoto() {
   updateAvatarRemoveButton(currentUser || {});
   updatePhotoReviewStatus(currentUser || {});
   updateRequiredFieldMarkers();
+  markParalegalProfileChanged();
   closePhotoCropper();
 }
 
@@ -6359,6 +7394,7 @@ function stagePhotoDirect(file, config) {
     updateAvatarRemoveButton(currentUser || {});
     updatePhotoReviewStatus(currentUser || {});
     updateRequiredFieldMarkers();
+    markParalegalProfileChanged();
   };
   reader.onerror = () => {
     const fallbackUrl = URL.createObjectURL(file);
@@ -6375,6 +7411,7 @@ function stagePhotoDirect(file, config) {
     updateAvatarRemoveButton(currentUser || {});
     updatePhotoReviewStatus(currentUser || {});
     updateRequiredFieldMarkers();
+    markParalegalProfileChanged();
   };
   reader.readAsDataURL(file);
 }
@@ -6411,19 +7448,37 @@ async function saveProfile() {
     saveBtn.textContent = "Saving…";
   }
   try {
-    await saveSettings();
+    const saved = await saveSettings();
+    if (saved) setParalegalProfileDirty(false);
   } catch (err) {
     console.error("Profile save failed", err);
     showToast(err?.message || "Unable to save settings right now.", "err");
   } finally {
     if (saveBtn) {
-      saveBtn.disabled = false;
+      saveBtn.disabled = !paralegalProfileDirty;
       saveBtn.textContent = originalLabel;
     }
   }
 }
 
 const profileSaveBtn = document.getElementById("profileSaveBtn");
+const profileSaveStatus = document.getElementById("profileSaveStatus");
+let paralegalProfileDirty = false;
+
+function setParalegalProfileDirty(dirty) {
+  paralegalProfileDirty = Boolean(dirty);
+  if (profileSaveBtn) profileSaveBtn.disabled = !paralegalProfileDirty;
+  if (profileSaveStatus) {
+    profileSaveStatus.textContent = paralegalProfileDirty ? "Unsaved changes" : "All changes saved.";
+    profileSaveStatus.dataset.state = paralegalProfileDirty ? "dirty" : "saved";
+  }
+}
+
+function markParalegalProfileChanged() {
+  setParalegalProfileDirty(true);
+  scheduleProfileSettingsDraftPersist();
+}
+
 if (profileSaveBtn) {
   profileSaveBtn.addEventListener("click", saveProfile);
 }
@@ -6431,16 +7486,28 @@ if (profileSaveBtn) {
 const profileForm = document.getElementById("profileForm");
 if (profileForm) {
   profileForm.addEventListener("submit", (e) => e.preventDefault());
+  profileForm.addEventListener("input", () => markParalegalProfileChanged());
+  profileForm.addEventListener("change", (event) => {
+    if (event.target instanceof HTMLInputElement && event.target.type === "file") return;
+    markParalegalProfileChanged();
+  });
+  setParalegalProfileDirty(false);
 }
 
-function handleProfilePreviewNavigation() {
+window.addEventListener("beforeunload", (event) => {
+  if (!paralegalProfileDirty) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
+
+async function handleProfilePreviewNavigation() {
   const cached = currentUser || getCachedUser() || {};
 
   const role = (cached.role || "").toLowerCase();
   const id = cached._id || cached.id;
 
   if (!id) {
-    alert("Missing user id.");
+    showToast("Your profile could not be opened because the account identifier is missing.", "err");
     return;
   }
 
@@ -6456,22 +7523,3 @@ function handleProfilePreviewNavigation() {
 [document.getElementById("previewProfileBtn"), document.getElementById("attorneyPreviewProfileBtn")]
   .filter(Boolean)
   .forEach((btn) => btn.addEventListener("click", handleProfilePreviewNavigation));
-window.logoutUser = function (e) {
-  if (e) e.preventDefault();
-
-  // Clear client auth (preserve non-auth keys like tour flags)
-  ["lpc_user", "lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"].forEach((key) => {
-    try {
-      localStorage.removeItem(key);
-    } catch {}
-    try {
-      sessionStorage.removeItem(key);
-    } catch {}
-  });
-
-  // Backend logout (if applicable)
-  fetch("/api/auth/logout", { credentials: "include" })
-    .finally(() => {
-      window.location.href = "/login.html";
-    });
-};

@@ -4,7 +4,6 @@ const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-const Incident = require("../../models/Incident");
 const IncidentInvestigation = require("../../models/IncidentInvestigation");
 const IncidentPatch = require("../../models/IncidentPatch");
 const {
@@ -31,13 +30,15 @@ const PREFERENCES_RECIPE_KEY = "preferences.save-button-regression";
 const PREFERENCES_RELATIVE_FILE = "frontend/assets/scripts/profile-settings.js";
 const PREFERENCES_REGRESSION_MARKER = "LPC-INCIDENT-TEST: intentional preferences save regression marker.";
 const PREFERENCES_REGRESSION_BLOCK = `      // ${PREFERENCES_REGRESSION_MARKER}\n      showToast("Unable to save preferences.", "err");\n      return;\n`;
-const PREFERENCES_RESTORED_BLOCK = `      const res = await fetch("/api/account/preferences", {\n        method: "POST",\n        headers: { "Content-Type": "application/json" },\n        credentials: "include",\n        body: JSON.stringify({ email, theme, state })\n      });\n\n      const data = await res.json().catch(() => ({}));\n\n      if (!res.ok) {\n        showToast(data.error || "Unable to save preferences.", "err");\n        return;\n      }\n`;
+const PREFERENCES_INSECURE_REQUEST = `      const res = await fetch("/api/account/preferences", {\n        method: "POST",\n        headers: { "Content-Type": "application/json" },\n        credentials: "include",\n        body: JSON.stringify(payload)\n      });\n`;
+const PREFERENCES_SECURE_REQUEST = `      const res = await secureFetch("/api/account/preferences", {\n        method: "POST",\n        body: payload,\n      });\n`;
+const PREFERENCES_AUTOSAVE_MARKER = "const queueAccountPreferenceWrite";
 
 function compactLowerText(value, maxLength = 2000) {
   return compactText(value, maxLength).toLowerCase();
 }
 
-function matchesPreferencesSaveIncident({ incident = {}, investigation = {} }) {
+function matchesPreferencesSaveIncident({ incident = {} }) {
   const corpus = [
     incident.summary,
     incident.originalReportText,
@@ -66,26 +67,28 @@ const PATCH_RECIPES = Object.freeze([
     allowedProtectedPaths: [PREFERENCES_RELATIVE_FILE],
     supportsWorkspaceSync: true,
     seedFromRunnerWorkspace: true,
-    match: ({ incident = {}, investigation = {} }) => matchesPreferencesSaveIncident({ incident, investigation }),
+    match: ({ incident = {} }) => matchesPreferencesSaveIncident({ incident }),
     execute: ({ worktreePath }) => {
       const target = path.join(worktreePath, PREFERENCES_RELATIVE_FILE);
       const source = fs.readFileSync(target, "utf8");
-      if (!source.includes(PREFERENCES_REGRESSION_BLOCK)) {
-        throw new Error("Preferences save regression marker was not found in the worktree.");
+      let repaired = source;
+      if (repaired.includes(PREFERENCES_REGRESSION_BLOCK)) {
+        repaired = repaired.replace(PREFERENCES_REGRESSION_BLOCK, PREFERENCES_SECURE_REQUEST);
       }
-
-      fs.writeFileSync(
-        target,
-        source.replace(PREFERENCES_REGRESSION_BLOCK, PREFERENCES_RESTORED_BLOCK),
-        "utf8"
-      );
+      if (repaired.includes(PREFERENCES_INSECURE_REQUEST)) {
+        repaired = repaired.replace(PREFERENCES_INSECURE_REQUEST, PREFERENCES_SECURE_REQUEST);
+      }
+      if (!repaired.includes(PREFERENCES_SECURE_REQUEST) && !repaired.includes(PREFERENCES_AUTOSAVE_MARKER)) {
+        throw new Error("The preferences save request could not be repaired safely in the isolated worktree.");
+      }
+      if (repaired !== source) fs.writeFileSync(target, repaired, "utf8");
 
       return {
         filesTouched: [PREFERENCES_RELATIVE_FILE],
         testsAdded: [],
         testsModified: [],
         patchSummary:
-          "Restored the preferences save POST request by removing the intentional regression marker and re-enabling the profile settings persistence flow.",
+          "Restored the CSRF-protected preferences save request and verified the profile settings persistence flow.",
       };
     },
   },
@@ -112,7 +115,7 @@ const PATCH_RECIPES = Object.freeze([
         throw new Error("Notification styles stub was not found in the worktree.");
       }
 
-      const replacement = `function ensureNotificationStyles() {\n  if (document.getElementById(NOTIFICATION_STYLE_ID)) return;\n  const style = document.createElement("style");\n  style.id = NOTIFICATION_STYLE_ID;\n  style.textContent = \`\n  .notif-fade-ready{opacity:0;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease}\n  .notif-fade-in{opacity:1;transform:translateY(0)}\n  \`;\n  document.head.appendChild(style);\n}\n`;
+      const replacement = `function ensureNotificationStyles() {\n  const NOTIFICATION_STYLE_ID = "lpc-notification-fade-styles";\n  if (document.getElementById(NOTIFICATION_STYLE_ID)) return;\n  const style = document.createElement("style");\n  style.id = NOTIFICATION_STYLE_ID;\n  style.textContent = \`\n  .notif-fade-ready{opacity:0;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease}\n  .notif-fade-in{opacity:1;transform:translateY(0)}\n  \`;\n  document.head.appendChild(style);\n}\n`;
 
       fs.writeFileSync(target, source.replace(needle, replacement), "utf8");
 

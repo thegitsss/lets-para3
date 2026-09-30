@@ -1,0 +1,14 @@
+/* Admin-only treatment; shared security controls keep their existing handlers. */
+body.admin-security #securitySection .settings-block { border:0; border-radius:0; box-shadow:none; padding:16px 0; background:transparent; }
+body.admin-security #securitySection .two-factor-hero,
+body.admin-security #securitySection .focused-settings-header,
+body.admin-security #securitySection .blocked-users-card { display:none; }
+body.admin-security #accountSettingsTitle { font-size:28px; }
+body.admin-security #securitySection .security-grid { gap:32px; }
+body.admin-security #securitySection .security-icon { width:24px; height:24px; border:0; }
+body.admin-security #securitySection .security-card-title h3 { font-size:16px; }
+body.admin-security #securitySection .security-column + .security-column { border:0; padding-left:0; }
+body.admin-security #dashboardReturnLink { display:block!important; margin-top:24px!important; }
+body.admin-security #navProfile,body.admin-security #navPreferences { display:none!important; }
+
+body.admin-security #adminSecurityBack { display:inline-block; margin-bottom:16px; font-size:14px; color:inherit; text-decoration:none; }

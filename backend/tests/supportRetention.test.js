@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const mongoose = require("mongoose");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 process.env.STRIPE_SECRET_KEY =
   process.env.STRIPE_SECRET_KEY || "sk_test_support_retention_fixture";
@@ -18,23 +18,16 @@ const {
 } = require("../services/support/conversationService");
 
 describe("support conversation retention and active-memory reset", () => {
-  let mongo;
-
   beforeAll(async () => {
-    mongo = await MongoMemoryServer.create();
-    await mongoose.connect(mongo.getUri());
+    await connect();
   });
 
-  afterEach(async () => {
-    await Promise.all([
-      SupportConversation.deleteMany({}),
-      SupportMessage.deleteMany({}),
-    ]);
+  beforeEach(async () => {
+    await clearDatabase();
   });
 
   afterAll(async () => {
-    await mongoose.disconnect();
-    await mongo.stop();
+    await closeDatabase();
   });
 
   test("removes expired conversations and their messages but retains current history", async () => {
@@ -133,8 +126,12 @@ describe("support conversation retention and active-memory reset", () => {
       path.join(__dirname, "../../frontend/privacy.html"),
       "utf8"
     );
-    expect(privacy).toMatch(/support-chat conversations.*183 days/is);
-    expect(privacy).toMatch(/resets the assistant’s active conversational context but does not immediately delete/is);
-    expect(privacy).toMatch(/cleanup removes eligible conversation and message records/is);
+    const retentionSection = privacy.match(/<section id="retention"[\s\S]*?<\/section>/i)?.[0] || "";
+    expect(retentionSection).toMatch(/Assistant conversations and associated messages/is);
+    expect(retentionSection).toMatch(/support-assistant messages/is);
+    expect(retentionSection).toMatch(/up to 183 days after the conversation’s last message/is);
+    expect(retentionSection).toMatch(/Starting or restarting an Assistant conversation resets its active conversational context/is);
+    expect(retentionSection).toMatch(/does not immediately delete earlier records/is);
+    expect(retentionSection).toMatch(/scheduled cleanup removes eligible conversation and message records/is);
   });
 });

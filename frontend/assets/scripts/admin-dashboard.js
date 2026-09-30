@@ -1,4 +1,6 @@
-import { secureFetch, fetchCSRF } from "./auth.js";
+import { readFinancial, money as financialMoney, stateLabel, providerLabel, unitAmount, reportAmount } from './admin/financial-read.js';
+import { confirmAdminSettlement } from './admin/settlement-dialog.js';
+import { secureFetch } from "./auth.js";
 import {
   fetchIncidentList,
   fetchIncidentDetail,
@@ -10,10 +12,11 @@ import { renderIncidentList } from "./admin/incidents/list.js";
 import { renderIncidentDetail } from "./admin/incidents/detail.js";
 import { renderIncidentTimeline } from "./admin/incidents/timeline.js";
 import { renderIncidentClusters } from "./admin/incidents/clusters.js";
+import { confirmAction, showAlert } from "./utils/dialogs.js";
 import "./admin/knowledge.js";
 import "./admin/engineering.js";
 import "./admin/marketing.js";
-import "./admin/support.js";
+import "./admin/inbox.js";
 import "./admin/sales.js";
 import "./admin/approvals.js";
 
@@ -22,16 +25,14 @@ userLine: null,
 combo: null,
 escrow: null,
 revenue: null,
-expense: null,
   escrowReport: null,
 };
 
-let analyticsInFlight = false;
+let analyticsInFlight = null;
+let analyticsSequence = 0;
 let latestAnalytics = null;
-let lastAnalyticsRenderAt = 0;
 let adminSettingsCache = null;
 let settingsBound = false;
-const ANALYTICS_COOLDOWN_MS = 30_000;
 const removedUserIds = new Set();
 let recentUsersCache = [];
 const NEW_USERS_PAGE_SIZE = 5;
@@ -54,41 +55,21 @@ let overviewActionsQueuedForceRefresh = false;
 let lastOverviewActionsAt = 0;
 const OVERVIEW_ACTIONS_COOLDOWN_MS = 15_000;
 
-const CURRENCY = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-});
-
 async function loadAnalytics() {
-if (analyticsInFlight) return null;
-analyticsInFlight = true;
-try {
-const res = await fetch("/api/admin/analytics", {
-credentials: "include",
-headers: { Accept: "application/json" },
-});
-if (!res.ok) {
-console.error("Failed to load analytics");
-return null;
-}
-return await res.json();
-} catch (err) {
-console.error("Failed to load analytics", err);
-return null;
-} finally {
-analyticsInFlight = false;
-}
+  if (!analyticsInFlight) {
+    const pending = readFinancial('/api/admin/analytics').finally(() => { if (analyticsInFlight === pending) analyticsInFlight = null; });
+    analyticsInFlight = pending;
+  }
+  return analyticsInFlight;
 }
 
 function cacheCharts() {
 if (!window.Chart?.getChart) return;
-chartCache.userLine = Chart.getChart("userChart") || chartCache.userLine;
-chartCache.combo = Chart.getChart("userMgmtComboChart") || chartCache.combo;
-chartCache.escrow = Chart.getChart("escrowChart") || chartCache.escrow;
-chartCache.revenue = Chart.getChart("revMainChart") || chartCache.revenue;
-chartCache.expense = Chart.getChart("revExpenseChart") || chartCache.expense;
-  chartCache.escrowReport = Chart.getChart("escrowReportChart") || chartCache.escrowReport;
+chartCache.userLine = window.Chart.getChart("userChart") || chartCache.userLine;
+chartCache.combo = window.Chart.getChart("userMgmtComboChart") || chartCache.combo;
+chartCache.escrow = window.Chart.getChart("escrowChart") || chartCache.escrow;
+chartCache.revenue = window.Chart.getChart("revMainChart") || chartCache.revenue;
+  chartCache.escrowReport = window.Chart.getChart("escrowReportChart") || chartCache.escrowReport;
 }
 
 function updateText(selector, value) {
@@ -97,21 +78,13 @@ const el = document.querySelector(selector);
 if (el) el.textContent = value;
 }
 
-function formatCurrency(value) {
-  const cents = Number(value);
-  if (!Number.isFinite(cents)) return "—";
-  return CURRENCY.format(cents / 100);
-}
+function formatCurrency(value, currency = 'USD') { return financialMoney(value, currency); }
 
 function formatNumber(value) {
 if (!Number.isFinite(Number(value))) return "0";
 return Number(value).toLocaleString();
 }
 
-function parseCountText(value, fallback = 0) {
-  const match = String(value || "").replace(/,/g, "").match(/-?\d+/);
-  return match ? Number(match[0]) : fallback;
-}
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -122,17 +95,6 @@ function escapeHTML(value) {
     .replace(/'/g, "&#39;");
 }
 
-async function fetchAdminJson(url, fallback = null) {
-  try {
-    const res = await secureFetch(url, { headers: { Accept: "application/json" } });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(payload?.error || `Unable to load ${url}.`);
-    return payload;
-  } catch (err) {
-    console.warn(`Unable to load admin dashboard resource: ${url}`, err);
-    return fallback;
-  }
-}
 
 async function fetchOverviewResource(key, url, fallback = null) {
   try {
@@ -153,9 +115,6 @@ function formatActionCount(count, noun) {
   return `${formatNumber(total)} ${noun}${total === 1 ? "" : "s"}`;
 }
 
-function pluralize(count, singular, plural = `${singular}s`) {
-  return Number(count) === 1 ? singular : plural;
-}
 
 function flashOverviewTarget(target) {
   if (!target) return;
@@ -329,7 +288,7 @@ function buildOverviewActions(summary = {}) {
           reason:
             disputesOpen > 0
               ? "Disputes are manual money-risk work and should not sit unresolved."
-              : "You can skip Finance unless you are checking reporting or receipts.",
+              : "No open matter disputes. Other payment exceptions may still require review.",
           buttonLabel: "Open Finance",
           target: {
             section: "finance",
@@ -472,13 +431,13 @@ function buildOverviewActions(summary = {}) {
         },
   ];
 
-  return rows.sort((left, right) => right.weight - left.weight);
+  return rows.filter(row => ['support','finance','engineering'].includes(row.key) && row.priority !== 'clear').sort((left,right)=>right.weight-left.weight);
 }
 
 function renderOverviewActionBoard(actions = [], { warningMessage = "" } = {}) {
   if (!overviewActionRowsEl) return;
   if (!actions.length && !warningMessage) {
-    overviewActionRowsEl.innerHTML = `<tr><td colspan="4" class="overview-action-empty">No overview actions are available right now.</td></tr>`;
+    overviewActionRowsEl.innerHTML = `<tr><td colspan="4" class="overview-action-empty">No other work is waiting in these queues.</td></tr>`;
     return;
   }
 
@@ -790,7 +749,9 @@ function animateAIControlRoomDecisionQueueTransition(snapshot = null, root = nul
         fill: "forwards",
       }
     );
-    animation.finished.catch(() => {}).finally(() => {
+    animation.finished.catch((error) => {
+      if (error?.name !== "AbortError") console.warn("[admin] removal animation rejected", error);
+    }).finally(() => {
       ghost.remove();
     });
   });
@@ -1062,10 +1023,7 @@ function buildAIControlRoomFallbackData() {
       founder: buildAIControlRoomFounderFallbackView(isUnavailable),
       admissions: buildNeutralFocus("Admissions / Review"),
       support: buildNeutralFocus("Support Ops"),
-      engineering: buildAIControlRoomUnavailableFocus(
-        "Engineering Triage",
-        "Engineering triage is not available in the War Room yet."
-      ),
+      engineering: buildNeutralFocus("Engineering Operations"),
       payments: buildNeutralFocus("Payments & Risk"),
       incidents: buildNeutralFocus("Incident Control Room"),
       lifecycle: buildNeutralFocus("Lifecycle & Follow-Up"),
@@ -1147,6 +1105,9 @@ async function loadAIControlRoomSummary(force = false) {
     try {
       const payload = await fetchAIControlRoomSummaryPayload();
       aiControlRoomState.summary = payload;
+      if (payload?.focusViews?.founder) {
+        aiControlRoomState.focusViews.founder = payload.focusViews.founder;
+      }
       aiControlRoomState.lastLoadedAt = Date.now();
       aiControlRoomState.loadStatus = "ready";
       return payload;
@@ -1198,9 +1159,9 @@ async function syncAIControlRoomInBackground({ refreshIncidentWorkspace = false 
         aiControlRoomState.queuedBackgroundSync = false;
         const focusKeys = Array.from(
           new Set(
-            ["founder", activeAIControlRoomKey]
+            [activeAIControlRoomKey]
               .map((key) => String(key || "").trim())
-              .filter((key) => AI_CONTROL_ROOM_FOCUS_ENDPOINTS[key])
+              .filter((key) => key !== "founder" && AI_CONTROL_ROOM_FOCUS_ENDPOINTS[key])
           )
         );
         const [summaryResult, ...viewResults] = await Promise.allSettled([
@@ -1218,6 +1179,9 @@ async function syncAIControlRoomInBackground({ refreshIncidentWorkspace = false 
           .map((result) => result.value);
 
         aiControlRoomState.summary = summaryPayload;
+        if (summaryPayload?.focusViews?.founder) {
+          aiControlRoomState.focusViews.founder = summaryPayload.focusViews.founder;
+        }
         aiControlRoomState.lastLoadedAt = Date.now();
         aiControlRoomState.loadStatus = "ready";
         views.forEach(({ key, view }) => {
@@ -1232,7 +1196,9 @@ async function syncAIControlRoomInBackground({ refreshIncidentWorkspace = false 
         repaintAIControlRoomFromState();
 
         if (refreshIncidentWorkspace) {
-          void renderIncidentWorkspace(true).catch(() => {});
+          void renderIncidentWorkspace(true).catch((error) => {
+            console.error("[admin] incident workspace refresh rejected", error);
+          });
         }
       } while (aiControlRoomState.queuedBackgroundSync);
     } finally {
@@ -1303,18 +1269,17 @@ function deepCloneAIControlRoomValue(value) {
 }
 
 function buildAIControlRoomSummaryNotes({
-  urgentDecisionCount = 0,
   needsDecisionCount = 0,
   autoHandledCount = 0,
   blockedWaitingCount = 0,
 } = {}) {
   return {
     urgent: {
-      value: String(urgentDecisionCount),
+      value: String(needsDecisionCount),
       note:
-        urgentDecisionCount > 0
-          ? `${pluralizeAIControlRoom(urgentDecisionCount, "decision")} need a yes or no right now across the live lanes.`
-          : "No urgent decision is currently required across the live lanes.",
+        needsDecisionCount > 0
+          ? `${pluralizeAIControlRoom(needsDecisionCount, "decision")} need a yes or no right now across the live lanes.`
+          : "No decision is currently required across the live lanes.",
     },
     review: {
       value: String(autoHandledCount),
@@ -1480,9 +1445,9 @@ function buildAIControlRoomGroupedDecisionCopy({ actionType = "", count = 0 } = 
     return {
       title: `${count} LinkedIn posts ready`,
       explanation: `Approve or reject all ${count} posts together in the existing marketing workflow.`,
-      proposedAction: `Apply the current publish decision path to all ${count} LinkedIn posts.`,
+      proposedAction: `Apply the current approval decision path to all ${count} LinkedIn posts.`,
       actionHelperText: `Yes applies the existing approve path to all ${count} posts. No applies the existing reject path to all ${count} posts.`,
-      yesLabel: "Yes, publish all",
+      yesLabel: "Approve drafts",
       noLabel: "No, keep all out",
     };
   }
@@ -1684,9 +1649,6 @@ function applyAIControlRoomDecisionGroupingToData(data = {}) {
     .filter(Boolean);
 
   const needsDecisionCount = groupedDecisionQueue.length;
-  const urgentDecisionCount = groupedDecisionQueue.filter((item) =>
-    /urgent/i.test(String(item?.urgencyLabel || ""))
-  ).length;
   const autoHandledCount = Array.isArray(founderView.autoHandledItems) ? founderView.autoHandledItems.length : 0;
   const blockedWaitingCount = founderView.blockedItems.reduce((sum, item) => {
     const laneKey = String(item?.laneKey || "").trim().toLowerCase();
@@ -1753,7 +1715,6 @@ function applyAIControlRoomDecisionGroupingToData(data = {}) {
   });
 
   const summaryNotes = buildAIControlRoomSummaryNotes({
-    urgentDecisionCount,
     needsDecisionCount,
     autoHandledCount,
     blockedWaitingCount,
@@ -2218,9 +2179,9 @@ function renderAIControlRoomFounderConsole(view) {
               <div>
                 <p class="ai-room-section-label">Decision Queue</p>
                 <h3>Decision Queue</h3>
-                <p class="ai-room-founder-queue-progress" aria-live="polite">${urgentDecisionCount} urgent remaining</p>
+                <p class="ai-room-founder-queue-progress" aria-live="polite">${pluralizeAIControlRoom(decisionQueue.length, "decision")} remaining</p>
               </div>
-              <span class="pending-count">${decisionQueue.length} total</span>
+              <span class="pending-count">${urgentDecisionCount ? `${urgentDecisionCount} urgent` : "No urgent flags"}</span>
             </div>
         ${
           decisionQueue.length
@@ -2249,140 +2210,9 @@ function renderAIControlRoomFounderConsole(view) {
   `;
 }
 
-function renderAIControlRoomList(containerId, countId, items = []) {
-  const container = document.getElementById(containerId);
-  const countEl = document.getElementById(countId);
-  if (!container) return;
-  if (countEl) countEl.textContent = `${items.length} ${items.length === 1 ? "item" : "items"}`;
-  if (!items.length) {
-    let emptyMessage = "No live items are currently visible.";
-    if (aiControlRoomState.loadStatus === "error") {
-      emptyMessage = "Live data is unavailable.";
-      if (containerId === "aiRoomOutboundMessages") {
-        emptyMessage = "Draft records are unavailable.";
-      }
-    } else if (!aiControlRoomState.summary) {
-      emptyMessage = "Loading live data...";
-    } else if (containerId === "aiRoomUrgentQueue") {
-      emptyMessage = "No urgent items are currently visible.";
-    } else if (containerId === "aiRoomAwaitingReview") {
-      emptyMessage = "No items are currently awaiting review.";
-    } else if (containerId === "aiRoomRecentEscalations") {
-      emptyMessage = "No recent escalations are currently visible.";
-    } else if (containerId === "aiRoomOutboundMessages") {
-      emptyMessage = "No real draft records are available.";
-    }
-    container.innerHTML = `<div class="ai-room-empty">${escapeHTML(emptyMessage)}</div>`;
-    return;
-  }
 
-  container.innerHTML = items
-    .map(
-      (item) => `
-      <article class="ai-room-list-item ${containerId === "aiRoomOutboundMessages" ? "ai-room-message" : ""}">
-        <div class="ai-room-list-item-top">
-          <strong class="ai-room-list-item-title">${escapeHTML(item.title)}</strong>
-          <span class="${getBadgeClass(item.tone)}">${escapeHTML(item.badge)}</span>
-        </div>
-        <p>${escapeHTML(item.body)}</p>
-      </article>
-    `
-    )
-    .join("");
-}
 
-function getAIControlRoomEmptyMessage(kind = "") {
-  if (aiControlRoomState.loadStatus === "error") {
-    return kind === "outbound" ? "Draft records are unavailable." : "Live data is unavailable.";
-  }
-  if (!aiControlRoomState.summary) {
-    return "Loading live data...";
-  }
-  if (kind === "urgent") return "No urgent items are currently visible.";
-  if (kind === "review") return "No items are currently awaiting review.";
-  if (kind === "escalations") return "No recent escalations are currently visible.";
-  if (kind === "outbound") return "No real draft records are available.";
-  return "No live items are currently visible.";
-}
 
-function buildAIControlRoomFeedItem(item = {}, options = {}) {
-  const isMessage = options.message === true;
-  return `
-    <article class="ai-room-list-item ${isMessage ? "ai-room-message" : ""}">
-      <div class="ai-room-list-item-top">
-        <strong class="ai-room-list-item-title">${escapeHTML(item.title)}</strong>
-        <span class="${getBadgeClass(item.tone)}">${escapeHTML(item.badge)}</span>
-      </div>
-      <p>${escapeHTML(item.body)}</p>
-    </article>
-  `;
-}
-
-function renderAIControlRoomCombinedFeed(data = {}) {
-  const container = document.getElementById("aiRoomCombinedFeed");
-  const metaEl = document.getElementById("aiRoomCombinedFeedMeta");
-  if (!container) return;
-
-  const sections = [
-    {
-      key: "urgent",
-      label: "Queue",
-      title: "Urgent Queue",
-      items: Array.isArray(data.urgentQueue) ? data.urgentQueue : [],
-    },
-    {
-      key: "review",
-      label: "Review",
-      title: "Awaiting Review",
-      items: Array.isArray(data.awaitingReview) ? data.awaitingReview : [],
-    },
-    {
-      key: "escalations",
-      label: "Signals",
-      title: "Recent Escalations",
-      items: Array.isArray(data.recentEscalations) ? data.recentEscalations : [],
-    },
-    {
-      key: "outbound",
-      label: "Drafts",
-      title: "Outbound Messages",
-      items: Array.isArray(data.outboundMessages) ? data.outboundMessages : [],
-      message: true,
-    },
-  ];
-
-  const activeSections = sections.filter((section) => section.items.length);
-  const totalItems = sections.reduce((sum, section) => sum + section.items.length, 0);
-
-  if (metaEl) {
-    metaEl.textContent = `${totalItems} ${totalItems === 1 ? "item" : "items"}`;
-  }
-
-  if (!activeSections.length) {
-    container.innerHTML = `<div class="ai-room-empty">${escapeHTML(getAIControlRoomEmptyMessage())}</div>`;
-    return;
-  }
-
-  container.innerHTML = sections
-    .filter((section) => section.items.length)
-    .map(
-      (section) => `
-        <section class="ai-room-feed-section">
-          <div class="ai-room-feed-section-top">
-            <div>
-              <p class="ai-room-section-label">${escapeHTML(section.label)}</p>
-              <h3>${escapeHTML(section.title)}</h3>
-            </div>
-            <span class="pending-count">${section.items.length} ${section.items.length === 1 ? "item" : "items"}</span>
-          </div>
-          <div class="ai-room-list">
-            ${section.items.map((item) => buildAIControlRoomFeedItem(item, { message: section.message === true })).join("")}
-          </div>
-        </section>
-      `
-    )
-    .join("");
-}
 
 function paintAIControlRoom(data, focusKey) {
   renderAIControlRoomSummary(data.summary);
@@ -2526,6 +2356,8 @@ async function renderIncidentWorkspace(force = false) {
 async function openIncidentInAdminRoom(incidentId) {
   const selectedId = String(incidentId || "").trim();
   if (!selectedId) return;
+  const technicalDetails = document.querySelector(".admin-automation-technical");
+  if (technicalDetails) technicalDetails.open = true;
   window.activateAdminSection?.("ai-control-room");
   await renderAIControlRoom(true);
   await selectIncidentForWorkspace(selectedId, true);
@@ -2538,11 +2370,13 @@ async function openIncidentInAdminRoom(incidentId) {
   document.getElementById("incidentWorkspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+window.loadAdminAutomationDetails = renderAIControlRoom;
 window.loadIncidentWorkspace = renderIncidentWorkspace;
 window.openIncidentInAdminRoom = openIncidentInAdminRoom;
 
 async function renderAIControlRoom(force = false) {
-  if (!document.getElementById("section-ai-control-room")) return;
+  // The daily Automation surface reads status only. Legacy diagnostics are loaded on demand.
+  if (!document.querySelector("#section-ai-control-room .admin-automation-technical[open]")) return;
 
   const refreshBadge = document.getElementById("aiRoomRefreshBadge");
   const timestamp = document.getElementById("aiRoomTimestamp");
@@ -2569,7 +2403,6 @@ async function renderAIControlRoom(force = false) {
     const loadResults = await Promise.allSettled([
       loadAIControlRoomSummary(force),
       loadAIControlRoomFocus(activeAIControlRoomKey, force),
-      loadAIControlRoomFocus("founder", force),
     ]);
 
     const failures = loadResults.filter((result) => result.status === "rejected");
@@ -2624,7 +2457,8 @@ async function openAIControlRoomCard(key, shouldScroll = true) {
     if (liveView) {
       renderAIControlRoomFocus(liveView);
     }
-  } catch (_err) {
+  } catch (err) {
+    console.warn("[admin-control-room] live focus refresh failed", err);
     // Keep the current focus panel state instead of repainting the whole control room.
   }
   if (shouldScroll) {
@@ -2669,7 +2503,9 @@ function applyOptimisticAIControlRoomDecisionDescriptor(input = {}) {
           descriptor.kind === "incident_approval" ||
           activeAIControlRoomKey === "engineering" ||
           activeAIControlRoomKey === "incidents",
-      }).catch(() => {});
+      }).catch((error) => {
+        console.error("[admin] control-room background synchronization rejected", error);
+      });
     },
   };
 }
@@ -2749,7 +2585,9 @@ async function runAIControlRoomDecisionAction(button) {
       if (completedCount > 0) {
         await syncAIControlRoomInBackground({
           refreshIncidentWorkspace: shouldRefreshIncidentWorkspace,
-        }).catch(() => {});
+        }).catch((syncError) => {
+          console.error("[admin] partial batch synchronization rejected", syncError);
+        });
       }
       throw error;
     }
@@ -2763,7 +2601,7 @@ function showToast(message, type = "info") {
   if (toast?.show) {
     toast.show(message, { targetId: "toastBanner", type });
   } else if (message) {
-    alert(message);
+    void showAlert(message, { title: type === "err" ? "Action unavailable" : "Notice" });
   }
 }
 
@@ -2774,11 +2612,7 @@ if (Number.isNaN(date.getTime())) return value;
 return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
-function formatCurrencyValue(value) {
-  const cents = Number(value);
-  if (!Number.isFinite(cents)) return "—";
-  return CURRENCY.format(cents / 100);
-}
+function formatCurrencyValue(value, currency = 'USD') { return financialMoney(value, currency); }
 
 function buildPersonLabel(person = {}) {
   if (!person) return "—";
@@ -2866,7 +2700,7 @@ function renderDisputeHeader(status) {
   if (!disputesHeaderRow) return;
   if (status === "resolved") {
     disputesHeaderRow.innerHTML = `
-      <th>Case</th>
+      <th>Matter</th>
       <th>Parties</th>
       <th>Resolution</th>
       <th>Resolved</th>
@@ -2876,7 +2710,7 @@ function renderDisputeHeader(status) {
   }
   if (status === "rejected") {
     disputesHeaderRow.innerHTML = `
-      <th>Case</th>
+      <th>Matter</th>
       <th>Parties</th>
       <th>Dispute</th>
       <th>Status</th>
@@ -2885,7 +2719,7 @@ function renderDisputeHeader(status) {
     return;
   }
   disputesHeaderRow.innerHTML = `
-    <th>Case</th>
+    <th>Matter</th>
     <th>Parties</th>
     <th>Dispute</th>
     <th>Status</th>
@@ -2969,28 +2803,9 @@ pageItems.forEach((user) => {
 });
 }
 
-function clampNumber(value, min, max) {
-const num = Number(value);
-if (!Number.isFinite(num)) return null;
-return Math.min(max, Math.max(min, num));
-}
-
-function formatTaxRatePercent(rate) {
-if (!Number.isFinite(Number(rate))) return "";
-const percent = Number(rate) * 100;
-return percent % 1 === 0 ? String(percent) : percent.toFixed(1);
-}
-
 function setSettingsStatus(message = "") {
 const status = document.getElementById("settingsStatus");
 if (status) status.textContent = message;
-}
-
-let adminThemeManuallyChanged = false;
-
-function normalizeAdminTheme(value) {
-const candidate = String(value || "").toLowerCase();
-return candidate === "light" || candidate === "mountain" ? candidate : "mountain";
 }
 
 function applySettingsToForm(settings = {}) {
@@ -3000,51 +2815,10 @@ const maintenanceInput = document.getElementById("settingMaintenanceMode");
 if (maintenanceInput) maintenanceInput.checked = !!settings.maintenanceMode;
 const emailInput = document.getElementById("settingSupportEmail");
 if (emailInput) emailInput.value = settings.supportEmail || "";
-const taxInput = document.getElementById("settingTaxRate");
-if (taxInput) taxInput.value = formatTaxRatePercent(settings.taxRate);
 const updatedLabel = document.getElementById("settingsUpdatedAt");
 if (updatedLabel) {
 const updated = settings.updatedAt ? formatDate(settings.updatedAt) : "";
 updatedLabel.textContent = updated ? `Last updated ${updated}` : "";
-}
-}
-
-function applyAdminThemeToForm(theme) {
-const themeInput = document.getElementById("settingAdminTheme");
-if (themeInput) themeInput.value = normalizeAdminTheme(theme);
-}
-
-function previewAdminTheme(theme) {
-const normalizedTheme = normalizeAdminTheme(theme);
-applyAdminThemeToForm(normalizedTheme);
-if (typeof window.applyThemePreference === "function") {
-window.applyThemePreference(normalizedTheme);
-}
-return normalizedTheme;
-}
-
-async function loadAdminThemePreference() {
-const fallbackTheme =
-  typeof window.getThemePreference === "function" ? window.getThemePreference() : "mountain";
-try {
-  const res = await secureFetch("/api/account/preferences", {
-    headers: { Accept: "application/json" },
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data?.error || data?.msg || "Unable to load theme preference.");
-  }
-  const resolvedTheme = normalizeAdminTheme(data?.theme || fallbackTheme);
-  if (!adminThemeManuallyChanged) {
-    previewAdminTheme(resolvedTheme);
-  }
-  return resolvedTheme;
-} catch (err) {
-  console.error("Failed to load admin theme preference", err);
-  if (!adminThemeManuallyChanged) {
-    previewAdminTheme(fallbackTheme);
-  }
-  return normalizeAdminTheme(fallbackTheme);
 }
 }
 
@@ -3060,6 +2834,7 @@ throw new Error(data?.error || data?.msg || "Unable to load settings.");
 const settings = data.settings || data;
 adminSettingsCache = settings;
 applySettingsToForm(settings);
+syncSettingsDirtyState({ updateStatus: false });
 setSettingsStatus("");
 return settings;
 } catch (err) {
@@ -3074,49 +2849,61 @@ function readSettingsFromForm() {
 const allowInput = document.getElementById("settingAllowSignups");
 const maintenanceInput = document.getElementById("settingMaintenanceMode");
 const emailInput = document.getElementById("settingSupportEmail");
-const taxInput = document.getElementById("settingTaxRate");
 
-const payload = {
+return {
 allowSignups: !!allowInput?.checked,
 maintenanceMode: !!maintenanceInput?.checked,
 supportEmail: emailInput ? emailInput.value.trim() : "",
 };
-if (taxInput) {
-const normalized = clampNumber(taxInput.value, 0, 50);
-if (normalized !== null) {
-payload.taxRate = normalized / 100;
-}
-}
-return payload;
 }
 
-async function saveAdminThemePreference() {
-const themeInput = document.getElementById("settingAdminTheme");
-const normalizedTheme = normalizeAdminTheme(themeInput?.value);
-const res = await secureFetch("/api/account/preferences", {
-method: "POST",
-body: { theme: normalizedTheme },
-});
-const data = await res.json().catch(() => ({}));
-if (!res.ok) {
-throw new Error(data?.error || data?.msg || "Unable to save theme preference.");
+function settingsAreDirty() {
+if (!adminSettingsCache) return false;
+const current = readSettingsFromForm();
+return current.allowSignups !== (adminSettingsCache.allowSignups !== false)
+  || current.maintenanceMode !== !!adminSettingsCache.maintenanceMode
+  || current.supportEmail.trim().toLowerCase() !== String(adminSettingsCache.supportEmail || "").trim().toLowerCase();
 }
-const savedTheme = normalizeAdminTheme(data?.preferences?.theme || data?.theme || normalizedTheme);
-adminThemeManuallyChanged = false;
-previewAdminTheme(savedTheme);
-return savedTheme;
+
+function syncSettingsDirtyState({ updateStatus = true } = {}) {
+const saveBtn = document.getElementById("saveAdminSettings");
+const dirty = settingsAreDirty();
+if (saveBtn) saveBtn.disabled = !dirty;
+if (updateStatus) setSettingsStatus(dirty ? "Unsaved changes." : "");
+return dirty;
 }
 
 async function saveAdminSettings() {
 const saveBtn = document.getElementById("saveAdminSettings");
 const original = saveBtn?.textContent || "Save Settings";
+const payload = readSettingsFromForm();
+const restrictions = [];
+if (payload.allowSignups === false && adminSettingsCache?.allowSignups !== false) {
+restrictions.push("pause all new account registrations");
+}
+if (payload.maintenanceMode === true && adminSettingsCache?.maintenanceMode !== true) {
+restrictions.push("block non-admin logins with maintenance mode");
+}
+if (restrictions.length) {
+const confirmed = await confirmAction(
+`This change will ${restrictions.join(" and ")}. Existing work should be coordinated before continuing.`,
+{
+title: "Apply platform restrictions?",
+confirmLabel: "Apply restrictions",
+tone: "danger",
+}
+);
+if (!confirmed) {
+setSettingsStatus("Not saved.");
+return null;
+}
+}
 if (saveBtn) {
 saveBtn.disabled = true;
 saveBtn.textContent = "Saving...";
 }
 setSettingsStatus("");
 try {
-const payload = readSettingsFromForm();
 const res = await secureFetch("/api/admin/settings", {
 method: "PUT",
 body: payload,
@@ -3125,10 +2912,10 @@ const data = await res.json().catch(() => ({}));
 if (!res.ok) {
 throw new Error(data?.error || data?.msg || "Unable to save settings.");
 }
-await saveAdminThemePreference();
 const settings = data.settings || data;
 adminSettingsCache = settings;
 applySettingsToForm(settings);
+syncSettingsDirtyState({ updateStatus: false });
 showToast("Settings saved.", "ok");
 setSettingsStatus("Saved.");
 await hydrateAnalytics();
@@ -3140,88 +2927,26 @@ setSettingsStatus("Save failed.");
 return null;
 } finally {
 if (saveBtn) {
-saveBtn.disabled = false;
 saveBtn.textContent = original;
 }
+syncSettingsDirtyState({ updateStatus: false });
 }
 }
 
 function bindSettingsActions() {
 if (settingsBound) return;
 const saveBtn = document.getElementById("saveAdminSettings");
-const themeInput = document.getElementById("settingAdminTheme");
+const allowInput = document.getElementById("settingAllowSignups");
+const maintenanceInput = document.getElementById("settingMaintenanceMode");
+const emailInput = document.getElementById("settingSupportEmail");
 if (saveBtn) {
 saveBtn.addEventListener("click", () => {
 saveAdminSettings();
 });
 }
-if (themeInput) {
-themeInput.addEventListener("change", () => {
-adminThemeManuallyChanged = true;
-previewAdminTheme(themeInput.value);
-setSettingsStatus("Theme preview updated. Save settings to keep it.");
-});
-}
+[allowInput, maintenanceInput].forEach((input) => input?.addEventListener("change", () => syncSettingsDirtyState()));
+emailInput?.addEventListener("input", () => syncSettingsDirtyState());
 settingsBound = true;
-}
-
-function formatReportDate(value = new Date()) {
-const date = value instanceof Date ? value : new Date(value);
-if (Number.isNaN(date.getTime())) return "";
-return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
-function csvEscape(value) {
-const normalized = String(value ?? "").replace(/\r?\n/g, " ").trim();
-return `"${normalized.replace(/"/g, "\"\"")}"`;
-}
-
-function buildTaxReportRows(data) {
-const { taxSummary = {}, ledger = [] } = data || {};
-const reportDate = formatReportDate(new Date());
-const rows = [
-["Lets-ParaConnect Tax Report"],
-["Generated", reportDate || formatDate(new Date())],
-[],
-["Tax Summary"],
-["Gross Earnings", formatCurrency(taxSummary.grossEarnings)],
-["Deductible Expenses", formatCurrency(taxSummary.deductibleExpenses)],
-["Estimated Tax Owed (22%)", formatCurrency(taxSummary.estimatedTax)],
-["Next Filing Deadline", taxSummary.nextFilingDeadline || "—"],
-];
-
-if (Array.isArray(ledger) && ledger.length) {
-rows.push([]);
-rows.push(["Ledger Entries"]);
-rows.push(["Date", "Category", "Description", "Amount", "Type", "Status"]);
-ledger.forEach((entry) => {
-rows.push([
-formatDate(entry.date),
-entry.category || "—",
-entry.description || "—",
-formatCurrency(entry.amount),
-toTitle(entry.type || "income"),
-toTitle(entry.status || "pending"),
-]);
-});
-}
-
-return rows;
-}
-
-function downloadTaxReport(data) {
-const rows = buildTaxReportRows(data);
-const csv = rows
-.map((row) => (row.length ? row.map(csvEscape).join(",") : ""))
-.join("\n");
-const blob = new Blob([csv], { type: "text/csv" });
-const url = URL.createObjectURL(blob);
-const a = document.createElement("a");
-const stamp = new Date().toISOString().split("T")[0];
-a.href = url;
-a.download = `LetsParaConnect_TaxReport_${stamp}.csv`;
-a.click();
-URL.revokeObjectURL(url);
 }
 
 function formatMonthLabel(value) {
@@ -3229,7 +2954,7 @@ if (!value) return "";
 const [year, month] = value.split("-");
 if (!year || !month) return value;
 const date = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
-return date.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+return date.toLocaleDateString(undefined, { month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 function toTitle(value) {
@@ -3240,31 +2965,32 @@ return String(value)
 }
 
 function populateMetrics(data) {
-const { userMetrics = {}, escrowMetrics = {}, revenueMetrics = {}, caseMetrics = {}, expenses = {} } = data || {};
+const { userMetrics = {}, escrowMetrics = {}, revenueMetrics = {}, caseMetrics = {}, payoutMetrics = {} } = data || {};
+const currency = financialReportUnit(data)?.currency || 'USD';
 
 updateText("#totalUsers", formatNumber(userMetrics.totalUsers));
 updateText("#activeCases", formatNumber(caseMetrics.activeCases));
 updateText("#pendingUsers", formatNumber(userMetrics.pendingApprovals));
-updateText("#escrowTotal", formatCurrency(escrowMetrics.totalEscrowHeld));
+updateText("#escrowTotal", reportAmount(escrowMetrics.held, currency));
+updateText("#accountingHeldValue", reportAmount(escrowMetrics.held, currency));
 
 updateText("#metricAttorneys", formatNumber(userMetrics.totalAttorneys));
 updateText("#metricParalegals", formatNumber(userMetrics.totalParalegals));
 updateText("#metricPending", formatNumber(userMetrics.pendingApprovals));
 
-populateQuickStats(userMetrics, caseMetrics, escrowMetrics);
-updateText("#revenueTotalValue", formatCurrency(revenueMetrics.totalRevenue));
-updateText("#fundsReleasedValue", formatCurrency(escrowMetrics.totalEscrowReleased));
-updateText("#pendingPayoutsValue", formatCurrency(escrowMetrics.pendingPayouts));
-updateText("#platformFeesCollectedValue", formatCurrency(revenueMetrics.platformFeesCollected));
+populateQuickStats(userMetrics, caseMetrics, escrowMetrics, currency);
+updateText("#revenueTotalValue", reportAmount(revenueMetrics, currency));
+updateText("#fundsReleasedValue", reportAmount(escrowMetrics.payouts, currency));
+updateText("#pendingPayoutsValue", reportAmount(escrowMetrics.pending, currency));
 
-updateText("#payoutTotal", formatCurrency(expenses.payoutTotal));
+updateText("#payoutTotal", reportAmount(payoutMetrics, currency));
 const payoutCountEl = document.getElementById("payoutCount");
 if (payoutCountEl) {
-const payoutCount = Number(expenses.payoutCount) || 0;
+const payoutCount = Number(payoutMetrics.count) || 0;
 payoutCountEl.textContent = `${payoutCount.toLocaleString()} payout${payoutCount === 1 ? "" : "s"} recorded`;
 }
 
-updateText("#incomeTotal", formatCurrency(revenueMetrics.platformFeesCollected));
+updateText("#incomeTotal", reportAmount(revenueMetrics, currency));
 const incomeCountEl = document.getElementById("incomeCount");
 if (incomeCountEl) {
 const incomeCount = Number(revenueMetrics.platformFeeCount) || 0;
@@ -3272,15 +2998,15 @@ incomeCountEl.textContent = `${incomeCount.toLocaleString()} income record${inco
 }
 }
 
-function populateQuickStats(userMetrics = {}, caseMetrics = {}, escrowMetrics = {}) {
+function populateQuickStats(userMetrics = {}, caseMetrics = {}, escrowMetrics = {}, currency = 'USD') {
 const nodes = document.querySelectorAll(".quick-stats div");
 const configs = [
 { label: "Total Users", value: formatNumber(userMetrics.totalUsers) },
 { label: "Pending Approvals", value: formatNumber(userMetrics.pendingApprovals) },
-{ label: "Active Cases", value: formatNumber(caseMetrics.activeCases) },
-{ label: "Completed Cases", value: formatNumber(caseMetrics.completedCases) },
-  { label: "Case funding in progress", value: formatCurrency(escrowMetrics.totalEscrowHeld) },
-  { label: "Funds released", value: formatCurrency(escrowMetrics.totalEscrowReleased) },
+{ label: "Active Matters", value: formatNumber(caseMetrics.activeCases) },
+{ label: "Completed Matters", value: formatNumber(caseMetrics.completedCases) },
+  { label: "Principal held", value: reportAmount(escrowMetrics.held, currency) },
+  { label: "Payouts recorded", value: reportAmount(escrowMetrics.payouts, currency) },
 ];
 nodes.forEach((node, index) => {
 const strong = node.querySelector("strong") || node.appendChild(document.createElement("strong"));
@@ -3303,30 +3029,16 @@ const chart = chartCache.revenue;
 if (!chart) return;
 const entries = revenueMetrics.monthlyRevenue || [];
 const labels = entries.map((entry) => formatMonthLabel(entry.month));
-const revenueData = entries.map((entry) => Math.round((Number(entry.revenue) || 0) / 100));
-const marginData = entries.map((entry) => Number(entry.margin) || 0);
+const revenueData = entries.map((entry) => entry.revenue / 100);
+const hasRevenue = revenueMetrics.chartAvailable === true && revenueData.some((value) => value !== 0);
+const emptyState = document.getElementById("revMainChartEmpty");
+chart.canvas.hidden = !hasRevenue;
+if (emptyState) { emptyState.hidden = hasRevenue; emptyState.textContent = revenueMetrics.chartAvailable === false ? "Separate currencies, modes, or unresolved records cannot form one revenue chart." : "No recorded platform fees in this window."; }
 
 chart.data.labels = labels;
 if (chart.data.datasets[0]) chart.data.datasets[0].data = revenueData;
-if (chart.data.datasets[1]) chart.data.datasets[1].data = marginData;
+styleFinancialChart(chart, revenueMetrics.chartUnit);
 chart.update("none");
-}
-
-function populateExpenseChart(data) {
-cacheCharts();
-const { revenueMetrics = {}, taxSummary = {}, expenses = {} } = data || {};
-const chart = chartCache.expense;
-if (!chart) return;
-const values = [
-Math.round((Number(revenueMetrics.platformFeesCollected) || 0) / 100),
-Math.round((Number(taxSummary.taxOwed ?? taxSummary.estimatedTax) || 0) / 100),
-Math.round((Number(expenses.operationalCosts) || 0) / 100),
-Math.round((Number(expenses.payoutTotal) || 0) / 100),
-];
-if (chart.data.datasets[0]) {
-chart.data.datasets[0].data = values;
-chart.update("none");
-}
 }
 
 function populateLedger(data) {
@@ -3340,13 +3052,13 @@ return;
 tbody.innerHTML = "";
 entries.forEach((entry) => {
 const row = document.createElement("tr");
-const statusLabel = toTitle(entry.status || "Pending");
+const statusLabel = stateLabel(entry.state || entry.status);
 const statusSlug = statusLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 row.innerHTML = `
-     <td>${formatDate(entry.date)}</td>
-     <td>${entry.category || "—"}</td>
-     <td>${entry.description || "—"}</td>
-     <td>${formatCurrency(entry.amount)}</td>
+     <td>${escapeHTML(formatDate(entry.date))}</td>
+     <td>${escapeHTML(entry.category || "—")}</td>
+     <td>${escapeHTML(entry.description || "—")}</td>
+     <td>${escapeHTML(formatCurrency(entry.amount, entry.currency))}<small>${escapeHTML(providerLabel(entry.stripeMode))}</small></td>
      <td>${toTitle(entry.type || "income")}</td>
      <td><span class="status ${statusSlug}">${statusLabel}</span></td>
    `;
@@ -3357,8 +3069,27 @@ tbody.appendChild(row);
 const receiptsBody = document.getElementById("receiptsBody");
 const receiptSearchInput = document.getElementById("receiptSearch");
 const receiptRefreshBtn = document.getElementById("receiptRefreshBtn");
+const receiptPageSelect = document.getElementById("receiptPageSelect");
 const RECEIPTS_PAGE_SIZE = 10;
 let receiptSearchTimer = null;
+let receiptPage = 1;
+let receiptSequence = 0, receiptRevision = null, receiptFilter = null;
+
+function updateReceiptPagination(total = 0) {
+  if (!receiptPageSelect) return;
+  const pages = Math.max(1, Math.ceil(Math.max(0, Number(total) || 0) / RECEIPTS_PAGE_SIZE));
+  receiptPage = Math.min(pages, Math.max(1, receiptPage));
+  receiptPageSelect.innerHTML = "";
+  for (let page = 1; page <= pages; page += 1) {
+    const option = document.createElement("option");
+    option.value = String(page);
+    option.textContent = `Page ${page} of ${pages}`;
+    receiptPageSelect.appendChild(option);
+  }
+  receiptPageSelect.value = String(receiptPage);
+  receiptPageSelect.hidden = pages <= 1;
+  receiptPageSelect.disabled = pages <= 1;
+}
 
 function renderReceipts(items = []) {
   if (!receiptsBody) return;
@@ -3372,18 +3103,18 @@ function renderReceipts(items = []) {
     .map((item) => {
       const issuedAt = item?.issuedAt ? formatDate(item.issuedAt) : "—";
       const receiptId = escapeHTML(item.receiptId || "—");
-      const caseTitle = escapeHTML(item.caseTitle || "Case");
+      const caseTitle = escapeHTML(item.caseTitle || "Untitled Matter");
       const party = escapeHTML(item.party || "—");
       const type = escapeHTML(item.type || "Receipt");
-      const amount = formatCurrencyValue(item.amountCents);
+      const amount = formatCurrencyValue(item.amountCents, item.currency);
       return `
         <tr>
           <td>${escapeHTML(issuedAt)}</td>
           <td><span class="receipt-id">${receiptId}</span></td>
           <td>${caseTitle}</td>
           <td>${party}</td>
-          <td>${type}</td>
-          <td>${escapeHTML(amount)}</td>
+          <td>${type}<small>${escapeHTML(stateLabel(item.state))}</small></td>
+          <td>${escapeHTML(amount)}<small>${escapeHTML(providerLabel(item.stripeMode))}</small></td>
         </tr>
       `;
     })
@@ -3392,50 +3123,39 @@ function renderReceipts(items = []) {
 
 async function loadReceipts() {
   if (!receiptsBody) return;
-  receiptsBody.innerHTML =
-    '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Loading receipts…</td></tr>';
+  const seq = ++receiptSequence;
+  receiptsBody.innerHTML = '<tr><td colspan="6">Loading receipts…</td></tr>';
   try {
     const q = String(receiptSearchInput?.value || "").trim();
-    const params = new URLSearchParams({ limit: String(RECEIPTS_PAGE_SIZE) });
-    if (q) params.set("q", q);
-    const res = await secureFetch(`/api/payments/receipts?${params.toString()}`, {
-      headers: { Accept: "application/json" },
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(payload?.error || "Unable to load receipts.");
-    const items = Array.isArray(payload?.items) ? payload.items : [];
-    renderReceipts(items);
+    if (q !== receiptFilter || receiptPage === 1) { receiptRevision = null; receiptFilter = q; }
+    const params = new URLSearchParams({ limit: String(RECEIPTS_PAGE_SIZE), page: String(receiptPage), q });
+    if (receiptRevision) params.set('revision', receiptRevision);
+    const payload = await readFinancial(`/api/payments/receipts?${params}`);
+    if (seq !== receiptSequence) return;
+    if (!Array.isArray(payload.items) || !Number.isSafeInteger(payload.total)) throw new Error('Receipt records could not be verified. Refresh to try again.');
+    receiptRevision = payload.revision;
+    updateReceiptPagination(payload.total);
+    renderReceipts(payload.items);
   } catch (err) {
-    receiptsBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted)">${escapeHTML(
-      err?.message || "Unable to load receipts."
-    )}</td></tr>`;
+    if (seq !== receiptSequence) return;
+    receiptRevision = null; updateReceiptPagination(0);
+    receiptsBody.innerHTML = `<tr><td colspan="6">${escapeHTML(err?.message || 'Receipts are unavailable. Refresh to try again.')}</td></tr>`;
   }
 }
 
-function populateTaxSummary(data) {
-const list = document.querySelector(".tax-summary");
-if (!list) return;
-const { taxSummary = {} } = data || {};
-const items = list.querySelectorAll("li");
-const taxRateLabel = formatTaxRatePercent(taxSummary.taxRate) || "22";
-if (items[0]) items[0].innerHTML = `<strong>Gross Earnings:</strong> ${formatCurrency(taxSummary.grossEarnings)}`;
-if (items[1]) items[1].innerHTML = `<strong>Deductible Expenses:</strong> ${formatCurrency(taxSummary.deductibleExpenses)}`;
-if (items[2]) items[2].innerHTML = `<strong>Estimated Tax Owed (${taxRateLabel}%):</strong> ${formatCurrency(taxSummary.estimatedTax)}`;
-if (items[3]) items[3].innerHTML = `<strong>Next Filing Deadline:</strong> ${taxSummary.nextFilingDeadline || "—"}`;
-}
-
-function populatePayoutSchedule(data) {
+function populatePendingPayoutQueue(data) {
 const container = document.querySelector(".payout-schedule");
 if (!container) return;
-const payouts = data?.upcomingPayouts || [];
+const payouts = data?.pendingPayoutQueue || [];
 container.innerHTML = "";
 if (!payouts.length) {
-container.innerHTML = "<li>No upcoming payouts scheduled.</li>";
+container.innerHTML = "<li>No pending payouts.</li>";
 return;
 }
 payouts.forEach((payout) => {
 const item = document.createElement("li");
-item.textContent = `${formatDate(payout.date)} – ${formatCurrency(payout.amount)} to ${payout.recipient || "Recipient"}`;
+const deadline = payout.matterDeadline ? ` · matter deadline ${formatDate(payout.matterDeadline)}` : " · matter deadline not set";
+item.textContent = `${payout.state === "recorded" ? `Estimated ${formatCurrency(payout.amount, payout.currency)}` : "Needs review"} · ${payout.recipient || "Name unavailable"} · ${providerLabel(payout.stripeMode)}${deadline}`;
 container.appendChild(item);
 });
 }
@@ -3465,18 +3185,36 @@ chartCache.userLine.update("none");
 }
 }
 
-function populateEscrowChart(data) {
-cacheCharts();
-const chart = chartCache.escrow;
-if (!chart) return;
-const { escrowMetrics = {} } = data || {};
-const held = Math.round((Number(escrowMetrics.totalEscrowHeld) || 0) / 100);
-const released = Math.round((Number(escrowMetrics.totalEscrowReleased) || 0) / 100);
-const pending = Math.round((Number(escrowMetrics.pendingPayouts) || 0) / 100);
-if (chart.data.datasets[0]) {
-chart.data.datasets[0].data = [held, released, pending];
-chart.update("none");
+function financialReportUnit(data) {
+  const metrics = data?.escrowMetrics || {};
+  const groups = [metrics.held, metrics.payouts, metrics.pending, data?.revenueMetrics].flatMap(report => report?.currencies || []);
+  const units = new Map(groups.map(group => [`${group.currency}:${group.stripeMode}`, group]));
+  return units.size === 1 ? [...units.values()][0] : null;
 }
+
+function styleFinancialChart(chart, unit) {
+  const styles = getComputedStyle(document.body), ink = styles.getPropertyValue('--ink').trim(), line = styles.getPropertyValue('--line').trim();
+  const fontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) * .75;
+  for (const axis of Object.values(chart.options.scales || {})) {
+    axis.ticks.color = ink;
+    axis.ticks.font = { size: fontSize };
+    axis.grid.color = line;
+    axis.title.color = ink;
+  }
+  if (chart.options.scales?.y) chart.options.scales.y.title = { display: true, color: ink, text: unit ? `${unit.currency} · ${providerLabel(unit.stripeMode)}s` : 'Amount' };
+  if (chart.options.plugins?.legend?.labels) { chart.options.plugins.legend.labels.color = ink; chart.options.plugins.legend.labels.font = { size: fontSize }; }
+}
+
+function populateEscrowChart(data) {
+  cacheCharts();
+  const chart = chartCache.escrow;
+  if (!chart) return;
+  const metrics = data?.escrowMetrics || {}, unit = financialReportUnit({ escrowMetrics: metrics });
+  const values = [metrics.held, metrics.payouts, metrics.pending].map(report => unitAmount(report, unit?.currency, unit?.stripeMode));
+  const units = new Set([metrics.held, metrics.payouts, metrics.pending].flatMap(report => (report?.currencies || []).map(group => `${group.currency}:${group.stripeMode}`)));
+  const available = values.every(Number.isSafeInteger) && units.size <= 1;
+  chart.canvas.hidden = !available;
+  if (chart.data.datasets[0]) { chart.data.datasets[0].data = available ? values.map(value => value / 100) : []; styleFinancialChart(chart, unit); chart.update('none'); }
 }
 
 function populateEscrowReportChart(data) {
@@ -3487,11 +3225,16 @@ function populateEscrowReportChart(data) {
   const months = Array.isArray(trends.months) ? trends.months : [];
   const labels = months.map((m) => formatMonthLabel(m));
   const held = (Array.isArray(trends.held) ? trends.held : []).map((v) =>
-    Math.round((Number(v) || 0) / 100)
+    v / 100
   );
   const released = (Array.isArray(trends.released) ? trends.released : []).map((v) =>
-    Math.round((Number(v) || 0) / 100)
+    v / 100
   );
+  const available = trends.chartAvailable === true;
+  const hasActivity = available && (held.some((value) => value !== 0) || released.some((value) => value !== 0));
+  const emptyState = document.getElementById("escrowReportEmpty");
+  chart.canvas.hidden = !hasActivity;
+  if (emptyState) { emptyState.hidden = hasActivity; emptyState.textContent = available ? "No recorded funding or payouts in this window." : "Separate currencies, modes, or unresolved records cannot form one payment chart."; }
 
   if (!chart.data.datasets[0]) {
     chart.data.datasets[0] = {
@@ -3515,8 +3258,11 @@ function populateEscrowReportChart(data) {
   }
 
   chart.data.labels = labels;
+  chart.data.datasets[0].label = "Funding recorded";
+  chart.data.datasets[1].label = "Payouts recorded";
   chart.data.datasets[0].data = months.map((_, idx) => held[idx] || 0);
   chart.data.datasets[1].data = months.map((_, idx) => released[idx] || 0);
+  styleFinancialChart(chart, trends.unit);
   chart.update("none");
 }
 
@@ -3536,29 +3282,56 @@ if (newUsersPageSelect) {
 
 function applyAnalyticsPayload(data) {
 latestAnalytics = data;
-lastAnalyticsRenderAt = Date.now();
 populateMetrics(data);
+populateFinancialGroups(data);
 populateCharts(data);
-populateExpenseChart(data);
-  populateEscrowReportChart(data);
+populateEscrowReportChart(data);
 populateLedger(data);
-populateTaxSummary(data);
-populatePayoutSchedule(data);
+populatePendingPayoutQueue(data);
 populateRegistrationChart(data);
 populateEscrowChart(data);
 populateNewUsers(data);
 }
 
+function populateFinancialGroups(data) {
+  const node = document.getElementById('adminFinancialGroups'), status = document.getElementById('adminFinancialReportStatus');
+  if (!node || !status) return;
+  const reports = [['Principal held', data.escrowMetrics.held], ['Payouts recorded', data.escrowMetrics.payouts], ['Platform fees recorded', data.revenueMetrics], ['Estimated pending payouts', data.escrowMetrics.pending]];
+  const groups = new Map();
+  for (const [, report] of reports) for (const group of report?.currencies || []) groups.set(`${group.currency}:${group.stripeMode}`, group);
+  document.getElementById('adminFinancialSummary').hidden = groups.size > 1;
+  node.innerHTML = groups.size > 1 ? [...groups.values()].map(group => `<section class="panel"><h3>${escapeHTML(group.currency)} · ${escapeHTML(providerLabel(group.stripeMode))}s</h3><dl class="admin-facts">${reports.map(([label, report]) => `<div><dt>${escapeHTML(label)}</dt><dd>${escapeHTML(financialMoney(unitAmount(report, group.currency, group.stripeMode), group.currency))}</dd></div>`).join('')}</dl></section>`).join('') : '';
+  const review = Math.max(...reports.map(([, report]) => report?.requiresReview || 0));
+  const testOnly = groups.size === 1 && [...groups.values()][0].stripeMode === 'test';
+  const windowLabel = data.from ? `Activity since ${new Date(data.from).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })}; principal held is current.` : '';
+  status.textContent = [testOnly ? 'Test records — no money moved.' : '', review ? 'Some financial records need review.' : '', windowLabel].filter(Boolean).join(' ');
+}
+function clearFinancialReports(message = 'Loading financial reports…') {
+  analyticsSequence++;
+  latestAnalytics = null;
+  for (const id of ['escrowTotal', 'accountingHeldValue', 'revenueTotalValue', 'fundsReleasedValue', 'pendingPayoutsValue', 'payoutTotal', 'incomeTotal']) updateText(`#${id}`, '—');
+  for (const id of ['payoutCount', 'incomeCount', 'adminFinancialReportStatus']) updateText(`#${id}`, message);
+  document.getElementById('adminFinancialGroups')?.replaceChildren();
+  const ledger = document.getElementById('ledgerBody');
+  if (ledger) ledger.innerHTML = `<tr><td colspan="6">${escapeHTML(message)}</td></tr>`;
+  cacheCharts();
+  for (const key of ['escrow', 'revenue', 'escrowReport']) if (chartCache[key]?.canvas) chartCache[key].canvas.hidden = true;
+  const queue = document.querySelector('.payout-schedule'); if (queue) { const item = document.createElement('li'); item.textContent = message; queue.replaceChildren(item); }
+}
 async function hydrateAnalytics() {
-const now = Date.now();
-if (latestAnalytics && now - lastAnalyticsRenderAt < ANALYTICS_COOLDOWN_MS) {
-return latestAnalytics;
+  clearFinancialReports();
+  const sequence = analyticsSequence;
+  try { const data = await loadAnalytics(); if (sequence !== analyticsSequence) return null; applyAnalyticsPayload(data); return data; }
+  catch (error) { if (sequence === analyticsSequence) clearFinancialReports(error.message || 'Financial reports are unavailable. Refresh to try again.'); return null; }
 }
-const data = await loadAnalytics();
-if (!data) return null;
-applyAnalyticsPayload(data);
-return data;
-}
+window.refreshAdminFinancialReports = hydrateAnalytics;
+const financialThemeObserver = new MutationObserver(() => {
+  if (!latestAnalytics) return;
+  populateCharts(latestAnalytics); populateEscrowChart(latestAnalytics); populateEscrowReportChart(latestAnalytics);
+});
+for (const target of [document.documentElement, document.body]) financialThemeObserver.observe(target, { attributes: true, attributeFilter: ['class', 'style'] });
+window.addEventListener('admin:financial-source-changed', () => { analyticsInFlight = null; clearFinancialReports('Financial records changed. Refresh before continuing.'); receiptSequence++; receiptRevision = null; if (receiptsBody) receiptsBody.replaceChildren(); });
+window.addEventListener('admin:financial-account-changed', () => { analyticsInFlight = null; clearFinancialReports('The signed-in account changed. Refresh before continuing.'); receiptSequence++; receiptRevision = null; if (receiptsBody) receiptsBody.replaceChildren(); });
 
 function destroyCharts() {
 cacheCharts();
@@ -3590,11 +3363,11 @@ function filterActiveUsers(users = []) {
 
 async function deactivateUser(userId, { source } = {}) {
   if (!userId) return;
-  const confirmed = window.confirm("Remove/deactivate this user?");
+  const confirmed = await confirmAction(
+    "The user will lose access and be removed from active platform participation.",
+    { title: "Deactivate this user?", confirmLabel: "Deactivate user", tone: "danger" }
+  );
   if (!confirmed) return;
-  try {
-    await fetchCSRF();
-  } catch (_) {}
   try {
     const res = await secureFetch(`/api/admin/users/${encodeURIComponent(userId)}/deny`, {
       method: "POST",
@@ -3622,72 +3395,8 @@ async function deactivateUser(userId, { source } = {}) {
   }
 }
 
-async function loadPendingParalegals() {
-try {
-const res = await secureFetch("/api/admin/pending-paralegals", {
-headers: { Accept: "application/json" },
-noRedirect: true,
-});
-const payload = await res.json().catch(() => ({}));
-renderVerificationList(Array.isArray(payload?.items) ? payload.items : []);
-} catch (err) {
-console.warn("Unable to load pending paralegals", err);
-renderVerificationList([]);
-}
-}
-
 function escapeAttribute(value = "") {
 return String(value || "").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-}
-
-function buildFileHref(value) {
-const raw = String(value || "").trim();
-if (!raw) return "";
-if (/^https?:\/\//i.test(raw)) return raw;
-if (raw.startsWith("/api/uploads/view")) return raw;
-return `/api/uploads/view?key=${encodeURIComponent(raw)}`;
-}
-
-function renderVerificationList(items) {
-const list = document.getElementById("paralegalVerificationList");
-if (!list) return;
-if (!items.length) {
-list.innerHTML = "<p>No paralegals awaiting verification.</p>";
-return;
-}
-const cards = items
-.map((p) => {
-const id = escapeAttribute(p._id || p.id || "");
-const firstName = escapeHTML(p.firstName || "");
-const lastName = escapeHTML(p.lastName || "");
-const email = escapeHTML(p.email || "");
-const years = Number.isFinite(Number(p.yearsExperience)) ? Number(p.yearsExperience) : null;
-const yearsLabel = years === null ? "N/A" : `${years} year${years === 1 ? "" : "s"}`;
-const linkedIn = p.linkedInURL
-? `<p><a href="${escapeAttribute(p.linkedInURL)}" target="_blank" rel="noopener">LinkedIn Profile</a></p>`
-: "<p>LinkedIn profile not provided.</p>";
-const certificateHref = buildFileHref(p.certificateURL);
-const certificate = certificateHref
-? `<p><a href="${escapeAttribute(certificateHref)}" target="_blank" rel="noopener">Certificate</a></p>`
-: "<p>Certificate not uploaded.</p>";
-    return `
-       <div class="verify-card" data-id="${id}">
-         <strong>${lastName || "N/A"}, ${firstName || "N/A"}</strong>
-         <p>Email: ${email || "N/A"}</p>
-         <p>Years Experience: ${yearsLabel}</p>
-         ${linkedIn}
-         ${certificate}
-         <button class="approveParalegalBtn" data-id="${id}">Approve</button>
-         <button class="rejectParalegalBtn" data-id="${id}">Reject</button>
-         <div class="user-card-actions">
-           <button class="disableUserBtn" data-id="${id}">Disable</button>
-           <button class="enableUserBtn" data-id="${id}">Enable</button>
-         </div>
-       </div>
-     `;
-})
-.join("");
-list.innerHTML = cards;
 }
 
 function renderOpenDisputes(items = []) {
@@ -3740,7 +3449,7 @@ function renderOpenDisputes(items = []) {
                 caseId
               )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Finalize payout</button>
             </div>
-            ${recommendedLabel ? `<div class="dispute-meta">Enter the payout amount to release to the paralegal. Recommended: no more than ${recommendedLabel} (70% of original case payout).</div>` : ""}
+            ${recommendedLabel ? `<div class="dispute-meta">Enter the payout amount to release to the paralegal. Recommended: no more than ${recommendedLabel} (70% of original Matter payout).</div>` : ""}
             ${actionNote}
       `;
       const standardActions = `
@@ -3764,7 +3473,7 @@ function renderOpenDisputes(items = []) {
           <td>
             <div>
               <a class="btn-link" href="/api/cases/${escapeAttribute(caseId)}/archive/download" target="_blank" rel="noopener">
-                ${escapeHTML(item.caseTitle || "Case")}
+                ${escapeHTML(item.caseTitle || "Untitled Matter")}
               </a>
             </div>
             <div class="dispute-meta">${escapeHTML(caseId)}</div>
@@ -3823,7 +3532,7 @@ function renderResolvedDisputes(items = []) {
           <td>
             <div>
               <a class="btn-link" href="/api/cases/${escapeAttribute(caseId)}/archive/download" target="_blank" rel="noopener">
-                ${escapeHTML(item.caseTitle || "Case")}
+                ${escapeHTML(item.caseTitle || "Untitled Matter")}
               </a>
             </div>
             <div class="dispute-meta">${escapeHTML(caseId)}</div>
@@ -3877,7 +3586,7 @@ function renderRejectedDisputes(items = []) {
           <td>
             <div>
               <a class="btn-link" href="/api/cases/${escapeAttribute(caseId)}/archive/download" target="_blank" rel="noopener">
-                ${escapeHTML(item.caseTitle || "Case")}
+                ${escapeHTML(item.caseTitle || "Untitled Matter")}
               </a>
             </div>
             <div class="dispute-meta">${escapeHTML(caseId)}</div>
@@ -3947,21 +3656,26 @@ function setActiveDisputeStatus(status) {
 
 async function loadDisputes() {
   if (!disputesBody) return;
-  const status = getActiveDisputeStatus();
+  const linkedReview = new URL(location.href).searchParams.get('review');
+  const status = linkedReview ? 'all' : window.adminFlowDisputeCaseId ? 'open' : getActiveDisputeStatus();
   renderDisputeHeader(status);
   disputesBody.innerHTML = `<tr><td colspan="${getDisputeColspan(status)}" class="pending-empty">Loading disputes…</td></tr>`;
   try {
-    const q = String(disputeSearchInput?.value || "").trim();
-    const params = new URLSearchParams({ status, limit: "50" });
+    const q = window.adminFlowDisputeCaseId ? '' : String(disputeSearchInput?.value || "").trim();
+    const params = new URLSearchParams({ status, limit: "25", page:String(window.adminDisputePage||1) });
+    if (window.adminFlowDisputeCaseId) { params.set('caseId', window.adminFlowDisputeCaseId); params.set('status', 'open'); }
     if (status === "resolved") params.set("finalized", "true");
-    if (q) params.set("q", q);
+    if (linkedReview) { params.set('disputeId', linkedReview); params.set('status', 'all'); params.set('page', '1'); params.delete('caseId'); const linkedMatter = new URL(location.href).searchParams.get('reviewMatter'); if (linkedMatter) params.set('caseId', linkedMatter); params.delete('finalized'); }
+    else if (q) params.set("q", q);
     const res = await secureFetch(`/api/disputes/admin?${params.toString()}`, {
       headers: { Accept: "application/json" },
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(payload?.error || "Unable to load disputes.");
     const items = Array.isArray(payload?.items) ? payload.items : [];
+    if(payload.pages && (window.adminDisputePage||1)>payload.pages){window.adminDisputePage=payload.pages;return loadDisputes();}
     renderDisputes(items, status);
+    window.adminDisputesRendered?.(items,payload,status);
   } catch (err) {
     disputesBody.innerHTML = `<tr><td colspan="${getDisputeColspan(getActiveDisputeStatus())}" class="pending-empty">${escapeHTML(
       err?.message || "Unable to load disputes."
@@ -3969,12 +3683,9 @@ async function loadDisputes() {
   }
 }
 
-async function settleDispute({ action, caseId, disputeId, payoutAmountCents, grossAmountCents }) {
+async function settleDispute({ action, caseId, disputeId, payoutAmountCents, grossAmountCents, previewRevision }) {
   if (!caseId || !disputeId) return;
-  try {
-    await fetchCSRF();
-  } catch (_) {}
-  const body = { action, disputeId };
+  const body = { action, disputeId, previewRevision };
   if (Number.isFinite(payoutAmountCents)) {
     body.payoutAmountCents = payoutAmountCents;
   } else if (Number.isFinite(grossAmountCents)) {
@@ -3994,9 +3705,6 @@ async function settleDispute({ action, caseId, disputeId, payoutAmountCents, gro
 
 async function saveDisputeNotes({ caseId, disputeId, notes }) {
   if (!caseId || !disputeId) return;
-  try {
-    await fetchCSRF();
-  } catch (_) {}
   const res = await secureFetch(
     `/api/disputes/${encodeURIComponent(caseId)}/${encodeURIComponent(disputeId)}/admin-notes`,
     {
@@ -4127,30 +3835,29 @@ if (disputesBody) {
       payoutAmountCents = Math.round(amountUsd * 100);
       const max = Number(row?.dataset?.payoutMax || 0);
       if (Number.isFinite(max) && max > 0 && payoutAmountCents > max) {
-        showToast("Payout amount exceeds the maximum available payout for this case.", "info");
+        showToast("Payout amount exceeds the maximum available payout for this Matter.", "info");
         return;
       }
     }
 
-    const confirmText =
-      actionKey === "refund"
-        ? "Refund the attorney and close this dispute?"
-        : actionKey === "release-full"
-        ? "Release full payout to the paralegal and close this dispute?"
-        : "Release the partial payout to the paralegal and close this dispute?";
-    if (!window.confirm(confirmText)) return;
-
-    const action =
-      actionKey === "refund"
-        ? "refund"
-        : actionKey === "release-full"
-        ? "release_full"
-        : "release_partial";
+    const action=actionKey==='refund'?'refund':actionKey==='release-full'?'release_full':'release_partial';
+    let preview;
+    try {
+      button.disabled=true;
+      const params=new URLSearchParams({action,disputeId});if(Number.isFinite(payoutAmountCents))params.set('payoutAmountCents',payoutAmountCents);
+      const response=await secureFetch(`/api/admin/workspace/finance/dispute-preview/${encodeURIComponent(caseId)}?${params}`,{headers:{Accept:'application/json'}});
+      preview=await response.json();if(!response.ok)throw new Error(preview.error||'Unable to preview this settlement.');
+    }catch(error){showToast(error.message,'err');return;}finally{button.disabled=false;}
+    if(!await confirmAdminSettlement(preview))return;
 
     try {
       button.disabled = true;
-      const payload = await settleDispute({ action, caseId, disputeId, payoutAmountCents });
-      if (payload?.refundId) {
+      const payload = await settleDispute({ action, caseId, disputeId, payoutAmountCents, previewRevision:preview.previewRevision });
+      if(preview.withdrawal && preview.payoutAmount===0){
+        showToast("Dispute settled with zero payout. Remaining matter funds were preserved.","success");
+      } else if(payload?.pending){
+        showToast("Settlement recorded. The payout is still pending.","info");
+      } else if (payload?.refundId) {
         showToast("Dispute settled. Refund issued.", "success");
       } else {
         showToast("Dispute settled. Payout released.", "success");
@@ -4185,13 +3892,7 @@ async function bootAdminDashboard() {
 const user = typeof window.requireRole === "function" ? await window.requireRole("admin") : null;
 if (!user) return null;
 applyRoleVisibility(user);
-await loadPendingParalegals();
 return user;
-}
-
-async function loadUsers() {
-await Promise.allSettled([loadPendingParalegals(), hydrateAnalytics()]);
-await renderAIControlRoom(true);
 }
 
 window.loadOverviewActionBoard = loadOverviewActionBoard;
@@ -4201,13 +3902,12 @@ const user = await bootAdminDashboard();
 if (!user) return;
 
 bindSettingsActions();
-await loadAdminSettings();
-await loadAdminThemePreference();
-await hydrateAnalytics();
-await loadDisputeSummary();
-await loadOverviewActionBoard(true);
-	await loadReceipts();
-	await renderAIControlRoom();
+await Promise.allSettled([loadDisputeSummary(),loadOverviewActionBoard(true)]);
+const loadOnEntry=(id,load)=>{const section=document.getElementById(id);if(!section)return;let loaded=false;const enter=()=>{if(!loaded&&section.classList.contains("visible")&&!section.hidden){loaded=true;Promise.resolve(load()).catch(error=>{loaded=false;showToast(error.message||"This workspace could not be loaded.","err");});}};new MutationObserver(enter).observe(section,{attributes:true,attributeFilter:["class","hidden"]});enter();};
+loadOnEntry("section-settings",loadAdminSettings);
+loadOnEntry("section-escrow",hydrateAnalytics);
+loadOnEntry("section-revenue",()=>Promise.all([hydrateAnalytics(),loadReceipts()]));
+loadOnEntry("section-ai-control-room",renderAIControlRoom);
 
 if (receiptRefreshBtn) {
 receiptRefreshBtn.addEventListener("click", () => {
@@ -4216,32 +3916,23 @@ loadReceipts();
 }
 if (receiptSearchInput) {
 receiptSearchInput.addEventListener("input", () => {
+receiptSequence++; receiptRevision = null;
+if (receiptPageSelect) receiptPageSelect.disabled = true;
+if (receiptsBody) receiptsBody.innerHTML = '<tr><td colspan="6">Searching receipts…</td></tr>';
 if (receiptSearchTimer) window.clearTimeout(receiptSearchTimer);
 receiptSearchTimer = window.setTimeout(() => {
+receiptPage = 1;
 loadReceipts();
 }, 250);
 });
 }
-
-const taxReportBtn = document.getElementById("taxReportBtn");
-if (taxReportBtn) {
-taxReportBtn.addEventListener("click", async () => {
-const originalLabel = taxReportBtn.textContent || "Generate Tax Report";
-taxReportBtn.disabled = true;
-taxReportBtn.textContent = "Generating...";
-try {
-const payload = latestAnalytics || (await hydrateAnalytics());
-if (!payload) throw new Error("Unable to load tax summary.");
-downloadTaxReport(payload);
-showToast("Tax report generated.", "ok");
-} catch (err) {
-showToast(err?.message || "Unable to generate tax report.", "err");
-} finally {
-taxReportBtn.disabled = false;
-taxReportBtn.textContent = originalLabel;
-}
+if (receiptPageSelect) {
+receiptPageSelect.addEventListener("change", () => {
+receiptPage = Number(receiptPageSelect.value) || 1;
+loadReceipts();
 });
 }
+
 });
 
 document.addEventListener("visibilitychange", () => {
@@ -4251,7 +3942,7 @@ destroyCharts();
 });
 
 document.addEventListener("click", async (evt) => {
-	const aiRoomTab = evt.target.closest('a[data-section="ai-control-room"]');
+	const aiRoomTab = evt.target.closest('[data-section="ai-control-room"]');
 	if (aiRoomTab) {
 	await renderAIControlRoom();
 	}
@@ -4305,7 +3996,10 @@ document.addEventListener("click", async (evt) => {
 	const approvalId = incidentApprovalBtn.getAttribute("data-approval-id");
 	const note = document.getElementById("incidentApprovalDecisionNote")?.value?.trim() || "";
 	if (!decision || !incidentId || !approvalId) return;
-	if (decision === "reject" && !window.confirm("Reject this release candidate?")) return;
+	if (decision === "reject" && !(await confirmAction(
+    "This rejection will be recorded in the incident approval timeline.",
+    { title: "Reject this release candidate?", confirmLabel: "Reject release", tone: "danger" }
+  ))) return;
   const optimisticUpdate = applyOptimisticAIControlRoomDecisionDescriptor({
     kind: "incident_approval",
     decision,
@@ -4341,63 +4035,4 @@ document.addEventListener("click", async (evt) => {
 	return;
 	}
 
-	const disableBtn = evt.target.closest(".disableUserBtn");
-	if (disableBtn) {
-const id = disableBtn.dataset.id;
-if (!id) return;
-try {
-await secureFetch(`/api/admin/disable/${encodeURIComponent(id)}`, { method: "POST" });
-await loadUsers();
-} catch (err) {
-console.error("Failed to disable user", err);
-}
-return;
-}
-
-const enableBtn = evt.target.closest(".enableUserBtn");
-if (enableBtn) {
-const id = enableBtn.dataset.id;
-if (!id) return;
-try {
-await secureFetch(`/api/admin/enable/${encodeURIComponent(id)}`, { method: "POST" });
-await loadUsers();
-} catch (err) {
-console.error("Failed to enable user", err);
-}
-return;
-}
-
-const approveBtn = evt.target.closest(".approveParalegalBtn");
-const rejectBtn = evt.target.closest(".rejectParalegalBtn");
-if (approveBtn) {
-const id = approveBtn.dataset.id;
-if (!id) return;
-try {
-	await secureFetch(`/api/admin/approve/${encodeURIComponent(id)}`, { method: "POST" });
-	await loadPendingParalegals();
-	await hydrateAnalytics();
-	await renderAIControlRoom(true);
-if (typeof window.loadPendingUsers === "function") {
-await window.loadPendingUsers();
-}
-} catch (err) {
-console.error("Failed to approve paralegal", err);
-}
-return;
-}
-if (rejectBtn) {
-const id = rejectBtn.dataset.id;
-if (!id) return;
-try {
-	await secureFetch(`/api/admin/reject/${encodeURIComponent(id)}`, { method: "POST" });
-	await loadPendingParalegals();
-	await hydrateAnalytics();
-	await renderAIControlRoom(true);
-if (typeof window.loadPendingUsers === "function") {
-await window.loadPendingUsers();
-}
-} catch (err) {
-console.error("Failed to reject paralegal", err);
-}
-}
 });

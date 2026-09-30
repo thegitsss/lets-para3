@@ -1,20 +1,24 @@
 // Shared notification center for headers
-import { secureFetch, getStoredSession } from "../auth.js";
+import { secureFetch } from "../auth.js";
 import { closeSupportDrawer, scanSupportLaunchers } from "./support-drawer.js";
+import { confirmAction } from "./dialogs.js";
 
-const NOTIFICATION_STYLE_ID = "lpc-notification-styles";
 const MAX_VISIBLE_NOTIFICATION_CARDS = 3;
-const COMPLETED_CASE_CACHE_TTL = 60 * 1000;
+const NOTIFICATION_POLL_INTERVAL_MS = 10000;
 const NOTIF_FADE_ENHANCE_KEY = "notifFadeEnhanced";
 const NOTIF_FADE_ITEM_KEY = "notifFadeItemBound";
-let lastKnownUnread = 0;
+let lastKnownUnread = null;
+let notificationCountSequence = 0;
+let notificationMutationVersion = 0;
 let viewportResizeBound = false;
-let completedCaseCache = { role: "", ids: new Set(), ts: 0 };
 let notificationEventSource = null;
 let notificationStreamActive = false;
 let notificationRefreshTimer = null;
 let notificationReconnectTimer = null;
+let notificationPollTimer = null;
 let lastNotificationEventAt = 0;
+let notificationPageActive = true;
+const notificationReads = new Set();
 
 function emitNotificationRefresh(payload = {}) {
   if (typeof window === "undefined" || typeof CustomEvent === "undefined") return;
@@ -141,120 +145,69 @@ function isNotificationRead(item = {}) {
   return item?.read === true;
 }
 
-function getUnreadCount(list = []) {
-  return list.filter((item) => item?.read === false).length;
+function currentUnreadCount() {
+  return lastKnownUnread;
 }
 
-function getAvatarFallback(name = "") {
-  const letter = (name || "?").trim().charAt(0).toUpperCase() || "?";
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="#eef1f7"/><text x="50%" y="56%" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#5c6477">${letter}</text></svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-}
-
-function normalizeUserId(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value;
-  return String(value._id || value.id || "");
-}
-
-function extractCaseIdFromLink(link = "") {
-  if (!link || typeof link !== "string") return "";
+async function readAuthoritativeUnread(signal) {
+  const sequence = ++notificationCountSequence;
+  const version = notificationMutationVersion;
   try {
-    const url = link.startsWith("http") ? new URL(link) : new URL(link, window.location.origin);
-    if (!url.pathname.endsWith("case-detail.html")) return "";
-    return url.searchParams.get("caseId") || "";
-  } catch {
-    const match = link.match(/case-detail\.html\?caseId=([^&#]+)/i);
-    return match ? decodeURIComponent(match[1]) : "";
+    const response = await secureFetch("/api/notifications/unread-count", {
+      method: "GET", credentials: "include", noRedirect: true, signal,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (!Number.isSafeInteger(payload?.count) || payload.count < 0) throw new Error("Invalid unread count");
+    if (signal?.aborted || version !== notificationMutationVersion) throw new DOMException("Canceled", "AbortError");
+    if (sequence === notificationCountSequence) syncNotificationBadges(payload.count);
+    return currentUnreadCount();
+  } catch (error) {
+    if (!signal?.aborted && version === notificationMutationVersion && sequence === notificationCountSequence) {
+      syncNotificationBadges(null);
+    }
+    throw error;
   }
 }
 
-async function resolveCaseDetailLink(link, item = {}) {
-  const caseId = extractCaseIdFromLink(link);
-  if (!caseId) return link;
-  const session = getStoredSession();
-  const role = String(item.userRole || session?.role || "").toLowerCase();
-  const userId = normalizeUserId(session?.user?._id || session?.user?.id);
-  let res;
-  try {
-    res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, { noRedirect: true });
-  } catch {
-    return role === "admin"
-      ? "admin-dashboard.html"
-      : role === "attorney"
-        ? "dashboard-attorney.html#cases"
-        : "dashboard-paralegal.html#cases";
-  }
-  if (!res || !res.ok) {
-    return role === "admin"
-      ? "admin-dashboard.html"
-      : role === "attorney"
-        ? "dashboard-attorney.html#cases"
-        : "dashboard-paralegal.html#cases";
-  }
-  let data = null;
-  try {
-    data = await res.json();
-  } catch {}
-  const caseData = data?.case || data;
-  if (!caseData) return link;
-  const status = String(caseData.status || "").toLowerCase();
-  const paymentReleased = caseData.paymentReleased === true;
-  const paralegalId = normalizeUserId(caseData.paralegalId || caseData.paralegal);
-  const withdrawnId = normalizeUserId(caseData.withdrawnParalegalId);
-  const isAssigned = userId && paralegalId && userId === paralegalId;
-  const isWithdrawn = userId && withdrawnId && userId === withdrawnId;
-  const activeStatuses = new Set(["in progress", "active"]);
-  const hasActiveParalegal = !!paralegalId;
-
-  if (role === "paralegal") {
-    if (["completed", "closed"].includes(status) || paymentReleased) {
-      return caseId
-        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases-completed`
-        : "dashboard-paralegal.html#cases-completed";
+function notificationFeedback(message = "") {
+  document.querySelectorAll("[data-notification-panel]").forEach(panel => {
+    let feedback = panel.querySelector("[data-notification-feedback]");
+    if (!feedback) {
+      feedback = document.createElement("p");
+      feedback.dataset.notificationFeedback = "";
+      feedback.className = "notif-feedback";
+      feedback.setAttribute("role", "status");
+      panel.appendChild(feedback);
     }
-    if (status === "paused" && caseData.pausedReason === "paralegal_withdrew" && isWithdrawn) {
-      return caseId
-        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases-completed`
-        : "dashboard-paralegal.html#cases-completed";
-    }
-    if (!isAssigned && !isWithdrawn) {
-      return caseId
-        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases`
-        : "dashboard-paralegal.html#cases";
-    }
-    if (["open", "draft", "applied"].includes(status)) {
-      return caseId
-        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases`
-        : "dashboard-paralegal.html#cases";
-    }
-    if (!hasActiveParalegal || !isAssigned || !activeStatuses.has(status)) {
-      return caseId
-        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases`
-        : "dashboard-paralegal.html#cases";
-    }
-  }
-
-  if (role === "attorney") {
-    if (["completed", "closed"].includes(status) || paymentReleased) {
-      return caseId
-        ? `dashboard-attorney.html?highlightCase=${encodeURIComponent(caseId)}#cases:archived`
-        : "dashboard-attorney.html#cases:archived";
-    }
-    if (["open", "draft", "applied"].includes(status)) {
-      return caseId
-        ? `dashboard-attorney.html?highlightCase=${encodeURIComponent(caseId)}#cases`
-        : "dashboard-attorney.html#cases";
-    }
-    if (!hasActiveParalegal || !activeStatuses.has(status)) {
-      return caseId
-        ? `dashboard-attorney.html?highlightCase=${encodeURIComponent(caseId)}#cases`
-        : "dashboard-attorney.html#cases";
-    }
-  }
-
-  return link;
+    feedback.textContent = message;
+    feedback.hidden = !message;
+  });
 }
+
+async function writeNotification(path, method) {
+  notificationMutationVersion += 1;
+  notificationReads.forEach(controller => controller.abort());
+  notificationFeedback();
+  try {
+    const response = await secureFetch(path, { method, credentials: "include" });
+    if (!response.ok || (await response.json())?.success !== true) throw new Error("Unconfirmed notification update");
+    // A confirmed write remains confirmed if the subsequent count is unavailable.
+    try { await readAuthoritativeUnread(); }
+    catch (error) { console.warn("[notifications] unread count unavailable after update", error); }
+  } catch (error) {
+    notificationFeedback("That update could not be confirmed. Please try again.");
+    scheduleNotificationRefresh();
+    throw error;
+  }
+}
+
+function getAvatarFallback() {
+  return "/assets/avatar-placeholder.svg";
+}
+
+
+
 
 const ADMIN_NOTIFICATION_IMAGE = "/hero-mountain.jpg";
 const ADMIN_TITLE_HINT = "welcome to let's-paraconnect";
@@ -297,7 +250,7 @@ function getNotificationAvatar(item = {}, actorName = "") {
     Boolean(item.payload?.actorName) ||
     Boolean(item.payload?.paralegalName);
   if (!hasActor) return ADMIN_NOTIFICATION_IMAGE;
-  return getAvatarFallback(actorName);
+  return getAvatarFallback();
 }
 
 function formatNotificationMessage(item = {}) {
@@ -319,12 +272,20 @@ function formatNotificationMessage(item = {}) {
 }
 
 export async function loadNotifications() {
+  if (!notificationPageActive) return;
+  const controller = new AbortController();
+  notificationReads.add(controller);
   bindNotificationViewportResize();
   try {
-    const res = await fetch("/api/notifications", { credentials: "include" });
+    const [res] = await Promise.all([
+      secureFetch("/api/notifications", { credentials: "include", signal: controller.signal, noRedirect: true }),
+      readAuthoritativeUnread(controller.signal),
+    ]);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
-    const items = (Array.isArray(payload) ? payload : []).map(normalizeNotification);
+    if (controller.signal.aborted || !notificationPageActive) return;
+    if (!Array.isArray(payload)) throw new Error("Invalid notification list");
+    const items = payload.map(normalizeNotification);
 
     const lists = document.querySelectorAll("[data-notification-list]");
     lists.forEach((listEl) => {
@@ -333,7 +294,7 @@ export async function loadNotifications() {
     });
     syncAllNotificationListViewports();
 
-    const unreadCount = getUnreadCount(items);
+    const unreadCount = currentUnreadCount();
     lastKnownUnread = unreadCount;
     syncNotificationBadges(unreadCount);
     emitNotificationRefresh({
@@ -343,125 +304,27 @@ export async function loadNotifications() {
       types: summarizeNotificationTypes(items),
     });
   } catch (err) {
+    if (controller.signal.aborted) return;
+    controller.abort();
+    document.querySelectorAll("[data-notification-list]").forEach(list => {
+      list.replaceChildren();
+      const empty = list.parentElement?.querySelector("[data-notification-empty]");
+      if (empty) { empty.style.display = "block"; empty.textContent = "Notifications unavailable."; }
+    });
     console.warn("[notifications] loadNotifications failed", err);
+  } finally {
+    notificationReads.delete(controller);
   }
 }
 
-function formatNotificationTitle(item = {}) {
-  switch (item.type) {
-    case "message":
-      return "New Message";
-    case "case_invite":
-      return "Case Invitation";
-    case "case_update":
-      return "Case Update";
-    case "case_invite_response":
-      return "Invitation Update";
-    case "application_submitted":
-      return "New Application";
-    case "application_accepted":
-      return "Application Accepted";
-    case "application_denied":
-      return "Application Update";
-    case "profile_approved":
-      return "Profile Approved";
-    case "profile_photo_approved":
-      return "Profile Photo Approved";
-    case "profile_photo_rejected":
-      return "Profile Photo Rejected";
-    case "resume_uploaded":
-      return "Resume Updated";
-    case "payout_released":
-      return "Payout Released";
-    case "case_awaiting_funding":
-      return "Funding Needed";
-    case "case_work_ready":
-      return "Work Ready";
-    case "case_file_uploaded":
-      return "Document Uploaded";
-    default:
-      return "Notification";
-  }
-}
 
-function formatNotificationBody(item = {}) {
-  const payload = item.payload || {};
-  switch (item.type) {
-    case "message":
-      return `Message from ${payload.fromName || "a user"}`;
-    case "case_invite":
-      return `You've been invited to "${payload.caseTitle || "a case"}"`;
-    case "case_invite_response":
-      if (payload.message) return payload.message;
-      if (item.userRole === "paralegal") {
-        if (payload.response === "accepted") {
-          return `You accepted the invitation for "${payload.caseTitle || "this case"}".`;
-        }
-        if (payload.response === "declined") {
-          return `You declined the invitation for "${payload.caseTitle || "this case"}".`;
-        }
-      }
-      if (payload.response === "accepted") {
-        return `${payload.paralegalName || "Paralegal"} accepted your invitation. Confirm hire and fund case to get started.`;
-      }
-      if (payload.response === "filled") {
-        return `The position for "${payload.caseTitle || "this case"}" has been filled.`;
-      }
-      return `${payload.paralegalName || "Paralegal"} declined your invitation`;
-    case "case_update":
-      return payload.summary || `Case "${payload.caseTitle || "update"}" has changed.`;
-    case "application_submitted":
-      return `${payload.paralegalName || "A paralegal"} applied to "${payload.title || "your job"}"`;
-    case "application_accepted":
-      return `Your application for "${payload.caseTitle || "the case"}" was accepted.`;
-    case "application_denied":
-      return payload.caseTitle
-        ? `This role has been filled for "${payload.caseTitle}".`
-        : "This role has been filled.";
-    case "resume_uploaded":
-      return "Your resume has been successfully uploaded.";
-    case "profile_approved":
-      return "Your profile was approved.";
-    case "profile_photo_approved":
-      return "Your profile photo was approved.";
-    case "profile_photo_rejected":
-      return "Your profile photo was rejected. Please upload a new one that meets our photo guidelines, including a plain or neutral background.";
-    case "payout_released":
-      return `Your payout is on the way${payload.amount ? ` (${payload.amount})` : ""}.`;
-    case "case_awaiting_funding":
-      return `${payload.caseTitle || "A case"} is awaiting funding.`;
-    case "case_work_ready":
-      return `${payload.caseTitle || "A case"} is funded. Work can begin.`;
-    case "case_file_uploaded":
-      return `${payload.fileName || "A document"} was uploaded${payload.caseTitle ? ` to "${payload.caseTitle}"` : "."}`;
-    default:
-      return "You have a new notification.";
-  }
-}
 
-function resolvePayoutReceiptLink(item = {}) {
-  const payload = item.payload || {};
-  const explicit = typeof payload.receiptUrl === "string" ? payload.receiptUrl.trim() : "";
-  if (explicit) return explicit;
-  if (item.type !== "payout_released") return "";
-  const caseId = extractCaseId(item);
-  if (!caseId) return "";
-  return `/api/payments/receipt/paralegal/${encodeURIComponent(caseId)}`;
-}
 
-function formatTimeAgo(dateString) {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
 
 async function markNotificationRead(id) {
   if (!id) return false;
   try {
-    await secureFetch(`/api/notifications/${id}/read`, {
-      method: "POST",
-      credentials: "include",
-    });
+    await writeNotification(`/api/notifications/${encodeURIComponent(id)}/read`, "POST");
     return true;
   } catch (err) {
     console.warn("[notifications] mark single read failed", err);
@@ -485,16 +348,7 @@ function closeAllNotificationPanels() {
 }
 
 function totalUnread() {
-  if (!centers.length) return lastKnownUnread || 0;
-  const ids = new Set();
-  centers.forEach((center, centerIndex) => {
-    (center.notifications || []).forEach((item, itemIndex) => {
-      if (item?.read !== false) return;
-      const id = item?._id || item?.id;
-      ids.add(id ? String(id) : `${centerIndex}-${itemIndex}`);
-    });
-  });
-  return ids.size;
+  return currentUnreadCount();
 }
 
 ensureNotificationStyles();
@@ -534,10 +388,10 @@ if (typeof window !== "undefined") {
   window.initNotificationCenters = scanNotificationCenters;
   window.scanNotificationCenters = scanNotificationCenters;
   window.refreshNotificationCenters = refreshNotificationCenters;
-  window.initPushNotifications = initPushNotifications;
 }
 
 function refreshNotificationCenters() {
+  if (!notificationPageActive) return;
   centers.forEach((center) => {
     if (center.loading) return;
     center.loaded = false;
@@ -546,7 +400,7 @@ function refreshNotificationCenters() {
 }
 
 function scheduleNotificationRefresh() {
-  if (notificationRefreshTimer) return;
+  if (!notificationPageActive || notificationRefreshTimer) return;
   notificationRefreshTimer = window.setTimeout(() => {
     notificationRefreshTimer = null;
     if (centers.length) {
@@ -555,6 +409,20 @@ function scheduleNotificationRefresh() {
       loadNotifications();
     }
   }, 200);
+}
+
+function stopNotificationPolling() {
+  if (!notificationPollTimer) return;
+  window.clearInterval(notificationPollTimer);
+  notificationPollTimer = null;
+}
+
+function startNotificationPolling() {
+  if (!notificationPageActive || notificationPollTimer || document.hidden) return;
+  scheduleNotificationRefresh();
+  notificationPollTimer = window.setInterval(() => {
+    if (!document.hidden) scheduleNotificationRefresh();
+  }, NOTIFICATION_POLL_INTERVAL_MS);
 }
 
 function stopNotificationStream() {
@@ -570,26 +438,49 @@ function stopNotificationStream() {
 }
 
 function startNotificationStream() {
-  if (notificationEventSource || typeof EventSource === "undefined") return false;
+  if (!notificationPageActive || notificationEventSource || typeof EventSource === "undefined") return false;
   const source = new EventSource("/api/notifications/stream");
   notificationEventSource = source;
 
   const onError = () => {
+    if (notificationEventSource !== source || !notificationPageActive) return;
     notificationStreamActive = false;
     stopNotificationStream();
     if (!document.hidden) {
+      startNotificationPolling();
       notificationReconnectTimer = window.setTimeout(startNotificationStream, 5000);
     }
   };
 
   source.addEventListener("open", () => {
+    if (notificationEventSource !== source || !notificationPageActive) return;
     notificationStreamActive = true;
+    stopNotificationPolling();
   });
   source.addEventListener("error", onError);
-  source.addEventListener("notifications", () => scheduleNotificationRefresh());
+  source.addEventListener("notifications", () => {
+    if (notificationEventSource === source) scheduleNotificationRefresh();
+  });
   source.addEventListener("ping", () => {});
 
   return true;
+}
+
+function stopNotificationActivity() {
+  notificationPageActive = false;
+  if (notificationRefreshTimer) window.clearTimeout(notificationRefreshTimer);
+  notificationRefreshTimer = null;
+  stopNotificationStream();
+  stopNotificationPolling();
+  for (const controller of notificationReads) controller.abort();
+  notificationReads.clear();
+}
+
+function resumeNotificationActivity() {
+  if (notificationPageActive || document.hidden) return;
+  notificationPageActive = true;
+  scheduleNotificationRefresh();
+  if (!startNotificationStream()) startNotificationPolling();
 }
 
 function createCenter(root) {
@@ -601,13 +492,8 @@ function createCenter(root) {
   const empty = root.querySelector("[data-notification-empty]");
   const markBtn = root.querySelector("[data-notification-mark]");
   let clearBtn = root.querySelector("[data-notification-clear]");
-  if (!clearBtn && panel) {
-    clearBtn = document.createElement("button");
-    clearBtn.type = "button";
-    clearBtn.className = "notif-markall notif-clear";
-    clearBtn.textContent = "Clear All";
-    clearBtn.setAttribute("data-notification-clear", "true");
-  }
+  if (clearBtn) clearBtn.classList.add("notif-clear");
+  if (markBtn) markBtn.textContent = "Mark all as read";
   const header = panel?.querySelector(".notif-header") || null;
   let actionsWrap = panel?.querySelector(".notif-actions") || null;
   if (panel && !actionsWrap && (markBtn || clearBtn)) {
@@ -622,9 +508,11 @@ function createCenter(root) {
       if (!titleEl) {
         titleEl = document.createElement("span");
         titleEl.className = "notif-header-title";
-        titleEl.textContent = header.textContent.trim();
+        titleEl.textContent = header.textContent.trim() || "Notifications";
         header.textContent = "";
         header.appendChild(titleEl);
+      } else if (!titleEl.textContent.trim()) {
+        titleEl.textContent = "Notifications";
       }
       actionsWrap.classList.add("notif-actions-header");
       header.appendChild(actionsWrap);
@@ -672,6 +560,7 @@ function createCenter(root) {
 }
 
 function togglePanel(center) {
+  resumeNotificationActivity();
   if (!center?.panel) return;
   if (center.panel.dataset.toggleLock === "true") return;
   center.panel.dataset.toggleLock = "true";
@@ -705,25 +594,21 @@ function preload(center) {
   fetchNotifications(center);
 }
 
-function markNotificationsReadQuiet() {
-  return secureFetch("/api/notifications/read-all", {
-    method: "POST",
-    credentials: "include",
-  }).catch((err) => {
-    console.warn("[notifications] mark read failed", err);
-  });
-}
 
 async function fetchNotifications(center, options = {}) {
-  if (center.loading) return;
+  if (!notificationPageActive || center.loading) return;
   center.loading = true;
+  const controller = new AbortController();
+  notificationReads.add(controller);
   try {
-    const res = await secureFetch("/api/notifications", {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      credentials: "include",
-      noRedirect: true,
-    });
+    const [res] = await Promise.all([
+      secureFetch("/api/notifications", {
+        method: "GET", headers: { Accept: "application/json" },
+        credentials: "include", noRedirect: true, signal: controller.signal,
+      }),
+      readAuthoritativeUnread(controller.signal),
+    ]);
+    if (controller.signal.aborted || !notificationPageActive) return;
     if (res.status === 401 || res.status === 403) {
       lastKnownUnread = 0;
       syncNotificationBadges(0);
@@ -733,11 +618,12 @@ async function fetchNotifications(center, options = {}) {
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
-    const items = Array.isArray(payload) ? payload : [];
-    const filtered = await filterCompletedCaseNotifications(items);
-    const normalized = Array.isArray(filtered) ? filtered.map(normalizeNotification) : [];
+    if (controller.signal.aborted || !notificationPageActive) return;
+    if (!Array.isArray(payload)) throw new Error("Invalid notification list");
+    const items = payload;
+    const normalized = items.map(normalizeNotification);
     center.notifications = normalized;
-    center.unread = getUnreadCount(center.notifications);
+    center.unread = currentUnreadCount();
     center.loaded = true;
     renderNotifications(center);
     emitNotificationRefresh({
@@ -752,16 +638,21 @@ async function fetchNotifications(center, options = {}) {
     if (options.openAfterLoad && center.panel?.dataset?.pendingShow === "true") {
       center.panel.dataset.pendingShow = "";
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      showPanel(center);
+      if (!controller.signal.aborted && notificationPageActive) showPanel(center);
     }
   } catch (err) {
+    if (controller.signal.aborted) return;
+    controller.abort();
     console.warn("[notifications] load failed", err);
     renderEmpty(center, "Notifications unavailable.");
   } finally {
+    notificationReads.delete(controller);
     center.loading = false;
-    if (center.panel?.dataset?.pendingShow === "true") {
+    if (!controller.signal.aborted && notificationPageActive && center.panel?.dataset?.pendingShow === "true") {
       center.panel.dataset.pendingShow = "";
-      requestAnimationFrame(() => requestAnimationFrame(() => showPanel(center)));
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!controller.signal.aborted && notificationPageActive) showPanel(center);
+      }));
     }
   }
 }
@@ -783,8 +674,10 @@ function showPanel(center) {
 }
 
 function renderNotifications(center) {
-  center.unread = getUnreadCount(center.notifications || []);
+  center.unread = currentUnreadCount();
   updateBadge(center, center.unread);
+  if (center.clearBtn) center.clearBtn.hidden = center.notifications.length === 0;
+  if (center.markBtn) center.markBtn.hidden = center.unread === 0;
   if (!center.list || !center.empty) {
     const totalIfMissing = totalUnread();
     lastKnownUnread = totalIfMissing;
@@ -817,7 +710,9 @@ function renderNotifications(center) {
 
 function renderEmpty(center, text) {
   if (center) {
-    center.unread = getUnreadCount(center.notifications || []);
+    center.unread = currentUnreadCount();
+    if (center.clearBtn) center.clearBtn.hidden = true;
+    if (center.markBtn) center.markBtn.hidden = true;
   }
   if (center.empty) {
     center.empty.style.display = "block";
@@ -827,28 +722,28 @@ function renderEmpty(center, text) {
     center.list.innerHTML = "";
     center.list.style.removeProperty("--notif-three-card-max-height");
   }
-  updateBadge(center, getUnreadCount(center?.notifications || []));
+  updateBadge(center, currentUnreadCount());
   syncNotificationBadges(totalUnread());
 }
 
 function updateBadge(center, count) {
   if (!center.badge) return;
-  const value = Math.max(0, Number(count) || 0);
-  center.badge.textContent = String(value);
-  center.badge.classList.toggle("show", value > 0);
+  const known = Number.isSafeInteger(count) && count >= 0;
+  center.badge.textContent = known ? String(count) : "!";
+  center.badge.classList.toggle("show", !known || count > 0);
+  center.toggle.setAttribute("aria-label", known
+    ? count > 0 ? `View notifications, ${count} unread` : "View notifications"
+    : "View notifications, unread count unavailable");
 }
 
 async function markNotificationsRead(center) {
-  const hasUnread = (center.notifications || []).some((item) => !isNotificationRead(item));
+  const hasUnread = currentUnreadCount() > 0;
   if (!hasUnread) return;
   try {
-    await secureFetch("/api/notifications/read-all", {
-      method: "POST",
-      credentials: "include",
-    });
+    await writeNotification("/api/notifications/read-all", "POST");
     centers.forEach((c) => {
       c.notifications = (c.notifications || []).map((item) => ({ ...item, read: true, isRead: true }));
-      c.unread = getUnreadCount(c.notifications);
+      c.unread = currentUnreadCount();
       updateBadge(c, c.unread);
       if (c !== center) renderNotifications(c);
     });
@@ -863,34 +758,38 @@ async function clearNotifications(center) {
     renderEmpty(center, "You're all caught up.");
     return;
   }
-  const confirmed = window.confirm("Confirm clear all notifications?");
+  // Safari does not focus a button on pointer activation. Give the dialog an
+  // explicit return target for both pointer and keyboard users.
+  center.clearBtn?.focus();
+  const confirmed = await confirmAction("This removes every notification from your notification center.", {
+    title: "Clear all notifications?",
+    confirmLabel: "Clear all",
+    tone: "danger",
+  });
   if (!confirmed) return;
   try {
-    await secureFetch("/api/notifications", {
-      method: "DELETE",
-      credentials: "include",
-    });
+    await writeNotification("/api/notifications", "DELETE");
+    const restoreToggleFocus = document.activeElement === center.clearBtn;
     centers.forEach((c) => {
       c.notifications = [];
-      c.unread = getUnreadCount(c.notifications);
+      c.unread = currentUnreadCount();
       renderEmpty(c, "You're all caught up.");
     });
     syncNotificationBadges(totalUnread());
+    if (restoreToggleFocus) center.toggle?.focus();
   } catch (err) {
     console.warn("[notifications] clear all failed", err);
   }
 }
 
-async function dismissNotification(center, id, options = {}) {
+async function dismissNotification(id, options = {}) {
   if (!id) return false;
   const store = Array.isArray(options.store) ? options.store : null;
   try {
-    await secureFetch(`/api/notifications/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
+    await writeNotification(`/api/notifications/${encodeURIComponent(id)}`, "DELETE");
   } catch (err) {
     console.warn("[notifications] dismiss failed", err);
+    return false;
   }
   const targetId = String(id);
   if (store) {
@@ -905,16 +804,16 @@ async function dismissNotification(center, id, options = {}) {
       (item) => String(item._id || item.id) !== targetId
     );
     if (before !== c.notifications.length) {
-      c.unread = getUnreadCount(c.notifications);
+      c.unread = currentUnreadCount();
       updateBadge(c, c.unread);
       renderNotifications(c);
     }
   });
   if (!centers.length) {
     if (store) {
-      syncNotificationBadges(getUnreadCount(store));
+      syncNotificationBadges(currentUnreadCount());
     } else {
-      syncNotificationBadges(lastKnownUnread || 0);
+      syncNotificationBadges(lastKnownUnread);
     }
     return true;
   }
@@ -927,7 +826,7 @@ function bindGlobalDismiss() {
   dismissBound = true;
   const isNotificationTarget = (event) => {
     const target = event.target;
-    if (target?.closest?.("[data-notification-panel], [data-notification-toggle], .notification-dropdown")) {
+    if (target?.closest?.("[data-notification-panel], [data-notification-toggle], .notification-dropdown, .lpc-dialog")) {
       return true;
     }
     const path = typeof event.composedPath === "function" ? event.composedPath() : [];
@@ -947,7 +846,7 @@ function bindGlobalDismiss() {
     true
   );
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" && !event.defaultPrevented && !event.target?.closest?.(".lpc-dialog")) {
       closeAllNotificationPanels();
     }
   });
@@ -955,6 +854,9 @@ function bindGlobalDismiss() {
 
 function bindMinimalToggleHandler() {
   document.addEventListener("click", (event) => {
+    // A confirmation dialog owns its interaction; keep its originating panel
+    // available for returned focus and any failed-write feedback.
+    if (event.target?.closest?.(".lpc-dialog")) return;
     const toggle = event.target.closest("[data-notification-toggle]");
     const root = toggle?.closest("[data-notification-center]");
     if (root?.dataset?.boundNotificationCenter === "true") return;
@@ -965,7 +867,7 @@ function bindMinimalToggleHandler() {
       return;
     }
     const panel =
-      root.querySelector("[data-notification-panel]") ||
+      root?.querySelector("[data-notification-panel]") ||
       toggle.parentElement?.querySelector("[data-notification-panel]");
     if (!panel) return;
     const willShow = !panel.classList.contains("show");
@@ -1002,231 +904,30 @@ function formatRelativeTime(value) {
   return date.toLocaleDateString();
 }
 
-function extractId(value) {
-  if (!value) return "";
-  if (typeof value === "object") {
-    return value._id || value.id || value.caseId || value.jobId || "";
-  }
-  return value;
-}
 
-function getNotificationCaseId(item = {}) {
-  const payload = item.payload || {};
-  return extractId(
-    item.caseId ||
-      payload.caseId ||
-      payload.caseID ||
-      payload.case ||
-      payload.case_id ||
-      payload.caseRef ||
-      payload.caseDoc
-  );
-}
 
-async function getCompletedCaseIds(role = "") {
-  const roleKey = String(role || "").toLowerCase();
-  const now = Date.now();
-  if (roleKey === completedCaseCache.role && now - completedCaseCache.ts < COMPLETED_CASE_CACHE_TTL) {
-    return completedCaseCache.ids;
-  }
-  try {
-    let ids = new Set();
-    if (roleKey === "paralegal") {
-      const res = await secureFetch("/api/cases/my-completed?limit=500");
-      const payload = await res.json().catch(() => ({}));
-      const items = Array.isArray(payload?.items)
-        ? payload.items
-        : Array.isArray(payload)
-        ? payload
-        : [];
-      ids = new Set(
-        items
-          .map((item) => String(item?.caseId || item?._id || item?.id || ""))
-          .filter(Boolean)
-      );
-    } else {
-      const res = await secureFetch("/api/cases/my?archived=true&limit=200");
-      const payload = await res.json().catch(() => []);
-      const items = Array.isArray(payload) ? payload : [];
-      ids = new Set(
-        items
-          .filter((item) => {
-            const status = String(item?.status || "").toLowerCase();
-            return status === "completed" || item?.paymentReleased === true;
-          })
-          .map((item) => String(item?._id || item?.id || ""))
-          .filter(Boolean)
-      );
-    }
-    completedCaseCache = { role: roleKey, ids, ts: now };
-    return ids;
-  } catch {
-    return new Set();
-  }
-}
 
-async function filterCompletedCaseNotifications(items = []) {
-  if (!Array.isArray(items) || !items.length) return items;
-  const role = String(items.find((item) => item?.userRole)?.userRole || "").toLowerCase();
-  if (role === "paralegal") return items;
-  const allowCompletedTypes = new Set(["payout_released"]);
-  if (role !== "attorney") return items;
-  const completedIds = await getCompletedCaseIds(role);
-  if (!completedIds.size) return items;
-  return items.filter((item) => {
-    if (allowCompletedTypes.has(String(item?.type || "").toLowerCase())) return true;
-    const caseId = getNotificationCaseId(item);
-    if (!caseId) return true;
-    return !completedIds.has(String(caseId));
-  });
-}
 
-function extractApplicantId(item = {}) {
-  const payload = item.payload || {};
-  return extractId(
-    item.applicantId ||
-      item.paralegalId ||
-      item.actorId ||
-      payload.applicantId ||
-      payload.paralegalId ||
-      payload.paralegalID ||
-      payload.paralegal ||
-      payload.paralegalRef ||
-      payload.paralegalUserId ||
-      payload.userId ||
-      payload.actorId
-  );
-}
 
-function isEscrowLockedNotice(item = {}) {
-  const text = [
-    item.message,
-    item.payload?.title,
-    item.payload?.body,
-    item.payload?.message,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  return text.includes("Case amount locked");
-}
 
 function resolveNotificationLink(item = {}) {
-  if (isEscrowLockedNotice(item)) return "";
-  const payload = item.payload || {};
-  const type = String(item.type || "").toLowerCase();
-  const role = String(item.userRole || "").toLowerCase();
-  const caseId = extractId(
-    item.caseId ||
-      payload.caseId ||
-      payload.caseID ||
-      payload.case ||
-      payload.case_id ||
-      payload.caseRef ||
-      payload.caseDoc
-  );
-  if (type === "case_update" && role === "paralegal") {
-    const summaryText = String(payload.summary || payload.message || item.message || "").toLowerCase();
-    if (summaryText.includes("close without release")) {
-      return caseId
-        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases-completed`
-        : "dashboard-paralegal.html#cases-completed";
-    }
-    if (summaryText.includes("you withdrew") || summaryText.includes("withdrawn")) {
-      return caseId
-        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases-completed`
-        : "dashboard-paralegal.html#cases-completed";
-    }
+  const raw = String(item?.action?.href || "").trim();
+  if (!raw || raw.startsWith("//") || raw.includes("\\")) return "";
+  try {
+    const url = new URL(raw, window.location.origin);
+    if (url.origin !== window.location.origin) return "";
+    const allowedPage = new Set([
+      "/case-detail.html",
+      "/profile-paralegal.html",
+      "/profile-settings.html",
+      "/dashboard-attorney.html",
+      "/dashboard-paralegal.html",
+    ]).has(url.pathname);
+    if (!allowedPage) return "";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "";
   }
-  if (type === "application_submitted" && role === "attorney") {
-    const applicantId = extractApplicantId(item);
-    if (caseId && applicantId) {
-      return `dashboard-attorney.html?caseId=${encodeURIComponent(
-        caseId
-      )}&applicantId=${encodeURIComponent(applicantId)}&openApplicant=1#cases:inquiries`;
-    }
-    return "dashboard-attorney.html#cases:inquiries";
-  }
-  if (type === "case_invite_response" && role === "attorney" && String(payload.response || "").toLowerCase() === "accepted") {
-    const applicantId = extractApplicantId(item);
-    if (caseId && applicantId) {
-      return `dashboard-attorney.html?caseId=${encodeURIComponent(
-        caseId
-      )}&applicantId=${encodeURIComponent(applicantId)}&openApplicant=1&continueHire=1#cases:inquiries`;
-    }
-    if (caseId) {
-      return `dashboard-attorney.html?openApplicants=1&caseId=${encodeURIComponent(caseId)}#cases:inquiries`;
-    }
-    return "dashboard-attorney.html#cases:inquiries";
-  }
-  if (role === "paralegal" && (type === "pre_engagement_requested" || type === "pre_engagement_changes_requested")) {
-    const applicationId = extractId(
-      item.applicationId ||
-        payload.applicationId ||
-        payload.applicationID ||
-        payload.appId ||
-        payload.application
-    );
-    if (applicationId) {
-      return `dashboard-paralegal.html?applicationId=${encodeURIComponent(applicationId)}#cases`;
-    }
-    return "dashboard-paralegal.html#cases";
-  }
-  if (type === "pre_engagement_submitted" && role === "attorney") {
-    const applicantId = extractApplicantId(item);
-    if (caseId && applicantId) {
-      return `dashboard-attorney.html?caseId=${encodeURIComponent(
-        caseId
-      )}&applicantId=${encodeURIComponent(applicantId)}&openApplicant=1#cases:inquiries`;
-    }
-    if (caseId) {
-      return `dashboard-attorney.html?openApplicants=1&caseId=${encodeURIComponent(caseId)}#cases:inquiries`;
-    }
-    return "dashboard-attorney.html#cases:inquiries";
-  }
-  const primaryLink = typeof item.link === "string" ? item.link.trim() : "";
-  const payloadLink = typeof payload.link === "string" ? payload.link.trim() : "";
-  const payloadUrl = typeof payload.url === "string" ? payload.url.trim() : "";
-  const explicitLink = primaryLink || payloadLink || payloadUrl;
-  if (explicitLink) return explicitLink;
-  if (type === "payout_released" && role === "paralegal") {
-    return caseId
-      ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases-completed`
-      : "dashboard-paralegal.html#cases-completed";
-  }
-  if (caseId) {
-    const base = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
-    if (type === "message") return `${base}#case-messages`;
-    if (type === "case_file_uploaded") return `${base}#caseFilesSection`;
-    if (type === "case_invite" && role === "paralegal") {
-      return `dashboard-paralegal.html?inviteCase=${encodeURIComponent(caseId)}#home`;
-    }
-    return base;
-  }
-  if (type === "case_invite" && role === "paralegal") return "dashboard-paralegal.html#home";
-  if (type === "case_invite") return "paralegal-invitations.html";
-  const jobId = extractId(item.jobId || payload.jobId || payload.job || payload.job_id || payload.jobRef);
-  if (type === "application_accepted") {
-    return caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "dashboard-paralegal.html";
-  }
-  if (type === "application_denied") {
-    return "browse-jobs.html";
-  }
-  if (jobId) return `browse-jobs.html?id=${encodeURIComponent(jobId)}`;
-  if (
-    type === "profile_approved" ||
-    type === "profile_photo_approved" ||
-    type === "profile_photo_rejected" ||
-    type === "resume_uploaded"
-  ) {
-    return "profile-settings.html";
-  }
-  if (type === "payout_released") {
-    return role === "attorney" ? "dashboard-attorney.html#billing" : "dashboard-paralegal.html";
-  }
-  if (role === "attorney") return "dashboard-attorney.html";
-  if (role === "paralegal") return "dashboard-paralegal.html";
-  return "";
 }
 
 if (!notificationsOptOut) {
@@ -1239,82 +940,32 @@ if (!notificationsOptOut) {
     if (!centers.length) {
       loadNotifications();
     }
-    initPushNotifications();
     bindMinimalToggleHandler();
-    startNotificationStream();
+    if (!startNotificationStream()) startNotificationPolling();
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible" && !notificationStreamActive) {
+      if (document.visibilityState !== "visible") {
+        stopNotificationPolling();
+        return;
+      }
+      if (!notificationStreamActive) {
+        startNotificationPolling();
         startNotificationStream();
       }
     });
-    window.addEventListener("beforeunload", () => {
-      stopNotificationStream();
-    });
+    window.addEventListener("beforeunload", stopNotificationActivity);
+    window.addEventListener("pagehide", stopNotificationActivity);
+    window.addEventListener("pageshow", resumeNotificationActivity);
+    // A canceled departure leaves this same document active. Resume when the
+    // user returns to it, as well as after a browser back/forward restoration.
+    for (const type of ["focus", "pointerdown", "keydown"]) {
+      window.addEventListener(type, event => { if (event.isTrusted) resumeNotificationActivity(); });
+    }
   };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootNotifications);
   } else {
     bootNotifications();
   }
-}
-
-async function initPushNotifications() {
-  if (typeof window === "undefined") return;
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-  try {
-    const registration = await navigator.serviceWorker.register("/sw.js");
-    const permission = await window.Notification?.requestPermission?.();
-    if (permission && permission !== "granted") return;
-    const publicKey = await fetchVapidKey();
-    if (!publicKey) return;
-    const existing = await registration.pushManager.getSubscription();
-    if (existing) {
-      await sendSubscriptionToServer(existing);
-      return;
-    }
-    const convertedKey = urlBase64ToUint8Array(publicKey);
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: convertedKey,
-    });
-    await sendSubscriptionToServer(subscription);
-  } catch (err) {
-    console.warn("[push] initialization failed", err);
-  }
-}
-
-async function fetchVapidKey() {
-  try {
-    const res = await fetch("/api/notifications/vapid-key");
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.key || null;
-  } catch {
-    return null;
-  }
-}
-
-async function sendSubscriptionToServer(subscription) {
-  try {
-    await secureFetch("/api/notifications/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(subscription),
-    });
-  } catch (err) {
-    console.warn("[push] subscription save failed", err);
-  }
-}
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
 }
 
 function buildNotificationNode(item = {}, center = null, options = {}) {
@@ -1339,39 +990,13 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
   copy.className = "notif-copy";
   copy.appendChild(message);
   copy.appendChild(time);
-
-  const receiptLink = resolvePayoutReceiptLink(normalized);
-  if (receiptLink) {
-    const actions = document.createElement("div");
-    actions.style.display = "flex";
-    actions.style.alignItems = "center";
-    actions.style.gap = "10px";
-    actions.style.marginTop = "4px";
-
-    const actionLink = document.createElement("a");
-    actionLink.href = receiptLink;
-    actionLink.className = "receipt-link";
-    actionLink.textContent = "Receipt";
-    actionLink.target = "_blank";
-    actionLink.rel = "noopener";
-    actionLink.style.color = "var(--accent, #b98a44)";
-    actionLink.style.textDecoration = "none";
-    actionLink.style.fontSize = "0.78rem";
-    actionLink.style.fontWeight = "600";
-    actionLink.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      const id = normalized._id || normalized.id;
-      if (!isNotificationRead(normalized) && id) {
-        const success = await markNotificationRead(id);
-        if (success) {
-          normalized.isRead = true;
-          normalized.read = true;
-        }
-      }
-    });
-
-    actions.appendChild(actionLink);
-    copy.appendChild(actions);
+  const link = resolveNotificationLink(normalized);
+  const actionLabel = link ? String(normalized?.action?.label || "View Matter") : "";
+  if (actionLabel) {
+    const action = document.createElement("span");
+    action.className = "notif-primary-action";
+    action.textContent = actionLabel;
+    copy.appendChild(action);
   }
 
   const actorName = String(
@@ -1390,13 +1015,17 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
   avatar.addEventListener(
     "error",
     () => {
-      avatar.src = getAvatarFallback(actorName);
+      avatar.src = getAvatarFallback();
     },
     { once: true }
   );
 
-  const main = document.createElement("div");
+  const main = document.createElement(link ? "a" : "div");
   main.className = "notif-main";
+  if (link) {
+    main.href = link;
+    main.setAttribute("aria-label", `${formatNotificationMessage(normalized)}. ${actionLabel}`);
+  }
   main.appendChild(avatar);
   main.appendChild(dot);
   main.appendChild(copy);
@@ -1409,7 +1038,7 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
   dismiss.textContent = "x";
   dismiss.addEventListener("click", async (event) => {
     event.stopPropagation();
-    const ok = await dismissNotification(center, normalized._id || normalized.id, options);
+    const ok = await dismissNotification(normalized._id || normalized.id, options);
     if (!center && ok) {
       wrapper.remove();
       if (onDismiss) onDismiss();
@@ -1419,8 +1048,7 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
   wrapper.appendChild(main);
   wrapper.appendChild(dismiss);
 
-  const link = resolveNotificationLink(normalized);
-  wrapper.addEventListener("click", async () => {
+  const activateNotification = async () => {
     const id = normalized._id || normalized.id;
     if (!isNotificationRead(normalized) && id) {
       const success = await markNotificationRead(id);
@@ -1439,7 +1067,7 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
               return { ...n, isRead: true, read: true };
             });
             if (touched) {
-              c.unread = getUnreadCount(c.notifications);
+              c.unread = currentUnreadCount();
               updateBadge(c, c.unread);
               renderNotifications(c);
             }
@@ -1457,31 +1085,26 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
           });
           if (touched) {
             store.splice(0, store.length, ...updated);
-            syncNotificationBadges(getUnreadCount(store));
+            syncNotificationBadges(currentUnreadCount());
           }
         } else {
-          syncNotificationBadges(lastKnownUnread || 0);
+          syncNotificationBadges(lastKnownUnread);
         }
       }
     }
     if (link) {
-      const resolvedLink = await resolveCaseDetailLink(link, normalized);
       closeAllNotificationPanels();
       const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-      let target = resolvedLink;
-      try {
-        if (/^https?:\/\//i.test(resolvedLink)) {
-          const url = new URL(resolvedLink);
-          target = `${url.pathname}${url.search}${url.hash}`;
-        } else if (resolvedLink.startsWith("/")) {
-          target = resolvedLink;
-        }
-      } catch {}
-      if (target === current) {
-        return;
-      }
-      window.location.href = resolvedLink;
+      if (link === current) return;
+      window.location.href = link;
     }
+  };
+  main.addEventListener("click", (event) => {
+    // Keep the destination and dismissal as separate controls. Native modified
+    // link clicks retain the browser's open-in-new-tab behavior.
+    if (link && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
+    if (link) event.preventDefault();
+    void activateNotification();
   });
 
   return wrapper;
@@ -1491,7 +1114,7 @@ function renderNotificationList(listEl, emptyEl, items = []) {
   if (!listEl) return;
   listEl.innerHTML = "";
   const normalized = (Array.isArray(items) ? items : []).map(normalizeNotification);
-  syncNotificationBadges(getUnreadCount(normalized));
+  syncNotificationBadges(currentUnreadCount());
   if (!normalized.length) {
     if (emptyEl) {
       emptyEl.style.display = "block";
@@ -1533,9 +1156,22 @@ function renderNotificationList(listEl, emptyEl, items = []) {
 }
 
 function syncNotificationBadges(unreadCount) {
-  lastKnownUnread = Math.max(0, Number(unreadCount) || 0);
-  const label = lastKnownUnread > 0 ? String(lastKnownUnread) : "";
+  lastKnownUnread = Number.isSafeInteger(unreadCount) && unreadCount >= 0 ? unreadCount : null;
+  const label = lastKnownUnread === null ? "!" : lastKnownUnread > 0 ? String(lastKnownUnread) : "";
+  centers.forEach(center => {
+    center.unread = lastKnownUnread;
+    updateBadge(center, lastKnownUnread);
+    if (center.markBtn) center.markBtn.hidden = !(lastKnownUnread > 0);
+  });
   document.querySelectorAll("[data-notification-toggle]").forEach((toggle) => {
+    toggle.setAttribute("aria-label", lastKnownUnread === null
+      ? "View notifications, unread count unavailable"
+      : lastKnownUnread > 0 ? `View notifications, ${lastKnownUnread} unread` : "View notifications");
+    const badge = toggle.querySelector("[data-notification-badge]");
+    if (badge) {
+      badge.textContent = lastKnownUnread === null ? "!" : String(lastKnownUnread);
+      badge.classList.toggle("show", lastKnownUnread === null || lastKnownUnread > 0);
+    }
     if (label) {
       toggle.dataset.count = label;
     } else {

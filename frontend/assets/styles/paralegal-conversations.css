@@ -1,0 +1,54 @@
+/* Role-local bridge to the approved shared Conversations visual system. */
+.pv2-conversations {--av2-bg:#fff;--av2-soft:#f6f8fb;--av2-ink:#27364c;--av2-muted:#5c6d85;--av2-line:#e4e9f1;--av2-accent:#4775b4;--av2-selected:#edf3fc;height:100%;min-height:480px;color:var(--av2-ink);font-family:Sarabun,sans-serif}
+:root.theme-dark .pv2-conversations {--av2-bg:var(--v2-white);--av2-soft:var(--v2-soft);--av2-ink:var(--v2-ink);--av2-muted:var(--v2-muted);--av2-line:var(--v2-line);--av2-accent:var(--v2-blue);--av2-selected:var(--v2-soft)}
+.pv2-conversations * {box-sizing:border-box}
+.pv2-conversations [hidden] {display:none!important}
+.pv2-conversations button,.pv2-conversations textarea {font:inherit;color:inherit}
+.pv2-conversations button {cursor:pointer}
+.pv2-conversations svg {width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.pv2-conversations :focus-visible {outline:2px solid var(--av2-accent);outline-offset:3px}
+.pv2-conversations .av2-view-header h1 {font-size:28px;font-weight:500;line-height:1.2;margin:0}
+.pv2-conversations .av2-inbox-workspace,.pv2-conversations .av2-matter-body,.pv2-conversations [data-workspace-messages] {height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.pv2-conversations .av2-matter-header {flex:none}
+.pv2-conversations .av2-matter-body {flex:1}
+.pv2-conversations .v2-matter-panel {border:0;border-radius:0;background:none;padding:0;margin:0;box-shadow:none}
+.pv2-conversations .v2-matter-panel-heading {display:none}
+.pv2-conversations .v2-matter-message-content {flex:1;overflow:auto;min-height:0;margin:0;padding:0;scrollbar-gutter:stable;overflow-anchor:none}
+.pv2-conversations .av2-conversation {list-style:none;margin:0;color:var(--av2-ink)}
+.pv2-conversations .av2-conversation > li {position:relative}
+.pv2-conversations .av2-conversation .av2-preserve-lines {white-space:pre-wrap;overflow-wrap:anywhere}
+.pv2-conversations .av2-message-heading time {color:var(--av2-muted)}
+.pv2-conversations .av2-muted {color:var(--av2-muted)}
+.pv2-conversations .v2-matter-message-form {display:block;min-height:0;box-shadow:none}
+.pv2-conversations .av2-button {background:#10243f;color:white}
+.pv2-conversations .v2-matter-message-status:empty {display:none}
+.pv2-conversations .v2-matter-message-status {flex:none;font-size:12px;margin:0 22px 8px}
+.pv2-conversations .av2-context-menu {position:absolute}
+.pv2-conversations .av2-context-menu summary {list-style:none;color:var(--av2-muted);font-size:20px;padding:0 6px;cursor:pointer}
+.pv2-conversations summary::-webkit-details-marker {display:none}
+.pv2-conversations .av2-context-options {position:absolute;top:100%;z-index:15;background:var(--av2-bg);padding:6px;border:1px solid var(--av2-line);border-radius:6px;box-shadow:0 8px 20px #10243f14}
+.pv2-conversations .av2-context-options button {display:block;width:100%;text-align:left;border:0;background:none;min-height:30px;padding:6px 10px;font-size:12px;white-space:nowrap}
+.pv2-conversations .av2-context-options button:hover {background:var(--av2-soft)}
+.pv2-conversations .v2-matter-message-attachments {list-style:none;padding:0;border:0;background:none}
+.pv2-conversations .v2-matter-message-attachments li {display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--av2-line);border-radius:5px;background:var(--av2-soft)}
+.pv2-conversations .v2-matter-message-attachments li>span {flex:1;min-width:0}
+.pv2-conversations .v2-matter-message-attachments strong {font-size:12px;font-weight:500}
+.pv2-conversations .v2-matter-message-attachments small {font-size:10px}
+.pv2-conversations .v2-matter-message-attachments button {font-size:12px;border:0;background:none;padding:3px;color:var(--av2-muted)}
+.pv2-conversations .v2-matter-message-file {padding:0;margin:0 0 20px;max-width:82%;border:0}
+.pv2-conversations .v2-matter-message-file-row {padding:10px 14px;border:1px solid var(--av2-line);border-radius:6px;gap:14px;width:fit-content;max-width:100%}
+.pv2-conversations .v2-matter-message-file-row strong {font-size:13px;font-weight:500}
+.pv2-conversations .v2-matter-message-file-row small {font-size:11px}
+.pv2-conversations .v2-matter-message-file-row button,.pv2-conversations .v2-matter-message-file-row a {font-size:12px;border:0;background:none;padding:0}
+.pv2-conversations .v2-matter-message-file .v2-matter-message-meta {font-size:11px;margin:0 0 4px;justify-content:flex-start;gap:12px}
+html[data-lpc-v2-route=conversations] [data-v2-route-outlet] {padding:28px 32px;overflow:hidden}
+@media(max-width:760px){html[data-lpc-v2-route=conversations] [data-v2-route-outlet]{padding:18px 12px}.pv2-conversations{min-height:0}.pv2-conversations .av2-view-header h1{font-size:24px}.pv2-conversations .v2-matter-message-meta{flex-direction:row}.pv2-conversations .v2-matter-message-attachments li{flex-direction:row}}
+:root body.lpc-v2 .v2-view .pv2-conversations h1 {font-family:Sarabun,sans-serif;font-size:28px;line-height:1.2;font-weight:500;letter-spacing:-.025em}
+.pv2-conversations {font-weight:400;flex:1;min-height:0}
+html[data-lpc-v2-route=conversations] [data-v2-route-outlet] {display:flex;flex-direction:column;gap:0}
+html[data-lpc-v2-route=conversations] [data-v2-route-outlet] > .v2-route-state {flex:none;margin-bottom:16px}
+.pv2-conversations .av2-conversations-page {min-height:0}
+.pv2-conversations .v2-matter-message-file-row.av2-attachment-tile {padding:0;display:block}
+.pv2-conversations .v2-matter-message-file-row .av2-file-open {color:var(--av2-ink)}
+.pv2-conversations .v2-matter-message-file-row .av2-file-download-icon {margin-left:auto;color:var(--av2-muted)}
+.pv2-conversations .v2-matter-message-file-row .av2-file-open:disabled {opacity:1;cursor:default}

@@ -13,30 +13,44 @@ function toActor(actor = {}) {
 
 async function ensureFAQCandidateApprovalTask(candidate = {}, actor = {}) {
   if (!candidate?._id) return null;
-  const existing = await ApprovalTask.findOne({
+  const filter = {
     taskType: "support_review",
     targetType: "faq_candidate",
     targetId: String(candidate._id),
     approvalState: "pending",
-  }).lean();
-  if (existing) return existing;
-
-  const task = await ApprovalTask.create({
-    taskType: "support_review",
-    targetType: "faq_candidate",
-    targetId: String(candidate._id),
-    parentType: "FAQCandidate",
-    parentId: String(candidate._id),
-    title: `Review FAQ candidate: ${candidate.title}`,
-    summary: candidate.summary || "A support FAQ candidate is awaiting Samantha review.",
-    approvalState: "pending",
-    requestedBy: toActor(actor),
-    assignedOwnerLabel: candidate.ownerLabel || "Samantha",
-    metadata: {
-      category: candidate.category || "",
-      repeatCount: Number(candidate.repeatCount || 0),
-    },
-  });
+  };
+  let task = null, created = false;
+  const session = await FAQCandidate.startSession();
+  try {
+    await session.withTransaction(async () => {
+      task = null; created = false;
+      const current = await FAQCandidate.findOne({ _id: candidate._id, approvalState: 'pending_review' }).session(session).lean();
+      if (!current) return;
+      task = await ApprovalTask.findOne(filter).session(session).lean();
+      if (task) return;
+      // Serialize competing generators and an owner decision on the same record.
+      const claim = await FAQCandidate.updateOne({ _id: current._id, approvalState: 'pending_review' }, { $inc: { approvalTaskClaimVersion: 1 } }, { session, timestamps: false });
+      if (claim.modifiedCount !== 1) return;
+      [task] = await ApprovalTask.create([{
+        taskType: "support_review",
+        targetType: "faq_candidate",
+        targetId: String(candidate._id),
+        parentType: "FAQCandidate",
+        parentId: String(candidate._id),
+        title: `Review FAQ candidate: ${current.title}`,
+        summary: current.summary || "A support FAQ candidate is awaiting Samantha review.",
+        approvalState: "pending",
+        requestedBy: toActor(actor),
+        assignedOwnerLabel: current.ownerLabel || "Samantha",
+        metadata: {
+          category: current.category || "",
+          repeatCount: Number(current.repeatCount || 0),
+        },
+      }], { session });
+      created = true;
+    });
+  } finally { await session.endSession(); }
+  if (!created) return task;
 
   await publishEventSafe({
     eventType: "approval.requested",
@@ -88,8 +102,8 @@ async function listSupportApprovalTasks() {
     .lean();
 }
 
-async function approveFAQCandidate({ candidateId, actor, note = "" } = {}) {
-  const candidate = await FAQCandidate.findById(candidateId);
+async function approveFAQCandidate({ candidateId, actor, note = "", session = null, afterCommit = null } = {}) {
+  const candidate = await FAQCandidate.findById(candidateId).session(session);
   if (!candidate) {
     throw new Error("FAQ candidate not found.");
   }
@@ -99,10 +113,10 @@ async function approveFAQCandidate({ candidateId, actor, note = "" } = {}) {
     targetType: "faq_candidate",
     targetId: String(candidate._id),
     approvalState: "pending",
-  }).lean();
+  }).session(session).lean();
 
   candidate.approvalState = "approved";
-  await candidate.save();
+  await candidate.save({ session });
 
   await ApprovalTask.updateMany(
     {
@@ -118,29 +132,34 @@ async function approveFAQCandidate({ candidateId, actor, note = "" } = {}) {
         decidedAt: new Date(),
         decisionNote: note || "Approved.",
       },
-    }
+    },
+    { session }
   );
 
-  await publishApprovalDecisionEvent({
-    decision: "approved",
-    approvalRecordType: "approval_task",
-    approvalRecordId: pendingTask?._id || String(candidate._id),
-    approvalTargetType: "faq_candidate",
-    approvalTargetId: String(candidate._id),
-    title: `FAQ candidate approved: ${candidate.title}`,
-    summary: note || candidate.summary || "FAQ candidate approved.",
-    actor,
-    related: {
-      approvalTaskId: pendingTask?._id || null,
-    },
-    service: "support",
-    sourceSurface: "admin",
-    route: `/api/admin/support/faq-candidates/${candidate._id}/approve`,
-    correlationId: `support:${candidate._id}`,
-    founderVisible: true,
-    publicFacing: true,
-    priority: "normal",
-  });
+  const publishDecision = async () => {
+    await publishApprovalDecisionEvent({
+      decision: "approved",
+      approvalRecordType: "approval_task",
+      approvalRecordId: pendingTask?._id || String(candidate._id),
+      approvalTargetType: "faq_candidate",
+      approvalTargetId: String(candidate._id),
+      title: `FAQ candidate approved: ${candidate.title}`,
+      summary: note || candidate.summary || "FAQ candidate approved.",
+      actor,
+      related: {
+        approvalTaskId: pendingTask?._id || null,
+      },
+      service: "support",
+      sourceSurface: "admin",
+      route: `/api/admin/support/faq-candidates/${candidate._id}/approve`,
+      correlationId: `support:${candidate._id}`,
+      founderVisible: true,
+      publicFacing: true,
+      priority: "normal",
+    });
+  };
+  if (afterCommit) afterCommit.push(publishDecision);
+  else await publishDecision();
 
   return candidate;
 }

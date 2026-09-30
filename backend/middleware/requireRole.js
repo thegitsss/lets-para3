@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("middleware:requireRole");
 // backend/middleware/requireRole.js
 const normalize = (value) => String(value || "").trim().toLowerCase();
 
@@ -16,7 +18,7 @@ module.exports = function requireRole(...roles) {
     const currentRole = normalize(req.user.role);
     if (!roleSet.size) return next();
     if (!currentRole || !roleSet.has(currentRole)) {
-      console.warn(
+      runtimeLogger.warn(
         `[requireRole] Forbidden`,
         JSON.stringify({
           userId: req.user?.id || req.user?._id || null,

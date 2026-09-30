@@ -1,10 +1,10 @@
 const ApprovalTask = require("../../models/ApprovalTask");
+const mongoose = require("mongoose");
 const AutonomyPreference = require("../../models/AutonomyPreference");
 const FAQCandidate = require("../../models/FAQCandidate");
 const Incident = require("../../models/Incident");
 const IncidentApproval = require("../../models/IncidentApproval");
 const IncidentRelease = require("../../models/IncidentRelease");
-const MarketingBrief = require("../../models/MarketingBrief");
 const MarketingDraftPacket = require("../../models/MarketingDraftPacket");
 const SalesDraftPacket = require("../../models/SalesDraftPacket");
 const { approveFAQCandidate } = require("../support/reviewService");
@@ -24,7 +24,7 @@ const AUTONOMY_ACTION_TYPES = Object.freeze({
   cto: "incident_approval",
 });
 
-const MAX_AUTO_ACTIONS_PER_PASS = 10;
+const MAX_AUTO_ATTEMPTS_PER_PASS = 10;
 const MONEY_KEYWORDS = /\b(payment|payments|billing|bill|refund|refunded|charge|charged|invoice|invoicing|payout|payouts|escrow|stripe|dispute|disputed|legal|lawsuit|settlement|claim)\b/i;
 const SENSITIVE_MARKETING_KEYWORDS = /\b(guarantee|guaranteed|lawsuit|settlement|regulated|confidential|refund|payout|payment)\b/i;
 const SENSITIVE_SALES_KEYWORDS = /\b(guarantee|guaranteed|lawsuit|settlement|refund|payout|payment)\b/i;
@@ -135,7 +135,7 @@ const AUTONOMY_DEFINITIONS = Object.freeze([
     autoActionType: "support_governed_content_auto_approved",
     laneKey: "cco",
     navSection: "support-ops",
-    title: "Let Support use governed answers automatically",
+    title: "Approve matching support answers automatically",
     nounPhrase: "support answers",
     explanation: (count) =>
       `You've approved ${count} governed support ${count === 1 ? "answer" : "answers"} in a row.`,
@@ -195,56 +195,28 @@ const AUTONOMY_DEFINITIONS = Object.freeze([
       );
       return { confidenceScore, confidenceReason, disqualifiers };
     },
-    async execute(item, evaluation) {
+    async execute(item, evaluation, { session, afterCommit }) {
       const candidateId = String(item.candidate._id);
-      const previousTaskStates = await ApprovalTask.find({
-        taskType: "support_review",
-        targetType: "faq_candidate",
+      const previousCandidate = { approvalState: item.candidate.approvalState };
+      await approveFAQCandidate({
+        candidateId,
+        actor: buildAutoActor(),
+        note: "Auto-approved from a founder autonomy preference.",
+        session, afterCommit,
+      });
+      const action = await logAction({
+        agentRole: "CCO",
+        actionType: "support_governed_content_auto_approved",
+        confidenceScore: evaluation.confidenceScore,
+        confidenceReason: evaluation.confidenceReason,
+        targetModel: "FAQCandidate",
         targetId: candidateId,
-        approvalState: "pending",
-      })
-        .select("_id approvalState decidedBy decidedAt decisionNote")
-        .lean();
-      const previousCandidate = {
-        approvalState: item.candidate.approvalState,
-      };
-
-      try {
-        await approveFAQCandidate({
-          candidateId,
-          actor: buildAutoActor(),
-          note: "Auto-approved from a founder autonomy preference.",
-        });
-        const action = await logAction({
-          agentRole: "CCO",
-          actionType: "support_governed_content_auto_approved",
-          confidenceScore: evaluation.confidenceScore,
-          confidenceReason: evaluation.confidenceReason,
-          targetModel: "FAQCandidate",
-          targetId: candidateId,
-          changedFields: { approvalState: "approved" },
-          previousValues: { approvalState: previousCandidate.approvalState },
-          actionTaken: `Support approved the governed answer "${compactText(item.candidate.title, 120)}" automatically after repeated matching founder approvals.`,
-          safetyContext: evaluation.disqualifiers,
-        });
-        return action;
-      } catch (error) {
-        await FAQCandidate.updateOne({ _id: candidateId }, { $set: previousCandidate });
-        for (const task of previousTaskStates) {
-          await ApprovalTask.updateOne(
-            { _id: task._id },
-            {
-              $set: {
-                approvalState: task.approvalState,
-                decidedBy: task.decidedBy || null,
-                decidedAt: task.decidedAt || null,
-                decisionNote: task.decisionNote || "",
-              },
-            }
-          );
-        }
-        throw error;
-      }
+        changedFields: { approvalState: "approved" },
+        previousValues: { approvalState: previousCandidate.approvalState },
+        actionTaken: `Support approved the governed answer "${compactText(item.candidate.title, 120)}" automatically after repeated matching founder approvals.`,
+        safetyContext: evaluation.disqualifiers,
+      }, { session });
+      return action;
     },
   },
   {
@@ -253,12 +225,12 @@ const AUTONOMY_DEFINITIONS = Object.freeze([
     autoActionType: "marketing_publish_auto_approved",
     laneKey: "cmo",
     navSection: "marketing-drafts",
-    title: "Let Marketing publish these automatically",
+    title: "Approve matching marketing drafts automatically",
     nounPhrase: "marketing posts",
     explanation: (count) =>
       `You've approved ${count} LinkedIn company ${count === 1 ? "post" : "posts"} in a row.`,
     preview:
-      "Future LinkedIn company posts that match this pattern will skip the founder queue and use the current marketing approval path automatically.",
+      "Matching LinkedIn drafts can be approved automatically. Approval does not schedule or publish a post.",
     actionHelperText:
       "Enable Auto will auto-approve future LinkedIn posts that stay within the current safety checks. Keep Reviewing will leave this category manual and stop this suggestion.",
     computeApprovalStreak: () =>
@@ -313,60 +285,28 @@ const AUTONOMY_DEFINITIONS = Object.freeze([
       );
       return { confidenceScore, confidenceReason, disqualifiers };
     },
-    async execute(item, evaluation) {
+    async execute(item, evaluation, { session, afterCommit }) {
       const packetId = String(item.packet._id);
       const previousPacket = { approvalState: item.packet.approvalState };
-      const brief = item.packet.briefId
-        ? await MarketingBrief.findById(item.packet.briefId).select("_id approvalState").lean()
-        : null;
-      const previousTaskStates = await ApprovalTask.find({
-        taskType: "marketing_review",
-        targetType: "marketing_draft_packet",
+      await approveMarketingPacket({
+        packetId,
+        actor: buildAutoActor(),
+        note: "Auto-approved from a founder autonomy preference.",
+        session, afterCommit,
+      });
+      const action = await logAction({
+        agentRole: "CMO",
+        actionType: "marketing_publish_auto_approved",
+        confidenceScore: evaluation.confidenceScore,
+        confidenceReason: evaluation.confidenceReason,
+        targetModel: "MarketingDraftPacket",
         targetId: packetId,
-        approvalState: "pending",
-      })
-        .select("_id approvalState decidedBy decidedAt decisionNote")
-        .lean();
-
-      try {
-        await approveMarketingPacket({
-          packetId,
-          actor: buildAutoActor(),
-          note: "Auto-approved from a founder autonomy preference.",
-        });
-        const action = await logAction({
-          agentRole: "CMO",
-          actionType: "marketing_publish_auto_approved",
-          confidenceScore: evaluation.confidenceScore,
-          confidenceReason: evaluation.confidenceReason,
-          targetModel: "MarketingDraftPacket",
-          targetId: packetId,
-          changedFields: { approvalState: "approved" },
-          previousValues: { approvalState: previousPacket.approvalState },
-          actionTaken: `Marketing approved the LinkedIn post packet "${compactText(item.packet.workflowType, 80)}" automatically after repeated matching founder approvals.`,
-          safetyContext: evaluation.disqualifiers,
-        });
-        return action;
-      } catch (error) {
-        await MarketingDraftPacket.updateOne({ _id: packetId }, { $set: previousPacket });
-        if (brief?._id) {
-          await MarketingBrief.updateOne({ _id: brief._id }, { $set: { approvalState: brief.approvalState } });
-        }
-        for (const task of previousTaskStates) {
-          await ApprovalTask.updateOne(
-            { _id: task._id },
-            {
-              $set: {
-                approvalState: task.approvalState,
-                decidedBy: task.decidedBy || null,
-                decidedAt: task.decidedAt || null,
-                decisionNote: task.decisionNote || "",
-              },
-            }
-          );
-        }
-        throw error;
-      }
+        changedFields: { approvalState: "approved" },
+        previousValues: { approvalState: previousPacket.approvalState },
+        actionTaken: `Marketing approved the LinkedIn post packet "${compactText(item.packet.workflowType, 80)}" automatically after repeated matching founder approvals.`,
+        safetyContext: evaluation.disqualifiers,
+      }, { session });
+      return action;
     },
   },
   {
@@ -375,12 +315,12 @@ const AUTONOMY_DEFINITIONS = Object.freeze([
     autoActionType: "sales_outreach_auto_approved",
     laneKey: "cso",
     navSection: "sales-workspace",
-    title: "Let Sales send these automatically",
+    title: "Approve matching outreach drafts automatically",
     nounPhrase: "outreach messages",
     explanation: (count) =>
       `You've approved ${count} outbound ${count === 1 ? "message" : "messages"} in a row.`,
     preview:
-      "Future outreach drafts with the same safe profile will skip the founder queue and use the current sales approval path automatically.",
+      "Matching outreach drafts can be approved automatically. Approval does not send a message.",
     actionHelperText:
       "Enable Auto will auto-approve future outreach drafts that still have clear context and no risk flags. Keep Reviewing will leave this category manual and stop this suggestion.",
     computeApprovalStreak: () =>
@@ -437,63 +377,38 @@ const AUTONOMY_DEFINITIONS = Object.freeze([
       );
       return { confidenceScore, confidenceReason, disqualifiers };
     },
-    async execute(item, evaluation) {
+    async execute(item, evaluation, { session, afterCommit }) {
       const packetId = String(item.packet._id);
       const previousPacket = { approvalState: item.packet.approvalState };
-      const previousTaskStates = await ApprovalTask.find({
-        taskType: "sales_review",
-        targetType: "sales_draft_packet",
+      await approveSalesPacket({
+        packetId,
+        actor: buildAutoActor(),
+        note: "Auto-approved from a founder autonomy preference.",
+        session, afterCommit,
+      });
+      const action = await logAction({
+        agentRole: "CSO",
+        actionType: "sales_outreach_auto_approved",
+        confidenceScore: evaluation.confidenceScore,
+        confidenceReason: evaluation.confidenceReason,
+        targetModel: "SalesDraftPacket",
         targetId: packetId,
-        approvalState: "pending",
-      })
-        .select("_id approvalState decidedBy decidedAt decisionNote")
-        .lean();
-
-      try {
-        await approveSalesPacket({
-          packetId,
-          actor: buildAutoActor(),
-          note: "Auto-approved from a founder autonomy preference.",
-        });
-        const action = await logAction({
-          agentRole: "CSO",
-          actionType: "sales_outreach_auto_approved",
-          confidenceScore: evaluation.confidenceScore,
-          confidenceReason: evaluation.confidenceReason,
-          targetModel: "SalesDraftPacket",
-          targetId: packetId,
-          changedFields: { approvalState: "approved" },
-          previousValues: { approvalState: previousPacket.approvalState },
-          actionTaken: `Sales approved the outreach draft "${compactText(item.packet.packetType, 80)}" automatically after repeated matching founder approvals.`,
-          safetyContext: evaluation.disqualifiers,
-        });
-        return action;
-      } catch (error) {
-        await SalesDraftPacket.updateOne({ _id: packetId }, { $set: previousPacket });
-        for (const task of previousTaskStates) {
-          await ApprovalTask.updateOne(
-            { _id: task._id },
-            {
-              $set: {
-                approvalState: task.approvalState,
-                decidedBy: task.decidedBy || null,
-                decidedAt: task.decidedAt || null,
-                decisionNote: task.decisionNote || "",
-              },
-            }
-          );
-        }
-        throw error;
-      }
+        changedFields: { approvalState: "approved" },
+        previousValues: { approvalState: previousPacket.approvalState },
+        actionTaken: `Sales approved the outreach draft "${compactText(item.packet.packetType, 80)}" automatically after repeated matching founder approvals.`,
+        safetyContext: evaluation.disqualifiers,
+      }, { session });
+      return action;
     },
   },
   {
     agentRole: "CTO",
     actionType: AUTONOMY_ACTION_TYPES.cto,
+    requiresOwnerDecision: true,
     autoActionType: "incident_approval_auto_approved",
     laneKey: "cto",
     navSection: "engineering",
-    title: "Let Engineering move these fixes forward automatically",
+    title: "Approve eligible production releases automatically",
     nounPhrase: "incident approvals",
     explanation: (count) =>
       `You've approved ${count} engineering ${count === 1 ? "fix" : "fixes"} in a row.`,
@@ -652,7 +567,7 @@ async function refreshPreferenceLearning(agentRole = "", actionType = "") {
       },
     },
     {
-      new: true,
+      returnDocument: "after",
       upsert: true,
     }
   );
@@ -668,7 +583,7 @@ async function refreshAllPreferenceLearning() {
   return Promise.all(AUTONOMY_DEFINITIONS.map((definition) => refreshPreferenceLearning(definition.agentRole, definition.actionType)));
 }
 
-function buildSuggestionActions(definition, preference) {
+function buildSuggestionActions(definition) {
   return {
     yes: {
       kind: "autonomy_preference",
@@ -717,7 +632,7 @@ function buildUpgradeSuggestion(definition, preference) {
     confidenceReason: "",
     createdAt: preference.createdAt || null,
     updatedAt: preference.lastPromptedAt || null,
-    actions: buildSuggestionActions(definition, preference),
+    actions: buildSuggestionActions(definition),
   };
 }
 
@@ -734,7 +649,7 @@ async function getTopUpgradeSuggestion() {
 
   for (const preference of preferences) {
     const definition = getDefinition(preference.agentRole, preference.actionType);
-    if (!definition) continue;
+    if (!definition || definition.requiresOwnerDecision) continue;
     return buildUpgradeSuggestion(definition, preference);
   }
   return null;
@@ -754,6 +669,9 @@ async function setAutonomyPreferenceMode(agentRole = "", actionType = "", mode =
     throw error;
   }
 
+  if (nextMode === 'auto' && definition.requiresOwnerDecision) {
+    throw Object.assign(new Error('Production release approvals require your decision.'), { statusCode: 409 });
+  }
   await refreshPreferenceLearning(definition.agentRole, definition.actionType);
 
   return AutonomyPreference.findOneAndUpdate(
@@ -766,7 +684,7 @@ async function setAutonomyPreferenceMode(agentRole = "", actionType = "", mode =
       },
     },
     {
-      new: true,
+      returnDocument: "after",
       upsert: true,
     }
   );
@@ -779,29 +697,96 @@ async function getAutoModePreferences() {
   }).lean();
 }
 
+function approvalSource(value) {
+  const sort = item => Array.isArray(item) ? item.map(sort) : item && typeof item === 'object'
+    ? Object.fromEntries(Object.keys(item).sort().map(key => [key, sort(item[key])])) : item;
+  return JSON.stringify(sort(JSON.parse(JSON.stringify(value))));
+}
+
+// Reserve before execution so a failed transaction still consumes its attempt.
+// The atomic policy write shares the daily allowance across processes/restarts.
+async function reserveDailyAttempt(preference) {
+  const day = new Date().toISOString().slice(0, 10);
+  return AutonomyPreference.findOneAndUpdate({
+    _id: preference._id, mode: 'auto',
+    $or: [{ executionDay: { $exists: false } }, { executionDay: { $lt: day } },
+      { executionDay: day, $expr: { $lt: [{ $ifNull: ['$dailyAttempts', 0] }, { $ifNull: ['$dailyAttemptLimit', 25] }] } }],
+  }, [{ $set: {
+    executionDay: day,
+    dailyAttempts: { $cond: [{ $eq: ['$executionDay', day] }, { $add: [{ $ifNull: ['$dailyAttempts', 0] }, 1] }, 1] },
+    executionRevision: { $add: [{ $ifNull: ['$executionRevision', 0] }, 1] },
+  } }], { returnDocument: 'after', updatePipeline: true });
+}
+
+async function executeReviewedApproval(definition, item) {
+  const Model = { CCO: FAQCandidate, CMO: MarketingDraftPacket, CSO: SalesDraftPacket }[definition.agentRole];
+  if (!Model) throw new Error('This action requires an owner decision.');
+  const reviewed = item.candidate || item.packet;
+  const afterCommit = [];
+  const action = await mongoose.connection.transaction(async session => {
+    // Transaction retries must not retain effects from an aborted attempt.
+    afterCommit.length = 0;
+    const current = await Model.findById(reviewed._id).session(session).lean();
+    const task = await ApprovalTask.findOne({ _id: item.task._id, approvalState: 'pending', updatedAt: item.task.updatedAt }).session(session).lean();
+    const policy = await AutonomyPreference.findOne({ agentRole: definition.agentRole, actionType: definition.actionType, mode: 'auto' }).session(session).lean();
+    if (!policy || !task || !current || current.approvalState !== 'pending_review' || approvalSource(current) !== approvalSource(reviewed) || approvalSource(task) !== approvalSource(item.task)) return null;
+    const evaluation = definition.evaluate(item, policy);
+    if (!Number.isFinite(Number(evaluation.confidenceScore)) || Number(evaluation.confidenceScore) <= 0) return null;
+    // A snapshot read alone allows an approval to commit after an owner pause.
+    // Writing the policy in this transaction makes concurrent policy edits
+    // conflict; the transaction retries against the newly saved mode.
+    const authority = await AutonomyPreference.updateOne(
+      { _id: policy._id, mode: 'auto' },
+      { $inc: { executionRevision: 1 } },
+      { session }
+    );
+    if (!authority.matchedCount) return null;
+    return definition.execute(item, evaluation, { session, afterCommit });
+  });
+  return { action, afterCommit };
+}
+
 async function processAutoModeActions() {
   const preferences = await getAutoModePreferences();
-  if (!preferences.length) return { executedCount: 0 };
+  if (!preferences.length) return { executedCount: 0, attemptedCount: 0, failedCount: 0 };
 
   const recentActionIds = [];
   let executedCount = 0;
+  let attemptedCount = 0, failedCount = 0;
 
   for (const preference of preferences) {
-    if (executedCount >= MAX_AUTO_ACTIONS_PER_PASS) break;
+    if (attemptedCount >= MAX_AUTO_ATTEMPTS_PER_PASS) break;
     const definition = getDefinition(preference.agentRole, preference.actionType);
-    if (!definition) continue;
+    if (!definition || definition.requiresOwnerDecision) continue;
     const pendingItems = await definition.listPendingItems();
     for (const item of pendingItems) {
-      if (executedCount >= MAX_AUTO_ACTIONS_PER_PASS) break;
-      const evaluation = definition.evaluate(item, preference);
+      if (item.task?.metadata?.automationFailure?.needsReview) continue;
+      if (attemptedCount >= MAX_AUTO_ATTEMPTS_PER_PASS) break;
+      // A pause must stop subsequent items even if this pass loaded its list earlier.
+      const currentPreference = await AutonomyPreference.findOne({ agentRole: preference.agentRole, actionType: preference.actionType, mode: 'auto' }).lean();
+      if (!currentPreference) break;
+      const evaluation = definition.evaluate(item, currentPreference);
       if (!Number.isFinite(Number(evaluation.confidenceScore)) || Number(evaluation.confidenceScore) <= 0) {
         continue;
       }
       try {
-        const action = await definition.execute(item, evaluation);
+        if (!await reserveDailyAttempt(currentPreference)) break;
+        attemptedCount += 1;
+        const { action, afterCommit } = await executeReviewedApproval(definition, item);
+        if (!action) continue;
         if (action?._id) recentActionIds.push(String(action._id));
         executedCount += 1;
+        for (const effect of afterCommit) await effect();
       } catch (error) {
+        failedCount += 1;
+        // Keep failed, uncommitted decisions in the existing owner review queue.
+        // Do not replace a decision or a task edited since this pass reviewed it.
+        if (item.task?._id) await ApprovalTask.updateOne({
+          _id: item.task._id, approvalState: 'pending', updatedAt: item.task.updatedAt,
+        }, { $set: { 'metadata.automationFailure': {
+          needsReview: true, occurredAt: new Date(),
+          summary: 'Automatic approval could not finish. Please review this draft before it is used.',
+        } } });
         logger.error("Failed to auto-handle founder-approved action type.", {
           agentRole: definition.agentRole,
           actionType: definition.actionType,
@@ -813,6 +798,8 @@ async function processAutoModeActions() {
 
   return {
     executedCount,
+    attemptedCount,
+    failedCount,
     recentActionIds,
   };
 }
@@ -826,7 +813,9 @@ async function getAutonomyPreferencesSnapshot() {
     .lean();
   return {
     suggestion,
-    preferences,
+    preferences: preferences.map(preference => getDefinition(preference.agentRole, preference.actionType)?.requiresOwnerDecision
+      ? { ...preference, configuredMode: preference.mode, mode: 'manual', requiresOwnerDecision: true }
+      : preference),
   };
 }
 

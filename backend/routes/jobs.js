@@ -2,29 +2,25 @@ const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();
 const Job = require("../models/Job");
-const Application = require("../models/Application");
 const Case = require("../models/Case");
 const User = require("../models/User");
+const { withActiveAccountWrite } = require("../utils/activeAccountWrite");
 const auth = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const applicationsRouter = require("./applications");
 const { cleanTitle, cleanText, cleanBudget } = require("../utils/sanitize");
-const { getBlockedUserIds } = require("../utils/blocks");
-const stripe = require("../utils/stripe");
 const {
-  ATTORNEY_WORKFLOW_STAGES,
   MIN_MATTER_AMOUNT_CENTS,
   evaluateMatterPosting,
-  isAttorneyPaymentMethodRequired,
 } = require("../services/attorneyWorkflowPolicy");
+const { resolveExperienceRequirement } = require("../services/experienceRequirement");
+const { protectMutations } = require("../utils/csrf");
+const {
+  addSubscriber: addMatterDiscoverySubscriber,
+  publishMatterDiscoveryEvent,
+} = require("../utils/matterDiscoveryEvents");
 const createApplicationForJob = applicationsRouter?.createApplicationForJob;
-const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
-  "samanthasider+attorney@gmail.com",
-  "samanthasider+56@gmail.com",
-  "game4funwithme1+1@gmail.com",
-  "game4funwithme1@gmail.com",
-]);
-const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+const { openDiscoveryCaseFilter, readOpenListingPage, readRecommendedListingPage } = require("../services/openMatterDiscovery");
 const PRACTICE_AREAS = [
   "administrative law",
   "antitrust law",
@@ -53,74 +49,101 @@ const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
 }, {});
 const authenticatedGuards = [auth, requireApproved];
 
-const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-const noop = (_req, _res, next) => next();
-const csrf = require("csurf");
-const csrfMiddleware = csrf({
-  cookie: {
-    httpOnly: true,
-    sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
-  },
-});
-const protectMutations = (req, res, next) => {
-  const requireCsrf = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-  if (!requireCsrf) return noop(req, res, next);
-  const method = String(req.method || "").toUpperCase();
-  if (SAFE_METHODS.has(method)) return next();
-  return csrfMiddleware(req, res, next);
-};
-
 const mutatingGuards = [...authenticatedGuards, protectMutations];
 
-async function attorneyHasPaymentMethod(attorneyId) {
-  if (!attorneyId) return false;
-  try {
-    const attorney = await User.findById(attorneyId).select("email stripeCustomerId");
-    const attorneyEmail = String(attorney?.email || "").toLowerCase().trim();
-    if (STRIPE_PAYMENT_METHOD_BYPASS_EMAILS.has(attorneyEmail)) return true;
-    if (!attorney?.stripeCustomerId) return false;
-    const customer = await stripe.customers.retrieve(attorney.stripeCustomerId);
-    return Boolean(customer?.invoice_settings?.default_payment_method);
-  } catch (err) {
-    console.warn("[jobs] Unable to verify attorney payment method", err?.message || err);
-    return false;
+// Live invalidation only. The stream never sends Matter content, so every
+// client still re-fetches its own authorized browse and recommendation views.
+router.get("/stream", ...authenticatedGuards, requireRole("paralegal"), (req, res) => {
+  res.status(200);
+  res.set({
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  if (typeof res.flushHeaders === "function") res.flushHeaders();
+  if (req.socket) {
+    req.socket.setTimeout(0);
+    req.socket.setNoDelay(true);
+    req.socket.setKeepAlive(true);
   }
-}
+  res.write(`event: ready\ndata: ${JSON.stringify({ at: new Date().toISOString() })}\n\n`);
+  const unsubscribe = addMatterDiscoverySubscriber(res);
+  const heartbeat = setInterval(() => {
+    try {
+      res.write("event: ping\ndata: {}\n\n");
+    } catch (err) {
+      runtimeLogger.debug("[jobs] discovery stream heartbeat ended", err?.message || err);
+    }
+  }, 25_000);
+  const cleanup = () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  };
+  req.on("close", cleanup);
+  req.on("aborted", cleanup);
+  res.on("error", cleanup);
+});
 
-async function linkJobToCase(caseDoc, jobId) {
+// Cross-process reconciliation token. Live SSE events provide immediate updates
+// inside the current web process; this lightweight database fingerprint catches
+// changes made by a scheduler or another web process without repeatedly loading
+// or repainting the full Browse and recommendation projections.
+router.get("/discovery-version", ...authenticatedGuards, requireRole("paralegal"), async (_req, res) => {
+  try {
+    const caseFilter = openDiscoveryCaseFilter();
+    const [caseCount, latestCase, jobCount, latestJob] = await Promise.all([
+      Case.countDocuments(caseFilter),
+      Case.findOne(caseFilter).sort({ updatedAt: -1, _id: -1 }).select("_id updatedAt").lean(),
+      Job.countDocuments({ status: "open" }),
+      Job.findOne({ status: "open" }).sort({ createdAt: -1, _id: -1 }).select("_id createdAt").lean(),
+    ]);
+    const version = [
+      caseCount,
+      latestCase?.updatedAt ? new Date(latestCase.updatedAt).getTime() : 0,
+      latestCase?._id || "",
+      jobCount,
+      latestJob?.createdAt ? new Date(latestJob.createdAt).getTime() : 0,
+      latestJob?._id || "",
+    ].join(":");
+    res.set("Cache-Control", "private, no-store");
+    return res.json({ version });
+  } catch (err) {
+    runtimeLogger.warn("[jobs] discovery version unavailable", err?.message || err);
+    return res.status(503).json({ error: "Matter updates are temporarily unavailable." });
+  }
+});
+
+async function linkJobToCase(caseDoc, jobId, session = null) {
   if (!caseDoc?._id || !jobId) return;
   await Case.updateOne(
     {
       _id: caseDoc._id,
       $or: [{ jobId: null }, { jobId: { $exists: false } }, { jobId }],
     },
-    { $set: { jobId } }
+    { $set: { jobId } },
+    ...(session ? [{ session }] : [])
   );
 }
 
 // POST /jobs — Attorney posts a job
 router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) => {
   try {
-    const hasPaymentMethod = await attorneyHasPaymentMethod(req.user._id || req.user.id);
-    if (isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.POST_MATTER) && !hasPaymentMethod) {
-      return res
-        .status(403)
-        .json({ error: "Connect Stripe and add a payment method before posting a job." });
-    }
     const caseId = req.body?.caseId || null;
     let caseDoc = null;
     if (caseId) {
       if (!mongoose.isValidObjectId(caseId)) {
-        return res.status(400).json({ error: "Invalid case id" });
+        return res.status(400).json({ error: "Invalid Matter ID" });
       }
-      caseDoc = await Case.findById(caseId).select("attorney attorneyId jobId");
+      caseDoc = await Case.findById(caseId).select(
+        "attorney attorneyId jobId state locationState experiencePreference minimumYearsExperience"
+      );
       if (!caseDoc) {
-        return res.status(404).json({ error: "Case not found" });
+        return res.status(404).json({ error: "Matter not found" });
       }
       const ownerId = String(caseDoc.attorneyId || caseDoc.attorney || "");
       if (!ownerId || ownerId !== String(req.user._id)) {
-        return res.status(403).json({ error: "You are not the attorney for this case" });
+        return res.status(403).json({ error: "You are not the attorney for this Matter" });
       }
       if (caseDoc.jobId) {
         const existingById = await Job.findById(caseDoc.jobId);
@@ -135,9 +158,12 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
     }
 
     const attorneyProfile = await User.findById(req.user._id || req.user.id).select("state");
-    const attorneyState = String(attorneyProfile?.state || "").trim().toUpperCase();
-    if (!attorneyState) {
-      return res.status(400).json({ error: "Attorney profile state is required to post a job." });
+    const requestedState = cleanTitle(req.body.state || req.body.locationState || "", 200);
+    const matterState = cleanTitle(caseDoc?.state || caseDoc?.locationState || "", 200);
+    const attorneyState = cleanTitle(attorneyProfile?.state || "", 200);
+    const resolvedState = matterState || requestedState || attorneyState;
+    if (!resolvedState) {
+      return res.status(400).json({ error: "Matter state is required to create a Matter." });
     }
 
     const title = cleanTitle(req.body.title, 150);
@@ -163,7 +189,6 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
       return res.status(400).json({ error: err.message });
     }
     const postingPolicy = evaluateMatterPosting({
-      paymentMethodSaved: hasPaymentMethod,
       title,
       details: description,
       practiceArea: practiceAreaValue,
@@ -171,12 +196,23 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
       deadlineProvided: false,
       deadlineValid: true,
       attorneyStateRequired: true,
-      attorneyState,
+      attorneyState: resolvedState,
     });
     if (!postingPolicy.ready) {
-      return res.status(400).json({ error: "This job is not ready to publish.", blockers: postingPolicy.blockers });
+      return res.status(400).json({ error: "This Matter is not ready to publish.", blockers: postingPolicy.blockers });
     }
 
+    const requestedExperience = cleanText(
+      req.body.experiencePreference || req.body.experience || "",
+      { max: 200, allowNewlines: false }
+    );
+    const experienceRequirement = resolveExperienceRequirement(
+      caseDoc || {},
+      {
+        experiencePreference: requestedExperience,
+        minimumYearsExperience: req.body.minimumYearsExperience,
+      }
+    );
     const jobPayload = {
       caseId: caseDoc?._id || null,
       attorneyId: req.user._id,
@@ -184,13 +220,19 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
       practiceArea: practiceAreaValue,
       description,
       budget: Math.round(budget),
-      state: attorneyState,
-      locationState: attorneyState,
+      state: resolvedState,
+      locationState: resolvedState,
+      experiencePreference: experienceRequirement.preference,
+      minimumYearsExperience: experienceRequirement.minimumYears,
     };
 
     let job = null;
     try {
-      job = await Job.create(jobPayload);
+      job = await withActiveAccountWrite([req.user._id || req.user.id], async session => {
+        const [created] = await Job.create([jobPayload], { session });
+        if (caseDoc) await linkJobToCase(caseDoc, created._id, session);
+        return created;
+      }, { ownerId: req.user._id || req.user.id, authVersion: req.auth?.payload?.av });
     } catch (err) {
       if (err?.code === 11000 && caseDoc?._id) {
         job = await Job.findOne({ caseId: caseDoc._id });
@@ -200,218 +242,43 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
     }
 
     if (!job) {
-      return res.status(409).json({ error: "A job already exists for this case." });
+      return res.status(409).json({ error: "A posting already exists for this Matter." });
     }
 
-    if (caseDoc) {
-      await linkJobToCase(caseDoc, job._id);
-    }
-
+    publishMatterDiscoveryEvent("matter_published_refresh");
     res.json(job);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (err.publicCode) return res.status(err.status).json({ code: err.publicCode, error: err.message });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-function buildAttorneyPreview(doc) {
-  if (!doc || typeof doc !== "object") return null;
-  const normalizedId = normalizeId(doc);
-  return {
-    _id: normalizedId,
-    firstName: doc.firstName || "",
-    lastName: doc.lastName || "",
-    lawFirm: doc.lawFirm || doc.firmName || "",
-    profileImage: doc.profileImage || doc.avatarURL || "",
-  };
-}
-
-function normalizeId(source) {
-  if (!source) return null;
-  if (typeof source === "string") return source;
-  if (typeof source === "object") {
-    if (source._id) return source._id;
-    if (typeof source.toString === "function") return source.toString();
-    return null;
-  }
-  return source;
-}
-
-function shapeListing({ job = null, caseDoc = null }) {
-  const autoRelistTypes = new Set(["zero_auto", "partial_attorney", "expired_zero", "admin"]);
-  const autoRelistFallback =
-    !caseDoc?.relistRequestedAt &&
-    caseDoc?.payoutFinalizedAt &&
-    autoRelistTypes.has(String(caseDoc?.payoutFinalizedType || ""));
-  const totalAmount = typeof caseDoc?.totalAmount === "number" ? caseDoc.totalAmount : null;
-  const lockedTotalAmount = typeof caseDoc?.lockedTotalAmount === "number" ? caseDoc.lockedTotalAmount : null;
-  const remainingAmount = typeof caseDoc?.remainingAmount === "number" ? caseDoc.remainingAmount : null;
-  const amountForCase =
-    remainingAmount != null ? remainingAmount : lockedTotalAmount != null ? lockedTotalAmount : totalAmount;
-  const budgetFromCase = amountForCase != null ? Math.round(amountForCase / 100) : null;
-  const attorneySource = job?.attorneyId || caseDoc?.attorney || null;
-  const normalizedAttorneyId =
-    normalizeId(job?.attorneyId) || normalizeId(caseDoc?.attorneyId) || normalizeId(caseDoc?.attorney);
-  const jobState = job?.state || job?.locationState || "";
-  const caseState = caseDoc?.state || caseDoc?.locationState || "";
-  const resolvedState = jobState || caseState;
-
-  return {
-    id: caseDoc?._id || job?.caseId || job?._id,
-    _id: caseDoc?._id || job?._id,
-    caseId: caseDoc?._id || job?.caseId || null,
-    jobId: job?._id || caseDoc?.jobId || null,
-    title: job?.title || caseDoc?.title || "Untitled Case",
-    practiceArea: job?.practiceArea || caseDoc?.practiceArea || "",
-    briefSummary: caseDoc?.briefSummary || "",
-    shortDescription: job?.shortDescription || caseDoc?.briefSummary || "",
-    description: job?.description || caseDoc?.details || "",
-    totalAmount,
-    lockedTotalAmount,
-    remainingAmount,
-    budget: typeof job?.budget === "number" ? job.budget : budgetFromCase,
-    currency: caseDoc?.currency || "usd",
-    state: resolvedState,
-    locationState: job?.locationState || job?.state || caseDoc?.locationState || caseDoc?.state || "",
-    createdAt: job?.createdAt || caseDoc?.createdAt || new Date(),
-    attorneyId: normalizedAttorneyId,
-    attorney: buildAttorneyPreview(attorneySource),
-    applicantsCount: Array.isArray(caseDoc?.applicants) ? caseDoc.applicants.length : job?.applicantsCount || 0,
-    status: caseDoc?.status || job?.status || "open",
-    contextCaseId: caseDoc?._id || job?.caseId || null,
-    tasks: Array.isArray(caseDoc?.tasks) ? caseDoc.tasks : [],
-    relistRequestedAt: caseDoc?.relistRequestedAt || (autoRelistFallback ? caseDoc.payoutFinalizedAt : null),
-  };
-}
-
-// GET /jobs/open — paralegals view available jobs
+// GET /jobs/open — paralegals browse every currently available Matter.
 router.get("/open", ...authenticatedGuards, requireRole("paralegal"), async (req, res) => {
   try {
-    const limit = clamp(parseInt(req.query.limit, 10) || 200, 1, 500);
-    const blockedIds = await getBlockedUserIds(req.user.id);
-    const autoRelistTypes = ["zero_auto", "partial_attorney", "expired_zero", "admin"];
-    const jobFilter = { status: "open" };
-    const caseFilter = {
-      archived: { $ne: true },
-      $or: [
-        { status: "open" },
-        {
-          status: "paused",
-          payoutFinalizedAt: { $ne: null },
-          $or: [
-            { relistRequestedAt: { $ne: null } },
-            { payoutFinalizedType: { $in: autoRelistTypes } },
-          ],
-        },
-      ],
-      paralegal: null,
-      paralegalId: null,
-    };
-    if (blockedIds.length) {
-      jobFilter.attorneyId = { $nin: blockedIds };
-      caseFilter.attorney = { $nin: blockedIds };
-      caseFilter.attorneyId = { $nin: blockedIds };
-    }
-
-    const [jobs, cases] = await Promise.all([
-      Job.find(jobFilter)
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .populate({
-          path: "attorneyId",
-          select: "firstName lastName lawFirm firmName profileImage avatarURL",
-        })
-        .lean(),
-      Case.find(caseFilter)
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .select("title practiceArea details briefSummary totalAmount lockedTotalAmount remainingAmount currency state locationState status applicants attorney attorneyId jobId createdAt tasks relistRequestedAt payoutFinalizedAt payoutFinalizedType")
-        .populate({
-          path: "attorney",
-          select: "firstName lastName lawFirm firmName profileImage avatarURL",
-        })
-        .lean(),
-    ]);
-
-    const jobIds = jobs.map((job) => String(job?._id || "")).filter(Boolean);
-    const jobCaseLinks = jobIds.length
-      ? await Case.find({ jobId: { $in: jobIds } })
-          .select("jobId status archived relistRequestedAt payoutFinalizedAt")
-          .lean()
-      : [];
-    const linkedJobEligibility = new Map();
-    jobCaseLinks.forEach((doc) => {
-      const jobId = String(doc.jobId || "");
-      if (!jobId) return;
-      const status = String(doc.status || "").toLowerCase();
-      const autoRelistEligible =
-        status === "paused" &&
-        doc.payoutFinalizedAt &&
-        autoRelistTypes.includes(String(doc.payoutFinalizedType || ""));
-      const eligible =
-        doc.archived !== true &&
-        (status === "open" ||
-          (status === "paused" && doc.relistRequestedAt && doc.payoutFinalizedAt) ||
-          autoRelistEligible);
-      linkedJobEligibility.set(jobId, eligible);
-    });
-
-    const activeCaseIds = new Set(cases.map((doc) => String(doc._id)));
-    const jobByCaseId = new Map();
-    const orphanJobs = [];
-    jobs.forEach((job) => {
-      const caseKey = job.caseId ? String(job.caseId) : null;
-      if (caseKey) {
-        if (activeCaseIds.has(caseKey)) {
-          if (!jobByCaseId.has(caseKey)) {
-            jobByCaseId.set(caseKey, job);
-          }
-        }
-        return;
-      }
-      const jobId = String(job?._id || "");
-      if (jobId && linkedJobEligibility.has(jobId) && !linkedJobEligibility.get(jobId)) {
-        return;
-      }
-      orphanJobs.push(shapeListing({ job, caseDoc: null }));
-    });
-
-    const shapedCases = [];
-    cases.forEach((caseDoc) => {
-      const key = String(caseDoc._id);
-      const job = jobByCaseId.get(key) || null;
-      if (job) jobByCaseId.delete(key);
-      if (!job) {
-        const fallbackCase = { ...caseDoc, jobId: null };
-        shapedCases.push(shapeListing({ job: null, caseDoc: fallbackCase }));
-        return;
-      }
-      shapedCases.push(shapeListing({ job, caseDoc }));
-    });
-
-    const items = [...shapedCases, ...orphanJobs];
-    if (items.length > limit) {
-      items.length = limit;
-    }
-    if (items.length) {
-      const jobIds = items.map((item) => item.jobId).filter(Boolean);
-      if (jobIds.length) {
-        const apps = await Application.find({
-          paralegalId: req.user._id || req.user.id,
-          jobId: { $in: jobIds },
-        })
-          .select("jobId createdAt")
-          .lean();
-        const appliedMap = new Map(apps.map((app) => [String(app.jobId), app.createdAt]));
-        items.forEach((item) => {
-          const appliedAt = appliedMap.get(String(item.jobId || ""));
-          if (appliedAt) item.appliedAt = appliedAt;
-        });
-      }
-    }
-
-    res.json(items);
+    const browse = req.query.view === "browse";
+    const page = await readOpenListingPage(req.user._id || req.user.id, req.query, { browse });
+    res.set("Cache-Control", "private, no-store");
+    res.set("X-Total-Count", String(page.total));
+    res.set("X-Page", String(page.page));
+    res.set("X-Total-Pages", String(page.totalPages));
+    return res.json(browse || req.query.view === "catalog" ? page : page.items);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(err.status || 500).json({ error: err.status ? err.message : "Available Matters could not be loaded.", ...(err.publicCode ? { code: err.publicCode } : {}) });
+  }
+});
+
+// GET /jobs/recommended — authoritative personalized recommendation projection.
+// Browse remains intentionally broader; application history is a permanent
+// recommendation exclusion regardless of the application's current status.
+router.get("/recommended", ...authenticatedGuards, requireRole("paralegal"), async (req, res) => {
+  try {
+    const projection = await readRecommendedListingPage(req.user._id || req.user.id, req.query);
+    res.set("Cache-Control", "private, no-store");
+    return res.json(projection);
+  } catch (err) {
+    runtimeLogger.error("[jobs] recommendation projection error", err);
+    return res.status(err.status || 500).json({ error: err.status ? err.message : "Unable to load recommendations.", ...(err.publicCode ? { code: err.publicCode } : {}) });
   }
 });
 
@@ -421,8 +288,13 @@ router.get("/my", ...authenticatedGuards, requireRole("attorney"), async (req, r
     const jobs = await Job.find({ attorneyId: req.user._id });
     res.json(jobs);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Server error" });
   }
+});
+
+router.post("/:jobId/requirements/decline", ...mutatingGuards, requireRole("paralegal"), async (req, res) => {
+  try { res.json(await require('../services/matterRequirements').declineRequirements({jobId:req.params.jobId,userId:req.user._id||req.user.id,authVersion:req.authVersion,requirements:req.body.requirements,confirmed:req.body.confirmed})); }
+  catch(error){res.status(error.status||503).json({error:error.status?error.message:'The decision could not be confirmed. Try again.'});}
 });
 
 // POST /jobs/:jobId/apply — paralegal applies
@@ -431,20 +303,20 @@ router.post("/:jobId/apply", ...mutatingGuards, requireRole("paralegal"), async 
     if (!createApplicationForJob) {
       return res.status(500).json({ error: "Applications service unavailable" });
     }
-    const application = await createApplicationForJob(req.params.jobId, req.user, req.body?.coverLetter || "");
+    const application = await createApplicationForJob(req.params.jobId, req.user, req.body?.coverLetter || "", req.body?.requirementAnswers);
     res.status(201).json(application);
   } catch (err) {
     if (err.status) {
       return res.status(err.status).json({ error: err.message });
     }
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-// POST /jobs/:jobId/hire/:paralegalId — disabled to avoid hiring without funded escrow
+// POST /jobs/:jobId/hire/:paralegalId — disabled to avoid hiring without confirmed Matter funding
 router.post("/:jobId/hire/:paralegalId", auth, protectMutations, requireRole(["attorney"]), async (_req, res) => {
   return res.status(410).json({
-    error: "Direct job-to-paralegal hire is disabled. Use the case hire + funding flow to ensure the case is funded.",
+    error: "Direct posting-to-paralegal hire is disabled. Use the Matter hire and funding flow to ensure the Matter is funded.",
   });
 });
 

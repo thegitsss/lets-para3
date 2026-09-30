@@ -1,0 +1,3876 @@
+{
+  "references": [
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/index.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "#how",
+      "text": "How It Works"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "#for-attorneys",
+      "text": "For Attorneys"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "#for-paralegals",
+      "text": "For Paralegals"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": "Browse Paralegals"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Sign In"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": "Create an account"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "#how",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": "Post a matter"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": "Browse paralegals"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Open the active matter"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html",
+      "raw": "attorney-faq.html",
+      "text": "FOR ATTORNEYS Attorney FAQ"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html",
+      "raw": "paralegal-faq.html",
+      "text": "FOR PARALEGALS Paralegal FAQ"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=attorney",
+      "raw": "signup.html?role=attorney",
+      "text": "FOR ATTORNEYS Post a matter"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=paralegal",
+      "raw": "signup.html?role=paralegal",
+      "text": "FOR PARALEGALS Apply to join"
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "#how",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=attorney",
+      "raw": "signup.html?role=attorney",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html",
+      "raw": "attorney-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=paralegal",
+      "raw": "signup.html?role=paralegal",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html",
+      "raw": "paralegal-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "raw": "accessibility.html",
+      "text": ""
+    },
+    {
+      "source": "/index.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/login.html",
+      "href": "http://127.0.0.1:5050/login.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/login.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/login.html",
+      "href": "http://127.0.0.1:5050/api/auth/google?intent=login",
+      "raw": "/api/auth/google?intent=login",
+      "text": "Continue with Google"
+    },
+    {
+      "source": "/login.html",
+      "href": "http://127.0.0.1:5050/forgot-password.html",
+      "raw": "forgot-password.html",
+      "text": "Forgot password?"
+    },
+    {
+      "source": "/login.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": "Sign up"
+    },
+    {
+      "source": "/signup.html",
+      "href": "http://127.0.0.1:5050/signup.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/signup.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/signup.html",
+      "href": "http://127.0.0.1:5050/api/auth/google?intent=signup&role=attorney",
+      "raw": "/api/auth/google?intent=signup&role=attorney",
+      "text": "Continue with Google"
+    },
+    {
+      "source": "/signup.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Log in"
+    },
+    {
+      "source": "/signup.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": "Learn more about our vetting process."
+    },
+    {
+      "source": "/signup.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": "Terms of Service"
+    },
+    {
+      "source": "/signup.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": "Privacy Policy"
+    },
+    {
+      "source": "/signup.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": "Terms of Service"
+    },
+    {
+      "source": "/signup.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": "Privacy Policy"
+    },
+    {
+      "source": "/signup.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Log in"
+    },
+    {
+      "source": "/signup.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Return home"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": "How It Works"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": "For Attorneys"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": "For Paralegals"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": "Browse Paralegals"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Sign In"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": "Create an account"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=6a530880c2e01cd42b2d122d",
+      "raw": "profile-paralegal.html?paralegalId=6a530880c2e01cd42b2d122d",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=6a530880c2e01cd42b2d122d",
+      "raw": "profile-paralegal.html?paralegalId=6a530880c2e01cd42b2d122d",
+      "text": "Shelbie Schupp"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=6a523eb2c2e01cd42b2ced99",
+      "raw": "profile-paralegal.html?paralegalId=6a523eb2c2e01cd42b2ced99",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=6a523eb2c2e01cd42b2ced99",
+      "raw": "profile-paralegal.html?paralegalId=6a523eb2c2e01cd42b2ced99",
+      "text": "Denise Leshe"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=6a4550934152f157dfbaa36a",
+      "raw": "profile-paralegal.html?paralegalId=6a4550934152f157dfbaa36a",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=6a4550934152f157dfbaa36a",
+      "raw": "profile-paralegal.html?paralegalId=6a4550934152f157dfbaa36a",
+      "text": "Sara Huff"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=6a452c7a4152f157dfba9113",
+      "raw": "profile-paralegal.html?paralegalId=6a452c7a4152f157dfba9113",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=6a452c7a4152f157dfba9113",
+      "raw": "profile-paralegal.html?paralegalId=6a452c7a4152f157dfba9113",
+      "text": "Lynda Rychen"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69e755b9a6810a3feab5604c",
+      "raw": "profile-paralegal.html?paralegalId=69e755b9a6810a3feab5604c",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69e755b9a6810a3feab5604c",
+      "raw": "profile-paralegal.html?paralegalId=69e755b9a6810a3feab5604c",
+      "text": "Abbi Marsh"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69dfd032873c04c1bfe5dcb3",
+      "raw": "profile-paralegal.html?paralegalId=69dfd032873c04c1bfe5dcb3",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69dfd032873c04c1bfe5dcb3",
+      "raw": "profile-paralegal.html?paralegalId=69dfd032873c04c1bfe5dcb3",
+      "text": "Karen Lewis"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69de9821873c04c1bfe5718b",
+      "raw": "profile-paralegal.html?paralegalId=69de9821873c04c1bfe5718b",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69de9821873c04c1bfe5718b",
+      "raw": "profile-paralegal.html?paralegalId=69de9821873c04c1bfe5718b",
+      "text": "Nomfundo Dumakude"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69de7657873c04c1bfe56446",
+      "raw": "profile-paralegal.html?paralegalId=69de7657873c04c1bfe56446",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69de7657873c04c1bfe56446",
+      "raw": "profile-paralegal.html?paralegalId=69de7657873c04c1bfe56446",
+      "text": "Concepcion Sosa"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69de4d37ed566ee56cd2f0da",
+      "raw": "profile-paralegal.html?paralegalId=69de4d37ed566ee56cd2f0da",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69de4d37ed566ee56cd2f0da",
+      "raw": "profile-paralegal.html?paralegalId=69de4d37ed566ee56cd2f0da",
+      "text": "Elainey Heltz"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69c0ace3044a73802311a4f9",
+      "raw": "profile-paralegal.html?paralegalId=69c0ace3044a73802311a4f9",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69c0ace3044a73802311a4f9",
+      "raw": "profile-paralegal.html?paralegalId=69c0ace3044a73802311a4f9",
+      "text": "Lucielle Tejeda"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Sign In"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": "Create Account"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=attorney",
+      "raw": "signup.html?role=attorney",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html",
+      "raw": "attorney-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=paralegal",
+      "raw": "signup.html?role=paralegal",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html",
+      "raw": "paralegal-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "raw": "accessibility.html",
+      "text": ""
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-settings.html",
+      "raw": "profile-settings.html",
+      "text": "Settings"
+    },
+    {
+      "source": "/browse-paralegals.html",
+      "href": "http://127.0.0.1:5050/profile-settings.html#profile",
+      "raw": "profile-settings.html#profile",
+      "text": "Member"
+    },
+    {
+      "source": "/forgot-password.html",
+      "href": "http://127.0.0.1:5050/forgot-password.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/forgot-password.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/forgot-password.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Back to sign in"
+    },
+    {
+      "source": "/forgot-password.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": "Privacy Policy"
+    },
+    {
+      "source": "/forgot-password.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": "Terms"
+    },
+    {
+      "source": "/forgot-password.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": "Admissions"
+    },
+    {
+      "source": "/forgot-password.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": "Contact"
+    },
+    {
+      "source": "/forgot-password.html",
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "raw": "accessibility.html",
+      "text": "Accessibility"
+    },
+    {
+      "source": "/reset-password.html?token=invalid",
+      "href": "http://127.0.0.1:5050/reset-password.html?token=invalid#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/reset-password.html?token=invalid",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/reset-password.html?token=invalid",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Back to sign in"
+    },
+    {
+      "source": "/verify-email.html",
+      "href": "http://127.0.0.1:5050/verify-email.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/verify-email.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/verify-email.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Return home"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": "How It Works"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": "For Attorneys"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": "For Paralegals"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": "Browse Paralegals"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Sign In"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": "Create an account"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#scope",
+      "raw": "#scope",
+      "text": "Scope"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#information",
+      "raw": "#information",
+      "text": "Information we collect"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#use",
+      "raw": "#use",
+      "text": "How we use information"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#disclosure",
+      "raw": "#disclosure",
+      "text": "How we disclose information"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#matter-assistant",
+      "raw": "#matter-assistant",
+      "text": "Matter-workspace LPC Assistant"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#ai-support",
+      "raw": "#ai-support",
+      "text": "AI-assisted support"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#cookies",
+      "raw": "#cookies",
+      "text": "Cookies and performance data"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#retention",
+      "raw": "#retention",
+      "text": "Retention and account deactivation"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#security",
+      "raw": "#security",
+      "text": "Security"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#choices",
+      "raw": "#choices",
+      "text": "Your choices and privacy requests"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#children",
+      "raw": "#children",
+      "text": "Age restrictions"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#international",
+      "raw": "#international",
+      "text": "Processing in the United States"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#changes",
+      "raw": "#changes",
+      "text": "Changes to this policy"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html#contact",
+      "raw": "#contact",
+      "text": "Contact us"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "https://openai.com/enterprise-privacy/",
+      "raw": "https://openai.com/enterprise-privacy/",
+      "text": "OpenAI’s enterprise privacy information"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": "contact form"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": "LPC contact form"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": "LPC contact form"
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=attorney",
+      "raw": "signup.html?role=attorney",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html",
+      "raw": "attorney-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=paralegal",
+      "raw": "signup.html?role=paralegal",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html",
+      "raw": "paralegal-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "raw": "accessibility.html",
+      "text": ""
+    },
+    {
+      "source": "/privacy.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": "How It Works"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": "For Attorneys"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": "For Paralegals"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": "Browse Paralegals"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Sign In"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": "Create an account"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-1",
+      "raw": "#section-1",
+      "text": "1. Let’s-ParaConnect Platform Overview"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-2",
+      "raw": "#section-2",
+      "text": "2. Flat-Fee Matters"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-3",
+      "raw": "#section-3",
+      "text": "3. Paralegal Replacement and Early Termination"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-4",
+      "raw": "#section-4",
+      "text": "4. Communication Between Attorneys and Paralegals"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-5",
+      "raw": "#section-5",
+      "text": "5. Account Registration"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-6",
+      "raw": "#section-6",
+      "text": "6. User Profiles"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-7",
+      "raw": "#section-7",
+      "text": "7. Let’s-ParaConnect Profiles"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-8",
+      "raw": "#section-8",
+      "text": "8. Working Together Outside the Platform"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-9",
+      "raw": "#section-9",
+      "text": "9. Paralegals Are Independent Contractors"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-10",
+      "raw": "#section-10",
+      "text": "10. Tax Reporting and IRS Forms"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-11",
+      "raw": "#section-11",
+      "text": "11. Matter Review and Dispute Resolution"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-12",
+      "raw": "#section-12",
+      "text": "12. Account Restrictions and Termination"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-13",
+      "raw": "#section-13",
+      "text": "13. Using the Platform"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-14",
+      "raw": "#section-14",
+      "text": "14. Content and Use of Platform Content"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-15",
+      "raw": "#section-15",
+      "text": "15. Notices Regarding Let’s-ParaConnect"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-16",
+      "raw": "#section-16",
+      "text": "16. Electronic Communications"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-17",
+      "raw": "#section-17",
+      "text": "17. Indemnification"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-18",
+      "raw": "#section-18",
+      "text": "18. Disclaimers and Limitations of Liability"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-19",
+      "raw": "#section-19",
+      "text": "19. Choice of Law and Venue"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-20",
+      "raw": "#section-20",
+      "text": "20. Waiver of Jury Trial and Class Action"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-21",
+      "raw": "#section-21",
+      "text": "21. Termination"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-22",
+      "raw": "#section-22",
+      "text": "22. General Terms"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-23",
+      "raw": "#section-23",
+      "text": "23. Changes to This Agreement"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html#section-24",
+      "raw": "#section-24",
+      "text": "24. Definitions"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": "Privacy Policy"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": "PRIVACY POLICY"
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=attorney",
+      "raw": "signup.html?role=attorney",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html",
+      "raw": "attorney-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=paralegal",
+      "raw": "signup.html?role=paralegal",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html",
+      "raw": "paralegal-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "raw": "accessibility.html",
+      "text": ""
+    },
+    {
+      "source": "/terms.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/accessibility.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": "How It Works"
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": "For Attorneys"
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": "For Paralegals"
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": "Browse Paralegals"
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Sign In"
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": "Create an account"
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "mailto:help@lets-paraconnect.com",
+      "raw": "mailto:help@lets-paraconnect.com",
+      "text": "help@lets-paraconnect.com"
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": "contact form"
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=attorney",
+      "raw": "signup.html?role=attorney",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html",
+      "raw": "attorney-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=paralegal",
+      "raw": "signup.html?role=paralegal",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html",
+      "raw": "paralegal-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "raw": "accessibility.html",
+      "text": ""
+    },
+    {
+      "source": "/accessibility.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/contact.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": "How It Works"
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": "For Attorneys"
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": "For Paralegals"
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": "Browse Paralegals"
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Sign In"
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": "Create an account"
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "tel:+13022814353",
+      "raw": "tel:+13022814353",
+      "text": "+1 (302) 281-4353"
+    },
+    {
+      "source": "/contact.html",
+      "href": "mailto:help@lets-paraconnect.com",
+      "raw": "mailto:help@lets-paraconnect.com",
+      "text": "help@lets-paraconnect.com"
+    },
+    {
+      "source": "/contact.html",
+      "href": "https://www.linkedin.com/company/lets-paraconnect/",
+      "raw": "https://www.linkedin.com/company/lets-paraconnect/",
+      "text": "in"
+    },
+    {
+      "source": "/contact.html",
+      "href": "https://www.facebook.com/LetsParaConnect/",
+      "raw": "https://www.facebook.com/LetsParaConnect/",
+      "text": "f"
+    },
+    {
+      "source": "/contact.html",
+      "href": "https://www.instagram.com/letsparaconnect/",
+      "raw": "https://www.instagram.com/letsparaconnect/",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=attorney",
+      "raw": "signup.html?role=attorney",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html",
+      "raw": "attorney-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=paralegal",
+      "raw": "signup.html?role=paralegal",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html",
+      "raw": "paralegal-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "raw": "accessibility.html",
+      "text": ""
+    },
+    {
+      "source": "/contact.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": "How It Works"
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": "For Attorneys"
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": "For Paralegals"
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": "Browse Paralegals"
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Sign In"
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": "Create an account"
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": "contact form"
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html#how",
+      "raw": "#how",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html#for-attorneys",
+      "raw": "#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html#for-paralegals",
+      "raw": "#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=attorney",
+      "raw": "signup.html?role=attorney",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html",
+      "raw": "attorney-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=paralegal",
+      "raw": "signup.html?role=paralegal",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html",
+      "raw": "paralegal-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "raw": "accessibility.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-admission.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": "How It Works"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": "For Attorneys"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": "For Paralegals"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": "Browse Paralegals"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Sign In"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": "Create an account"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q1",
+      "raw": "#q1",
+      "text": "1. Vetted paralegals"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q2",
+      "raw": "#q2",
+      "text": "2. Matter-based work—not placement"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q3",
+      "raw": "#q3",
+      "text": "3. Clear scope before work begins"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q4",
+      "raw": "#q4",
+      "text": "4. Stripe-processed, approval-based payments"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q5",
+      "raw": "#q5",
+      "text": "5. Independent, professional engagement"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q6",
+      "raw": "#q6",
+      "text": "6. What Let’s-ParaConnect is — and isn’t"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q7",
+      "raw": "#q7",
+      "text": "7. Is there a minimum Matter amount?"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q8",
+      "raw": "#q8",
+      "text": "8. Are there platform fees?"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q9",
+      "raw": "#q9",
+      "text": "9. Can attorneys request conflict checks?"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q10",
+      "raw": "#q10",
+      "text": "10. Admission & availability"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q11",
+      "raw": "#q11",
+      "text": "11. What do platform fees support?"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "paralegal-admission.html",
+      "text": "Our vetting process →"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=attorney",
+      "raw": "signup.html?role=attorney",
+      "text": "Post a matter"
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=attorney",
+      "raw": "signup.html?role=attorney",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html",
+      "raw": "attorney-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=paralegal",
+      "raw": "signup.html?role=paralegal",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html",
+      "raw": "paralegal-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "raw": "accessibility.html",
+      "text": ""
+    },
+    {
+      "source": "/attorney-faq.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": "How It Works"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": "For Attorneys"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": "For Paralegals"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": "Browse Paralegals"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Sign In"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": "Create an account"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q1",
+      "raw": "#q1",
+      "text": "1. What does Let’s-ParaConnect do for paralegals?"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q2",
+      "raw": "#q2",
+      "text": "2. Do I have to pay anything to join?"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q3",
+      "raw": "#q3",
+      "text": "3. How do payments work?"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q4",
+      "raw": "#q4",
+      "text": "4. Can I choose which Matters to apply for?"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q5",
+      "raw": "#q5",
+      "text": "5. Do I need to be certified?"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q6",
+      "raw": "#q6",
+      "text": "6. How soon can I start working?"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q7",
+      "raw": "#q7",
+      "text": "7. Do attorneys see my resume?"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q8",
+      "raw": "#q8",
+      "text": "8. How is Matter compensation handled?"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q9",
+      "raw": "#q9",
+      "text": "9. How do I build repeat work?"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q10",
+      "raw": "#q10",
+      "text": "10. What if there’s a dispute?"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q11",
+      "raw": "#q11",
+      "text": "11. What do platform fees support?"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "paralegal-admission.html",
+      "text": "Our Vetting Process"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=paralegal",
+      "raw": "signup.html?role=paralegal",
+      "text": "Apply to join"
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=attorney",
+      "raw": "signup.html?role=attorney",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/attorney-faq.html",
+      "raw": "attorney-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/signup.html?role=paralegal",
+      "raw": "signup.html?role=paralegal",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html",
+      "raw": "paralegal-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "raw": "accessibility.html",
+      "text": ""
+    },
+    {
+      "source": "/paralegal-faq.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/help.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/dashboard-attorney.html",
+      "raw": "dashboard-attorney.html",
+      "text": "Home"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/dashboard-attorney.html#cases",
+      "raw": "dashboard-attorney.html#cases",
+      "text": "Matters"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/dashboard-attorney.html#tasks",
+      "raw": "dashboard-attorney.html#tasks",
+      "text": "Tasks"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": "Paralegals"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/dashboard-attorney.html#funds",
+      "raw": "dashboard-attorney.html#funds",
+      "text": "Payments"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": "Contact Support"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/forgot-password.html",
+      "raw": "forgot-password.html",
+      "text": "Reset it here"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/profile-settings.html",
+      "raw": "profile-settings.html",
+      "text": "Settings"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/dashboard-attorney.html#cases",
+      "raw": "dashboard-attorney.html#cases",
+      "text": "Matters"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/dashboard-attorney.html#tasks",
+      "raw": "dashboard-attorney.html#tasks",
+      "text": "Tasks"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": "Privacy Policy"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": "Terms of Service"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": "Admissions"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": "Contact"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "raw": "accessibility.html",
+      "text": "Accessibility"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/profile-settings.html",
+      "raw": "profile-settings.html",
+      "text": "Settings"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/create-case.html",
+      "raw": "create-case.html",
+      "text": "Create"
+    },
+    {
+      "source": "/help.html",
+      "href": "http://127.0.0.1:5050/profile-settings.html#profile",
+      "raw": "profile-settings.html#profile",
+      "text": "Member"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/paralegalhelp.html#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/dashboard-paralegal.html",
+      "raw": "dashboard-paralegal.html",
+      "text": "Home"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/browse-jobs.html",
+      "raw": "browse-jobs.html",
+      "text": "Browse Matters"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/dashboard-paralegal.html#cases",
+      "raw": "dashboard-paralegal.html#cases",
+      "text": "My Matters & Applications"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/profile-settings.html",
+      "raw": "profile-settings.html",
+      "text": "Profile Settings"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/paralegalhelp.html",
+      "raw": "paralegalhelp.html",
+      "text": "Help"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "© Let’s‑ParaConnect 2026"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": "Contact Support"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/forgot-password.html",
+      "raw": "forgot-password.html",
+      "text": "Reset it here"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/profile-settings.html",
+      "raw": "profile-settings.html",
+      "text": "Settings"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/dashboard-paralegal.html#cases",
+      "raw": "dashboard-paralegal.html#cases",
+      "text": "My Matters & Applications"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/profile-settings.html#securitySection",
+      "raw": "profile-settings.html#securitySection",
+      "text": "Profile Settings"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/profile-settings.html#securitySection",
+      "raw": "profile-settings.html#securitySection",
+      "text": "Stripe account"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": "Privacy Policy"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": "Terms of Service"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": "Admissions"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": "Contact"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "raw": "accessibility.html",
+      "text": "Accessibility"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/profile-settings.html",
+      "raw": "profile-settings.html",
+      "text": "Settings"
+    },
+    {
+      "source": "/paralegalhelp.html",
+      "href": "http://127.0.0.1:5050/profile-settings.html#profile",
+      "raw": "profile-settings.html#profile",
+      "text": "Member"
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/definitely-not-a-real-public-page#main",
+      "raw": "#main",
+      "text": "Skip to main content"
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": "How It Works"
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": "For Attorneys"
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": "For Paralegals"
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": "Browse Paralegals"
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": "Sign In"
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": "Create an account"
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "login.html",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/signup.html",
+      "raw": "signup.html",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/",
+      "raw": "/",
+      "text": "Go to homepage"
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "/browse-paralegals.html",
+      "text": "Browse paralegals"
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/login.html",
+      "raw": "/login.html",
+      "text": "Sign in"
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "/contact.html",
+      "text": "Contact support"
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "raw": "index.html#how",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "raw": "index.html#for-attorneys",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "raw": "index.html#for-paralegals",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "raw": "browse-paralegals.html",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/signup.html?role=attorney",
+      "raw": "signup.html?role=attorney",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/attorney-faq.html",
+      "raw": "attorney-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/contact.html",
+      "raw": "contact.html",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/signup.html?role=paralegal",
+      "raw": "signup.html?role=paralegal",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/paralegal-faq.html",
+      "raw": "paralegal-faq.html",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "raw": "/paralegal-admission.html",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/terms.html",
+      "raw": "terms.html",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "raw": "privacy.html",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "raw": "accessibility.html",
+      "text": ""
+    },
+    {
+      "source": "/definitely-not-a-real-public-page",
+      "href": "http://127.0.0.1:5050/index.html",
+      "raw": "index.html",
+      "text": "Let’s-ParaConnect"
+    }
+  ],
+  "checks": [
+    {
+      "href": "http://127.0.0.1:5050/index.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/index.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/index.html#how",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#how",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/index.html#for-attorneys",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#for-attorneys",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/index.html#for-paralegals",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#for-paralegals",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/browse-paralegals.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/login.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/signup.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/attorney-faq.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-faq.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/signup.html?role=attorney",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/signup.html?role=paralegal",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/contact.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-admission.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/accessibility.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/login.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/api/auth/google?intent=login",
+      "status": 302,
+      "location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=211233504269-0bibqn633gp3fas2ttg6ab16b0th5j35.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fwww.lets-paraconnect.com%2Fapi%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid+email+profile&state=YcenmV38903dN1rTvE72oCzUJ7ZDbgXV7RYPjk10rGQ&nonce=3_whKTBDW_A9h0jY7sFy3F36OHGKvWx5S7QqByKuHnI&prompt=select_account",
+      "contentType": "text/plain; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/forgot-password.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/signup.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/api/auth/google?intent=signup&role=attorney",
+      "status": 302,
+      "location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=211233504269-0bibqn633gp3fas2ttg6ab16b0th5j35.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fwww.lets-paraconnect.com%2Fapi%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid+email+profile&state=o__A28VO80GkcHS7B5qON4EM2ZrX6Zi-aJdnIZfp16U&nonce=w_s7dCrfcKCFvdGKqkjx5OF5naYAlOvqH7NrYpq1DWk&prompt=select_account",
+      "contentType": "text/plain; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/browse-paralegals.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=6a530880c2e01cd42b2d122d",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=6a523eb2c2e01cd42b2ced99",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=6a4550934152f157dfbaa36a",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=6a452c7a4152f157dfba9113",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69e755b9a6810a3feab5604c",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69dfd032873c04c1bfe5dcb3",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69de9821873c04c1bfe5718b",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69de7657873c04c1bfe56446",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69de4d37ed566ee56cd2f0da",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/profile-paralegal.html?paralegalId=69c0ace3044a73802311a4f9",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/profile-settings.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/profile-settings.html#profile",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#profile",
+      "hashExists": false,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/forgot-password.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/reset-password.html?token=invalid#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/verify-email.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#scope",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#scope",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#information",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#information",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#use",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#use",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#disclosure",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#disclosure",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#matter-assistant",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#matter-assistant",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#ai-support",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#ai-support",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#cookies",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#cookies",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#retention",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#retention",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#security",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#security",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#choices",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#choices",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#children",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#children",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#international",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#international",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#changes",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#changes",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/privacy.html#contact",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#contact",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-1",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-1",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-2",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-2",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-3",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-3",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-4",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-4",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-5",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-5",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-6",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-6",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-7",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-7",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-8",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-8",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-9",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-9",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-10",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-10",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-11",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-11",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-12",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-12",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-13",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-13",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-14",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-14",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-15",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-15",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-16",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-16",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-17",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-17",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-18",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-18",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-19",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-19",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-20",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-20",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-21",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-21",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-22",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-22",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-23",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-23",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/terms.html#section-24",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#section-24",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/accessibility.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/contact.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-admission.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-admission.html#how",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#how",
+      "hashExists": false,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-admission.html#for-attorneys",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#for-attorneys",
+      "hashExists": false,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-admission.html#for-paralegals",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#for-paralegals",
+      "hashExists": false,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/attorney-faq.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q1",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q1",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q2",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q2",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q3",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q3",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q4",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q4",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q5",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q5",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q6",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q6",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q7",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q7",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q8",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q8",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q9",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q9",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q10",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q10",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/attorney-faq.html#q11",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q11",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q1",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q1",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q2",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q2",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q3",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q3",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q4",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q4",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q5",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q5",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q6",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q6",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q7",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q7",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q8",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q8",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q9",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q9",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q10",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q10",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegal-faq.html#q11",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#q11",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/help.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/dashboard-attorney.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/dashboard-attorney.html#cases",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#cases",
+      "hashExists": false,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/dashboard-attorney.html#tasks",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#tasks",
+      "hashExists": false,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/dashboard-attorney.html#funds",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#funds",
+      "hashExists": false,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/create-case.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegalhelp.html#main",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/dashboard-paralegal.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/browse-jobs.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/dashboard-paralegal.html#cases",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#cases",
+      "hashExists": false,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/paralegalhelp.html",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/profile-settings.html#securitySection",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#securitySection",
+      "hashExists": true,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/definitely-not-a-real-public-page#main",
+      "status": 404,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "#main",
+      "hashExists": null,
+      "error": null
+    },
+    {
+      "href": "http://127.0.0.1:5050/",
+      "status": 200,
+      "location": null,
+      "contentType": "text/html; charset=utf-8",
+      "hash": "",
+      "hashExists": null,
+      "error": null
+    }
+  ]
+}

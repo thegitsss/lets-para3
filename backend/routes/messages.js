@@ -1,3 +1,6 @@
+const matterFileWrites = require("../services/matterFileWrites"), matterRetirement = require("../services/matterStorageRetirement");
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:messages");
 // backend/routes/messages.js
 const router = require("express").Router();
 const mongoose = require("mongoose");
@@ -5,43 +8,52 @@ const verifyToken = require("../utils/verifyToken");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const { requireApproved, requireRole, requireCaseAccess } = require("../utils/authz");
 const Message = require("../models/Message");
+const attorneyConversation = require("../services/attorneyConversation");
+const CaseFile = require("../models/CaseFile");
 const Case = require("../models/Case");
 const User = require("../models/User");
 const AuditLog = require("../models/AuditLog"); // match filename
 const { notifyUser } = require("../utils/notifyUser");
 const { containsProfanity, maskProfanity } = require("../utils/badWords");
+const { removeAngleMarkup } = require("../utils/sanitize");
 const { CASE_STATE } = require("../utils/caseState");
 const { evaluateMessagingPermission: evaluatePlatformMessagingPermission } = require("../services/attorneyWorkflowPolicy");
 const { evaluateMessagingPermission: evaluateParalegalMessagingPermission } = require("../services/paralegalWorkflowPolicy");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
 const { publishCaseEvent } = require("../utils/caseEvents");
 const { publishNotificationEvent } = require("../utils/notificationEvents");
-const { decryptMessagePayload, decryptString } = require("../utils/dataEncryption");
+const { publishCaseProjectionRefresh } = require("../utils/caseProjectionEvents");
+const {
+  buildCaseFileKeyQuery,
+  decryptCaseFilePayload,
+  decryptMessagePayload,
+  decryptString,
+} = require("../utils/dataEncryption");
 const { isWorkspacePresenceActive } = require("../utils/workspacePresence");
-
-// ----------------------------------------
-// CSRF (enabled in production or when ENABLE_CSRF=true)
-// ----------------------------------------
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
-}
+const { csrfProtection } = require("../utils/csrf");
+const { resolveMessageNotificationPolicy } = require("../utils/messageNotificationPolicy");
+const { applyAssignmentVisibility, buildAssignmentVisibilityLookup } = require("../utils/matterAssignmentVisibility");
 
 // ----------------------------------------
 // Helpers
 // ----------------------------------------
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const isObjId = (id) => mongoose.isValidObjectId(id);
+const validReaction = value => typeof value === 'string' && value.trim().length > 0 && value.trim().length <= 30
+  && !/[.$\x00-\x1f\x7f]/.test(value) && !['__proto__', 'constructor', 'prototype'].includes(value.trim());
 
 function sanitizeText(s) {
   if (typeof s !== "string") return "";
-  const stripped = s.replace(/<[^>]*>/g, "").replace(/[\u0000-\u001F\u007F]/g, "").trim();
+  const stripped = removeAngleMarkup(s).replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001F\u007F]/g, "").trim();
   if (!stripped) return "";
   const limited = stripped.slice(0, 2000);
   return containsProfanity(limited) ? maskProfanity(limited) : limited;
+}
+
+function sanitizeClientMessageId(value) {
+  const id = String(value || "").trim();
+  if (!id) return "";
+  return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{15,127}$/.test(id) ? id : null;
 }
 
 function buildCaseAccessFilter(user) {
@@ -121,14 +133,6 @@ function buildShortPreview(text = "", maxLen = 50) {
   return `${source.slice(0, maxLen - 1).trim()}…`;
 }
 
-function buildMessagesAfterBoundary(createdAt, messageId) {
-  return {
-    $or: [
-      { createdAt: { $gt: createdAt } },
-      { createdAt, _id: { $gt: messageId } },
-    ],
-  };
-}
 
 function buildMessagesBeforeBoundary(createdAt, messageId) {
   return {
@@ -139,10 +143,7 @@ function buildMessagesBeforeBoundary(createdAt, messageId) {
   };
 }
 
-const MESSAGE_NOTIFY_COOLDOWN_MS = Math.max(
-  0,
-  parseInt(process.env.MESSAGE_NOTIFY_COOLDOWN_MS, 10) || 2 * 60 * 60 * 1000
-);
+const MESSAGE_NOTIFICATION_COOLDOWN_MS = resolveMessageNotificationPolicy().suppressMs;
 
 async function shouldNotifyForMessage({ caseId, messageDoc, senderRole }) {
   const caseObjectId = toObjectId(caseId);
@@ -152,7 +153,7 @@ async function shouldNotifyForMessage({ caseId, messageDoc, senderRole }) {
   if (!caseObjectId || !currentMessageId || !currentCreatedAt || Number.isNaN(currentCreatedAt.getTime())) {
     return true;
   }
-  if (!normalizedSenderRole || MESSAGE_NOTIFY_COOLDOWN_MS <= 0) {
+  if (!normalizedSenderRole || MESSAGE_NOTIFICATION_COOLDOWN_MS <= 0) {
     return true;
   }
   const currentBoundary = buildMessagesBeforeBoundary(currentCreatedAt, currentMessageId);
@@ -180,7 +181,7 @@ async function shouldNotifyForMessage({ caseId, messageDoc, senderRole }) {
   }
 
   const gapMs = currentCreatedAt.getTime() - latestMessageCreatedAt.getTime();
-  return gapMs >= MESSAGE_NOTIFY_COOLDOWN_MS;
+  return gapMs >= MESSAGE_NOTIFICATION_COOLDOWN_MS;
 }
 
 async function createMessageNotification({ caseDoc, senderDoc, previewText, messageDoc }) {
@@ -197,7 +198,11 @@ async function createMessageNotification({ caseDoc, senderDoc, previewText, mess
   if (!recipientId) return;
   const senderId = toObjectId(senderDoc._id || senderDoc.id);
   if (senderId && String(recipientId) === String(senderId)) return;
-  if (isWorkspacePresenceActive(recipientId, caseDoc._id)) {
+  if (await isWorkspacePresenceActive(recipientId, caseDoc._id, "messages")) {
+    publishNotificationEvent(recipientId, "notifications", {
+      at: new Date().toISOString(),
+      type: "message_refresh",
+    });
     return;
   }
   const shouldNotify = await shouldNotifyForMessage({
@@ -214,12 +219,13 @@ async function createMessageNotification({ caseDoc, senderDoc, previewText, mess
   try {
     await notifyUser(recipientId, "message", {
       caseId: caseDoc._id,
-      caseTitle: caseDoc.title || "Case",
+      caseTitle: caseDoc.title || "Untitled Matter",
       fromName: senderName,
       messageSnippet: buildShortPreview(previewText, 40),
+      messageId: messageDoc?._id || null,
     }, { actorUserId: senderId });
   } catch (err) {
-    console.warn("[messages] notifyUser failed", err);
+    runtimeLogger.warn("[messages] notifyUser failed", err);
   }
 }
 
@@ -233,6 +239,38 @@ function buildUnreadClause(userObjectId) {
   };
 }
 
+function lastViewedForCase(lastMap, caseId) {
+  const key = String(caseId || "");
+  const value = typeof lastMap?.get === "function" ? lastMap.get(key) : lastMap?.[key];
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function assignmentViewer(user, acl = {}) {
+  return {
+    role: user?.role,
+    userId: user?.id || user?._id,
+    isParalegal: acl?.isParalegal === true,
+  };
+}
+
+function scopedMessageFilter(req, filter) {
+  return applyAssignmentVisibility(filter, req.case, assignmentViewer(req.user, req.acl));
+}
+
+function buildCaseUnreadQuery(caseDoc, userObjectId, lastMap, user) {
+  const caseId = caseDoc?._id || caseDoc;
+  const lastViewed = lastViewedForCase(lastMap, caseId);
+  const query = {
+    caseId,
+    deleted: { $ne: true },
+    ...(lastViewed ? { createdAt: { $gt: lastViewed } } : {}),
+    ...buildUnreadClause(userObjectId),
+  };
+  return applyAssignmentVisibility(query, caseDoc, assignmentViewer(user));
+}
+
 function isCaseReadOnly(req) {
   return !!(req.case?.readOnly && !req.acl?.isAdmin);
 }
@@ -240,7 +278,7 @@ function isCaseReadOnly(req) {
 function assertMessagingOpen(req, res) {
   const caseDoc = req.case;
   if (!caseDoc) {
-    return res.status(400).json({ error: "Case not loaded" });
+    return res.status(400).json({ error: "Matter not loaded" });
   }
   const viewerRole = String(req.user?.role || "").toLowerCase();
   const policy = viewerRole === "paralegal"
@@ -260,23 +298,17 @@ function assertMessagingOpen(req, res) {
     return res.status(403).json({ error: "Messaging is available after hire" });
   }
   if (policy.blockers.includes("funding_required")) {
-    return res.status(403).json({ error: "Work begins once payment is secured." });
+    return res.status(403).json({ error: "Work begins once Matter funding is confirmed." });
   }
   if (policy.blockers.includes("messaging_closed") || policy.blockers.includes("case_read_only")) {
-    return res.status(403).json({ error: "Messaging is closed for this case." });
+    return res.status(403).json({ error: "Messaging is closed for this Matter." });
   }
   if (policy.blockers.includes("workspace_not_active")) {
-    return res.status(403).json({ error: "Messaging unlocks once the case is funded and in progress." });
+    return res.status(403).json({ error: "Messaging unlocks once the Matter is funded and in progress." });
   }
   return null;
 }
 
-function resolveSenderRole(req) {
-  if (req?.acl?.isAdmin) return "admin";
-  if (req?.acl?.isParalegal) return "paralegal";
-  if (req?.acl?.isAttorney) return "attorney";
-  return String(req?.user?.role || "");
-}
 
 function normalizeSenderRole(role) {
   const normalized = String(role || "").toLowerCase();
@@ -295,13 +327,16 @@ async function loadSenderDoc(req) {
 // All message routes require auth
 router.use(verifyToken);
 router.use(requireApproved);
-router.use(requireRole("admin", "attorney", "paralegal"));
+router.use(requireRole("attorney", "paralegal"));
+router.use(require("../utils/requestOwner"));
 
 router.get(
   "/unread-count",
   asyncHandler(async (req, res) => {
     const caseFilter = await buildMessagingCaseFilter(req.user);
-    const caseDocs = await Case.find(caseFilter).select("_id").lean();
+    const caseDocs = await Case.find(caseFilter)
+      .select("_id paralegal paralegalId withdrawnParalegalId hiredAt")
+      .lean();
     if (!caseDocs.length) {
       return res.json({ count: 0 });
     }
@@ -310,17 +345,7 @@ router.get(
     const lastMap = viewer?.messageLastViewedAt || new Map();
     let totalUnread = 0;
     for (const doc of caseDocs) {
-      const key = String(doc._id);
-      const lastViewed =
-        typeof lastMap.get === "function" ? lastMap.get(key) : lastMap?.[key];
-      const baseQuery = {
-        caseId: doc._id,
-        deleted: { $ne: true },
-        senderId: { $ne: requesterObjectId },
-      };
-      const query = lastViewed
-        ? { ...baseQuery, createdAt: { $gt: new Date(lastViewed) } }
-        : { ...baseQuery, $and: buildUnreadClause(requesterObjectId).$and };
+      const query = buildCaseUnreadQuery(doc, requesterObjectId, lastMap, req.user);
       // eslint-disable-next-line no-await-in-loop
       totalUnread += await Message.countDocuments(query);
     }
@@ -332,7 +357,9 @@ router.get(
   "/summary",
   asyncHandler(async (req, res) => {
     const filter = await buildMessagingCaseFilter(req.user);
-    const caseDocs = await Case.find(filter).select("_id title").lean();
+    const caseDocs = await Case.find(filter)
+      .select("_id title paralegal paralegalId withdrawnParalegalId hiredAt")
+      .lean();
     if (!caseDocs.length) {
       return res.json({ items: [] });
     }
@@ -342,22 +369,11 @@ router.get(
     const requesterObjectId = new mongoose.Types.ObjectId(req.user.id);
     for (const doc of caseDocs) {
       const key = String(doc._id);
-      const lastViewed =
-        typeof lastMap.get === "function" ? lastMap.get(key) : lastMap?.[key];
-      const query = {
-        caseId: doc._id,
-        deleted: { $ne: true },
-        senderId: { $ne: requesterObjectId },
-      };
-      if (lastViewed) {
-        query.createdAt = { $gt: new Date(lastViewed) };
-      } else {
-        query.$and = buildUnreadClause(requesterObjectId).$and;
-      }
+      const query = buildCaseUnreadQuery(doc, requesterObjectId, lastMap, req.user);
       const unread = await Message.countDocuments(query);
       items.push({
         caseId: key,
-        title: doc.title || "Case",
+        title: doc.title || "Untitled Matter",
         unread,
       });
     }
@@ -373,7 +389,7 @@ router.get(
 router.get(
   "/threads",
   asyncHandler(async (req, res) => {
-    const { q = "" } = req.query;
+    const q = typeof req.query.q === "string" ? req.query.q : "";
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
@@ -381,42 +397,89 @@ router.get(
     const caseFilter = await buildMessagingCaseFilter(req.user);
     if (q.trim()) caseFilter.title = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 
-    const [caseItems, totalCases] = await Promise.all([
-      Case.find(caseFilter).sort({ createdAt: -1 }).skip(skip).limit(limit).select("_id title createdAt").lean(),
-      Case.countDocuments(caseFilter),
+    // Aggregation does not cast schema paths automatically. Keep exactly the
+    // existing participant/funding/block filter and cast it as a normal read.
+    const castFilter = Case.find(caseFilter).cast(Case);
+    const visibility = buildAssignmentVisibilityLookup(assignmentViewer(req.user));
+    const [threadPage, userDoc] = await Promise.all([
+      Case.aggregate([
+        { $match: castFilter },
+        { $facet: {
+          total: [{ $count: "count" }],
+          items: [
+            { $project: { title: 1, createdAt: 1, attorney: 1, attorneyId: 1, paralegal: 1, paralegalId: 1, withdrawnParalegalId: 1, hiredAt: 1 } },
+            { $lookup: {
+              from: Message.collection.name,
+              let: { caseId: "$_id", ...visibility.let },
+              pipeline: [
+                { $match: { deleted: { $ne: true }, $expr: { $and: [
+                  { $eq: ["$caseId", "$$caseId"] }, visibility.expression,
+                ] } } },
+                { $sort: { createdAt: -1, _id: -1 } },
+                { $limit: 1 },
+                { $project: { type: 1, text: 1, fileName: 1, createdAt: 1, senderId: 1 } },
+              ],
+              as: "latestMessage",
+            } },
+            { $set: { last: { $arrayElemAt: ["$latestMessage", 0] }, hasMessages: { $gt: [{ $size: "$latestMessage" }, 0] } } },
+            { $set: { conversationUpdatedAt: { $ifNull: ["$last.createdAt", "$createdAt"] } } },
+            // Empty, newly funded Matters must not push real conversations off
+            // the recent-message page. Retain them after visible conversations.
+            { $sort: { hasMessages: -1, conversationUpdatedAt: -1, _id: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+            { $unset: ["latestMessage", "conversationUpdatedAt", "hasMessages"] },
+          ],
+        } },
+      ]),
+      User.findById(req.user.id).select("messageLastViewedAt").lean(),
     ]);
+    const caseItems = threadPage[0]?.items || [];
+    const totalCases = threadPage[0]?.total[0]?.count || 0;
     const caseIds = caseItems.map((c) => c._id);
 
     if (caseIds.length === 0) {
       return res.json({ page, limit, total: totalCases, pages: Math.ceil(totalCases / limit), threads: [] });
     }
 
-    // Last message per case (aggregation to avoid N+1)
-    const lastMsgs = await Message.aggregate([
-      { $match: { caseId: { $in: caseIds }, deleted: { $ne: true } } },
-      { $sort: { createdAt: -1 } },
-      {
-        $group: {
-          _id: "$caseId",
-          last: { $first: { type: "$type", text: "$text", fileName: "$fileName", createdAt: "$createdAt" } },
-        },
-      },
-    ]);
-
     // Unread counts per case (checks both legacy readBy and new readReceipts.user)
     const requesterObjectId = new mongoose.Types.ObjectId(req.user.id);
+    const lastMap = userDoc?.messageLastViewedAt || new Map();
+    const unreadBranches = caseItems.map((caseDoc) => {
+      const lastViewed = lastViewedForCase(lastMap, caseDoc._id);
+      return applyAssignmentVisibility(
+        {
+          caseId: caseDoc._id,
+          ...(lastViewed ? { createdAt: { $gt: lastViewed } } : {}),
+        },
+        caseDoc,
+        assignmentViewer(req.user)
+      );
+    });
     const unreadClause = buildUnreadClause(requesterObjectId);
     const unreadAgg = await Message.aggregate([
-      { $match: { caseId: { $in: caseIds }, deleted: { $ne: true } } },
-      { $match: unreadClause },
+      {
+        $match: {
+          deleted: { $ne: true },
+          $and: [
+            { $or: unreadBranches },
+            ...unreadClause.$and,
+          ],
+        },
+      },
       { $group: { _id: "$caseId", count: { $sum: 1 } } },
     ]);
 
-    const lastByCase = new Map(lastMsgs.map((d) => [String(d._id), d.last]));
     const unreadByCase = new Map(unreadAgg.map((d) => [String(d._id), d.count]));
 
+    const participantId = item => req.user.role === "attorney" ? String(item.paralegal || item.paralegalId || "") : String(item.attorney || item.attorneyId || "");
+    const senderIds=[...new Set(caseItems.flatMap(item=>[String(item.last?.senderId||""),participantId(item)]).filter(value=>mongoose.isValidObjectId(value)))];
+    const senders=senderIds.length?await User.find({_id:{$in:senderIds}}).select("firstName lastName profileImage avatarURL profilePhotoStatus updatedAt").lean():[];
+    const senderNames=new Map(senders.map(user=>[String(user._id),[user.firstName,user.lastName].filter(Boolean).join(" ")]));
+    const photos = require('../services/profilePhotoDelivery');
+    const senderPhotos = new Map(senders.map(user=>[String(user._id), user.profilePhotoStatus === 'approved' && photos.hasPhotoReference(user) ? photos.buildAuthenticatedProfilePhotoUrl(user) : '']));
     const threads = caseItems.map((c) => {
-      const last = lastByCase.get(String(c._id));
+      const last = c.last;
       let snippet = "";
       if (last) {
         const lastText = last.text ? decryptString(last.text) : "";
@@ -429,7 +492,9 @@ router.get(
       return {
         id: String(c._id),
         title: c.title,
+        participant: participantId(c) ? { id: participantId(c), name: senderNames.get(participantId(c)) || "", photo: senderPhotos.get(participantId(c)) || "", role: req.user.role === "attorney" ? "paralegal" : "attorney" } : null,
         lastMessageSnippet: snippet,
+        lastSenderName: last ? (String(last.senderId)===String(req.user.id)?"You":senderNames.get(String(last.senderId))||"Participant") : "",
         updatedAt: last?.createdAt || c.createdAt,
         unread: unreadByCase.get(String(c._id)) || 0,
       };
@@ -460,7 +525,27 @@ async function ensureNotBlockedForCase(req, res, next) {
   }
 }
 
-router.use("/:caseId", ensureCaseParticipant(), ensureNotBlockedForCase);
+function ensureActiveMessagingParticipant(req, res, next) {
+  if (!req.acl?.isAttorney && !req.acl?.isParalegal) {
+    return res.status(403).json({ error: "Messaging is available only to active Matter participants." });
+  }
+  return next();
+}
+
+router.use(
+  "/:caseId",
+  ensureCaseParticipant(),
+  ensureActiveMessagingParticipant,
+  ensureNotBlockedForCase
+);
+
+router.use("/:caseId", asyncHandler(async (req, res, next) => {
+  if (req.method !== "GET" && attorneyConversation.enabled(req)) {
+    try { await attorneyConversation.prepareMutation(req); }
+    catch (error) { return attorneyConversation.sendError(res, error); }
+  }
+  return next();
+}));
 
 /**
  * GET /api/messages/:caseId?before=&after=&limit=&threadRoot=
@@ -473,10 +558,19 @@ router.use("/:caseId", ensureCaseParticipant(), ensureNotBlockedForCase);
 router.get(
   "/:caseId",
   asyncHandler(async (req, res) => {
+    if (req.method === "GET" && attorneyConversation.enabled(req)) {
+      res.set("Cache-Control", "private, no-store");
+      try { return res.json(await attorneyConversation.read(req)); } catch (error) { return attorneyConversation.sendError(res, error); }
+    }
     const closed = assertMessagingOpen(req, res);
     if (closed) return;
     const { caseId } = req.params;
-    const items = await Message.find({ caseId, deleted: { $ne: true } })
+    const messageFilter = applyAssignmentVisibility(
+      { caseId, deleted: { $ne: true } },
+      req.case,
+      assignmentViewer(req.user, req.acl)
+    );
+    const items = await Message.find(messageFilter)
       .sort({ createdAt: 1 })
       .populate("senderId", "firstName lastName email role")
       .lean();
@@ -508,29 +602,73 @@ router.post(
     const { caseId } = req.params;
     const caseDoc = req.case;
     if (caseDoc?.readOnly && !req.acl?.isAdmin) {
-      return res.status(403).json({ error: "Case is read-only" });
+      return res.status(403).json({ error: "Matter is read-only" });
     }
 
     const text = sanitizeText(req.body?.text);
+    const exactRequest = attorneyConversation.enabled(req) || req.get('X-LPC-Owner-Id') !== undefined;
+    if (exactRequest && (typeof req.body?.text !== "string" || req.body.text.length > 2000)) return res.status(400).json({ code: "WORKSPACE_INVALID", error: "Enter a message of up to 2,000 characters." });
     if (!text) return res.status(400).json({ error: "text required" });
+
+    const clientMessageId = sanitizeClientMessageId(req.body?.clientMessageId);
+    if (clientMessageId === null) {
+      return res.status(400).json({ error: "Invalid message request id" });
+    }
 
     const senderDoc = await loadSenderDoc(req);
     if (!senderDoc) return res.status(403).json({ error: "Invalid sender role" });
+    // A sending caller may confirm its own persisted request. Ordinary message
+    // feeds continue to remove these private retry identifiers.
+    const receipt = saved => {
+      const message = decryptMessagePayload(saved);
+      if (String(saved.senderId) === String(req.user.id) && saved.clientMessageId) message.clientMessageId = saved.clientMessageId;
+      return { message };
+    };
 
-    const msg = await Message.create({
-      caseId,
-      senderId: req.user.id,
-      senderRole: senderDoc.role,
-      type: "text",
-      text,
-      content: text,
-    });
+    if (clientMessageId) {
+      const existing = await Message.findOne({ caseId, senderId: req.user.id, clientMessageId }).select('+clientMessageId');
+      if (existing) {
+        if (exactRequest && (existing.type !== 'text' || decryptMessagePayload(existing).text !== text)) return res.status(409).json({ code: "WORKSPACE_MESSAGE_CHANGED", error: "This message request already has different text." });
+        await attorneyConversation.prepareMutation(req);
+        return res.status(200).json({ ...receipt(existing), idempotent: true });
+      }
+    }
+
+    let msg;
+    try {
+      await attorneyConversation.prepareMutation(req);
+      msg = await Message.create({
+        caseId,
+        senderId: req.user.id,
+        senderRole: senderDoc.role,
+        type: "text",
+        text,
+        content: text,
+        ...(clientMessageId ? { clientMessageId } : {}),
+      });
+    } catch (error) {
+      if (clientMessageId && error?.code === 11000) {
+        const existing = await Message.findOne({ caseId, senderId: req.user.id, clientMessageId }).select('+clientMessageId');
+        if (existing) {
+          if (exactRequest && (existing.type !== 'text' || decryptMessagePayload(existing).text !== text)) return res.status(409).json({ code: "WORKSPACE_MESSAGE_CHANGED", error: "This message request already has different text." });
+          await attorneyConversation.prepareMutation(req);
+          return res.status(200).json({ ...receipt(existing), idempotent: true });
+        }
+      }
+      throw error;
+    }
 
     await AuditLog.logFromReq(req, "message_sent", {
       targetType: "case",
       targetId: caseId,
       meta: { messageId: msg._id },
     });
+
+    // Delivery to an open Matter workspace must not wait on notification or
+    // email work. The record is authoritative at this point, so participants
+    // can reconcile it immediately through the existing authenticated stream.
+    publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
+    publishCaseProjectionRefresh(caseDoc, "message_refresh", { caseEvent: "" });
 
     try {
       await createMessageNotification({
@@ -540,11 +678,10 @@ router.post(
         messageDoc: msg,
       });
     } catch (err) {
-      console.warn("[messages] notification creation failed", err);
+      runtimeLogger.warn("[messages] notification creation failed", err);
     }
 
-    publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
-    return res.status(201).json({ message: decryptMessagePayload(msg) });
+    return res.status(201).json(receipt(msg));
   })
 );
 
@@ -555,35 +692,85 @@ router.post(
  */
 router.post(
   "/:caseId/file",
-  requireCaseAccess("caseId"),
+  requireCaseAccess("caseId", { project: "withdrawnParalegalId hiredAt escrowStatus escrowIntentId paymentReleased tasksLocked" }),
   csrfProtection,
-  asyncHandler(async (req, res) => {
+  asyncHandler(matterFileWrites.handle(async (req, res) => {
     const closed = assertMessagingOpen(req, res);
     if (closed) return;
     if (isCaseReadOnly(req)) {
-      return res.status(403).json({ error: "Case is read-only" });
+      return res.status(403).json({ error: "Matter is read-only" });
     }
-    const { fileKey, fileName, mimeType, fileSize } = req.body || {};
-    if (!fileKey || !fileName) return res.status(400).json({ error: "fileKey and fileName required" });
+    const writeReview = await matterFileWrites.read(req);
+    const { fileKey, fileName, mimeType, fileSize, fileId, fileVersion } = req.body || {};
+    const exactFile = fileId !== undefined;
+    const clientMessageId = sanitizeClientMessageId(req.body?.clientMessageId);
+    if (clientMessageId === null || exactFile && (!isObjId(fileId) || !Number.isSafeInteger(fileVersion) || fileVersion < 1 || !clientMessageId || (!attorneyConversation.enabled(req) && req.user.role !== "paralegal"))) return res.status(400).json({code:'WORKSPACE_INVALID',error:'A reviewed document and request ID are required.'});
+    await attorneyConversation.prepareMutation(req);
+    const receipt = saved => { const message=decryptMessagePayload(saved); if(saved.clientMessageId)message.clientMessageId=saved.clientMessageId; return {message}; };
+    async function earlierRequest() {
+      if (!clientMessageId) return null;
+      const saved=await Message.findOne({caseId:req.params.caseId,senderId:req.user.id,clientMessageId}).select('+clientMessageId');
+      if (!saved) return null;
+      const plain=decryptMessagePayload(saved);
+      if (saved.type!=='file' || (exactFile ? plain.content?.caseFileId!==fileId || plain.content?.fileVersion!==fileVersion : plain.fileKey!==fileKey)) throw Object.assign(new Error('This request belongs to a different attachment.'),{status:409,publicCode:'WORKSPACE_MESSAGE_CHANGED'});
+      return saved;
+    }
+    const earlier=await earlierRequest(); if(earlier)return res.status(200).json({...receipt(earlier),idempotent:true});
+    if (!exactFile && (!fileKey || !fileName)) return res.status(400).json({ error: "fileKey and fileName required" });
+    const fileRecord = await CaseFile.findOne(applyAssignmentVisibility(
+      exactFile ? {_id:fileId,caseId:req.params.caseId} : buildCaseFileKeyQuery({
+        caseId: req.params.caseId,
+        storageKey: String(fileKey),
+      }),
+      req.case,
+      assignmentViewer(req.user, req.acl)
+    ));
+    if (!fileRecord) {
+      return res.status(400).json({ error: "Attach the file to this Matter before sending it." });
+    }
+    const plainFile = decryptCaseFilePayload(fileRecord);
+    if (!exactFile && String(plainFile.storageKey || "") !== String(fileKey)) {
+      return res.status(400).json({ error: "The file does not belong to this Matter." });
+    }
+    if (exactFile && Number(fileRecord.version || 1)!==fileVersion) return res.status(409).json({code:'FILE_WRITE_CHANGED',error:'The selected document was replaced. Review it before sharing.'});
+    if (!["clean", "not_required"].includes(String(fileRecord.securityStatus || "pending"))) {
+      return res.status(fileRecord.securityStatus==='blocked'?422:423).json({
+        error: "This file cannot be sent until security scanning completes.",
+        code: "FILE_SCAN_PENDING",
+      });
+    }
 
     const senderDoc = await loadSenderDoc(req);
     if (!senderDoc) return res.status(403).json({ error: "Invalid sender role" });
 
-    const size = Number.isFinite(+fileSize) ? +fileSize : undefined;
-    const msg = await Message.create({
+    const size = Number.isFinite(plainFile.size) ? plainFile.size : Number.isFinite(+fileSize) ? +fileSize : undefined;
+    let msg;
+    try { msg = await matterFileWrites.run(req, writeReview, async session => {
+      await matterRetirement.assertAttachable(req.params.caseId, plainFile.storageKey, session);
+      const current = await CaseFile.findOne(applyAssignmentVisibility({ _id: fileRecord._id, caseId: req.params.caseId }, writeReview, assignmentViewer(req.user, req.acl))).session(session);
+      if (!current || decryptCaseFilePayload(current).storageKey !== plainFile.storageKey || !["clean", "not_required"].includes(current.securityStatus) || Number(current.version || 1) !== Number(fileRecord.version || 1)) throw Object.assign(new Error("The attachment changed. Refresh Files before sending it."), { status: 409, publicCode: "FILE_WRITE_CHANGED" });
+      const [record] = await Message.create([{
       caseId: req.params.caseId,
       senderId: req.user.id,
       senderRole: senderDoc.role,
       type: "file",
-      text: fileName,
-      fileKey,
-      fileName,
+      text: plainFile.originalName,
+      fileKey: plainFile.storageKey,
+      fileName: plainFile.originalName,
       fileSize: size ?? null,
-      mimeType,
+      mimeType: plainFile.mimeType || mimeType,
       content: {
         size,
+        caseFileId:String(fileRecord._id),fileVersion:Number(fileRecord.version || 1),
       },
-    });
+      ...(clientMessageId ? {clientMessageId} : {}),
+      }], { session }); return record;
+    }); } catch (error) {
+      // A concurrent retry may lose the Matter guard or the unique request-ID race.
+      // Reconcile the committed record before reporting an uncertain outcome.
+      const saved=await earlierRequest(); if(saved){await attorneyConversation.prepareMutation(req);return res.status(200).json({...receipt(saved),idempotent:true});}
+      throw error;
+    }
 
     await AuditLog.logFromReq(req, "message.file.create", {
       targetType: "message",
@@ -592,65 +779,20 @@ router.post(
     });
 
     publishCaseEvent(req.params.caseId, "messages", { at: new Date().toISOString() });
-    res.status(201).json({ message: decryptMessagePayload(msg) });
-  })
-);
-
-/**
- * POST /api/messages/:caseId/voice
- * Body: { fileKey, fileName?, mimeType, transcript? }
- */
-router.post(
-  "/:caseId/voice",
-  requireCaseAccess("caseId"),
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    const closed = assertMessagingOpen(req, res);
-    if (closed) return;
-    if (isCaseReadOnly(req)) {
-      return res.status(403).json({ error: "Case is read-only" });
+    publishCaseProjectionRefresh(req.case, "message_refresh", { caseEvent: "" });
+    try {
+      await createMessageNotification({
+        caseDoc: req.case,
+        senderDoc,
+        previewText: `Shared ${plainFile.originalName || fileName}`,
+        messageDoc: msg,
+      });
+    } catch (err) {
+      runtimeLogger.warn("[messages] file notification creation failed", err);
     }
-    const { fileKey, fileName, mimeType, transcript = "" } = req.body || {};
-    if (!fileKey) return res.status(400).json({ error: "fileKey required" });
-    if (!mimeType || !String(mimeType).startsWith("audio/")) {
-      return res.status(400).json({ error: "mimeType must be audio/*" });
-    }
-
-    const senderDoc = await loadSenderDoc(req);
-    if (!senderDoc) return res.status(403).json({ error: "Invalid sender role" });
-
-    const safeTranscript = sanitizeText(transcript);
-    const msg = await Message.create({
-      caseId: req.params.caseId,
-      senderId: req.user.id,
-      senderRole: senderDoc.role,
-      type: "audio",
-      text: safeTranscript,
-      fileKey,
-      fileName,
-      mimeType,
-      transcript: safeTranscript,
-      content: { transcript: safeTranscript },
-    });
-
-    await AuditLog.logFromReq(req, "message.audio.create", {
-      targetType: "message",
-      targetId: msg._id,
-      caseId: req.params.caseId,
-    });
-
-    publishCaseEvent(req.params.caseId, "messages", { at: new Date().toISOString() });
-    res.status(201).json({ message: decryptMessagePayload(msg) });
-  })
-);
-
-router.post(
-  "/:caseId/summary",
-  requireCaseAccess("caseId"),
-  csrfProtection,
-  asyncHandler(async (_req, res) => {
-    res.json({ summary: "Summary endpoint placeholder." });
-  })
+    await matterFileWrites.read(req);
+    res.status(201).json(receipt(msg));
+  }))
 );
 
 /**
@@ -660,29 +802,41 @@ router.post(
  */
 router.post(
   "/:caseId/read",
-  requireCaseAccess("caseId"),
+  requireCaseAccess("caseId", { project: "withdrawnParalegalId hiredAt escrowStatus escrowIntentId paymentReleased tasksLocked" }),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
     const upTo = req.body.upTo ? new Date(req.body.upTo) : new Date();
+    if (attorneyConversation.enabled(req) && (!req.body.upTo || !Number.isFinite(upTo.getTime()) || upTo.getTime() > Date.now() + 5000)) return res.status(400).json({ code: "WORKSPACE_INVALID", error: "Invalid message read date." });
+    await attorneyConversation.prepareMutation(req);
     const readerId = new mongoose.Types.ObjectId(req.user.id);
     const caseObjectId = new mongoose.Types.ObjectId(caseId);
 
     // Mark legacy readBy
-    const res1 = await Message.updateMany(
+    const visibleReadFilter = applyAssignmentVisibility(
       { caseId: caseObjectId, createdAt: { $lte: upTo }, deleted: { $ne: true } },
+      req.case,
+      assignmentViewer(req.user, req.acl)
+    );
+    const res1 = await Message.updateMany(
+      visibleReadFilter,
       { $addToSet: { readBy: readerId } }
     );
 
     // Add rich readReceipts without duplicates: set by user with $addToSet + fixed timestamp bucket
     const now = new Date();
-    const res2 = await Message.updateMany(
+    const receiptFilter = applyAssignmentVisibility(
       {
         caseId: caseObjectId,
         createdAt: { $lte: upTo },
         deleted: { $ne: true },
         "readReceipts.user": { $ne: readerId },
       },
+      req.case,
+      assignmentViewer(req.user, req.acl)
+    );
+    const res2 = await Message.updateMany(
+      receiptFilter,
       { $push: { readReceipts: { user: readerId, at: now } } }
     );
 
@@ -702,6 +856,14 @@ router.post(
       await viewer.save();
     }
 
+    if ((res1.modifiedCount || 0) > 0 || (res2.modifiedCount || 0) > 0) {
+      publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
+      publishNotificationEvent(req.user.id, "notifications", {
+        at: new Date().toISOString(),
+        type: "message_read_refresh",
+      });
+    }
+
     res.json({ updatedLegacy: res1.modifiedCount || 0, updatedReceipts: res2.modifiedCount || 0 });
   })
 );
@@ -713,18 +875,18 @@ router.post(
  */
 router.patch(
   "/:caseId/:messageId",
-  requireCaseAccess("caseId"),
+  requireCaseAccess("caseId", { project: "withdrawnParalegalId hiredAt escrowStatus escrowIntentId paymentReleased tasksLocked" }),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const closed = assertMessagingOpen(req, res);
     if (closed) return;
     if (isCaseReadOnly(req)) {
-      return res.status(403).json({ error: "Case is read-only" });
+      return res.status(403).json({ error: "Matter is read-only" });
     }
     const { caseId, messageId } = req.params;
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });
 
-    const msg = await Message.findOne({ _id: messageId, caseId });
+    const msg = await Message.findOne(scopedMessageFilter(req, { _id: messageId, caseId }));
     if (!msg) return res.status(404).json({ error: "Not found" });
 
     const isOwner = String(msg.senderId) === String(req.user.id);
@@ -735,6 +897,7 @@ router.patch(
     if (typeof content === "string") {
       if (!canEdit) return res.status(403).json({ error: "Not allowed to edit" });
       const nextText = sanitizeText(content);
+      if (attorneyConversation.enabled(req) && (!nextText || content.length > 2000 || msg.type !== "text")) return res.status(400).json({ code: "WORKSPACE_INVALID", error: "Enter a text message of up to 2,000 characters." });
       msg.text = nextText;
       msg.content = nextText;
       msg.markEdited?.(req.user.id);
@@ -750,7 +913,8 @@ router.patch(
       msg.pinnedBy = null;
     }
 
-    await msg.save();
+    try { await attorneyConversation.prepareMutation(req, msg); await msg.save(); }
+    catch (error) { if (attorneyConversation.enabled(req)) return attorneyConversation.sendError(res, error); throw error; }
     await AuditLog.logFromReq(req, "message.update", {
       targetType: "message",
       targetId: msg._id,
@@ -759,6 +923,7 @@ router.patch(
     });
 
     publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
+    publishCaseProjectionRefresh(req.case, "message_refresh", { caseEvent: "" });
     res.json({ ok: true });
   })
 );
@@ -769,24 +934,25 @@ router.patch(
  */
 router.post(
   "/:caseId/:messageId/react",
-  requireCaseAccess("caseId"),
+  requireCaseAccess("caseId", { project: "withdrawnParalegalId hiredAt escrowStatus escrowIntentId paymentReleased tasksLocked" }),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const closed = assertMessagingOpen(req, res);
     if (closed) return;
     if (isCaseReadOnly(req)) {
-      return res.status(403).json({ error: "Case is read-only" });
+      return res.status(403).json({ error: "Matter is read-only" });
     }
     const { caseId, messageId } = req.params;
     const { emoji } = req.body || {};
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });
-    if (!emoji || !String(emoji).trim()) return res.status(400).json({ error: "emoji required" });
+    if (!validReaction(emoji)) return res.status(400).json({ error: "Choose a valid reaction." });
 
-    const msg = await Message.findOne({ _id: messageId, caseId });
+    const msg = await Message.findOne(scopedMessageFilter(req, { _id: messageId, caseId }));
     if (!msg) return res.status(404).json({ error: "Not found" });
 
     msg.addReaction?.(String(emoji).trim(), req.user.id);
-    await msg.save();
+    try { await attorneyConversation.prepareMutation(req, msg); await msg.save(); }
+    catch (error) { if (attorneyConversation.enabled(req)) return attorneyConversation.sendError(res, error); throw error; }
 
     await AuditLog.logFromReq(req, "message.react.add", {
       targetType: "message",
@@ -796,29 +962,33 @@ router.post(
     });
 
     publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
+    publishCaseProjectionRefresh(req.case, "message_refresh", { caseEvent: "" });
     res.status(201).json({ ok: true });
   })
 );
 
 router.delete(
   "/:caseId/:messageId/react",
-  requireCaseAccess("caseId"),
+  requireCaseAccess("caseId", { project: "withdrawnParalegalId hiredAt escrowStatus escrowIntentId paymentReleased tasksLocked" }),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const closed = assertMessagingOpen(req, res);
     if (closed) return;
     if (isCaseReadOnly(req)) {
-      return res.status(403).json({ error: "Case is read-only" });
+      return res.status(403).json({ error: "Matter is read-only" });
     }
     const { caseId, messageId } = req.params;
     const { emoji } = req.body || {};
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });
 
-    const msg = await Message.findOne({ _id: messageId, caseId });
+    if (!validReaction(emoji)) return res.status(400).json({ error: "Choose a valid reaction." });
+
+    const msg = await Message.findOne(scopedMessageFilter(req, { _id: messageId, caseId }));
     if (!msg) return res.status(404).json({ error: "Not found" });
 
     if (emoji) msg.removeReaction?.(String(emoji).trim(), req.user.id);
-    await msg.save();
+    try { await attorneyConversation.prepareMutation(req, msg); await msg.save(); }
+    catch (error) { if (attorneyConversation.enabled(req)) return attorneyConversation.sendError(res, error); throw error; }
 
     await AuditLog.logFromReq(req, "message.react.remove", {
       targetType: "message",
@@ -828,6 +998,7 @@ router.delete(
     });
 
     publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
+    publishCaseProjectionRefresh(req.case, "message_refresh", { caseEvent: "" });
     res.json({ ok: true });
   })
 );
@@ -838,18 +1009,18 @@ router.delete(
  */
 router.delete(
   "/:caseId/:messageId",
-  requireCaseAccess("caseId"),
+  requireCaseAccess("caseId", { project: "withdrawnParalegalId hiredAt escrowStatus escrowIntentId paymentReleased tasksLocked" }),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const closed = assertMessagingOpen(req, res);
     if (closed) return;
     if (isCaseReadOnly(req)) {
-      return res.status(403).json({ error: "Case is read-only" });
+      return res.status(403).json({ error: "Matter is read-only" });
     }
     const { caseId, messageId } = req.params;
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });
 
-    const msg = await Message.findOne({ _id: messageId, caseId });
+    const msg = await Message.findOne(scopedMessageFilter(req, { _id: messageId, caseId }));
     if (!msg) return res.status(404).json({ error: "Not found" });
 
     const isOwner = String(msg.senderId) === String(req.user.id);
@@ -859,7 +1030,8 @@ router.delete(
 
     msg.deleted = true;
     msg.deletedBy = req.user.id;
-    await msg.save();
+    try { await attorneyConversation.prepareMutation(req, msg); await msg.save(); }
+    catch (error) { if (attorneyConversation.enabled(req)) return attorneyConversation.sendError(res, error); throw error; }
 
     await AuditLog.logFromReq(req, "message.delete.soft", {
       targetType: "message",
@@ -868,8 +1040,13 @@ router.delete(
     });
 
     publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
+    publishCaseProjectionRefresh(req.case, "message_refresh", { caseEvent: "" });
     res.json({ ok: true });
   })
 );
 
+router.use((error, req, res, next) => {
+  if (attorneyConversation.enabled(req)) return attorneyConversation.sendError(res, error);
+  return next(error);
+});
 module.exports = router;

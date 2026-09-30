@@ -4,13 +4,12 @@ const { URLSearchParams } = require("url");
 
 const MarketingChannelConnection = require("../../models/MarketingChannelConnection");
 const {
-  MARKETING_CHANNEL_CONNECTION_STATUSES,
-  MARKETING_PUBLISHING_CHANNELS,
+  MARKETING_ACTIVE_PUBLISHING_CHANNELS,
 } = require("./constants");
 const { decryptString, encryptString } = require("../../utils/dataEncryption");
+const { LINKEDIN_API_VERSION } = require("./linkedinApiPolicy");
 
 const LINKEDIN_CONTENT_AUTHORIZATION_ACTION = "ORGANIC_SHARE_CREATE";
-const LINKEDIN_DEFAULT_API_VERSION = "202503";
 const LINKEDIN_REQUIRED_SCOPES = Object.freeze(["w_organization_social", "rw_organization_admin"]);
 
 function toActor(actor = {}) {
@@ -34,14 +33,12 @@ function uniqueStrings(values = []) {
 
 function normalizeChannelKey(value = "") {
   const channelKey = String(value || "").trim();
-  if (!MARKETING_PUBLISHING_CHANNELS.includes(channelKey)) {
-    throw new Error("Unsupported marketing channel.");
+  if (!MARKETING_ACTIVE_PUBLISHING_CHANNELS.includes(channelKey)) {
+    const error = new Error("Unsupported active marketing channel.");
+    error.statusCode = 400;
+    throw error;
   }
   return channelKey;
-}
-
-function normalizeApiVersion(value = "") {
-  return String(value || "").trim().slice(0, 40) || LINKEDIN_DEFAULT_API_VERSION;
 }
 
 function getLinkedInOAuthConfig() {
@@ -151,7 +148,7 @@ function serializeConnection(connection = null, { includeSecret = false } = {}) 
       accessTokenLast4: "",
       tokenExpiresAt: null,
       scopeSnapshot: [],
-      apiVersion: LINKEDIN_DEFAULT_API_VERSION,
+      apiVersion: LINKEDIN_API_VERSION,
       lastValidatedAt: null,
       lastValidationStatus: "not_connected",
       lastValidationNote: "LinkedIn company posting is not connected.",
@@ -186,7 +183,7 @@ function serializeConnection(connection = null, { includeSecret = false } = {}) 
     accessTokenLast4: connection.accessTokenLast4 || "",
     tokenExpiresAt: connection.tokenExpiresAt || null,
     scopeSnapshot: Array.isArray(connection.scopeSnapshot) ? connection.scopeSnapshot : [],
-    apiVersion: connection.apiVersion || LINKEDIN_DEFAULT_API_VERSION,
+    apiVersion: LINKEDIN_API_VERSION,
     lastValidatedAt: connection.lastValidatedAt || null,
     lastValidationStatus: connection.lastValidationStatus || normalized.status,
     lastValidationNote: connection.lastValidationNote || normalized.note,
@@ -212,8 +209,8 @@ async function getOrCreateConnection(channelKey = "linkedin_company") {
   if (connection) return connection;
   connection = await MarketingChannelConnection.create({
     channelKey: normalizedChannelKey,
-    provider: normalizedChannelKey === "linkedin_company" ? "linkedin" : "facebook",
-    status: normalizedChannelKey === "linkedin_company" ? "not_connected" : "blocked",
+    provider: "linkedin",
+    status: "not_connected",
   });
   return connection;
 }
@@ -259,19 +256,8 @@ async function upsertChannelConnection({ channelKey = "", payload = {}, actor = 
   connection.organizationId = orgPayload.organizationId;
   connection.organizationUrn = orgPayload.organizationUrn;
   connection.organizationName = orgPayload.organizationName || connection.organizationName || "";
-  connection.apiVersion = normalizeApiVersion(payload.apiVersion);
+  connection.apiVersion = LINKEDIN_API_VERSION;
   connection.updatedBy = toActor(actor);
-  if (Object.prototype.hasOwnProperty.call(payload, "scopeSnapshot")) {
-    connection.scopeSnapshot = uniqueStrings(payload.scopeSnapshot || []);
-  }
-  if (Object.prototype.hasOwnProperty.call(payload, "accessToken")) {
-    const accessToken = String(payload.accessToken || "").trim();
-    connection.encryptedAccessToken = accessToken ? encryptString(accessToken) : "";
-    connection.accessTokenLast4 = accessToken ? accessToken.slice(-4) : "";
-  }
-  if (Object.prototype.hasOwnProperty.call(payload, "tokenExpiresAt")) {
-    connection.tokenExpiresAt = payload.tokenExpiresAt ? new Date(payload.tokenExpiresAt) : null;
-  }
 
   const normalized = normalizeConnectionStatus(connection);
   connection.status = normalized.status;
@@ -302,13 +288,6 @@ async function markConnectionPublishResult({
 }
 
 async function getChannelReadinessSummary(channelKey = "") {
-  if (channelKey === "facebook_page") {
-    return {
-      channelKey,
-      status: "blocked",
-      note: "Facebook Page publishing is not implemented yet.",
-    };
-  }
   const serialized = await getChannelConnection(channelKey);
   return {
     channelKey,
@@ -317,11 +296,11 @@ async function getChannelReadinessSummary(channelKey = "") {
   };
 }
 
-function buildLinkedInHeaders(accessToken = "", apiVersion = LINKEDIN_DEFAULT_API_VERSION) {
+function buildLinkedInHeaders(accessToken = "") {
   return {
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
-    "Linkedin-Version": normalizeApiVersion(apiVersion),
+    "Linkedin-Version": LINKEDIN_API_VERSION,
     "X-Restli-Protocol-Version": "2.0.0",
   };
 }
@@ -392,9 +371,9 @@ async function fetchLinkedInUserInfo({ accessToken = "" } = {}) {
   };
 }
 
-async function discoverManagedOrganizations({ accessToken = "", apiVersion = LINKEDIN_DEFAULT_API_VERSION } = {}) {
+async function discoverManagedOrganizations({ accessToken = "" } = {}) {
   const response = await axios.get("https://api.linkedin.com/v2/organizationAcls?q=roleAssignee&state=APPROVED", {
-    headers: buildLinkedInHeaders(accessToken, apiVersion),
+    headers: buildLinkedInHeaders(accessToken),
     timeout: 15000,
     validateStatus: () => true,
   });
@@ -418,7 +397,7 @@ async function discoverManagedOrganizations({ accessToken = "", apiVersion = LIN
   const lookupResponse = await axios.get(
     `https://api.linkedin.com/rest/organizationsLookup?ids=List(${ids})`,
     {
-      headers: buildLinkedInHeaders(accessToken, apiVersion),
+      headers: buildLinkedInHeaders(accessToken),
       timeout: 15000,
       validateStatus: () => true,
     }
@@ -441,14 +420,13 @@ async function validateOrganizationAuthorization({
   accessToken = "",
   memberUrn = "",
   organizationUrn = "",
-  apiVersion = LINKEDIN_DEFAULT_API_VERSION,
 } = {}) {
   const encodedMemberUrn = encodeURIComponent(memberUrn);
   const encodedOrganizationUrn = encodeURIComponent(organizationUrn);
   const response = await axios.get(
     `https://api.linkedin.com/rest/organizationAuthorizations/(impersonator:${encodedMemberUrn},organization:${encodedOrganizationUrn},action:(organizationContentAuthorizationAction:(actionType:${LINKEDIN_CONTENT_AUTHORIZATION_ACTION})))`,
     {
-      headers: buildLinkedInHeaders(accessToken, apiVersion),
+      headers: buildLinkedInHeaders(accessToken),
       timeout: 15000,
       validateStatus: () => true,
     }
@@ -526,7 +504,6 @@ async function validateLinkedInConnection({ actor = {}, forceRevalidate = false 
 
     const discoveredOrganizations = await discoverManagedOrganizations({
       accessToken,
-      apiVersion: connection.apiVersion || LINKEDIN_DEFAULT_API_VERSION,
     });
     connection.discoveredOrganizations = discoveredOrganizations;
 
@@ -553,7 +530,6 @@ async function validateLinkedInConnection({ actor = {}, forceRevalidate = false 
       accessToken,
       memberUrn: connection.memberUrn,
       organizationUrn: connection.organizationUrn,
-      apiVersion: connection.apiVersion || LINKEDIN_DEFAULT_API_VERSION,
     });
 
     connection.authorizationGranted = validation.granted === true;
@@ -574,10 +550,10 @@ async function validateLinkedInConnection({ actor = {}, forceRevalidate = false 
     connection.authorizationGranted = false;
     connection.lastValidatedAt = new Date();
     connection.updatedBy = toActor(actor);
-    connection.status =
-      error.failureStatus || error.statusCode === 401 || error.statusCode === 403
-        ? "auth_failed"
-        : "blocked";
+    const failureStatus = ["auth_failed", "blocked"].includes(error.failureStatus)
+      ? error.failureStatus
+      : null;
+    connection.status = failureStatus || ([401, 403].includes(error.statusCode) ? "auth_failed" : "blocked");
     connection.lastValidationStatus = connection.status;
     connection.lastValidationNote = String(error.message || "LinkedIn validation failed.").trim().slice(0, 1000);
     await connection.save();
@@ -592,9 +568,7 @@ async function startLinkedInOAuth({ actor = {}, hints = {} } = {}) {
   if (orgPayload.organizationId) connection.organizationId = orgPayload.organizationId;
   if (orgPayload.organizationUrn) connection.organizationUrn = orgPayload.organizationUrn;
   if (orgPayload.organizationName) connection.organizationName = orgPayload.organizationName;
-  if (Object.prototype.hasOwnProperty.call(hints, "apiVersion")) {
-    connection.apiVersion = normalizeApiVersion(hints.apiVersion);
-  }
+  connection.apiVersion = LINKEDIN_API_VERSION;
 
   const state = crypto.randomBytes(24).toString("hex");
   connection.oauthStateHash = hashState(state);

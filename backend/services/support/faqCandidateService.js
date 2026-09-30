@@ -91,10 +91,15 @@ async function generateFAQCandidates() {
     });
     if (openIncidentCount > 0) continue;
 
+    const createdAt = new Date();
     const candidate = await FAQCandidate.findOneAndUpdate(
       { key: `faq__${group.key}` },
       {
-        $set: {
+        // A pattern proposes one answer. Regeneration must not overwrite an
+        // owner's edits or turn a reviewed answer back into a pending decision.
+        $setOnInsert: {
+          createdAt,
+          updatedAt: createdAt,
           title: buildTitleFromGroup(group),
           question: buildQuestionFromGroup(group),
           draftAnswer: buildAnswerFromGroup(group),
@@ -112,12 +117,14 @@ async function generateFAQCandidates() {
         },
       },
       {
-        new: true,
+        returnDocument: "after",
         upsert: true,
         setDefaultsOnInsert: true,
+        timestamps: false,
       }
     ).lean();
 
+    if (candidate.approvalState !== 'pending_review') continue;
     await ensureFAQCandidateApprovalTask(candidate, {
       actorType: "system",
       label: "FAQ Candidate Service",

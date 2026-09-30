@@ -7,15 +7,6 @@ function ensureApprovedUserAuthReady(user, { touchApprovedAt = true } = {}) {
 
   let changed = false;
 
-  if (user.emailVerified !== true) {
-    if (typeof user.markEmailVerified === "function") {
-      user.markEmailVerified();
-    } else {
-      user.emailVerified = true;
-    }
-    changed = true;
-  }
-
   if (touchApprovedAt && !user.approvedAt) {
     user.approvedAt = new Date();
     changed = true;

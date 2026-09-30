@@ -1,0 +1,129 @@
+/* LPC settings: one readable form column, related fields together, quiet controls.
+   The persistent title, tabs and save feedback retain their shell alignment. */
+.v2-settings .v2-settings-header { position: sticky; top: 0; z-index: 30; background: var(--v2-white); }
+.v2-settings .v2-settings-tabs { min-width: 0; max-width: 100%; flex-wrap: wrap; overflow: visible; }
+.v2-view:has(> .v2-settings) { scroll-padding-top: 150px; }
+/* Keep the same desktop inset without viewport-based padding on the scroll
+   container, which leaves stale horizontal overflow after a WebKit resize. */
+@media (min-width: 901px) {
+  .v2-view:has(> .v2-settings, > .v2-settings-preview) { padding-inline: 0; }
+  .v2-view > :is(.v2-settings, .v2-settings-preview) { width: min(calc(100% - var(--v2-gutter) * 2), var(--v2-content-max)); }
+}
+.v2-settings .v2-settings-panel { width: min(100%, 800px); padding: 0 0 64px; }
+.v2-settings :is(.v2-settings-profile-overview,.v2-settings-two-column,.v2-settings-security-grid) { display: block; }
+.v2-settings .v2-settings-identity-card {
+  display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center;
+  gap: 18px; min-height: 0; margin: 0 0 8px; padding: 24px 0;
+  border: 0; border-radius: 0; text-align: left;
+}
+.v2-settings .v2-settings-photo { width: 64px; height: 64px; overflow: visible; }
+.v2-settings .v2-settings-photo img { border-radius: inherit; }
+.v2-settings .v2-settings-photo__hint { right: -4px; bottom: -2px; font-weight: 400; }
+.v2-settings .v2-settings-identity-copy { margin: 0; }
+.v2-settings .v2-settings-identity-copy small { max-width: 540px; margin: 0; }
+.v2-settings .v2-settings-identity-card > a { color: var(--v2-blue-hover); background: transparent; }
+.v2-settings .v2-settings-card {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px;
+  margin: 0; padding: 26px 0; border: 0; border-radius: 0;
+}
+.v2-settings .v2-settings-card--identity { padding-top: 4px; }
+.v2-settings .v2-settings-card-body { min-width: 0; }
+.v2-settings .v2-settings-section-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin: 0; }
+.v2-settings .v2-settings-section-heading h2,
+.v2-settings .v2-settings-group-title { font-family: var(--v2-font-sans); font-size: 18px; font-weight: 500; line-height: 1.4; margin: 0; letter-spacing: 0; }
+.v2-settings .v2-settings-section-heading p { flex-basis: 100%; max-width: none; margin: 0; font-size: max(13px,.8125rem); line-height: 1.5; }
+.v2-settings .v2-settings-group { padding: 28px 0 8px; border-top: 1px solid var(--v2-line); }
+.v2-settings .v2-settings-group-title { margin-bottom: 20px; }
+.v2-settings .v2-settings-group .v2-settings-card { padding: 0 0 24px; }
+.v2-settings .v2-settings-group .v2-settings-section-heading h2 { font-size: 15px; font-weight: 400; }
+.v2-settings .v2-settings-compact-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 24px; }
+.v2-settings .v2-settings-field-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px 24px; }
+.v2-settings .v2-settings-field__label,
+.v2-settings .v2-settings-preference-block > strong { font-weight: 400; font-size: max(13px,.8125rem); }
+.v2-settings .v2-settings-required { color: var(--v2-muted); font-size: max(12px,.75rem); font-weight: 300; margin-left: 8px; }
+.v2-settings .v2-settings-section-heading > .v2-settings-required { margin-left: 0; }
+.v2-settings .v2-settings-input { background: var(--v2-soft); border: 1px solid transparent; border-radius: 6px; font-weight: 300; }
+.v2-settings .v2-settings-input:hover { border-color: var(--v2-line); }
+.v2-settings .v2-settings-input:focus { background: var(--v2-white); border-color: var(--v2-blue); box-shadow: 0 0 0 2px color-mix(in srgb,var(--v2-blue) 15%,transparent); }
+.v2-settings :is(button,a,summary):focus-visible { outline: 2px solid var(--v2-blue); outline-offset: 3px; }
+.v2-settings .v2-settings-input[aria-invalid="true"] { border-color: var(--v2-danger); }
+.v2-settings .v2-settings-field-error { color: var(--v2-danger); font-size: max(13px,.8125rem); }
+:root.theme-dark .v2-settings :is(.v2-settings-save-status[data-state="error"],.v2-settings-inline-status[data-state="error"],.v2-settings-field-error,.v2-settings-text-action--danger,.v2-settings-menu-action--danger,.v2-settings-chip-remove:hover) { color: #f0a6ad; }
+:root.theme-dark .v2-settings .v2-settings-input[aria-invalid="true"] { border-color: #f0a6ad; }
+.v2-settings .v2-settings-textarea { min-height: 112px; }
+.v2-settings .v2-settings-input--years { max-width: 120px; }
+.v2-settings .v2-settings-token-entry,
+.v2-settings [data-profile-section="skills"] .v2-settings-token-entry { width: min(100%,360px); grid-template-columns: minmax(0,1fr) auto; }
+.v2-settings [aria-label="Primary state"] { width: min(100%,360px); }
+.v2-settings .v2-settings-chip { background: var(--v2-soft); border-color: transparent; border-radius: 5px; }
+.v2-settings .v2-settings-secondary { border-color: transparent; border-radius: 6px; background: var(--v2-soft); }
+.v2-settings .v2-settings-secondary:hover { color: var(--v2-blue-hover); background: color-mix(in srgb,var(--v2-blue) 8%,var(--v2-white)); }
+.v2-settings .v2-settings-readiness { margin: 0 0 24px; border: 0; border-left: 2px solid var(--v2-blue); border-radius: 0; background: color-mix(in srgb,var(--v2-blue) 6%,var(--v2-white)); }
+.v2-settings .v2-settings-optional { grid-column: 1 / -1; margin-top: 14px; }
+.v2-settings .v2-settings-optional > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; width: fit-content; cursor: pointer; list-style: none; color: var(--v2-blue-hover); font-size: 14px; }
+.v2-settings summary::-webkit-details-marker { display: none; }
+.v2-settings .v2-settings-disclosure-mark { width: 20px; font-size: 20px; line-height: 1; text-align: center; transition: transform 160ms ease; }
+.v2-settings .v2-settings-optional[open] > summary .v2-settings-disclosure-mark { transform: rotate(45deg); }
+.v2-settings .v2-settings-optional-body { padding: 8px 0 4px; display: grid; gap: 18px; }
+.v2-settings .v2-settings-repeater { gap: 8px; margin: 0 0 6px; }
+.v2-settings .v2-settings-repeater:empty { display: none; }
+.v2-settings .v2-settings-repeater-row { padding: 0; border: 0; border-radius: 6px; background: transparent; }
+.v2-settings .v2-settings-repeater-row > summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 64px; padding: 10px 14px; margin-inline: -14px; cursor: pointer; list-style: none; border-radius: 6px; }
+.v2-settings .v2-settings-repeater-row > summary:hover { background: var(--v2-soft); }
+.v2-settings .v2-settings-entry-copy { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.v2-settings .v2-settings-entry-copy strong { font-size: 15px; font-weight: 400; }
+.v2-settings .v2-settings-entry-subtitle { color: var(--v2-muted); font-size: max(13px,.8125rem); }
+.v2-settings .v2-settings-entry-edit { font-size: 14px; color: var(--v2-blue-hover); }
+.v2-settings .v2-settings-repeater-row[open] > summary .v2-settings-entry-edit { visibility: hidden; }
+.v2-settings .v2-settings-entry-editor { padding: 12px 0 20px; }
+.v2-settings .v2-settings-entry-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px; }
+.v2-settings .v2-settings-entry-actions > button { min-height: 44px; }
+.v2-settings .v2-settings-group + [data-profile-section="résumé"] { border-top: 1px solid var(--v2-line); }
+.v2-settings :is(.v2-settings-document-row,.v2-settings-record-row,.v2-settings-preference-row,.v2-settings-security-methods article) { border: 0; padding-block: 12px; }
+.v2-settings :is(.v2-settings-document-row,.v2-settings-record-row,.v2-settings-preference-row,.v2-settings-security-methods) strong { font-weight: 400; }
+.v2-settings .v2-settings-security-methods strong,
+.v2-settings .v2-settings-preference-row strong,
+.v2-settings .v2-settings-subsection h3 { color: var(--v2-ink); }
+.v2-settings .v2-settings-record-list { margin-top: 0; }
+.v2-settings .v2-settings-inline-status:empty { display: none; }
+.v2-settings .v2-settings-panel-toolbar { min-height: 0; padding-top: 22px; margin: 0; }
+.v2-settings .v2-settings-card-actions { justify-content: flex-start; flex-wrap: wrap; margin-top: 16px; }
+.v2-settings .v2-settings-payout-card .v2-settings-card-actions { margin-top: 0; }
+.v2-settings .v2-settings-security-card + .v2-settings-security-card,
+.v2-settings .v2-settings-deactivate-card,
+.v2-settings .v2-settings-preferences-grid + .v2-settings-card { border-top: 1px solid var(--v2-line); }
+.v2-settings .v2-settings-preference-block { padding: 0 0 22px; border: 0; }
+.v2-settings .v2-settings-card--workspace .v2-settings-field-grid { margin-bottom: 22px; }
+.v2-settings [aria-label="Font size"] { max-width: 220px; }
+.v2-settings .v2-settings-theme { min-height: 56px; border-radius: 6px; }
+.v2-settings .v2-settings-theme[aria-checked="true"] { background: color-mix(in srgb,var(--v2-blue) 5%,var(--v2-white)); }
+.v2-settings .v2-settings-theme strong { font-weight: 400; }
+.v2-settings .v2-settings-deactivate-card .v2-settings-section-heading h2 { color: var(--v2-danger); }
+@media (max-width:760px) {
+  .v2-settings .v2-settings-identity-card { grid-template-columns: 56px minmax(0,1fr); gap: 14px; padding: 20px 0; }
+  .v2-settings .v2-settings-photo { width: 56px; height: 56px; }
+  .v2-settings .v2-settings-identity-card > a { grid-column: 2; justify-self: start; width: auto; min-height: 36px; padding: 0; }
+  .v2-settings .v2-settings-photo-menu { left: 0; transform: none; }
+  .v2-settings .v2-settings-field-grid { grid-template-columns: 1fr; gap: 16px; }
+  .v2-settings .v2-settings-personal-fields { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px 12px; }
+  .v2-settings .v2-settings-personal-fields > :nth-child(n+3) { grid-column: 1 / -1; }
+  .v2-settings .v2-settings-compact-grid { grid-template-columns: 1fr; }
+  .v2-settings .v2-settings-field__label .v2-settings-required { display: block; margin-left: 0; }
+  .v2-settings .v2-settings-preference-row { flex-direction: row; align-items: center; gap: 16px; }
+  .v2-settings .v2-settings-preference-row > div { min-width: 0; }
+  .v2-settings .v2-settings-theme { grid-template-columns: 1fr; gap: 8px; }
+  .v2-settings .v2-settings-repeater-row > summary { margin-inline: 0; padding-inline: 0; }
+}
+@media (prefers-reduced-motion:reduce) { .v2-settings .v2-settings-disclosure-mark { transition: none; } }
+
+.v2-settings .v2-settings-date-pair { display: grid; grid-template-columns: minmax(0,1fr) minmax(80px,120px); gap: 12px; }
+.v2-settings .v2-settings-field--dates { max-width: 240px; }
+
+/* The small switch retains a full-size pointer and touch target. */
+.v2-settings .v2-settings-switch { height: 44px; }
+.v2-settings .v2-settings-switch > span { inset: 8px 0 9px; }
+.v2-settings .v2-settings-switch > input { inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; z-index: 1; cursor: pointer; }
+.v2-settings .v2-settings-switch > input:disabled { cursor: not-allowed; }
+.v2-settings .v2-settings-preference-row:has(.v2-settings-switch) { padding-block: 4px; }
+/* Cover the scroll-container inset above the pinned settings heading. */
+.v2-settings .v2-settings-header::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 24px; background: var(--v2-white); pointer-events: none; }

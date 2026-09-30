@@ -17,12 +17,8 @@ const CLAIMABLE_JOB_TYPES = Object.freeze([
   "verification",
   "deployment",
 ]);
-const DEFAULT_INTERVAL_MS = Number(process.env.INCIDENT_SCHEDULER_INTERVAL_MS || 15000);
 const DEFAULT_LOCK_MS = Number(process.env.INCIDENT_SCHEDULER_LOCK_MS || 60000);
 const MAX_JOBS_PER_RUN = Number(process.env.INCIDENT_SCHEDULER_MAX_JOBS || 10);
-
-let schedulerTimer = null;
-let activeRunPromise = null;
 
 function defaultWorkerId() {
   return `incident-scheduler:${os.hostname()}:${process.pid}`;
@@ -62,7 +58,7 @@ async function claimNextIncidentJob({
       },
     },
     {
-      new: true,
+      returnDocument: "after",
       sort: {
         "orchestration.nextJobRunAt": 1,
         createdAt: 1,
@@ -105,7 +101,7 @@ async function renewIncidentJobLock({
         "orchestration.lastWorkerAt": now,
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   ).lean();
 
   if (!renewed) {
@@ -182,6 +178,7 @@ async function processClaimedIncidentJob(claim) {
 async function runIncidentSchedulerOnce({
   maxJobs = MAX_JOBS_PER_RUN,
   workerId = defaultWorkerId(),
+  jobTypes = CLAIMABLE_JOB_TYPES,
 } = {}) {
   if (!isDbReady()) {
     return { ok: false, reason: "db_not_ready", processed: 0, results: [] };
@@ -191,7 +188,7 @@ async function runIncidentSchedulerOnce({
   const limit = Math.max(1, Number(maxJobs) || MAX_JOBS_PER_RUN);
 
   for (let count = 0; count < limit; count += 1) {
-    const claim = await claimNextIncidentJob({ workerId });
+    const claim = await claimNextIncidentJob({ workerId, jobTypes });
     if (!claim) break;
     // eslint-disable-next-line no-await-in-loop
     const result = await processClaimedIncidentJob(claim);
@@ -205,61 +202,10 @@ async function runIncidentSchedulerOnce({
   };
 }
 
-function scheduleTick() {
-  if (activeRunPromise) return activeRunPromise;
-  activeRunPromise = runIncidentSchedulerOnce()
-    .catch((error) => {
-      logger.error("Incident scheduler run failed.", error?.message || error);
-      return { ok: false, reason: "run_failed", processed: 0, results: [] };
-    })
-    .finally(() => {
-      activeRunPromise = null;
-    });
-  return activeRunPromise;
-}
-
-function startIncidentScheduler({
-  intervalMs = DEFAULT_INTERVAL_MS,
-} = {}) {
-  if (process.env.INCIDENT_SCHEDULER_ENABLED === "false") {
-    logger.info("Incident scheduler disabled by environment.");
-    return { started: false, reason: "disabled" };
-  }
-
-  if (schedulerTimer) {
-    return { started: true, reused: true, intervalMs: DEFAULT_INTERVAL_MS };
-  }
-
-  schedulerTimer = setInterval(() => {
-    void scheduleTick();
-  }, Math.max(1000, Number(intervalMs) || DEFAULT_INTERVAL_MS));
-
-  if (typeof schedulerTimer.unref === "function") {
-    schedulerTimer.unref();
-  }
-
-  void scheduleTick();
-
-  logger.info("Incident scheduler started.", {
-    intervalMs: Math.max(1000, Number(intervalMs) || DEFAULT_INTERVAL_MS),
-  });
-
-  return { started: true, intervalMs: Math.max(1000, Number(intervalMs) || DEFAULT_INTERVAL_MS) };
-}
-
-function stopIncidentScheduler() {
-  if (schedulerTimer) {
-    clearInterval(schedulerTimer);
-    schedulerTimer = null;
-  }
-}
-
 module.exports = {
   CLAIMABLE_JOB_TYPES,
   claimNextIncidentJob,
   renewIncidentJobLock,
   processClaimedIncidentJob,
   runIncidentSchedulerOnce,
-  startIncidentScheduler,
-  stopIncidentScheduler,
 };

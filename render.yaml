@@ -1,0 +1,495 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+services:
+  - type: web
+    name: lets-para3
+    runtime: node
+    repo: https://github.com/thegitsss/lets-para3
+    branch: main
+    buildCommand: cd backend && node scripts/verify-runtime.js && PUPPETEER_SKIP_DOWNLOAD=true MONGOMS_DISABLE_POSTINSTALL=true npm ci --include=dev && npm run build:frontend
+    preDeployCommand: cd backend && npm run migrate:production:apply && npm run admin:communications:indexes
+    startCommand: cd backend && npm start
+    autoDeployTrigger: checksPass
+    healthCheckPath: /api/health
+    maxShutdownDelaySeconds: 30
+    domains:
+      - www.lets-paraconnect.com
+    renderSubdomainPolicy: disabled
+    previews:
+      generation: manual
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24.18.0
+      - key: APP_BASE_URL
+        value: https://www.lets-paraconnect.com
+      - key: CLIENT_BASE_URL
+        value: https://www.lets-paraconnect.com
+      - key: FRONTEND_BASE_URL
+        value: https://www.lets-paraconnect.com
+      - key: PUBLIC_ORIGIN
+        value: https://www.lets-paraconnect.com
+      - key: EMAIL_BASE_URL
+        value: https://www.lets-paraconnect.com
+      - key: CORS_ORIGINS
+        value: https://www.lets-paraconnect.com
+      - key: WEBAUTHN_ORIGIN
+        value: https://www.lets-paraconnect.com
+      - key: WEBAUTHN_RP_ID
+        value: www.lets-paraconnect.com
+      - key: WEBAUTHN_RP_NAME
+        value: Let's-ParaConnect
+      - key: JWT_ISSUER
+        value: https://www.lets-paraconnect.com
+      - key: JWT_AUDIENCE
+        value: lets-paraconnect-web
+      - key: STRIPE_API_VERSION
+        value: 2026-07-29.dahlia
+      - key: STRIPE_CONNECT_COUNTRY
+        value: US
+      - key: STRIPE_WEBHOOK_ALERTS_ENABLED
+        value: "true"
+      - key: PLATFORM_FEE_ATTORNEY_PERCENT
+        value: "22"
+      - key: PLATFORM_FEE_PARALEGAL_PERCENT
+        value: "18"
+      - key: STRIPE_CONNECT_RETURN_URL
+        value: https://www.lets-paraconnect.com/profile-settings.html?stripe=return
+      - key: STRIPE_CONNECT_REFRESH_URL
+        value: https://www.lets-paraconnect.com/profile-settings.html?stripe=refresh
+      - key: STRIPE_CHECKOUT_SUCCESS_URL
+        value: "https://www.lets-paraconnect.com/dashboard-attorney.html?payment=success#funds"
+      - key: STRIPE_CHECKOUT_CANCEL_URL
+        value: "https://www.lets-paraconnect.com/dashboard-attorney.html?payment=cancel#funds"
+      - key: ENABLE_CSRF
+        value: "true"
+      - key: REQUIRE_AUTH_SESSION
+        value: "true"
+      - key: REQUIRE_DATA_ENCRYPTION
+        value: "true"
+      - key: S3_MALWARE_SCAN_REQUIRED
+        value: "true"
+      - key: ENABLE_TWO_FACTOR
+        value: "true"
+      - key: TURNSTILE_ENFORCED
+        value: "true"
+      - key: EMAIL_DISABLE
+        value: "false"
+      - key: MESSAGE_EMAIL_SUPPRESS_MINUTES
+        value: "120"
+      - key: INCIDENT_AUTO_DEPLOY_ENABLED
+        value: "false"
+      - key: INCIDENT_PREVIEW_DEPLOY_MODE
+        value: disabled
+      - key: INCIDENT_PRODUCTION_DEPLOY_MODE
+        value: disabled
+      - key: INCIDENT_ROLLBACK_MODE
+        value: disabled
+      - key: BUSINESS_TIME_ZONE
+        value: America/New_York
+      - key: TZ
+        value: America/New_York
+      - key: LEGAL_APPROVED_TERMS_VERSION
+        value: "2026-09-25"
+      - key: LEGAL_APPROVED_PRIVACY_VERSION
+        value: "2026-09-25"
+      - key: LEGAL_COUNSEL_APPROVAL_ID
+        sync: false
+      - key: LEGAL_APPROVED_TERMS_SHA256
+        sync: false
+      - key: LEGAL_APPROVED_PRIVACY_SHA256
+        sync: false
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: DATA_ENCRYPTION_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_SAFETY_SALT
+        sync: false
+      - key: OPENAI_SUPPORT_MANAGER_ENABLED
+        value: "true"
+      - key: OPENAI_ATTORNEY_MANAGER_ENABLED
+        sync: false
+      - key: OPENAI_ATTORNEY_MANAGER_ROLLOUT_PERCENT
+        sync: false
+      - key: OPENAI_ATTORNEY_MANAGER_ALLOWLIST
+        sync: false
+      - key: OPENAI_ATTORNEY_LEGACY_FALLBACK
+        value: "false"
+      - key: OPENAI_PARALEGAL_MANAGER_ENABLED
+        value: "false"
+      - key: OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT
+        value: "0"
+      - key: OPENAI_PARALEGAL_LEGACY_FALLBACK
+        value: "false"
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_CONNECT_WEBHOOK_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        value: https://www.lets-paraconnect.com/api/auth/google/callback
+      - key: TURNSTILE_SECRET
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        sync: false
+      - key: OWNER_ALERT_EMAILS
+        sync: false
+      - key: FOUNDER_EMAIL
+        sync: false
+      - key: INCIDENT_FOUNDER_APPROVER_EMAILS
+        sync: false
+      - key: INCIDENT_FOUNDER_ALERT_EMAILS
+        sync: false
+      - key: LINKEDIN_CLIENT_ID
+        sync: false
+      - key: LINKEDIN_CLIENT_SECRET
+        sync: false
+      - key: LINKEDIN_OAUTH_REDIRECT_URI
+        value: https://www.lets-paraconnect.com/api/admin/marketing/publishing/channel-connections/linkedin_company/oauth/callback
+      - key: ZOHO_MAIL_REFRESH_TOKEN
+        sync: false
+      - key: ZOHO_MAIL_CLIENT_ID
+        sync: false
+      - key: ZOHO_MAIL_CLIENT_SECRET
+        sync: false
+      - key: DIRECTOR_SMTP_USER
+        sync: false
+      - key: DIRECTOR_SMTP_PASS
+        sync: false
+      - key: ADMIN_ALERT_EMAIL
+        sync: false
+      - key: SUPPORT_ZOHO_MAILBOX
+        sync: false
+      - key: SUPPORT_ZOHO_ACCOUNT_ID
+        sync: false
+      - key: SUPPORT_ZOHO_INBOX_FOLDER_ID
+        sync: false
+      - key: SUPPORT_ZOHO_CLIENT_ID
+        sync: false
+      - key: SUPPORT_ZOHO_CLIENT_SECRET
+        sync: false
+      - key: SUPPORT_ZOHO_REFRESH_TOKEN
+        sync: false
+      - key: SUPPORT_ZOHO_API_BASE_URL
+        sync: false
+      - key: SUPPORT_ZOHO_ACCOUNTS_BASE_URL
+        sync: false
+      - key: SUPPORT_MAIL_SYNC_SINCE
+        sync: false
+
+  - type: worker
+    name: lets-para3-incident-runner
+    runtime: node
+    repo: https://github.com/thegitsss/lets-para3
+    branch: main
+    buildCommand: cd backend && node scripts/verify-runtime.js && PUPPETEER_SKIP_DOWNLOAD=true MONGOMS_DISABLE_POSTINSTALL=true npm ci
+    startCommand: cd backend && npm run incident:runner
+    autoDeployTrigger: checksPass
+    maxShutdownDelaySeconds: 300
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24.18.0
+      - key: APP_BASE_URL
+        value: https://www.lets-paraconnect.com
+      - key: EMAIL_BASE_URL
+        value: https://www.lets-paraconnect.com
+      - key: EMAIL_DISABLE
+        value: "false"
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: "true"
+      - key: MONGOMS_DISABLE_POSTINSTALL
+        value: "true"
+      - key: INCIDENT_RUNNER_MAX_JOBS
+        value: "1"
+      - key: INCIDENT_RUNNER_POLL_MS
+        value: "5000"
+      - key: INCIDENT_RUNNER_LOCK_MS
+        value: "240000"
+      - key: INCIDENT_RUNNER_LOCK_RENEW_MS
+        value: "30000"
+      - key: INCIDENT_RUNNER_HEARTBEAT_MS
+        value: "300000"
+      - key: INCIDENT_RUNNER_SHUTDOWN_GRACE_MS
+        value: "270000"
+      - key: INCIDENT_AUTO_DEPLOY_ENABLED
+        value: "false"
+      - key: INCIDENT_PREVIEW_DEPLOY_MODE
+        value: disabled
+      - key: INCIDENT_PRODUCTION_DEPLOY_MODE
+        value: disabled
+      - key: INCIDENT_ROLLBACK_MODE
+        value: disabled
+      - key: TZ
+        value: America/New_York
+      - key: MONGO_URI
+        sync: false
+      - key: DATA_ENCRYPTION_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_SAFETY_SALT
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        sync: false
+      - key: INCIDENT_FOUNDER_APPROVER_EMAILS
+        sync: false
+      - key: INCIDENT_FOUNDER_ALERT_EMAILS
+        sync: false
+
+  - type: cron
+    name: lets-para3-automation
+    runtime: node
+    repo: https://github.com/thegitsss/lets-para3
+    branch: main
+    schedule: "*/5 * * * *"
+    buildCommand: cd backend && node scripts/verify-runtime.js && PUPPETEER_SKIP_DOWNLOAD=true MONGOMS_DISABLE_POSTINSTALL=true npm ci
+    startCommand: cd backend && npm run automation:cycle
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24.18.0
+      - key: APP_BASE_URL
+        value: https://www.lets-paraconnect.com
+      - key: EMAIL_BASE_URL
+        value: https://www.lets-paraconnect.com
+      - key: EMAIL_DISABLE
+        value: "false"
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: "true"
+      - key: MONGOMS_DISABLE_POSTINSTALL
+        value: "true"
+      - key: MARKETING_JR_CMO_EXTERNAL_RESEARCH_ENABLED
+        value: "false"
+      - key: TZ
+        value: America/New_York
+      - key: MONGO_URI
+        sync: false
+      - key: DATA_ENCRYPTION_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_SAFETY_SALT
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        sync: false
+      - key: FOUNDER_EMAIL
+        sync: false
+      - key: LINKEDIN_CLIENT_ID
+        sync: false
+      - key: LINKEDIN_CLIENT_SECRET
+        sync: false
+      - key: LINKEDIN_OAUTH_REDIRECT_URI
+        value: https://www.lets-paraconnect.com/api/admin/marketing/publishing/channel-connections/linkedin_company/oauth/callback
+      - key: ZOHO_MAIL_REFRESH_TOKEN
+        sync: false
+      - key: ZOHO_MAIL_CLIENT_ID
+        sync: false
+      - key: ZOHO_MAIL_CLIENT_SECRET
+        sync: false
+      - key: DIRECTOR_SMTP_USER
+        sync: false
+      - key: DIRECTOR_SMTP_PASS
+        sync: false
+
+  - type: cron
+    name: lets-para3-ops-monitor
+    runtime: node
+    repo: https://github.com/thegitsss/lets-para3
+    branch: main
+    schedule: "*/5 * * * *"
+    buildCommand: cd backend && node scripts/verify-runtime.js && PUPPETEER_SKIP_DOWNLOAD=true MONGOMS_DISABLE_POSTINSTALL=true npm ci
+    startCommand: cd backend && npm run ops:monitor
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24.18.0
+      - key: APP_BASE_URL
+        value: https://www.lets-paraconnect.com
+      - key: OPS_HEALTHCHECK_URL
+        value: https://www.lets-paraconnect.com/api/health
+      - key: EMAIL_DISABLE
+        value: "false"
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: "true"
+      - key: MONGOMS_DISABLE_POSTINSTALL
+        value: "true"
+      - key: MONITOR_CHECK_WEBHOOKS
+        value: "true"
+      - key: MONITOR_REQUIRE_BACKUP
+        value: "true"
+      - key: MONITOR_PERSIST_STATE
+        value: "true"
+      - key: MONITOR_SEND_OWNER_ALERTS
+        value: "true"
+      - key: MONITOR_ALERT_ON_OK
+        value: "true"
+      - key: BACKUP_MAX_AGE_HOURS
+        value: "36"
+      - key: WEBHOOK_FAILURE_LOOKBACK_MINUTES
+        value: "30"
+      - key: ATLAS_CLUSTER_TYPE
+        value: replica_set
+      - key: TZ
+        value: America/New_York
+      - key: MONGO_URI
+        sync: false
+      - key: ATLAS_PROJECT_ID
+        sync: false
+      - key: ATLAS_CLUSTER_NAME
+        sync: false
+      - key: ATLAS_CLIENT_ID
+        sync: false
+      - key: ATLAS_CLIENT_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        sync: false
+      - key: OWNER_ALERT_EMAILS
+        sync: false
+
+  - type: worker
+    name: lets-para3-admin-communications
+    runtime: node
+    plan: starter
+    region: virginia
+    repo: https://github.com/thegitsss/lets-para3
+    branch: main
+    buildCommand: cd backend && node scripts/verify-runtime.js && PUPPETEER_SKIP_DOWNLOAD=true MONGOMS_DISABLE_POSTINSTALL=true npm ci
+    startCommand: cd backend && npm run admin:communications
+    autoDeployTrigger: checksPass
+    maxShutdownDelaySeconds: 300
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24.18.0
+      - key: APP_BASE_URL
+        value: https://www.lets-paraconnect.com
+      - key: EMAIL_BASE_URL
+        value: https://www.lets-paraconnect.com
+      - key: EMAIL_DISABLE
+        value: "false"
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: "true"
+      - key: MONGOMS_DISABLE_POSTINSTALL
+        value: "true"
+      - key: TZ
+        value: America/New_York
+      - key: MONGO_URI
+        sync: false
+      - key: DATA_ENCRYPTION_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        sync: false
+      - key: ADMIN_ALERT_EMAIL
+        sync: false
+      - key: SUPPORT_ZOHO_MAILBOX
+        sync: false
+      - key: SUPPORT_ZOHO_ACCOUNT_ID
+        sync: false
+      - key: SUPPORT_ZOHO_INBOX_FOLDER_ID
+        sync: false
+      - key: SUPPORT_ZOHO_CLIENT_ID
+        sync: false
+      - key: SUPPORT_ZOHO_CLIENT_SECRET
+        sync: false
+      - key: SUPPORT_ZOHO_REFRESH_TOKEN
+        sync: false
+      - key: SUPPORT_ZOHO_API_BASE_URL
+        sync: false
+      - key: SUPPORT_ZOHO_ACCOUNTS_BASE_URL
+        sync: false
+      - key: SUPPORT_MAIL_SYNC_SINCE
+        sync: false

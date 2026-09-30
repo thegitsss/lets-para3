@@ -4,6 +4,7 @@ const {
   MARKETING_CHANNEL_CONNECTION_STATUSES,
   MARKETING_PUBLISHING_CHANNELS,
 } = require("../services/marketing/constants");
+const { LINKEDIN_API_VERSION } = require("../services/marketing/linkedinApiPolicy");
 
 const { Schema } = mongoose;
 
@@ -37,7 +38,7 @@ const marketingChannelConnectionSchema = new Schema(
     accessTokenLast4: { type: String, trim: true, default: "", maxlength: 16 },
     tokenExpiresAt: { type: Date, default: null },
     scopeSnapshot: { type: [String], default: [] },
-    apiVersion: { type: String, trim: true, default: "", maxlength: 40 },
+    apiVersion: { type: String, trim: true, default: LINKEDIN_API_VERSION, maxlength: 40 },
     authorizationAction: { type: String, trim: true, default: "", maxlength: 120 },
     authorizationGranted: { type: Boolean, default: false },
     discoveredOrganizations: { type: [Schema.Types.Mixed], default: [] },

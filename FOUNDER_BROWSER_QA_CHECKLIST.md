@@ -4,10 +4,12 @@ Use this pass in a real browser on the current app build. The goal is to catch r
 
 ## Preflight
 
-- Verify the web app and the separate incident runner are both running.
+- Record the exact environment, full release commit, tester, browser/device, date, and evidence location.
+- Verify the web app, incident runner, automation cron, and operations monitor are all running the same full release commit.
 - Confirm admin login works and the admin dashboard loads without console errors.
 - Keep one signed-out browser window for public pages and one signed-in admin window for internal surfaces.
 - If testing LinkedIn, use the deployed callback URL and a real LinkedIn app config. Do not test OAuth from a mismatched local callback.
+- Do not trigger provider, publishing, finance, account, or destructive actions unless the named test environment and operator plan explicitly authorize them.
 
 ## Public Homepage
 
@@ -73,7 +75,7 @@ Use this pass in a real browser on the current app build. The goal is to catch r
 - Confirm draft queue, packet detail, publishing settings, cycle list, and LinkedIn section all load without throwing.
 - Create or open a packet and verify readiness/history blocks render truthfully.
 - Confirm no publish action is enabled for non-approved packets.
-- Confirm Facebook still reads as unavailable for publishing.
+- Confirm no active Facebook authoring, approval, connection, or publishing control is exposed; legacy Facebook history, if present, must be labelled retired and read-only.
 
 ## Support
 
@@ -125,13 +127,13 @@ Use this pass in a real browser on the current app build. The goal is to catch r
 
 - Admin workspace loaders partially succeeding and leaving stale detail panels behind.
 - Signed-in versus signed-out header state drifting on public FAQ/help pages.
-- War Room copy implying canonical truth where the backend is still using heuristics or compatibility-only lifecycle signals.
+- Control Room copy implying canonical truth where the backend is still using heuristics or compatibility-only lifecycle signals.
 - Marketing publish readiness showing stale connection or packet state after refreshes.
 - Incident detail and timeline panels not clearing when the selected incident changes or a fetch fails.
 
 ## Manual-Risk Areas Still Worth Extra Attention
 
-- Public static pages do not have meaningful automated browser coverage.
-- Admin workspace rendering across Marketing, Support, Sales, and Approvals is still mostly manual-browser tested rather than component-tested.
+- Automated public-page accessibility coverage is broad, but it does not replace real-browser visual, keyboard, zoom/reflow, or assistive-technology review.
+- The core Control Room has cross-browser automated coverage; Marketing, Support, Sales, Approvals, and live provider state still need targeted manual verification.
 - LinkedIn OAuth and publish flows still require live environment testing with real provider configuration.
-- Mobile layout and keyboard navigation remain primarily manual verification areas across public and admin surfaces.
+- Real Safari, Edge, iOS, Android, supported screen readers, software keyboards, orientation changes, and continuous-width behavior remain manual evidence requirements.

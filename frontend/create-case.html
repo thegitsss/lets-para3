@@ -7,16 +7,16 @@
         const raw = localStorage.getItem("lpc_user");
         if (!raw) return;
         const stored = JSON.parse(raw);
-        const theme = String(stored?.preferences?.theme || "").toLowerCase();
-        if (!theme) return;
-        const classes = theme === "mountain-dark" ? ["theme-mountain-dark", "theme-dark"] : [`theme-${theme}`];
-        classes.forEach((cls) => document.documentElement.classList.add(cls));
+        const storedTheme = String(stored?.preferences?.theme || "").toLowerCase();
+        const theme = storedTheme === "dark" || /dark$/i.test(storedTheme) ? "dark" : "light";
+        document.documentElement.classList.add(`theme-${theme}`);
       } catch (_) {}
     })();
   </script>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
   <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
+  <link rel="stylesheet" href="assets/styles/dashboard-system.css?v=20260820-4" />
   <link rel="preload" as="image" href="hero-mountain.jpg" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
@@ -31,7 +31,9 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
-  <script src="assets/scripts/utils/session.js"></script>
+  <link rel="stylesheet" href="assets/styles/global-search.css?v=20260831-3" />
+  <script src="assets/scripts/utils/session.js?v=20260902-1"></script>
+  <script src="assets/scripts/utils/business-date.js"></script>
   <style>
     .skip-link {
       position: absolute;
@@ -53,7 +55,7 @@
     .gold{color:#b4975a;}
     :root {
       --bg:#ffffff;
-      --sidebar-bg:#f5f5f5e6;
+      --sidebar-bg:#ffffff;
       --accent:#b6a47a;
       --ink:#1a1a1a;
       --muted:#8a8a8a;
@@ -61,7 +63,7 @@
       --panel:#fcfcfc;
       --sidebar-text:#1a1a1a;
       --radius:14px;
-      --font-serif:'Cormorant Garamond',serif;
+      --font-serif:'Sarabun',sans-serif;
       --font-sans:'Sarabun',sans-serif;
     }
     body.theme-dark{
@@ -72,12 +74,6 @@
       --muted:#9aa7c4;
       --line:rgba(255,255,255,0.08);
       --sidebar-text:#f8fbff;
-    }
-    body.theme-mountain{
-      --bg:#f8f6f1;
-      --panel:#ffffff;
-      --muted:#7a736a;
-      --sidebar-text:#ffffff;
     }
     *{margin:0;padding:0;box-sizing:border-box}
     body{
@@ -113,19 +109,6 @@
       pointer-events:none;
       transition:background .3s ease;
     }
-    body.theme-mountain .sidebar,
-    body.theme-mountain-dark .sidebar{
-      background:var(--bg) url('hero-mountain.jpg') center/cover no-repeat;
-    }
-    body.theme-mountain .sidebar::before,
-    body.theme-mountain-dark .sidebar::before{
-      background:rgba(0,0,0,0.45);
-    }
-    body.theme-mountain .sidebar > *,
-    body.theme-mountain-dark .sidebar > *{
-      position:relative;
-      z-index:1;
-    }
     .logo{
       font-family:var(--font-serif);
       font-size:1.6rem;
@@ -145,12 +128,6 @@
     nav a.active,nav a:hover{background:rgba(0,0,0,0.04);}
     body.theme-dark nav a.active,
     body.theme-dark nav a:hover{background:rgba(255,255,255,0.12);}
-    body.theme-mountain nav a.active,
-    body.theme-mountain nav a:hover,
-    body.theme-mountain-dark nav a.active,
-    body.theme-mountain-dark nav a:hover{background:rgba(255,255,255,0.18);}
-    body.theme-mountain nav a,
-    body.theme-mountain-dark nav a{color:#fff;}
     .sidebar-link{
       margin-top:1.5rem;
       width:100%;
@@ -172,15 +149,9 @@
       outline:none;
     }
     body.theme-dark .sidebar-link:hover,
-    body.theme-dark .sidebar-link:focus,
-    body.theme-mountain .sidebar-link:hover,
-    body.theme-mountain .sidebar-link:focus,
-    body.theme-mountain-dark .sidebar-link:hover,
-    body.theme-mountain-dark .sidebar-link:focus{
+    body.theme-dark .sidebar-link:focus{
       color:#fff;
     }
-    body.theme-mountain .sidebar-link,
-    body.theme-mountain-dark .sidebar-link{color:#fff;}
     .sidebar-bottom{
       margin-top:auto;
       display:flex;
@@ -340,7 +311,7 @@
   margin: 0 auto 8px;
   font-size: 0.8rem;
   color: var(--muted);
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 .step.active .circle {
@@ -375,18 +346,11 @@
     body.theme-dark .user-profile strong{color:#fff;}
     body.theme-dark .user-profile span{color:rgba(255,255,255,0.8);}
     body.theme-dark .profile-dropdown button:hover,
-    body.theme-dark .profile-dropdown a:hover,
-    body.theme-mountain-dark .profile-dropdown button:hover,
-    body.theme-mountain-dark .profile-dropdown a:hover{background:rgba(255,255,255,0.06);}
-    body.theme-mountain .user-profile{background:rgba(255,255,255,0.65);border-color:transparent;box-shadow:0 18px 34px rgba(17,22,26,0.2);}
-    body.theme-mountain .user-profile strong{color:#fff;}
-    body.theme-mountain .user-profile span{color:rgba(255,255,255,0.85);}
-    body.theme-mountain #createCaseTopbar .user-profile strong{color:#1a1a1a;}
-    body.theme-mountain #createCaseTopbar .user-profile span{color:#6b6b6b;}
+    body.theme-dark .profile-dropdown a:hover{background:rgba(255,255,255,0.06);}
 
     header h1{
-      font-family:var(--font-serif);
-      font-weight:300;
+      font-family:var(--font-sans);
+      font-weight:400;
       font-size:2rem;
       margin:0 0 0.75rem;
     }
@@ -457,6 +421,12 @@
       margin-bottom:6px;
       font-size:0.9rem;
       color:var(--ink);
+    }
+    .field-requirement{
+      margin-left:6px;
+      color:var(--muted);
+      font-size:0.76rem;
+      font-weight:400;
     }
     button{
       font-family:var(--font-serif);
@@ -550,7 +520,7 @@
       font-family:var(--font-serif);
       font-weight:300;
       cursor:pointer;
-      transition:all .2s;
+      transition:background-color .2s, border-color .2s, color .2s, box-shadow .2s, transform .2s;
     }
     .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
     .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
@@ -628,7 +598,7 @@ body.theme-dark #comp{
   padding: 0.4rem 0.8rem;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
 }
 body.theme-dark .type-btn{
   background:rgba(15,23,42,0.55);
@@ -971,8 +941,8 @@ body.theme-dark .select-field select{
       line-height:1.45;
     }
     .summary h2{
-      font-family:'Cormorant Garamond',serif;
-      font-weight:300;
+      font-family:'Sarabun',sans-serif;
+      font-weight:400;
       font-size:1.5rem;
       line-height:1.2;
       margin-bottom:0.65rem;
@@ -1018,7 +988,7 @@ body.theme-dark .select-field select{
       padding:0 2rem;
       justify-content:flex-end;
     }
-    .btn{border:none;border-radius:6px;padding:0.6rem 1.1rem;font-size:0.9rem;font-family:var(--font-serif);font-weight:300;cursor:pointer;transition:all .2s;}
+    .btn{border:none;border-radius:6px;padding:0.6rem 1.1rem;font-size:0.9rem;font-family:var(--font-serif);font-weight:300;cursor:pointer;transition:background-color .2s,border-color .2s,color .2s,box-shadow .2s,transform .2s;}
     .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
     .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
     .btn.primary{background:var(--accent);color:#fff;}
@@ -1046,24 +1016,22 @@ body.theme-dark .select-field select{
       color:var(--ink);
       line-height:1.6;
     }
-    body.theme-dark .modal-content,
-    body.theme-mountain-dark .modal-content{
+    body.theme-dark .modal-content{
       background:var(--panel);
       border-color:rgba(255,255,255,0.08);
       box-shadow:0 18px 50px rgba(0,0,0,0.35);
       color:var(--ink);
     }
     .modal-content h3{
-      font-family:'Cormorant Garamond',serif;
-      font-weight:300;
+      font-family:'Sarabun',sans-serif;
+      font-weight:400;
       font-size:1.9rem;
       color:#1a1a1a;
       margin-bottom:2rem;
       text-align:center;
       letter-spacing:0.3px;
     }
-    body.theme-dark .modal-content h3,
-    body.theme-mountain-dark .modal-content h3{
+    body.theme-dark .modal-content h3{
       color:#f8fbff;
     }
     .modal-content hr{
@@ -1071,8 +1039,7 @@ body.theme-dark .select-field select{
       border-top:1px solid #e0ded8;
       margin:1.5rem 0;
     }
-    body.theme-dark .modal-content hr,
-    body.theme-mountain-dark .modal-content hr{
+    body.theme-dark .modal-content hr{
       border-top-color:rgba(255,255,255,0.12);
     }
     .modal-content p{
@@ -1083,20 +1050,18 @@ body.theme-dark .select-field select{
       align-items:baseline;
       gap:6px;
     }
-    body.theme-dark .modal-content p,
-    body.theme-mountain-dark .modal-content p{
+    body.theme-dark .modal-content p{
       color:#e6ecf8;
     }
     .modal-content strong{
-      font-family:'Cormorant Garamond',serif;
-      font-weight:300;
+      font-family:'Sarabun',sans-serif;
+      font-weight:400;
       font-size:1rem;
       color:#111;
       min-width:130px;
       display:inline-block;
     }
-    body.theme-dark .modal-content strong,
-    body.theme-mountain-dark .modal-content strong{
+    body.theme-dark .modal-content strong{
       color:#f8fbff;
     }
     .close-btn{
@@ -1109,11 +1074,10 @@ body.theme-dark .select-field select{
       font-size:0.9rem;
       cursor:pointer;
       color:#333;
-      transition:all 0.2s ease;
-      font-family:'Cormorant Garamond',serif;
+      transition:background-color 0.2s ease,border-color 0.2s ease,color 0.2s ease,box-shadow 0.2s ease,transform 0.2s ease;
+      font-family:'Sarabun',sans-serif;
     }
-    body.theme-dark .close-btn,
-    body.theme-mountain-dark .close-btn{
+    body.theme-dark .close-btn{
       background:rgba(255,255,255,0.08);
       border-color:rgba(255,255,255,0.2);
       color:#f8fbff;
@@ -1369,23 +1333,42 @@ body.theme-dark .select-field select{
       }
     }
 
+
+    .current-posting-editor { max-width: 960px; margin: 2rem auto; }
+    .current-posting-editor [hidden] { display: none !important; }
+    .current-posting-editor .av2-card { border: 1px solid var(--border, #d9e0e8); padding: 1.25rem; margin: 1rem 0; border-radius: 10px; }
+    .current-posting-editor .av2-draft-fields { display: grid; gap: .65rem; }
+    .current-posting-editor input, .current-posting-editor textarea, .current-posting-editor select { width: 100%; min-width: 0; padding: .75rem; font: inherit; color: inherit; background: var(--card-bg, #fff); border: 1px solid var(--border, #b8c0cc); border-radius: 6px; }
+    .current-posting-editor .av2-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+    .current-posting-editor button { padding: .65rem 1rem; margin: .5rem .5rem .5rem 0; font: inherit; cursor: pointer; }
+    .current-posting-editor button:disabled { cursor: default; opacity: .6; }
+    .current-posting-editor pre, .current-posting-editor .av2-draft-review p { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+    .draft-save-recovery select { padding: .7rem; max-width: 100%; margin: .5rem; font: inherit; }
+    .draft-save-recovery { margin: 1.5rem 0; padding: 1rem; border: 1px solid var(--border, #d9e0e8); border-radius: 10px; }
+    .draft-save-recovery .av2-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+    .draft-save-recovery pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+    .draft-save-recovery [hidden] { display: none !important; }
   </style>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260831-21" />
+  <link rel="stylesheet" href="assets/styles/matter-publication.css" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260831-3" />
+  <script defer src="assets/scripts/universal-header.js?v=20260831-3"></script>
+  <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
+  <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
 </head>
-  <body class="dashboard-no-shadows">
+  <body class="dashboard-no-shadows lpc-role-dashboard lpc-product-clean lpc-static-universal-header">
   <script>
     (function applyStoredTheme() {
       try {
         const raw = localStorage.getItem("lpc_user");
         if (!raw) return;
         const stored = JSON.parse(raw);
-        const theme = String(stored?.preferences?.theme || "").toLowerCase();
-        const allowed = new Set(["light", "dark", "mountain", "mountain-dark"]);
-        if (allowed.has(theme)) {
-          const classes = theme === "mountain-dark" ? ["theme-mountain-dark", "theme-dark"] : [`theme-${theme}`];
-          classes.forEach((cls) => document.body.classList.add(cls));
-        }
+        const storedTheme = String(stored?.preferences?.theme || "").toLowerCase();
+        const theme = storedTheme === "dark" || /dark$/i.test(storedTheme) ? "dark" : "light";
+        document.body.classList.add(`theme-${theme}`);
         const fontKey = String(stored?.preferences?.fontSize || "").toLowerCase();
-        const sizeMap = { xs: "14px", sm: "15px", md: "16px", lg: "17px", xl: "20px" };
+        const sizeMap = { xs: "15px", sm: "16px", md: "17px", lg: "20px", xl: "22px" };
         if (sizeMap[fontKey]) {
           document.documentElement.style.fontSize = sizeMap[fontKey];
         }
@@ -1399,30 +1382,29 @@ body.theme-dark .select-field select{
   <aside class="sidebar" id="sidebarNav">
     <div class="logo">Dashboard</div>
     <nav>
-      <a href="dashboard-attorney.html">Home</a>
-      <a href="dashboard-attorney.html#cases">Matters</a>
-      <a href="dashboard-attorney.html#billing">Funds &amp; Payments</a>
-      <a href="help.html">Help</a>
+      <a href="dashboard-attorney.html"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"></path><path d="M5 9v11h14V9"></path><path d="M9 20v-6h6v6"></path></svg><span>Home</span></a>
+      <a href="dashboard-attorney.html#cases"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M3 12h18"></path></svg><span>Matters</span></a>
+      <a href="dashboard-attorney.html#tasks"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="m8 12 2.5 2.5L16 9"></path></svg><span>Tasks</span></a>
+      <a href="browse-paralegals.html"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><span>Paralegals</span></a>
+      <a href="dashboard-attorney.html#funds"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M2 10h20"></path><path d="M6 15h2"></path></svg><span>Payments</span></a>
     </nav>
     <div class="sidebar-bottom">
-      <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-      <div class="sidebar-footer">© Let’s‑ParaConnect 2026</div>
+      <div class="sidebar-footer">© Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect 2026</div>
     </div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
   <!-- Main -->
+  <div class="lpc-auth-page-shell">
+  <div class="lpc-universal-header-shell lpc-universal-header-shell--created" role="group" aria-label="Workspace tools" data-lpc-universal-header="true"></div>
   <main id="main" tabindex="-1" class="main">
     <div class="topbar" id="createCaseTopbar">
       <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Show menu" aria-controls="sidebarNav" aria-expanded="false">
-        <span class="sidebar-toggle-glyph" aria-hidden="true">
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--top"></span>
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--middle"></span>
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--bottom"></span>
-        </span>
+        <span class="lpc-mobile-menu-icon" aria-hidden="true"></span>
       </button>
-      <div class="topbar-actions">
-      <div class="notification-wrapper" data-notification-center>
+      <div class="topbar-actions" data-notification-center>
+      <div class="lpc-global-search-host" data-productivity-trigger-host></div>
+      <div class="notification-wrapper">
         <button class="notification-icon" id="createCaseNotifBtn" type="button" aria-label="View notifications" data-notification-toggle>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -1440,10 +1422,9 @@ body.theme-dark .select-field select{
         </div>
       </div>
       <div class="user-profile" id="createCaseUserChip" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-controls="createCaseProfileMenu" aria-label="Open profile menu">
-        <img id="createCaseAvatar" src="assets/default-avatar.png" alt="Attorney avatar" />
+        <img id="createCaseAvatar" src="assets/avatar-placeholder.svg" alt="Attorney avatar" />
         <div>
           <strong id="createCaseName">Attorney</strong>
-          <span id="createCaseRole">Attorney</span>
         </div>
         <div class="profile-dropdown" id="createCaseProfileMenu" aria-hidden="true">
           <a href="profile-settings.html" data-account-settings>Account Settings</a>
@@ -1453,6 +1434,10 @@ body.theme-dark .select-field select{
       </div>
     </div>
 
+    <header id="draftEditorHeader" class="lpc-draft-editor-header" hidden>
+      <h1>Create a New Matter</h1>
+      <p>Drafts stay private. Publishing doesn’t charge you.</p>
+    </header>
     <section class="step-panel" data-step="details" id="create-step-details">
       <header>
         <h1>Create a New Matter</h1>
@@ -1471,13 +1456,14 @@ body.theme-dark .select-field select{
       </div>
 
       <form>
+        <p class="field-instructions">Fields are required unless marked optional.</p>
         <div class="field">
           <label for="caseTitleInput">Matter Title</label>
-          <input id="caseTitleInput" type="text" placeholder="e.g., Draft asset purchase agreement" />
+          <input id="caseTitleInput" maxlength="300" type="text" placeholder="e.g., Draft asset purchase agreement" autocomplete="off" required />
         </div>
       <div class="field">
         <label for="specialty">Field of Law</label>
-        <select id="specialty">
+        <select id="specialty" required>
               <option value="">Select…</option>
     <option>Administrative Law</option>
     <option>Admiralty & Maritime Law</option>
@@ -1536,7 +1522,7 @@ body.theme-dark .select-field select{
 
       <div class="field">
   <label for="state">Location (State)</label>
-  <select id="state">
+  <select id="state" required>
     <option value="">Select…</option>
     <option>Alabama</option>
     <option>Alaska</option>
@@ -1593,22 +1579,24 @@ body.theme-dark .select-field select{
 </div>
 
   <div class="field">
-  <label for="comp">Compensation<span class="fee-info" tabindex="0" data-tooltip="Your card will not be charged until you select and hire a paralegal. Payment is securely processed through Stripe and released only after you mark the matter complete.">?</span></label>
+  <label for="comp">Compensation<span class="fee-info" tabindex="0" data-tooltip="Your card will not be charged until you select and hire a paralegal. Payment is processed through Stripe and released after you approve completed work or a platform review or dispute is resolved.">?</span></label>
   <div class="comp-wrapper">
     <span class="dollar-sign">$</span>
-    <input id="comp" type="text" inputmode="numeric" placeholder="3,500+" />
+    <input id="comp" type="text" inputmode="numeric" placeholder="3,500+" autocomplete="off" required />
   </div>
 </div>
 
       <div class="field select-field">
-        <label for="experience">Preferred Experience (Optional)</label>
+        <label for="experience">Minimum Experience (Optional)</label>
         <div class="select-wrapper">
           <select id="experience">
-            <option value="">No preference</option>
-            <option value="1–3 years (Early Career)">1–3 years (Early Career)</option>
-            <option value="3–7 years (Intermediate)">3–7 years (Intermediate)</option>
-            <option value="7–12 years (Experienced)">7–12 years (Experienced)</option>
-            <option value="12+ years (Advanced)">12+ years (Advanced)</option>
+            <option value="">No minimum</option>
+            <option value="1+ years">At least 1 year</option>
+            <option value="3+ years">At least 3 years</option>
+            <option value="5+ years">At least 5 years</option>
+            <option value="7+ years">At least 7 years</option>
+            <option value="10+ years">At least 10 years</option>
+            <option value="12+ years">At least 12 years</option>
           </select>
           <span class="select-arrow">▾</span>
         </div>
@@ -1647,20 +1635,20 @@ body.theme-dark .select-field select{
           </div>
           <div class="field">
             <label for="caseDescription">Matter Description</label>
-            <textarea id="caseDescription" placeholder="Describe your matter, goals, and expectations for the paralegal..." maxlength="4000"></textarea>
+            <textarea id="caseDescription" placeholder="Describe your matter, goals, and expectations for the paralegal..." maxlength="4000" required></textarea>
             <div class="char-count" id="descriptionCharCount">0 / 4000</div>
           </div>
           <div class="field" id="caseTasksField">
-            <label for="caseTaskInput">Required Tasks</label>
+            <label for="caseTaskInput">Tasks</label>
             <div class="task-input-row">
-              <input id="caseTaskInput" type="text" placeholder="e.g., Draft initial motion" />
+              <input id="caseTaskInput" type="text" placeholder="e.g., Draft initial motion" aria-describedby="caseTaskHelper" />
               <button type="button" class="btn secondary" id="addCaseTaskBtn">Add</button>
             </div>
-            <p class="task-helper" id="caseTaskHelper">Add at least one task. Tasks describe the overall scope of deliverables required to satisfy the matter.</p>
+            <p class="task-helper" id="caseTaskHelper">Add at least one deliverable or requirement.</p>
             <ul class="task-list" id="caseTaskList"></ul>
           </div>
           <div class="field">
-            <label for="caseDeadline">Deadline</label>
+            <label for="caseDeadline">Deadline <span class="field-requirement">Optional</span></label>
             <input id="caseDeadline" type="date" placeholder="YYYY-MM-DD" />
           </div>
         </form>
@@ -1696,7 +1684,7 @@ body.theme-dark .select-field select{
           </div>
           <aside class="compliance-note" aria-label="Professional guidelines">
             <h3>Professional Guidelines</h3>
-            <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed securely through Stripe and are released only upon attorney approval within the workspace or resolution of a platform review or dispute.</p>
+            <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed through Stripe and are released only upon attorney approval within the workspace or resolution of a platform review or dispute.</p>
           </aside>
           <div class="summary-wide"></div>
         </div>
@@ -1710,21 +1698,25 @@ body.theme-dark .select-field select{
       </div>
     </section>
   </main>
+  </div>
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
-  <div class="modal" id="previewModal" aria-hidden="true">
-    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+  <div class="modal" id="previewModal" aria-hidden="true" inert>
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="previewTitle" tabindex="-1">
       <h3 id="previewTitle"></h3>
       <p><strong>Field of Law:</strong> <span id="previewField">—</span></p>
       <p><strong>Location:</strong> <span id="previewState">—</span></p>
       <p><strong>Compensation:</strong> <span id="previewComp">—</span></p>
-      <p><strong>Platform fee (22%):</strong> <span id="previewPlatformFee">—</span><span class="fee-info" tabindex="0" data-tooltip="The platform fee supports tools that enable attorneys and paralegals to collaborate, including secure workspace, messaging, document sharing, case workflow tools, payment processing, identity verification, and platform administration. The platform fee is not a fee for legal services.">?</span></p>
+      <p><strong>Platform fee (22%):</strong> <span id="previewPlatformFee">—</span></p>
+      <details class="preview-fee-details">
+        <summary>About the platform fee</summary>
+        <p>The platform fee supports tools that enable attorneys and paralegals to collaborate, including the Matter workspace, messaging, document sharing, workflow tools, Stripe payment processing, account review, and platform administration. The platform fee is not a fee for legal services.</p>
+      </details>
       <p><strong>Estimated total due at hire:</strong> <span id="previewTotalDue">—</span></p>
       <p><strong>Experience:</strong> <span id="previewExperience">—</span></p>
       <p id="previewDeadlineRow" hidden><strong>Deadline:</strong> <span id="previewDeadline">—</span></p>
       <hr>
       <p id="previewDescription"></p>
       <div class="preview-tasks" id="previewTasks"></div>
-      <p class="auto-note" id="previewAutoNote"></p>
       <button type="button" class="close-btn" id="closePreview">Close Preview</button>
     </div>
   </div>
@@ -1740,366 +1732,20 @@ body.theme-dark .select-field select{
         return full || fallbackName || "Attorney";
       }
 
-      function userRoleLabel(user) {
-        const role = String(user?.role || "attorney").toLowerCase();
-        return role ? role.charAt(0).toUpperCase() + role.slice(1) : "Attorney";
-      }
-
       function userAvatar(user) {
         return (
           user?.profileImage ||
           user?.avatarURL ||
           user?.pendingProfileImage ||
-          "assets/default-avatar.png"
+          "assets/avatar-placeholder.svg"
         );
       }
 
       function applyUser(user) {
         const nameEl = document.getElementById("createCaseName");
-        const roleEl = document.getElementById("createCaseRole");
         const avatarEl = document.getElementById("createCaseAvatar");
         if (nameEl) nameEl.textContent = userDisplayName(user);
-        if (roleEl) roleEl.textContent = userRoleLabel(user);
         if (avatarEl) avatarEl.src = userAvatar(user);
-      }
-
-      function formatNotifTime(value) {
-        if (!value) return "";
-        const parsed = new Date(value);
-        if (Number.isNaN(parsed.getTime())) return "";
-        return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-      }
-
-      const ADMIN_NOTIFICATION_IMAGE = "/hero-mountain.jpg";
-      const ADMIN_TITLE_HINT = "welcome to let's-paraconnect";
-      const PLATFORM_NOTIFICATION_TYPES = new Set([
-        "paralegal_welcome",
-        "profile_approved",
-        "profile_photo_approved",
-        "profile_photo_rejected",
-      ]);
-
-      function getAvatarFallback(name = "") {
-        const letter = (name || "?").trim().charAt(0).toUpperCase() || "?";
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="#eef1f7"/><text x="50%" y="56%" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#5c6477">${letter}</text></svg>`;
-        return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-      }
-
-      function isAdminNotification(item = {}) {
-        const actorName = String(item.actorFirstName || "").trim().toLowerCase();
-        const payloadRole = String(item.payload?.actorRole || item.payload?.fromRole || "").trim().toLowerCase();
-        const fromName = String(item.payload?.fromName || "").trim().toLowerCase();
-        const type = String(item.type || "").trim().toLowerCase();
-        if (
-          actorName === "admin" ||
-          payloadRole === "admin" ||
-          payloadRole === "platform" ||
-          payloadRole === "system" ||
-          fromName === "admin"
-        ) {
-          return true;
-        }
-        if (PLATFORM_NOTIFICATION_TYPES.has(type)) return true;
-        const message = String(item.message || item.payload?.message || "").trim().toLowerCase();
-        const title = String(item.payload?.title || "").trim().toLowerCase();
-        if (message.includes(ADMIN_TITLE_HINT) || title.includes(ADMIN_TITLE_HINT)) return true;
-        return false;
-      }
-
-      function getNotificationAvatar(item = {}, actorName = "") {
-        if (isAdminNotification(item)) return ADMIN_NOTIFICATION_IMAGE;
-        if (item.actorProfileImage) return item.actorProfileImage;
-        return getAvatarFallback(actorName);
-      }
-
-      function formatNotificationMessage(item = {}) {
-        if (item.type === "paralegal_welcome") {
-          const title = String(item.payload?.title || "").trim();
-          const body = String(item.payload?.body || "").trim();
-          if (title && body) {
-            return `${title} ${body}`;
-          }
-          if (item.message) {
-            return item.message.replace(/\.\./g, ".");
-          }
-        }
-        if (item.message) return item.message;
-        if (item.type === "message" && item.actorFirstName) {
-          return `${item.actorFirstName} sent you a message.`;
-        }
-        return "You have a new notification.";
-      }
-
-      function formatRelativeTime(value) {
-        if (!value) return "";
-        const date = value instanceof Date ? value : new Date(value);
-        if (Number.isNaN(date.getTime())) return "";
-        const diff = Date.now() - date.getTime();
-        const minutes = Math.floor(diff / 60000);
-        if (minutes < 1) return "Moments ago";
-        if (minutes < 60) return `${minutes}m ago`;
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return `${hours}h ago`;
-        const days = Math.floor(hours / 24);
-        if (days < 7) return `${days}d ago`;
-        return date.toLocaleDateString();
-      }
-
-      function resolveNotifLink(item = {}) {
-        const payload = item.payload || {};
-        const caseId =
-          item.caseId || payload.caseId || payload.caseID || payload.case || payload.case_id || payload.caseRef || "";
-        const type = String(item.type || "").toLowerCase();
-        if (item.link) return item.link;
-        if (caseId) {
-          const base = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
-          if (type === "message") return `${base}#case-messages`;
-          return base;
-        }
-        return "dashboard-attorney.html";
-      }
-
-      function setNotifBadge(count) {
-        const badge = document.getElementById("createCaseNotifBadge");
-        const toggle = document.querySelector("[data-notification-toggle]");
-        const safe = Math.max(0, Number(count) || 0);
-        if (badge) {
-          badge.textContent = String(safe);
-          badge.classList.toggle("show", safe > 0);
-        }
-        if (toggle) {
-          if (safe > 0) toggle.dataset.count = String(safe);
-          else delete toggle.dataset.count;
-        }
-      }
-
-      const CREATE_CASE_NOTIF_ENHANCED_KEY = "createCaseNotifEnhanced";
-      const CREATE_CASE_NOTIF_ITEM_KEY = "createCaseNotifItemBound";
-
-      function enhanceCreateCaseNotifScroll(list) {
-        if (!list || list.dataset[CREATE_CASE_NOTIF_ENHANCED_KEY] === "true") return;
-        list.dataset[CREATE_CASE_NOTIF_ENHANCED_KEY] = "true";
-        const observer = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((entry) => {
-              const item = entry.target;
-              if (!(item instanceof HTMLElement)) return;
-              if (!entry.isIntersecting) return;
-              item.classList.add("notif-fade-in");
-              observer.unobserve(item);
-            });
-          },
-          { root: list, threshold: 0.2, rootMargin: "0px 0px -4% 0px" }
-        );
-        const bindItems = () => {
-          const items = list.querySelectorAll(".notif-item, .notif-card");
-          items.forEach((item) => {
-            if (!(item instanceof HTMLElement)) return;
-            if (item.dataset[CREATE_CASE_NOTIF_ITEM_KEY] === "true") return;
-            item.dataset[CREATE_CASE_NOTIF_ITEM_KEY] = "true";
-            item.classList.add("notif-fade-ready");
-            observer.observe(item);
-          });
-        };
-        const itemObserver = new MutationObserver(() => bindItems());
-        itemObserver.observe(list, { childList: true, subtree: true });
-        bindItems();
-      }
-
-      function syncCreateCaseNotifViewport(list) {
-        if (!list) return;
-        const cards = Array.from(list.querySelectorAll(":scope > .notif-item, :scope > .notif-card"));
-        if (!cards.length) {
-          list.style.removeProperty("--notif-three-card-max-height");
-          return;
-        }
-        const targetIndex = Math.min(3, cards.length) - 1;
-        const targetCard = cards[targetIndex];
-        if (!targetCard) return;
-        const listStyles = window.getComputedStyle(list);
-        const gap = parseFloat(listStyles.rowGap || listStyles.gap || "0") || 0;
-        const paddingTop = parseFloat(listStyles.paddingTop || "0") || 0;
-        const paddingBottom = parseFloat(listStyles.paddingBottom || "0") || 0;
-        let maxHeight = paddingTop + paddingBottom;
-        const visibleCards = Math.min(3, cards.length);
-        for (let index = 0; index < visibleCards; index += 1) {
-          maxHeight += cards[index].offsetHeight;
-        }
-        if (visibleCards > 1) maxHeight += gap * (visibleCards - 1);
-        maxHeight = Math.round(maxHeight);
-        if (maxHeight > 0) {
-          list.style.setProperty("--notif-three-card-max-height", `${maxHeight}px`);
-        }
-      }
-
-      let currentNotifications = [];
-
-      async function dismissNotification(id) {
-        if (!id) return false;
-        try {
-          await authorizedFetch(`/api/notifications/${encodeURIComponent(id)}`, {
-            method: "DELETE",
-          });
-        } catch (_) {}
-        const targetId = String(id);
-        currentNotifications = currentNotifications.filter(
-          (item) => String(item?._id || item?.id) !== targetId
-        );
-        renderNotifList(currentNotifications);
-        return true;
-      }
-
-      function renderNotifList(items = []) {
-        const list = document.querySelector("[data-notification-list]");
-        const empty = document.querySelector("[data-notification-empty]");
-        if (!list || !empty) return;
-        const notifications = Array.isArray(items) ? items : [];
-        currentNotifications = notifications.slice();
-        const unread = notifications.filter((item) => item?.read === false).length;
-        setNotifBadge(unread);
-        list.innerHTML = "";
-        if (!notifications.length) {
-          empty.style.display = "block";
-          empty.textContent = "You're all caught up.";
-          list.style.removeProperty("--notif-three-card-max-height");
-          return;
-        }
-        empty.style.display = "none";
-        notifications.forEach((item) => {
-          const row = document.createElement("div");
-          row.className = `notif-item ${item?.read === false ? "unread" : "read"}`;
-          row.dataset.id = item?.id || item?._id || "";
-          const message = String(formatNotificationMessage(item));
-          const time = formatRelativeTime(item?.createdAt);
-          const actorName = String(
-            item?.actorFirstName ||
-              item?.payload?.actorFirstName ||
-              item?.payload?.fromName ||
-              item?.payload?.actorName ||
-              item?.payload?.paralegalName ||
-              ""
-          ).trim();
-          const avatarSrc = getNotificationAvatar(item, actorName);
-
-          const main = document.createElement("div");
-          main.className = "notif-main";
-          const avatar = document.createElement("img");
-          avatar.className = "notif-avatar";
-          avatar.loading = "lazy";
-          avatar.alt = actorName ? `${actorName} profile photo` : "Notification profile photo";
-          avatar.src = avatarSrc;
-          avatar.addEventListener(
-            "error",
-            () => {
-              avatar.src = getAvatarFallback(actorName);
-            },
-            { once: true }
-          );
-          const dot = document.createElement("span");
-          dot.className = "notif-dot";
-          dot.setAttribute("aria-hidden", "true");
-          const copy = document.createElement("div");
-          copy.className = "notif-copy";
-          const title = document.createElement("div");
-          title.className = "notif-title";
-          title.textContent = message;
-          const timeEl = document.createElement("div");
-          timeEl.className = "notif-time";
-          timeEl.textContent = time;
-          copy.appendChild(title);
-          copy.appendChild(timeEl);
-          main.appendChild(avatar);
-          main.appendChild(dot);
-          main.appendChild(copy);
-
-          const dismiss = document.createElement("button");
-          dismiss.className = "notif-dismiss";
-          dismiss.type = "button";
-          dismiss.title = "Dismiss";
-          dismiss.setAttribute("aria-label", "Dismiss notification");
-          dismiss.textContent = "x";
-          dismiss.addEventListener("click", async (event) => {
-            event.stopPropagation();
-            await dismissNotification(item?.id || item?._id);
-          });
-
-          row.appendChild(main);
-          row.appendChild(dismiss);
-          row.addEventListener("click", async () => {
-            try {
-              if (item?.read === false && (item?.id || item?._id)) {
-                await authorizedFetch(`/api/notifications/${encodeURIComponent(item.id || item._id)}/read`, {
-                  method: "POST",
-                });
-              }
-            } catch (_) {}
-            window.location.href = resolveNotifLink(item);
-          });
-          list.appendChild(row);
-        });
-        requestAnimationFrame(() => {
-          enhanceCreateCaseNotifScroll(list);
-          syncCreateCaseNotifViewport(list);
-        });
-      }
-
-      async function fetchNotifications() {
-        try {
-          const res = await fetch("/api/notifications", {
-            credentials: "include",
-            headers: { Accept: "application/json" },
-          });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const payload = await res.json().catch(() => []);
-          renderNotifList(Array.isArray(payload) ? payload : []);
-        } catch (_) {
-          renderNotifList([]);
-        }
-      }
-
-      function bindNotificationCenter() {
-        const toggle = document.querySelector("[data-notification-toggle]");
-        const panel = document.querySelector("[data-notification-panel]");
-        const list = document.querySelector("[data-notification-list]");
-        const markAll = document.querySelector("[data-notification-mark]");
-        if (!toggle || !panel) return;
-        enhanceCreateCaseNotifScroll(list);
-        const setOpen = (open) => {
-          panel.classList.toggle("show", open);
-          panel.classList.toggle("hidden", !open);
-        };
-        setOpen(false);
-        toggle.addEventListener("click", async (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          const willOpen = !panel.classList.contains("show");
-          setOpen(willOpen);
-          if (willOpen) {
-            await fetchNotifications();
-            syncCreateCaseNotifViewport(list);
-          }
-        });
-        markAll?.addEventListener("click", async (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          try {
-            await authorizedFetch("/api/notifications/read-all", {
-              method: "POST",
-            });
-          } catch (_) {}
-          await fetchNotifications();
-        });
-        document.addEventListener("click", (event) => {
-          if (toggle.contains(event.target) || panel.contains(event.target)) return;
-          setOpen(false);
-        });
-        document.addEventListener("keydown", (event) => {
-          if (event.key === "Escape") setOpen(false);
-        });
-        window.addEventListener("resize", () => {
-          if (!panel.classList.contains("show")) return;
-          syncCreateCaseNotifViewport(list);
-        });
       }
 
       async function hydrateUser() {
@@ -2121,29 +1767,16 @@ body.theme-dark .select-field select{
               applyUser(profile);
             }
           }
-        } catch (_) {}
-      }
-
-      async function logoutNow(event) {
-        event?.preventDefault?.();
-        try {
-          await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-        } catch (_) {}
-        window.clearStoredSession?.();
-        window.location.href = "login.html";
+        } catch {
+          // Keep the verified session identity when the optional profile refresh fails.
+          applyUser(user);
+        }
       }
 
       document.addEventListener("DOMContentLoaded", () => {
-        const logoutBtn = document.getElementById("logoutBtn");
-        if (logoutBtn) logoutBtn.addEventListener("click", logoutNow);
-        bindNotificationCenter();
 
         const userChip = document.getElementById("createCaseUserChip");
         const profileMenu = document.getElementById("createCaseProfileMenu");
-        const menuLogoutBtn = profileMenu?.querySelector("[data-logout]");
-        if (menuLogoutBtn) {
-          menuLogoutBtn.addEventListener("click", logoutNow);
-        }
         if (userChip && profileMenu) {
           const setProfileMenuOpen = (open) => {
             profileMenu.classList.toggle("show", open);
@@ -2178,7 +1811,6 @@ body.theme-dark .select-field select{
         const cached = window.getStoredUser?.();
         if (cached) applyUser(cached);
         void hydrateUser();
-        void fetchNotifications();
       });
     })();
   </script>
@@ -2228,18 +1860,19 @@ body.theme-dark .select-field select{
   (function () {
     const params = new URLSearchParams(window.location.search);
     const editingCaseId = params.get("caseId");
+    const retainedCaseDraftId = params.get("caseDraftId");
     const draftIdParam = params.get("draftId");
-    const isEditing = Boolean(editingCaseId);
+    const isEditing = Boolean(editingCaseId || retainedCaseDraftId);
     let currentDraftId = !isEditing ? draftIdParam : "";
-    const DRAFT_AUTOSAVE_MS = 1600;
-    const DRAFT_SAVE_ERROR_BACKOFF_MS = 3000;
-    const EDIT_PREFILL_KEY = "lpc_case_edit_prefill";
-    let draftLoaded = false;
-    let draftSaveTimer = null;
-    let draftSavePending = false;
-    let draftSaveInFlight = false;
-    let lastDraftSaveSnapshot = "";
-    let draftSaveBlockedUntil = 0;
+    let draftSession = null;
+    let draftState = null;
+    let draftRecovery = null;
+    let publication = null;
+    let draftContract = null;
+    let draftReturnTo = "";
+    let draftOwnerId = "";
+    let draftPosting = false;
+    const draftController = new AbortController();
     const draftCache = {
       title: "",
       practiceArea: "",
@@ -2269,9 +1902,6 @@ body.theme-dark .select-field select{
     const taskInput = document.getElementById("caseTaskInput");
     const taskAddBtn = document.getElementById("addCaseTaskBtn");
     const taskList = document.getElementById("caseTaskList");
-    const taskHelper = document.getElementById("caseTaskHelper");
-    const compLockNotice = document.getElementById("compLockNotice");
-    const compWrapper = fields.comp?.closest(".comp-wrapper");
     const titlePreview = document.getElementById("caseTitlePreviewText");
     const descriptionInput = document.getElementById("caseDescription");
     const descriptionCount = document.getElementById("descriptionCharCount");
@@ -2281,7 +1911,7 @@ body.theme-dark .select-field select{
     const postBtn = document.getElementById("postBtn");
     const previewModal = document.getElementById("previewModal");
     const closePreviewBtn = document.getElementById("closePreview");
-    const toastEl = document.getElementById("toast");
+    let previewReturnFocus = null;
     const previewFields = {
       title: document.getElementById("previewTitle"),
       field: document.getElementById("previewField"),
@@ -2295,17 +1925,11 @@ body.theme-dark .select-field select{
       description: document.getElementById("previewDescription"),
       tasks: document.getElementById("previewTasks"),
     };
-    const previewAutoNote = document.getElementById("previewAutoNote");
-    const autoNoteCopy = "";
     const PLATFORM_FEE_PCT = 22;
     const PLATFORM_FEE_NOTE =
-      "The platform fee supports tools that enable attorneys and paralegals to collaborate, including secure workspace, messaging, document sharing, case workflow tools, payment processing, identity verification, and platform administration. The platform fee is not a fee for legal services.";
-    const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
-      "samanthasider+attorney@gmail.com",
-      "samanthasider+56@gmail.com",
-    ]);
+      "The platform fee supports tools that enable attorneys and paralegals to collaborate, including the Matter workspace, messaging, document sharing, workflow tools, Stripe payment processing, account review, and platform administration. The platform fee is not a fee for legal services.";
     let latestCaseData = null;
-    let csrfToken = "";
+    let authModulePromise = null;
     const tasksState = {
       items: [],
       locked: false,
@@ -2329,8 +1953,8 @@ body.theme-dark .select-field select{
       },
       {
         field: fields.comp,
-        check: (value) => parseCompAmount(value) > 0,
-        message: "Enter a valid compensation amount greater than $400.",
+        check: (value) => parseCompAmount(value) >= 400,
+        message: "Enter a compensation amount of at least $400.",
       },
     ];
 
@@ -2382,8 +2006,6 @@ body.theme-dark .select-field select{
       descriptionCount.textContent = `${descriptionInput.value.length} / 4000`;
     }
 
-    const MAX_REVIEW_DESCRIPTION = 1200;
-    const MAX_REVIEW_TASKS = 25;
 
     function normalizeTaskTitle(value) {
       return String(value || "")
@@ -2423,6 +2045,11 @@ body.theme-dark .select-field select{
         showFieldError(taskInput, "Add at least one task.");
         return false;
       }
+      if (tasks.length > 25) {
+        showFieldError(taskInput, "Use 25 tasks or fewer before publishing.");
+        taskInput.focus();
+        return false;
+      }
       return true;
     }
 
@@ -2460,13 +2087,7 @@ body.theme-dark .select-field select{
       }
     }
 
-    function setTasksLocked(locked) {
-      tasksState.locked = !!locked;
-      if (taskInput) taskInput.disabled = tasksState.locked;
-      if (taskAddBtn) taskAddBtn.disabled = tasksState.locked;
-      if (taskHelper) taskHelper.style.display = tasksState.locked ? "none" : "";
-      renderTasks();
-    }
+
 
     const DRAFT_FIELD_MAP = {
       caseTitle: "title",
@@ -2626,7 +2247,7 @@ body.theme-dark .select-field select{
       updateDescriptionCount();
       hydrateDeadline();
       descriptionInput.addEventListener("input", () => {
-        if (descriptionInput.value.length > 4000) {
+        if (!isEditing && descriptionInput.value.length > 4000) {
           descriptionInput.value = descriptionInput.value.slice(0, 4000);
         }
         setDraftField("caseDescription", descriptionInput.value);
@@ -2653,45 +2274,137 @@ body.theme-dark .select-field select{
         taskAddBtn.click();
       });
     }
-    async function initDraftLoad() {
-      if (isEditing) {
-        applyInitialStep();
-        return;
-      }
-      if (!currentDraftId) {
-        applyInitialStep();
-        return;
-      }
-      try {
-        const draft = await fetchDraftById(currentDraftId);
-        if (draft) {
-          draftCache.title = draft.title || "";
-          draftCache.practiceArea = draft.practiceArea || "";
-          draftCache.state = draft.state || "";
-          draftCache.compAmount = draft.compAmount || "";
-          draftCache.experience = draft.experience || "";
-          draftCache.deadline = draft.deadline || "";
-          draftCache.description = draft.description || "";
-          draftCache.tasks = Array.isArray(draft.tasks) ? draft.tasks : [];
-          if (fields.title) fields.title.value = draftCache.title;
-          if (fields.specialty) setSelectValue(fields.specialty, draftCache.practiceArea);
-          if (fields.state) setSelectValue(fields.state, draftCache.state);
-          if (fields.comp) setCompFieldValue(draftCache.compAmount);
-          if (fields.experience) fields.experience.value = draftCache.experience;
-          if (fields.deadline) fields.deadline.value = draftCache.deadline;
-          if (descriptionInput) {
-            descriptionInput.value = draftCache.description.slice(0, 4000);
-            updateDescriptionCount();
-          }
-          updateTitlePreview(draftCache.title);
-          tasksState.items = readStoredTasks();
-          renderTasks();
-          draftLoaded = true;
+    function hydrateDraftValues(values) {
+      Object.assign(draftCache, values);
+      if (fields.title && fields.title.value !== values.title) fields.title.value = values.title;
+      for (const [key, control] of [["practiceArea", fields.specialty], ["state", fields.state], ["experience", fields.experience]]) {
+        if (control && control.value !== values[key]) {
+          if (values[key]) setSelectValue(control, values[key]); else control.value = "";
         }
-      } catch (err) {
-        console.warn("Unable to load draft", err);
       }
-      applyInitialStep();
+      if (getCompFieldRawValue() !== values.compAmount) setCompFieldValue(values.compAmount);
+      if (fields.deadline) {
+        fields.deadline.maxLength = 50;
+        fields.deadline.type = values.deadline && !draftContract.validDraftDate(values.deadline) ? "text" : "date";
+        if (fields.deadline.value !== values.deadline) fields.deadline.value = values.deadline;
+      }
+      if (descriptionInput && descriptionInput.value !== values.description) descriptionInput.value = values.description;
+      tasksState.items = structuredClone(values.tasks);
+      renderTasks(); updateDescriptionCount(); updateTitlePreview(values.title);
+      latestCaseData = null;
+      if (currentStep === "review") hydrateReviewSummary();
+    }
+    function protectDraft() {
+      draftController.abort();
+      clearDraft();
+      document.querySelectorAll(".step-panel input, .step-panel textarea").forEach((control) => { control.value = ""; });
+      tasksState.items = []; renderTasks();
+      draftRecovery?.root.replaceChildren();
+      publication?.root.replaceChildren();
+      draftState = null;
+      window.location.replace("/login.html");
+    }
+    async function draftRequest(path, { method = "GET", body, signal = draftController.signal } = {}) {
+      const response = await authorizedFetch(path, { method, body, signal, noRedirect: true, suppressToast: true, cache: "no-store", headers: { Accept: "application/json" } });
+      const { data } = await readResponsePayload(response);
+      if (!response.ok) {
+        if (response.status === 401 || data.code === "DRAFT_ACCOUNT_CHANGED") protectDraft();
+        const error = new Error(data.error || "Draft request failed."); error.status = response.status; error.code = data.code; throw error;
+      }
+      return data;
+    }
+    async function verifyDraftOwner() {
+      const { user } = await draftRequest("/api/auth/me");
+      const id = String(user?.id || user?._id || "");
+      if (!id || user.role !== "attorney" || user.status !== "approved" || user.disabled || user.deleted || (draftOwnerId && id !== draftOwnerId)) {
+        protectDraft(); throw new Error("Draft account changed.");
+      }
+      draftOwnerId = id;
+    }
+    async function initDraftLoad() {
+      if (isEditing) return;
+      document.body.classList.add("lpc-current-draft");
+      document.getElementById("draftEditorHeader").hidden = false;
+      const editable = [...document.querySelectorAll(".step-panel input, .step-panel select, .step-panel textarea, .step-panel button")];
+      editable.forEach((control) => { control.disabled = true; });
+      try {
+        const [{ createDraftSession, newDraftState }, { createDraftRecovery }, contract, { createPublication }, { safeCurrentMatterReturn }] = await Promise.all([
+          import("./assets/scripts/matter-draft-session.mjs"), import("./assets/scripts/matter-draft-recovery.mjs"), import("./assets/scripts/matter-draft-contract.mjs"), import("./assets/scripts/matter-publication.mjs"), import("./assets/scripts/attorney-v2/matter-return.mjs")
+        ]);
+        draftReturnTo = safeCurrentMatterReturn(params.get("returnTo")) || "";
+        let requestId = params.get("request") || crypto.randomUUID();
+        draftContract = contract;
+        draftState = newDraftState({ id: currentDraftId || "", requestId });
+        if (!currentDraftId) { const url = new URL(location.href); url.searchParams.set("request", requestId); history.replaceState(null, "", url); }
+        const api = {
+          publishMatter: async (review, options) => { await verifyDraftOwner(); return draftRequest("/api/cases/posting/publications", { ...options, method: "POST", body: { ...review, expectedOwnerId: draftOwnerId } }); },
+          cleanupMatterPublication: async (requestId, options) => { await verifyDraftOwner(); return draftRequest(`/api/cases/posting/publications/${requestId}/cleanup`, { ...options, method: "POST", body: { expectedOwnerId: draftOwnerId } }); },
+          get: async (path, options) => { await verifyDraftOwner(); return draftRequest(path, options); },
+          createMatterDraft: async (values, clientRequestId, options) => { await verifyDraftOwner(); return draftRequest("/api/case-drafts", { ...options, method: "POST", body: { ...values, clientRequestId, expectedOwnerId: draftOwnerId } }); },
+          saveMatterDraft: async (id, values, revision, options) => { await verifyDraftOwner(); return draftRequest(`/api/case-drafts/${id}`, { ...options, method: "PUT", body: { ...values, revision, expectedOwnerId: draftOwnerId } }); },
+          deleteMatterDraft: async (id, revision, options) => { await verifyDraftOwner(); return draftRequest(`/api/case-drafts/${id}`, { ...options, method: "DELETE", body: { revision, expectedOwnerId: draftOwnerId } }); },
+        };
+        draftSession = createDraftSession(draftState, { api, ownerId: "", signal: draftController.signal,
+          onIdentity: () => { currentDraftId = draftState.id; if (currentDraftId) syncDraftIdInUrl(currentDraftId); },
+          onChange: (state) => {
+            if (draftController.signal.aborted) return;
+            draftRecovery.render(state);
+            editable.forEach((control) => { control.disabled = !state.loaded || state.missing || state.deleted || draftPosting || Boolean(publication?.locked); });
+            if (postBtn) postBtn.disabled = !state.loaded || state.uncertain || state.busy || state.missing || state.deleted || state.values.tasks.length > 25 || draftPosting || Boolean(publication?.locked);
+            if (state.loaded && !state.deleted) hydrateDraftValues(state.values);
+          }
+        });
+        draftRecovery = createDraftRecovery(draftSession, { buttonClass: "btn secondary", className: "draft-save-recovery" });
+        document.querySelector(".step-panel").before(draftRecovery.root);
+        publication = createPublication({ state: draftState, session: draftSession, api, ownerId: draftOwnerId, signal: draftController.signal, buttonClass: "btn secondary", returnHref: draftReturnTo || "/dashboard-attorney.html#cases", reviewControl: postBtn,
+          onChange: () => {
+            if (draftController.signal.aborted || !publication) return;
+            draftPosting = publication.locked;
+            editable.forEach((control) => { control.disabled = draftPosting || !draftState.loaded || draftState.missing || draftState.deleted; });
+            if (postBtn) postBtn.disabled = draftPosting || !draftState.loaded || draftState.busy || draftState.uncertain || draftState.values.tasks.length > 25;
+            draftRecovery.render(draftState);
+            draftRecovery.root.querySelectorAll("button").forEach((control) => { if (draftPosting) control.disabled = true; });
+            if (publication.result) {
+              document.getElementById("draftEditorHeader").hidden = true;
+              document.querySelectorAll(".step-panel").forEach((panel) => { panel.hidden = true; });
+              draftRecovery.root.hidden = true;
+            }
+          }
+        });
+        draftRecovery.root.before(publication.root);
+        draftRecovery.render(draftState);
+        if ((draftIdParam !== null && !contract.validDraftId(draftIdParam)) || !contract.validRequestId(requestId)) {
+          draftState.error = "This draft link is invalid. Return to Matters and open the draft again.";
+          draftState.uncertain = true; draftRecovery.render(draftState); return;
+        }
+        await publication.check();
+        if (!publication.result) await draftSession.check();
+        window.addEventListener("focus", () => { void verifyDraftOwner().catch(() => {
+          if (!draftController.signal.aborted && draftState) {
+            draftState.uncertain = true;
+            draftState.error = "Your session couldn’t be confirmed. Check the saved draft before continuing.";
+            draftRecovery.render(draftState);
+          }
+        }); }, { signal: draftController.signal });
+        window.addEventListener("beforeunload", (event) => {
+          if (draftState && (["busy", "uncertain"].includes(draftState.publication?.phase) || draftState.dirty || (["save", "delete"].includes(draftState.action) && (draftState.uncertain || draftState.busy)))) { event.preventDefault(); event.returnValue = ""; }
+        }, { signal: draftController.signal });
+        window.addEventListener("pagehide", () => {
+          draftController.abort(); clearDraft(); draftState = null; tasksState.items = [];
+          document.querySelectorAll(".step-panel").forEach((panel) => panel.replaceChildren());
+          draftRecovery.root.replaceChildren(); publication?.root.replaceChildren();
+        }, { once: true });
+        window.addEventListener("pageshow", (event) => { if (event.persisted) location.reload(); });
+      } catch (error) {
+        if (!draftController.signal.aborted) {
+          const recovery = document.createElement("section"); recovery.className = "draft-save-recovery"; recovery.setAttribute("role", "alert");
+          recovery.textContent = "The draft editor couldn’t load. Reload this page to try again. ";
+          const reload = document.createElement("button"); reload.type = "button"; reload.className = "btn secondary"; reload.textContent = "Reload draft editor";
+          reload.addEventListener("click", () => location.reload()); recovery.append(reload);
+          document.querySelector(".step-panel").before(recovery);
+        }
+      }
+      if (!publication?.result) applyInitialStep();
     }
 
     void initDraftLoad();
@@ -2734,7 +2447,12 @@ body.theme-dark .select-field select{
       field.setAttribute("aria-invalid", "true");
       const error = document.createElement("div");
       error.className = "field-error";
+      error.id = `${field.id || "field"}-error`;
+      error.setAttribute("role", "alert");
       error.textContent = message;
+      const describedBy = new Set(String(field.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean));
+      describedBy.add(error.id);
+      field.setAttribute("aria-describedby", Array.from(describedBy).join(" "));
       const wrapper = field.closest(".field") || field.closest("[data-field-wrapper]");
       if (wrapper) wrapper.appendChild(error);
       else field.insertAdjacentElement("afterend", error);
@@ -2744,6 +2462,12 @@ body.theme-dark .select-field select{
       if (!field) return;
       field.classList.remove("input-error");
       field.removeAttribute("aria-invalid");
+      const errorId = `${field.id || "field"}-error`;
+      const describedBy = String(field.getAttribute("aria-describedby") || "")
+        .split(/\s+/)
+        .filter((id) => id && id !== errorId);
+      if (describedBy.length) field.setAttribute("aria-describedby", describedBy.join(" "));
+      else field.removeAttribute("aria-describedby");
       const wrapper = field.closest(".field") || field.closest("[data-field-wrapper]");
       if (wrapper) {
         const existing = wrapper.querySelector(".field-error");
@@ -2768,7 +2492,7 @@ body.theme-dark .select-field select{
       if (!amount) return "—";
       const numeric = Number(normalizeCompInputValue(amount));
       if (!Number.isFinite(numeric)) return `$${amount}`;
-      return numeric.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+      return numeric.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function formatMoney(value) {
@@ -2829,12 +2553,7 @@ body.theme-dark .select-field select{
       };
     }
 
-    function setCompLocked(locked) {
-      if (!fields.comp) return;
-      fields.comp.disabled = !!locked;
-      fields.comp.setAttribute("aria-disabled", locked ? "true" : "false");
-      compWrapper?.classList.toggle("is-locked", !!locked);
-    }
+
 
     function hasDescription() {
       if ((descriptionInput?.value || "").trim()) return true;
@@ -2844,13 +2563,17 @@ body.theme-dark .select-field select{
     function ensureReviewReady() {
       if (!validateDetails()) return false;
       if (!validateTasks()) return false;
+      clearFieldError(descriptionInput);
       if (!hasDescription()) {
+        showFieldError(descriptionInput, "Describe the Matter, its goals, and the expected deliverables.");
+        descriptionInput?.focus();
         return false;
       }
       if (fields.deadline && fields.deadline.value) {
-        const parsed = new Date(fields.deadline.value);
-        if (Number.isNaN(parsed.getTime())) {
-          showToastBanner("Enter a valid deadline date (YYYY-MM-DD).", "error");
+        const parsed = window.LPCBusinessDate?.normalize(fields.deadline.value);
+        if (!parsed) {
+          showFieldError(fields.deadline, "Enter a valid deadline date.");
+          fields.deadline.focus();
           return false;
         }
       }
@@ -2862,13 +2585,11 @@ body.theme-dark .select-field select{
       const data = collectCaseData();
       latestCaseData = data;
       const deadlineText = data.deadline
-        ? new Date(data.deadline).toLocaleDateString() || data.deadline
+        ? window.LPCBusinessDate?.format(data.deadline) || data.deadline
         : "No deadline set";
       const tasks = Array.isArray(data.tasks) ? data.tasks : [];
-      const visibleTasks = tasks.slice(0, MAX_REVIEW_TASKS);
-      const extraTasks = tasks.length - visibleTasks.length;
-      const tasksMarkup = visibleTasks.length
-        ? `<ul class="task-list">${visibleTasks
+      const tasksMarkup = tasks.length
+        ? `<ul class="task-list">${tasks
             .map((task) => `<li>${escapeHTML(task.title)}</li>`)
             .join("")}</ul>`
         : `<p><strong>Tasks:</strong> Not provided</p>`;
@@ -2893,15 +2614,11 @@ body.theme-dark .select-field select{
         : "";
       const rawDescription = data.description || "No description provided yet.";
       const safeDescription = escapeHTML(rawDescription);
-      const truncated =
-        safeDescription.length > MAX_REVIEW_DESCRIPTION
-          ? `${safeDescription.slice(0, MAX_REVIEW_DESCRIPTION)}…`
-          : safeDescription;
-      const displayDescription = truncated.replace(/\n/g, "<br>");
+      const displayDescription = safeDescription.replace(/\n/g, "<br>");
       const guidelinesHtml = `
         <aside class="compliance-note" aria-label="Professional guidelines">
           <h3>Professional Guidelines</h3>
-          <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed securely through Stripe and are released only upon attorney approval within the workspace or resolution of a platform review or dispute.</p>
+          <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed through Stripe and are released only upon attorney approval within the workspace or resolution of a platform review or dispute.</p>
         </aside>
       `;
       reviewSummary.innerHTML = `
@@ -2923,8 +2640,7 @@ body.theme-dark .select-field select{
               <div class="description-label" style="margin-bottom:6px;font-family:var(--font-serif);">Required Tasks</div>
               <div class="review-task-list">${tasksMarkup}</div>
             </div>
-            ${extraTasks > 0 ? `<p class="auto-note">+${extraTasks} more tasks will be included when you post.</p>` : ""}
-            <p class="auto-note">${autoNoteCopy}</p>
+            ${tasks.length > 25 ? '<p role="alert">Use 25 tasks or fewer before publishing.</p>' : ""}
           </div>
         </div>
       `;
@@ -2938,13 +2654,11 @@ body.theme-dark .select-field select{
         return;
       }
       const tasks = Array.isArray(data.tasks) ? data.tasks : [];
-      const visibleTasks = tasks.slice(0, MAX_REVIEW_TASKS);
-      const extraTasks = tasks.length - visibleTasks.length;
-      const tasksMarkup = visibleTasks.length
+      const tasksMarkup = tasks.length
         ? `<div class="description-label" style="margin-bottom:6px;font-family:var(--font-serif);">Required Tasks</div>
-           <ul class="task-list">${visibleTasks
+           <ul class="task-list">${tasks
              .map((task) => `<li>${escapeHTML(task.title)}</li>`)
-             .join("")}</ul>${extraTasks > 0 ? `<p class="auto-note">+${extraTasks} more tasks will be included when you post.</p>` : ""}`
+             .join("")}</ul>${tasks.length > 25 ? '<p role="alert">Use 25 tasks or fewer before publishing.</p>' : ""}`
         : `<p><strong>Tasks:</strong> Not provided</p>`;
       previewFields.title && (previewFields.title.textContent = data.title);
       previewFields.field && (previewFields.field.textContent = data.field || "—");
@@ -2967,7 +2681,7 @@ body.theme-dark .select-field select{
       previewFields.tasks && (previewFields.tasks.innerHTML = tasksMarkup);
       if (previewFields.deadline && previewFields.deadlineRow) {
         if (data.deadline) {
-          const deadlineText = new Date(data.deadline).toLocaleDateString() || data.deadline;
+          const deadlineText = window.LPCBusinessDate?.format(data.deadline) || data.deadline;
           previewFields.deadline.textContent = deadlineText;
           previewFields.deadlineRow.hidden = false;
         } else {
@@ -2975,15 +2689,23 @@ body.theme-dark .select-field select{
           previewFields.deadlineRow.hidden = true;
         }
       }
-      if (previewAutoNote) previewAutoNote.textContent = autoNoteCopy;
+      previewReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : previewBtn;
       previewModal.classList.add("active");
+      previewModal.setAttribute("aria-hidden", "false");
+      previewModal.removeAttribute("inert");
       document.body.classList.add("modal-open");
+      const previewDialog = previewModal.querySelector('[role="dialog"]');
+      previewDialog?.focus({ preventScroll: true });
+      if (previewDialog) previewDialog.scrollTop = 0;
     }
 
     function closePreviewModal() {
       if (!previewModal) return;
       previewModal.classList.remove("active");
+      previewModal.setAttribute("aria-hidden", "true");
+      previewModal.setAttribute("inert", "");
       document.body.classList.remove("modal-open");
+      previewReturnFocus?.focus();
     }
 
     function clearDraft() {
@@ -2997,26 +2719,7 @@ body.theme-dark .select-field select{
       draftCache.tasks = [];
     }
 
-    function showToast(message, href, isError = false, linkLabel = "View Matter") {
-      if (!toastEl) return;
-      const linkHtml = href ? ` <a href="${href}">${escapeHTML(linkLabel || "View Matter")}</a>` : "";
-      toastEl.innerHTML = `${isError ? "⚠️" : "✅"} ${message}${linkHtml}`;
-      toastEl.classList.toggle("error", Boolean(isError));
-      toastEl.classList.add("show");
-      setTimeout(() => toastEl.classList.remove("show"), 5000);
-    }
 
-    async function fetchCsrfToken() {
-      if (csrfToken) return csrfToken;
-      try {
-        const res = await fetch("/api/csrf", { credentials: "include" });
-        const json = await res.json().catch(() => ({}));
-        csrfToken = json?.csrfToken || "";
-      } catch (err) {
-        console.warn("Unable to fetch CSRF token", err);
-      }
-      return csrfToken;
-    }
 
     async function readResponsePayload(res) {
       const text = await res.text().catch(() => "");
@@ -3028,55 +2731,10 @@ body.theme-dark .select-field select{
       }
     }
 
-    function resolveAuthHeader(token) {
-      if (!token || token === "__cookie_session__") return {};
-      return { Authorization: `Bearer ${token}` };
-    }
-
     async function authorizedFetch(url, options = {}) {
-      const token = (window.getSessionToken && window.getSessionToken()) || "";
-      const headers = { ...(options.headers || {}), ...resolveAuthHeader(token) };
-      let body = options.body;
-      if (typeof body !== "undefined" && body !== null && !(body instanceof FormData)) {
-        headers["Content-Type"] = headers["Content-Type"] || "application/json";
-        body = JSON.stringify(body);
-      }
-      if (options.method && options.method !== "GET") {
-        await fetchCsrfToken();
-        headers["X-CSRF-Token"] = csrfToken || "";
-      }
-      return fetch(url, {
-        credentials: "include",
-        ...options,
-        headers,
-        body,
-      });
-    }
-
-    async function fetchDraftById(draftId) {
-      if (!draftId) return null;
-      const res = await authorizedFetch(`/api/case-drafts/${encodeURIComponent(draftId)}`);
-      const { data, text } = await readResponsePayload(res);
-      if (!res.ok) {
-        const message = data?.error || data?.message || text;
-        throw new Error(message || "Unable to load draft.");
-      }
-      return data?.draft || null;
-    }
-
-    async function saveDraftRemote(payload) {
-      if (!payload) return null;
-      const url = currentDraftId
-        ? `/api/case-drafts/${encodeURIComponent(currentDraftId)}`
-        : "/api/case-drafts";
-      const method = currentDraftId ? "PUT" : "POST";
-      const res = await authorizedFetch(url, { method, body: payload });
-      const { data, text } = await readResponsePayload(res);
-      if (!res.ok) {
-        const message = data?.error || data?.message || text;
-        throw new Error(message || "Unable to save draft.");
-      }
-      return data?.draft || null;
+      authModulePromise ||= import("./assets/scripts/auth.js");
+      const { secureFetch } = await authModulePromise;
+      return secureFetch(url, options);
     }
 
     function syncDraftIdInUrl(draftId) {
@@ -3085,6 +2743,7 @@ body.theme-dark .select-field select{
         const url = new URL(window.location.href);
         if (draftId) {
           url.searchParams.set("draftId", draftId);
+          url.searchParams.delete("request");
         } else {
           url.searchParams.delete("draftId");
         }
@@ -3092,343 +2751,44 @@ body.theme-dark .select-field select{
       } catch {}
     }
 
-    async function deleteDraftRemote(draftId) {
-      if (!draftId) return;
-      const res = await authorizedFetch(`/api/case-drafts/${encodeURIComponent(draftId)}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const { data, text } = await readResponsePayload(res);
-        const message = data?.error || data?.message || text;
-        throw new Error(message || "Unable to delete draft.");
-      }
-    }
 
-    async function submitCase(payload) {
-      const token = (window.getSessionToken && window.getSessionToken()) || "";
-      if (!token) {
-        window.checkSession?.("attorney");
-        throw new Error("Please log in again before posting.");
-      }
-      await fetchCsrfToken();
-      const res = await fetch("/api/cases", {
-        method: "POST",
-        suppressToast: true,
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...resolveAuthHeader(token),
-          "X-CSRF-Token": csrfToken || "",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      const { data, text } = await readResponsePayload(res);
-      if (!res.ok) {
-        const message = data?.error || data?.msg || data?.message || (text && !text.includes("<") ? text : "");
-        const statusNote = res.status ? ` (HTTP ${res.status})` : "";
-        throw new Error(message || `Unable to post this case right now.${statusNote}`);
-      }
-      return data;
-    }
 
-    async function hasDefaultPaymentMethod() {
-      const storedUser = window.getStoredUser?.() || null;
-      const email = String(storedUser?.email || "").toLowerCase().trim();
-      if (STRIPE_PAYMENT_METHOD_BYPASS_EMAILS.has(email)) return true;
-      const res = await authorizedFetch("/api/payments/payment-method/default", {
-        headers: { Accept: "application/json" },
-        suppressToast: true,
-      });
-      const { data, text } = await readResponsePayload(res);
-      if (!res.ok) {
-        const message = data?.error || data?.msg || data?.message || (text && !text.includes("<") ? text : "");
-        throw new Error(message || "Unable to verify your payment method.");
-      }
-      return Boolean(data?.paymentMethod);
-    }
 
-    function mapPracticeArea(area = "") {
-      // Must align exactly with backend PRACTICE_AREAS (lowercase)
-      const allowed = [
-        "administrative law",
-        "antitrust law",
-        "bankruptcy",
-        "business law",
-        "civil litigation",
-        "commercial litigation",
-        "contract law",
-        "corporate law",
-        "criminal defense",
-        "employment law",
-        "estate planning",
-        "trusts & estates",
-        "family law",
-        "immigration",
-        "intellectual property",
-        "labor law",
-        "personal injury",
-        "real estate",
-        "tax law",
-        "technology",
-      ];
-      const aliases = {
-        "admiralty & maritime law": "civil litigation",
-        "competition law": "antitrust law",
-        "appellate law": "civil litigation",
-        "banking law": "business law",
-        "bankruptcy law": "bankruptcy",
-        "business / corporate law": "business law",
-        "civil rights law": "civil litigation",
-        "class action law": "civil litigation",
-        "commercial law": "commercial litigation",
-        "communications law": "technology",
-        "construction law": "civil litigation",
-        "consumer protection law": "civil litigation",
-        "corporate law": "corporate law",
-        "criminal defense law": "criminal defense",
-        "education law": "administrative law",
-        "elder law": "estate planning",
-        "election law": "administrative law",
-        "employment & labor law": "employment law",
-        "energy law": "technology",
-        "entertainment law": "technology",
-        "environmental law": "civil litigation",
-        "estate planning & probate": "estate planning",
-        "franchise law": "business law",
-        "government contracts law": "contract law",
-        "health care law": "employment law",
-        "immigration law": "immigration",
-        "insurance law": "business law",
-        "intellectual property (ip) law": "intellectual property",
-        "international law": "business law",
-        "land use & zoning law": "real estate",
-        "litigation": "civil litigation",
-        "media law": "technology",
-        "medical malpractice": "personal injury",
-        "military law": "administrative law",
-        "municipal law": "administrative law",
-        "personal injury law": "personal injury",
-        "product liability law": "personal injury",
-        "real estate law": "real estate",
-        "securities law": "business law",
-        "social security / disability law": "administrative law",
-        "sports law": "business law",
-        "technology law": "technology",
-        "telecommunications law": "technology",
-        "torts": "civil litigation",
-        "transportation law": "business law",
-        "trusts and estates": "trusts & estates",
-        "white collar crime": "criminal defense",
-        "workers’ compensation": "employment law",
-      };
 
-      const cleaned = area.trim().replace(/[’']/g, "'").toLowerCase();
-      if (allowed.includes(cleaned)) return cleaned;
-      if (aliases[cleaned]) return aliases[cleaned];
-      const ampCandidate = cleaned.replace(/\band\b/g, "&").replace(/\s*&\s*/g, " & ");
-      if (allowed.includes(ampCandidate)) return ampCandidate;
-      if (aliases[ampCandidate]) return aliases[ampCandidate];
 
-      // Broad keyword fallbacks
-      if (cleaned.includes("contract")) return "contract law";
-      if (cleaned.includes("family")) return "family law";
-      if (cleaned.includes("immigration")) return "immigration";
-      if (cleaned.includes("real estate") || cleaned.includes("zoning") || cleaned.includes("land use"))
-        return "real estate";
-      if (cleaned.includes("employment") || cleaned.includes("labor")) return "employment law";
-      if (cleaned.includes("corporate") || cleaned.includes("business")) return "business law";
-      if (cleaned.includes("tax")) return "tax law";
-      if (cleaned.includes("technology") || cleaned.includes("telecom") || cleaned.includes("media"))
-        return "technology";
-      if (cleaned.includes("ip") || cleaned.includes("intellectual")) return "intellectual property";
-      if (cleaned.includes("injury") || cleaned.includes("liability") || cleaned.includes("malpractice"))
-        return "personal injury";
-      if (cleaned.includes("estate")) return "estate planning";
-      if (cleaned.includes("trust")) return "trusts & estates";
-      if (cleaned.includes("antitrust")) return "antitrust law";
-      if (cleaned.includes("criminal") || cleaned.includes("white collar")) return "criminal defense";
-      if (cleaned.includes("bankruptcy")) return "bankruptcy";
-      // Default to a safe allowed value
-      return "civil litigation";
-    }
-
-    function padDescription(text = "") {
-      if (text.length >= 50) return text;
-      const filler = " Additional details will be provided to qualified applicants.";
-      let result = text.trim();
-      while (result.length < 50) {
-        result += filler;
-      }
-      return result;
-    }
-
-    function buildPayload(data) {
-      const description = data.description || "Additional details will be provided once the case is accepted.";
-      const practiceArea = mapPracticeArea(data.field);
-      const deadline = data.deadline || "";
-      const payload = {
-        title: data.title,
-        practiceArea,
-        state: data.state,
-        compensationAmount: data.compAmount,
-        experience: data.experience,
-        details: description,
-        deadline,
-      };
-      if (!tasksState.locked) {
-        payload.tasks = Array.isArray(data.tasks) ? data.tasks : [];
-      }
-      return payload;
-    }
-
-    function hasDraftContent(payload) {
-      if (!payload) return false;
-      if (payload.title || payload.practiceArea || payload.state || payload.compAmount) return true;
-      if (payload.experience || payload.deadline || payload.description) return true;
-      return Array.isArray(payload.tasks) && payload.tasks.length > 0;
-    }
 
     function buildDraftPayload() {
-      const data = latestCaseData || collectCaseData();
       return {
-        title: data.title || "",
-        practiceArea: data.field || "",
-        state: data.state || "",
-        compAmount: data.compAmount || "",
-        experience: data.experience || "",
-        deadline: data.deadline || "",
-        description: data.description || "",
-        tasks: Array.isArray(data.tasks) ? data.tasks : [],
+        title: fields.title?.value || "", practiceArea: fields.specialty?.value || "", state: fields.state?.value || "",
+        compAmount: getCompFieldRawValue() || "", experience: fields.experience?.value || "", deadline: fields.deadline?.value || "",
+        description: descriptionInput?.value || "", tasks: structuredClone(tasksState.items),
       };
     }
-
     async function flushDraftSave() {
-      if (isEditing) return;
-      if (draftSaveInFlight) {
-        draftSavePending = true;
-        return;
-      }
-      if (Date.now() < draftSaveBlockedUntil) return;
-      const payload = buildDraftPayload();
-      if (!hasDraftContent(payload)) return;
-      const snapshot = JSON.stringify(payload);
-      if (snapshot === lastDraftSaveSnapshot) return;
-      draftSaveInFlight = true;
-      try {
-        const saved = await saveDraftRemote(payload);
-        if (saved?.id) {
-          currentDraftId = saved.id;
-          syncDraftIdInUrl(currentDraftId);
-          draftLoaded = true;
-        }
-        lastDraftSaveSnapshot = snapshot;
-        draftSaveBlockedUntil = 0;
-      } catch (err) {
-        console.warn("Draft save failed", err);
-        draftSaveBlockedUntil = Date.now() + DRAFT_SAVE_ERROR_BACKOFF_MS;
-      } finally {
-        draftSaveInFlight = false;
-        if (draftSavePending) {
-          draftSavePending = false;
-          if (Date.now() >= draftSaveBlockedUntil) {
-            void flushDraftSave();
-          }
-        }
-      }
+      if (isEditing) return true;
+      if (!draftSession || draftPosting) return false;
+      draftSession.edit(buildDraftPayload());
+      return draftSession.save();
     }
-
     function queueDraftSave({ immediate = false } = {}) {
-      if (isEditing) return;
-      if (immediate) {
-        if (draftSaveTimer) clearTimeout(draftSaveTimer);
-        draftSaveTimer = null;
-        void flushDraftSave();
-        return;
-      }
-      if (draftSaveTimer) clearTimeout(draftSaveTimer);
-      draftSaveTimer = setTimeout(() => {
-        draftSaveTimer = null;
-        void flushDraftSave();
-      }, DRAFT_AUTOSAVE_MS);
-    }
-
-    async function deleteDraftIfExists() {
-      if (!currentDraftId) return;
-      try {
-        await deleteDraftRemote(currentDraftId);
-      } catch (err) {
-        console.warn("Unable to delete draft", err);
-      } finally {
-        currentDraftId = "";
-        syncDraftIdInUrl("");
-      }
+      if (isEditing || !draftSession || draftPosting) return;
+      draftSession.edit(buildDraftPayload());
+      if (immediate) void draftSession.save();
     }
 
     window.saveDraftAndExit = async function (targetHref) {
-      await flushDraftSave();
-      if (targetHref) {
-        window.location.href = targetHref;
-      }
+      if (await flushDraftSave() && targetHref) window.location.href = draftReturnTo || targetHref;
     };
 
     async function handlePost() {
-      if (!ensureReviewReady()) {
-        showToastBanner("Finish the required fields before posting.", "error");
-        return;
-      }
-      const data = latestCaseData || collectCaseData();
-      if (!data.title || !data.description) {
-        showToastBanner("Add a matter title and description before posting.", "error");
-        return;
-      }
-      if (postBtn) postBtn.disabled = true;
-      try {
-        if (!isEditing) {
-          const paymentMethodReady = await hasDefaultPaymentMethod();
-          if (!paymentMethodReady) {
-            showToast(
-              "Connect Stripe and add a payment method before posting a matter.",
-              "dashboard-attorney.html#billing",
-              true,
-              "Open Billing"
-            );
-            if (postBtn) postBtn.disabled = false;
-            return;
-          }
-        }
-        const payload = buildPayload(data);
-        const created = isEditing && editingCaseId
-          ? await updateCase(editingCaseId, payload)
-          : await submitCase(payload);
-        await deleteDraftIfExists();
-        clearDraft();
-        const caseId = created?.id || created?._id || editingCaseId;
-        if (isEditing) {
-          const href = caseId
-            ? `dashboard-attorney.html?previewCaseId=${encodeURIComponent(caseId)}#cases`
-            : "dashboard-attorney.html#cases";
-          showToast("Your changes have been saved.", href, false, "View Details");
-          return;
-        }
-        const postedTitle = created?.title || data.title || "";
-        sessionStorage.setItem(
-          "lpc_case_posted_notice",
-          JSON.stringify({ caseId, title: postedTitle, ts: Date.now() })
-        );
-        window.location.href = "dashboard-attorney.html#cases";
-      } catch (err) {
-        console.error(err);
-        showToast(err?.message || "Unable to post this matter right now.", null, true);
-        if (postBtn) postBtn.disabled = false;
-      }
+      if (isEditing || !publication || publication.locked) return;
+      if (!ensureReviewReady()) { showToastBanner("Finish the required fields before posting.", "error"); return; }
+      if (await flushDraftSave()) await publication.prepare();
     }
 
     function showToastBanner(message, type = "info") {
       if (toastHelper?.show) {
         toastHelper.show(message, { targetId: "toastBanner", type });
-      } else {
-        alert(message);
       }
     }
 
@@ -3437,31 +2797,30 @@ body.theme-dark .select-field select{
     previewModal?.addEventListener("click", (event) => {
       if (event.target === previewModal) closePreviewModal();
     });
+    previewModal?.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closePreviewModal();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(
+        previewModal.querySelectorAll('button:not([disabled]), summary, a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
+      ).filter((element) => !element.hidden && getComputedStyle(element).display !== "none");
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
     postBtn?.addEventListener("click", handlePost);
 
-    function applyEditingCopy() {
-      document.title = "Edit Matter – Let’s-ParaConnect";
-      const detailsHeader = document.querySelector('#create-step-details header h1');
-      const detailsSub = document.querySelector('#create-step-details header p');
-      const descHeader = document.querySelector('#create-step-description header h1');
-      const descSub = document.querySelector('#create-step-description header p');
-      const reviewHeader = document.querySelector('#create-step-review header h1');
-      const reviewSub = document.querySelector('#create-step-review header p');
-      const labelDetails = document.querySelectorAll('[data-step-link="details"] span');
-      const labelDesc = document.querySelectorAll('[data-step-link="description"] span');
-      const labelReview = document.querySelectorAll('[data-step-link="review"] span');
-      detailsHeader && (detailsHeader.textContent = "Edit Matter");
-      detailsSub && (detailsSub.textContent = "Step 1: Update your matter basics.");
-      descHeader && (descHeader.textContent = "Edit Matter");
-      descSub && (descSub.textContent = "Step 2: Update the matter description.");
-      reviewHeader && (reviewHeader.textContent = "Review & Save Changes");
-      reviewSub && (reviewSub.textContent = "Step 3: Confirm updates before saving.");
-      labelDetails.forEach((el) => (el.textContent = "Matter details"));
-      labelDesc.forEach((el) => (el.textContent = "Description"));
-      labelReview.forEach((el) => (el.textContent = "Review & Save"));
-      if (postBtn) postBtn.textContent = "Save Changes";
-      if (previewBtn) previewBtn.textContent = "Preview Updates";
-    }
+
 
     function titleCaseWords(value = "") {
       return String(value)
@@ -3490,186 +2849,67 @@ body.theme-dark .select-field select{
       select.value = option.value;
     }
 
-    function extractDescriptionFromCase(caseData = {}) {
-      const raw = caseData.details || caseData.description || "";
-      if (raw) return raw;
-      const summary = String(caseData.briefSummary || "").trim();
-      if (!summary) return "";
-      if (/^state:/i.test(summary) || summary.includes("Engagement:") || summary.includes("Experience:")) {
-        return "";
-      }
-      return summary;
-    }
 
-    function extractStateFromSummary(summary = "") {
-      const match = String(summary).match(/State:\s*([^•]+)/i);
-      if (!match) return "";
-      return String(match[1] || "").trim();
-    }
 
-    function consumeEditPrefill(caseId) {
-      if (!caseId) return null;
+
+
+
+
+
+
+
+
+    async function initPostingEditor() {
+      const panels = [...document.querySelectorAll(".step-panel")];
+      panels.forEach((panel) => { panel.hidden = true; });
+      const container = document.createElement("div"); container.className = "current-posting-editor";
+      document.getElementById("main").append(container);
+      container.textContent = retainedCaseDraftId ? "Loading saved draft…" : "Loading saved posting…";
       try {
-        const raw = sessionStorage.getItem(EDIT_PREFILL_KEY);
-        if (!raw) return null;
-        const payload = JSON.parse(raw);
-        if (!payload || String(payload.caseId) !== String(caseId)) return null;
-        sessionStorage.removeItem(EDIT_PREFILL_KEY);
-        return payload.payload || null;
-      } catch {
-        return null;
-      }
-    }
-
-    function mergeEditPrefill(prefill, data) {
-      if (!prefill) return data;
-      const summary = data?.briefSummary || prefill?.briefSummary || "";
-      const merged = {
-        ...prefill,
-        ...data,
-      };
-      merged.practiceArea = data?.practiceArea || prefill?.practiceArea || "";
-      const stateValue =
-        data?.locationState ||
-        data?.state ||
-        prefill?.locationState ||
-        prefill?.state ||
-        extractStateFromSummary(summary);
-      merged.state = stateValue;
-      merged.locationState = stateValue;
-      merged.details =
-        data?.details ||
-        data?.description ||
-        prefill?.details ||
-        prefill?.description ||
-        "";
-      merged.tasks =
-        Array.isArray(data?.tasks) && data.tasks.length
-          ? data.tasks
-          : Array.isArray(prefill?.tasks)
-          ? prefill.tasks
-          : [];
-      merged.totalAmount =
-        typeof data?.totalAmount === "number"
-          ? data.totalAmount
-          : typeof prefill?.totalAmount === "number"
-          ? prefill.totalAmount
-          : data?.totalAmount || prefill?.totalAmount || 0;
-      return merged;
-    }
-
-    function applyCaseDataToForm(caseData = {}) {
-      if (fields.title) {
-        fields.title.value = caseData.title || "";
-        updateTitlePreview(fields.title.value);
-      }
-      setSelectValue(fields.specialty, caseData.practiceArea || caseData.field);
-      const stateValue =
-        caseData.locationState || caseData.state || extractStateFromSummary(caseData.briefSummary || "");
-      setSelectValue(fields.state, stateValue);
-      const amountCents = Number.isFinite(caseData.lockedTotalAmount)
-        ? caseData.lockedTotalAmount
-        : Number(caseData.totalAmount) || 0;
-      if (fields.comp) {
-        setCompFieldValue(amountCents ? Math.round(amountCents / 100) : "");
-      }
-      const hasParalegal = !!(caseData.paralegal || caseData.paralegalId);
-      const hasPendingInvites = Array.isArray(caseData.invites)
-        ? caseData.invites.some((invite) => String(invite?.status || "pending").toLowerCase() === "pending")
-        : false;
-      const hasPendingParalegal = !!(caseData.pendingParalegal || caseData.pendingParalegalId);
-      const isLocked =
-        caseData.lockedTotalAmount != null || hasParalegal || hasPendingInvites || hasPendingParalegal;
-      setCompLocked(isLocked);
-      if (fields.experience && caseData.experience) {
-        setSelectValue(fields.experience, caseData.experience);
-      }
-      const details = extractDescriptionFromCase(caseData);
-      if (descriptionInput) {
-        descriptionInput.value = details;
-        updateDescriptionCount();
-      }
-      if (fields.deadline && caseData.deadline) {
-        const iso = new Date(caseData.deadline).toISOString().slice(0, 10);
-        fields.deadline.value = iso;
-      }
-      const incomingTasks = Array.isArray(caseData.tasks) ? caseData.tasks : [];
-      tasksState.items = incomingTasks
-        .map((task) => ({
-          title: normalizeTaskTitle(typeof task === "string" ? task : task?.title),
-        }))
-        .filter((task) => task.title);
-      const lockTasks = Boolean(caseData.tasksLocked || caseData.paralegal || caseData.paralegalId || caseData.hiredAt);
-      setTasksLocked(lockTasks);
-      latestCaseData = collectCaseData();
-      hydrateReviewSummary();
-      applyInitialStep();
-    }
-
-    async function loadExistingCase() {
-      if (!editingCaseId) return;
-      const prefill = consumeEditPrefill(editingCaseId);
-      if (prefill) {
-        applyCaseDataToForm(prefill);
-      }
-      try {
-        const token = (window.getSessionToken && window.getSessionToken()) || "";
-        const res = await fetch(`/api/cases/${encodeURIComponent(editingCaseId)}`, {
-          headers: Object.assign({ Accept: "application/json" }, resolveAuthHeader(token)),
-          credentials: "include",
-        });
-        const { data, text } = await readResponsePayload(res);
-        if (!res.ok) {
-          const message = data?.error || data?.msg || data?.message || (text && !text.includes("<") ? text : "");
-          const statusNote = res.status ? ` (HTTP ${res.status})` : "";
-          throw new Error(message || `Unable to load this case for editing.${statusNote}`);
+        const [editorModule, { createApiClient }, { createPrivateState }, { classifySession }, { safeCurrentMatterReturn }, { previousWorkspaceDestination }] = await Promise.all([
+          retainedCaseDraftId ? import("./assets/scripts/attorney-v2/draft-editor.mjs") : import("./assets/scripts/attorney-v2/posting-editor.mjs"), import("./assets/scripts/attorney-v2/api-client.mjs"), import("./assets/scripts/attorney-v2/private-state.mjs"), import("./assets/scripts/attorney-v2/session-boundary.mjs"), import("./assets/scripts/attorney-v2/matter-return.mjs"), import("./assets/scripts/utils/workspace-destinations.mjs")
+        ]);
+        const privateState = createPrivateState();
+        const protect = () => { privateState.clear(); draftController.abort(); container.replaceChildren(); window.location.replace("/login.html"); };
+        const api = createApiClient({ onAuthenticationLost: protect });
+        const session = classifySession(await api.get("/api/auth/me", { signal: draftController.signal }));
+        if (session.state !== "ready") { protect(); return; }
+        if (retainedCaseDraftId && (editingCaseId || draftIdParam)) { container.textContent = "This draft link is invalid. Open the draft from Matters to continue."; return; }
+        const options = { api, privateState, signal: draftController.signal, returnHref: "/dashboard-attorney.html#cases" };
+        if (retainedCaseDraftId) {
+          const target = new URL(safeCurrentMatterReturn(params.get("returnTo")) || "/dashboard-attorney.html#cases:draft", location.origin);
+          if (params.get("workspace") === "legacy") target.searchParams.set("workspace", "legacy");
+          const returnHref = `${target.pathname}${target.search}${target.hash}`;
+          params.set("step", params.get("step") || location.hash.slice(1) || "description");
+          options.navigation = {
+            returnHref, returnLabel: target.hash === "#cases:draft" ? "drafts" : "Matters",
+            sync(query, step) { const url = new URL(location.href); url.search = query.toString(); url.hash = step; history.replaceState(history.state, "", `${url.pathname}${url.search}${url.hash}`); },
+            go(href) { location.assign(href); },
+            href(value) { return previousWorkspaceDestination("attorney", `/attorney-v2.html${value}`, { origin: location.origin, ownerId: session.identity.id }) || returnHref; },
+          };
         }
-        const merged = mergeEditPrefill(prefill, data);
-        applyCaseDataToForm(merged);
-      } catch (err) {
-        console.warn("Edit case load failed", err);
-        if (!prefill) {
-          showToastBanner(err?.message || "Unable to load this case for editing.", "error");
-        }
-      }
+        const editor = retainedCaseDraftId ? editorModule.createDraftEditor({ query: params }, session.identity, options) : editorModule.createPostingEditor({ query: params }, session.identity, options);
+        container.replaceChildren(editor);
+        window.addEventListener("beforeunload", (event) => { if (privateState.hasUnsaved()) { event.preventDefault(); event.returnValue = ""; } }, { signal: draftController.signal });
+        window.addEventListener("pagehide", () => { privateState.clear(); api.clear(); draftController.abort(); container.replaceChildren(); }, { once: true });
+        window.addEventListener("pageshow", (event) => { if (event.persisted) location.reload(); });
+        window.addEventListener("focus", async () => {
+          try { const current = classifySession(await api.get("/api/auth/me", { signal: draftController.signal })); if (current.state !== "ready" || current.identity.id !== session.identity.id) protect(); }
+          catch { if (!draftController.signal.aborted) protect(); }
+        }, { signal: draftController.signal });
+        await editor.readiness;
+      } catch { if (!draftController.signal.aborted) container.textContent = retainedCaseDraftId ? "The draft couldn’t load. Reload this page to try again." : "The posting editor couldn’t load. Reload this page to try again."; }
     }
-
-    async function updateCase(caseId, payload) {
-      const token = (window.getSessionToken && window.getSessionToken()) || "";
-      if (!token) {
-        window.checkSession?.("attorney");
-        throw new Error("Please log in again before saving changes.");
-      }
-      await fetchCsrfToken();
-      const res = await fetch(`/api/cases/${encodeURIComponent(caseId)}`, {
-        method: "PATCH",
-        suppressToast: true,
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...resolveAuthHeader(token),
-          "X-CSRF-Token": csrfToken || "",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      const { data, text } = await readResponsePayload(res);
-      if (!res.ok) {
-        const message = data?.error || data?.msg || data?.message || (text && !text.includes("<") ? text : "");
-        const statusNote = res.status ? ` (HTTP ${res.status})` : "";
-        throw new Error(message || `Unable to save changes to this case.${statusNote}`);
-      }
-      return data;
-    }
-
     if (isEditing) {
-      clearDraft();
-      applyEditingCopy();
-      void loadExistingCase();
+      clearDraft(); document.title = retainedCaseDraftId ? "Continue Matter draft – Let’s-ParaConnect" : "Edit Matter – Let’s-ParaConnect";
+      void initPostingEditor();
     }
+
   })();
   </script>
   <script src="assets/scripts/create-case-nav.js"></script>
+  <script src="assets/scripts/productivity-command-registry.js"></script>
+  <script src="assets/scripts/global-search.js?v=20260831-2"></script>
   <script type="module" src="assets/scripts/utils/support-drawer.js"></script>
 </body>
 </html>

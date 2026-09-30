@@ -1,72 +1,19 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Opening Matter Review – Let’s-ParaConnect</title>
   <link rel="stylesheet" href="assets/styles/fonts.css" />
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Create Case Redirect – Let’s-ParaConnect</title>
-  <meta http-equiv="refresh" content="0;url=create-case.html#review" />
-  <style>
-    .skip-link {
-      position: absolute;
-      left: 12px;
-      top: -40px;
-      background: #1a2230;
-      color: #ffffff;
-      padding: 8px 12px;
-      border-radius: 6px;
-      text-decoration: none;
-      z-index: 10000;
-      font-size: 14px;
-    }
-
-    .skip-link:focus {
-      top: 12px;
-    }
-
-    body {
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #f8f6f1;
-      color: #1a1a1a;
-      margin: 0;
-    }
-    .redirect-card {
-      text-align: center;
-      max-width: 420px;
-      padding: 2rem;
-      border-radius: 18px;
-      background: rgba(255,255,255,0.9);
-      box-shadow: 0 25px 60px rgba(10, 16, 34, 0.08);
-    }
-    .redirect-card h1 {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      margin-bottom: 0.5rem;
-    }
-    .redirect-card a {
-      color: #887244;
-      font-weight: 600;
-      text-decoration: none;
-    }
-  </style>
-  <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      window.location.replace('create-case.html#review');
-    });
-  </script>
+  <link rel="stylesheet" href="assets/styles/redirect-page.css" />
+  <script defer src="assets/scripts/canonical-redirect.js"></script>
 </head>
-<body>
+<body data-redirect-target="create-case.html#review" data-preserve-search="true">
   <a class="skip-link" href="#main">Skip to main content</a>
-  <div class="redirect-card" id="main" role="main" tabindex="-1">
-    <h1>Final step moved</h1>
-    <p>The Review &amp; Post step now lives inside the main create-case flow.</p>
-    <p><a href="create-case.html#review">Jump to Step 3</a></p>
-  </div>
+  <main class="redirect-card" id="main" tabindex="-1" aria-live="polite">
+    <h1>Opening Matter Review</h1>
+    <p>Review and publishing are part of the unified Matter creation flow.</p>
+    <p><a href="create-case.html#review">Continue to review</a></p>
+  </main>
 </body>
 </html>

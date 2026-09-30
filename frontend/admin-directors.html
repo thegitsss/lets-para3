@@ -10,14 +10,14 @@
       --font-sans: 'Sarabun', sans-serif;
       --font-serif: 'Cormorant Garamond', serif;
       --ink: #171419;
-      --muted: #817b84;
+      --muted: #6f6872;
       --line: rgba(23, 20, 25, 0.1);
       --panel: #ffffff;
       --bg: #f6f7f8;
-      --gold: #b6a47a;
-      --blue: #5b8ee9;
+      --gold: #75613b;
+      --blue: #2f63b5;
       --danger: #b94d62;
-      --green: #3c8a62;
+      --green: #26724d;
     }
     * { box-sizing: border-box; }
     body {
@@ -26,8 +26,10 @@
       background: var(--bg);
       color: var(--ink);
       font-family: var(--font-sans);
-      font-weight: 200;
+      font-weight: 400;
     }
+    .skip-link { position: fixed; left: 12px; top: -48px; z-index: 1000; padding: 8px 12px; border-radius: 6px; background: #171419; color: #fff; }
+    .skip-link:focus { top: 12px; }
     .shell {
       display: grid;
       grid-template-columns: 240px minmax(0, 1fr);
@@ -63,6 +65,9 @@
       text-align: left;
       font: inherit;
       cursor: pointer;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
     }
     nav a:hover,
     .side-btn:hover,
@@ -118,7 +123,7 @@
       border-radius: 8px;
       background: #fff;
       color: var(--ink);
-      min-height: 38px;
+      min-height: 44px;
       padding: 0 0.9rem;
       cursor: pointer;
       font: inherit;
@@ -269,8 +274,12 @@
       background: transparent;
       color: var(--blue);
       cursor: pointer;
-      padding: 0;
+      min-height: 44px;
+      padding: 0.5rem 0;
       font: inherit;
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.2em;
     }
     .empty-state,
     .empty-row td {
@@ -387,36 +396,46 @@
       }
     }
   </style>
+<link rel="stylesheet" href="assets/styles/admin-experience.css">
+  <link rel="stylesheet" href="assets/styles/director-financials.css" />
+  <link rel="stylesheet" href="assets/styles/admin-live.css" />
 </head>
-<body>
+<body class="admin-experience admin-directors">
+  <a class="skip-link" href="#main">Skip to main content</a>
   <div class="shell">
-    <aside>
-      <div class="logo">Let’s-ParaConnect</div>
+    <aside class="sidebar">
+      <div class="logo admin-brand"><span class="admin-brand-mark">LPC</span><span>Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect<small>ADMIN</small></span></div>
       <nav aria-label="Admin navigation">
-        <a href="admin-dashboard.html">Admin Dashboard</a>
-        <a class="active" href="admin-directors.html">Director Oversight</a>
+        <a href="admin-dashboard.html#overview">Today</a>
+        <a href="admin-dashboard.html#user-management">People</a>
+        <a href="admin-dashboard.html#matters">Matters</a>
+        <a href="admin-dashboard.html#support-ops">Inbox</a>
+        <a href="admin-dashboard.html#finance">Finance</a>
+        <a class="active" aria-current="page" href="admin-directors.html">Growth</a>
+        <a href="admin-dashboard.html#ai-control-room">System</a>
         <button class="side-btn" type="button" id="logoutBtn">Log Out</button>
       </nav>
     </aside>
-    <main>
+    <main id="main" tabindex="-1" class="main">
       <header class="topbar">
         <div>
-          <h1>Director Oversight</h1>
-          <p class="muted" id="directorAdminStatus"></p>
+          <h1>Growth</h1>
+          <p class="muted" id="directorAdminStatus" role="status"></p>
         </div>
         <div class="actions">
-          <button class="btn" type="button" id="refreshBtn">Refresh</button>
+          <button class="btn secondary" type="button" id="refreshBtn">Refresh</button>
           <button class="btn primary" type="button" id="downloadCsvBtn">Download CSV</button>
         </div>
       </header>
 
+      <nav class="director-workspace-tabs" aria-label="Growth views"><a href="admin-dashboard.html#marketing-drafts">Marketing</a><a href="admin-dashboard.html#sales-workspace">Sales</a><a href="admin-directors.html" aria-current="page">Directors</a></nav>
       <section class="metric-grid" aria-label="Director metrics">
         <article class="metric"><span>Directors</span><strong id="metricDirectors">0</strong></article>
         <article class="metric"><span>Records</span><strong id="metricRecords">0</strong></article>
         <article class="metric"><span>Replies</span><strong id="metricReplies">0</strong></article>
         <article class="metric"><span>Failed Follow-Ups</span><strong id="metricFailures">0</strong></article>
-        <article class="metric"><span>Commission</span><strong id="metricCommission">$0.00</strong></article>
-        <article class="metric"><span>Unpaid Commission</span><strong id="metricUnpaidCommission">$0.00</strong></article>
+        <article class="metric"><span>Commission</span><strong id="metricCommission" class="commission-value">—</strong></article>
+        <article class="metric"><span>Unpaid Commission</span><strong id="metricUnpaidCommission" class="commission-value">—</strong></article>
         <article class="metric"><span>Duplicates</span><strong id="metricDuplicates">0</strong></article>
       </section>
 
@@ -474,16 +493,17 @@
     </main>
   </div>
 
-  <div class="audit-panel" id="auditPanel" hidden>
-    <div class="audit-dialog">
+  <dialog class="audit-panel" id="auditPanel" aria-labelledby="auditTitle" hidden inert>
+    <div class="audit-dialog" tabindex="-1">
       <div class="audit-head">
-        <h2>Commission Audit</h2>
-        <button class="btn" type="button" id="closeAuditBtn">Close</button>
+        <h2 id="auditTitle">Commission Audit</h2>
+        <button class="btn secondary" type="button" id="closeAuditBtn">Close</button>
       </div>
       <div id="auditBody"></div>
     </div>
-  </div>
+  </dialog>
 
   <script type="module" src="assets/scripts/admin-directors.js"></script>
+  <script type="module" src="assets/scripts/web-vitals-rum.js"></script>
 </body>
 </html>
