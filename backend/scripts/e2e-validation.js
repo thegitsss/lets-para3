@@ -65,11 +65,10 @@ async function submitAttorneySignup(page, { barNumber, barState, goodStanding = 
   if (goodStanding) {
     await clickVisible(page, "#attorneyGoodStanding");
   }
-  await clickVisible(page, "#termsAccept");
-  await clickVisible(page, "#attorneyPricingAck");
   await clickVisible(page, "#submitBtn");
-  await page.waitForSelector("#msg.show");
-  return page.$eval("#msg", (el) => el.textContent.trim());
+  await page.waitForFunction(() => document.querySelector("#msg.show") || !document.getElementById("signupConfirmation")?.hidden);
+  return page.evaluate(() => document.querySelector("#msg.show")?.textContent.trim()
+    || document.getElementById("signupConfirmation")?.textContent.trim() || "");
 }
 
 async function run() {
@@ -128,9 +127,7 @@ async function run() {
       await closeContext(context);
     }
 
-    // Test: Pricing acknowledgement is required on attorney signup.
-    // Input values: valid attorney fields without checking pricing acknowledgement.
-    // Expected result: inline pricing validation is shown and submit is blocked.
+    // The attorney's pricing and legal terms are visible before registration.
     {
       const context = await createContext();
       const page = await context.newPage();
@@ -145,24 +142,17 @@ async function run() {
       });
       await page.type("#bar", "CA12345");
       await page.select("#barState", "CA");
-      await clickVisible(page, "#termsAccept");
-      await clickVisible(page, "#attorneyGoodStanding");
-      await clickVisible(page, "#submitBtn");
-      await page.waitForSelector("#msg.show");
-      const msg = await page.$eval("#msg", (el) => el.textContent.trim());
-      const inlinePricingError = await page.$eval("#attorneyPricingError", (el) => ({
-        text: el.textContent.trim(),
-        shown: el.classList.contains("show"),
+      const disclosures = await page.evaluate(() => ({
+        pricing: document.getElementById("attorneyPricingText")?.textContent || "",
+        legal: document.getElementById("attorneySubmitLegal")?.textContent || "",
+        pricingVisible: !document.getElementById("attorneyPricingText")?.hidden,
+        legalVisible: !document.getElementById("attorneySubmitLegal")?.hidden,
       }));
-      const pricingInvalid = await page.$eval("#attorneyPricingAck", (el) => el.getAttribute("aria-invalid"));
-      if (!msg.includes("$400 minimum Matter requirement")) {
-        throw new Error(`Expected pricing acknowledgement message, got: ${msg}`);
+      if (!disclosures.pricingVisible || !disclosures.pricing.includes("$400") || !disclosures.pricing.includes("22%")) {
+        throw new Error("Attorney pricing disclosure is missing before submission.");
       }
-      if (!inlinePricingError.shown || !inlinePricingError.text.includes("$400 minimum")) {
-        throw new Error(`Expected inline pricing validation, got: ${JSON.stringify(inlinePricingError)}`);
-      }
-      if (pricingInvalid !== "true") {
-        throw new Error(`Expected attorney pricing checkbox to be invalid, got: ${pricingInvalid}`);
+      if (!disclosures.legalVisible || !disclosures.legal.includes("Terms of Service") || !disclosures.legal.includes("Privacy Policy")) {
+        throw new Error("Attorney legal disclosure is missing before submission.");
       }
       await closeContext(context);
     }
@@ -198,7 +188,7 @@ async function run() {
     // - NY: "NY-98765"
     // - TX: "TX 12345"
     // - FL: "FLA9876"
-    // Expected result: "Application submitted. Await approval." shown.
+    // Expected result: the registration confirmation is shown.
     const validCases = [
       { state: "CA", bar: "CA12345", email: "validca@example.com" },
       { state: "NY", bar: "NY-98765", email: "validny@example.com" },
@@ -222,7 +212,7 @@ async function run() {
         barNumber: testCase.bar,
         barState: testCase.state,
       });
-      if (!msg.includes("Application submitted")) {
+      if (!msg.includes("Your registration is with us.")) {
         throw new Error(`Expected success message for ${testCase.state}, got: ${msg}`);
       }
       await closeContext(context);

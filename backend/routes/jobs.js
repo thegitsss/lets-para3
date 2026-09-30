@@ -1,5 +1,3 @@
-const { createLogger: createRuntimeLogger } = require("../utils/logger");
-const runtimeLogger = createRuntimeLogger("routes:jobs");
 const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();

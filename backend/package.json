@@ -133,7 +133,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.9.2",
     "multer": "^2.0.2",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "10.0.12",
     "openai": "^7.4.0",
     "puppeteer": "^25.7.0",
     "qrcode": "^1.5.4",
@@ -148,6 +148,7 @@
     "ajv": "8.20.0",
     "jest": "^30.4.2",
     "jest-junit": "^17.0.0",
+    "mongodb": "7.5.0",
     "mongodb-memory-server": "^11.2.0",
     "nodemon": "^3.1.10",
     "playwright": "^1.58.2",
@@ -157,9 +158,9 @@
   "overrides": {
     "follow-redirects": "^1.15.6",
     "body-parser": "2.3.0",
-    "brace-expansion": "2.1.4",
-    "ip-address": "10.3.1",
-    "js-yaml": "4.3.1"
+    "brace-expansion": "2.1.7",
+    "ip-address": "10.7.2",
+    "js-yaml": "4.3.2"
   },
   "allowScripts": {
     "argon2@0.45.1": true,

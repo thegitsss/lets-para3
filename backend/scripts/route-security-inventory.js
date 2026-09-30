@@ -277,7 +277,7 @@ for (const row of rows) {
 }
 lines.push("");
 
-const renderedInventory = `${lines.join("\n")}\n`;
+const renderedInventory = `${lines.join("\n").trimEnd()}\n`;
 const checkOnly = process.argv.includes("--check");
 if (checkOnly) {
   const currentInventory = fs.existsSync(outFile) ? fs.readFileSync(outFile, "utf8") : "";
