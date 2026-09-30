@@ -1,0 +1,18 @@
+:root { color-scheme: light dark; --closure-bg: #f7f8fa; --closure-surface: #fff; --closure-text: #182b40; --closure-muted: #506174; --closure-line: #d8e0e7; --closure-accent: #204e77; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--closure-bg); color: var(--closure-text); font-family: "Sarabun", sans-serif; line-height: 1.65; }
+.skip-link { position: fixed; top: 12px; left: 12px; z-index: 10; padding: .5rem 1rem; background: var(--closure-surface); transform: translateY(-200%); }
+.skip-link:focus { transform: translateY(0); }
+.closure-header { padding: 1.25rem max(1.25rem, calc((100% - 72rem) / 2)); border-bottom: 1px solid var(--closure-line); background: var(--closure-surface); }
+.closure-header a { color: var(--closure-text); text-decoration: none; font-weight: 600; }
+main { width: min(42rem, calc(100% - 24px)); margin: clamp(24px, 12vh, 128px) auto; padding: clamp(16px, 4vw, 40px); background: var(--closure-surface); border: 1px solid var(--closure-line); border-radius: .75rem; overflow-wrap: anywhere; }
+h1 { margin: 0; font-size: clamp(1.25rem, 3vw, 2rem); line-height: 1.3; font-weight: 500; }
+p { color: var(--closure-muted); margin: 1rem 0 0; }
+#closure-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; margin-top: 1.5rem; }
+a { color: var(--closure-accent); text-underline-offset: .2em; }
+#closure-actions a, button { min-height: 44px; display: inline-flex; align-items: center; padding: .5rem 0; }
+button { font: inherit; color: var(--closure-text); background: var(--closure-surface); border: 1px solid var(--closure-line); border-radius: .4rem; padding: .5rem 1rem; cursor: pointer; }
+button:disabled { opacity: .55; cursor: wait; }
+:focus-visible { outline: 2px solid var(--closure-accent); outline-offset: 4px; }
+@media (max-width: 480px) { main { margin: 24px auto; } .closure-header { padding: 16px; } }
+@media (prefers-color-scheme: dark) { :root { --closure-bg: #101923; --closure-surface: #172331; --closure-text: #e9eef5; --closure-muted: #bfccd9; --closure-line: #425569; --closure-accent: #a9cff2; } }

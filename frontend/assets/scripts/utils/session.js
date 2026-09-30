@@ -5,20 +5,76 @@
   let nukedOnRedirect = false;
   let cachedUser = null;
   let sessionPromise = null;
-  let cachedSessionToken = null;
+  let sessionGeneration = 0;
   let lastSessionFailure = null;
   const LEGACY_TOKEN_KEYS = ["lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"];
-  const VALID_THEMES = ["light", "dark", "mountain", "mountain-dark"];
+  const VALID_THEMES = ["light", "dark"];
+  const THEME_CLASSES_TO_CLEAR = ["theme-light", "theme-dark"];
   const FONT_SIZE_MAP = {
-    xs: "14px",
-    sm: "15px",
-    md: "16px",
-    lg: "17px",
-    xl: "20px"
+    xs: "15px",
+    sm: "16px",
+    md: "17px",
+    lg: "20px",
+    xl: "22px"
   };
-  const MOUNTAIN_BG = "#f8f6f1";
-  let currentTheme = null;
   let currentFontSize = null;
+
+  function projectSessionUser(user) {
+    if (!user || typeof user !== "object" || Array.isArray(user)) return null;
+    const snapshot = {};
+    const id = typeof (user.id || user._id) === "string" ? String(user.id || user._id) : "";
+    if (id) snapshot.id = id;
+    if (typeof user.role === "string") snapshot.role = user.role;
+    if (typeof user.status === "string") snapshot.status = user.status;
+    if (typeof user.firstName === "string") snapshot.firstName = user.firstName;
+    if (typeof user.lastName === "string") snapshot.lastName = user.lastName;
+    if (typeof user.name === "string") snapshot.name = user.name;
+    if (typeof user.avatarURL === "string") snapshot.avatarURL = user.avatarURL;
+    if (typeof user.profileImage === "string") snapshot.profileImage = user.profileImage;
+    if (typeof user.pendingProfileImage === "string") snapshot.pendingProfileImage = user.pendingProfileImage;
+    if (typeof user.profilePhotoStatus === "string") snapshot.profilePhotoStatus = user.profilePhotoStatus;
+    if (typeof user.disabled === "boolean") snapshot.disabled = user.disabled;
+    if (typeof user.deleted === "boolean") snapshot.deleted = user.deleted;
+    if (typeof user.isFirstLogin === "boolean") snapshot.isFirstLogin = user.isFirstLogin;
+
+    const preferences = {};
+    if (typeof user.preferences?.theme === "string") {
+      preferences.theme = normalizeTheme(user.preferences.theme);
+    }
+    if (typeof user.preferences?.fontSize === "string") preferences.fontSize = user.preferences.fontSize;
+    if (Object.keys(preferences).length) snapshot.preferences = preferences;
+
+    const onboarding = {};
+    if (typeof user.onboarding?.paralegalTourCompleted === "boolean") onboarding.paralegalTourCompleted = user.onboarding.paralegalTourCompleted;
+    if (typeof user.onboarding?.paralegalProfileTourCompleted === "boolean") onboarding.paralegalProfileTourCompleted = user.onboarding.paralegalProfileTourCompleted;
+    if (typeof user.onboarding?.attorneyTourCompleted === "boolean") onboarding.attorneyTourCompleted = user.onboarding.attorneyTourCompleted;
+    if (typeof user.onboarding?.attorneyProfileCompleted === "boolean") onboarding.attorneyProfileCompleted = user.onboarding.attorneyProfileCompleted;
+    if (Object.keys(onboarding).length) snapshot.onboarding = onboarding;
+    return snapshot;
+  }
+
+  function sanitizeStoredSessionSnapshot() {
+    try {
+      const raw = localStorage.getItem("lpc_user");
+      if (raw) {
+        const snapshot = projectSessionUser(JSON.parse(raw));
+        if (snapshot && Object.keys(snapshot).length) {
+          const next = JSON.stringify(snapshot);
+          if (next !== raw) localStorage.setItem("lpc_user", next);
+        } else {
+          localStorage.removeItem("lpc_user");
+        }
+      }
+      localStorage.removeItem("avatarURL");
+    } catch (_) {
+      try {
+        localStorage.removeItem("lpc_user");
+        localStorage.removeItem("avatarURL");
+      } catch (_) {}
+    }
+  }
+
+  sanitizeStoredSessionSnapshot();
 
   const earlyTheme = (() => {
     try {
@@ -28,18 +84,17 @@
       const theme = String(stored?.preferences?.theme || "").toLowerCase();
       const fontSize = String(stored?.preferences?.fontSize || "").toLowerCase();
       const hasUser = !!(stored?.id || stored?._id || stored?.email || stored?.role);
-      if (!VALID_THEMES.includes(theme)) return { classes: [], fontSize, theme: "", hasUser };
-      const classes = theme === "mountain-dark" ? ["theme-mountain-dark", "theme-dark"] : [`theme-${theme}`];
-      return { classes, fontSize, theme, hasUser };
+      const normalizedTheme = normalizeTheme(theme);
+      return { classes: [`theme-${normalizedTheme}`], fontSize, theme: normalizedTheme, hasUser };
     } catch (_) {
       return null;
     }
   })();
 
   function applyThemeClasses(node, classes) {
-    if (!node || !classes?.length) return;
-    VALID_THEMES.forEach((theme) => node.classList.remove(`theme-${theme}`));
-    classes.forEach((cls) => node.classList.add(cls));
+    if (!node) return;
+    THEME_CLASSES_TO_CLEAR.forEach((className) => node.classList.remove(className));
+    (classes || []).forEach((cls) => node.classList.add(cls));
   }
 
   if (earlyTheme) {
@@ -65,7 +120,8 @@
 
   function normalizeTheme(value) {
     const candidate = String(value || "").toLowerCase();
-    return VALID_THEMES.includes(candidate) ? candidate : "mountain";
+    if (VALID_THEMES.includes(candidate)) return candidate;
+    return /dark$/i.test(candidate) ? "dark" : "light";
   }
 
   function applyClassToBody(classNames) {
@@ -74,7 +130,7 @@
     if (document.body) targets.push(document.body);
     if (document.documentElement) targets.push(document.documentElement);
     targets.forEach((node) => {
-      VALID_THEMES.forEach((theme) => node.classList.remove(`theme-${theme}`));
+      THEME_CLASSES_TO_CLEAR.forEach((className) => node.classList.remove(className));
       classes.forEach((value) => {
         if (value) node.classList.add(value);
       });
@@ -82,13 +138,11 @@
   }
 
   function getThemeClasses(theme) {
-    if (theme === "mountain-dark") return ["theme-mountain-dark", "theme-dark"];
     return [`theme-${theme}`];
   }
 
   function setThemeClass(theme) {
     const normalized = normalizeTheme(theme);
-    if (currentTheme === normalized) return normalized;
     const classNames = getThemeClasses(normalized);
     if (document.body) {
       applyClassToBody(classNames);
@@ -101,27 +155,19 @@
         { once: true }
       );
     }
-    currentTheme = normalized;
-    applyThemeOverrides(normalized);
+    applyThemeOverrides();
     return normalized;
   }
 
-  function applyThemeOverrides(theme) {
+  function applyThemeOverrides() {
     const apply = () => {
       const body = document.body;
       const root = document.documentElement;
       if (!body || !root) return;
-      if (theme === "mountain") {
-        body.style.setProperty("--bg", MOUNTAIN_BG);
-        root.style.setProperty("--bg", MOUNTAIN_BG);
-        body.style.setProperty("--app-background", MOUNTAIN_BG);
-        root.style.setProperty("--app-background", MOUNTAIN_BG);
-      } else {
-        body.style.removeProperty("--bg");
-        root.style.removeProperty("--bg");
-        body.style.removeProperty("--app-background");
-        root.style.removeProperty("--app-background");
-      }
+      body.style.removeProperty("--bg");
+      root.style.removeProperty("--bg");
+      body.style.removeProperty("--app-background");
+      root.style.removeProperty("--app-background");
     };
 
     if (document.body) {
@@ -135,9 +181,7 @@
     const normalized = setThemeClass(theme);
     if (cachedUser) {
       cachedUser.preferences = { ...(cachedUser.preferences || {}), theme: normalized };
-      try {
-        localStorage.setItem("lpc_user", JSON.stringify(cachedUser));
-      } catch (_) {}
+      persistStoredUser(cachedUser);
     }
     return normalized;
   }
@@ -167,9 +211,7 @@
     currentFontSize = normalized;
     if (cachedUser) {
       cachedUser.preferences = { ...(cachedUser.preferences || {}), fontSize: normalized };
-      try {
-        localStorage.setItem("lpc_user", JSON.stringify(cachedUser));
-      } catch (_) {}
+      persistStoredUser(cachedUser);
     }
     return normalized;
   }
@@ -189,7 +231,7 @@
     if (isLoginPage()) return;
     hasRedirected = true;
     try {
-      window.location.href = "login.html";
+      window.location.href = `login.html?next=${encodeURIComponent(window.location.pathname + window.location.search + window.location.hash)}`;
     } catch (_) {}
   }
 
@@ -200,10 +242,21 @@
     return path.endsWith("/login.html") || path.endsWith("login.html") || href.includes("login.html");
   }
 
-  function clearServerSession() {
+  async function clearServerSession() {
     try {
-      fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    } catch (_) {}
+      const csrfResponse = await fetch("/api/csrf", { credentials: "include" });
+      const payload = await csrfResponse.json().catch(() => ({}));
+      const csrfToken = csrfResponse.ok ? String(payload?.csrfToken || "") : "";
+      if (!csrfToken) return false;
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+        headers: { "X-CSRF-Token": csrfToken },
+      });
+      return response.ok;
+    } catch (_) {
+      return false;
+    }
   }
 
   function rememberDisabled(message) {
@@ -218,7 +271,7 @@
 
   function handleDisabledAccount(message) {
     rememberDisabled(message);
-    clearServerSession();
+    void clearServerSession();
     invalidateAndRedirect();
   }
 
@@ -227,8 +280,12 @@
   }
 
   async function fetchSession(force = false) {
-    if (force) sessionPromise = null;
+    if (force) {
+      sessionGeneration += 1;
+      sessionPromise = null;
+    }
     if (!sessionPromise) {
+      const requestGeneration = ++sessionGeneration;
       sessionPromise = fetch("/api/auth/me", { credentials: "include" })
         .then(async (res) => {
           const payload = await res.json().catch(() => ({}));
@@ -239,7 +296,10 @@
               lastSessionFailure = "disabled";
               return null;
             }
-            if (res.status === 401) {
+            if (
+              res.status === 401 ||
+              (res.status === 403 && /session expired|invalid token|not authenticated/i.test(String(message || "")))
+            ) {
               lastSessionFailure = "unauthorized";
               return null;
             }
@@ -254,6 +314,7 @@
           return null;
         })
         .then((user) => {
+          if (requestGeneration !== sessionGeneration) return null;
           let resolvedUser = user;
           if (!resolvedUser && shouldPreserveStoredSession()) {
             resolvedUser = readStoredUserRaw();
@@ -264,22 +325,12 @@
           syncStoredUser(mergedUser);
           applyThemeFromUser(mergedUser);
           applyFontSizeFromUser(mergedUser);
-          if (typeof document !== "undefined") {
-            if (document.readyState === "loading") {
-              document.addEventListener("DOMContentLoaded", () => injectBetaFooter(resolvedUser), { once: true });
-            } else {
-              injectBetaFooter(resolvedUser);
-            }
-          }
           try {
             const avatarSrc =
               resolvedUser?.pendingProfileImage ||
               resolvedUser?.profileImage ||
               resolvedUser?.avatarURL ||
-              "assets/default-avatar.png";
-            if (resolvedUser?.avatarURL) {
-              localStorage.setItem("avatarURL", resolvedUser.avatarURL);
-            }
+              "assets/avatar-placeholder.svg";
             const avatarNodes = document.querySelectorAll("[data-avatar]");
             avatarNodes.forEach((el) => {
               if (el) el.src = avatarSrc;
@@ -296,12 +347,18 @@
   }
 
   function clearStoredSession() {
+    sessionGeneration += 1;
     cachedUser = null;
     sessionPromise = null;
-    cachedSessionToken = null;
     try {
       localStorage.removeItem("lpc_user");
+      localStorage.removeItem("avatarURL");
     } catch (_) {}
+    ["lpc-support-context", "lpc_support_session_user", "lpc_support_drawer_pin"].forEach((key) => {
+      try {
+        sessionStorage.removeItem(key);
+      } catch (_) {}
+    });
     LEGACY_TOKEN_KEYS.forEach((key) => {
       try {
         localStorage.removeItem(key);
@@ -311,6 +368,37 @@
       } catch (_) {}
     });
   }
+
+  window.addEventListener("storage", (event) => {
+    if (event.key !== "lpc_user" || event.newValue || !event.oldValue) return;
+    sessionGeneration += 1;
+    cachedUser = null;
+    sessionPromise = null;
+    redirectToLogin();
+  });
+
+  function reauthorizeVisibleSession(source) {
+    fetchSession(true).then((user) => {
+      if (!user && !shouldPreserveStoredSession()) invalidateAndRedirect();
+    }).catch((error) => {
+      console.warn(`[session] ${source} reauthorization failed`, error);
+    });
+  }
+
+  window.addEventListener("lpc:lifecycle-refresh", () => {
+    if (document.visibilityState !== "visible") return;
+    reauthorizeVisibleSession("lifecycle");
+  });
+
+  window.addEventListener("pageshow", (event) => {
+    if (!event.persisted) return;
+    reauthorizeVisibleSession("pageshow");
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    reauthorizeVisibleSession("visibility");
+  });
 
   function invalidateAndRedirect() {
     if (!nukedOnRedirect) {
@@ -361,8 +449,7 @@
   function redirectUserDashboard(roleOverride) {
     const roleValue = roleOverride || cachedUser?.role || "attorney";
     const norm = String(roleValue).toLowerCase();
-    const target =
-      norm === "admin"
+    const target = norm === "admin"
         ? "admin-dashboard.html"
         : norm === "director"
         ? "director-portal.html"
@@ -396,26 +483,6 @@
     }
   }
 
-  function readLegacyToken() {
-    for (const key of LEGACY_TOKEN_KEYS) {
-      try {
-        const value = localStorage.getItem(key) || sessionStorage.getItem(key);
-        if (value) return value;
-      } catch (_) {}
-    }
-    return "";
-  }
-
-  function readStoredUser() {
-    if (cachedUser) return cachedUser;
-    try {
-      const raw = localStorage.getItem("lpc_user");
-      return raw ? JSON.parse(raw) : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
   function readStoredUserRaw() {
     try {
       const raw = localStorage.getItem("lpc_user");
@@ -423,58 +490,6 @@
     } catch (_) {
       return null;
     }
-  }
-
-  const BETA_FOOTER_STYLE_ID = "lpc-beta-footer-style";
-
-  function ensureBetaFooterStyles() {
-    if (typeof document === "undefined") return;
-    if (document.getElementById(BETA_FOOTER_STYLE_ID)) return;
-    const style = document.createElement("style");
-    style.id = BETA_FOOTER_STYLE_ID;
-    style.textContent = `
-      .sidebar-footer{display:flex;flex-direction:column;align-items:center;}
-      .sidebar-footer .beta-footer{display:flex;align-items:center;justify-content:center;width:100%;gap:6px;font-size:0.82rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:8px;font-weight:400;}
-      .sidebar-footer .beta-pill{padding:0;border:none;border-radius:0;font-size:0.8rem;letter-spacing:0.12em;font-weight:400;}
-      .sidebar-footer .beta-sep{font-size:0.7rem;letter-spacing:0;opacity:0.6;line-height:1;}
-      .sidebar-footer .beta-link{color:var(--muted);text-decoration:none;border-bottom:1px solid transparent;font-size:0.82rem;letter-spacing:0.08em;font-weight:400;}
-      .sidebar-footer .beta-link:hover{border-bottom-color:currentColor;}
-    `;
-    document.head.appendChild(style);
-  }
-
-  function buildBugReportLink() {
-    const subject = encodeURIComponent("Report an Issue");
-    const body = encodeURIComponent(
-      "What happened?\n\nWhat did you expect?\n\n(Optional) Page or feature:"
-    );
-    return `mailto:help@lets-paraconnect.com?subject=${subject}&body=${body}`;
-  }
-
-  function injectBetaFooter(user) {
-    if (!user || typeof document === "undefined") return;
-    if (String(user.role || "").toLowerCase() === "admin") return;
-    const footers = document.querySelectorAll(".sidebar-footer");
-    if (!footers.length) return;
-    ensureBetaFooterStyles();
-    const href = buildBugReportLink();
-    footers.forEach((footer) => {
-      if (footer.querySelector(".beta-footer")) return;
-      const wrap = document.createElement("div");
-      wrap.className = "beta-footer";
-      const link = document.createElement("a");
-      link.className = "beta-link";
-      link.href = href;
-      link.textContent = "Report an Issue";
-      link.addEventListener("click", (event) => {
-        event.stopPropagation();
-      });
-      wrap.addEventListener("click", (event) => {
-        event.stopPropagation();
-      });
-      wrap.appendChild(link);
-      footer.prepend(wrap);
-    });
   }
 
   function normalizeUserId(user) {
@@ -501,8 +516,14 @@
   function persistStoredUser(user) {
     try {
       if (user) {
-        localStorage.setItem("lpc_user", JSON.stringify(user));
-      } else {
+        const snapshot = projectSessionUser(user);
+        if (snapshot && Object.keys(snapshot).length) {
+          const payload = JSON.stringify(snapshot);
+          if (localStorage.getItem("lpc_user") !== payload) localStorage.setItem("lpc_user", payload);
+        } else if (localStorage.getItem("lpc_user")) {
+          localStorage.removeItem("lpc_user");
+        }
+      } else if (localStorage.getItem("lpc_user")) {
         localStorage.removeItem("lpc_user");
       }
     } catch (_) {}
@@ -514,14 +535,13 @@
       if (stored) persistStoredUser(null);
       return;
     }
-    if (!stored) {
-      persistStoredUser(serverUser);
-      return;
-    }
+    const next = projectSessionUser(serverUser);
+    const changed = JSON.stringify(stored || null) !== JSON.stringify(next || null);
+    persistStoredUser(serverUser);
+    if (!stored) return;
     const sameId = normalizeUserId(stored) === normalizeUserId(serverUser);
     const sameRole = normalizeRole(stored) === normalizeRole(serverUser);
-    if (!sameId || !sameRole) {
-      persistStoredUser(serverUser);
+    if (!sameId || !sameRole || changed) {
       if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
         try {
           window.dispatchEvent(new CustomEvent("lpc:user-updated", { detail: serverUser }));
@@ -530,31 +550,18 @@
     }
   }
 
-  function getSessionToken() {
-    if (cachedSessionToken) return cachedSessionToken;
-    const legacy = readLegacyToken();
-    if (legacy) {
-      cachedSessionToken = legacy;
-      return cachedSessionToken;
-    }
-    const user = readStoredUser();
-    if (user?.id || user?._id) {
-      cachedSessionToken = "__cookie_session__";
-      return cachedSessionToken;
-    }
-    return "";
+  if (!isLoginPage()) {
+    fetchSession().catch((error) => console.warn("[session] background session refresh rejected", error));
   }
-
-  fetchSession().catch(() => {});
 
   window.checkSession = checkSession;
   window.redirectUserDashboard = redirectUserDashboard;
   window.clearStoredSession = clearStoredSession;
-  window.getSessionToken = getSessionToken;
   window.getSessionData = getSessionData;
   window.getStoredUser = getCachedUser;
   window.refreshSession = refreshSession;
   window.updateSessionUser = updateSessionUser;
+  window.projectSessionUser = projectSessionUser;
   window.applyThemePreference = applyThemePreference;
   window.getThemePreference = () => cachedUser?.preferences?.theme || null;
   window.applyFontSizePreference = applyFontSizePreference;
@@ -577,7 +584,9 @@
     try {
       await checkSession(undefined, { redirectOnFail: false });
       authed = true;
-    } catch {}
+    } catch (error) {
+      console.debug("[session] public header authentication probe failed", error);
+    }
     updateHeaderBasedOnAuth(authed);
     headerRoot.style.visibility = "visible";
   }
@@ -590,7 +599,7 @@
 
   async function requireRole(expectedRole) {
     try {
-      const session = await checkSession(undefined, { redirectOnFail: false });
+      const session = await checkSession(undefined, { redirectOnFail: true });
       const user = session?.user || session;
       if (!user) throw new Error("Not logged-in");
       const normalizedRole = String(user.role || session?.role || "").toLowerCase();
@@ -607,8 +616,8 @@
         protectedRoot.style.visibility = "visible";
       }
       return user;
-    } catch {
-      window.location.href = "login.html";
+    } catch (error) {
+      redirectToLogin();
       return null;
     }
   }
@@ -629,3 +638,5 @@
 
   window.requireRole = requireRole;
 })();
+
+import("../web-vitals-rum.js").catch((error) => console.warn("[performance] RUM module failed to load", error));

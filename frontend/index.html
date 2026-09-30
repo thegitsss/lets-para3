@@ -1,2411 +1,572 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="lpc-homepage">
 <head>
-
-  <link rel="stylesheet" href="assets/styles/fonts.css" />
-  <script>
-    document.documentElement.classList.add("js");
-  </script>
-  <link href="assets/styles/styles.css" rel="stylesheet" />  
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Let’s-ParaConnect</title>
+  <title>Matter-Based Paralegal Services | Let’s-ParaConnect</title>
+  <meta name="description" content="Let’s-ParaConnect provides software for matter postings, applications, shared workspaces, and payments. Attorneys and independent paralegals choose whether to work together." />
+  <link rel="canonical" href="https://www.lets-paraconnect.com/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Matter-Based Paralegal Services | Let’s-ParaConnect" />
+  <meta property="og:description" content="Define the matter, review applications from approved independent paralegals, work together, and manage completion in one organized platform." />
+  <meta property="og:url" content="https://www.lets-paraconnect.com/" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="theme-color" content="#FFFFFF" />
+
+  <link rel="stylesheet" href="assets/styles/fonts.css?v=20260826-full-sarabun" />
+  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
+  <link rel="stylesheet" href="assets/styles/public-site-chrome.css?v=20260925-narrow-footer" />
+  <link rel="stylesheet" href="assets/styles/homepage.css?v=20260929-workflow-leading" />
+  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20260925-contrast" />
+  <link rel="stylesheet" href="assets/styles/homepage-readable-type.css?v=20260924-original-hero" />
+  <link rel="stylesheet" href="assets/styles/homepage-serif-type.css?v=20260929-workflow-wrap" />
+  <style>
+    body.lpc-home--editorial { --lpc-gold: #6495ed; --lpc-focus: #6495ed; }
+    .lpc-home--editorial .editorial-hero__qualifier { color: #4775bd; }
+    body.lpc-home--editorial,
+    .lpc-home--editorial :is(.home-header, .mobile-nav, .editorial-hero, .path-scene--attorney) {
+      background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+        radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+      background-attachment: fixed;
+    }
+    .lpc-home--editorial .home-header {
+      background: radial-gradient(ellipse at 4% 0%, rgba(220, 230, 251, .72), transparent 46%),
+        radial-gradient(ellipse at 100% 100%, rgba(204, 217, 229, .72), transparent 50%),
+        rgba(237, 240, 243, .72);
+      background-attachment: fixed;
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+    .lpc-home--editorial .home-header.is-past-hero { background: rgba(255, 255, 255, .72); }
+    .lpc-home--editorial .home-header,
+    .lpc-home--editorial .home-header.is-scrolled {
+      border-bottom: 0;
+      box-shadow: 0 7px 22px rgba(21, 28, 37, .025);
+    }
+    .lpc-home--editorial .fee-card--hybrid { background: #fff; color: #27394d; }
+    .lpc-home--editorial .fee-card--hybrid .fee-card__row > h4 { color: #27394d; }
+    .lpc-home--editorial .fee-card--hybrid .fee-card__row > p,
+    .lpc-home--editorial .fee-card--hybrid > small { color: #596b80; }
+    .lpc-home--editorial .fee-card--hybrid .fee-card__row,
+    .lpc-home--editorial .fee-card--hybrid > small { border-top-color: #e2e8f0; }
+  </style>
+  <link rel="stylesheet" href="assets/styles/homepage-assistant.css?v=20260925-spotlight" />
+  <link rel="stylesheet" href="assets/styles/homepage-map.css?v=20260929-dot-pulse-1" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
-  <style>
-    .gold{color:#b4975a;}
-    :root {
-      --ink: #0a0f14;
-      --muted: #d6dbe3;
-      --bg: #0a0f14;
-      --line: rgba(255,255,255,.16);
-      --accent: #ffffff;
-      --alpha-header: 0.14;
-      --e1: cubic-bezier(.2,.7,.2,1);
-      --radius: 14px;
-      --hero-slide-duration: 6000ms;
-      --hero-transition-duration: 900ms;
-      --hero-zoom-start: 1.08;
-      --hero-zoom-end: 1;
-      --hero-zoom-duration: 7000ms;
-    }
-    html.lenis { height: auto; }
-    .lenis.lenis-smooth { scroll-behavior: auto; }
-    .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
-    .lenis.lenis-stopped { overflow: hidden; }
-    .lenis.lenis-scrolling iframe { pointer-events: none; }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; }
-    body {
-  background: #ffffff;
-  color: #1a2230;
-  font: 16px/1.5 Inter, system-ui, Sarabun, sans-serif;
-}
-
-/* Header */
-.site-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 68px;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center; /* centers the brand horizontally */
-  background: transparent;
-  border-bottom: none;
-  backdrop-filter: saturate(160%) blur(10px);
-  transition: background-color 0.45s ease, box-shadow 0.45s ease, border-color 0.45s ease;
-}
-/* Banner font: Sarabun-Regular */
-.site-header,
-.site-header nav a {
-  font-family: 'Sarabun', sans-serif;
-  font-weight: 200;
-  letter-spacing: 0.03em;
-}
-
-.brand {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 300;
-  font-size: 20px;
-  letter-spacing: 0.05em;
-  color: #1a2230;
-  text-decoration: none;
-  text-transform: none;
-
-}
-.brand .accent-apostrophe {
-  color: #b4975a;
-}
-    .header-inner {
-      width: min(1200px, 92vw);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-
-    }
-    .brand-mark {
-      width: 26px; height: 26px;
-      display: grid; place-items: center;
-      border: 2px solid var(--ink);
-      border-radius: 6px;
-      font-size: 12px;
-    }
-    nav ul {
-      list-style: none;
-      display: flex;
-      gap: 28px;
-      padding: 0;
-      margin: 0;
-    }
-    nav a {
-      color: #1a2230;
-      text-decoration: none;
-      opacity: .88;
-      font-weight: 300;
-    }
-    nav a:hover {
-      opacity: 1;
-    }
-    .header-actions .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 14px;
-      border: 1px solid rgba(26,34,48,0.2);
-      border-radius: 999px;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: .12em;
-      color: #1a2230;
-      text-decoration: none;
-      transition: background .2s ease, color .2s ease, border-color .2s ease;
-    }
-
-    .site-header.over-image .brand,
-    .site-header.over-image nav a,
-    .site-header.over-image .header-actions .pill {
-      color: #f8f9fa;
-    }
-    .site-header.over-image .header-actions .pill {
-      border-color: rgba(255,255,255,0.6);
-    }
-
-    .hero-section {
-      position: relative;
-      height: 100vh;
-      width: 100%;
-      overflow: hidden;
-    }
-
-    .hero-img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-  }
-
-    /* Hero Slider */
-    .slider {
-      position: relative;
-      height: 100vh;
-      overflow: hidden;
-      background-color: #05080f;
-      z-index: 0;
-    }
-    .slides {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      background-color: #05080f;
-      z-index: 0;
-    }
-    .slide {
-      grid-area: 1/1;
-      width: 100%;
-      height: 100%;
-      position: relative;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity var(--hero-transition-duration) cubic-bezier(.4, 0, .2, 1);
-      background-color: #05080f;
-      z-index: 0;
-    }
-    .slide.active {
-      opacity: 1;
-      pointer-events: auto;
-      z-index: 3;
-    }
-    .slide.leaving {
-      z-index: 2;
-    }
-    .slide::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-    }
-    @keyframes heroZoomOut {
-      from {
-        transform: scale(var(--hero-zoom-start));
-      }
-      to {
-        transform: scale(var(--hero-zoom-end));
-      }
-    }
-    .slide .hero-bg {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      will-change: transform;
-      transition: transform 0.2s ease-out;
-    }
-    .slide .hero-bg img {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: center;
-      transform-origin: center;
-      transform: scale(var(--hero-zoom-start));
-      filter: saturate(95%);
-    }
-    .hero-bg img.hero-zooming {
-      animation: heroZoomOut var(--hero-zoom-duration) ease-in-out forwards;
-    }
-
-    .caption {
-      position: absolute;
-      inset: auto 0 24vh 0;
-      display: grid;
-      place-items: center;
-      text-align: center;
-      padding: 0 24px;
-      z-index: 60;
-    }
-    .kicker {
-      display: inline-block;
-      color: #ffffff;
-      letter-spacing: .24em;
-      text-transform: uppercase;
-      font-size: 16px;
-      font-weight: 500;
-      margin-bottom: 14px;
-      text-shadow:
-        0 4px 14px rgba(0, 0, 0, 0.72),
-        0 0 12px rgba(255, 255, 255, 0.32),
-        0 0 28px rgba(255, 255, 255, 0.18);
-      filter:
-        drop-shadow(0 0 8px rgba(255, 255, 255, 0.28))
-        drop-shadow(0 5px 18px rgba(0, 0, 0, 0.65));
-    }
-    .headline {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(40px, 8vw, 92px);
-  font-weight: 300;
-  line-height: 1.04;
-  margin: 0 0 22px;
-  letter-spacing: 0.02em;
-  text-align: center;
-  z-index: 4;
-  color: #f8f9fa !important;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 300;
-}
-    .cta {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 14px 22px;
-      border: 2px solid var(--accent);
-      border-radius: 8px;
-      background: transparent;
-      color: var(--ink);
-      text-decoration: none;
-      font-weight: 300;
-      text-transform: uppercase;
-      letter-spacing: .12em;
-    }
-
-    .hero-cta {
-      background: rgba(255, 255, 255, 0.12);
-      border-color: rgba(255, 255, 255, 0.45);
-      color: #f8f9fa;
-      backdrop-filter: saturate(160%) blur(2px);
-    }
-
-    .hero-cta:hover {
-      background: rgba(255, 255, 255, 0.2);
-      border-color: rgba(255, 255, 255, 0.6);
-    }
-    .cta:hover {
-      background: rgba(255,255,255, .08);
-    }
-    .arrow {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 46px;
-      height: 46px;
-      border: 2px solid var(--accent);
-      border-radius: 999px;
-      background: rgba(0,0,0, .18);
-      display: grid;
-      place-items: center;
-      cursor: pointer;
-      z-index: 3;
-    }
-    .arrow:hover {
-      background: rgba(255,255,255, .1);
-    }
-    .arrow.left { left: 24px; }
-    .arrow.right { right: 24px; }
-    .bullets {
-      position: absolute;
-      left: 50%;
-      bottom: 26px;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 10px;
-    }
-    .dot {
-      width: 10px; height: 10px;
-      border: 2px solid var(--accent);
-      border-radius: 999px;
-      background: transparent;
-      opacity: .7;
-      cursor: pointer;
-    }
-    .dot.active {
-      background: var(--accent);
-      opacity: 1;
-    }
-    .hero-bg {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #ffffff;
-}
-
-.hero-bg img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-}
-
-    /* Below-fold sections */
-    .section {
-      padding: 80px 0;
-    }
-    .wrap {
-      width: min(1200px, 92vw);
-      margin: auto;
-    }
-    .about {
-      text-align: center;
-      color: var(--ink);
-    }
-    .about h2 {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(28px, 4vw, 44px);
-  font-weight: 300;
-  margin: 0 0 16px;
-}
-    .about p {
-      color: var(--muted);
-      margin: 0 auto;
-      max-width: 60ch;
-      font-size: 1rem;
-      line-height: 1.6;
-    }
-    .cards {
-      margin-top: 60px;
-      display: grid;
-      gap: 32px;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    }
-    .card {
-      background: #ffffff;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      transition: transform .3s var(--e1), box-shadow .3s var(--e1);
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      color: #1a2230; /* dark ink tone */
-      opacity: 1;
-      transform: translateY(0);
-      transition: opacity 0.6s ease-out, transform 0.6s ease-out;
-    }
-
-    .card:hover {
-      transform: translateY(-8px);
-    }
-    .card img {
-      width: 100%;
-      height: 180px;
-      object-fit: cover;
-      display: block;
-    }
-    .card .pad {
-      padding: 20px;
-    }
-.card h3 {
-  font-size: 1.25rem;
-  margin-top: 1.2rem;
-}
-
-.card p {
-  font-size: 0.95rem;
-  line-height: 1.6;
-  margin: 1rem 0;
-  color: var(--muted);
-  margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.4;
-}
-
-.card a {
-  font-weight: 300;
-  font-size: 0.9rem;
-  color: #887244;
-  text-decoration: none;
-}
-
-    .dashboard-preview {
-      position: relative;
-      background: #ffffff;
-      overflow: hidden;
-      padding-top: 90px;
-      padding-bottom: 420px;
-    }
-    .dashboard-preview__parallax-bg {
-      position: absolute;
-      inset: -20% 0;
-      background: #ffffff;
-      pointer-events: none;
-      will-change: transform;
-      transform: translateY(0);
-    }
-    .dashboard-preview .wrap {
-      position: relative;
-      z-index: 1;
-    }
-    .dashboard-preview__header {
-      text-align: center;
-      margin-bottom: 140px;
-    }
-    .dashboard-preview__eyebrow {
-      font-family: 'Sarabun', sans-serif;
-      font-size: 0.75rem;
-      letter-spacing: 0.34em;
-      text-transform: uppercase;
-      color: #887244;
-      margin: 0 0 12px;
-    }
-    .dashboard-preview__header h2 {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-size: clamp(26px, 4vw, 44px);
-      margin: 0 0 12px;
-      color: #111;
-    }
-    .dashboard-preview__header p {
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      color: #555;
-      max-width: 62ch;
-      margin: 0 auto;
-    }
-    .dashboard-preview__main {
-      display: grid;
-      gap: 28px;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      align-items: stretch;
-      margin-bottom: 28px;
-    }
-    .dashboard-shot {
-      margin: 0;
-      background: #ffffff;
-      border: 1px solid rgba(10,15,20,0.08);
-      border-radius: 18px;
-      overflow: hidden;
-      box-shadow: 0 18px 40px rgba(10,15,20,0.08);
-      transition: transform 0.35s var(--e1), box-shadow 0.35s var(--e1);
-      display: flex;
-      flex-direction: column;
-      transform: translateY(var(--preview-parallax, 0px));
-    }
-    .dashboard-shot--feature img {
-      aspect-ratio: 16 / 10;
-    }
-    .dashboard-shot img {
-      width: 100%;
-      object-fit: cover;
-      display: block;
-      background: #f4f2ec;
-    }
-    .dashboard-shot--feature img {
-      cursor: zoom-in;
-    }
-    .dashboard-shot figcaption {
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      color: #1a2230;
-      padding: 14px 18px 18px;
-      letter-spacing: 0.02em;
-    }
-    .image-lightbox {
-      position: fixed;
-      inset: 0;
-      background: rgba(10, 15, 20, 0.78);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.25s ease;
-      z-index: 9999;
-      padding: 24px;
-    }
-    .image-lightbox.open {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .image-lightbox img {
-      max-width: min(1400px, 96vw);
-      max-height: 92vh;
-      width: auto;
-      height: auto;
-      border-radius: 16px;
-      background: #ffffff;
-      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
-      transition: transform 0.25s ease;
-      touch-action: pan-y;
-    }
-    .image-lightbox button {
-      background: rgba(255, 255, 255, 0.12);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      color: #f8f9fa;
-      width: 46px;
-      height: 46px;
-      border-radius: 999px;
-      display: grid;
-      place-items: center;
-      cursor: pointer;
-      transition: background 0.2s ease, transform 0.2s ease;
-    }
-    .image-lightbox button:hover {
-      background: rgba(255, 255, 255, 0.22);
-    }
-    .image-lightbox .lightbox-prev,
-    .image-lightbox .lightbox-next {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-    }
-    .image-lightbox .lightbox-prev {
-      left: 24px;
-    }
-    .image-lightbox .lightbox-next {
-      right: 24px;
-    }
-    body.lightbox-open {
-      overflow: hidden;
-    }
-    @media (max-width: 768px) {
-      .image-lightbox .lightbox-prev,
-      .image-lightbox .lightbox-next {
-        display: none;
-      }
-    }
-    .dashboard-shot:hover {
-      transform: translateY(calc(var(--preview-parallax, 0px) - 6px));
-      box-shadow: 0 26px 60px rgba(10,15,20,0.12);
-    }
-    .dashboard-shot--feature:hover {
-      transform: translateY(var(--preview-parallax, 0px));
-      box-shadow: 0 18px 40px rgba(10,15,20,0.08);
-    }
-
-    .card .read {
-      margin-top: 14px;
-      display: inline-block;
-      font-weight: 300;
-      text-transform: uppercase;
-      font-size: 12px;
-      letter-spacing: .12em;
-      opacity: .9;
-      color: var(--ink);
-      text-decoration: none;
-    }
-    
-
-    /* === Responsive Header Behavior === */
-
-/* Normal desktop (everything visible) */
-@media (min-width: 801px) {
-  .site-header nav,
-  .site-header .pill {
-    display: flex;
-  }
-}
-
-/* Tablet and smaller: gradually space things tighter */
-@media (max-width: 800px) {
-  .mobile-only {
-    display: inline-flex;
-  }
-
-  .site-header {
-    justify-content: center;
-  }
-
-  .site-header nav ul {
-    gap: 20px;
-  }
-}
-
-/* === Responsive Header Behavior (Apple-style smooth collapse) === */
-
-/* Default (desktop) */
-.site-header {
-  transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.site-header nav,
-.header-actions {
-  transition: opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1),
-              transform 0.45s cubic-bezier(0.4, 0, 0.2, 1),
-              visibility 0.45s ease;
-  will-change: opacity, transform;
-
-}
-.hero-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translateZ(0);
-  z-index: 2000;
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(2rem, 6vw, 4rem);
-  font-weight: 300;
-  letter-spacing: 0.05em;
-  text-align: center;
-  max-width: 90vw;
-  opacity: 1;
-  text-shadow: 0px 8px 20px rgba(0, 0, 0, 0.35);
-
-}
-.hero-content::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.02); /* VERY subtle */
-  filter: blur(30px);
-  z-index: -1;
-}
-.hero-content .btn {
-  position: relative;
-  z-index: 250;
-  box-shadow:
-    0 12px 30px rgba(0, 0, 0, 0.25),
-    0 4px 10px rgba(0, 0, 0, 0.15);
-  transform: translateZ(20px);   /* actual 3D depth */
-}
-
-/* Smooth spacing for large viewports */
-.header-inner {
-  gap: 40px;
-  transition: gap 0.4s ease;
-}
-
-/* === Smooth fade + scale for responsive header === */
-.site-header nav,
-.header-actions {
-  transition: opacity 0.35s ease, transform 0.4s ease;
-  will-change: opacity, transform;
-}
-.next-section {
-  position: relative;
-  z-index: 10;
-  margin-top: -12vh;   /* pulls it up over the hero */
-}
-
-/* Tablet & mobile: Hide nav links, keep Sign In visible */
-@media (max-width: 800px) {
-  .site-header nav {
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transition: opacity 0.4s ease, visibility 0.4s ease;
-  }
-
-  .header-actions {
-    transform: scale(0.96);
-    opacity: 1;
-  }
-}
-
-@media (max-width: 600px) {
-  body {
-    padding-top: 0;
-  }
-
-  .site-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.95);
-    border-bottom: 1px solid rgba(10, 15, 20, 0.08);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-  }
-
-  .header-inner {
-    width: 100%;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
-  .brand {
-    position: static;
-    transform: none;
-    margin: 0;
-  }
-
-  .site-header nav {
-    display: none;
-  }
-
-  .header-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    position: static !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    width: auto;
-    flex-wrap: nowrap;
-  }
-
-  .header-actions .pill {
-    position: static !important;
-    background: transparent;
-    color: #1a2230;
-    border: 1px solid rgba(26, 34, 48, 0.2);
-    box-shadow: none;
-    padding: 6px 10px;
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    white-space: nowrap;
-  }
-
-  .site-header.over-image .brand,
-  .site-header.over-image .header-actions .pill {
-    color: #1a2230;
-    border-color: rgba(26, 34, 48, 0.2);
-  }
-
-  .slider {
-    margin-top: 0;
-  }
-}
-  </style>
+  <script>
+    document.documentElement.classList.add("js");
+  </script>
 </head>
-<body>
+<body class="lpc-home lpc-home--hybrid lpc-home--editorial public-site-chrome home-motion-ready">
   <a class="skip-link" href="#main">Skip to main content</a>
-<!-- Header -->
-  <header class="site-header">
-    <div class="header-inner">
-      <nav aria-label="Primary">
-        <ul>
-          <li><a href="contact.html">Contact Us</a></li>
-          <li><a href="#who-we-are">About</a></li>
-          <li><a href="#how">How It Works</a></li>
-        </ul>
-      </nav>
-      <a class="brand" href="index.html">
-        Let<span class="accent-apostrophe">’</span>s-ParaConnect
+
+  <header class="home-header" data-home-header>
+    <div class="home-header__inner">
+      <a class="home-brand" href="index.html" aria-label="Let’s-ParaConnect home">
+        Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect
       </a>
-      <div class="header-actions">
-<a class="pill signup-pill" href="signup.html" id="signupAction">Sign Up</a>
-        <a class="pill" href="login.html" id="authAction">Sign In</a>
-        <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
+
+      <nav class="home-nav home-nav--desktop" aria-label="Primary navigation">
+        <a href="#how">How It Works</a>
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      </nav>
+
+      <div class="home-header__actions">
+        <a class="header-signin" href="login.html" id="authAction" data-auth-action data-public-action="text">Sign in</a>
+        <button class="header-signout" type="button" id="logoutAction" data-logout-action data-public-action="text" hidden>Sign out</button>
+        <a class="button button--small button--ink" href="signup.html" id="signupAction" data-signup-action data-public-action="primary" data-action-shape="pill" data-action-size="compact">Create an account</a>
+        <button
+          class="mobile-nav-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="mobileNav"
+          aria-label="Open navigation"
+          data-mobile-nav-toggle
+          data-public-action="icon"
+        >
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="mobile-nav" id="mobileNav" aria-hidden="true" data-mobile-nav>
+      <nav aria-label="Mobile navigation">
+        <a href="#how">How It Works</a>
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      </nav>
+      <div class="mobile-nav__actions">
+        <a href="login.html" data-auth-action data-public-action="text">Sign in</a>
+        <button type="button" data-logout-action data-public-action="text" hidden>Sign out</button>
+        <a class="button button--ink" href="signup.html" data-signup-action data-public-action="primary" data-action-shape="pill">Create an account</a>
       </div>
     </div>
   </header>
 
   <main id="main" tabindex="-1">
-  <!-- Hero Slider -->
-  <section class="slider" aria-label="Featured banners" data-image-bg>
-    <button class="arrow left" aria-label="Previous slide" data-dir="-1">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-    </button>
-    <button class="arrow right" aria-label="Next slide" data-dir="1">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
-    </button>
+    <section class="editorial-hero" aria-labelledby="hero-title">
+      <div class="editorial-hero__inner">
+        <div class="editorial-hero__main">
+          <div class="editorial-hero__lead">
+            <p class="editorial-hero__qualifier">
+              <span class="sr-only">For solo and small-firm attorneys</span>
+              <span class="editorial-hero__qualifier-words" aria-hidden="true">
+                <span style="--word-index: 0">For</span>
+                <span style="--word-index: 1">solo</span>
+                <span style="--word-index: 2">and</span>
+                <span style="--word-index: 3">small-firm</span>
+                <span style="--word-index: 4">attorneys</span>
+              </span>
+            </p>
+            <h1 id="hero-title">
+              <span class="editorial-hero__line editorial-hero__line--one">Your caseload grew.</span>
+              <em class="editorial-hero__line editorial-hero__line--two">Your payroll doesn’t have to.</em>
+            </h1>
+          </div>
 
-<!-- Fade-in JS + Section Observer -->
-<script defer>
-  (function () {
-    const scrollHandlers = [];
-
-    function registerScrollHandler(fn) {
-      if (typeof fn === 'function') {
-        scrollHandlers.push(fn);
-      }
-    }
-
-    function handleScrollAnimations() {
-      scrollHandlers.forEach((fn) => fn());
-    }
-
-    window.registerScrollHandler = registerScrollHandler;
-    window.handleScrollAnimations = handleScrollAnimations;
-
-    window.initFadeIns = function initFadeIns() {
-      const sections = document.querySelectorAll('.section');
-
-      if ('IntersectionObserver' in window) {
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add('visible');
-              observer.unobserve(entry.target);
-            }
-          });
-        }, { threshold: 0.1 });
-
-        sections.forEach((section) => observer.observe(section));
-      } else {
-        sections.forEach(section => section.classList.add('visible'));
-      }
-    };
-  })();
-</script>
-
-<style>
-    /* WHO WE ARE */
-.who-we-are {
-  text-align: center;
-  background-color: #ffffff;
-  position: relative;
-  z-index: 500;
-  padding: 6rem 0 4rem;
-  margin: 0;
-}
-
-    .who-title {
-      font-family: "Cormorant Garamond", serif;
-      font-weight: 300;
-      font-size: 44px;
-      color: #111;
-      margin-bottom: 18px;
-      letter-spacing: 0.4px;
-    }
-
-.who-text {
-  font-family: "Sarabun", sans-serif;
-  font-weight: 200;
-  font-size: 18px;
-  line-height: 1.7;
-  color: #555;
-  max-width: none;
-  margin: 0 auto;
-  text-align: center;
-}
-.who-text + .who-text {
-  margin-top: 18px;
-}
-.who-text-more {
-  display: block;
-}
-.who-expand {
-  display: none;
-  margin-top: 18px;
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(26, 34, 48, 0.2);
-  background: transparent;
-  color: #1a2230;
-  font-family: "Sarabun", sans-serif;
-  font-weight: 200;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.7rem;
-  cursor: pointer;
-}
-.who-expand:hover {
-  background: rgba(26, 34, 48, 0.06);
-}
-@keyframes whoChunkFade {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-    color: #ffffff;
-    filter: blur(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-    color: #555;
-    filter: blur(0);
-  }
-}
-
-@media (max-width: 768px) {
-  .who-text-more {
-    display: none;
-  }
-  .who-body.is-expanded .who-text-more {
-    display: block;
-    margin-top: 18px;
-  }
-  .who-body.is-expanded .who-chunk {
-    display: block;
-    opacity: 0;
-    transform: translateY(8px);
-    animation: whoChunkFade 1.2s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
-    animation-delay: var(--chunk-delay, 0ms);
-    margin-top: 18px;
-  }
-  .who-body.is-expanded .who-chunk:first-of-type {
-    margin-top: 0;
-  }
-  .who-expand {
-    display: inline-flex;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .who-body.is-expanded .who-chunk {
-    animation: none;
-    opacity: 1;
-    transform: none;
-    filter: none;
-  }
-}
-
-  html {
-    scroll-behavior: smooth;
-    scroll-padding-top: 80px;
-  }
-
-  .section {
-    opacity: 1;
-    transform: none;
-  }
-
-  html.js .section {
-    opacity: 0;
-    transform: translateY(60px);
-    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
-    will-change: opacity, transform;
-  }
-
-  html.js .section.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  .slide .hero-bg {
-    will-change: transform;
-    transition: transform 0.2s ease-out;
-  }
-
-  .slide .hero-bg img {
-    will-change: transform;
-  }
-
-  .slide .caption {
-    will-change: transform;
-    transition: transform 0.2s ease-out;
-  }
-</style>
-
-<div class="slides" id="slides">
-  <article class="slide active" data-idx="0">
-    <div class="hero-bg">
-      <img src="./hero-mountain.jpg" alt="Snow-capped mountain peak" />
-    </div>
-    <div class="caption">
-      <div class="kicker">Connect With</div>
-      <h1 class="headline">Experienced Independent Paralegals</h1>
-      <a class="cta hero-cta" href="browse-paralegals.html">Browse Paralegals
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M5 12h14M13 5l7 7-7 7"/>
-        </svg>
-      </a>
-    </div>
-  </article>
-
-      <article class="slide" data-idx="1">
-        <div class="hero-bg">
-          <img src="./hero-city.jpg" alt="City skyline at dusk with river and bridges" loading="lazy" />
+          <div class="editorial-hero__details">
+            <p class="editorial-hero__support">Let’s-ParaConnect is a platform where attorneys and independent paralegals can work together on individual matters. Delegate your firm’s overflow work matter by matter—without the commitment of a full-time hire.</p>
+            <div class="action-row editorial-hero__actions">
+              <a class="button button--ink" href="signup.html" data-post-matter-action data-public-action="primary" data-action-shape="pill">Post a matter</a>
+              <a class="text-action" href="browse-paralegals.html" data-public-action="text">Browse paralegals</a>
+            </div>
+            <p class="editorial-hero__publishing">Post for free. Fund only when you hire.</p>
+          </div>
         </div>
-        <div class="caption">
-          <div class="kicker">Project-based paralegal support</div>
-          <h1 class="headline">On Your Terms</h1>
-          <a class="cta hero-cta" href="#how">How It Works
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+
+        <div class="editorial-hero__reassurance">
+          <p><strong>INCREASE CAPACITY</strong> <span aria-hidden="true">|</span> <strong>GAIN FLEXIBILITY</strong> <span aria-hidden="true">|</span> <strong>DELEGATE</strong></p>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="workflow" id="how" aria-labelledby="workflow-title">
+      <div class="workflow__intro">
+        <div class="workflow__intro-title">
+          <h2 id="workflow-title">One matter.<br />One workspace.</h2>
+        </div>
+      </div>
+
+      <div class="workflow__story">
+        <div class="workflow-mobile-stage" aria-live="polite">
+          <div class="workflow-mobile-stage__sticky">
+            <div class="workflow-mobile-stage__heading">
+              <span class="workflow-mobile-stage__number">01</span>
+              <h3>Scope the work</h3>
+              <p>Define the deliverables, timing, and expectations.</p>
+            </div>
+            <div class="workflow-mobile-stage__canvas" data-mobile-workflow-stage></div>
+          </div>
+        </div>
+
+        <div class="workflow-chapters" role="group" aria-label="Matter workflow steps" tabindex="0">
+          <article class="workflow-chapter is-active" data-workflow-chapter="1">
+            <span class="workflow-chapter__number">01</span>
+            <div>
+              <h3>Scope the work</h3>
+              <p>Define the deliverables, timing, and expectations.</p>
+            </div>
+            <div class="workflow-mobile-canvas" data-mobile-workflow-state="1"></div>
+          </article>
+
+          <article class="workflow-chapter" data-workflow-chapter="2">
+            <span class="workflow-chapter__number">02</span>
+            <div>
+              <h3>Review fit, check conflicts</h3>
+              <p>Compare applicants and request an optional conflicts check from your selected paralegal before hiring.</p>
+            </div>
+            <div class="workflow-mobile-canvas" data-mobile-workflow-state="2"></div>
+          </article>
+
+          <article class="workflow-chapter" data-workflow-chapter="3">
+            <span class="workflow-chapter__number">03</span>
+            <div>
+              <h3>Work together</h3>
+              <p>Keep messages, files, and progress connected to the matter.</p>
+            </div>
+            <div class="workflow-mobile-canvas" data-mobile-workflow-state="3"></div>
+          </article>
+
+          <article class="workflow-chapter" data-workflow-chapter="4">
+            <span class="workflow-chapter__number">04</span>
+            <div>
+              <h3>Review <span class="keep-together">deliverables</span></h3>
+              <p>Check the submitted work and request revisions if needed.</p>
+            </div>
+            <div class="workflow-mobile-canvas" data-mobile-workflow-state="4"></div>
+          </article>
+
+          <article class="workflow-chapter" data-workflow-chapter="5">
+            <span class="workflow-chapter__number">05</span>
+            <div>
+              <h3>Confirm completion</h3>
+              <p>Approve the final work and release the paralegal’s payout together.</p>
+            </div>
+            <div class="workflow-mobile-canvas" data-mobile-workflow-state="5"></div>
+          </article>
+
+          <article class="workflow-chapter" data-workflow-chapter="6">
+            <span class="workflow-chapter__number">06</span>
+            <div>
+              <h3>Close the matter</h3>
+              <p>Keep the payment record and download your archive.</p>
+            </div>
+            <div class="workflow-mobile-canvas" data-mobile-workflow-state="6"></div>
+          </article>
+        </div>
+
+        <div class="workflow-canvas-wrap">
+          <div class="workflow-canvas product-shell" data-workflow-canvas data-workflow-state="1">
+            <div class="product-topbar">
+              <span class="product-wordmark">LPC</span>
+              <span class="matter-identity matter-identity--compact">
+                <strong>Medical Records Chronology</strong>
+                <small>Personal Injury · Example</small>
+              </span>
+            </div>
+
+            <div class="workflow-state is-active" data-state="1" aria-hidden="false">
+              <div class="state-heading">
+                <h4>Accepting applications</h4>
+              </div>
+              <div class="form-grid">
+                <div class="field"><span>Compensation</span><strong>$650.00</strong></div>
+                <div class="field"><span>Applications</span><strong>2</strong></div>
+                <div class="field field--wide field--tall"><span>Scope</span><strong>Build a treatment chronology from medical records, organized by provider and date.</strong></div>
+                <div class="field field--wide"><span>Deliverables</span><strong>Medical records chronology, Source index</strong></div>
+              </div>
+            </div>
+
+            <div class="workflow-state" data-state="2" aria-hidden="true">
+              <div class="state-heading state-heading--row">
+                <div><h4>3 applications</h4></div>
+              </div>
+              <div class="applicant-list">
+                <article class="applicant-row is-featured">
+                  <span class="avatar avatar--nr">NR</span>
+                  <div class="applicant-row__identity"><strong>Natalie Rivera</strong><span>Litigation · 10+ years</span></div>
+                  <div class="applicant-row__skills"><span>Personal Injury</span><span>Medical Records</span></div>
+                  <div class="match-score"><strong>Submitted today</strong></div>
+                </article>
+                <article class="applicant-row">
+                  <span class="avatar avatar--em">EM</span>
+                  <div class="applicant-row__identity"><strong>Emily Morgan</strong><span>Records review · 8+ years</span></div>
+                  <div class="applicant-row__skills"><span>Chronologies</span><span>Discovery</span></div>
+                  <div class="match-score"><strong>Submitted today</strong></div>
+                </article>
+                <article class="applicant-row">
+                  <span class="avatar avatar--jp">JP</span>
+                  <div class="applicant-row__identity"><strong>Jordan Parker</strong><span>Litigation · 7+ years</span></div>
+                  <div class="applicant-row__skills"><span>Records Review</span><span>Clio</span></div>
+                  <div class="match-score"><strong>Submitted yesterday</strong></div>
+                </article>
+              </div>
+            </div>
+
+            <div class="workflow-state" data-state="3" aria-hidden="true">
+              <div class="workspace-grid">
+                <section class="workspace-chat">
+                  <div class="panel-heading"><strong>Messages</strong></div>
+                  <div class="message message--received"><p>The provider index is ready.<small>10:24 AM</small></p></div>
+                  <div class="message message--sent"><p>Please flag any treatment gaps.<small>10:31 AM</small></p></div>
+                  <div class="message-composer">Write a message… <span>Send</span></div>
+                </section>
+                <aside class="workspace-details">
+                  <div class="detail-block"><p class="interface-label">Deadline</p><strong>August 18</strong></div>
+                <div class="detail-block"><p class="interface-label">Tasks</p><label><i class="is-done" aria-hidden="true"></i> Provider index</label><label><i aria-hidden="true">2</i> Chronology</label><label><i aria-hidden="true">3</i> Source index</label></div>
+                  <div class="detail-block workflow-files"><p class="interface-label">Files in progress</p><span class="compact-file"><b>Chronology-draft.docx</b></span><span class="compact-file"><b>Source-index-draft.pdf</b></span></div>
+                </aside>
+              </div>
+            </div>
+
+            <div class="workflow-state" data-state="4" aria-hidden="true">
+              <div class="completion-state">
+                <h4>Ready for review</h4>
+                <p>Submitted August 17</p>
+                <div class="completion-files">
+                  <span><i>PDF</i><b>Medical Records Chronology.pdf</b></span>
+                  <span><i>PDF</i><b>Source Index.pdf</b></span>
+                </div>
+                <div class="payment-summary">
+                  <span class="workflow-preview-action">Review files</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="workflow-state" data-state="5" aria-hidden="true">
+              <div class="completion-state">
+                <h4>Ready to close</h4>
+                <p>Approve the completed work to begin payment release.</p>
+                <div class="completion-files">
+                  <span><i>PDF</i><b>Medical Records Chronology.pdf</b></span>
+                  <span><i>PDF</i><b>Source Index.pdf</b></span>
+                </div>
+                <div class="payment-summary">
+                  <span class="workflow-preview-action">Approve completed work</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="workflow-state" data-state="6" aria-hidden="true">
+              <div class="completion-state completion-state--released">
+                <div class="completion-mark" aria-hidden="true"></div>
+                <h4>Payment released</h4>
+                <p>Save your matter records—messages, documents, and receipts—in one download.</p>
+                <div class="payment-summary">
+                  <span><small>Funded matter amount</small><strong>$650.00</strong></span>
+                  <span class="workflow-preview-action">Download matter records</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="matter-rail matter-rail--workflow" data-matter-rail="1" aria-label="Matter progress">
+              <span class="matter-rail__line"></span>
+              <div class="is-active"><i>1</i><span>Post</span></div>
+              <div><i>2</i><span>Choose</span></div>
+              <div><i>3</i><span>Work</span></div>
+              <div><i>4</i><span>Review</span></div>
+              <div><i>5</i><span>Approve</span></div>
+              <div><i>6</i><span>Finish</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="feature-sequence">
+    <section class="assistant-spotlight" id="assistant" aria-labelledby="assistant-title">
+      <div class="assistant-spotlight__inner">
+        <div class="assistant-spotlight__copy">
+          <p class="assistant-spotlight__eyebrow"><span aria-hidden="true">✦</span> THE LPC ASSISTANT</p>
+          <h2 id="assistant-title">Less searching.<br /><em>More clarity.</em></h2>
+          <p class="assistant-spotlight__description">Ask about your active matters. Get the details—and a way back to the work.</p>
+          <div class="assistant-spotlight__examples" role="group" aria-label="Explore example Assistant answers">
+            <div>
+              <button type="button" data-public-action="secondary" data-assistant-example="deadlines" aria-pressed="true">Deadlines</button>
+              <button type="button" data-public-action="secondary" data-assistant-example="people" aria-pressed="false">Your paralegals</button>
+              <button type="button" data-public-action="secondary" data-assistant-example="review" aria-pressed="false">Work to review</button>
+            </div>
+          </div>
+        </div>
+        <div class="assistant-spotlight__visual">
+          <div class="assistant-demo">
+            <header class="assistant-demo__header">
+              <span class="assistant-demo__icon" aria-hidden="true">✦</span>
+              <div><strong>LPC Assistant</strong><span>Connected to your matters</span></div>
+              <span class="assistant-demo__online" aria-hidden="true"></span>
+            </header>
+            <div class="assistant-demo__conversation" aria-live="polite" aria-atomic="true">
+              <p class="assistant-demo__question" data-demo-question>What’s my next deadline?</p>
+              <div class="assistant-demo__answer">
+                <span class="assistant-demo__answer-label">LPC ASSISTANT</span>
+                <p data-demo-answer>Your next deadline is August 23 for Henderson v. Walker.</p>
+                <div class="assistant-demo__fact"><span data-demo-fact-label>Next deadline</span><strong data-demo-fact>August 23</strong><span data-demo-detail>Henderson v. Walker</span></div>
+              </div>
+            </div>
+            <a class="assistant-demo__source" href="login.html">
+              <span class="assistant-demo__file" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6"/></svg></span>
+              <span><small>GO TO THE MATTER</small><strong data-demo-matter>Henderson v. Walker</strong></span>
+              <span aria-hidden="true">↗</span>
+            </a>
+            <div class="assistant-demo__composer" aria-hidden="true"><span>Ask about your matters…</span><span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></span></div>
+          </div>
+        </div>
+      </div>
+      <p class="assistant-spotlight__disclaimer">Workspace information, not legal advice or decisions.</p>
+    </section>
+
+    </div>
+
+    <section class="trust-band" aria-label="Why attorneys and paralegals use Let’s-ParaConnect">
+      <div class="trust-band__inner">
+        <article>
+          <span aria-hidden="true">01</span>
+          <h2>Approval-based access</h2>
+          <p>Every paralegal completes LPC’s application and eligibility review before joining the platform.</p>
+        </article>
+        <article>
+          <span aria-hidden="true">02</span>
+          <h2>Everything stays connected</h2>
+          <p>Scope, messages, files, completion, and payment activity stay connected to the same matter.</p>
+        </article>
+        <article>
+          <span aria-hidden="true">03</span>
+          <h2>Structured payments</h2>
+          <p>Funding, completion, and payment status remain connected to the matter.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="paralegal-map" aria-labelledby="paralegal-map-title">
+      <div class="paralegal-map__inner">
+        <div class="paralegal-map__intro">
+          <p class="paralegal-map__eyebrow">The network today</p>
+          <h2 id="paralegal-map-title">Paralegals across the map</h2>
+          <p>An ever-growing network of experienced, independent paralegals across the country. All in one place.</p>
+        </div>
+        <div class="paralegal-map__stage">
+          <div class="paralegal-map__canvas" data-paralegal-map></div>
+          <div class="paralegal-map__status" data-map-status role="status"><a class="paralegal-map__stat" href="browse-paralegals.html" aria-label="Browse paralegal profiles" data-public-action="primary"><strong data-map-total>—</strong><span class="paralegal-map__stat-detail"><span class="paralegal-map__stat-copy"><span data-map-summary>Loading the map…</span><span data-map-growth hidden>and growing.</span><span class="paralegal-map__stat-cue" aria-hidden="true">Browse profiles</span></span><span class="paralegal-map__stat-arrow" aria-hidden="true">↗</span></span></a></div>
+          <p class="paralegal-map__note">Dots show approved members; locations are illustrative.</p>
+          <button class="paralegal-map__retry" type="button" data-map-retry hidden>Try again</button>
+          <noscript><p class="paralegal-map__status">Enable JavaScript to view the network map.</p></noscript>
+        </div>
+      </div>
+    </section>
+
+    <section class="clarity-section" aria-labelledby="clarity-title">
+      <div class="clarity-section__intro">
+        <p class="eyebrow">Fees and minimums</p>
+        <h2 id="clarity-title">Know what to expect from the start.</h2>
+      </div>
+
+      <div class="clarity-section__grid">
+        <aside class="fee-card fee-card--hybrid" aria-labelledby="fee-card-title">
+          <h3 id="fee-card-title">Platform fees.</h3>
+          <div class="fee-card__row">
+            <span>To get started</span>
+            <strong>$0</strong>
+            <h4>Post for free.</h4>
+            <p>Post a matter without adding a payment method. When you find the right paralegal, you’ll add one to hire them. Compensation for the paralegal’s work starts at $400 per matter.</p>
+          </div>
+          <div class="fee-card__row">
+            <span>For attorneys</span>
+            <strong>22%</strong>
+            <h4>Added when you hire.</h4>
+            <p>When you’re ready to hire, Stripe charges your matter amount plus LPC’s 22% platform fee. After you confirm the work is complete, the paralegal’s share of the matter amount is sent through Stripe Connect directly to the paralegal.</p>
+          </div>
+          <div class="fee-card__row">
+            <span>For paralegals</span>
+            <strong>18%</strong>
+            <h4>Deducted before payout.</h4>
+            <p>The paralegal platform fee is deducted from the matter amount before payout, after completed work is approved.</p>
+          </div>
+          <small>Payments are securely processed by Stripe. LPC does not store full card details.</small>
+        </aside>
+
+        <div class="home-faq">
+          <p class="interface-label">Common questions</p>
+          <h3>Answers before you get started.</h3>
+          <div class="home-faq__questions">
+            <details name="homepage-faq" data-faq-order="1">
+              <summary>Does LPC assign a paralegal to an attorney?<span class="home-faq__icon" aria-hidden="true"></span></summary>
+              <p>No. Attorneys review applications and profiles, then decide whether and whom to engage.</p>
+            </details>
+            <details name="homepage-faq" data-faq-order="2">
+              <summary>Who defines the work and compensation?<span class="home-faq__icon" aria-hidden="true"></span></summary>
+              <p>The attorney defines the matter’s scope, deliverables, timing, and offered compensation.</p>
+            </details>
+            <details name="homepage-faq" data-faq-order="3">
+              <summary>Is Let’s-ParaConnect a law firm or staffing agency?<span class="home-faq__icon" aria-hidden="true"></span></summary>
+              <p>No. LPC is a technology platform. It does not provide legal advice, assign professionals, or supervise legal work.</p>
+            </details>
+            <details name="homepage-faq" data-faq-order="4">
+              <summary>How are payments handled?<span class="home-faq__icon" aria-hidden="true"></span></summary>
+              <p>The attorney funds the Matter through Stripe when hiring. LPC uses Stripe Connect to facilitate payment processing and route the payout to the paralegal after completion is confirmed in the platform or a platform review is resolved.</p>
+            </details>
+            <details name="homepage-faq" data-faq-order="5">
+              <summary>Can I request a conflicts check before hiring?<span class="home-faq__icon" aria-hidden="true"></span></summary>
+              <p>Yes. You can request a conflicts check or confidentiality agreement from a selected paralegal before hiring. These tools are optional; attorneys remain responsible for the professional obligations that apply to their Matter.</p>
+            </details>
+          </div>
+          <div class="home-faq__links">
+            <a href="attorney-faq.html">
+              <span class="home-faq__link-copy"><small>For attorneys</small><strong>Attorney FAQ</strong></span>
+              <i aria-hidden="true"></i>
+            </a>
+            <a href="paralegal-faq.html">
+              <span class="home-faq__link-copy"><small>For paralegals</small><strong>Paralegal FAQ</strong></span>
+              <i aria-hidden="true"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing-scene" aria-labelledby="closing-title">
+      <canvas class="matter-field matter-field--closing" data-matter-field="closing" aria-hidden="true"></canvas>
+      <div class="closing-scene__content">
+        <h2 id="closing-title">Start with the role that brings you here.</h2>
+        <div class="role-actions">
+          <a class="role-action" href="signup.html?role=attorney" data-public-action="secondary" data-action-shape="control">
+            <span>For attorneys</span>
+            <strong>Post a matter</strong>
+            <i aria-hidden="true"></i>
+          </a>
+          <a class="role-action" href="signup.html?role=paralegal" data-public-action="secondary" data-action-shape="control">
+            <span>For paralegals</span>
+            <strong>Apply to join</strong>
+            <i aria-hidden="true"></i>
           </a>
         </div>
-      </article>
-    </div>
-
-    <div class="bullets" id="bullets" role="tablist" aria-label="Slide navigation">
-      <button class="dot active" data-go="0" aria-selected="true" role="tab"></button>
-      <button class="dot" data-go="1" role="tab"></button>
-    </div>
-  </section>
-
-  <section id="who-we-are" class="who-wrapper">
-    <h2 class="who-title">Who We Are</h2>
-    <div class="who-body" id="whoText">
-      <p class="who-text">
-        Let’s-ParaConnect is a technology platform where attorneys can directly engage experienced independent paralegals for single-scope and project-based support work. The platform provides a secure workspace for communication, task coordination, and professional collaboration, enabling attorneys and paralegals to work together efficiently within a structured environment. Each attorney and paralegal profile is reviewed for platform access to promote a trusted and professional working environment. Let’s-ParaConnect is not a law firm, does not provide legal services, assign engagements, or employ paralegals.
-      </p>
-    </div>
-  </section>
-
-  <section class="section dashboard-preview" id="dashboard-preview">
-    <div class="dashboard-preview__parallax-bg" aria-hidden="true"></div>
-    <div class="wrap">
-      <div class="dashboard-preview__header">
-        <p class="dashboard-preview__eyebrow">Dashboard preview</p>
-        <h2>See the workspace before you sign in</h2>
-        <p>Preview the dashboard as an attorney and as a paralegal used to manage cases, track tasks, and stay aligned.</p>
       </div>
-      <div class="dashboard-preview__main">
-        <figure class="dashboard-shot dashboard-shot--feature">
-          <img src="AttorneyExampleDash.png" alt="Attorney dashboard example showing case metrics and summary cards" loading="lazy" class="dashboard-preview-zoom" />
-          <figcaption>Attorney dashboard example</figcaption>
-        </figure>
-        <figure class="dashboard-shot dashboard-shot--feature">
-          <img src="ParalegalExampleDash.png" alt="Paralegal dashboard example showing assignments and case progress" loading="lazy" class="dashboard-preview-zoom" />
-          <figcaption>Paralegal dashboard example</figcaption>
-        </figure>
-      </div>
-    </div>
-  </section>
-  <!-- ✅ Insert this block directly after your closing </section> for the hero slider -->
-<!-- Parallax Container -->
-<section class="parallax-section" id="how" data-image-bg>
-  <div class="parallax-bg"></div>
+    </section>
+  </main>
 
-  <div class="how-it-works-bg">
-    <h2>How It Works</h2>
-    <p>Attorneys post a project, paralegals apply, attorneys hire directly through the platform, and the work is completed and confirmed inside the workspace. Attorneys and paralegals decide directly whether to work together. Payments are processed through Stripe Connect, which routes payouts directly to the paralegal’s connected account, and Let’s-ParaConnect charges a platform fee for use of the platform infrastructure.</p>
-    <div class="cta-row mobile-only" style="display:flex;flex-wrap:wrap;gap:9rem;justify-content:center;margin:0 auto 1.5rem;">
-      <a class="cta" href="paralegal-faq.html" style="display:inline-flex;align-items:center;gap:6px;">Paralegal FAQ
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-      </a>
-      <a class="cta" href="attorney-faq.html" style="display:inline-flex;align-items:center;gap:6px;">For Attorneys
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-      </a>
-    </div>
-
-    <div class="cards">
-      <div class="card">
-        <div class="pad">
-          <span class="card-icon" aria-hidden="true"><img src="android-chrome-512x512.png" alt="" /></span>
-          <div class="hiw-card">
-            <div class="hiw-default">
-              <h3>Post a Job</h3>
-              <p>Attorneys post what they need in minutes: timelines, type of law, matter details, and required tasks.</p>
-              <a href="#" class="hiw-toggle" data-target="post-job">Learn More →</a>
-            </div>
-            <div class="hiw-expanded card-scroll-area" data-section="post-job">
-              <h3>How Posting Works</h3>
-              <p>Create a clear outline of the work you need completed — such as drafting, research, document preparation, or case support.<br>
-              Your posting becomes visible to approved paralegals who can apply through the platform.</p>
-              <a href="#" class="hiw-toggle-back">← Learn Less</a>
-            </div>
+  <footer class="home-footer">
+    <div class="home-footer__inner">
+      <p class="home-footer__statement"><span>Legal work.</span><span>Clearly connected.</span></p>
+      <nav class="home-footer__directory" aria-label="Footer navigation">
+        <details open>
+          <summary>Platform</summary>
+          <div class="home-footer__links">
+            <a href="#how">How It Works</a>
+            <a href="attorney-faq.html">For Attorneys</a>
+            <a href="paralegal-faq.html">For Paralegals</a>
+            <a href="browse-paralegals.html">Browse Paralegals</a>
           </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="pad">
-          <span class="card-icon" aria-hidden="true"><img src="android-chrome-512x512.png" alt="" /></span>
-          <div class="hiw-card">
-            <div class="hiw-default">
-              <h3>Paralegals Apply</h3>
-              <p>Qualified paralegals review your posting and apply if they have the experience and availability you need.</p>
-              <a href="#" class="hiw-toggle" data-target="paralegals-apply">Learn More →</a>
-            </div>
-            <div class="hiw-expanded card-scroll-area" data-section="paralegals-apply">
-              <h3>How Applications Work</h3>
-              You’ll see each applicant’s background, skillset, and relevant experience.<br>
-              Select the paralegal that best fits the needs of your case — no back-and-forth emails or delays.</p>
-              <a href="#" class="hiw-toggle-back">← Learn Less</a>
-            </div>
+        </details>
+        <details open>
+          <summary>For Attorneys</summary>
+          <div class="home-footer__links">
+            <a href="signup.html?role=attorney">Post a Matter</a>
+            <a href="attorney-faq.html">Attorney FAQ</a>
+            <a href="contact.html">Contact</a>
           </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="pad">
-          <span class="card-icon" aria-hidden="true"><img src="android-chrome-512x512.png" alt="" /></span>
-          <div class="hiw-card">
-            <div class="hiw-default">
-              <h3>Work Begins</h3>
-              <p>Once you choose a paralegal, work starts immediately. All communication stays securely within your LPC dashboard.</p>
-              <a href="#" class="hiw-toggle" data-target="work-begins">Learn More →</a>
-            </div>
-            <div class="hiw-expanded card-scroll-area" data-section="work-begins">
-              <h3>How Workflows Operate</h3>
-              <p>After selecting a paralegal, communication takes place directly through your secure LPC dashboard.<br>
-              Files, instructions, and updates stay in one place.<br>
-              Create tasks and check them off as the paralegal completes them.<br>
-              You maintain full visibility on progress without disrupting your existing workflow.</p>
-              <a href="#" class="hiw-toggle-back">← Learn Less</a>
-            </div>
+        </details>
+        <details open>
+          <summary>For Paralegals</summary>
+          <div class="home-footer__links">
+            <a href="signup.html?role=paralegal">Apply to Join</a>
+            <a href="paralegal-faq.html">Paralegal FAQ</a>
+            <a href="/paralegal-admission.html">Our Application Review</a>
           </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="pad">
-          <span class="card-icon" aria-hidden="true"><img src="android-chrome-512x512.png" alt="" /></span>
-          <div class="hiw-card">
-            <div class="hiw-default">
-              <h3>Payments Through Stripe</h3>
-              <p>Payments are processed through Stripe Connect. Attorneys authorize payment through Stripe, and Stripe processes payout to the paralegal’s connected account once the project is marked complete in the platform. Let’s‑ParaConnect does not take custody of funds outside of Stripe, does not act as a payment processor, and charges a platform fee for access to the platform’s communication, workflow, and payment-facilitation tools.</p>
-              <a href="#" class="hiw-toggle" data-target="secure-escrow">Learn More →</a>
-            </div>
-            <div class="hiw-expanded card-scroll-area" data-section="secure-escrow">
-              <h3>How Completion Confirmation Works</h3>
-              <p>Attorneys review deliverables and confirm completion in the platform. Stripe then processes payout to the paralegal’s connected account in accordance with Stripe’s systems and terms.<br>
-              This ensures fairness, transparency, and accountability for every assignment.</p>
-              <a href="#" class="hiw-toggle-back">← Learn Less</a>
-            </div>
+        </details>
+        <details open>
+          <summary>Legal</summary>
+          <div class="home-footer__links">
+            <a href="terms.html">Terms</a>
+            <a href="privacy.html">Privacy</a>
+            <a href="accessibility.html">Accessibility</a>
           </div>
+        </details>
+      </nav>
+      <div class="home-footer__bottom">
+        <div class="home-footer__identity">
+          <a class="home-footer__brand" href="index.html" aria-label="Let’s-ParaConnect home">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+          <p>Copyright © 2026 Let’s-ParaConnect. All rights reserved.</p>
         </div>
-      </div>
-      <div class="card">
-        <div class="pad">
-          <span class="card-icon" aria-hidden="true"><img src="android-chrome-512x512.png" alt="" /></span>
-          <div class="hiw-card">
-            <div class="hiw-default">
-              <h3>Finalize &amp; Close</h3>
-              <p>Review the work, confirm completion, and close the job.</p>
-              <a href="#" class="hiw-toggle" data-target="finalize-close">Learn More →</a>
-            </div>
-            <div class="hiw-expanded card-scroll-area" data-section="finalize-close">
-              <h3>How Closing Works</h3>
-              <p>Once you confirm the final deliverable meets your expectations, Stripe processes payout to the connected paralegal account.<br>
-              You’ll receive a full record of the assignment in your dashboard, including dates, files, and payment confirmation.<br>
-              This creates a clear, organized archive for your practice.</p>
-              <a href="#" class="hiw-toggle-back">← Learn Less</a>
-            </div>
-          </div>
-        </div>
+        <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode" data-public-action="icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg>
+          <span>Accessibility</span>
+        </button>
       </div>
     </div>
-  </div>
-  <p class="pricing-note">
-    A standard 22% USD platform service fee applies to attorney payments. An 18% USD platform service fee applies to paralegal earnings. Minimum case compensation is $400.
-  </p>
-</section>
-
-<!-- CTA Section (Final Call to Action) -->
-<section class="section about wrap" style="text-align: center; background-color: #ffffff;" id="cta">
-  <h2 style="color: #1a2230; font-family: 'Cormorant Garamond', sans-serif; font-weight: 200;">Ready to Get Started?</h2>
-  <p style="color: #333333; font-family: 'Sarabun', sans-serif; font-weight: 200; max-width: 600px; margin: 0 auto 1.5rem;">
-    Whether you're an attorney seeking reliable help, or a paralegal looking for your next great opportunity, Let’s-ParaConnect is where your journey begins.
-  </p>
-<a class="cta" href="signup.html" style="
-  margin-top: 1rem;
-  border: 1.5px solid #1a2230;
-  color: #1a2230;
-  font-family: 'Sarabun', sans-serif;
-  font-weight: 200;
-  padding: 0.75rem 2rem;
-  border-radius: 6px;
-  display: inline-block;
-  text-decoration: none;
-  transition: all 0.3s ease;
-">Sign Up</a>
-</section>
-
-</main>
-
-<footer class="footer">
-  <div class="footer-inner">
-    <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
-    <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
-    <nav>
-      <a href="privacy.html">Privacy Policy</a>
-      <span>|</span>
-      <a href="terms.html">Terms</a>
-      <span>|</span>
-      <a href="/paralegal-admission.html">Admissions</a>
-      <span>|</span>
-      <a href="contact.html">Contact</a>
-      <span>|</span>
-      <a href="accessibility.html">Accessibility</a>
-    </nav>
-    <div class="region">United States</div>
-  </div>
-</footer>
-
-  <div class="image-lightbox" id="imageLightbox" aria-hidden="true">
-    <button type="button" class="lightbox-prev" aria-label="Previous image">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M15 18l-6-6 6-6"/>
-      </svg>
-    </button>
-    <img src="" alt="" />
-    <button type="button" class="lightbox-next" aria-label="Next image">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M9 6l6 6-6 6"/>
-      </svg>
-    </button>
-  </div>
-
-  <script defer>
-    window.initHeroSlider = function initHeroSlider() {
-      const HERO_ZOOM_CLASS = 'hero-zooming';
-      const slides = Array.from(document.querySelectorAll('.slide'));
-      if (!slides.length) return;
-
-      const dots = Array.from(document.querySelectorAll('.dot'));
-      const arrows = Array.from(document.querySelectorAll('.arrow'));
-      const slider = document.querySelector('.slider');
-      const timingStyles = getComputedStyle(document.documentElement);
-      const slideDuration = parseFloat(timingStyles.getPropertyValue('--hero-slide-duration')) || 6000;
-      const transitionDuration = parseFloat(timingStyles.getPropertyValue('--hero-transition-duration')) || 1200;
-      const delay = slideDuration;
-      let idx = slides.findIndex((slide) => slide.classList.contains('active'));
-      if (idx < 0) idx = 0;
-      let timer = null;
-
-      const triggerZoom = (slide) => {
-        if (!slide) return;
-        const img = slide.querySelector('.hero-bg img');
-        if (!img) return;
-        img.classList.remove(HERO_ZOOM_CLASS);
-        void img.offsetWidth;
-        img.classList.add(HERO_ZOOM_CLASS);
-      };
-
-      const handleSlideFade = (event) => {
-        if (event.propertyName !== 'opacity') return;
-        const img = event.currentTarget.querySelector('.hero-bg img');
-        event.currentTarget.classList.remove('leaving');
-        if (img) {
-          img.classList.remove(HERO_ZOOM_CLASS);
-          img.style.transform = `scale(var(--hero-zoom-start))`;
-        }
-        event.currentTarget.removeEventListener('transitionend', handleSlideFade);
-      };
-
-      function updateDots(prev, next) {
-        if (!dots.length) return;
-        if (dots[prev]) {
-          dots[prev].classList.remove('active');
-          dots[prev].setAttribute('aria-selected', 'false');
-        }
-        if (dots[next]) {
-          dots[next].classList.add('active');
-          dots[next].setAttribute('aria-selected', 'true');
-        }
-      }
-
-      function show(n) {
-        if (!slides.length) return;
-        const prevIdx = idx;
-        idx = (n + slides.length) % slides.length;
-        if (prevIdx === idx) return;
-
-        const nextSlide = slides[idx];
-        const prevSlide = slides[prevIdx];
-
-        nextSlide.classList.add('active');
-        triggerZoom(nextSlide);
-        nextSlide.setAttribute('aria-hidden', 'false');
-
-        if (prevSlide && prevSlide !== nextSlide) {
-          prevSlide.setAttribute('aria-hidden', 'true');
-          prevSlide.classList.add('leaving');
-          prevSlide.addEventListener('transitionend', handleSlideFade);
-          requestAnimationFrame(() => prevSlide.classList.remove('active'));
-        }
-
-        updateDots(prevIdx, idx);
-      }
-
-      function next(delta = 1) {
-        show(idx + delta);
-      }
-
-      function play() {
-        stop();
-        timer = setInterval(() => next(1), delay);
-      }
-
-      function stop() {
-        if (timer) {
-          clearInterval(timer);
-          timer = null;
-        }
-      }
-
-      triggerZoom(slides[idx]);
-
-      dots.forEach((dot) => dot.addEventListener('click', (e) => {
-        const targetIndex = Number(e.currentTarget.dataset.go);
-        show(targetIndex);
-        play();
-      }));
-
-      arrows.forEach((arrow) => arrow.addEventListener('click', (e) => {
-        next(Number(e.currentTarget.dataset.dir));
-        play();
-      }));
-
-      let pointerMoved = false;
-      window.addEventListener('pointermove', () => {
-        pointerMoved = true;
-      }, { once: true });
-
-      if (slider) {
-        slider.addEventListener('mouseenter', () => {
-          if (!pointerMoved) return;
-          stop();
-        });
-        slider.addEventListener('mouseleave', () => {
-          if (!pointerMoved) return;
-          play();
-        });
-      }
-
-      document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-          stop();
-        } else if (!timer) {
-          play();
-        }
-      });
-
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowRight') next(1);
-        if (e.key === 'ArrowLeft') next(-1);
-      });
-
-      const textSpeed = 0.06;
-      const smoothing = 0.1;
-      const parallaxItems = slides.map((slide) => {
-        const caption = slide.querySelector('.caption');
-        if (!caption) return null;
-        return {
-          slide,
-          caption,
-          targetText: 0,
-          currentText: 0,
-        };
-      }).filter(Boolean);
-
-      if (parallaxItems.length) {
-        const updateTargets = () => {
-          parallaxItems.forEach((item) => {
-            const rect = item.slide.getBoundingClientRect();
-            if (rect.bottom < 0 || rect.top > window.innerHeight) {
-              item.targetText = 0;
-              return;
-            }
-
-            const offset = rect.top + rect.height / 2 - window.innerHeight / 2;
-            item.targetText = -offset * textSpeed;
-          });
-        };
-
-        const render = () => {
-          parallaxItems.forEach((item) => {
-            item.currentText += (item.targetText - item.currentText) * smoothing;
-            item.caption.style.transform = `translate3d(0, ${item.currentText}px, 0)`;
-          });
-          requestAnimationFrame(render);
-        };
-
-        updateTargets();
-        render();
-        if (typeof registerScrollHandler === 'function') {
-          registerScrollHandler(updateTargets);
-        }
-        window.addEventListener('resize', updateTargets);
-      }
-
-      play();
-      setTimeout(() => {
-        if (!timer) play();
-      }, 1000);
-    };
-  </script>
-  <script defer>
-    // Header scroll effect
-const header = document.querySelector('.site-header');
-const imageBgSections = Array.from(document.querySelectorAll('[data-image-bg]'));
-
-function headerOverImage() {
-  if (!header || !imageBgSections.length) return false;
-  const scrollTop = window.scrollY;
-  const headerBottom = scrollTop + header.offsetHeight;
-  return imageBgSections.some(section => {
-    const top = section.offsetTop;
-    const bottom = top + section.offsetHeight;
-    return headerBottom > top && scrollTop < bottom;
-  });
-}
-
-function updateHeaderAppearance() {
-  if (!header) return;
-  if (headerOverImage()) {
-    header.style.backgroundColor = 'transparent';
-    header.style.boxShadow = 'none';
-    header.style.borderColor = 'rgba(255,255,255,0.25)';
-    header.classList.add('over-image');
-  } else {
-    header.style.backgroundColor = 'rgba(255, 255, 255, 0.78)';
-    header.style.boxShadow = '0 4px 18px rgba(15, 23, 42, 0.06)';
-    header.style.borderColor = 'rgba(15,23,42,0.05)';
-    header.classList.remove('over-image');
-  }
-}
-
-window.addEventListener('resize', updateHeaderAppearance);
-if (typeof registerScrollHandler === 'function') {
-  registerScrollHandler(updateHeaderAppearance);
-}
-window.addEventListener('DOMContentLoaded', updateHeaderAppearance);
-updateHeaderAppearance();
-
-  document.addEventListener('DOMContentLoaded', () => {
-    const cards = document.querySelectorAll('.card');
-
-    if ('IntersectionObserver' in window) {
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('show');
-            observer.unobserve(entry.target); // optional: animate only once
-          }
-        });
-      });
-
-      cards.forEach((card) => observer.observe(card));
-    } else {
-      // Fallback if IntersectionObserver is not supported
-      cards.forEach((card) => card.classList.add('show'));
-    }
-  });
-  </script>
-
-<style>
-  .login-modal {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0,0,0,0.4);
-    display: flex;
-    align-items: center; justify-content: center;
-    z-index: 999;
-  }
-  .login-modal.hidden { display: none; }
-  .login-box {
-    background: white;
-    padding: 2rem;
-    border-radius: 12px;
-    box-shadow: 0 5px 25px rgba(0,0,0,0.2);
-    width: 320px;
-  }
-  .login-box input {
-    display: block;
-    width: 100%;
-    margin: 0.5rem 0;
-    padding: 0.6rem;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-  }
-  .login-box button {
-    width: 100%;
-    margin-top: 1rem;
-    background: var(--gold, #887244);
-    border: none;
-    padding: 0.7rem;
-    color: white;
-    border-radius: 6px;
-    cursor: pointer;
-  }
- .how-it-works-bg {
-  background-image: url('desert.jpg');
-  background-size: cover;
-  background-position: center;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  background-attachment: scroll;
-  position: relative;
-  z-index: 5;
-}
-
-.how-it-works-bg * {
-  position: relative;
-  z-index: 4;
-}
-.parallax-section {
-  position: relative;
-  overflow: hidden;
-  min-height: 150vh; /* allow content to dictate extra space */
-  padding-bottom: 8rem;
-  z-index: 500;
-  margin-top: -18vh;
-  padding-top: 18vh;
-  background: #fff;
-}
-
-.parallax-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 170%;              /* extend so cards stay within backdrop */
-  background-image: url('desert.jpg');
-  background-size: cover;     /* fills but keeps proportions */
-  background-position: center center;
-  background-repeat: no-repeat;
-  z-index: 1;
-  will-change: transform;
-  transform: translateY(-80px);   /* neutral starting point */
-  filter: brightness(0.98);
-}
-
-/* === Foreground Content === */
-.how-it-works-bg {
-  position: relative;
-  z-index: 1000;
-  text-align: center;
-  padding: 3.5rem 0 9rem;
-  color: #1a2230;
-  background: transparent;
-}
-
-.how-it-works-bg h2 {
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 300;
-  font-size: clamp(28px, 4vw, 44px);
-  margin-bottom: 1rem;
-}
-
-.how-it-works-bg p {
-  font-family: 'Sarabun', sans-serif;
-  font-weight: 200;
-  color: #333;
-  margin: 0 auto 4rem;
-  max-width: 60ch;
-}
-
-/* === Cards === */
-.how-it-works-bg .cards {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 60px;
-  max-width: 700px;
-  margin: 180px auto 0;
-  padding: 40px 0 0;
-}
-
-.how-it-works-bg .card {
-  background: #ffffff;
-  border-radius: 0;
-  border: 1px solid rgba(10,15,20,0.06);
-  box-shadow: 0 16px 60px rgba(10,15,20,0.12);
-  padding: 1.4rem 1.5rem;
-  transform: translateY(0);
-  opacity: 1;
-  will-change: transform, opacity;
-  transition: transform 0.6s ease-out, opacity 0.6s ease-out;
-  width: 100%;
-  height: 460px;
-  display: flex;
-  text-align: left;
-  position: relative;
-  z-index: 1000;
-}
-
-.how-it-works-bg .card .pad {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  height: 100%;
-}
-
-.how-it-works-bg .card-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 0;
-  background: #ffffff;
-  color: #ffffff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.4rem;
-  font-family: 'Cormorant Garamond', serif;
-  letter-spacing: 0.08em;
-}
-.how-it-works-bg .card-icon img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.how-it-works-bg .card h3 {
-  margin: 0;
-  font-size: 1.4rem;
-  font-weight: 300;
-  color: #0a0f14;
-}
-
-.how-it-works-bg .card p {
-  margin: 0;
-  line-height: 1.7;
-  color: #4b5664;
-}
-
-.how-it-works-bg .card .read {
-  margin-top: auto;
-}
-
-.hiw-default,
-.hiw-expanded {
-  transition: opacity 0.6s ease-in-out, visibility 0.6s ease-in-out;
-  will-change: opacity;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  flex: 1;
-  overflow-y: auto;
-}
-
-.hiw-expanded {
-  display: none;
-  opacity: 0;
-  visibility: hidden;
-}
-
-.hiw-expanded.show {
-  display: flex;
-  opacity: 1;
-  visibility: visible;
-}
-
-.hiw-default.fade-out {
-  opacity: 0;
-  visibility: hidden;
-}
-
-.hiw-card {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  position: relative;
-}
-
-.hiw-card a {
-  margin-top: auto;
-}
-
-.pricing-note {
-  text-align: center;
-  color: #979da7;
-  font-size: 0.9rem;
-  max-width: 700px;
-  margin: 32px auto 0;
-  line-height: 1.4;
-  position: relative;
-  z-index: 1000;
-}
-
-@media (min-width: 960px) {
-  .how-it-works-bg .cards {
-    grid-template-columns: repeat(2, minmax(300px, 360px));
-    gap: 140px 220px;
-    max-width: 960px;
-    padding: 0 1.5rem;
-  }
-
-  .how-it-works-bg .card {
-    margin: 0;
-    padding: 1.75rem 1.5rem;
-    height: 480px;
-    box-shadow: 0 24px 80px rgba(10,15,20,0.12);
-  }
-
-  .how-it-works-bg .card:nth-child(odd) {
-    align-self: flex-start;
-    transform: translateY(-80px);
-  }
-
-  .how-it-works-bg .card:nth-child(even) {
-    margin-top: 220px;
-    align-self: flex-end;
-    transform: translateY(80px);
-  }
-}
-
-@media (max-width: 600px) {
-  .how-it-works-bg .cards {
-    max-width: 92vw;
-    gap: 50px;
-  }
-
-  .how-it-works-bg .card {
-    padding: 1.5rem 1.35rem;
-    margin: 0 auto;
-    height: 440px;
-  }
-}
-
-@media (max-width: 768px) {
-  .card-scroll-area {
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin !important;
-    scrollbar-color: #d1d1d1 transparent !important;
-    scrollbar-gutter: stable both-edges;
-  }
-
-  .card-scroll-area[data-section="post-job"] {
-    overflow-y: hidden !important;
-  }
-
-  .card-scroll-area::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .card-scroll-area::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-  }
-
-  .card-scroll-area::-webkit-scrollbar-track {
-    background: transparent;
-  }
-}
-.floating-panel {
-  position: relative;
-  z-index: 10;
-  background: white;
-}
-.slider, .slides, .slide {
-  will-change: opacity, transform;
-  transform: translateZ(0);
-}
-.how-cards,
-.intro,
-.white-section {
-  transform: translateZ(0);
-  will-change: transform;
-}
-
-</style>
-
-<!-- === Floating Parallax Scroll === -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/locomotive-scroll@beta/bundled/locomotive-scroll.min.js"></script>
-
-<script defer>
-  window.initGSAPAnimations = function initGSAPAnimations() {
-    if (typeof gsap === 'undefined' || typeof ScrollTrigger === 'undefined') return;
-    gsap.registerPlugin(ScrollTrigger);
-
-    gsap.to(".parallax-bg", {
-      yPercent: 10,
-      ease: "none",
-      scrollTrigger: {
-        trigger: ".parallax-section",
-        start: "top bottom",
-        end: "bottom top",
-        scrub: 0.8
-      }
-    });
-
-    function registerDriftAnimation(selector, {
-      trigger = selector,
-      baseOffset = -20,
-      offsetStep = 6,
-      scaleAmount = 1.05,
-      scrub = 0.4,
-      start = "top bottom",
-      end = "bottom top"
-    } = {}) {
-      const elements = gsap.utils.toArray(selector);
-      if (!elements.length) return;
-
-      elements.forEach((el, idx) => {
-        const offset = baseOffset - (idx * offsetStep);
-        gsap.to(el, {
-          yPercent: offset,
-          scale: scaleAmount,
-          ease: "none",
-          scrollTrigger: {
-            trigger,
-            start,
-            end,
-            scrub
-          }
-        });
-      });
-    }
-
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
-    const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
-    const isTouchOnly = hasCoarsePointer && !hasFinePointer;
-    const isSmallScreen = window.innerWidth <= 768;
-    if (prefersReducedMotion.matches || isTouchOnly || isSmallScreen) return;
-
-    const enableSmoothWheelFallback = () => {
-      const state = {
-        target: window.scrollY || 0,
-        current: window.scrollY || 0,
-        max: Math.max(0, document.documentElement.scrollHeight - window.innerHeight),
-        active: false,
-        rafId: null,
-        enabled: true,
-      };
-
-      const updateMax = () => {
-        state.max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-      };
-
-      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-
-      const syncScroll = () => {
-        if (state.active) return;
-        state.current = window.scrollY || 0;
-        state.target = state.current;
-      };
-
-      const animate = () => {
-        if (!state.active || !state.enabled) return;
-        const delta = state.target - state.current;
-        state.current += delta * 0.12;
-        if (Math.abs(delta) < 0.5) {
-          state.current = state.target;
-          window.scrollTo(0, state.current);
-          state.active = false;
-          return;
-        }
-        window.scrollTo(0, state.current);
-        if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.update();
-        state.rafId = requestAnimationFrame(animate);
-      };
-
-      const onWheel = (event) => {
-        if (!state.enabled) return;
-        if (event.ctrlKey) return;
-        if (event.deltaMode === 0 && Math.abs(event.deltaY) < 40) return;
-        event.preventDefault();
-        updateMax();
-        let delta = event.deltaY;
-        if (event.deltaMode === 1) delta *= 48;
-        if (event.deltaMode === 2) delta *= window.innerHeight * 0.9;
-        state.target = clamp(state.target + delta, 0, state.max);
-        if (!state.active) {
-          state.active = true;
-          state.rafId = requestAnimationFrame(animate);
-        }
-      };
-
-      const start = () => {
-        if (state.enabled) return;
-        state.enabled = true;
-        syncScroll();
-      };
-
-      const stop = () => {
-        state.enabled = false;
-        state.active = false;
-        if (state.rafId) cancelAnimationFrame(state.rafId);
-        state.rafId = null;
-      };
-
-      window.addEventListener('wheel', onWheel, { passive: false });
-      window.addEventListener('resize', updateMax);
-      window.addEventListener('scroll', syncScroll, { passive: true });
-
-      return { start, stop };
-    };
-
-    if (typeof LocomotiveScroll !== 'undefined') {
-
-      const locomotiveScroll = new LocomotiveScroll({
-        lenisOptions: {
-          duration: 1.2,
-          easing: (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
-          direction: 'vertical',
-          smooth: true,
-          smoothWheel: true,
-          smoothTouch: false,
-          touchMultiplier: 1.2,
-          wheelMultiplier: 1.1,
-          normalizeWheel: true,
-        },
-      });
-
-      const lenis = locomotiveScroll.lenis || null;
-      const updateScroll = () => {
-        if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.update();
-      };
-      if (lenis && typeof lenis.on === 'function') {
-        lenis.on('scroll', updateScroll);
-      } else if (typeof locomotiveScroll.on === 'function') {
-        locomotiveScroll.on('scroll', updateScroll);
-      }
-
-      prefersReducedMotion.addEventListener('change', (event) => {
-        if (event.matches) {
-          if (lenis && typeof lenis.stop === 'function') lenis.stop();
-        } else if (lenis && typeof lenis.start === 'function') {
-          lenis.start();
-        }
-      });
-
-      if (lenis && typeof lenis.raf === 'function') {
-        const raf = (time) => {
-          lenis.raf(time);
-          requestAnimationFrame(raf);
-        };
-        requestAnimationFrame(raf);
-      }
-      window.lenis = lenis;
-      window.locomotiveScroll = locomotiveScroll;
-    } else {
-      const fallback = enableSmoothWheelFallback();
-      window.lenis = {
-        start: fallback.start,
-        stop: fallback.stop,
-      };
-    }
-  };
-</script>
-
-<script defer>
-  (function () {
-    const section = document.getElementById("how");
-    if (!section) return;
-    const cards = Array.from(section.querySelectorAll(".how-it-works-bg .card"));
-    if (!cards.length) return;
-
-    const speed = 0.22;
-    const smoothing = 0.12;
-    const items = cards.map((card) => ({
-      card,
-      target: 0,
-      current: 0,
-    }));
-
-    const updateTargets = () => {
-      items.forEach((item) => {
-        const rect = item.card.getBoundingClientRect();
-        if (rect.bottom < 0 || rect.top > window.innerHeight) {
-          item.target = 0;
-          return;
-        }
-        const offset = rect.top + rect.height / 2 - window.innerHeight / 2;
-        item.target = -offset * speed;
-      });
-    };
-
-    const render = () => {
-      items.forEach((item) => {
-        item.current += (item.target - item.current) * smoothing;
-        item.card.style.transform = `translate3d(0, ${item.current}px, 0)`;
-      });
-      requestAnimationFrame(render);
-    };
-
-    updateTargets();
-    render();
-    if (typeof registerScrollHandler === "function") {
-      registerScrollHandler(updateTargets);
-    }
-    window.addEventListener("resize", updateTargets);
-  })();
-</script>
-
-<script defer>
-  document.addEventListener("DOMContentLoaded", () => {
-    const toggles = document.querySelectorAll(".hiw-toggle");
-    const backs = document.querySelectorAll(".hiw-toggle-back");
-
-    toggles.forEach(t => {
-      t.addEventListener("click", e => {
-        e.preventDefault();
-
-        const section = t.dataset.target;
-        const card = t.closest(".hiw-card");
-        const defaultBox = card.querySelector(".hiw-default");
-        const expandedBox = card.querySelector(`.hiw-expanded[data-section="${section}"]`);
-
-        defaultBox.classList.add("fade-out");
-
-        setTimeout(() => {
-          defaultBox.style.display = "none";
-          expandedBox.style.display = "block";
-
-          requestAnimationFrame(() => expandedBox.classList.add("show"));
-          card.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }, 600);
-      });
-    });
-
-    backs.forEach(b => {
-      b.addEventListener("click", e => {
-        e.preventDefault();
-
-        const card = b.closest(".hiw-card");
-        const defaultBox = card.querySelector(".hiw-default");
-        const expandedBox = card.querySelector(".hiw-expanded");
-
-        expandedBox.classList.remove("show");
-
-        setTimeout(() => {
-          expandedBox.style.display = "none";
-          defaultBox.style.display = "block";
-
-          requestAnimationFrame(() => defaultBox.classList.remove("fade-out"));
-          card.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }, 600);
-      });
-    });
-  });
-</script>
-
-<script defer>
-  (function () {
-    const readStoredUser = () => {
-      if (typeof window.getStoredUser === "function") return window.getStoredUser();
-      try {
-        const raw = localStorage.getItem("lpc_user");
-        return raw ? JSON.parse(raw) : null;
-      } catch {
-        return null;
-      }
-    };
-
-    const readStoredToken = () => {
-      if (typeof window.getSessionToken === "function") return window.getSessionToken() || "";
-      try {
-        return localStorage.getItem("lpc_token") || "";
-      } catch {
-        return "";
-      }
-    };
-
-    function resolveDashboard(user) {
-      const role = String(user?.role || "").toLowerCase();
-      if (role === "admin") return "admin-dashboard.html";
-      if (role === "paralegal") return "dashboard-paralegal.html";
-      if (role === "attorney") return "dashboard-attorney.html";
-      return "";
-    }
-
-    function updateAuthLink() {
-      const link = document.getElementById("authAction");
-      const logoutBtn = document.getElementById("logoutAction");
-      const signupLink = document.getElementById("signupAction");
-      if (!link) return;
-      const token = readStoredToken();
-      const user = readStoredUser();
-      const dashboard = token && user?.status === "approved" ? resolveDashboard(user) : "";
-
-      if (dashboard) {
-        link.textContent = "Dashboard";
-        link.href = dashboard;
-        link.setAttribute("data-authenticated", "true");
-        if (logoutBtn) logoutBtn.style.display = "inline-flex";
-        if (signupLink) signupLink.style.display = "none";
-      } else {
-        link.textContent = "Sign In";
-        link.href = "login.html";
-        link.removeAttribute("data-authenticated");
-        if (logoutBtn) logoutBtn.style.display = "none";
-        if (signupLink) signupLink.style.display = "inline-flex";
-      }
-    }
-
-    const runUpdate = () => updateAuthLink();
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", runUpdate, { once: true });
-    } else {
-      runUpdate();
-    }
-
-    window.addEventListener("storage", (event) => {
-      if (event.key === "lpc_user" || event.key === "lpc_token") {
-        updateAuthLink();
-      }
-    });
-
-    document.addEventListener("click", (event) => {
-      const logoutBtn = document.getElementById("logoutAction");
-      if (logoutBtn && event.target === logoutBtn) {
-        try {
-          if (window.clearStoredSession) window.clearStoredSession();
-          else {
-            localStorage.removeItem("lpc_token");
-            localStorage.removeItem("lpc_user");
-          }
-        } catch (err) {
-          console.warn("Unable to clear session", err);
-        }
-        updateAuthLink();
-        window.location.href = "index.html";
-      }
-    });
-  })();
-</script>
-
-<script defer>
-  let scrollTicking = false;
-
-  window.addEventListener("scroll", () => {
-    if (!scrollTicking) {
-      window.requestAnimationFrame(() => {
-        if (typeof handleScrollAnimations === "function") {
-          handleScrollAnimations();
-        }
-        scrollTicking = false;
-      });
-      scrollTicking = true;
-    }
-  }, { passive: true });
-</script>
-
-<script defer>
-  document.addEventListener("DOMContentLoaded", () => {
-    if (typeof initHeroSlider === "function") {
-      initHeroSlider();
-    }
-    if (typeof initFadeIns === "function") {
-      initFadeIns();
-    }
-
-    window.addEventListener("load", () => {
-      try {
-        if (window.Webflow && Webflow.require) {
-          const ix2 = Webflow.require("ix2");
-          if (ix2 && ix2.init) ix2.init();
-        }
-      } catch (e) {
-        console.warn("Webflow IX2 init error:", e);
-      }
-
-      if (typeof gsap !== "undefined" && typeof ScrollTrigger !== "undefined") {
-        if (typeof initGSAPAnimations === "function") {
-          initGSAPAnimations();
-        }
-      }
-
-    });
-  });
-</script>
-
-<script defer>
-  document.addEventListener("DOMContentLoaded", () => {
-    const lightbox = document.getElementById("imageLightbox");
-    if (!lightbox) return;
-    const lightboxImg = lightbox.querySelector("img");
-    if (!lightboxImg) return;
-    const prevButton = lightbox.querySelector(".lightbox-prev");
-    const nextButton = lightbox.querySelector(".lightbox-next");
-    const zoomImages = Array.from(document.querySelectorAll(".dashboard-preview-zoom"));
-    let currentIndex = -1;
-
-    const pauseMotion = () => {
-      if (window.lenis && typeof window.lenis.stop === "function") {
-        window.lenis.stop();
-      } else if (window.locomotiveScroll && typeof window.locomotiveScroll.stop === "function") {
-        window.locomotiveScroll.stop();
-      }
-      if (window.ScrollTrigger && typeof window.ScrollTrigger.getAll === "function") {
-        window.ScrollTrigger.getAll().forEach((trigger) => trigger.disable(false));
-      }
-    };
-
-    const resumeMotion = () => {
-      if (window.lenis && typeof window.lenis.start === "function") {
-        window.lenis.start();
-      } else if (window.locomotiveScroll && typeof window.locomotiveScroll.start === "function") {
-        window.locomotiveScroll.start();
-      }
-      if (window.ScrollTrigger && typeof window.ScrollTrigger.getAll === "function") {
-        window.ScrollTrigger.getAll().forEach((trigger) => trigger.enable(false));
-        if (typeof window.ScrollTrigger.refresh === "function") {
-          window.ScrollTrigger.refresh();
-        }
-      }
-    };
-
-    const showIndex = (index) => {
-      if (!zoomImages.length) return;
-      currentIndex = (index + zoomImages.length) % zoomImages.length;
-      const img = zoomImages[currentIndex];
-      lightboxImg.src = img.src;
-      lightboxImg.alt = img.alt || "Dashboard preview";
-    };
-
-    const openLightbox = (img) => {
-      const startIndex = zoomImages.indexOf(img);
-      showIndex(startIndex >= 0 ? startIndex : 0);
-      lightboxImg.style.transform = "translateX(0)";
-      lightboxImg.style.transition = "transform 0.25s ease";
-      lightbox.classList.add("open");
-      lightbox.setAttribute("aria-hidden", "false");
-      document.body.classList.add("lightbox-open");
-      pauseMotion();
-    };
-
-    const closeLightbox = () => {
-      lightbox.classList.remove("open");
-      lightbox.setAttribute("aria-hidden", "true");
-      document.body.classList.remove("lightbox-open");
-      lightboxImg.src = "";
-      lightboxImg.style.transform = "translateX(0)";
-      currentIndex = -1;
-      resumeMotion();
-    };
-
-    document.querySelectorAll(".dashboard-preview-zoom").forEach((img) => {
-      img.addEventListener("click", () => openLightbox(img));
-    });
-
-    if (prevButton) {
-      prevButton.addEventListener("click", (event) => {
-        event.stopPropagation();
-        showIndex(currentIndex - 1);
-      });
-    }
-
-    if (nextButton) {
-      nextButton.addEventListener("click", (event) => {
-        event.stopPropagation();
-        showIndex(currentIndex + 1);
-      });
-    }
-
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let dragDeltaX = 0;
-    let dragDeltaY = 0;
-    let isDragging = false;
-    let isHorizontal = null;
-    let suppressClick = false;
-    const swipeThreshold = 60;
-
-    const endDrag = () => {
-      if (!isDragging) return;
-      lightboxImg.style.transition = "transform 0.25s ease";
-      if (isHorizontal && Math.abs(dragDeltaX) > swipeThreshold) {
-        if (dragDeltaX < 0) {
-          showIndex(currentIndex + 1);
-        } else {
-          showIndex(currentIndex - 1);
-        }
-      }
-      lightboxImg.style.transform = "translateX(0)";
-      isDragging = false;
-      isHorizontal = null;
-      if (suppressClick) {
-        setTimeout(() => {
-          suppressClick = false;
-        }, 0);
-      }
-    };
-
-    lightboxImg.addEventListener("click", (event) => {
-      if (suppressClick) {
-        event.stopPropagation();
-        return;
-      }
-      event.stopPropagation();
-      showIndex(currentIndex + 1);
-    });
-
-    lightboxImg.addEventListener("touchstart", (event) => {
-      const touch = event.touches[0];
-      if (!touch) return;
-      touchStartX = touch.clientX;
-      touchStartY = touch.clientY;
-      dragDeltaX = 0;
-      dragDeltaY = 0;
-      isDragging = true;
-      isHorizontal = null;
-      suppressClick = false;
-      lightboxImg.style.transition = "none";
-    }, { passive: true });
-
-    lightboxImg.addEventListener("touchmove", (event) => {
-      if (!isDragging) return;
-      const touch = event.touches[0];
-      if (!touch) return;
-      dragDeltaX = touch.clientX - touchStartX;
-      dragDeltaY = touch.clientY - touchStartY;
-      if (isHorizontal === null) {
-        if (Math.abs(dragDeltaX) > 6 || Math.abs(dragDeltaY) > 6) {
-          isHorizontal = Math.abs(dragDeltaX) > Math.abs(dragDeltaY);
-        }
-      }
-      if (!isHorizontal) return;
-      event.preventDefault();
-      lightboxImg.style.transform = `translateX(${dragDeltaX}px)`;
-      if (Math.abs(dragDeltaX) > 8) {
-        suppressClick = true;
-      }
-    }, { passive: false });
-
-    lightboxImg.addEventListener("touchend", () => {
-      endDrag();
-    }, { passive: true });
-
-    lightboxImg.addEventListener("touchcancel", () => {
-      endDrag();
-    }, { passive: true });
-
-    lightbox.addEventListener("click", (event) => {
-      if (event.target === lightbox) {
-        closeLightbox();
-      }
-    });
-
-    document.addEventListener("keydown", (event) => {
-      if (!lightbox.classList.contains("open")) return;
-      if (event.key === "Escape") {
-        closeLightbox();
-      }
-      if (event.key === "ArrowRight") {
-        showIndex(currentIndex + 1);
-      }
-      if (event.key === "ArrowLeft") {
-        showIndex(currentIndex - 1);
-      }
-    });
-  });
-</script>
-
-<script defer>
-  (function () {
-    const section = document.getElementById("dashboard-preview");
-    if (!section) return;
-    const bg = section.querySelector(".dashboard-preview__parallax-bg");
-    const cards = Array.from(section.querySelectorAll(".dashboard-shot"));
-
-    const updatePreviewParallax = () => {
-      const rect = section.getBoundingClientRect();
-      const viewport = window.innerHeight || 0;
-      const total = rect.height + viewport;
-      if (!total) return;
-      const progress = (viewport - rect.top) / total;
-      const clamped = Math.max(0, Math.min(1, progress));
-      const bgOffset = (clamped - 0.5) * 140;
-      const cardOffset = (clamped - 0.5) * 70;
-
-      if (bg) {
-        bg.style.transform = `translateY(${bgOffset}px)`;
-      }
-
-      cards.forEach((card) => {
-        card.style.setProperty("--preview-parallax", `${cardOffset}px`);
-      });
-    };
-
-    if (typeof registerScrollHandler === "function") {
-      registerScrollHandler(updatePreviewParallax);
-    }
-    window.addEventListener("resize", updatePreviewParallax);
-    updatePreviewParallax();
-  })();
-</script>
-
-<script defer>
-  document.addEventListener("DOMContentLoaded", () => {
-    const whoText = document.getElementById("whoText");
-    const toggle = document.querySelector(".who-expand");
-    if (!whoText || !toggle) return;
-
-    const updateToggle = (expanded) => {
-      toggle.textContent = expanded ? "Collapse" : "Expand";
-      toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
-    };
-
-    toggle.addEventListener("click", () => {
-      const expanded = whoText.classList.toggle("is-expanded");
-      updateToggle(expanded);
-    });
-  });
-</script>
-  <script src="assets/scripts/accessibility-toggle.js"></script>
+  </footer>
+
+  <script src="assets/scripts/homepage-map.js?v=20260929-dot-pulse-1" defer></script>
+  <script src="assets/scripts/homepage.js?v=20260924-header-section" defer></script>
+  <script src="assets/scripts/homepage-assistant.js?v=20260929-review-copy" defer></script>
+  <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
 </html>

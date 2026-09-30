@@ -3,12 +3,13 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0B2A4A">
   <meta charset="UTF-8" />
-  <title>Sign Up – Let’s-ParaConnect</title>
+  <title>Create an account – Let’s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
@@ -16,15 +17,17 @@
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="preload" as="image" href="hero-mountain.jpg" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>
+  <link href="assets/styles/auth-matter-field.css?v=20260826-darker-field" rel="stylesheet" />
+  <link href="assets/styles/auth-google.css?v=20260730" rel="stylesheet" />
+  <script src="assets/scripts/auth-matter-field.js?v=20260826-navy-auth" defer></script>
+  <script async defer src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>
 
     <style>
-    .gold{color:var(--gold);}
-    .accent-apostrophe{color:var(--gold);}
+    .gold{color:var(--auth-accent);}
+    .accent-apostrophe{color:#6495ed;}
     :root {
-      --gold: #887244;
+      --auth-accent: #6495ed;
       --navy: #27394d;
       --line: #e8edf3;
       --muted: #64748b;
@@ -40,27 +43,91 @@
     html, body {
       margin: 0;
       padding: 0;
-      height: 100%;
+      min-height: 100%;
+      height: auto;
       width: 100%;
+      max-width: 100%;
       overflow-x: hidden;
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
-      background: url('hero-mountain.jpg') no-repeat center center fixed;
-      background-size: cover;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(100, 149, 237, 0.13), transparent 34%),
+        linear-gradient(180deg, #fff 0%, #f0f5ff 100%);
     }
 
     .overlay {
       display: flex;
-      height: 100vh;
-      width: 100vw;
-      backdrop-filter: blur(5px);
-      background-color: rgba(0, 0, 0, 0.2);
+      align-items: center;
+      padding-block: 24px;
+      min-height: 100vh;
+      min-height: 100dvh;
+      width: 100%;
+      max-width: 100%;
+      background: #0d1723;
+    }
+
+    .signup-page .overlay::after {
+      background: rgba(13, 23, 35, 0.16);
+    }
+
+    .signup-aside-copy {
+      position: absolute;
+      z-index: 2;
+      inset: 0 0 0 42%;
+      display: grid;
+      place-items: center;
+      padding: clamp(48px, 7vw, 112px);
+      pointer-events: none;
+    }
+
+    .signup-aside-copy__inner {
+      width: min(100%, 540px);
+    }
+
+    .signup-aside-copy__title {
+      max-width: none;
+      margin: 0;
+      color: #f8f6f1;
+      font-family: "Cormorant Garamond", serif;
+      font-size: clamp(3.8rem, 5.6vw, 6rem);
+      font-weight: 300;
+      letter-spacing: -0.045em;
+      line-height: 0.94;
+      text-wrap: balance;
+    }
+
+    .signup-aside-copy__title span {
+      display: block;
+    }
+
+    .signup-aside-copy__title span:first-child {
+      white-space: nowrap;
+    }
+
+    .signup-aside-copy__title em {
+      font-style: italic;
+      font-weight: 300;
+    }
+
+    .signup-aside-copy__text {
+      max-width: 46ch;
+      margin: 28px 0 0;
+      color: rgba(248, 246, 241, .7);
+      font-family: "Sarabun", sans-serif;
+      font-size: clamp(1rem, 1.3vw, 1.16rem);
+      font-weight: 200;
+      letter-spacing: .005em;
+      line-height: 1.6;
     }
 
     .left-panel {
-      width: 50%;
-      background-color: rgba(255, 255, 255, 0.95);
-      padding: 60px;
+      width: 42%;
+      flex-shrink: 0;
+      margin-left: clamp(16px, 2.34vw, 40px);
+      min-height: 0;
+      border-radius: 24px;
+      background-color: #fff;
+      padding: 60px clamp(34px, 3.2vw, 52px);
       display: flex;
       justify-content: center;
       align-items: center;
@@ -71,6 +138,10 @@
     .form-container {
       max-width: 420px;
       width: 100%;
+    }
+
+    .form-container [hidden] {
+      display: none !important;
     }
 
     .brand-fixed {
@@ -93,6 +164,17 @@
       font-weight: 300;
       color: var(--navy);
       margin-bottom: 1.2rem;
+    }
+
+    #signupHeading {
+      font-size: clamp(2.35rem, 3.4vw, 2.9rem);
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      text-wrap: balance;
+    }
+
+    #signupHeading em {
+      font-weight: 300;
     }
 
     label {
@@ -159,10 +241,10 @@
     .role-note.pricing-note {
       margin: 12px 0 18px;
       padding: 10px 12px;
-      border: 1px solid rgba(180, 151, 90, 0.35);
+      border: 1px solid rgba(100, 149, 237, 0.35);
       border-radius: 10px;
-      background: #faf7ef;
-      color: #6b5b3f;
+      background: #eef3fd;
+      color: #385b96;
       font-size: 0.9rem;
     }
 
@@ -183,6 +265,7 @@
     input[type="tel"],
     input[type="url"] {
       width: 100%;
+      min-height: 50px;
       padding: 0.7rem 0.85rem;
       font-size: 0.95rem;
       border: 1px solid var(--line);
@@ -195,13 +278,21 @@
     }
 
     input:focus {
-      border-color: var(--gold);
-      box-shadow: 0 0 0 3px rgba(180, 151, 90, 0.15);
+      border-color: var(--auth-accent);
+      box-shadow: 0 0 0 3px rgba(100, 149, 237, 0.15);
       outline: none;
+    }
+
+    input:focus-visible,
+    .select-field:focus-visible {
+      border-color: var(--lpc-focus);
+      outline: 2px solid var(--lpc-focus);
+      outline-offset: 2px;
     }
 
     .select-field {
       width: 100%;
+      min-height: 50px;
       padding: 0.7rem 0.85rem;
       font-size: 0.95rem;
       border: 1px solid var(--line);
@@ -221,9 +312,15 @@
     }
 
     .select-field:focus {
-      border-color: var(--gold);
-      box-shadow: 0 0 0 3px rgba(180, 151, 90, 0.15);
+      border-color: var(--auth-accent);
+      box-shadow: 0 0 0 3px rgba(100, 149, 237, 0.15);
       outline: none;
+    }
+
+    .select-field:focus-visible {
+      border-color: var(--lpc-focus);
+      outline: 2px solid var(--lpc-focus);
+      outline-offset: 2px;
     }
 
     .seg {
@@ -236,6 +333,7 @@
     }
 
     .seg button {
+      min-height: 44px;
       flex: 1;
       background: transparent;
       border: 0;
@@ -256,11 +354,15 @@
       position: relative;
     }
 
+    .pw-wrap input { padding-right: 132px; }
+
     .pw-toggle {
       position: absolute;
+      z-index: 1;
+      top: 0;
       right: 12px;
-      top: 37%;
-      transform: translateY(-50%);
+      height: 50px;
+      transform: none;
       font-family: Sarabun;
       font-size: 0.9rem;
       font-weight: 200;
@@ -268,6 +370,41 @@
       background: transparent;
       border: 0;
       cursor: pointer;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .password-guidance {
+      margin: -6px 2px 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 180ms ease, visibility 180ms ease;
+    }
+
+    .password-guidance.is-visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .password-guidance__meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .password-hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.72rem;
+      line-height: 1.35;
+    }
+
+    .caps-lock-note {
+      margin: 6px 0 0;
+      color: #6495ed;
+      font-size: 0.72rem;
     }
 
     .step-panel {
@@ -291,31 +428,32 @@
     }
 
     .btn {
-      background-color: transparent;
-      color: var(--navy);
-      border: 0.02px solid transparent;
+      min-height: 50px;
+      border: 1px solid var(--navy);
+      border-radius: 8px;
+      background-color: var(--navy);
+      color: #fff;
       padding: 0.75rem 1rem;
       display: block;
       margin: 1.2rem auto 0;
-      width: auto;
+      width: 100%;
       text-align: center;
       font-size: 0.95rem;
       font-family: Sarabun;
-      font-weight: 200;
-      transition: background-color 0.4s ease, transform 0.3s ease, border-color 0.3s ease;
+      font-weight: 500;
+      transition: background-color 0.16s ease, border-color 0.16s ease;
       cursor: pointer;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.01em;
     }
 
     .btn:hover {
-      background-color: #ffffff;
-      color: #1a2230;
-      border-color: #1a2230;
-      transform: scale(1.01);
+      background-color: #1d2b3b;
+      color: #fff;
+      border-color: #1d2b3b;
     }
 
     .btn:focus-visible {
-      outline: 2px solid var(--gold);
+      outline: 2px solid var(--lpc-focus);
       outline-offset: 2px;
     }
 
@@ -346,7 +484,7 @@
     }
 
     .extra-links a {
-      color: var(--gold);
+      color: var(--auth-accent);
       text-decoration: none;
     }
 
@@ -360,15 +498,131 @@
       overflow: hidden;
     }
 
-    .prelaunch-note {
+    .account-pricing-note {
       color: var(--muted);
       margin-bottom: 1.25rem;
       line-height: 1.5;
     }
 
+    .attorney-minimum-disclosure {
+      margin: 4px 0 20px;
+      padding: 15px 17px;
+      border: 1px solid rgba(172, 145, 86, 0.3);
+      border-radius: 12px;
+      background: #eef3fd;
+    }
+
+    .attorney-minimum-disclosure__label {
+      display: block;
+      margin-bottom: 2px;
+      color: #8a7445;
+      font-size: 0.68rem;
+      font-weight: 400;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .attorney-minimum-disclosure__amount {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--navy);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2.25rem, 5vw, 3rem);
+      font-weight: 400;
+      line-height: 0.95;
+    }
+
+    .attorney-minimum-disclosure p,
+    .paralegal-fee-disclosure p,
+    .attorney-submit-legal {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 200;
+      line-height: 1.5;
+    }
+
+    .attorney-submit-legal {
+      margin-top: 11px;
+      text-align: center;
+    }
+
+    .attorney-submit-legal a {
+      color: var(--auth-accent);
+      text-decoration: none;
+    }
+
+    .attorney-submit-legal a:hover,
+    .attorney-submit-legal a:focus-visible {
+      text-decoration: underline;
+    }
+
+    .attorney-submit-legal a:focus-visible {
+      outline: 2px solid var(--lpc-focus);
+      outline-offset: 2px;
+    }
+
+    .paralegal-fee-disclosure__headline {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--navy);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.45rem;
+      font-weight: 400;
+      line-height: 1.08;
+    }
+
+    .upload-placeholder--application small {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 200;
+    }
+
     .name-row {
       display: flex;
+      flex-direction: column;
       gap: 16px;
+    }
+
+    .name-row.attorney-credentials-row {
+      flex-direction: row;
+      gap: 12px;
+    }
+
+    .attorney-credentials-row input,
+    .attorney-credentials-row .select-field {
+      margin-bottom: 0;
+    }
+
+    .attorney-details-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .attorney-details-row .field-col {
+      flex: 1;
+      min-width: 0;
+    }
+
+    #attorneyPricingText {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+      text-align: left;
+    }
+
+    .signup-page.attorney-step-two .left-panel {
+      padding-bottom: 96px;
+    }
+
+    .signup-page.attorney-step-two #attorneySubmitLegal {
+      position: absolute;
+      left: 50%;
+      bottom: 24px;
+      width: min(420px, calc(100% - 68px));
+      transform: translateX(-50%);
     }
 
     .name-row .field-col {
@@ -421,20 +675,144 @@
       font-weight: 300;
     }
 
+    .signup-confirmation {
+      padding: 8px 0 4px;
+      color: var(--navy);
+    }
+
+    .signup-confirmation__eyebrow {
+      margin: 0 0 10px;
+      color: var(--auth-accent);
+      font-size: .72rem;
+      font-weight: 400;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+
+    .signup-confirmation h2 {
+      max-width: 11ch;
+      margin: 0 0 18px;
+      font-size: clamp(2.7rem, 4.4vw, 3.6rem);
+      letter-spacing: -.035em;
+      line-height: .96;
+    }
+
+    .signup-confirmation__lead {
+      margin: 0;
+      color: #4d5d70;
+      font-size: 1rem;
+      font-weight: 300;
+      line-height: 1.62;
+    }
+
+    .signup-confirmation__email {
+      color: var(--navy);
+      overflow-wrap: anywhere;
+    }
+
+    .signup-confirmation__actions {
+      margin-top: 34px;
+      padding-top: 22px;
+      border-top: 1px solid var(--line);
+    }
+
+    .signup-confirmation__home {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      color: var(--auth-accent);
+      text-underline-offset: 4px;
+    }
+
+    button.signup-confirmation__home {
+      border: 0;
+      background: transparent;
+      padding: 0;
+      font: inherit;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    #paralegalExperience {
+      background-image: none;
+      padding-right: 14px;
+    }
+
     @media (max-width: 768px) {
+      html,
+      body {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: clip;
+      }
+
       .overlay {
+        width: 100%;
+        max-width: 100%;
         flex-direction: column;
+        justify-content: center;
+        background: #0d1723;
+        overflow-x: clip;
+      }
+
+      .signup-page .overlay::after {
+        display: none;
       }
 
       .left-panel {
-        width: 100%;
-        padding: 40px 24px;
+        width: calc(100% - 32px);
+        margin-left: 0;
+        max-width: 100%;
+        min-width: 0;
+        min-height: 0;
+        padding: 88px 8px 48px;
+        background-color: #ffffff;
+        overflow-x: clip;
       }
 
+      .form-container,
+      .form-step,
+      form,
+      fieldset,
+      .field-col,
+      input,
+      select,
+      textarea,
+      button {
+        max-width: 100%;
+        min-width: 0;
+      }
+
+      .brand-fixed { left: 16px; }
+
+      .signup-aside-copy {display:none}
+
+      .signup-confirmation { padding-top: 20px; }
+
       .name-row {
-      flex-direction: column;
+        flex-direction: column;
+      }
+
+      .name-row.attorney-credentials-row {
+        flex-direction: column;
+      }
+
+      .attorney-details-row {
+        flex-direction: column;
+        gap: 0;
+      }
+
+      .signup-page.attorney-step-two .left-panel {
+        padding-bottom: 48px;
+      }
+
+      .signup-page.attorney-step-two #attorneySubmitLegal {
+        position: static;
+        width: auto;
+        transform: none;
+      }
+
     }
-  }
 
     /* Style ONLY the file input button */
     input[type="file"] {
@@ -451,7 +829,7 @@
       background: white;
       color: #333;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     }
 
     input[type="file"]::file-selector-button:hover {
@@ -463,57 +841,89 @@
       outline: none;
       border-color: #999;
     }
+    @media (max-width: 700px) {
+      .signin-link a,
+      .form-step p a { min-height: 44px; display: inline-flex; align-items: center; }
+    }
   </style>
 
   <script type="module" src="assets/scripts/auth.js"></script>
+  <link rel="stylesheet" href="assets/styles/auth-entry.css?v=20260925-public-polish" />
+  <link rel="stylesheet" href="assets/styles/auth-workspace-preview.css?v=20260925-contrast" />
 </head>
 
-<body class="signup-page" data-public-page="true">
+<body class="signup-page auth-entry" data-public-page="true">
   <a class="skip-link" href="#main">Skip to main content</a>
-  <a href="index.html" class="brand-fixed">Let<span class="accent-apostrophe">’</span>s-ParaConnect</a>
-  <div class="overlay" id="main" role="main" tabindex="-1">
+  <main class="overlay" id="main" tabindex="-1">
     <div class="left-panel">
+      <a href="index.html" class="brand-fixed">Let<span class="accent-apostrophe">’</span>s-ParaConnect</a>
       <div class="form-container fade-in">
-        <p class="prelaunch-note">
-          All signups and accounts are free. No payments, no subscriptions.
-        </p>
-        <h1>Create your account</h1>
+        <p class="account-pricing-note" id="signupIntroduction" hidden></p>
+        <h1 id="signupHeading">Create your account, <em>it’s free.</em></h1>
 
-        <div class="seg" role="tablist" aria-label="Choose role">
-          <button id="btnA" role="tab" aria-selected="true" aria-pressed="true" data-role="attorney">Attorney</button>
-          <button id="btnP" role="tab" aria-selected="false" aria-pressed="false" data-role="paralegal">Paralegal</button>
+        <div id="stepOneOptions">
+          <div class="seg" role="group" aria-label="Choose account role">
+            <button id="btnA" type="button" aria-pressed="true" data-role="attorney" data-public-action="secondary" data-action-shape="control">Attorney</button>
+            <button id="btnP" type="button" aria-pressed="false" data-role="paralegal" data-public-action="secondary" data-action-shape="control">Paralegal</button>
+          </div>
+
+          <a id="googleSignupButton" class="google-auth-button" href="/api/auth/google?intent=signup&amp;role=attorney" data-public-action="secondary" data-action-shape="control">
+            <svg viewBox="0 0 18 18" aria-hidden="true">
+              <path fill="#4285F4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.482h4.844a4.14 4.14 0 0 1-1.797 2.715v2.258h2.909c1.702-1.567 2.684-3.876 2.684-6.614Z"/>
+              <path fill="#34A853" d="M9 18c2.43 0 4.468-.806 5.956-2.181l-2.909-2.258c-.806.54-1.835.859-3.047.859-2.344 0-4.329-1.585-5.039-3.714H.953v2.332A9 9 0 0 0 9 18Z"/>
+              <path fill="#FBBC05" d="M3.961 10.706A5.41 5.41 0 0 1 3.679 9c0-.592.102-1.168.282-1.706V4.962H.953A9 9 0 0 0 0 9c0 1.452.347 2.827.953 4.038l3.008-2.332Z"/>
+              <path fill="#EA4335" d="M9 3.58c1.321 0 2.507.454 3.441 1.346l2.581-2.581C13.464.892 11.425 0 9 0A9 9 0 0 0 .953 4.962l3.008 2.332C4.671 5.165 6.656 3.58 9 3.58Z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </a>
+          <div class="auth-divider"><span>or</span></div>
         </div>
 
         <form id="signupForm" novalidate>
           <div id="stepOnePanel" class="step-panel">
             <div class="name-row">
               <div class="field-col">
-                <input id="firstName" type="text" autocomplete="given-name" placeholder="First name" required />
-              </div>
-              <div class="field-col">
-                <input id="lastName" type="text" autocomplete="family-name" placeholder="Last name" required />
+                <input id="fullName" type="text" autocomplete="name" placeholder="Full name" aria-label="Full name" required />
               </div>
             </div>
 
+            <label class="sr-only" for="email">Email address</label>
             <input id="email" type="email" autocomplete="email" placeholder="Email" required />
 
             <div class="pw-wrap">
-              <input id="password" type="password" autocomplete="new-password" placeholder="Password" required />
-              <button id="togglePw" class="pw-toggle" aria-controls="password">Show</button>
+              <label class="sr-only" for="password">Password</label>
+              <input id="password" type="password" autocomplete="new-password" placeholder="Password" minlength="8" maxlength="128" required />
+              <button id="togglePw" class="pw-toggle" type="button" aria-controls="password" aria-pressed="false" data-public-action="icon">Show password</button>
             </div>
-            <input id="passwordConfirm" type="password" autocomplete="new-password" placeholder="Confirm password" required />
+            <div id="passwordGuidance" class="password-guidance" aria-live="polite" aria-hidden="true">
+              <div class="password-guidance__meta">
+                <p class="password-hint">8+ characters</p>
+              </div>
+              <div id="capsLockNote" class="caps-lock-note" hidden>Caps Lock is on</div>
+            </div>
 
-            <button id="nextStepBtn" class="btn" type="button">Next →</button>
+            <button id="nextStepBtn" class="btn" type="button" data-public-action="primary" data-action-shape="control">Continue</button>
+            <div id="msg" class="msg" role="status" aria-live="polite"></div>
             <div class="extra-links">
-              <p>Already have an account? <a href="login.html">Log in</a></p>
+              <p>Already have an account? <a href="login.html">Sign in</a></p>
             </div>
           </div>
 
-          <div id="stepTwoPanel" class="step-panel hidden-step">
-            <p class="step-note">We require this information to complete verification before approval.</p>
-            <div id="signupStateWrap">
-              <label for="signupState"><span class="sr-only">State</span></label>
-              <select id="signupState" name="state" class="select-field" required>
+          <div id="stepTwoPanel" class="step-panel hidden-step" hidden inert aria-hidden="true">
+            <aside class="attorney-minimum-disclosure" id="attorneyMinimumDisclosure" hidden aria-labelledby="attorneyMinimumLabel">
+              <span class="attorney-minimum-disclosure__label" id="attorneyMinimumLabel">Matter minimum</span>
+              <strong class="attorney-minimum-disclosure__amount">$400</strong>
+              <p>Every matter requires at least $400 in compensation for the paralegal’s work. A 22% attorney platform fee is added when you hire.</p>
+            </aside>
+            <aside class="attorney-minimum-disclosure paralegal-fee-disclosure" id="paralegalFeeDisclosure" hidden aria-labelledby="paralegalFeeLabel">
+              <span class="attorney-minimum-disclosure__label" id="paralegalFeeLabel">No cost to join</span>
+              <strong class="paralegal-fee-disclosure__headline">18% deducted from completed, paid work</strong>
+              <p>There is no upfront cost. LPC’s 18% paralegal platform fee is deducted from matter compensation before payout, after completed work is approved.</p>
+            </aside>
+            <div class="name-row paralegal-core-row" id="paralegalCoreRow">
+              <div id="signupStateWrap">
+                <label for="signupState"><span class="sr-only">State</span></label>
+                <select id="signupState" name="state" class="select-field" required>
                 <option value="">Select state</option>
                 <option value="AL">Alabama</option>
                 <option value="AK">Alaska</option>
@@ -566,35 +976,27 @@
                 <option value="WV">West Virginia</option>
                 <option value="WI">Wisconsin</option>
                 <option value="WY">Wyoming</option>
-              </select>
+                </select>
+              </div>
+              <div id="paralegalExperienceWrap" hidden>
+                <label for="paralegalExperience" class="field-label">Completed years of paralegal experience</label>
+                <input id="paralegalExperience" class="select-field" type="number" min="0" max="80" step="1" required />
+              </div>
             </div>
             <div id="roleFieldWrap"></div>
 
-            <label class="terms-label" style="margin-top:16px;display:flex;align-items:flex-start;gap:8px;font-size:0.9rem;font-weight:200;color:var(--muted);">
-              <input type="checkbox" id="termsAccept" required>
-              <span>I have read and agree to the
-                <a href="terms.html" target="_blank" style="color:var(--gold);text-decoration:none;">Terms of Use</a> and
-                <a href="privacy.html" target="_blank" style="color:var(--gold);text-decoration:none;">Privacy Policy</a>.
-              </span>
-            </label>
+            <p class="attorney-submit-legal" id="attorneyPricingText" hidden>All matters begin at $400 in paralegal compensation. A 22% attorney platform fee is added when you hire.</p>
             <div id="attorneyConfirmWrap" style="display:none;margin-top:10px;">
               <label class="terms-label" style="display:flex;align-items:flex-start;gap:8px;font-size:0.9rem;font-weight:200;color:var(--muted);">
                 <input id="attorneyGoodStanding" type="checkbox" />
                 <span>I confirm that I am an attorney licensed and in good standing in the state listed above.</span>
               </label>
             </div>
-            <div id="attorneyPricingWrap" style="display:none;margin-top:10px;">
-              <label id="attorneyPricingLabel" class="terms-label" style="display:flex;align-items:flex-start;gap:8px;font-size:0.9rem;font-weight:200;color:var(--muted);">
-                <input id="attorneyPricingAck" type="checkbox" required aria-describedby="attorneyPricingError" aria-invalid="false" />
-                <span>I acknowledge that all matters posted on Let’s-ParaConnect require a $400 minimum.</span>
-              </label>
-              <p id="attorneyPricingError" class="inline-validation" role="alert">You must acknowledge the $400 minimum before creating your account.</p>
-            </div>
-
             <div class="turnstile-wrap" aria-hidden="true">
               <div
                 class="cf-turnstile"
                 data-sitekey="0x4AAAAAACND61mi1ZgPWRsA"
+                data-action="signup"
                 data-appearance="execute"
                 data-callback="onTurnstileSignupSuccess"
                 data-error-callback="onTurnstileSignupError"
@@ -603,28 +1005,68 @@
             </div>
 
             <p id="paralegalAdmissionNotice" class="role-note" style="display:none;margin-top:16px;font-size:0.9rem;font-weight:200;color:var(--muted);">
-              Let’s-ParaConnect is a highly curated professional platform. Not all paralegal applications are approved. Learn more about our
-              <a href="/paralegal-admission.html" style="color:var(--gold);text-decoration:none;">Paralegal Admission Requirements</a>.
+              <a href="/paralegal-admission.html" target="_blank" rel="noopener" style="color:var(--auth-accent);text-decoration:none;">Learn more about our application review.</a>
             </p>
-            <button id="submitBtn" class="btn" type="submit">Create Account</button>
-            <div class="extra-links">
-              <p>Already have an account? <a href="login.html">Log in</a></p>
+            <button id="submitBtn" class="btn" type="submit" data-public-action="primary" data-action-shape="control">Submit registration</button>
+            <button id="editSignupBasics" class="signup-confirmation__home" type="button">Edit basic information</button>
+            <p class="attorney-submit-legal" id="attorneySubmitLegal" hidden>By selecting Submit registration, you agree to the <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> and acknowledge that you have read the <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+            <p class="attorney-submit-legal" id="paralegalSubmitLegal" hidden>By selecting Submit application, you agree to the <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> and acknowledge that you have read the <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+            <div class="extra-links" id="stepTwoLoginLink">
+              <p>Already have an account? <a href="login.html">Sign in</a></p>
             </div>
           </div>
 
-          <div id="msg" class="msg" role="status" aria-live="polite"></div>
         </form>
+
+        <section class="signup-confirmation" id="signupConfirmation" aria-labelledby="signupConfirmationTitle" hidden>
+          <p class="signup-confirmation__eyebrow" id="signupConfirmationEyebrow">Application received</p>
+          <h2 id="signupConfirmationTitle" tabindex="-1">Your application is with us.</h2>
+          <p class="signup-confirmation__lead" id="signupConfirmationLead">
+            Your submission has been received for review.
+          </p>
+          <p class="signup-confirmation__email" id="signupConfirmationEmail"></p>
+          <div class="signup-confirmation__actions">
+            <button id="resendSignupVerification" class="signup-confirmation__home" type="button" hidden>Resend verification email</button>
+            <a class="signup-confirmation__home" href="index.html" data-public-action="text">Return home</a>
+          </div>
+          <p id="signupVerificationStatus" role="status" aria-live="polite"></p>
+          <p>Need to correct your submitted email? Contact <a href="mailto:help@lets-paraconnect.com">help@lets-paraconnect.com</a>.</p>
+        </section>
       </div>
     </div>
-  </div>
+    <aside class="signup-aside-copy" aria-label="LPC workspace preview">
+      <div class="auth-story">
+        <p class="auth-story__eyebrow">The LPC workspace</p>
+        <h2 class="auth-story__title">One matter.<br>Everything connected.</h2>
+        <p class="auth-story__text">Work together with clear scope, shared files, and a place for every next step.</p>
+      </div>
+      <figure class="lpc-entry-preview" role="img" aria-label="Illustrative LPC features: a document awaiting review, a paralegal profile, and a conversation about the submitted work. Sample content.">
+        <div class="lpc-entry-preview__canvas">
+        <div class="lpc-closeup lpc-closeup--document" aria-hidden="true">
+          <div class="lpc-closeup__eyebrow"><span class="lpc-closeup__mark">LPC</span><span>Deliverables</span><span class="lpc-closeup__dots">···</span></div>
+          <div class="lpc-closeup__document-title"><strong>Document review.pdf</strong><span>1st Draft · Morgan Ellis</span></div>
+          <div class="lpc-closeup__paper"><span class="lpc-closeup__paper-label">DOCUMENT SUMMARY</span><b>Review &amp; findings</b><i></i><i></i><i class="is-short"></i><div class="lpc-closeup__highlight"><i></i><i class="is-short"></i></div><i></i><i class="is-short"></i></div>
+          <div class="lpc-closeup__document-footer"><span class="lpc-closeup__status"><i></i>Awaiting review</span><span class="lpc-closeup__open">Review <b>↗</b></span></div>
+        </div>
+        <div class="lpc-closeup lpc-closeup--profile" aria-hidden="true">
+          <span class="lpc-closeup__eyebrow">Find a Paralegal</span>
+          <div class="lpc-closeup__person"><span class="lpc-closeup__avatar">ME</span><div><strong>Morgan Ellis</strong><small>Litigation paralegal</small></div></div>
+          <div class="lpc-closeup__skills"><span>Discovery</span><span>Document review</span></div>
+          <div class="lpc-closeup__profile-footer"><span><i></i>Available</span><b>View profile ↗</b></div>
+        </div>
+        <div class="lpc-closeup lpc-closeup--conversation" aria-hidden="true">
+          <div class="lpc-closeup__conversation-heading"><span class="lpc-closeup__avatar lpc-closeup__avatar--small">ME</span><div><strong>Morgan Ellis</strong><small>Document review</small></div><span class="lpc-closeup__dots">···</span></div>
+          <div class="lpc-closeup__bubble">The summary is ready for your review.</div>
+          <div class="lpc-closeup__bubble lpc-closeup__bubble--reply">Thanks. I’ll take a look today.</div>
+          <div class="lpc-closeup__composer"><span>Message Morgan…</span><b>↑</b></div>
+        </div>
+        </div>
+      </figure>
+      <div class="auth-story__footer"><span>Clear scope</span><span>Connected files</span><span>Shared progress</span></div>
+    </aside>
+  </main>
 
   <script>
-    const API_BASE = location.origin + '/api';
-    fetch('/api/csrf', { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => window.__CSRF__ = d.csrfToken)
-      .catch(() => {});
-
     function getTurnstileToken(formEl) {
       const input = formEl?.querySelector('input[name="cf-turnstile-response"]');
       return input?.value?.trim() || "";
@@ -640,34 +1082,80 @@
 
     const btnA = document.getElementById('btnA');
     const btnP = document.getElementById('btnP');
+    const googleSignupButton = document.getElementById('googleSignupButton');
     const form = document.getElementById('signupForm');
+    const signupConfirmation = document.getElementById('signupConfirmation');
+    const signupConfirmationTitle = document.getElementById('signupConfirmationTitle');
+    const signupConfirmationEyebrow = document.getElementById('signupConfirmationEyebrow');
+    const signupConfirmationEmail = document.getElementById('signupConfirmationEmail');
     const msg = document.getElementById('msg');
     const submitBtn = document.getElementById('submitBtn');
     const roleFieldWrap = document.getElementById('roleFieldWrap');
     const admissionNotice = document.getElementById('paralegalAdmissionNotice');
-    const attorneyPricingNotice = document.getElementById('attorneyPricingNotice');
-    const attorneyPricingWrap = document.getElementById('attorneyPricingWrap');
-    const attorneyPricingLabel = document.getElementById('attorneyPricingLabel');
-    const attorneyPricingAck = document.getElementById('attorneyPricingAck');
-    const attorneyPricingError = document.getElementById('attorneyPricingError');
     const togglePw = document.getElementById('togglePw');
     const pw = document.getElementById('password');
-    const pwConfirm = document.getElementById('passwordConfirm');
+    const passwordGuidance = document.getElementById('passwordGuidance');
+    const capsLockNote = document.getElementById('capsLockNote');
     const stepOnePanel = document.getElementById('stepOnePanel');
     const stepTwoPanel = document.getElementById('stepTwoPanel');
     const nextStepBtn = document.getElementById('nextStepBtn');
-    const prelaunchNote = document.querySelector('.prelaunch-note');
+    const accountPricingNote = document.querySelector('.account-pricing-note');
+    const signupHeading = document.getElementById('signupHeading');
+    const stepOneOptions = document.getElementById('stepOneOptions');
+    const stepTwoNote = document.getElementById('stepTwoNote');
+    const attorneyMinimumDisclosure = document.getElementById('attorneyMinimumDisclosure');
+    const paralegalFeeDisclosure = document.getElementById('paralegalFeeDisclosure');
+    const paralegalExperienceWrap = document.getElementById('paralegalExperienceWrap');
+    const attorneySubmitLegal = document.getElementById('attorneySubmitLegal');
+    const attorneyPricingText = document.getElementById('attorneyPricingText');
+    const paralegalSubmitLegal = document.getElementById('paralegalSubmitLegal');
+    const stepTwoLoginLink = document.getElementById('stepTwoLoginLink');
     let msgFadeTimer = null;
     const emailEl = document.getElementById('email');
-    const firstNameEl = document.getElementById('firstName');
-    const lastNameEl = document.getElementById('lastName');
-    const termsCheckbox = document.getElementById('termsAccept');
+    const fullNameEl = document.getElementById('fullName');
     const stateWrap = document.getElementById('signupStateWrap');
     const stateSelect = document.getElementById('signupState');
     const phoneEl = document.getElementById('phoneNumber');
-    emailEl.value = localStorage.getItem('lastEmail') || '';
+    emailEl.value = sessionStorage.getItem('lastEmail') || '';
 
-    let role = 'attorney';
+    const getPasswordRules = (value) => ({
+      started: value.length >= 8,
+      strongLength: value.length >= 8,
+      maxLength: value.length <= 128,
+    });
+
+    const isPasswordValid = (value) => {
+      const rules = getPasswordRules(value);
+      return rules.strongLength && rules.maxLength;
+    };
+
+    const getNameParts = () => {
+      const parts = (fullNameEl?.value || '').trim().split(/\s+/).filter(Boolean);
+      return {
+        firstName: parts[0] || '',
+        lastName: parts.slice(1).join(' '),
+      };
+    };
+
+    const syncPasswordGuidance = () => {
+      if (!pw || !passwordGuidance) return;
+      const shouldShow = pw.value.length > 0;
+      passwordGuidance.classList.toggle('is-visible', shouldShow);
+      passwordGuidance.setAttribute('aria-hidden', String(!shouldShow));
+    };
+
+    pw?.addEventListener('focus', syncPasswordGuidance);
+    pw?.addEventListener('input', syncPasswordGuidance);
+    pw?.addEventListener('blur', syncPasswordGuidance);
+    pw?.addEventListener('keyup', (event) => {
+      if (capsLockNote) capsLockNote.hidden = !event.getModifierState('CapsLock');
+    });
+    syncPasswordGuidance();
+
+    const requestedRole = new URLSearchParams(window.location.search).get('role');
+    let role = requestedRole === 'paralegal' ? 'paralegal' : 'attorney';
+    let googleSignupProfile = null;
+    let googleSignupActive = false;
     let currentStep = 1;
     let submitLocked = false;
 
@@ -676,30 +1164,90 @@
       submitBtn.disabled = submitLocked;
     };
 
-    function setAttorneyPricingValidation(showError) {
-      if (!attorneyPricingAck) return;
-      attorneyPricingAck.setAttribute('aria-invalid', showError ? 'true' : 'false');
-      attorneyPricingLabel?.classList.toggle('validation-error', Boolean(showError));
-      attorneyPricingError?.classList.toggle('show', Boolean(showError));
+    function setStepPanelActive(panel, active) {
+      if (!panel) return;
+      const controls = panel.querySelectorAll('button, input, select, textarea');
+
+      if (!active) {
+        controls.forEach((control) => {
+          if (!control.disabled) {
+            control.dataset.disabledByStepFlow = 'true';
+            control.disabled = true;
+          }
+        });
+        panel.classList.add('hidden-step');
+        panel.hidden = true;
+        panel.setAttribute('inert', '');
+        panel.setAttribute('aria-hidden', 'true');
+        return;
+      }
+
+      panel.hidden = false;
+      panel.removeAttribute('inert');
+      panel.setAttribute('aria-hidden', 'false');
+      panel.classList.remove('hidden-step');
+      controls.forEach((control) => {
+        if (control.dataset.disabledByStepFlow === 'true') {
+          control.disabled = false;
+          delete control.dataset.disabledByStepFlow;
+        }
+      });
     }
 
-    function clearAttorneyPricingValidation() {
-      setAttorneyPricingValidation(false);
+    function updateAttorneyStepTwoPresentation(step) {
+      const attorneyStepTwo = step === 2 && role === 'attorney';
+      const paralegalStepTwo = step === 2 && role === 'paralegal';
+
+      if (signupHeading) {
+        if (attorneyStepTwo) {
+          signupHeading.textContent = 'Complete your attorney account';
+        } else if (paralegalStepTwo) {
+          signupHeading.textContent = 'Apply to join LPC';
+        } else {
+          signupHeading.innerHTML = 'Create your account, <em>it’s free.</em>';
+        }
+      }
+      if (accountPricingNote) {
+        accountPricingNote.textContent = paralegalStepTwo
+          ? 'Every paralegal application is reviewed before platform access is granted. Approval is not guaranteed.'
+          : '';
+        accountPricingNote.hidden = !paralegalStepTwo;
+      }
+
+      if (stepOneOptions) {
+        stepOneOptions.hidden = step === 2;
+        stepOneOptions.toggleAttribute('inert', step === 2);
+        stepOneOptions.setAttribute('aria-hidden', String(step === 2));
+      }
+      if (stepTwoNote) stepTwoNote.hidden = step !== 2;
+      if (attorneyMinimumDisclosure) attorneyMinimumDisclosure.hidden = true;
+      if (paralegalFeeDisclosure) paralegalFeeDisclosure.hidden = !paralegalStepTwo;
+      if (attorneySubmitLegal) attorneySubmitLegal.hidden = !attorneyStepTwo;
+      if (attorneyPricingText) attorneyPricingText.hidden = !attorneyStepTwo;
+      if (paralegalSubmitLegal) paralegalSubmitLegal.hidden = !paralegalStepTwo;
+      if (stepTwoLoginLink) stepTwoLoginLink.hidden = step === 2;
+      document.body.classList.toggle('attorney-step-two', attorneyStepTwo);
+      if (submitBtn && !submitLocked) {
+        submitBtn.textContent = paralegalStepTwo ? 'Submit application' : 'Submit registration';
+      }
+
     }
 
     function goToStep(step) {
       currentStep = step;
       if (!stepOnePanel || !stepTwoPanel) return;
       if (step === 1) {
-        stepOnePanel.classList.remove('hidden-step');
-        stepTwoPanel.classList.add('hidden-step');
-        if (prelaunchNote) prelaunchNote.style.display = '';
+        setStepPanelActive(stepOnePanel, true);
+        setStepPanelActive(stepTwoPanel, false);
+        nextStepBtn?.insertAdjacentElement('afterend', msg);
       } else {
-        stepOnePanel.classList.add('hidden-step');
-        stepTwoPanel.classList.remove('hidden-step');
-        if (prelaunchNote) prelaunchNote.style.display = 'none';
+        setStepPanelActive(stepOnePanel, false);
+        setStepPanelActive(stepTwoPanel, true);
+        submitBtn?.insertAdjacentElement('afterend', msg);
         updateSubmitState();
       }
+      updateAttorneyStepTwoPresentation(step);
+      if (step === 1) setStepPanelActive(stepTwoPanel, false);
     }
 
     function attachResumeHandler() {
@@ -720,27 +1268,34 @@
           hintEl.textContent = '';
           hintEl.classList.remove('selected');
         }
-        if (labelEl && labelText) labelEl.textContent = labelText;
+        if (labelEl && labelText) {
+          const title = labelEl.querySelector('[data-upload-title]');
+          if (title) title.textContent = labelText;
+          else labelEl.textContent = labelText;
+        }
       };
 
       if (resumeInput) {
-        resumeInput.onchange = () => updateHint(resumeInput, resumeHint, resumeLabel, 'Resume');
-        updateHint(resumeInput, resumeHint, resumeLabel, 'Resume');
+        resumeInput.addEventListener('change', () => updateHint(resumeInput, resumeHint, resumeLabel, 'Upload résumé'));
+        updateHint(resumeInput, resumeHint, resumeLabel, 'Upload résumé');
       }
       if (certInput) {
-        certInput.onchange = () => updateHint(certInput, certHint, certLabel, 'Certificate / License');
-        updateHint(certInput, certHint, certLabel, 'Certificate / License');
+        certInput.addEventListener('change', () => updateHint(certInput, certHint, certLabel, 'Certificate, degree, or license'));
+        updateHint(certInput, certHint, certLabel, 'Certificate, degree, or license');
       }
     }
 
     function validateStepOne() {
-      const firstName = firstNameEl.value.trim();
-      const lastName = lastNameEl.value.trim();
+      const { firstName, lastName } = getNameParts();
       const email = emailEl.value.trim();
       const password = pw.value;
-      const passwordConfirm = pwConfirm?.value || '';
-      if (!firstName || !lastName || !email || !password || !passwordConfirm) {
+      if (!firstName || !email || !password) {
         say('Please complete your basic account information.', 'err');
+        return false;
+      }
+      if (!lastName) {
+        say('Enter your first and last name.', 'err');
+        fullNameEl?.focus();
         return false;
       }
       if (!isValidEmail(email)) {
@@ -751,24 +1306,23 @@
         say('Please use a .com email address (.con is a typo).', 'err');
         return false;
       }
-      if (password.length < 8) {
-        say('Use 8+ characters with letters and numbers.', 'err');
+      if (!isPasswordValid(password)) {
+        say('Password must contain at least 8 characters.', 'err');
         return false;
       }
-      if (password !== passwordConfirm) {
-        say('Passwords do not match.', 'err');
-        return false;
-      }
+      say('');
       return true;
     }
 
     function setRole(r) {
       role = r;
+      if (googleSignupButton) {
+        googleSignupButton.href = `/api/auth/google?intent=signup&role=${encodeURIComponent(r)}`;
+      }
       if (admissionNotice) admissionNotice.style.display = r === 'paralegal' ? '' : 'none';
-      if (attorneyPricingNotice) attorneyPricingNotice.style.display = r === 'attorney' ? '' : 'none';
-      if (attorneyPricingWrap) attorneyPricingWrap.style.display = r === 'attorney' ? '' : 'none';
       const showGeneralState = r !== 'attorney';
       if (stateWrap) stateWrap.style.display = showGeneralState ? '' : 'none';
+      if (paralegalExperienceWrap) paralegalExperienceWrap.hidden = r !== 'paralegal';
       if (stateSelect) {
         stateSelect.required = showGeneralState;
         if (!showGeneralState) stateSelect.value = '';
@@ -776,11 +1330,10 @@
       [btnA, btnP].forEach(b => {
         const on = b.dataset.role === r;
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
-        b.setAttribute('aria-selected', on ? 'true' : 'false');
       });
       roleFieldWrap.innerHTML = r === 'attorney'
         ? `<label for="bar"><span class="sr-only">Bar Number</span></label>
-           <div class="name-row" style="gap:12px;">
+           <div class="name-row attorney-credentials-row" style="gap:12px;">
              <div class="field-col">
                <input id="bar" type="text" autocomplete="off" placeholder="State Bar Number" required />
              </div>
@@ -841,44 +1394,39 @@
                </select>
              </div>
            </div>
-           <p class="field-note" style="margin-top:4px;margin-bottom:12px;">Your bar number is used only for verification and is never shared.</p>
-           <label for="attorneyLinkedIn">
-             <span class="sr-only">LinkedIn</span>
-           </label>
-           <input id="attorneyLinkedIn" type="url" autocomplete="url" placeholder="https://www.linkedin.com/in/username" />
-           <label for="lawFirm"><span class="sr-only">Law Firm</span></label>
-           <input id="lawFirm" type="text" autocomplete="organization" placeholder="Law Firm (optional)" />
-           <p</p>`
-        : `<div class="name-row" style="gap:12px; align-items:flex-start;">
+           <p class="field-note" style="margin-top:4px;margin-bottom:12px;">Your bar number is used for account review and remains private.</p>
+           <div class="attorney-details-row">
              <div class="field-col">
-               <div class="upload-wrapper">
-                 <input id="resumeUpload" type="file" accept=".pdf,.doc,.docx" class="upload-input" aria-label="Resume" required />
-                 <label for="resumeUpload" class="upload-placeholder">Resume</label>
-               </div>
-               <div class="file-hint" id="resumeFileHint"></div>
+               <label for="attorneyLinkedIn"><span class="sr-only">LinkedIn</span></label>
+               <input id="attorneyLinkedIn" type="url" autocomplete="url" placeholder="LinkedIn (optional)" />
              </div>
              <div class="field-col">
-               <label for="paralegalExperience" class="sr-only-label"><span class="sr-only">Years of experience</span></label>
-               <select id="paralegalExperience" class="select-field">
-                 <option value="">Years of experience</option>
-                 <option value="0">0–1 years (Emerging)</option>
-                 <option value="1">1–3 years (Early Career)</option>
-                 <option value="3">3–7 years (Intermediate)</option>
-                 <option value="7">7–12 years (Experienced)</option>
-                 <option value="12">12+ years (Advanced)</option>
-               </select>
+               <label for="lawFirm"><span class="sr-only">Law Firm</span></label>
+               <input id="lawFirm" type="text" autocomplete="organization" placeholder="Law Firm (optional)" />
              </div>
            </div>
-           <label for="paralegalLinkedIn"><span class="sr-only">LinkedIn</span></label>
-           <input id="paralegalLinkedIn" type="url" autocomplete="url" placeholder="https://www.linkedin.com/in/username" />
+           `
+        : `<label for="paralegalQualification" class="field-label">Which qualification do you meet?</label>
+           <select id="paralegalQualification" class="select-field" required>
+             <option value="">Choose one qualification</option>
+             <option value="certificate">Paralegal certificate</option>
+             <option value="degree">Degree in paralegal studies</option>
+             <option value="law_firm_experience">At least 1 year working in a law firm</option>
+           </select>
            <div class="upload-wrapper">
-             <input id="certUpload" type="file" accept=".pdf,.doc,.docx" class="upload-input" aria-label="Certification document" />
-             <label for="certUpload" class="upload-placeholder">Certificate / License</label>
+             <input id="resumeUpload" type="file" accept=".pdf,application/pdf" class="upload-input" aria-label="Upload résumé, PDF required" required />
+             <label for="resumeUpload" class="upload-placeholder upload-placeholder--application"><span data-upload-title>Upload résumé</span><small>PDF required</small></label>
+           </div>
+           <div class="file-hint" id="resumeFileHint"></div>
+           <label for="paralegalLinkedIn"><span class="sr-only">LinkedIn</span></label>
+           <input id="paralegalLinkedIn" type="url" autocomplete="url" placeholder="LinkedIn" />
+           <div class="upload-wrapper">
+             <input id="certUpload" type="file" accept=".pdf,application/pdf" class="upload-input" aria-label="Certificate, degree, or license, optional" />
+             <label for="certUpload" class="upload-placeholder upload-placeholder--application"><span data-upload-title>Certificate, degree, or license</span><small>Optional</small></label>
            </div>
            <div class="file-hint" id="certFileHint"></div>`;
       const attorneyConfirmWrap = document.getElementById('attorneyConfirmWrap');
       const attorneyConfirm = document.getElementById('attorneyGoodStanding');
-      const attorneyPricingAck = document.getElementById('attorneyPricingAck');
       if (attorneyConfirmWrap && attorneyConfirm) {
         const showConfirm = r === 'attorney';
         attorneyConfirmWrap.style.display = showConfirm ? '' : 'none';
@@ -886,13 +1434,6 @@
         attorneyConfirm.disabled = !showConfirm;
         if (!showConfirm) attorneyConfirm.checked = false;
       }
-      if (attorneyPricingAck) {
-        const showPricing = r === 'attorney';
-        attorneyPricingAck.required = showPricing;
-        attorneyPricingAck.disabled = !showPricing;
-        if (!showPricing) attorneyPricingAck.checked = false;
-      }
-      clearAttorneyPricingValidation();
       if (r === 'paralegal') attachResumeHandler();
     }
     function resetSignupForm(nextRole) {
@@ -908,17 +1449,20 @@
       if (form) {
         form.reset();
       }
-      if (emailEl) emailEl.value = localStorage.getItem('lastEmail') || '';
+      if (emailEl) emailEl.value = sessionStorage.getItem('lastEmail') || '';
+      applyGoogleSignupProfile();
       if (pw) pw.type = 'password';
-      if (pwConfirm) pwConfirm.type = 'password';
-      if (togglePw) togglePw.textContent = 'Show';
+      if (togglePw) {
+        togglePw.textContent = 'Show password';
+        togglePw.setAttribute('aria-pressed', 'false');
+      }
+      syncPasswordGuidance();
       const tokenInput = form?.querySelector('input[name="cf-turnstile-response"]');
       if (tokenInput) tokenInput.value = '';
       if (window.turnstile?.reset) {
         window.turnstile.reset();
       }
       say('');
-      clearAttorneyPricingValidation();
       setRole(nextRole);
       goToStep(1);
       updateSubmitState();
@@ -939,14 +1483,33 @@
       e.preventDefault();
       const show = pw.type === 'password';
       pw.type = show ? 'text' : 'password';
-      if (pwConfirm) pwConfirm.type = show ? 'text' : 'password';
-      togglePw.textContent = show ? 'Hide' : 'Show';
+      togglePw.textContent = show ? 'Hide password' : 'Show password';
+      togglePw.setAttribute('aria-pressed', String(show));
     });
 
     nextStepBtn?.addEventListener('click', () => {
       if (validateStepOne()) {
         goToStep(2);
       }
+    });
+    document.getElementById('editSignupBasics')?.addEventListener('click', () => {
+      if (submitLocked) return;
+      goToStep(1);
+      document.getElementById('fullName')?.focus();
+    });
+    document.getElementById('resendSignupVerification')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      const status = document.getElementById('signupVerificationStatus');
+      if (button.disabled) return;
+      button.disabled = true;
+      status.textContent = 'Requesting another verification email…';
+      try {
+        const { secureFetch } = await import('./assets/scripts/auth.js');
+        const response = await secureFetch('/api/auth/resend-verification', { method: 'POST', body: { email: signupConfirmationEmail.textContent.trim() }, noRedirect: true });
+        if (!response.ok) throw new Error(response.status === 429 ? 'Please wait before requesting another email.' : 'Unable to request an email right now. Please try again shortly.');
+        status.textContent = 'Verification email requested. Check your inbox and spam folder. You can request another in one minute.';
+      } catch (error) { status.textContent = error.message; }
+      window.setTimeout(() => { button.disabled = false; }, 60_000);
     });
 
     form.addEventListener('keydown', (e) => {
@@ -959,12 +1522,6 @@
     });
 
     stateSelect?.addEventListener('change', updateSubmitState);
-    attorneyPricingAck?.addEventListener('change', () => {
-      if (attorneyPricingAck.checked) {
-        clearAttorneyPricingValidation();
-      }
-    });
-
     function say(text, cls = '') {
       if (!msg) return;
       clearTimeout(msgFadeTimer);
@@ -984,13 +1541,64 @@
       }, 5000);
     }
 
-    function sayPersistent(text, cls = '') {
-      if (!msg) return;
-      clearTimeout(msgFadeTimer);
-      msg.textContent = text;
-      msg.className = `msg ${cls}`.trim();
-      msg.classList.add('show');
+
+
+    function applyGoogleSignupProfile() {
+      if (!googleSignupProfile) return;
+      const fullName = [googleSignupProfile.firstName, googleSignupProfile.lastName]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      if (fullNameEl && fullName) fullNameEl.value = fullName;
+      if (emailEl) {
+        emailEl.value = googleSignupProfile.email || '';
+        emailEl.readOnly = true;
+        emailEl.classList.add('google-verified-email');
+        emailEl.setAttribute('aria-description', 'Verified by Google');
+      }
     }
+
+    async function loadGoogleSignupProfile() {
+      const params = new URLSearchParams(window.location.search);
+      const errorCode = params.get('google_error');
+      if (errorCode) {
+        const messages = {
+          invalid_state: 'Google signup expired. Please try again.',
+          cancelled: 'Google signup was cancelled.',
+          oauth_failed: 'Google could not verify your account. Please try again.',
+          identity_invalid: 'Google did not return a verified identity.',
+          unavailable: 'Google signup is temporarily unavailable.',
+        };
+        say(messages[errorCode] || 'Google signup could not be completed.', 'err');
+        return;
+      }
+      if (params.get('google') !== '1') return;
+
+      try {
+        const response = await fetch('/api/auth/google/signup-profile', {
+          credentials: 'include',
+          headers: { Accept: 'application/json' },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.profile?.email) {
+          throw new Error(payload?.msg || 'Google signup session expired. Please try again.');
+        }
+        googleSignupProfile = payload.profile;
+        googleSignupActive = true;
+        applyGoogleSignupProfile();
+        say('Google verified your name and email. Complete the remaining information.', 'ok');
+      } catch (err) {
+        googleSignupActive = false;
+        if (emailEl) {
+          emailEl.readOnly = false;
+          emailEl.classList.remove('google-verified-email');
+          emailEl.removeAttribute('aria-description');
+        }
+        say(err.message || 'Google signup session expired. Please try again.', 'err');
+      }
+    }
+
+    loadGoogleSignupProfile();
 
     function isValidEmail(email) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((email || '').trim());
@@ -1006,7 +1614,8 @@
       try {
         const url = new URL(raw);
         const host = url.hostname.toLowerCase();
-        return (url.protocol === 'https:' || url.protocol === 'http:') && host.endsWith('linkedin.com');
+        return (url.protocol === 'https:' || url.protocol === 'http:') &&
+          (host === 'linkedin.com' || host.endsWith('.linkedin.com'));
       } catch {
         return false;
       }
@@ -1022,7 +1631,7 @@
       return true;
     }
 
-    const defaultSubmitText = submitBtn?.textContent || "Create Account";
+    const defaultSubmitText = submitBtn?.textContent || "Submit registration";
     let pendingTurnstileSignup = null;
 
     const restoreSignupButton = (label) => {
@@ -1080,9 +1689,8 @@
       if (window.turnstile?.reset) {
         window.turnstile.reset();
       }
-      if (pending) {
-        restoreSignupButton(pending.originalLabel);
-      }
+      if (!pending) return;
+      restoreSignupButton(pending.originalLabel);
       say('Verification failed. Please try again.', 'err');
     };
 
@@ -1092,9 +1700,8 @@
       if (window.turnstile?.reset) {
         window.turnstile.reset();
       }
-      if (pending) {
-        restoreSignupButton(pending.originalLabel);
-      }
+      if (!pending) return;
+      restoreSignupButton(pending.originalLabel);
       say('Verification expired. Please try again.', 'err');
     };
 
@@ -1102,26 +1709,18 @@
       e.preventDefault();
       say('');
 
-      const firstName = firstNameEl.value.trim();
-      const lastName = lastNameEl.value.trim();
+      const { firstName, lastName } = getNameParts();
       const email = emailEl.value.trim().toLowerCase();
       const password = pw.value;
-      const passwordConfirm = pwConfirm?.value || '';
       const phoneNumber = (phoneEl?.value || '').trim();
       const signupState = (stateSelect?.value || '').trim();
       const timezone = getBrowserTimezone();
 
-      const termsAccepted = termsCheckbox?.checked;
-      if (!termsAccepted) {
-        alert('You must agree to the Terms of Use and Privacy Policy before creating an account.');
-        return;
-      }
-
-      if (!firstName || !lastName || !email || !password || !passwordConfirm) { say('Please fill all required fields.', 'err'); return; }
+      if (!firstName || !email || !password) { say('Please fill all required fields.', 'err'); return; }
+      if (!lastName) { say('Enter your first and last name.', 'err'); fullNameEl?.focus(); return; }
       if (!isValidEmail(email)) { say('Enter a valid email address.', 'err'); return; }
       if (isTypoEmailDomain(email)) { say('Please use a .com email address (.con is a typo).', 'err'); return; }
-      if (password.length < 8) { say('Use 8+ characters with letters and numbers.', 'err'); return; }
-      if (password !== passwordConfirm) { say('Passwords do not match.', 'err'); return; }
+      if (!isPasswordValid(password)) { say('Password must contain at least 8 characters.', 'err'); return; }
 
       let attorneyBar = '';
       let attorneyLinkedIn = '';
@@ -1129,6 +1728,7 @@
       let attorneyLawFirm = '';
       let paralegalLinkedIn = '';
       let paralegalExperience = '';
+      let paralegalQualification = '';
       let paralegalCertFile = null;
 
       if (role === 'attorney') {
@@ -1137,7 +1737,6 @@
         attorneyBarState = (document.getElementById('barState')?.value || '').trim();
         attorneyLawFirm = (document.getElementById('lawFirm')?.value || '').trim();
         const goodStandingConfirmed = document.getElementById('attorneyGoodStanding')?.checked;
-        const pricingAcknowledged = document.getElementById('attorneyPricingAck')?.checked;
         if (!attorneyBar) { say('State Bar Number is required for attorneys.', 'err'); return; }
         if (!isValidBarNumber(attorneyBar, attorneyBarState)) {
           say('Enter a valid bar number.', 'err');
@@ -1148,13 +1747,6 @@
           say('Please confirm you are licensed and in good standing.', 'err');
           return;
         }
-        if (!pricingAcknowledged) {
-          setAttorneyPricingValidation(true);
-          say('Please acknowledge the $400 minimum case requirement.', 'err');
-          document.getElementById('attorneyPricingAck')?.focus();
-          return;
-        }
-        clearAttorneyPricingValidation();
         if (attorneyLinkedIn && !isValidLinkedInUrl(attorneyLinkedIn)) {
           say('Enter a valid LinkedIn URL (e.g., https://www.linkedin.com/in/username).', 'err');
           return;
@@ -1167,7 +1759,18 @@
         }
         const resumeInput = document.getElementById('resumeUpload');
         if (!resumeInput || !resumeInput.files?.length) { say('Please upload your resume.', 'err'); return; }
+        paralegalQualification = document.getElementById('paralegalQualification')?.value || '';
+        if (!['certificate', 'degree', 'law_firm_experience'].includes(paralegalQualification)) {
+          say('Choose the qualification you meet: a paralegal certificate, a degree in paralegal studies, or at least one year working in a law firm.', 'err');
+          document.getElementById('paralegalQualification')?.focus();
+          return;
+        }
         paralegalExperience = (document.getElementById('paralegalExperience')?.value || '').trim();
+        if (!paralegalExperience || !Number.isInteger(Number(paralegalExperience)) || Number(paralegalExperience) < 0 || Number(paralegalExperience) > 80) {
+          say('Enter your completed years of paralegal experience, from 0 to 80.', 'err');
+          document.getElementById('paralegalExperience')?.focus();
+          return;
+        }
         paralegalLinkedIn = (document.getElementById('paralegalLinkedIn')?.value || '').trim();
         if (paralegalLinkedIn && !isValidLinkedInUrl(paralegalLinkedIn)) {
           say('Enter a valid LinkedIn URL (e.g., https://www.linkedin.com/in/username).', 'err');
@@ -1200,6 +1803,8 @@
         formData.append('role', role);
         formData.append('state', stateToSubmit);
         formData.append('termsAccepted', 'true');
+        formData.append('privacyAcknowledged', 'true');
+        if (googleSignupActive) formData.append('googleSignupIntent', 'true');
         if (phoneNumber) formData.append('phoneNumber', phoneNumber);
         if (timezone) formData.append('timezone', timezone);
 
@@ -1208,44 +1813,75 @@
           if (attorneyBarState) formData.append('barState', attorneyBarState);
           if (attorneyLinkedIn) formData.append('linkedInURL', attorneyLinkedIn);
           if (attorneyLawFirm) formData.append('lawFirm', attorneyLawFirm);
-          formData.append('attorneyPricingAccepted', String(Boolean(document.getElementById('attorneyPricingAck')?.checked)));
+          formData.append('attorneyPricingAccepted', 'true');
         } else {
           const resumeFile = document.getElementById('resumeUpload')?.files?.[0];
           if (resumeFile) formData.append('resume', resumeFile, resumeFile.name || 'resume.pdf');
           if (paralegalCertFile) formData.append('certificateFile', paralegalCertFile, paralegalCertFile.name || 'certificate.pdf');
           if (paralegalLinkedIn) formData.append('linkedInURL', paralegalLinkedIn);
           if (paralegalExperience) formData.append('yearsExperience', paralegalExperience);
+          formData.append('paralegalQualification', paralegalQualification);
         }
 
         formData.append('turnstileToken', turnstileToken);
 
-        const headers = {};
-        if (window.__CSRF__) headers['X-CSRF-Token'] = window.__CSRF__;
-
-        const res = await fetch(`${API_BASE}/auth/register`, {
+        const { secureFetch } = await import('./assets/scripts/auth.js');
+        const res = await secureFetch('/api/auth/register', {
           method: 'POST',
-          credentials: 'include',
-          headers,
-          body: formData
+          body: formData,
+          noRedirect: true
         });
 
         let data = {};
-        try { data = await res.json(); } catch {}
+        try { data = await res.json(); } catch { data = {}; }
 
         if (!res.ok) {
-          if (res.status === 409) throw new Error('That email is already registered.');
+          const errorCopy = String(data?.error || data?.msg || data?.message || '');
+          const basicField = data.field || (/password/i.test(errorCopy) ? 'password' : /email|registered/i.test(errorCopy) ? 'email' : /first.*last.*name/i.test(errorCopy) ? 'fullName' : '');
+          if (['password', 'email', 'fullName'].includes(basicField)) {
+            goToStep(1);
+            document.getElementById(basicField)?.focus();
+          }
+          if (res.status === 409) {
+            throw new Error(data?.msg || 'That account is already registered.');
+          }
           if (res.status === 429) throw new Error('Too many attempts. Please wait and try again.');
           throw new Error(data?.error || data?.msg || data?.message || 'Could not create account.');
         }
 
-        localStorage.setItem('lastEmail', email);
-        sessionStorage.setItem('signupToast', 'Your application has been submitted for approval.');
-        sayPersistent("Application submitted. We'll email you once it's approved.", 'ok');
+        sessionStorage.setItem('lastEmail', email);
+        const submittedMessage = data.emailVerified === true ? 'Submission received. Your email is verified.' : data.verificationEmailStatus !== 'sent'
+          ? 'Submission received. Request another verification email from your confirmation page.' : role === 'attorney'
+          ? 'Registration submitted. Check your email to verify your address.'
+          : 'Application submitted. Check your email to verify your address.';
+        sessionStorage.setItem('signupToast', submittedMessage);
         shouldRestoreButton = false;
         submitLocked = true;
         if (submitBtn) {
           submitBtn.disabled = true;
           submitBtn.textContent = 'Submitted';
+        }
+        if (form && signupConfirmation) {
+          form.hidden = true;
+          stepOneOptions.hidden = true;
+          accountPricingNote.hidden = true;
+          signupHeading.hidden = true;
+          signupConfirmationEyebrow.textContent = role === 'attorney' ? 'Registration received' : 'Application received';
+          signupConfirmationTitle.textContent = role === 'attorney'
+            ? 'Your registration is with us.'
+            : 'Your application is with us.';
+          signupConfirmationEmail.textContent = email;
+          const verified = data.emailVerified === true;
+          const receiptLabel = role === 'attorney' ? 'registration' : 'application';
+          document.getElementById('signupConfirmationLead').textContent = verified
+            ? 'Your email is verified. Your submission is under review. We’ll contact you when your LPC account is ready.'
+            : data.verificationEmailStatus === 'sent'
+              ? 'We sent a verification link to the email below. Your submission is under review. Verify your address for account notices.'
+              : `Your ${receiptLabel} was received, but the verification email could not be sent. Request another link below. Your submission is under review.`;
+          document.getElementById('resendSignupVerification').hidden = verified;
+          signupConfirmation.hidden = false;
+          signupConfirmationTitle.focus();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       } catch (err) {
         console.error(err);
@@ -1260,5 +1896,7 @@
       }
     });
   </script>
+  <script type="module" src="assets/scripts/web-vitals-rum.js"></script>
+  <script src="assets/scripts/auth-illustration-fit.js?v=20260924-window-fit"></script>
 </body>
 </html>

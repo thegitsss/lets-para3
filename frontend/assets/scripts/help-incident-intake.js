@@ -87,19 +87,22 @@
         grid-template-columns:repeat(2, minmax(0, 1fr));
       }
       .incident-submit{
+        min-height:48px;
         display:inline-flex;
         align-items:center;
         justify-content:center;
         min-width:170px;
         padding:0.7rem 1.1rem;
         border:none;
-        border-radius:12px;
-        background:#27394d;
+        border-radius:8px;
+        background:#1a2230;
         color:#ffffff;
         cursor:pointer;
         font:inherit;
-        letter-spacing:0.05em;
-        text-transform:uppercase;
+        letter-spacing:0.01em;
+      }
+      .incident-submit:hover:not([disabled]){
+        background:#1d2b3b;
       }
       .incident-submit[disabled]{
         opacity:0.65;
@@ -296,11 +299,11 @@
               <input id="incidentFeatureKey" name="featureKey" type="text" maxlength="120" value="${escapeHtml(defaults.featureKey)}" placeholder="Optional" />
             </div>
             <div class="incident-field">
-              <label for="incidentCaseId">Related case id</label>
+              <label for="incidentCaseId">Related Matter ID</label>
               <input id="incidentCaseId" name="caseId" type="text" maxlength="64" value="${escapeHtml(defaults.caseId)}" placeholder="Optional" />
             </div>
             <div class="incident-field">
-              <label for="incidentJobId">Related job id</label>
+              <label for="incidentJobId">Related Matter ID</label>
               <input id="incidentJobId" name="jobId" type="text" maxlength="64" value="${escapeHtml(defaults.jobId)}" placeholder="Optional" />
             </div>
             <div class="incident-field">
@@ -309,7 +312,7 @@
             </div>
           </div>`}
           <div class="incident-intake-actions">
-            <button class="incident-submit" type="submit">Submit Issue</button>
+            <button class="incident-submit" type="submit" data-public-action="primary" data-action-shape="control">Submit issue</button>
           </div>
         </form>
         <div class="incident-status" data-tone="neutral" aria-live="polite"${hideReadyStatus ? ' hidden' : ""}>
@@ -396,7 +399,7 @@
     if (!session || role !== surface) {
       container.innerHTML = buildUnavailableMarkup(
         "Structured reporting unavailable",
-        "This form is available for signed-in users on the matching help surface."
+        "This form is available for signed-in users on the corresponding help page."
       );
       return;
     }
@@ -458,7 +461,7 @@
         });
       } finally {
         submitButton.disabled = false;
-        submitButton.textContent = "Submit Issue";
+        submitButton.textContent = "Submit issue";
       }
     });
   }

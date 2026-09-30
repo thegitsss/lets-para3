@@ -1,4 +1,9 @@
-import { secureFetch, logout } from "./auth.js";
+import { createSavedParalegals } from "./attorney-v2/saved-paralegals.mjs";
+import { createApiClient } from "./attorney-v2/api-client.mjs";
+import { createLegacyInvitationDialog } from "./utils/legacy-invitation-dialog.mjs";
+import { secureFetch, logout } from "./auth.js?v=20260812-state-filter-owner";
+import { normalizePresentation } from "./authenticated-object-search.mjs";
+import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
 
 const states = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","District of Columbia","Florida","Georgia",
@@ -22,12 +27,16 @@ const specialties = [
 
 const selectedSpecialties = new Set();
 const selectedStates = new Set();
+const AVATAR_PLACEHOLDER = "/assets/avatar-placeholder.svg";
 
 const elements = {
   results: document.getElementById("paralegalResults"),
   status: document.getElementById("resultsStatus"),
   experience: document.getElementById("experience"),
   sortBy: document.getElementById("sortBy"),
+  sortMenuTrigger: document.getElementById("sortMenuTrigger"),
+  sortMenuOptions: document.getElementById("sortMenuOptions"),
+  sortMenuValue: document.getElementById("sortMenuValue"),
   stateInput: document.getElementById("stateInput"),
   stateList: document.getElementById("stateList"),
   selectedStateChips: document.getElementById("selectedStateChips"),
@@ -35,19 +44,24 @@ const elements = {
   specialtyList: document.getElementById("specialtyList"),
   prevPage: document.getElementById("prevPage"),
   nextPage: document.getElementById("nextPage"),
+  pagination: document.getElementById("pagination"),
   paginationLabel: document.getElementById("paginationLabel"),
-  inquireModal: document.getElementById("inquireModal"),
-  jobList: document.getElementById("jobList"),
-  inquireMessage: document.getElementById("inquireMessage"),
-  cancelInquire: document.getElementById("cancelInquire"),
-  confirmInquire: document.getElementById("confirmInquire"),
-  selectedParalegalText: document.getElementById("selectedParalegalText"),
   filterMenu: document.getElementById("filterMenu"),
   filterToggle: document.getElementById("filterToggle"),
+  filterCount: document.getElementById("filterCount"),
+  filterClose: document.querySelector("[data-filter-close]"),
   applyFilters: document.getElementById("applyFilters"),
   clearFilters: document.getElementById("clearFilters"),
   authBlocker: document.getElementById("authBlocker"),
   returnDashboard: document.getElementById("returnDashboard"),
+  utilityHeader: document.querySelector("[data-utility-header]"),
+  publicHeader: document.querySelector("[data-public-header]"),
+  authSidebar: document.querySelector("[data-auth-sidebar]"),
+  authSidebarNav: document.querySelector("[data-auth-sidebar-nav]"),
+  authSidebarToggle: document.querySelector("[data-auth-sidebar-toggle]"),
+  authSidebarBackdrop: document.querySelector("[data-auth-sidebar-backdrop]"),
+  authSidebarLogout: document.querySelector("[data-auth-sidebar-logout]"),
+  publicFooter: document.querySelector("[data-public-footer]"),
 };
 
 const state = {
@@ -68,10 +82,9 @@ const state = {
   canInvite: false,
 };
 
-let availableCases = [];
-let activeParalegal = null;
+let invitationDialog;
 let filterFetchTimer = null;
-const toast = window.toastUtils;
+let sidebarProfileLoadPromise = null;
 const AUTH_LOCK_CLASS = "auth-locked";
 const AUTH_BLOCKER_READY_CLASS = "auth-blocker-ready";
 
@@ -96,22 +109,135 @@ document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   await hydrateViewer();
+  syncAuthenticatedShell();
   syncAuthButtons();
   toggleAuthBlocker();
+  const savedLink = document.querySelector('[data-saved-paralegal-link]');
+  if (savedLink) savedLink.hidden = !state.canInvite;
+  if (new URLSearchParams(location.search).get('view') === 'saved') {
+    if (!state.canInvite) { elements.results.textContent = 'Sign in with an approved attorney account to view your saved paralegals.'; return; }
+    document.body.classList.add('lpc-saved-list-page');
+    document.getElementById('browse-paralegals-title').textContent = 'Saved paralegals';
+    if (savedLink) { savedLink.textContent = 'Browse paralegals'; savedLink.href = 'browse-paralegals.html'; }
+    document.querySelector('.results-header').hidden = true;
+    elements.results.style.display = 'block';
+    const controller = new AbortController();
+    const reset = () => { controller.abort(); location.reload(); };
+    window.addEventListener('pagehide', () => controller.abort(), { once: true });
+    window.addEventListener('storage', event => { if (event.key === 'lpc_user' || event.key === null) reset(); });
+    window.addEventListener('lpc:user-updated', event => { const next = normalizeId(event.detail?.user || event.detail); if (next && next !== normalizeId(state.viewer)) reset(); });
+    const api = createApiClient({ onAuthenticationLost: () => { controller.abort(); location.href = '/login.html'; } });
+    const list = createSavedParalegals({ api, signal: controller.signal, ownerId: normalizeId(state.viewer), legacy: true });
+    elements.results.replaceChildren(list); await list.readiness; return;
+  }
   initStateDropdown();
   initSpecialtyDropdown();
   bindFilterEvents();
+  bindSortMenu();
   bindFilterMenuToggle();
   bindFilterButtons();
   bindModalEvents();
-
-  if (state.canInvite) {
-    await loadCases();
-  } else {
-    renderCaseOptions();
-  }
+  updateFilterCount();
 
   await loadParalegals();
+}
+
+function dashboardHrefForRole(role = "") {
+  if (role === "paralegal") return "dashboard-paralegal.html";
+  if (role === "admin") return "admin-dashboard.html";
+  return "dashboard-attorney.html";
+}
+
+function authenticatedNavItems(role = "") {
+  if (role === "paralegal") {
+    return [
+      ["Home", "dashboard-paralegal.html#home"],
+      ["Browse Matters", "browse-jobs.html"],
+      ["My Matters & Applications", "dashboard-paralegal.html#cases"],
+      ["Profile Settings", "profile-settings.html"],
+      ["Help", "paralegalhelp.html"],
+    ];
+  }
+  if (role === "admin") {
+    return [
+      ["Dashboard", "admin-dashboard.html"],
+      ["Browse Paralegals", "browse-paralegals.html", true],
+      ["Help", "help.html"],
+    ];
+  }
+  return [
+    ["Home", "dashboard-attorney.html#home"],
+    ["Matters", "dashboard-attorney.html#cases"],
+    ["Tasks", "dashboard-attorney.html#tasks"],
+    ["Paralegals", "browse-paralegals.html", true],
+    ["Payments", "dashboard-attorney.html#funds"],
+  ];
+}
+
+function closeAuthenticatedSidebar() {
+  document.body?.classList.remove("authenticated-sidebar-open");
+  elements.authSidebarToggle?.setAttribute("aria-expanded", "false");
+  elements.authSidebarToggle?.setAttribute("aria-label", "Open dashboard navigation");
+  if (elements.authSidebarBackdrop) elements.authSidebarBackdrop.hidden = true;
+}
+
+function loadAuthenticatedSidebarProfile() {
+  if (!state.isLoggedIn || !elements.authSidebar) return Promise.resolve();
+  if (!sidebarProfileLoadPromise) {
+    sidebarProfileLoadPromise = import("./sidebar-profile.js?v=20260828-phase1")
+      .catch((error) => {
+        sidebarProfileLoadPromise = null;
+        console.warn("[browse-paralegals] authenticated sidebar profile failed to load", error);
+      });
+  }
+  return sidebarProfileLoadPromise;
+}
+
+function syncAuthenticatedShell() {
+  const signedIn = state.isLoggedIn;
+  document.body?.classList.toggle("authenticated-browse", signedIn);
+  document.body?.classList.toggle("lpc-product-clean", signedIn);
+  document.documentElement.classList.toggle("authenticated-browse", signedIn);
+  document.documentElement.classList.toggle("has-user-cache", signedIn);
+  if (elements.utilityHeader) elements.utilityHeader.hidden = signedIn;
+  if (elements.publicHeader) elements.publicHeader.hidden = signedIn;
+  if (elements.authSidebar) elements.authSidebar.hidden = !signedIn;
+  if (elements.authSidebarToggle) elements.authSidebarToggle.hidden = !signedIn;
+  if (elements.publicFooter) elements.publicFooter.hidden = signedIn;
+  if (!signedIn) {
+    closeAuthenticatedSidebar();
+    return;
+  }
+
+  if (elements.authSidebarNav) {
+    const links = authenticatedNavItems(state.viewerRole).map(([label, href, active]) => {
+      const link = document.createElement("a");
+      link.href = href;
+      link.textContent = label;
+      if (active) {
+        link.classList.add("active");
+        link.setAttribute("aria-current", "page");
+      }
+      link.addEventListener("click", closeAuthenticatedSidebar);
+      return link;
+    });
+    elements.authSidebarNav.replaceChildren(...links);
+  }
+
+  void loadAuthenticatedSidebarProfile();
+
+  elements.authSidebarToggle?.addEventListener("click", () => {
+    const open = !document.body.classList.contains("authenticated-sidebar-open");
+    document.body.classList.toggle("authenticated-sidebar-open", open);
+    elements.authSidebarToggle.setAttribute("aria-expanded", String(open));
+    elements.authSidebarToggle.setAttribute("aria-label", open ? "Close dashboard navigation" : "Open dashboard navigation");
+    if (elements.authSidebarBackdrop) elements.authSidebarBackdrop.hidden = !open;
+  });
+  elements.authSidebarBackdrop?.addEventListener("click", closeAuthenticatedSidebar);
+  elements.authSidebarLogout?.addEventListener("click", () => logout("login.html"));
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 960) closeAuthenticatedSidebar();
+  });
 }
 
 async function hydrateViewer() {
@@ -122,25 +248,22 @@ async function hydrateViewer() {
       const session = await window.getSessionData();
       user = session?.user || null;
       role = session?.role || "";
-    } catch {}
+    } catch (error) {
+      console.warn("[browse-paralegals] session hydration failed", error);
+    }
   }
   state.viewer = user;
   state.viewerRole = String(role || "").toLowerCase();
   state.isLoggedIn = Boolean(user);
-  state.canInvite = state.viewerRole === "attorney";
+  state.canInvite = state.viewerRole === "attorney" && state.viewer?.status === "approved" && !state.viewer?.disabled && !state.viewer?.deleted;
 }
 
 function syncAuthButtons() {
   const signInLink = document.getElementById("authAction");
   const logoutBtn = document.getElementById("logoutAction");
+  const dashboardHref = dashboardHrefForRole(state.viewerRole);
   if (elements.returnDashboard) {
     if (state.isLoggedIn) {
-      const dashboardHref =
-        state.viewerRole === "paralegal"
-          ? "dashboard-paralegal.html"
-          : state.viewerRole === "admin"
-          ? "admin-dashboard.html"
-          : "dashboard-attorney.html";
       elements.returnDashboard.href = dashboardHref;
       elements.returnDashboard.textContent = "RETURN TO DASHBOARD";
     } else {
@@ -161,14 +284,23 @@ function syncAuthButtons() {
     if (logoutBtn) logoutBtn.style.display = "none";
     if (signInLink) signInLink.style.display = "inline-flex";
   }
+  document.querySelectorAll("[data-utility-guest]").forEach((element) => {
+    element.hidden = state.isLoggedIn;
+  });
+  document.querySelectorAll("[data-utility-member]").forEach((element) => {
+    element.hidden = !state.isLoggedIn;
+  });
+  document.querySelectorAll("[data-utility-auth], [data-utility-signup]").forEach((element) => {
+    element.hidden = state.isLoggedIn;
+  });
+  document.querySelectorAll("[data-utility-dashboard]").forEach((element) => {
+    element.href = dashboardHref;
+  });
 }
 
 function toggleAuthBlocker() {
   if (!elements.authBlocker || !document.body) return;
-  if (state.isLoggedIn) {
-    closeAuthBlocker();
-  }
-  if (!state.isLoggedIn) closeAuthBlocker();
+  closeAuthBlocker();
 }
 
 function openAuthBlocker() {
@@ -176,6 +308,11 @@ function openAuthBlocker() {
   document.body.classList.add(AUTH_LOCK_CLASS);
   document.body.classList.add(AUTH_BLOCKER_READY_CLASS);
   elements.authBlocker.setAttribute("aria-hidden", "false");
+  elements.authBlocker.removeAttribute("inert");
+  activateDialogFocus(elements.authBlocker, {
+    initialFocus: elements.authBlocker.querySelector("a[href]"),
+    onEscape: closeAuthBlocker,
+  });
 }
 
 function closeAuthBlocker() {
@@ -183,6 +320,8 @@ function closeAuthBlocker() {
   document.body.classList.remove(AUTH_LOCK_CLASS);
   document.body.classList.remove(AUTH_BLOCKER_READY_CLASS);
   elements.authBlocker.setAttribute("aria-hidden", "true");
+  elements.authBlocker.setAttribute("inert", "");
+  deactivateDialogFocus(elements.authBlocker);
 }
 
 function requireSignIn(event) {
@@ -218,24 +357,141 @@ function bindFilterEvents() {
   });
 }
 
+function bindSortMenu() {
+  const trigger = elements.sortMenuTrigger;
+  const menu = elements.sortMenuOptions;
+  const select = elements.sortBy;
+  if (!trigger || !menu || !select) return;
+  const options = Array.from(menu.querySelectorAll("[data-sort-value]"));
+
+  const selectedIndex = () => Math.max(0, options.findIndex((option) => option.getAttribute("aria-selected") === "true"));
+  const focusOption = (index) => {
+    const normalizedIndex = (index + options.length) % options.length;
+    options.forEach((option, optionIndex) => option.setAttribute("tabindex", optionIndex === normalizedIndex ? "0" : "-1"));
+    options[normalizedIndex]?.focus();
+  };
+  const syncVisualSelection = () => {
+    const selectedValue = normalizeSortValue(select.value);
+    const selected = options.find((option) => option.dataset.sortValue === selectedValue) || options[0];
+    options.forEach((option) => {
+      option.setAttribute("aria-selected", String(option === selected));
+      option.setAttribute("tabindex", "-1");
+    });
+    if (elements.sortMenuValue && selected) elements.sortMenuValue.textContent = selected.textContent.trim();
+  };
+  const close = ({ restoreFocus = false } = {}) => {
+    menu.hidden = true;
+    trigger.setAttribute("aria-expanded", "false");
+    options.forEach((option) => option.setAttribute("tabindex", "-1"));
+    if (restoreFocus) trigger.focus();
+  };
+  const open = ({ focusIndex = selectedIndex() } = {}) => {
+    menu.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+    focusOption(focusIndex);
+  };
+  const commit = (option) => {
+    if (!option) return;
+    select.value = option.dataset.sortValue || "recent";
+    syncVisualSelection();
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    close({ restoreFocus: true });
+  };
+
+  trigger.addEventListener("click", () => menu.hidden ? open() : close());
+  trigger.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      open();
+      return;
+    }
+    if (event.key === "Escape" && !menu.hidden) {
+      event.preventDefault();
+      close({ restoreFocus: true });
+    }
+  });
+  options.forEach((option) => option.addEventListener("click", () => commit(option)));
+  menu.addEventListener("keydown", (event) => {
+    const current = options.indexOf(document.activeElement);
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close({ restoreFocus: true });
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const delta = event.key === "ArrowDown" ? 1 : -1;
+      focusOption((current < 0 ? selectedIndex() : current) + delta);
+    } else if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      focusOption(event.key === "Home" ? 0 : options.length - 1);
+    } else if ((event.key === "Enter" || event.key === " ") && current >= 0) {
+      event.preventDefault();
+      commit(options[current]);
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (!menu.hidden && !event.target.closest(".sort-menu-control")) close();
+  });
+  select.addEventListener("change", syncVisualSelection);
+  syncVisualSelection();
+}
+
 function bindFilterMenuToggle() {
   const menu = elements.filterMenu;
   const toggle = elements.filterToggle;
   if (!menu || !toggle) return;
-  toggle.addEventListener("click", () => {
-    menu.classList.toggle("active");
+
+  const setOpen = (open, { restoreFocus = false } = {}) => {
+    if (!open) closeFilterOptionLists();
+    menu.hidden = !open;
+    menu.classList.toggle("active", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.setAttribute("aria-label", open ? "Close filters" : "Open filters");
+    if (restoreFocus) toggle.focus();
+  };
+
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setOpen(menu.hidden);
   });
+  elements.filterClose?.addEventListener("click", () => setOpen(false, { restoreFocus: true }));
   document.addEventListener("click", (event) => {
     if (!menu.contains(event.target) && !toggle.contains(event.target)) {
-      menu.classList.remove("active");
+      setOpen(false);
     }
   });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !menu.hidden) setOpen(false, { restoreFocus: true });
+  });
+}
+
+function closeFilterMenu() {
+  if (!elements.filterMenu || !elements.filterToggle) return;
+  closeFilterOptionLists();
+  elements.filterMenu.hidden = true;
+  elements.filterMenu.classList.remove("active");
+  elements.filterToggle.setAttribute("aria-expanded", "false");
+  elements.filterToggle.setAttribute("aria-label", "Open filters");
+}
+
+function updateFilterCount() {
+  const count = (elements.experience?.value ? 1 : 0) + selectedStates.size + selectedSpecialties.size;
+  if (elements.filterCount) {
+    elements.filterCount.textContent = String(count);
+    elements.filterCount.hidden = count === 0;
+  }
+  elements.filterToggle?.classList.toggle("has-filters", count > 0);
+  const description = count
+    ? `Open filters, ${count} active filter${count === 1 ? "" : "s"}`
+    : "Open filters";
+  if (elements.filterToggle?.getAttribute("aria-expanded") !== "true") {
+    elements.filterToggle?.setAttribute("aria-label", description);
+  }
 }
 
 function bindFilterButtons() {
   elements.applyFilters?.addEventListener("click", () => {
     syncFiltersFromInputs();
-    elements.filterMenu?.classList.remove("active");
+    closeFilterMenu();
     resetPageAndFetch();
   });
   elements.clearFilters?.addEventListener("click", () => {
@@ -246,20 +502,20 @@ function bindFilterButtons() {
     selectedStates.clear();
     renderSelectedStateChips();
     if (elements.stateList) {
-      elements.stateList.querySelectorAll("input[type='checkbox']").forEach((cb) => {
-        cb.checked = false;
+      elements.stateList.querySelectorAll("[role='option']").forEach((option) => {
+        option.setAttribute("aria-selected", "false");
       });
       elements.stateList.classList.remove("show");
     }
     selectedSpecialties.clear();
     updateSpecialtyInput();
     if (elements.specialtyList) {
-      elements.specialtyList.querySelectorAll("input[type='checkbox']").forEach((cb) => {
-        cb.checked = false;
+      elements.specialtyList.querySelectorAll("[role='option']").forEach((option) => {
+        option.setAttribute("aria-selected", "false");
       });
       elements.specialtyList.classList.remove("show");
     }
-    elements.filterMenu?.classList.remove("active");
+    closeFilterMenu();
     syncFiltersFromInputs();
     resetPageAndFetch();
   });
@@ -271,97 +527,142 @@ function syncFiltersFromInputs() {
   state.filters.sort = normalizeSortValue(elements.sortBy?.value);
 }
 
+function filterOptionElements(list) {
+  return Array.from(list?.querySelectorAll?.("[role='option'][data-filter-value]") || []);
+}
+
+function closeFilterOptionList(input, list, { restoreFocus = false } = {}) {
+  if (!input || !list) return;
+  list.classList.remove("show");
+  input.setAttribute("aria-expanded", "false");
+  filterOptionElements(list).forEach((option) => option.setAttribute("tabindex", "-1"));
+  if (restoreFocus) input.focus();
+}
+
+function closeFilterOptionLists({ except = null } = {}) {
+  [
+    [elements.specialtyInput, elements.specialtyList],
+    [elements.stateInput, elements.stateList],
+  ].forEach(([input, list]) => {
+    if (list && list !== except) closeFilterOptionList(input, list);
+  });
+}
+
+function focusFilterOption(list, index) {
+  const options = filterOptionElements(list);
+  if (!options.length) return;
+  const normalizedIndex = (index + options.length) % options.length;
+  options.forEach((option, optionIndex) => option.setAttribute("tabindex", optionIndex === normalizedIndex ? "0" : "-1"));
+  options[normalizedIndex].focus();
+  options[normalizedIndex].scrollIntoView({ block: "nearest" });
+}
+
+function openFilterOptionList(input, list, render, { moveFocus = false } = {}) {
+  closeFilterOptionLists({ except: list });
+  render();
+  list.classList.add("show");
+  input.setAttribute("aria-expanded", "true");
+  if (moveFocus) {
+    const options = filterOptionElements(list);
+    const selectedIndex = options.findIndex((option) => option.getAttribute("aria-selected") === "true");
+    focusFilterOption(list, selectedIndex >= 0 ? selectedIndex : 0);
+  }
+}
+
+function handleFilterOptionListKeydown(event, { input, list, toggleSelection }) {
+  const options = filterOptionElements(list);
+  const current = options.indexOf(document.activeElement);
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    closeFilterOptionList(input, list, { restoreFocus: true });
+  } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const delta = event.key === "ArrowDown" ? 1 : -1;
+    focusFilterOption(list, (current < 0 ? 0 : current) + delta);
+  } else if (event.key === "Home" || event.key === "End") {
+    event.preventDefault();
+    focusFilterOption(list, event.key === "Home" ? 0 : options.length - 1);
+  } else if ((event.key === "Enter" || event.key === " ") && current >= 0) {
+    event.preventDefault();
+    toggleSelection(options[current]);
+  }
+}
+
 
 function bindModalEvents() {
-  elements.cancelInquire?.addEventListener("click", closeInquireModal);
-  elements.inquireModal?.addEventListener("click", (event) => {
-    if (event.target === elements.inquireModal) {
-      closeInquireModal();
-    }
-  });
-  elements.confirmInquire?.addEventListener("click", sendInquiry);
-  elements.jobList?.addEventListener("change", (event) => {
-    if (event.target.matches("input[name='jobOption']")) {
-      clearFieldError(elements.jobList);
-    }
-  });
-  elements.inquireMessage?.addEventListener("input", () => clearFieldError(elements.inquireMessage));
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeInquireModal();
-  });
-  elements.authBlocker?.addEventListener("click", (event) => {
-    if (event.target === elements.authBlocker) {
-      closeAuthBlocker();
-    }
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeAuthBlocker();
-  });
+  elements.authBlocker?.addEventListener("click", event => { if (event.target === elements.authBlocker) closeAuthBlocker(); });
+  document.addEventListener("keydown", event => { if (event.key === "Escape") closeAuthBlocker(); });
 }
 
 function initStateDropdown() {
   if (!elements.stateInput || !elements.stateList) return;
+  elements.stateInput.readOnly = true;
+  elements.stateInput.placeholder = "State";
+  elements.stateInput.setAttribute("role", "combobox");
+  elements.stateInput.setAttribute("aria-haspopup", "listbox");
+  elements.stateInput.setAttribute("aria-controls", elements.stateList.id);
+  elements.stateInput.setAttribute("aria-expanded", "false");
+  elements.stateInput.setAttribute("aria-autocomplete", "none");
+  elements.stateList.setAttribute("role", "listbox");
+  elements.stateList.setAttribute("aria-multiselectable", "true");
   const stateWrapper = elements.stateInput.closest(".dropdown-wrapper");
   const specialtyWrapper = elements.specialtyInput?.closest(".dropdown-wrapper") || null;
-  const closeList = () => elements.stateList.classList.remove("show");
-  const openList = () => {
-    renderList(elements.stateInput.value);
-    elements.specialtyList?.classList.remove("show");
-    elements.stateList.classList.add("show");
-  };
-  const renderList = (query = "") => {
-    const normalizedQuery = String(query || "").trim().toLowerCase();
-    const matches = states.filter((stateName) => stateName.toLowerCase().includes(normalizedQuery));
-    elements.stateList.innerHTML = matches.length
-      ? matches
+  const closeList = (options) => closeFilterOptionList(elements.stateInput, elements.stateList, options);
+  const renderList = () => {
+    elements.stateList.innerHTML = states
       .map((stateName) => {
         const slug = stateName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         return `
-        <li>
-          <input type="checkbox" id="state-${slug}" value="${escapeHTML(stateName)}" ${selectedStates.has(stateName) ? "checked" : ""}>
-          <label for="state-${slug}">${escapeHTML(stateName)}</label>
+        <li id="state-option-${slug}" role="option" tabindex="-1" data-filter-value="${escapeHTML(stateName)}" aria-selected="${selectedStates.has(stateName) ? "true" : "false"}">
+          <span class="filter-option-check" aria-hidden="true"></span>
+          <span class="filter-option-label">${escapeHTML(stateName)}</span>
         </li>`;
       })
-      .join("")
-      : '<li class="empty-option">No states match</li>';
+      .join("");
+  };
+  const openList = (options) => {
+    openFilterOptionList(elements.stateInput, elements.stateList, renderList, options);
+  };
+  const toggleSelection = (row) => {
+    const value = row?.dataset.filterValue || "";
+    if (!value) return;
+    const selected = row.getAttribute("aria-selected") !== "true";
+    row.setAttribute("aria-selected", String(selected));
+    if (selected) selectedStates.add(value);
+    else selectedStates.delete(value);
+    renderSelectedStateChips();
+    updateStateInput();
+    state.filters.location = [...selectedStates].join("|");
+    scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
   };
   elements.stateInput.addEventListener("click", (event) => {
     event.preventDefault();
-    openList();
-  });
-  elements.stateInput.addEventListener("focus", openList);
-  elements.stateInput.addEventListener("input", () => {
-    renderList(elements.stateInput.value);
-    elements.stateList.classList.add("show");
+    if (elements.stateList.classList.contains("show")) closeList();
+    else openList();
   });
   elements.stateInput.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      closeList();
-      elements.stateInput.blur();
+      event.preventDefault();
+      event.stopPropagation();
+      closeList({ restoreFocus: true });
       return;
     }
     if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown") {
       event.preventDefault();
-      openList();
+      openList({ moveFocus: true });
     }
   });
   elements.stateList.addEventListener("click", (event) => {
-    const row = event.target.closest("li");
-    if (!row) return;
-    const checkbox = row.querySelector("input[type='checkbox']");
-    if (!checkbox) return;
-    if (event.target === checkbox || event.target.tagName === "LABEL") return;
-    checkbox.checked = !checkbox.checked;
-    checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+    const row = event.target.closest("[role='option'][data-filter-value]");
+    if (row) toggleSelection(row);
   });
-  elements.stateList.addEventListener("change", (event) => {
-    const value = event.target.value;
-    if (!value) return;
-    if (event.target.checked) selectedStates.add(value);
-    else selectedStates.delete(value);
-    renderSelectedStateChips();
-    state.filters.location = [...selectedStates].join("|");
-    scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
+  elements.stateList.addEventListener("keydown", (event) => {
+    handleFilterOptionListKeydown(event, {
+      input: elements.stateInput,
+      list: elements.stateList,
+      toggleSelection,
+    });
   });
   elements.selectedStateChips?.addEventListener("click", (event) => {
     const removeButton = event.target.closest("[data-remove-state]");
@@ -369,7 +670,7 @@ function initStateDropdown() {
     if (removeButton) {
       selectedStates.delete(removeButton.dataset.removeState || "");
       renderSelectedStateChips();
-      syncStateCheckboxes();
+      syncStateOptions();
       state.filters.location = [...selectedStates].join("|");
       scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
       return;
@@ -377,7 +678,7 @@ function initStateDropdown() {
     if (clearButton) {
       selectedStates.clear();
       renderSelectedStateChips();
-      syncStateCheckboxes();
+      syncStateOptions();
       state.filters.location = "";
       scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
     }
@@ -387,78 +688,92 @@ function initStateDropdown() {
       closeList();
     }
     if (!specialtyWrapper?.contains(event.target)) {
-      elements.specialtyList?.classList.remove("show");
+      closeFilterOptionList(elements.specialtyInput, elements.specialtyList);
     }
   });
   renderSelectedStateChips();
+  updateStateInput();
 }
 
-function syncStateCheckboxes() {
+function updateStateInput() {
+  if (!elements.stateInput) return;
+  const count = selectedStates.size;
+  elements.stateInput.value = count ? `${count} state${count === 1 ? "" : "s"} selected` : "";
+  elements.stateInput.setAttribute("aria-label", count ? `State, ${count} selected` : "State");
+}
+
+function syncStateOptions() {
   if (!elements.stateList) return;
-  elements.stateList.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
-    checkbox.checked = selectedStates.has(checkbox.value);
+  filterOptionElements(elements.stateList).forEach((option) => {
+    option.setAttribute("aria-selected", String(selectedStates.has(option.dataset.filterValue || "")));
   });
+  updateStateInput();
 }
 
 function initSpecialtyDropdown() {
   if (!elements.specialtyInput || !elements.specialtyList) return;
-  const closeList = () => elements.specialtyList.classList.remove("show");
-  const openList = () => {
-    renderList();
-    elements.stateList?.classList.remove("show");
-    elements.specialtyList.classList.add("show");
-  };
-  const toggleList = () => {
-    if (elements.specialtyList.classList.contains("show")) {
-      closeList();
-    } else {
-      openList();
-    }
-  };
+  elements.specialtyInput.readOnly = true;
+  elements.specialtyInput.placeholder = "Specialty";
+  elements.specialtyInput.setAttribute("role", "combobox");
+  elements.specialtyInput.setAttribute("aria-haspopup", "listbox");
+  elements.specialtyInput.setAttribute("aria-controls", elements.specialtyList.id);
+  elements.specialtyInput.setAttribute("aria-expanded", "false");
+  elements.specialtyInput.setAttribute("aria-autocomplete", "none");
+  elements.specialtyList.setAttribute("role", "listbox");
+  elements.specialtyList.setAttribute("aria-multiselectable", "true");
+  const closeList = (options) => closeFilterOptionList(elements.specialtyInput, elements.specialtyList, options);
   const renderList = () => {
     elements.specialtyList.innerHTML = specialties
       .map((spec) => {
         const slug = spec.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         return `
-        <li>
-          <input type="checkbox" id="spec-${slug}" value="${spec}" ${selectedSpecialties.has(spec) ? "checked" : ""}>
-          <label for="spec-${slug}">${spec}</label>
+        <li id="specialty-option-${slug}" role="option" tabindex="-1" data-filter-value="${escapeHTML(spec)}" aria-selected="${selectedSpecialties.has(spec) ? "true" : "false"}">
+          <span class="filter-option-check" aria-hidden="true"></span>
+          <span class="filter-option-label">${escapeHTML(spec)}</span>
         </li>`;
       })
       .join("");
   };
+  const openList = (options) => {
+    openFilterOptionList(elements.specialtyInput, elements.specialtyList, renderList, options);
+  };
+  const toggleSelection = (row) => {
+    const value = row?.dataset.filterValue || "";
+    if (!value) return;
+    const selected = row.getAttribute("aria-selected") !== "true";
+    row.setAttribute("aria-selected", String(selected));
+    if (selected) selectedSpecialties.add(value);
+    else selectedSpecialties.delete(value);
+    updateSpecialtyInput();
+    scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
+  };
   elements.specialtyInput.addEventListener("click", (event) => {
     event.preventDefault();
-    toggleList();
+    if (elements.specialtyList.classList.contains("show")) closeList();
+    else openList();
   });
-  elements.specialtyInput.addEventListener("focus", openList);
   elements.specialtyInput.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      closeList();
-      elements.specialtyInput.blur();
+      event.preventDefault();
+      event.stopPropagation();
+      closeList({ restoreFocus: true });
       return;
     }
     if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown") {
       event.preventDefault();
-      openList();
+      openList({ moveFocus: true });
     }
   });
   elements.specialtyList.addEventListener("click", (event) => {
-    const row = event.target.closest("li");
-    if (!row) return;
-    const checkbox = row.querySelector("input[type='checkbox']");
-    if (!checkbox) return;
-    if (event.target === checkbox || event.target.tagName === "LABEL") return;
-    checkbox.checked = !checkbox.checked;
-    checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+    const row = event.target.closest("[role='option'][data-filter-value]");
+    if (row) toggleSelection(row);
   });
-  elements.specialtyList.addEventListener("change", (event) => {
-    const value = event.target.value;
-    if (!value) return;
-    if (event.target.checked) selectedSpecialties.add(value);
-    else selectedSpecialties.delete(value);
-    updateSpecialtyInput();
-    resetPageAndFetch();
+  elements.specialtyList.addEventListener("keydown", (event) => {
+    handleFilterOptionListKeydown(event, {
+      input: elements.specialtyInput,
+      list: elements.specialtyList,
+      toggleSelection,
+    });
   });
   updateSpecialtyInput();
 }
@@ -486,10 +801,13 @@ function renderSelectedStateChips() {
 
 function updateSpecialtyInput() {
   if (!elements.specialtyInput) return;
-  elements.specialtyInput.value = [...selectedSpecialties].join(", ");
+  const count = selectedSpecialties.size;
+  elements.specialtyInput.value = count ? `${count} specialt${count === 1 ? "y" : "ies"} selected` : "";
+  elements.specialtyInput.setAttribute("aria-label", count ? `Specialty, ${count} selected` : "Specialty");
 }
 
 function resetPageAndFetch(options = {}) {
+  updateFilterCount();
   if (filterFetchTimer) {
     clearTimeout(filterFetchTimer);
     filterFetchTimer = null;
@@ -499,6 +817,7 @@ function resetPageAndFetch(options = {}) {
 }
 
 function scheduleResetPageAndFetch(options = {}) {
+  updateFilterCount();
   if (filterFetchTimer) clearTimeout(filterFetchTimer);
   filterFetchTimer = setTimeout(() => {
     filterFetchTimer = null;
@@ -530,9 +849,15 @@ async function loadParalegals(options = {}) {
       headers: { Accept: "application/json" },
       credentials: state.isLoggedIn ? "include" : "omit",
     });
-    const data = await res.json();
+    const contentType = String(res.headers.get("content-type") || "").toLowerCase();
+    const data = contentType.includes("application/json")
+      ? await res.json()
+      : null;
     if (!res.ok) {
-      throw new Error(data?.error || "Unable to load paralegals");
+      throw new Error(data?.error || "Paralegal profiles are temporarily unavailable.");
+    }
+    if (!data || typeof data !== "object") {
+      throw new Error("Paralegal profiles are temporarily unavailable.");
     }
     renderParalegals(Array.isArray(data.items) ? data.items : []);
     updatePagination({ total: data.total, pages: data.pages, page: data.page });
@@ -542,40 +867,12 @@ async function loadParalegals(options = {}) {
   } catch (error) {
     console.error(error);
     renderParalegals([]);
+    if (elements.pagination) elements.pagination.hidden = true;
     setResultsStatus(error.message || "Unable to load paralegals right now.", true);
   }
 }
 
-async function loadCases() {
-  try {
-    const res = await secureFetch("/api/cases/my-active", {
-      headers: { Accept: "application/json" },
-    });
-    const payload = await res.json().catch(() => ({}));
-    const items = Array.isArray(payload?.items)
-      ? payload.items
-      : Array.isArray(payload)
-      ? payload
-      : [];
-    availableCases = items.filter((item) => {
-      const archived = Boolean(item.archived);
-      const assigned = Boolean(
-        item.acceptedParalegal ||
-          item.assignedTo?.id ||
-          item.assignedTo?._id ||
-          item.paralegal?.id ||
-          item.paralegal?._id ||
-          item.paralegal ||
-          item.paralegalId
-      );
-      return !archived && !assigned;
-    });
-  } catch (error) {
-    console.warn("Unable to load cases", error);
-    availableCases = [];
-  }
-  renderCaseOptions();
-}
+
 
 function renderParalegals(items) {
   elements.results.innerHTML = "";
@@ -589,20 +886,26 @@ function renderParalegals(items) {
   setResultsStatus("");
   const fragment = document.createDocumentFragment();
   items.forEach((item) => {
-    fragment.appendChild(buildParalegalCard(item));
+    const card = buildParalegalCard(item);
+    if (card) fragment.appendChild(card);
   });
   elements.results.appendChild(fragment);
 }
 
 function buildParalegalCard(paralegal) {
   const paralegalId = String(paralegal._id || paralegal.id || paralegal.paralegalId || "");
-  const name = formatName(paralegal);
-  const summary = (paralegal.bio || paralegal.about || "This professional hasn’t added a summary yet.").trim();
-  const location = paralegal.location || "Location not specified";
-  const availability = paralegal.availability || "Availability on request";
-  const specialties = (paralegal.practiceAreas || []).slice(0, 2);
+  const presentation = normalizePresentation(paralegal.presentation, window.location.origin, {
+    expectedKind: "card",
+    expectedType: "profile",
+    expectedId: paralegalId,
+  });
+  if (!presentation) return null;
+  const name = presentation.object.title;
+  const location = presentation.details.find((item) => item.label === "Location")?.value || "";
+  const specialties = (presentation.details.find((item) => item.label === "Practice areas")?.value || "").split(", ").filter(Boolean).slice(0, 2);
   const experience = formatExperience(paralegal.yearsExperience);
-  const avatar = paralegal.avatarURL || buildInitialAvatar(getInitials(name));
+  const avatar = paralegal.avatarURL || AVATAR_PLACEHOLDER;
+  const profileHref = presentation.links.self;
 
   const card = document.createElement("article");
   card.className = "paralegal-card";
@@ -612,18 +915,21 @@ function buildParalegalCard(paralegal) {
 
   const photoLink = document.createElement("a");
   photoLink.className = "profile-photo-link profile-link";
-  photoLink.href = buildParalegalProfileUrl(paralegalId);
+  photoLink.href = profileHref;
   photoLink.addEventListener("click", (event) => {
     requireSignIn(event);
   });
   const img = document.createElement("img");
   img.src = avatar;
   img.alt = `Portrait of ${name}`;
+  img.addEventListener("error", () => {
+    if (img.getAttribute("src") !== AVATAR_PLACEHOLDER) img.src = AVATAR_PLACEHOLDER;
+  }, { once: true });
   photoLink.appendChild(img);
   card.appendChild(photoLink);
   const heading = document.createElement("h3");
   const headingLink = document.createElement("a");
-  headingLink.href = buildParalegalProfileUrl(paralegalId);
+  headingLink.href = profileHref;
   headingLink.textContent = name;
   headingLink.className = "profile-name-link profile-link";
   headingLink.addEventListener("click", (event) => {
@@ -635,17 +941,19 @@ function buildParalegalCard(paralegal) {
   content.appendChild(heading);
 
   const intro = document.createElement("p");
-  intro.textContent = `${specialties[0] || "Generalist"} · ${location}`;
-  content.appendChild(intro);
+  intro.textContent = [specialties[0], location].filter(Boolean).join(" · ");
+  if (intro.textContent) content.appendChild(intro);
 
-  const bio = document.createElement("p");
-  bio.textContent = getFirstSentence(summary);
-  content.appendChild(bio);
+  if (presentation.summary) {
+    const bio = document.createElement("p");
+    bio.textContent = getFirstSentence(presentation.summary);
+    content.appendChild(bio);
+  }
 
   const meta = document.createElement("div");
   meta.className = "card-meta";
   meta.appendChild(buildMetaChip("Experience", experience));
-  meta.appendChild(buildMetaChip("Availability", availability, { hideLabel: true }));
+  meta.appendChild(buildMetaChip("Status", presentation.status.label, { hideLabel: true }));
   content.appendChild(meta);
   card.appendChild(content);
 
@@ -655,8 +963,10 @@ function buildParalegalCard(paralegal) {
     const inquireBtn = document.createElement("button");
     inquireBtn.type = "button";
     inquireBtn.className = "action-btn invite-btn";
-    inquireBtn.textContent = "Invite to Case";
-    inquireBtn.addEventListener("click", () => openInquireModal({ id: paralegalId, name }));
+    inquireBtn.dataset.publicAction = "primary";
+    inquireBtn.dataset.actionShape = "pill";
+    inquireBtn.textContent = "Invite to Matter";
+    inquireBtn.addEventListener("click", () => openInquireModal({ id: paralegalId, name }, inquireBtn));
     actions.appendChild(inquireBtn);
   }
   if (actions.children.length) {
@@ -668,7 +978,7 @@ function buildParalegalCard(paralegal) {
     const isProfileLink = event.target.closest(".profile-link");
     if (isAction || isProfileLink || !paralegalId) return;
     if (requireSignIn(event)) return;
-    window.location.href = buildParalegalProfileUrl(paralegalId);
+    window.location.href = profileHref;
   });
 
   return card;
@@ -698,6 +1008,7 @@ function setResultsStatus(message, isError = false) {
 function updatePagination(data = {}) {
   state.total = Number(data.total || 0);
   state.pages = Number(data.pages || 1) || 1;
+  if (elements.pagination) elements.pagination.hidden = state.pages <= 1;
   updatePaginationLabel();
   if (elements.prevPage) elements.prevPage.disabled = state.page <= 1;
   if (elements.nextPage) elements.nextPage.disabled = state.page >= state.pages;
@@ -705,145 +1016,20 @@ function updatePagination(data = {}) {
 
 function updatePaginationLabel() {
   if (!elements.paginationLabel) return;
-  const from = state.total ? (state.page - 1) * state.limit + 1 : 0;
-  const to = Math.min(state.page * state.limit, state.total);
-  const range = state.total ? `${from}-${to}` : "0";
-  elements.paginationLabel.textContent = `Page ${state.page} of ${Math.max(state.pages, 1)} • Showing ${range} of ${state.total}`;
+  elements.paginationLabel.textContent = `Page ${state.page} of ${Math.max(state.pages, 1)}`;
 }
 
-function openInquireModal(paralegal) {
-  activeParalegal = paralegal;
-  if (!elements.inquireModal) return;
-  clearFieldError(elements.jobList);
-  clearFieldError(elements.inquireMessage);
-  elements.selectedParalegalText.textContent = `Select an open case for ${paralegal.name}.`;
-  elements.inquireMessage.value = "";
-  const firstOption = elements.jobList.querySelector("input[name='jobOption']");
-  if (firstOption) firstOption.checked = false;
-  elements.confirmInquire.disabled = !availableCases.length;
-  elements.inquireModal.classList.add("show");
+function openInquireModal(paralegal, trigger) {
+  if (!state.canInvite) return;
+  invitationDialog ||= createLegacyInvitationDialog({ ownerId: normalizeId(state.viewer), request: secureFetch });
+  invitationDialog.open({ paralegalId: paralegal.id, name: paralegal.name, trigger });
 }
 
-function closeInquireModal() {
-  activeParalegal = null;
-  elements.inquireModal?.classList.remove("show");
-  elements.inquireMessage.value = "";
-  clearFieldError(elements.jobList);
-  clearFieldError(elements.inquireMessage);
-  const checked = elements.jobList?.querySelector("input[name='jobOption']:checked");
-  if (checked) checked.checked = false;
-}
 
-function renderCaseOptions() {
-  if (!elements.jobList) return;
-  if (!availableCases.length) {
-    elements.jobList.innerHTML = "<p>No open cases available. Post a job to invite paralegals.</p>";
-    elements.confirmInquire.disabled = true;
-    return;
-  }
-  const targetId = String(
-    normalizeId(activeParalegal) ||
-      normalizeId(activeParalegal?.paralegal) ||
-      normalizeId(activeParalegal?.user) ||
-      normalizeId(activeParalegal?.person)
-  );
-  const options = availableCases.map((c) => {
-    const caseId = c.id || c._id;
-    const inviteEntries = Array.isArray(c.invites) ? c.invites : [];
-    const matchingInvite = inviteEntries.find(
-      (invite) => normalizeId(invite?.paralegalId) && String(normalizeId(invite.paralegalId)) === targetId
-    );
-    const inviteStatus = String(matchingInvite?.status || "").toLowerCase();
-    const assignedId =
-      normalizeId(c.assignedTo?.id) ||
-      normalizeId(c.assignedTo?._id) ||
-      normalizeId(c.paralegalId) ||
-      normalizeId(c.paralegal?.id) ||
-      normalizeId(c.paralegal?._id) ||
-      normalizeId(c.paralegal);
-    const assigned = Boolean(assignedId || c.acceptedParalegal);
-    const invited = targetId && (inviteStatus === "pending" || inviteStatus === "accepted");
-    const disabled = invited || assigned;
-    const statusLabel = invited
-      ? "Invitation already sent to this paralegal"
-      : assigned
-      ? "A paralegal is already assigned"
-      : "";
-    return { caseId, title: c.title || "Untitled matter", disabled, statusLabel };
-  });
-  const visibleOptions = options.filter((opt) => opt.statusLabel !== "A paralegal is already assigned");
-  const hasSelectable = visibleOptions.some((opt) => !opt.disabled);
-  if (!visibleOptions.length) {
-    elements.jobList.innerHTML = "<p>No open cases available. Post a job to invite paralegals.</p>";
-    elements.confirmInquire.disabled = true;
-    return;
-  }
-  elements.jobList.innerHTML = visibleOptions
-    .map(
-      (opt) => `
-      <label class="job-option${opt.disabled ? " disabled" : ""}">
-        <input type="radio" name="jobOption" value="${opt.caseId}" ${opt.disabled ? "disabled" : ""} aria-disabled="${opt.disabled ? "true" : "false"}">
-        <span>${escapeHtml(opt.title)}${opt.statusLabel ? ` — ${escapeHtml(opt.statusLabel)}` : ""}</span>
-      </label>`
-    )
-    .join("");
-  elements.confirmInquire.disabled = !hasSelectable;
-}
 
-async function sendInquiry() {
-  if (!activeParalegal || !elements.jobList) return;
-  const selected = elements.jobList.querySelector("input[name='jobOption']:checked");
-  clearFieldError(elements.jobList);
-  if (!selected) {
-    showFieldError(elements.jobList, "Select an open case before sending.");
-    showToast("Select an open case first.", "err");
-    return;
-  }
-  const message = (elements.inquireMessage.value || "").trim();
-  const targetId = normalizeId(activeParalegal) || normalizeId(activeParalegal?.paralegal) || normalizeId(activeParalegal?.user) || normalizeId(activeParalegal?.person);
-  const caseMeta = availableCases.find((c) => String(c.id || c._id) === String(selected.value));
-  if (caseMeta && targetId) {
-    const inviteEntries = Array.isArray(caseMeta.invites) ? caseMeta.invites : [];
-    const matchingInvite = inviteEntries.find(
-      (invite) => normalizeId(invite?.paralegalId) && String(normalizeId(invite.paralegalId)) === targetId
-    );
-    const inviteStatus = String(matchingInvite?.status || "").toLowerCase();
-    const assignedId =
-      normalizeId(caseMeta.assignedTo?.id) ||
-      normalizeId(caseMeta.assignedTo?._id) ||
-      normalizeId(caseMeta.paralegalId) ||
-      normalizeId(caseMeta.paralegal?.id) ||
-      normalizeId(caseMeta.paralegal?._id) ||
-      normalizeId(caseMeta.paralegal);
-    if (inviteStatus === "pending" || inviteStatus === "accepted") {
-      showToast("Invitation already sent to this paralegal for this case.", "err");
-      return;
-    }
-    if (assignedId || caseMeta.acceptedParalegal) {
-      showToast("A paralegal is already assigned to this case.", "err");
-      return;
-    }
-  }
-  try {
-    const res = await secureFetch(
-      `/api/cases/${encodeURIComponent(selected.value)}/invite/${encodeURIComponent(activeParalegal.id)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseId: selected.value, message }),
-      }
-    );
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || "Unable to send invite");
-    }
-    showToast("Invite sent successfully.", "ok");
-    closeInquireModal();
-  } catch (error) {
-    console.error(error);
-    showToast(error.message || "Unable to send invite", "err");
-  }
-}
+
+
+
 
 function parseExperience(value = "") {
   const match = value.match(/\d+/);
@@ -856,14 +1042,6 @@ function normalizeSortValue(value = "") {
   return "recent";
 }
 
-function handleContactClick(paralegalId) {
-  if (!paralegalId) return;
-  if (!state.isLoggedIn) {
-    window.location.href = "login.html";
-    return;
-  }
-  window.location.href = buildParalegalProfileUrl(paralegalId);
-}
 
 function formatExperience(years) {
   const num = Number(years);
@@ -871,81 +1049,4 @@ function formatExperience(years) {
   if (num <= 0) return "Under a year";
   if (num >= 10) return "10+ years";
   return `${Math.round(num)}+ years`;
-}
-
-function formatName(person = {}) {
-  const fn = person.firstName || person.first_name || "";
-  const ln = person.lastName || person.last_name || "";
-  return `${fn} ${ln}`.trim() || "Experienced Paralegal";
-}
-
-function getInitials(name = "") {
-  const parts = name.trim().split(/\\s+/).filter(Boolean);
-  const initials = parts.slice(0, 2).map((p) => p[0]?.toUpperCase() || "");
-  return (initials.join("") || "A").slice(0, 2);
-}
-
-function buildInitialAvatar(initials) {
-  const label = (initials || "A").slice(0, 2).toUpperCase();
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><circle cx='40' cy='40' r='36' fill='#d4c6a4' stroke='#ffffff' stroke-width='4'/><text x='50%' y='55%' text-anchor='middle' font-family='Sarabun, Arial' font-size='28' fill='#1a1a1a' font-weight='600'>${label}</text></svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
-
-function truncate(text, max = 200) {
-  if (!text) return "";
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
-}
-
-function buildParalegalProfileUrl(paralegalId = "") {
-  const safeId = String(paralegalId || "").trim();
-  if (!safeId) return "profile-paralegal.html";
-  return `profile-paralegal.html?paralegalId=${encodeURIComponent(safeId)}`;
-}
-
-function escapeHtml(value = "") {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function showFieldError(target, message) {
-  if (!target) return;
-  clearFieldError(target);
-  target.classList?.add("input-error");
-  if (typeof target.setAttribute === "function") {
-    target.setAttribute("aria-invalid", "true");
-  }
-  const error = document.createElement("div");
-  error.className = "field-error";
-  error.textContent = message;
-  const wrapper = target.closest(".field") || target.closest("[data-field-wrapper]");
-  if (wrapper) wrapper.appendChild(error);
-  else target.insertAdjacentElement("afterend", error);
-}
-
-function clearFieldError(target) {
-  if (!target) return;
-  target.classList?.remove("input-error");
-  if (typeof target.removeAttribute === "function") {
-    target.removeAttribute("aria-invalid");
-  }
-  const wrapper = target.closest(".field") || target.closest("[data-field-wrapper]");
-  if (wrapper) {
-    const existing = wrapper.querySelector(".field-error");
-    if (existing) existing.remove();
-    return;
-  }
-  const next = target.nextElementSibling;
-  if (next?.classList.contains("field-error")) next.remove();
-}
-
-function showToast(message, type = "info") {
-  if (toast?.show) {
-    toast.show(message, { targetId: "toastBanner", type });
-  } else {
-    alert(message);
-  }
 }
