@@ -1609,10 +1609,10 @@ const { skip, limit, page } = parsePagination(req, { defaultLimit: 25 });
 if (status !== undefined && (typeof status !== "string" || !CASE_STATUS_ENUM.includes(status)) ||
     attorney !== undefined && (typeof attorney !== "string" || !isObjId(attorney)) ||
     paralegal !== undefined && (typeof paralegal !== "string" || !isObjId(paralegal))) {
-  return res.status(400).json({ error: "Choose valid case filters." });
+  return res.status(400).json({ error: "Choose valid Matter filters." });
 }
 if (q !== undefined && (typeof q !== "string" || q.length > 200)) {
-  return res.status(400).json({ error: "Choose a valid case search." });
+  return res.status(400).json({ error: "Choose a valid Matter search." });
 }
 
 const filter = {};
