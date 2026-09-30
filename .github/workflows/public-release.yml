@@ -1,0 +1,61 @@
+name: Public release checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [codex/public-site-release]
+
+permissions:
+  contents: read
+
+jobs:
+  public-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.17.0
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install exact dependencies
+        working-directory: backend
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: "true"
+          MONGOMS_DISABLE_POSTINSTALL: "true"
+        run: npm ci --include=dev
+      - name: Audit production dependencies
+        working-directory: backend
+        run: npm audit --omit=dev --audit-level=high
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          JWT_SECRET: ci-only-jwt-secret-longer-than-thirty-two-bytes
+          EMAIL_DISABLE: "true"
+        run: npm test
+      - name: Install browser for public journeys
+        working-directory: backend
+        run: npx playwright install --with-deps chromium
+      - name: Run public browser journeys
+        working-directory: backend
+        env:
+          JWT_SECRET: ci-only-jwt-secret-longer-than-thirty-two-bytes
+          EMAIL_DISABLE: "true"
+        run: |
+          export PUPPETEER_EXECUTABLE_PATH="$(node -p "require('playwright').chromium.executablePath()")"
+          node scripts/test-public-auth-navigation-ui.js
+          npm run test:e2e:auth
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v3
