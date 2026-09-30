@@ -25,7 +25,6 @@
 .faq-guide nav a span{color:#4775bd;font-size:11px;letter-spacing:.08em}
 .faq-guide nav a:hover{color:#4775bd}
 .faq-page .faq-other-role{display:block;margin-top:32px;padding-top:24px;border-top:1px solid var(--faq-line);color:var(--faq-muted);font-size:14px;text-decoration:none}
-.faq-other-role span{color:#4775bd}
 .faq-group{margin:0 0 54px;scroll-margin-top:calc(var(--header-height,72px) + 28px)}
 .faq-group:last-child{margin-bottom:0}
 .faq-group h2{display:flex;align-items:baseline;gap:16px;margin-bottom:24px;color:#151c25;font:300 clamp(2rem,3vw,2.75rem)/1.1 "Cormorant Garamond",serif;letter-spacing:-.025em}
