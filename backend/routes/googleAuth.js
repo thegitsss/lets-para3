@@ -20,6 +20,7 @@ const target = (value, role) => resolveReturnTarget(value, role) || dashboard(ro
 const errorPage = (code, intent) => `${intent === "signup" ? "/signup.html" : "/login.html"}?google_error=${encodeURIComponent(code)}`;
 
 const googleStartLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
+const googleCallbackLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
 
 router.get("/google", googleStartLimiter, (req, res) => {
   const config = configuration();
@@ -39,7 +40,7 @@ router.get("/google", googleStartLimiter, (req, res) => {
 });
 
 function installGoogleCallback({ signAccess, authCookieOptions, accessTtlMs }) {
-  router.get("/google/callback", asyncHandler(async (req, res) => {
+  router.get("/google/callback", googleCallbackLimiter, asyncHandler(async (req, res) => {
     const config = configuration();
     const context = verifyContext(req.cookies?.[CONTEXT_COOKIE], "google_oauth");
     const intent = context?.intent === "signup" ? "signup" : "login";

@@ -1614,7 +1614,8 @@
       try {
         const url = new URL(raw);
         const host = url.hostname.toLowerCase();
-        return (url.protocol === 'https:' || url.protocol === 'http:') && host.endsWith('linkedin.com');
+        return (url.protocol === 'https:' || url.protocol === 'http:') &&
+          (host === 'linkedin.com' || host.endsWith('.linkedin.com'));
       } catch {
         return false;
       }
