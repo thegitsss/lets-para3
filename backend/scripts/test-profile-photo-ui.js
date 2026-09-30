@@ -1119,7 +1119,7 @@ async function openAndAssertSidebarAccountMenu(page, viewport, screenshotDir = "
   const menu = page.locator(".lpc-sidebar-account-menu");
   await menu.waitFor({ state: "visible" });
   assert.equal(await trigger.getAttribute("aria-expanded"), "true");
-  assert.equal(await menu.locator(".lpc-account-menu-product").textContent(), "Let's-ParaConnect");
+  assert.equal(await menu.locator(".lpc-account-menu-product").textContent(), "Let’s-ParaConnect");
   assert.equal(await menu.locator("[data-account-settings] .lpc-account-menu-label").textContent(), "Settings");
   assert.equal(await menu.locator("[data-account-create] .lpc-account-menu-label").textContent(), "Create");
   assert.equal(await menu.locator(".lpc-account-menu-user-name").textContent(), "Alex Attorney");

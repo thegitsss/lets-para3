@@ -5,8 +5,8 @@ services:
     runtime: node
     repo: https://github.com/thegitsss/lets-para3
     branch: main
-    buildCommand: cd backend && node scripts/verify-runtime.js && npm ci
-    preDeployCommand: cd backend && npm run migrate:production:apply
+    buildCommand: cd backend && node scripts/verify-runtime.js && PUPPETEER_SKIP_DOWNLOAD=true MONGOMS_DISABLE_POSTINSTALL=true npm ci --include=dev && npm run build:frontend
+    preDeployCommand: cd backend && npm run migrate:production:apply && npm run admin:communications:indexes
     startCommand: cd backend && npm start
     autoDeployTrigger: checksPass
     healthCheckPath: /api/health
@@ -90,9 +90,9 @@ services:
       - key: TZ
         value: America/New_York
       - key: LEGAL_APPROVED_TERMS_VERSION
-        value: "2026-08-15"
+        value: "2026-09-25"
       - key: LEGAL_APPROVED_PRIVACY_VERSION
-        value: "2026-08-15"
+        value: "2026-09-25"
       - key: LEGAL_COUNSEL_APPROVAL_ID
         sync: false
       - key: LEGAL_APPROVED_TERMS_SHA256
@@ -186,6 +186,26 @@ services:
       - key: DIRECTOR_SMTP_USER
         sync: false
       - key: DIRECTOR_SMTP_PASS
+        sync: false
+      - key: ADMIN_ALERT_EMAIL
+        sync: false
+      - key: SUPPORT_ZOHO_MAILBOX
+        sync: false
+      - key: SUPPORT_ZOHO_ACCOUNT_ID
+        sync: false
+      - key: SUPPORT_ZOHO_INBOX_FOLDER_ID
+        sync: false
+      - key: SUPPORT_ZOHO_CLIENT_ID
+        sync: false
+      - key: SUPPORT_ZOHO_CLIENT_SECRET
+        sync: false
+      - key: SUPPORT_ZOHO_REFRESH_TOKEN
+        sync: false
+      - key: SUPPORT_ZOHO_API_BASE_URL
+        sync: false
+      - key: SUPPORT_ZOHO_ACCOUNTS_BASE_URL
+        sync: false
+      - key: SUPPORT_MAIL_SYNC_SINCE
         sync: false
 
   - type: worker
@@ -405,4 +425,71 @@ services:
       - key: SMTP_FROM_NAME
         sync: false
       - key: OWNER_ALERT_EMAILS
+        sync: false
+
+  - type: worker
+    name: lets-para3-admin-communications
+    runtime: node
+    plan: starter
+    region: virginia
+    repo: https://github.com/thegitsss/lets-para3
+    branch: main
+    buildCommand: cd backend && node scripts/verify-runtime.js && PUPPETEER_SKIP_DOWNLOAD=true MONGOMS_DISABLE_POSTINSTALL=true npm ci
+    startCommand: cd backend && npm run admin:communications
+    autoDeployTrigger: checksPass
+    maxShutdownDelaySeconds: 300
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24.18.0
+      - key: APP_BASE_URL
+        value: https://www.lets-paraconnect.com
+      - key: EMAIL_BASE_URL
+        value: https://www.lets-paraconnect.com
+      - key: EMAIL_DISABLE
+        value: "false"
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: "true"
+      - key: MONGOMS_DISABLE_POSTINSTALL
+        value: "true"
+      - key: TZ
+        value: America/New_York
+      - key: MONGO_URI
+        sync: false
+      - key: DATA_ENCRYPTION_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        sync: false
+      - key: ADMIN_ALERT_EMAIL
+        sync: false
+      - key: SUPPORT_ZOHO_MAILBOX
+        sync: false
+      - key: SUPPORT_ZOHO_ACCOUNT_ID
+        sync: false
+      - key: SUPPORT_ZOHO_INBOX_FOLDER_ID
+        sync: false
+      - key: SUPPORT_ZOHO_CLIENT_ID
+        sync: false
+      - key: SUPPORT_ZOHO_CLIENT_SECRET
+        sync: false
+      - key: SUPPORT_ZOHO_REFRESH_TOKEN
+        sync: false
+      - key: SUPPORT_ZOHO_API_BASE_URL
+        sync: false
+      - key: SUPPORT_ZOHO_ACCOUNTS_BASE_URL
+        sync: false
+      - key: SUPPORT_MAIL_SYNC_SINCE
         sync: false

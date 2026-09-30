@@ -1,7 +1,6 @@
 const fs = require("fs");
 const path = require("path");
 const assert = require("assert/strict");
-const { execFileSync } = require("child_process");
 const { chromium } = require("playwright");
 const { prepareMatterModule, fulfillFrontendAsset } = require("./ui-module-fixture");
 
@@ -17,8 +16,6 @@ function stripScripts(source) {
 
 const htmlSource = stripScripts(fs.readFileSync(htmlPath, "utf8"));
 const scriptSource = prepareMatterModule(fs.readFileSync(scriptPath, "utf8"));
-const baselineHtmlSource = stripScripts(execFileSync("git", ["show", "HEAD:frontend/case-detail.html"], { cwd: repositoryRoot, encoding: "utf8" }));
-const baselineScriptSource = prepareMatterModule(execFileSync("git", ["show", "HEAD:frontend/assets/scripts/case-detail.js"], { cwd: repositoryRoot, encoding: "utf8" }));
 
 function experience(role) {
   const attorney = role === "attorney";
@@ -101,10 +98,8 @@ function matterPayload(role) {
   };
 }
 
-function documentHtml({ baseline = false } = {}) {
-  const html = baseline ? baselineHtmlSource : htmlSource;
-  const script = baseline ? baselineScriptSource : scriptSource;
-  return html.replace("</body>", `<script type="module">${script}</script></body>`);
+function documentHtml() {
+  return htmlSource.replace("</body>", `<script type="module">${scriptSource}</script></body>`);
 }
 
 async function installRoutes(page, role, counters) {
@@ -133,8 +128,8 @@ async function installRoutes(page, role, counters) {
       await route.fulfill({ json: { user: { ...actor, id: actor._id, status: "approved" } } });
       return;
     }
-    if (["/case-detail.html", "/baseline-case-detail.html"].includes(url.pathname)) {
-      await route.fulfill({ contentType: "text/html", body: documentHtml({ baseline: url.pathname.startsWith("/baseline") }) });
+    if (url.pathname === "/case-detail.html") {
+      await route.fulfill({ contentType: "text/html", body: documentHtml() });
       return;
     }
     if (url.pathname === `/api/cases/${matterId}`) {
@@ -344,31 +339,15 @@ async function runRoleJourney(browser, role) {
   await page.screenshot({ path: `/tmp/lpc-prompt2-${role}-matter-mobile.png`, fullPage: true });
   await page.close();
 
-  const baselinePage = await browser.newPage({ viewport: { width: 1280, height: 820 } });
-  const baselineCounters = { detail: 0, messages: 0, files: 0, failFilesOnce: false };
-  const baselineErrors = [];
-  baselinePage.on("pageerror", (error) => baselineErrors.push(error.message));
-  await installRoutes(baselinePage, role, baselineCounters);
-  await baselinePage.goto(`https://matter.test/baseline-case-detail.html?caseId=${matterId}`);
-  try {
-    await baselinePage.waitForFunction(
-      () => [...document.querySelectorAll("#case-select option")]
-        .some((option) => option.textContent.includes("Discovery response")),
-      null,
-      { timeout: 10_000 }
-    );
-  } catch (error) {
-    const baselineState = await baselinePage.evaluate(() => ({
-      selectedMatter: document.querySelector("#case-select")?.selectedOptions?.[0]?.textContent || "",
-      listStatus: document.querySelector("#caseListStatus")?.textContent || "",
-      url: location.href,
-    }));
-    throw new Error(
-      `${error.message}; baseline page errors: ${baselineErrors.join(" | ") || "none"}; detail requests: ${baselineCounters.detail}; state: ${JSON.stringify(baselineState)}`
-    );
-  }
-  await baselinePage.screenshot({ path: `/tmp/lpc-prompt2-${role}-matter-baseline.png`, fullPage: true });
-  await baselinePage.close();
+  const deepLinkPage = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  const deepLinkCounters = { detail: 0, messages: 0, files: 0, failFilesOnce: false };
+  await installRoutes(deepLinkPage, role, deepLinkCounters);
+  await deepLinkPage.goto(`https://matter.test/case-detail.html?caseId=${matterId}`);
+  await deepLinkPage.waitForFunction(() => document.querySelector("#caseTitle")?.textContent.includes("Discovery response"));
+  assert.ok(deepLinkCounters.detail >= 1);
+  assert.equal(await deepLinkPage.locator("#matterSwitcher button").first().isVisible(), true);
+  await deepLinkPage.screenshot({ path: `/tmp/lpc-prompt2-${role}-matter-deep-link.png`, fullPage: true });
+  await deepLinkPage.close();
 }
 
 (async () => {
