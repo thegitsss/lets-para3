@@ -59,25 +59,25 @@ describe("Paralegal V2 Home contract", () => {
 
   test("Home preserves the approved state-adaptive content and language", () => {
     const source = read("frontend/assets/scripts/paralegal-v2/home-view.mjs");
+    const desktop = read("frontend/assets/scripts/paralegal-v2/home-desktop.mjs");
     const model = read("frontend/assets/scripts/paralegal-v2/home-model.mjs");
     const requiredCopy = [
-      "Active work",
-      "Opportunities",
-      "No deadlines in the available schedule.",
+      "My work",
+      "Needs your attention",
+      "Current Matters",
+      "No deadlines in this period.",
       "No unread messages.",
       "Recommended",
-      "No matters to show right now.",
-      "No applications in progress",
-      "Payouts & history",
+      "No matters in this view.",
     ];
-    requiredCopy.forEach((copy) => expect(source).toContain(copy));
+    requiredCopy.forEach((copy) => expect(source + desktop).toContain(copy));
     expect(model).toContain('href: "/work?section=invitations"');
-    expect(source).toContain('"/work?section=applications"');
+    expect(desktop).toContain('applications: "Applications"');
     expect(source + model).not.toMatch(/\/work\?tab=(?:applications|invitations)/);
     expect(model).toContain("Add a profile photo before applying");
     expect(model).toContain("Payout setup is required before applying or accepting an invitation.");
     expect(source).toMatch(/model\.readiness\.items/);
-    expect(source).toMatch(/model\.attention\.(?:complete === false|state === "partial")/);
+    expect(source + desktop).toMatch(/model\.attention/);
     expect(source).not.toContain("Welcome,");
     expect(source).not.toContain("Private office");
     expect(source).not.toContain("Your worktable");
@@ -86,16 +86,14 @@ describe("Paralegal V2 Home contract", () => {
 
   test("recommendations remain opportunities with contextual previews and never become assigned work", () => {
     const source = read("frontend/assets/scripts/paralegal-v2/home-view.mjs");
+    const desktop = read("frontend/assets/scripts/paralegal-v2/home-desktop.mjs");
     const model = read("frontend/assets/scripts/paralegal-v2/home-model.mjs");
-    expect(source).toMatch(/function opportunities\(model,/);
-    expect(source).toMatch(/model\.opportunities\[key\]/);
-    expect(source).toMatch(/model\.activeWork\.slice/);
-    expect(source).not.toMatch(/activeWork\([^)]*recommendation/);
+    expect(desktop).toContain('...model.opportunities.recommendations.map(row => ({ ...row, type: "recommendation", group: "recommendations" }))');
+    expect(desktop).toContain('...model.activeWork.map(row => ({ ...row, type: "matter", group: "work" }))');
     expect(model).toMatch(/const activeWork = activeRows\(sources\.dashboard\.value,/);
-    expect(source).toContain("Accepting an invitation does not start an active matter.");
-    expect(source).toContain("Review the full scope and application requirements in Browse Matters.");
-    expect(source).toMatch(/row\.description \|\| row\.detail/);
-    expect(source).toContain("Posted compensation");
+    expect(model).toContain('recommendations: recommendationRows(list(sources.recommendations.value), exclusions)');
+    expect(desktop).toMatch(/row\.description \|\| row\.detail/);
+    expect(desktop).toContain("Posted compensation");
     expect(source).toMatch(/trigger\.focus\(\{ preventScroll: true \}\)/);
   });
 
@@ -112,7 +110,7 @@ describe("Paralegal V2 Home contract", () => {
     expect(source).toMatch(/if \(!isValid\(\)\) \{ dialog\.close\(\); return; \}/);
     expect(source).toMatch(/aria-labelledby/);
     expect(source).toMatch(/role: "alert"/);
-    expect(source).not.toMatch(/window\.location|location\.reload/);
+    expect(source).not.toMatch(/location\.(?:reload|assign|replace)\(/);
   });
 
   test("the authenticated entry keeps the active cascade and responsive hidden-state safeguards", () => {

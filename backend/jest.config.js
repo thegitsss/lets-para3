@@ -11,5 +11,8 @@ module.exports = {
   // Database suites share one isolated in-memory Mongo process for the run.
   // Serial execution prevents cross-suite database cleanup races.
   maxWorkers: 1,
+  // Keep suites serial while recycling the worker before a long run exhausts
+  // the CI runner's heap. Database cleanup still runs between suites.
+  workerIdleMemoryLimit: "1024MB",
   testTimeout: 30000,
 };

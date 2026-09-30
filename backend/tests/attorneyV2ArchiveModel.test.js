@@ -17,7 +17,7 @@ test("restore copy preserves paused/read-only state and explicitly distinguishes
   assert.equal(m.archiveAction({...value,legacyReopen:true}),'Restore as open posting');assert.match(m.archiveEffect({...value,legacyReopen:true}),/reopen as an open posting/);
 `));
 test("archive writes verify the account and CSRF, send one reviewed PATCH, and never use the generic status editor", () => check(`
-  const owner='a'.repeat(24),calls=[];const api=createApiClient({fetchImpl:async(path,options)=>{calls.push({path,...options});return {ok:options.method==='GET',status:options.method==='GET'?200:409,json:async()=>path==='/api/auth/me'?{user:{id:owner,role:'attorney',status:'approved'}}:path==='/api/csrf'?{csrfToken:'synthetic'}:{code:'ARCHIVE_CHANGED'}};}});
+  const owner='a'.repeat(24),calls=[];const api=createApiClient({fetchImpl:async(path,options)=>{calls.push({path,...options});return {ok:options.method==='GET',status:options.method==='GET'?200:409,headers:{get:()=>null},json:async()=>path==='/api/auth/me'?{user:{id:owner,role:'attorney',status:'approved'}}:path==='/api/csrf'?{csrfToken:'synthetic'}:{code:'ARCHIVE_CHANGED'}};}});
   const sent={requestId:'request',revision:'b'.repeat(64),archived:false};await assert.rejects(api.changeMatterArchive('c'.repeat(24),sent,{ownerId:owner}),e=>e.code==='ARCHIVE_CHANGED');assert.equal(calls.length,3);assert.ok(calls[2].path.endsWith('/archive'));assert.equal(calls[2].method,'PATCH');assert.equal(calls[2].headers['X-CSRF-Token'],'synthetic');assert.deepEqual(JSON.parse(calls[2].body),{...sent,expectedOwnerId:owner});
 `));
 

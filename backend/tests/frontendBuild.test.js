@@ -1,4 +1,4 @@
-const fs = require("fs"), path = require("path"), vm = require("vm");
+const fs = require("fs"), path = require("path"), os = require("os"), vm = require("vm");
 const { execFile } = require("child_process"), { promisify } = require("util"), { pathToFileURL } = require("url");
 const { PROJECT_ROOT, RECIPE_INPUTS, frontendDirectory } = require("../utils/frontendAssets");
 const runNode = async code => {
@@ -28,7 +28,7 @@ let root;
 const write = (file, value) => { const target = path.join(root, file); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, value); };
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 beforeEach(() => {
-  root = fs.mkdtempSync("/private/tmp/lpc-frontend-build-test-");
+  root = fs.mkdtempSync(path.join(os.tmpdir(), "lpc-frontend-build-test-"));
   for (const file of RECIPE_INPUTS) write(file, "Synthetic recipe input");
   write("backend/package.json", JSON.stringify({ devDependencies: { terser: require("terser/package.json").version, "clean-css": require("clean-css/package.json").version } }));
   write("frontend/index.html", '<!doctype html><main>Build fixture</main><script src="/assets/scripts/classic.js"></script>');
@@ -37,7 +37,7 @@ beforeEach(() => {
   write("frontend/assets/scripts/classic.js", 'function namedTask(value) { return value?.title ?? "empty"; }\nclass NamedMatter {}\nglobalThis.result = [namedTask.name, NamedMatter.name, namedTask({title:"Matter"}), String.raw`line\\n${2}\\end`];\n');
   write("frontend/assets/scripts/module.mjs", 'await Promise.resolve();\nexport function namedAction() { return "ready"; }\nexport const result = [namedAction.name, namedAction()];\n');
 });
-afterEach(() => { jest.restoreAllMocks(); fs.rmSync(root, { recursive: true, force: true }); });
+afterEach(() => { jest.restoreAllMocks(); if (root) fs.rmSync(root, { recursive: true, force: true }); });
 
 test("the current complete frontend preserves semantic syntax in every emitted script", async () => {
   const result = await runNode(`

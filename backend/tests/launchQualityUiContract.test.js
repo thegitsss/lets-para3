@@ -38,7 +38,7 @@ describe("Prompt 5 launch-quality UI contracts", () => {
     expect(heroMarkup).toContain("For solo and small-firm attorneys");
     expect(heroMarkup).toContain("Your caseload grew.");
     expect(heroMarkup).toContain("Your payroll doesn’t have to.");
-    expect(heroMarkup).toContain("Publish free. Fund only when you hire.");
+    expect(heroMarkup).toContain("Post for free. Fund only when you hire.");
     expect(heroMarkup).not.toMatch(/<(?:img|canvas|svg)\b/);
     expect(fonts).toMatch(/font-family: 'Sarabun';[\s\S]{0,120}font-style: italic;[\s\S]{0,120}font-weight: 200/);
     expect(hybridStyles).toMatch(/editorial-hero-word-enter/);

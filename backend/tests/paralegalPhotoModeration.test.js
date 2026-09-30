@@ -30,7 +30,7 @@ app.use("/api/uploads", require("../routes/uploads"));
 app.use("/api/admin", require("../routes/admin"));
 app.use("/api/public/paralegals", require("../routes/publicParalegalDirectory"));
 app.use((error,_req,res,_next) => res.status(500).json({error:error.message}));
-const image = fs.readFileSync(path.resolve(__dirname,"../../docs/audits/completion-2026-09-09/accounts/paralegal/photo-fixture.png"));
+const image = fs.readFileSync(path.resolve(__dirname,"fixtures/photo-gradient.png"));
 const cookie = user => `token=${jwt.sign({id:String(user._id),role:user.role,status:user.status,email:user.email},process.env.JWT_SECRET,{expiresIn:"1h"})}`;
 const stored = user => User.findById(user._id).select("+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey").lean();
 let user, admin, oldKey, oldOriginal;

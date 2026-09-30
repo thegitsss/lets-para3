@@ -81,6 +81,7 @@ function cleanBudget(value, { min = 0.01, max = 30000 } = {}) {
 }
 
 module.exports = {
+  removeAngleMarkup,
   cleanPlainText,
   cleanText,
   cleanTitle,

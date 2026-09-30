@@ -66,6 +66,15 @@ afterAll(closeDatabase);
 beforeEach(clearDatabase);
 
 describe("Matter-linked calendar Event authority", () => {
+  test("rejects query operators and oversized event searches", async () => {
+    const owner = await approvedUser("attorney", "filters");
+    const cookie = authCookie(owner);
+    const operator = await request(app).get("/api/events?type%5B%24ne%5D=deadline").set("Cookie", cookie);
+    const oversized = await request(app).get(`/api/events?q=${"a".repeat(201)}`).set("Cookie", cookie);
+    expect(operator.status).toBe(400);
+    expect(oversized.status).toBe(400);
+  });
+
   test.each(["attorney", "paralegal"])("%s reminder pages retain owner scope and stable date ties beyond fifty records", async role => {
     const owner = await approvedUser(role, "paged"), other = await approvedUser(role, "other");
     const records = Array.from({ length: 203 }, (_, index) => ({

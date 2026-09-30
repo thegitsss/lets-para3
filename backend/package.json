@@ -66,7 +66,7 @@
     "test:ci": "npm run check:ci-workflow && npm run check:repository && npm run check:runtime && npm run check:syntax && npm run check:focus && npm run check:routes && npm run check:backend-reachability && npm run check:runtime-bindings && npm run check:route-security && npm run check:logging && npm run check:secrets && npm run check:frontend && npm run check:frontend-bindings && npm run check:vendor && npm run check:no-theater && npm run check:api-contract && npm run check:performance && npm run check:legal && JEST_JUNIT_OUTPUT_DIR=test-results/jest JEST_JUNIT_OUTPUT_NAME=results.xml npm test -- --ci --reporters=default --reporters=jest-junit",
     "certify:legal": "node scripts/check-legal-documents.js --require-approval",
     "release:verify": "npm run check:candidate && npm run check:lockfile && npm run generate:sbom && npm run check:licenses && npm run check:security && npm run check:deploy && npm run test:ci && npm run test:payments && npm run test:auth && npm run test:browser:contracts && npm run test:e2e && npm run test:playwright:a11y && npm run test:playwright:critical && npm run test:playwright:performance",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --maxWorkers=1",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:e2e": "node scripts/run-e2e-suite.js",
     "test:e2e:auth": "node scripts/e2e-auth.js",

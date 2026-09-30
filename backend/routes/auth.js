@@ -8,6 +8,7 @@ const argon2 = require("argon2");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const crypto = require("crypto");
+const { isEmailAddressShape } = require("../utils/emailAddressShape");
 const { resolve: resolveLoginReturnTarget } = require("../../frontend/assets/scripts/utils/login-return-target");
 const { URLSearchParams } = require("url");
 const multer = require("multer");
@@ -444,7 +445,7 @@ async function linkPendingGoogleIdentity(req, res, user) {
 }
 
 function isEmail(v = "") {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).toLowerCase());
+  return isEmailAddressShape(v);
 }
 
 function isTypoEmailDomain(v = "") {

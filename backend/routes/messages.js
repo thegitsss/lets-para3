@@ -15,6 +15,7 @@ const User = require("../models/User");
 const AuditLog = require("../models/AuditLog"); // match filename
 const { notifyUser } = require("../utils/notifyUser");
 const { containsProfanity, maskProfanity } = require("../utils/badWords");
+const { removeAngleMarkup } = require("../utils/sanitize");
 const { CASE_STATE } = require("../utils/caseState");
 const { evaluateMessagingPermission: evaluatePlatformMessagingPermission } = require("../services/attorneyWorkflowPolicy");
 const { evaluateMessagingPermission: evaluateParalegalMessagingPermission } = require("../services/paralegalWorkflowPolicy");
@@ -43,7 +44,7 @@ const validReaction = value => typeof value === 'string' && value.trim().length 
 
 function sanitizeText(s) {
   if (typeof s !== "string") return "";
-  const stripped = s.replace(/<[^>]*>/g, "").replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001F\u007F]/g, "").trim();
+  const stripped = removeAngleMarkup(s).replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001F\u007F]/g, "").trim();
   if (!stripped) return "";
   const limited = stripped.slice(0, 2000);
   return containsProfanity(limited) ? maskProfanity(limited) : limited;

@@ -87,6 +87,10 @@ router.get(
   asyncHandler(async (req, res) => {
     const owner = req.user.id;
     res.set("Cache-Control", "private, no-store");
+    const filterKeys = new Set(["expectedOwnerId", "from", "to", "type", "caseId", "q", "page", "limit"]);
+    if (Object.keys(req.query).some((key) => !filterKeys.has(key))) {
+      return res.status(400).json({ error: "Choose valid event filters." });
+    }
     if (req.query.expectedOwnerId !== undefined && req.query.expectedOwnerId !== String(owner)) {
       return res.status(403).json({ error: "The workspace account changed.", code: "EVENT_ACCOUNT_CHANGED" });
     }
@@ -96,6 +100,11 @@ router.get(
       return res.status(400).json({ error: "Choose a valid date range." });
     }
     const { type, caseId, q = "" } = req.query;
+    if ((type !== undefined && !["deadline", "meeting", "call", "court", "misc"].includes(type)) ||
+        (caseId !== undefined && (typeof caseId !== "string" || !/^[a-f0-9]{24}$/i.test(caseId))) ||
+        typeof q !== "string" || q.length > 200) {
+      return res.status(400).json({ error: "Choose valid event filters." });
+    }
     const { page, limit, skip } = parsePagination(req);
 
     const filter = {

@@ -23,6 +23,7 @@ const {
   recordChargebackEvent,
 } = require("../services/chargebackService");
 const logger = createLogger("admin");
+const { isEmailAddressShape } = require("../utils/emailAddressShape");
 const {
   deactivateUserAccount,
   finalizeAccountDataRemoval,
@@ -107,7 +108,7 @@ return mongoose.isValidObjectId(id);
 }
 
 function isEmail(value = "") {
-return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).toLowerCase());
+return isEmailAddressShape(value);
 }
 
 function sanitizeAdminNote(value = "", max = 4000) {
