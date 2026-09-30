@@ -304,6 +304,7 @@ async function applyAuthResponseRedirect(response, opts = {}) {
       }
     } catch {
       // A malformed denial is still returned to the caller as-is.
+      return;
     }
   }
 }

@@ -18,7 +18,7 @@ const onePixelPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
   "base64"
 );
-const wideAttorneyPhotoPath = path.join(frontendRoot, "assets/images/homepage-matter/lpc-sky-v1.jpg");
+const wideAttorneyPhotoPath = path.resolve(frontendRoot, "../docs/assets/homepage-matter/lpc-sky-v1.jpg");
 const wideAttorneyPhoto = fs.existsSync(wideAttorneyPhotoPath) ? fs.readFileSync(wideAttorneyPhotoPath) : onePixelPng;
 const wideAttorneyPhotoContentType = fs.existsSync(wideAttorneyPhotoPath) ? "image/jpeg" : "image/png";
 

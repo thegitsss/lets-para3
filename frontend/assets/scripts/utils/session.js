@@ -175,7 +175,7 @@
     return normalized;
   }
 
-  function applyThemeOverrides(theme) {
+  function applyThemeOverrides() {
     const apply = () => {
       const body = document.body;
       const root = document.documentElement;

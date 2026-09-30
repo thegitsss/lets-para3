@@ -13,7 +13,7 @@ const {
 } = require("../services/platformFeePolicy");
 
 const RENDER_SCHEMA_URL = "https://render.com/schema/render.yaml.json";
-const RENDER_SCHEMA_SHA256 = "665539cb0c191856ba38d292b985a963880bb69b030d666e5fe7788e78e7e696";
+const RENDER_SCHEMA_SHA256 = "57aa0a1ff9c3b2d0fcb91b790b7b285aef6397adb0c92930e6e601054444cfe5";
 const CANONICAL_ORIGIN = "https://www.lets-paraconnect.com";
 
 function fail(message) {

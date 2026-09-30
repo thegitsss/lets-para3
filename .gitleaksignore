@@ -1,0 +1,14 @@
+# Reviewed synthetic test and CI fixtures introduced in 7f8c5bb99.
+# Exact commit/path/rule/line fingerprints only; all new findings remain enabled.
+7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:backend/scripts/e2e-validation.js:generic-api-key:8
+7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:backend/scripts/e2e-withdrawal-flow.js:generic-api-key:13
+7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:.github/workflows/quality.yml:generic-api-key:63
+7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:.github/workflows/quality.yml:generic-api-key:147
+7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:backend/tests/opsAlerting.test.js:stripe-access-token:21
+7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:backend/tests/csrf.test.js:generic-api-key:67
+7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:backend/tests/logger.test.js:generic-api-key:5
+7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:backend/tests/stripeSafety.test.js:stripe-access-token:11
+7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:backend/tests/stripeSafety.test.js:stripe-access-token:25
+7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:backend/tests/stripeSafety.test.js:stripe-access-token:34
+7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:backend/tests/workerProductionConfig.test.js:generic-api-key:11
+7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:backend/tests/productionOrigin.test.js:generic-api-key:36

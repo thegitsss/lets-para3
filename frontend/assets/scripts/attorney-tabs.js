@@ -1150,7 +1150,6 @@ async function initOverviewPage() {
   const messagePreviewSender = document.getElementById("messagePreviewSender");
   const messagePreviewText = document.getElementById("messagePreviewText");
   const messagePreviewLink = document.getElementById("messagePreviewLink");
-  const deadlineList = document.getElementById("deadlineList");
   const escrowDetails = document.getElementById("escrowDetails");
   const caseCards = document.getElementById("caseCards");
   const homeView = document.querySelector(".view-home");
@@ -6247,19 +6246,6 @@ async function fetchOverdueCount() {
   }
 }
 
-async function fetchUpcomingEvents(limit = 3) {
-  try {
-    const params = new URLSearchParams({ limit: String(limit) });
-    const res = await secureFetch(`/api/events?${params.toString()}`, { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("Events fetch failed");
-    const data = await res.json();
-    return Array.isArray(data.items) ? data.items : [];
-  } catch (err) {
-    console.warn("Unable to fetch events", err);
-    return [];
-  }
-}
-
 async function fetchThreadsOverview(limit = 10) {
   try {
     const res = await secureFetch(`/api/messages/threads?limit=${limit}`, { headers: { Accept: "application/json" }, noRedirect: true });
@@ -6657,33 +6643,6 @@ function initHomeTabs() {
       if (key) activate(key);
     });
   });
-}
-
-function renderDeadlines(container, events = []) {
-  if (!container) return;
-  const now = new Date();
-  const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const upcoming = (events || [])
-    .map((ev) => {
-      const start = ev?.start ? new Date(ev.start) : null;
-      if (!start || Number.isNaN(start.getTime())) return null;
-      return { ...ev, start };
-    })
-    .filter((ev) => ev && ev.start >= now && ev.start <= weekFromNow)
-    .sort((a, b) => a.start - b.start)
-    .slice(0, 2);
-  if (!upcoming.length) {
-    container.innerHTML = `<div class="info-line" style="color:var(--muted);">No upcoming deadlines this week.</div>`;
-    return;
-  }
-  container.innerHTML = upcoming
-    .map((ev) => {
-      const title = sanitize(ev.title || "Event");
-      const when = ev.start.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-      const where = ev.where ? ` · ${sanitize(ev.where)}` : "";
-      return `<div class="info-line">&bull; ${title}${where} – <strong>${when}</strong></div>`;
-    })
-    .join("");
 }
 
 function updateMessagePreviewUI({

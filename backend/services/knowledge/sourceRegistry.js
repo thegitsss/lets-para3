@@ -113,7 +113,7 @@ const SOURCE_REGISTRY = Object.freeze([
             sourceKey: "platform_faq_core",
             label: "frontend/attorney-faq.html",
             filePath: "frontend/attorney-faq.html",
-            locator: "Vetted paralegals",
+            locator: "Approved paralegals",
             excerpt: "Every paralegal completes LPC’s application and eligibility review before joining the platform.",
           },
         ],
@@ -393,9 +393,9 @@ const SOURCE_REGISTRY = Object.freeze([
         content: {
           audience: "paralegals",
           summary:
-            "Use this value card when explaining LPC to paralegals: vetted paralegals can pursue clearly scoped matter work with choice, fit, and a workflow that supports remote collaboration.",
+            "Use this value card when explaining LPC to paralegals: approved paralegals can pursue clearly scoped matter work with choice, fit, and a workflow that supports remote collaboration.",
           statement:
-            "Vetted paralegals can connect with attorneys seeking support on clearly scoped matters, choose which matters to pursue, and use LPC’s workflow for remote collaboration.",
+            "Approved paralegals can connect with attorneys seeking support on clearly scoped matters, choose which matters to pursue, and use LPC’s workflow for remote collaboration.",
           supportingPoints: [
             "Use this to explain value without implying guaranteed volume.",
             "Keep the language tied to approval, fit, and choice.",

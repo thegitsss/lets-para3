@@ -3,7 +3,8 @@ const fs = require("fs");
 const path = require("path");
 
 const repositoryRoot = path.resolve(__dirname, "../..");
-const MAX_SCANNED_FILE_BYTES = 2_000_000;
+// Audit screenshots can exceed 2 MB; keep them in scope for byte scanning.
+const MAX_SCANNED_FILE_BYTES = 8_000_000;
 const forbiddenNames = /(^|\/)(?:\.env(?:\..+)?|id_(?:rsa|ecdsa|ed25519)|[^/]+\.(?:pem|p12|pfx|key))$/i;
 const secretPatterns = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
