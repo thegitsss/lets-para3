@@ -3,12 +3,14 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0B2A4A">
 <link href="assets/styles/styles.css" rel="stylesheet" />
-<link href="assets/styles/hero-pages.css" rel="stylesheet" />
+<link href="assets/styles/public-site-chrome.css?v=20260925-narrow-footer" rel="stylesheet" />
+<script src="assets/scripts/public-site-chrome.js?v=20260924-responsive-fixes" defer></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Contact Support – Let’s-ParaConnect</title>
@@ -17,7 +19,6 @@
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
-  <script src="assets/scripts/utils/session.js"></script>
 
   <style>
     .gold{color:var(--gold);}
@@ -256,34 +257,61 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="assets/styles/contact-page.css?v=20260930-login-inspired" />
 </head>
-<body>
+<body class="contact-page-redesign" data-public-page="true">
   <a class="skip-link" href="#main">Skip to main content</a>
-<!-- Header -->
-<header>
-  <div class="header-inner">
-    <nav class="nav-left" aria-label="Primary">
-      <a href="index.html#who-we-are">About</a>
-      <a href="index.html#how">How It Works</a>
-    </nav>
+  <header class="home-header" data-home-header data-public-header>
+    <div class="home-header__inner">
+      <a class="home-brand" href="index.html" aria-label="Let’s-ParaConnect home">
+        Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect
+      </a>
 
-    <a href="index.html" class="header-logo">
-      Let<span class="accent-apostrophe">’</span>s<span class="accent-dash">-</span>ParaConnect
-    </a>
+      <nav class="home-nav home-nav--desktop" aria-label="Primary navigation">
+        <a href="index.html#how">How It Works</a>
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      </nav>
 
-    <div class="header-actions">
-<a class="pill" href="login.html" id="authAction">Sign In</a>
+      <div class="home-header__actions">
+        <a class="header-signin" href="login.html" id="authAction" data-auth-action>Sign In</a>
+        <button class="header-signout" type="button" id="logoutAction" data-logout-action hidden>Log Out</button>
+        <a class="button button--small button--ink" href="signup.html" id="signupAction" data-signup-action>Create an account</a>
+        <button
+          class="mobile-nav-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="mobileNav"
+          aria-label="Open navigation"
+          data-mobile-nav-toggle
+        >
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </button>
+      </div>
     </div>
+
+    <div class="mobile-nav" id="mobileNav" aria-hidden="true" data-mobile-nav>
+      <nav aria-label="Mobile navigation">
+        <a href="index.html#how">How It Works <span aria-hidden="true">↘</span></a>
+        <a href="attorney-faq.html">For Attorneys <span aria-hidden="true">↘</span></a>
+        <a href="paralegal-faq.html">For Paralegals <span aria-hidden="true">↘</span></a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      </nav>
+      <div class="mobile-nav__actions">
+        <a href="login.html" data-auth-action>Sign In</a>
+        <button type="button" data-logout-action hidden>Log Out</button>
+        <a class="button button--ink" href="signup.html" data-signup-action>Create an account</a>
+      </div>
     </div>
   </header>
 
-  <div class="hero-banner" role="presentation" aria-hidden="true"></div>
-
   <main tabindex="-1" aria-labelledby="contact-title" id="main">
-    <h1 id="contact-title">Contact Support</h1>
-    <p class="muted">Questions, or support—send us a note and we’ll get back to you shortly.</p>
-
     <div class="contact-shell">
+      <div class="contact-primary">
+        <h1 id="contact-title">Contact Support</h1>
+        <p class="muted">Questions, or support—send us a note and we’ll get back to you shortly.</p>
       <form id="contactForm" novalidate>
         <input type="text" id="hp" name="hp" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;" />
         <div class="field-group">
@@ -324,6 +352,7 @@
         </div>
         <div id="formStatus" class="form-status" role="status" aria-live="polite"></div>
       </form>
+      </div>
 
       <aside class="contact-details" aria-label="Contact details">
         <div class="contact-block">
@@ -360,177 +389,55 @@
     </div>
   </main>
 
-<footer class="footer">
-  <div class="footer-inner">
-    <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
-    <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
-    <nav>
-      <a href="privacy.html">Privacy Policy</a>
-      <span>|</span>
-      <a href="terms.html">Terms</a>
-      <span>|</span>
-      <a href="/paralegal-admission.html">Admissions</a>
-      <span>|</span>
-      <a href="contact.html">Contact</a>
-      <span>|</span>
-      <a href="accessibility.html">Accessibility</a>
-    </nav>
-    <div class="region">United States</div>
-  </div>
-</footer>
-<script type="module" src="assets/scripts/hero-parallax.js"></script>
-<script>
-  (async function syncHeaderAuth() {
-    const authAction = document.getElementById('authAction');
-    if (!authAction) return;
-
-    function applySignedOutState() {
-      authAction.href = 'login.html';
-      authAction.textContent = 'Sign In';
-      authAction.style.display = 'inline-flex';
-    }
-
-    function applySignedInState(roleValue) {
-      const role = String(roleValue || '').toLowerCase();
-      const dashboardHref =
-        role === 'paralegal'
-          ? 'dashboard-paralegal.html'
-          : role === 'admin'
-          ? 'admin-dashboard.html'
-          : 'dashboard-attorney.html';
-      authAction.href = dashboardHref;
-      authAction.textContent = 'RETURN TO DASHBOARD';
-      authAction.style.display = 'inline-flex';
-    }
-
-    let cachedUser = null;
-    try {
-      cachedUser = JSON.parse(localStorage.getItem('lpc_user') || 'null');
-    } catch {}
-    if (cachedUser && typeof cachedUser === 'object') {
-      applySignedInState(cachedUser.role);
-    } else {
-      applySignedOutState();
-    }
-
-    let session = null;
-    try {
-      session = typeof window.getSessionData === 'function' ? await window.getSessionData() : null;
-    } catch {}
-
-    const user = session?.user || null;
-    const role = String(session?.role || user?.role || '').toLowerCase();
-    if (!user) {
-      try {
-        const stored = JSON.parse(localStorage.getItem('lpc_user') || 'null');
-        if (stored && typeof stored === 'object') {
-          applySignedInState(stored.role);
-          return;
-        }
-      } catch {}
-      applySignedOutState();
-      return;
-    }
-
-    applySignedInState(role);
-  })();
-</script>
-<script>
-  function alignContactDetails() {
-    const shell = document.querySelector('.contact-shell');
-    const details = document.querySelector('.contact-details');
-    const textarea = document.getElementById('message');
-    if (!shell || !details || !textarea) return;
-    if (window.matchMedia('(max-width: 768px)').matches) {
-      details.style.top = '';
-      return;
-    }
-    const shellRect = shell.getBoundingClientRect();
-    const textareaRect = textarea.getBoundingClientRect();
-    const detailsHeight = details.offsetHeight || 0;
-    const targetTop = Math.max(0, textareaRect.bottom - shellRect.top - detailsHeight);
-    details.style.top = `${targetTop}px`;
-  }
-
-  window.addEventListener('load', () => {
-    requestAnimationFrame(alignContactDetails);
-  });
-  window.addEventListener('resize', () => {
-    requestAnimationFrame(alignContactDetails);
-  });
-</script>
-<script>
-  const form = document.getElementById('contactForm');
-  const statusEl = document.getElementById('formStatus');
-  const submitBtn = form?.querySelector('button[type="submit"]');
-
-  async function fetchCsrfToken() {
-    try {
-      const res = await fetch('/api/csrf', { credentials: 'include' });
-      if (!res.ok) return '';
-      const data = await res.json().catch(() => ({}));
-      return data?.csrfToken || '';
-    } catch {
-      return '';
-    }
-  }
-
-  function setStatus(message, type) {
-    if (!statusEl) return;
-    statusEl.textContent = message;
-    statusEl.classList.remove('success', 'error', 'show');
-    if (type) statusEl.classList.add(type, 'show');
-  }
-
-  if (form) {
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      if (!form.checkValidity()) {
-        form.reportValidity();
-        return;
-      }
-
-      const formData = new FormData(form);
-      const payload = Object.fromEntries(formData.entries());
-      const originalLabel = submitBtn?.textContent || 'Submit Message';
-
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Sending...';
-      }
-      setStatus('Sending your message...', '');
-
-      try {
-        const csrfToken = await fetchCsrfToken();
-        const res = await fetch('/api/public/contact', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-          },
-          credentials: 'include',
-          body: JSON.stringify(payload),
-        });
-
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data?.ok) {
-          setStatus('Message sent. We will get back to you shortly.', 'success');
-          form.reset();
-        } else {
-          const msg = data?.msg || 'We could not send your message. Please try again.';
-          setStatus(msg, 'error');
-        }
-      } catch {
-        setStatus('Unable to send message. Please check your connection and try again.', 'error');
-      } finally {
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = originalLabel;
-        }
-      }
-    });
-  }
-</script>
+  <footer class="home-footer" data-public-footer>
+    <div class="home-footer__inner">
+      <p class="home-footer__statement"><span>Legal work.</span><span>Clearly connected.</span></p>
+      <nav class="home-footer__directory" aria-label="Footer navigation">
+        <details open>
+          <summary>Platform</summary>
+          <div class="home-footer__links">
+            <a href="index.html#how">How It Works</a>
+            <a href="attorney-faq.html">For Attorneys</a>
+            <a href="paralegal-faq.html">For Paralegals</a>
+            <a href="browse-paralegals.html">Browse Paralegals</a>
+          </div>
+        </details>
+        <details open>
+          <summary>For Attorneys</summary>
+          <div class="home-footer__links">
+            <a href="signup.html?role=attorney">Post a Matter</a>
+            <a href="attorney-faq.html">Attorney FAQ</a>
+            <a href="contact.html">Contact</a>
+          </div>
+        </details>
+        <details open>
+          <summary>For Paralegals</summary>
+          <div class="home-footer__links">
+            <a href="signup.html?role=paralegal">Apply to Join</a>
+            <a href="paralegal-faq.html">Paralegal FAQ</a>
+            <a href="/paralegal-admission.html">Our Application Review</a>
+          </div>
+        </details>
+        <details open>
+          <summary>Legal</summary>
+          <div class="home-footer__links">
+            <a href="terms.html">Terms</a>
+            <a href="privacy.html">Privacy</a>
+            <a href="accessibility.html">Accessibility</a>
+          </div>
+        </details>
+      </nav>
+      <div class="home-footer__bottom">
+        <a class="home-footer__brand" href="index.html" aria-label="Let’s-ParaConnect home">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+        <p>Copyright © 2026 Let’s-ParaConnect. All rights reserved.</p>
+        <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg>
+          <span>Accessibility</span>
+        </button>
+      </div>
+    </div>
+  </footer>
+<script src="assets/scripts/contact-form.js" defer></script>
   <script src="assets/scripts/accessibility-toggle.js"></script>
 </body>
 </html>
