@@ -9,7 +9,8 @@ const LINK_COOKIE = "lpc_google_link";
 function configuration() {
   const clientId = String(process.env.GOOGLE_CLIENT_ID || "").trim();
   const clientSecret = String(process.env.GOOGLE_CLIENT_SECRET || "").trim();
-  const appBase = String(process.env.APP_BASE_URL || "").replace(/\/+$/, "");
+  const appBase = String(process.env.APP_BASE_URL ||
+    (process.env.NODE_ENV === "production" ? "https://www.lets-paraconnect.com" : "")).replace(/\/+$/, "");
   const redirectUri = String(process.env.GOOGLE_REDIRECT_URI || (appBase ? `${appBase}/api/auth/google/callback` : "")).trim();
   if (!clientId || !clientSecret || !redirectUri || !process.env.JWT_SECRET) return null;
   if (process.env.NODE_ENV === "production" && !redirectUri.startsWith("https://")) return null;

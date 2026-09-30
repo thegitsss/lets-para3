@@ -9,6 +9,7 @@ jest.mock("../utils/googleOAuth", () => ({
   verifiedProfile: jest.fn(),
 }));
 const { verifiedProfile } = require("../utils/googleOAuth");
+const { configuration } = jest.requireActual("../utils/googleOAuth");
 const app = buildTestApp();
 
 beforeAll(async () => { await connect(); });
@@ -27,6 +28,25 @@ function challenge(response) {
   expect(url.hostname).toBe("accounts.google.com");
   return { state: url.searchParams.get("state"), nonce: url.searchParams.get("nonce") };
 }
+
+test("production Google sign-in uses the canonical callback when no redirect setting is provided", () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousBaseUrl = process.env.APP_BASE_URL;
+  const previousRedirectUri = process.env.GOOGLE_REDIRECT_URI;
+  try {
+    process.env.NODE_ENV = "production";
+    delete process.env.APP_BASE_URL;
+    delete process.env.GOOGLE_REDIRECT_URI;
+    expect(configuration()?.redirectUri).toBe("https://www.lets-paraconnect.com/api/auth/google/callback");
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+    if (previousBaseUrl === undefined) delete process.env.APP_BASE_URL;
+    else process.env.APP_BASE_URL = previousBaseUrl;
+    if (previousRedirectUri === undefined) delete process.env.GOOGLE_REDIRECT_URI;
+    else process.env.GOOGLE_REDIRECT_URI = previousRedirectUri;
+  }
+});
 
 test("Google signup verifies state and binds the provider identity to the submitted email", async () => {
   const agent = request.agent(app);
