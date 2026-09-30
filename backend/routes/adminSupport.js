@@ -22,12 +22,30 @@ const User = require("../models/User");
 const AuditLog = require("../models/AuditLog");
 const mongoose = require("mongoose");
 const { triageFilter, triageRevision } = require("../services/support/triageRevision");
+const { SUPPORT_TICKET_STATUSES } = require("../services/support/constants");
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 router.use(verifyToken, requireApproved, requireRole("admin"));
 
-router.get("/inbox", asyncHandler(async (req, res) => res.json({ ok: true, ...await listInbox({...req.query, operatorId:req.user.id || req.user._id}) })));
+router.get("/inbox", asyncHandler(async (req, res) => {
+  const allowed = new Set(["source", "status", "q", "assignment", "followUp", "includeTests", "page", "limit"]);
+  if (Object.entries(req.query).some(([key, value]) => !allowed.has(key) || typeof value !== "string")) {
+    return res.status(400).json({ error: "Choose valid inquiry filters." });
+  }
+  const { source, status, q, assignment, followUp, includeTests, page, limit } = req.query;
+  if (source !== undefined && !["all", "email", "contact", "human"].includes(source) ||
+      status !== undefined && !["active", "all", "resolved", ...SUPPORT_TICKET_STATUSES].includes(status) ||
+      q !== undefined && q.length > 200 ||
+      assignment !== undefined && !["mine", "unassigned", ""].includes(assignment) ||
+      followUp !== undefined && !["overdue", ""].includes(followUp) ||
+      includeTests !== undefined && !["true", "false"].includes(includeTests) ||
+      page !== undefined && !/^[1-9]\d{0,5}$/.test(page) ||
+      limit !== undefined && !/^[1-9]\d{0,2}$/.test(limit)) {
+    return res.status(400).json({ error: "Choose valid inquiry filters." });
+  }
+  return res.json({ ok: true, ...await listInbox({ source, status, q, assignment, followUp, includeTests, page, limit, operatorId: req.user.id || req.user._id }) });
+}));
 router.get("/inbox-summary", asyncHandler(async (_req, res) => res.json({ ok: true, ...await inboxSummary() })));
 router.get("/operators", asyncHandler(async (_req,res) => {
   const operators=await User.find({role:"admin",status:"approved",disabled:{$ne:true},deleted:{$ne:true}}).select("firstName lastName email").sort({firstName:1}).lean();

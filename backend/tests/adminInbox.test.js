@@ -73,6 +73,12 @@ beforeEach(async () => {
   attorney = await makeUser('attorney', 'attorney@example.test');
   paralegal = await makeUser('paralegal', 'para@example.test');
 });
+test('inbox filters reject query operators instead of passing them to MongoDB', async () => {
+  const response = await request(app)
+    .get('/api/admin/support/inbox?status%5B%24ne%5D=resolved')
+    .set('Cookie', cookie(admin));
+  expect(response.status).toBe(400);
+});
 test('every contact form inquiry is persisted even if the notification email fails', async () => {
   sendEmail.mockRejectedValueOnce(new Error('mail unavailable'));
   const response = await request(app).post('/api/public/contact').send({
