@@ -16,9 +16,10 @@ const {
 const { createPayoutTransfer, getPayoutHold } = require("../services/payoutHoldService");
 const { getParalegalEarnings } = require("../services/paymentProjectionService");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
+const providerDisputes = new Map();
 
 async function createMatter({ paid = false, archived = false } = {}) {
-  const [attorney, paralegal] = await User.create([
+  const [attorney, paralegal, admin] = await User.create([
     {
       firstName: "Chargeback",
       lastName: "Attorney",
@@ -37,6 +38,7 @@ async function createMatter({ paid = false, archived = false } = {}) {
       status: "approved",
       state: "CA",
     },
+    { firstName: "Synthetic", lastName: "Administrator", email: `chargeback-admin-${new mongoose.Types.ObjectId()}@example.com`, password: "Synthetic123!", role: "admin", status: "approved" },
   ]);
   const paymentIntentId = `pi_${new mongoose.Types.ObjectId()}`;
   const caseDoc = await Case.create({
@@ -79,23 +81,38 @@ async function createMatter({ paid = false, archived = false } = {}) {
       stripeMode: "test",
     });
   }
-  return { attorney, paralegal, caseDoc, payout, income, paymentIntentId };
+  return { attorney, paralegal, admin, caseDoc, payout, income, paymentIntentId };
 }
 
 function stripeFixture({ caseDoc, paymentIntentId, livemode = false, refunded = 0 } = {}) {
   const charge = {
     id: `ch_${new mongoose.Types.ObjectId()}`,
+    object: "charge",
     amount: 48800,
+    amount_captured: 48800,
+    paid: true,
+    captured: true,
+    status: "succeeded",
+    disputed: true,
     amount_refunded: refunded,
     currency: "usd",
     livemode,
     metadata: { caseId: String(caseDoc?._id || "") },
     payment_intent: {
       id: paymentIntentId,
+      object: "payment_intent",
+      status: "succeeded",
+      amount: 48800,
+      amount_received: 48800,
+      currency: "usd",
+      livemode,
       metadata: { caseId: String(caseDoc?._id || "") },
     },
   };
+  charge.payment_intent.latest_charge = charge.id;
+  if (caseDoc?._id) charge.payment_intent.transfer_group = `case_${caseDoc._id}`;
   const stripeClient = {
+    disputes: { retrieve: jest.fn(async id => structuredClone(providerDisputes.get(id))) },
     charges: { retrieve: jest.fn(async () => charge) },
     paymentIntents: { retrieve: jest.fn(async () => charge.payment_intent) },
     balanceTransactions: { retrieve: jest.fn(async (id) => ({ id })) },
@@ -133,6 +150,12 @@ function disputeEvent({
       created,
     }],
   };
+  const previous = providerDisputes.get(id);
+  if (!previous || created >= previous._fixtureObservedAt) {
+    const transactions = new Map((previous?.balance_transactions || []).map(value => [typeof value === "string" ? value : value.id, value]));
+    for (const value of dispute.balance_transactions) transactions.set(typeof value === "string" ? value : value.id, typeof value === "string" ? value : { object: "balance_transaction", type: "adjustment", reporting_category: "dispute", source: id, ...value });
+    providerDisputes.set(id, { ...dispute, balance_transactions: [...transactions.values()], _fixtureObservedAt: created });
+  }
   return {
     id: eventId,
     type: status === "won" || status === "lost" ? "charge.dispute.closed" : "charge.dispute.updated",
@@ -144,10 +167,10 @@ function disputeEvent({
 
 beforeAll(async () => {
   await connect();
-  await FinancialAdjustment.init();
+  await Promise.all([User.init(), Case.init(), PaymentOperation.init(), Payout.init(), PlatformIncome.init(), FinancialAdjustment.init(), require("../models/AuditLog").init()]);
 });
 afterAll(closeDatabase);
-beforeEach(clearDatabase);
+beforeEach(async () => { await clearDatabase(); providerDisputes.clear(); });
 
 describe("Phase 4B chargeback lifecycle", () => {
   test("pre-payout chargeback creates one canonical operation, debit evidence, and payout hold", async () => {
@@ -212,11 +235,11 @@ describe("Phase 4B chargeback lifecycle", () => {
     const { charge, stripeClient } = stripeFixture(matter);
     const event = disputeEvent({ caseDoc: matter.caseDoc, charge, status: "lost" });
     const result = await recordChargebackEvent({ event, stripeClient });
-    const acknowledgment = await acknowledgeChargeback(result.operation._id, matter.attorney._id);
+    const acknowledgment = await acknowledgeChargeback(result.operation._id, matter.admin._id);
 
     expect(acknowledgment.operation.administrativeStatus).toBe("acknowledged");
     expect((await getPayoutHold(matter.caseDoc._id)).held).toBe(true);
-    await expect(clearEligiblePayoutHold(result.operation._id, matter.attorney._id))
+    await expect(clearEligiblePayoutHold(result.operation._id, matter.admin._id))
       .rejects.toMatchObject({ code: "CHARGEBACK_HOLD_NOT_ELIGIBLE" });
   });
 
@@ -227,8 +250,8 @@ describe("Phase 4B chargeback lifecycle", () => {
       event: disputeEvent({ caseDoc: matter.caseDoc, charge, status: "won" }),
       stripeClient,
     });
-    const first = await clearEligiblePayoutHold(result.operation._id, matter.attorney._id);
-    const second = await clearEligiblePayoutHold(result.operation._id, matter.attorney._id);
+    const first = await clearEligiblePayoutHold(result.operation._id, matter.admin._id);
+    const second = await clearEligiblePayoutHold(result.operation._id, matter.admin._id);
 
     expect(first.changed).toBe(true);
     expect(second.changed).toBe(false);
@@ -244,12 +267,14 @@ describe("Phase 4B chargeback lifecycle", () => {
       event: disputeEvent({ caseDoc: matter.caseDoc, charge, id: disputeId, status: "won", created: 500 }),
       stripeClient,
     });
-    await clearEligiblePayoutHold(first.operation._id, matter.attorney._id);
+    await clearEligiblePayoutHold(first.operation._id, matter.admin._id);
+    const operation = await PaymentOperation.create({ caseId: matter.caseDoc._id, operationKey: `case_payout:${matter.caseDoc._id}`, kind: "case_payout", amount: 32800, fingerprint: "cleared-then-paid" });
     const transfer = await createPayoutTransfer({
       caseId: matter.caseDoc._id,
       stripeClient,
       payload: { amount: 32800 },
       stripeOptions: { idempotencyKey: "cleared-then-paid" },
+      operation,
     });
     expect(transfer.id).toBe("tr_should_not_run");
     expect((await PaymentOperation.findById(first.operation._id).lean()).payoutPosition).toBe("post_payout");
@@ -430,15 +455,15 @@ describe("Phase 4B chargeback lifecycle", () => {
       event: disputeEvent({ caseDoc: testMatter.caseDoc, charge: testStripe.charge, id: "dp_mode_test" }),
       stripeClient: testStripe.stripeClient,
     });
-    await recordChargebackEvent({
-      event: disputeEvent({
-        caseDoc: liveMatter.caseDoc,
-        charge: liveStripe.charge,
-        id: "dp_mode_live",
-        livemode: true,
-      }),
-      stripeClient: liveStripe.stripeClient,
-    });
+    const previousSecret = process.env.STRIPE_SECRET_KEY;
+    try {
+      // This is a mocked live-mode partition, never a real provider credential.
+      process.env.STRIPE_SECRET_KEY = "sk_live_synthetic_chargeback_fixture";
+      await recordChargebackEvent({
+        event: disputeEvent({ caseDoc: liveMatter.caseDoc, charge: liveStripe.charge, id: "dp_mode_live", livemode: true }),
+        stripeClient: liveStripe.stripeClient,
+      });
+    } finally { if (previousSecret === undefined) delete process.env.STRIPE_SECRET_KEY; else process.env.STRIPE_SECRET_KEY = previousSecret; }
     expect(await FinancialAdjustment.countDocuments({ stripeMode: "test" })).toBe(2);
     expect(await FinancialAdjustment.countDocuments({ stripeMode: "live" })).toBe(2);
   });

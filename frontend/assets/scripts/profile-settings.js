@@ -9,6 +9,54 @@ const ATTORNEY_ONBOARDING_MODAL_SEEN_KEY = "lpc_attorney_onboarding_modal_seen";
 
 const DEFAULT_AVATAR_DATA = "/assets/avatar-placeholder.svg";
 const initialSettingsTasks = [];
+const PROFILE_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+let preferenceMutationQueue = Promise.resolve();
+
+function initSettingsSidebarToggle() {
+  const sidebarToggle = document.getElementById("sidebarToggle");
+  const sidebarNav = document.getElementById("sidebarNav");
+  const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+  if (!sidebarToggle || !sidebarNav || !sidebarBackdrop || sidebarToggle.dataset.lpcSidebarBound === "true") return;
+  sidebarToggle.dataset.lpcSidebarBound = "true";
+
+  const setOpen = (open, { restoreFocus = false } = {}) => {
+    document.body.classList.toggle("nav-open", Boolean(open));
+    sidebarToggle.setAttribute("aria-expanded", String(Boolean(open)));
+    sidebarToggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    if (!open && restoreFocus) sidebarToggle.focus({ preventScroll: true });
+  };
+
+  sidebarToggle.addEventListener("click", () => {
+    setOpen(!document.body.classList.contains("nav-open"));
+  });
+  sidebarBackdrop.addEventListener("click", () => setOpen(false));
+  sidebarNav.addEventListener("click", (event) => {
+    if (event.target.closest("a") || event.target.closest("button")) setOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || event.key !== "Escape" || !document.body.classList.contains("nav-open")) return;
+    if (document.querySelector(".profile-dropdown.show, [data-profile-menu].show")) return;
+    setOpen(false, { restoreFocus: true });
+  });
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 1024 && document.body.classList.contains("nav-open")) setOpen(false);
+  });
+}
+
+initSettingsSidebarToggle();
+
+function setPreferencesSaveStatus(message, state = "idle") {
+  const status = document.getElementById("preferencesSaveStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.state = state;
+}
+
+function queuePreferenceMutation(operation) {
+  const scheduled = preferenceMutationQueue.then(operation);
+  preferenceMutationQueue = scheduled.catch(() => undefined);
+  return scheduled;
+}
 
 function trackInitialSettingsTask(task) {
   const trackedTask = Promise.resolve(task);
@@ -202,12 +250,18 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".settings-item").forEach((el) => {
       el.classList.toggle("active", el.id === activeNavId);
     });
+    document.querySelectorAll("[data-settings-section]").forEach((el) => {
+      const active = el.dataset.settingsSection === sectionId;
+      el.classList.toggle("active", active);
+      if (active) el.setAttribute("aria-current", "page");
+      else el.removeAttribute("aria-current");
+    });
   };
   const syncSettingsHeader = (sectionId) => {
     const isDirectory = sectionId === "settingsDirectorySection";
     const title = document.getElementById("accountSettingsTitle");
     const subtitle = document.getElementById("accountSettingsSubtitle");
-    if (title) title.textContent = isDirectory ? "Settings" : "Account settings";
+    if (title) title.textContent = isDirectory ? "Settings" : "Account Settings";
     if (subtitle) {
       subtitle.textContent = isDirectory
         ? "Manage your attorney account and preferences."
@@ -215,12 +269,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     document.body.classList.toggle("settings-directory-active", isDirectory);
   };
+  if ("scrollRestoration" in window.history) {
+    window.history.scrollRestoration = "manual";
+  }
+  let pendingSettingsScrollFrame = 0;
   const focusSettingsTarget = (targetId = "") => {
     const main = document.getElementById("main");
-    window.requestAnimationFrame(() => {
+    const resetSettingsScroll = () => {
+      main?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      if (document.scrollingElement) {
+        document.scrollingElement.scrollTop = 0;
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    };
+    if (pendingSettingsScrollFrame) window.cancelAnimationFrame(pendingSettingsScrollFrame);
+    pendingSettingsScrollFrame = window.requestAnimationFrame(() => {
+      pendingSettingsScrollFrame = 0;
       if (!targetId) {
-        if (window.matchMedia("(min-width: 961px)").matches && main) main.scrollTo({ top: 0 });
-        else window.scrollTo({ top: 0 });
+        resetSettingsScroll();
         return;
       }
       const target = document.getElementById(targetId);
@@ -233,6 +299,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
   const setActiveSection = (sectionId, { targetId = "" } = {}) => {
+    if (String(currentUser?.role || "").toLowerCase() === "admin") {
+      sectionId = "securitySection";
+      if (targetId === "security:closure") targetId = "";
+    }
+    const section = document.getElementById(sectionId);
+    const sectionChanged = !section?.classList.contains("active") || section?.hidden;
     topLevelSections.forEach((sec) => {
       sec.classList.remove("active");
       sec.classList.add("hidden");
@@ -240,7 +312,6 @@ document.addEventListener("DOMContentLoaded", () => {
       sec.hidden = true;
       sec.style.setProperty("display", "none", "important");
     });
-    const section = document.getElementById(sectionId);
     if (section) {
       section.classList.remove("hidden");
       section.classList.add("active");
@@ -251,7 +322,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     syncActiveNav(sectionId);
     syncSettingsHeader(sectionId);
-    focusSettingsTarget(targetId);
+    if (String(currentUser?.role || "").toLowerCase() === "admin") {
+      const heading = document.getElementById('accountSettingsTitle');
+      if (heading) heading.textContent = 'Admin security';
+      const subtitle = document.getElementById('accountSettingsSubtitle');
+      if (subtitle) subtitle.textContent = 'Manage your sign-in and devices.';
+    }
+    if (sectionChanged || targetId) focusSettingsTarget(targetId);
     scheduleProfileScrollIndicatorUpdate();
   };
 
@@ -292,6 +369,20 @@ document.addEventListener("DOMContentLoaded", () => {
       if (currentUrl !== nextUrl) {
         window.history.pushState(null, "", nextUrl);
       }
+      setActiveSection(sectionId);
+    });
+  });
+
+  document.querySelectorAll("[data-settings-section]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const sectionId = btn.dataset.settingsSection;
+      if (!sectionId || !sectionToNav[sectionId]) return;
+      const nextHash = sectionId === "profileSection"
+        ? "#profile"
+        : sectionId === "securitySection"
+        ? "#security"
+        : "#preferences";
+      window.history.pushState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
       setActiveSection(sectionId);
     });
   });
@@ -381,8 +472,8 @@ document.addEventListener("DOMContentLoaded", () => {
         showToast("Passwords do not match.", "err");
         return;
       }
-      if (String(newPass).length < 15) {
-        showToast("Password must be at least 15 characters.", "err");
+      if (String(newPass).length < 8) {
+        showToast("Password must be at least 8 characters.", "err");
         return;
       }
 
@@ -417,7 +508,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!inputId) return;
       const input = document.getElementById(inputId);
       if (!input) return;
-      input.type = input.type === "password" ? "text" : "password";
+      const reveal = input.type === "password";
+      input.type = reveal ? "text" : "password";
+      const label = input.labels?.[0]?.textContent.trim() || "Password";
+      btn.setAttribute("aria-label", `${reveal ? "Hide" : "Show"} ${label.toLowerCase()}`);
     });
   });
 
@@ -429,13 +523,39 @@ document.addEventListener("DOMContentLoaded", () => {
   const fontSizeSelect = document.getElementById("fontSizePreference");
   const hideProfileToggle = document.getElementById("paralegalHideProfile");
   statePreferenceSelect = document.getElementById("statePreference");
-  const normalizeSelectableTheme = (value) => (String(value || "").toLowerCase() === "dark" ? "dark" : "light");
+  const selectableThemes = new Set(["light", "dark"]);
+  const normalizeSelectableTheme = (value) => {
+    const normalized = String(value || "").toLowerCase();
+    return selectableThemes.has(normalized) ? normalized : "light";
+  };
+  const queueAccountPreferenceWrite = (payload, { successMessage = "Saved", recover = true } = {}) => {
+    setPreferencesSaveStatus("Saving…", "saving");
+    return queuePreferenceMutation(async () => {
+      try {
+        const response = await secureFetch("/api/account/preferences", {
+          method: "POST",
+          suppressToast: true,
+          body: payload,
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data?.error || "Unable to save preference.");
+        setPreferencesSaveStatus(successMessage, "saved");
+        return data;
+      } catch (err) {
+        console.error("Failed to persist account preference", err);
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
+        if (recover) await loadPreferences({ preserveStatus: true });
+        return null;
+      }
+    });
+  };
 
   const updateThemePreview = (value) => {
     if (!themePreviewButtons.length) return;
     themePreviewButtons.forEach((btn) => {
       const isActive = btn.dataset.themePreview === value;
       btn.setAttribute("aria-checked", isActive ? "true" : "false");
+      btn.tabIndex = isActive ? 0 : -1;
       btn.classList.toggle("is-active", isActive);
     });
   };
@@ -458,24 +578,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  async function persistThemePreference(themeValue, fontSizeValue) {
-    try {
-      const payload = {
-        theme: normalizeSelectableTheme(themeValue || themeSelect?.value),
-        fontSize: fontSizeValue || fontSizeSelect?.value,
-        email: emailToggle ? !!emailToggle.checked : false,
-        state: statePreferenceSelect ? statePreferenceSelect.value : undefined
-      };
-      const response = await secureFetch("/api/account/preferences", {
-        method: "POST",
-        body: payload,
-      });
-      if (!response.ok) {
-        throw new Error("Unable to save display preferences.");
-      }
-    } catch (err) {
-      console.error("Failed to persist theme preference", err);
-    }
+  function persistThemePreference(themeValue, fontSizeValue) {
+    return queueAccountPreferenceWrite({
+      theme: normalizeSelectableTheme(themeValue || themeSelect?.value),
+      fontSize: fontSizeValue || fontSizeSelect?.value,
+    }, { successMessage: "Appearance saved" });
   }
 
   const applyThemeSelection = (value) => {
@@ -544,6 +651,20 @@ document.addEventListener("DOMContentLoaded", () => {
       const value = btn.dataset.themePreview;
       applyThemeSelection(value);
     });
+    btn.addEventListener("keydown", (event) => {
+      const buttons = Array.from(themePreviewButtons).filter((item) => !item.disabled);
+      const currentIndex = buttons.indexOf(btn);
+      if (currentIndex < 0) return;
+      let nextIndex = currentIndex;
+      if (["ArrowRight", "ArrowDown"].includes(event.key)) nextIndex = (currentIndex + 1) % buttons.length;
+      else if (["ArrowLeft", "ArrowUp"].includes(event.key)) nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+      else if (event.key === "Home") nextIndex = 0;
+      else if (event.key === "End") nextIndex = buttons.length - 1;
+      else return;
+      event.preventDefault();
+      buttons[nextIndex].focus();
+      buttons[nextIndex].click();
+    });
   });
 
   if (themeSelect) {
@@ -572,12 +693,13 @@ document.addEventListener("DOMContentLoaded", () => {
     bestForList.addEventListener("input", handleBestForListInput);
   }
 
-  async function loadPreferences() {
+  async function loadPreferences({ preserveStatus = false } = {}) {
     try {
       const res = await fetch("/api/account/preferences", {
+        suppressToast: true,
         credentials: "include"
       });
-      if (!res.ok) return;
+      if (!res.ok) throw new Error("Unable to load preferences.");
       const prefs = await res.json();
       if (emailToggle) emailToggle.checked = !!prefs.email;
       if (themeSelect) {
@@ -607,65 +729,25 @@ document.addEventListener("DOMContentLoaded", () => {
       if (statePreferenceSelect) {
         setStatePreferenceValue(stateValue);
       }
+      if (!preserveStatus) setPreferencesSaveStatus("Changes save automatically.", "idle");
     } catch (err) {
       console.error("Failed to load preferences", err);
+      setPreferencesSaveStatus("Preferences could not be loaded. Try refreshing this page.", "error");
     }
   }
   trackInitialSettingsTask(loadPreferences());
 
-  const prefBtn = document.getElementById("savePreferencesBtn");
-  if (prefBtn) {
-    prefBtn.addEventListener("click", async () => {
-      const email = emailToggle ? emailToggle.checked : false;
-      const theme = normalizeSelectableTheme(themeSelect?.value);
-      const fontSize = fontSizeSelect ? fontSizeSelect.value : "md";
-      const hideProfile = hideProfileToggle ? !!hideProfileToggle.checked : undefined;
-      const state = statePreferenceSelect ? statePreferenceSelect.value : "";
-      const payload = {
-        email,
-        theme,
-        fontSize,
-        state,
-      };
-      if (typeof hideProfile === "boolean") {
-        payload.hideProfile = hideProfile;
-      }
-
-      const res = await secureFetch("/api/account/preferences", {
-        method: "POST",
-        body: payload,
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        showToast(data.error || "Unable to save preferences.", "err");
-        return;
-      }
-
-      if (theme && typeof window.applyThemePreference === "function") {
-        window.applyThemePreference(theme);
-      }
-      if (fontSize && typeof window.applyFontSizePreference === "function") {
-        window.applyFontSizePreference(fontSize);
-      }
+  if (statePreferenceSelect) {
+    statePreferenceSelect.addEventListener("change", async () => {
+      const state = statePreferenceSelect.value;
+      const data = await queueAccountPreferenceWrite({ state }, { successMessage: "Primary state saved" });
+      if (!data) return;
       if (currentUser) {
-        currentUser.notificationPrefs = {
-          ...(currentUser.notificationPrefs || {}),
-          email
-        };
-        currentUser.preferences = {
-          ...(currentUser.preferences || {}),
-          theme,
-          fontSize,
-          ...(typeof hideProfile === "boolean" ? { hideProfile } : {})
-        };
         currentUser.location = state || "";
         currentUser.state = state || "";
         persistSession({ user: mergeSessionPreferences(currentUser) });
       }
       hydrateStatePreference(currentUser || { state });
-      showToast("Preferences saved", "ok");
     });
   }
 
@@ -1239,6 +1321,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- STRIPE CONNECT ---
   const connectStripeBtn = document.getElementById("connectStripeBtn");
   const stripeStatus = document.getElementById("stripeStatus");
+  const stripeRequirementCopy = document.getElementById("stripeRequirementCopy");
   const cachedUser = getCachedUser();
   const cachedRole = String(cachedUser?.role || "").toLowerCase();
   const isParalegal = cachedRole === "paralegal";
@@ -1249,7 +1332,9 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const updateStripeStatus = (data = {}) => {
-    const connected = !!data.details_submitted && !!data.payouts_enabled;
+    const readiness = data.readiness && typeof data.readiness === "object" ? data.readiness : null;
+    const connected = readiness?.ready === true;
+    const statusUnavailable = readiness?.evidenceState && readiness.evidenceState !== "verified";
     const bankName = String(data.bank_name || "").trim();
     const bankLast4 = String(data.bank_last4 || "").trim();
     if (stripeStatus) {
@@ -1260,12 +1345,27 @@ document.addEventListener("DOMContentLoaded", () => {
         setStripeStatus(bankBits.length
           ? `Stripe connected for payouts (${bankBits.join(" ")})`
           : "Stripe connected for payouts.");
+      } else if (statusUnavailable) {
+        setStripeStatus("Stripe status unavailable.");
       } else {
         setStripeStatus();
       }
     }
+    if (stripeRequirementCopy) {
+      if (connected) {
+        stripeRequirementCopy.textContent = "Your payout account is connected and ready to receive eligible payouts.";
+      } else if (statusUnavailable) {
+        stripeRequirementCopy.textContent = "LPC could not confirm your current payout readiness. Review Stripe before relying on this status.";
+      } else if (readiness?.accountPresent) {
+        stripeRequirementCopy.textContent = "Finish the remaining Stripe requirements before receiving payouts.";
+      } else {
+        stripeRequirementCopy.textContent = "Connect Stripe before applying to Matters or receiving payment.";
+      }
+    }
     if (connectStripeBtn) {
-      connectStripeBtn.textContent = connected ? "Update Stripe Details" : "Connect Stripe Account →";
+      connectStripeBtn.textContent = connected || readiness?.accountPresent
+        ? "Update Stripe Details"
+        : "Connect Stripe Account →";
       connectStripeBtn.disabled = !isParalegal;
       connectStripeBtn.setAttribute("aria-disabled", !isParalegal ? "true" : "false");
       connectStripeBtn.removeAttribute("title");
@@ -1283,6 +1383,9 @@ document.addEventListener("DOMContentLoaded", () => {
       updateStripeStatus(data);
     } catch (err) {
       setStripeStatus("Stripe status unavailable.");
+      if (stripeRequirementCopy) {
+        stripeRequirementCopy.textContent = "LPC could not confirm your current payout readiness. Review Stripe before relying on this status.";
+      }
       if (connectStripeBtn) {
         connectStripeBtn.disabled = !isParalegal;
         connectStripeBtn.setAttribute("aria-disabled", !isParalegal ? "true" : "false");
@@ -1385,7 +1488,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadSettings();
     await Promise.allSettled(initialSettingsTasks);
   } finally {
-    window.__markAccountSettingsLayoutReady?.();
+    document.getElementById("settingsContent")?.removeAttribute("aria-busy");
   }
 });
 
@@ -1666,12 +1769,48 @@ function getAttorneyInitials(user = {}) {
   return buildInitials(fullName, "A");
 }
 
+function getParalegalInitials(user = {}) {
+  const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.name || "";
+  return buildInitials(fullName, "P");
+}
+
 function getProfileSettingsDraftStorageKey(user = currentUser || getCachedUser() || {}) {
   const role = String(user?.role || "").trim().toLowerCase();
   const identifier =
     String(user?._id || user?.id || user?.email || "").trim().toLowerCase();
   if (!role || !identifier) return "";
   return `${PROFILE_SETTINGS_DRAFT_KEY}:${role}:${identifier}`;
+}
+
+function getProfileSettingsServerFingerprint(user = currentUser || getCachedUser() || {}) {
+  const role = String(user?.role || "").trim().toLowerCase();
+  const profile = role === "attorney"
+    ? {
+        firstName: user?.firstName || "",
+        lastName: user?.lastName || "",
+        linkedInURL: user?.linkedInURL || "",
+        lawFirm: user?.lawFirm || "",
+        firmWebsite: user?.firmWebsite || "",
+        practiceDescription: user?.practiceDescription || user?.bio || "",
+        publications: user?.publications || [],
+        practiceAreas: user?.practiceAreas || [],
+      }
+    : {
+        firstName: user?.firstName || "",
+        lastName: user?.lastName || "",
+        email: user?.email || "",
+        bio: user?.bio || "",
+        linkedInURL: user?.linkedInURL || "",
+        yearsExperience: user?.yearsExperience || "",
+        practiceAreas: user?.practiceAreas || [],
+        highlightedSkills: user?.highlightedSkills || user?.skills || [],
+        stateExperience: user?.stateExperience || [],
+        bestFor: user?.bestFor || [],
+        experience: user?.experience || [],
+        education: user?.education || [],
+        languages: user?.languages || [],
+      };
+  return JSON.stringify(profile);
 }
 
 function readProfileSettingsDraft(user = currentUser || getCachedUser() || {}) {
@@ -1681,8 +1820,24 @@ function readProfileSettingsDraft(user = currentUser || getCachedUser() || {}) {
     const raw = sessionStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : null;
+    if (!parsed || typeof parsed !== "object") return null;
+    const savedAt = Number(parsed.savedAt || 0);
+    const age = Date.now() - savedAt;
+    const currentServerFingerprint = getProfileSettingsServerFingerprint(user);
+    const draftServerFingerprint = String(parsed.serverFingerprint || "");
+    if (
+      !Number.isFinite(savedAt) ||
+      savedAt <= 0 ||
+      age < 0 ||
+      age > PROFILE_DRAFT_MAX_AGE_MS ||
+      draftServerFingerprint !== currentServerFingerprint
+    ) {
+      clearProfileSettingsDraft(user);
+      return null;
+    }
+    return parsed;
   } catch {
+    clearProfileSettingsDraft(user);
     return null;
   }
 }
@@ -1750,7 +1905,8 @@ function persistProfileSettingsDraft() {
       key,
       JSON.stringify({
         ...draft,
-        updatedAt: Date.now(),
+        savedAt: Date.now(),
+        serverFingerprint: getProfileSettingsServerFingerprint(),
       })
     );
   } catch {}
@@ -1856,14 +2012,6 @@ function bindProfileDraftPersistence() {
 
   document.addEventListener("input", scheduleFromEvent, true);
   document.addEventListener("change", scheduleFromEvent, true);
-  document.addEventListener(
-    "click",
-    (event) => {
-      if (!currentUser || applyingProfileDraft || !shouldTrack(event.target)) return;
-      setTimeout(() => scheduleProfileSettingsDraftPersist(), 0);
-    },
-    true
-  );
   profileDraftPersistenceBound = true;
 }
 
@@ -2059,7 +2207,7 @@ function updatePhotoReviewStatus(user = {}) {
   statusEl.classList.remove("is-rejected");
   let message = "";
   if (status === "pending_review") {
-    message = "Pending";
+    message = "Your profile is hidden from attorney discovery until your photo is approved.";
   } else if (status === "rejected") {
     message = "Your photo needs a quick update. Please upload a new one that meets our guidelines.";
     statusEl.classList.add("is-rejected");
@@ -2127,11 +2275,52 @@ function updateRequiredFieldMarkers() {
   if (!status.resumeOk) missing.push("Resume");
   if (!status.photoOk) missing.push("Profile photo");
 
+  const readiness = document.getElementById("profileReadiness");
+  const readinessTitle = document.getElementById("profileReadinessTitle");
+  const readinessDetail = document.getElementById("profileReadinessDetail");
+  const readinessAction = document.getElementById("profileReadinessAction");
+  const isReady = missing.length === 0;
+  if (readiness) readiness.dataset.state = isReady ? "ready" : "incomplete";
+  if (readinessTitle) {
+    readinessTitle.textContent = isReady
+      ? "Your profile is ready"
+      : `${missing.length} required ${missing.length === 1 ? "item" : "items"} to finish`;
+  }
+  if (readinessDetail) {
+    readinessDetail.hidden = isReady;
+    readinessDetail.textContent = isReady
+      ? ""
+      : `Add ${missing.join(", ")} before making your profile visible.`;
+  }
+  if (readinessAction) {
+    readinessAction.hidden = isReady;
+    readinessAction.dataset.target = !status.photoOk
+      ? "avatarFrame"
+      : !status.bioOk
+      ? "bioSection"
+      : !status.skillsOk
+      ? "skillsCard"
+      : !status.practiceAreasOk
+      ? "practiceAreasCard"
+      : "settingsResume";
+  }
+
   return {
     ...status,
     ok: status.bioOk && status.skillsOk && status.practiceAreasOk && status.resumeOk && status.photoOk,
     missing,
   };
+}
+
+const profileReadinessAction = document.getElementById("profileReadinessAction");
+if (profileReadinessAction) {
+  profileReadinessAction.addEventListener("click", () => {
+    const target = document.getElementById(profileReadinessAction.dataset.target || "");
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    const editToggle = target.querySelector?.("[data-edit-toggle]");
+    (editToggle || target).focus({ preventScroll: true });
+  });
 }
 
 function bindParalegalRequiredFieldWatchers() {
@@ -2849,6 +3038,7 @@ function createExperienceRow(entry = {}) {
       container.appendChild(createExperienceRow());
     }
     updateExperienceRemoveButtons(container);
+    markParalegalProfileChanged();
   });
   row.appendChild(removeBtn);
   return row;
@@ -2980,6 +3170,7 @@ function renderSkillsChips(values = []) {
       applySkillsInput(updated);
       refreshParalegalSectionDisplays();
       updateRequiredFieldMarkers();
+      markParalegalProfileChanged();
     });
     chip.appendChild(remove);
     container.appendChild(chip);
@@ -3101,6 +3292,7 @@ function renderStateExperienceChips(values = []) {
       const updated = readStateExperienceInput().filter((value) => value !== code);
       renderStateExperienceChips(updated);
       refreshParalegalSectionDisplays();
+      markParalegalProfileChanged();
     });
     chip.appendChild(remove);
     container.appendChild(chip);
@@ -3732,7 +3924,7 @@ function syncPracticeAreasInput(inputId, values = []) {
   input.value = (Array.isArray(values) ? values : [values]).filter(Boolean).join(", ");
 }
 
-function loadAvatarPreview({ preview, frame, initials, url, fallbackText = "" } = {}) {
+function loadAvatarPreview({ preview, frame, initials, url, fallbackText = "", onLoad, onError } = {}) {
   if (!preview) {
     if (initials && fallbackText) initials.textContent = fallbackText;
     return;
@@ -3747,6 +3939,7 @@ function loadAvatarPreview({ preview, frame, initials, url, fallbackText = "" } 
     preview.classList.add("is-loaded");
     frame?.classList.add("has-photo");
     if (initials) initials.style.display = "none";
+    onLoad?.();
   };
 
   const handleError = () => {
@@ -3757,6 +3950,7 @@ function loadAvatarPreview({ preview, frame, initials, url, fallbackText = "" } 
       initials.style.display = "flex";
       if (fallbackText) initials.textContent = fallbackText;
     }
+    onError?.();
   };
 
   preview.addEventListener("load", markLoaded, { once: true });
@@ -4055,7 +4249,7 @@ function bindAttorneyNotificationToggles() {
     emailInput.addEventListener("change", async () => {
       const checked = emailInput.checked;
       try {
-        await saveNotificationPref("email", checked);
+        await saveNotificationPreferenceWithStatus("email", checked);
         settingsState.notificationPrefs.email = checked;
         syncChildren();
         showToast("Notification preference updated", "ok");
@@ -4065,6 +4259,7 @@ function bindAttorneyNotificationToggles() {
         settingsState.notificationPrefs.email = emailInput.checked;
         syncChildren();
         showToast("Unable to update preference right now.", "err");
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
       }
     });
   }
@@ -4075,7 +4270,7 @@ function bindAttorneyNotificationToggles() {
     input.addEventListener("change", async () => {
       const checked = input.checked;
       try {
-        await saveNotificationPref(key, checked);
+        await saveNotificationPreferenceWithStatus(key, checked);
         settingsState.notificationPrefs[key] = checked;
         syncChildren();
         showToast("Notification preference updated", "ok");
@@ -4084,6 +4279,7 @@ function bindAttorneyNotificationToggles() {
         input.checked = !checked;
         syncChildren();
         showToast("Unable to update preference right now.", "err");
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
       }
     });
   });
@@ -4117,16 +4313,15 @@ function bindParalegalNotificationToggles() {
     emailInput.addEventListener("change", async () => {
       const checked = emailInput.checked;
       try {
-        await saveNotificationPref("email", checked);
+        await saveNotificationPreferenceWithStatus("email", checked);
         settingsState.notificationPrefs.email = checked;
         syncChildren();
-        showToast("Notification preference updated", "ok");
       } catch (err) {
         console.error("Unable to update notification preference", err);
         emailInput.checked = !checked;
         settingsState.notificationPrefs.email = emailInput.checked;
         syncChildren();
-        showToast("Unable to update preference right now.", "err");
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
       }
     });
   }
@@ -4137,15 +4332,14 @@ function bindParalegalNotificationToggles() {
     input.addEventListener("change", async () => {
       const checked = input.checked;
       try {
-        await saveNotificationPref(key, checked);
+        await saveNotificationPreferenceWithStatus(key, checked);
         settingsState.notificationPrefs[key] = checked;
         syncChildren();
-        showToast("Notification preference updated", "ok");
       } catch (err) {
         console.error("Unable to update notification preference", err);
         input.checked = !checked;
         syncChildren();
-        showToast("Unable to update preference right now.", "err");
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
       }
     });
   });
@@ -4160,8 +4354,9 @@ function bindParalegalVisibilityToggle() {
   if (!input) return;
   input.addEventListener("change", async () => {
     const checked = input.checked;
+    setPreferencesSaveStatus("Saving…", "saving");
     try {
-      const prefs = await saveProfileVisibility(checked);
+      const prefs = await queuePreferenceMutation(() => saveProfileVisibility(checked));
       if (currentUser) {
         currentUser.preferences = {
           ...(currentUser.preferences || {}),
@@ -4170,11 +4365,11 @@ function bindParalegalVisibilityToggle() {
         persistSession({ user: currentUser });
         window.updateSessionUser?.(currentUser);
       }
-      showToast(checked ? "Profile hidden" : "Profile visible", "ok");
+      setPreferencesSaveStatus("Profile visibility saved", "saved");
     } catch (err) {
       console.error("Unable to update profile visibility", err);
       input.checked = !checked;
-      showToast("Unable to update profile visibility right now.", "err");
+      setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
     }
   });
   paralegalVisibilityBound = true;
@@ -4182,12 +4377,18 @@ function bindParalegalVisibilityToggle() {
 
 function updateParalegalVisibilityLock(user = {}) {
   const toggle = document.getElementById("paralegalHideProfile");
+  const help = document.getElementById("profileVisibilityHelp");
   if (!toggle) return;
   const approved = isParalegalPhotoApproved(user);
   if (!approved) {
     toggle.checked = true;
   }
   toggle.disabled = !approved;
+  if (help) {
+    help.textContent = approved
+      ? "Controls whether attorneys can discover your profile."
+      : "Your profile remains hidden until your profile photo is approved.";
+  }
 }
 
 function hydrateAttorneyNotificationPrefs(user = {}) {
@@ -4408,6 +4609,7 @@ async function handleAttorneyProfileSave() {
 async function saveNotificationPref(key, value) {
   const res = await secureFetch("/api/users/me/notification-prefs", {
     method: "PATCH",
+    suppressToast: true,
     body: { [key]: !!value }
   });
   if (!res.ok) {
@@ -4416,9 +4618,16 @@ async function saveNotificationPref(key, value) {
   }
 }
 
+async function saveNotificationPreferenceWithStatus(key, value) {
+  setPreferencesSaveStatus("Saving…", "saving");
+  await queuePreferenceMutation(() => saveNotificationPref(key, value));
+  setPreferencesSaveStatus("Notification preferences saved", "saved");
+}
+
 async function saveProfileVisibility(value) {
   const res = await secureFetch("/api/account/preferences", {
     method: "POST",
+    suppressToast: true,
     body: { hideProfile: !!value }
   });
   const data = await res.json().catch(() => ({}));
@@ -4508,7 +4717,10 @@ function addLanguageRow(entry = {}) {
   removeBtn.type = "button";
   removeBtn.className = "remove-language";
   removeBtn.textContent = "Remove";
-  removeBtn.addEventListener("click", () => row.remove());
+  removeBtn.addEventListener("click", () => {
+    row.remove();
+    markParalegalProfileChanged();
+  });
   row.appendChild(removeBtn);
 
   languagesEditor.appendChild(row);
@@ -4573,7 +4785,10 @@ function addEducationRow(entry = {}) {
   removeBtn.type = "button";
   removeBtn.className = "remove-education";
   removeBtn.textContent = "Remove";
-  removeBtn.addEventListener("click", () => row.remove());
+  removeBtn.addEventListener("click", () => {
+    row.remove();
+    markParalegalProfileChanged();
+  });
   row.appendChild(removeBtn);
 
   educationEditor.appendChild(row);
@@ -4872,6 +5087,7 @@ function bindEducationModal() {
     settingsState.education = entries;
     renderEducationEditor(entries);
     refreshParalegalSectionDisplays();
+    markParalegalProfileChanged();
     closeEducationModal();
   });
 }
@@ -5064,15 +5280,35 @@ function applyUnifiedRoleStyling(user = {}) {
   const sidebarLogo = document.querySelector(".sidebar .logo");
 
   if (title) {
-    title.textContent = "Account settings";
+    title.textContent = role === "admin" ? "Admin security" : "Account Settings";
   }
   if (sidebarLogo && !sidebarLogo.classList.contains("sidebar-profile-host")) {
     const defaultText = sidebarLogo.dataset.defaultText || sidebarLogo.textContent;
     if (!sidebarLogo.dataset.defaultText) sidebarLogo.dataset.defaultText = defaultText;
     sidebarLogo.textContent = isParalegal ? "Account Settings" : defaultText;
   }
+  document.body.classList.toggle("admin-security", role === "admin");
+  if (role === "admin") {
+    if (!document.getElementById('adminSecurityBack')) {
+      const heading = document.getElementById('accountSettingsTitle');
+      const back = document.createElement('a');
+      back.id = 'adminSecurityBack'; back.href = 'admin-dashboard.html#overview'; back.textContent = '← Back to admin';
+      heading?.before(back);
+    }
+    document.querySelectorAll('[data-deactivate-account]').forEach(button => {
+      button.disabled = true;
+      button.closest('.settings-block')?.remove();
+    });
+    const back = document.getElementById('dashboardReturnLink');
+    if (back) { back.removeAttribute('data-attorney-only'); back.href='admin-dashboard.html#overview'; back.textContent='Back to admin'; back.hidden=false; back.style.display='block'; }
+    document.getElementById('navProfile')?.setAttribute('hidden', '');
+    document.getElementById('navPreferences')?.setAttribute('hidden', '');
+    if (location.hash !== '#security') location.hash = 'security';
+  }
   document.body.classList.toggle("paralegal-flat", isParalegal);
   document.body.classList.toggle("attorney-classic", role === "attorney");
+  document.documentElement.classList.toggle("role-paralegal", isParalegal);
+  document.documentElement.classList.toggle("role-attorney", role === "attorney");
 
   document.querySelectorAll("[data-paralegal-only]").forEach((el) => {
     if (el.dataset.forceVisible !== undefined) {
@@ -5117,19 +5353,35 @@ function applyAvatar(user) {
 
   const preview = document.getElementById("avatarPreview");
   const attorneyPreview = document.getElementById("attorneyAvatarPreview");
+  const paralegalInitials = document.getElementById("avatarInitials");
+  const attorneyInitials = document.getElementById("attorneyAvatarInitials");
+  const paralegalFallbackText = getParalegalInitials(user);
+  const attorneyFallbackText = getAttorneyInitials(user);
+  if (paralegalInitials) paralegalInitials.textContent = paralegalFallbackText;
+  if (attorneyInitials) attorneyInitials.textContent = attorneyFallbackText;
   loadAvatarPreview({
     preview,
     frame: document.getElementById("avatarFrame"),
-    initials: document.getElementById("avatarInitials"),
+    initials: paralegalInitials,
     url: cacheBusted,
-    fallbackText: document.getElementById("avatarInitials")?.textContent || "",
+    fallbackText: paralegalFallbackText,
+    onLoad: () => {
+      const editButton = document.getElementById("editAvatarBtn");
+      if (editButton) editButton.textContent = "Edit photo";
+      syncParalegalAvatarFrameAction(true);
+    },
+    onError: () => {
+      const editButton = document.getElementById("editAvatarBtn");
+      if (editButton) editButton.textContent = "Replace photo";
+      syncParalegalAvatarFrameAction(false);
+    },
   });
   loadAvatarPreview({
     preview: attorneyPreview,
     frame: document.getElementById("attorneyAvatarFrame"),
-    initials: document.getElementById("attorneyAvatarInitials"),
+    initials: attorneyInitials,
     url: cacheBusted,
-    fallbackText: document.getElementById("attorneyAvatarInitials")?.textContent || "",
+    fallbackText: attorneyFallbackText,
   });
 
   const cluster = document.getElementById("clusterAvatar");
@@ -5163,6 +5415,28 @@ function syncCluster(user = {}) {
   window.hydrateParalegalCluster?.(user);
 }
 
+function ensureAttorneySettingsStyles() {
+  const styles = [
+    ["assets/styles/profile-settings-attorney-account.css?v=20260820-14", "lpcAttorneyAccountStyles"],
+    ["assets/styles/profile-settings-focused.css?v=20260902-2", "lpcAttorneyFocusedStyles"],
+  ];
+  return Promise.all(styles.map(([href, id]) => new Promise((resolve) => {
+    const existing = document.getElementById(id);
+    if (existing?.sheet) {
+      resolve(existing);
+      return;
+    }
+    const link = existing || document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = href;
+    const finish = () => resolve(link);
+    link.addEventListener("load", finish, { once: true });
+    link.addEventListener("error", finish, { once: true });
+    if (!existing) document.head.appendChild(link);
+  })));
+}
+
 async function loadSettings() {
   showForceVisible();
   let user = {};
@@ -5184,8 +5458,13 @@ async function loadSettings() {
     currentUser = mergeSessionPreferences(user);
     window.currentUser = currentUser;
     persistSession({ user: currentUser });
+    window.updateSessionUser?.(currentUser);
     hydrateStatePreference(user);
     bindProfileDraftPersistence();
+
+    if (String(currentUser?.role || "").toLowerCase() === "attorney") {
+      await ensureAttorneySettingsStyles().catch(() => null);
+    }
 
     if (!hasSettingsAccess(user)) {
       showPendingSettingsNotice();
@@ -5195,7 +5474,7 @@ async function loadSettings() {
     const titleEl = document.getElementById("accountSettingsTitle");
     const subtitleEl = document.getElementById("accountSettingsSubtitle");
 
-    if (titleEl) titleEl.textContent = "Account settings";
+    if (titleEl) titleEl.textContent = "Account Settings";
     if (currentUser?.role === "attorney") {
       if (subtitleEl) subtitleEl.textContent = "Manage your profile, security, and preferences.";
     }
@@ -5229,8 +5508,10 @@ async function loadSettings() {
   const draft = readProfileSettingsDraft(user);
   if (draft) {
     applyProfileSettingsDraft(draft, user);
+    setParalegalProfileDirty(true);
   } else {
     syncCluster(user);
+    setParalegalProfileDirty(false);
   }
   scheduleProfileScrollIndicatorUpdate();
 
@@ -5335,6 +5616,7 @@ function loadCertificate(user) {
           if (chooseBtn) chooseBtn.textContent = "Certificate on file";
           const removeBtn = document.getElementById("removeCertificateBtn");
           if (removeBtn) removeBtn.hidden = false;
+          markParalegalProfileChanged();
         },
         onFinally: () => {
           if (status && status.textContent === "Uploading…") {
@@ -5367,6 +5649,7 @@ function loadCertificate(user) {
     if (chooseBtn) chooseBtn.textContent = "Choose File";
     const removeBtn = document.getElementById("removeCertificateBtn");
     if (removeBtn) removeBtn.hidden = true;
+    markParalegalProfileChanged();
   });
 }
 
@@ -5442,6 +5725,7 @@ function loadResume(user) {
           const removeBtn = document.getElementById("removeResumeBtn");
           if (removeBtn) removeBtn.hidden = false;
           updateRequiredFieldMarkers();
+          markParalegalProfileChanged();
         },
         onFinally: () => {
           if (status && status.textContent === "Uploading…") {
@@ -5475,6 +5759,7 @@ function loadResume(user) {
     const removeBtn = document.getElementById("removeResumeBtn");
     if (removeBtn) removeBtn.hidden = true;
     updateRequiredFieldMarkers();
+    markParalegalProfileChanged();
   });
 
   updateRequiredFieldMarkers();
@@ -5539,6 +5824,7 @@ function loadWritingSample(user) {
           if (chooseBtn) chooseBtn.textContent = "Writing sample on file";
           const removeBtn = document.getElementById("removeWritingSampleBtn");
           if (removeBtn) removeBtn.hidden = false;
+          markParalegalProfileChanged();
         },
         onFinally: () => {
           if (status && status.textContent === "Uploading…") {
@@ -5571,6 +5857,7 @@ function loadWritingSample(user) {
     if (chooseBtn) chooseBtn.textContent = "Choose File";
     const removeBtn = document.getElementById("removeWritingSampleBtn");
     if (removeBtn) removeBtn.hidden = true;
+    markParalegalProfileChanged();
   });
 }
 
@@ -5848,7 +6135,7 @@ async function saveSettings() {
   } catch (error) {
     showToast(error?.message || "Enter a valid LinkedIn URL.", "err");
     linkedInInput?.focus();
-    return;
+    return false;
   }
   if (settingsState.stagedProfilePhotoFile) {
     try {
@@ -5862,7 +6149,7 @@ async function saveSettings() {
     } catch (err) {
       console.error("Unable to upload profile photo", err);
       showToast("Unable to upload photo. Please try again.", "err");
-      return;
+      return false;
     }
   }
   const body = {
@@ -5924,7 +6211,7 @@ async function saveSettings() {
 
   if (!res.ok) {
     showToast("Could not save settings.", "err");
-    return;
+    return false;
   }
 
   const updatedUser = await secureFetch("/api/users/me").then((r) => r.json());
@@ -6005,7 +6292,7 @@ async function saveSettings() {
       : [];
     if (uploadedPhotoPendingReview && remainingMissing.length === 0) {
       showToast("Settings saved and profile photo submitted for review.", "ok");
-      return;
+      return true;
     }
     const missingList = remainingMissing.length
       ? remainingMissing.join(", ")
@@ -6014,7 +6301,7 @@ async function saveSettings() {
       ? "Settings saved and profile photo submitted for review."
       : "Settings saved.";
     showToast(`${savedMessage} Complete ${missingList} to finish your profile for attorney review.`, "info");
-    return;
+    return true;
   }
 
   showToast(
@@ -6025,6 +6312,7 @@ async function saveSettings() {
       : "Settings saved!",
     "ok"
   );
+  return true;
 }
 
 // -----------------------------
@@ -6306,6 +6594,42 @@ async function canDecodeImageFile(file) {
   });
 }
 
+function closeParalegalAvatarActions({ restoreFocus = false } = {}) {
+  const menu = document.getElementById("avatarPhotoActions");
+  const frame = document.getElementById("avatarFrame");
+  if (!menu || !frame) return;
+  const wasOpen = !menu.classList.contains("hidden");
+  menu.classList.add("hidden");
+  frame.setAttribute("aria-expanded", "false");
+  if (restoreFocus && wasOpen) frame.focus();
+}
+
+function toggleParalegalAvatarActions() {
+  const menu = document.getElementById("avatarPhotoActions");
+  const frame = document.getElementById("avatarFrame");
+  if (!menu || !frame) return;
+  const willOpen = menu.classList.contains("hidden");
+  menu.classList.toggle("hidden", !willOpen);
+  frame.setAttribute("aria-expanded", willOpen ? "true" : "false");
+  if (willOpen) {
+    menu.querySelector('[role="menuitem"]:not(:disabled)')?.focus();
+  }
+}
+
+function syncParalegalAvatarFrameAction(hasVisiblePhoto) {
+  const frame = document.getElementById("avatarFrame");
+  if (!frame) return;
+  frame.setAttribute("aria-label", hasVisiblePhoto ? "Open profile photo actions" : "Upload profile photo");
+  if (hasVisiblePhoto) {
+    frame.setAttribute("aria-haspopup", "menu");
+    frame.setAttribute("aria-controls", "avatarPhotoActions");
+    return;
+  }
+  frame.removeAttribute("aria-haspopup");
+  frame.removeAttribute("aria-controls");
+  closeParalegalAvatarActions();
+}
+
 function initAvatarUploaders() {
   bindAvatarRemoval();
   bindAvatarEditing();
@@ -6319,10 +6643,20 @@ function initAvatarUploaders() {
       cropperReturnFocus = frame;
       const isAttorneyFrame = config.frameId === "attorneyAvatarFrame";
       const existingPhoto = getDisplayProfileImage(currentUser || {}, { allowPending: true });
+      if (
+        !isAttorneyFrame &&
+        frame.classList.contains("has-photo") &&
+        existingPhoto &&
+        existingPhoto !== DEFAULT_AVATAR_DATA
+      ) {
+        toggleParalegalAvatarActions();
+        return;
+      }
       if (isAttorneyFrame && existingPhoto && existingPhoto !== DEFAULT_AVATAR_DATA) {
         openExistingPhotoEditor(config);
         return;
       }
+      closeParalegalAvatarActions();
       input.click();
     };
     frame.style.cursor = "pointer";
@@ -6336,6 +6670,24 @@ function initAvatarUploaders() {
 
     input.addEventListener("change", () => handleAvatarUpload(config));
   });
+
+  if (document.body.dataset.paralegalAvatarActionsBound !== "true") {
+    document.body.dataset.paralegalAvatarActionsBound = "true";
+    document.addEventListener("click", (event) => {
+      const menu = document.getElementById("avatarPhotoActions");
+      const frame = document.getElementById("avatarFrame");
+      if (!menu || menu.classList.contains("hidden")) return;
+      if (menu.contains(event.target) || frame?.contains(event.target)) return;
+      closeParalegalAvatarActions();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      const menu = document.getElementById("avatarPhotoActions");
+      if (!menu || menu.classList.contains("hidden")) return;
+      event.preventDefault();
+      closeParalegalAvatarActions({ restoreFocus: true });
+    });
+  }
 }
 
 function updateAvatarRemoveButton(user = currentUser || {}) {
@@ -6347,6 +6699,8 @@ function updateAvatarRemoveButton(user = currentUser || {}) {
   const pendingUrl = resolvePendingProfileImage(user);
   const stagedUrl = settingsState.stagedProfilePhotoUrl || "";
   const hasPhoto = Boolean(rawUrl || pendingUrl || stagedUrl);
+  const avatarFrame = document.getElementById("avatarFrame");
+  syncParalegalAvatarFrameAction(Boolean(hasPhoto && avatarFrame?.classList.contains("has-photo")));
   if (removeBtn) {
     removeBtn.classList.toggle("hidden", !hasPhoto);
     removeBtn.disabled = !hasPhoto;
@@ -6442,6 +6796,7 @@ function bindAvatarRemoval() {
     if (!button || button.dataset.bound === "true") return;
     button.dataset.bound = "true";
     button.addEventListener("click", async () => {
+      if (button.id === "removeAvatarBtn") closeParalegalAvatarActions();
       const confirmed = await confirmAction(
         "This removes the photo from your account, public profile, and navigation avatar.",
         {
@@ -6509,6 +6864,8 @@ function bindAvatarEditing() {
   if (editBtn && editBtn.dataset.bound !== "true") {
     editBtn.dataset.bound = "true";
     editBtn.addEventListener("click", () => {
+      closeParalegalAvatarActions();
+      cropperReturnFocus = document.getElementById("avatarFrame");
       if (paralegalConfig) openExistingPhotoEditor(paralegalConfig);
     });
   }
@@ -7006,6 +7363,7 @@ async function applyCroppedPhoto() {
   updateAvatarRemoveButton(currentUser || {});
   updatePhotoReviewStatus(currentUser || {});
   updateRequiredFieldMarkers();
+  markParalegalProfileChanged();
   closePhotoCropper();
 }
 
@@ -7036,6 +7394,7 @@ function stagePhotoDirect(file, config) {
     updateAvatarRemoveButton(currentUser || {});
     updatePhotoReviewStatus(currentUser || {});
     updateRequiredFieldMarkers();
+    markParalegalProfileChanged();
   };
   reader.onerror = () => {
     const fallbackUrl = URL.createObjectURL(file);
@@ -7052,6 +7411,7 @@ function stagePhotoDirect(file, config) {
     updateAvatarRemoveButton(currentUser || {});
     updatePhotoReviewStatus(currentUser || {});
     updateRequiredFieldMarkers();
+    markParalegalProfileChanged();
   };
   reader.readAsDataURL(file);
 }
@@ -7088,19 +7448,37 @@ async function saveProfile() {
     saveBtn.textContent = "Saving…";
   }
   try {
-    await saveSettings();
+    const saved = await saveSettings();
+    if (saved) setParalegalProfileDirty(false);
   } catch (err) {
     console.error("Profile save failed", err);
     showToast(err?.message || "Unable to save settings right now.", "err");
   } finally {
     if (saveBtn) {
-      saveBtn.disabled = false;
+      saveBtn.disabled = !paralegalProfileDirty;
       saveBtn.textContent = originalLabel;
     }
   }
 }
 
 const profileSaveBtn = document.getElementById("profileSaveBtn");
+const profileSaveStatus = document.getElementById("profileSaveStatus");
+let paralegalProfileDirty = false;
+
+function setParalegalProfileDirty(dirty) {
+  paralegalProfileDirty = Boolean(dirty);
+  if (profileSaveBtn) profileSaveBtn.disabled = !paralegalProfileDirty;
+  if (profileSaveStatus) {
+    profileSaveStatus.textContent = paralegalProfileDirty ? "Unsaved changes" : "All changes saved.";
+    profileSaveStatus.dataset.state = paralegalProfileDirty ? "dirty" : "saved";
+  }
+}
+
+function markParalegalProfileChanged() {
+  setParalegalProfileDirty(true);
+  scheduleProfileSettingsDraftPersist();
+}
+
 if (profileSaveBtn) {
   profileSaveBtn.addEventListener("click", saveProfile);
 }
@@ -7108,7 +7486,19 @@ if (profileSaveBtn) {
 const profileForm = document.getElementById("profileForm");
 if (profileForm) {
   profileForm.addEventListener("submit", (e) => e.preventDefault());
+  profileForm.addEventListener("input", () => markParalegalProfileChanged());
+  profileForm.addEventListener("change", (event) => {
+    if (event.target instanceof HTMLInputElement && event.target.type === "file") return;
+    markParalegalProfileChanged();
+  });
+  setParalegalProfileDirty(false);
 }
+
+window.addEventListener("beforeunload", (event) => {
+  if (!paralegalProfileDirty) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
 
 async function handleProfilePreviewNavigation() {
   const cached = currentUser || getCachedUser() || {};

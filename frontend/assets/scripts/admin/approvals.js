@@ -570,7 +570,7 @@ function renderApprovalDetail(item = null) {
         <p class="small">${escapeHTML(actionCopy.approve)}</p>
         <p class="small">${escapeHTML(actionCopy.reject)}</p>
         <label class="approval-decision-label">Optional note
-          <textarea class="approval-decision-note" id="approvalDecisionNote" rows="3" maxlength="2000" placeholder="Optional note for why you approved or rejected this"></textarea>
+          <textarea class="approval-decision-note" id="approvalDecisionNote" rows="3" maxlength="2000"></textarea>
         </label>
         <div class="approval-decision-actions">
           <button class="btn" type="button" data-approval-action="approve"${item.actionable?.approve ? "" : " disabled"}>Approve</button>
@@ -582,14 +582,12 @@ function renderApprovalDetail(item = null) {
       <section class="ai-room-focus-block">
         <h3>What Happens Next</h3>
         <p>${escapeHTML(approvalResolvedOutcomeCopy(item))}</p>
-        <p class="small">This item is no longer waiting in the pending approvals queue.</p>
       </section>
     `;
 
   const isTestItem = isApprovalTestItem(item);
   const statusLabel = friendlyStatusLabel(item.currentStatus || "pending");
   const noticeParts = [
-    isPendingDecision ? `${statusLabel}. This item needs your approval.` : `${statusLabel}.`,
     isTestItem ? "This appears to be an internal test item." : "",
   ].filter(Boolean);
   const detailBadges = [
@@ -602,7 +600,7 @@ function renderApprovalDetail(item = null) {
     <section class="ai-room-focus-block">
       <div class="approval-detail-badges">${detailBadges.join("")}</div>
       <p><strong>${escapeHTML(friendlyApprovalTitle(item))}</strong></p>
-      <p>${escapeHTML(noticeParts.join(" "))}</p>
+      ${noticeParts.length ? `<p>${escapeHTML(noticeParts.join(" "))}</p>` : ""}
     </section>
   `;
 

@@ -4,6 +4,8 @@ const request = require("supertest");
 process.env.STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "whsec_test";
 
 const mockStripe = {
+  disputes: { retrieve: jest.fn() },
+  refunds: { retrieve: jest.fn(), list: jest.fn() },
   webhooks: {
     constructEvent: jest.fn(),
   },
@@ -18,10 +20,12 @@ const mockStripe = {
   },
   isTransferablePaymentIntent: jest.fn(() => ({ transferable: true })),
 };
-const mockNotifyUser = jest.fn(async () => ({ ok: true }));
+const mockDispatchNotice = jest.fn(async () => ({ ok: true }));
+const mockNotifyUser = jest.fn(async (_userId, _type, _payload, options = {}) => options.deferDispatch ? mockDispatchNotice : { ok: true });
 const mockSendOwnerAlert = jest.fn(async () => ({ ok: true }));
 
 jest.mock("../utils/stripe", () => mockStripe);
+jest.mock("../services/lpcEvents/publishEventService", () => ({ publishEventSafe: jest.fn(async () => ({ ok: true })) }));
 
 jest.mock("../utils/notifyUser", () => ({
   notifyUser: (...args) => mockNotifyUser(...args),
@@ -52,8 +56,7 @@ const app = (() => {
 
 beforeAll(async () => {
   await connect();
-  await WebhookEvent.init();
-  await FinancialAdjustment.init();
+  await Promise.all([User.init(), Case.init(), Payout.init(), PaymentOperation.init(), AuditLog.init(), WebhookEvent.init(), FinancialAdjustment.init(), require("../models/PlatformIncome").init(), require("../models/AuthSession").init()]);
 });
 
 afterAll(async () => {
@@ -64,10 +67,14 @@ beforeEach(async () => {
   await clearDatabase();
   mockStripe.webhooks.constructEvent.mockReset();
   mockStripe.paymentIntents.retrieve.mockReset();
+  mockStripe.refunds.retrieve.mockReset();
+  mockStripe.refunds.list.mockReset();
   mockStripe.charges.retrieve.mockReset();
   mockStripe.balanceTransactions.retrieve.mockReset();
+  mockStripe.disputes.retrieve.mockReset();
   mockStripe.isTransferablePaymentIntent.mockClear();
   mockNotifyUser.mockClear();
+  mockDispatchNotice.mockClear();
   mockSendOwnerAlert.mockClear();
 });
 
@@ -101,6 +108,7 @@ describe("Webhook handling", () => {
       data: {
         object: {
           id: "dp_chargeback_interrupted",
+          object: "dispute",
           amount: 48800,
           currency: "usd",
           status: "needs_response",
@@ -111,8 +119,16 @@ describe("Webhook handling", () => {
       },
     };
     mockStripe.webhooks.constructEvent.mockImplementation(() => event);
+    mockStripe.disputes.retrieve.mockResolvedValue(event.data.object);
+    mockStripe.paymentIntents.retrieve.mockResolvedValue({ id: "pi_chargeback_webhook", object: "payment_intent", status: "succeeded", amount: 48800, amount_received: 48800, currency: "usd", livemode: false, latest_charge: "ch_chargeback_interrupted", transfer_group: `case_${caseDoc._id}`, metadata: { caseId: String(caseDoc._id) } });
     mockStripe.charges.retrieve.mockResolvedValue({
       id: "ch_chargeback_interrupted",
+      object: "charge",
+      status: "succeeded",
+      paid: true,
+      captured: true,
+      livemode: false,
+      amount_captured: 48800,
       amount: 48800,
       amount_refunded: 0,
       currency: "usd",
@@ -123,6 +139,8 @@ describe("Webhook handling", () => {
     });
     mockStripe.balanceTransactions.retrieve.mockResolvedValue({
       id: "txn_chargeback_interrupted",
+      object: "balance_transaction",
+      source: "dp_chargeback_interrupted",
       amount: -48800,
       fee: 1500,
       net: -50300,
@@ -137,6 +155,8 @@ describe("Webhook handling", () => {
       .send(Buffer.from(JSON.stringify({})));
     expect(first.status).toBe(500);
     expect((await WebhookEvent.findOne({ eventId: event.id }).lean()).status).toBe("failed");
+    expect(await PaymentOperation.countDocuments({ kind: "chargeback" })).toBe(0);
+    expect(await FinancialAdjustment.countDocuments()).toBe(0);
 
     const replay = await request(app)
       .post("/api/payments/webhook")
@@ -158,7 +178,7 @@ describe("Webhook handling", () => {
 
   test("PaymentIntent succeeded updates case and logs", async () => {
     // Description: Stripe webhook marks case funded and logs the event.
-    // Input values: payment_intent.succeeded with metadata.caseId.
+    // Input values: a retained PaymentIntent and complete current capture evidence.
     // Expected result: escrowStatus=funded, paymentStatus=succeeded, AuditLog + WebhookEvent recorded.
 
     const attorney = await User.create({
@@ -190,6 +210,8 @@ describe("Webhook handling", () => {
       paralegalId: paralegal._id,
       escrowStatus: "awaiting_funding",
       totalAmount: 100000,
+      escrowIntentId: "pi_123",
+      paymentIntentId: "pi_123",
       currency: "usd",
     });
 
@@ -200,16 +222,21 @@ describe("Webhook handling", () => {
       data: {
         object: {
           id: "pi_123",
+          object: "payment_intent",
+          status: "succeeded",
           amount: 122000,
+          amount_received: 122000,
           currency: "usd",
           livemode: false,
           metadata: { caseId: String(caseDoc._id) },
           transfer_group: `case_${caseDoc._id}`,
+          latest_charge: { id: "ch_123", amount: 122000, amount_captured: 122000, amount_refunded: 0, paid: true, captured: true, status: "succeeded", currency: "usd", livemode: false, payment_intent: "pi_123", balance_transaction: { id: "txn_123", type: "charge", amount: 122000, fee: 3500, net: 118500, currency: "usd", source: "ch_123" } },
         },
       },
     };
 
     mockStripe.webhooks.constructEvent.mockImplementation(() => event);
+    mockStripe.paymentIntents.retrieve.mockResolvedValue(event.data.object);
 
     const res = await request(app)
       .post("/api/payments/webhook")
@@ -219,6 +246,8 @@ describe("Webhook handling", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.received).toBe(true);
+    expect(mockNotifyUser).toHaveBeenCalledWith(String(paralegal._id), "case_work_ready", expect.objectContaining({ caseId: caseDoc._id }), expect.objectContaining({ deferDispatch: true, workReady: true }));
+    expect(mockDispatchNotice).toHaveBeenCalledTimes(1);
 
     const updated = await Case.findById(caseDoc._id).lean();
     expect(updated.escrowStatus).toBe("funded");
@@ -316,13 +345,16 @@ describe("Webhook handling", () => {
     expect(count).toBe(1);
   });
 
-  test("refund webhooks retrieve payment intents with connected account context and do not fail on lookup errors", async () => {
+  test("authenticated connected-account refunds stay separate from platform funding", async () => {
     const event = {
       id: "evt_refund_connect",
       type: "refund.updated",
+      livemode: false,
+      account: "acct_connected_refund",
       data: {
         object: {
           id: "re_connect",
+          object: "refund",
           amount: 5000,
           currency: "usd",
           payment_intent: "pi_connect_refund",
@@ -342,15 +374,15 @@ describe("Webhook handling", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.received).toBe(true);
-    expect(mockStripe.paymentIntents.retrieve).toHaveBeenCalledWith("pi_connect_refund", {
-      stripeAccount: "acct_connected_refund",
-    });
+    expect(mockStripe.paymentIntents.retrieve).not.toHaveBeenCalled();
+    expect(mockStripe.refunds.retrieve).not.toHaveBeenCalled();
 
     const audit = await AuditLog.findOne({
       action: "refund.updated",
       "meta.externalRef": "re_connect",
     }).lean();
     expect(audit).toBeTruthy();
+    expect(audit.meta.associationProblem).toBe("unsupported_connected_account_refund");
 
     const webhookRecord = await WebhookEvent.findOne({ eventId: "evt_refund_connect" }).lean();
     expect(webhookRecord.status).toBe("processed");
@@ -462,21 +494,15 @@ describe("Webhook handling", () => {
       feeAttorneyAmount: 8800,
       currency: "usd",
     });
-    mockStripe.paymentIntents.retrieve.mockResolvedValue({
-      id: "pi_refund_ordering",
-      metadata: { caseId: String(caseDoc._id) },
-    });
+    const charge = { id: "ch_refund_ordering", object: "charge", payment_intent: "pi_refund_ordering", amount: 48800, amount_captured: 48800, amount_refunded: 48800, paid: true, captured: true, refunded: true, disputed: false, status: "succeeded", currency: "usd", livemode: false };
+    const refund = { id: "re_ordering", object: "refund", status: "succeeded", amount: 48800, currency: "usd", payment_intent: "pi_refund_ordering", charge: charge.id, created: 1788951600 };
+    mockStripe.paymentIntents.retrieve.mockResolvedValue({ id: "pi_refund_ordering", object: "payment_intent", status: "succeeded", amount: 48800, amount_received: 48800, currency: "usd", livemode: false, metadata: { caseId: String(caseDoc._id) }, transfer_group: `case_${caseDoc._id}`, latest_charge: charge });
+    mockStripe.charges.retrieve.mockResolvedValue(charge);
+    mockStripe.refunds.retrieve.mockResolvedValue(refund);
+    mockStripe.refunds.list.mockResolvedValue({ data: [refund], has_more: false });
     mockStripe.webhooks.constructEvent
-      .mockReturnValueOnce({
-        id: "evt_refund_succeeded_ordering",
-        type: "refund.succeeded",
-        data: { object: { id: "re_ordering", status: "succeeded", amount: 48800, currency: "usd", payment_intent: "pi_refund_ordering" } },
-      })
-      .mockReturnValueOnce({
-        id: "evt_refund_failed_late",
-        type: "refund.failed",
-        data: { object: { id: "re_ordering", status: "failed", amount: 48800, currency: "usd", payment_intent: "pi_refund_ordering" } },
-      });
+      .mockReturnValueOnce({ id: "evt_refund_succeeded_ordering", type: "refund.updated", livemode: false, created: 1788955200, data: { object: refund } })
+      .mockReturnValueOnce({ id: "evt_refund_failed_late", type: "refund.failed", livemode: false, created: 1788955199, data: { object: { ...refund, status: "failed" } } });
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const response = await request(app)
@@ -532,16 +558,22 @@ describe("Webhook handling", () => {
       amountPaid: 32800,
       transferId: "tr_transfer_ordering",
       status: "paid",
+      stripeMode: "test",
     });
     const transfer = {
       id: "tr_transfer_ordering",
+      object: "transfer",
       amount: 32800,
       currency: "usd",
+      destination: "acct_transfer_ordering",
+      livemode: false,
+      reversed: true,
+      amount_reversed: 32800,
       transfer_group: `case_${caseDoc._id}`,
     };
     mockStripe.webhooks.constructEvent
-      .mockReturnValueOnce({ id: "evt_transfer_reversed_first", type: "transfer.reversed", data: { object: transfer } })
-      .mockReturnValueOnce({ id: "evt_transfer_created_late", type: "transfer.created", data: { object: transfer } });
+      .mockReturnValueOnce({ id: "evt_transfer_reversed_first", type: "transfer.reversed", created: 1788955200, livemode: false, data: { object: transfer } })
+      .mockReturnValueOnce({ id: "evt_transfer_created_late", type: "transfer.created", created: 1788868800, livemode: false, data: { object: { ...transfer, reversed: false, amount_reversed: 0 } } });
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const response = await request(app)

@@ -40,4 +40,24 @@ function parseAvailabilityUpdate(
   };
 }
 
-module.exports = { AVAILABILITY_STATUSES, parseAvailabilityUpdate };
+function effectiveAvailability(user = {}, { now = new Date(), timeZone = process.env.BUSINESS_TIME_ZONE || DEFAULT_BUSINESS_TIME_ZONE } = {}) {
+  const details = user.availabilityDetails?.toObject?.() || user.availabilityDetails || {};
+  const date = normalizeDateOnly(details.nextAvailable);
+  const today = dateOnlyFromZonedInstant(now, timeZone);
+  const returned = Boolean(date && today && date <= today);
+  const unavailable = !returned && (details.status === "unavailable" || /^unavailable/i.test(String(user.availability || "")));
+  return {
+    availability: unavailable ? /^unavailable/i.test(String(user.availability || "")) ? user.availability : "Unavailable" : "Available now",
+    availabilityDetails: { ...details, status: unavailable ? "unavailable" : "available", nextAvailable: unavailable ? details.nextAvailable || null : null },
+  };
+}
+
+function buildEffectiveAvailableClause({ now = new Date(), timeZone = process.env.BUSINESS_TIME_ZONE || DEFAULT_BUSINESS_TIME_ZONE } = {}) {
+  const today = dateOnlyToUtcDate(dateOnlyFromZonedInstant(now, timeZone));
+  return { $or: [
+    { "availabilityDetails.nextAvailable": { $type: "date", $lte: today } },
+    { $and: [{ "availabilityDetails.status": { $ne: "unavailable" } }, { availability: { $not: /^unavailable/i } }] },
+  ] };
+}
+
+module.exports = { AVAILABILITY_STATUSES, parseAvailabilityUpdate, effectiveAvailability, buildEffectiveAvailableClause };

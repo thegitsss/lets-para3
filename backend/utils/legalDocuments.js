@@ -1,5 +1,5 @@
-const CURRENT_TERMS_VERSION = "2026-08-15";
-const CURRENT_PRIVACY_VERSION = "2026-08-15";
+const CURRENT_TERMS_VERSION = "2026-09-25";
+const CURRENT_PRIVACY_VERSION = "2026-09-25";
 
 function recordSignupPolicyAcknowledgement(user, { now = new Date() } = {}) {
   if (!user || typeof user !== "object") {

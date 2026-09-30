@@ -380,7 +380,7 @@ async function loadParalegalPayoutUser(user = {}) {
   const userId = user._id || user.id;
   if (!userId) return null;
   return User.findOne({ _id: userId, role: "paralegal" })
-    .select("_id role status stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled")
+    .select("_id role status profileImage avatarURL stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled")
     .lean();
 }
 
@@ -890,9 +890,13 @@ async function getParalegalWorkflowReadiness(user = {}, caseReference = "") {
   const ownApplicant = (caseDoc.applicants || []).find((item) => normalizeId(item.paralegalId) === normalizeId(userId));
   const evaluations = {
     application: evaluateApplicationEligibility({
-      user,
+      user: { ...user, ...payoutUser },
       caseDoc,
       alreadyApplied: Boolean(ownApplicant),
+      payoutReadiness: {
+        ready: stripeState.connected === true,
+        ...stripeState,
+      },
     }),
     invitation: evaluateInvitationEligibility({
       user,

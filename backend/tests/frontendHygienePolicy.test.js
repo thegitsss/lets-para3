@@ -1,3 +1,14 @@
+// Exercise the checker in Node, as the CLI runs it. Jest intercepts even
+// createRequire and cannot load these pinned ESM Babel dependencies directly.
+const { execFileSync } = require("node:child_process");
+const checkerPath = require("node:path").resolve(__dirname, "../scripts/check-frontend-hygiene.js");
+const checker = new Proxy({}, { get(_target, method) {
+  return (...args) => JSON.parse(execFileSync(process.execPath, ["--eval", `
+    const fs = require('node:fs'), checker = require(process.argv[1]);
+    const result = checker[process.argv[2]](...JSON.parse(fs.readFileSync(0, 'utf8')));
+    process.stdout.write(JSON.stringify(result instanceof Set ? [...result] : result));
+  `, checkerPath, method], { input: JSON.stringify(args), encoding: "utf8" }));
+} });
 const {
   clientSessionCompatibilityIssue,
   duplicateStaticIds,
@@ -18,7 +29,9 @@ const {
   nativeDialogIssue,
   remoteVisualAssetIssue,
   duplicatedAvatarFallbackIssue,
-} = require("../scripts/check-frontend-hygiene");
+  collectReachableScripts,
+  collectServerReachableScripts,
+} = checker;
 
 describe("frontend hygiene policy", () => {
   test("rejects retired browser-token reads and Bearer construction", () => {
@@ -147,6 +160,18 @@ describe("frontend hygiene policy", () => {
     expect(nativeDialogIssue("confirm('Delete?')")).toBe(true);
     expect(nativeDialogIssue("window.prompt('Name')")).toBe(true);
     expect(nativeDialogIssue("dialogs.confirm(options)")).toBe(false);
+    expect(nativeDialogIssue("globalThis['confirm']('Delete?')")).toBe(true);
+    expect(nativeDialogIssue("window?.prompt?.('Name')")).toBe(true);
+  });
+
+  test("distinguishes lexical product confirmations from native dialogs", () => {
+    expect(nativeDialogIssue("function confirm() {} confirm();")).toBe(false);
+    expect(nativeDialogIssue("import { confirm } from './dialogs.mjs'; confirm();")).toBe(false);
+    expect(nativeDialogIssue("function run(confirm) { confirm(); } confirm('Outside');")).toBe(true);
+    expect(nativeDialogIssue("function run(window) { window.confirm(); }")).toBe(false);
+    expect(nativeDialogIssue("const html = '<script>confirm(1)</script>';" )).toBe(false);
+    expect(nativeDialogIssue('<html><script type="application/json">{"copy":"confirm(1)"}</script><script>window.confirm(1)</script></html>', '/repo/frontend/test.html')).toBe(true);
+    expect(nativeDialogIssue('<script type="application/json">{"copy":"confirm(1)"}</script>', '/repo/frontend/test.html')).toBe(false);
   });
 
   test("rejects mutable remote visual assets but permits functional vendor scripts", () => {
@@ -196,5 +221,46 @@ describe("frontend hygiene policy", () => {
       </main>
     `;
     expect(staticDocumentRelationshipIssues(htmlPath, valid)).toEqual([]);
+  });
+
+  test("validates declared application routes without accepting arbitrary fragments", () => {
+    const htmlPath = require("path").resolve(__dirname, "../../frontend/index.html");
+    const source = '<a href="#/home">Home</a><a data-view="/home?view=work" href="#/home?view=work">Work</a><button data-section="finance" type="button">Finance</button><a href="#finance">Finance</a>';
+    expect(staticDocumentRelationshipIssues(htmlPath, source)).toEqual([]);
+    expect(staticDocumentRelationshipIssues(htmlPath, source + '<a href="#/missing">Missing route</a><a href="#missing">Missing section</a>')).toEqual(expect.arrayContaining(['references missing fragment #/missing', 'references missing fragment #missing']));
+  });
+
+  test("validates V2 links against the mounted application's real route parser", () => {
+    const path = require('node:path');
+    for (const [role, route] of [['attorney', '/matters/new'], ['paralegal', '/conversations']]) {
+      const htmlPath = path.resolve(__dirname, `../../frontend/${role}-v2.html`);
+      const script = `<script type="module" src="assets/scripts/${role}-v2/app.mjs?v=example"></script>`;
+      expect(staticDocumentRelationshipIssues(htmlPath, script + `<a href="#${route}">Open</a>`)).toEqual([]);
+      expect(staticDocumentRelationshipIssues(htmlPath, script + '<a href="#/missing-route">Missing</a>')).toContain('references missing fragment #/missing-route');
+      expect(staticDocumentRelationshipIssues(htmlPath, `<a href="#${route}">Unmounted</a>`)).toContain(`references missing fragment #${route}`);
+      expect(staticDocumentRelationshipIssues(path.resolve(__dirname, '../../frontend/index.html'), script + `<a href="#${route}">Wrong document</a>`)).toContain(`references missing fragment #${route}`);
+    }
+  });
+
+  test("counts real server imports without treating unused frontend modules as reachable", () => {
+    const path = require('node:path');
+    const files = collectServerReachableScripts();
+    expect(files).toContain(path.resolve(__dirname, '../../frontend/assets/scripts/attorney-v2/draft-profile.mjs'));
+    expect(files).not.toContain(path.resolve(__dirname, '../../frontend/assets/scripts/attorney-v2/draft-assistant.mjs'));
+  });
+
+  test("follows inline imports and consumed import-map overrides in their own document", () => {
+    const fs = require("fs"), path = require("path");
+    const directory = fs.mkdtempSync(path.resolve(__dirname, "../../frontend/assets/scripts/hygiene-fixture-"));
+    try {
+      const base = '/assets/scripts/' + path.basename(directory);
+      fs.writeFileSync(path.join(directory, 'entry.mjs'), "import './original.mjs';");
+      for (const name of ['original', 'mapped', 'unused']) fs.writeFileSync(path.join(directory, name + '.mjs'), 'export const available = true;');
+      const mapped = path.join(directory, 'mapped.html'), ordinary = path.join(directory, 'ordinary.html');
+      fs.writeFileSync(mapped, `<script type="importmap">${JSON.stringify({ imports: { [base + '/original.mjs']: base + '/mapped.mjs', 'unused-dependency': base + '/unused.mjs' } })}</script><script type="module">import './entry.mjs';</script>`);
+      fs.writeFileSync(ordinary, '<script type="module" src="entry.mjs"></script>');
+      expect([...collectReachableScripts([mapped])].sort()).toEqual(['entry.mjs', 'mapped.mjs'].map(name => path.join(directory, name)).sort());
+      expect([...collectReachableScripts([mapped, ordinary])].sort()).toEqual(['entry.mjs', 'mapped.mjs', 'original.mjs'].map(name => path.join(directory, name)).sort());
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
   });
 });

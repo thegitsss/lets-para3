@@ -12,6 +12,7 @@ const express = require("express");
 const path = require("path");
 const { setStaticResponseHeaders } = require("./utils/staticCache");
 const { createLogger } = require("./utils/logger");
+const { startRealtimeProjectionBridge } = require("./services/realtimeProjectionBridge");
 const { requestIdMiddleware } = require("./utils/requestId");
 const {
   collectInlineScriptHashes,
@@ -32,7 +33,7 @@ app.use("/api/webhooks/stripe", require("./routes/paymentsWebhook"));
 app.set("trust proxy", 1);
 const PROD = process.env.NODE_ENV === "production";
 const PORT = Number(process.env.PORT || 5050);
-const FRONTEND_DIR = path.join(__dirname, "../frontend");
+const FRONTEND_DIR = require("./utils/frontendAssets").frontendDirectory();
 const PUBLIC_DIR = path.join(__dirname, "../public");
 
 // 3) Global Middleware
@@ -47,14 +48,8 @@ app.use((req, res, next) => {
 app.use(cookieParser());
 app.use(
   helmet({
-    contentSecurityPolicy: false,
-    hsts: PROD ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
-    referrerPolicy: { policy: "no-referrer" },
-  })
-);
-app.use(
-  helmet.contentSecurityPolicy({
-    directives: {
+    contentSecurityPolicy: {
+      directives: {
       defaultSrc: ["'self'"],
       scriptSrc: [
         "'self'",
@@ -80,7 +75,10 @@ app.use(
         `https://${process.env.S3_BUCKET}.s3.${process.env.S3_REGION}.amazonaws.com`,
       ],
       upgradeInsecureRequests: upgradeInsecureRequestsDirective(PROD),
+      },
     },
+    hsts: PROD ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
+    referrerPolicy: { policy: "no-referrer" },
   })
 );
 app.use(compression({ threshold: 1024 }));
@@ -159,6 +157,7 @@ app.use(
 app.use("/api", (_req, res, next) => {
   if (mongoose.connection.readyState !== 1) {
     return res
+      .set({ 'Retry-After': '5', 'Cache-Control': 'no-store' })
       .status(503)
       .json({ error: "Service temporarily unavailable. Please try again shortly." });
   }
@@ -179,6 +178,7 @@ const adminKnowledgeRouter = require("./routes/adminKnowledge");
 const adminMarketingRouter = require("./routes/adminMarketing");
 const adminDirectorsRouter = require("./routes/adminDirectors");
 const adminSupportRouter = require("./routes/adminSupport");
+const adminWorkspaceRouter = require("./routes/adminWorkspace");
 const adminSalesRouter = require("./routes/adminSales");
 const adminApprovalsRouter = require("./routes/adminApprovals");
 const adminEngineeringRouter = require("./routes/adminEngineering");
@@ -235,6 +235,7 @@ app.use("/api/admin/approvals", adminApprovalsRouter);
 app.use("/api/admin/engineering", adminEngineeringRouter);
 app.use("/api/admin/autonomous-actions", autonomousActionsRouter);
 app.use("/api/admin/incidents", incidentAdminRouter);
+app.use("/api/admin/workspace", adminWorkspaceRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/cases", casesRouter);
 app.use("/api/case-drafts", caseDraftsRouter);
@@ -278,6 +279,11 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.get("/assets/vendor/simplewebauthn.js", (_req, res) => {
+  res.setHeader("Cache-Control", "no-cache");
+  res.redirect(302, "/assets/vendor/simplewebauthn-13.3.0.js");
+});
+
+app.get("/assets/vendor/simplewebauthn-13.3.0.js", (_req, res) => {
   res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
   res.type("application/javascript");
   res.sendFile(path.join(
@@ -329,6 +335,7 @@ app.use((err, req, res, _next) => {
 // 8) MongoDB Connection & Server start
 let mongoRetryTimer = null;
 let shuttingDown = false;
+let realtimeProjectionBridge = null;
 
 function connectWithRetry() {
   if (shuttingDown) return;
@@ -343,7 +350,12 @@ function connectWithRetry() {
       connectTimeoutMS: 5000,
       socketTimeoutMS: 20000,
     })
-    .then(() => logger.info("Connected to MongoDB Atlas."))
+    .then(() => {
+      logger.info("Connected to MongoDB Atlas.");
+      if (!realtimeProjectionBridge) {
+        realtimeProjectionBridge = startRealtimeProjectionBridge({ logger });
+      }
+    })
     .catch((err) => {
       logger.error("MongoDB connection failed.", err);
       if (!shuttingDown) mongoRetryTimer = setTimeout(connectWithRetry, 5000);
@@ -387,6 +399,8 @@ async function shutdown(signal) {
 
     const closeError = await closed;
     clearTimeout(forceTimer);
+    await realtimeProjectionBridge?.stop?.();
+    realtimeProjectionBridge = null;
     try {
       await mongoose.disconnect();
     } catch (error) {

@@ -22,7 +22,7 @@ function resolveLocalModule(importer, specifier) {
   return candidates.find((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile()) || null;
 }
 
-function localDependencies(filePath) {
+function localDependencies(filePath, dependencyRoot = backendRoot) {
   const source = fs.readFileSync(filePath, "utf8");
   const dependencies = new Set();
   const patterns = [
@@ -34,7 +34,7 @@ function localDependencies(filePath) {
   patterns.forEach((pattern) => {
     for (const match of source.matchAll(pattern)) {
       const resolved = resolveLocalModule(filePath, match[1]);
-      if (resolved?.startsWith(backendRoot)) dependencies.add(resolved);
+      if (resolved?.startsWith(path.resolve(dependencyRoot) + path.sep)) dependencies.add(resolved);
     }
   });
   return [...dependencies];
@@ -52,14 +52,14 @@ function declaredEntrypoints() {
   return roots;
 }
 
-function reachableFiles() {
+function reachableFiles({ dependencyRoot = backendRoot } = {}) {
   const reachable = new Set();
   const queue = [...declaredEntrypoints()];
   while (queue.length) {
     const filePath = queue.pop();
     if (reachable.has(filePath)) continue;
     reachable.add(filePath);
-    localDependencies(filePath).forEach((dependency) => {
+    localDependencies(filePath, dependencyRoot).forEach((dependency) => {
       if (!reachable.has(dependency)) queue.push(dependency);
     });
   }

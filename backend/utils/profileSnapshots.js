@@ -29,7 +29,18 @@ function shapeParalegalSnapshot(person = {}) {
   };
 }
 
+// Read presentation only: retain saved application fields, keep the existing
+// authenticated current-photo treatment, and never spread a hydrated document.
+function presentApplicationProfileSnapshot(stored, person = {}) {
+  const base = shapeParalegalSnapshot(person);
+  const saved = stored && typeof stored === "object"
+    ? typeof stored.toObject === "function" ? stored.toObject() : stored
+    : {};
+  return { ...base, ...saved, profileImage: base.profileImage || "" };
+}
+
 module.exports = {
   shapeParalegalSnapshot,
+  presentApplicationProfileSnapshot,
 };
 const { buildAuthenticatedProfilePhotoUrl } = require("../services/profilePhotoDelivery");

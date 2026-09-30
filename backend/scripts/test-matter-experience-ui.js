@@ -3,6 +3,7 @@ const path = require("path");
 const assert = require("assert/strict");
 const { execFileSync } = require("child_process");
 const { chromium } = require("playwright");
+const { prepareMatterModule, fulfillFrontendAsset } = require("./ui-module-fixture");
 
 const repositoryRoot = path.resolve(__dirname, "../..");
 const htmlPath = path.join(repositoryRoot, "frontend/case-detail.html");
@@ -13,22 +14,11 @@ function stripScripts(source) {
   return String(source).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
 }
 
-function transformCaseScript(source) {
-  return String(source).replace(
-    /^import[^\n]+\n/,
-    `const secureFetch = (url, options = {}) => fetch(url, { ...options, credentials: "include", headers: { ...(options.headers || {}), "Content-Type": options.body && !(options.body instanceof FormData) ? "application/json" : undefined }, body: options.body && !(options.body instanceof FormData) && typeof options.body !== "string" ? JSON.stringify(options.body) : options.body });
-const fetchCSRF = async () => "test-csrf";
-const showMsg = (node, message) => { if (node) node.textContent = message || ""; };
-const loadUserHeaderInfo = async () => {};
-const applyRoleVisibility = (role) => document.querySelectorAll("[data-visible]").forEach((node) => { node.hidden = node.dataset.visible !== role; });
-`
-  );
-}
 
 const htmlSource = stripScripts(fs.readFileSync(htmlPath, "utf8"));
-const scriptSource = transformCaseScript(fs.readFileSync(scriptPath, "utf8"));
+const scriptSource = prepareMatterModule(fs.readFileSync(scriptPath, "utf8"));
 const baselineHtmlSource = stripScripts(execFileSync("git", ["show", "HEAD:frontend/case-detail.html"], { cwd: repositoryRoot, encoding: "utf8" }));
-const baselineScriptSource = transformCaseScript(execFileSync("git", ["show", "HEAD:frontend/assets/scripts/case-detail.js"], { cwd: repositoryRoot, encoding: "utf8" }));
+const baselineScriptSource = prepareMatterModule(execFileSync("git", ["show", "HEAD:frontend/assets/scripts/case-detail.js"], { cwd: repositoryRoot, encoding: "utf8" }));
 
 function experience(role) {
   const attorney = role === "attorney";
@@ -70,7 +60,9 @@ function experience(role) {
       { code: "posted", label: "Matter posted", at: "2026-07-25T00:00:00.000Z" },
     ],
     financials: {
-      currency: "usd",
+      version: 2, caseId: matterId, ownerId: attorney ? "64b000000000000000000103" : "64b000000000000000000104", role,
+      revision: "a".repeat(64), state: "active", stripeMode: "test", receipts: [], receiptsAreEarlier: false,
+      currency: "USD",
       status: "Funded",
       amounts: attorney
         ? [{ code: "compensation", label: "Matter compensation", cents: 100000 }, { code: "attorney_fee", label: "Attorney platform fee", cents: 22000 }]
@@ -112,10 +104,11 @@ function matterPayload(role) {
 function documentHtml({ baseline = false } = {}) {
   const html = baseline ? baselineHtmlSource : htmlSource;
   const script = baseline ? baselineScriptSource : scriptSource;
-  return html.replace("</body>", `<script>${script}</script></body>`);
+  return html.replace("</body>", `<script type="module">${script}</script></body>`);
 }
 
 async function installRoutes(page, role, counters) {
+  page.on("pageerror", (error) => console.error("[Matter contract page error]", error.message));
   counters.messageItems = [{
     _id: "m1",
     text: "Matter update",
@@ -125,14 +118,21 @@ async function installRoutes(page, role, counters) {
   }];
   counters.sentMessages = [];
   await page.addInitScript((viewerRole) => {
-    localStorage.setItem("lpc_user", JSON.stringify({ id: "viewer", role: viewerRole, status: "approved" }));
+    const id = viewerRole === "attorney" ? "64b000000000000000000103" : "64b000000000000000000104";
+    localStorage.setItem("lpc_user", JSON.stringify({ id, role: viewerRole, status: "approved" }));
     window.EventSource = class MockEventSource {
       addEventListener() {}
       close() {}
     };
   }, role);
-  await page.route("http://matter.test/**", async (route) => {
+  await page.route("https://matter.test/**", async (route) => {
     const url = new URL(route.request().url());
+    if (await fulfillFrontendAsset(route, repositoryRoot)) return;
+    if (url.pathname === "/api/auth/me") {
+      const actor = role === "attorney" ? matterPayload(role).attorney : matterPayload(role).paralegal;
+      await route.fulfill({ json: { user: { ...actor, id: actor._id, status: "approved" } } });
+      return;
+    }
     if (["/case-detail.html", "/baseline-case-detail.html"].includes(url.pathname)) {
       await route.fulfill({ contentType: "text/html", body: documentHtml({ baseline: url.pathname.startsWith("/baseline") }) });
       return;
@@ -155,7 +155,9 @@ async function installRoutes(page, role, counters) {
       if (route.request().method() === "POST") {
         const body = route.request().postDataJSON();
         const message = {
-          _id: `sent-${role}`,
+          _id: role === "attorney" ? "64b000000000000000000106" : "64b000000000000000000107",
+          caseId: matterId,
+          clientMessageId: body.clientMessageId,
           text: String(body?.text || ""),
           createdAt: "2026-08-15T12:00:00.000Z",
           senderId: role === "attorney" ? matterPayload(role).attorney : matterPayload(role).paralegal,
@@ -195,7 +197,7 @@ async function runRoleJourney(browser, role) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
   const counters = { detail: 0, messages: 0, files: 0, failFilesOnce: role === "attorney" };
   await installRoutes(page, role, counters);
-  await page.goto(`http://matter.test/case-detail.html?caseId=${matterId}&tab=overview`);
+  await page.goto(`https://matter.test/case-detail.html?caseId=${matterId}&tab=overview`);
   await page.waitForSelector('[data-matter-panel="overview"]:not([hidden])');
   await page.waitForFunction(() => document.querySelectorAll(".sidebar nav:not([hidden])").length === 1);
   assert.equal(
@@ -206,8 +208,8 @@ async function runRoleJourney(browser, role) {
 
   const visibleTabs = await page.locator('[data-matter-tab]:not([hidden])').allTextContents();
   assert.deepEqual(visibleTabs, role === "attorney"
-    ? ["Overview", "Applications", "Work", "Files", "Messages", "Activity", "Financials"]
-    : ["Overview", "Work", "Files", "Messages", "Activity", "Financials"]);
+    ? ["Overview", "Applications", "Work", "Files", "Messages", "Activity", "Payments"]
+    : ["Overview", "Work", "Files", "Messages", "Activity", "Payments"]);
   assert.equal(counters.messages, 0);
   assert.equal(counters.files, 0);
 
@@ -290,9 +292,9 @@ async function runRoleJourney(browser, role) {
   await page.waitForSelector(role === "attorney" ? ".case-dispute-overlay" : ".case-flag-overlay", { state: "detached" });
   assert.equal(await page.evaluate(() => document.activeElement?.id), "caseDisputeButton");
   await page.click('[data-matter-tab="financials"]');
-  assert.match(await page.locator("#matterFinancialList").innerText(), /Matter compensation/i);
-  assert.doesNotMatch(await page.locator("#matterFinancialList").innerText(), role === "attorney" ? /Paralegal|Net payout/ : /Attorney platform fee/);
-  assert.equal(await page.locator("#matterReceiptAction").isVisible(), false);
+  assert.match(await page.locator("#matterPaymentDetails").innerText(), /Matter compensation/i);
+  assert.doesNotMatch(await page.locator("#matterPaymentDetails").innerText(), role === "attorney" ? /Paralegal|Net payout/ : /Attorney platform fee/);
+  assert.equal(await page.getByRole("button", { name: "View receipts", exact: true }).count(), role === "attorney" ? 1 : 0);
 
   const tabIds = role === "attorney"
     ? ["overview", "applications", "work", "files", "messages", "activity", "financials"]
@@ -347,7 +349,7 @@ async function runRoleJourney(browser, role) {
   const baselineErrors = [];
   baselinePage.on("pageerror", (error) => baselineErrors.push(error.message));
   await installRoutes(baselinePage, role, baselineCounters);
-  await baselinePage.goto(`http://matter.test/baseline-case-detail.html?caseId=${matterId}`);
+  await baselinePage.goto(`https://matter.test/baseline-case-detail.html?caseId=${matterId}`);
   try {
     await baselinePage.waitForFunction(
       () => [...document.querySelectorAll("#case-select option")]

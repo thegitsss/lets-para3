@@ -166,7 +166,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await closeDatabase();
+  try { await closeDatabase(); }
+  finally { require("./helpers/incidentGitFixture").cleanupIncidentGitFixture(); }
 });
 
 beforeEach(async () => {
@@ -392,3 +393,4 @@ describe("Incident verification runner", () => {
     expect(updatedIncident.orchestration.nextJobType).toBe("deployment");
   });
 });
+jest.mock("child_process", () => require("./helpers/incidentGitFixture").isolatedChildProcess(jest.requireActual("child_process")));

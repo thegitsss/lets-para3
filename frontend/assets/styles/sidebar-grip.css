@@ -42,8 +42,6 @@
   body.lpc-product-clean.nav-collapsed :where(.sidebar, #sidebarNav) .sidebar-profile-cluster :where(.user-chip, .user-profile) > div:not(.profile-dropdown),
   body.lpc-product-clean.nav-collapsed :where(.sidebar, #sidebarNav) .lpc-sidebar-nav-label,
   body.lpc-product-clean.nav-collapsed :where(.sidebar, #sidebarNav) .lpc-sidebar-section-label,
-  body.lpc-product-clean.nav-collapsed :where(.sidebar, #sidebarNav) .lpc-sidebar-matters-caret,
-  body.lpc-product-clean.nav-collapsed :where(.sidebar, #sidebarNav) .lpc-sidebar-matters-panel,
   body.lpc-product-clean.nav-collapsed :where(.sidebar, #sidebarNav) .case-nav-caret,
   body.lpc-product-clean.nav-collapsed :where(.sidebar, #sidebarNav) .case-nav-dropdown,
   body.lpc-product-clean.nav-collapsed :where(.sidebar, #sidebarNav) .sidebar-footer {

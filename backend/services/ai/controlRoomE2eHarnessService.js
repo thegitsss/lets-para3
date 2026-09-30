@@ -300,6 +300,11 @@ async function upsertHarnessSupportParalegal() {
   paralegal.availability = "Available this week";
   paralegal.yearsExperience = 6;
   paralegal.languages = ["English"];
+  paralegal.onboarding = {
+    ...(paralegal.onboarding || {}),
+    paralegalTourCompleted: true,
+    paralegalProfileTourCompleted: true,
+  };
   paralegal.stripeAccountId = "acct_control_room_support_paralegal";
   paralegal.stripeOnboarded = true;
   paralegal.stripePayoutsEnabled = true;

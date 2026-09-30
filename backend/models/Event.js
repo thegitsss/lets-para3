@@ -77,6 +77,7 @@ const eventSchema = new Schema(
  * Indexes
  * -----------------------------------------*/
 eventSchema.index({ owner: 1, start: 1 });
+eventSchema.index({ owner: 1, caseId: 1, start: 1, _id: 1 });
 eventSchema.index({ caseId: 1, start: 1 });
 eventSchema.index({ type: 1, start: 1 });
 eventSchema.index({ visibility: 1, start: 1 });

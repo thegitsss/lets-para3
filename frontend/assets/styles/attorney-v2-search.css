@@ -1,0 +1,51 @@
+/* Dashboard Search presentation, scoped to Attorney V2's authorized controller. */
+body.av2 .av2-header .av2-search-slot { display:flex; width:46px; min-width:46px; max-width:46px; height:46px; flex:0 0 46px; transition:width 220ms ease,max-width 220ms ease,flex-basis 220ms ease; }
+body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within) { width:260px; max-width:260px; flex-basis:260px; }
+body.av2 .av2-header .av2-search-slot.is-open { width:46px; max-width:46px; flex-basis:46px; }
+body.av2 .av2-header .av2-search-slot > .av2-search-trigger { display:flex; width:100%; min-width:46px; height:46px; padding:0 13px; gap:0; border:1px solid transparent; border-radius:999px; color:#162b3d; background:transparent; font:200 14.62px/23.392px "Sarabun",sans-serif; transition:gap 180ms ease,background 180ms ease; }
+body.av2 .av2-header .av2-search-slot > .av2-search-trigger svg { display:block; width:17px; height:17px; flex:0 0 17px; }
+body.av2 .av2-header .av2-search-slot > .av2-search-trigger span { display:block; max-width:0; opacity:0; overflow:hidden; white-space:nowrap; transition:max-width 220ms ease,opacity 140ms ease; }
+body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within) > .av2-search-trigger { gap:10px; background:#eef5fb; }
+body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within) > .av2-search-trigger span { max-width:180px; opacity:.72; }
+body.av2 .av2-header .av2-search-slot.is-open > .av2-search-trigger { gap:0; background:#eef5fb; }
+body.av2 .av2-header .av2-search-slot.is-open > .av2-search-trigger span { max-width:0; opacity:0; }
+body.av2 #av2-search { padding:0; width:360px; max-width:none; max-height:320px; border:1px solid rgba(60,66,87,.14); border-radius:9px; background:#fff; color:#162b3d; box-shadow:none; font:200 17px/1.6 "Sarabun",sans-serif; }
+body.av2 #av2-search [data-av2-search-form] { margin:0; padding:0; border-bottom:1px solid rgba(15,23,42,.1); }
+body.av2 #av2-search .av2-search-row { display:block; position:relative; margin:0; padding:0; border:0; border-radius:0; background:transparent; }
+body.av2 #av2-search .av2-search-row svg { position:absolute; top:50%; left:15px; width:17px; height:17px; transform:translateY(-50%); color:#64748b; pointer-events:none; }
+body.av2 #av2-search #av2-query { box-sizing:border-box; display:block; width:100%; height:44px; min-height:44px; margin:0; padding:8px 14px 8px 40px; border:0; border-radius:8px 8px 0 0; background:#fff; color:#162b3d; font:200 14.96px/23.936px "Sarabun",sans-serif; }
+body.av2 #av2-search #av2-query:focus { outline:none; box-shadow:inset 0 0 0 2px rgba(182,164,122,.62); }
+body.av2 #av2-search [data-av2-search-results] { min-height:52px; max-height:296px; margin:0; padding:5px 6px 7px; scrollbar-gutter:auto; }
+body.av2 #av2-search .lpc-search-group { display:grid; gap:1px; margin:0; }
+body.av2 #av2-search .lpc-search-group + .lpc-search-group { margin-top:5px; }
+body.av2 #av2-search .lpc-search-group-title { margin:0; padding:6px 8px 3px; color:#1a1a1a; font:300 12.07px/19.312px "Sarabun",sans-serif; letter-spacing:.02em; text-transform:none; }
+body.av2 #av2-search .lpc-search-result { display:block; min-height:40px; padding:5px 8px; border:1px solid transparent; border-radius:7px; color:#162b3d; text-decoration:none; }
+body.av2 #av2-search .lpc-search-result:is(:hover,:focus-visible,.is-active) { border-color:rgba(182,164,122,.2); background:rgba(182,164,122,.09); outline:none; }
+body.av2 #av2-search .lpc-search-copy { display:block; }
+body.av2 #av2-search .lpc-search-copy strong { display:block; color:inherit; font:200 14.96px/23.936px "Sarabun",sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+body.av2 #av2-search .lpc-search-copy > span { display:block; margin-top:2px; color:#52697e; font:200 12.75px/20.4px "Sarabun",sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+body.av2 #av2-search .lpc-search-arrow { display:none; }
+body.av2 #av2-search .lpc-search-state { font-size:13.26px; text-align:center; justify-content:center; }
+@media(max-width:640px) {
+ body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within,.is-open) { width:46px; max-width:46px; flex:0 0 46px; }
+ body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within,.is-open) > .av2-search-trigger { gap:0; }
+ body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within,.is-open) > .av2-search-trigger span { max-width:0; opacity:0; }
+ body.av2 #av2-search { border-radius:10px; }
+ body.av2 #av2-search [data-av2-search-results] { max-height:calc(100dvh - 132px); }
+}
+@media(prefers-reduced-motion:reduce) { body.av2 .av2-header .av2-search-slot,body.av2 .av2-header .av2-search-slot > .av2-search-trigger,body.av2 .av2-header .av2-search-slot > .av2-search-trigger span { transition:none; } }
+
+/* One outlined search surface expands from the header, including its results. */
+body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within,.is-open) { width:280px; max-width:280px; flex-basis:280px; }
+body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within) > .av2-search-trigger { border-color:var(--av2-line); border-radius:6px; background:var(--av2-bg); }
+body.av2 .av2-header .av2-search-slot.is-open > .av2-search-trigger { visibility:hidden; }
+body.av2 #av2-search { border-color:var(--av2-line); border-radius:6px; }
+body.av2 #av2-search:focus-within { border-color:#aebbd0; }
+body.av2 .av2-header .av2-search-slot { height:34px; }
+body.av2 .av2-header .av2-search-slot > .av2-search-trigger { height:34px; }
+body.av2 #av2-search #av2-query { height:32px; min-height:32px; padding-block:4px; font-size:13px; border-radius:5px; }
+body.av2 #av2-search #av2-query:focus { box-shadow:none; }
+body.av2 #av2-search:has(#av2-query:placeholder-shown) [data-av2-search-form] { border-bottom:0; }
+body.av2 #av2-search:has(#av2-query:placeholder-shown) [data-av2-search-results] { display:none; }
+body.av2 #av2-search:has(#av2-query:not(:placeholder-shown)) { box-shadow:0 4px 16px rgba(16,36,63,.10),0 1px 3px rgba(16,36,63,.04); }
+@media(max-width:640px) { body.av2 .av2-header .av2-search-slot:is(:hover,:focus-within,.is-open) { width:46px; max-width:46px; flex:0 0 46px; } }

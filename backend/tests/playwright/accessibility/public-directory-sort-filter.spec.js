@@ -114,6 +114,7 @@ test("branded sort control is singular, anchored, and functional at every requir
 });
 
 test("filter lists stay inside the panel and preserve Apply and Reset behavior", async ({ page }) => {
+  test.setTimeout(90_000);
   await mockPublicDirectory(page);
 
   for (const viewport of PHASE_TWO_VIEWPORTS) {

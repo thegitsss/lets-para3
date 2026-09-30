@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const FRONTEND_ROOT = path.resolve(__dirname, "../../frontend");
+const { verifyFrontendBuild } = require("../utils/frontendAssets");
 const BACKEND_RUNTIME_ROOTS = ["routes", "services", "utils"].map((directory) =>
   path.resolve(__dirname, "..", directory)
 );
@@ -37,8 +37,8 @@ function walk(directory) {
   });
 }
 
-function relative(filePath) {
-  return path.relative(FRONTEND_ROOT, filePath).split(path.sep).join("/");
+function relative(filePath, frontendRoot) {
+  return path.relative(frontendRoot, filePath).split(path.sep).join("/");
 }
 
 function formatBytes(bytes) {
@@ -62,11 +62,12 @@ function rasterSignatureIsValid(filePath, extension) {
 }
 
 function main() {
-  const files = walk(FRONTEND_ROOT);
+  const { frontendRoot } = verifyFrontendBuild();
+  const files = walk(frontendRoot);
   const failures = [];
   const totalBytes = files.reduce((sum, filePath) => sum + fs.statSync(filePath).size, 0);
   if (totalBytes > BUDGETS.total) {
-    failures.push(`frontend payload is ${formatBytes(totalBytes)}; budget is ${formatBytes(BUDGETS.total)}`);
+    failures.push(`built frontend payload is ${formatBytes(totalBytes)}; budget is ${formatBytes(BUDGETS.total)}`);
   }
 
   const searchableText = files
@@ -82,7 +83,7 @@ function main() {
   for (const filePath of files) {
     const extension = path.extname(filePath).toLowerCase();
     const bytes = fs.statSync(filePath).size;
-    const rel = relative(filePath);
+    const rel = relative(filePath, frontendRoot);
     let limit = null;
     let kind = "asset";
 

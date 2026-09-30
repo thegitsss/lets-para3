@@ -48,6 +48,10 @@ async function installRoutes(page, { pageBody, initialUser }) {
       await route.fulfill({ contentType: "text/javascript; charset=utf-8", body: sources.auth });
       return;
     }
+    if (["/assets/scripts/utils/help-storage.mjs", "/assets/scripts/utils/document-navigation.mjs"].includes(url.pathname)) {
+      await route.fulfill({ contentType: "text/javascript; charset=utf-8", body: fs.readFileSync(path.join(frontendRoot, url.pathname.slice(1)), "utf8") });
+      return;
+    }
     if (url.pathname === "/api/auth/me") {
       await route.fulfill({
         contentType: "application/json",
@@ -96,7 +100,7 @@ async function verifyHomepage(browser) {
   assert.equal(await page.locator("[data-post-matter-action]").first().getAttribute("href"), "create-case.html");
   await page.locator("#logoutAction").click();
   await page.waitForURL("**/index.html");
-  await page.waitForFunction(() => document.querySelector("#authAction")?.textContent === "Sign In");
+  await page.waitForFunction(() => document.querySelector("#authAction")?.textContent === "Sign in");
   assert.equal(state.logoutCalls, 1);
   assert.deepEqual(state.logoutTokens, ["public-csrf-1"]);
   await page.close();

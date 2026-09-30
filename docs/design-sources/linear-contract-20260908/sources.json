@@ -1,0 +1,50 @@
+[
+  {
+    "file": "my-issues.png",
+    "sourcePage": "https://linear.app/docs/my-issues",
+    "imageURL": "https://webassets.linear.app/images/ornj730p/production/70c22a56e776bfbffa920091b64a28845ca8eaeb-1864x842.png",
+    "sha256": "b31c032e1d097c0c3d50793d1fe614532f21aaa4bcdf358d5acb8aed129afbc1",
+    "visuallyInspected": true,
+    "retainedDate": "2026-09-08"
+  },
+  {
+    "file": "inbox.png",
+    "sourcePage": "https://linear.app/docs/inbox",
+    "imageURL": "https://webassets.linear.app/images/ornj730p/production/b442b340278740de70919c868dce1afca4335fe7-3600x2080.png",
+    "sha256": "0754627b5db89fec5b1819a799d17940105c2bbb5ef830c215caf8d0b6fe14b3",
+    "visuallyInspected": true,
+    "retainedDate": "2026-09-08"
+  },
+  {
+    "file": "ui-refresh.png",
+    "sourcePage": "https://linear.app/changelog/2026-03-12-ui-refresh",
+    "imageURL": "https://webassets.linear.app/images/ornj730p/production/696c7f2b0921b5e3163710ea1b310dfb8e4e377c-3600x2080.png",
+    "sha256": "7e5361e667a6d29888f544fa46ae15df2204987ec08aafedf3c6e34c317b4b66",
+    "visuallyInspected": true,
+    "retainedDate": "2026-09-08"
+  },
+  {
+    "file": "header-system.png",
+    "sourcePage": "https://linear.app/now/behind-the-latest-design-refresh",
+    "imageURL": "https://webassets.linear.app/images/ornj730p/production/b15d343ed41c5e938c26f9e2f5a61c7b63285caa-3904x2160.png",
+    "sha256": "8de15e1936bebf28e5b91faf7d5ad23a8be62b5bfd18d007b6ae69cfe5ba6ee4",
+    "visuallyInspected": true,
+    "retainedDate": "2026-09-08"
+  },
+  {
+    "file": "sidebar-controls.png",
+    "sourcePage": "https://linear.app/now/behind-the-latest-design-refresh",
+    "imageURL": "https://webassets.linear.app/images/ornj730p/production/b6d6be14c96978b10553cfb9205be1065087e793-3904x2720.png",
+    "sha256": "e8455151bee6433e6add7fd3407d09319612eb900fc02bc35d8bb0960b21e782",
+    "visuallyInspected": true,
+    "retainedDate": "2026-09-08"
+  },
+  {
+    "file": "peek.png",
+    "sourcePage": "https://linear.app/docs/peek",
+    "imageURL": "https://webassets.linear.app/images/ornj730p/production/5205025fbe6e96bf749f76d5e1cad30b484f8b50-1052x634.png",
+    "sha256": "e5285d4b9a0ee0310997c6f0073bbbd849a5983b5c4ed3b6a3f11b95f31f0aff",
+    "visuallyInspected": true,
+    "retainedDate": "2026-09-08"
+  }
+]

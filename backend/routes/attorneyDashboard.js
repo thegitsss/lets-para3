@@ -7,7 +7,7 @@ const auth = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
 const { requireApproved } = require("../utils/authz");
 const Job = require("../models/Job");
-const Application = require("../models/Application");
+const accountApplications = require("../services/accountApplicationProjections");
 const Case = require("../models/Case");
 const { getAttorneyPaymentSummary } = require("../services/paymentProjectionService");
 const {
@@ -24,14 +24,15 @@ const ACTIVE_CASE_STATUSES = Object.freeze([
   "reviewing",
   "funded_in_progress",
 ]);
-const PENDING_APPLICATION_STATUSES = Object.freeze(["submitted", "viewed", "shortlisted"]);
 
 /**
  * GET /api/attorney/dashboard
  * Main overview for the attorney dashboard.
  */
 router.get("/", auth, requireApproved, requireRole(["attorney"]), async (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
   try {
+    const applicationProjection = await accountApplications.readReceived(req);
     const attorneyId = req.user._id;
     const caseOwnership = [{ attorney: attorneyId }, { attorneyId }];
     const currentBusinessDate = dateOnlyFromZonedInstant(new Date());
@@ -45,12 +46,10 @@ router.get("/", auth, requireApproved, requireRole(["attorney"]), async (req, re
     };
 
     // 1. Fetch basic collections in parallel
-    const [openJobs, allJobs, activeCases] = await Promise.all([
+    const [openJobs, activeCases] = await Promise.all([
       Job.find({ attorneyId, status: "open" })
         .sort({ createdAt: -1 })
         .limit(5),
-
-      Job.find({ attorneyId }).select("_id status"),
 
       Case.find(activeCaseFilter)
         .populate("paralegalId", "firstName lastName email role")
@@ -58,21 +57,6 @@ router.get("/", auth, requireApproved, requireRole(["attorney"]), async (req, re
         .sort({ createdAt: -1 })
         .limit(5),
     ]);
-
-    // 2. Build list of jobIds for applications query
-    const jobIds = allJobs.map((j) => j._id);
-
-    let pendingApplications = [];
-    if (jobIds.length) {
-      pendingApplications = await Application.find({
-        jobId: { $in: jobIds },
-        status: { $in: PENDING_APPLICATION_STATUSES },
-      })
-        .populate("paralegalId", "firstName lastName email role")
-        .populate("jobId", "title practiceArea budget")
-        .sort({ createdAt: -1 })
-        .limit(10);
-    }
 
     // 3. Aggregate metrics
     const [
@@ -90,10 +74,7 @@ router.get("/", auth, requireApproved, requireRole(["attorney"]), async (req, re
         status: "completed",
       }),
       Job.countDocuments({ attorneyId, status: "open" }),
-      Application.countDocuments({
-        jobId: { $in: jobIds },
-        status: { $in: PENDING_APPLICATION_STATUSES },
-      }),
+      applicationProjection.rows.length,
       weekStart && weekEnd
         ? Case.countDocuments({
             ...activeCaseFilter,
@@ -110,7 +91,7 @@ router.get("/", auth, requireApproved, requireRole(["attorney"]), async (req, re
             .limit(3)
             .lean()
         : [],
-      getAttorneyPaymentSummary(attorneyId).then((summary) => summary.activeFunds),
+      getAttorneyPaymentSummary(attorneyId, { req }).then((summary) => summary.activeFunds),
     ]);
 
     const metrics = {
@@ -145,18 +126,14 @@ router.get("/", auth, requireApproved, requireRole(["attorney"]), async (req, re
       createdAt: j.createdAt,
     }));
 
-    const pendingAppsSummary = pendingApplications.map((a) => ({
-      applicationId: a._id,
-      jobId: a.jobId ? a.jobId._id : null,
-      jobTitle: a.jobId ? a.jobId.title : null,
-      practiceArea: a.jobId ? a.jobId.practiceArea : null,
-      paralegalId: a.paralegalId ? a.paralegalId._id : null,
-      paralegalName: a.paralegalId
-        ? `${a.paralegalId.firstName} ${a.paralegalId.lastName}`
-        : null,
-      status: a.status,
-      createdAt: a.createdAt,
+    const pendingAppsSummary = applicationProjection.rows.slice(0, 10).map(a => ({
+      applicationId: a.id, caseId: a.caseId, jobId: a.jobId, jobTitle: a.jobTitle,
+      practiceArea: a.practiceArea, paralegalId: a.paralegal?._id || null,
+      paralegalName: [a.paralegal?.firstName, a.paralegal?.lastName].filter(Boolean).join(' ') || null,
+      status: a.status, createdAt: a.createdAt,
     }));
+    const currentApplications = await accountApplications.readReceived(req);
+    if (applicationProjection.revision !== currentApplications.revision) throw Object.assign(new Error('Applications changed while loading. Refresh to review the current records.'), { status: 409, publicCode: 'APPLICATION_SOURCE_CHANGED' });
 
     return res.json({
       metrics,
@@ -175,6 +152,7 @@ router.get("/", auth, requireApproved, requireRole(["attorney"]), async (req, re
       },
     });
   } catch (err) {
+    if (err.publicCode === 'PAYMENT_SETUP_ACCOUNT_CHANGED' || ['APPLICATION_', 'PAYMENT_SUMMARY_'].some(prefix => String(err.publicCode || '').startsWith(prefix))) return res.status(err.status || 503).json({ error: err.message, code: err.publicCode });
     runtimeLogger.error("Attorney dashboard error:", err);
     return res.status(500).json({ error: "Internal server error" });
   }

@@ -19,6 +19,7 @@ const MessageSchema = new Schema(
 
     // Message content
     type: { type: String, enum: ["text", "file", "audio", "system"], default: "text" },
+    clientMessageId: { type: String, trim: true, maxlength: 128, default: undefined, select: false },
     text: { type: String, trim: true },
     content: { type: Schema.Types.Mixed, default: null },
     transcript: { type: String, default: null },
@@ -62,6 +63,17 @@ const MessageSchema = new Schema(
     toObject: { virtuals: true },
   }
 );
+
+MessageSchema.index(
+  { caseId: 1, senderId: 1, clientMessageId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clientMessageId: { $type: "string" } },
+  }
+);
+
+// Stable bounded conversation paging, including messages sharing a timestamp.
+MessageSchema.index({ caseId: 1, createdAt: -1, _id: -1 });
 
 MessageSchema.pre("save", function () {
   encryptMessageFields(this);

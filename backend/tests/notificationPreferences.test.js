@@ -7,6 +7,7 @@ jest.mock("../utils/email", () => jest.fn());
 
 const sendEmail = require("../utils/email");
 const { notifyUser } = require("../utils/notifyUser");
+const { addSubscriber } = require("../utils/notificationEvents");
 
 beforeAll(async () => {
   await connect();
@@ -153,11 +154,16 @@ describe("Notification preferences", () => {
       },
     });
 
+    const writes = [];
+    const unsubscribe = addSubscriber(user._id, { write: (value) => writes.push(String(value)) });
     await notifyUser(user._id, "message", { message: "New message" });
+    unsubscribe();
 
     const notif = await Notification.findOne({ userId: user._id, type: "message" }).lean();
     expect(notif).toBeFalsy();
     expect(sendEmail).not.toHaveBeenCalled();
+    expect(writes.join("\n")).toContain("event: notifications");
+    expect(writes.join("\n")).toContain("message_refresh");
   });
 
   test("Recent last-viewed timestamp suppresses message email", async () => {

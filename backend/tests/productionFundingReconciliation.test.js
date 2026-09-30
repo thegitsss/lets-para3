@@ -27,11 +27,8 @@ const LIVE_CASE_ID = "64b000000000000000000002";
 const ACCOUNT_ID = "acct_synthetic_lpc_reconcile";
 
 function validEnvironment(overrides = {}) {
-  const syntheticUri = new URL("mongodb+srv://prod-cluster.mongodb.net/lpcprod");
-  syntheticUri.username = "readonly";
-  syntheticUri.password = "masked";
   return {
-    MONGODB_RECONCILE_READONLY_URI: syntheticUri.toString(),
+    MONGODB_RECONCILE_READONLY_URI: new URL("lpcprod", "mongodb+srv://prod-cluster.mongodb.net/").href,
     MONGODB_RECONCILE_EXPECTED_DATABASE: "lpcprod",
     MONGODB_RECONCILE_EXPECTED_HOST: "prod-cluster.mongodb.net",
     STRIPE_RECONCILE_TEST_KEY: "rk_test_synthetic_reconcile",

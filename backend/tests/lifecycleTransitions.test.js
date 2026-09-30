@@ -8,8 +8,12 @@ process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_stub";
 
 const User = require("../models/User");
 const Case = require("../models/Case");
+const Job = require("../models/Job");
+const Application = require("../models/Application");
 const adminRouter = require("../routes/admin");
 const casesRouter = require("../routes/cases");
+const { addSubscriber: addCaseSubscriber } = require("../utils/caseEvents");
+const { addSubscriber: addNotificationSubscriber } = require("../utils/notificationEvents");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 const app = (() => {
@@ -242,5 +246,71 @@ describe("Case lifecycle transitions", () => {
     expect(res.status).toBe(409);
     expect(res.body.error).toMatch(/never-engaged|hiring a paralegal/i);
     expect(await Case.findById(caseDoc._id).lean()).not.toBeNull();
+  });
+
+  test("deleting an open posting immediately invalidates every affected paralegal and open deep link", async () => {
+    const attorney = await User.create({
+      firstName: "Morgan",
+      lastName: "Delete",
+      email: "morgan.delete@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Taylor",
+      lastName: "Applicant",
+      email: "taylor.applicant@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Never engaged posting",
+      details: "An open posting that can be safely removed before an engagement begins.",
+      status: "open",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      applicants: [{ paralegalId: paralegal._id, status: "pending", appliedAt: new Date() }],
+      totalAmount: 45000,
+      currency: "usd",
+    });
+    const job = await Job.create({
+      attorneyId: attorney._id,
+      caseId: caseDoc._id,
+      title: caseDoc.title,
+      practiceArea: "litigation",
+      description: "An open posting that can be safely removed before an engagement begins.",
+      budget: 450,
+      status: "open",
+    });
+    caseDoc.jobId = job._id;
+    caseDoc.job = job._id;
+    await caseDoc.save();
+    await Application.create({
+      jobId: job._id,
+      paralegalId: paralegal._id,
+      coverLetter: "I am available to support this matter and its filing schedule.",
+      status: "submitted",
+    });
+
+    const caseSignals = [];
+    const paralegalSignals = [];
+    const stopCase = addCaseSubscriber(caseDoc._id, { write: (value) => caseSignals.push(String(value)) });
+    const stopParalegal = addNotificationSubscriber(paralegal._id, { write: (value) => paralegalSignals.push(String(value)) });
+    const response = await request(app)
+      .delete(`/api/cases/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(attorney));
+    stopCase();
+    stopParalegal();
+
+    expect(response.status).toBe(200);
+    expect(caseSignals.join("\n")).toContain("matter_deleted_refresh");
+    expect(paralegalSignals.join("\n")).toContain("matter_deleted_refresh");
+    expect(await Case.findById(caseDoc._id)).toBeNull();
+    expect(await Job.findById(job._id)).toBeNull();
+    expect(await Application.findOne({ jobId: job._id })).toBeNull();
   });
 });

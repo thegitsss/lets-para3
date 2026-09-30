@@ -5,6 +5,7 @@ const Job = require("../../models/Job");
 const SupportConversation = require("../../models/SupportConversation");
 const SupportMessage = require("../../models/SupportMessage");
 const SupportTicket = require("../../models/SupportTicket");
+const { triageRevision } = require("./triageRevision");
 const User = require("../../models/User");
 const {
   SUPPORT_CONFIDENCE,
@@ -107,7 +108,7 @@ function serializeRequester(user = null, fallback = {}) {
   const source = user || {};
   return {
     id: normalizeId(source._id || source.id || fallback.requesterUserId || fallback.userId),
-    name: buildUserLabel(source),
+    name: source.firstName || source.lastName ? buildUserLabel(source) : fallback.contextSnapshot?.requesterName || source.email || fallback.requesterEmail || buildUserLabel(source),
     email: source.email || fallback.requesterEmail || "",
     role: source.role || fallback.requesterRole || "unknown",
     status: source.status || "",
@@ -164,6 +165,7 @@ function serializeTicketForList(ticket = {}) {
     ...ticket,
     id: normalizeId(ticket._id || ticket.id),
     reference: formatSupportTicketReference(ticket._id || ticket.id),
+    triageRevision: triageRevision(ticket),
     status: normalizeTicketStatus(ticket.status, "open"),
     urgency: normalizeUrgency(ticket.urgency, ticket.latestResponsePacket?.confidence || "medium"),
     requester,
@@ -185,6 +187,7 @@ function serializeTicketForDetail(ticket = {}, detail = {}) {
     : [];
   return {
     ...ticket,
+    triageRevision: triageRevision(ticket),
     id: normalizeId(ticket._id || ticket.id),
     reference: formatSupportTicketReference(ticket._id || ticket.id),
     status: normalizeTicketStatus(ticket.status, "open"),
@@ -193,6 +196,7 @@ function serializeTicketForDetail(ticket = {}, detail = {}) {
     assignedTo,
     internalNotes: Array.isArray(ticket.internalNotes) ? ticket.internalNotes.map(serializeNote) : [],
     conversation: detail.conversation || null,
+    inboundEmails: detail.inboundEmails || [],
     conversationMessages: Array.isArray(detail.conversationMessages) ? detail.conversationMessages : [],
     latestSupportFactsSnapshot: ticket.supportFactsSnapshot || {},
     latestPageContext: ticket.pageContext || {},
@@ -314,7 +318,7 @@ async function hydrateTicket(ticketId) {
     .lean();
 }
 
-async function createSupportTicket(payload = {}) {
+async function prepareSupportTicket(payload = {}) {
   if (!String(payload.subject || "").trim()) throw new Error("Support ticket subject is required.");
   if (!String(payload.message || "").trim()) throw new Error("Support ticket message is required.");
 
@@ -407,6 +411,11 @@ async function createSupportTicket(payload = {}) {
     advisories: packet.advisories,
   };
 
+  return ticket;
+}
+
+async function createSupportTicket(payload = {}) {
+  const ticket = await prepareSupportTicket(payload);
   await ticket.save();
   const hydrated = await hydrateTicket(ticket._id);
   return serializeTicketForList(hydrated || ticket.toObject());
@@ -587,21 +596,43 @@ async function addSupportTicketNote({ ticketId, adminUser = {}, text = "" } = {}
   };
 }
 
-async function replyToSupportTicket({ ticketId, adminUser = {}, text = "", status } = {}) {
+async function replyToSupportTicket({ ticketId, adminUser = {}, text = "", status, requestId } = {}) {
   const replyText = compactText(text, 12000);
   if (!replyText) throw new Error("Support reply text is required.");
 
   const ticket = await SupportTicket.findById(ticketId);
   if (!ticket) throw new Error("Support ticket not found.");
-  if (!ticket.conversationId) throw new Error("This ticket is not linked to a support conversation.");
+  if (!ticket.conversationId) {
+    const { replyByEmail } = require("./adminInboxService");
+    return replyByEmail({ ticket, adminUser, text: replyText, status: normalizeTicketStatus(status, "waiting_on_user"), requestId });
+  }
 
   const conversation = await SupportConversation.findById(ticket.conversationId);
   if (!conversation) throw new Error("Support conversation not found.");
 
+  if(requestId && !/^[a-f0-9-]{36}$/i.test(String(requestId)))throw Object.assign(new Error('Invalid reply request ID.'),{statusCode:400});
+  const existingReply=async()=>{
+    const existing=await SupportMessage.findOne({conversationId:conversation._id,'metadata.adminReplyRequestId':requestId});
+    if(!existing)return null;
+    if(existing.text!==replyText || String(existing.metadata?.adminId)!==String(adminUser._id||adminUser.id))throw Object.assign(new Error('This request ID was already used for a different reply.'),{statusCode:409});
+    if(!existing.metadata?.adminReplyApplied) {
+      const replyAt=existing.createdAt;
+      const savedStatus=normalizeTicketStatus(existing.metadata?.ticketStatus,'waiting_on_user');
+      // Repair a crash after the message was saved, without overwriting newer work.
+      await SupportTicket.updateOne({_id:ticket._id,updatedAt:{$lte:replyAt}},{$set:{status:savedStatus,lastAdminReplyAt:replyAt,...(['resolved','closed'].includes(savedStatus)?{resolvedAt:replyAt}:{})}});
+      await SupportConversation.updateOne({_id:conversation._id,$or:[{lastMessageAt:null},{lastMessageAt:{$lte:replyAt}}]},{$set:{status:toConversationStatus(savedStatus,true),lastMessageAt:replyAt,'escalation.requested':true,'escalation.note':'Team responded in support.'}});
+      await SupportMessage.updateOne({_id:existing._id},{$set:{'metadata.adminReplyApplied':true}});
+      publishConversationEvent(conversation._id,{type:'conversation.updated',reason:'ticket.reply_recovered',ticketId:normalizeId(ticket._id)});
+    }
+    const hydrated=await hydrateTicket(ticket._id);
+    return {ticket:serializeTicketForList(hydrated||ticket.toObject()),replyMessage:serializeSupportMessage(existing.toObject()),reused:true};
+  };
+  if(requestId){const prior=await existingReply();if(prior)return prior;}
   const createdAt = new Date();
   const nextStatus = normalizeTicketStatus(status, "waiting_on_user");
   const adminName = await resolveActorLabel(adminUser);
-  const message = await SupportMessage.create({
+  let message;
+  try { message = await SupportMessage.create({
     conversationId: conversation._id,
     sender: "system",
     text: replyText,
@@ -609,6 +640,7 @@ async function replyToSupportTicket({ ticketId, adminUser = {}, text = "", statu
     pageContext: ticket.pageContext || conversation.pageContext || {},
     metadata: {
       kind: "team_reply",
+      ...(requestId?{adminReplyRequestId:requestId}:{}),
       source: "admin_support",
       teamLabel: "LPC Team",
       adminId: normalizeId(adminUser._id || adminUser.id),
@@ -618,6 +650,8 @@ async function replyToSupportTicket({ ticketId, adminUser = {}, text = "", statu
       ticketStatus: nextStatus,
     },
   });
+
+  } catch(error) {if(error.code!==11000||!requestId)throw error;const prior=await existingReply();if(prior)return prior;throw error;}
 
   ticket.status = nextStatus;
   ticket.lastAdminReplyAt = createdAt;
@@ -641,6 +675,7 @@ async function replyToSupportTicket({ ticketId, adminUser = {}, text = "", statu
     ticketReference: formatSupportTicketReference(ticket._id),
   });
 
+  if(requestId)await SupportMessage.updateOne({_id:message._id},{$set:{'metadata.adminReplyApplied':true}});
   const hydrated = await hydrateTicket(ticket._id);
   return {
     ticket: serializeTicketForList(hydrated || ticket.toObject()),
@@ -665,6 +700,7 @@ async function linkTicketToIncident({ ticketId, incidentId } = {}) {
 
 async function reconcileResolvedLinkedIncidentTickets({ ticketId = "" } = {}) {
   const query = {
+    requestKind: { $nin: ["human", "contact"] },
     linkedIncidentIds: { $exists: true, $not: { $size: 0 } },
     status: { $in: ACTIVE_WORK_STATUSES },
   };
@@ -814,7 +850,9 @@ async function getSupportTicketById(ticketId) {
     conversationMessages = messageDocs.map(serializeSupportMessage);
   }
 
+  const { ticketEmails } = require("./mailboxSyncService");
   return serializeTicketForDetail(ticket, {
+    inboundEmails: await ticketEmails(ticketId),
     conversation,
     conversationMessages,
   });
@@ -869,8 +907,10 @@ async function getSupportOverview() {
 }
 
 module.exports = {
+  classifyTicket,
   addSupportTicketNote,
   createSupportTicket,
+  prepareSupportTicket,
   getSupportOverview,
   getSupportTicketById,
   linkTicketToIncident,

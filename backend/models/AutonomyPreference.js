@@ -32,6 +32,12 @@ const autonomyPreferenceSchema = new Schema(
       default: 0,
       min: 0,
     },
+    // Serialize automatic decisions with owner policy changes. Older records
+    // acquire the counter on their first decision; no backfill is required.
+    executionRevision: { type: Number, default: 0, min: 0 },
+    dailyAttemptLimit: { type: Number, default: 25, min: 1, max: 100, validate: Number.isInteger },
+    executionDay: { type: String, default: "" },
+    dailyAttempts: { type: Number, default: 0, min: 0 },
     lastPromptedAt: {
       type: Date,
       default: null,

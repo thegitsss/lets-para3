@@ -1,26 +1,32 @@
+const { reportOperationalFailure } = require("../utils/operationalFailure");
 const { createLogger: createRuntimeLogger } = require("../utils/logger");
 const runtimeLogger = createRuntimeLogger("routes:applications");
 const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();
 const Application = require("../models/Application");
+const accountApplications = require("../services/accountApplicationProjections");
 const Job = require("../models/Job");
 const Case = require("../models/Case");
 const User = require("../models/User");
 const auth = require("../utils/verifyToken");
+const { cleanPlainText } = require("../utils/sanitize");
 const { requireApproved, requireRole } = require("../utils/authz");
 const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
-const stripe = require("../utils/stripe");
+const { captureResumeReference, withResumeReferenceWrite } = require("../utils/resumeReferenceWrite");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
 const { evaluateApplicationEligibility } = require("../services/paralegalWorkflowPolicy");
 const { createDevOnlyEmailSet } = require("../utils/devOnlyEmailSet");
+const { hasStripeConnectBypass } = require("../utils/stripeConnectBypass");
+const { resolveLivePayoutReadiness } = require("../services/paralegalReadinessService");
 const { buildAuthenticatedProfilePhotoUrl } = require("../services/profilePhotoDelivery");
 const { protectMutations } = require("../utils/csrf");
+const { publishNotificationEvent } = require("../utils/notificationEvents");
+const { publishCaseProjectionRefresh } = require("../utils/caseProjectionEvents");
+const { notifyUser } = require("../utils/notifyUser");
+require("../models/MatterApplicationNotification");
 const {
-  markApplicationNeedsReconciliation,
-  markApplicationSynced,
   syncApplicationMirror,
-  syncApplicantsCount,
 } = require("../services/applicationService");
 const {
   getHistoricalRecommendationExclusions,
@@ -28,7 +34,6 @@ const {
 const PROFILE_PHOTO_REQUIRED_MESSAGE = "Complete your profile before applying.";
 const REAPPLY_BYPASS_EMAILS = createDevOnlyEmailSet(["samanthasider+0@gmail.com"]);
 const authenticatedGuards = [auth, requireApproved];
-const INVITE_STATUSES = new Set(["pending", "accepted", "declined", "expired"]);
 
 function presentProfilePerson(person) {
   if (!person || typeof person !== "object") return person || null;
@@ -42,99 +47,44 @@ const mutatingGuards = [...authenticatedGuards, protectMutations];
 
 function sanitizeMessage(value, { max = 2000 } = {}) {
   if (typeof value !== "string") return "";
-  const stripped = value.replace(/<[^>]*>/g, "").replace(/[\u0000-\u001F\u007F]/g, "").trim();
-  if (!stripped) return "";
-  return stripped.slice(0, Math.max(1, max));
+  return cleanPlainText(value.replace(/<[^>]*>/g, ""), { max: Math.max(1, max) });
 }
 
-function normalizeInviteStatus(value) {
-  const key = String(value || "").toLowerCase();
-  return INVITE_STATUSES.has(key) ? key : "pending";
-}
-
-function normalizeInviteParalegalId(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "object") {
-    return String(value._id || value.id || value.userId || "");
-  }
-  return String(value);
-}
 
 async function ensureStripeOnboardedUser(userDoc) {
-  if (!userDoc?.stripeAccountId) return false;
-  if (userDoc.stripeOnboarded && userDoc.stripePayoutsEnabled) return true;
-  try {
-    const account = await stripe.accounts.retrieve(userDoc.stripeAccountId);
-    const submitted = !!account?.details_submitted;
-    const chargesEnabled = !!account?.charges_enabled;
-    const payoutsEnabled = !!account?.payouts_enabled;
-    userDoc.stripeChargesEnabled = chargesEnabled;
-    userDoc.stripePayoutsEnabled = payoutsEnabled;
-    userDoc.stripeOnboarded = submitted && payoutsEnabled;
+  const readiness = await resolveLivePayoutReadiness(userDoc || {});
+  if (readiness.evidenceState === "verified" && !readiness.devBypass) {
+    userDoc.stripeChargesEnabled = readiness.chargesEnabled;
+    userDoc.stripePayoutsEnabled = readiness.payoutsEnabled;
+    userDoc.stripeOnboarded = readiness.ready;
     await userDoc.save();
-    return userDoc.stripeOnboarded;
-  } catch (err) {
-    runtimeLogger.warn("[applications] stripe onboarding status check failed", err?.message || err);
   }
-  return false;
+  return readiness;
 }
 
-async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
-  const attorneyKey = String(attorneyId || "");
-  const ownershipFilters = [];
-  if (attorneyId) {
-    ownershipFilters.push({ attorneyId }, { attorney: attorneyId });
-  }
-  const cases = await Case.find({
-    ...(ownershipFilters.length ? { $or: ownershipFilters } : {}),
-    "applicants.0": { $exists: true },
-  })
-    .select("title practiceArea totalAmount lockedTotalAmount currency applicants createdAt jobId")
-    .populate("applicants.paralegalId", "firstName lastName email role profileImage avatarURL")
-    .lean();
 
-  const entries = [];
-  cases.forEach((caseDoc) => {
-    const amountCents = Number.isFinite(caseDoc.lockedTotalAmount)
-      ? caseDoc.lockedTotalAmount
-      : caseDoc.totalAmount;
-    const budget = typeof amountCents === "number" ? Math.round(amountCents / 100) : null;
-    const caseId = String(caseDoc._id || "");
-    const jobTitle = caseDoc.title || "Untitled Matter";
-    const practiceArea = caseDoc.practiceArea || "";
-    const fallbackDate = caseDoc.createdAt || null;
-    (caseDoc.applicants || []).forEach((applicant) => {
-      const status = String(applicant?.status || "pending").toLowerCase();
-      if (status !== "pending") return;
-      const paralegal = applicant?.paralegalId || null;
-      const paralegalId = paralegal?._id || applicant?.paralegalId || "";
-      if (blockedSet && paralegalId && blockedSet.has(String(paralegalId))) {
-        return;
-      }
-      const starred =
-        !!attorneyKey &&
-        Array.isArray(applicant?.starredBy) &&
-        applicant.starredBy.some((id) => String(id) === attorneyKey);
-      entries.push({
-        id: `case:${caseId}:${paralegalId || "unknown"}`,
-        jobId: caseDoc.jobId || null,
-        jobTitle,
-        practiceArea,
-        budget,
-        caseId,
-        paralegal: presentProfilePerson(paralegal),
-        coverLetter: applicant?.note || applicant?.coverLetter || "",
-        starred,
-        createdAt: applicant?.appliedAt || fallbackDate,
-      });
-    });
-  });
-
-  return entries;
+function applicationScope(caseDoc, job, capturedAt) {
+  return {
+    title: caseDoc?.title || job.title,
+    description: caseDoc?.details || job.description,
+    practiceArea: caseDoc?.practiceArea || job.practiceArea,
+    state: caseDoc?.state || caseDoc?.locationState || job.state || job.locationState || "",
+    caseId: String(caseDoc?._id || job.caseId || ""),
+    totalAmount: caseDoc?.relistRequestedAt && Number.isFinite(caseDoc.remainingAmount)
+      ? caseDoc.remainingAmount : caseDoc?.lockedTotalAmount ?? caseDoc?.totalAmount ?? Math.round(job.budget * 100),
+    currency: caseDoc?.currency || "usd",
+    deadlineDate: caseDoc?.deadlineDate || "",
+    requirements: caseDoc?.requirements || job.requirements || [],
+    tasks: (caseDoc?.tasks || []).filter((task) => !caseDoc.relistRequestedAt || !task.completed).map((task) => task.title),
+    capturedAt,
+  };
 }
 
-async function createApplicationForJob(jobId, user, coverLetter) {
+function applicationMatterChanged() {
+  return Object.assign(new Error("This Matter changed. Review the current posting before applying again."), { status: 409, publicCode: "APPLICATION_MATTER_CHANGED" });
+}
+
+async function createApplicationForJob(jobId, user, coverLetter, requirementAnswers = []) {
   if (!mongoose.isValidObjectId(jobId)) {
     const err = new Error("Invalid Matter posting ID");
     err.status = 400;
@@ -174,7 +124,7 @@ async function createApplicationForJob(jobId, user, coverLetter) {
   let caseDoc = null;
   if (job.caseId) {
     caseDoc = await Case.findById(job.caseId).select(
-      "status archived paralegal paralegalId totalAmount lockedTotalAmount amountLockedAt title attorney attorneyId relistRequestedAt payoutFinalizedAt"
+      "status archived paralegal paralegalId totalAmount lockedTotalAmount remainingAmount amountLockedAt title details practiceArea state locationState deadlineDate tasks requirements currency attorney attorneyId relistRequestedAt payoutFinalizedAt"
     );
     if (!caseDoc) {
       const err = new Error("Matter not found");
@@ -224,43 +174,48 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     err.status = 404;
     throw err;
   }
+  const resumeReference = captureResumeReference(applicant);
   if (!applicant.profileImage && !applicant.avatarURL) {
     const err = new Error(PROFILE_PHOTO_REQUIRED_MESSAGE);
     err.status = 403;
     throw err;
   }
-  const stripeBypassEmails = createDevOnlyEmailSet(["samanthasider+11@gmail.com", "samanthasider+56@gmail.com"]);
   const applicantEmail = String(applicant.email || user?.email || "").toLowerCase().trim();
-  const bypassStripe = stripeBypassEmails.has(applicantEmail);
+  const bypassStripe = hasStripeConnectBypass(applicantEmail);
   if (!bypassStripe) {
     if (!applicant.stripeAccountId) {
       const err = new Error("Connect Stripe before applying to Matters.");
       err.status = 403;
       throw err;
     }
-    if (!applicant.stripeOnboarded || !applicant.stripePayoutsEnabled) {
-      const refreshed = await ensureStripeOnboardedUser(applicant);
-      if (!refreshed) {
-        const err = new Error("Complete Stripe onboarding before applying to Matters.");
-        err.status = 403;
-        throw err;
-      }
+    const refreshed = await ensureStripeOnboardedUser(applicant);
+    if (!refreshed.ready) {
+      const err = new Error(
+        refreshed.evidenceState === "temporarily_unavailable"
+          ? "Stripe payout status is temporarily unavailable. Try again before applying."
+          : "Complete Stripe onboarding before applying to Matters."
+      );
+      err.status = 403;
+      throw err;
     }
   }
 
   const applicationPolicy = evaluateApplicationEligibility({
-    applicantApproved: String(user.status || "").toLowerCase() === "approved",
+    user: {
+      role: user.role,
+      status: user.status,
+      profileImage: applicant.profileImage,
+      avatarURL: applicant.avatarURL,
+      stripeAccountId: applicant.stripeAccountId,
+      stripeOnboarded: applicant.stripeOnboarded,
+      stripeChargesEnabled: applicant.stripeChargesEnabled,
+      stripePayoutsEnabled: applicant.stripePayoutsEnabled,
+    },
+    caseDoc,
+    job,
     partiesBlocked,
-    caseStatus: caseDoc?.status || job.status,
-    jobStatus: job.status,
-    archived: caseDoc?.archived === true,
-    paralegalAssigned: Boolean(caseDoc?.paralegal || caseDoc?.paralegalId),
-    relistRequestedAt: caseDoc?.relistRequestedAt,
-    payoutFinalizedAt: caseDoc?.payoutFinalizedAt,
     duplicateApplication: Boolean(existingIsActive && !allowReapply),
-    profilePhotoReady: Boolean(applicant.profileImage || applicant.avatarURL),
-    payoutSetupReady:
-      bypassStripe || Boolean(applicant.stripeAccountId && applicant.stripeOnboarded && applicant.stripePayoutsEnabled),
+    devBypass: bypassStripe,
   });
   if (!applicationPolicy.ready) {
     const err = new Error("This application is not ready to submit.");
@@ -269,38 +224,100 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     throw err;
   }
 
+  const requirementConfirmations = await require("../services/matterRequirements").assertRequirements(job, caseDoc, user._id, requirementAnswers);
   let application = null;
+  const scopeSnapshot = applicationScope(caseDoc, job, new Date());
+  const dispatches = [];
   try {
-    if (existingApplication) {
-      const previousStatus = String(existingApplication.status || "submitted");
-      existingApplication.coverLetter = note;
-      existingApplication.resumeURL = applicant.resumeURL || "";
-      existingApplication.linkedInURL = applicant.linkedInURL || "";
-      existingApplication.profileSnapshot = shapeParalegalSnapshot(applicant);
-      existingApplication.status = "submitted";
-      existingApplication.withdrawnAt = null;
-      existingApplication.syncStatus = "pending";
-      existingApplication.syncedAt = null;
-      existingApplication.syncError = "";
-      existingApplication.statusHistory.push({
-        from: previousStatus,
-        to: "submitted",
-        reason: "reapplied",
-        actorId: user._id,
-        at: new Date(),
-      });
-      application = await existingApplication.save();
-    } else {
-      application = await Application.create({
-        jobId,
-        paralegalId: user._id,
-        coverLetter: note,
-        resumeURL: applicant.resumeURL || "",
-        linkedInURL: applicant.linkedInURL || "",
-        profileSnapshot: shapeParalegalSnapshot(applicant),
-        statusHistory: [{ to: "submitted", reason: "applied", actorId: user._id }],
-      });
-    }
+    application = await withResumeReferenceWrite(resumeReference, async (session) => {
+      // Bind the retained application, amount lock and recipient obligations to
+      // the same current posting. The later mirror repair remains independent.
+      const currentJob = await Job.findById(job._id).session(session);
+      const currentCase = caseDoc ? await Case.findById(caseDoc._id).session(session) : null;
+      const sameId = (left, right) => String(left || '').toLowerCase() === String(right || '').toLowerCase();
+      if (!currentJob || currentJob.status !== 'open' || !sameId(currentJob.attorneyId, attorneyId) || !sameId(currentJob.caseId, job.caseId)) throw applicationMatterChanged();
+      if (caseDoc) {
+        const identity = require('../utils/caseParticipantIdentity').caseParticipantIdentity(currentCase || {}, attorneyId);
+        const relisted = currentCase?.status === 'paused' && currentCase.relistRequestedAt && currentCase.payoutFinalizedAt;
+        if (!currentCase || currentCase.archived || currentCase.paralegal || currentCase.paralegalId || !identity.isAttorney || identity.identityConflict || currentCase.status !== 'open' && !relisted) throw applicationMatterChanged();
+      }
+      await require("../services/matterRequirements").assertRequirements(currentJob, currentCase, user._id, requirementAnswers, session);
+      const fingerprint = require('../services/matterDraftRevision').fingerprint;
+      if (fingerprint(applicationScope(currentCase, currentJob, scopeSnapshot.capturedAt)) !== fingerprint(scopeSnapshot)) throw applicationMatterChanged();
+      const available = await Job.collection.updateOne({ _id: currentJob._id, status: currentJob.status }, { $inc: { __v: 1 } }, { session });
+      if (!available.matchedCount) throw applicationMatterChanged();
+      const lockedNow = Boolean(currentCase && currentCase.lockedTotalAmount == null);
+      if (currentCase) {
+        const matterWrite = await Case.collection.updateOne({ _id: currentCase._id }, {
+          $inc: { __v: 1 },
+          ...(lockedNow ? { $set: { lockedTotalAmount: currentCase.totalAmount, amountLockedAt: new Date() } } : {}),
+        }, { session });
+        if (matterWrite.matchedCount !== 1) throw applicationMatterChanged();
+      }
+      let recorded;
+      if (existingApplication) {
+        const previousStatus = String(existingApplication.status || "submitted");
+        existingApplication.coverLetter = note;
+        existingApplication.resumeURL = applicant.resumeURL || "";
+        existingApplication.linkedInURL = applicant.linkedInURL || "";
+        existingApplication.profileSnapshot = shapeParalegalSnapshot(applicant);
+        existingApplication.scopeSnapshot = scopeSnapshot;
+        existingApplication.requirementConfirmations = requirementConfirmations;
+        existingApplication.status = "submitted";
+        existingApplication.withdrawnAt = null;
+        existingApplication.syncStatus = "pending";
+        existingApplication.syncedAt = null;
+        existingApplication.syncError = "";
+        existingApplication.statusHistory.push({
+          from: previousStatus,
+          to: "submitted",
+          reason: "reapplied",
+          actorId: user._id,
+          at: new Date(),
+        });
+        recorded = await existingApplication.save({ session });
+      } else {
+        const [created] = await Application.create([{
+          jobId,
+          paralegalId: user._id,
+          coverLetter: note,
+          resumeURL: applicant.resumeURL || "",
+          linkedInURL: applicant.linkedInURL || "",
+          profileSnapshot: shapeParalegalSnapshot(applicant),
+          scopeSnapshot, requirementConfirmations,
+          statusHistory: [{ to: "submitted", reason: "applied", actorId: user._id }],
+        }], { session });
+        recorded = created;
+      }
+      if (attorneyId) {
+        const payload = {
+          jobId: job._id, caseId: caseDoc?._id || job.caseId || null,
+          title: caseDoc?.title || job.title || "Matter application",
+          caseTitle: caseDoc?.title || job.title || "Matter application",
+          paralegalName: `${applicant.firstName || ""} ${applicant.lastName || ""}`.trim() || "Paralegal",
+          paralegalId: user._id,
+        };
+        try {
+          if (lockedNow) {
+            const dispatch = await notifyUser(attorneyId, "case_budget_locked", {
+              caseId: payload.caseId, caseTitle: payload.caseTitle,
+              link: `case-detail.html?caseId=${encodeURIComponent(payload.caseId)}`,
+            }, { actorUserId: user._id, session, deferDispatch: true });
+            if (typeof dispatch !== 'function') throw new Error('Application notification recipient could not be verified.');
+            dispatches.push(dispatch);
+          }
+          const dispatch = await notifyUser(attorneyId, "application_submitted", payload, {
+            actorUserId: user._id, session, deferDispatch: true,
+            applicationSubmission: { applicationId: recorded._id },
+          });
+          if (typeof dispatch !== 'function') throw new Error('Application notification recipient could not be verified.');
+          dispatches.push(dispatch);
+        } catch (cause) {
+          throw Object.assign(new Error("Your application could not be saved. Try again."), { status: 503, publicCode: "APPLICATION_SUBMISSION_UNAVAILABLE", cause });
+        }
+      }
+      return recorded;
+    });
   } catch (err) {
     if (err?.code === 11000) {
       const duplicate = new Error("You have already applied to this Matter");
@@ -309,70 +326,29 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     }
     throw err;
   }
-  const lockedNow = !!caseDoc && caseDoc.lockedTotalAmount == null;
-  let budgetLockError = null;
-  if (caseDoc && lockedNow) {
-    try {
-      await Case.updateOne(
-        { _id: caseDoc._id, lockedTotalAmount: null },
-        { $set: { lockedTotalAmount: caseDoc.totalAmount, amountLockedAt: new Date() } }
-      );
-    } catch (err) {
-      budgetLockError = err;
-      runtimeLogger.error("[applications] budget lock synchronization deferred", application._id, err?.message || err);
-    }
-  }
   await syncApplicationMirror({ application, caseId: caseDoc?._id || null });
-  if (budgetLockError) {
-    await markApplicationNeedsReconciliation(application._id, budgetLockError);
+  if (caseDoc?._id) {
+    publishCaseProjectionRefresh(caseDoc, "application_submitted_refresh", {
+      additionalUserIds: [user._id],
+      caseEvent: "case",
+    });
   }
 
-  // Notify the attorney who posted the job
-  try {
-    const attorneyId =
-      job.attorneyId && job.attorneyId._id
-        ? job.attorneyId._id
-        : job.attorneyId || null;
-    if (attorneyId) {
-      const paralegalName =
-        `${applicant.firstName || ""} ${applicant.lastName || ""}`.trim() || "Paralegal";
-      if (lockedNow) {
-        const caseTitle = caseDoc?.title || job.title || "Untitled Matter";
-        const caseLink = caseDoc?._id ? `case-detail.html?caseId=${encodeURIComponent(caseDoc._id)}` : "";
-        await require("../utils/notifyUser").notifyUser(
-          attorneyId,
-          "case_budget_locked",
-          {
-            caseId: caseDoc?._id || job.caseId || null,
-            caseTitle,
-            link: caseLink,
-          },
-          { actorUserId: user._id }
-        );
-      }
-      await require("../utils/notifyUser").notifyUser(
-        attorneyId,
-        "application_submitted",
-        {
-          jobId: job._id,
-          caseId: caseDoc?._id || job.caseId || null,
-          title: caseDoc?.title || job.title || "Matter application",
-          caseTitle: caseDoc?.title || job.title || "Matter application",
-          paralegalName,
-          paralegalId: user._id,
-        },
-        { actorUserId: user._id }
-      );
-    }
-  } catch (err) {
-    runtimeLogger.warn("[applications] Failed to notify attorney of application", err?.message || err);
+  for (const dispatch of dispatches) {
+    await dispatch().catch(reportOperationalFailure("routes.applications.notice_dispatch"));
   }
+
+  publishNotificationEvent(user._id, "notifications", {
+    at: new Date().toISOString(),
+    type: "application_submitted_refresh",
+  });
 
   return application;
 }
 
-// GET /applications/recommendation-exclusions — durable Application-backed
-// identities used only by Home Recommended Matters.
+// GET /applications/recommendation-exclusions — durable application-history
+// identities used only by Home Recommended Matters. Retained Case.applicants
+// evidence closes compatibility gaps when a canonical Application is missing.
 router.get(
   "/recommendation-exclusions",
   ...authenticatedGuards,
@@ -391,185 +367,26 @@ router.get(
 
 // GET /applications/my — paralegal views jobs they've applied to
 router.get("/my", ...authenticatedGuards, requireRole("paralegal"), async (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
   try {
-    const apps = await Application.find({
-      paralegalId: req.user._id,
-      status: { $ne: "withdrawn" },
-    })
-      .populate({
-        path: "jobId",
-        populate: {
-          path: "attorneyId",
-          select: "firstName lastName name",
-        },
-      })
-      .lean();
-    const visible = apps.filter((app) => app?.jobId && typeof app.jobId === "object");
-    const caseIds = visible
-      .map((app) => app?.jobId?.caseId)
-      .filter((value) => mongoose.isValidObjectId(value));
-    const invitedCases = await Case.find({
-      archived: { $ne: true },
-      applicants: { $elemMatch: { paralegalId: req.user._id } },
-    })
-      .select(
-        "_id title practiceArea details briefSummary totalAmount lockedTotalAmount currency status createdAt jobId attorney attorneyId paralegal paralegalId applicants preEngagement invites"
-      )
-      .populate("attorney", "firstName lastName name")
-      .populate("attorneyId", "firstName lastName name")
-      .lean();
-    const combinedCaseIds = [
-      ...caseIds,
-      ...invitedCases.map((doc) => doc?._id).filter((value) => mongoose.isValidObjectId(value)),
-    ];
-    const caseDocs = combinedCaseIds.length
-      ? await Case.find({ _id: { $in: combinedCaseIds } })
-          .select("_id preEngagement paymentReleased escrowStatus")
-          .lean()
-      : [];
-    const casesById = new Map(caseDocs.map((doc) => [String(doc._id), doc]));
-    const viewerId = String(req.user._id || "");
-    const payload = visible.map((app) => {
-      const job = app.jobId && typeof app.jobId === "object" ? app.jobId : null;
-      const caseId = job?.caseId ? String(job.caseId) : "";
-      const caseDoc = caseId ? casesById.get(caseId) : null;
-      const pre = caseDoc?.preEngagement || null;
-      const attorneyName =
-        job?.attorneyId?.name ||
-        [job?.attorneyId?.firstName, job?.attorneyId?.lastName].filter(Boolean).join(" ").trim() ||
-        "";
-      const matchesRequestedParalegal =
-        !!pre?.requestedParalegalId &&
-        String(pre.requestedParalegalId) === viewerId &&
-        ["requested", "submitted", "changes_requested"].includes(String(pre.status || "").toLowerCase());
-      return {
-        ...app,
-        profileSnapshot: {
-          ...(app.profileSnapshot || {}),
-          profileImage: app.profileSnapshot?.profileImage
-            ? buildAuthenticatedProfilePhotoUrl(viewerId)
-            : "",
-        },
-        caseId: caseId || null,
-        casePaymentReleased: caseDoc?.paymentReleased === true,
-        caseEscrowStatus: caseDoc?.escrowStatus || null,
-        preEngagement: matchesRequestedParalegal
-          ? {
-              status: String(pre.status || "requested").toLowerCase(),
-              requestedParalegalId: String(pre.requestedParalegalId),
-              confidentialityAgreementRequired: !!pre.confidentialityAgreementRequired,
-              conflictsCheckRequired: !!pre.conflictsCheckRequired,
-              conflictsDetails: pre.conflictsDetails || "",
-              confidentialityDocument: pre.confidentialityDocument || null,
-              paralegalConfidentialityDocument: pre.paralegalConfidentialityDocument || null,
-              requestedAt: pre.requestedAt || null,
-              requestedBy: pre.requestedBy ? String(pre.requestedBy) : null,
-              requestedByName: attorneyName || null,
-              confidentialityAcknowledged: !!pre.confidentialityAcknowledged,
-              confidentialityAcknowledgedAt: pre.confidentialityAcknowledgedAt || null,
-              conflictsResponseType: pre.conflictsResponseType || "",
-              conflictsDisclosureText: pre.conflictsDisclosureText || "",
-              submittedAt: pre.submittedAt || null,
-              submittedBy: pre.submittedBy ? String(pre.submittedBy) : null,
-              reviewedAt: pre.reviewedAt || null,
-              reviewedBy: pre.reviewedBy ? String(pre.reviewedBy) : null,
-            }
-          : null,
-      };
-    });
-    const visibleCaseIdSet = new Set(
-      visible
-        .map((app) => {
-          const job = app?.jobId && typeof app.jobId === "object" ? app.jobId : null;
-          return String(job?.caseId || "");
-        })
-        .filter(Boolean)
-    );
-    const inviteEntries = invitedCases
-      .map((caseDoc) => {
-        const caseId = String(caseDoc?._id || "");
-        if (!caseId || visibleCaseIdSet.has(caseId)) return null;
-        if (caseDoc?.paralegal || caseDoc?.paralegalId) return null;
-        const applicantEntry = Array.isArray(caseDoc?.applicants)
-          ? caseDoc.applicants.find((entry) => String(entry?.paralegalId || "") === viewerId)
-          : null;
-        if (!applicantEntry) return null;
-        const relatedInvite = Array.isArray(caseDoc?.invites)
-          ? caseDoc.invites.find(
-              (invite) =>
-                normalizeInviteParalegalId(invite?.paralegalId) === viewerId &&
-                normalizeInviteStatus(invite?.status) === "accepted"
-            )
-          : null;
-        if (!relatedInvite) return null;
-        const pre = caseDocs.length ? casesById.get(caseId)?.preEngagement || caseDoc?.preEngagement || null : caseDoc?.preEngagement || null;
-        const attorneyName =
-          caseDoc?.attorney?.name ||
-          caseDoc?.attorneyId?.name ||
-          [caseDoc?.attorney?.firstName, caseDoc?.attorney?.lastName].filter(Boolean).join(" ").trim() ||
-          [caseDoc?.attorneyId?.firstName, caseDoc?.attorneyId?.lastName].filter(Boolean).join(" ").trim() ||
-          "";
-        const matchesRequestedParalegal =
-          !!pre?.requestedParalegalId &&
-          String(pre.requestedParalegalId) === viewerId &&
-          ["requested", "submitted", "changes_requested"].includes(String(pre.status || "").toLowerCase());
-        const amountCents = Number.isFinite(caseDoc?.lockedTotalAmount) ? caseDoc.lockedTotalAmount : caseDoc?.totalAmount;
-        const budget = typeof amountCents === "number" ? Math.round(amountCents / 100) : null;
-        const embeddedStatus = String(applicantEntry?.status || "pending").toLowerCase();
-        return {
-          id: "",
-          _id: "",
-          // Embedded Case applicants retain the legacy `pending` value for
-          // compatibility. Expose the canonical Application state so the same
-          // user action does not render as Pending or Submitted based only on
-          // whether the Matter has a Job mirror.
-          status: embeddedStatus === "pending" ? "submitted" : embeddedStatus,
-          createdAt: applicantEntry?.appliedAt || relatedInvite?.respondedAt || relatedInvite?.invitedAt || caseDoc?.createdAt || null,
-          updatedAt: caseDoc?.updatedAt || null,
-          coverLetter: applicantEntry?.note || "Accepted invitation",
-          caseId,
-          casePaymentReleased: caseDoc?.paymentReleased === true,
-          caseEscrowStatus: caseDoc?.escrowStatus || null,
-          applicationSource: "invite_accept",
-          jobId: {
-            _id: caseDoc?.jobId ? String(caseDoc.jobId) : caseId,
-            id: caseDoc?.jobId ? String(caseDoc.jobId) : caseId,
-            caseId,
-            title: caseDoc?.title || "Untitled Matter",
-            practiceArea: caseDoc?.practiceArea || "",
-            description: caseDoc?.details || caseDoc?.briefSummary || "",
-            budget,
-            status: String(caseDoc?.status || "open").toLowerCase(),
-            attorneyId: caseDoc?.attorneyId || caseDoc?.attorney || null,
-          },
-          preEngagement: matchesRequestedParalegal
-            ? {
-                status: String(pre.status || "requested").toLowerCase(),
-                requestedParalegalId: String(pre.requestedParalegalId),
-                confidentialityAgreementRequired: !!pre.confidentialityAgreementRequired,
-                conflictsCheckRequired: !!pre.conflictsCheckRequired,
-                conflictsDetails: pre.conflictsDetails || "",
-                confidentialityDocument: pre.confidentialityDocument || null,
-                paralegalConfidentialityDocument: pre.paralegalConfidentialityDocument || null,
-                requestedAt: pre.requestedAt || null,
-                requestedBy: pre.requestedBy ? String(pre.requestedBy) : null,
-                requestedByName: attorneyName || null,
-                confidentialityAcknowledged: !!pre.confidentialityAcknowledged,
-                confidentialityAcknowledgedAt: pre.confidentialityAcknowledgedAt || null,
-                conflictsResponseType: pre.conflictsResponseType || "",
-                conflictsDisclosureText: pre.conflictsDisclosureText || "",
-                submittedAt: pre.submittedAt || null,
-                submittedBy: pre.submittedBy ? String(pre.submittedBy) : null,
-                reviewedAt: pre.reviewedAt || null,
-                reviewedBy: pre.reviewedBy ? String(pre.reviewedBy) : null,
-              }
-            : null,
-        };
-      })
-      .filter(Boolean);
-    res.json([...payload, ...inviteEntries]);
+    const result = await accountApplications.readOwn(req);
+    return res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    if (String(err.publicCode || '').startsWith('APPLICATION_')) return res.status(err.status || 503).json({ error: err.message, code: err.publicCode });
+    runtimeLogger.error('[applications] my error', err);
+    return res.status(500).json({ error: 'Unable to load applications.' });
+  }
+});
+
+// Embedded historical applications have no canonical Application ID.
+router.post('/earlier/:caseId/revoke', ...mutatingGuards, requireRole('paralegal'), async (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  try {
+    return res.json(await require('../services/earlierApplicationWithdrawal').withdraw(req));
+  } catch (err) {
+    if (err.publicCode) return res.status(err.status || 409).json({ code: err.publicCode, error: err.message });
+    runtimeLogger.error('[applications] earlier withdrawal error', err);
+    return res.status(500).json({ error: 'Unable to withdraw this application.' });
   }
 });
 
@@ -579,19 +396,29 @@ router.post(
   ...mutatingGuards,
   requireRole("paralegal"),
   async (req, res) => {
+    const withdrawal = require('../services/applicationWithdrawalInterlock');
+    let mirrorRemoved = false, withdrawalApplicationId = null;
     try {
       const applicationId = req.params.applicationId;
       if (!mongoose.isValidObjectId(applicationId)) {
         return res.status(400).json({ error: "Invalid application id." });
       }
-      const application = await Application.findOne({
-        _id: applicationId,
-        paralegalId: req.user._id,
-      });
-      if (!application) {
+      const source = await withdrawal.read(req, applicationId);
+      if (!source) {
         return res.status(404).json({ error: "Application not found." });
       }
+      const { application, job, caseDoc } = source;
+      withdrawalApplicationId = application._id;
       if (String(application.status || "").toLowerCase() === "withdrawn") {
+        if (application.syncStatus !== 'synced') {
+          try {
+            await withdrawal.syncCount(application.jobId);
+            await withdrawal.markSynced(application);
+          } catch (error) {
+            await withdrawal.markNeedsReconciliation(application._id, error, application);
+            runtimeLogger.error("[applications] withdrawal replay reconciliation deferred", application._id, error);
+          }
+        }
         return res.json({ success: true, alreadyRevoked: true });
       }
       if (String(application.status || "").toLowerCase() === "rejected") {
@@ -600,13 +427,6 @@ router.post(
           code: "APPLICATION_CONFLICT",
         });
       }
-      let caseDoc = null;
-      if (application.jobId && mongoose.isValidObjectId(application.jobId)) {
-        const job = await Job.findById(application.jobId).select("caseId");
-        if (job?.caseId && mongoose.isValidObjectId(job.caseId)) {
-          caseDoc = await Case.findById(job.caseId).select("paymentReleased escrowStatus applicants");
-        }
-      }
       const funded =
         caseDoc?.paymentReleased === true ||
         String(caseDoc?.escrowStatus || "").toLowerCase() === "funded";
@@ -614,56 +434,41 @@ router.post(
         return res.status(400).json({ error: "Accepted applications cannot be revoked after funding." });
       }
 
-      const previousStatus = String(application.status || "submitted");
-      const withdrawnAt = new Date();
-      const revokedApplication = await Application.findOneAndUpdate(
-        {
-          _id: application._id,
-          paralegalId: req.user._id,
-          status: { $ne: "withdrawn" },
-        },
-        {
-          $set: {
-            status: "withdrawn",
-            withdrawnAt,
-            syncStatus: "pending",
-            syncedAt: null,
-            syncError: "",
-          },
-          $push: {
-            statusHistory: {
-              $each: [{
-                from: previousStatus,
-                to: "withdrawn",
-                reason: "revoked_by_paralegal",
-                actorId: req.user._id,
-                at: withdrawnAt,
-              }],
-              $slice: -50,
-            },
-          },
-        },
-        { returnDocument: "after" }
-      );
-      if (!revokedApplication) {
-        return res.json({ success: true, alreadyRevoked: true });
+      if (caseDoc) {
+        await withdrawal.removeMirror(req, application, job, caseDoc);
+        mirrorRemoved = true;
       }
+      const recorded = await withdrawal.record(req, source);
+      const revokedApplication = recorded.application;
       try {
-        if (caseDoc) {
-          await Case.updateOne(
-            { _id: caseDoc._id },
-            { $pull: { applicants: { paralegalId: req.user._id } } }
-          );
-        }
-        await syncApplicantsCount(revokedApplication.jobId);
-        await markApplicationSynced(revokedApplication._id);
+        await withdrawal.syncCount(revokedApplication.jobId);
+        await withdrawal.markSynced(revokedApplication);
       } catch (syncErr) {
-        await markApplicationNeedsReconciliation(revokedApplication._id, syncErr);
+        await withdrawal.markNeedsReconciliation(revokedApplication._id, syncErr, revokedApplication);
         runtimeLogger.error("[applications] revoke mirror synchronization deferred", revokedApplication._id, syncErr);
       }
+      if (recorded.alreadyRevoked) return res.json({ success: true, alreadyRevoked: true });
+
+      if (caseDoc?._id) {
+        publishCaseProjectionRefresh(caseDoc, "application_withdrawn_refresh", {
+          additionalUserIds: [req.user._id],
+          caseEvent: "case",
+        });
+      }
+
+      publishNotificationEvent(req.user._id, "notifications", {
+        at: new Date().toISOString(),
+        type: "application_withdrawn_refresh",
+      });
+
+      await recorded.dispatch().catch(error => {
+        runtimeLogger.warn("[applications] Withdrawal notification dispatch failed", error?.message);
+      });
 
       return res.json({ success: true });
     } catch (err) {
+      if (mirrorRemoved && withdrawalApplicationId) await withdrawal.markNeedsReconciliation(withdrawalApplicationId, err).catch(error => runtimeLogger.error("[applications] withdrawal reconciliation marker failed", error));
+      if (err.publicCode) return res.status(err.status || 409).json({ code: err.publicCode, error: err.message });
       runtimeLogger.error("[applications] revoke error", err);
       return res.status(500).json({ error: "Unable to revoke application." });
     }
@@ -711,72 +516,14 @@ router.get("/for-job/:jobId", ...authenticatedGuards, requireRole("admin", "atto
 
 // GET /applications/my-postings — attorney sees applications to their jobs
 router.get("/my-postings", ...authenticatedGuards, requireRole("attorney"), async (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
   try {
-    const jobs = await Job.find({ attorneyId: req.user._id }).select("_id title practiceArea budget caseId");
-    const blockedIds = await getBlockedUserIds(req.user._id || req.user.id);
-    const blockedSet = blockedIds.length ? new Set(blockedIds.map((id) => String(id))) : null;
-    const caseApps = await getCaseApplicationsForAttorney(req.user._id, blockedSet);
-    if (!jobs.length && !caseApps.length) return res.json([]);
-    const jobIds = jobs.map((j) => j._id);
-    const jobById = new Map(jobs.map((j) => [String(j._id), j]));
-    const appFilter = { jobId: { $in: jobIds } };
-    if (blockedIds.length) {
-      appFilter.paralegalId = { $nin: blockedIds };
-    }
-    const apps = await Application.find(appFilter)
-      .populate("paralegalId", "firstName lastName email role profileImage avatarURL")
-      .sort({ createdAt: -1 })
-      .lean();
-    const shaped = apps.filter((app) =>
-      !["accepted", "rejected", "withdrawn"].includes(String(app.status || "").toLowerCase())
-    ).map((app) => {
-      const job = jobById.get(String(app.jobId?._id || app.jobId)) || {};
-      const starred =
-        Array.isArray(app.starredBy) &&
-        app.starredBy.some((id) => String(id) === String(req.user._id || req.user.id));
-      return {
-        id: String(app._id),
-        jobId: app.jobId?._id || app.jobId || null,
-        jobTitle: job.title || "Untitled Matter",
-        practiceArea: job.practiceArea || "",
-        budget: job.budget || null,
-        caseId: job.caseId ? String(job.caseId._id || job.caseId) : null,
-        paralegal: presentProfilePerson(app.paralegalId),
-        coverLetter: app.coverLetter || "",
-        starred,
-        createdAt: app.createdAt,
-      };
-    });
-    const applicationKey = (entry) => {
-      const paralegal = entry?.paralegal || {};
-      const paralegalId = String(paralegal?._id || paralegal?.id || entry?.paralegalId || "");
-      const contextId = String(entry?.caseId || entry?.jobId || "");
-      return contextId && paralegalId ? `${contextId}:${paralegalId}` : String(entry?.id || "");
-    };
-    const canonicalKeys = new Set(
-      apps.map((app) => {
-        const job = jobById.get(String(app.jobId?._id || app.jobId)) || {};
-        const paralegal = app?.paralegalId || {};
-        const paralegalId = String(paralegal?._id || paralegal?.id || app?.paralegalId || "");
-        const contextId = String(job.caseId || app.jobId || "");
-        return contextId && paralegalId ? `${contextId}:${paralegalId}` : "";
-      }).filter(Boolean)
-    );
-    const combinedByKey = new Map(
-      caseApps
-        .filter((entry) => !canonicalKeys.has(applicationKey(entry)))
-        .map((entry) => [applicationKey(entry), entry])
-    );
-    shaped.forEach((entry) => combinedByKey.set(applicationKey(entry), entry));
-    const combined = [...combinedByKey.values()].sort((a, b) => {
-      const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bTime = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return bTime - aTime;
-    });
-    res.json(combined);
+    const result = await accountApplications.readReceived(req);
+    return res.json(result.rows);
   } catch (err) {
-    runtimeLogger.error("[applications] my-postings error", err);
-    res.status(500).json({ error: "Unable to load applications." });
+    if (String(err.publicCode || '').startsWith('APPLICATION_')) return res.status(err.status || 503).json({ error: err.message, code: err.publicCode });
+    runtimeLogger.error('[applications] my-postings error', err);
+    return res.status(500).json({ error: 'Unable to load applications.' });
   }
 });
 

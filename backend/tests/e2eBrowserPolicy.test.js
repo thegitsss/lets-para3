@@ -56,6 +56,15 @@ describe("browser runtime and E2E policy", () => {
     }
   });
 
+  test("critical release verification includes both Attorney generations and retains V2 evidence", () => {
+    const scripts = JSON.parse(read("package.json")).scripts;
+    expect(scripts["test:playwright:critical"]).toContain("npm run test:playwright:support");
+    expect(scripts["test:playwright:critical"]).toContain("npm run test:playwright:attorney-v2");
+    expect(scripts["test:playwright:attorney-v2"]).toContain("tests/playwright/attorney-v2/playwright.config.js");
+    expect(scripts["test:playwright:attorney-v2"]).toContain("--fail-on-flaky-tests");
+    expect(read("tests/playwright/attorney-v2/playwright.config.js")).toContain('buildPlaywrightReporters("playwright-attorney-v2")');
+  });
+
   test("the aggregate E2E command includes every launch journey and emits JUnit", () => {
     const manifest = JSON.parse(read("package.json"));
     expect(manifest.scripts?.["test:e2e"]).toBe("node scripts/run-e2e-suite.js");

@@ -204,8 +204,16 @@ jobs:
             backend/test-results/playwright-performance
             backend/test-results/playwright-support
             backend/test-results/playwright-paralegal-support
+            backend/test-results/paralegal-financial-records
+            backend/test-results/attorney-v2-matter-drafts
             backend/test-results/playwright-director
             backend/test-results/playwright-control-room
+            backend/test-results/admin-financials
+            backend/test-results/financial-lifecycle
+            backend/test-results/frontend-hygiene
+            backend/test-results/workspace-navigation
+            backend/test-results/workspace-session
+            backend/test-results/director-commission
           if-no-files-found: ignore
           retention-days: 7
 

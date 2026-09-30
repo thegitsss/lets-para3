@@ -2,6 +2,7 @@
 const { Types } = require("mongoose");
 const Case = require("../models/Case");
 const { createLogger } = require("./logger");
+const { caseParticipantIdentity, conflictMessage } = require("./caseParticipantIdentity");
 
 const authzLogger = createLogger("authz");
 
@@ -109,14 +110,18 @@ function requireCaseAccess(paramKey = "caseId", opts = {}) {
 
       const uid = toId(req.user.id);
       const isAdmin = req.user.role === "admin";
-      const isAttorney = sameId(c.attorney, uid) || sameId(c.attorneyId, uid);
-      const isParalegal = sameId(c.paralegal, uid) || sameId(c.paralegalId, uid);
+      const { isAttorney, isParalegal, identityConflict } = caseParticipantIdentity(c, uid);
       const paralegalRevoked = isParalegal && !isAdmin && !!c.paralegalAccessRevokedAt;
 
       if (paralegalRevoked) {
         return res
           .status(hideExistence ? 404 : 403)
           .json({ error: hideExistence ? "Matter not found" : "Access revoked" });
+      }
+
+      if (!isAdmin && identityConflict) {
+        res.set("Cache-Control", "private, no-store");
+        return res.status(409).json({ code: "CASE_IDENTITY_CONFLICT", error: conflictMessage });
       }
 
       let isApplicant = false;

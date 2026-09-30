@@ -26,10 +26,19 @@ const ApplicationSchema = new mongoose.Schema({
     required: true,
   },
 
+  requirementConfirmations: [{ _id:false, requirement:String, meets:Boolean }],
   coverLetter: { type: String, required: true, trim: true, maxlength: 2000 },
   resumeURL: { type: String, trim: true, default: "" },
   linkedInURL: { type: String, trim: true, default: "" },
   profileSnapshot: { type: profileSnapshotSchema, default: () => ({}) },
+  scopeSnapshot: {
+    type: new mongoose.Schema({
+      title: String, description: String, practiceArea: String, state: String,
+      caseId: String, totalAmount: Number, currency: String, deadlineDate: String,
+      tasks: [String], requirements:[String], capturedAt: Date,
+    }, { _id: false }),
+    default: undefined,
+  },
 
   status: {
     type: String,
@@ -64,6 +73,11 @@ ApplicationSchema.index({ jobId: 1, paralegalId: 1 }, { unique: true });
 ApplicationSchema.index({ paralegalId: 1, status: 1, createdAt: -1 });
 ApplicationSchema.index({ jobId: 1, status: 1, createdAt: -1 });
 ApplicationSchema.index({ syncStatus: 1, updatedAt: 1 });
+
+// Match the inventory's comparison rules so mixed BSON/string identity joins
+// retain their ambiguity checks without scanning the full application history.
+ApplicationSchema.index({ jobId: 1, _id: 1 }, { name: 'inventory_application_job_en', collation: { locale: 'en', strength: 3 } });
+ApplicationSchema.index({ _id: 1, jobId: 1 }, { name: 'inventory_application_identity_en', collation: { locale: 'en', strength: 3 } });
 
 ApplicationSchema.pre("validate", function () {
   if (Array.isArray(this.starredBy) && this.starredBy.length > 1) {

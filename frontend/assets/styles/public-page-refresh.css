@@ -1,0 +1,7 @@
+/* Public utility pages follow the cornflower palette. */
+body.public-page-refresh { --utility-gold: #416eaf; --help-gold: #416eaf; --help-wash: #edf2fc; --lpc-gold: #6495ed; --lpc-focus: #416eaf; }
+.public-page-refresh :is(.hero-banner, .help-hero) { background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%), radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3; }
+.public-page-refresh .utility-hero__copy { background: none; }
+.public-page-refresh :is(.utility-hero__eyebrow, .help-eyebrow) { color: #416eaf; }
+.public-page-refresh .utility-content a { color: #416eaf; }
+.public-page-refresh .home-footer summary { color: #a8c8ff; }

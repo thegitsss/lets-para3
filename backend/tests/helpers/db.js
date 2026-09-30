@@ -22,7 +22,20 @@ async function connect() {
     serverSelectionTimeoutMS: MONGO_SELECTION_TIMEOUT_MS,
     waitQueueTimeoutMS: MONGO_CONNECT_TIMEOUT_MS,
     maxPoolSize: 10,
+    // Route-heavy suites register many models before connecting. Build their
+    // collections and indexes in order instead of competing with cleanup for
+    // the same small connection pool.
+    autoCreate: false,
+    autoIndex: false,
   });
+  for (const model of Object.values(mongoose.models)) {
+    await model.init();
+    await model.createCollection();
+    await model.createIndexes();
+  }
+  // Models imported later in a test retain normal Mongoose initialization.
+  mongoose.connection.config.autoCreate = true;
+  mongoose.connection.config.autoIndex = true;
   await clearDatabase();
 }
 

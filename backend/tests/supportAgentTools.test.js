@@ -402,7 +402,7 @@ describe("support manager tool permissions", () => {
           practiceAreas: ["Litigation"],
           bio: "Attorney bio",
           twoFactorEnabled: true,
-          preferences: { theme: "mountain" },
+          preferences: { theme: "light" },
         }),
       }),
     });

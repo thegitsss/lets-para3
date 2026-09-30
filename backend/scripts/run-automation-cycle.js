@@ -16,6 +16,7 @@ const {
   processAutomaticDirectorFollowUps,
 } = require("../services/director/directorPortalService");
 const { purgeExpiredCases } = require("../services/caseLifecycle");
+const { processMatterStorageRetirements } = require("../services/matterStorageRetirement");
 const { processPersonalStorageDeletionTasks } = require("../services/personalStorageDeletion");
 const {
   processAdminOverdueDisputes,
@@ -24,6 +25,8 @@ const {
 const { createLogger } = require("../utils/logger");
 const { releaseCommit } = require("../utils/releaseIdentity");
 const { readMaintenanceMode } = require("../utils/appSettings");
+const { processAutoModeActions } = require("../services/ai/autonomyPreferenceService");
+const { recordAutomationCycle } = require('../services/automationCycleStatus');
 const { assertAutomationConfiguration } = require("../utils/workerProductionConfig");
 const {
   MONGO_OPERATION_OPTIONS,
@@ -61,6 +64,7 @@ async function runTask(name, operation, results, failures) {
 async function runAutomationCycle({ now = new Date(), dependencies = {} } = {}) {
   const deps = {
     readMaintenanceMode,
+    processAutoModeActions,
     generateMonitoringReport,
     runTimedTriggers,
     prepareFounderDailyLogIfDue,
@@ -71,6 +75,7 @@ async function runAutomationCycle({ now = new Date(), dependencies = {} } = {}) 
     processAutomaticDirectorFollowUps,
     purgeExpiredCases,
     processPersonalStorageDeletionTasks,
+    processMatterStorageRetirements,
     processAdminOverdueDisputes,
     processExpiredWithdrawalWindows,
     ...dependencies,
@@ -160,6 +165,8 @@ async function runAutomationCycle({ now = new Date(), dependencies = {} } = {}) 
     failures
   );
 
+  const matterStorageRetirement = await runTask("matterStorageRetirement", async () => { const result = await deps.processMatterStorageRetirements(); if (Number(result?.failed || 0) + Number(result?.retried || 0) > 0) throw new Error("Matter storage cleanup has unconfirmed items."); return result; }, results, failures);
+
   const mailImport = await runTask(
     "directorMailImport",
     async () => {
@@ -181,6 +188,7 @@ async function runAutomationCycle({ now = new Date(), dependencies = {} } = {}) 
       now: now.toISOString(),
       casePurge,
       personalStorageDeletion,
+    matterStorageRetirement,
       expiredWithdrawals,
       overdueDisputes,
       mailImport,
@@ -192,6 +200,16 @@ async function runAutomationCycle({ now = new Date(), dependencies = {} } = {}) 
   const monitoring = await runTask(
     "monitoringReport",
     () => deps.generateMonitoringReport(),
+    results,
+    failures
+  );
+  const governedApprovals = await runTask(
+    "governedApprovals",
+    async () => {
+      const result = await deps.processAutoModeActions();
+      if (result.failedCount > 0) throw new Error(`${result.failedCount} routine approval attempts could not be completed. Review their records before retrying.`);
+      return result;
+    },
     results,
     failures
   );
@@ -247,10 +265,12 @@ async function runAutomationCycle({ now = new Date(), dependencies = {} } = {}) 
     now: now.toISOString(),
     casePurge,
     personalStorageDeletion,
+    matterStorageRetirement,
     expiredWithdrawals,
     overdueDisputes,
     mailImport,
     monitoring,
+    governedApprovals,
     timedTriggers,
     research,
     cleanup,
@@ -267,7 +287,7 @@ async function main() {
   const mongoUri = requireMongoUri(process.env.MONGO_URI);
   await mongoose.connect(mongoUri, MONGO_OPERATION_OPTIONS);
   try {
-    const summary = await runAutomationCycle({ now: new Date() });
+    const summary = await recordAutomationCycle(() => runAutomationCycle({ now: new Date() }));
     process.stdout.write(`${JSON.stringify({ ...summary, releaseCommit: releaseCommit(process.env) }, null, 2)}\n`);
     if (!summary.ok) process.exitCode = 1;
   } finally {

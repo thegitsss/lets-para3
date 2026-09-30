@@ -15,9 +15,9 @@
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
   <link href="assets/styles/hero-pages.css?v=20260826-uniform-heroes" rel="stylesheet" />
-  <link href="assets/styles/public-site-chrome.css?v=20260828-phase8" rel="stylesheet" />
-  <script src="assets/scripts/public-site-chrome.js?v=20260827-mobile-footer-alignment" defer></script>
-  <script src="assets/scripts/utils/session.js?v=20260820-1"></script>
+  <link href="assets/styles/public-site-chrome.css?v=20260925-narrow-footer" rel="stylesheet" />
+  <script src="assets/scripts/public-site-chrome.js?v=20260924-responsive-fixes" defer></script>
+  <script src="assets/scripts/utils/session.js?v=20260902-1"></script>
   <script type="module" src="assets/scripts/auth.js?v=20260812-state-filter-owner"></script>
   <style>
     :root {
@@ -42,7 +42,7 @@
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
       color: #1a2230;
-      background: #ffffff !important;
+      background: var(--clean-surface, #ffffff) !important;
       margin: 0;
     }
 
@@ -161,7 +161,7 @@
       width: 224px;
       flex-shrink: 0;
       margin-top: 3rem;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       border: 1px solid rgba(26, 34, 48, 0.08);
       border-radius: 16px;
       padding: 1rem;
@@ -192,7 +192,7 @@
       padding: 0.55rem 0.75rem;
       border: 1px solid rgba(26, 34, 48, 0.12);
       border-radius: 10px;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       font-size: 0.95rem;
       color: #475569;
       box-sizing: border-box;
@@ -274,7 +274,7 @@
 
     .auth-blocker__card {
       box-sizing: border-box;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       border-radius: 16px;
       padding: clamp(1.5rem, 6vw, 2rem);
       max-width: 420px;
@@ -324,7 +324,7 @@
     }
 
     .auth-blocker__actions .btn.secondary {
-      background: #fff;
+      background: var(--clean-surface, #fff);
       color: #1a2230;
     }
 
@@ -352,7 +352,7 @@
       border-radius: 999px;
       padding: 0.3rem 0.75rem;
       font-size: 0.9rem;
-      background: #fff;
+      background: var(--clean-surface, #fff);
     }
 
     .filter-toggle {
@@ -368,7 +368,7 @@
     .job-card {
       border: 1px solid rgba(26, 34, 48, 0.08);
       border-left: 4px solid #111;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       padding: 1.15rem 1.35rem;
       border-radius: 14px;
       box-shadow: none;
@@ -382,7 +382,7 @@
     }
 
     .job-card .area {
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.95rem;
       margin-bottom: 0.4rem;
     }
@@ -391,7 +391,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 0.65rem;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.9rem;
       margin-bottom: 0.8rem;
     }
@@ -415,7 +415,7 @@
       display: flex;
       justify-content: center;
       width: 100%;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.95rem;
       margin-top: 0.5rem;
     }
@@ -423,9 +423,9 @@
     footer {
       border-top: 1px solid rgba(26, 34, 48, 0.08);
       padding: 32px 0;
-      background: #ffffff;
+      background: var(--clean-surface, #ffffff);
       text-align: center;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.95rem;
     }
 
@@ -435,7 +435,7 @@
       margin: 0 0 8px;
     }
 
-    footer a { color: #6b7280; text-decoration: none; }
+    footer a { color: var(--clean-muted, #6b7280); text-decoration: none; }
 
     .authenticated-browse-sidebar,
     .authenticated-browse-toggle,
@@ -531,7 +531,7 @@
       padding: 0;
       border: 1px solid rgba(15, 23, 42, 0.12);
       border-radius: 10px;
-      background: #ffffff;
+      background: var(--clean-surface, #ffffff);
       color: #1a1a1a;
       font:300 0.8rem/1 "Sarabun", sans-serif;
       cursor: pointer;
@@ -577,7 +577,7 @@
       min-height: 128px;
       height: 128px;
       padding: 0;
-      background: #ffffff !important;
+      background: var(--clean-surface, #ffffff) !important;
       border-bottom: 1px solid #e5e7eb;
     }
 
@@ -742,8 +742,8 @@
       padding: 7px 14px;
       border: 1px solid rgba(26, 34, 48, 0.14);
       border-radius: 999px;
-      background: #fff;
-      color: #1a2230;
+      background: var(--clean-surface, #fff);
+      color: var(--clean-ink, #1a2230);
       font: inherit;
       cursor: pointer;
     }
@@ -773,7 +773,7 @@
       padding: 6px;
       border: 1px solid rgba(26, 34, 48, 0.14);
       border-radius: 12px;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       box-shadow: 0 18px 42px rgba(26, 34, 48, 0.14);
       list-style: none;
     }
@@ -787,7 +787,7 @@
       border: 0;
       border-radius: 8px;
       background: transparent;
-      color: #1a2230;
+      color: var(--clean-ink, #1a2230);
       font: inherit;
       text-align: left;
       white-space: nowrap;
@@ -829,7 +829,7 @@
       top: 100%;
       left: 0;
       right: 0;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       border: 1px solid rgba(26, 34, 48, 0.12);
       border-top: none;
       border-radius: 10px;
@@ -953,7 +953,7 @@
       color: #475569;
       border: 1px solid rgba(26, 34, 48, 0.12);
       border-radius: 10px;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       outline: none;
       transition: border-color 0.2s;
       appearance: none;
@@ -999,7 +999,7 @@
       padding: 1.75rem 2rem;
       border: 1px solid var(--line);
       border-left: 4px solid #111;
-      background: #fdfdfb;
+      background: var(--clean-surface, #fdfdfb);
     }
 
     .paralegal-card img {
@@ -1100,149 +1100,34 @@
 
     .action-btn:hover { background: #1d2b3b; border-color: #1d2b3b; color: #fff; }
 
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(16, 24, 40, 0.6);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 200;
-      padding: 1.5rem;
-    }
-
-    .modal-overlay.show { display: flex; }
-
-    .inquire-modal {
-      background: #fff;
-      border-radius: 8px;
-      width: min(420px, 90vw);
-      padding: 1.5rem;
-      border: 1px solid var(--line);
-      box-shadow: 0 10px 25px rgba(17, 24, 39, 0.12);
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .inquire-modal h3 {
-      margin: 0;
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 1.4rem;
-      color: var(--navy);
-    }
-
-    .inquire-modal p {
-      margin: 0;
-      font-size: 0.95rem;
-      color: var(--muted);
-    }
-
-    .inquire-modal .invite-lock-note {
-      margin: 0;
-      font-size: 0.9rem;
-      color: var(--muted);
-      line-height: 1.4;
-    }
-
-    .job-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-      max-height: 220px;
-      overflow-y: auto;
-      padding-right: 0.2rem;
-    }
-
-    .modal-note {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      font-size: 0.95rem;
-      color: var(--muted);
-    }
-
-    .modal-note textarea {
-      width: 100%;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 0.6rem;
-      resize: vertical;
-      font-family: 'Sarabun', sans-serif;
-      font-size: 0.95rem;
-      min-height: 70px;
-    }
-
-    .job-option {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      border: 1px solid var(--line);
-      padding: 0.45rem 0.6rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.95rem;
-      color: var(--navy);
-    }
-
-    .job-option input { accent-color: var(--gold); }
-
-    .job-option.disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .job-option.disabled input {
-      pointer-events: none;
-    }
-
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.75rem;
-      margin-top: 0.5rem;
-    }
-
-    .modal-actions button {
-      min-height: 48px;
-      padding: 0.4rem 1.2rem;
-      border: 1px solid var(--navy);
-      border-radius: 8px;
-      background: transparent;
-      color: var(--navy);
-      cursor: pointer;
-      font-size: 0.95rem;
-      font-family: 'Sarabun', sans-serif;
-      transition: background 0.2s, color 0.2s;
-    }
-
-    .modal-actions button.confirm {
-      background: var(--navy);
-      border-color: var(--navy);
-      color: #fff;
-    }
-
-    .modal-actions button:hover { background: var(--navy); color: #fff; }
-
     .pagination-controls {
       display: flex;
       justify-content: center;
       align-items: center;
       gap: 1rem;
       padding: 0.5rem 0 1rem;
+      min-width: 0;
     }
+
+    #pagination[hidden] { display: none !important; }
 
     .pagination-controls .page-nav {
       display: flex;
       align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      min-width: 0;
+      max-width: 100%;
       gap: 0.75rem;
     }
+
+    #paginationLabel { overflow-wrap: anywhere; text-align: center; }
 
     .pagination-controls button {
       min-width: 44px;
       min-height: 44px;
       border: 1px solid var(--line);
-      background: #fff;
+      background: var(--clean-surface, #fff);
       padding: 0.35rem 0.9rem;
       border-radius: 999px;
       font-size: 0.95rem;
@@ -1392,7 +1277,7 @@
       justify-content: center;
       padding: 0;
       color: #53627a;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       border: 1px solid #dfe3e8;
       border-radius: 7px;
       box-shadow: none;
@@ -1460,7 +1345,7 @@
       overflow-x: hidden;
       overflow-y: auto;
       overscroll-behavior: contain;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       border: 1px solid #dfe3e8;
       border-radius: 10px;
       box-shadow: 0 12px 32px rgba(17, 24, 39, 0.13);
@@ -1494,7 +1379,7 @@
       align-items: center;
       justify-content: center;
       padding: 0;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       background: transparent;
       border: 0;
       border-radius: 5px;
@@ -1541,7 +1426,7 @@
       overflow-x: hidden;
       overflow-y: auto;
       overscroll-behavior: contain;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       border: 1px solid #dfe3e8;
       border-radius: 8px;
       box-shadow: 0 8px 22px rgba(17, 24, 39, 0.11);
@@ -1591,7 +1476,7 @@
       box-sizing: border-box;
       border: 1px solid #aeb8c5;
       border-radius: 3px;
-      background: #fff;
+      background: var(--clean-surface, #fff);
     }
 
     .browse-paralegals-page aside.filter.filter-popover li[aria-selected="true"] .filter-option-check {
@@ -1626,7 +1511,7 @@
       border-color: #dfe3e8;
       border-radius: 6px;
       color: #53627a;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       font-size: 0.8rem;
       letter-spacing: 0;
     }
@@ -1677,13 +1562,16 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260820-18" />
-  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260812-1" />
-  <script defer src="assets/scripts/universal-header.js?v=20260812-1"></script>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260831-21" />
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260831-3" />
+  <script defer src="assets/scripts/universal-header.js?v=20260831-3"></script>
   <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
   <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
+  <link rel="stylesheet" href="assets/styles/matter-invitations.css" />
+  <link rel="stylesheet" href="assets/styles/saved-paralegals.css" data-saved-paralegals-style>
+  <link rel="stylesheet" href="assets/styles/public-page-refresh.css?v=20260925" />
 </head>
-<body class="browse-jobs-page browse-paralegals-page" data-public-page="true">
+<body class="browse-jobs-page browse-paralegals-page public-page-refresh" data-public-page="true">
   <a class="skip-link" href="#main">Skip to main content</a>
   <button class="authenticated-browse-toggle" type="button" aria-label="Open dashboard navigation" aria-controls="authenticatedBrowseSidebar" aria-expanded="false" data-auth-sidebar-toggle hidden>
     <span class="authenticated-browse-toggle__glyph" aria-hidden="true"><span></span><span></span><span></span></span>
@@ -1692,7 +1580,7 @@
     <div class="logo authenticated-browse-sidebar__logo">Dashboard</div>
     <nav data-auth-sidebar-nav></nav>
     <div class="sidebar-bottom authenticated-browse-sidebar__bottom">
-      <div class="sidebar-footer authenticated-browse-sidebar__footer">© <span class="authenticated-browse-sidebar__brand">Let’s-ParaConnect</span> 2026</div>
+      <div class="sidebar-footer authenticated-browse-sidebar__footer">© <span class="authenticated-browse-sidebar__brand">Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect</span> 2026</div>
     </div>
   </aside>
   <div class="authenticated-browse-backdrop" data-auth-sidebar-backdrop hidden></div>
@@ -1701,8 +1589,8 @@
     <div class="utility-header__inner">
       <nav class="utility-header__nav" aria-label="Primary navigation">
         <a href="index.html#how">How It Works</a>
-        <a href="index.html#for-attorneys">For Attorneys</a>
-        <a href="index.html#for-paralegals">For Paralegals</a>
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
         <a href="browse-paralegals.html">Browse Paralegals</a>
       </nav>
       <a class="utility-header__brand" href="index.html">Let<span class="utility-header__brand-mark">’</span>s-ParaConnect</a>
@@ -1737,8 +1625,8 @@
     </div>
     <nav class="utility-header__mobile" id="utilityBrowseMenu" aria-label="Mobile navigation" data-utility-menu hidden>
       <a href="index.html#how">How It Works</a>
-      <a href="index.html#for-attorneys">For Attorneys</a>
-      <a href="index.html#for-paralegals">For Paralegals</a>
+      <a href="attorney-faq.html">For Attorneys</a>
+      <a href="paralegal-faq.html">For Paralegals</a>
         <a href="browse-paralegals.html">Browse Paralegals</a>
       <a href="login.html" data-utility-auth>Sign In</a>
       <button type="button" data-utility-logout hidden>Log Out</button>
@@ -1751,6 +1639,9 @@
   </section>
 
   <main id="main" tabindex="-1" class="jobs-shell">
+    <nav aria-label="Paralegal lists">
+      <a href="browse-paralegals.html?view=saved" data-saved-paralegal-link hidden>Saved paralegals</a>
+    </nav>
     <div class="layout">
       <section class="results">
         <div class="results-header">
@@ -1821,7 +1712,7 @@
         </div>
       </section>
     </div>
-    <div id="pagination">
+    <nav id="pagination" aria-label="Paralegal result pages" hidden>
       <div class="pagination-controls">
         <div class="page-nav">
           <button type="button" id="prevPage" class="invite-btn" data-public-action="pagination" data-action-shape="pill">Previous</button>
@@ -1829,12 +1720,12 @@
           <button type="button" id="nextPage" class="invite-btn" data-public-action="pagination" data-action-shape="pill">Next</button>
         </div>
       </div>
-    </div>
+    </nav>
   </main>
 
   <div class="auth-blocker" id="authBlocker" aria-hidden="true" inert>
     <div class="auth-blocker__card" role="dialog" aria-modal="true" aria-labelledby="authBlockerTitle">
-      <h2 id="authBlockerTitle">Sign in to connect</h2>
+      <h2 id="authBlockerTitle">Sign in to browse paralegals</h2>
       <p>You can browse and filter freely. Sign in to open full profiles or send an inquiry.</p>
       <div class="auth-blocker__actions">
         <a class="btn primary" href="login.html" data-public-action="primary" data-action-shape="pill">Sign in</a>
@@ -1843,22 +1734,6 @@
     </div>
   </div>
 
-  <div class="modal-overlay" id="inquireModal" aria-hidden="true" inert>
-    <div class="inquire-modal" role="dialog" aria-modal="true" aria-labelledby="inquireModalTitle" aria-describedby="selectedParalegalText">
-      <h3 id="inquireModalTitle">Send Inquiry</h3>
-      <p id="selectedParalegalText">Select a matter to send this paralegal.</p>
-      <div class="job-list" id="jobList"></div>
-      <p class="invite-lock-note">Sending an invitation locks the matter amount.</p>
-      <label class="modal-note">
-        <span class="sr-only">Message (optional)</span>
-        <textarea id="inquireMessage" placeholder="Add context or next steps" rows="3"></textarea>
-      </label>
-      <div class="modal-actions">
-        <button type="button" id="cancelInquire" data-public-action="secondary" data-action-shape="control">Cancel</button>
-        <button type="button" class="confirm" id="confirmInquire" data-public-action="primary" data-action-shape="control">Send</button>
-      </div>
-    </div>
-  </div>
   <footer class="home-footer" data-public-footer>
     <div class="home-footer__top">
       <div class="home-footer__brand">
@@ -1871,7 +1746,7 @@
         <a href="contact.html">Contact</a>
         <a href="privacy.html">Privacy</a>
         <a href="terms.html">Terms</a>
-        <a href="/paralegal-admission.html">Our Vetting Process</a>
+        <a href="/paralegal-admission.html">Our Application Review</a>
         <a href="accessibility.html">Accessibility</a>
       </nav>
     </div>

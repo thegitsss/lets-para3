@@ -86,3 +86,22 @@ describe("production worker configuration", () => {
       .toThrow(/MONITOR_REQUIRE_BACKUP=true/i);
   });
 });
+
+const { assertAdminCommunicationsConfiguration } = require('../utils/workerProductionConfig');
+const communicationsEnv = () => ({ ...base(), APP_BASE_URL: 'https://www.lets-paraconnect.com',
+  ADMIN_ALERT_EMAIL: 'owner@example.com', SUPPORT_ZOHO_MAILBOX: 'help@example.com',
+  SUPPORT_ZOHO_ACCOUNT_ID: '12345678901234567890', SUPPORT_ZOHO_INBOX_FOLDER_ID: '23456789012345678901',
+  SUPPORT_ZOHO_CLIENT_ID: 'client', SUPPORT_ZOHO_CLIENT_SECRET: 'secret', SUPPORT_ZOHO_REFRESH_TOKEN: 'refresh' });
+test('admin communications needs its own mailbox and mail delivery, without unrelated AI or payment credentials', () => {
+  const env = communicationsEnv(); delete env.OPENAI_API_KEY; delete env.OPENAI_SAFETY_SALT;
+  expect(() => assertAdminCommunicationsConfiguration(env)).not.toThrow();
+  expect(() => assertAdminCommunicationsConfiguration({ ...env, RENDER: 'true' })).toThrow(/RENDER_GIT_COMMIT/);
+});
+test.each([
+  ['SUPPORT_ZOHO_REFRESH_TOKEN', ''], ['SUPPORT_ZOHO_ACCOUNT_ID', '1e30'], ['ADMIN_ALERT_EMAIL', 'owner@example.com,other@example.com'],
+  ['DATA_ENCRYPTION_KEY', 'too-short'], ['EMAIL_DISABLE', 'true'], ['SMTP_PORT', 'not-a-port'],
+  ['SUPPORT_ZOHO_API_BASE_URL', 'http://mail.zoho.com/api'], ['APP_BASE_URL', 'https://user:secret@example.com'],
+  ['SUPPORT_MAIL_SYNC_SINCE', '2999-01-01'],
+])('admin communications rejects invalid %s before connecting', (name, value) => {
+  expect(() => assertAdminCommunicationsConfiguration({ ...communicationsEnv(), [name]: value })).toThrow(new RegExp(name));
+});

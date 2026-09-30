@@ -5749,7 +5749,7 @@ describe("Support assistant API", () => {
     ["someone", "attorney", "Can I talk to someone?"],
     ["callback", "paralegal", "Can a team member call me?"],
     ["direct", "admin", "I need to speak with you"],
-  ])("directs a %s human-contact request to Contact Us", async (scenario, role, text) => {
+  ])("routes a %s human-contact request to the appropriate team channel", async (scenario, role, text) => {
     const user = await createUser({
       role,
       email: `support-human-contact-${role}-${scenario}@lets-paraconnect.test`,
@@ -5766,6 +5766,14 @@ describe("Support assistant API", () => {
     });
 
     expect(sendRes.status).toBe(201);
+    if (role !== "admin") {
+      expect(sendRes.body.assistantMessage.text).toMatch(/sent to the LPC team/i);
+      expect(sendRes.body.assistantReply.provider).toBe("human_handoff");
+      const ticket = await SupportTicket.findById(sendRes.body.conversation.escalation.ticketId);
+      expect(ticket.requestKind).toBe("human");
+      expect(String(ticket.requesterUserId)).toBe(String(user._id));
+      return;
+    }
     expect(sendRes.body.assistantMessage.text).toMatch(/Contact Us/i);
     expect(sendRes.body.assistantMessage.text).toMatch(/monitors those messages closely/i);
     expect(sendRes.body.assistantReply).toEqual(
@@ -5794,7 +5802,7 @@ describe("Support assistant API", () => {
 
     const conversationRes = await createConversation(paralegal);
     await sendSupportMessage(paralegal, conversationRes.body.conversation.id, {
-      text: "customer service",
+      text: "hello",
       pageContext: {
         pathname: "/dashboard-paralegal.html",
         viewName: "dashboard-paralegal",
@@ -6002,12 +6010,12 @@ describe("Support assistant API", () => {
     );
     expect(escalateRes.body.conversation.escalation).toEqual(
       expect.objectContaining({
-        engineeringReviewStarted: true,
-        engineeringExecutionStarted: true,
+        engineeringReviewStarted: false,
+        engineeringExecutionStarted: false,
       })
     );
     expect(escalateRes.body.systemMessage.text).toMatch(/Sent to the team for review/i);
-    expect(escalateRes.body.systemMessage.text).toMatch(/won't need to repeat yourself/i);
+    expect(escalateRes.body.systemMessage.text).toContain(escalateRes.body.ticket.reference);
     expect(escalateRes.body.confirmation.handoffSummary).toMatch(/Issue:/i);
     expect(escalateRes.body.systemMessage.metadata.handoffSummary).toMatch(/AI summary:/i);
 
@@ -7358,6 +7366,23 @@ describe("Support assistant API", () => {
     expect(sendRes.body.assistantMessage.text).toMatch(/review queue/i);
   });
 
+  test("admin attention answers use the same saved follow-ups as Today", async () => {
+    const admin = await createUser({ role: 'admin', email: 'admin-attention@lets-paraconnect.test' });
+    const ticket = await SupportTicket.create({ subject: 'Where is my matter?', message: 'Help finding my work', requestKind: 'human', status: 'open' });
+    const conversationRes = await createConversation(admin, { sourcePage: '/admin-dashboard.html', viewName: 'admin-dashboard' });
+    const context = { pathname: '/admin-dashboard.html', viewName: 'admin-dashboard' };
+    const first = await sendSupportMessage(admin, conversationRes.body.conversation.id, { text: 'What actually needs me today?', pageContext: context });
+    expect(first.status).toBe(201);
+    expect(first.body.assistantReply).toMatchObject({ provider: 'admin_attention', supportFacts: { available: true, remaining: 1, nextKey: `inquiry:${ticket._id}` } });
+    await require('../services/adminFlowService').saveFollowUp({ owner: admin._id, key: `inquiry:${ticket._id}`, sourceRevision: ticket.updatedAt.toISOString(), followUpAt: new Date(Date.now() + 86400000).toISOString(), revision: 0 });
+    const second = await sendSupportMessage(admin, conversationRes.body.conversation.id, { text: 'What should I review?', pageContext: context });
+    expect(second.status).toBe(201);
+    expect(second.body.assistantReply).toMatchObject({ provider: 'admin_attention', supportFacts: { available: true, remaining: 0, deferred: 1, nextKey: null } });
+    expect(second.body.assistantMessage.text).toContain('set for later');
+    expect(second.body.assistantReply.navigation.ctaHref).toBe('admin-dashboard.html#overview');
+    expect((await SupportTicket.findById(ticket._id)).status).toBe('open');
+  });
+
   test("gives admins a database-grounded read-only operations snapshot", async () => {
     const admin = await createUser({
       role: "admin",
@@ -8396,20 +8421,16 @@ describe("Support assistant API", () => {
           expect(text).toMatch(/How can I help today\?|LPC attorney questions/i);
           break;
         case "human_contact":
-          expect(reply).toEqual(
-            expect.objectContaining({
-              primaryAsk: "human_contact",
-              activeTask: "NAVIGATION",
-              needsEscalation: false,
-              manualReviewSuggested: false,
-              navigation: expect.objectContaining({
-                ctaLabel: "Contact Us",
-                ctaHref: "contact.html",
-              }),
-            })
-          );
-          expect(text).toMatch(/Contact Us/i);
-          expect(text).not.toMatch(/sent to the team|already contacted|handoff/i);
+          expect(reply.provider).toBe("human_handoff");
+          expect(text).toMatch(/sent to the LPC team/i);
+          expect(sendRes.body.conversation.escalation.ticketId).toBeTruthy();
+          expect(await SupportTicket.countDocuments({
+            conversationId,
+            requestKind: "human",
+          })).toBe(1);
+          // The remaining sweep prompts are separate AI tasks, so start a new
+          // conversation after verifying the persistent human handoff.
+          expect((await restartSupportConversation(activeAttorney, conversationId)).status).toBe(201);
           break;
         case "browse_paralegals":
           expect(reply.navigation).toEqual(
@@ -9065,4 +9086,40 @@ describe("Support assistant API", () => {
     expect(second.body.conversation.supportState.verifiedEntities).toHaveLength(2);
     expect(second.body.conversation.supportState.lastRequestedDimensions).toEqual(["billing_summary"]);
   });
+});
+
+
+test('mounted recovery returns only the authenticated owners exact interrupted request', async () => {
+  const owner = await createUser({ role: 'attorney', email: 'recovery-owner@assistant.test' });
+  const other = await createUser({ role: 'attorney', email: 'recovery-other@assistant.test' });
+  const opened = await createConversation(owner), conversationId = opened.body.conversation.id;
+  const create = SupportMessage.create.bind(SupportMessage); let injected = false;
+  const spy = jest.spyOn(SupportMessage, 'create').mockImplementation(async (...args) => {
+    if (!injected && args[0][0]?.sender === 'assistant') { injected = true; throw Error('Synthetic interrupted acknowledgment'); }
+    return create(...args);
+  });
+  try {
+    const failed = await sendSupportMessage(owner, conversationId, { text: 'Where are my profile settings?', sourcePage: '/attorney-v2.html#/settings/profile' });
+    expect(failed.status).toBe(503); expect(injected).toBe(true);
+    const recovered = await createConversation(owner);
+    expect(recovered.headers['cache-control']).toBe('no-store');
+    expect(recovered.body.recoveryRequest).toMatchObject({ ownerId: String(owner._id), role: 'attorney', conversationId, action: 'send', body: { text: 'Where are my profile settings?' } });
+    const foreign = await createConversation(other); expect(foreign.body.recoveryRequest).toBeUndefined();
+    const record = recovered.body.recoveryRequest;
+    const outcome = await request(app).get(`/api/support/conversation/${conversationId}/requests/${record.requestId}`).set('Cookie', authCookieFor(other));
+    expect(outcome.status).toBe(404);
+    const retry = await sendSupportMessage(owner, conversationId, { ...record.body, requestId: record.requestId });
+    expect(retry.status).toBe(201); expect(retry.body.request.state).toBe('succeeded');
+    expect(await SupportMessage.countDocuments({ conversationId, sender: 'user' })).toBe(1);
+  } finally { spy.mockRestore(); }
+});
+
+test('a newly queued incident does not claim engineering is already working on it', async () => {
+  const user = await createUser({ role: 'paralegal', email: 'queued-status@assistant.test' });
+  const opened = await createConversation(user), conversationId = opened.body.conversation.id;
+  const incident = await createIncidentDoc({ user, summary: 'Save Preferences issue', state: 'reported', userVisibleStatus: 'received' });
+  const ticket = await SupportTicket.create({ userId: user._id, requesterUserId: user._id, requesterRole: user.role, conversationId, subject: 'Save Preferences issue', message: 'Save Preferences is not working.', latestUserMessage: 'Save Preferences is not working.', status: 'open', linkedIncidentIds: [incident._id] });
+  const reply = await sendSupportMessage(user, conversationId, { text: 'Any update on that issue?', promptAction: { key: `open-ticket:${ticket._id}`, ticketId: String(ticket._id), ticketStatus: 'open', intent: 'issue_review_status', issueLabel: 'Save Preferences issue', issueState: 'open' } });
+  expect(reply.status).toBe(201); expect(reply.body.assistantMessage.text).not.toMatch(/work is in progress|already with engineering/i);
+  expect(reply.body.assistantMessage.text).toMatch(/review|team/i);
 });

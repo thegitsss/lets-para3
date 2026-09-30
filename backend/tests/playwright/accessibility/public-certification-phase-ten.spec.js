@@ -1,10 +1,7 @@
 const fs = require("fs");
-const path = require("path");
 const { test, expect } = require("playwright/test");
 
 const VALID_RESET_TOKEN = `0123456789abcdef01234567.${"a".repeat(43)}`;
-const EVIDENCE_ROOT = path.resolve(__dirname, "../../../../test-results/public-phase10-20260828");
-const AUDIT_ROOT = path.resolve(__dirname, "../../../../test-results/public-visual-audit-20260828");
 
 const VIEWPORTS = [
   { name: "mobile-320", width: 320, height: 844 },
@@ -142,20 +139,13 @@ async function pageHealth(page, item) {
   }, { pageName: item.name });
 }
 
-function auditEvidenceFor(item, viewport) {
-  if (viewport.name === "mobile-390") return path.join(AUDIT_ROOT, `${item.audit}-mobile-390.png`);
-  if (viewport.name === "desktop-1366") return path.join(AUDIT_ROOT, `${item.audit}-desktop-1366.png`);
-  return "";
-}
-
 for (const viewport of VIEWPORTS) {
-  test(`all 17 public surfaces render cleanly at ${viewport.name}`, async ({ page, browserName }) => {
+  test(`all 17 public surfaces render cleanly at ${viewport.name}`, async ({ page }, testInfo) => {
     test.setTimeout(180_000);
     await mockPublicNetwork(page);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.emulateMedia({ reducedMotion: "reduce" });
 
-    fs.mkdirSync(path.join(EVIDENCE_ROOT, "viewports"), { recursive: true });
     const consoleErrors = [];
     const pageErrors = [];
     const resourceFailures = [];
@@ -194,16 +184,21 @@ for (const viewport of VIEWPORTS) {
       expect(pageErrors.slice(pageErrorStart), `${item.name} page errors`).toEqual([]);
       expect(resourceFailures.slice(resourceStart), `${item.name} resource failures`).toEqual([]);
 
-      const auditEvidence = auditEvidenceFor(item, viewport);
-      if (auditEvidence) {
-        expect(fs.existsSync(auditEvidence), `${item.name} is missing its 2026-08-28 audit comparison`).toBe(true);
-        expect(fs.statSync(auditEvidence).size, `${item.name} audit comparison is empty`).toBeGreaterThan(0);
-      }
-
-      if (browserName === "chromium") {
-        const screenshotPath = path.join(EVIDENCE_ROOT, "viewports", `${item.name}-${viewport.name}.png`);
-        await page.screenshot({ path: screenshotPath, fullPage: true, animations: "disabled" });
-        expect(fs.statSync(screenshotPath).size, `${item.name} screenshot is empty`).toBeGreaterThan(0);
+      // Long legal pages exceed Firefox's 32,767-pixel capture limit on mobile.
+      // Retain every part at CSS-pixel scale instead of dropping page evidence.
+      const captureSize = await page.evaluate(() => ({
+        width: document.documentElement.scrollWidth,
+        height: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
+      }));
+      const tileHeight = 16000;
+      for (let top = 0, part = 1; top < captureSize.height; top += tileHeight, part += 1) {
+        const suffix = captureSize.height > tileHeight ? `-part-${part}` : "";
+        const screenshotPath = testInfo.outputPath(`${item.name}-${viewport.name}${suffix}.png`);
+        await page.screenshot({
+          path: screenshotPath, fullPage: true, animations: "disabled", scale: "css",
+          clip: { x: 0, y: top, width: captureSize.width, height: Math.min(tileHeight, captureSize.height - top) },
+        });
+        expect(fs.statSync(screenshotPath).size, `${item.name} screenshot part ${part} is empty`).toBeGreaterThan(0);
       }
     }
   });
@@ -235,7 +230,7 @@ test("compact landscape keeps public navigation, Help, and form surfaces usable"
   }
 });
 
-test("iPhone 13 Pro Max clears the completed-matter card before Two perspectives", async ({ page }) => {
+test("iPhone 13 Pro Max clears the completed-matter card before the Assistant section", async ({ page }) => {
   await mockPublicNetwork(page);
   await page.setViewportSize({ width: 428, height: 926 });
   await page.emulateMedia({ reducedMotion: "no-preference" });
@@ -246,7 +241,7 @@ test("iPhone 13 Pro Max clears the completed-matter card before Two perspectives
     const absoluteTop = (node) => node.getBoundingClientRect().top + window.scrollY;
     return {
       lastChapterTop: absoluteTop(document.querySelector(".workflow-chapter:last-child")),
-      pathsDocumentTop: absoluteTop(document.querySelector(".paths")),
+      pathsDocumentTop: absoluteTop(document.querySelector(".assistant-spotlight")),
     };
   });
 
@@ -276,8 +271,8 @@ test("iPhone 13 Pro Max clears the completed-matter card before Two perspectives
     const completedCard = document.querySelector(
       '.workflow-mobile-stage__canvas .workflow-state.is-active .payment-summary',
     );
-    const pathsHeading = document.querySelector(".paths__heading");
-    const paths = document.querySelector(".paths");
+    const pathsHeading = document.querySelector(".assistant-spotlight__copy h2");
+    const paths = document.querySelector(".assistant-spotlight");
     return {
       completedCardBottom: completedCard.getBoundingClientRect().bottom,
       pathsHeadingTop: pathsHeading.getBoundingClientRect().top,
@@ -297,13 +292,13 @@ test("all 19 protected frontend documents still redirect anonymous visitors to s
   for (const documentName of PROTECTED_DOCUMENTS) {
     await page.goto(`/${documentName}`, { waitUntil: "domcontentloaded" });
     await expect(page, `${documentName} did not preserve anonymous access protection`).toHaveURL(/\/login\.html(?:$|[?#])/);
-    await expect(page.getByRole("heading", { name: /Sign in to Let’s-ParaConnect/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Sign in$/i })).toBeVisible();
   }
 });
 
 test("login retains validation, loading, pending-review, Google, and passkey boundaries", async ({ page }) => {
   test.setTimeout(60_000);
-  await page.route("**/assets/vendor/simplewebauthn.js", (route) => route.fulfill({
+  await page.route("**/assets/vendor/simplewebauthn-13.3.0.js", (route) => route.fulfill({
     status: 200,
     contentType: "text/javascript",
     body: "window.SimpleWebAuthnBrowser={browserSupportsWebAuthn:()=>true,startAuthentication:async()=>({id:'phase-ten'})};",
@@ -330,7 +325,7 @@ test("login retains validation, loading, pending-review, Google, and passkey bou
   await page.locator("#email").fill("pending@example.com");
   await page.locator("#password").fill("Correct-Horse-Battery-Staple-2026");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Logging in…" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Signing in…" })).toBeDisabled();
   await expect(page.locator("#toastBanner")).toContainText("still under review");
   await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeEnabled();
   expect(loginRequests).toBe(1);
@@ -353,7 +348,7 @@ test("signup retains both role transitions and the Turnstile submission boundary
   let registrationRequests = 0;
   await page.route("**/api/auth/register", (route) => {
     registrationRequests += 1;
-    return json(route, { ok: true }, 201);
+    return json(route, { ok: true, emailVerified: false, verificationEmailStatus: "sent" }, 201);
   });
 
   await page.goto("/signup.html", { waitUntil: "domcontentloaded" });
@@ -390,8 +385,8 @@ test("signup retains both role transitions and the Turnstile submission boundary
   });
   await page.locator("#submitBtn").click();
   await expect(page.locator("#signupConfirmation")).toBeVisible();
-  await expect(page.locator("#signupConfirmation")).toContainText("Your submission is already under review.");
-  await expect(page.locator("#signupConfirmation a")).toHaveText("Return home");
+  await expect(page.locator("#signupConfirmation")).toContainText("Your submission is under review.");
+  await expect(page.locator("#signupConfirmation").getByRole("link", { name: "Return home", exact: true })).toBeVisible();
   expect(registrationRequests).toBe(1);
 });
 
@@ -440,8 +435,8 @@ test("reset-password covers missing, validation, loading, generic error, expired
   await page.goto("/reset-password.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#resetTitle")).toHaveText("This reset link can’t be used.");
   await page.goto(`/reset-password.html?token=${VALID_RESET_TOKEN}`, { waitUntil: "domcontentloaded" });
-  await page.locator("#newPassword").fill("too short");
-  await page.locator("#confirmPassword").fill("too short");
+  await page.locator("#newPassword").fill("short");
+  await page.locator("#confirmPassword").fill("short");
   await page.getByRole("button", { name: "Reset password" }).click();
   await expect(page.locator("#newPassword:invalid")).toHaveCount(1);
   await expect(page.locator("#message")).toHaveText("");

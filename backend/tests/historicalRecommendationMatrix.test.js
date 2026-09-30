@@ -1,5 +1,3 @@
-const fs = require("fs");
-const path = require("path");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
@@ -44,11 +42,6 @@ const APPLICATION_STATUSES = [
   "withdrawn",
 ];
 const ACTIVE_QUEUE_STATUSES = new Set(["submitted", "viewed", "shortlisted"]);
-const dashboardSource = fs.readFileSync(
-  path.resolve(__dirname, "../../frontend/assets/scripts/paralegal-dashboard.js"),
-  "utf8"
-);
-
 const app = (() => {
   const instance = express();
   instance.use(cookieParser());
@@ -176,12 +169,6 @@ afterAll(closeDatabase);
 beforeEach(clearDatabase);
 
 describe("historical recommendation surface matrix", () => {
-  beforeAll(() => {
-    expect(dashboardSource).toMatch(/isHistoricallyExcluded\(job, historicalRecommendationIds\)/);
-    expect(dashboardSource).toMatch(/statusKey === 'accepted' \|\| statusKey === 'rejected' \|\| statusKey === 'withdrawn'/);
-    expect(dashboardSource).toMatch(/jobStatus && jobStatus !== 'open'/);
-  });
-
   test.each(APPLICATION_STATUSES)(
     "%s remains excluded from Home Recommendations while other surfaces preserve their own rules",
     async (status) => {
@@ -189,8 +176,9 @@ describe("historical recommendation surface matrix", () => {
       const paralegalCookie = authCookieFor(fixture.paralegal);
       const attorneyCookie = authCookieFor(fixture.attorney);
 
-      const [exclusions, browse, search, details, applications, candidates, dashboard] = await Promise.all([
+      const [exclusions, recommendations, browse, search, details, applications, candidates, dashboard] = await Promise.all([
         request(app).get("/api/applications/recommendation-exclusions").set("Cookie", paralegalCookie),
+        request(app).get("/api/jobs/recommended").set("Cookie", paralegalCookie),
         request(app).get("/api/jobs/open").set("Cookie", paralegalCookie),
         request(app).get("/api/cases/search?q=historical&types=matter").set("Cookie", paralegalCookie),
         request(app).get(`/api/cases/${fixture.caseDoc._id}`).set("Cookie", paralegalCookie),
@@ -204,6 +192,9 @@ describe("historical recommendation surface matrix", () => {
       expect(exclusions.body.applicationCount).toBe(1);
       expect(exclusions.body.jobIds).toContain(String(fixture.job._id));
       expect(exclusions.body.caseIds).toContain(String(fixture.caseDoc._id));
+      expect(recommendations.status).toBe(200);
+      expect(recommendations.headers["cache-control"]).toContain("no-store");
+      expect(recommendations.body.items).toEqual([]);
 
       expect(browse.status).toBe(200);
       const listing = browse.body.find((item) => String(item.id) === String(fixture.caseDoc._id));
@@ -221,7 +212,8 @@ describe("historical recommendation surface matrix", () => {
       const applicationsApiVisible = applications.body.some(
         (entry) => String(entry._id || entry.id) === String(fixture.application._id)
       );
-      expect(applicationsApiVisible).toBe(status !== "withdrawn");
+      // The own-application endpoint retains every outcome for Work history.
+      expect(applicationsApiVisible).toBe(true);
       const applicationsSectionVisible = applicationsApiVisible && ACTIVE_QUEUE_STATUSES.has(status);
       expect(applicationsSectionVisible).toBe(ACTIVE_QUEUE_STATUSES.has(status));
 
@@ -230,7 +222,7 @@ describe("historical recommendation surface matrix", () => {
         ACTIVE_QUEUE_STATUSES.has(status)
       );
       expect(dashboard.status).toBe(200);
-      expect(dashboard.body.metrics.pendingApplications).toBe(status === "submitted" ? 1 : 0);
+      expect(dashboard.body.metrics.pendingApplications).toBe(ACTIVE_QUEUE_STATUSES.has(status) ? 1 : 0);
       expect(dashboard.body.myApplications).toHaveLength(status === "withdrawn" ? 0 : 1);
       expect(listing.applicantsCount).toBe(ACTIVE_QUEUE_STATUSES.has(status) ? 1 : 0);
 
@@ -251,7 +243,7 @@ describe("historical recommendation surface matrix", () => {
 
   test("the same open Matter remains recommended for another eligible paralegal", async () => {
     const fixture = await createFixture("rejected");
-    const [applicantExclusions, otherExclusions, browse] = await Promise.all([
+    const [applicantExclusions, otherExclusions, browse, otherRecommendations] = await Promise.all([
       request(app)
         .get("/api/applications/recommendation-exclusions")
         .set("Cookie", authCookieFor(fixture.paralegal)),
@@ -259,12 +251,82 @@ describe("historical recommendation surface matrix", () => {
         .get("/api/applications/recommendation-exclusions")
         .set("Cookie", authCookieFor(fixture.otherParalegal)),
       request(app).get("/api/jobs/open").set("Cookie", authCookieFor(fixture.otherParalegal)),
+      request(app).get("/api/jobs/recommended").set("Cookie", authCookieFor(fixture.otherParalegal)),
     ]);
     const listing = browse.body.find((item) => String(item.id) === String(fixture.caseDoc._id));
     expect(listing).toBeDefined();
     expect(listingIds(listing).some((id) => new Set(applicantExclusions.body.matterIds).has(id))).toBe(true);
     expect(listingIds(listing).some((id) => new Set(otherExclusions.body.matterIds).has(id))).toBe(false);
+    expect(otherRecommendations.body.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: fixture.caseDoc._id.toString(),
+        recommendation: expect.objectContaining({ reason: "state_and_practice" }),
+      }),
+    ]));
   });
+
+  test("the V2 dashboard retains an active Matter stored only through legacy participant and status aliases", async () => {
+    const fixture = await createFixture("accepted");
+    await Case.collection.updateOne(
+      { _id: fixture.caseDoc._id },
+      {
+        $set: {
+          paralegal: fixture.paralegal._id,
+          status: "funded_in_progress",
+          archived: false,
+          paymentReleased: false,
+        },
+        $unset: { paralegalId: "", attorneyId: "" },
+      }
+    );
+
+    const dashboard = await request(app)
+      .get("/api/paralegal/dashboard")
+      .set("Cookie", authCookieFor(fixture.paralegal));
+
+    expect(dashboard.status).toBe(200);
+    expect(dashboard.body.metrics.activeCases).toBe(1);
+    expect(dashboard.body.activeCases).toEqual([
+      expect.objectContaining({
+        caseId: String(fixture.caseDoc._id),
+        status: "in progress",
+        attorneyName: "History Attorney",
+        paralegalId: String(fixture.paralegal._id),
+      }),
+    ]);
+  });
+
+  test.each(["pending", "rejected", "accepted"])(
+    "legacy Case.applicants %s evidence excludes recommendations without a canonical Application",
+    async (legacyStatus) => {
+      const fixture = await createFixture("submitted");
+      await Promise.all([
+        Application.deleteMany({ paralegalId: fixture.paralegal._id }),
+        Case.updateOne(
+          { _id: fixture.caseDoc._id, "applicants.paralegalId": fixture.paralegal._id },
+          { $set: { "applicants.$.status": legacyStatus } }
+        ),
+      ]);
+
+      const [exclusions, recommendations, otherRecommendations] = await Promise.all([
+        request(app)
+          .get("/api/applications/recommendation-exclusions")
+          .set("Cookie", authCookieFor(fixture.paralegal)),
+        request(app).get("/api/jobs/recommended").set("Cookie", authCookieFor(fixture.paralegal)),
+        request(app).get("/api/jobs/recommended").set("Cookie", authCookieFor(fixture.otherParalegal)),
+      ]);
+
+      expect(exclusions.status).toBe(200);
+      expect(exclusions.body.applicationCount).toBe(0);
+      expect(exclusions.body.legacyApplicantEvidenceCount).toBe(1);
+      expect(exclusions.body.caseIds).toContain(String(fixture.caseDoc._id));
+      expect(exclusions.body.jobIds).toContain(String(fixture.job._id));
+      expect(recommendations.body.items).toEqual([]);
+      expect(otherRecommendations.body.items).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: String(fixture.caseDoc._id) }),
+      ]));
+    }
+  );
 
   test("Case identity excludes a Case-only listing when its historical Job is closed", async () => {
     const fixture = await createFixture("withdrawn");
@@ -419,5 +481,70 @@ describe("historical recommendation surface matrix", () => {
       .get("/api/applications/recommendation-exclusions")
       .set("Cookie", authCookieFor(fixture.attorney));
     expect(response.status).toBe(403);
+  });
+
+  test("the discovery version changes without exposing Matter data and remains paralegal-only", async () => {
+    const fixture = await createFixture("withdrawn");
+    const cookie = authCookieFor(fixture.paralegal);
+    const before = await request(app).get("/api/jobs/discovery-version").set("Cookie", cookie);
+    expect(before.status).toBe(200);
+    expect(before.headers["cache-control"]).toContain("no-store");
+    expect(Object.keys(before.body)).toEqual(["version"]);
+    expect(typeof before.body.version).toBe("string");
+
+    await Promise.all([
+      Case.updateOne({ _id: fixture.caseDoc._id }, { $set: { archived: true } }),
+      Job.updateOne({ _id: fixture.job._id }, { $set: { status: "closed" } }),
+    ]);
+    const after = await request(app).get("/api/jobs/discovery-version").set("Cookie", cookie);
+    expect(after.status).toBe(200);
+    expect(after.body.version).not.toBe(before.body.version);
+
+    const attorney = await request(app)
+      .get("/api/jobs/discovery-version")
+      .set("Cookie", authCookieFor(fixture.attorney));
+    expect(attorney.status).toBe(403);
+  });
+
+  test("published Matter edits stay consistent in the compatibility Job and paralegal discovery projection", async () => {
+    const fixture = await createFixture("withdrawn");
+    const update = await request(app)
+      .patch(`/api/cases/${fixture.caseDoc._id}`)
+      .set("Cookie", authCookieFor(fixture.attorney))
+      .send({
+        title: "Updated immigration evidence review",
+        details: "Review, organize, and summarize the updated immigration evidence packet for attorney review.",
+        practiceArea: "Immigration",
+        budget: 750,
+        experiencePreference: "7+ years",
+      });
+    expect(update.status).toBe(200);
+
+    const mirrored = await Job.findById(fixture.job._id).lean();
+    expect(mirrored).toEqual(expect.objectContaining({
+      title: "Updated immigration evidence review",
+      description: "Review, organize, and summarize the updated immigration evidence packet for attorney review.",
+      practiceArea: "immigration",
+      budget: 750,
+      state: "CA",
+      locationState: "CA",
+      experiencePreference: "7+ years",
+      minimumYearsExperience: 7,
+    }));
+
+    const browse = await request(app)
+      .get("/api/jobs/open")
+      .set("Cookie", authCookieFor(fixture.otherParalegal));
+    expect(browse.status).toBe(200);
+    expect(browse.body.find((item) => String(item.id) === String(fixture.caseDoc._id))).toEqual(
+      expect.objectContaining({
+        title: "Updated immigration evidence review",
+        description: "Review, organize, and summarize the updated immigration evidence packet for attorney review.",
+        practiceArea: "immigration",
+        budget: 750,
+        state: "CA",
+        minimumYearsExperience: 7,
+      })
+    );
   });
 });

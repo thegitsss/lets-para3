@@ -16,7 +16,8 @@ describe("attorney and paralegal dashboard upgrade contracts", () => {
     expect(account).toMatch(/"\/dashboard-views"/);
     expect(account).toMatch(/"\/dashboard-views\/:scope\/:viewId"/);
     expect(attorneyHtml).toMatch(/data-matter-saved-view/);
-    expect(attorneyScript).toMatch(/scope: "attorney_matters"/);
+    expect(attorneyScript).toMatch(/mountAttorneySavedViews/);
+    expect(read("frontend/assets/scripts/attorney-v2/saved-view-model.mjs")).toMatch(/VIEW_SCOPE = "attorney_matters"/);
     expect(paralegalHtml).toMatch(/data-application-saved-view/);
     expect(paralegalScript).toMatch(/scope: 'paralegal_applications'/);
   });
@@ -45,16 +46,29 @@ describe("attorney and paralegal dashboard upgrade contracts", () => {
     expect(paralegal).toMatch(/LPCContextPanel\?\.openMatter/);
   });
 
-  test("paralegal dashboard exposes a derived next-step queue", () => {
+  test("paralegal dashboard exposes the private-office worktable and authorized activity inbox", () => {
     const html = read("frontend/dashboard-paralegal.html");
     const script = read("frontend/assets/scripts/paralegal-dashboard.js");
     expect(html).toMatch(/id="paralegalPriorityQueue"/);
-    expect(html).toMatch(/id="paralegalPriorityTitle">Next best action/);
-    expect(html).toMatch(/Invitations, messages, deadlines, and account items that need your attention/);
+    expect(html).toMatch(/id="paralegalPriorityTitle">Office inbox/);
+    expect(html).toMatch(/id="homeWorkSection"/);
+    expect(html).toMatch(/On your desk/);
+    expect(html).toMatch(/id="deadlineList"/);
+    expect(html).toMatch(/id="recommendedMattersList"/);
+    expect(html).toMatch(/id="homeApplicationPipeline"/);
+    expect(html).toMatch(/id="recommendedMattersTitle">Matters to explore/);
+    expect(html).not.toMatch(/id="privateOfficeDate"/);
+    expect(script).toContain("renderCalendar");
+    expect(read("frontend/assets/scripts/legacy-paralegal-calendar.mjs")).toContain("No deadlines or reminders this week.");
+    expect(script).toContain("No requests or unread messages.");
+    expect(script).toMatch(/No matters to show right now\./);
+    expect(script).toMatch(/No applications in progress/);
+    expect(script).toMatch(/Required before applying to Matters or receiving payment\./);
     expect(html).toMatch(/data-paralegal-priority-count aria-live="polite"/);
     expect(html).toMatch(/data-paralegal-priority-list aria-live="polite"/);
     expect(script).toMatch(/function renderParalegalPriorityQueue/);
-    expect(script).toMatch(/Pre-engagement information required/);
-    expect(script).toMatch(/Complete payout setup/);
+    expect(script).toContain("Pre-engagement information requested");
+    expect(script).toMatch(/function renderPrivateOfficeDesk/);
+    expect(script).toMatch(/assignmentReviewState/);
   });
 });

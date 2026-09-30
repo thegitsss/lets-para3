@@ -6,6 +6,7 @@ const argon2 = require("argon2");
 const { Schema, Types } = mongoose;
 const { normalizePassword } = require("../utils/passwordPolicy");
 const { normalizeHttpUrl } = require("../utils/httpUrl");
+const { SUPPORTED_ACCOUNT_THEMES, normalizeAccountTheme } = require("../utils/accountPreferences");
 
 const uniqueStrings = (arr = []) =>
   [...new Set((arr || []).map((s) => String(s || "").trim()).filter(Boolean))];
@@ -166,6 +167,7 @@ const onboardingSchema = new Schema(
 const pendingHireSchema = new Schema(
   {
     caseId: { type: Types.ObjectId, ref: "Case", default: null },
+    paralegalId: { type: Types.ObjectId, ref: "User", default: null },
     paralegalName: { type: String, default: "", trim: true, maxlength: 200 },
     fundUrl: { type: String, default: "", trim: true, maxlength: 2000 },
     message: { type: String, default: "", trim: true, maxlength: 2000 },
@@ -307,6 +309,7 @@ const userSchema = new Schema(
     stateExperience: { type: [String], default: [], set: uniqueStrings },
     skills: { type: [String], default: [], set: uniqueStrings },
     yearsExperience: { type: Number, min: 0, max: 80, default: 0 },
+    paralegalQualification: { type: String, enum: ["", "certificate", "degree", "law_firm_experience"], default: "" },
     languages: { type: [languageEntrySchema], default: [], set: sanitizeLanguageEntries },
     writingSamples: { type: [writingSampleSchema], default: [] },
     experience: { type: [experienceEntrySchema], default: [] },
@@ -367,7 +370,7 @@ const userSchema = new Schema(
     preferences: {
       theme: {
         type: String,
-        enum: ["light", "dark", "mountain", "mountain-dark"],
+        enum: SUPPORTED_ACCOUNT_THEMES,
         default: "light",
       },
       fontSize: {
@@ -492,6 +495,11 @@ userSchema.pre("validate", function () {
   if (this.email) this.email = String(this.email).trim().toLowerCase();
   if (this.firstName) this.firstName = String(this.firstName).trim();
   if (this.lastName) this.lastName = String(this.lastName).trim();
+  // A projected user save may not have read appearance preferences. Do not
+  // turn an unrelated profile or Stripe update into a default-theme write.
+  if (this.preferences && (this.isSelected("preferences.theme") || this.isModified("preferences.theme"))) {
+    this.preferences.theme = normalizeAccountTheme(this.preferences.theme);
+  }
 });
 
 // Hash password on create/update

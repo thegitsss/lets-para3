@@ -103,7 +103,9 @@ function buildCandidateManifest({
   const dirty = gitRunner(resolvedRoot, [
     "status",
     "--porcelain=v1",
-    "--untracked-files=all",
+    // Directory summaries still reject every untracked tree without expanding
+    // thousands of generated evidence files into the synchronous output buffer.
+    "--untracked-files=normal",
   ]);
   if (dirty) {
     const sample = dirty.split(/\r?\n/).slice(0, 8).join("; ");

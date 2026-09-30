@@ -78,3 +78,23 @@ blob-report/
 *.crt
 *.key
 certs/
+
+# Generated frontend artifacts and temporary build directories
+/.lpc-build/
+/.lpc-build-*/
+
+# Generated local completion evidence (retained owner-only, not release source)
+/docs/audits/**/evidence/
+/docs/audits/**/artifacts/
+/docs/audits/**/captures/
+/docs/audits/**/test-output/
+/docs/audits/**/test-results/
+/docs/audits/**/screenshots/
+/docs/audits/**/*-artifacts/
+/docs/audits/completion-2026-09-09/audit-followup-20260913/*.json
+/docs/audits/completion-2026-09-09/audit-followup-20260913/*.jsonl
+/docs/audits/completion-2026-09-09/audit-followup-20260913/*.png
+/docs/audits/completion-2026-09-09/audit-followup-20260913/*.patch
+/docs/audits/completion-2026-09-09/audit-followup-20260913/*.log
+/docs/audits/completion-2026-09-09/audit-followup-20260913/*.pending
+/docs/audits/completion-2026-09-09/audit-followup-20260913/*-generated-preview-retention/

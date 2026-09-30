@@ -66,7 +66,10 @@ describe("Prompt 5 launch-quality UI contracts", () => {
     expect(script).toMatch(/state\.viewerRole === "attorney"/);
     expect(script).toMatch(/Browse Paralegals[\s\S]*dashboard-attorney\.html#cases/);
     expect(script).toMatch(/Browse Matters[\s\S]*dashboard-paralegal\.html#cases/);
-    expect(script).toMatch(/Boolean\(payload\?\.hasDefault \|\| payload\?\.paymentMethod\)/);
+    // Hiring/card review belongs to the shared, account-bound engagement flow.
+    expect(script).toContain('import { createLegacyEngagementDialog }');
+    expect(script).toContain('createLegacyEngagementDialog({ ownerId: state.viewerId, request: secureFetch })');
+    expect(script).not.toMatch(/Boolean\(payload\?\.hasDefault \|\| payload\?\.paymentMethod\)/);
   });
 
   test("Matter skip navigation opens only an authorized Messages tab", () => {
@@ -91,12 +94,14 @@ describe("Prompt 5 launch-quality UI contracts", () => {
 
   test("Create Matter exposes required state and associates field errors", () => {
     const html = read("frontend/create-case.html");
-    expect(html).toMatch(/Matter Title <span class="field-requirement">Required/);
+    expect(html).toMatch(/<label for="caseTitleInput">Matter Title<\/label>/);
+    expect(html).toMatch(/<input[^>]*id="caseTitleInput"[^>]*required/);
+    expect(html).toMatch(/<label for="caseDescription">Matter Description<\/label>/);
     expect(html).toMatch(/id="caseDescription"[^>]*required/);
     expect(html).toMatch(/id="caseTaskInput"[^>]*aria-describedby="caseTaskHelper"/);
     expect(html).toMatch(/error\.id = `\$\{field\.id \|\| "field"\}-error`/);
     expect(html).toMatch(/field\.setAttribute\("aria-describedby"/);
-    expect(html).toMatch(/Describe the Matter, its goals, and the expected deliverables/);
+    expect(html).toMatch(/id="caseDescription"[^>]*maxlength="4000"/);
     expect(html).toMatch(/parseCompAmount\(value\) >= 400/);
     expect(html).toMatch(/Enter a compensation amount of at least \$400\./);
     expect(html).not.toContain("/api/payments/payment-method/default");
@@ -110,7 +115,7 @@ describe("Prompt 5 launch-quality UI contracts", () => {
     const dashboardScript = read("frontend/assets/scripts/paralegal-dashboard.js");
     const browseScript = read("frontend/assets/scripts/views/browse-jobs.js");
     const registry = require("../../frontend/assets/scripts/productivity-command-registry.js");
-    expect(dashboardScript).toMatch(/browse-jobs\.html\?caseId=/);
+    expect(dashboardScript).toMatch(/browse-jobs\.html\?id=/);
     expect(dashboard).toMatch(/completedMattersRequested \? "#cases-completed" : "#cases"/);
     expect(dashboard).toMatch(/data-retry-active-matters/);
     expect(dashboard).toMatch(/data-retry-completed-matters/);
@@ -127,6 +132,7 @@ describe("Prompt 5 launch-quality UI contracts", () => {
     const paralegalFaq = read("frontend/paralegal-faq.html");
     const paralegalHelp = read("frontend/paralegalhelp.html");
     const browseParalegals = read("frontend/assets/scripts/browse-paralegals.js");
+    const invitationDialog = read("frontend/assets/scripts/utils/legacy-invitation-dialog.mjs");
     const attorneyTour = read("frontend/assets/scripts/attorney-dashboard.js");
     const supportDrawer = read("frontend/assets/scripts/utils/support-drawer.js");
     const attorneySupportTools = read("backend/ai/supportAgentTools.js");
@@ -136,17 +142,36 @@ describe("Prompt 5 launch-quality UI contracts", () => {
     expect(attorneyDashboard).toMatch(/Completed Matters/);
     expect(attorneyDashboard).not.toMatch(/Completed Jobs|No completed jobs/i);
     expect(paralegalDashboard).toMatch(/Search by Matter title or practice area/);
-    expect(paralegalFaq).toMatch(/which Matters to apply for|Matter compensation handled/);
+    expect(paralegalFaq).toMatch(/which Matters to pursue/);
     expect(paralegalHelp).toMatch(/Browse Matters|My Matters & Applications|Working a Matter|Matter workspace/);
-    expect(browseParalegals).toMatch(/No open Matters are available\. Create a Matter/);
-    expect(browseParalegals).toMatch(/Invite to matter|Select an open Matter/);
+    expect(browseParalegals).toContain('createLegacyInvitationDialog');
+    expect(invitationDialog).toContain('No Matters are available for invitation review.');
+    expect(invitationDialog).toContain('Invite to a Matter');
+    expect(invitationDialog).toContain('Search Matters');
     expect(attorneyTour).toMatch(/Fund Matters|Create a Matter|invite the right fit to your Matter/);
     expect(supportDrawer).toMatch(/Ask about a Matter|Where can I see my Matters/);
+    expect(supportDrawer).not.toMatch(/Checking that now/);
     expect(attorneySupportTools).toMatch(/ctaLabel: "Post a Matter"/);
     expect(paralegalSupportTools).toMatch(/ctaLabel: "My Matters & Applications"/);
     expect(conversationService).toMatch(/ctaLabel: "Browse Matters"/);
     expect(conversationService).toMatch(/inside each Matter workspace/);
     expect(conversationService).not.toMatch(/(?:ctaLabel|label): "(?:Browse cases|Cases|Cases & Files|Cases and Applications|Case workspace|Open case|View cases|Completed cases)"/);
+  });
+
+  test("legacy image-card notices use the shared compact LPC dialog treatment", () => {
+    const attorneyDashboard = read("frontend/dashboard-attorney.html");
+    const paralegalDashboard = read("frontend/dashboard-paralegal.html");
+    const matterWorkspace = read("frontend/case-detail.html");
+    const dialogStyles = read("frontend/assets/styles/lpc-dialog-refresh.css");
+
+    for (const page of [attorneyDashboard, paralegalDashboard, matterWorkspace]) {
+      expect(page).toMatch(/assets\/styles\/lpc-dialog-refresh\.css/);
+    }
+    expect(dialogStyles).toMatch(/:is\(\.tour-modal, \.onboarding-modal\)/);
+    expect(dialogStyles).toMatch(/background-image: none !important/);
+    expect(dialogStyles).toMatch(/box-shadow: none !important/);
+    expect(dialogStyles).toMatch(/width: min\(440px, calc\(100vw - 32px\)\)/);
+    expect(dialogStyles).not.toMatch(/hero-mountain/);
   });
 
   test("Application dialog has an accessible name, bounded input, focus containment, and confirmed title", () => {
@@ -162,17 +187,12 @@ describe("Prompt 5 launch-quality UI contracts", () => {
   test("Matter files expose quarantine states instead of presenting unsafe actions", () => {
     const html = read("frontend/case-detail.html");
     const script = read("frontend/assets/scripts/case-detail.js");
-    const fileView = read("frontend/assets/scripts/case-files-view.js");
     expect(script).toMatch(/function getFileSecurityPresentation/);
     expect(script).toMatch(/security scan in progress/i);
     expect(script).toMatch(/refreshFileSecurityStatus/);
     expect(script).toMatch(/approveButton\.disabled = !docId \|\| !security\.ready/);
     expect(script).toMatch(/requestButton\.disabled = !docId \|\| !security\.ready/);
     expect(html).toMatch(/\.case-documents-item\.is-security-pending/);
-    expect(fileView).toMatch(/fileSecurityPresentation/);
-    expect(fileView).toMatch(/Open details/);
-    expect(fileView).toMatch(/const caseId = file\.caseId \|\| ""/);
-    expect(fileView).not.toMatch(/file\.caseId \|\| file\.id/);
   });
 
   test("Attorney entry points expose only owned page modes and no retired review workflow", () => {

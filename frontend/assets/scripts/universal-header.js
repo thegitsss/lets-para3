@@ -1,4 +1,22 @@
 (function initializeUniversalAuthenticatedHeader() {
+  // These destinations can reveal without accepting an outgoing snapshot.
+  // Keep their navigation ordinary: Chromium can otherwise reject the native
+  // transition while the new settings, shell or Matter document is opening.
+  let transitionBoundaryStyle = null;
+  const restoreTransitionBoundary = () => {
+    transitionBoundaryStyle?.remove();
+    transitionBoundaryStyle = null;
+  };
+  window.navigation?.addEventListener("navigate", (event) => {
+    restoreTransitionBoundary();
+    const destination = new URL(event.destination.url);
+    if (destination.origin !== window.location.origin || !["/attorney-v2.html", "/paralegal-v2.html", "/profile-settings.html", "/case-detail.html"].includes(destination.pathname)) return;
+    transitionBoundaryStyle = document.createElement("style");
+    transitionBoundaryStyle.textContent = "@view-transition { navigation: none; }";
+    document.head.append(transitionBoundaryStyle);
+  });
+  window.navigation?.addEventListener("navigateerror", restoreTransitionBoundary);
+  window.addEventListener("pageshow", restoreTransitionBoundary);
   const scriptUrl = document.currentScript?.src || window.location.href;
   const assetUrl = (relative) => new URL(relative, scriptUrl).href;
   let controls = null;
@@ -18,7 +36,15 @@
   }
 
   function loadStylesheet(href, marker) {
-    if (document.querySelector(`link[data-${marker}]`)) return;
+    const requestedPath = new URL(href, document.baseURI).pathname;
+    const existing = Array.from(document.querySelectorAll('link[rel="stylesheet"][href]')).find((link) => {
+      try {
+        return new URL(link.href, document.baseURI).pathname === requestedPath;
+      } catch (_) {
+        return false;
+      }
+    });
+    if (existing || document.querySelector(`link[data-${marker}]`)) return;
     const link = document.createElement("link");
     link.rel = "stylesheet";
     link.href = href;
@@ -71,21 +97,44 @@
   }
 
   function headerFor(main) {
-    const candidates = [
-      ":scope > .topbar",
-      ":scope > .case-topbar",
-      ":scope > .page-header",
-      ":scope > header",
-    ];
-    for (const selector of candidates) {
-      const header = main.querySelector(selector);
-      if (header) return header;
-    }
-    const header = document.createElement("header");
+    const existing = main.querySelector(":scope > .lpc-universal-header-shell[data-lpc-universal-header='true']");
+    if (existing) return existing;
+    const header = document.createElement("div");
     header.className = "lpc-universal-header-shell lpc-universal-header-shell--created";
+    header.setAttribute("role", "group");
     header.setAttribute("aria-label", "Workspace tools");
     main.prepend(header);
     return header;
+  }
+
+  function sharedHeaderHost(main) {
+    const browseShell = main.closest(".browse-page-shell");
+    if (browseShell) return browseShell;
+    if (main.parentElement?.classList.contains("lpc-auth-page-shell")) return main.parentElement;
+    return main;
+  }
+
+  function relocateMobileMenu(toolbar) {
+    const menu = toolbar.querySelector(":scope > .sidebar-toggle");
+    if (!menu) return;
+    const sidebar = document.querySelector(".sidebar, #sidebarNav, .authenticated-browse-sidebar");
+    if (sidebar?.parentNode) sidebar.parentNode.insertBefore(menu, sidebar);
+  }
+
+  function retireLegacyToolbars(main, activeHeader) {
+    main.querySelectorAll(":scope > .topbar, :scope > .case-topbar, :scope > .page-header > .topbar").forEach((toolbar) => {
+      if (toolbar === activeHeader) return;
+      relocateMobileMenu(toolbar);
+      if (toolbar.querySelector(":scope > .back-link")) {
+        toolbar.classList.add("lpc-context-toolbar");
+        return;
+      }
+      toolbar.hidden = true;
+      toolbar.setAttribute("aria-hidden", "true");
+      toolbar.querySelectorAll("[tabindex], button, a, input, select, textarea").forEach((control) => {
+        control.setAttribute("tabindex", "-1");
+      });
+    });
   }
 
   function removeHeaderProfiles(root = document) {
@@ -157,11 +206,15 @@
     const role = roleOf(user);
     if (!["attorney", "paralegal"].includes(role)) return;
     const sidebar = document.querySelector(".sidebar, #sidebarNav, .authenticated-browse-sidebar");
-    const main = document.querySelector("main, .case-main, .browse-page-shell");
-    if (!sidebar || !main) return;
+    const pageMain = document.querySelector("main") || document.querySelector(".case-main");
+    const headerHost = pageMain ? sharedHeaderHost(pageMain) : null;
+    if (!sidebar || !pageMain || !headerHost) return;
 
-    const header = headerFor(main);
+    const header = headerFor(headerHost);
     header.classList.add("lpc-universal-header-shell");
+    header.dataset.lpcUniversalHeader = "true";
+    header.setAttribute("aria-label", "Workspace tools");
+    retireLegacyToolbars(pageMain, header);
     controls = header.querySelector(".lpc-universal-header-controls");
     if (!controls) {
       controls = document.createElement("div");
@@ -180,9 +233,9 @@
     controls.prepend(searchHost);
     sync(role);
 
-    loadStylesheet(assetUrl("../styles/global-search.css"), "lpcUniversalSearchStyles");
+    loadStylesheet(assetUrl("../styles/global-search.css?v=20260831-2"), "lpcUniversalSearchStyles");
     loadStylesheet(assetUrl("../styles/notifications-dashboard.css"), "lpcUniversalNotificationStyles");
-    loadStylesheet(assetUrl("../styles/support-drawer.css?v=20260812-remove-legacy-tab"), "lpcUniversalAssistantStyles");
+    loadStylesheet(assetUrl("../styles/support-drawer.css?v=20260831-side-drawer"), "lpcUniversalAssistantStyles");
 
     try {
       await loadScript(assetUrl("productivity-command-registry.js"), "lpcUniversalRegistry");

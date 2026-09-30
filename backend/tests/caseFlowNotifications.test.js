@@ -9,8 +9,19 @@ const Job = require("../models/Job");
 const Application = require("../models/Application");
 const Notification = require("../models/Notification");
 process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_stub";
+jest.mock("../utils/stripe", () => ({
+  accounts: {
+    retrieve: jest.fn(async () => ({
+      details_submitted: true,
+      charges_enabled: true,
+      payouts_enabled: true,
+    })),
+  },
+}));
 const casesRouter = require("../routes/cases");
 const applicationsRouter = require("../routes/applications");
+const { addSubscriber: addCaseSubscriber } = require("../utils/caseEvents");
+const { addSubscriber: addNotificationSubscriber } = require("../utils/notificationEvents");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 const app = (() => {
@@ -50,6 +61,19 @@ beforeEach(async () => {
 });
 
 describe("Case flow notifications", () => {
+  test("own application history retains withdrawn and closed outcomes without exposing another applicant", async () => {
+    const user = await User.create({ firstName: "History", lastName: "Paralegal", email: "history@example.com", password: "Password123!", role: "paralegal", status: "approved" });
+    const attorney = await User.create({ firstName: "History", lastName: "Attorney", email: "history-attorney@example.com", password: "Password123!", role: "attorney", status: "approved" });
+    const job = await Job.create({ title: "Closed scope", practiceArea: "Litigation", description: "Scope available to the applicant", attorneyId: attorney._id, budget: 500, status: "closed" });
+    const own = await Application.create({ jobId: job._id, paralegalId: user._id, coverLetter: "My retained application", status: "withdrawn" });
+    await Application.create({ jobId: job._id, paralegalId: attorney._id, coverLetter: "Other private application", status: "rejected" });
+    const response = await request(app).get("/api/applications/my").set("Cookie", authCookieFor(user));
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0]).toMatchObject({ _id: String(own._id), status: "withdrawn", coverLetter: "My retained application" });
+    expect(response.body[0].jobId).toMatchObject({ _id: String(job._id), status: "closed" });
+  });
+
   test("Paralegal application creates application_submitted notification for attorney", async () => {
     // Description: Paralegal applies to an open case.
     // Input values: attorney + paralegal, open case with at least one scope task.
@@ -91,14 +115,26 @@ describe("Case flow notifications", () => {
       tasks: [{ title: "Draft initial filing", completed: false }],
     });
 
+    const caseSignals = [];
+    const attorneySignals = [];
+    const stopCase = addCaseSubscriber(caseDoc._id, { write: (value) => caseSignals.push(String(value)) });
+    const stopAttorney = addNotificationSubscriber(attorney._id, { write: (value) => attorneySignals.push(String(value)) });
     const res = await request(app)
       .post(`/api/cases/${caseDoc._id}/apply`)
       .set("Cookie", authCookieFor(paralegal))
-      .send({ coverLetter: "I can provide careful filing and document support." });
+      .send({ coverLetter: "I can provide careful filing support.\n\nI will retain the document references." });
+    stopCase();
+    stopAttorney();
 
     expect(res.status).toBe(201);
 
     const application = await Application.findById(res.body?._id).lean();
+    expect(application.coverLetter).toBe("I can provide careful filing support.\n\nI will retain the document references.");
+    expect(application.scopeSnapshot).toMatchObject({ title: "Immigration support", totalAmount: 60000, tasks: ["Draft initial filing"] });
+    await Job.updateOne({ _id: application.jobId }, { $set: { title: "Edited after submission", description: "New listing description" } });
+    const savedRecord = await request(app).get("/api/applications/my").set("Cookie", authCookieFor(paralegal));
+    expect(savedRecord.status).toBe(200);
+    expect(savedRecord.body.find(item => item._id === String(application._id)).scopeSnapshot).toMatchObject({ title: "Immigration support", totalAmount: 60000, tasks: ["Draft initial filing"] });
     const job = await Job.findOne({ caseId: caseDoc._id }).lean();
     const mirroredCase = await Case.findById(caseDoc._id).lean();
     expect(application).toEqual(expect.objectContaining({
@@ -119,6 +155,8 @@ describe("Case flow notifications", () => {
     }).lean();
     expect(notif).toBeTruthy();
     expect(String(notif.payload?.caseId || "")).toBe(String(caseDoc._id));
+    expect(caseSignals.join("\n")).toContain("application_submitted_refresh");
+    expect(attorneySignals.join("\n")).toContain("application_submitted_refresh");
   });
 
   test("Paralegal application is blocked when no profile photo is present", async () => {
@@ -544,7 +582,7 @@ describe("Case flow notifications", () => {
       userId: paralegal._id,
       type: "case_invite_response",
       "payload.caseId": caseDoc._id,
-      "payload.message": `You revoked your application for ${caseDoc.title}.`,
+      "payload.message": `You withdrew from consideration for ${caseDoc.title}.`,
     }).lean();
     expect(paralegalNotif).toBeTruthy();
   });
@@ -953,10 +991,16 @@ describe("Case flow notifications", () => {
       status: "accepted",
     });
 
+    const caseSignals = [];
+    const attorneySignals = [];
+    const stopCase = addCaseSubscriber(caseDoc._id, { write: (value) => caseSignals.push(String(value)) });
+    const stopAttorney = addNotificationSubscriber(attorney._id, { write: (value) => attorneySignals.push(String(value)) });
     const res = await request(app)
       .post(`/api/applications/${application._id}/revoke`)
       .set("Cookie", authCookieFor(paralegal))
       .send({});
+    stopCase();
+    stopAttorney();
 
     expect(res.status).toBe(200);
     expect(res.body?.success).toBe(true);
@@ -979,6 +1023,13 @@ describe("Case flow notifications", () => {
     const updatedCase = await Case.findById(caseDoc._id).lean();
     expect(Array.isArray(updatedCase?.applicants)).toBe(true);
     expect(updatedCase.applicants.some((entry) => String(entry?.paralegalId || "") === String(paralegal._id))).toBe(false);
+    const withdrawalNotice = await Notification.findOne({ userId: attorney._id, type: 'case_update', 'payload.outcome': 'application_withdrawn' }).lean();
+    expect(withdrawalNotice).toBeTruthy();
+    const presentedWithdrawal = require('../services/notificationPresentation').presentNotification(withdrawalNotice, { viewer: attorney, caseDoc: updatedCase });
+    expect(presentedWithdrawal.action.href).toBe(`/dashboard-attorney.html?caseId=${caseDoc._id}&applicantId=${paralegal._id}&openApplicant=1&applicationHistory=1#cases:inquiries`);
+    expect(presentedWithdrawal.action.href).toContain(`applicantId=${paralegal._id}`);
+    expect(caseSignals.join("\n")).toContain("application_withdrawn_refresh");
+    expect(attorneySignals.join("\n")).toContain("application_withdrawn_refresh");
   });
 
   test("Paralegal applications list includes matching changes-requested pre-engagement data", async () => {
@@ -1068,7 +1119,7 @@ describe("Case flow notifications", () => {
     const attorney = await User.create({
       firstName: "Alex",
       lastName: "Stone",
-      email: "game4funwithme1+1@gmail.com",
+      email: "synthetic-hire-attorney@example.test",
       password: "Password123!",
       role: "attorney",
       status: "approved",
@@ -1078,13 +1129,16 @@ describe("Case flow notifications", () => {
     const paralegal = await User.create({
       firstName: "Priya",
       lastName: "Ng",
-      email: "samanthasider+paralegal@gmail.com",
+      email: "synthetic-hire-paralegal@example.test",
+      stripeAccountId: "acct_synthetic_hire_notice", stripeOnboarded: true, stripePayoutsEnabled: true,
       password: "Password123!",
       role: "paralegal",
       status: "approved",
       state: "CA",
     });
 
+    const former = await User.create({ firstName: "Synthetic", lastName: "Former", email: "synthetic-former-paralegal@example.test", password: "Password123!", role: "paralegal", status: "approved" });
+    const finalizedAt = new Date('2026-09-02T12:00:00Z');
     const caseDoc = await Case.create({
       title: "Relist and hire notification",
       practiceArea: "immigration",
@@ -1096,7 +1150,8 @@ describe("Case flow notifications", () => {
       escrowStatus: "funded",
       escrowIntentId: "pi_relist_test",
       fundingIntegrityStatus: "verified",
-      payoutFinalizedAt: new Date(Date.now() - 60 * 60 * 1000),
+      payoutFinalizedAt: finalizedAt, payoutFinalizedType: "partial_attorney", withdrawnParalegalId: former._id,
+      partialPayoutAmount: 40000, payoutTransferId: "tr_synthetic_hire_notice", payoutStatus: "paid", paidOutAt: finalizedAt, stripeMode: "test",
       totalAmount: 100000,
       remainingAmount: 60000,
       currency: "usd",
@@ -1104,6 +1159,9 @@ describe("Case flow notifications", () => {
       applicants: [{ paralegalId: paralegal._id, status: "pending", appliedAt: new Date() }],
     });
 
+    const operationKey = `partial_payout:${caseDoc._id}:retained`;
+    await require('../models/Payout').collection.insertOne({ caseId: caseDoc._id, paralegalId: former._id, operationKey, amountPaid: 32800, transferId: 'tr_synthetic_hire_notice', stripeMode: 'test', livemode: false, status: 'paid', createdAt: finalizedAt });
+    await require('../models/PaymentOperation').collection.insertOne({ caseId: caseDoc._id, operationKey, kind: 'partial_payout', status: 'succeeded', amount: 32800, transferAmount: 32800, currency: 'usd', stripeMode: 'test', livemode: false, stripeTransferId: 'tr_synthetic_hire_notice', completedAt: finalizedAt });
     const res = await request(app)
       .post(`/api/cases/${caseDoc._id}/hire/${paralegal._id}`)
       .set("Cookie", authCookieFor(attorney))
@@ -1120,7 +1178,7 @@ describe("Case flow notifications", () => {
     expect(String(notif.payload?.caseId || "")).toBe(String(caseDoc._id));
   });
 
-  test("Concurrent invitation accepts are idempotent and create one canonical application", async () => {
+  test("Concurrent invitation accepts preserve one application and recover the losing attempt", async () => {
     const attorney = await User.create({
       firstName: "Alex",
       lastName: "Stone",
@@ -1170,8 +1228,9 @@ describe("Case flow notifications", () => {
       request(app).post(`/api/cases/${caseDoc._id}/invite/accept`).set("Cookie", authCookieFor(paralegal)).send({}),
     ]);
 
-    expect([first.status, second.status]).toEqual([200, 200]);
-    expect([first.body?.alreadyProcessed, second.body?.alreadyProcessed].filter(Boolean)).toHaveLength(1);
+    expect([[200, 200], [200, 409]]).toContainEqual([first.status, second.status].sort());
+    const recovered = await request(app).post(`/api/cases/${caseDoc._id}/invite/accept`).set("Cookie", authCookieFor(paralegal)).send({});
+    expect(recovered.status).toBe(200); expect(recovered.body.alreadyProcessed).toBe(true);
     const applications = await Application.find({ jobId: job._id, paralegalId: paralegal._id }).lean();
     expect(applications).toHaveLength(1);
     expect(applications[0].status).toBe("submitted");
@@ -1336,15 +1395,16 @@ describe("Case flow notifications", () => {
       tasks: [{ title: "Review agreement", completed: false }],
     });
 
+    const terminationReason = "Scope relationship ended.\n\nThe remaining work requires a separate engagement.";
     const [first, second] = await Promise.all([
       request(app)
         .post(`/api/cases/${caseDoc._id}/terminate`)
         .set("Cookie", authCookieFor(attorney))
-        .send({ reason: "Scope relationship ended." }),
+        .send({ reason: terminationReason }),
       request(app)
         .post(`/api/cases/${caseDoc._id}/terminate`)
         .set("Cookie", authCookieFor(attorney))
-        .send({ reason: "Scope relationship ended." }),
+        .send({ reason: terminationReason }),
     ]);
 
     expect([first.status, second.status]).toEqual([202, 202]);
@@ -1354,6 +1414,18 @@ describe("Case flow notifications", () => {
     expect(openReviews).toHaveLength(1);
     expect(updatedCase.terminationStatus).toBe("disputed");
     expect(updatedCase.terminationDisputeId).toBe(openReviews[0].disputeId);
+    expect(updatedCase.terminationReason).toBe(terminationReason);
+    expect(openReviews[0].message).toBe(`Attorney requested termination: ${terminationReason}`);
+    expect(updatedCase.totalAmount).toBe(caseDoc.totalAmount);
+    expect(updatedCase.escrowIntentId).toBe(caseDoc.escrowIntentId);
+    expect(updatedCase.escrowStatus).toBe('funded');
+    const paralegalAlerts = await Notification.find({
+      userId: paralegal._id,
+      type: "dispute_opened",
+    }).lean();
+    expect(paralegalAlerts).toHaveLength(1);
+    expect(paralegalAlerts[0].message).toMatch(/review has been opened/i);
+    expect(paralegalAlerts[0].payload?.title).toBe("Matter review opened");
   });
 
   test("Concurrent withdrawal requests detach the assignment once and retry idempotently", async () => {

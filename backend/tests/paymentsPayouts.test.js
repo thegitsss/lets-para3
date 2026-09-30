@@ -86,6 +86,110 @@ beforeEach(async () => {
 });
 
 describe("Payments + payouts", () => {
+  describe("audited paralegal receipt evidence", () => {
+    async function receiptFixture(overrides = {}) {
+      const attorney = await User.create({ firstName: "Receipt", lastName: "Attorney", email: "receipt-attorney@example.com", password: "Password123!", role: "attorney", status: "approved" });
+      const paralegal = await User.create({ firstName: "Receipt", lastName: "Paralegal", email: "receipt-paralegal@example.com", password: "Password123!", role: "paralegal", status: "approved" });
+      const matter = await Case.create({ title: "Receipt evidence", practiceArea: "immigration", details: "Synthetic receipt evidence", attorney: attorney._id, attorneyId: attorney._id, paralegal: paralegal._id, paralegalId: paralegal._id, status: "in progress", totalAmount: 100000, lockedTotalAmount: 100000, ...overrides });
+      return { matter, paralegal };
+    }
+
+    test.each([null, "pending", "failed", "reversed", "needs_reconciliation"])("does not issue a Paid receipt with payout status %s", async (status) => {
+      const { matter, paralegal } = await receiptFixture({ paymentReleased: status !== null });
+      if (status) await Payout.create({ caseId: matter._id, paralegalId: paralegal._id, amountPaid: 82000, transferId: `tr_${status}`, status });
+      const response = await request(app).get(`/api/payments/receipt/paralegal/${matter._id}`).set("Cookie", authCookieFor(paralegal));
+      expect(response.status).toBe(409);
+      expect(caseLifecycle.buildReceiptPdfBuffer).not.toHaveBeenCalled();
+    });
+
+    test("replacement withdrawal preserves the predecessor settlement and receipt", async () => {
+      const predecessor = await User.create({ firstName: "Prior", lastName: "Paralegal", email: "prior@example.com", password: "Password123!", role: "paralegal", status: "approved" });
+      const { matter, paralegal } = await receiptFixture({
+        withdrawnParalegalId: predecessor._id, payoutFinalizedAt: new Date("2026-08-01"), payoutFinalizedType: "partial_attorney",
+        partialPayoutAmount: 40000, remainingAmount: 60000, hiredAt: new Date("2026-07-01"),
+        paralegal: null, paralegalId: null, status: "paused", pausedReason: "paralegal_withdrew", fundingIntegrityStatus: "verified",
+        escrowStatus: "funded", escrowIntentId: "pi_replacement", tasks: [{ title: "Previous approved work", completed: true }, { title: "Remaining work", completed: false }],
+      });
+      await Payout.create({ caseId: matter._id, paralegalId: predecessor._id, amountPaid: 32800, transferId: "tr_predecessor", status: "paid", stripeMode: "test" });
+      await User.updateOne({ _id: paralegal._id }, { $set: { stripeAccountId: "acct_replacement_paid", stripeOnboarded: true, stripePayoutsEnabled: true } });
+      await Case.updateOne({ _id: matter._id }, { $push: { applicants: { paralegalId: paralegal._id, status: "pending" } } });
+      const attorney = await User.findById(matter.attorneyId);
+      const hire = await request(app).post(`/api/cases/${matter._id}/hire/${paralegal._id}`).set("Cookie", authCookieFor(attorney)).send({});
+      expect(hire.status).toBe(200);
+      const priorReceiptDuringReplacement = await request(app).get(`/api/payments/receipt/paralegal/${matter._id}`).set("Cookie", authCookieFor(predecessor));
+      expect(priorReceiptDuringReplacement.status).toBe(200);
+      expect(caseLifecycle.buildReceiptPdfBuffer).toHaveBeenLastCalledWith(expect.objectContaining({ totalAmount: "$328.00", partyName: "Prior Paralegal" }));
+      const withdrawal = await request(app).post(`/api/cases/${matter._id}/withdraw`).set("Cookie", authCookieFor(paralegal)).send({});
+      expect(withdrawal.status).toBe(200);
+      expect(withdrawal.body.withdrawalOutcome).toBe("zero_auto");
+      const refreshed = await Case.findById(matter._id).lean();
+      expect(String(refreshed.withdrawnParalegalId)).toBe(String(paralegal._id));
+      expect(refreshed.remainingAmount).toBe(60000);
+      expect(refreshed.withdrawalHistory).toEqual(expect.arrayContaining([expect.objectContaining({ partialPayoutAmount: 40000 })]));
+      const receipt = await request(app).get(`/api/payments/receipt/paralegal/${matter._id}`).set("Cookie", authCookieFor(predecessor));
+      expect(receipt.status).toBe(200);
+      expect(caseLifecycle.buildReceiptPdfBuffer).toHaveBeenLastCalledWith(expect.objectContaining({ totalAmount: "$328.00", partyName: "Prior Paralegal" }));
+      const history = await request(app).get("/api/cases/my-completed").set("Cookie", authCookieFor(predecessor));
+      expect(history.status).toBe(200);
+      expect(history.body.items).toEqual(expect.arrayContaining([expect.objectContaining({ caseId: String(matter._id), isWithdrawn: true, receiptAvailable: true })]));
+      const listing = await request(app).get(`/api/cases/${matter._id}`).set("Cookie", authCookieFor(predecessor));
+      // Relisted scope is discoverable, but a historical receipt owner gains no workspace access.
+      expect(listing.status).toBe(200);
+      expect(listing.body.files).toEqual([]);
+      expect(listing.body.tasks).toEqual([]);
+      expect(listing.body.submissionSummary).toBeNull();
+      expect(mockStripe.transfers.create).not.toHaveBeenCalled();
+    });
+
+    test.each([null, "pending", "failed", "reversed", "needs_reconciliation"])("a positive withdrawal receipt also requires confirmed payout evidence: %s", async status => {
+      const { matter, paralegal } = await receiptFixture({ paralegal: null, paralegalId: null, payoutFinalizedAt: new Date(), payoutFinalizedType: "partial_attorney", partialPayoutAmount: 40000, pausedReason: "paralegal_withdrew", status: "paused" });
+      await Case.updateOne({ _id: matter._id }, { $set: { withdrawnParalegalId: paralegal._id } });
+      if (status) await Payout.create({ caseId: matter._id, paralegalId: paralegal._id, amountPaid: 32800, transferId: `tr_withdrawal_${status}`, status });
+      const response = await request(app).get(`/api/payments/receipt/paralegal/${matter._id}`).set("Cookie", authCookieFor(paralegal));
+      expect(response.status).toBe(409);
+      expect(caseLifecycle.buildReceiptPdfBuffer).not.toHaveBeenCalled();
+    });
+
+    test("withdraw, relist, hire a replacement, and withdraw again preserves each assignment", async () => {
+      const replacement = await User.create({ firstName: "New", lastName: "Paralegal", email: "replacement-journey@example.com", password: "Password123!", role: "paralegal", status: "approved", stripeAccountId: "acct_replacement_journey", stripeOnboarded: true, stripePayoutsEnabled: true });
+      const { matter, paralegal } = await receiptFixture({ escrowStatus: "funded", escrowIntentId: "pi_journey", fundingIntegrityStatus: "verified", hiredAt: new Date("2026-08-01"), tasks: [{ title: "Unfinished scope", completed: false }] });
+      const attorney = await User.findById(matter.attorneyId);
+      const first = await request(app).post(`/api/cases/${matter._id}/withdraw`).set("Cookie", authCookieFor(paralegal)).send({});
+      expect(first.status).toBe(200);
+      expect(first.body.withdrawalOutcome).toBe("zero_auto");
+      // The replacement expresses interest in the relisted scope before hire.
+      await Case.updateOne({ _id: matter._id }, { $push: { applicants: { paralegalId: replacement._id, status: "pending" } } });
+      const hire = await request(app).post(`/api/cases/${matter._id}/hire/${replacement._id}`).set("Cookie", authCookieFor(attorney)).send({});
+      expect(hire.status).toBe(200);
+      const second = await request(app).post(`/api/cases/${matter._id}/withdraw`).set("Cookie", authCookieFor(replacement)).send({});
+      expect(second.status).toBe(200);
+      expect(second.body.withdrawalOutcome).toBe("zero_auto");
+      const repeated = await request(app).post(`/api/cases/${matter._id}/withdraw`).set("Cookie", authCookieFor(replacement)).send({});
+      expect(repeated.status).toBe(200);
+      expect(repeated.body.alreadyProcessed).toBe(true);
+      const final = await Case.findById(matter._id).lean();
+      expect(final.remainingAmount).toBe(100000);
+      expect(final.withdrawalHistory).toHaveLength(1);
+      expect(String(final.withdrawalHistory[0].withdrawnParalegalId)).toBe(String(paralegal._id));
+      expect(String(final.withdrawnParalegalId)).toBe(String(replacement._id));
+      expect(mockStripe.transfers.create).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ["replacement", { remainingAmount: 60000, payoutFinalizedAt: new Date("2026-08-01"), payoutFinalizedType: "partial_attorney", feeParalegalAmount: 10800 }, 49200, "$600.00", "$108.00", "$492.00"],
+      ["partial dispute", { feeParalegalAmount: 7200, disputeSettlement: { transferId: "tr_confirmed", action: "release_partial", grossAmount: 40000, feeParalegalPct: 18, feeParalegalAmount: 7200, payoutAmount: 32800 } }, 32800, "$400.00", "$72.00", "$328.00"],
+    ])("uses the actual %s settlement gross, fee and net", async (_kind, fields, net, grossLabel, feeLabel, netLabel) => {
+      const { matter, paralegal } = await receiptFixture({ paymentReleased: true, payoutTransferId: "tr_confirmed", ...fields });
+      await Payout.create({ caseId: matter._id, paralegalId: paralegal._id, amountPaid: net, transferId: "tr_confirmed", status: "paid", stripeMode: "test" });
+      const response = await request(app).get(`/api/payments/receipt/paralegal/${matter._id}`).set("Cookie", authCookieFor(paralegal));
+      expect(response.status).toBe(200);
+      expect(caseLifecycle.buildReceiptPdfBuffer).toHaveBeenLastCalledWith(expect.objectContaining({
+        lineItems: [{ label: "Gross amount", value: grossLabel }, { label: "Platform fee (18%)", value: feeLabel }],
+        totalAmount: netLabel,
+      }));
+    });
+  });
+
   test("Stripe test payout is created to connected Amex Business account and amount is correct", async () => {
     // Description: Attorney completes case and payout transfers to connected account.
     // Input values: total=100000 cents, paralegal stripeAccountId="acct_amex_business".
@@ -132,6 +236,7 @@ describe("Payments + payouts", () => {
     });
 
     mockStripe.paymentIntents.retrieve.mockResolvedValue({
+      livemode: false,
       id: "pi_test_123",
       status: "succeeded",
       amount: 122000,
@@ -252,6 +357,7 @@ describe("Payments + payouts", () => {
       tasks: [{ title: "Finalize and deliver", completed: true }],
     });
     mockStripe.paymentIntents.retrieve.mockResolvedValue({
+      livemode: false,
       id: "pi_concurrent_completion",
       status: "succeeded",
       amount: 122000,
@@ -387,6 +493,7 @@ describe("Payments + payouts", () => {
       tasks: [{ title: "Finalize and deliver", completed: true }],
     });
     mockStripe.paymentIntents.retrieve.mockResolvedValue({
+      livemode: false,
       id: "pi_completion_dispute_race",
       status: "succeeded",
       amount: 122000,
@@ -540,6 +647,7 @@ describe("Payments + payouts", () => {
     });
 
     mockStripe.paymentIntents.retrieve.mockResolvedValue({
+      livemode: false,
       id: "pi_test_456",
       status: "succeeded",
       amount: 122000,
@@ -561,7 +669,8 @@ describe("Payments + payouts", () => {
       .set("Cookie", authCookieFor(attorney))
       .send({});
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe("PAYOUT_RECONCILIATION_REQUIRED");
     expect(res.body.error).toMatch(/transfer failed/i);
 
     const payoutDoc = await Payout.findOne({ caseId: caseDoc._id }).lean();
@@ -570,16 +679,17 @@ describe("Payments + payouts", () => {
     const refreshed = await Case.findById(caseDoc._id).lean();
     expect(refreshed.payoutTransferId).toBeFalsy();
     expect(refreshed.paymentReleased).not.toBe(true);
-    expect(refreshed.payoutStatus).toBe("failed");
+    expect(refreshed.payoutStatus).toBe("needs_reconciliation");
 
     const operation = await PaymentOperation.findOne({
       operationKey: `case_payout:${caseDoc._id}`,
     }).lean();
-    expect(operation.status).toBe("failed");
+    expect(operation.status).toBe("needs_reconciliation");
+    expect(operation.evidenceStatus).toBe("needs_reconciliation");
     expect(operation.lastError).toMatch(/transfer failed/i);
   });
 
-  test("A persisted payout can reconcile the matter lifecycle without creating another transfer", async () => {
+  test("A Case-only payout reference requires reconciliation without creating another transfer", async () => {
     const attorney = await User.create({
       firstName: "Alex",
       lastName: "Stone",
@@ -628,16 +738,13 @@ describe("Payments + payouts", () => {
       .set("Cookie", authCookieFor(attorney))
       .send({});
 
-    expect({ status: res.status, body: res.body }).toEqual({
-      status: 200,
-      body: expect.objectContaining({ ok: true }),
-    });
-    expect(res.body.ok).toBe(true);
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe("PAYOUT_RECONCILIATION_REQUIRED");
     expect(mockStripe.transfers.create).not.toHaveBeenCalled();
+    expect(await Payout.countDocuments({ caseId: caseDoc._id })).toBe(0);
     const refreshed = await Case.findById(caseDoc._id).lean();
-    expect(refreshed.status).toBe("completed");
-    expect(refreshed.archived).toBe(true);
-    expect(refreshed.readOnly).toBe(true);
+    expect(refreshed.status).toBe("in progress");
+    expect(refreshed.payoutTransferId).toBe("tr_reconcile_123");
   });
 
   test("Incomplete payout evidence requires reconciliation instead of returning false success", async () => {
@@ -690,7 +797,7 @@ describe("Payments + payouts", () => {
     expect((await Case.findById(caseDoc._id).lean()).status).toBe("in progress");
   });
 
-  test("Completion repairs ledgers from recorded transfer evidence without a second Stripe transfer", async () => {
+  test("Completion preserves an uncertain transfer for administrative reconciliation without fabricating ledgers", async () => {
     const attorney = await User.create({
       firstName: "Alex",
       lastName: "Recovery",
@@ -750,22 +857,13 @@ describe("Payments + payouts", () => {
       .set("Cookie", authCookieFor(attorney))
       .send({});
 
-    expect({ status: res.status, body: res.body }).toEqual({
-      status: 200,
-      body: expect.objectContaining({ ok: true }),
-    });
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe("PAYOUT_RECONCILIATION_REQUIRED");
     expect(mockStripe.transfers.create).not.toHaveBeenCalled();
     const refreshed = await Case.findById(caseDoc._id).lean();
-    const payout = await Payout.findOne({ caseId: caseDoc._id }).lean();
-    const operation = await PaymentOperation.findOne({ caseId: caseDoc._id }).lean();
-    expect(refreshed.status).toBe("completed");
-    expect(refreshed.payoutTransferId).toBe("tr_operation_recovery");
-    expect(refreshed.paymentReleased).toBe(true);
-    expect(payout).toEqual(expect.objectContaining({
-      operationKey: `case_payout:${caseDoc._id}`,
-      amountPaid: 82000,
-      transferId: "tr_operation_recovery",
-    }));
-    expect(operation.status).toBe("succeeded");
+    expect(refreshed.status).toBe("in progress");
+    expect(refreshed.paymentReleased).toBe(false);
+    expect(await Payout.countDocuments({ caseId: caseDoc._id })).toBe(0);
+    expect((await PaymentOperation.findOne({ caseId: caseDoc._id })).status).toBe("needs_reconciliation");
   });
 });

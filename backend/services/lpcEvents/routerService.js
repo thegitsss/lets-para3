@@ -37,13 +37,14 @@ async function openFounderAlert({
   metadata = {},
   ownerLabel = "Samantha",
   openedBy = { actorType: "system", label: "LPC Router" },
+  session = null,
 } = {}) {
   if (!dedupeKey || !subject?.entityType || !subject?.entityId) {
     throw new Error("Founder alert requires a dedupe key and subject.");
   }
 
   const now = new Date();
-  const existing = await LpcAction.findOne({ dedupeKey, status: "open" });
+  const existing = await LpcAction.findOne({ dedupeKey, status: "open" }).session(session);
   if (existing) {
     existing.lastSeenAt = now;
     existing.title = title || existing.title;
@@ -54,11 +55,11 @@ async function openFounderAlert({
     existing.metadata = { ...(existing.metadata || {}), ...(metadata || {}) };
     existing.sourceEventIds = uniqueObjectIds([...(existing.sourceEventIds || []), sourceEventId].filter(Boolean));
     existing.latestEventId = sourceEventId || existing.latestEventId;
-    await existing.save();
+    await existing.save({ ...(session ? { session } : {}) });
     return { action: existing, created: false };
   }
 
-  const action = await LpcAction.create({
+  const actionDocument = {
     actionType: "founder_alert",
     status: "open",
     dedupeKey,
@@ -76,7 +77,8 @@ async function openFounderAlert({
     lastSeenAt: now,
     openedBy,
     metadata,
-  });
+  };
+  const action = session ? (await LpcAction.create([actionDocument], { session }))[0] : await LpcAction.create(actionDocument);
 
   return { action, created: true };
 }
@@ -204,22 +206,27 @@ function mapSupportEventCategoryToTicketCategory(category = "") {
   return normalized || "general_support";
 }
 
-async function buildSupportLearningSnapshot({ patternKey = "", category = "", latestUserMessage = "" } = {}) {
+async function buildSupportLearningSnapshot({ patternKey = "", category = "", latestUserMessage = "", session = null } = {}) {
   const key = String(patternKey || "").trim();
   const normalizedMessage = normalizeText(latestUserMessage);
   const ticketCategory = mapSupportEventCategoryToTicketCategory(category);
 
-  await refreshSupportInsights();
-  const [insight, faqCandidateCount, ticketPatternCount, categoryTickets] = await Promise.all([
-    key ? SupportInsight.findOne({ patternKey: key, state: "active" }).sort({ updatedAt: -1 }).lean() : null,
-    key ? FAQCandidate.countDocuments({ patternKey: key }) : 0,
-    key ? SupportTicket.countDocuments({ "classification.patternKey": key }) : 0,
+  if (!session) await refreshSupportInsights();
+  const reads = [
+    key ? SupportInsight.findOne({ patternKey: key, state: "active" }).sort({ updatedAt: -1 }).session(session).lean() : null,
+    key ? FAQCandidate.countDocuments({ patternKey: key }).session(session) : 0,
+    key ? SupportTicket.countDocuments({ "classification.patternKey": key }).session(session) : 0,
     normalizedMessage && ticketCategory
       ? SupportTicket.find({ "classification.category": ticketCategory })
           .select("latestUserMessage")
+          .session(session)
           .lean()
       : [],
-  ]);
+  ];
+  const values = [];
+  if (session) { for (const read of reads) values.push(await read); }
+  else values.push(...await Promise.all(reads));
+  const [insight, faqCandidateCount, ticketPatternCount, categoryTickets] = values;
 
   const messageMatchCount = normalizedMessage
     ? categoryTickets.filter((ticket) => normalizeText(ticket.latestUserMessage) === normalizedMessage).length
@@ -432,7 +439,8 @@ async function routeIncompleteProfileWindow(event) {
   return { status: "routed", actionKeys: [String(result.action._id)] };
 }
 
-async function routeSupportSubmissionCreated(event) {
+async function routeSupportSubmissionCreated(event, options) {
+  if (event.facts?.assistantMutationId) return require('../support/mutationRoutingService').deliverSupportIncidentRouting(event, options);
   return routeSupportSubmissionEvent(event);
 }
 
@@ -448,6 +456,7 @@ async function routeIncidentResolved(event) {
   );
   if (incidentId) {
     const linkedOpenTickets = await SupportTicket.find({
+      requestKind: { $nin: ["human", "contact"] },
       linkedIncidentIds: incidentId,
       status: { $in: ["open", "in_review", "waiting_on_user", "waiting_on_info"] },
     })
@@ -491,7 +500,7 @@ async function routeSupportTicketResolved(event) {
   };
 }
 
-async function routeSupportTicketEscalated(event) {
+async function routeSupportTicketEscalated(event, { session = null } = {}) {
   const ticketReference = String(event.facts?.after?.ticketReference || event.subject?.publicId || "").trim();
   const category = String(event.facts?.after?.category || "").trim();
   const patternKey = String(event.facts?.after?.patternKey || "").trim();
@@ -509,6 +518,7 @@ async function routeSupportTicketEscalated(event) {
     patternKey,
     category,
     latestUserMessage,
+    session,
   });
   const learningLine =
     learning.repeatCount >= 2
@@ -535,6 +545,7 @@ async function routeSupportTicketEscalated(event) {
   );
   const result = await openFounderAlert({
     dedupeKey: `founder-alert:support-ticket:${event.subject.entityId}`,
+    session,
     title,
     summary,
     recommendedAction: lane.recommendedAction,
@@ -746,7 +757,7 @@ async function routeApprovalDecisionCompleted(event) {
   };
 }
 
-async function routeEvent(event) {
+async function routeEvent(event, { claimToken = "" } = {}) {
   if (!event?._id) throw new Error("Event is required for routing.");
 
   let outcome = { status: "skipped", actionKeys: [] };
@@ -770,7 +781,7 @@ async function routeEvent(event) {
       outcome = await routeIncompleteProfileWindow(event);
       break;
     case "support.submission.created":
-      outcome = await routeSupportSubmissionCreated(event);
+      outcome = await routeSupportSubmissionCreated(event, { claimToken });
       break;
     case "incident.created":
       outcome = await routeIncidentCreated(event);
@@ -809,7 +820,14 @@ async function routeEvent(event) {
   event.routing.actionKeys = outcome.actionKeys || [];
   event.routing.lastRoutedAt = new Date();
   event.routing.error = "";
-  await event.save();
+  if (claimToken) {
+    const saved = await LpcEvent.updateOne({ _id: event._id, "routing.claimToken": claimToken }, { $set: {
+      "routing.status": event.routing.status, "routing.actionKeys": event.routing.actionKeys,
+      "routing.lastRoutedAt": event.routing.lastRoutedAt, "routing.error": "",
+      "routing.claimToken": "", "routing.leaseExpiresAt": null,
+    } });
+    if (saved.modifiedCount !== 1) throw new Error("Support routing claim was superseded.");
+  } else await event.save();
   return outcome;
 }
 
@@ -823,4 +841,5 @@ module.exports = {
   openFounderAlert,
   routeEvent,
   routeEventById,
+  routeSupportTicketEscalated,
 };

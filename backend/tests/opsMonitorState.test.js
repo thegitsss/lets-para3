@@ -15,12 +15,18 @@ const {
   summarizeMonitorForOutput,
 } = require("../scripts/ops-monitor");
 
+const previousMongoUri = process.env.MONGO_URI;
 beforeAll(async () => {
   await connect();
+  process.env.MONGO_URI = require("./helpers/mongoHarnessState").readReadyState().uri;
 });
 
 afterAll(async () => {
-  await closeDatabase();
+  try { await closeDatabase(); }
+  finally {
+    if (previousMongoUri === undefined) delete process.env.MONGO_URI;
+    else process.env.MONGO_URI = previousMongoUri;
+  }
 });
 
 beforeEach(async () => {

@@ -194,7 +194,7 @@ function shouldEscalateTicketToIncident(ticket = {}, submission = {}) {
   return { shouldEscalate: false, reason: "The visible submission is safer to keep in Support Ops." };
 }
 
-async function findMatchingActiveIncident({ ticket = {}, submission = {} } = {}) {
+async function findMatchingActiveIncident({ ticket = {}, submission = {}, session = null } = {}) {
   const candidate = buildIncidentCandidate(ticket, submission);
   const clusterKey = buildClusterKey(candidate);
   const issueFingerprint = buildIssueFingerprint(candidate);
@@ -224,6 +224,7 @@ async function findMatchingActiveIncident({ ticket = {}, submission = {} } = {})
     state: { $nin: INCIDENT_TERMINAL_STATES },
     $or: relatedClauses,
   })
+    .session(session)
     .sort({ updatedAt: -1, createdAt: -1 })
     .lean();
 
@@ -330,7 +331,8 @@ async function startEngineeringDiagnosisForIncident(incident = {}) {
 
 async function routeSupportSubmissionEvent(event = {}) {
   const submission = buildTicketPayloadFromEvent(event);
-  const ticket = await createSupportTicket(submission);
+  const existing = event.related?.supportTicketId ? await SupportTicket.findById(event.related.supportTicketId).lean() : null;
+  const ticket = existing || await createSupportTicket(submission);
   const ticketId = String(ticket?._id || ticket?.id || "").trim();
 
   const actionKeys = ticketId ? [ticketId] : [];

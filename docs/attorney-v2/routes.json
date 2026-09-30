@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-04",
+  "canonicalV2Prefix": null,
+  "canonicalV2PrefixDecision": "owner-open",
+  "routes": [
+    {
+      "id": "attorney-home",
+      "v1": "dashboard-attorney.html#home",
+      "aliases": ["dashboard-attorney.html", "dashboard-attorney.html#"],
+      "authentication": "approved-attorney",
+      "responsibility": "home overview, onboarding, recent matters, applications, messages, deadlines and weekly notes",
+      "queryParameters": ["openApplicant", "returnFromProfile"],
+      "hashValues": ["home"],
+      "v2Responsibility": "home",
+      "retirement": "retain V1 until cohort and deep-link gates pass"
+    },
+    {
+      "id": "attorney-matters",
+      "v1": "dashboard-attorney.html#cases",
+      "aliases": ["active-cases.html"],
+      "authentication": "approved-attorney",
+      "responsibility": "active, draft, archived and inquiry/application matter lists",
+      "queryParameters": ["openApplicant", "openApplicants", "caseId", "previewCaseId", "highlightCase", "matterDeadline", "matterUpdated", "matterSort", "matterPractice", "returnFromProfile", "continueHire"],
+      "hashValues": ["cases", "cases:active", "cases:draft", "cases:archived", "cases:inquiries"],
+      "v2Responsibility": "matters-list",
+      "retirement": "keep active-cases redirect until measured external usage is zero"
+    },
+    {
+      "id": "attorney-private-tasks",
+      "v1": "dashboard-attorney.html#tasks",
+      "aliases": [],
+      "authentication": "approved-attorney",
+      "responsibility": "attorney-private ChecklistTask list, create, detail, toggle and delete",
+      "queryParameters": [],
+      "hashValues": ["tasks"],
+      "v2Responsibility": "private-tasks",
+      "retirement": "retain V1 until task source and privacy contract passes"
+    },
+    {
+      "id": "attorney-payments",
+      "v1": "dashboard-attorney.html#funds",
+      "aliases": ["billing-attorney.html"],
+      "authentication": "approved-attorney",
+      "responsibility": "payment method, active escrow, billing history, receipts, CSV and portal return",
+      "queryParameters": ["from", "settingsTarget", "payment", "caseId", "highlightCase"],
+      "allowedValues": {"from": ["settings"], "settingsTarget": ["payment-method", "billing-history"]},
+      "hashValues": ["funds"],
+      "v2Responsibility": "payments",
+      "retirement": "redirect retained after V1 implementation retirement"
+    },
+    {
+      "id": "attorney-create-matter",
+      "v1": "create-case.html#details",
+      "aliases": ["create-case-step2.html", "create-case-step5.html"],
+      "authentication": "approved-attorney",
+      "responsibility": "create, autosave, resume, review and publish Matter; edit eligible Matter",
+      "queryParameters": ["draftId", "caseId"],
+      "hashValues": ["details", "description", "review"],
+      "v2Responsibility": "matter-editor",
+      "retirement": "step redirects retained until external usage is measured"
+    },
+    {
+      "id": "attorney-applications-redirect",
+      "v1": "case-applications.html",
+      "aliases": [],
+      "authentication": "approved-attorney",
+      "responsibility": "legacy candidate-review entry",
+      "queryParameters": ["openApplicants", "caseId"],
+      "hashValues": [],
+      "redirectTarget": "dashboard-attorney.html?openApplicants=1#cases:inquiries",
+      "v2Responsibility": "matters-applications-filter",
+      "retirement": "redirect retained until email/bookmark/access-log evidence permits removal"
+    },
+    {
+      "id": "attorney-workspace",
+      "v1": "case-detail.html?caseId=:caseId",
+      "aliases": [],
+      "authentication": "approved-attorney-owner-or-currently-authorized-participant",
+      "responsibility": "Matter workspace and lifecycle actions",
+      "queryParameters": ["caseId", "tab", "panel", "applicantId", "fileId", "messageId"],
+      "allowedValues": {"tab": ["overview", "applications", "work", "files", "messages", "activity", "financials"]},
+      "hashValues": ["case-messages", "main"],
+      "v2Responsibility": "matter-workspace",
+      "retirement": "shared V1 route cannot be removed by attorney project"
+    },
+    {
+      "id": "attorney-paralegal-directory",
+      "v1": "browse-paralegals.html",
+      "aliases": [],
+      "authentication": "public-read-with-approved-attorney-actions",
+      "responsibility": "directory, filters, pagination, profile navigation and inquiry/invite",
+      "queryParameters": ["page", "limit", "sort", "minYears", "location", "practice"],
+      "hashValues": [],
+      "v2Responsibility": "paralegal-directory",
+      "retirement": "public route remains; attorney action experience may move to V2"
+    },
+    {
+      "id": "attorney-candidate-profile",
+      "v1": "profile-paralegal.html?paralegalId=:paralegalId",
+      "aliases": ["profile-paralegal.html?id=:paralegalId", "profile-paralegal.html?me=1"],
+      "authentication": "public-or-approved-viewer-with-field-and-action-gating",
+      "responsibility": "candidate profile, documents, invite, pre-engagement and hire continuation",
+      "queryParameters": ["paralegalId", "id", "me", "returnTo", "caseId", "applicantId", "returnFromProfile", "openApplicant", "continueHire"],
+      "hashValues": [],
+      "v2Responsibility": "candidate-profile",
+      "retirement": "public/self/paralegal consumers require shared compatibility"
+    },
+    {
+      "id": "attorney-profile",
+      "v1": "profile-attorney.html",
+      "aliases": ["profile-attorney.html?id=:attorneyId", "profile-attorney.html#id=:attorneyId"],
+      "authentication": "authenticated-viewer-with-profile-policy",
+      "responsibility": "own or authorized attorney profile presentation",
+      "queryParameters": ["id", "from"],
+      "hashValues": ["id=:attorneyId&from=:context"],
+      "v2Responsibility": "attorney-profile",
+      "retirement": "retain until every profile producer and viewer role is migrated"
+    },
+    {
+      "id": "attorney-settings-directory",
+      "v1": "profile-settings.html",
+      "aliases": [],
+      "authentication": "approved-user-with-role-conditional-presentation",
+      "responsibility": "settings directory and role dispatch",
+      "queryParameters": ["onboardingStep", "profilePrompt"],
+      "hashValues": [],
+      "v2Responsibility": "settings-index",
+      "retirement": "shared V1 document cannot be removed by attorney project"
+    },
+    {
+      "id": "attorney-settings-profile",
+      "v1": "profile-settings.html#profile:personal",
+      "aliases": [],
+      "authentication": "approved-attorney",
+      "responsibility": "personal, public and firm profile editing",
+      "queryParameters": ["onboardingStep", "profilePrompt"],
+      "hashValues": ["profile:personal", "profile:public", "profile:firm", "profile:notifications"],
+      "v2Responsibility": "settings-profile",
+      "retirement": "retain shared route until coordinated migration"
+    },
+    {
+      "id": "attorney-settings-security",
+      "v1": "profile-settings.html#securitySection",
+      "aliases": [],
+      "authentication": "approved-attorney",
+      "responsibility": "password, 2FA, passkeys, sessions and account closure",
+      "queryParameters": [],
+      "hashValues": ["securitySection", "security:closure"],
+      "v2Responsibility": "settings-security",
+      "retirement": "retain shared route until coordinated migration"
+    },
+    {
+      "id": "attorney-settings-preferences",
+      "v1": "profile-settings.html#preferencesSection",
+      "aliases": [],
+      "authentication": "approved-attorney",
+      "responsibility": "theme, font and account preferences",
+      "queryParameters": [],
+      "hashValues": ["preferencesSection"],
+      "v2Responsibility": "settings-preferences",
+      "retirement": "mountain compatibility blocks preference retirement"
+    },
+    {
+      "id": "attorney-help",
+      "v1": "help.html",
+      "aliases": [],
+      "authentication": "public-with-authenticated-header-adaptation",
+      "responsibility": "attorney help, incident intake and supporting links",
+      "queryParameters": [],
+      "hashValues": ["account-access", "posting", "hiring", "workflow", "private-tasks", "payments", "report-issue", "resources"],
+      "v2Responsibility": "owner-decision-public-link-or-authenticated-wrapper",
+      "retirement": "public route remains"
+    },
+    {
+      "id": "attorney-auth-return",
+      "v1": "login.html",
+      "aliases": ["forgot-password.html", "reset-password.html", "verify-email.html"],
+      "authentication": "shared-authentication-boundary",
+      "responsibility": "login, session-loss redirect, password recovery and safe return",
+      "queryParameters": ["next", "token", "email"],
+      "hashValues": [],
+      "v2Responsibility": "shared-compatibility-dependency",
+      "retirement": "out of attorney V2 scope"
+    },
+    {
+      "id": "attorney-supporting-public-content",
+      "v1": "attorney-faq.html",
+      "aliases": ["terms.html", "privacy.html", "accessibility.html", "contact.html"],
+      "authentication": "public",
+      "responsibility": "FAQ, legal, accessibility and support content linked by authenticated UX",
+      "queryParameters": [],
+      "hashValues": ["q8"],
+      "v2Responsibility": "external-public-dependency",
+      "retirement": "out of attorney V2 scope"
+    }
+  ],
+  "compatibilityNotes": [
+    "openApplicant and openApplicants both exist and must not be silently merged before characterization",
+    "returnTo must be same-origin and allowlisted before navigation",
+    "caseId, applicantId, fileId and messageId are authorization inputs, not proof of access",
+    "legacy redirect usage is unmeasured",
+    "case-detail and profile-settings remain shared V1 routes"
+  ]
+}

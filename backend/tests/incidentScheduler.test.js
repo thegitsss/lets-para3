@@ -1,3 +1,4 @@
+jest.mock("child_process", () => require("./helpers/incidentGitFixture").isolatedChildProcess(jest.requireActual("child_process")));
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -58,7 +59,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await closeDatabase();
+  try { await closeDatabase(); }
+  finally { require("./helpers/incidentGitFixture").cleanupIncidentGitFixture(); }
 });
 
 beforeEach(async () => {

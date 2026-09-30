@@ -18,7 +18,7 @@ const onePixelPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
   "base64"
 );
-const wideAttorneyPhotoPath = path.resolve(frontendRoot, "../docs/assets/homepage-matter/lpc-sky-v1.jpg");
+const wideAttorneyPhotoPath = path.join(frontendRoot, "hero-mountain.jpg");
 const wideAttorneyPhoto = fs.existsSync(wideAttorneyPhotoPath) ? fs.readFileSync(wideAttorneyPhotoPath) : onePixelPng;
 const wideAttorneyPhotoContentType = fs.existsSync(wideAttorneyPhotoPath) ? "image/jpeg" : "image/png";
 
@@ -146,7 +146,7 @@ async function installRoutes(
     failNextPhotoUpload: false,
     failNextPhotoRemoval: false,
     dashboardRequests: {
-      summary: 0,
+      inventory: 0,
       applications: 0,
       unread: 0,
       events: 0,
@@ -157,7 +157,7 @@ async function installRoutes(
     localStorage.setItem("lpc_user", JSON.stringify(user));
   }, viewer);
 
-  await page.route("http://lpc.test/**", async (route) => {
+  await page.route("https://lpc.test/**", async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname === `/api/public/paralegals/${profileId}/photo`) {
       if (photoStatus !== 200) {
@@ -175,6 +175,16 @@ async function installRoutes(
         });
       }
       return;
+    }
+    if (url.pathname === "/api/csrf") { await route.fulfill({ json: { csrfToken: "synthetic-ui-csrf" } }); return; }
+    if (url.pathname === "/api/auth/workspace-release") {
+      await route.fulfill({ json: { workspace: { schemaVersion: 1, ownerId: state.viewer.id, role: state.viewer.role, revision: 0, version: "legacy", defaultDestination: `/dashboard-${state.viewer.role}.html` } } }); return;
+    }
+    if (url.pathname === "/api/notifications") { await route.fulfill({ json: [] }); return; }
+    if (url.pathname === "/api/notifications/unread-count") { await route.fulfill({ json: { count: 0 } }); return; }
+    if (url.pathname === "/api/notifications/stream") { await route.fulfill({ status: 204, body: "" }); return; }
+    if (url.pathname === "/api/payments/attorney-financial-history") {
+      await route.fulfill({ json: { ownerId: viewerId, revision: "b".repeat(64), view: url.searchParams.get("view") || "all", q: url.searchParams.get("q") || "", caseId: url.searchParams.get("caseId") || null, total: 0, entries: [], nextCursor: null, summary: { currencies: [], requiresReview: 0, pending: 0, undated: 0 } } }); return;
     }
     if (url.pathname === "/api/auth/me") {
       await route.fulfill({ json: { user: state.viewer } });
@@ -201,7 +211,7 @@ async function installRoutes(
       return;
     }
     if (url.pathname === "/api/payments/payment-method/default") {
-      await route.fulfill({ json: { paymentMethod: null } });
+      await route.fulfill({ json: { hasDefault: false, paymentMethod: null } });
       return;
     }
     if (url.pathname === "/api/payments/history") {
@@ -214,7 +224,7 @@ async function installRoutes(
         state.preferenceRequests.push(payload);
         await route.fulfill({ json: { success: true, preferences: payload, state: payload.state || "" } });
       } else {
-        await route.fulfill({ json: { email: true, theme: "mountain", fontSize: "md", hideProfile: false, state: "VA" } });
+        await route.fulfill({ json: { email: true, theme: "light", fontSize: "md", hideProfile: false, state: "VA" } });
       }
       return;
     }
@@ -312,38 +322,21 @@ async function installRoutes(
       await route.fulfill({ json: { items: [] } });
       return;
     }
-    if (role === "attorney" && url.pathname === "/api/attorney/dashboard") {
-      state.dashboardRequests.summary += 1;
+    if (role === "attorney" && url.pathname === "/api/cases/inventory/home") {
+      state.dashboardRequests.inventory += 1;
       if (dashboardDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, dashboardDelayMs));
-      const empty = dashboardState === "empty";
-      const singular = dashboardState === "singular";
-      await route.fulfill({
-        json: {
-          metrics: {
-            activeCases: empty ? 0 : singular ? 1 : 6,
-            completedCases: empty ? 0 : singular ? 1 : 12,
-            openJobs: empty ? 0 : singular ? 1 : 2,
-            pendingApplications: empty ? 0 : singular ? 1 : 4,
-            weekDeadlines: empty ? 0 : singular ? 1 : 2,
-            escrowTotal: 0,
-          },
-          activeCases: empty ? [] : [
-            { caseId: "66b000000000000000000001", jobTitle: "Martinez discovery", practiceArea: "Civil litigation", paralegalName: "Jordan Lee", status: "in progress", createdAt: "2026-08-18T12:00:00.000Z" },
-            { caseId: "66b000000000000000000002", jobTitle: "Northstar contract review", practiceArea: "Contract law", paralegalName: "Taylor Morgan", status: "in progress", createdAt: "2026-08-17T12:00:00.000Z" },
-            { caseId: "66b000000000000000000003", jobTitle: "Acme document production", practiceArea: "Commercial litigation", paralegalName: "Avery Chen", status: "in progress", createdAt: "2026-08-16T12:00:00.000Z" },
-          ].slice(0, singular ? 1 : 3),
-          openJobs: [],
-          pendingApplications: [],
-          week: {
-            start: "2026-08-17",
-            end: "2026-08-23",
-            deadlines: empty ? [] : [
-              { caseId: "66b000000000000000000001", title: "Martinez discovery", dueDate: "2026-08-21", href: "case-detail.html?id=66b000000000000000000001" },
-              { caseId: "66b000000000000000000002", title: "Northstar contract review", dueDate: "2026-08-23", href: "case-detail.html?id=66b000000000000000000002" },
-            ].slice(0, singular ? 1 : 2),
-          },
-        },
-      });
+      const empty = dashboardState === "empty", singular = dashboardState === "singular";
+      const total = empty ? 0 : singular ? 1 : 6, completed = empty ? 0 : singular ? 1 : 12;
+      const titles = ["Martinez discovery", "Northstar contract review", "Acme document production", "Employment response", "Contract exhibits"];
+      const items = titles.slice(0, Math.min(5, total)).map((title, index) => ({ id: `66b${String(index + 1).padStart(21, "0")}`, title, practiceArea: "Civil litigation", label: "In Progress" }));
+      const weekItems = items.slice(0, singular ? 1 : 2).map((item, index) => ({ ...item, dueDate: index ? "2026-08-23" : "2026-08-21" }));
+      const completedItems = Array.from({ length: Math.min(3, completed) }, (_, index) => ({ id: `66d${String(index + 1).padStart(21, "0")}`, title: `Completed Matter ${index + 1}`, practiceArea: "Civil litigation", label: "Completed" }));
+      await route.fulfill({ json: {
+        ownerId: viewerId, revision: "a".repeat(64), counts: { active: total, applications: 0, draft: 0, archived: completed }, postedCount: total + completed,
+        recent: { total, items }, completed: { total: completed, items: completedItems },
+        attention: { total: total ? 1 : 0, items: items.slice(0, 1).map(item => ({ ...item, actions: ["files"] })), page: 1, pageSize: 5, pages: 1 },
+        week: { start: "2026-08-17", end: "2026-08-23", total: weekItems.length, items: weekItems, page: 1, pageSize: 3, pages: 1 },
+      } });
       return;
     }
     if (role === "attorney" && url.pathname === "/api/cases/my") {
@@ -385,8 +378,13 @@ async function installRoutes(
       await route.fulfill({ json: { count: dashboardState === "empty" ? 0 : dashboardState === "singular" ? 1 : 3 } });
       return;
     }
+    if (role === "attorney" && url.pathname === "/api/messages/summary") {
+      const unread = dashboardState === "empty" ? 0 : dashboardState === "singular" ? 1 : 3;
+      await route.fulfill({ json: { items: unread ? [{ caseId: "66b000000000000000000001", unread }] : [] } }); return;
+    }
     if (role === "attorney" && url.pathname === "/api/messages/threads") {
-      await route.fulfill({ json: { threads: [] } });
+      const unread = dashboardState === "empty" ? 0 : dashboardState === "singular" ? 1 : 3;
+      await route.fulfill({ json: { threads: unread ? [{ caseId: "66b000000000000000000001", unread }] : [], total: unread ? 1 : 0 } });
       return;
     }
     if (role === "attorney" && url.pathname === "/api/events") {
@@ -398,11 +396,18 @@ async function installRoutes(
       await route.fulfill({ json: { items: [], total: 0, page: 1, pages: 0 } });
       return;
     }
+    if (role === "attorney" && url.pathname === "/api/users/me/weekly-notes" && route.request().method() === "GET") {
+      const weekStart = url.searchParams.get("weekStart");
+      await route.fulfill({ json: { weekStart, notes: Array(7).fill(""), updatedAt: null, revision: `empty:${viewerId}:${weekStart}` } });
+      return;
+    }
     if (url.pathname.startsWith("/api/")) {
       await route.fulfill({ status: 404, json: { error: "Not available in UI fixture" } });
       return;
     }
 
+    const vendor = { "/assets/vendor/web-vitals-6.1.1.js": "web-vitals/dist/web-vitals.js", "/assets/vendor/simplewebauthn-13.3.0.js": "@simplewebauthn/browser/dist/bundle/index.umd.min.js" }[url.pathname];
+    if (vendor) { await route.fulfill({ contentType: "application/javascript", body: fs.readFileSync(path.resolve(__dirname, "../node_modules", vendor)) }); return; }
     const relative = decodeURIComponent(url.pathname).replace(/^\/+/, "") || "index.html";
     const filePath = path.resolve(frontendRoot, relative);
     if (!filePath.startsWith(`${frontendRoot}${path.sep}`) || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
@@ -499,21 +504,30 @@ async function assertStripeDashboardShell(page) {
 
   const layout = await page.evaluate(() => {
     const main = document.querySelector("main.main");
-    const topbar = document.querySelector(".topbar");
+    const topbar = document.querySelector("[data-lpc-universal-header='true']");
     const searchHost = document.querySelector(".lpc-global-search-host");
     const searchTrigger = document.querySelector(".lpc-global-search-trigger");
     const searchLabel = document.querySelector(".lpc-global-search-trigger-label");
     const mainStyle = getComputedStyle(main);
+    const topbarStyle = getComputedStyle(topbar);
     const triggerStyle = getComputedStyle(searchTrigger);
     const mainContentLeft = main.getBoundingClientRect().left + parseFloat(mainStyle.paddingLeft);
+    const mainContentRight = main.getBoundingClientRect().right - parseFloat(mainStyle.paddingRight);
+    const headerContentRight = topbar.getBoundingClientRect().right - parseFloat(topbarStyle.paddingRight);
     return {
       mainContentLeft,
+      mainContentRight,
       mainPaddingLeft: parseFloat(mainStyle.paddingLeft),
       mainPaddingRight: parseFloat(mainStyle.paddingRight),
       mainPaddingBottom: parseFloat(mainStyle.paddingBottom),
-      topbarMarginBottom: parseFloat(getComputedStyle(topbar).marginBottom),
+      topbarMarginBottom: parseFloat(topbarStyle.marginBottom),
+      topbarHeight: topbar.getBoundingClientRect().height,
+      topbarBorderBottomWidth: topbarStyle.borderBottomWidth,
+      topbarBackground: topbarStyle.backgroundColor,
+      headerContentRight,
       searchWidth: searchHost.getBoundingClientRect().width,
       searchLeft: searchHost.getBoundingClientRect().left,
+      searchRight: searchHost.getBoundingClientRect().right,
       searchHeight: searchTrigger.getBoundingClientRect().height,
       searchRadius: triggerStyle.borderRadius,
       searchBackground: triggerStyle.backgroundColor,
@@ -522,23 +536,21 @@ async function assertStripeDashboardShell(page) {
   });
   assert.ok(layout.mainPaddingLeft >= 40 && layout.mainPaddingLeft <= 72, JSON.stringify(layout));
   assert.equal(layout.mainPaddingLeft, layout.mainPaddingRight, JSON.stringify(layout));
-  assert.equal(layout.mainPaddingBottom, 88, JSON.stringify(layout));
-  assert.ok(layout.topbarMarginBottom >= 32, JSON.stringify(layout));
+  assert.equal(layout.mainPaddingBottom, isAttorney ? 88 : 64, JSON.stringify(layout));
+  assert.equal(layout.topbarMarginBottom, 0, JSON.stringify(layout));
+  assert.equal(layout.topbarHeight, 68, JSON.stringify(layout));
+  assert.equal(layout.topbarBorderBottomWidth, "1px", JSON.stringify(layout));
+  assert.equal(layout.topbarBackground, "rgb(255, 255, 255)", JSON.stringify(layout));
+  assert.equal(layout.searchWidth, 46, JSON.stringify(layout));
+  const expectedTrailingToolsWidth = isAttorney ? 150 : 100;
   assert.ok(
-    isAttorney
-      ? layout.searchWidth >= 260 && layout.searchWidth <= 321
-      : layout.searchWidth >= 379 && layout.searchWidth <= 381,
+    Math.abs((layout.headerContentRight - layout.searchRight) - expectedTrailingToolsWidth) <= 2,
     JSON.stringify(layout)
   );
-  assert.ok(Math.abs(layout.searchLeft - layout.mainContentLeft) <= 1, JSON.stringify(layout));
-  assert.equal(layout.searchHeight, 40, JSON.stringify(layout));
-  assert.equal(layout.searchRadius, "8px", JSON.stringify(layout));
-  assert.equal(
-    layout.searchBackground,
-    isAttorney ? "rgb(238, 245, 251)" : "rgb(246, 248, 250)",
-    JSON.stringify(layout)
-  );
-  assert.equal(layout.searchLabelOpacity, "1", JSON.stringify(layout));
+  assert.equal(layout.searchHeight, 46, JSON.stringify(layout));
+  assert.equal(layout.searchRadius, "999px", JSON.stringify(layout));
+  assert.equal(layout.searchBackground, "rgba(0, 0, 0, 0)", JSON.stringify(layout));
+  assert.equal(layout.searchLabelOpacity, "0", JSON.stringify(layout));
 }
 
 async function assertDashboardBodyCopyUsesSarabun(page, selector) {
@@ -556,7 +568,7 @@ async function assertAttorneyOperationalHome(page) {
   await page.waitForFunction(() => document.getElementById("user-name-heading")?.textContent?.trim() === "Alex");
   await page.waitForFunction(() =>
     ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
-      .every((id) => ["populated", "empty", "failed"].includes(document.getElementById(id)?.dataset.state))
+      .every((id) => ["ready", "failed"].includes(document.getElementById(id)?.dataset.state))
   );
 
   const home = await page.evaluate(() => {
@@ -675,7 +687,7 @@ async function assertAttorneyOperationalHome(page) {
 
   assert.equal(home.bodyClass, true, JSON.stringify(home));
   assert.equal(home.heading, "Today", JSON.stringify(home));
-  assert.match(home.summary, /Welcome, Alex\. Here’s what needs your attention\./, JSON.stringify(home));
+  assert.equal(home.summary, "Welcome, Alex.", JSON.stringify(home));
   assert.equal(home.summaryNameMinWidth, "0px", JSON.stringify(home));
   assert.equal(home.createHref, "/create-case.html", JSON.stringify(home));
   assert.equal(home.actionQueueInMain, true, JSON.stringify(home));
@@ -689,7 +701,7 @@ async function assertAttorneyOperationalHome(page) {
   assert.ok(Math.abs(home.overviewWidth - (home.mainWidth + home.railWidth + home.columnGap)) <= 2, JSON.stringify(home));
   assert.equal(home.overviewHeading, "Your overview", JSON.stringify(home));
   assert.equal(home.overviewGridDisplay, "grid", JSON.stringify(home));
-  assert.equal(home.overviewGridColumns.split(" ").length, 3, JSON.stringify(home));
+  assert.equal(home.overviewGridColumns.split(" ").length, 4, JSON.stringify(home));
   assert.ok(home.overviewGridGap >= 8 && home.overviewGridGap <= 12, JSON.stringify(home));
   assert.equal(home.overviewCardCount, 4, JSON.stringify(home));
   assert.ok(home.overviewCardMinHeight >= 150 && home.overviewCardMinHeight <= 180, JSON.stringify(home));
@@ -701,7 +713,7 @@ async function assertAttorneyOperationalHome(page) {
   assert.equal(home.recentMatters.borderRadius, "0px", JSON.stringify(home));
   assert.equal(home.recentMatterDisplay, "block", JSON.stringify(home));
   assert.doesNotMatch(home.recentMatterColumns, /px .*px/, JSON.stringify(home));
-  assert.ok(home.recentMatterCount <= 3, JSON.stringify(home));
+  assert.equal(home.recentMatterCount, 5, JSON.stringify(home));
   assert.equal(home.recentMattersAllHref, "#cases", JSON.stringify(home));
   assert.equal(home.recentMattersAllTarget, "cases", JSON.stringify(home));
   if (home.matterRows.length > 1) {
@@ -735,17 +747,17 @@ async function assertAttorneyOperationalHome(page) {
   assert.equal(home.onboardingFullyVisible, true, JSON.stringify(home));
   assert.equal(home.onboardingProgressColor, "rgb(85, 124, 159)", JSON.stringify(home));
   assert.deepEqual(home.overviewStates, {
-    overviewMattersBody: "populated",
-    overviewApplicationsBody: "populated",
-    overviewMessagesBody: "populated",
-    overviewCompletedBody: "populated",
-    deadlineList: "populated",
+    overviewMattersBody: "ready",
+    overviewApplicationsBody: "ready",
+    overviewMessagesBody: "ready",
+    overviewCompletedBody: "ready",
+    deadlineList: "ready",
   }, JSON.stringify(home));
-  assert.equal(home.overviewCopy.overviewMattersBody, "6 active matters", JSON.stringify(home));
-  assert.equal(home.overviewCopy.overviewApplicationsBody, "4 applications awaiting review", JSON.stringify(home));
-  assert.equal(home.overviewCopy.overviewMessagesBody, "3 unread messages", JSON.stringify(home));
-  assert.equal(home.overviewCopy.overviewCompletedBody, "12 completed matters", JSON.stringify(home));
-  assert.match(home.overviewCopy.deadlineList, /^2 deadlines this week/, JSON.stringify(home));
+  assert.equal(home.overviewCopy.overviewMattersBody, "6 current", JSON.stringify(home));
+  assert.equal(home.overviewCopy.overviewApplicationsBody, "4 awaiting review", JSON.stringify(home));
+  assert.equal(home.overviewCopy.overviewMessagesBody, "3", JSON.stringify(home));
+  assert.equal(home.overviewCopy.overviewCompletedBody, "12", JSON.stringify(home));
+  assert.match(home.overviewCopy.deadlineList, /Martinez discovery.*Northstar contract review/, JSON.stringify(home));
   assert.equal(home.deadlineRowCount, 2, JSON.stringify(home));
   assert.equal(home.statusRail.borderLeftWidth, "0px", JSON.stringify(home));
   assert.equal(home.statusRail.borderRightWidth, "0px", JSON.stringify(home));
@@ -757,7 +769,7 @@ async function assertAttorneyOperationalHome(page) {
   assert.ok(home.mainWidth / (home.mainWidth + home.railWidth) <= 0.71, JSON.stringify(home));
   assert.ok(home.columnGap >= 32 && home.columnGap <= 40, JSON.stringify(home));
   assert.equal(home.canvasBackground, "rgb(255, 255, 255)", JSON.stringify(home));
-  assert.equal(home.searchBackground, "rgb(238, 245, 251)", JSON.stringify(home));
+  assert.equal(home.searchBackground, "rgba(0, 0, 0, 0)", JSON.stringify(home));
   assert.equal(home.activeNavBackground, "rgb(238, 245, 251)", JSON.stringify(home));
   assert.equal(home.createMatterBackground, "rgb(255, 255, 255)", JSON.stringify(home));
   assert.deepEqual(home.keyShadows, ["none", "none", "none", "none", "none"], JSON.stringify(home));
@@ -808,7 +820,7 @@ async function assertAttorneyWeeklyNotesInTasks(page) {
 async function runDirectory(browser, viewport, photoStatus = 200, role = "attorney") {
   const page = await browser.newPage({ viewport });
   await installRoutes(page, { role, photoStatus });
-  await page.goto("http://lpc.test/browse-paralegals.html");
+  await page.goto("https://lpc.test/browse-paralegals.html");
   await page.waitForSelector("body.authenticated-browse");
   const shell = await page.evaluate(() => {
     const publicHeader = document.querySelector("[data-public-header]");
@@ -844,13 +856,13 @@ async function runDirectory(browser, viewport, photoStatus = 200, role = "attorn
       const node = document.querySelector(`.paralegal-card[data-paralegal-id="${id}"] img`);
       return node?.complete && node.naturalWidth > 0;
     }, profileId);
-    assert.equal(new URL(await image.getAttribute("src"), "http://lpc.test").pathname, `/api/public/paralegals/${profileId}/photo`);
+    assert.equal(new URL(await image.getAttribute("src"), "https://lpc.test").pathname, `/api/public/paralegals/${profileId}/photo`);
   } else {
     await page.waitForFunction((id) => {
       const node = document.querySelector(`.paralegal-card[data-paralegal-id="${id}"] img`);
       return node?.complete && node.naturalWidth > 0 && new URL(node.src).pathname === "/assets/avatar-placeholder.svg";
     }, profileId);
-    assert.equal(new URL(await image.getAttribute("src"), "http://lpc.test").pathname, "/assets/avatar-placeholder.svg");
+    assert.equal(new URL(await image.getAttribute("src"), "https://lpc.test").pathname, "/assets/avatar-placeholder.svg");
   }
   await assertNoHorizontalOverflow(page);
   if (photoStatus === 200) {
@@ -863,17 +875,17 @@ async function runProfile(browser, { role, viewport, self = false }) {
   const page = await browser.newPage({ viewport });
   await installRoutes(page, { role });
   const query = self ? "?me=1" : `?paralegalId=${profileId}`;
-  await page.goto(`http://lpc.test/profile-paralegal.html${query}`);
+  await page.goto(`https://lpc.test/profile-paralegal.html${query}`);
   const image = page.locator("[data-profile-avatar]");
   await image.waitFor();
   await page.waitForFunction(() => {
     const node = document.querySelector("[data-profile-avatar]");
     return node?.complete && node.naturalWidth > 0;
   });
-  assert.equal(new URL(await image.getAttribute("src"), "http://lpc.test").pathname, `/api/public/paralegals/${profileId}/photo`);
+  assert.equal(new URL(await image.getAttribute("src"), "https://lpc.test").pathname, `/api/public/paralegals/${profileId}/photo`);
   const resumeLink = page.locator("#resumeLink");
   await resumeLink.waitFor({ state: "visible" });
-  const resumeHref = new URL(await resumeLink.getAttribute("href"), "http://lpc.test");
+  const resumeHref = new URL(await resumeLink.getAttribute("href"), "https://lpc.test");
   assert.equal(resumeHref.pathname, "/api/uploads/view");
   assert.equal(resumeHref.searchParams.get("key"), profile.resumeURL);
   assert.equal(await resumeLink.getAttribute("data-key"), profile.resumeURL);
@@ -887,7 +899,7 @@ async function runProfileSettingsCropper(browser, { role, viewport }) {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   const state = await installRoutes(page, { role });
-  await page.goto(`http://lpc.test/profile-settings.html${role === "attorney" ? "#profile" : ""}`);
+  await page.goto(`https://lpc.test/profile-settings.html${role === "attorney" ? "#profile" : ""}`);
 
   const isAttorney = role === "attorney";
   const rolePanel = page.locator(isAttorney ? "#attorneySettings" : "#paralegalSettings");
@@ -1000,7 +1012,7 @@ async function runProfileSettingsCropper(browser, { role, viewport }) {
   } else {
     assert.equal(state.viewer.profilePhotoStatus, "pending_review");
     assert.match(state.viewer.pendingProfileImage, /variant=pending/);
-    assert.equal(await page.locator("#photoReviewStatus").textContent(), "Pending");
+    assert.equal(await page.locator("#photoReviewStatus").textContent(), "Your profile is hidden from attorney discovery until your photo is approved.");
   }
   assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
   await assertNoHorizontalOverflow(page);
@@ -1113,13 +1125,13 @@ async function openAndAssertSidebarAccountMenu(page, viewport, screenshotDir = "
   assert.equal(await menu.locator(".lpc-account-menu-user-name").textContent(), "Alex Attorney");
   const profileLink = menu.locator("a.lpc-account-menu-user");
   assert.equal(await profileLink.count(), 1);
-  const profileUrl = new URL(await profileLink.getAttribute("href"), "http://lpc.test");
+  const profileUrl = new URL(await profileLink.getAttribute("href"), "https://lpc.test");
   assert.equal(profileUrl.pathname, "/profile-settings.html");
   assert.equal(profileUrl.hash, "#profile");
   assert.equal(await profileLink.getAttribute("aria-label"), "Open profile settings for Alex Attorney");
   assert.equal(await menu.locator("[data-logout] .lpc-account-menu-label").textContent(), "Sign out");
-  assert.equal(new URL(await menu.locator("[data-account-settings]").getAttribute("href"), "http://lpc.test").pathname, "/profile-settings.html");
-  assert.equal(new URL(await menu.locator("[data-account-create]").getAttribute("href"), "http://lpc.test").pathname, "/create-case.html");
+  assert.equal(new URL(await menu.locator("[data-account-settings]").getAttribute("href"), "https://lpc.test").pathname, "/profile-settings.html");
+  assert.equal(new URL(await menu.locator("[data-account-create]").getAttribute("href"), "https://lpc.test").pathname, "/create-case.html");
   assert.equal(await menu.getByText(/sandbox/i).count(), 0);
   assert.equal(await menu.locator(".lpc-account-menu-icon").count(), 4);
   assert.equal(await menu.locator(".lpc-account-menu-trailing-icon").count(), 2);
@@ -1173,7 +1185,7 @@ async function runAttorneyPhotoReliability(browser, viewport) {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   const state = await installRoutes(page, { role: "attorney", attorneyPhoto: true });
-  await page.goto("http://lpc.test/profile-settings.html#profile");
+  await page.goto("https://lpc.test/profile-settings.html#profile");
   await page.locator("#attorneySettings").waitFor({ state: "visible" });
   await page.waitForFunction(() => {
     const image = document.getElementById("attorneyAvatarPreview");
@@ -1259,12 +1271,12 @@ async function runAttorneySettingsLayout(browser, viewport) {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   const state = await installRoutes(page, { role: "attorney", attorneyPhoto: true });
-  await page.goto("http://lpc.test/profile-settings.html");
+  await page.goto("https://lpc.test/profile-settings.html");
   await page.locator("#settingsDirectorySection").waitFor({ state: "visible" });
   await assertNoCormorant(page);
   assert.equal(await page.locator("#accountSettingsTitle").textContent(), "Settings");
   assert.equal(await page.locator("[data-settings-destination]").count(), 12);
-  assert.equal(await page.locator("#settingsDirectorySearch").getAttribute("placeholder"), "Search settings");
+  assert.equal(await page.getByRole("searchbox", { name: "Search settings", exact: true }).getAttribute("id"), "settingsDirectorySearch");
   const settingsNavIcons = await page.locator("#navSettings, #navProfile, #navSecurity, #navPreferences").evaluateAll((items) =>
     items.map((item) => ({ kind: item.dataset.sidebarIcon, markup: item.querySelector(".sidebar-nav-icon")?.innerHTML || "" }))
   );
@@ -1326,7 +1338,7 @@ async function runAttorneySettingsLayout(browser, viewport) {
   assert.equal(destinationHrefs.includes("dashboard-attorney.html?from=settings&settingsTarget=payment-method#funds"), true);
   assert.equal(destinationHrefs.includes("dashboard-attorney.html?from=settings&settingsTarget=billing-history#funds"), true);
   destinationHrefs.filter((href) => href && !href.startsWith("#")).forEach((href) => {
-    const pathname = new URL(href, "http://lpc.test").pathname.replace(/^\/+/, "");
+    const pathname = new URL(href, "https://lpc.test").pathname.replace(/^\/+/, "");
     assert.equal(fs.existsSync(path.join(frontendRoot, pathname)), true, `Missing settings destination: ${href}`);
   });
 
@@ -1339,7 +1351,7 @@ async function runAttorneySettingsLayout(browser, viewport) {
   await page.goForward();
   await page.locator("#attorneySettings").waitFor({ state: "visible" });
   assert.equal(new URL(page.url()).hash, "#profile:personal");
-  assert.equal(await page.locator("#accountSettingsTitle").textContent(), "Account settings");
+  assert.equal(await page.locator("#accountSettingsTitle").textContent(), "Account Settings");
   assert.equal(await page.locator("#attorneySettings .attorney-settings-panel").count(), 3);
   assert.equal(await page.locator("#saveAttorneyProfile").isDisabled(), true);
   assert.equal(await page.locator('#attorneySettings input[type="tel"]').count(), 0);
@@ -1379,15 +1391,14 @@ async function runAttorneySettingsLayout(browser, viewport) {
         sidebarWidth: sidebarRect.width,
         leftGutter: settingsRect.left - sidebarRect.right,
         rightGutter: contentRect.right - settingsRect.right,
-        scrollbarGutter: contentRect.width - document.getElementById("main").clientWidth,
         settingsWidth: settingsRect.width,
         availableWidth: contentRect.width,
       };
     });
     assert.ok(Math.abs(shellLayout.sidebarWidth - 230) <= 1, JSON.stringify(shellLayout));
     assert.ok(shellLayout.leftGutter >= 31 && shellLayout.leftGutter <= 69, JSON.stringify(shellLayout));
-    assert.ok(Math.abs(shellLayout.leftGutter - (shellLayout.rightGutter - shellLayout.scrollbarGutter)) <= 1, JSON.stringify(shellLayout));
-    assert.ok(shellLayout.settingsWidth / shellLayout.availableWidth >= 0.88, JSON.stringify(shellLayout));
+    assert.ok(shellLayout.rightGutter >= shellLayout.leftGutter - 1, JSON.stringify(shellLayout));
+    assert.ok(Math.abs(shellLayout.settingsWidth - 1080) <= 1, JSON.stringify(shellLayout));
 
     const scrollMetrics = await page.locator("#main").evaluate((main) => ({
       clientHeight: main.clientHeight,
@@ -1467,7 +1478,7 @@ async function runAttorneySettingsLayout(browser, viewport) {
       heroDisplay: getComputedStyle(hero).display,
     };
   });
-  assert.equal(securityLayout.columns, 1);
+  assert.equal(securityLayout.columns, viewport.width > 960 ? 2 : 1);
   assert.equal(securityLayout.borderLeftWidth, "0px");
   assert.equal(securityLayout.borderRadius, "0px");
   assert.equal(securityLayout.boxShadow, "none");
@@ -1498,8 +1509,13 @@ async function runAttorneySettingsLayout(browser, viewport) {
   assert.equal(await page.locator("#preferencesSection [data-theme-preview]").count(), 2);
   assert.equal(await page.locator('#preferencesSection [data-theme-preview="light"]').count(), 1);
   assert.equal(await page.locator('#preferencesSection [data-theme-preview="dark"]').count(), 1);
-  assert.equal(await page.locator('#preferencesSection [data-theme-preview*="mountain"]').count(), 0);
   assert.equal(await page.locator("#themePreference").inputValue(), "light");
+  const preferencesLayout = await page.locator("#preferencesSection .preferences-layout").evaluate((layout) => ({
+    columns: getComputedStyle(layout).gridTemplateColumns.split(" ").filter(Boolean).length,
+    width: layout.getBoundingClientRect().width,
+  }));
+  assert.equal(preferencesLayout.columns, viewport.width > 960 ? 2 : 1, JSON.stringify(preferencesLayout));
+  assert.ok(preferencesLayout.width > 0, JSON.stringify(preferencesLayout));
   await assertNoHorizontalOverflow(page);
   const preferencesAccessibility = await new AxeBuilder({ page }).include("#preferencesSection").analyze();
   assert.deepEqual(
@@ -1521,10 +1537,16 @@ async function runAttorneySettingsLayout(browser, viewport) {
     });
   }
 
-  const preferencesResponse = page.waitForResponse((response) =>
+  let preferencesResponse = page.waitForResponse((response) =>
     response.request().method() === "POST" && new URL(response.url()).pathname === "/api/account/preferences"
   );
-  await page.locator("#savePreferencesBtn").click();
+  await page.locator('#preferencesSection [data-theme-preview="dark"]').click();
+  await preferencesResponse;
+  assert.equal(state.preferenceRequests.at(-1)?.theme, "dark");
+  preferencesResponse = page.waitForResponse((response) =>
+    response.request().method() === "POST" && new URL(response.url()).pathname === "/api/account/preferences"
+  );
+  await page.locator('#preferencesSection [data-theme-preview="light"]').click();
   await preferencesResponse;
   assert.equal(state.preferenceRequests.at(-1)?.theme, "light");
 
@@ -1558,18 +1580,18 @@ async function runAccountSettingsStableHydration(browser) {
     userGetDelayMs: 500,
   });
 
-  await page.goto("http://lpc.test/profile-settings.html", { waitUntil: "domcontentloaded" });
-  assert.equal(await page.locator("body").evaluate((body) => body.classList.contains("settings-layout-ready")), false);
-  assert.equal(await page.locator("#accountSettingsBoot").isVisible(), true);
+  await page.goto("https://lpc.test/profile-settings.html", { waitUntil: "domcontentloaded" });
+  assert.equal(await page.locator("body").evaluate((body) => body.classList.contains("settings-layout-ready")), true);
+  assert.equal(await page.locator("#accountSettingsBoot").count(), 0);
   const loadingVisibility = await page.evaluate(() => ({
     main: getComputedStyle(document.getElementById("main")).visibility,
     sidebar: getComputedStyle(document.getElementById("sidebarNav")).visibility,
   }));
-  assert.deepEqual(loadingVisibility, { main: "hidden", sidebar: "hidden" });
+  assert.deepEqual(loadingVisibility, { main: "visible", sidebar: "visible" });
 
-  await page.waitForFunction(() => document.body.classList.contains("settings-layout-ready"));
+  await page.waitForFunction(() => document.body.classList.contains("attorney-classic"));
+  await page.waitForFunction(() => document.getElementById("settingsContent")?.getAttribute("aria-busy") !== "true");
   assert.equal(await page.locator("body").evaluate((body) => body.classList.contains("attorney-classic")), true);
-  await page.locator("#accountSettingsBoot").waitFor({ state: "hidden" });
   assert.equal(await page.locator("#main").evaluate((main) => getComputedStyle(main).visibility), "visible");
   assert.equal(await page.locator("#settingsDirectorySection").isVisible(), true);
   assert.equal(await page.locator("#attorneySettings").isVisible(), false);
@@ -1584,14 +1606,14 @@ async function runAttorneyDashboardAccountMenu(browser) {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   const routeState = await installRoutes(page, { role: "attorney", attorneyPhoto: true });
-  await page.goto("http://lpc.test/dashboard-attorney.html");
+  await page.goto("https://lpc.test/dashboard-attorney.html");
   await page.locator("#sidebarNav").waitFor({ state: "visible" });
   await assertNoCormorant(page);
   await assertStripeDashboardEmphasis(page);
   await assertStripeDashboardShell(page);
-  await assertDashboardBodyCopyUsesSarabun(page, ".queue-meta");
+  await assertDashboardBodyCopyUsesSarabun(page, ".matter-meta");
   await assertAttorneyOperationalHome(page);
-  assert.equal(routeState.dashboardRequests.summary, 1, JSON.stringify(routeState.dashboardRequests));
+  assert.equal(routeState.dashboardRequests.inventory, 1, JSON.stringify(routeState.dashboardRequests));
   assert.equal(routeState.dashboardRequests.applications, 1, JSON.stringify(routeState.dashboardRequests));
   assert.equal(routeState.dashboardRequests.events, 0, JSON.stringify(routeState.dashboardRequests));
   if (accountSettingsScreenshotDir) {
@@ -1624,13 +1646,13 @@ async function runAttorneyDashboardAccountMenu(browser) {
   }
   await openAndAssertSidebarAccountMenu(page, { width: 1440, height: 900 });
 
-  await page.goto("http://lpc.test/dashboard-attorney.html?from=settings&settingsTarget=payment-method#funds");
+  await page.goto("https://lpc.test/dashboard-attorney.html?from=settings&settingsTarget=payment-method#funds");
   await page.locator('[data-view="funds"]').waitFor({ state: "visible" });
   await page.locator("#paymentsSettingsBackLink").waitFor({ state: "visible" });
   assert.equal(await page.locator("#paymentsSettingsBackLink").getAttribute("href"), "profile-settings.html");
   await page.waitForFunction(() => document.activeElement?.id === "payment-method-heading");
 
-  await page.goto("http://lpc.test/dashboard-attorney.html?from=settings&settingsTarget=billing-history#funds");
+  await page.goto("https://lpc.test/dashboard-attorney.html?from=settings&settingsTarget=billing-history#funds");
   await page.locator('[data-view="funds"]').waitFor({ state: "visible" });
   await page.locator("#paymentsSettingsBackLink").waitFor({ state: "visible" });
   await page.waitForFunction(() => document.activeElement?.id === "history-heading");
@@ -1644,9 +1666,9 @@ async function runAttorneyDashboardMobileLayout(browser) {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await installRoutes(page, { role: "attorney", attorneyPhoto: true });
-  await page.goto("http://lpc.test/dashboard-attorney.html");
+  await page.goto("https://lpc.test/dashboard-attorney.html");
   await page.locator("#attorneyNeedsAttention").waitFor({ state: "visible" });
-  await page.waitForFunction(() => document.getElementById("overviewMattersBody")?.dataset.state === "populated");
+  await page.waitForFunction(() => document.getElementById("overviewMattersBody")?.dataset.state === "ready");
 
   const mobile = await page.evaluate(() => {
     const attention = document.getElementById("attorneyNeedsAttention");
@@ -1705,10 +1727,10 @@ async function runAttorneyDashboardEmptyOverview(browser) {
       attorneyPhoto: true,
       dashboardState: "empty",
     });
-    await page.goto("http://lpc.test/dashboard-attorney.html");
+    await page.goto("https://lpc.test/dashboard-attorney.html");
     await page.waitForFunction(() =>
       ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
-        .every((id) => document.getElementById(id)?.dataset.state === "empty")
+        .every((id) => document.getElementById(id)?.dataset.state === "ready")
     );
     const empty = await page.evaluate(() => ({
       matters: document.getElementById("overviewMattersBody")?.textContent?.replace(/\s+/g, " ").trim(),
@@ -1716,17 +1738,17 @@ async function runAttorneyDashboardEmptyOverview(browser) {
       messages: document.getElementById("overviewMessagesBody")?.textContent?.replace(/\s+/g, " ").trim(),
       completed: document.getElementById("overviewCompletedBody")?.textContent?.replace(/\s+/g, " ").trim(),
       week: document.getElementById("deadlineList")?.textContent?.replace(/\s+/g, " ").trim(),
-      createHref: document.querySelector("#overviewMattersBody .overview-module-action")?.getAttribute("href"),
+      createHref: document.querySelector(".command-create-matter")?.getAttribute("href"),
       skeletonCount: document.querySelectorAll(".home-overview .overview-module-skeleton").length,
     }));
-    assert.equal(empty.matters, "No active matters. Create a matter", JSON.stringify(empty));
-    assert.equal(empty.applications, "No applications yet. Applications will appear here when paralegals apply.", JSON.stringify(empty));
-    assert.equal(empty.messages, "You’re all caught up.", JSON.stringify(empty));
-    assert.equal(empty.completed, "No completed matters yet.", JSON.stringify(empty));
-    assert.equal(empty.week, "No deadlines this week.", JSON.stringify(empty));
+    assert.equal(empty.matters, "No current Matters.", JSON.stringify(empty));
+    assert.equal(empty.applications, "No applications to review.", JSON.stringify(empty));
+    assert.equal(empty.messages, "No unread messages.", JSON.stringify(empty));
+    assert.equal(empty.completed, "None yet.", JSON.stringify(empty));
+    assert.match(empty.week, /No Matter deadlines this week\.$/, JSON.stringify(empty));
     assert.equal(empty.createHref, "create-case.html", JSON.stringify(empty));
     assert.equal(empty.skeletonCount, 0, JSON.stringify(empty));
-    assert.equal(routeState.dashboardRequests.summary, 1, JSON.stringify(routeState.dashboardRequests));
+    assert.equal(routeState.dashboardRequests.inventory, 1, JSON.stringify(routeState.dashboardRequests));
     assert.equal(routeState.dashboardRequests.events, 0, JSON.stringify(routeState.dashboardRequests));
     assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
     await assertNoHorizontalOverflow(page);
@@ -1747,8 +1769,9 @@ async function runAttorneyDashboardResponsiveOverview(browser, viewport) {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await installRoutes(page, { role: "attorney", attorneyPhoto: true });
-  await page.goto("http://lpc.test/dashboard-attorney.html");
-  await page.waitForFunction(() => document.getElementById("overviewMattersBody")?.dataset.state === "populated");
+  await page.goto("https://lpc.test/dashboard-attorney.html");
+  await page.waitForFunction(() => ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"].every(id => document.getElementById(id)?.dataset.state === "ready"));
+  await page.locator("#attorneyOnboardingAttentionCard").waitFor({ state: "visible" });
   const responsive = await page.evaluate(() => {
     const grid = document.querySelector(".home-overview-grid");
     const layout = document.querySelector(".home-layout");
@@ -1757,7 +1780,7 @@ async function runAttorneyDashboardResponsiveOverview(browser, viewport) {
       topColumns: getComputedStyle(layout).gridTemplateColumns.split(" ").length,
     };
   });
-  assert.equal(responsive.overviewColumns, viewport.width <= 900 ? 2 : 3, JSON.stringify(responsive));
+  assert.equal(responsive.overviewColumns, viewport.width <= 900 ? 2 : 4, JSON.stringify(responsive));
   assert.equal(responsive.topColumns, viewport.width <= 900 ? 1 : 2, JSON.stringify(responsive));
   await assertNoHorizontalOverflow(page);
   assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
@@ -1770,20 +1793,21 @@ async function runAttorneyDashboardSingularOverview(browser) {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await installRoutes(page, { role: "attorney", attorneyPhoto: true, dashboardState: "singular" });
-  await page.goto("http://lpc.test/dashboard-attorney.html");
+  await page.goto("https://lpc.test/dashboard-attorney.html");
   await page.waitForFunction(() =>
     ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
-      .every((id) => document.getElementById(id)?.dataset.state === "populated")
+      .every((id) => document.getElementById(id)?.dataset.state === "ready")
   );
   const copy = await page.evaluate(() => Object.fromEntries(
     ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
       .map((id) => [id, document.getElementById(id)?.textContent?.replace(/\s+/g, " ").trim()])
   ));
-  assert.equal(copy.overviewMattersBody, "1 active matter", JSON.stringify(copy));
-  assert.equal(copy.overviewApplicationsBody, "1 application awaiting review", JSON.stringify(copy));
-  assert.equal(copy.overviewMessagesBody, "1 unread message", JSON.stringify(copy));
-  assert.equal(copy.overviewCompletedBody, "1 completed matter", JSON.stringify(copy));
-  assert.match(copy.deadlineList, /^1 deadline this week/, JSON.stringify(copy));
+  assert.equal(copy.overviewMattersBody, "1 current", JSON.stringify(copy));
+  assert.equal(copy.overviewApplicationsBody, "1 awaiting review", JSON.stringify(copy));
+  assert.equal(copy.overviewMessagesBody, "1", JSON.stringify(copy));
+  assert.equal(copy.overviewCompletedBody, "1", JSON.stringify(copy));
+  assert.match(copy.deadlineList, /Martinez discovery/, JSON.stringify(copy));
+  assert.equal(await page.locator("#deadlineList .overview-deadline-row").count(), 1);
   assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
   await context.close();
 }
@@ -1796,16 +1820,19 @@ async function runAttorneyDashboardOverviewStateIsolation(browser) {
     attorneyPhoto: true,
     dashboardDelayMs: 350,
   });
-  await loadingPage.goto("http://lpc.test/dashboard-attorney.html");
+  await loadingPage.goto("https://lpc.test/dashboard-attorney.html");
   await loadingPage.locator(".home-overview").waitFor({ state: "visible" });
+  await loadingPage.waitForFunction(() => document.getElementById("overviewMattersBody")?.textContent.trim() === "Loading Matters…");
   const loading = await loadingPage.evaluate(() => ({
     states: ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
       .map((id) => document.getElementById(id)?.dataset.state),
-    skeletons: document.querySelectorAll(".home-overview .overview-module-skeleton").length,
+    labels: ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"].map(id => document.getElementById(id)?.textContent.trim()),
+    busy: ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"].every(id => document.getElementById(id)?.getAttribute("aria-busy") === "true"),
   }));
   assert.deepEqual(loading.states, ["loading", "loading", "loading", "loading", "loading"], JSON.stringify(loading));
-  assert.equal(loading.skeletons, 5, JSON.stringify(loading));
-  await loadingPage.waitForFunction(() => document.getElementById("overviewMattersBody")?.dataset.state === "populated");
+  assert.deepEqual(loading.labels, ["Loading Matters…", "Loading Applications…", "Loading Messages…", "Loading Completed Matters…", "Loading Deadlines…"], JSON.stringify(loading));
+  assert.equal(loading.busy, true, JSON.stringify(loading));
+  await loadingPage.waitForFunction(() => document.getElementById("overviewMattersBody")?.dataset.state === "ready");
   await loadingContext.close();
 
   const failureContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -1817,17 +1844,18 @@ async function runAttorneyDashboardOverviewStateIsolation(browser) {
     attorneyPhoto: true,
     dashboardState: "applications-failed",
   });
-  await failurePage.goto("http://lpc.test/dashboard-attorney.html");
+  await failurePage.goto("https://lpc.test/dashboard-attorney.html");
   await failurePage.waitForFunction(() => document.getElementById("overviewApplicationsBody")?.dataset.state === "failed");
+  await failurePage.waitForFunction(() => ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"].every(id => ["ready", "failed"].includes(document.getElementById(id)?.dataset.state)));
   const isolated = await failurePage.evaluate(() => Object.fromEntries(
     ["overviewMattersBody", "overviewApplicationsBody", "overviewMessagesBody", "overviewCompletedBody", "deadlineList"]
       .map((id) => [id, document.getElementById(id)?.dataset.state])
   ));
   assert.equal(isolated.overviewApplicationsBody, "failed", JSON.stringify(isolated));
-  assert.equal(isolated.overviewMattersBody, "populated", JSON.stringify(isolated));
-  assert.equal(isolated.overviewMessagesBody, "populated", JSON.stringify(isolated));
-  assert.equal(isolated.overviewCompletedBody, "populated", JSON.stringify(isolated));
-  assert.equal(isolated.deadlineList, "populated", JSON.stringify(isolated));
+  assert.equal(isolated.overviewMattersBody, "ready", JSON.stringify(isolated));
+  assert.equal(isolated.overviewMessagesBody, "ready", JSON.stringify(isolated));
+  assert.equal(isolated.overviewCompletedBody, "ready", JSON.stringify(isolated));
+  assert.equal(isolated.deadlineList, "ready", JSON.stringify(isolated));
   assert.equal(pageErrors.length, 0, pageErrors.join("\n"));
   await failureContext.close();
 }
@@ -1836,7 +1864,7 @@ async function runParalegalDashboardTypography(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await installRoutes(page, { role: "paralegal" });
-  await page.goto("http://lpc.test/dashboard-paralegal.html");
+  await page.goto("https://lpc.test/dashboard-paralegal.html");
   await page.locator("body.lpc-role-dashboard").waitFor({ state: "visible" });
   const displayTypography = await page.evaluate(() => {
     const styleFor = (selector) => {
@@ -1845,18 +1873,17 @@ async function runParalegalDashboardTypography(browser) {
       return style ? { family: style.fontFamily, weight: style.fontWeight } : null;
     };
     return {
-      primaryHeading: styleFor(".home-feed-hero h1"),
-      sectionHeading: styleFor(".home-feed-section__header h2"),
+      primaryHeadingPresent: Boolean(document.querySelector(".private-office-greeting h1")),
+      sectionHeading: styleFor(".private-office-opportunities h2"),
       sidebarBrand: styleFor("#sidebarNav .logo"),
     };
   });
-  assert.match(displayTypography.primaryHeading?.family || "", /Cormorant Garamond/i, JSON.stringify(displayTypography));
+  assert.equal(displayTypography.primaryHeadingPresent, false, JSON.stringify(displayTypography));
   assert.match(displayTypography.sectionHeading?.family || "", /Cormorant Garamond/i, JSON.stringify(displayTypography));
-  assert.equal(displayTypography.primaryHeading?.weight, "400", JSON.stringify(displayTypography));
   assert.equal(displayTypography.sectionHeading?.weight, "400", JSON.stringify(displayTypography));
   assert.match(displayTypography.sidebarBrand?.family || "", /Söhne/i, JSON.stringify(displayTypography));
   await assertStripeDashboardShell(page);
-  await assertDashboardBodyCopyUsesSarabun(page, ".home-feed-hero > div:first-child > p");
+  await assertDashboardBodyCopyUsesSarabun(page, ".private-office-secondary-state");
   if (accountSettingsScreenshotDir) {
     fs.mkdirSync(accountSettingsScreenshotDir, { recursive: true });
     await page.screenshot({
@@ -1873,7 +1900,7 @@ async function runProfileSettingsSave(browser, { role, viewport }) {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   const state = await installRoutes(page, { role });
-  await page.goto(`http://lpc.test/profile-settings.html${role === "attorney" ? "#profile" : ""}`);
+  await page.goto(`https://lpc.test/profile-settings.html${role === "attorney" ? "#profile" : ""}`);
 
   const isAttorney = role === "attorney";
   const rolePanel = page.locator(isAttorney ? "#attorneySettings" : "#paralegalSettings");

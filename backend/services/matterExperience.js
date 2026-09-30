@@ -1,9 +1,11 @@
+const { openMatter } = require("./accountApplicationProjections");
 const SECTION_DEFINITIONS = Object.freeze([
   { id: "overview", label: "Overview" },
   { id: "applications", label: "Applications" },
   { id: "work", label: "Work" },
   { id: "files", label: "Files" },
   { id: "messages", label: "Messages" },
+  { id: "deadlines", label: "Deadlines" },
   { id: "activity", label: "Activity" },
   { id: "financials", label: "Financials" },
 ]);
@@ -11,10 +13,7 @@ const { resolveMatterDeadlineDate } = require("../utils/businessDate");
 
 const asId = (value) => String(value?._id || value?.id || value || "");
 const sameId = (left, right) => Boolean(asId(left)) && asId(left) === asId(right);
-const finiteCents = (value) => {
-  if (value === null || value === undefined || value === "") return null;
-  return Number.isFinite(Number(value)) ? Math.max(0, Math.round(Number(value))) : null;
-};
+
 
 function normalizeStatus(value) {
   const status = String(value || "open").trim().toLowerCase().replace(/_/g, " ");
@@ -140,9 +139,9 @@ function buildActivity(caseDoc, { role, isAttorney, isParalegal, isAdmin, applic
     applications.forEach((application) => add("application", "Application submitted", application.appliedAt));
   }
   if (isAttorney || preEngagement) {
-    add("preengagement_requested", "Pre-engagement requested", caseDoc?.preEngagement?.requestedAt);
-    add("preengagement_submitted", "Pre-engagement submitted", caseDoc?.preEngagement?.submittedAt);
-    add("preengagement_reviewed", "Pre-engagement reviewed", caseDoc?.preEngagement?.reviewedAt);
+    add("preengagement_requested", "Information requested before hiring", caseDoc?.preEngagement?.requestedAt);
+    add("preengagement_submitted", "Requested information submitted", caseDoc?.preEngagement?.submittedAt);
+    add("preengagement_reviewed", "Requested information reviewed", caseDoc?.preEngagement?.reviewedAt);
   }
   if (!isAttorney && !isParalegal && !isAdmin) {
     return items
@@ -167,70 +166,30 @@ function buildActivity(caseDoc, { role, isAttorney, isParalegal, isAdmin, applic
     .slice(0, 30);
 }
 
-function fundingLabel(caseDoc) {
-  if (caseDoc?.paymentReleased) return "Released";
+function buildDisputeAction(caseDoc, { isParalegal }) {
+  if (!isParalegal) return null;
+  const blockers = [];
   const status = normalizeStatus(caseDoc?.status);
-  if (["paused", "disputed"].includes(status)) return "Under review";
-  const funding = String(caseDoc?.escrowStatus || "").trim().toLowerCase();
-  if (funding === "funded") return "Funded";
-  if (["awaiting_funding", "requires_payment_method", "requires_action"].includes(funding)) {
-    return "Funding required";
+  if (!["in progress", "paused", "completed"].includes(status)) blockers.push("funded_work_required");
+  if (!caseDoc?.escrowIntentId || String(caseDoc?.escrowStatus || "").toLowerCase() !== "funded") {
+    blockers.push("funded_work_required");
   }
-  if (status === "open") return "Not funded";
-  return "Payment status unavailable";
-}
-
-function buildFinancials(caseDoc, { isAttorney, isParalegal }) {
-  if (!isAttorney && !isParalegal) return null;
-  const originalGross = finiteCents(caseDoc?.lockedTotalAmount ?? caseDoc?.totalAmount);
-  const activeGross = caseDoc?.relistRequestedAt
-    ? finiteCents(caseDoc?.remainingAmount) ?? originalGross
-    : originalGross;
-  const gross = isParalegal ? activeGross : originalGross;
-  const currency = String(caseDoc?.currency || "usd").toLowerCase();
-  const amounts = [];
-  if (gross !== null) amounts.push({ code: "compensation", label: "Matter compensation", cents: gross });
-
-  const settlement = caseDoc?.disputeSettlement || null;
-  if (isAttorney) {
-    const fee = finiteCents(settlement?.feeAttorneyAmount ?? caseDoc?.feeAttorneyAmount);
-    if (fee) amounts.push({ code: "attorney_fee", label: "Attorney platform fee", cents: fee });
+  if (["claimed", "needs_reconciliation"].includes(String(caseDoc?.completionClaimStatus || "").toLowerCase())) {
+    blockers.push("completion_in_progress");
   }
-  if (isParalegal) {
-    const fee = finiteCents(settlement?.feeParalegalAmount ?? caseDoc?.feeParalegalAmount);
-    if (fee) amounts.push({ code: "paralegal_fee", label: "Platform fee", cents: fee });
-    const settledNet = finiteCents(settlement?.payoutAmount);
-    const snapshotNet = caseDoc?.paymentReleased && gross !== null && fee !== null
-      ? Math.max(0, gross - fee)
-      : null;
-    const net = settledNet ?? snapshotNet;
-    if (net !== null) {
-      amounts.push({
-        code: "net",
-        label: settledNet !== null ? "Net payout" : "Estimated net",
-        cents: net,
-      });
-    }
+  if ((Array.isArray(caseDoc?.disputes) ? caseDoc.disputes : []).some(
+    (dispute) => String(dispute?.status || "open").toLowerCase() === "open"
+  )) {
+    blockers.push("open_dispute");
   }
-
-  const receiptAvailable = isAttorney
-    ? !!(caseDoc?.paymentReleased || caseDoc?.completedAt || caseDoc?.payoutFinalizedAt)
-    : !!(caseDoc?.paymentReleased || caseDoc?.payoutFinalizedAt);
   return {
-    currency,
-    status: fundingLabel(caseDoc),
-    amounts,
-    receiptHref: receiptAvailable
-      ? `/api/payments/receipt/${isAttorney ? "attorney" : "paralegal"}/${encodeURIComponent(asId(caseDoc))}`
-      : null,
-    note: amounts.length > 1
-      ? "Amounts reflect the Matter's saved financial record."
-      : "Additional amounts will appear after the financial record is finalized.",
+    allowed: blockers.length === 0,
+    blockers: [...new Set(blockers)],
   };
 }
 
 function primaryAction(caseDoc, context) {
-  const { role, isAttorney, isParalegal, isApplicant, preEngagement, completionPolicy, applications = [] } = context;
+  const { role, isAttorney, isParalegal, isApplicant, preEngagement, completionPolicy, pendingApplicationCount = 0 } = context;
   const status = normalizeStatus(caseDoc?.status);
   const tasks = Array.isArray(caseDoc?.tasks) ? caseDoc.tasks : [];
   const tasksComplete = tasks.length > 0 && tasks.every((task) => !!(task?.completed ?? task?.done));
@@ -240,9 +199,16 @@ function primaryAction(caseDoc, context) {
     : "";
   const hasAssignedParalegal = Boolean(asId(caseDoc?.paralegal || caseDoc?.paralegalId));
 
+  if (isParalegal && (caseDoc?.archived || ["completed", "closed", "cancelled", "canceled", "expired"].includes(status))) {
+    return { code: "view_financials", label: "View financials", tab: "financials" };
+  }
+  if (isParalegal && ["paused", "disputed"].includes(status)) {
+    return { code: "view_activity", label: "View Matter status", tab: "activity" };
+  }
+
   if (isAttorney) {
     if (caseDoc?.paymentReleased || ["completed", "closed"].includes(status)) {
-      return { code: "view_receipt", label: "View financials", tab: "financials" };
+      return { code: "view_receipt", label: "View payments", tab: "financials" };
     }
     if (tasksComplete && completionPolicy?.ready === true) {
       return { code: "review_completion", label: "Review completion", tab: "work" };
@@ -255,25 +221,25 @@ function primaryAction(caseDoc, context) {
         tab: "work",
       };
     }
-    if (status === "open" && applications.length) {
+    if (status === "open" && pendingApplicationCount) {
       return {
         code: "review_applications",
         label: "Review applications",
-        detail: `${applications.length} application${applications.length === 1 ? "" : "s"} ready for review`,
+        detail: `${pendingApplicationCount} application${pendingApplicationCount === 1 ? "" : "s"} ready for review`,
         tab: "applications",
       };
     }
     return { code: "view_posting", label: "View posting", tab: "overview" };
   }
   if (role === "paralegal" && preEngagement && ["requested", "changes_requested"].includes(preEngagement.status)) {
-    return { code: "complete_preengagement", label: "Complete pre-engagement", tab: "applications" };
+    return { code: "complete_preengagement", label: "Provide requested information", tab: "applications" };
   }
   if (isParalegal) return { code: "continue_work", label: "Continue work", tab: "work" };
   if (isApplicant) return { code: "view_application", label: "View application", tab: "applications" };
   return { code: "view_overview", label: "View overview", tab: "overview" };
 }
 
-function buildMatterExperience(caseDoc, { viewer = {}, acl = {}, applicants = [], policies = {} } = {}) {
+function buildMatterExperience(caseDoc, { viewer = {}, acl = {}, applicants = [], pendingApplicationCount, policies = {}, financials = null } = {}) {
   const role = String(viewer?.role || "").toLowerCase();
   const viewerId = asId(viewer?.id || viewer?._id);
   const isAdmin = role === "admin" && !!acl.isAdmin;
@@ -281,6 +247,9 @@ function buildMatterExperience(caseDoc, { viewer = {}, acl = {}, applicants = []
   const isParalegal = role === "paralegal" && !!acl.isParalegal;
   const isApplicant = role === "paralegal" && !!acl.isApplicant;
   const applications = applicationItems({ caseDoc, applicants, viewer, role, isAttorney });
+  const pendingCount = Number.isSafeInteger(pendingApplicationCount) && pendingApplicationCount >= 0
+    ? pendingApplicationCount
+    : openMatter(caseDoc) ? applications.filter(item => ["pending", "submitted", "viewed", "shortlisted"].includes(item.status)).length : 0;
   const preEngagement = ownPreEngagement(caseDoc, viewerId);
   const hasApplicationContext = isAttorney || (!isParalegal && (isApplicant || !!preEngagement || applications.length > 0));
   const workspaceParticipant = !isAdmin && (isAttorney || isParalegal);
@@ -291,6 +260,7 @@ function buildMatterExperience(caseDoc, { viewer = {}, acl = {}, applicants = []
     work: isAttorney || isParalegal,
     files: workspaceParticipant,
     messages: workspaceParticipant,
+    deadlines: workspaceParticipant,
     activity: isAdmin || isAttorney || isParalegal || isApplicant,
     financials: isAttorney || isParalegal,
   };
@@ -300,6 +270,17 @@ function buildMatterExperience(caseDoc, { viewer = {}, acl = {}, applicants = []
     completed: !!(task?.completed ?? task?.done),
   }));
   const completedTasks = tasks.filter((task) => task.completed).length;
+  const withdrawalPolicy = isParalegal && policies.withdrawal
+    ? {
+        allowed: policies.withdrawal.allowed === true,
+        blockers: Array.isArray(policies.withdrawal.blockers)
+          ? policies.withdrawal.blockers.map(String)
+          : [],
+        completedTaskCount: Math.max(0, Number(policies.withdrawal.facts?.completedTaskCount) || 0),
+        totalTaskCount: Math.max(0, Number(policies.withdrawal.facts?.totalTaskCount) || 0),
+        outcomeRequiresReview: policies.withdrawal.facts?.outcomeRequiresReview === true,
+      }
+    : null;
   const matterContext = {
     role,
     isAdmin,
@@ -309,15 +290,16 @@ function buildMatterExperience(caseDoc, { viewer = {}, acl = {}, applicants = []
     preEngagement,
     completionPolicy: policies.completion || null,
     applications,
+    pendingApplicationCount: pendingCount,
   };
   let attention = null;
   const status = normalizeStatus(caseDoc?.status);
   if (status === "disputed") attention = "Review in progress";
   else if (status === "paused") attention = "Matter paused";
   else if (preEngagement && ["requested", "changes_requested"].includes(preEngagement.status)) {
-    attention = "Pre-engagement required";
+    attention = "Information needed before hiring";
   } else if (policies.completion?.ready === true) attention = "Ready for completion review";
-  else if (isAttorney && !asId(caseDoc?.paralegal || caseDoc?.paralegalId) && applications.length) {
+  else if (isAttorney && pendingCount) {
     attention = "Applications available";
   }
 
@@ -336,7 +318,7 @@ function buildMatterExperience(caseDoc, { viewer = {}, acl = {}, applicants = []
             ? "Applicant"
             : isAdmin
               ? "Administrator"
-              : "Authorized viewer",
+              : null,
       attention,
       primaryAction: primaryAction(caseDoc, matterContext),
     },
@@ -361,6 +343,7 @@ function buildMatterExperience(caseDoc, { viewer = {}, acl = {}, applicants = []
     applications: hasApplicationContext
       ? {
           items: applications,
+          pendingCount,
           preEngagement,
           reviewHref: isAttorney
             ? `/dashboard-attorney.html?openApplicants=1&caseId=${encodeURIComponent(asId(caseDoc))}#cases:inquiries`
@@ -370,12 +353,19 @@ function buildMatterExperience(caseDoc, { viewer = {}, acl = {}, applicants = []
         }
       : null,
     work: visibility.work
-      ? { tasks, readOnly: !!caseDoc?.readOnly, completed: completedTasks, total: tasks.length }
+      ? {
+          tasks,
+          readOnly: !!caseDoc?.readOnly,
+          completed: completedTasks,
+          total: tasks.length,
+          withdrawal: withdrawalPolicy,
+          dispute: buildDisputeAction(caseDoc, { isParalegal }),
+        }
       : null,
     activity: visibility.activity
       ? buildActivity(caseDoc, { role, isAttorney, isParalegal, isAdmin, applications, preEngagement })
       : [],
-    financials: visibility.financials ? buildFinancials(caseDoc, { isAttorney, isParalegal }) : null,
+    financials: visibility.financials ? financials || { currency: null, status: "Payment details unavailable", amounts: [], receiptHref: null, note: "Refresh the Matter to check its payment details." } : null,
   };
 }
 

@@ -44,7 +44,7 @@ test("director portal is complete, accessible, responsive, and free of implicit 
   await expect(page.locator("#recordsBody")).not.toContainText("Loading");
   await page.waitForTimeout(200);
 
-  const analyticsValues = await page.locator("#metricEmailsSent, #metricRegisteredCount, #metricCompletedMatters, #metricFollowUpsSent")
+  const analyticsValues = await page.locator("#metricEmailsSent, #metricRegisteredCount, #metricFollowUpsSent")
     .allTextContents();
   if (analyticsValues.every((value) => Number(value.trim()) === 0)) {
     await expect(page.locator(".director-performance")).toHaveClass(/is-empty/);

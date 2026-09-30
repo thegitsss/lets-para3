@@ -1,15 +1,47 @@
-import { secureFetch } from "./auth.js";
+import { loadReceivedInvitations } from "./utils/received-invitations.mjs";
+import { createEarlierApplicationWithdrawal } from "./utils/earlier-application-withdrawal.mjs";
+import { secureFetch, getStoredSession, publishLifecycleRefresh } from "./auth.js";
+import { readEarningsReport, readExpectedCompensation, renderEarningsReport } from "./utils/paralegal-financials.mjs";
+import { loadHomeDeadlines } from "./paralegal-v2/home-deadlines.mjs";
+import { calendarRange, calendarRows, renderCalendar } from "./legacy-paralegal-calendar.mjs";
+import { availabilitySnapshot, saveAvailability } from "./utils/availability-save.mjs";
+
+let financialOwnerId = "";
+let financialGeneration = 0;
+let homeAccountLost = false;
+const homeReadControllers = new Map();
+const currentFinancialOwner = () => {
+  if (homeAccountLost) return '';
+  const { user, role, status } = getStoredSession();
+  const id = String(user?.id || user?._id || "");
+  return role === "paralegal" && status === "approved" && id === financialOwnerId ? id : "";
+};
+async function earlierWithdrawalRequest(url, body) {
+  const response = await secureFetch(url, { ...(body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}), suppressToast: true });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.error || 'The application could not be checked.');
+  return payload;
+}
+const earlierWithdrawal = createEarlierApplicationWithdrawal({ getOwner: currentFinancialOwner, get: earlierWithdrawalRequest, post: earlierWithdrawalRequest });
+function renderFinancialSummary(metrics) {
+  const root = document.getElementById("paralegalFinancialSummary");
+  if (!root) return;
+  const ownerId = currentFinancialOwner();
+  let report = null, expected = null;
+  try { report = readEarningsReport(metrics?.earningsReport, ownerId); } catch {}
+  try { expected = readExpectedCompensation(metrics?.expectedCompensation, ownerId); } catch {}
+  root.replaceChildren(renderEarningsReport(report, { expected, onRetry: () => refreshDashboardFromServer("payouts", { force: true }) }));
+}
+function clearFinancialSummary() { financialGeneration++; renderFinancialSummary(null); }
+
 import {
-  buildHistoricalExclusionSet,
-  createRecommendationStateLoader,
-  isHistoricallyExcluded,
+  getRecommendationIdentityIds,
   shouldHandleRecommendationHistoryChange,
   subscribeRecommendationHistoryChanges,
 } from "./recommendation-state.mjs";
 import {
   getStripeConnectStatus,
   isStripeConnected,
-  startStripeOnboarding,
   STRIPE_GATE_MESSAGE,
 } from "./utils/stripe-connect.js";
 import { mountDashboardSavedViews } from "./dashboard-saved-views.js";
@@ -23,6 +55,7 @@ const FUNDED_WORKSPACE_STATUSES = new Set([
 ]);
 
 const PLACEHOLDER_AVATAR = "/assets/avatar-placeholder.svg";
+const PARALEGAL_DASHBOARD_ENDPOINT = "/api/paralegal/dashboard";
 
 function getAvatarUrl(user = {}) {
   return user.pendingProfileImage || user.profileImage || user.avatarURL || PLACEHOLDER_AVATAR;
@@ -120,15 +153,9 @@ function deriveAttorneyId(invite = {}) {
 }
 
 const selectors = {
-  messageBox: document.getElementById('messageBox'),
-  messageCount: document.getElementById('messageCount'),
-  messageLabel: document.getElementById('messageLabel'),
   deadlineList: document.getElementById('deadlineList'),
   assignmentList: document.getElementById('assignmentList'),
-  assignmentTemplate: document.getElementById('assignmentCardTemplate'),
   toastBanner: document.getElementById('toastBanner'),
-  nameHeading: document.getElementById('user-name-heading'),
-  welcomeGreeting: document.getElementById('welcomeGreeting'),
   inviteOverlay: document.getElementById('inviteOverlay'),
   inviteCaseTitle: document.getElementById('inviteCaseTitle'),
   inviteJobTitle: document.getElementById('inviteJobTitle'),
@@ -146,11 +173,7 @@ const selectors = {
   revokeConfirmClose: document.querySelector('[data-revoke-confirm-close]'),
   revokeConfirmCancel: document.querySelector('[data-revoke-confirm-cancel]'),
   revokeConfirmSubmit: document.querySelector('[data-revoke-confirm-submit]'),
-  earningsCard: document.getElementById('earnedThisMonthCard'),
-  earningsToggle: document.getElementById('earningsToggle'),
-  earningsLabel: document.getElementById('earningsLabelText'),
   homeWorkSection: document.getElementById('homeWorkSection'),
-  homeApplicationsSection: document.getElementById('homeApplicationsSection'),
   homeApplicationsList: document.getElementById('homeApplicationsList'),
   recommendedMattersSection: document.getElementById('recommendedMattersSection'),
   recommendedMattersList: document.getElementById('recommendedMattersList'),
@@ -158,7 +181,11 @@ const selectors = {
   homeProfilePractices: document.getElementById('homeProfilePractices'),
   homeProfileExperience: document.getElementById('homeProfileExperience'),
   homeReturningOverview: document.getElementById('homeReturningOverview'),
+  homeApplicationsSection: document.getElementById('homeApplicationsSection'),
   homeApplicationPipeline: document.getElementById('homeApplicationPipeline'),
+  privateOfficeSummary: document.getElementById('privateOfficeSummary'),
+  deskMatterSwitcher: document.getElementById('deskMatterSwitcher'),
+  deskMatterPosition: document.getElementById('deskMatterPosition'),
 };
 
 const recentActivityState = {
@@ -187,6 +214,7 @@ const appliedPagination = {
 const JSON_HEADERS = { Accept: 'application/json' };
 
 async function fetchJson(url, options = {}) {
+  if (dashboardDeparting) throw new DOMException("View changed", "AbortError");
   const res = await secureFetch(url, {
     ...options,
     headers: { ...JSON_HEADERS, ...(options.headers || {}) },
@@ -203,8 +231,6 @@ async function fetchJson(url, options = {}) {
   }
 }
 
-let latestMessageThread = null;
-let unreadMessageCount = 0;
 let stripeConnected = false;
 let stripeGateBound = false;
 let pendingApprovalReady = false;
@@ -216,6 +242,8 @@ let paralegalPrioritySnapshot = { activeCases: [], invites: [], threads: [], dea
 let activeApplication = null;
 let applicationPreEngagementDraft = null;
 let applicationPreEngagementExpandedKey = '';
+const applicationPreEngagementDrafts = new Map();
+let applicationDraftGeneration = 0;
 const APPLIED_PAGE_SIZE = 3;
 let appliedPage = 1;
 let appliedTotalPages = 1;
@@ -226,19 +254,65 @@ let appliedPreviewBound = false;
 let appliedQueryHandled = false;
 let appliedHighlightHandled = false;
 let applicationReturnFocus = null;
+let dashboardDeparting = false;
 let dashboardRefreshInFlight = false;
 let dashboardRefreshGeneration = 0;
 let dashboardRefreshQueuedReason = '';
 let lastDashboardRefreshAt = 0;
 const DASHBOARD_REFRESH_COOLDOWN_MS = 4000;
-let earningsMode = 'month';
-let earningsSnapshot = { month: 0, total: 0 };
+let applicationRefreshGeneration = 0;
 let clusterMenuBound = false;
 let recommendationProfile = {};
 let recommendedJobsCache = [];
-let historicalRecommendationIds = new Set();
 let recommendationViewerId = '';
 let recommendationHistorySubscription = null;
+let recommendationRefreshGeneration = 0;
+let recommendationHasMatchingProfile = false;
+let availabilityRefreshGeneration = 0;
+let stripeStatusKnown = false;
+let profileStatusKnown = false;
+let dashboardStatus = 'loading';
+let calendarController = null;
+let calendarSnapshot = { rows: [], unavailable: [], loading: true };
+let homeMessagesPhase = 'loading';
+let homeApplicationsPhase = 'loading';
+let pendingAppliedFilters = null;
+let homeDetailsPhase = 'loading';
+let recommendationStatus = 'loading';
+let deskAssignments = [];
+let deskMatterIndex = 0;
+let deskSwitcherBound = false;
+let deskEnrichmentGeneration = 0;
+let initialDashboardHydrating = true;
+let rankedRecommendationsCache = [];
+let officeMetrics = { activeCases: 0, unread: 0, nextDeadline: '—' };
+let dashboardPayloadFingerprint = '';
+let recommendationPayloadFingerprint = '';
+let applicationPayloadFingerprint = '';
+let assignmentsSourceFingerprint = '';
+const homeSectionRenderStates = new WeakMap();
+
+function dataFingerprint(value) {
+  try {
+    return JSON.stringify(value);
+  } catch (error) {
+    console.warn('Unable to compare refreshed dashboard data', error);
+    return '';
+  }
+}
+
+function renderHomeSectionWhenChanged(container, source, render) {
+  const fingerprint = dataFingerprint({ ownerId: currentFinancialOwner(), source });
+  const previous = homeSectionRenderStates.get(container);
+  if (fingerprint && previous?.fingerprint === fingerprint &&
+      previous.first === container.firstElementChild && previous.last === container.lastElementChild) return;
+  render();
+  homeSectionRenderStates.set(container, {
+    fingerprint,
+    first: container.firstElementChild,
+    last: container.lastElementChild,
+  });
+}
 
 function bindClusterProfileMenu() {
   if (clusterMenuBound) return;
@@ -280,25 +354,32 @@ function bindClusterProfileMenu() {
   });
 }
 
-function updateUnreadDisplay(count = 0) {
-  const unread = Number(count) || 0;
-  setField('unreadMessages', unread);
-  unreadMessageCount = unread;
-  if (selectors.messageCount) {
-    selectors.messageCount.textContent = unread;
-  }
-  if (selectors.messageLabel) {
-    selectors.messageLabel.textContent =
-      unread === 0 ? 'No unread messages' : unread === 1 ? 'Message waiting' : 'Messages waiting';
-  }
-  if (selectors.messageBox) {
-    selectors.messageBox.disabled = unread < 1;
-    selectors.messageBox.classList.toggle('has-unread', unread > 0);
-    selectors.messageBox.setAttribute(
-      'aria-label',
-      unread > 0 ? `Open ${unread} unread message${unread === 1 ? '' : 's'}` : 'No unread messages'
-    );
-  }
+function clearHomeAccount() {
+  if (homeAccountLost) return;
+  homeAccountLost = true; ++dashboardRefreshGeneration; ++deskEnrichmentGeneration; ++applicationRefreshGeneration;
+  for (const controller of homeReadControllers.values()) controller.abort(); homeReadControllers.clear(); calendarController?.abort();
+  deskAssignments = []; appliedAppsCache = []; clearFinancialSummary();
+  paralegalPrioritySnapshot = { activeCases: [], invites: [], threads: [], deadlines: [], applications: [] };
+  clearApplicationDraftsOnAccountChange();
+  const root = document.getElementById('paralegalHomeView'); if (!root) return;
+  const notice = document.createElement('p'); notice.className = 'private-office-secondary-state'; notice.textContent = 'Your account changed. Reload to continue.';
+  const reload = document.createElement('button'); reload.type = 'button'; reload.className = 'office-calendar-control'; reload.textContent = 'Reload'; reload.addEventListener('click', () => window.location.reload());
+  root.classList.remove('is-hydrating'); root.dataset.state = 'account-changed'; root.replaceChildren(notice, reload);
+  window.dispatchEvent(new CustomEvent('lpc:home-account-changed'));
+}
+
+async function readOwnedHome(key, read) {
+  const ownerId = currentFinancialOwner(); if (dashboardDeparting) throw new DOMException('View changed', 'AbortError'); if (!ownerId) throw new Error('Workspace account needs verification.');
+  homeReadControllers.get(key)?.abort(); const controller = new AbortController(); homeReadControllers.set(key, controller);
+  const options = { signal: controller.signal, cache: 'no-store' }, timer = setTimeout(() => controller.abort(), 30000);
+  const current = () => { if (dashboardDeparting || controller.signal.aborted || currentFinancialOwner() !== ownerId) throw new DOMException('View changed', 'AbortError'); };
+  const verify = async () => {
+    current(); const session = await fetchJson('/api/auth/me', options); current();
+    const user = session?.user;
+    if (String(user?._id || user?.id || '') !== ownerId || user?.role !== 'paralegal' || user?.status !== 'approved') { clearHomeAccount(); throw new Error('Workspace account changed.'); }
+  };
+  try { await verify(); const value = await read(options, ownerId); await verify(); return value; }
+  finally { clearTimeout(timer); if (homeReadControllers.get(key) === controller) homeReadControllers.delete(key); }
 }
 
 function notifyCasesApplicationsRefresh(reason = '', payload = {}) {
@@ -349,89 +430,59 @@ function applyStripeGateToApplyActions() {
 }
 
 async function loadViewerProfile() {
-  const profile = await fetchJson('/api/users/me');
-  return profile;
+  return readOwnedHome('profile', async (options, ownerId) => {
+    const profile = await fetchJson('/api/users/me', options);
+    if (String(profile?._id || profile?.id || '') !== ownerId) throw new Error('Profile could not be verified.');
+    return profile;
+  });
 }
 
 async function loadStripeStatus() {
-  const banner = document.getElementById("stripeGateBanner");
-  const message = document.querySelector("[data-stripe-gate-message]");
-  const cta = document.getElementById("stripeConnectCta");
-
   const data = await getStripeConnectStatus({ force: true });
   stripeConnected = isStripeConnected(data);
-  if (banner) banner.classList.toggle("hidden", stripeConnected);
-  if (message && !stripeConnected) {
-    message.textContent = "";
-  }
-  if (cta) {
-    cta.disabled = !stripeConnected;
-    if (!stripeConnected) {
-      cta.setAttribute("aria-disabled", "true");
-    } else {
-      cta.removeAttribute("aria-disabled");
-    }
-  }
-  if (cta && stripeConnected && !cta.dataset.bound) {
-    cta.dataset.bound = "true";
-    cta.addEventListener("click", async () => {
-      const original = cta.textContent || "Connect Stripe";
-      cta.disabled = true;
-      cta.textContent = "Connecting...";
-      try {
-        await startStripeOnboarding();
-      } catch (err) {
-        console.error("Stripe connect failed", err);
-        await showAlert(err?.message || "Unable to start Stripe onboarding.", { title: "Stripe connection unavailable" });
-        cta.disabled = false;
-        cta.textContent = original;
-      }
-    });
-  }
+  stripeStatusKnown = data !== null && typeof data === 'object';
   applyStripeGateToApplyActions();
+  renderPrivateOfficeDesk();
+  renderParalegalPriorityQueue();
   return data;
 }
 
 async function fetchParalegalData({ fresh = false } = {}) {
-  const url = fresh
-    ? `/api/paralegal/dashboard?ts=${Date.now()}`
-    : '/api/paralegal/dashboard';
-  const headers = fresh ? { 'Cache-Control': 'no-store' } : undefined;
-  const cache = fresh ? 'no-store' : undefined;
-  return fetchJson(url, { headers, cache });
+  const ownerId = currentFinancialOwner(), generation = financialGeneration;
+  if (!ownerId) throw new Error("Workspace account needs verification.");
+  const query = new URLSearchParams({ expectedOwnerId: ownerId });
+  if (fresh) query.set("ts", String(Date.now()));
+  const value = await fetchJson(`${PARALEGAL_DASHBOARD_ENDPOINT}?${query}`, { cache: "no-store" });
+  if (generation !== financialGeneration || ownerId !== currentFinancialOwner()) throw new Error("Workspace account changed.");
+  return value;
 }
 
-async function loadDeadlineEvents(limit = 5) {
-  const params = new URLSearchParams({ limit: String(limit) });
-  return fetchJson(`/api/events?${params.toString()}`).then((data) => (Array.isArray(data.items) ? data.items : []));
+async function loadDeadlineEvents() {
+  const ownerId = currentFinancialOwner(), generation = financialGeneration;
+  calendarController?.abort(); const controller = new AbortController(); calendarController = controller;
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const value = await loadHomeDeadlines({ get: fetchJson }, ownerId, calendarRange(), { signal: controller.signal, isCurrent: () => currentFinancialOwner() === ownerId && financialGeneration === generation });
+    return value.items;
+  } finally { clearTimeout(timeout); }
 }
 
-function getCaseDeadlineDate(caseItem = {}) {
-  return window.LPCBusinessDate?.matterValue(caseItem) || "";
-}
-
-function buildCaseDeadlines(activeCases = []) {
-  return (Array.isArray(activeCases) ? activeCases : [])
-    .map((caseItem) => {
-      const dateOnly = getCaseDeadlineDate(caseItem);
-      if (!dateOnly) return null;
-      return {
-        title: caseItem.jobTitle || caseItem.title || 'Matter deadline',
-        where: caseItem.practiceArea || '',
-        start: dateOnly,
-        caseId: getCaseId(caseItem),
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => String(a.start).localeCompare(String(b.start)));
-}
-
-async function loadMessageThreads(limit = 50) {
-  return fetchJson(`/api/messages/threads?limit=${limit}`).then((data) => (Array.isArray(data.threads) ? data.threads : []));
-}
-
-async function loadUnreadMessageCount() {
-  return fetchJson('/api/messages/unread-count').then((data) => Number(data.count) || 0);
+async function loadHomeMessages() {
+  homeMessagesPhase = 'loading';
+  try {
+    const value = await readOwnedHome('messages', async options => {
+      const [summary, count] = await Promise.all([fetchJson('/api/messages/summary', options), fetchJson('/api/messages/unread-count', options)]);
+      if (!Array.isArray(summary?.items) || !Number.isSafeInteger(count?.count) || count.count < 0) throw new Error('Message counts could not be verified.');
+      const ids = new Set(); let total = 0;
+      for (const item of summary.items) {
+        if (!/^[a-f0-9]{24}$/i.test(item?.caseId || '') || ids.has(item.caseId) || !Number.isSafeInteger(item.unread) || item.unread < 0) throw new Error('Message counts could not be verified.');
+        ids.add(item.caseId); total += item.unread;
+      }
+      if (!Number.isSafeInteger(total) || total !== count.count) throw new Error('Message counts changed. Refresh to check the current conversations.');
+      return { threads: summary.items, unreadCount: total };
+    });
+    homeMessagesPhase = 'ready'; return value;
+  } catch (error) { homeMessagesPhase = 'error'; throw error; }
 }
 
 function formatCurrency(value = 0) {
@@ -460,155 +511,11 @@ function getRecommendationPay(job = {}) {
   return 0;
 }
 
-const STATE_CODES = new Map([
-  ['ALABAMA', 'AL'], ['ALASKA', 'AK'], ['ARIZONA', 'AZ'], ['ARKANSAS', 'AR'],
-  ['CALIFORNIA', 'CA'], ['COLORADO', 'CO'], ['CONNECTICUT', 'CT'], ['DELAWARE', 'DE'],
-  ['DISTRICT OF COLUMBIA', 'DC'], ['FLORIDA', 'FL'], ['GEORGIA', 'GA'], ['HAWAII', 'HI'],
-  ['IDAHO', 'ID'], ['ILLINOIS', 'IL'], ['INDIANA', 'IN'], ['IOWA', 'IA'],
-  ['KANSAS', 'KS'], ['KENTUCKY', 'KY'], ['LOUISIANA', 'LA'], ['MAINE', 'ME'],
-  ['MARYLAND', 'MD'], ['MASSACHUSETTS', 'MA'], ['MICHIGAN', 'MI'], ['MINNESOTA', 'MN'],
-  ['MISSISSIPPI', 'MS'], ['MISSOURI', 'MO'], ['MONTANA', 'MT'], ['NEBRASKA', 'NE'],
-  ['NEVADA', 'NV'], ['NEW HAMPSHIRE', 'NH'], ['NEW JERSEY', 'NJ'], ['NEW MEXICO', 'NM'],
-  ['NEW YORK', 'NY'], ['NORTH CAROLINA', 'NC'], ['NORTH DAKOTA', 'ND'], ['OHIO', 'OH'],
-  ['OKLAHOMA', 'OK'], ['OREGON', 'OR'], ['PENNSYLVANIA', 'PA'], ['RHODE ISLAND', 'RI'],
-  ['SOUTH CAROLINA', 'SC'], ['SOUTH DAKOTA', 'SD'], ['TENNESSEE', 'TN'], ['TEXAS', 'TX'],
-  ['UTAH', 'UT'], ['VERMONT', 'VT'], ['VIRGINIA', 'VA'], ['WASHINGTON', 'WA'],
-  ['WEST VIRGINIA', 'WV'], ['WISCONSIN', 'WI'], ['WYOMING', 'WY'],
-]);
-
-const GENERIC_PRACTICE_WORDS = new Set([
-  'and', 'the', 'law', 'legal', 'practice', 'matters', 'matter', 'litigation', 'services', 'support',
-]);
-
-function practiceKey(value = '') {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
-}
-
-function normalizeStateCode(value = '') {
-  const normalized = String(value || '')
-    .trim()
-    .toUpperCase()
-    .replace(/\./g, '')
-    .replace(/\s+/g, ' ');
-  if (!normalized) return '';
-  if (/^[A-Z]{2}$/.test(normalized)) return normalized;
-  if (STATE_CODES.has(normalized)) return STATE_CODES.get(normalized);
-  const trailingCode = normalized.match(/(?:,|\s)\s*([A-Z]{2})$/);
-  return trailingCode ? trailingCode[1] : normalized;
-}
-
-function practiceTokens(value = '') {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .split(/\s+/)
-    .filter((token) => token && !GENERIC_PRACTICE_WORDS.has(token));
-}
-
-function getPracticeMatchScore(matterArea = '', profileAreas = []) {
-  const matterTokens = practiceTokens(matterArea);
-  const matterRawKey = practiceKey(matterArea);
-  if (!matterRawKey) return 0;
-  const matterKey = matterTokens.join(' ');
-  return (Array.isArray(profileAreas) ? profileAreas : []).reduce((best, area) => {
-    const profileTokens = practiceTokens(area);
-    const profileRawKey = practiceKey(area);
-    if (!profileRawKey) return best;
-    if (matterRawKey === profileRawKey) return Math.max(best, 8);
-    if (matterRawKey.includes(profileRawKey) || profileRawKey.includes(matterRawKey)) return Math.max(best, 7);
-    if (!matterTokens.length || !profileTokens.length) return best;
-    const profileKey = profileTokens.join(' ');
-    if (matterKey === profileKey) return Math.max(best, 7);
-    const profileSet = new Set(profileTokens);
-    const overlap = matterTokens.filter((token) => profileSet.has(token)).length;
-    return overlap ? Math.max(best, 5 + Math.min(1, overlap / Math.max(matterTokens.length, profileTokens.length))) : best;
-  }, 0);
-}
-
-function getMatterMinimumExperience(job = {}) {
-  const explicit = Number(job.minimumYearsExperience ?? job.minimumExperienceYears);
-  if (Number.isFinite(explicit) && explicit > 0) return Math.min(80, explicit);
-  const preference = String(job.experiencePreference || job.requiredExperience || '');
-  const preferenceMatch = preference.match(/\d+(?:\.\d+)?/);
-  if (preferenceMatch) return Math.min(80, Number(preferenceMatch[0]) || 0);
-  const legacyMatch = String(job.briefSummary || '').match(/Experience:\s*(\d+(?:\.\d+)?)/i);
-  return legacyMatch ? Math.min(80, Number(legacyMatch[1]) || 0) : 0;
-}
-
-function getRecommendationProfile() {
-  const stateValues = [
-    ...(Array.isArray(recommendationProfile.stateExperience) ? recommendationProfile.stateExperience : []),
-    recommendationProfile.state,
-    recommendationProfile.location,
-  ];
-  return {
-    states: new Set(stateValues.map(normalizeStateCode).filter(Boolean)),
-    practiceAreas: Array.isArray(recommendationProfile.practiceAreas) ? recommendationProfile.practiceAreas : [],
-    yearsExperience: Math.max(0, Number(recommendationProfile.yearsExperience) || 0),
-  };
-}
-
-function rankRecommendedMatters(jobs = []) {
-  const profile = getRecommendationProfile();
-  const hasMatchingProfile = profile.states.size > 0 || profile.practiceAreas.length > 0;
-  const ranked = (Array.isArray(jobs) ? jobs : []).map((job) => {
-    const id = getRecommendationId(job);
-    const title = String(job?.title || job?.caseTitle || '').trim().toLowerCase();
-    const minimumYears = getMatterMinimumExperience(job);
-    if (!id || isHistoricallyExcluded(job, historicalRecommendationIds) || title.includes('job not found')) return null;
-    if (minimumYears > profile.yearsExperience) return null;
-    const matterState = normalizeStateCode(
-      job.state || job.locationState || job.location?.state || job.jurisdiction || ''
-    );
-    const stateMatch = Boolean(matterState && profile.states.has(matterState));
-    const practiceScore = getPracticeMatchScore(job.practiceArea, profile.practiceAreas);
-    const practiceMatch = practiceScore > 0;
-    if (!stateMatch && !practiceMatch) return null;
-    const score = (stateMatch ? 5 : 0) + practiceScore + (stateMatch && practiceMatch ? 2 : 0);
-    return { job, score, stateMatch, practiceMatch, minimumYears };
-  }).filter(Boolean);
-  ranked.sort((left, right) => (
-    right.score - left.score ||
-    new Date(right.job?.createdAt || 0) - new Date(left.job?.createdAt || 0)
-  ));
-  return { hasMatchingProfile, ranked };
-}
-
 function getApplicationJobId(application = {}) {
   const job = application.jobId || application.job || {};
   return normalizeIdCandidate(
     job?._id || job?.id || application.jobId || application.job_id || application.caseId || ''
   );
-}
-
-function syncHomeFeedSectionOrder(hasApplications) {
-  selectors.homeApplicationsSection?.classList.toggle('has-applications', hasApplications);
-}
-
-function renderApplicationPipeline(applications = []) {
-  const counts = { applied: 0, reviewing: 0, shortlisted: 0, hired: 0 };
-  (Array.isArray(applications) ? applications : []).forEach((application) => {
-    const status = getApplicationStatusKey(application);
-    const preEngagement = String(getApplicationPreEngagement(application)?.status || '').toLowerCase();
-    if (status === 'accepted') counts.hired += 1;
-    else if (status === 'shortlisted') counts.shortlisted += 1;
-    else if (status === 'viewed' || ['requested', 'changes_requested'].includes(preEngagement)) counts.reviewing += 1;
-    else if (!['rejected', 'withdrawn'].includes(status)) counts.applied += 1;
-  });
-  document.querySelectorAll('[data-home-pipeline-count]').forEach((node) => {
-    const key = node.getAttribute('data-home-pipeline-count');
-    node.textContent = String(counts[key] || 0);
-  });
-  const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
-  selectors.homeApplicationPipeline?.classList.toggle('is-empty', total === 0);
-  return { counts, total };
 }
 
 function describeHomeApplicationStatus(application = {}) {
@@ -619,7 +526,7 @@ function describeHomeApplicationStatus(application = {}) {
   const status = getApplicationStatusKey(application);
   const labels = {
     submitted: 'Submitted',
-    viewed: 'Attorney reviewing',
+    viewed: 'Viewed by attorney',
     shortlisted: 'Shortlisted',
     accepted: 'Accepted',
     rejected: 'Not selected',
@@ -630,158 +537,159 @@ function describeHomeApplicationStatus(application = {}) {
   };
 }
 
-function renderHomeApplications(applications = [], allApplications = applications) {
-  const container = selectors.homeApplicationsList;
+function renderHomeApplications(applications = []) {
+  const container = selectors.homeApplicationPipeline;
+  const otherContainer = selectors.homeApplicationsList;
   if (!container) return;
-  const pipeline = renderApplicationPipeline(allApplications);
   const visible = (Array.isArray(applications) ? applications : [])
-    .slice()
-    .sort((left, right) => new Date(right?.createdAt || 0) - new Date(left?.createdAt || 0))
-    .slice(0, 3);
-  syncHomeFeedSectionOrder(visible.length > 0);
-
+    .filter(isActiveApplication)
+    .sort((left, right) => (
+      new Date(right?.updatedAt || right?.createdAt || 0) - new Date(left?.updatedAt || left?.createdAt || 0)
+    ));
   if (!visible.length) {
-    if (pipeline.total === 0) {
-      container.hidden = true;
-      container.innerHTML = '';
-      return;
-    }
-    container.hidden = false;
+    selectors.homeApplicationsSection?.classList.add('is-empty');
     container.innerHTML = `
-      <div class="home-feed-empty home-feed-empty--compact">
-        <p><strong>No applications currently in progress.</strong> Completed outcomes remain summarized in your pipeline.</p>
-        <a href="dashboard-paralegal.html#cases">View history</a>
-      </div>`;
+      <p class="private-office-secondary-state">No applications in progress</p>`;
+    if (otherContainer) otherContainer.innerHTML = '';
     return;
   }
 
-  container.hidden = false;
-  container.innerHTML = visible.map((application) => {
-    const job = application.jobId || application.job || {};
-    const applicationId = normalizeIdCandidate(application._id || application.id || '');
-    const jobId = getApplicationJobId(application);
-    const href = applicationId
-      ? `dashboard-paralegal.html?applicationId=${encodeURIComponent(applicationId)}#cases`
-      : jobId
-        ? `dashboard-paralegal.html?jobId=${encodeURIComponent(jobId)}#cases`
-        : 'dashboard-paralegal.html#cases';
-    const status = describeHomeApplicationStatus(application);
-    const appliedDate = application.createdAt
-      ? new Date(application.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  selectors.homeApplicationsSection?.classList.remove('is-empty');
+
+  const application = visible[0];
+  const job = application.jobId || application.job || {};
+  const applicationId = normalizeIdCandidate(application._id || application.id || '');
+  const jobId = getApplicationJobId(application);
+  const href = applicationId
+    ? `dashboard-paralegal.html?applicationId=${encodeURIComponent(applicationId)}#cases`
+    : jobId
+      ? `dashboard-paralegal.html?jobId=${encodeURIComponent(jobId)}#cases`
+      : 'dashboard-paralegal.html#cases';
+  const appliedDate = application.createdAt
+    ? new Date(application.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    : '';
+  container.innerHTML = `
+    <article class="application-motion">
+      <div class="application-motion__matter">
+        <strong>${escapeHtml(job.title || 'Untitled Matter')}</strong>
+        <span>${escapeHtml([job.practiceArea, appliedDate ? `Applied ${appliedDate}` : ''].filter(Boolean).join(' · '))}</span>
+      </div>
+      <p class="application-current-status">${escapeHtml(describeHomeApplicationStatus(application).label)}</p>
+      <a class="application-motion__action" href="${escapeHtml(href)}">View application</a>
+    </article>`;
+  if (otherContainer) {
+    const others = visible.length - 1;
+    otherContainer.innerHTML = others > 0
+      ? `<a class="application-other-link" href="dashboard-paralegal.html#cases">${others} other active application${others === 1 ? '' : 's'}</a>`
       : '';
-    return `
-      <article class="home-application-row">
-        <div>
-          <strong>${escapeHtml(job.title || 'Untitled Matter')}</strong>
-          <small>${escapeHtml(job.practiceArea || 'General practice')}${appliedDate ? ` · Applied ${escapeHtml(appliedDate)}` : ''}</small>
-        </div>
-        <span class="home-application-status is-${escapeHtml(status.tone)}">${escapeHtml(status.label)}</span>
-        <a href="${escapeHtml(href)}">View application</a>
-      </article>`;
-  }).join('');
+  }
 }
 
-function renderRecommendedMatters(jobs = []) {
+function renderRecommendedMatters(jobs = [], { hasMatchingProfile = recommendationHasMatchingProfile } = {}) {
   const container = selectors.recommendedMattersList;
   if (!container) return;
   recommendedJobsCache = Array.isArray(jobs) ? jobs : [];
-  const { hasMatchingProfile, ranked } = rankRecommendedMatters(recommendedJobsCache);
-  const visible = ranked.slice(0, 3);
+  recommendationHasMatchingProfile = Boolean(hasMatchingProfile);
+  const visible = recommendedJobsCache.slice(0, 3);
+  rankedRecommendationsCache = recommendedJobsCache;
+  recommendationStatus = 'ready';
+  renderPrivateOfficeDesk();
 
+  renderHomeSectionWhenChanged(container, { visible, hasMatchingProfile }, () => {
+    renderRecommendedMatterRows(container, visible, hasMatchingProfile);
+  });
+}
+
+function renderRecommendedMatterRows(container, visible, hasMatchingProfile) {
   if (!visible.length) {
-    const emptyAction = hasMatchingProfile
-      ? ''
-      : '<a href="profile-settings.html">Update profile</a>';
     container.innerHTML = `
-      <div class="home-feed-empty">
-        <strong>${hasMatchingProfile ? 'No matching matters right now' : 'Complete your profile for recommendations'}</strong>
-        <p>${hasMatchingProfile
-          ? 'There are no eligible open Matters matching your state or practice areas right now.'
-          : 'Add state experience and practice areas so Let’s-ParaConnect can identify relevant Matters.'}</p>
-        ${emptyAction}
+      <div class="private-office-secondary-state">
+        <strong>${hasMatchingProfile ? 'No matters to show right now.' : 'Complete your profile to explore matters.'}</strong>
+        ${hasMatchingProfile ? '' : '<a href="profile-settings.html">Update profile</a>'}
       </div>`;
     return;
   }
 
-  container.innerHTML = visible.map(({ job, stateMatch, practiceMatch, minimumYears }) => {
+  container.innerHTML = visible.map((job) => {
     const id = getRecommendationId(job);
     const pay = getRecommendationPay(job);
     const location = job.state || job.locationState || job.location?.state || job.jurisdiction || '';
-    const posted = job.createdAt
-      ? `Posted ${new Date(job.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
-      : 'Posted recently';
-    const compensation = pay > 0 ? formatCurrency(pay) : 'Compensation available';
+    const compensation = pay > 0 ? formatCurrency(pay) : 'Not listed';
     const deadlineValue = job.deadlineDate || job.deadline || '';
-    const deadline = deadlineValue ? `Due ${formatMatterDeadline(deadlineValue)}` : 'No deadline listed';
-    const matchReason = stateMatch && practiceMatch
-      ? 'Matches your state and practice areas'
-      : stateMatch
-        ? 'Matches your state experience'
-        : 'Matches your practice areas';
+    const deadline = deadlineValue ? formatMatterDeadline(deadlineValue) : '';
     return `
-      <article class="home-recommendation-card">
-        <div class="home-recommendation-heading">
-          <span class="home-recommendation-match">${escapeHtml(matchReason)}</span>
+      <article class="matter-folio">
+        <div>
           <h3>${escapeHtml(job.title || 'Untitled Matter')}</h3>
-          <p>${escapeHtml(job.practiceArea || 'General practice')}</p>
         </div>
-        <div class="home-recommendation-meta">
-          ${location ? `<span>${escapeHtml(location)}</span>` : ''}
-          <span>${escapeHtml(deadline)}</span>
-          <span>${escapeHtml(posted)}</span>
-          ${minimumYears > 0 ? `<span>${escapeHtml(`${minimumYears}+ years required`)}</span>` : ''}
-        </div>
-        <div class="home-recommendation-aside">
-          <strong class="home-recommendation-pay">${escapeHtml(compensation)}</strong>
-          <a class="home-recommendation-details" href="browse-jobs.html?id=${encodeURIComponent(id)}">Details</a>
-        </div>
+        <dl>
+          ${job.practiceArea ? `<div><dt>Practice</dt><dd>${escapeHtml(job.practiceArea)}</dd></div>` : ''}
+          ${location ? `<div><dt>State</dt><dd>${escapeHtml(location)}</dd></div>` : ''}
+          ${deadline ? `<div><dt>Deadline</dt><dd>${escapeHtml(deadline)}</dd></div>` : ''}
+          <div><dt>Compensation</dt><dd>${escapeHtml(compensation)}</dd></div>
+        </dl>
+        <footer><a href="browse-jobs.html?id=${encodeURIComponent(id)}">Details</a></footer>
       </article>`;
   }).join('');
 }
 
 function renderRecommendationLoading() {
+  recommendationStatus = 'loading';
+  renderPrivateOfficeDesk();
   selectors.recommendedMattersSection?.setAttribute('aria-busy', 'true');
   if (!selectors.recommendedMattersList) return;
   selectors.recommendedMattersList.innerHTML = `
-    <div class="home-feed-empty">
-      <strong>Checking for matching matters…</strong>
+    <div class="private-office-secondary-state">
+      <strong>Loading open matters…</strong>
     </div>`;
 }
 
 function renderRecommendationUnavailable(error) {
+  recommendationStatus = 'error';
+  rankedRecommendationsCache = [];
+  renderPrivateOfficeDesk();
   console.warn('Unable to load recommended matters', error);
   selectors.recommendedMattersSection?.removeAttribute('aria-busy');
   if (!selectors.recommendedMattersList) return;
   selectors.recommendedMattersList.innerHTML = `
-    <div class="home-feed-empty">
-      <strong>Recommendations are unavailable</strong>
+    <div class="private-office-secondary-state">
+      <strong>Matter listings are unavailable</strong>
       <p>You can still view every open opportunity on the Matter board.</p>
     </div>`;
 }
 
-const recommendationStateLoader = createRecommendationStateLoader({
-  loadProfile: () => loadViewerProfile(),
-  loadJobs: () => fetchJson('/api/jobs/open'),
-  loadExclusions: () => fetchJson('/api/applications/recommendation-exclusions'),
-  onLoading: renderRecommendationLoading,
-  onReady: ({ profile, jobs, exclusions }) => {
-    updateProfile(profile || {});
-    historicalRecommendationIds = buildHistoricalExclusionSet(exclusions);
-    const listings = Array.isArray(jobs) ? jobs : Array.isArray(jobs?.items) ? jobs.items : [];
+async function loadRecommendedMatters(options = {}) {
+  const generation = ++recommendationRefreshGeneration;
+  if (!options.silent) renderRecommendationLoading();
+  try {
+    const projection = await readOwnedHome('recommendations', options => fetchJson('/api/jobs/recommended', options));
+    if (generation !== recommendationRefreshGeneration) return { stale: true };
+    if (!Array.isArray(projection?.items) || typeof projection.hasMatchingProfile !== 'boolean') throw new Error('Matter listings could not be verified.');
+    const listings = projection.items;
+    const nextFingerprint = dataFingerprint(projection);
+    if (options.silent && recommendationStatus === 'ready' && nextFingerprint && nextFingerprint === recommendationPayloadFingerprint) {
+      selectors.recommendedMattersSection?.removeAttribute('aria-busy');
+      return { stale: false, projection };
+    }
+    recommendationPayloadFingerprint = nextFingerprint;
     selectors.recommendedMattersSection?.removeAttribute('aria-busy');
-    renderRecommendedMatters(listings);
-  },
-  onError: renderRecommendationUnavailable,
-});
-
-function loadRecommendedMatters(options = {}) {
-  return recommendationStateLoader.refresh(options);
+    renderRecommendedMatters(listings, { hasMatchingProfile: projection?.hasMatchingProfile });
+    return { stale: false, projection };
+  } catch (error) {
+    if (generation !== recommendationRefreshGeneration) return { stale: true, error };
+    renderRecommendationUnavailable(error);
+    return { stale: false, error };
+  }
 }
 
 function handleRecommendationHistoryChange(payload = {}) {
   if (!shouldHandleRecommendationHistoryChange(payload, recommendationViewerId)) return;
-  const changedIds = buildHistoricalExclusionSet(payload);
-  changedIds.forEach((id) => historicalRecommendationIds.add(id));
+  const changedIds = new Set([
+    ...(payload.caseIds || []), ...(payload.jobIds || []), ...(payload.matterIds || []),
+  ].map((value) => String(value || '')).filter(Boolean));
+  recommendedJobsCache = recommendedJobsCache.filter(
+    (job) => !getRecommendationIdentityIds(job).some((id) => changedIds.has(id))
+  );
   renderRecommendedMatters(recommendedJobsCache);
   void loadRecommendedMatters();
 }
@@ -805,155 +713,145 @@ function setField(field, value) {
   });
 }
 
-function readEarningsMode() {
-  try {
-    const saved = localStorage.getItem('lpc-earnings-mode');
-    if (saved === 'total' || saved === 'month') return saved;
-  } catch {}
-  return 'month';
-}
-
-function writeEarningsMode(mode) {
-  try {
-    localStorage.setItem('lpc-earnings-mode', mode);
-  } catch {}
-}
-
-function renderEarningsDisplay() {
-  const amount = earningsMode === 'total' ? earningsSnapshot.total : earningsSnapshot.month;
-  const label = earningsMode === 'total' ? 'total earned' : 'earned this month';
-  if (selectors.earningsLabel) selectors.earningsLabel.textContent = label;
-  if (selectors.earningsToggle) {
-    selectors.earningsToggle.dataset.mode = earningsMode;
-    selectors.earningsToggle.setAttribute('aria-pressed', earningsMode === 'total' ? 'true' : 'false');
-  }
-  const earningsDisplay = formatCurrency(amount).replace(/^\$/, '');
-  setField('earningsValue', earningsDisplay);
-}
-
-function toggleEarningsMode(event) {
-  if (event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-  earningsMode = earningsMode === 'total' ? 'month' : 'total';
-  writeEarningsMode(earningsMode);
-  renderEarningsDisplay();
-}
-
 function updateStats(stats = {}) {
   const activeCases = Number(stats.activeCases ?? 0);
-  const unread = Number(stats.unreadMessages ?? 0);
+  const unread = Number.isSafeInteger(stats.unreadMessages) ? stats.unreadMessages : null;
   const nextDeadline = stats.nextDeadline ?? '—';
-  const monthEarnings = Number(stats.monthEarnings ?? 0);
-  const totalEarnings = Number(stats.totalEarnings ?? monthEarnings ?? 0);
-  const payout30Days = Number(stats.payout30Days ?? 0);
-  const nextPayout = stats.nextPayout ?? '—';
-  const expectedPayouts = Number(stats.expectedPayouts ?? 0);
 
-  setField('welcomeSubheading', `You have ${activeCases} active assignment${activeCases === 1 ? '' : 's'}`);
-  setField('activeCases', activeCases);
-  updateUnreadDisplay(unread);
-  setField('nextDeadline', nextDeadline);
-  const payoutDisplay = formatCurrency(payout30Days).replace(/^\$/, '');
-  earningsSnapshot = { month: monthEarnings, total: totalEarnings };
-  renderEarningsDisplay();
-  setField('payout30Days', payoutDisplay);
-  setField('nextPayout', nextPayout);
   setField('homeActiveMatters', activeCases);
   setField('homeNextDeadline', nextDeadline);
   setField('homeUnreadMessages', unread);
-  setField('homeExpectedPayouts', formatCurrency(expectedPayouts));
-  const hasNextDeadline = Boolean(nextDeadline && nextDeadline !== '—');
-  if (selectors.homeReturningOverview) {
-    selectors.homeReturningOverview.hidden = !(activeCases > 0 || unread > 0 || hasNextDeadline || expectedPayouts > 0);
+  officeMetrics = { activeCases, unread, nextDeadline };
+  updatePrivateOfficeSummary();
+  if (selectors.homeReturningOverview) selectors.homeReturningOverview.hidden = true;
+}
+
+function updatePrivateOfficeSummary() {
+  const node = selectors.privateOfficeSummary;
+  if (!node) return;
+  const parts = [];
+  if (officeMetrics.activeCases > 0) {
+    parts.push(`${officeMetrics.activeCases} active Matter${officeMetrics.activeCases === 1 ? '' : 's'}`);
   }
+  if (officeMetrics.unread > 0) {
+    parts.push(`${officeMetrics.unread} unread message${officeMetrics.unread === 1 ? '' : 's'}`);
+  }
+  if (officeMetrics.nextDeadline && officeMetrics.nextDeadline !== '—') {
+    parts.push(`next deadline ${officeMetrics.nextDeadline}`);
+  }
+  node.textContent = parts.join(' · ');
+  node.hidden = parts.length === 0;
+}
+
+function buildDashboardSnapshot({ dashboard = null, invites = [], deadlines = null, messages = null } = {}) {
+  const activeCases = Array.isArray(dashboard?.activeCases) ? dashboard.activeCases : [];
+  const normalizedInvites = Array.isArray(invites) ? invites : [];
+  const normalizedThreads = messages?.threads || [];
+  const normalizedDeadlines = calendarRows({ matters: activeCases, reminders: Array.isArray(deadlines) ? deadlines : [], ownerId: currentFinancialOwner() });
+  return {
+    dashboard,
+    activeCases,
+    invites: normalizedInvites,
+    deadlines: normalizedDeadlines,
+    deadlineUnavailable: [...(!dashboard ? ['Matter deadlines'] : []), ...(!Array.isArray(deadlines) ? ['Private reminders'] : [])],
+    threads: normalizedThreads,
+    unreadCount: messages?.unreadCount ?? null,
+  };
+}
+
+function renderDashboardSnapshot(snapshot, { preserveDashboardOnFailure = false, deferAssignments = false } = {}) {
+  renderFinancialSummary(snapshot.dashboard?.metrics);
+  if (snapshot.dashboard || !preserveDashboardOnFailure) {
+    updateStats({
+      activeCases: snapshot.dashboard?.metrics?.activeCases,
+      unreadMessages: snapshot.unreadCount,
+      nextDeadline: deriveNextDeadline(snapshot.deadlines),
+    });
+    if (!deferAssignments) {
+      renderAssignments(mapActiveCasesToAssignments(snapshot.activeCases, snapshot.threads));
+    }
+  }
+  renderDeadlines(snapshot.deadlines, snapshot.deadlineUnavailable);
+  syncRecentActivityState({
+    invites: snapshot.invites,
+    threads: snapshot.threads,
+    deadlines: snapshot.deadlines,
+  });
+  maybeOpenInviteFromQuery();
 }
 
 async function refreshDashboardFromServer(reason = '', { force = false } = {}) {
-  const generation = ++dashboardRefreshGeneration;
+  if (dashboardDeparting || !currentFinancialOwner()) return;
   if (dashboardRefreshInFlight) {
     dashboardRefreshQueuedReason = reason || 'queued';
     return;
   }
   const now = Date.now();
   if (!force && now - lastDashboardRefreshAt < DASHBOARD_REFRESH_COOLDOWN_MS) return;
+  const generation = ++dashboardRefreshGeneration;
   dashboardRefreshInFlight = true;
+  if (force) assignmentsSourceFingerprint = '';
+  clearFinancialSummary();
   lastDashboardRefreshAt = now;
   try {
-    const [dashboard, invites, deadlines, threads, unreadCount] = await Promise.all([
+    const [dashboard, invites, deadlines, messages, profileRead] = await Promise.all([
       fetchParalegalData({ fresh: true }).catch((err) => {
         console.warn('Paralegal dashboard payload refresh failed', reason || '', err);
         return null;
       }),
       loadInvites().catch((err) => {
         console.warn('Paralegal invites refresh failed', reason || '', err);
-        return recentActivityState.invites;
+        return [];
       }),
       loadDeadlineEvents().catch((err) => {
         console.warn('Paralegal deadlines refresh failed', reason || '', err);
-        return [];
+        return null;
       }),
-      loadMessageThreads().catch((err) => {
-        console.warn('Paralegal threads refresh failed', reason || '', err);
-        return recentActivityState.threads;
+      loadHomeMessages().catch((err) => {
+        console.warn('Paralegal messages refresh failed', reason || '', err);
+        return null;
       }),
-      loadUnreadMessageCount().catch((err) => {
-        console.warn('Paralegal unread refresh failed', reason || '', err);
-        return unreadMessageCount;
-      }),
+      loadViewerProfile().then(value => ({ value })).catch(error => ({ error })),
     ]);
 
+    // A newer refresh was requested while this snapshot was in flight. The
+    // queued read will commit current work; do not briefly paint this result.
+    if (generation !== dashboardRefreshGeneration || dashboardRefreshQueuedReason) return;
+    if (profileRead.value) updateProfile(profileRead.value);
+    else if (profileRead.error?.name !== 'AbortError') updateProfile({});
+
+    const snapshot = buildDashboardSnapshot({ dashboard, invites, deadlines, messages });
+    renderFinancialSummary(dashboard?.metrics);
+    const nextDashboardFingerprint = dataFingerprint(snapshot);
+    const dashboardChanged = !nextDashboardFingerprint || nextDashboardFingerprint !== dashboardPayloadFingerprint;
+    if (dashboardChanged) {
+      dashboardPayloadFingerprint = nextDashboardFingerprint;
+      dashboardStatus = dashboard ? 'ready' : 'error';
+      renderDashboardSnapshot(snapshot);
+    } else if (dashboard && force) { renderAssignments(mapActiveCasesToAssignments(snapshot.activeCases, snapshot.threads)); }
+    await loadAppliedJobs({ preservePage: true, silent: true });
     if (generation !== dashboardRefreshGeneration) return;
-
-    updateUnreadDisplay(unreadCount);
-    initLatestMessage(Array.isArray(threads) ? threads : []);
-
-    const activeCases = Array.isArray(dashboard?.activeCases) ? dashboard.activeCases : [];
-    const caseDeadlines = buildCaseDeadlines(activeCases);
-    const deadlineEvents = Array.isArray(deadlines) && deadlines.length ? deadlines : caseDeadlines;
-
-    if (dashboard) {
-      updateStats({
-        activeCases: dashboard?.metrics?.activeCases,
-        unreadMessages: unreadCount,
-        nextDeadline: deriveNextDeadline(deadlineEvents),
-        monthEarnings: dashboard?.metrics?.earnings,
-        totalEarnings: dashboard?.metrics?.earningsTotal,
-        payout30Days: dashboard?.metrics?.earningsLast30Days,
-        nextPayout: dashboard?.metrics?.nextPayoutDate,
-        expectedPayouts: dashboard?.metrics?.expectedPayouts,
+    await loadRecommendedMatters({ silent: true });
+    if (generation !== dashboardRefreshGeneration) return;
+    if (dashboardChanged || force) {
+      paralegalPrioritySnapshot = {
+        activeCases: snapshot.activeCases,
+        invites: snapshot.invites,
+        threads: snapshot.threads,
+        deadlines: snapshot.deadlines,
+        applications: appliedAppsCache,
+      };
+      renderParalegalPriorityQueue();
+      notifyCasesApplicationsRefresh(reason, {
+        activeCases: snapshot.activeCases,
+        dashboardAvailable: Boolean(dashboard),
       });
-      renderAssignments(mapActiveCasesToAssignments(activeCases, threads));
     }
-
-    renderDeadlines(deadlineEvents);
-    syncRecentActivityState({
-      invites: Array.isArray(invites) ? invites : [],
-      threads: Array.isArray(threads) ? threads : [],
-      deadlines: deadlineEvents,
-    });
-    maybeOpenInviteFromQuery();
-    await loadAppliedJobs({ preservePage: true });
-    if (generation !== dashboardRefreshGeneration) return;
-    await loadRecommendedMatters();
-    if (generation !== dashboardRefreshGeneration) return;
-    paralegalPrioritySnapshot = {
-      activeCases,
-      invites: Array.isArray(invites) ? invites : [],
-      threads: Array.isArray(threads) ? threads : [],
-      deadlines: deadlineEvents,
-      applications: appliedAppsCache,
-    };
-    renderParalegalPriorityQueue();
-    notifyCasesApplicationsRefresh(reason, {
-      activeCases: activeCases,
-    });
   } catch (err) {
     console.warn('Paralegal dashboard refresh failed', reason || '', err);
   } finally {
     dashboardRefreshInFlight = false;
-    if (dashboardRefreshQueuedReason) {
+    if (!dashboardDeparting && dashboardRefreshQueuedReason) {
       const queuedReason = dashboardRefreshQueuedReason;
       dashboardRefreshQueuedReason = '';
       queueMicrotask(() => refreshDashboardFromServer(queuedReason, { force: true }));
@@ -962,15 +860,32 @@ async function refreshDashboardFromServer(reason = '', { force = false } = {}) {
 }
 
 function setupDashboardAutoRefresh() {
-  window.addEventListener('pageshow', (event) => {
-    if (event.persisted) {
-      refreshDashboardFromServer('pageshow', { force: true });
-    }
+  // A cancelled in-flight read can finish before pagehide. Stop its queued
+  // refresh as soon as navigation starts, and reauthorize when this view returns.
+  const stop = () => {
+    dashboardDeparting = true; dashboardRefreshQueuedReason = '';
+    ++dashboardRefreshGeneration; ++deskEnrichmentGeneration;
+  };
+  const resume = reason => {
+    dashboardDeparting = false;
+    refreshDashboardFromServer(reason, { force: true });
+  };
+  window.addEventListener('beforeunload', stop);
+  window.addEventListener('pagehide', () => {
+    stop();
+    calendarController?.abort(); ++dashboardRefreshGeneration; ++deskEnrichmentGeneration;
+    dashboardPayloadFingerprint = ''; assignmentsSourceFingerprint = '';
+    for (const controller of homeReadControllers.values()) controller.abort(); homeReadControllers.clear();
+    clearFinancialSummary(); calendarSnapshot = { rows: [], unavailable: [], loading: true }; renderDeadlines();
   });
+  window.addEventListener('pageshow', (event) => {
+    dashboardDeparting = false;
+    if (event.persisted) resume('pageshow');
+  });
+  // Cancelling a native leave-page prompt can return focus without pageshow.
+  window.addEventListener('focus', () => { if (dashboardDeparting && document.visibilityState === 'visible') resume('focus'); });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      refreshDashboardFromServer('visible', { force: true });
-    }
+    if (document.visibilityState === 'visible') resume('visible');
   });
   window.addEventListener('lpc:notifications-refreshed', () => {
     if (document.visibilityState !== 'visible') return;
@@ -980,98 +895,295 @@ function setupDashboardAutoRefresh() {
     if (document.visibilityState !== 'visible') return;
     refreshDashboardFromServer('lifecycle', { force: true });
   });
+  window.addEventListener('lpc:paralegal-dashboard-request-refresh', (event) => {
+    const reason = String(event?.detail?.reason || 'surface-request');
+    refreshDashboardFromServer(reason, { force: true });
+  });
 }
 
-function renderDeadlines(deadlines = []) {
-  const container = selectors.deadlineList;
+function renderDeadlines(rows, unavailable) {
+  if (rows) calendarSnapshot = { rows, unavailable: unavailable || [], loading: false };
+  const root = selectors.deadlineList;
+  const query = new URL(window.location.href).searchParams;
+  const page = /^[1-9]\d*$/.test(query.get('calendarPage') || '') ? Number(query.get('calendarPage')) : 1;
+  const snapshot = currentFinancialOwner() ? calendarSnapshot : { rows: [], unavailable: ['Calendar'], loading: false };
+  renderCalendar(root, { ...snapshot, page,
+    onPage: next => {
+      const url = new URL(window.location.href); if (next === 1) url.searchParams.delete('calendarPage'); else url.searchParams.set('calendarPage', String(next));
+      window.history.replaceState(window.history.state, '', url); renderDeadlines();
+    },
+    onRetry: () => { void refreshDashboardFromServer('calendar', { force: true }); },
+  });
+}
+
+function getMissingProfileActions() {
+  if (!profileStatusKnown) return [];
+  const profileStates = [
+    ...(Array.isArray(recommendationProfile.stateExperience) ? recommendationProfile.stateExperience : []),
+    recommendationProfile.state,
+    recommendationProfile.location,
+  ].map((value) => String(value || '').trim()).filter(Boolean);
+  const practiceAreas = Array.isArray(recommendationProfile.practiceAreas)
+    ? recommendationProfile.practiceAreas.filter((value) => String(value || '').trim())
+    : [];
+  const missing = [];
+  if (!profileStates.length) missing.push('Add state experience');
+  if (!practiceAreas.length) missing.push('Add practice areas');
+  const years = recommendationProfile.yearsExperience;
+  if (years === null || years === undefined || years === '' || !Number.isFinite(Number(years))) {
+    missing.push('Add years of experience');
+  }
+  return missing;
+}
+
+function assignmentReviewState(assignment = {}) {
+  const files = Array.isArray(assignment.detail?.files) ? assignment.detail.files.filter((file) => file.uploadedByRole === 'paralegal') : [];
+  if (assignment.detail?.submissionSummary?.revisions > 0) return 'revision';
+  if (assignment.detail?.submissionSummary?.awaitingReview > 0) return 'review';
+  if (files.some((file) => String(file?.status || '').toLowerCase() === 'attorney_revision')) return 'revision';
+  if (files.some((file) => String(file?.status || '').toLowerCase() === 'pending_review')) return 'review';
+  return 'active';
+}
+
+function sortDeskAssignments(assignments = []) {
+  const priority = { revision: 0, review: 1, active: 2 };
+  return assignments.slice().sort((left, right) => {
+    const stateDifference = priority[assignmentReviewState(left)] - priority[assignmentReviewState(right)];
+    if (stateDifference) return stateDifference;
+    const leftDeadline = left.deadlineDate ? new Date(left.deadlineDate).getTime() : Number.POSITIVE_INFINITY;
+    const rightDeadline = right.deadlineDate ? new Date(right.deadlineDate).getTime() : Number.POSITIVE_INFINITY;
+    if (leftDeadline !== rightDeadline) return leftDeadline - rightDeadline;
+    return new Date(right.updatedAt || right.createdAt || 0) - new Date(left.updatedAt || left.createdAt || 0);
+  });
+}
+
+function renderDeskState({ eyebrow, title, detail, actionLabel, actionHref, tone = 'open' }) {
+  return `
+    <article class="desk-matter desk-matter--${escapeHtml(tone)}">
+      <div class="desk-matter__meta"><span class="desk-matter__status">${escapeHtml(eyebrow)}</span></div>
+      <div>
+        <h3>${escapeHtml(title)}</h3>
+        <p class="desk-matter__scope">${escapeHtml(detail)}</p>
+      </div>
+      <div></div>
+      <div class="desk-matter__footer">
+        <a class="desk-matter__action" href="${escapeHtml(actionHref)}">${escapeHtml(actionLabel)}</a>
+      </div>
+    </article>`;
+}
+
+function renderPrivateOfficeDesk() {
+  const container = selectors.assignmentList;
   if (!container) return;
-  if (!deadlines.length) {
-    container.innerHTML = '<div class="info-line">No assigned deadlines.</div>';
+  if (initialDashboardHydrating) return;
+  const missingProfile = getMissingProfileActions();
+  renderHomeSectionWhenChanged(container, {
+    dashboardStatus,
+    profileStatusKnown,
+    stripeStatusKnown,
+    stripeConnected,
+    missingProfile,
+    assignments: deskAssignments,
+    selectedIndex: deskMatterIndex,
+    recommendationStatus,
+    hasRecommendations: rankedRecommendationsCache.length > 0,
+  }, () => renderPrivateOfficeDeskContent(container, missingProfile));
+}
+
+function renderPrivateOfficeDeskContent(container, missingProfile) {
+  if (dashboardStatus === 'error') {
+    container.innerHTML = renderDeskState({
+      eyebrow: 'Office unavailable',
+      title: 'Your work could not be loaded',
+      detail: 'Reload Home to check your current assignments.',
+      actionLabel: 'Reload dashboard',
+      actionHref: 'dashboard-paralegal.html',
+      tone: 'error',
+    });
+    selectors.homeWorkSection?.removeAttribute('aria-busy');
     return;
   }
-  container.innerHTML = deadlines
-    .map((deadline) => {
-      const title = deadline.title || 'Deadline';
-      const where = deadline.where ? ` · ${deadline.where}` : '';
-      const dueText = deadline.start ? ` due ${formatMatterDeadline(deadline.start)}` : '';
-      return `<div class="info-line">• ${title}${where}${dueText}</div>`;
-    })
-    .join('');
+  if (selectors.recommendedMattersSection) selectors.recommendedMattersSection.hidden = missingProfile.length > 0;
+  if (!deskAssignments.length && (!profileStatusKnown || !stripeStatusKnown)) {
+    container.innerHTML = renderDeskState({ eyebrow: 'Account unavailable', title: 'Account details couldn’t load', detail: 'Reload Home to check your profile and payout setup.', actionLabel: 'Reload Home', actionHref: 'dashboard-paralegal.html#home', tone: 'error' });
+    selectors.deskMatterSwitcher.hidden = true; selectors.homeWorkSection?.removeAttribute('aria-busy'); return;
+  }
+  if (!deskAssignments.length && stripeStatusKnown && !stripeConnected) {
+    container.innerHTML = renderDeskState({
+      eyebrow: 'Office setup',
+      title: 'Complete payout setup',
+      detail: 'Required before applying to Matters or receiving payment.',
+      actionLabel: 'Complete setup',
+      actionHref: 'profile-settings.html?onboardingStep=payment',
+      tone: 'setup',
+    });
+    selectors.homeWorkSection?.removeAttribute('aria-busy');
+    selectors.deskMatterSwitcher.hidden = true;
+    return;
+  }
+  if (!deskAssignments.length && missingProfile.length) {
+    container.innerHTML = renderDeskState({
+      eyebrow: 'Office setup',
+      title: 'Complete your professional profile',
+      detail: missingProfile.join(' · '),
+      actionLabel: 'Complete profile',
+      actionHref: 'profile-settings.html',
+      tone: 'setup',
+    });
+    selectors.homeWorkSection?.removeAttribute('aria-busy');
+    selectors.deskMatterSwitcher.hidden = true;
+    return;
+  }
+  if (deskAssignments.length) {
+    deskMatterIndex = Math.min(Math.max(0, deskMatterIndex), deskAssignments.length - 1);
+    const assignment = deskAssignments[deskMatterIndex];
+    const detail = assignment.detail || {};
+    const experience = detail.matterExperience || {};
+    const header = experience.header || {};
+    const reviewState = assignmentReviewState(assignment);
+    const files = Array.isArray(detail.files) ? detail.files : null;
+    const revisionCount = detail.submissionSummary?.revisions ?? (files?.filter((file) => file.uploadedByRole === 'paralegal' && String(file?.status || '').toLowerCase() === 'attorney_revision').length || 0);
+    const reviewCount = detail.submissionSummary?.awaitingReview ?? (files?.filter((file) => file.uploadedByRole === 'paralegal' && String(file?.status || '').toLowerCase() === 'pending_review').length || 0);
+    const tasks = experience.overview?.taskProgress;
+    const taskTotal = Number.isFinite(Number(tasks?.total)) ? Number(tasks.total) : assignment.tasksTotal;
+    const taskCompleted = Number.isFinite(Number(tasks?.completed)) ? Number(tasks.completed) : Math.max(0, taskTotal - assignment.tasksRemaining);
+    const tone = reviewState;
+    const statusText = reviewState === 'revision'
+      ? `${revisionCount} revision${revisionCount === 1 ? '' : 's'} requested`
+      : reviewState === 'review'
+        ? `${reviewCount} file${reviewCount === 1 ? '' : 's'} awaiting attorney review`
+        : header.status?.label || formatStatusLabel(assignment.status) || 'Active Matter';
+    const primaryAction = header.primaryAction || {};
+    const workspaceEligible = isWorkspaceEligibleCase(assignment);
+    const actionTab = ['revision', 'review'].includes(reviewState) ? 'files' : primaryAction.tab || 'work';
+    const actionHref = `case-detail.html?caseId=${encodeURIComponent(assignment.caseId)}&tab=${encodeURIComponent(actionTab)}`;
+    const actionLabel = reviewState === 'revision' ? 'Review requested changes' : reviewState === 'review' ? 'View submitted work' : primaryAction.label || 'Continue work';
+    const work = taskTotal > 0 ? `${taskCompleted} of ${taskTotal} complete` : 'No work items';
+    const detailNotice = assignment.detailState === 'error' ? '<p class="desk-matter__read-state">Work details couldn’t load. <button type="button" data-desk-retry>Retry details</button></p>'
+      : !assignment.detail ? '<p class="desk-matter__read-state">Checking work details…</p>' : '';
+    container.innerHTML = `
+      <article class="desk-matter desk-matter--${escapeHtml(tone)}" data-case-id="${escapeHtml(assignment.caseId)}">
+        <div class="desk-matter__meta">
+          <span class="desk-matter__status">${escapeHtml(statusText)}</span>
+          ${assignment.practiceArea ? `<span>${escapeHtml(assignment.practiceArea)}</span>` : ''}
+          ${assignment.attorney ? `<span>With ${escapeHtml(assignment.attorney)}</span>` : ''}
+        </div>
+        <div>
+          <h3>${escapeHtml(header.title || assignment.title || 'Matter')}</h3>
+          ${experience.overview?.summary ? `<p class="desk-matter__scope">${escapeHtml(experience.overview.summary)}</p>` : ''}
+        </div>
+        <div>
+          <div class="desk-matter__slips">
+            <div class="desk-slip"><span>Deadline</span><strong>${escapeHtml(assignment.due || 'Not set')}</strong></div>
+            <div class="desk-slip"><span>Work items</span><strong>${escapeHtml(work)}</strong></div>
+            ${files ? `<div class="desk-slip"><span>Shared files</span><strong>${files.length}</strong></div>` : ''}
+          </div>
+          ${detailNotice}
+        </div>
+        <div class="desk-matter__footer">
+          <div class="desk-matter__actions">
+            <button type="button" class="desk-matter__preview" data-desk-preview>Details</button>
+            ${workspaceEligible ? `<a class="desk-matter__action" href="${escapeHtml(actionHref)}">${escapeHtml(actionLabel)}</a>` : ''}
+          </div>
+        </div>
+      </article>`;
+    container.querySelector('[data-desk-retry]')?.addEventListener('click', () => { void refreshDashboardFromServer('details', { force: true }); });
+    container.querySelector('[data-desk-preview]')?.addEventListener('click', (event) => {
+      const trigger = event.currentTarget;
+      if (window.LPCContextPanel?.openMatter?.(assignment.caseId, { historyMode: 'push', returnFocus: trigger })) return;
+      navigateToCase(assignment.caseId);
+    });
+    const multiple = deskAssignments.length > 1;
+    selectors.deskMatterSwitcher.hidden = !multiple;
+    if (selectors.deskMatterPosition) selectors.deskMatterPosition.textContent = `${deskMatterIndex + 1} / ${deskAssignments.length}`;
+    selectors.homeWorkSection?.removeAttribute('aria-busy');
+    return;
+  }
+  selectors.deskMatterSwitcher.hidden = true;
+  if (dashboardStatus === 'loading') {
+    container.innerHTML = '<div class="private-office-desk__loading">Preparing your desk…</div>';
+    return;
+  }
+  const detail = recommendationStatus === 'loading'
+    ? 'Loading open Matters for you to review.'
+    : recommendationStatus === 'error'
+      ? 'These listings are temporarily unavailable. You can still review the complete Matter board.'
+      : rankedRecommendationsCache.length
+        ? 'Explore the Matters below and decide whether they fit your experience.'
+        : 'Your next assignment will appear here.';
+  container.innerHTML = renderDeskState({
+    eyebrow: 'Your desk is open',
+    title: 'Ready for the next Matter',
+    detail,
+    actionLabel: 'Browse Matters',
+    actionHref: 'browse-jobs.html',
+    tone: 'open',
+  });
+  selectors.homeWorkSection?.removeAttribute('aria-busy');
+}
+
+async function enrichDeskAssignments(assignments = [], generation = deskEnrichmentGeneration) {
+  const ownerId = currentFinancialOwner();
+  const enriched = new Array(assignments.length); let index = 0, restricted = false;
+  const current = () => generation === deskEnrichmentGeneration && currentFinancialOwner() === ownerId;
+  async function worker() {
+    while (index < assignments.length && current()) {
+      const position = index++, assignment = assignments[position];
+      try {
+        const detail = await readOwnedHome(`matter:${assignment.caseId}`, options => fetchJson(`/api/cases/${encodeURIComponent(assignment.caseId)}`, options));
+        if (getCaseId(detail) !== assignment.caseId) throw new Error('Matter details could not be verified.');
+        enriched[position] = { ...assignment, detail, detailState: 'ready' };
+      } catch (error) {
+        if (!current()) return;
+        if ([403, 404].includes(error.status)) { restricted = true; enriched[position] = null; }
+        else enriched[position] = { ...assignment, detailState: 'error' };
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(4, assignments.length) }, worker));
+  if (!current()) return;
+  const selectedId = deskAssignments[deskMatterIndex]?.caseId;
+  deskAssignments = sortDeskAssignments(enriched.filter(Boolean));
+  homeDetailsPhase = restricted || deskAssignments.some(assignment => assignment.detailState !== 'ready') ? 'error' : 'ready';
+  deskMatterIndex = Math.max(0, deskAssignments.findIndex(assignment => assignment.caseId === selectedId));
+  if (restricted) renderDeadlines([], ['Matter access']);
+  renderPrivateOfficeDesk(); renderParalegalPriorityQueue();
+  document.getElementById('paralegalHomeView')?.classList.remove('is-hydrating');
 }
 
 function renderAssignments(assignments = []) {
-  const container = selectors.assignmentList;
-  if (!container || !selectors.assignmentTemplate) return;
-  const usableAssignments = assignments.filter((assignment) => assignment && assignment.caseId);
-  if (!usableAssignments.length) {
-    if (selectors.homeWorkSection) selectors.homeWorkSection.hidden = true;
-    container.innerHTML = "";
-    return;
-  }
-  if (selectors.homeWorkSection) selectors.homeWorkSection.hidden = false;
-  container.removeAttribute("hidden");
-  container.innerHTML = '';
+  const usableAssignments = (Array.isArray(assignments) ? assignments : []).filter(assignment => assignment && assignment.caseId);
+  const nextFingerprint = dataFingerprint({ assignments: usableAssignments, status: dashboardStatus });
+  if (nextFingerprint && nextFingerprint === assignmentsSourceFingerprint) return;
+  assignmentsSourceFingerprint = nextFingerprint;
+  for (const [key, controller] of homeReadControllers) if (key.startsWith('matter:')) { controller.abort(); homeReadControllers.delete(key); }
+  const selectedId = deskAssignments[deskMatterIndex]?.caseId, generation = ++deskEnrichmentGeneration;
+  // Retain verified details only for assignments still present in the fresh
+  // owned summary. Commit the new detail batch together so refresh cannot
+  // temporarily drop revisions, reorder work or shorten the Inbox.
+  const priorDetails = new Map(deskAssignments.filter(assignment => assignment.detailState === 'ready').map(assignment => [assignment.caseId, assignment.detail]));
+  deskAssignments = sortDeskAssignments(usableAssignments.map(assignment => priorDetails.has(assignment.caseId)
+    ? { ...assignment, detail: priorDetails.get(assignment.caseId), detailState: 'ready' }
+    : assignment));
+  homeDetailsPhase = usableAssignments.length ? 'loading' : 'ready';
+  deskMatterIndex = Math.max(0, deskAssignments.findIndex(assignment => assignment.caseId === selectedId));
+  renderPrivateOfficeDesk();
+  if (usableAssignments.length) void enrichDeskAssignments(usableAssignments, generation);
+  else document.getElementById('paralegalHomeView')?.classList.remove('is-hydrating');
+}
 
-  usableAssignments.slice(0, 2).forEach((assignment) => {
-    const node = selectors.assignmentTemplate.content.cloneNode(true);
-    const card = node.querySelector('.case-card');
-    const titleEl = card.querySelector('[data-field="assignmentTitle"]');
-    const metaEl = card.querySelector('[data-field="assignmentMeta"]');
-    const summaryEl = card.querySelector('[data-field="assignmentSummary"]');
-    const signalsEl = card.querySelector('[data-field="assignmentSignals"]');
-    const actions = card.querySelector('.case-actions');
-    const primaryBtn = card.querySelector('[data-action="primary"]');
-    const secondaryBtn = card.querySelector('[data-action="secondary"]');
-
-    const attorney = assignment.attorney ? `Attorney: ${assignment.attorney}` : '';
-    const practiceArea = assignment.practiceArea || '';
-    const statusLabel = assignment.status ? formatStatusLabel(assignment.status) : '';
-    const metaParts = [attorney, practiceArea, statusLabel].filter(Boolean);
-    const caseId = assignment.caseId;
-    const eligible = isWorkspaceEligibleCase(assignment);
-
-    titleEl.textContent = assignment.title || 'Matter';
-    metaEl.textContent = metaParts.join(' · ');
-    if (signalsEl) {
-      const taskLabel = assignment.tasksTotal > 0
-        ? `${assignment.tasksRemaining} task${assignment.tasksRemaining === 1 ? '' : 's'} remaining`
-        : 'No tasks listed';
-      const messageLabel = assignment.unreadMessages > 0
-        ? `${assignment.unreadMessages} unread message${assignment.unreadMessages === 1 ? '' : 's'}`
-        : 'No unread messages';
-      signalsEl.innerHTML = `
-        <span>${escapeHtml(assignment.due ? `Due ${assignment.due}` : 'No deadline listed')}</span>
-        <span>${escapeHtml(taskLabel)}</span>
-        <span class="${assignment.unreadMessages > 0 ? 'has-unread' : ''}">${escapeHtml(messageLabel)}</span>
-      `;
-    }
-    summaryEl.textContent = assignment.latestActivity || '';
-    summaryEl.hidden = !assignment.latestActivity;
-    if (card) card.dataset.caseId = caseId;
-    card.classList.add('open');
-
-    if (actions) {
-      actions.hidden = !eligible;
-    }
-    if (primaryBtn) primaryBtn.textContent = 'Continue working';
-    if (secondaryBtn) {
-      secondaryBtn.hidden = !caseId;
-      secondaryBtn.addEventListener('click', (event) => {
-        event.stopPropagation();
-        if (window.LPCContextPanel?.openMatter?.(caseId, { historyMode: 'push', returnFocus: secondaryBtn })) return;
-        navigateToCase(caseId);
-      });
-    }
-    if (eligible && caseId) {
-      if (primaryBtn) {
-        primaryBtn.addEventListener('click', (event) => {
-          event.stopPropagation();
-          navigateToCase(caseId);
-        });
-      }
-    }
-
-    container.appendChild(node);
+function bindDeskMatterSwitcher() {
+  if (deskSwitcherBound) return;
+  deskSwitcherBound = true;
+  document.querySelector('[data-desk-previous]')?.addEventListener('click', () => {
+    if (deskAssignments.length < 2) return;
+    deskMatterIndex = (deskMatterIndex - 1 + deskAssignments.length) % deskAssignments.length;
+    renderPrivateOfficeDesk();
+  });
+  document.querySelector('[data-desk-next]')?.addEventListener('click', () => {
+    if (deskAssignments.length < 2) return;
+    deskMatterIndex = (deskMatterIndex + 1) % deskAssignments.length;
+    renderPrivateOfficeDesk();
   });
 }
 
@@ -1098,13 +1210,12 @@ function mapActiveCasesToAssignments(activeCases = [], threads = []) {
         title: caseItem.jobTitle || caseItem.title || 'Matter',
         attorney: caseItem.attorneyName || '',
         practiceArea: caseItem.practiceArea || '',
-        due: caseItem.deadline
-          ? formatMatterDeadline(caseItem.deadlineDate || caseItem.deadline)
-          : caseItem.dueDate
-            ? new Date(caseItem.dueDate).toLocaleDateString()
-            : caseItem.createdAt
-              ? new Date(caseItem.createdAt).toLocaleDateString()
-              : '',
+        due: caseItem.deadline || caseItem.deadlineDate || caseItem.dueDate
+          ? formatMatterDeadline(caseItem.deadlineDate || caseItem.deadline || caseItem.dueDate)
+          : '',
+        deadlineDate: caseItem.deadlineDate || caseItem.deadline || caseItem.dueDate || '',
+        updatedAt: caseItem.latestUpdateAt || caseItem.updatedAt || '',
+        createdAt: caseItem.createdAt || '',
         status: caseItem.status || '',
         tasksTotal: Math.max(0, Number(caseItem.tasksTotal) || 0),
         tasksRemaining: Math.max(0, Number(caseItem.tasksRemaining) || 0),
@@ -1121,16 +1232,39 @@ function mapActiveCasesToAssignments(activeCases = [], threads = []) {
 }
 
 async function loadInvites() {
+  const ownerId = currentFinancialOwner();
+  const api = { get: async (path, options) => {
+    if (dashboardDeparting) throw new DOMException('View changed', 'AbortError');
+    const response = await secureFetch(path, { ...options, headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error('Invitations couldn’t load.');
+    return response.json();
+  } };
   try {
-    const res = await secureFetch('/api/cases/invited-to', { headers: { Accept: 'application/json' } });
-    if (!res.ok) throw new Error('Unable to load invites');
-    const payload = await res.json().catch(() => ({}));
-    return Array.isArray(payload?.items) ? payload.items : [];
-  } catch (error) {
-    console.warn('Unable to load invites', error);
-    return [];
-  }
+    const value = await loadReceivedInvitations(api, ownerId, { isCurrent: () => !dashboardDeparting && currentFinancialOwner() === ownerId });
+    renderInvitationLoadState(false); return value.items;
+  } catch (error) { if (!dashboardDeparting && error?.name !== 'AbortError') renderInvitationLoadState(true); throw error; }
 }
+let invitationQueueUnavailable = false;
+function renderInvitationLoadState(unavailable) {
+  invitationQueueUnavailable = unavailable;
+  let notice = document.querySelector('[data-invitation-load-state]');
+  if (!notice) {
+    const queue = document.querySelector('[data-paralegal-priority-list]');
+    if (!queue) return;
+    notice = document.createElement('div'); notice.dataset.invitationLoadState = '';
+    const message = document.createElement('p'); message.setAttribute('role', 'status'); message.textContent = 'Invitations couldn’t load.';
+    const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = 'Retry invitations';
+    retry.addEventListener('click', async () => {
+      retry.disabled = true;
+      try { await refreshDashboardFromServer('invitation-retry', { force: true }); }
+      finally { retry.disabled = false; }
+    });
+    notice.append(message, retry); queue.before(notice);
+  }
+  notice.hidden = !unavailable;
+  if (unavailable && activeInvite) closeInviteOverlay();
+}
+
 
 
 function findInviteByCaseId(caseId = '') {
@@ -1253,17 +1387,17 @@ async function respondToInvite(caseId, action, button) {
 
 async function revokeAcceptedInvite(caseId, button) {
   if (!caseId || inviteResponseInFlight) return;
-  const originalLabel = button?.textContent || 'Revoke application';
+  const originalLabel = button?.textContent || 'Withdraw application';
   inviteResponseInFlight = true;
   if (button) {
     button.disabled = true;
-    button.textContent = 'Revoking…';
+    button.textContent = 'Withdrawing…';
   }
   const toastHelper = window.toastUtils;
   try {
     const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/invite/revoke`, { method: 'POST' });
     const payload = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(payload?.error || 'Unable to revoke this application.');
+    if (!res.ok) throw new Error(payload?.error || 'Unable to withdraw this application.');
     recentActivityState.invites = recentActivityState.invites.filter(
       (invite) => String(invite?.id || invite?._id || '') !== String(caseId)
     );
@@ -1276,9 +1410,9 @@ async function revokeAcceptedInvite(caseId, button) {
       window.refreshNotificationCenters();
     }
     closeInviteOverlay();
-    toastHelper?.show?.('Application revoked.', { targetId: selectors.toastBanner?.id, type: 'success' });
+    toastHelper?.show?.('Application withdrawn.', { targetId: selectors.toastBanner?.id, type: 'success' });
   } catch (error) {
-    toastHelper?.show?.(error.message || 'Unable to revoke this application.', {
+    toastHelper?.show?.(error.message || 'Unable to withdraw this application.', {
       targetId: selectors.toastBanner?.id,
       type: 'error',
     });
@@ -1297,9 +1431,6 @@ function attachUIHandlers() {
   if (stagedToast?.message && selectors.toastBanner) {
     toastHelper.show(stagedToast.message, { targetId: selectors.toastBanner.id, type: stagedToast.type });
   }
-  earningsMode = readEarningsMode();
-  renderEarningsDisplay();
-
   if (selectors.inviteCloseBtn) {
     selectors.inviteCloseBtn.addEventListener('click', closeInviteOverlay);
   }
@@ -1343,17 +1474,6 @@ function attachUIHandlers() {
       closeRevokeConfirmModal();
     }
   });
-  if (selectors.messageBox) {
-    selectors.messageBox.addEventListener('click', () => {
-      if (unreadMessageCount < 1) return;
-      const caseId = latestMessageThread?.id || latestMessageThread?._id || '';
-      if (!caseId) return;
-      window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}&tab=messages`;
-    });
-  }
-  if (selectors.earningsToggle) {
-    selectors.earningsToggle.addEventListener('click', toggleEarningsMode);
-  }
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && selectors.inviteOverlay?.classList.contains('show')) {
       closeInviteOverlay();
@@ -1366,9 +1486,12 @@ function attachUIHandlers() {
 
 let activeInvite = null;
 let pendingRevokeAction = null;
+let stopEarlierWithdrawalObservation = null;
 let inviteReturnFocus = null;
 
 function closeRevokeConfirmModal() {
+  stopEarlierWithdrawalObservation?.();
+  stopEarlierWithdrawalObservation = null;
   const modal = selectors.revokeConfirmModal;
   modal?.classList.add('hidden');
   modal?.setAttribute('aria-hidden', 'true');
@@ -1397,9 +1520,13 @@ function closeRevokeConfirmModal() {
 }
 
 function openRevokeConfirmModal(onConfirm) {
+  stopEarlierWithdrawalObservation?.();
+  stopEarlierWithdrawalObservation = null;
   pendingRevokeAction = typeof onConfirm === 'function' ? onConfirm : null;
   const modal = selectors.revokeConfirmModal;
   if (!modal) return;
+  modal.querySelector('[data-earlier-withdrawal-status]')?.remove();
+  if (selectors.revokeConfirmSubmit) { selectors.revokeConfirmSubmit.disabled = false; selectors.revokeConfirmSubmit.textContent = 'Withdraw application'; }
   if (applicationModal && !applicationModal.classList.contains('hidden')) {
     deactivateDialogFocus(applicationModal, { restoreFocus: false });
     applicationModal.setAttribute('inert', '');
@@ -1460,9 +1587,9 @@ function openInviteOverlay(invite) {
     ? `Invited ${new Date(inviteDateValue).toLocaleDateString()}`
     : '';
   const brief =
-    invite?.briefSummary ||
-    invite?.description ||
     invite?.details ||
+    invite?.description ||
+    invite?.briefSummary ||
     invite?.summary ||
     invite?.caseDescription ||
     '';
@@ -1474,12 +1601,12 @@ function openInviteOverlay(invite) {
   const inviteStatus = String(invite?.inviteStatus || '').toLowerCase();
   const isAccepted = inviteStatus === 'accepted';
 
-  if (inviteCaseTitle) inviteCaseTitle.textContent = isAccepted ? 'Await attorney action' : "You've been invited to a Matter";
+  if (inviteCaseTitle) inviteCaseTitle.textContent = isAccepted ? 'Await attorney action' : 'Invitation';
   if (inviteJobTitle) inviteJobTitle.textContent = title;
   if (inviteLead) {
     inviteLead.textContent = isAccepted
       ? 'You accepted this invitation. The attorney must confirm hire and fund the Matter next.'
-      : '';
+      : 'Accepting confirms interest. Work starts after any requested checks, hiring, and funding.';
   }
   if (inviteMeta) {
     const metaPieces = [
@@ -1501,6 +1628,9 @@ function openInviteOverlay(invite) {
     if (brief) {
       detailParts.push(`<p>${escapeHtml(brief)}</p>`);
     }
+    const deadline = invite?.deadlineDate || invite?.deadline;
+    if (deadline) detailParts.push(`<p>Deadline: ${escapeHtml(formatMatterDeadline(deadline))}</p>`);
+    if (Number(invite?.minimumYearsExperience) > 0) detailParts.push(`<p>${escapeHtml(String(invite.minimumYearsExperience))}+ years required</p>`);
     if (tasks.length) {
       detailParts.push(`
         <div class="invite-task-block">
@@ -1546,7 +1676,7 @@ function openInviteOverlay(invite) {
   if (inviteDeclineBtn) {
     inviteDeclineBtn.dataset.caseId = caseId;
     inviteDeclineBtn.dataset.inviteAction = isAccepted ? 'revoke' : 'decline';
-    inviteDeclineBtn.textContent = isAccepted ? 'Revoke application' : 'Decline';
+    inviteDeclineBtn.textContent = isAccepted ? 'Withdraw application' : 'Decline';
     inviteDeclineBtn.disabled = !caseId;
   }
   inviteActions?.classList.toggle('is-accepted', isAccepted);
@@ -1615,14 +1745,6 @@ function normalizeOnboarding(raw = {}) {
   };
 }
 
-function getCachedOnboarding(user) {
-  if (user?.onboarding && typeof user.onboarding === "object") {
-    onboardingState = normalizeOnboarding(user.onboarding);
-    return onboardingState;
-  }
-  return onboardingState || normalizeOnboarding({});
-}
-
 async function loadOnboardingState(user) {
   if (user?.onboarding && typeof user.onboarding === "object") {
     onboardingState = normalizeOnboarding(user.onboarding);
@@ -1661,6 +1783,7 @@ async function updateOnboardingState(updates = {}, { markFirstLoginComplete = fa
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(payload?.error || "Unable to update onboarding state.");
+    if (Object.entries(updates).some(([key, value]) => payload.onboarding?.[key] !== value)) throw new Error("Onboarding update was not confirmed.");
     onboardingState = normalizeOnboarding(payload.onboarding || {});
     if (typeof window.updateSessionUser === "function") {
       const nextUser = { onboarding: onboardingState };
@@ -1670,19 +1793,14 @@ async function updateOnboardingState(updates = {}, { markFirstLoginComplete = fa
     return onboardingState;
   } catch (err) {
     console.warn("Unable to update onboarding state", err);
-    return getCachedOnboarding({});
+    return null;
   }
 }
 
 
-function markTourCompleted() {
-  void updateOnboardingState({ paralegalTourCompleted: true }, { markFirstLoginComplete: true });
-}
-
-function updateWelcomeGreeting() {
-  const greetingEl = selectors.welcomeGreeting;
-  if (!greetingEl) return;
-  greetingEl.textContent = "Welcome";
+async function markTourCompleted() {
+  const saved = await updateOnboardingState({ paralegalTourCompleted: true }, { markFirstLoginComplete: true });
+  return saved?.paralegalTourCompleted === true;
 }
 
 let tourInitialized = false;
@@ -1746,7 +1864,6 @@ async function initParalegalTour(user, options = {}) {
     (force || isFirstLogin) &&
     (force || !onboarding?.paralegalTourCompleted);
   if (!shouldShow) return;
-  if (!force) markTourCompleted();
 
   const showOverlay = () => {
     overlay.classList.add("is-active");
@@ -1865,7 +1982,6 @@ async function initParalegalTour(user, options = {}) {
     tooltip.classList.remove("is-active");
     hideOverlay();
     profileLink.focus();
-    updateWelcomeGreeting();
   };
 
   const buildProfileTourUrl = (href = "profile-settings.html") => {
@@ -1882,16 +1998,29 @@ async function initParalegalTour(user, options = {}) {
   closeBtn?.addEventListener("click", completeTour);
   tooltipCloseBtn?.addEventListener("click", completeTour);
   backBtn?.addEventListener("click", showIntro);
-  nextBtn?.addEventListener("click", () => {
+  const completionError = document.createElement("p");
+  completionError.setAttribute("role", "alert");
+  completionError.className = "tour-completion-error";
+  completionError.hidden = true;
+  tooltip.append(completionError);
+  let savingCompletion = false;
+  const finishAndOpenProfile = async () => {
+    if (savingCompletion) return;
+    savingCompletion = true; completionError.hidden = true;
+    if (nextBtn) nextBtn.disabled = true;
+    if (backBtn) backBtn.disabled = true;
+    const saved = await markTourCompleted();
+    savingCompletion = false;
+    if (nextBtn) nextBtn.disabled = false;
+    if (backBtn) backBtn.disabled = false;
+    if (!overlay.classList.contains("is-active")) return;
+    if (!saved) { completionError.textContent = "Couldn’t save tour completion. Try again."; completionError.hidden = false; nextBtn?.focus(); return; }
     completeTour();
     window.location.href = buildProfileTourUrl(profileLink.getAttribute("href") || "profile-settings.html");
-  });
+  };
+  nextBtn?.addEventListener("click", () => void finishAndOpenProfile());
   profileLink.addEventListener("click", (event) => {
-    if (overlay.classList.contains("is-active")) {
-      event.preventDefault();
-      completeTour();
-      window.location.href = buildProfileTourUrl(profileLink.getAttribute("href") || "profile-settings.html");
-    }
+    if (overlay.classList.contains("is-active")) { event.preventDefault(); void finishAndOpenProfile(); }
   });
   window.addEventListener("resize", () => {
     if (overlay.classList.contains("is-active") && tooltip.classList.contains("is-active")) {
@@ -1909,6 +2038,15 @@ async function initParalegalTour(user, options = {}) {
 }
 
 function updateProfile(profile = {}) {
+  profileStatusKnown = Boolean(currentFinancialOwner()) && String(profile?._id || profile?.id || '') === currentFinancialOwner();
+  const availabilityButton = document.querySelector('[data-action="availability"]');
+  let availabilityKnown = false;
+  try { availabilitySnapshot(profile); availabilityKnown = profileStatusKnown; } catch { availabilityKnown = false; }
+  if (availabilityButton) availabilityButton.disabled = !availabilityKnown;
+  if (!profileStatusKnown) {
+    const availability = document.getElementById('availabilityStatus'); if (availability) availability.textContent = 'Not loaded';
+    renderPrivateOfficeDesk(); return;
+  }
   recommendationProfile = { ...recommendationProfile, ...profile };
   const stateExperience = Array.isArray(profile.stateExperience)
     ? profile.stateExperience.map((value) => String(value || '').trim()).filter(Boolean)
@@ -1936,18 +2074,11 @@ function updateProfile(profile = {}) {
       ? `${years} year${years === 1 ? '' : 's'}`
       : 'Add experience';
   }
-  if (recommendedJobsCache.length) renderRecommendedMatters(recommendedJobsCache);
+  if (recommendationStatus === 'ready') {
+    renderRecommendedMatters(recommendedJobsCache);
+  }
   const composedName =
     [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim() || profile.name || 'Paralegal';
-  const firstName =
-    String(profile.firstName || '')
-      .trim() ||
-    String(profile.name || composedName)
-      .trim()
-      .split(/\s+/)[0] ||
-    'Paralegal';
-  setField('name', firstName);
-  updateWelcomeGreeting();
   const avatarUrl = getAvatarUrl(profile);
   document.querySelectorAll('[data-avatar]').forEach((node) => {
     node.src = avatarUrl;
@@ -1956,7 +2087,9 @@ function updateProfile(profile = {}) {
   const a = document.querySelector('#user-avatar');
   if (a) a.src = avatarUrl;
   updatePendingApprovalBanner(profile);
-  syncAvailabilityProfile(profile);
+  if (availabilityKnown) syncAvailabilityProfile(profile);
+  else { const availability = document.getElementById('availabilityStatus'); if (availability) availability.textContent = 'Not loaded'; }
+  renderPrivateOfficeDesk();
 }
 
 function availabilityDateOnly(value) {
@@ -1979,7 +2112,10 @@ function syncAvailabilityProfile(profile = {}) {
   const nextDisplay = document.getElementById("availabilityNext");
   if (statusDisplay) {
     statusDisplay.dataset.value = status;
-    statusDisplay.textContent = status === "available" ? "Available now" : "Not available";
+    const label = status === "available" ? "Available now" : "Not available";
+    // A same-value refresh must retain the pointer's text node. Replacing it
+    // between pointer-down and pointer-up can cancel WebKit's native click.
+    if (statusDisplay.textContent !== label) statusDisplay.textContent = label;
   }
   if (nextDisplay) {
     nextDisplay.dataset.date = nextAvailableDate;
@@ -2012,49 +2148,27 @@ function formatAvailabilityDate(value) {
 }
 
 function handleStoredUserUpdate(event) {
-  if (event.key !== 'lpc_user') return;
-  if (!event.newValue) return updateProfile({});
-  try {
-    const profile = JSON.parse(event.newValue);
-    updateProfile(profile || {});
-  } catch {
-    updateProfile({});
-  }
+  if (event.key !== 'lpc_user' && event.key !== null) return;
+  if (!financialOwnerId) return;
+  clearApplicationDraftsOnAccountChange();
+  clearFinancialSummary();
+  if (!currentFinancialOwner()) { clearHomeAccount(); return; }
+  const generation = ++availabilityRefreshGeneration;
+  void loadViewerProfile()
+    .then((profile) => {
+      if (generation === availabilityRefreshGeneration) updateProfile(profile || {});
+    })
+    .catch(() => {
+      // Preserve the last verified server projection when a cross-tab refresh fails.
+    });
 }
 
 window.addEventListener('storage', handleStoredUserUpdate);
-window.addEventListener('lpc:user-updated', (event) => {
-  if (event?.detail) {
-    updateProfile(event.detail);
-  }
+window.addEventListener('lpc:user-updated', () => {
+  // Session events can contain only identity fields. Re-read the owned profile
+  // instead of treating that partial payload as missing availability/setup.
+  handleStoredUserUpdate({ key: 'lpc_user' });
 });
-
-function getThreadTimestamp(thread = {}) {
-  const raw = thread.updatedAt || thread.lastMessageAt || thread.createdAt || null;
-  if (!raw) return 0;
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
-}
-
-function selectLatestThread(threads = []) {
-  return threads.reduce((latest, current) => {
-    if (!latest) return current;
-    return getThreadTimestamp(current) > getThreadTimestamp(latest) ? current : latest;
-  }, null);
-}
-
-function initLatestMessage(threads = []) {
-  if (!threads.length) {
-    latestMessageThread = null;
-    setField('latestMessageName', 'Inbox');
-    setField('latestMessageExcerpt', 'No new messages.');
-    return;
-  }
-  const latest = selectLatestThread(threads);
-  latestMessageThread = latest || null;
-  setField('latestMessageName', latest?.title || 'Matter thread');
-  setField('latestMessageExcerpt', latest?.lastMessageSnippet || 'No new messages.');
-}
 
 function escapeHtml(value = '') {
   return String(value || '')
@@ -2087,6 +2201,7 @@ function getApplicationPreEngagement(app) {
   if (!['requested', 'submitted', 'changes_requested'].includes(status)) return null;
   return {
     status,
+    revision: Number(pre.revision || 0),
     requestedParalegalId: String(pre.requestedParalegalId || ''),
     confidentialityAgreementRequired: !!pre.confidentialityAgreementRequired,
     conflictsCheckRequired: !!pre.conflictsCheckRequired,
@@ -2120,6 +2235,7 @@ function createApplicationPreEngagementDraft(app) {
   const pre = getApplicationPreEngagement(app);
   if (!pre || pre.status === 'submitted') return null;
   return {
+    requestRevision: pre.revision,
     confidentialityAcknowledged: !!pre.confidentialityAcknowledged,
     signedConfidentialityFile: null,
     signedConfidentialityFileName: String(pre.paralegalConfidentialityDocument?.name || ''),
@@ -2128,7 +2244,38 @@ function createApplicationPreEngagementDraft(app) {
   };
 }
 
+function applicationDraftKey(app) {
+  const ownerId = currentFinancialOwner(), caseId = getCaseId(app?.caseId);
+  return ownerId && caseId ? `${ownerId}:${caseId}:${String(app?._id || app?.id || '')}` : '';
+}
+
+function rememberApplicationDraft() {
+  const key = applicationDraftKey(activeApplication);
+  if (!key) return;
+  if (applicationPreEngagementDraft) applicationPreEngagementDrafts.set(key, { draft: applicationPreEngagementDraft, expandedKey: applicationPreEngagementExpandedKey });
+  else applicationPreEngagementDrafts.delete(key);
+}
+
+function clearApplicationDraftsOnAccountChange() {
+  if (currentFinancialOwner()) return;
+  applicationDraftGeneration++;
+  earlierWithdrawal.clear();
+  closeRevokeConfirmModal();
+  applicationPreEngagementDrafts.clear();
+  closeApplicationModal();
+  applicationDetail?.replaceChildren();
+}
+
+function restoreApplicationDraft(app, saved) {
+  const fresh = createApplicationPreEngagementDraft(app);
+  if (!fresh || !saved) return fresh;
+  if (fresh.requestRevision === saved.requestRevision) return saved;
+  return { ...fresh, conflictsDisclosureText: saved.conflictsDisclosureText || fresh.conflictsDisclosureText,
+    pending: !!saved.pending, sending: !!saved.sending, refreshing: !!saved.refreshing, pendingMessage: saved.pendingMessage || '' };
+}
+
 function isApplicationPreEngagementValid(pre, draft) {
+  if (draft?.pending) return false;
   if (!pre) return true;
   if (pre.status === 'submitted') return true;
   if (pre.confidentialityAgreementRequired && !draft?.confidentialityAcknowledged) return false;
@@ -2223,14 +2370,11 @@ function buildApplicationPreEngagementSection(app) {
   const signedDocName = escapeHtml(
     draft.signedConfidentialityFileName || signedDoc?.name || 'No file selected'
   );
-  const cards = getApplicationPreEngagementCards(pre, draft);
   const expandedKey = resolveApplicationPreEngagementExpandedKey(pre, draft);
 
   const confidentialityCard = pre.confidentialityAgreementRequired
     ? `
-      <article class="application-preengagement-card ${
-        cards.find((card) => card.key === 'confidentiality')?.complete ? 'is-complete' : ''
-      } ${expandedKey === 'confidentiality' ? 'is-expanded' : ''}">
+      <article class="application-preengagement-card ${expandedKey === 'confidentiality' ? 'is-expanded' : ''}">
         <button
           type="button"
           class="application-preengagement-card-toggle"
@@ -2241,16 +2385,6 @@ function buildApplicationPreEngagementSection(app) {
             <div class="application-preengagement-card-copy">
               <div class="application-preengagement-item-title">Confidentiality Agreement</div>
             </div>
-          </div>
-          <div class="application-preengagement-card-status ${
-            cards.find((card) => card.key === 'confidentiality')?.complete ? 'is-complete' : ''
-          }">
-            <span class="application-preengagement-card-check" aria-hidden="true">${
-              cards.find((card) => card.key === 'confidentiality')?.complete ? '&#10003;' : ''
-            }</span>
-            <span>${
-              cards.find((card) => card.key === 'confidentiality')?.complete ? 'Complete' : 'Required'
-            }</span>
           </div>
         </button>
         <div class="application-preengagement-card-body" ${expandedKey === 'confidentiality' ? '' : 'hidden'}>
@@ -2292,9 +2426,7 @@ function buildApplicationPreEngagementSection(app) {
 
   const conflictsCard = pre.conflictsCheckRequired
     ? `
-      <article class="application-preengagement-card ${
-        cards.find((card) => card.key === 'conflicts')?.complete ? 'is-complete' : ''
-      } ${expandedKey === 'conflicts' ? 'is-expanded' : ''}">
+      <article class="application-preengagement-card ${expandedKey === 'conflicts' ? 'is-expanded' : ''}">
         <button
           type="button"
           class="application-preengagement-card-toggle"
@@ -2305,16 +2437,6 @@ function buildApplicationPreEngagementSection(app) {
             <div class="application-preengagement-card-copy">
               <div class="application-preengagement-item-title">Conflicts Check</div>
             </div>
-          </div>
-          <div class="application-preengagement-card-status ${
-            cards.find((card) => card.key === 'conflicts')?.complete ? 'is-complete' : ''
-          }">
-            <span class="application-preengagement-card-check" aria-hidden="true">${
-              cards.find((card) => card.key === 'conflicts')?.complete ? '&#10003;' : ''
-            }</span>
-            <span>${
-              cards.find((card) => card.key === 'conflicts')?.complete ? 'Complete' : 'Required'
-            }</span>
           </div>
         </button>
         <div class="application-preengagement-card-body" ${expandedKey === 'conflicts' ? '' : 'hidden'}>
@@ -2343,6 +2465,7 @@ function buildApplicationPreEngagementSection(app) {
               <div ${showDisclosure ? '' : 'hidden'}>
                 <textarea
                   rows="4"
+                  aria-label="Possible conflict details"
                   placeholder="Describe the possible conflict for the attorney to review."
                   data-preengagement-disclosure
                 >${escapeHtml(draft.conflictsDisclosureText || '')}</textarea>
@@ -2376,8 +2499,10 @@ function buildApplicationPreEngagementSection(app) {
           <span class="application-preengagement-status">Submitted${pre.submittedAt ? ` on ${escapeHtml(formatDate(pre.submittedAt))}` : ''}.</span>
         </div>
       ` : `
+        ${draft.pendingMessage ? `<p role="alert">${escapeHtml(draft.pendingMessage)}</p>` : ''}
         <div class="application-preengagement-actions">
-          <button type="button" class="btn primary application-preengagement-submit-btn" data-preengagement-submit ${submitDisabled ? 'disabled' : ''}>Submit to attorney</button>
+          <button type="button" class="btn primary application-preengagement-submit-btn" data-preengagement-submit ${submitDisabled ? 'disabled' : ''}>${draft.sending ? 'Submitting…' : 'Submit to attorney'}</button>
+          ${draft.pending && !draft.sending ? `<button type="button" class="btn secondary application-preengagement-action-btn" data-preengagement-refresh ${draft.refreshing ? 'disabled' : ''}>Review saved requirements</button>` : ''}
         </div>
       `}
     </section>
@@ -2388,25 +2513,15 @@ function buildApplicationDetail(app) {
   if (!app) {
     return '<p class="muted">Application not found.</p>';
   }
-  const job = app.jobId || app.job || {};
-  const browseMatterId = getCaseId(app) || getCaseId(job);
-  const browseMatterHref = browseMatterId
-    ? `browse-jobs.html?caseId=${encodeURIComponent(browseMatterId)}`
-    : '';
-  const title = escapeHtml(job.title || app.caseTitle || 'Matter');
+  const job = { ...(app.jobId || app.job || {}), ...(app.scopeSnapshot || {}) };
   const practice = escapeHtml(job.practiceArea || 'General practice');
   const description = escapeHtml(job.description || '');
-  const budgetValue = Number(job.budget);
+  const budgetValue = Number.isFinite(job.totalAmount) ? job.totalAmount / 100 : Number(job.budget);
   const budget = job.compensationDisplay || job.payDisplay || (Number.isFinite(budgetValue) ? formatCurrency(budgetValue) : '');
   const status = formatApplicationStatus(getApplicationStatusKey(app));
   const appliedAt = app.createdAt ? formatDate(app.createdAt) : 'Recently';
   const cover = formatMultiline(app.coverLetter || '');
-
   return `
-    <div class="detail-row">
-      <span class="detail-label">Matter</span>
-      <span class="detail-value">${title}</span>
-    </div>
     <div class="detail-row">
       <span class="detail-label">Practice area</span>
       <span class="detail-value">${practice}</span>
@@ -2435,27 +2550,42 @@ function buildApplicationDetail(app) {
       <strong>Cover message</strong>
       <p>${cover || 'No cover message available.'}</p>
     </div>
-    ${browseMatterHref ? `
-      <div class="application-detail-actions">
-        <a class="card-link" href="${escapeHtml(browseMatterHref)}">View Matter posting</a>
-      </div>
-    ` : ''}
+    <details class="application-detail-actions">
+      <summary>Matter details</summary>
+      <p>${app.scopeSnapshot?.capturedAt ? 'Scope saved when you applied.' : 'Latest retained listing details. A snapshot was not saved for this older application.'}</p>
+      ${job.state ? `<p>State: ${escapeHtml(job.state)}</p>` : ''}
+      ${job.deadlineDate ? `<p>Deadline: ${escapeHtml(formatMatterDeadline(job.deadlineDate))}</p>` : ''}
+      <ul>${(job.tasks || []).map((task) => `<li>${escapeHtml(typeof task === 'string' ? task : task.title)}</li>`).join('')}</ul>
+    </details>
     ${buildApplicationPreEngagementSection(app)}
   `;
 }
 
 function renderActiveApplicationModal() {
   if (!applicationDetail) return;
+  rememberApplicationDraft();
+  const heading = document.getElementById('applicationDetailTitle');
+  const job = { ...(activeApplication?.jobId || activeApplication?.job || {}), ...(activeApplication?.scopeSnapshot || {}) };
+  if (heading) heading.textContent = job.title || activeApplication?.caseTitle || 'Matter application';
   applicationDetail.innerHTML = buildApplicationDetail(activeApplication);
+  const revokeButton = applicationModal?.querySelector('[data-application-revoke]');
+  if (revokeButton) {
+    revokeButton.hidden = !isApplicationRevocable(activeApplication);
+    revokeButton.disabled = !!applicationPreEngagementDraft?.pending || !isApplicationRevocable(activeApplication);
+    revokeButton.textContent = 'Withdraw application';
+    revokeButton.closest('.note-modal-actions').hidden = revokeButton.hidden;
+  }
+  if (applicationPreEngagementDraft?.pending) {
+    applicationDetail.querySelectorAll('.application-preengagement input, .application-preengagement textarea').forEach(input => { input.disabled = true; });
+  }
   bindApplicationPreEngagementActions();
 }
 
 function updateActiveApplicationInCache(updatedApp = {}) {
-  const activeId = String(updatedApp?._id || updatedApp?.id || '');
-  if (!activeId) return;
+  const key = applicationDraftKey(updatedApp);
+  if (!key || appliedAppsCache.filter(entry => applicationDraftKey(entry) === key).length !== 1) return;
   appliedAppsCache = appliedAppsCache.map((entry) => {
-    const entryId = String(entry?._id || entry?.id || '');
-    return entryId === activeId ? { ...entry, ...updatedApp } : entry;
+    return applicationDraftKey(entry) === key ? { ...entry, ...updatedApp } : entry;
   });
 }
 
@@ -2486,23 +2616,32 @@ async function reviewApplicationPreEngagementDocument(app) {
   }
 }
 
-async function submitApplicationPreEngagement(app, button) {
+async function submitApplicationPreEngagement(app) {
   const pre = getApplicationPreEngagement(app);
   const caseId = String(app?.caseId || '');
   if (!pre || pre.status === 'submitted' || !caseId) return;
   const draft = applicationPreEngagementDraft || createApplicationPreEngagementDraft(app) || {};
+  const key = applicationDraftKey(app), ownerId = currentFinancialOwner(), generation = applicationDraftGeneration;
+  if (!key || !ownerId) return;
+  const isCurrentOwner = () => currentFinancialOwner() === ownerId && generation === applicationDraftGeneration;
+  const isSelected = () => isCurrentOwner() && applicationDraftKey(activeApplication) === key;
+  const saveDraft = next => {
+    if (!isCurrentOwner()) return;
+    const expandedKey = applicationPreEngagementDrafts.get(key)?.expandedKey || '';
+    if (next) applicationPreEngagementDrafts.set(key, { draft: next, expandedKey });
+    else applicationPreEngagementDrafts.delete(key);
+    if (isSelected()) applicationPreEngagementDraft = next;
+  };
   if (!isApplicationPreEngagementValid(pre, draft)) {
     renderActiveApplicationModal();
     return;
   }
   const toastHelper = window.toastUtils;
-  const originalLabel = button?.textContent || 'Submit pre-engagement';
-  if (button) {
-    button.disabled = true;
-    button.textContent = 'Submitting...';
-  }
+  saveDraft({ ...draft, pending: true, sending: true, pendingMessage: '' });
+  renderActiveApplicationModal();
   try {
     const formData = new FormData();
+    formData.set('expectedPreEngagementRevision', String(draft.requestRevision));
     formData.set('confidentialityAcknowledged', draft.confidentialityAcknowledged ? 'true' : 'false');
     formData.set('conflictsResponseType', draft.conflictsResponseType || '');
     formData.set('conflictsDisclosureText', draft.conflictsDisclosureText || '');
@@ -2515,33 +2654,40 @@ async function submitApplicationPreEngagement(app, button) {
     }
     const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/pre-engagement/respond`, {
       method: 'POST',
+      suppressToast: true,
       headers: { Accept: 'application/json' },
       body: formData,
     });
     const payload = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(payload?.error || 'Unable to submit pre-engagement.');
+    if (!isCurrentOwner()) return;
+    if (!res.ok) throw Object.assign(new Error(payload?.error || 'Unable to submit pre-engagement.'), { status: res.status, code: payload?.code });
+    if (payload?.success !== true || payload.preEngagement?.status !== 'submitted' || payload.preEngagement.revision !== draft.requestRevision + 1 || String(payload.preEngagement.requestedParalegalId || '') !== pre.requestedParalegalId) throw new Error('Submission could not be confirmed.');
     const updatedApp = {
       ...app,
-      preEngagement: payload?.preEngagement || pre,
+      preEngagement: payload.preEngagement,
     };
-    activeApplication = updatedApp;
-    applicationPreEngagementDraft = createApplicationPreEngagementDraft(updatedApp);
+    saveDraft(null);
     updateActiveApplicationInCache(updatedApp);
-    renderActiveApplicationModal();
+    if (isSelected()) {
+      activeApplication = updatedApp;
+      renderActiveApplicationModal();
+    }
     applyAppliedFilters({ resetPage: false });
-    toastHelper?.show?.(pre?.status === 'changes_requested' ? 'Pre-engagement resubmitted.' : 'Pre-engagement submitted.', {
+    if (isSelected()) toastHelper?.show?.(pre?.status === 'changes_requested' ? 'Pre-engagement resubmitted.' : 'Pre-engagement submitted.', {
       targetId: selectors.toastBanner?.id,
       type: 'success',
     });
   } catch (error) {
-    toastHelper?.show?.(error.message || 'Unable to submit pre-engagement.', {
-      targetId: selectors.toastBanner?.id,
-      type: 'error',
-    });
-    if (button) {
-      button.disabled = false;
-      button.textContent = originalLabel;
+    if (!isCurrentOwner()) return;
+    const changed = error?.status === 409 && error?.code === 'PRE_ENGAGEMENT_CONFLICT';
+    const uncertain = !error?.status || error.status >= 500;
+    if (changed || uncertain) {
+      saveDraft({ ...draft, pending: true, sending: false, pendingMessage: uncertain ? 'Submission could not be confirmed. Review the saved requirements before trying again.' : error.message });
+      if (isSelected()) renderActiveApplicationModal();
+      return;
     }
+    saveDraft({ ...draft, pending: false, sending: false, pendingMessage: error.message || 'Unable to submit pre-engagement.' });
+    if (isSelected()) renderActiveApplicationModal();
   }
 }
 
@@ -2549,6 +2695,46 @@ function bindApplicationPreEngagementActions() {
   if (!applicationDetail || !activeApplication) return;
   const pre = getApplicationPreEngagement(activeApplication);
   if (!pre) return;
+
+  applicationDetail.querySelector('[data-preengagement-refresh]')?.addEventListener('click', async (event) => {
+    const key = applicationDraftKey(activeApplication), ownerId = currentFinancialOwner(), generation = applicationDraftGeneration, draft = applicationPreEngagementDraft;
+    if (!key || !ownerId || draft?.sending || draft?.refreshing) return;
+    const isSelected = item => !!item && applicationDraftKey(item) === key;
+    event.currentTarget.disabled = true;
+    applicationPreEngagementDraft = { ...draft, refreshing: true };
+    rememberApplicationDraft();
+    try {
+      // This explicit recovery read must not be discarded by a background list refresh.
+      const response = await secureFetch('/api/applications/my', { headers: { Accept: 'application/json' }, suppressToast: true });
+      const payload = await response.json().catch(() => null);
+      if (ownerId !== currentFinancialOwner() || generation !== applicationDraftGeneration) return;
+      const applications = response.ok && (Array.isArray(payload) ? payload : payload?.items);
+      if (!Array.isArray(applications)) throw new Error('Saved requirements could not load. Try again.');
+      const matches = applications.filter(isSelected);
+      if (matches.length !== 1) throw new Error('This application is no longer available. Close these details and review your applications.');
+      const updated = matches[0];
+      const restored = restoreApplicationDraft(updated, draft);
+      const fresh = restored && { ...restored, pending: false, sending: false, refreshing: false, pendingMessage: '' };
+      const expandedKey = applicationPreEngagementDrafts.get(key)?.expandedKey || '';
+      if (fresh) applicationPreEngagementDrafts.set(key, { draft: fresh, expandedKey });
+      else applicationPreEngagementDrafts.delete(key);
+      updateActiveApplicationInCache(updated);
+      applyAppliedFilters({ resetPage: false });
+      if (!isSelected(activeApplication)) return;
+      activeApplication = updated;
+      applicationPreEngagementDraft = fresh;
+      renderActiveApplicationModal();
+      applicationDetail.querySelector('[data-preengagement-card-toggle]')?.focus();
+    } catch (error) {
+      if (ownerId !== currentFinancialOwner() || generation !== applicationDraftGeneration) return;
+      const failed = { ...draft, pending: true, refreshing: false, pendingMessage: error?.message || 'Saved requirements could not load. Try again.' };
+      const expandedKey = applicationPreEngagementDrafts.get(key)?.expandedKey || '';
+      applicationPreEngagementDrafts.set(key, { draft: failed, expandedKey });
+      if (!isSelected(activeApplication)) return;
+      applicationPreEngagementDraft = failed;
+      renderActiveApplicationModal();
+    }
+  });
 
   applicationDetail.querySelectorAll('[data-preengagement-card-toggle]').forEach((toggle) => {
     toggle.addEventListener('click', () => {
@@ -2614,7 +2800,7 @@ function bindApplicationPreEngagementActions() {
 
   const submitBtn = applicationDetail.querySelector('[data-preengagement-submit]');
   submitBtn?.addEventListener('click', async () => {
-    await submitApplicationPreEngagement(activeApplication, submitBtn);
+    await submitApplicationPreEngagement(activeApplication);
   });
 }
 
@@ -2622,7 +2808,6 @@ function findAppliedApplication(applicationId, jobId) {
   const appId = String(applicationId || '');
   const jobKey = String(jobId || '');
   return appliedAppsCache.find((app) => {
-    if (isRejectedApplication(app)) return false;
     const id = String(app._id || app.id || '');
     if (appId && id === appId) return true;
     if (!jobKey) return false;
@@ -2635,24 +2820,25 @@ async function revokeApplication(app, button) {
   const appId = app?._id || app?.id || '';
   if (!appId) return;
   const toastHelper = window.toastUtils;
-  const originalLabel = button?.textContent || 'Revoke application';
+  const originalLabel = button?.textContent || 'Withdraw application';
   if (button) {
     button.disabled = true;
-    button.textContent = 'Revoking…';
+    button.textContent = 'Withdrawing…';
   }
   try {
     const res = await secureFetch(`/api/applications/${encodeURIComponent(appId)}/revoke`, {
       method: 'POST',
     });
     const payload = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(payload?.error || 'Unable to revoke this application.');
-    appliedAppsCache = appliedAppsCache.filter((entry) => String(entry?._id || entry?.id || '') !== String(appId));
+    if (!res.ok) throw new Error(payload?.error || 'Unable to withdraw this application.');
+    appliedAppsCache = appliedAppsCache.map((entry) => String(entry?._id || entry?.id || '') === String(appId)
+      ? { ...entry, status: 'withdrawn', preEngagement: null, withdrawnAt: new Date().toISOString() } : entry);
     populateAppliedFilterOptions(appliedAppsCache);
     applyAppliedFilters();
     closeApplicationModal();
-    toastHelper?.show?.('Application revoked.', { targetId: selectors.toastBanner?.id, type: 'success' });
+    toastHelper?.show?.('Application withdrawn.', { targetId: selectors.toastBanner?.id, type: 'success' });
   } catch (error) {
-    toastHelper?.show?.(error.message || 'Unable to revoke this application.', {
+    toastHelper?.show?.(error.message || 'Unable to withdraw this application.', {
       targetId: selectors.toastBanner?.id,
       type: 'error',
     });
@@ -2670,6 +2856,8 @@ function isApplicationFunded(app) {
 }
 
 function isApplicationRevocable(app) {
+  if (['withdrawn', 'rejected', 'hired'].includes(String(app?.status || '').toLowerCase())) return false;
+  if (app?.applicationSource === 'case_applicant') return app.withdrawal?.available === true;
   const hasId = Boolean(app?._id || app?.id);
   const isInviteAcceptedEntry = String(app?.applicationSource || '').toLowerCase() === 'invite_accept' && !!app?.caseId;
   const jobStatus = String(app?.jobId?.status || '').toLowerCase();
@@ -2718,16 +2906,18 @@ function getAppliedHighlightTarget() {
   }
 }
 
-function openApplicationModal(app) {
+function openApplicationModal(app, trigger = null) {
   if (!applicationModal || !applicationDetail) return;
   if (window.location.hash !== '#cases') return;
-  if (!isActiveApplication(app)) {
+  if (!currentFinancialOwner() || !hasApplicationJob(app)) {
     closeApplicationModal();
     return;
   }
+  rememberApplicationDraft();
   activeApplication = app || null;
-  applicationPreEngagementDraft = createApplicationPreEngagementDraft(app);
-  applicationPreEngagementExpandedKey = resolveDefaultPreEngagementExpandedKey(
+  const saved = applicationPreEngagementDrafts.get(applicationDraftKey(app));
+  applicationPreEngagementDraft = restoreApplicationDraft(app, saved?.draft);
+  applicationPreEngagementExpandedKey = saved?.expandedKey || resolveDefaultPreEngagementExpandedKey(
     getApplicationPreEngagement(app),
     applicationPreEngagementDraft || {}
   );
@@ -2735,10 +2925,12 @@ function openApplicationModal(app) {
   if (revokeBtn) {
     const disabled = !isApplicationRevocable(app);
     revokeBtn.disabled = disabled;
-    revokeBtn.textContent = disabled ? 'Revoke unavailable' : 'Revoke application';
+    revokeBtn.textContent = 'Withdraw application';
   }
   renderActiveApplicationModal();
-  applicationReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  applicationReturnFocus = trigger instanceof HTMLElement && trigger.isConnected
+    ? trigger
+    : document.activeElement instanceof HTMLElement ? document.activeElement : null;
   applicationModal.classList.remove('hidden');
   applicationModal.setAttribute('aria-hidden', 'false');
   applicationModal.removeAttribute('inert');
@@ -2751,6 +2943,7 @@ function openApplicationModal(app) {
 
 function closeApplicationModal() {
   if (!applicationModal) return;
+  rememberApplicationDraft();
   applicationModal.classList.add('hidden');
   applicationModal.setAttribute('aria-hidden', 'true');
   applicationModal.setAttribute('inert', '');
@@ -2772,6 +2965,38 @@ function bindApplicationModal() {
   if (revokeBtn) {
     revokeBtn.addEventListener('click', async () => {
       if (!activeApplication) return;
+      if (activeApplication.applicationSource === 'case_applicant') {
+        const selected = activeApplication, selectedKey = applicationDraftKey(selected);
+        const action = async () => {
+          const reviewing = earlierWithdrawal.state(selected).review;
+          const result = await earlierWithdrawal.act(selected);
+          if (!result) return;
+          if (result.saved) {
+            updateActiveApplicationInCache({ ...selected, status: 'withdrawn', pending: false, preEngagement: null, withdrawal: { available: false, revision: null } });
+            applyAppliedFilters({ resetPage: false });
+            if (pendingRevokeAction === action) closeRevokeConfirmModal();
+            if (applicationDraftKey(activeApplication) === selectedKey) closeApplicationModal();
+            window.toastUtils?.show?.('Application withdrawn.', { targetId: selectors.toastBanner?.id, type: 'success' });
+            await loadAppliedJobs();
+          } else if (reviewing && !result.review && pendingRevokeAction === action) {
+            closeRevokeConfirmModal();
+            appliedAppsCache = appliedAppsCache.map(entry => getCaseId(entry.caseId) === getCaseId(selected.caseId) ? result.application : entry);
+            applyAppliedFilters({ resetPage: false });
+            openApplicationModal(result.application);
+            window.toastUtils?.show?.('Review the updated application before withdrawing.', { targetId: selectors.toastBanner?.id, type: 'info' });
+          }
+        };
+        openRevokeConfirmModal(action);
+        const message = document.createElement('p'); message.dataset.earlierWithdrawalStatus = ''; message.setAttribute('role', 'status');
+        selectors.revokeConfirmModal.querySelector('.application-detail').append(message);
+        stopEarlierWithdrawalObservation = earlierWithdrawal.observe(selected, state => {
+          selectors.revokeConfirmSubmit.disabled = state.pending || state.saved || !state.review && state.application.withdrawal?.available !== true;
+          selectors.revokeConfirmSubmit.textContent = state.pending ? 'Checking…' : state.review ? 'Review saved application' : 'Withdraw application';
+          message.textContent = state.message;
+          if (state.saved) queueMicrotask(() => { if (pendingRevokeAction === action) closeRevokeConfirmModal(); });
+        });
+        return;
+      }
       openRevokeConfirmModal(async () => {
         if (String(activeApplication?.applicationSource || '').toLowerCase() === 'invite_accept' && activeApplication?.caseId) {
           const caseId = String(activeApplication.caseId || '');
@@ -2818,7 +3043,7 @@ function bindAppliedPreviewActions() {
     const jobId = trigger.dataset.jobId || '';
     const match = findAppliedApplication(appId, jobId);
     setApplicationQuery(appId, jobId);
-    openApplicationModal(match);
+    openApplicationModal(match, trigger);
   });
 }
 
@@ -2835,49 +3060,64 @@ function maybeOpenApplicationFromQuery() {
   openApplicationModal(match);
 }
 
-async function loadAppliedJobs({ preservePage = false } = {}) {
+async function loadAppliedJobs({ preservePage = false, silent = false } = {}) {
+  const generation = ++applicationRefreshGeneration;
+  const previousPhase = homeApplicationsPhase;
+  homeApplicationsPhase = 'loading';
   const container = document.getElementById('appliedJobsList');
   if (!container) return;
-  container.innerHTML = '';
   bindApplicationModal();
   bindAppliedPreviewActions();
-  const loading = document.createElement('div');
-  loading.className = 'case-card';
-  loading.innerHTML = '<div class="case-header"><div><h2>Loading applications…</h2></div></div>';
-  container.appendChild(loading);
+  if (!silent) {
+    container.innerHTML = '';
+    const loading = document.createElement('div');
+    loading.className = 'case-card';
+    loading.innerHTML = '<div class="case-header"><div><h2>Loading applications…</h2></div></div>';
+    container.appendChild(loading);
+  }
 
   try {
-    const res = await secureFetch('/api/applications/my', { headers: { Accept: 'application/json' } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const payload = await res.json().catch(() => []);
-    const apps = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
-    const visibleApps = apps.filter((app) => isActiveApplication(app));
+    const payload = await readOwnedHome('applications', options => fetchJson('/api/applications/my', options));
+    if (generation !== applicationRefreshGeneration) return;
+    const apps = Array.isArray(payload) ? payload : payload?.items;
+    if (!Array.isArray(apps) || apps.some(app => !app || typeof app !== 'object' || app.paralegalId && normalizeIdCandidate(app.paralegalId) !== currentFinancialOwner())) throw new Error('Applications could not be verified.');
+    homeApplicationsPhase = 'ready';
+    const nextFingerprint = dataFingerprint(apps);
+    if (silent && previousPhase === 'ready' && nextFingerprint && nextFingerprint === applicationPayloadFingerprint) {
+      if (pendingAppliedFilters) applyAppliedFilters();
+      renderParalegalPriorityQueue();
+      return appliedAppsCache;
+    }
+    applicationPayloadFingerprint = nextFingerprint;
+    const visibleApps = apps.filter((app) => hasApplicationJob(app));
     appliedAppsCache = visibleApps;
-    paralegalPrioritySnapshot.applications = visibleApps;
-    renderHomeApplications(visibleApps, apps);
+    paralegalPrioritySnapshot.applications = visibleApps.filter(isActiveApplication);
+    renderHomeApplications(visibleApps);
     appliedPage = preservePage ? appliedPage : 1;
     bindAppliedFilters();
     populateAppliedFilterOptions(visibleApps);
     applyAppliedFilters({ resetPage: false });
     renderParalegalPriorityQueue();
     maybeOpenApplicationFromQuery();
+    return visibleApps;
   } catch (err) {
+    if (generation !== applicationRefreshGeneration) return;
+    homeApplicationsPhase = 'error';
     console.error('Failed to load applied jobs', err);
-    renderApplicationPipeline([]);
-    if (selectors.homeApplicationsList) {
-      selectors.homeApplicationsList.innerHTML = `
-        <div class="home-feed-empty">
-          <strong>Applications are unavailable</strong>
-          <p>Your application history could not be loaded. Try again from the full applications view.</p>
-          <a href="dashboard-paralegal.html#cases">Open applications</a>
-        </div>`;
+    appliedAppsCache = [];
+    paralegalPrioritySnapshot.applications = [];
+    if (selectors.homeApplicationPipeline) {
+      selectors.homeApplicationPipeline.innerHTML = '<p class="private-office-secondary-state">Applications couldn’t load.</p><button type="button" class="office-calendar-control" data-home-applications-retry>Retry applications</button>';
+      selectors.homeApplicationPipeline.querySelector('[data-home-applications-retry]')?.addEventListener('click', () => { void loadAppliedJobs({ preservePage: true }); });
     }
+    if (selectors.homeApplicationsList) selectors.homeApplicationsList.replaceChildren();
+    renderParalegalPriorityQueue();
     container.innerHTML = `
       <div class="case-card empty-state">
         <div class="case-header">
           <div>
             <h2>Unable to load applications</h2>
-            <div class="case-subinfo">Your current view is preserved. Try loading the applications again.</div>
+            <div class="case-subinfo">Reload your application history to continue.</div>
             <button type="button" class="completed-page-btn" data-applications-retry>Retry</button>
           </div>
         </div>
@@ -2886,7 +3126,6 @@ async function loadAppliedJobs({ preservePage = false } = {}) {
       void loadAppliedJobs({ preservePage: true });
     });
     updateAppliedPagination({ total: 0 });
-    maybeOpenApplicationFromQuery();
   }
 }
 
@@ -2965,6 +3204,7 @@ function bindAppliedFilters() {
 
   applicationSavedViews = mountDashboardSavedViews({
     scope: 'paralegal_applications',
+    getOwner: currentFinancialOwner,
     picker: '[data-application-saved-view]',
     saveButton: '[data-application-save-view]',
     deleteButton: '[data-application-delete-view]',
@@ -3003,7 +3243,7 @@ function populateAppliedFilterOptions(apps = []) {
   const practiceValues = new Set();
   apps.forEach((app) => {
     const normalizedStatus = getApplicationStatusKey(app);
-    if (normalizedStatus && normalizedStatus !== 'rejected') {
+    if (normalizedStatus) {
       statusValues.add(normalizedStatus);
     }
     const job = app.jobId || {};
@@ -3027,9 +3267,16 @@ function populateAppliedFilterOptions(apps = []) {
 }
 
 function applyAppliedFilters({ resetPage = false } = {}) {
+  if (homeApplicationsPhase !== 'ready') {
+    if (homeApplicationsPhase === 'loading') {
+      pendingAppliedFilters = { resetPage: resetPage || Boolean(pendingAppliedFilters?.resetPage) };
+    }
+    return;
+  }
   const container = document.getElementById('appliedJobsList');
   if (!container) return;
-  if (resetPage) appliedPage = 1;
+  if (resetPage || pendingAppliedFilters?.resetPage) appliedPage = 1;
+  pendingAppliedFilters = null;
 
   const { search, status, practice, dateRange, sort } = appliedFilters;
   const query = String(search?.value || '').trim().toLowerCase();
@@ -3037,7 +3284,7 @@ function applyAppliedFilters({ resetPage = false } = {}) {
   const practiceFilter = String(practice?.value || 'all');
   const rangeFilter = String(dateRange ? dateRange.value : 'all');
 
-  let filtered = appliedAppsCache.filter((app) => isActiveApplication(app));
+  let filtered = appliedAppsCache.filter((app) => hasApplicationJob(app));
 
   if (query) {
     filtered = filtered.filter((app) => {
@@ -3170,7 +3417,7 @@ function renderAppliedJobs(container, apps, total, { startIndex = 0, endIndex = 
             <div>
               <h2>${title}</h2>
               <div class="case-subinfo">${practice}</div>
-              <div class="case-subinfo">Applied on ${when}</div>
+              <div class="case-subinfo">${escapeHtml(formatApplicationStatus(getApplicationStatusKey(app)))} · Applied on ${when}</div>
             </div>
             <div class="case-actions">
               <a class="card-link" href="${href}" data-application-view data-application-id="${escapeHtml(applicationId)}" data-job-id="${escapeHtml(jobId)}">${escapeHtml(['requested', 'changes_requested'].includes(pre?.status) ? 'Complete pre-engagement →' : 'View →')}</a>
@@ -3241,10 +3488,6 @@ function hasApplicationJob(app) {
   return Boolean(job._id || job.id || job.title);
 }
 
-function isRejectedApplication(app) {
-  return getApplicationStatusKey(app) === 'rejected';
-}
-
 function isActiveApplication(app) {
   if (!hasApplicationJob(app)) return false;
   const statusKey = getApplicationStatusKey(app);
@@ -3256,155 +3499,126 @@ function isActiveApplication(app) {
 
 function formatApplicationStatus(value) {
   const cleaned = String(value || 'submitted').replace(/_/g, ' ').toLowerCase();
+  if (cleaned === 'rejected') return 'Not selected';
   return cleaned ? cleaned.charAt(0).toUpperCase() + cleaned.slice(1) : 'Submitted';
 }
 
 function renderParalegalPriorityQueue() {
   const list = document.querySelector('[data-paralegal-priority-list]');
   const count = document.querySelector('[data-paralegal-priority-count]');
-  const shell = document.getElementById('paralegalPriorityQueue');
-  if (!list) return;
-  const { invites = [], deadlines = [], applications = [] } = paralegalPrioritySnapshot;
+  if (!list || homeAccountLost) return;
+  const { invites = [], threads = [] } = paralegalPrioritySnapshot;
+  const applications = homeApplicationsPhase === 'ready' ? (paralegalPrioritySnapshot.applications || []).filter(isActiveApplication) : [];
   const priorities = [];
-  const pendingInvites = invites.filter((invite) => String(invite?.inviteStatus || invite?.status || 'pending').toLowerCase() === 'pending');
-  if (pendingInvites.length) {
-    const first = pendingInvites[0];
-    const caseId = getCaseId(first);
-    priorities.push({
-      title: `${pendingInvites.length} Matter invitation${pendingInvites.length === 1 ? '' : 's'} waiting`,
-      detail: 'Review the scope and respond so the attorney knows whether you are available.',
-      label: 'Review invitation',
-      href: caseId ? `dashboard-paralegal.html?inviteCase=${encodeURIComponent(caseId)}#home` : 'dashboard-paralegal.html#home',
-    });
+  if (!invitationQueueUnavailable) for (const invite of invites) {
+    if (String(invite.inviteStatus || invite.status || 'pending').toLowerCase() !== 'pending') continue;
+    const caseId = getCaseId(invite); if (!caseId) continue;
+    priorities.push({ title: 'Matter invitation', detail: invite.title || 'New invitation', label: 'Review invitation', href: `dashboard-paralegal.html?inviteCase=${encodeURIComponent(caseId)}#home`, unread: true });
   }
-  if (unreadMessageCount > 0) {
-    const caseId = getCaseId(latestMessageThread);
-    priorities.push({
-      title: `${unreadMessageCount} unread message${unreadMessageCount === 1 ? '' : 's'}`,
-      detail: 'Continue the conversation inside the related Matter workspace.',
-      label: 'Open messages',
-      href: caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}&tab=messages` : 'dashboard-paralegal.html#home',
-    });
-  }
-  const applicationNeedingResponse = applications.find((application) => {
+  for (const application of applications) {
     const pre = getApplicationPreEngagement(application);
-    return ['requested', 'changes_requested'].includes(String(pre?.status || '').toLowerCase());
-  });
-  if (applicationNeedingResponse) {
-    const appId = String(applicationNeedingResponse?._id || applicationNeedingResponse?.id || '');
-    priorities.push({
-      title: 'Pre-engagement information required',
-      detail: 'Complete the requested confidentiality or conflicts information before the Matter can advance.',
-      label: 'Complete request',
-      href: appId ? `dashboard-paralegal.html?applicationId=${encodeURIComponent(appId)}#cases` : 'dashboard-paralegal.html#cases',
-    });
+    if (!['requested', 'changes_requested'].includes(pre?.status)) continue;
+    const appId = String(application._id || application.id || ''); if (!appId) continue;
+    priorities.push({ title: pre.status === 'changes_requested' ? 'Information changes requested' : 'Pre-engagement information requested', detail: application.jobId?.title || application.job?.title || 'Application', label: 'Complete request', href: `dashboard-paralegal.html?applicationId=${encodeURIComponent(appId)}#cases`, unread: true });
   }
-  if (!stripeConnected) {
-    priorities.unshift({
-      title: 'Complete payout setup',
-      detail: 'Required before you can apply to Matters or receive payment.',
-      kicker: 'Account setup required',
-      tone: 'blocking',
-      label: 'Complete setup',
-      href: 'profile-settings.html?onboardingStep=payment',
-    });
+  for (const assignment of deskAssignments) {
+    if (assignmentReviewState(assignment) !== 'revision') continue;
+    priorities.push({ title: 'Revisions requested', detail: assignment.title || 'Matter', label: 'Review requested changes', href: `case-detail.html?caseId=${encodeURIComponent(assignment.caseId)}&tab=files`, unread: true });
   }
-  const today = window.LPCBusinessDate?.today() || "";
-  const sevenDaysFromToday = window.LPCBusinessDate?.addDays(today, 7) || "";
-  const dated = deadlines
-    .map((deadline) => ({
-      ...deadline,
-      dateOnly: window.LPCBusinessDate?.normalize(deadline?.start || deadline?.deadline) || "",
-    }))
-    .filter((deadline) => deadline.dateOnly)
-    .sort((left, right) => left.dateOnly.localeCompare(right.dateOnly));
-  const upcoming = dated.find((deadline) => deadline.dateOnly <= sevenDaysFromToday);
-  if (upcoming) {
-    const caseId = getCaseId(upcoming);
-    const overdue = upcoming.dateOnly < today;
-    priorities.push({
-      title: overdue ? 'A Matter deadline is overdue' : 'A Matter deadline is approaching',
-      detail: `${upcoming.title || 'Matter'} · ${formatMatterDeadline(upcoming.dateOnly)}`,
-      label: 'Open Matter',
-      href: caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}&tab=work` : 'dashboard-paralegal.html#cases',
-    });
+  if (homeMessagesPhase === 'ready') for (const thread of threads) {
+    if (!thread.unread) continue;
+    priorities.push({ title: `${thread.unread} unread message${thread.unread === 1 ? '' : 's'}`, detail: thread.title || 'Matter conversation', label: 'Open messages', href: `case-detail.html?caseId=${encodeURIComponent(thread.caseId)}&tab=messages`, unread: true });
   }
-  if (!priorities.length) {
-    if (shell) shell.hidden = true;
-    list.innerHTML = '';
-    if (count) count.textContent = '';
-    return;
-  }
-  if (shell) shell.hidden = false;
-  const visible = priorities.slice(0, 5);
-  if (count) {
-    count.textContent = `${visible.length} action${visible.length === 1 ? '' : 's'}`;
-  }
-  list.innerHTML = visible.map((item) => `
-    <div class="lpc-priority-item${item.tone === 'blocking' ? ' is-blocking' : ''}">
-      <div>
-        ${item.kicker ? `<span class="home-priority-eyebrow">${escapeHtml(item.kicker)}</span>` : ''}
-        <strong>${escapeHtml(item.title)}</strong>
-        <span>${escapeHtml(item.detail)}</span>
-      </div>
-      <a class="lpc-priority-action" href="${escapeHtml(item.href)}">${escapeHtml(item.label)}</a>
-    </div>
-  `).join('');
+  const sources = [[homeMessagesPhase, 'Messages'], [homeApplicationsPhase, 'Applications'], [homeDetailsPhase, 'Work details'], [dashboardStatus, 'Assignments']];
+  const unavailable = sources.filter(([phase]) => phase === 'error').map(([, label]) => label);
+  const loading = sources.some(([phase]) => phase === 'loading');
+  const notice = unavailable.length ? `<div class="office-inbox-notice"><p>${escapeHtml(unavailable.join(', '))} couldn’t load.</p><button type="button" class="office-calendar-control" data-inbox-retry>Retry updates</button></div>` : loading ? '<p class="private-office-secondary-state">Checking updates…</p>' : '';
+  const pages = Math.max(1, Math.ceil(priorities.length / 4));
+  const requestedPage = new URL(window.location.href).searchParams.get('inboxPage') || '1';
+  const inboxPage = Math.max(1, Math.min(pages, /^[1-9]\d*$/.test(requestedPage) ? Number(requestedPage) : 1));
+  const visible = priorities.slice((inboxPage - 1) * 4, inboxPage * 4);
+  if (count) count.textContent = loading ? 'Checking…' : priorities.length ? `${priorities.length} item${priorities.length === 1 ? '' : 's'}` : '';
+  list.dataset.state = unavailable.length || invitationQueueUnavailable ? 'unavailable' : loading ? 'loading' : 'ready';
+  list.innerHTML = notice + visible.map(item => `
+    <div class="office-inbox-item${item.unread ? ' is-unread' : ''}">
+      <div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p></div>
+      <a href="${escapeHtml(item.href)}">${escapeHtml(item.label)}</a>
+    </div>`).join('') + (!priorities.length && !notice && !invitationQueueUnavailable ? '<p class="private-office-secondary-state">No requests or unread messages.</p>' : '') + (pages > 1 ? `
+      <nav class="office-inbox-pagination" aria-label="Inbox pages">
+        <button type="button" class="office-calendar-control" data-inbox-page="${inboxPage - 1}" aria-label="Previous inbox page"${inboxPage === 1 ? ' disabled' : ''}>Previous</button>
+        <span>Page ${inboxPage} of ${pages}</span>
+        <button type="button" class="office-calendar-control" data-inbox-page="${inboxPage + 1}" aria-label="Next inbox page"${inboxPage === pages ? ' disabled' : ''}>Next</button>
+      </nav>` : '');
+  list.querySelector('[data-inbox-retry]')?.addEventListener('click', () => { void refreshDashboardFromServer('inbox', { force: true }); });
+  list.querySelectorAll('[data-inbox-page]').forEach(button => button.addEventListener('click', () => {
+    const url = new URL(window.location.href), page = Number(button.dataset.inboxPage);
+    if (page === 1) url.searchParams.delete('inboxPage'); else url.searchParams.set('inboxPage', String(page));
+    window.history.replaceState(window.history.state, '', url); renderParalegalPriorityQueue(); list.tabIndex = -1; list.focus({ preventScroll: true });
+  }));
 }
 
 async function initDashboard() {
+  const generation = dashboardRefreshGeneration, ownerId = currentFinancialOwner();
+  dashboardRefreshInFlight = true;
   attachUIHandlers();
+  bindDeskMatterSwitcher();
   try {
     const profilePromise = loadViewerProfile();
-    const recommendationRequest = loadRecommendedMatters({ profilePromise });
-    const [profile, , dashboard, invites, deadlines, threads, unreadCount] = await Promise.all([
+    const recommendationRequest = loadRecommendedMatters();
+    const [profile, , dashboard, invites, deadlines, messages] = await Promise.all([
       profilePromise.catch(() => ({})),
       loadStripeStatus().catch(() => null),
-      fetchParalegalData().catch(() => ({})),
+      fetchParalegalData().catch((error) => {
+        console.warn('Paralegal dashboard payload failed', error);
+        return null;
+      }),
       loadInvites().catch(() => []),
-      loadDeadlineEvents().catch(() => []),
-      loadMessageThreads().catch(() => []),
-      loadUnreadMessageCount().catch(() => 0),
+      loadDeadlineEvents().catch(() => null),
+      loadHomeMessages().catch(() => null),
     ]);
+    if (generation !== dashboardRefreshGeneration || ownerId !== currentFinancialOwner()) return;
     const viewer = profile || {};
+    dashboardStatus = dashboard ? 'ready' : 'error';
     pendingApprovalReady = true;
     updateProfile(viewer);
-    const caseDeadlines = buildCaseDeadlines(dashboard?.activeCases || []);
-    const deadlineEvents = deadlines.length ? deadlines : caseDeadlines;
-    updateStats({
-      activeCases: dashboard?.metrics?.activeCases,
-      unreadMessages: unreadCount,
-      nextDeadline: deriveNextDeadline(deadlineEvents),
-      monthEarnings: dashboard?.metrics?.earnings,
-      totalEarnings: dashboard?.metrics?.earningsTotal,
-      payout30Days: dashboard?.metrics?.earningsLast30Days,
-      nextPayout: dashboard?.metrics?.nextPayoutDate,
-      expectedPayouts: dashboard?.metrics?.expectedPayouts,
-    });
+    const snapshot = buildDashboardSnapshot({ dashboard, invites, deadlines, messages });
+    dashboardPayloadFingerprint = dataFingerprint(snapshot);
+    renderDashboardSnapshot(snapshot, { deferAssignments: true });
     await loadAppliedJobs();
     await recommendationRequest;
-    renderDeadlines(deadlineEvents);
-    initLatestMessage(threads);
-    renderAssignments(mapActiveCasesToAssignments(dashboard?.activeCases || [], threads));
-    syncRecentActivityState({ invites, threads, deadlines: deadlineEvents });
+    if (generation !== dashboardRefreshGeneration || ownerId !== currentFinancialOwner()) return;
+    initialDashboardHydrating = false;
+    renderAssignments(mapActiveCasesToAssignments(snapshot.activeCases, snapshot.threads));
     paralegalPrioritySnapshot = {
-      activeCases: dashboard?.activeCases || [],
-      invites,
-      threads,
-      deadlines: deadlineEvents,
+      activeCases: snapshot.activeCases,
+      invites: snapshot.invites,
+      threads: snapshot.threads,
+      deadlines: snapshot.deadlines,
       applications: appliedAppsCache,
     };
     renderParalegalPriorityQueue();
     maybeOpenInviteFromQuery();
+    notifyCasesApplicationsRefresh('initial', {
+      activeCases: snapshot.activeCases,
+      dashboardAvailable: Boolean(dashboard),
+    });
   } catch (err) {
     console.warn('Paralegal dashboard init failed', err);
+    dashboardStatus = 'error';
+    initialDashboardHydrating = false;
     renderAssignments([]);
     syncRecentActivityState({ invites: [], threads: [], deadlines: [] });
-    renderDeadlines([]);
-    initLatestMessage([]);
+    renderDeadlines([], ['Calendar']);
     loadAppliedJobs();
     paralegalPrioritySnapshot = { activeCases: [], invites: [], threads: [], deadlines: [], applications: appliedAppsCache };
     renderParalegalPriorityQueue();
+    notifyCasesApplicationsRefresh('initial', { activeCases: [], dashboardAvailable: false });
+  } finally {
+    dashboardRefreshInFlight = false;
+    if (!dashboardDeparting && dashboardRefreshQueuedReason) {
+      const reason = dashboardRefreshQueuedReason; dashboardRefreshQueuedReason = '';
+      queueMicrotask(() => refreshDashboardFromServer(reason, { force: true }));
+    }
   }
 }
 
@@ -3415,18 +3629,18 @@ document.addEventListener('DOMContentLoaded', () => {
 async function bootParalegalDashboard() {
   const user = typeof window.requireRole === 'function' ? await window.requireRole('paralegal') : null;
   if (!user) return;
+  financialOwnerId = String(user._id || user.id || '');
   recommendationViewerId = normalizeIdCandidate(user._id || user.id || '');
   setupRecommendationHistorySync();
   bindClusterProfileMenu();
   applyRoleVisibility(user);
-  updateProfile(user || {});
   initParalegalTour(user || {}, { force: consumeReplayFlag() });
   window.hydrateParalegalCluster?.(user || {});
   if (window.state) {
     window.state.viewerRole = String(user.role || '').toLowerCase();
   }
-  await initDashboard();
   setupDashboardAutoRefresh();
+  await initDashboard();
 }
 
 function applyRoleVisibility(user) {
@@ -3444,173 +3658,70 @@ function applyRoleVisibility(user) {
 }
 
 function initAvailabilityModal() {
-  const modal = document.getElementById("availabilityModal");
-  const openBtn = document.getElementById("updateAvailabilityLink");
-  const saveBtn = document.getElementById("saveAvailabilityBtn");
-  const cancelBtn = document.getElementById("cancelAvailabilityBtn");
-  const statusInput = document.getElementById("availabilityStatusInput");
-  const dateInput = document.getElementById("availabilityDateInput");
-  const statusDisplay = document.getElementById("availabilityStatus");
-  const nextDisplay = document.getElementById("availabilityNext");
-  const nextRow = document.getElementById("availabilityNextRow");
-  const dateRow = document.getElementById("availabilityDateRow");
-  const currentSummary = document.getElementById("availabilityCurrentSummary");
-  const quickActionBtn = document.querySelector('[data-action="availability"]');
-
-  if (!modal) return;
-
-  if (dateInput) {
-    const now = new Date();
-    dateInput.min = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-  }
-
-  const resolveStatusValue = (value) => {
-    const lowered = String(value || "").toLowerCase();
-    if (lowered.includes("unavail")) return "unavailable";
-    return "available";
+  const modal = document.getElementById('availabilityModal');
+  const openBtn = document.getElementById('updateAvailabilityLink');
+  const quickAction = document.querySelector('[data-action="availability"]');
+  const save = document.getElementById('saveAvailabilityBtn');
+  const cancel = document.getElementById('cancelAvailabilityBtn');
+  const status = document.getElementById('availabilityStatusInput');
+  const date = document.getElementById('availabilityDateInput');
+  const dateRow = document.getElementById('availabilityDateRow');
+  const error = document.getElementById('availabilityError');
+  if (!modal || !save || !cancel || !status || !date || !error) return;
+  let pending = false, ownerId = '', baseline = null;
+  const reload = document.createElement('button'); reload.type = 'button'; reload.className = 'office-calendar-control'; reload.textContent = 'Reload Home'; reload.hidden = true;
+  reload.addEventListener('click', () => window.location.reload()); error.after(reload);
+  const api = {
+    get: fetchJson,
+    async post(path, body) {
+      const response = await secureFetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), suppressToast: true });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw Object.assign(new Error(data?.error || data?.msg || 'Availability could not be updated.'), { code: data?.code, status: response.status });
+      return data;
+    },
   };
-
-  const syncAvailabilityUI = (value) => {
-    const isUnavailable = resolveStatusValue(value) === "unavailable";
-    if (dateRow) dateRow.style.display = isUnavailable ? "" : "none";
-    if (nextRow) nextRow.style.display = isUnavailable ? "" : "none";
-    if (!isUnavailable && dateInput) dateInput.value = "";
-    if (!isUnavailable && nextDisplay) nextDisplay.textContent = "";
+  const syncDate = () => { dateRow.hidden = status.value !== 'unavailable'; };
+  const close = (force = false) => {
+    if (pending && !force) return;
+    modal.classList.remove('show'); modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true'); modal.setAttribute('inert', ''); deactivateDialogFocus(modal);
+    if (force) { ownerId = ''; baseline = null; status.value = ''; date.value = ''; error.textContent = ''; error.hidden = true; reload.hidden = true; }
   };
-
-  const syncFromDisplay = () => {
-    if (!statusInput) return;
-    const displayValue = statusDisplay?.dataset.value || statusDisplay?.textContent || "";
-    statusInput.value = resolveStatusValue(displayValue);
-    if (dateInput) dateInput.value = statusInput.value === "unavailable" ? nextDisplay?.dataset.date || "" : "";
-    if (currentSummary) {
-      currentSummary.textContent =
-        statusInput.value === "available"
-          ? "Current status: Available now"
-          : `Current status: ${nextDisplay?.textContent || "Not available — no return date set"}`;
-    }
-    syncAvailabilityUI(statusInput.value);
+  const open = event => {
+    event.preventDefault();
+    if (pending || !profileStatusKnown || !currentFinancialOwner()) return;
+    try { baseline = availabilitySnapshot(recommendationProfile); } catch { return; }
+    ownerId = currentFinancialOwner(); status.value = baseline.availabilityDetails.status; date.value = availabilityDateOnly(baseline.availabilityDetails.nextAvailable); date.min = calendarRange().start;
+    syncDate(); error.hidden = true; reload.hidden = true;
+    modal.style.display = 'flex'; modal.classList.add('show'); modal.setAttribute('aria-hidden', 'false'); modal.removeAttribute('inert');
+    activateDialogFocus(modal, { initialFocus: status, returnFocus: event.currentTarget, onEscape: () => close() });
   };
-
-  const showModal = (event) => {
-    event?.preventDefault();
-    if (!modal) return;
-    syncFromDisplay();
-    modal.style.display = "flex";
-    modal.classList.add("show");
-    modal.setAttribute("aria-hidden", "false");
-    modal.removeAttribute("inert");
-    activateDialogFocus(modal, {
-      initialFocus: statusInput,
-      returnFocus: event?.currentTarget instanceof HTMLElement ? event.currentTarget : quickActionBtn || openBtn,
-      onEscape: hideModal,
-    });
-  };
-
-  const hideModal = () => {
-    if (!modal) return;
-    modal.classList.remove("show");
-    modal.style.display = "none";
-    modal.setAttribute("aria-hidden", "true");
-    modal.setAttribute("inert", "");
-    deactivateDialogFocus(modal);
-  };
-
-  if (openBtn) {
-    openBtn.addEventListener("click", showModal);
-  }
-
-  if (quickActionBtn) {
-    quickActionBtn.addEventListener("click", showModal);
-  }
-
-  if (cancelBtn) {
-    cancelBtn.addEventListener("click", hideModal);
-  }
-
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) {
-      hideModal();
+  openBtn?.addEventListener('click', open); quickAction?.addEventListener('click', open);
+  cancel.addEventListener('click', () => close()); status.addEventListener('change', syncDate);
+  modal.addEventListener('click', event => { if (event.target === modal) close(); });
+  window.addEventListener('lpc:home-account-changed', () => close(true));
+  window.addEventListener('pagehide', () => close(true));
+  save.addEventListener('click', async () => {
+    if (pending || !ownerId || currentFinancialOwner() !== ownerId || !baseline) return;
+    if (status.value === 'unavailable' && !date.checkValidity()) { date.reportValidity(); return; }
+    const requested = { status: status.value, nextAvailable: status.value === 'unavailable' ? date.value : null };
+    const savingOwner = ownerId;
+    pending = true; save.disabled = true; cancel.disabled = true; status.disabled = true; date.disabled = true; save.textContent = 'Saving…'; error.hidden = true; reload.hidden = true;
+    try {
+      const saved = await saveAvailability(api, { ownerId: savingOwner, profile: baseline, ...requested, isCurrent: () => ownerId === savingOwner && currentFinancialOwner() === savingOwner });
+      recommendationProfile = { ...recommendationProfile, ...saved };
+      syncAvailabilityProfile(saved); persistAvailabilityState(saved.availability, saved.availabilityDetails);
+      pending = false; close();
+      publishLifecycleRefresh({ url: '/api/paralegals/update-availability', method: 'POST' });
+    } catch (failure) {
+      if (failure.code === 'ACCOUNT_CHANGED') { clearHomeAccount(); close(true); }
+      else if (ownerId === savingOwner && currentFinancialOwner() === savingOwner) {
+        error.textContent = failure.message || 'Availability could not be updated.'; error.hidden = false;
+        reload.hidden = !['ACCOUNT_CONFLICT', 'AVAILABILITY_UNCONFIRMED'].includes(failure.code);
+      }
+    } finally {
+      pending = false; save.disabled = false; cancel.disabled = false; status.disabled = false; date.disabled = false; save.textContent = 'Save';
     }
   });
-  if (statusInput) {
-    statusInput.addEventListener("change", () => {
-      syncAvailabilityUI(statusInput.value);
-    });
-  }
-
-  syncFromDisplay();
-
-  if (saveBtn && statusInput && dateInput && statusDisplay && nextDisplay) {
-    saveBtn.addEventListener("click", async () => {
-      const status = statusInput.value;
-      const nextDate = status === "unavailable" ? dateInput.value : "";
-      if (nextDate && !dateInput.checkValidity()) {
-        dateInput.reportValidity();
-        return;
-      }
-
-      const payload = {
-        status,
-        nextAvailable: nextDate || null
-      };
-
-      try {
-        const res = await secureFetch("/api/paralegals/update-availability", {
-          method: "POST",
-          body: payload
-        });
-
-        const data = await res.json().catch(() => ({}));
-
-        if (!res.ok) {
-          await showAlert(data.msg || "Failed to update availability.", { title: "Availability not updated" });
-          return;
-        }
-
-        const fallbackAvailability = status === "available" ? "Available now" : "Unavailable";
-        const details = data.availabilityDetails || {};
-        const availabilityLabel = data.availability || fallbackAvailability;
-        const nextSource = nextDate || details.nextAvailable || null;
-        const friendly = formatAvailabilityDate(nextSource);
-
-        statusDisplay.textContent = fallbackAvailability;
-        if (status === "unavailable") {
-          if (friendly) {
-            nextDisplay.textContent = `Available on ${friendly}`;
-          } else {
-            nextDisplay.textContent = "No return date set";
-          }
-        } else {
-          nextDisplay.textContent = "";
-        }
-
-        syncAvailabilityUI(status);
-
-        const nextAvailable =
-          status === "unavailable"
-            ? details.nextAvailable || (nextDate ? new Date(nextDate).toISOString() : null)
-            : null;
-        persistAvailabilityState(availabilityLabel, {
-          status: details.status || status,
-          nextAvailable,
-          updatedAt: details.updatedAt || new Date().toISOString()
-        });
-        syncAvailabilityProfile({
-          availability: availabilityLabel,
-          availabilityDetails: {
-            status: details.status || status,
-            nextAvailable,
-          },
-        });
-
-        hideModal();
-      } catch (err) {
-        console.error(err);
-        await showAlert("Server error updating availability.", { title: "Availability not updated" });
-      }
-    });
-  }
 }
 
 if (document.readyState === "loading") {

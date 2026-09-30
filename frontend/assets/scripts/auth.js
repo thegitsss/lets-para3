@@ -4,6 +4,9 @@
 // - secureFetch(): auto-includes CSRF header for mutating requests, supports FormData/Blob
 // - Role-based visibility via [data-visible="attorney|paralegal|admin"]
 
+import { clearHelpStorage, scopeHelpStorageToOwner } from "./utils/help-storage.mjs";
+import { documentIsLeaving, fetchInDocument } from "./utils/document-navigation.mjs";
+
 export let CSRF_TOKEN = "";
 
 const USER_KEY = "lpc_user";
@@ -96,8 +99,6 @@ function shouldPublishLifecycleMutation(url, opts = {}) {
 setupLifecycleSync();
 
 const SESSION_STRING_FIELDS = [
-  "id",
-  "_id",
   "role",
   "status",
   "firstName",
@@ -122,6 +123,8 @@ export function projectSessionUser(user) {
   }
   if (!user || typeof user !== "object" || Array.isArray(user)) return null;
   const snapshot = {};
+  const id = typeof (user.id || user._id) === "string" ? String(user.id || user._id) : "";
+  if (id) snapshot.id = id;
   SESSION_STRING_FIELDS.forEach((field) => {
     if (typeof user[field] === "string") snapshot[field] = user[field];
   });
@@ -156,7 +159,13 @@ function redirectToLoginOnce() {
   redirectingToLogin = true;
   try {
     if (typeof window !== "undefined") {
-      window.location.href = "login.html";
+      const isParalegalV2 = window.location.pathname === "/paralegal-v2.html";
+      const returnTarget = isParalegalV2
+        ? `/paralegal-v2.html${/^#\//.test(window.location.hash) ? window.location.hash : "#/home"}`
+        : `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      window.location.href = returnTarget
+        ? `login.html?next=${encodeURIComponent(returnTarget)}`
+        : "login.html";
     }
   } catch {
     /* noop */
@@ -185,12 +194,14 @@ export function persistSession({ user } = {}) {
   if (typeof user === "undefined") return;
   try {
     const snapshot = projectSessionUser(user);
+    scopeHelpStorageToOwner(snapshot?.id || snapshot?._id);
     const payload = snapshot && Object.keys(snapshot).length ? JSON.stringify(snapshot) : "";
-    if (payload) localStorage.setItem(USER_KEY, payload);
-    else localStorage.removeItem(USER_KEY);
+    const current = localStorage.getItem(USER_KEY) || "";
+    if (payload && payload !== current) localStorage.setItem(USER_KEY, payload);
+    else if (!payload && current) localStorage.removeItem(USER_KEY);
   } catch {
     try {
-      localStorage.removeItem(USER_KEY);
+      if (localStorage.getItem(USER_KEY)) localStorage.removeItem(USER_KEY);
     } catch {
       /* noop */
     }
@@ -198,6 +209,11 @@ export function persistSession({ user } = {}) {
 }
 
 export function clearSession() {
+  try {
+    if (typeof window?.clearStoredSession === "function") window.clearStoredSession();
+  } catch {
+    /* Fall through to direct storage cleanup. */
+  }
   try {
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem("avatarURL");
@@ -256,7 +272,7 @@ export async function fetchCSRF(force = false) {
     CSRF_TOKEN = "";
     if (typeof window !== "undefined") window.__CSRF__ = "";
   }
-  const r = await fetch("/api/csrf", { credentials: "include" });
+  const r = await fetchInDocument("/api/csrf", { credentials: "include" });
   if (r.ok) {
     const { csrfToken } = await r.json();
     CSRF_TOKEN = csrfToken || "";
@@ -302,9 +318,8 @@ async function applyAuthResponseRedirect(response, opts = {}) {
         clearSession();
         redirectToLoginOnce();
       }
-    } catch {
-      // A malformed denial is still returned to the caller as-is.
-      return;
+    } catch (error) {
+      console.debug("[auth] Unable to parse a 403 response as JSON; preserving the original response.", error);
     }
   }
 }
@@ -352,7 +367,7 @@ export async function secureFetch(url, opts = {}) {
     }
   }
 
-  let res = await fetch(url, {
+  let res = await fetchInDocument(url, {
     ...opts,
     body,
     headers,
@@ -367,7 +382,7 @@ export async function secureFetch(url, opts = {}) {
       const refreshedToken = await fetchCSRF(true);
       if (refreshedToken) {
         headers.set("X-CSRF-Token", refreshedToken);
-        res = await fetch(url, { ...opts, body, headers, credentials: "include" });
+        res = await fetchInDocument(url, { ...opts, body, headers, credentials: "include" });
       }
     } catch (error) {
       console.warn("[auth] CSRF refresh failed; preserving the original response", error);
@@ -414,6 +429,7 @@ export async function logout(redirect = "login.html") {
       });
     return false;
   }
+  clearHelpStorage();
   clearSession();
   if (redirect) {
     try {
@@ -476,17 +492,23 @@ window.addEventListener("DOMContentLoaded", async () => {
   try {
     await fetchCSRF();
   } catch (error) {
+    if (documentIsLeaving()) return;
     console.warn("[auth] initial CSRF hydration failed", error);
   }
+  if (documentIsLeaving()) return;
 
   const isPublicPage = document.body?.dataset?.publicPage === "true";
-  if (!isPublicPage) {
+  // The persistent paralegal shell verifies admission before enabling its UI
+  // and owns retry/reentry. A second boot guard races that boundary on outages.
+  const hasParalegalSessionBoundary = window.location.pathname === "/paralegal-v2.html"
+    && document.body?.dataset?.sessionOwner === "paralegal-v2";
+  if (!isPublicPage && !hasParalegalSessionBoundary) {
     try {
       let me = null;
       if (typeof window.getSessionData === "function") {
         me = (await window.getSessionData())?.user || null;
       } else {
-        const response = await fetch("/api/auth/me", { credentials: "include" });
+        const response = await fetchInDocument("/api/auth/me", { credentials: "include" });
         const payload = await response.json().catch(() => ({}));
         me = response.ok ? payload?.user || null : null;
         if (!response.ok && (response.status === 401 || response.status === 403)) {
@@ -499,6 +521,7 @@ window.addEventListener("DOMContentLoaded", async () => {
           }
         }
       }
+      if (documentIsLeaving()) return;
       if (!me) {
         clearSession();
         redirectToLoginOnce();
@@ -506,6 +529,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       }
       if (me?.role) applyRoleVisibility(me.role);
     } catch (error) {
+      if (documentIsLeaving()) return;
       console.warn("[auth] authenticated page guard failed closed", error);
       clearSession();
       redirectToLoginOnce();

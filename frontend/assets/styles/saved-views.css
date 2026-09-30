@@ -1,0 +1,27 @@
+.attorney-saved-views { margin: 1rem 0; color: var(--text, #1e2924); }
+.attorney-saved-views > label { display: block; margin-bottom: .4rem; font-weight: 600; }
+.attorney-saved-views select, .attorney-saved-views input { box-sizing: border-box; max-width: 100%; min-height: 44px; padding: .65rem; border: 1px solid #78857e; border-radius: .4rem; background: #fff; color: #1e2924; font: inherit; }
+.saved-view-review { padding: 1rem; margin-top: .75rem; border: 1px solid #bdc8c1; border-radius: .6rem; background: #f7f9f7; color: #1e2924; overflow-wrap: anywhere; }
+.saved-view-review[hidden] { display: none; }
+.saved-view-review h3 { margin: 0 0 .75rem; font-size: 1.1rem; }
+.saved-view-review label { display: block; margin: .75rem 0 .35rem; }
+.saved-view-review input { width: min(100%, 32rem); }
+.saved-view-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .75rem; }
+.saved-view-button { min-height: 44px; padding: .6rem .85rem; border: 1px solid #6a7c71; border-radius: .4rem; background: #fff; color: #243e2f; font: inherit; cursor: pointer; }
+.saved-view-primary { background: #294c39; color: #fff; }
+.saved-view-button:disabled { opacity: .65; cursor: default; }
+.attorney-saved-views :focus-visible { outline: 3px solid #3b7650; outline-offset: 3px; }
+.saved-view-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .65rem 1rem; margin: 1rem 0; }
+.saved-view-filters dt { font-weight: 600; }
+.saved-view-filters dd { margin: .25rem 0 0; white-space: pre-wrap; }
+
+.av2 .av2-saved-views-host { color: var(--av2-ink); }
+.av2-saved-views-host > .attorney-saved-views { margin: 0; color: inherit; }
+.av2-saved-views-host > [role="status"]:empty { display: none; }
+.av2-saved-view-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 16px; }
+.av2-saved-view-toolbar > label { display: grid; flex: 0 1 260px; gap: 7px; min-width: 0; font-size: .875rem; }
+.av2-saved-view-toolbar .saved-view-actions { margin: 0; }
+.av2 .av2-saved-views-host select, .av2 .av2-saved-views-host input, .av2 .av2-saved-views-host .saved-view-button { min-width: 0; max-width: 100%; background: var(--av2-bg); color: var(--av2-ink); border-color: var(--av2-muted); }
+.av2 .av2-saved-views-host .saved-view-primary { background: var(--av2-accent); color: var(--av2-bg); border-color: var(--av2-accent); }
+.av2 .av2-saved-views-host .saved-view-review { background: var(--av2-soft); color: var(--av2-ink); border-color: var(--av2-line); }
+.av2 .av2-saved-views-host :focus-visible { outline-color: var(--av2-accent); }

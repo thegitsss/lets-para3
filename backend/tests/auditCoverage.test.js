@@ -11,6 +11,7 @@ const AuditLog = require("../models/AuditLog");
 const messagesRouter = require("../routes/messages");
 const casesRouter = require("../routes/cases");
 const disputesRouter = require("../routes/disputes");
+const { addSubscriber: addNotificationSubscriber } = require("../utils/notificationEvents");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 const app = (() => {
@@ -132,18 +133,34 @@ describe("Audit coverage: messages, documents, disputes", () => {
 
     const caseDoc = await seedFundedCase({ attorney, paralegal });
     const key = `cases/${caseDoc._id}/documents/audit-coverage.pdf`;
+    const attorneyEvents = [];
+    const paralegalEvents = [];
+    const unsubscribeAttorney = addNotificationSubscriber(attorney._id, {
+      write: (value) => attorneyEvents.push(String(value)),
+    });
+    const unsubscribeParalegal = addNotificationSubscriber(paralegal._id, {
+      write: (value) => paralegalEvents.push(String(value)),
+    });
 
-    const res = await request(app)
-      .post(`/api/cases/${caseDoc._id}/files`)
-      .set("Cookie", authCookieFor(attorney))
-      .send({
-        key,
-        original: "audit-coverage.pdf",
-        mime: "application/pdf",
-        size: 1024,
-      });
+    let res;
+    try {
+      res = await request(app)
+        .post(`/api/cases/${caseDoc._id}/files`)
+        .set("Cookie", authCookieFor(attorney))
+        .send({
+          key,
+          original: "audit-coverage.pdf",
+          mime: "application/pdf",
+          size: 1024,
+        });
+    } finally {
+      unsubscribeAttorney();
+      unsubscribeParalegal();
+    }
 
     expect([200, 201]).toContain(res.status);
+    expect(attorneyEvents.join("\n")).toContain("matter_documents_refresh");
+    expect(paralegalEvents.join("\n")).toContain("matter_documents_refresh");
 
     const log = await AuditLog.findOne({
       action: "case.file.attach",
@@ -154,6 +171,29 @@ describe("Audit coverage: messages, documents, disputes", () => {
     expect(log.targetType).toBe("case");
     expect(log.meta?.key).toBe(key);
     expect(String(log.actor)).toBe(String(attorney._id));
+
+    const removalAttorneyEvents = [];
+    const removalParalegalEvents = [];
+    const unsubscribeRemovalAttorney = addNotificationSubscriber(attorney._id, {
+      write: (value) => removalAttorneyEvents.push(String(value)),
+    });
+    const unsubscribeRemovalParalegal = addNotificationSubscriber(paralegal._id, {
+      write: (value) => removalParalegalEvents.push(String(value)),
+    });
+    let removeResponse;
+    try {
+      removeResponse = await request(app)
+        .delete(`/api/cases/${caseDoc._id}/files`)
+        .set("Cookie", authCookieFor(attorney))
+        .send({ key });
+    } finally {
+      unsubscribeRemovalAttorney();
+      unsubscribeRemovalParalegal();
+    }
+
+    expect(removeResponse.status).toBe(200);
+    expect(removalAttorneyEvents.join("\n")).toContain("matter_documents_refresh");
+    expect(removalParalegalEvents.join("\n")).toContain("matter_documents_refresh");
   });
 
   test("Dispute create writes dispute.create audit log", async () => {

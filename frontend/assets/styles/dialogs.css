@@ -4,15 +4,14 @@
   margin: auto;
   padding: 0;
   border: 0;
-  border-radius: 1rem;
+  border-radius: 3px;
   color: #172033;
   background: transparent;
-  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24);
+  box-shadow: none;
 }
 
 .lpc-dialog::backdrop {
-  background: rgba(15, 23, 42, 0.58);
-  backdrop-filter: blur(3px);
+  background: rgba(9, 24, 40, 0.46);
 }
 
 .lpc-dialog__card {
@@ -57,7 +56,7 @@
   min-height: 2.75rem;
   padding: 0.7rem 0.8rem;
   border: 1px solid #94a3b8;
-  border-radius: 0.6rem;
+  border-radius: 3px;
   color: #0f172a;
   background: #fff;
   font: inherit;
@@ -66,8 +65,8 @@
 }
 
 .lpc-dialog__input:focus-visible {
-  border-color: #315c4d;
-  outline: 3px solid rgba(49, 92, 77, 0.2);
+  border-color: #315f9f;
+  outline: 2px solid rgba(49, 95, 159, 0.22);
   outline-offset: 1px;
 }
 
@@ -93,14 +92,14 @@
   min-height: 2.75rem;
   padding: 0.65rem 1rem;
   border: 1px solid transparent;
-  border-radius: 0.65rem;
+  border-radius: 3px;
   font: inherit;
   font-weight: 750;
   cursor: pointer;
 }
 
 .lpc-dialog__button:focus-visible {
-  outline: 3px solid rgba(49, 92, 77, 0.28);
+  outline: 2px solid rgba(49, 95, 159, 0.28);
   outline-offset: 2px;
 }
 
@@ -112,7 +111,7 @@
 
 .lpc-dialog__button--primary {
   color: #fff;
-  background: #315c4d;
+  background: #0d263f;
 }
 
 .lpc-dialog[data-tone="danger"] .lpc-dialog__button--primary {
@@ -147,28 +146,20 @@
 }
 
 html.theme-dark .lpc-dialog__card,
-body.theme-dark .lpc-dialog__card,
-html.theme-mountain-dark .lpc-dialog__card,
-body.theme-mountain-dark .lpc-dialog__card {
+body.theme-dark .lpc-dialog__card {
   border-color: rgba(148, 163, 184, 0.34);
   color: #e5e7eb;
   background: #172033;
 }
 
 html.theme-dark .lpc-dialog__title,
-body.theme-dark .lpc-dialog__title,
-html.theme-mountain-dark .lpc-dialog__title,
-body.theme-mountain-dark .lpc-dialog__title {
+body.theme-dark .lpc-dialog__title {
   color: #f8fafc;
 }
 
 html.theme-dark .lpc-dialog__description,
 body.theme-dark .lpc-dialog__description,
-html.theme-mountain-dark .lpc-dialog__description,
-body.theme-mountain-dark .lpc-dialog__description,
 html.theme-dark .lpc-dialog__label,
-body.theme-dark .lpc-dialog__label,
-html.theme-mountain-dark .lpc-dialog__label,
-body.theme-mountain-dark .lpc-dialog__label {
+body.theme-dark .lpc-dialog__label {
   color: #cbd5e1;
 }

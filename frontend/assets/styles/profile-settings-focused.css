@@ -1,0 +1,1765 @@
+/* Focused refresh: Account Settings directory, Security, and Preferences only. */
+body.lpc-product-clean {
+  --focused-ink: var(--clean-ink, #17233b);
+  --focused-muted: var(--clean-muted, #667487);
+  --focused-line: var(--clean-border, #dce2e7);
+  --focused-soft: var(--clean-hover, #f8f7f3);
+  --focused-navy: #0d263f;
+  --focused-gold: #ad9360;
+}
+
+body.lpc-product-clean :is(#settingsDirectorySection, #securitySection, #preferencesSection) {
+  width: min(100%, 1120px);
+  margin-inline: 0;
+  color: var(--focused-ink);
+}
+
+body.lpc-product-clean .focused-settings-header {
+  margin: 0 0 28px;
+  padding: 0 0 22px;
+  border-bottom: 1px solid var(--focused-line);
+}
+
+body.lpc-product-clean .focused-settings-header .settings-back-link {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  margin-bottom: 12px;
+  color: var(--focused-muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+body.lpc-product-clean .focused-settings-header h2,
+body.lpc-product-clean #preferencesSection .focused-settings-header h2 {
+  margin: 0;
+  color: var(--focused-ink);
+  font-size: clamp(1.55rem, 2.2vw, 2rem);
+  line-height: 1.15;
+}
+
+body.lpc-product-clean .focused-settings-header p,
+body.lpc-product-clean #preferencesSection .focused-settings-header p {
+  max-width: 620px;
+  margin: 9px 0 0;
+  color: var(--focused-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* Account Settings directory */
+body.attorney-classic.lpc-product-clean #settingsDirectorySection {
+  padding-bottom: 56px;
+}
+
+body.attorney-classic.lpc-product-clean .settings-directory-search {
+  width: min(100%, 420px);
+  margin-bottom: 36px;
+}
+
+body.attorney-classic.lpc-product-clean #settingsDirectorySearch {
+  height: 44px;
+  border-color: var(--focused-line);
+  border-radius: 2px;
+  background: var(--clean-surface, #fff);
+}
+
+body.attorney-classic.lpc-product-clean .settings-directory-groups { gap: 38px; }
+
+body.attorney-classic.lpc-product-clean .settings-directory-group > h3 {
+  margin-bottom: 13px;
+  color: #806a3f;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+
+body.attorney-classic.lpc-product-clean .settings-directory-grid {
+  gap: 0;
+  border-top: 1px solid var(--focused-line);
+}
+
+body.attorney-classic.lpc-product-clean .settings-destination {
+  min-height: 94px;
+  padding: 19px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--focused-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+body.attorney-classic.lpc-product-clean .settings-destination:hover,
+body.attorney-classic.lpc-product-clean .settings-destination:focus-visible {
+  background: var(--focused-soft);
+  transform: none;
+}
+
+body.attorney-classic.lpc-product-clean .settings-destination-icon {
+  border-radius: 2px;
+  color: var(--clean-ink, var(--focused-navy));
+  background: var(--clean-surface, #fff);
+}
+
+/* Security */
+body.lpc-product-clean #securitySection { padding: 0 0 52px; }
+
+body.lpc-product-clean #securitySection .security-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+body.lpc-product-clean #securitySection .security-column {
+  gap: 18px;
+}
+
+body.lpc-product-clean #securitySection .security-column + .security-column {
+  padding-left: 0;
+  border-left: 0;
+}
+
+body.lpc-product-clean #securitySection .settings-block,
+body.paralegal-flat.lpc-product-clean #securitySection .settings-block {
+  gap: 16px;
+  margin: 0;
+  padding: 24px 4px 26px;
+  border: 0 !important;
+  border-top: 1px solid var(--focused-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+body.lpc-product-clean #securitySection .security-card-title {
+  gap: 12px;
+  padding-bottom: 2px;
+  border-bottom: 0;
+}
+
+body.lpc-product-clean #securitySection .security-card-title h3 {
+  color: var(--focused-ink);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+body.lpc-product-clean #securitySection .security-icon,
+body.lpc-product-clean #securitySection .session-device-icon {
+  border-radius: 2px;
+  color: var(--clean-ink, var(--focused-navy));
+  background: var(--focused-soft);
+}
+
+body.lpc-product-clean #securitySection input:is([type="password"], [type="text"]),
+body.lpc-product-clean #securitySection .backup-codes-output {
+  min-height: 44px;
+  border-color: var(--focused-line);
+  border-radius: 2px;
+  background: var(--clean-surface, #fff);
+}
+
+body.lpc-product-clean #securitySection .two-factor-hero {
+  min-height: 116px;
+  border-radius: 2px;
+  background: var(--focused-soft);
+}
+
+body.lpc-product-clean #securitySection .two-factor-option {
+  min-height: 72px;
+  padding-block: 15px;
+}
+
+body.lpc-product-clean #securitySection .blocked-users-card {
+  padding: 0;
+  border-top-color: var(--focused-line);
+}
+
+body.lpc-product-clean #securitySection .security-extras {
+  margin-top: 30px;
+  padding-top: 22px;
+  border-top: 1px solid var(--focused-line);
+}
+
+body.lpc-product-clean #securitySection .security-extras .settings-block,
+body.paralegal-flat.lpc-product-clean #securitySection .security-extras .settings-block {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  border-top-color: #b34a4a !important;
+}
+
+/* Preferences */
+body.lpc-product-clean #preferencesSection.settings-panel {
+  max-width: 980px;
+  padding: 0 0 56px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+body.lpc-product-clean #preferencesSection .preferences-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 1px;
+  border-top: 1px solid var(--focused-line);
+  background: var(--focused-line);
+}
+
+body.lpc-product-clean #preferencesSection .pref-row {
+  min-height: 74px;
+  margin: 0;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--focused-line);
+  background: var(--clean-surface, #fff);
+  color: var(--focused-ink);
+  font-size: 14px;
+}
+
+body.lpc-product-clean #preferencesSection .pref-row--appearance,
+body.lpc-product-clean #preferencesSection .pref-row--state,
+body.lpc-product-clean #preferencesSection .pref-row:has(#fontSizePreference) {
+  grid-column: 1 / -1;
+  border-right: 0;
+}
+
+body.lpc-product-clean #preferencesSection .pref-row--appearance {
+  align-items: flex-start;
+  padding-block: 22px;
+}
+
+body.lpc-product-clean #preferencesSection .theme-preview-grid {
+  width: min(100%, 430px);
+  margin: 0;
+  gap: 12px;
+}
+
+body.lpc-product-clean #preferencesSection .theme-preview {
+  border-radius: 2px;
+  background: var(--clean-surface, #fff);
+}
+
+body.lpc-product-clean #preferencesSection .theme-preview[aria-checked="true"] {
+  border-color: var(--clean-ink, var(--focused-navy));
+  outline: 2px solid color-mix(in srgb, var(--focused-navy) 16%, transparent);
+  outline-offset: 2px;
+}
+
+body.lpc-product-clean #preferencesSection select {
+  min-width: 170px;
+  min-height: 44px;
+  border-color: var(--focused-line);
+  border-radius: 2px;
+  background: var(--clean-surface, #fff);
+}
+
+body.lpc-product-clean :is(#securitySection, #preferencesSection) .btn {
+  min-height: 44px;
+  border-radius: 2px;
+}
+
+body.lpc-product-clean :is(#securitySection, #preferencesSection) .btn-primary {
+  border-color: var(--clean-ink, var(--focused-navy));
+  background: var(--focused-navy);
+}
+
+@media (max-width: 960px) {
+  body.lpc-product-clean #securitySection .security-grid,
+  body.lpc-product-clean #preferencesSection .preferences-layout {
+    grid-template-columns: 1fr;
+  }
+
+  body.lpc-product-clean #preferencesSection .pref-row,
+  body.lpc-product-clean #preferencesSection .pref-row:nth-of-type(odd) {
+    grid-column: 1;
+    border-right: 0;
+  }
+
+  body.lpc-product-clean #securitySection .security-extras .settings-block,
+  body.paralegal-flat.lpc-product-clean #securitySection .security-extras .settings-block {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  body.lpc-product-clean .focused-settings-header { margin-bottom: 20px; }
+
+  body.lpc-product-clean #securitySection .settings-block,
+  body.paralegal-flat.lpc-product-clean #securitySection .settings-block {
+    padding: 18px 16px;
+  }
+
+  body.lpc-product-clean #preferencesSection .pref-row,
+  body.lpc-product-clean #preferencesSection .pref-row--appearance,
+  body.lpc-product-clean #preferencesSection .pref-row--state {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+    padding-inline: 4px;
+  }
+
+  body.lpc-product-clean #preferencesSection .theme-preview-grid { width: 100%; }
+  body.lpc-product-clean #preferencesSection select { width: 100%; }
+}
+
+body.theme-dark.lpc-product-clean :is(#securitySection, #preferencesSection) .settings-block,
+body.theme-dark.lpc-product-clean #preferencesSection .theme-preview,
+body.theme-dark.lpc-product-clean #preferencesSection select,
+body.theme-dark.attorney-classic.lpc-product-clean #settingsDirectorySearch {
+  color: var(--ink);
+  border-color: rgba(255,255,255,.12);
+  background: var(--panel);
+}
+
+body.theme-dark.lpc-product-clean #preferencesSection .pref-row {
+  background: var(--bg);
+}
+
+/* Paralegal preference groups are layout-neutral on the attorney surface. */
+body.attorney-classic.lpc-product-clean #preferencesSection :is(.preference-group, .preference-group-rows) {
+  display: contents;
+}
+
+body.attorney-classic.lpc-product-clean #preferencesSection .preference-group-header {
+  display: none;
+}
+
+/* Paralegal Account Settings V2 — one professional profile and account system. */
+body.paralegal-flat.lpc-product-clean {
+  --settings-v2-ink: #17243a;
+  --settings-v2-muted: #65748a;
+  --settings-v2-line: #dce3ea;
+  --settings-v2-soft: #f6f8fa;
+  --settings-v2-blue: #365b8d;
+  --settings-v2-navy: #0d263f;
+  --settings-v2-gold: #ad9360;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--clean-surface, #fff);
+}
+
+body.paralegal-flat.lpc-product-clean .content {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  padding: 28px clamp(28px, 4vw, 64px) 72px;
+}
+
+body.paralegal-flat.lpc-product-clean .page-header,
+body.paralegal-flat.lpc-product-clean #settingsContent {
+  width: min(100%, 1120px);
+  height: auto;
+  margin-inline: auto;
+}
+
+body.paralegal-flat.lpc-product-clean .page-header {
+  margin-bottom: 24px;
+}
+
+body.paralegal-flat.lpc-product-clean .paralegal-account-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+body.paralegal-flat.lpc-product-clean .paralegal-account-nav a {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 6px;
+  color: #2f3b4e;
+  text-decoration: none;
+}
+
+body.paralegal-flat.lpc-product-clean .paralegal-account-nav a.active {
+  color: #365b8d;
+  font-weight: 500;
+}
+
+body.paralegal-flat.lpc-product-clean .account-settings-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 26px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--settings-v2-line);
+}
+
+body.paralegal-flat.lpc-product-clean .account-settings-tabs :is(button, a) {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #536276;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+body.paralegal-flat.lpc-product-clean .account-settings-tabs :is(button, a):hover,
+body.paralegal-flat.lpc-product-clean .account-settings-tabs button.active {
+  background: #edf3f9;
+  color: #294b78;
+}
+
+body.paralegal-flat.lpc-product-clean .unified-header {
+  align-items: flex-start;
+  text-align: left;
+}
+
+body.paralegal-flat.lpc-product-clean #accountSettingsTitle {
+  color: var(--settings-v2-ink);
+  font-size: clamp(1.9rem, 3vw, 2.35rem);
+  font-weight: 400;
+  letter-spacing: -.035em;
+  line-height: 1.05;
+}
+
+body.paralegal-flat.lpc-product-clean #accountSettingsSubtitle {
+  margin-top: 7px;
+  color: var(--settings-v2-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+body.paralegal-flat.lpc-product-clean #settingsContent,
+body.paralegal-flat.lpc-product-clean .settings-section.active,
+body.paralegal-flat.lpc-product-clean #profileSection {
+  min-height: 0;
+  overflow: visible;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings {
+  width: 100%;
+  max-width: none;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .paralegal-profile-form {
+  height: auto;
+  min-height: 0;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-layout {
+  grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+  gap: 28px;
+  height: auto;
+  min-height: 0;
+  align-items: start;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-sidebar,
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main {
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-sidebar {
+  position: static;
+  top: auto;
+  gap: 18px;
+  padding: 0;
+  border: 0;
+  scrollbar-gutter: auto;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main {
+  gap: 16px;
+  padding: 0;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-photo-block,
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-header,
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-section {
+  border: 1px solid var(--settings-v2-line);
+  border-radius: 10px;
+  background: var(--clean-surface, #fff);
+  box-shadow: none;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-photo-block {
+  gap: 16px;
+  align-items: center;
+  padding: 24px 20px;
+  background: var(--settings-v2-soft);
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .hero-photo {
+  width: 116px;
+  height: 116px;
+  border: 1px solid #cfd8e2;
+  background: var(--clean-surface, #fff);
+  box-shadow: none;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .hero-photo .avatar-frame {
+  font-size: 1.65rem;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .hero-photo .avatar-frame img {
+  position: absolute;
+  inset: 0;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .hero-photo .avatar-frame span {
+  position: relative;
+  z-index: 1;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .avatar-actions {
+  gap: 8px;
+  margin-top: 0;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings :is(.avatar-edit-btn, .avatar-remove-btn) {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--clean-surface, #fff);
+  font-size: 12px;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .photo-guidelines {
+  max-width: 230px;
+  margin: 0;
+  color: #5f6e83;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-meta-stack,
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-meta-columns {
+  width: 100%;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-meta-columns {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-meta-columns .hero-meta-pill {
+  margin: 8px 0 0;
+  color: #536276;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings input,
+body.paralegal-flat.lpc-product-clean #paralegalSettings textarea,
+body.paralegal-flat.lpc-product-clean #paralegalSettings select,
+body.paralegal-flat.lpc-product-clean #paralegalSettings .dropdown-toggle {
+  min-height: 44px;
+  border: 1px solid #cfd8e2;
+  border-radius: 6px;
+  background: var(--clean-surface, #fff);
+  color: var(--settings-v2-ink);
+  box-shadow: none;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings :is(input, textarea, select, .dropdown-toggle):focus {
+  border-color: var(--settings-v2-blue);
+  outline: 2px solid rgba(54, 91, 141, .14);
+  outline-offset: 1px;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-header {
+  padding: 24px;
+  background: linear-gradient(90deg, #fff 0%, #fff 72%, #f7f9fb 100%);
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-identity {
+  gap: 18px;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-name-input {
+  min-height: 48px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 1px solid var(--settings-v2-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--settings-v2-ink);
+  font-family: "Sarabun", sans-serif;
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  font-weight: 300;
+  letter-spacing: -.03em;
+  text-align: left;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .full-name-input::before {
+  content: attr(data-field-label);
+  display: block;
+  margin-bottom: 5px;
+  color: var(--settings-v2-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-name-input:focus {
+  border-bottom-color: var(--settings-v2-blue);
+  outline: 0;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-section-row {
+  gap: 16px;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-section-row--highlights {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-section {
+  min-height: 0;
+  padding: 20px;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings [data-edit-section] {
+  --section-base-height: auto;
+  min-height: 0;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings [data-edit-section]:not(.is-editing),
+body.paralegal-flat.lpc-product-clean #paralegalSettings [data-edit-section].is-editing {
+  overflow: visible;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .section-header {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -6px 0 8px;
+  padding: 0;
+  border-bottom: 1px solid var(--settings-v2-line);
+  text-align: left;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .card-header-label {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--settings-v2-ink);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .section-edit-toggle {
+  position: static;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 4px;
+  border-radius: 4px;
+  color: var(--settings-v2-blue);
+  font-size: 12px;
+  font-weight: 500;
+  transform: none;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .section-edit-toggle:hover,
+body.paralegal-flat.lpc-product-clean #paralegalSettings .section-edit-toggle:focus-visible,
+body.paralegal-flat.lpc-product-clean #paralegalSettings .section-edit-toggle[aria-pressed="true"] {
+  background: #edf3f9;
+  color: #294b78;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .section-display-text {
+  margin: 10px 0 0;
+  color: var(--settings-v2-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .best-for-list {
+  padding-left: 18px;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings #documentsSection .documents-toggle {
+  justify-content: space-between;
+  border: 0;
+  border-radius: 4px;
+  color: var(--settings-v2-ink);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings #documentsSection .section-header {
+  margin: -6px 0 0;
+  border-bottom: 0;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .paralegal-actions {
+  position: static;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  padding: 15px 0;
+  border-top: 1px solid var(--settings-v2-line);
+  background: var(--clean-surface, #fff);
+  box-shadow: none;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .paralegal-actions .profile-standards-tooltip {
+  margin-right: auto;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-save-status {
+  margin: 0 4px 0 0;
+  color: var(--settings-v2-muted);
+  font-size: 12px;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-save-status[data-state="dirty"] {
+  color: #7a5a22;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings #profileSaveBtn:disabled {
+  cursor: default;
+  opacity: .55;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .paralegal-actions .btn {
+  min-height: 44px;
+  padding: 10px 17px;
+  border-radius: 6px;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings #profileSaveBtn {
+  border-color: var(--settings-v2-navy);
+  background: var(--settings-v2-navy);
+  color: #fff;
+}
+
+body.paralegal-flat.lpc-product-clean .scroll-indicator { display: none !important; }
+
+/* Security uses the same grouped account-panel language as Profile. */
+body.paralegal-flat.lpc-product-clean :is(#securitySection, #preferencesSection) {
+  width: 100%;
+  max-width: none;
+  padding-bottom: 64px;
+}
+
+body.paralegal-flat.lpc-product-clean .focused-settings-header {
+  margin-bottom: 22px;
+  padding-bottom: 18px;
+}
+
+body.paralegal-flat.lpc-product-clean .focused-settings-header h2,
+body.paralegal-flat.lpc-product-clean #preferencesSection .focused-settings-header h2 {
+  color: var(--settings-v2-ink);
+  font-size: 1.55rem;
+  font-weight: 500;
+  letter-spacing: -.02em;
+}
+
+body.paralegal-flat.lpc-product-clean .focused-settings-header p,
+body.paralegal-flat.lpc-product-clean #preferencesSection .focused-settings-header p {
+  color: var(--settings-v2-muted);
+  font-size: 13px;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-column {
+  gap: 16px;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .settings-block,
+body.paralegal-flat.lpc-product-clean #securitySection .security-extras .settings-block {
+  gap: 15px;
+  padding: 22px;
+  border: 1px solid var(--settings-v2-line) !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-column:first-child > .settings-block:first-child {
+  border-top: 3px solid var(--settings-v2-navy) !important;
+  background: #f8fafc !important;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-card-title {
+  min-height: 36px;
+  gap: 11px;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-card-title h3,
+body.paralegal-flat.lpc-product-clean #securitySection .settings-title-with-help h3 {
+  color: var(--settings-v2-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-icon,
+body.paralegal-flat.lpc-product-clean #securitySection .session-device-icon {
+  border: 1px solid var(--settings-v2-line);
+  border-radius: 6px;
+  background: var(--settings-v2-soft);
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection :is(input[type="password"], input[type="text"], .backup-codes-output) {
+  min-height: 44px;
+  border: 1px solid #cfd8e2;
+  border-radius: 6px;
+  background: var(--clean-surface, #fff);
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .two-factor-hero { display: none; }
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-verification-card {
+  border-left: 3px solid #365b8d !important;
+  background: #f8fafc !important;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .two-factor-option {
+  min-height: 76px;
+  padding: 14px 0;
+  border-top: 1px solid var(--settings-v2-line);
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .blocked-users-card {
+  padding: 10px 18px !important;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-extras {
+  margin-top: 20px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-extras .settings-block {
+  align-items: center;
+  border-color: #e5caca !important;
+  background: #fffafa !important;
+}
+
+/* Preferences becomes one calm, scannable account-settings list. */
+body.paralegal-flat.lpc-product-clean #preferencesSection.settings-panel {
+  max-width: none;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .preferences-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  width: min(100%, 820px);
+  overflow: hidden;
+  border: 1px solid var(--settings-v2-line);
+  border-radius: 10px;
+  background: var(--clean-surface, #fff);
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row,
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row:nth-of-type(odd) {
+  grid-column: 1;
+  min-height: 72px;
+  padding: 16px 20px;
+  border: 0;
+  border-bottom: 1px solid var(--settings-v2-line);
+  background: var(--clean-surface, #fff);
+  color: var(--settings-v2-ink);
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row--appearance {
+  align-items: flex-start;
+  padding-block: 20px;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .theme-preview-grid {
+  width: min(100%, 560px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .theme-preview {
+  border: 1px solid var(--settings-v2-line);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .theme-preview[aria-checked="true"] {
+  border-color: var(--settings-v2-blue);
+  outline: 2px solid rgba(54, 91, 141, .14);
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row-copy {
+  max-width: 580px;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row-copy .muted {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .preferences-save-status {
+  margin: 8px 0 0;
+  color: var(--settings-v2-muted);
+  font-size: 13px;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .preferences-save-status[data-state="saving"] { color: #365b8d; }
+body.paralegal-flat.lpc-product-clean #preferencesSection .preferences-save-status[data-state="saved"] { color: var(--clean-success, #356247); }
+body.paralegal-flat.lpc-product-clean #preferencesSection .preferences-save-status[data-state="error"] { color: var(--clean-danger, #9a3412); }
+
+body.paralegal-flat.lpc-product-clean #preferencesSection select {
+  min-height: 44px;
+  border: 1px solid #cfd8e2;
+  border-radius: 6px;
+  background: var(--clean-surface, #fff);
+}
+
+/* Keep the dark appearance consistent across the complete V2 settings shell. */
+body.theme-dark.paralegal-flat.lpc-product-clean {
+  --bg: #0f172a;
+  --panel: #111b2b;
+  --ink: #eef3f9;
+  --muted: #aebbd0;
+  --line: rgba(203, 213, 225, .18);
+  --app-background: #0f172a;
+  --app-text: #eef3f9;
+  --app-muted: #aebbd0;
+  --app-border: rgba(203, 213, 225, .18);
+  --lpc-text-primary: #eef3f9;
+  --lpc-text-secondary: #aebbd0;
+  --lpc-border-subtle: rgba(203, 213, 225, .18);
+  --lpc-surface-panel: #111b2b;
+  --lpc-surface-subtle: #172235;
+  --settings-v2-ink: #eef3f9;
+  --settings-v2-muted: #aebbd0;
+  --settings-v2-line: rgba(203, 213, 225, .18);
+  --settings-v2-soft: #172235;
+  --settings-v2-blue: #9bbcf2;
+  --settings-v2-navy: #d8e6f8;
+  color: #eef3f9 !important;
+  background: #0f172a !important;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean .content,
+body.theme-dark.paralegal-flat.lpc-product-clean #settingsContent {
+  color: var(--settings-v2-ink);
+  background: var(--bg, #0f172a) !important;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean .sidebar {
+  color: #eef3f9 !important;
+  border-right-color: var(--settings-v2-line) !important;
+  background: #111b2b !important;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean .sidebar :is(
+  .globalProfileName,
+  .lpc-profile-trigger-caret,
+  nav a,
+  nav button
+) {
+  color: #eef3f9 !important;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean .lpc-universal-header-shell {
+  color: #eef3f9;
+  border-bottom-color: var(--settings-v2-line) !important;
+  background: #111b2b !important;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean #accountSettingsTitle {
+  color: #eef3f9 !important;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean :is(.account-settings-tabs, .focused-settings-header) {
+  border-color: var(--settings-v2-line);
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean .account-settings-tabs button {
+  color: var(--settings-v2-muted);
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean .account-settings-tabs button:is(.active, :hover, :focus-visible) {
+  color: #c7dcff;
+  background: #1b2b42;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean #paralegalSettings :is(
+  .profile-sidebar,
+  .profile-main,
+  .profile-photo-block,
+  .profile-header,
+  .profile-section,
+  .paralegal-actions
+),
+body.theme-dark.paralegal-flat.lpc-product-clean #preferencesSection .preferences-layout,
+body.theme-dark.paralegal-flat.lpc-product-clean #preferencesSection .pref-row,
+body.theme-dark.paralegal-flat.lpc-product-clean #preferencesSection .theme-preview,
+body.theme-dark.paralegal-flat.lpc-product-clean #securitySection .settings-block {
+  color: var(--settings-v2-ink);
+  border-color: var(--settings-v2-line) !important;
+  background: var(--panel, #111b2b) !important;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean #paralegalSettings .profile-header {
+  background: linear-gradient(90deg, var(--panel, #111b2b) 0%, var(--panel, #111b2b) 72%, #172235 100%) !important;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean :is(#paralegalSettings, #securitySection, #preferencesSection) :is(
+  input,
+  textarea,
+  select,
+  .dropdown-toggle,
+  .backup-codes-output
+) {
+  color: var(--settings-v2-ink);
+  border-color: rgba(203, 213, 225, .25);
+  background: #0c1626;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean #securitySection :is(.security-verification-card, .payout-readiness-card) {
+  background: #172235 !important;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean #paralegalSettings :is(.section-display-text, .photo-guidelines, .profile-save-status),
+body.theme-dark.paralegal-flat.lpc-product-clean :is(#securitySection, #preferencesSection) :is(.muted, p) {
+  color: var(--settings-v2-muted);
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean #paralegalSettings .hero-meta-pill {
+  color: #b9c6d8;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings #avatarInitials {
+  color: #745d28;
+}
+
+@media (max-width: 960px) {
+  body.paralegal-flat.lpc-product-clean .content {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-layout,
+  body.paralegal-flat.lpc-product-clean #securitySection .security-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-sidebar {
+    display: grid;
+    grid-template-columns: minmax(240px, .72fr) minmax(0, 1.28fr);
+    align-items: start;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-section-row--highlights {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  body.paralegal-flat.lpc-product-clean .content {
+    padding: 20px 20px 48px;
+  }
+
+  body.paralegal-flat.lpc-product-clean .page-header {
+    margin-bottom: 18px;
+  }
+
+  body.paralegal-flat.lpc-product-clean .account-settings-tabs {
+    overflow-x: auto;
+    margin-inline: -4px;
+    padding-inline: 4px;
+    scrollbar-width: none;
+  }
+
+  body.paralegal-flat.lpc-product-clean .unified-header {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  body.paralegal-flat.lpc-product-clean #accountSettingsTitle {
+    font-size: 1.8rem;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-layout,
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-sidebar,
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-section-row,
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-section-row--highlights {
+    grid-template-columns: 1fr;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-photo-block {
+    padding: 20px 18px;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .hero-photo {
+    width: 104px;
+    height: 104px;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-header,
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-section {
+    padding: 18px;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-name-input {
+    font-size: 1.7rem;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .paralegal-actions {
+    position: static;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .paralegal-actions .profile-standards-tooltip {
+    margin-right: 0;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .paralegal-actions .btn {
+    width: 100%;
+  }
+
+  body.paralegal-flat.lpc-product-clean #securitySection .settings-block,
+  body.paralegal-flat.lpc-product-clean #securitySection .security-extras .settings-block {
+    padding: 18px !important;
+  }
+
+  body.paralegal-flat.lpc-product-clean #securitySection .security-extras .settings-block {
+    align-items: stretch;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .preferences-layout {
+    width: 100%;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row,
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row:nth-of-type(odd),
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row--appearance,
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row--state {
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row > :is(select, .switch, button) {
+    align-self: stretch;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection select {
+    width: 100%;
+  }
+
+}
+
+/* Paralegal Account Settings V3 — profile dossier, security ledger, and preference board. */
+body.paralegal-flat.lpc-product-clean {
+  --settings-v3-navy: #0b263f;
+  --settings-v3-blue: #315f96;
+  --settings-v3-blue-soft: #edf3f8;
+  --settings-v3-paper: #f7f8f6;
+  --settings-v3-cream: #f4efe4;
+  --settings-v3-gold: #b49a65;
+  --settings-v3-line: #d9e1e8;
+}
+
+body.paralegal-flat.lpc-product-clean .content {
+  padding-top: 34px;
+}
+
+body.paralegal-flat.lpc-product-clean .page-header,
+body.paralegal-flat.lpc-product-clean #settingsContent {
+  width: min(100%, 1180px);
+}
+
+body.paralegal-flat.lpc-product-clean .page-header {
+  position: relative;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  padding: 0 0 22px;
+  border-bottom: 1px solid var(--settings-v3-line);
+  text-align: left;
+}
+
+body.paralegal-flat.lpc-product-clean .page-header::before {
+  content: "ACCOUNT";
+  display: block;
+  margin-bottom: 10px;
+  color: #7b6740;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: .18em;
+}
+
+body.paralegal-flat.lpc-product-clean #accountSettingsTitle {
+  font-size: clamp(2rem, 3vw, 2.65rem);
+  font-weight: 350;
+  letter-spacing: -.045em;
+}
+
+body.paralegal-flat.lpc-product-clean #accountSettingsSubtitle {
+  max-width: 560px;
+  margin-top: 9px;
+}
+
+body.paralegal-flat.lpc-product-clean .account-settings-tabs {
+  gap: 28px;
+  margin: 0 0 32px;
+  padding: 0;
+  border-bottom: 1px solid var(--settings-v3-line);
+}
+
+body.paralegal-flat.lpc-product-clean .account-settings-tabs :is(button, a) {
+  position: relative;
+  min-height: 48px;
+  padding: 0 1px 13px;
+  border-radius: 0;
+  color: #68788c;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+body.paralegal-flat.lpc-product-clean .account-settings-tabs :is(button, a)::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: transparent;
+}
+
+body.paralegal-flat.lpc-product-clean .account-settings-tabs :is(button, a):hover,
+body.paralegal-flat.lpc-product-clean .account-settings-tabs button.active {
+  color: var(--settings-v3-blue);
+  background: transparent;
+}
+
+body.paralegal-flat.lpc-product-clean .account-settings-tabs button.active::after {
+  background: var(--settings-v3-blue);
+}
+
+/* Profile: one identity panel paired with one continuous professional record. */
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-layout {
+  grid-template-columns: minmax(260px, 310px) minmax(0, 1fr);
+  gap: 24px;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-sidebar {
+  gap: 12px;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-photo-block {
+  padding: 30px 24px 26px;
+  border-color: var(--settings-v3-navy);
+  border-radius: 14px;
+  color: #f7f4ed;
+  background: var(--settings-v3-navy);
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .hero-photo {
+  width: 124px;
+  height: 124px;
+  border: 1px solid rgba(255,255,255,.52);
+  background: #f7f4ed;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings :is(.avatar-edit-btn, .avatar-remove-btn) {
+  border-color: rgba(255,255,255,.38);
+  color: #f7f4ed;
+  background: transparent;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings :is(.avatar-edit-btn, .avatar-remove-btn):hover,
+body.paralegal-flat.lpc-product-clean #paralegalSettings :is(.avatar-edit-btn, .avatar-remove-btn):focus-visible {
+  border-color: #fff;
+  background: rgba(255,255,255,.09);
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .photo-guidelines {
+  color: #bfcbd6;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-photo-block .hero-meta-pill {
+  color: #bfcbd6;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-photo-block :is(input, select, textarea) {
+  border-color: rgba(255,255,255,.22);
+  color: #f7f4ed;
+  background: rgba(255,255,255,.075);
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-photo-block :is(input, select, textarea)::placeholder {
+  color: #aebdca;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-sidebar > .profile-section {
+  border-radius: 10px;
+  background: var(--settings-v3-paper);
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--settings-v3-line);
+  border-radius: 14px;
+  background: var(--clean-surface, #fff);
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-header,
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-section,
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-section-row > .profile-section {
+  border: 0;
+  border-bottom: 1px solid var(--settings-v3-line);
+  border-radius: 0;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-header {
+  position: relative;
+  padding: 28px 30px 26px;
+  background: linear-gradient(105deg, #f8fafb 0%, #f8fafb 74%, #edf3f8 100%);
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-header::before {
+  content: "PROFESSIONAL RECORD";
+  display: block;
+  margin-bottom: 18px;
+  color: #7b6740;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: .15em;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-name-input {
+  font-size: clamp(1.65rem, 2.4vw, 2.1rem);
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-section,
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-section-row > .profile-section {
+  padding: 23px 30px 25px;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-section-row {
+  gap: 0;
+  border-bottom: 1px solid var(--settings-v3-line);
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-section-row > .profile-section {
+  border-bottom: 0;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-section-row > .profile-section + .profile-section {
+  border-left: 1px solid var(--settings-v3-line);
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .section-header {
+  min-height: 38px;
+  margin: 0 0 5px;
+  border: 0;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .card-header-label,
+body.paralegal-flat.lpc-product-clean #paralegalSettings #documentsSection .documents-toggle {
+  color: #33465c;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .075em;
+  text-transform: uppercase;
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .section-edit-toggle {
+  min-width: 44px;
+  color: var(--settings-v3-blue);
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .section-edit-toggle:hover,
+body.paralegal-flat.lpc-product-clean #paralegalSettings .section-edit-toggle:focus-visible,
+body.paralegal-flat.lpc-product-clean #paralegalSettings .section-edit-toggle[aria-pressed="true"] {
+  background: var(--settings-v3-blue-soft);
+}
+
+body.paralegal-flat.lpc-product-clean #paralegalSettings .paralegal-actions {
+  margin-top: 18px;
+  padding: 18px 0 0;
+}
+
+/* Security: two continuous ledgers instead of a field of disconnected cards. */
+body.paralegal-flat.lpc-product-clean .focused-settings-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  margin-bottom: 24px;
+  padding-bottom: 18px;
+}
+
+body.paralegal-flat.lpc-product-clean .focused-settings-header h2 {
+  grid-column: 1;
+}
+
+body.paralegal-flat.lpc-product-clean .focused-settings-header p:not(.preferences-save-status) {
+  grid-column: 1;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-grid {
+  gap: 18px;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-column {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--settings-v3-line);
+  border-radius: 14px;
+  background: var(--clean-surface, #fff);
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .settings-block,
+body.paralegal-flat.lpc-product-clean #securitySection .security-column:first-child > .settings-block:first-child,
+body.paralegal-flat.lpc-product-clean #securitySection .security-verification-card {
+  padding: 25px 26px 27px;
+  border: 0 !important;
+  border-bottom: 1px solid var(--settings-v3-line) !important;
+  border-radius: 0 !important;
+  background: #fff !important;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-column > .settings-block:last-child {
+  border-bottom: 0 !important;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-column:first-child > .settings-block:first-child {
+  position: relative;
+  color: #f7f4ed;
+  background: var(--settings-v3-navy) !important;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-column:first-child > .settings-block:first-child::before {
+  content: "PAYOUT READINESS";
+  color: #d2bc8a;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: .14em;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-column:first-child > .settings-block:first-child :is(h3, p, .muted) {
+  color: #f7f4ed !important;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-column:first-child > .settings-block:first-child .settings-help-tooltip summary {
+  color: #f7f4ed;
+  border-color: rgba(255,255,255,.35);
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-column:first-child > .settings-block:first-child .btn {
+  border-color: #d2bc8a;
+  color: #f7f4ed;
+  background: transparent;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-verification-card {
+  background: var(--settings-v3-cream) !important;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-card-title {
+  min-height: 42px;
+  margin-bottom: 3px;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-card-title h3,
+body.paralegal-flat.lpc-product-clean #securitySection .settings-title-with-help h3 {
+  font-size: 14px;
+  letter-spacing: -.01em;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-icon,
+body.paralegal-flat.lpc-product-clean #securitySection .session-device-icon {
+  border: 0;
+  border-radius: 50%;
+  color: var(--settings-v3-blue);
+  background: var(--settings-v3-blue-soft);
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .two-factor-option {
+  padding: 17px 0;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .blocked-users-card {
+  padding: 15px 26px !important;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-extras {
+  margin-top: 22px;
+}
+
+body.paralegal-flat.lpc-product-clean #securitySection .security-extras .settings-block {
+  padding: 18px 22px !important;
+  border: 1px solid #e4c9c9 !important;
+  border-radius: 10px !important;
+}
+
+/* Preferences: a compact board with stronger grouping and hierarchy. */
+body.paralegal-flat.lpc-product-clean #preferencesSection .focused-settings-header {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .preferences-save-status {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  margin: 0;
+  padding: 8px 11px;
+  border: 1px solid var(--settings-v3-line);
+  border-radius: 999px;
+  background: var(--settings-v3-paper);
+  white-space: nowrap;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .preferences-layout {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  gap: 12px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row,
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row:nth-of-type(odd) {
+  position: relative;
+  grid-column: auto;
+  min-height: 94px;
+  padding: 22px 22px 20px 54px;
+  border: 1px solid var(--settings-v3-line);
+  border-radius: 10px;
+  background: var(--settings-v3-paper);
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row::before {
+  content: "";
+  position: absolute;
+  top: 24px;
+  left: 22px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #90a5ba;
+  border-radius: 50%;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row:has(input:checked)::before {
+  border-color: var(--settings-v3-blue);
+  background: var(--settings-v3-blue);
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row.pref-row--appearance,
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row.pref-row--state,
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row:has(#fontSizePreference) {
+  grid-column: 1 / -1;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row--appearance {
+  min-height: 190px;
+  padding-top: 22px;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .theme-preview-grid {
+  width: min(100%, 650px);
+  gap: 10px;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .theme-preview {
+  min-height: 126px;
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--clean-surface, #fff);
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .theme-preview-icon {
+  width: 112px;
+  height: auto;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row--state {
+  background: #f1f5f8;
+}
+
+body.paralegal-flat.lpc-product-clean #preferencesSection select {
+  min-width: 210px;
+  background-color: #fff;
+}
+
+/* Current dark appearance retains the same composition and hierarchy. */
+body.theme-dark.paralegal-flat.lpc-product-clean .page-header::before,
+body.theme-dark.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-header::before {
+  color: #d2bc8a;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean #paralegalSettings .profile-photo-block,
+body.theme-dark.paralegal-flat.lpc-product-clean #securitySection .security-column:first-child > .settings-block:first-child {
+  border-color: #25445f !important;
+  background: #071d31 !important;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main,
+body.theme-dark.paralegal-flat.lpc-product-clean #securitySection .security-column {
+  border-color: var(--settings-v2-line);
+  background: var(--panel);
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-header {
+  background: linear-gradient(105deg, #111b2b 0%, #111b2b 74%, #172b42 100%) !important;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean #preferencesSection .pref-row,
+body.theme-dark.paralegal-flat.lpc-product-clean #preferencesSection .pref-row:nth-of-type(odd),
+body.theme-dark.paralegal-flat.lpc-product-clean #preferencesSection .pref-row--state,
+body.theme-dark.paralegal-flat.lpc-product-clean #preferencesSection .preferences-save-status {
+  border-color: var(--settings-v2-line);
+  background: #111b2b;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean #preferencesSection .theme-preview {
+  background: #0c1626 !important;
+}
+
+body.theme-dark.paralegal-flat.lpc-product-clean #securitySection .security-verification-card {
+  background: #1b2a3b !important;
+}
+
+@media (max-width: 960px) {
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-sidebar {
+    grid-template-columns: minmax(260px, .78fr) minmax(0, 1.22fr);
+  }
+
+  body.paralegal-flat.lpc-product-clean #securitySection .security-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  body.paralegal-flat.lpc-product-clean .content {
+    padding: 22px 18px 54px;
+  }
+
+  body.paralegal-flat.lpc-product-clean .page-header {
+    padding-bottom: 18px;
+  }
+
+  body.paralegal-flat.lpc-product-clean #accountSettingsTitle {
+    font-size: 1.85rem;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-layout {
+    grid-template-columns: 1fr;
+  }
+
+  body.paralegal-flat.lpc-product-clean .account-settings-tabs {
+    gap: 22px;
+    margin-bottom: 24px;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-photo-block {
+    padding: 26px 20px;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-header,
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-section,
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-section-row > .profile-section {
+    padding: 21px 20px 23px;
+  }
+
+  body.paralegal-flat.lpc-product-clean #paralegalSettings .profile-main > .profile-section-row > .profile-section + .profile-section {
+    border-top: 1px solid var(--settings-v3-line);
+    border-left: 0;
+  }
+
+  body.paralegal-flat.lpc-product-clean .focused-settings-header,
+  body.paralegal-flat.lpc-product-clean #preferencesSection .focused-settings-header {
+    display: block;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .preferences-save-status {
+    display: inline-flex;
+    margin-top: 12px;
+    white-space: normal;
+  }
+
+  body.paralegal-flat.lpc-product-clean #securitySection .settings-block,
+  body.paralegal-flat.lpc-product-clean #securitySection .security-column:first-child > .settings-block:first-child,
+  body.paralegal-flat.lpc-product-clean #securitySection .security-verification-card {
+    padding: 22px 20px 24px !important;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .preferences-layout {
+    grid-template-columns: 1fr;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row,
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row:nth-of-type(odd),
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row--appearance,
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row--state {
+    grid-column: 1;
+    min-height: 86px;
+    padding: 19px 18px 19px 48px;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row:not(.pref-row--appearance):not(.pref-row--state) {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row:not(.pref-row--appearance):not(.pref-row--state) > .switch {
+    align-self: center;
+    margin-left: auto;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row:has(#fontSizePreference),
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row--state {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row::before {
+    top: 22px;
+    left: 19px;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .pref-row--appearance {
+    min-height: 0;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .theme-preview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .theme-preview {
+    min-height: 106px;
+    padding: 10px;
+  }
+
+  body.paralegal-flat.lpc-product-clean #preferencesSection .theme-preview-icon {
+    width: 88px;
+  }
+}

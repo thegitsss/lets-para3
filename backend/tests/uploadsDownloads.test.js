@@ -3,6 +3,7 @@ const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const request = require("supertest");
+const { PassThrough } = require("stream");
 
 process.env.S3_BUCKET = process.env.S3_BUCKET || "test-bucket";
 process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_stub";
@@ -59,6 +60,8 @@ const notificationsRouter = require("../routes/notifications");
 const sendEmail = require("../utils/email");
 const { buildCaseFileKeyQuery } = require("../utils/dataEncryption");
 const { resetWorkspacePresence } = require("../utils/workspacePresence");
+const { addSubscriber: addCaseSubscriber } = require("../utils/caseEvents");
+const { addSubscriber: addNotificationSubscriber } = require("../utils/notificationEvents");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 const app = (() => {
@@ -98,7 +101,7 @@ beforeEach(async () => {
   mockSend.mockReset();
   mockGetSignedUrl.mockClear();
   sendEmail.mockClear();
-  resetWorkspacePresence();
+  await resetWorkspacePresence();
   mockSend.mockImplementation((cmd) => {
     const key = cmd?.input?.Key || "";
     if (String(key).includes("missing")) {
@@ -187,7 +190,7 @@ describe("File uploads + downloads", () => {
     expect(stored.pendingProfileImage).toContain(`/api/users/profile-photo/${paralegal._id}?variant=pending`);
   });
 
-  test("Approved replacement upload changes the public cache version token", async () => {
+  test("Paralegal recrop stays pending and changes the private delivery cache version token", async () => {
     const paralegal = await User.create({
       firstName: "Cache",
       lastName: "Refresh",
@@ -212,9 +215,11 @@ describe("File uploads + downloads", () => {
       });
 
     expect(response.status).toBe(200);
-    expect(response.body.pending).toBe(false);
+    expect(response.body.pending).toBe(true);
+    expect(response.body.status).toBe("pending_review");
     const delivered = new URL(response.body.url, "https://www.lets-paraconnect.com");
-    expect(delivered.pathname).toBe(`/api/public/paralegals/${paralegal._id}/photo`);
+    expect(delivered.pathname).toBe(`/api/users/profile-photo/${paralegal._id}`);
+    expect(delivered.searchParams.get("variant")).toBe("pending");
     expect(delivered.searchParams.get("v")).toMatch(/^[0-9]+$/);
     expect(delivered.searchParams.get("v")).not.toBe(previousVersion);
   });
@@ -257,6 +262,8 @@ describe("File uploads + downloads", () => {
       currency: "usd",
     });
 
+    const signedUrl = "https://signed-url.test/object?X-Amz-SignedHeaders=content-length%3Bcontent-type%3Bhost%3Bif-none-match";
+    mockGetSignedUrl.mockResolvedValueOnce(signedUrl);
     const res = await request(app)
       .post("/api/uploads/presign")
       .set("Cookie", authCookieFor(paralegal))
@@ -267,7 +274,8 @@ describe("File uploads + downloads", () => {
         size: 1024,
       });
     expect(res.status).toBe(200);
-    expect(res.body.url).toBe("https://signed-url.test/object");
+    expect(res.body.url).toBe(signedUrl);
+    expect(res.body.requiredHeaders).toEqual({ "content-type": "application/pdf", "if-none-match": "*" });
     expect(res.body.key).toContain(`cases/${caseDoc._id}`);
   });
 
@@ -728,10 +736,17 @@ describe("File uploads + downloads", () => {
 
     expect(presenceRes.status).toBe(200);
 
+    const caseEvents = [];
+    const recipientEvents = [];
+    const unsubscribeCase = addCaseSubscriber(caseDoc._id, { write: (value) => caseEvents.push(String(value)) });
+    const unsubscribeRecipient = addNotificationSubscriber(paralegal._id, { write: (value) => recipientEvents.push(String(value)) });
+
     const res = await request(app)
       .post(`/api/uploads/case/${caseDoc._id}`)
       .set("Cookie", authCookieFor(attorney))
       .attach("file", Buffer.from("%PDF-1.4\ndraft content"), "draft.pdf");
+    unsubscribeCase();
+    unsubscribeRecipient();
 
     expect(res.status).toBe(201);
 
@@ -740,9 +755,134 @@ describe("File uploads + downloads", () => {
       .lean();
     expect(notif).toBeFalsy();
     expect(sendEmail).not.toHaveBeenCalled();
+    expect(caseEvents.join("\n")).toContain("event: documents");
+    expect(recipientEvents.join("\n")).toContain("case_file_uploaded_refresh");
   });
 
-  test("Direct Matter upload deletes stored objects when metadata persistence fails", async () => {
+  test("Being on Matter overview does not suppress a new-file alert, while the Files surface does", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Surface",
+      email: "alex.surface-upload@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Surface",
+      email: "priya.surface-upload@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Surface-aware file alerts",
+      details: "Only an open Files surface suppresses its stored alert.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowIntentId: "pi_surface_file_alerts",
+      escrowStatus: "funded",
+      totalAmount: 100000,
+      currency: "usd",
+    });
+
+    const overviewPresence = await request(app)
+      .post("/api/notifications/workspace-presence")
+      .set("Cookie", authCookieFor(paralegal))
+      .send({ caseId: String(caseDoc._id), surface: "overview" });
+    expect(overviewPresence.status).toBe(200);
+
+    const firstUpload = await request(app)
+      .post(`/api/uploads/case/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(attorney))
+      .attach("file", Buffer.from("%PDF-1.4\nfirst"), "first.pdf");
+    expect(firstUpload.status).toBe(201);
+    expect(
+      await require("../models/Notification").countDocuments({
+        userId: paralegal._id,
+        type: "case_file_uploaded",
+      })
+    ).toBe(1);
+
+    const filesPresence = await request(app)
+      .post("/api/notifications/workspace-presence")
+      .set("Cookie", authCookieFor(paralegal))
+      .send({ caseId: String(caseDoc._id), surface: "files" });
+    expect(filesPresence.status).toBe(200);
+
+    const secondUpload = await request(app)
+      .post(`/api/uploads/case/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(attorney))
+      .attach("file", Buffer.from("%PDF-1.4\nsecond"), "second.pdf");
+    expect({ status: secondUpload.status, body: secondUpload.body }).toMatchObject({ status: 201 });
+    expect(
+      await require("../models/Notification").countDocuments({
+        userId: paralegal._id,
+        type: "case_file_uploaded",
+      })
+    ).toBe(1);
+  });
+
+  test("Direct Matter upload retries are idempotent for the same client request", async () => {
+    const attorney = await User.create({
+      firstName: "Upload",
+      lastName: "Idempotency",
+      email: "upload.idempotency.attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Upload",
+      lastName: "Recipient",
+      email: "upload.idempotency.paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Idempotent upload",
+      details: "A retried browser request must not duplicate the Matter file.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowIntentId: "pi_upload_idempotency",
+      escrowStatus: "funded",
+      totalAmount: 100000,
+      currency: "usd",
+    });
+    const clientUploadId = "upload-request-1234567890";
+    const send = () => request(app)
+      .post(`/api/uploads/case/${caseDoc._id}?presentation=matter`)
+      .set("Cookie", authCookieFor(attorney))
+      .field("clientUploadId", clientUploadId)
+      .attach("file", Buffer.from("%PDF-1.4\nidempotent content"), "idempotent.pdf");
+
+    const first = await send();
+    const retry = await send();
+
+    expect(first.status).toBe(201);
+    expect(retry.status).toBe(200);
+    expect(retry.body).toMatchObject({ idempotent: true });
+    expect(retry.body.file.id).toBe(first.body.file.id);
+    expect(await CaseFile.countDocuments({ caseId: caseDoc._id })).toBe(1);
+    const storedObjectWrites = mockSend.mock.calls
+      .map(([command]) => command?.input || {})
+      .filter((input) => input.Body && input.Key?.includes("/documents/"));
+    expect(storedObjectWrites).toHaveLength(1);
+  });
+
+  test("Direct Matter upload retains attempt evidence without deleting a possibly committed object after metadata failure", async () => {
     const attorney = await User.create({
       firstName: "Upload",
       lastName: "Recovery",
@@ -763,7 +903,7 @@ describe("File uploads + downloads", () => {
     });
     const caseDoc = await Case.create({
       title: "Upload recovery",
-      details: "An object must not remain orphaned after a database failure.",
+      details: "A failed acknowledgement cannot prove it is safe to delete an uploaded object.",
       status: "in progress",
       attorney: attorney._id,
       attorneyId: attorney._id,
@@ -782,13 +922,16 @@ describe("File uploads + downloads", () => {
       .attach("file", Buffer.from("%PDF-1.4\ndraft content"), "draft.pdf");
     createSpy.mockRestore();
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(503);
     const storageCalls = mockSend.mock.calls.map(([command]) => command?.input || {});
     const uploaded = storageCalls.find((input) => input.Body && input.Key?.includes(`/documents/`));
     const deleted = storageCalls.find((input) => !input.Body && input.Key === uploaded?.Key);
     expect(uploaded).toBeTruthy();
-    expect(deleted).toBeTruthy();
+    expect(deleted).toBeUndefined();
     expect(await CaseFile.countDocuments({ caseId: caseDoc._id })).toBe(0);
+    const operation = await require("../models/MatterFileUpload").collection.findOne({ caseId: caseDoc._id });
+    expect(operation.status).toBe("unconfirmed"); expect(operation.attempts).toHaveLength(1);
+    expect(uploaded.Key).toContain(`${operation.fileId}-${operation.attempts[0].token}`);
   });
 
   test("Unauthorized user cannot presign uploads", async () => {
@@ -899,6 +1042,171 @@ describe("File uploads + downloads", () => {
     expect(response.status).toBe(404);
     expect(JSON.stringify(response.body)).not.toContain("second-matter-only.pdf");
     expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  test("Authorized preview uses inline disposition only for an allowlisted file type", async () => {
+    const previewBody = Buffer.from("%PDF-1.4\nauthorized preview");
+    const attorney = await User.create({
+      firstName: "Preview",
+      lastName: "Attorney",
+      email: "preview.attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Preview",
+      lastName: "Paralegal",
+      email: "preview.paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const matter = await Case.create({
+      title: "Preview Matter",
+      details: "Authorized file preview contract.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowIntentId: "pi_preview_file",
+      escrowStatus: "funded",
+      totalAmount: 100000,
+      currency: "usd",
+    });
+    const file = await CaseFile.create({
+      caseId: matter._id,
+      userId: attorney._id,
+      originalName: "authorized-preview.pdf",
+      storageKey: `cases/${matter._id}/documents/authorized-preview.pdf`,
+      mimeType: "application/pdf",
+      size: previewBody.length,
+      securityStatus: "not_required",
+      uploadedByRole: "attorney",
+    });
+    mockSend.mockImplementation((command) => {
+      if (command?.constructor?.name !== "GetObjectCommand") return {};
+      const body = new PassThrough();
+      body.end(previewBody);
+      return { Body: body };
+    });
+
+    const response = await request(app)
+      .get(`/api/uploads/case/${matter._id}/${file._id}/download?preview=true`)
+      .set("Cookie", authCookieFor(paralegal));
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toMatch(/^application\/pdf/);
+    expect(response.headers["content-disposition"]).toMatch(/^inline;/);
+  });
+
+  test("A replacement paralegal cannot list, preview, sign, or download a prior assignment's files", async () => {
+    const attorney = await User.create({
+      firstName: "File",
+      lastName: "Attorney",
+      email: "reassignment-file-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const priorParalegal = await User.create({
+      firstName: "Prior",
+      lastName: "Fileworker",
+      email: "reassignment-file-prior@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const replacement = await User.create({
+      firstName: "Replacement",
+      lastName: "Fileworker",
+      email: "reassignment-file-current@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Reassigned file Matter",
+      details: "Assignment-scoped file fixture.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: replacement._id,
+      paralegalId: replacement._id,
+      withdrawnParalegalId: priorParalegal._id,
+      hiredAt: new Date("2026-09-02T12:00:00.000Z"),
+      escrowIntentId: "pi_reassignment_files",
+      escrowStatus: "funded",
+      totalAmount: 100000,
+      currency: "usd",
+    });
+    const oldKey = `cases/${caseDoc._id}/documents/prior-assignment.pdf`;
+    const currentKey = `cases/${caseDoc._id}/documents/current-assignment.pdf`;
+    const oldFile = await CaseFile.create({
+      caseId: caseDoc._id,
+      userId: priorParalegal._id,
+      originalName: "prior-assignment.pdf",
+      storageKey: oldKey,
+      mimeType: "application/pdf",
+      size: 256,
+      uploadedByRole: "paralegal",
+      securityStatus: "not_required",
+      securityScanResult: "NOT_REQUIRED",
+      createdAt: new Date("2026-09-01T12:00:00.000Z"),
+    });
+    const currentFile = await CaseFile.create({
+      caseId: caseDoc._id,
+      userId: attorney._id,
+      originalName: "current-assignment.pdf",
+      storageKey: currentKey,
+      mimeType: "application/pdf",
+      size: 256,
+      uploadedByRole: "attorney",
+      securityStatus: "not_required",
+      securityScanResult: "NOT_REQUIRED",
+      createdAt: new Date("2026-09-03T12:00:00.000Z"),
+    });
+
+    const list = await request(app)
+      .get(`/api/uploads/case/${caseDoc._id}?presentation=matter`)
+      .set("Cookie", authCookieFor(replacement));
+    expect(list.status).toBe(200);
+    expect(list.body.files.map((file) => file.id)).toEqual([String(currentFile._id)]);
+
+    const oldStatus = await request(app)
+      .get(`/api/uploads/case/${caseDoc._id}/${oldFile._id}/security-status`)
+      .set("Cookie", authCookieFor(replacement));
+    expect(oldStatus.status).toBe(404);
+
+    const oldDownload = await request(app)
+      .get(`/api/uploads/case/${caseDoc._id}/${oldFile._id}/download`)
+      .set("Cookie", authCookieFor(replacement));
+    expect(oldDownload.status).toBe(404);
+
+    const oldSignedUploadRoute = await request(app)
+      .get(`/api/uploads/signed-get?caseId=${caseDoc._id}&key=${encodeURIComponent(oldKey)}`)
+      .set("Cookie", authCookieFor(replacement));
+    expect(oldSignedUploadRoute.status).toBe(403);
+
+    const oldSignedCaseRoute = await request(app)
+      .get(`/api/cases/${caseDoc._id}/files/signed-get?key=${encodeURIComponent(oldKey)}`)
+      .set("Cookie", authCookieFor(replacement));
+    expect(oldSignedCaseRoute.status).toBe(404);
+
+    const attorneyList = await request(app)
+      .get(`/api/uploads/case/${caseDoc._id}?presentation=matter`)
+      .set("Cookie", authCookieFor(attorney));
+    expect(attorneyList.status).toBe(200);
+    expect(attorneyList.body.files.map((file) => file.id)).toEqual([
+      String(currentFile._id),
+      String(oldFile._id),
+    ]);
   });
 
   test("Assigned paralegal can attach case file metadata", async () => {

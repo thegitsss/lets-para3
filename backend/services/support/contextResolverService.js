@@ -5,6 +5,7 @@ const Message = require("../../models/Message");
 const Payout = require("../../models/Payout");
 const User = require("../../models/User");
 const stripe = require("../../utils/stripe");
+const { projectPayoutReadiness } = require("../paralegalReadinessService");
 const { normalizeCaseStatus } = require("../../utils/caseState");
 const { BLOCKED_MESSAGE, isBlockedBetween } = require("../../utils/blocks");
 const {
@@ -606,37 +607,30 @@ async function getStripeConnectSnapshot(user = {}) {
       }
     : stored;
 
-  const blockers = [];
+  const readiness = projectPayoutReadiness({
+    ...snapshot,
+    evidenceState: stored.accountId && !live ? "temporarily_unavailable" : "verified",
+  });
   const nextSteps = [];
-
-  if (!snapshot.accountId) {
-    blockers.push("missing_stripe_account");
+  if (!readiness.accountPresent || !readiness.detailsSubmitted) {
     nextSteps.push("Return to Stripe onboarding and complete any remaining identity or bank details.");
-  } else {
-    if (!snapshot.detailsSubmitted) {
-      blockers.push("stripe_details_missing");
-      nextSteps.push("Return to Stripe onboarding and complete any remaining identity or bank details.");
-    }
-    if (!snapshot.chargesEnabled) {
-      blockers.push("stripe_charges_disabled");
-    }
-    if (!snapshot.payoutsEnabled) {
-      blockers.push("stripe_payouts_disabled");
-      nextSteps.push("Finish any remaining Stripe requirements before payouts can be enabled.");
-    }
+  }
+  if (!readiness.payoutsEnabled) {
+    nextSteps.push("Finish any remaining Stripe requirements before payouts can be enabled.");
   }
 
   return {
     accountId: snapshot.accountId,
-    source: snapshot.source,
-    onboardingComplete: snapshot.onboardingComplete,
-    detailsSubmitted: snapshot.detailsSubmitted,
-    chargesEnabled: snapshot.chargesEnabled,
-    payoutsEnabled: snapshot.payoutsEnabled,
-    connected: snapshot.connected,
+    source: readiness.source,
+    evidenceState: readiness.evidenceState,
+    onboardingComplete: readiness.ready,
+    detailsSubmitted: readiness.detailsSubmitted,
+    chargesEnabled: readiness.chargesEnabled,
+    payoutsEnabled: readiness.payoutsEnabled,
+    connected: readiness.ready,
     bankName: snapshot.bankName,
     bankLast4: snapshot.bankLast4,
-    blockers: uniqueStrings(blockers),
+    blockers: readiness.blockers,
     nextSteps: uniqueStrings(nextSteps),
   };
 }

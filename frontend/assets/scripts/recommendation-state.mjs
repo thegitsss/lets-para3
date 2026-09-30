@@ -48,7 +48,7 @@ export function createRecommendationStateLoader({
   return {
     async refresh(options = {}) {
       const currentGeneration = ++generation;
-      onLoading(options);
+      if (!options.silent) onLoading(options);
       try {
         const [profile, jobs, exclusions] = await Promise.all([
           options.profilePromise || loadProfile(options),
@@ -61,7 +61,7 @@ export function createRecommendationStateLoader({
         return { stale: false, ...payload };
       } catch (error) {
         if (currentGeneration !== generation) return { stale: true, error };
-        onError(error, options);
+        if (!options.silent) onError(error, options);
         return { stale: false, error };
       }
     },

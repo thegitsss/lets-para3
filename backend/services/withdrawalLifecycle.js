@@ -1,11 +1,12 @@
 "use strict";
 
 const Case = require("../models/Case");
+const mongoose = require("mongoose");
 const Job = require("../models/Job");
 const User = require("../models/User");
 const { buildReceiptPdfBuffer, uploadPdfToS3 } = require("./caseLifecycle");
 const { DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT } = require("./platformFeePolicy");
-const { notifyUser } = require("../utils/notifyUser");
+const { publishCaseProjectionRefresh } = require("../utils/caseProjectionEvents");
 const { createLogger, logPromiseFailure } = require("../utils/logger");
 
 const logger = createLogger("services:withdrawalLifecycle");
@@ -58,8 +59,9 @@ function computeParalegalFeeFromGross(grossCents, caseDoc) {
 
 function getWithdrawalReceiptKey(caseId, kind, paralegalId) {
   const safeKind = kind === "paralegal" ? "paralegal" : "attorney";
-  const suffix = safeKind === "paralegal" && paralegalId
-    ? `paralegal-${String(paralegalId)}`
+  const retainedId = paralegalId?._id || paralegalId;
+  const suffix = safeKind === "paralegal" && retainedId
+    ? `paralegal-${String(retainedId)}`
     : safeKind;
   return `cases/${caseId}/receipt-withdrawal-${suffix}.pdf`;
 }
@@ -142,47 +144,66 @@ async function markPostingReconciliation(caseDoc, error) {
   }));
 }
 
-async function markPostingSynced(caseDoc, jobId) {
+async function markPostingSynced(caseDoc, jobId, session = null) {
   const values = {
     postingSyncStatus: "synced",
     postingSyncedAt: new Date(),
     postingSyncError: "",
   };
   if (jobId) values.jobId = jobId;
-  await Case.updateOne({ _id: caseDoc._id }, { $set: values });
+  await Case.updateOne({ _id: caseDoc._id }, { $set: values }, { session });
 }
 
-async function ensureCaseJobOpen(caseDoc) {
+async function ensureCaseJobOpen(caseDoc, { session = null } = {}) {
   if (!caseDoc) return null;
-  const jobId = resolveCaseJobId(caseDoc);
+  if (session && !session.inTransaction()) throw new Error("Posting synchronization requires an active transaction.");
+  const postingSource = session ? await Case.collection.findOne({ _id: caseDoc._id }, { session }) : caseDoc;
+  if (!postingSource) throw new Error("The Matter posting source is unavailable.");
+  let jobId = resolveCaseJobId(postingSource);
+  if (session) {
+    const id = value => String(value?._id || value || "");
+    const ownerId = id(postingSource.attorneyId || postingSource.attorney);
+    const postingId = id(jobId);
+    if (postingId && !mongoose.isObjectIdOrHexString(postingId)) throw Object.assign(new Error("The Matter posting could not be verified. Refresh before withdrawing."), { status: 409, code: "WITHDRAWAL_POSTING_CONFLICT" });
+    const related = await Job.collection.find({ $or: [{ caseId: { $in: [caseDoc._id, String(caseDoc._id)] } }, ...(postingId ? [{ _id: new mongoose.Types.ObjectId(postingId) }] : [])] }, { session }).limit(3).toArray();
+    if (postingSource.job && postingSource.jobId && id(postingSource.job) !== id(postingSource.jobId)
+      || postingSource.attorney && postingSource.attorneyId && id(postingSource.attorney) !== id(postingSource.attorneyId)
+      || related.length > 1 || jobId && !related.length
+      || related.some(job => id(job.attorneyId) !== ownerId || job.caseId && id(job.caseId) !== id(caseDoc._id))) {
+      throw Object.assign(new Error("The Matter posting changed. Refresh before withdrawing."), { status: 409, code: "WITHDRAWAL_POSTING_CONFLICT" });
+    }
+    if (!jobId && related.length === 1) jobId = related[0]._id;
+  }
   if (jobId) {
-    const reopened = await Job.findByIdAndUpdate(jobId, { status: "open" });
+    const reopened = await Job.findByIdAndUpdate(jobId, { status: "open" }, { session });
     if (!reopened) {
       const error = new Error(`Unable to reopen missing Matter posting ${String(jobId)}`);
-      await markPostingReconciliation(caseDoc, error);
+      if (!session) await markPostingReconciliation(caseDoc, error);
       throw error;
     }
-    await markPostingSynced(caseDoc);
+    await markPostingSynced(caseDoc, session ? jobId : null, session);
     return jobId;
   }
 
-  const existing = await Job.findOne({ caseId: caseDoc._id });
+  const existingQuery = Job.findOne({ caseId: caseDoc._id });
+  const existing = await (session ? existingQuery.session(session) : existingQuery);
   if (existing) {
     existing.status = "open";
-    await existing.save();
+    await existing.save({ session });
     caseDoc.jobId = existing._id;
-    await markPostingSynced(caseDoc, existing._id);
+    await markPostingSynced(caseDoc, existing._id, session);
     return existing._id;
   }
 
   const attorneyId = caseDoc.attorneyId || caseDoc.attorney;
-  const attorneyProfile = attorneyId ? await User.findById(attorneyId).select("state") : null;
+  const attorneyQuery = attorneyId ? User.findById(attorneyId).select("state") : null;
+  const attorneyProfile = await (session && attorneyQuery ? attorneyQuery.session(session) : attorneyQuery);
   const attorneyState = String(attorneyProfile?.state || "").trim().toUpperCase();
   const budgetCents = resolveRemainingAmount(caseDoc) ?? caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0;
   const budgetDollars = Math.max(1, Math.round(Number(budgetCents || 0) / 100));
   let job = null;
   try {
-    job = await Job.create({
+    const values = {
       caseId: caseDoc._id,
       attorneyId,
       title: caseDoc.title || "Untitled Matter",
@@ -192,8 +213,10 @@ async function ensureCaseJobOpen(caseDoc) {
       status: "open",
       state: attorneyState,
       locationState: attorneyState,
-    });
+    };
+    job = session ? (await Job.create([values], { session }))[0] : await Job.create(values);
   } catch (error) {
+    if (session) throw error;
     if (error?.code !== 11000) {
       await markPostingReconciliation(caseDoc, error);
       throw error;
@@ -206,33 +229,16 @@ async function ensureCaseJobOpen(caseDoc) {
   }
   if (!job) {
     const error = new Error(`Unable to create or recover Matter posting for Matter ${String(caseDoc._id)}`);
-    await markPostingReconciliation(caseDoc, error);
+    if (!session) await markPostingReconciliation(caseDoc, error);
     throw error;
   }
   caseDoc.jobId = job._id;
-  await markPostingSynced(caseDoc, job._id);
+  await markPostingSynced(caseDoc, job._id, session);
   return job._id;
 }
 
-function buildExpiredWithdrawalState(caseDoc, now) {
-  const remainingAmount = resolveRemainingAmount(caseDoc) ?? caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0;
-  return {
-    partialPayoutAmount: 0,
-    payoutFinalizedType: "expired_zero",
-    payoutFinalizedAt: now,
-    disputeDeadlineAt: null,
-    adminDisputeDeadlineAt: null,
-    adminDisputeOverdueNotifiedAt: null,
-    relistRequestedAt: caseDoc.relistRequestedAt || now,
-    relistPending: false,
-    remainingAmount: Math.max(0, Math.round(Number(remainingAmount) || 0)),
-    pausedReason: "paralegal_withdrew",
-    status: "paused",
-  };
-}
-
 function isExpiredWithdrawalEligible(caseDoc, now) {
-  if (!caseDoc?.disputeDeadlineAt || caseDoc.payoutFinalizedAt) return false;
+  if (!caseDoc?.disputeDeadlineAt || caseDoc.payoutFinalizedAt || caseDoc.withdrawalClaimStatus || caseDoc.withdrawalClaimToken) return false;
   if (now.getTime() < new Date(caseDoc.disputeDeadlineAt).getTime()) return false;
   if (String(caseDoc.status || "").toLowerCase() === "disputed") return false;
   return !(Array.isArray(caseDoc.disputes) && caseDoc.disputes.some(
@@ -241,7 +247,6 @@ function isExpiredWithdrawalEligible(caseDoc, now) {
 }
 
 async function completeExpiredWithdrawalSideEffects(caseDoc) {
-  await ensureCaseJobOpen(caseDoc);
   try {
     await generateWithdrawalReceipts(caseDoc, { grossAmount: 0 });
   } catch (error) {
@@ -251,9 +256,12 @@ async function completeExpiredWithdrawalSideEffects(caseDoc) {
 
 async function finalizeExpiredDisputeWindow(caseDoc, { now = new Date() } = {}) {
   if (!isExpiredWithdrawalEligible(caseDoc, now)) return false;
-  Object.assign(caseDoc, buildExpiredWithdrawalState(caseDoc, now));
-  if (typeof caseDoc.ensureLifecycleStatus === "function") caseDoc.ensureLifecycleStatus("paused");
-  await completeExpiredWithdrawalSideEffects(caseDoc);
+  const result = await require("./attorneyWithdrawal").expire(caseDoc._id, { now });
+  if (result.changed && !result.recovered) {
+    await completeExpiredWithdrawalSideEffects(result.doc);
+    publishCaseProjectionRefresh(result.doc, "matter_withdrawal_expired_refresh", { additionalUserIds: [result.doc.withdrawnParalegalId], discovery: true });
+  }
+  // Callers refresh their projection; they must not save their earlier document.
   return true;
 }
 
@@ -262,7 +270,14 @@ async function processExpiredWithdrawalWindows({ now = new Date(), limit = DEFAU
     pausedReason: "paralegal_withdrew",
     disputeDeadlineAt: { $lte: now },
     payoutFinalizedAt: null,
-    status: { $ne: "disputed" },
+    withdrawalClaimStatus: { $nin: ["claimed", "needs_reconciliation"] },
+    withdrawalClaimToken: { $in: [null, ""] },
+    status: "paused",
+    archived: { $ne: true }, readOnly: { $ne: true }, purgedAt: null, paymentReleased: { $ne: true },
+    paralegal: null, paralegalId: null, partialPayoutAmount: { $in: [null, 0] },
+    hiringClaimStatus: { $in: [null, ""] }, hiringClaimToken: { $in: [null, ""] },
+    completionClaimStatus: { $in: [null, ""] }, completionClaimToken: { $in: [null, ""] },
+    payoutStatus: { $nin: ["failed", "reversed", "needs_reconciliation"] },
     disputes: { $not: { $elemMatch: { status: "open" } } },
   })
     .sort({ disputeDeadlineAt: 1, _id: 1 })
@@ -274,21 +289,12 @@ async function processExpiredWithdrawalWindows({ now = new Date(), limit = DEFAU
   const summary = { scanned: candidates.length, finalized: 0, failed: 0 };
   for (const candidate of candidates) {
     try {
-      const state = buildExpiredWithdrawalState(candidate, now);
-      const claimed = await Case.findOneAndUpdate(
-        {
-          _id: candidate._id,
-          pausedReason: "paralegal_withdrew",
-          disputeDeadlineAt: { $lte: now },
-          payoutFinalizedAt: null,
-          status: { $ne: "disputed" },
-          disputes: { $not: { $elemMatch: { status: "open" } } },
-        },
-        { $set: state },
-        { returnDocument: "after", runValidators: true }
-      );
-      if (!claimed) continue;
-      await completeExpiredWithdrawalSideEffects(claimed);
+      const result = await require("./attorneyWithdrawal").expire(candidate._id, { now });
+      if (!result.changed) continue;
+      if (!result.recovered) {
+        await completeExpiredWithdrawalSideEffects(result.doc);
+        publishCaseProjectionRefresh(result.doc, "matter_withdrawal_expired_refresh", { additionalUserIds: [result.doc.withdrawnParalegalId], discovery: true });
+      }
       summary.finalized += 1;
     } catch (error) {
       summary.failed += 1;
@@ -296,30 +302,6 @@ async function processExpiredWithdrawalWindows({ now = new Date(), limit = DEFAU
     }
   }
   return summary;
-}
-
-async function notifyAdminReviewOverdue(caseDoc) {
-  const basePayload = {
-    caseId: caseDoc._id,
-    caseTitle: caseDoc.title || "Untitled Matter",
-    message: "Our team is still reviewing this request and will follow up when the review is complete.",
-  };
-  const attorneyId = caseDoc.attorney?._id || caseDoc.attorneyId || caseDoc.attorney || null;
-  const withdrawnId = caseDoc.withdrawnParalegalId && typeof caseDoc.withdrawnParalegalId === "object"
-    ? caseDoc.withdrawnParalegalId._id
-    : caseDoc.withdrawnParalegalId || null;
-  if (attorneyId) {
-    await notifyUser(attorneyId, "admin_review_overdue", {
-      ...basePayload,
-      link: "dashboard-attorney.html#cases",
-    });
-  }
-  if (withdrawnId) {
-    await notifyUser(withdrawnId, "admin_review_overdue", {
-      ...basePayload,
-      link: "dashboard-paralegal.html#cases",
-    });
-  }
 }
 
 async function processAdminOverdueDisputes({ now = new Date(), limit = DEFAULT_BATCH_LIMIT } = {}) {
@@ -336,29 +318,8 @@ async function processAdminOverdueDisputes({ now = new Date(), limit = DEFAULT_B
   const summary = { scanned: candidates.length, notified: 0, failed: 0 };
   for (const candidate of candidates) {
     try {
-      const claimed = await Case.findOneAndUpdate(
-        {
-          _id: candidate._id,
-          adminDisputeDeadlineAt: { $lte: now },
-          adminDisputeOverdueNotifiedAt: null,
-          status: "disputed",
-          pausedReason: "dispute",
-        },
-        { $set: { adminDisputeOverdueNotifiedAt: now } },
-        { returnDocument: "after" }
-      );
-      if (!claimed) continue;
-      try {
-        await notifyAdminReviewOverdue(claimed);
-      } catch (error) {
-        await Case.updateOne(
-          { _id: claimed._id, adminDisputeOverdueNotifiedAt: now },
-          { $set: { adminDisputeOverdueNotifiedAt: null } }
-        ).catch(logPromiseFailure(logger, "Admin dispute notification claim rollback failed.", {
-          caseId: claimed._id,
-        }));
-        throw error;
-      }
+      const result = await require("./matterReviewNotifications").remindOverdue(candidate._id, { now });
+      if (!result.changed) continue;
       summary.notified += 1;
     } catch (error) {
       summary.failed += 1;

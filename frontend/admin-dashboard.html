@@ -28,7 +28,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admin Dashboard – Let’s-ParaConnect</title>
 <script defer src="/assets/vendor/chart-4.5.1.js"></script>
-<script defer src="assets/scripts/utils/session.js?v=20260820-1"></script>
+<script defer src="assets/scripts/utils/session.js?v=20260902-1"></script>
 <script type="module" src="assets/scripts/auth.js"></script>
 <style>
     .skip-link {
@@ -54,7 +54,7 @@
 --bg:#fff;
 --sidebar-bg:#f5f5f5e6;
 --line:rgba(0,0,0,.08);
---muted:#6b7280;
+--muted:#626b78;
 --ink:#1a1a1a;
 --panel:#fcfcfc;
 --sidebar-text:#1a1a1a;
@@ -192,13 +192,7 @@ stroke-width:1.8;
 stroke-linecap:round;
 }
 
-.sidebar-backdrop{
-display:none;
-position:fixed;
-inset:0;
-background:rgba(0,0,0,0.35);
-z-index:1900;
-}
+
 
 html.theme-light,
 html.theme-light body,
@@ -206,7 +200,7 @@ body.theme-light{
 --bg:#ffffff;
 --sidebar-bg:#f5f5f5e6;
 --line:rgba(0,0,0,0.08);
---muted:#6b7280;
+--muted:#626b78;
 --ink:#1a1a1a;
 --panel:#fcfcfc;
 --sidebar-text:#1a1a1a;
@@ -224,80 +218,24 @@ body.theme-dark{
 --sidebar-text:#f8fbff;
 }
 
-html.theme-mountain,
-html.theme-mountain body,
-body.theme-mountain{
---bg:#ffffff;
---panel:#ffffff;
---muted:#6b7280;
---sidebar-bg:#ffffff;
---sidebar-text:#1a1a1a;
-}
-
-html.theme-mountain .sidebar,
-body.theme-mountain .sidebar{
-background:#ffffff;
-}
-
-html.theme-mountain-dark .sidebar,
-body.theme-mountain-dark .sidebar{
-background:#1c2333;
-}
-
-html.theme-mountain nav a,
-body.theme-mountain nav a,
-html.theme-mountain nav button[data-section],
-body.theme-mountain nav button[data-section],
-html.theme-mountain .sidebar-link,
-body.theme-mountain .sidebar-link{
-color:#1a1a1a;
-}
-
 html.theme-dark nav a.active,
 html.theme-dark nav a:hover,
 body.theme-dark nav a.active,
-body.theme-dark nav a:hover,
-html.theme-mountain nav a.active,
-html.theme-mountain nav a:hover,
-html.theme-mountain-dark nav a.active,
-html.theme-mountain-dark nav a:hover,
-body.theme-mountain nav a.active,
-body.theme-mountain nav a:hover,
-body.theme-mountain-dark nav a.active,
-body.theme-mountain-dark nav a:hover{
+body.theme-dark nav a:hover{
 background:rgba(255,255,255,0.14);
 }
 
 html.theme-dark nav button[data-section].active,
 html.theme-dark nav button[data-section]:hover,
 body.theme-dark nav button[data-section].active,
-body.theme-dark nav button[data-section]:hover,
-html.theme-mountain-dark nav button[data-section].active,
-html.theme-mountain-dark nav button[data-section]:hover,
-body.theme-mountain-dark nav button[data-section].active,
-body.theme-mountain-dark nav button[data-section]:hover{
+body.theme-dark nav button[data-section]:hover{
 background:rgba(255,255,255,0.14);
-}
-
-html.theme-mountain nav button[data-section].active,
-html.theme-mountain nav button[data-section]:hover,
-body.theme-mountain nav button[data-section].active,
-body.theme-mountain nav button[data-section]:hover{
-background:rgba(0,0,0,0.04);
 }
 
 html.theme-dark .sidebar-link:hover,
 html.theme-dark .sidebar-link:focus,
 body.theme-dark .sidebar-link:hover,
-body.theme-dark .sidebar-link:focus,
-html.theme-mountain .sidebar-link:hover,
-html.theme-mountain .sidebar-link:focus,
-html.theme-mountain-dark .sidebar-link:hover,
-html.theme-mountain-dark .sidebar-link:focus,
-body.theme-mountain .sidebar-link:hover,
-body.theme-mountain .sidebar-link:focus,
-body.theme-mountain-dark .sidebar-link:hover,
-body.theme-mountain-dark .sidebar-link:focus{
+body.theme-dark .sidebar-link:focus{
 background:rgba(255,255,255,0.14);
 }
 
@@ -1027,9 +965,7 @@ flex-wrap:wrap;
 gap:.45rem;
 }
 html.theme-dark #section-ai-control-room .ai-room-card,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card,
-body.theme-dark #section-ai-control-room .ai-room-card,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card{
+body.theme-dark #section-ai-control-room .ai-room-card{
 background:rgba(21,27,41,.98);
 border-color:rgba(255,255,255,.08);
 box-shadow:0 16px 30px rgba(0,0,0,.24);
@@ -1038,24 +974,14 @@ html.theme-dark #section-ai-control-room .ai-room-card-department,
 html.theme-dark #section-ai-control-room .ai-room-card-desc,
 html.theme-dark #section-ai-control-room .ai-room-card-action-line,
 html.theme-dark #section-ai-control-room .ai-room-card-note,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-department,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-desc,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-action-line,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-note,
 body.theme-dark #section-ai-control-room .ai-room-card-department,
 body.theme-dark #section-ai-control-room .ai-room-card-desc,
 body.theme-dark #section-ai-control-room .ai-room-card-action-line,
-body.theme-dark #section-ai-control-room .ai-room-card-note,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-department,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-desc,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-action-line,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-note{
+body.theme-dark #section-ai-control-room .ai-room-card-note{
 color:rgba(244,246,251,.72);
 }
 html.theme-dark #section-ai-control-room .ai-room-card-metric,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-metric,
-body.theme-dark #section-ai-control-room .ai-room-card-metric,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-metric{
+body.theme-dark #section-ai-control-room .ai-room-card-metric{
 background:rgba(247,240,226,.12);
 border-color:rgba(247,240,226,.18);
 }
@@ -1068,15 +994,6 @@ html.theme-dark #section-ai-control-room .ai-room-card-decision-preview,
 html.theme-dark #section-ai-control-room .ai-room-card-decision-meta,
 html.theme-dark #section-ai-control-room .ai-room-card-detail-line,
 html.theme-dark #section-ai-control-room .ai-room-card-detail-line span,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-state-pill,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-state-pill strong,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-label,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-title,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-body,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-preview,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-meta,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-detail-line,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-detail-line span,
 body.theme-dark #section-ai-control-room .ai-room-card-state-pill,
 body.theme-dark #section-ai-control-room .ai-room-card-state-pill strong,
 body.theme-dark #section-ai-control-room .ai-room-card-decision-label,
@@ -1085,26 +1002,13 @@ body.theme-dark #section-ai-control-room .ai-room-card-decision-body,
 body.theme-dark #section-ai-control-room .ai-room-card-decision-preview,
 body.theme-dark #section-ai-control-room .ai-room-card-decision-meta,
 body.theme-dark #section-ai-control-room .ai-room-card-detail-line,
-body.theme-dark #section-ai-control-room .ai-room-card-detail-line span,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-state-pill,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-state-pill strong,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-label,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-title,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-body,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-preview,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-meta,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-detail-line,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-detail-line span{
+body.theme-dark #section-ai-control-room .ai-room-card-detail-line span{
 color:rgba(244,246,251,.78);
 }
 html.theme-dark #section-ai-control-room .ai-room-card-state-pill,
 html.theme-dark #section-ai-control-room .ai-room-card-decision,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-state-pill,
-html.theme-mountain-dark #section-ai-control-room .ai-room-card-decision,
 body.theme-dark #section-ai-control-room .ai-room-card-state-pill,
-body.theme-dark #section-ai-control-room .ai-room-card-decision,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-state-pill,
-body.theme-mountain-dark #section-ai-control-room .ai-room-card-decision{
+body.theme-dark #section-ai-control-room .ai-room-card-decision{
 background:rgba(247,240,226,.08);
 border-color:rgba(247,240,226,.16);
 }
@@ -1508,34 +1412,8 @@ font-size:.7rem;
 line-height:1.1;
 border-radius:4px;
 }
-.pending-controls,
-.pending-controls .search,
-.sidebar{
-position:fixed;
-top:0;
-left:0;
-width:260px;
-height:100vh;
-border-right:none;
-border-bottom:none;
-flex-direction:column;
-flex-wrap:nowrap;
-gap:24px;
-padding:24px 18px;
-padding-top:72px;
-transform:translateX(-110%);
-transition:transform .25s ease;
-z-index:2000;
-box-shadow:18px 0 40px rgba(0,0,0,0.18);
-}
-body.nav-open .sidebar{transform:translateX(0);}
-body.nav-open .sidebar-backdrop{display:block;}
-.sidebar-toggle{
-display:inline-flex;
-position:fixed;
-top:14px;
-left:14px;
-}
+.sidebar-toggle{display:inline-flex;}
+
 nav{
 flex-direction:column;
 gap:8px;
@@ -1551,34 +1429,36 @@ font-size:.95rem;
 </style>
 </head>
 
-<body class="is-loading">
+<body class="is-loading admin-experience">
   <a class="skip-link" href="#main">Skip to main content</a>
 <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open navigation" aria-controls="sidebarNav" aria-expanded="false">
   <svg class="sidebar-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
 </button>
 <aside class="sidebar" id="sidebarNav">
-<div class="logo">Admin Panel</div>
-<nav>
-<button type="button" class="active" data-section="overview" aria-current="page">Overview</button>
-<button type="button" data-section="user-management">User Management</button>
-<button type="button" data-section="ai-control-room">AI Control Room</button>
-<button type="button" data-section="engineering">Engineering</button>
-<button type="button" data-section="approvals-workspace">Approvals</button>
-<button type="button" data-section="knowledge-studio">Knowledge Studio</button>
-<button type="button" data-section="marketing-drafts">Marketing</button>
-<button type="button" data-section="support-ops">Support Ops</button>
-<button type="button" data-section="sales-workspace">Sales</button>
-<a href="admin-directors.html">Director Oversight</a>
+<div class="logo admin-brand"><span class="admin-brand-mark">lp<span>c</span></span><span>Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect<small>ADMIN WORKSPACE</small></span></div>
+<nav aria-label="Admin navigation">
+<button type="button" class="active" data-section="overview" aria-current="page">Today <span class="admin-nav-count" id="adminSignupBadge"></span></button>
+<button type="button" data-section="user-management">People</button>
+<button type="button" data-section="matters">Matters</button>
+<button type="button" data-section="support-ops">Inbox <span class="admin-nav-count" id="adminInboxBadge"></span></button>
 <button type="button" data-section="finance">Finance</button>
-<button type="button" data-section="posts">Attorney Posts</button>
-<span class="nav-section-label">Utilities</span>
-<button type="button" data-section="activity-logs">Activity Logs</button>
+<button type="button" data-section="marketing-drafts" class="admin-primary-growth">Growth</button>
+<details class="admin-nav-group" data-live-group="growth"><summary>Growth</summary>
+<button type="button" data-section="marketing-drafts">Marketing</button>
+<button type="button" data-section="sales-workspace">Sales</button>
+<a href="admin-directors.html">Directors</a>
+</details>
+<button type="button" data-section="ai-control-room" class="admin-primary-system">System</button>
+<details class="admin-nav-group" data-live-group="system"><summary>System</summary>
+<button type="button" data-section="engineering">Engineering</button>
+<button type="button" data-section="ai-control-room">Automation</button>
+<button type="button" data-section="activity-logs">Activity log</button>
 <button type="button" data-section="settings">Settings</button>
+</details>
 </nav>
 <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-<div class="sidebar-footer">© Let’s-ParaConnect 2026</div>
+<div class="sidebar-footer">© Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect 2026</div>
 </aside>
-  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <div id="adminSupportChatHost" class="admin-support-chat-host" data-notification-center="true" aria-label="Open support chat"></div>
 
 <main id="main" tabindex="-1" class="main">
@@ -1586,9 +1466,16 @@ font-size:.95rem;
 <!-- OVERVIEW (default visible) -->
 <section id="section-overview" class="section visible">
 <header>
-<h1>Welcome, Admin</h1>
+<h1>Overview</h1>
 </header>
 
+<div class="panel admin-signup-priority" id="adminSignupPanel">
+<div class="panel-header"><div><h2>New signups</h2></div><button class="btn secondary" type="button" id="adminHomeRefresh">Refresh</button></div>
+<p id="adminSignupStatus" class="small" role="status">Loading applications…</p><div id="adminSignupList"></div>
+<button class="btn secondary" type="button" data-admin-open-users>View all applications</button>
+</div>
+<div class="panel" id="adminPeoplePanel"><div class="panel-header"><div><h2>Inquiries</h2></div></div>
+<div class="admin-inquiry-cards"><button class="admin-inquiry-card" type="button" data-admin-inbox="contact"><strong id="adminContactCount">—</strong><span>Contact form submissions</span></button><button class="admin-inquiry-card" type="button" data-admin-inbox="human"><strong id="adminHumanCount">—</strong><span>Human assistance requests</span></button></div><p class="small" id="adminInboxHomeStatus" role="status"></p></div>
 <div class="health-banner" id="healthBanner" role="status" aria-live="polite">
   <span class="health-dot" aria-hidden="true"></span>
   <span id="healthBannerText">System status: Checking…</span>
@@ -1597,8 +1484,7 @@ font-size:.95rem;
 <div class="panel overview-action-panel">
 <div class="panel-header">
 <div>
-<h2>Start Here</h2>
-<p class="small overview-action-note">Work this list from top to bottom. Click any row to open the exact admin workspace you should handle next.</p>
+<h2>Other work needing attention</h2>
 </div>
 </div>
 <div id="overviewActionStatus" class="small" style="margin-top:.35rem;color:var(--muted);">Loading overview actions…</div>
@@ -1623,7 +1509,7 @@ font-size:.95rem;
 
 <div class="metrics">
 <div class="metric"><h3>Total Users</h3><p id="totalUsers">0</p></div>
-<div class="metric"><h3>Funded Payments in Stripe</h3><p id="escrowTotal">—</p></div>
+<div class="metric"><h3>Principal held</h3><p id="escrowTotal">—</p></div>
 <div class="metric"><h3>Active Matters</h3><p id="activeCases">0</p></div>
 <div class="metric" id="pendingApprovalsMetric" role="button" tabindex="0" aria-label="Open pending user signup approvals"><h3>Pending Approvals</h3><p id="pendingUsers">0</p></div>
 </div>
@@ -1646,24 +1532,6 @@ font-size:.95rem;
 </div>
 </div>
 
-<div class="grid-four">
-<div class="card clickable" data-overview-link="ai-control-room" role="button" tabindex="0">
-<h3>AI Control Room</h3>
-<p class="small">Top-level summary across the main admin areas.</p>
-</div>
-<div class="card clickable" data-overview-link="approvals-workspace" role="button" tabindex="0">
-<h3>Approvals</h3>
-<p class="small">Main place to approve or reject items that need a decision.</p>
-</div>
-<div class="card clickable" data-overview-link="finance" role="button" tabindex="0">
-<h3>Finance</h3>
-<p class="small">Payments, disputes, receipts, and reporting.</p>
-</div>
-<div class="card clickable" data-overview-link="posts" role="button" tabindex="0">
-<h3>Attorney Posts</h3>
-<p class="small">Marketplace moderation for attorney-created posts.</p>
-</div>
-</div>
 
 </section>
 
@@ -1734,7 +1602,7 @@ font-size:.95rem;
 <div id="aiRoomFocusBody"></div>
 </div>
 
-<details id="aiRoomFounderConsole" class="ai-room-secondary-console" open>
+<details id="aiRoomFounderConsole" class="ai-room-secondary-console">
 <summary class="ai-room-secondary-console-summary">
 <div>
 <p class="ai-room-secondary-console-note">Founder Console</p>
@@ -1800,9 +1668,7 @@ font-size:.95rem;
 </div>
 
 <div class="panel workspace-panel workspace-panel--detail">
-<p class="workspace-step-label">Quick Actions</p>
-<h2>Next useful actions</h2>
-<p class="small">Shortcuts based on the current engineering queue.</p>
+<h2>Quick Actions</h2>
 <div id="engineeringQuickActionList" class="ai-room-list">
 <div class="ai-room-empty">Quick actions will appear here when the engineering queue loads.</div>
 </div>
@@ -1811,7 +1677,6 @@ font-size:.95rem;
 
 <div class="workspace-grid workspace-grid--engineering-main">
 <div class="panel workspace-panel workspace-panel--queue">
-<p class="workspace-step-label">Issue List</p>
 <div class="panel-header">
 <div>
 <h2>Engineering Issues</h2>
@@ -1834,6 +1699,7 @@ font-size:.95rem;
 </section>
 
 <section id="section-approvals-workspace" class="section">
+<nav class="admin-context-nav" aria-label="Return to workspace"><button type="button" class="btn secondary" data-section="support-ops">Back to Inbox</button></nav>
 <header>
 <h1>Approvals Workspace</h1>
 <p>One place to review items that need approval across knowledge, marketing, support, and sales.</p>
@@ -1924,6 +1790,7 @@ font-size:.95rem;
 </section>
 
 <section id="section-knowledge-studio" class="section">
+<nav class="admin-context-nav" aria-label="Return to workspace"><button type="button" class="btn secondary" data-section="support-ops">Back to Inbox</button></nav>
 <header>
 <h1>Knowledge Studio</h1>
 <p>Approved reference material for platform facts, messaging, admissions language, and common responses.</p>
@@ -1971,7 +1838,6 @@ font-size:.95rem;
 <div class="panel-header">
 <div>
 <h2>Approval Queue</h2>
-<p class="small">Knowledge updates waiting on your decision.</p>
 </div>
 </div>
 <div id="knowledgeApprovalList" class="ai-room-list">
@@ -1985,7 +1851,6 @@ font-size:.95rem;
 <div class="panel-header">
 <div>
 <h2>Approved Knowledge</h2>
-<p class="small">Approved knowledge records and summaries.</p>
 </div>
 </div>
 <div id="knowledgeItemList" class="ai-room-list">
@@ -1999,7 +1864,6 @@ font-size:.95rem;
 <div class="panel-header">
 <div>
 <h2>Item Detail</h2>
-<p class="small">Open a knowledge record to review the current approved version and its sources.</p>
 </div>
 </div>
 <div id="knowledgeDetailPanel" class="knowledge-detail-panel">
@@ -2017,7 +1881,6 @@ font-size:.95rem;
 
 <div class="workspace-grid founder-layer-grid">
 <div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
-<p class="workspace-step-label">Daily Summary</p>
 <div class="panel-header">
 <div>
 <h2>Daily Log</h2>
@@ -2056,11 +1919,9 @@ font-size:.95rem;
 </div>
 
 <div class="panel workspace-panel workspace-panel--detail">
-<p class="workspace-step-label">Quick Actions</p>
 <div class="panel-header">
 <div>
 <h2>Quick Actions</h2>
-<p class="small">The next useful actions, without opening the full list.</p>
 </div>
 </div>
 <div id="marketingFounderQuickActions" class="founder-action-grid">
@@ -2071,11 +1932,9 @@ font-size:.95rem;
 
 <div class="workspace-stack" style="margin-bottom:1.5rem;">
 <div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
-<p class="workspace-step-label">Today</p>
 <div class="panel-header">
 <div>
 <h2>Today’s Ready Posts</h2>
-<p class="small">Posts that are ready to review or ready to post today.</p>
 </div>
 <div class="workspace-form-actions">
 <button class="btn secondary" type="button" id="marketingFounderOpenQueueBtn">Open Full Marketing List</button>
@@ -2112,7 +1971,6 @@ font-size:.95rem;
 
 <div class="workspace-grid workspace-grid--marketing-top" style="margin-bottom:1.5rem;">
 <div class="panel workspace-panel workspace-panel--form">
-<p class="workspace-step-label">1. Posting Settings</p>
 <div class="panel-header">
 <div>
 <h2>Posting Settings</h2>
@@ -2161,8 +2019,8 @@ font-size:.95rem;
 </label>
 <label class="checkbox-inline"><input id="marketingPublishingIsEnabled" type="checkbox" /> Enable schedule</label>
 <label class="checkbox-inline"><input id="marketingPublishingLinkedIn" type="checkbox" /> LinkedIn company</label>
-<label style="grid-column:1 / -1;">Pause Reason
-<input id="marketingPublishingPauseReason" type="text" maxlength="500" placeholder="Optional reason to pause scheduled cycles" />
+<label style="grid-column:1 / -1;">Pause Reason (optional)
+<input id="marketingPublishingPauseReason" type="text" maxlength="500" />
 </label>
 <div class="workspace-form-actions">
 <button class="btn secondary" type="button" id="marketingPublishingRefreshBtn">Refresh Publishing Loop</button>
@@ -2182,8 +2040,8 @@ font-size:.95rem;
 <h3>LinkedIn Connection</h3>
 <p class="small">Connect the LinkedIn company account used for posting. The fields below are optional hints.</p>
 <form id="marketingLinkedInConnectionForm" class="pending-controls workspace-form-grid workspace-form-grid--roomy workspace-form-grid--lpc" style="margin-top:0.75rem;">
-<label>Organization Name Hint
-<input id="marketingLinkedInOrgName" type="text" maxlength="240" placeholder="Optional company/org name hint" />
+<label>Organization Name Hint (optional)
+<input id="marketingLinkedInOrgName" type="text" maxlength="240" />
 </label>
 <label>Organization ID Hint
 <input id="marketingLinkedInOrgId" type="text" maxlength="120" placeholder="Optional if discovery is ambiguous" />
@@ -2206,7 +2064,6 @@ font-size:.95rem;
 </div>
 
 <div class="panel workspace-panel workspace-panel--queue">
-<p class="workspace-step-label">2. Post Batches</p>
 <div class="panel-header">
 <div>
 <h2>Post Batches</h2>
@@ -2221,7 +2078,6 @@ font-size:.95rem;
 
 <div class="workspace-stack" style="margin-bottom:1.5rem;">
 <div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
-<p class="workspace-step-label">3. Batch Detail</p>
 <div class="panel-header">
 <div>
 <h2>Batch Detail</h2>
@@ -2255,7 +2111,6 @@ font-size:.95rem;
 
 <div class="workspace-grid workspace-grid--marketing-top" id="marketingFullQueueAnchor">
 <div class="panel workspace-panel workspace-panel--form">
-<p class="workspace-step-label">5. Create Brief</p>
 <div class="panel-header">
 <div>
 <h2>Create Brief</h2>
@@ -2273,19 +2128,19 @@ font-size:.95rem;
 <input id="marketingTargetAudience" type="text" maxlength="240" placeholder="e.g. solo attorneys, approved paralegals" />
 </label>
 <label style="grid-column:1 / -1;">Title
-<input id="marketingTitle" type="text" maxlength="240" required placeholder="Short internal title" />
+<input id="marketingTitle" type="text" maxlength="240" required />
 </label>
 <label style="grid-column:1 / -1;">Objective
-<input id="marketingObjective" type="text" maxlength="1000" placeholder="What this draft should accomplish" />
+<input id="marketingObjective" type="text" maxlength="1000" />
 </label>
 <label style="grid-column:1 / -1;">Brief Summary
-<textarea id="marketingBriefSummary" rows="4" maxlength="8000" placeholder="What you want to say and why"></textarea>
+<textarea id="marketingBriefSummary" rows="4" maxlength="8000"></textarea>
 </label>
 <label style="grid-column:1 / -1;">Update Facts
 <textarea id="marketingUpdateFacts" rows="4" maxlength="4000" placeholder="One fact per line"></textarea>
 </label>
-<label style="grid-column:1 / -1;">CTA Preference
-<input id="marketingCtaPreference" type="text" maxlength="500" placeholder="Optional CTA preference" />
+<label style="grid-column:1 / -1;">CTA Preference (optional)
+<input id="marketingCtaPreference" type="text" maxlength="500" />
 </label>
 <div class="workspace-form-actions">
 <button class="btn secondary" type="button" id="marketingRefreshBtn">Refresh Queue</button>
@@ -2296,7 +2151,6 @@ font-size:.95rem;
 </div>
 
 <div class="panel workspace-panel workspace-panel--queue">
-<p class="workspace-step-label">6. Draft List</p>
 <div class="panel-header">
 <div>
 <h2>Draft Queue</h2>
@@ -2311,7 +2165,6 @@ font-size:.95rem;
 
 <div class="workspace-stack">
 <div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
-<p class="workspace-step-label">7. Draft Detail</p>
 <div class="panel-header">
 <div>
 <h2>Draft Detail</h2>
@@ -2326,134 +2179,25 @@ font-size:.95rem;
 </section>
 
 <section id="section-support-ops" class="section">
-<header>
-<h1>Support Ops</h1>
-<p>Review support tickets, understand the context, and reply to users.</p>
-</header>
-
-<div class="grid-four" style="margin-bottom:1.5rem;">
-<div class="card">
-<h3>Open Tickets</h3>
-<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="supportOpenCount">0</p>
-<p class="small">Active support work items</p>
+<header><h1>Inbox</h1><p>Read inquiries, review replies, and keep approved answers up to date.</p></header>
+<nav class="admin-context-nav" aria-label="Inbox tools"><button type="button" class="btn secondary" data-section="knowledge-studio">Approved knowledge</button><button type="button" class="btn secondary" data-section="approvals-workspace">Content reviews</button></nav>
+<div class="admin-tabs" role="group" aria-label="Inquiry source">
+<button type="button" data-inbox-source="all" aria-pressed="true">All inquiries</button><button type="button" data-inbox-source="contact" aria-pressed="false">Contact submissions</button><button type="button" data-inbox-source="email" aria-pressed="false">Support email</button>
+<button type="button" data-inbox-source="human" aria-pressed="false">Human requests</button>
 </div>
-<div class="card">
-<h3>Blockers</h3>
-<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="supportBlockerCount">0</p>
-<p class="small">High-priority support items</p>
-</div>
-<div class="card">
-<h3>Waiting on User</h3>
-<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="supportWaitingCount">0</p>
-<p class="small">Team replied and waiting</p>
-</div>
-<div class="card">
-<h3>Resolved</h3>
-<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="supportResolvedCount">0</p>
-<p class="small">Closed out recently</p>
-</div>
-</div>
-
-<div class="workspace-grid workspace-grid--support-top">
-<div class="panel workspace-panel workspace-panel--queue">
-<div class="panel-header">
-<div>
-<h2>Support Ticket Queue</h2>
-<p class="small">Support conversations with user context and message history.</p>
-</div>
-<button class="btn secondary" type="button" id="supportRefreshBtn">Refresh Queue</button>
-</div>
-<div class="support-ops-filter-bar">
-<div class="support-filter-pills">
-<button class="support-filter-pill is-active" type="button" data-support-filter-status="open" aria-pressed="true">Open</button>
-<button class="support-filter-pill" type="button" data-support-filter-status="in_review" aria-pressed="false">In Review</button>
-<button class="support-filter-pill" type="button" data-support-filter-status="waiting_on_user" aria-pressed="false">Waiting on User</button>
-<button class="support-filter-pill" type="button" data-support-filter-status="resolved" aria-pressed="false">Resolved</button>
-<button class="support-filter-pill" type="button" data-support-filter-status="all" aria-pressed="false">All</button>
-</div>
-<div class="support-ops-filter-controls">
-<label class="support-filter-select">Urgency
-<select id="supportUrgencyFilter">
-<option value="all">All</option>
-<option value="high">High</option>
-<option value="medium">Medium</option>
-<option value="low">Low</option>
-</select>
-</label>
-<label class="support-filter-select">Role
-<select id="supportRoleFilter">
-<option value="all">All</option>
-<option value="attorney">Attorney</option>
-<option value="paralegal">Paralegal</option>
-<option value="admin">Admin</option>
-</select>
-</label>
-<label class="support-filter-select">Window
-<select id="supportDateFilter">
-<option value="all">All time</option>
-<option value="7">Last 7 days</option>
-<option value="30">Last 30 days</option>
-</select>
-</label>
-<label class="support-filter-select">Sort
-<select id="supportSortFilter">
-<option value="newest">Newest first</option>
-<option value="updated">Recently updated</option>
-<option value="oldest">Oldest first</option>
-</select>
-</label>
-</div>
-</div>
-<div id="supportOpsStatus" class="small support-ops-status-line" style="margin-bottom:1rem;color:var(--muted);">Support queue not loaded yet.</div>
-<div id="supportTicketList" class="ai-room-list">
-<div class="ai-room-empty">No support tickets loaded yet.</div>
-</div>
-</div>
-</div>
-
-<div class="workspace-stack">
-<div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
-<div class="panel-header">
-<div>
-<h2>Ticket Detail</h2>
-<p class="small">Review the issue, see the context, add notes, and reply to the user.</p>
-</div>
-</div>
-<div id="supportTicketDetail" class="ai-room-focus-blocks-left">
-<div class="ai-room-empty">Select a support ticket to inspect the conversation and respond.</div>
-</div>
-</div>
-</div>
-
-<div class="workspace-grid workspace-grid--support-bottom">
-<div class="panel workspace-panel workspace-panel--queue">
-<div class="panel-header">
-<div>
-<h2>FAQ Candidate Review</h2>
-<p class="small">Suggested help answers based on repeated resolved issues.</p>
-</div>
-<button class="btn secondary" type="button" id="supportGenerateFaqBtn">Generate FAQ Candidates</button>
-</div>
-<div id="supportFaqCandidateList" class="ai-room-list">
-<div class="ai-room-empty">No FAQ candidates are pending review.</div>
-</div>
-</div>
-
-<div class="panel workspace-panel workspace-panel--queue">
-<div class="panel-header">
-<div>
-<h2>Support Insights</h2>
-<p class="small">Repeated friction or confusion themes surfaced from ticket patterns.</p>
-</div>
-<button class="btn secondary" type="button" id="supportRefreshInsightsBtn">Refresh Insights</button>
-</div>
-<div id="supportInsightList" class="ai-room-list">
-<div class="ai-room-empty">No support insights are visible yet.</div>
-</div>
-</div>
-</div>
+<div class="admin-inbox-layout"><div class="panel admin-inbox-queue">
+<label for="adminInboxSearch">Search inquiries</label><input class="search" id="adminInboxSearch" type="search" placeholder="Name, email, subject, or question">
+<div class="pending-controls"><label>Status<select id="adminInboxStatus" aria-label="Inquiry status"><option value="active">Active</option><option value="open">New</option><option value="waiting_on_user">Waiting</option><option value="resolved">Resolved</option><option value="all">All</option></select></label><label>Owner<select id="adminInboxAssignment" aria-label="Inquiry owner"><option value="">All</option><option value="mine">Me</option><option value="unassigned">Unassigned</option></select></label><label>Follow-up<select id="adminInboxFollowUp" aria-label="Inquiry follow-up"><option value="">All</option><option value="overdue">Overdue</option></select></label><button class="btn secondary" id="adminInboxRefresh" type="button">Refresh</button></div>
+<p id="adminInboxListStatus" class="small" role="status"></p><div id="adminInboxList"></div><div class="admin-pager" hidden><button class="btn secondary" id="adminInboxPrev" type="button">Previous</button><span id="adminInboxPage"></span><button class="btn secondary" id="adminInboxNext" type="button">Next</button></div>
+</div><div class="panel admin-inbox-detail" id="adminInboxDetail"><p>Select an inquiry to read it and reply.</p></div></div>
+<button class="btn secondary" type="button" data-admin-knowledge>Manage support knowledge</button>
 </section>
-
+<section id="section-matters" class="section">
+<header><h1>Matters</h1><p>Follow the engagement, its participants, and the next step.</p></header>
+<nav class="admin-context-nav" aria-label="Matter tools"><button type="button" class="btn secondary" data-section="posts">Posting moderation</button></nav>
+<div class="pending-controls"><input class="search" type="search" id="adminMatterSearch" aria-label="Search matters" placeholder="Search matters"><select id="adminMatterFilter" aria-label="Filter matters"><option value="all">All matters</option><option value="open">Open postings</option><option value="active">Active engagements</option><option value="review">Posting review</option><option value="completed">Completed</option><option value="archived">Archived</option><option value="disputed">Disputed</option><option value="overdue">Overdue matters</option><option value="stalled">Workflow exceptions</option></select><button class="btn secondary" id="adminMatterRefresh" type="button">Refresh</button></div>
+<p class="small" id="adminMatterStatus" role="status"></p><div class="panel"><div id="adminMatterList"></div><div class="admin-pager"><button class="btn secondary" id="adminMatterPrev" type="button">Previous</button><span id="adminMatterPage"></span><button class="btn secondary" id="adminMatterNext" type="button">Next</button></div></div><div class="panel" id="adminMatterDetail" hidden></div>
+</section>
 <section id="section-sales-workspace" class="section">
 <header>
 <h1>Sales Workspace</h1>
@@ -2485,7 +2229,6 @@ font-size:.95rem;
 
 <div class="workspace-grid workspace-grid--sales-top">
 <div class="panel workspace-panel workspace-panel--form">
-<p class="workspace-step-label">1. Create or import account</p>
 <div class="panel-header">
 <div>
 <h2>Create Account</h2>
@@ -2495,10 +2238,10 @@ font-size:.95rem;
 </div>
 <form id="salesAccountForm" class="pending-controls workspace-form-grid workspace-form-grid--roomy">
 <label>Name
-<input id="salesAccountName" type="text" maxlength="240" placeholder="Account or contact name" required />
+<input id="salesAccountName" type="text" maxlength="240" required />
 </label>
-<label>Primary Email
-<input id="salesPrimaryEmail" type="email" maxlength="320" placeholder="Optional email" />
+<label>Primary Email (optional)
+<input id="salesPrimaryEmail" type="email" maxlength="320" />
 </label>
 <label>Audience Type
 <select id="salesAudienceType">
@@ -2511,8 +2254,8 @@ font-size:.95rem;
 <label>Role / Label
 <input id="salesRoleLabel" type="text" maxlength="120" placeholder="e.g. managing attorney" />
 </label>
-<label style="grid-column:1 / -1;">Company / Firm
-<input id="salesCompanyName" type="text" maxlength="240" placeholder="Optional firm or company" />
+<label style="grid-column:1 / -1;">Company / Firm (optional)
+<input id="salesCompanyName" type="text" maxlength="240" />
 </label>
 <label style="grid-column:1 / -1;">Account Summary
 <textarea id="salesAccountSummary" rows="4" maxlength="4000" placeholder="Internal summary only. Keep it factual and restrained."></textarea>
@@ -2526,7 +2269,6 @@ font-size:.95rem;
 </div>
 
 <div class="panel workspace-panel workspace-panel--queue">
-<p class="workspace-step-label">2. Review accounts and snapshots</p>
 <div class="panel-header">
 <div>
 <h2>Account Snapshot List</h2>
@@ -2541,7 +2283,6 @@ font-size:.95rem;
 
 <div class="workspace-stack">
 <div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
-<p class="workspace-step-label">3. Inspect account detail</p>
 <div class="panel-header">
 <div>
 <h2>Account Detail</h2>
@@ -2556,7 +2297,6 @@ font-size:.95rem;
 
 <div class="workspace-stack">
 <div class="panel workspace-panel workspace-panel--queue">
-<p class="workspace-step-label">4. Review outreach queue</p>
 <div class="panel-header">
 <div>
 <h2>Outreach Draft Queue</h2>
@@ -2571,7 +2311,6 @@ font-size:.95rem;
 
 <div class="workspace-stack">
 <div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
-<p class="workspace-step-label">Packet detail</p>
 <div class="panel-header">
 <div>
 <h2>Packet Detail</h2>
@@ -2589,7 +2328,7 @@ font-size:.95rem;
 <section id="section-user-management" class="section">
 <header>
 <div class="header-top">
-<h1>User Management</h1>
+<h1>People</h1>
 </div>
 <p>Admissions, approved-user maintenance, photo review, and targeted admin outreach.</p>
 </header>
@@ -2654,12 +2393,12 @@ font-size:.95rem;
 <th>Name</th>
 <th>Role</th>
 <th>Email</th>
-<th>Approved</th>
+<th>Account state</th>
 <th>Actions</th>
 </tr>
 </thead>
 <tbody id="approvedUsersBody">
-<tr><td colspan="5" class="pending-empty">Loading approved users…</td></tr>
+<tr><td colspan="5" class="pending-empty">Loading users…</td></tr>
 </tbody>
 </table>
 </div>
@@ -2736,8 +2475,8 @@ font-size:.95rem;
 </div>
 <div class="mass-email-actions">
 <button class="btn primary" type="button" id="massEmailCompleteBtn">Send profile-photo reminder</button>
-<button class="btn primary" type="button" id="massEmailAttorneyLaunchSetupBtn">Send launch + full-setup notice</button>
-<button class="btn primary" type="button" id="massEmailAttorneyLaunchBtn">Send launch + payout-setup notice</button>
+<button class="btn primary" type="button" id="massEmailAttorneyLaunchSetupBtn">Send profile-setup reminder</button>
+<button class="btn primary" type="button" id="massEmailAttorneyLaunchBtn">Send browse-Matters reminder</button>
 <button class="btn primary" type="button" id="massEmailAttorneyFirstMatterBtn">Send first-matter reminder</button>
 </div>
 <div class="pending-controls mass-email-controls">
@@ -2764,12 +2503,6 @@ font-size:.95rem;
 
 <!-- PHOTO REVIEWS (shown with User Management) -->
 <section id="section-photo-reviews" class="section">
-<header>
-<p class="workspace-step-label">Admissions detail</p>
-<h2>Profile Photo Reviews</h2>
-<p>Approve or reject profile photos without leaving the broader user-ops workflow.</p>
-</header>
-
 <div class="panel" id="photoReviewsPanel">
 <div class="panel-header">
 <h2>Profile Photo Reviews</h2>
@@ -2816,16 +2549,16 @@ font-size:.95rem;
 <div class="grid-two escrow-chart-row" style="margin-bottom:2rem;">
 <div class="panel">
 <h2>Monthly Payment Activity</h2>
-<canvas id="escrowReportChart" height="90"></canvas>
+<div class="admin-financial-chart"><canvas id="escrowReportChart" height="90"></canvas></div>
 <p id="escrowReportEmpty" class="chart-empty-state" hidden>No payment activity in the reporting window.</p>
 </div>
 
 <div class="panel">
-<h2>Reconcile Matter Payment</h2>
-<p class="small">Refresh a matter’s payment status from Stripe.</p>
+<h2>Check payment</h2>
+<p class="small">Check Stripe and update the recorded payment status.</p>
 <label for="reconcileCaseId">Matter ID</label>
-<input type="text" id="reconcileCaseId" class="input-field" placeholder="Enter Matter ID">
-<button class="btn primary" type="button" id="reconcileCaseBtn">Reconcile</button>
+<input type="text" id="reconcileCaseId" class="input-field">
+<button class="btn primary" type="button" id="reconcileCaseBtn">Check Stripe</button>
 <p class="small" id="reconcileStatus"></p>
 </div>
 </div>
@@ -2840,9 +2573,6 @@ font-size:.95rem;
 </header>
 
 <div class="panel">
-<div class="panel-header">
-<h2>Disputed Matters</h2>
-</div>
 <div class="pending-controls">
 <div class="dispute-tabs" id="disputeTabs">
 <button class="tab-btn active" type="button" data-dispute-tab="open">Open</button>
@@ -2884,7 +2614,8 @@ font-size:.95rem;
 </div>
 <button class="btn secondary" type="button" id="refreshChargebacks">Refresh</button>
 </div>
-<div class="table-wrap">
+<p class="admin-table-scroll-hint">Scroll for all columns.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Chargeback columns">
 <table class="ledger-table">
 <thead>
 <tr><th>Matter</th><th>Amount</th><th>Processor fees</th><th>Payout</th><th>Mode</th><th>Processor</th><th>Admin review</th><th>Evidence</th><th>Net exposure</th><th>Actions</th></tr>
@@ -2902,22 +2633,24 @@ font-size:.95rem;
 <header>
 <p class="workspace-step-label">Accounting</p>
 <h2>Payments & Revenue</h2>
-<p>Recorded platform fees, funding, payouts, and payment receipts. This is an operational view, not a general ledger or tax report.</p>
+<p>Funding, payouts, fees, and retained receipt records.</p>
 </header>
 
 <!-- Overview Row -->
-<div class="grid-four">
-<div class="card"><h3>Platform Fee Revenue</h3><p id="revenueTotalValue">—</p></div>
-<div class="card highlight"><h3>Matter Payments Released</h3><p id="fundsReleasedValue">—</p></div>
-<div class="card"><h3>Pending Payouts</h3><p id="pendingPayoutsValue">—</p></div>
-<div class="card highlight"><h3>Payouts Recorded</h3><p id="payoutsRecordedValue">—</p></div>
+<div class="grid-four" id="adminFinancialSummary">
+<div class="card"><h3>Principal held</h3><p id="accountingHeldValue">—</p></div>
+<div class="card"><h3>Platform fees recorded</h3><p id="revenueTotalValue">—</p></div>
+<div class="card highlight"><h3>Payouts recorded</h3><p id="fundsReleasedValue">—</p></div>
+<div class="card"><h3>Estimated pending payouts</h3><p id="pendingPayoutsValue">—</p></div>
 </div>
 
+<div id="adminFinancialGroups"></div>
+<p id="adminFinancialReportStatus" role="status"></p>
 <!-- Charts -->
 <div style="margin-top:2rem;">
 <div class="panel">
 <div class="panel-header"><h2>Monthly Platform Fee Revenue</h2></div>
-<canvas id="revMainChart" height="90"></canvas>
+<div class="admin-financial-chart"><canvas id="revMainChart" height="90"></canvas></div>
 <p id="revMainChartEmpty" class="chart-empty-state" hidden>No platform fee revenue in the reporting window.</p>
 </div>
 </div>
@@ -2926,11 +2659,13 @@ font-size:.95rem;
 <div class="panel" style="margin-top:2rem;">
 <div class="panel-header">
 <div>
-<h2>Operational Money Movement</h2>
-<p class="settings-help">Funding, fee, and payout records. Reconcile these records with Stripe before making accounting decisions.</p>
+<h2>Recent financial activity</h2>
+<p class="settings-help">Most recent 40 records. Search or export the complete record above.</p>
 </div>
-<button class="btn primary" type="button" id="downloadLedgerCsvBtn">Download CSV</button>
+
 </div>
+<p class="admin-table-scroll-hint">Scroll for all columns.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Recent financial activity columns">
 <table class="ledger-table">
 <thead>
 <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Type</th><th>Status</th></tr>
@@ -2939,6 +2674,7 @@ font-size:.95rem;
 <tr><td colspan="6" style="text-align:center;color:var(--muted)">No ledger entries found.</td></tr>
 </tbody>
 </table>
+</div>
 </div>
 
 <!-- Receipts Table -->
@@ -2951,7 +2687,8 @@ font-size:.95rem;
 <button class="btn secondary" type="button" id="receiptRefreshBtn">Refresh</button>
 </div>
 </div>
-<div class="table-wrap">
+<p class="admin-table-scroll-hint">Scroll for all columns.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Receipt columns">
 <table class="ledger-table receipts-table">
 <thead>
 <tr><th>Date</th><th>Receipt ID</th><th>Matter</th><th>Party</th><th>Type</th><th>Amount</th></tr>
@@ -2964,8 +2701,8 @@ font-size:.95rem;
 </div>
 
 <div class="panel" style="margin-top:2rem;">
-<h2>Pending Payout Queue</h2>
-<p class="settings-help">Amounts awaiting release. Matter deadlines are shown for context and are not promised payout dates.</p>
+<h2>Next five pending payouts</h2>
+<p class="settings-help">A preview of amounts awaiting release. Matter deadlines are shown for context and are not promised payout dates.</p>
 <ul class="payout-schedule" aria-live="polite">
 <li>No pending payouts.</li>
 </ul>
@@ -2974,6 +2711,7 @@ font-size:.95rem;
 
 <!-- POSTS -->
 <section id="section-posts" class="section">
+<nav class="admin-context-nav" aria-label="Return to workspace"><button type="button" class="btn secondary" data-section="matters">Back to Matters</button></nav>
 <header>
 <h1>Attorney Posts</h1>
 <p>Moderate attorney-created marketplace posts. Review, request edits, archive, suspend, or remove them.</p>
@@ -3084,9 +2822,9 @@ font-size:.95rem;
 </div>
 <p class="suspend-helper">This will disable the account and send a suspension email to the attorney.</p>
 <label for="suspendReason">Reason (required)</label>
-<textarea id="suspendReason" class="input-field" rows="3" placeholder="Explain why this account is being suspended"></textarea>
+<textarea id="suspendReason" class="input-field" rows="3"></textarea>
 <label for="suspendMessage">Custom note in email (optional)</label>
-<textarea id="suspendMessage" class="input-field" rows="4" placeholder="Optional additional context for the attorney"></textarea>
+<textarea id="suspendMessage" class="input-field" rows="4"></textarea>
 <div class="flag-menu-actions">
 <button type="button" class="btn secondary" data-suspend-cancel>Cancel</button>
 <button type="button" class="btn danger" data-suspend-confirm>Send suspension</button>
@@ -3094,20 +2832,23 @@ font-size:.95rem;
 </div>
 </div>
 
-<div id="deletePostModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="deletePostTitle" aria-hidden="true" inert>
+<div id="deletePostModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="deletePostTitle" aria-hidden="true" tabindex="-1" inert>
 <div class="details-content">
 <div class="details-header">
-<h2 id="deletePostTitle">Delete post</h2>
-<button type="button" class="btn secondary" data-delete-close>Close ✕</button>
+<h2 id="deletePostTitle">Delete posting?</h2>
+<button type="button" class="btn secondary" data-delete-close aria-label="Close deletion review">×</button>
 </div>
-<p class="suspend-helper">Only an open posting with no hire, payment, or dispute history can be permanently deleted. The attorney will be notified.</p>
-<label for="deleteReason">Reason (required)</label>
-<textarea id="deleteReason" class="input-field" rows="3" placeholder="Explain why this post is being deleted"></textarea>
-<label for="deleteMessage">Custom note in email (optional)</label>
-<textarea id="deleteMessage" class="input-field" rows="4" placeholder="Optional additional context for the attorney"></textarea>
+<p data-delete-matter></p>
+<p class="suspend-helper">The posting and its applications will be removed. This cannot be undone.</p>
+<p data-delete-feedback role="status" hidden></p>
+<label for="deleteReason">Reason</label>
+<textarea id="deleteReason" class="input-field" rows="3" required maxlength="2000"></textarea>
+<label for="deleteMessage">Note to attorney (optional)</label>
+<textarea id="deleteMessage" class="input-field" rows="4" maxlength="4000"></textarea>
 <div class="flag-menu-actions">
 <button type="button" class="btn secondary" data-delete-cancel>Cancel</button>
-<button type="button" class="btn danger" data-delete-confirm>Delete post</button>
+<button type="button" class="btn secondary" data-delete-review hidden>Review again</button>
+<button type="button" class="btn danger" data-delete-confirm>Delete posting</button>
 </div>
 </div>
 </div>
@@ -3188,9 +2929,8 @@ font-size:.95rem;
     <p class="settings-help">When enabled, only admins can log in.</p>
   </div>
   <div class="panel">
-    <h3>Support Contact</h3>
-    <label for="settingSupportEmail">Support email</label>
-    <input type="email" id="settingSupportEmail" class="input-field" placeholder="help@lets-paraconnect.com">
+    <h3 id="settingSupportEmailLabel">Support email</h3>
+    <input type="email" id="settingSupportEmail" class="input-field" aria-labelledby="settingSupportEmailLabel" placeholder="help@lets-paraconnect.com">
     <p class="settings-help">Used in admin communications and alerts.</p>
     <div class="settings-meta">
       <span id="settingsUpdatedAt" class="muted"></span>
@@ -3265,12 +3005,9 @@ document.addEventListener("DOMContentLoaded", () => {
 void window.checkSession('admin');
 const navLinks=document.querySelectorAll("nav [data-section]");
 const sections=document.querySelectorAll(".section");
-const sidebarToggle=document.getElementById("sidebarToggle");
-const sidebarNav=document.getElementById("sidebarNav");
-const sidebarBackdrop=document.getElementById("sidebarBackdrop");
 const ACTIVE_SECTION_KEY="adminActiveSection";
 const SCROLL_POS_KEY="adminScrollY";
-const VALID_SECTION_NAMES=new Set(Array.from(navLinks).map(link=>link.dataset.section).filter(Boolean));
+const SECTION_PARENTS={posts:"matters","knowledge-studio":"support-ops","approvals-workspace":"support-ops","sales-workspace":"marketing-drafts",engineering:"ai-control-room","activity-logs":"ai-control-room",settings:"ai-control-room"};
 const SECTION_ALIASES={
 "photo-reviews":"user-management",
 escrow:"finance",
@@ -3287,11 +3024,14 @@ engineering:["section-engineering"],
 "support-ops":["section-support-ops"],
 "sales-workspace":["section-sales-workspace"],
 "user-management":["section-user-management","section-photo-reviews"],
+matters:["section-matters"],
 finance:["section-escrow","section-disputes","section-revenue"],
 posts:["section-posts"],
 "activity-logs":["section-activity-logs"],
 settings:["section-settings"],
 };
+// Routes remain valid when navigation controls move between workspace headers.
+const VALID_SECTION_NAMES=new Set(Object.keys(SECTION_GROUPS));
 const healthBanner=document.getElementById("healthBanner");
 const healthBannerText=document.getElementById("healthBannerText");
 const refreshCharts=()=>{
@@ -3308,7 +3048,7 @@ const res=await fetch("/api/health",{cache:"no-store"});
 const payload=await res.json().catch(()=>({}));
 if(res.ok&&payload?.ok){
 healthBanner.classList.add("is-ok");
-healthBannerText.textContent="System status: Healthy";
+healthBannerText.textContent="App and database reachable";
 }else{
 healthBanner.classList.add("is-bad");
 const dbStatus=payload?.db?`DB ${payload.db}`:"DB unavailable";
@@ -3320,45 +3060,8 @@ healthBannerText.textContent="System status: Unable to check";
 }
 };
 
-const setSidebarOpen=(open,{restoreFocus=false}={})=>{
-const nextOpen=Boolean(open)&&window.innerWidth<=1024;
-document.body.classList.toggle("nav-open",nextOpen);
-if(sidebarToggle){
-sidebarToggle.setAttribute("aria-expanded",String(nextOpen));
-sidebarToggle.setAttribute("aria-label",nextOpen?"Close navigation":"Open navigation");
-}
-if(sidebarBackdrop) sidebarBackdrop.setAttribute("aria-hidden",String(!nextOpen));
-if(nextOpen) sidebarNav?.querySelector("a,button")?.focus({preventScroll:true});
-else if(restoreFocus) sidebarToggle?.focus({preventScroll:true});
-};
-const closeSidebar=(options)=>setSidebarOpen(false,options);
-const openSidebar=()=>setSidebarOpen(true);
-if(sidebarToggle){
-sidebarToggle.addEventListener("click",()=>{
-if(document.body.classList.contains("nav-open")) closeSidebar({restoreFocus:true});
-else openSidebar();
-});
-}
-if(sidebarBackdrop){
-sidebarBackdrop.addEventListener("click",()=>closeSidebar({restoreFocus:true}));
-}
-if(sidebarNav){
-sidebarNav.addEventListener("click",(event)=>{
-if(event.target.closest("a")||event.target.closest("button")){
-closeSidebar();
-}
-});
-}
-document.addEventListener("keydown",(event)=>{
-if(event.key==="Escape"&&document.body.classList.contains("nav-open")){
-closeSidebar({restoreFocus:true});
-}
-});
 refreshHealth();
 setInterval(refreshHealth,60000);
-window.addEventListener("resize",()=>{
-if(window.innerWidth>1024) closeSidebar();
-});
 
 function activateSection(sectionName,options={}){
 const normalizedSection=normalizeSectionName(sectionName);
@@ -3366,10 +3069,11 @@ if(!normalizedSection||!VALID_SECTION_NAMES.has(normalizedSection)) return;
 const syncHash=options.syncHash!==false;
 try{sessionStorage.setItem(ACTIVE_SECTION_KEY,normalizedSection);}catch{}
 if(syncHash&&window.location.hash!==`#${normalizedSection}`){
-history.replaceState(null,"",`#${normalizedSection}`);
+history.pushState(null,"",`#${normalizedSection}`);
 }
 navLinks.forEach(link=>{
-const match=link.dataset.section===normalizedSection;
+const match=link.dataset.section===normalizedSection || (link.closest("#sidebarNav") && link.dataset.section===SECTION_PARENTS[normalizedSection]);
+if(match && link.closest("details")) link.closest("details").open=true;
 link.classList.toggle("active",match);
 if(match) link.setAttribute("aria-current","page");
 else link.removeAttribute("aria-current");
@@ -3381,10 +3085,11 @@ section.classList.toggle("visible",visibleSectionIds.has(section.id));
 const mainContent=document.querySelector(".main");
 if(mainContent) mainContent.scrollTo({top:0,left:0,behavior:"auto"});
 if(normalizedSection==="user-management"){
-loadPendingUsers?.();
-loadApprovedUsers?.();
-loadDeletedUsers?.();
-loadMassEmailUsers?.();
+if(sectionName==="photo-reviews") window.showAdminUsers?.("photos",{navigate:false});
+window.loadPendingUsers?.();
+window.loadApprovedUsers?.();
+window.loadDeletedUsers?.();
+window.loadMassEmailUsers?.();
 window.loadProfilePhotoReviews?.();
 }
 if(normalizedSection==="overview"){
@@ -3411,7 +3116,12 @@ window.loadSupportOps?.(true);
 if(normalizedSection==="sales-workspace"){
 window.loadSalesWorkspace?.(true);
 }
+if(normalizedSection==="posts")window.loadAdminPosts?.();
+if(normalizedSection==="activity-logs")window.loadAuditLogs?.();
 if(normalizedSection==="finance"){
+window.loadFinanceCards?.();
+if(sectionName==="revenue") window.showAdminFinance?.("reporting");
+if(sectionName==="disputes"||new URL(location.href).searchParams.has("review")) { window.showAdminFinance?.("exceptions"); window.showAdminExceptions?.("disputes"); }
 window.loadDisputes?.();
 window.loadChargebacks?.();
 }
@@ -3428,7 +3138,7 @@ if(target) activateSection(target);
 });
 });
 
-const savedSection=normalizeSectionName(sessionStorage.getItem(ACTIVE_SECTION_KEY));
+const savedSection="overview";
 const hashSection=normalizeSectionName(window.location.hash.replace(/^#/,"").trim());
 if(hashSection&&VALID_SECTION_NAMES.has(hashSection)){
 activateSection(hashSection,{syncHash:false});
@@ -3442,7 +3152,7 @@ activateSection(nextSection,{syncHash:false});
 }
 });
 const savedScroll=Number(sessionStorage.getItem(SCROLL_POS_KEY));
-if(Number.isFinite(savedScroll)){
+if(hashSection&&Number.isFinite(savedScroll)){
 requestAnimationFrame(()=>window.scrollTo(0,savedScroll));
 }
 
@@ -3487,8 +3197,12 @@ setTimeout(clearLoadingState,2000);
 </script>
 
 
-<script type="module">
-import { secureFetch, fetchCSRF, logoutUser } from './assets/scripts/auth.js';
+<script type="module">import { replaceEventHandler } from './assets/scripts/utils/event-bindings.mjs';
+
+import { secureFetch, fetchCSRF } from './assets/scripts/auth.js';
+import { readFinancial, money as financialMoney } from './assets/scripts/admin/financial-read.js';
+import { archiveAdminPost } from './assets/scripts/admin-matter-archive.mjs';
+import { reviewAdminPostingDeletion, deleteAdminPosting } from './assets/scripts/admin-matter-deletion.mjs';
 import { activateDialogFocus, deactivateDialogFocus } from './assets/scripts/utils/dialog-focus.js';
 import { confirmAction, promptForText, showAlert } from './assets/scripts/utils/dialogs.js';
 const toastHelper = window.toastUtils;
@@ -3527,65 +3241,31 @@ bindPanelToggle("approvedUsersPanel");
 bindPanelToggle("deletedUsersPanel");
 const dashboardCharts=window.dashboardCharts||(window.dashboardCharts=[]);
 if (window.Chart) {
-Chart.defaults.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
-Chart.defaults.animation = false;
+window.Chart.defaults.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+window.Chart.defaults.animation = false;
 }
 const pushChart = (el, config) => {
 if (!window.Chart || !el) return null;
-const chart = new Chart(el, config);
+const chart = new window.Chart(el, config);
 dashboardCharts.push(chart);
 return chart;
 };
-const payoutTotalEl=document.getElementById("payoutTotal");
-const payoutCountEl=document.getElementById("payoutCount");
-const incomeTotalEl=document.getElementById("incomeTotal");
-const incomeCountEl=document.getElementById("incomeCount");
+function formatCurrencyFromCents(value, currency = "USD") { return financialMoney(value, currency); }
 
-async function fetchAdminJSON(url, fallback = null) {
-try {
-const res = await secureFetch(url, { headers: { Accept: "application/json" } });
-if (!res.ok) throw new Error(`HTTP ${res.status}`);
-return res.json();
-} catch (err) {
-console.warn(`Unable to fetch ${url}`, err);
-return fallback;
-}
-}
-
-function formatCurrencyFromCents(value, currency = "USD") {
-const cents = Number(value);
-if (!Number.isFinite(cents)) return "—";
-try {
-return new Intl.NumberFormat("en-US", {
-style: "currency",
-currency: String(currency || "USD").toUpperCase(),
-minimumFractionDigits: 2,
-}).format(cents / 100);
-} catch {
-return `${String(currency || "USD").toUpperCase()} ${(cents / 100).toFixed(2)}`;
-}
-}
-
-async function loadFinanceCards() {
-if (!payoutTotalEl || !incomeTotalEl) return;
-try {
-const [payoutData, incomeData] = await Promise.all([
-fetchAdminJSON("/api/admin/payouts", { totalAmount: 0, count: 0 }),
-fetchAdminJSON("/api/admin/income", { totalAmount: 0, count: 0 }),
-]);
-payoutTotalEl.textContent = formatCurrencyFromCents(payoutData.totalAmount);
-payoutCountEl.textContent = `${payoutData.count || 0} payout${(payoutData.count || 0) === 1 ? "" : "s"} recorded`;
-incomeTotalEl.textContent = formatCurrencyFromCents(incomeData.totalAmount);
-incomeCountEl.textContent = `${incomeData.count || 0} income record${(incomeData.count || 0) === 1 ? "" : "s"}`;
-} catch (err) {
-console.warn("Unable to load finance cards", err);
-payoutCountEl.textContent = "Unable to load payouts";
-incomeCountEl.textContent = "Unable to load income";
-}
-}
+async function loadFinanceCards() { return window.refreshAdminFinancialReports?.(); }
 
 const chargebacksBody=document.getElementById("chargebacksBody");
 const refreshChargebacks=document.getElementById("refreshChargebacks");
+let chargebackSequence=0,chargebackRevision=null,chargebackFilter=null;
+
+function clearChargebacks(message){
+chargebackSequence++;chargebackRevision=null;
+if(!chargebacksBody)return;
+const row=document.createElement("tr"),cell=chargebackCell(message);cell.colSpan=10;row.append(cell);chargebacksBody.replaceChildren(row);
+window.adminChargebacksRendered?.(null);
+}
+window.addEventListener('admin:financial-account-changed',()=>clearChargebacks('The signed-in account changed. Reload before continuing.'));
+window.addEventListener('admin:financial-source-changed',()=>clearChargebacks('Financial records changed. Refresh before continuing.'));
 
 function chargebackCell(value){
 const cell=document.createElement("td");
@@ -3600,26 +3280,38 @@ const res=await secureFetch(`/api/admin/chargebacks/${encodeURIComponent(operati
 const payload=await res.json().catch(()=>({}));
 if(!res.ok)throw new Error(payload?.msg||payload?.error||"Unable to update chargeback review.");
 showAlert(action==="clear-hold"?"The eligible payout hold was cleared.":action==="reconcile"?"Chargeback evidence was reconciled.":"Chargeback review acknowledged.",{title:"Chargeback updated"});
-await loadChargebacks();
+await loadChargebacks({fresh:true});
 }catch(err){
 showAlert(err?.message||"Unable to update chargeback review.",{title:"Chargeback review"});
 }
 }
 
-async function loadChargebacks(){
+async function loadChargebacks({fresh=false}={}){
 if(!chargebacksBody)return;
+const sequence=++chargebackSequence;
+if(fresh){chargebackRevision=null;window.adminChargebackPage=1;}
 chargebacksBody.replaceChildren();
 const loading=document.createElement("tr");
 const loadingCell=chargebackCell("Loading chargebacks…");
 loadingCell.colSpan=10;
 loading.appendChild(loadingCell);
 chargebacksBody.appendChild(loading);
-const payload=await fetchAdminJSON("/api/admin/chargebacks",{items:[]});
+const params=new URLSearchParams({page:String(window.adminChargebackPage||1),limit:'25',status:window.adminFlowChargebackId?'all':window.adminChargebackStatus||'all'});
+if(window.adminFlowChargebackId)params.set('id',window.adminFlowChargebackId);
+const filter=new URLSearchParams(params);filter.delete('page');
+if(filter.toString()!==chargebackFilter||(window.adminChargebackPage||1)===1)chargebackRevision=null;
+chargebackFilter=filter.toString();if(chargebackRevision)params.set('revision',chargebackRevision);
+let payload;
+try{payload=await readFinancial(`/api/admin/chargebacks?${params}`);if(sequence!==chargebackSequence)return;if(!Array.isArray(payload.items)||!Number.isSafeInteger(payload.total)||!Number.isSafeInteger(payload.pages))throw new Error('Chargeback records could not be verified. Refresh to try again.');}
+catch(error){if(sequence===chargebackSequence)clearChargebacks(error.message||'Chargebacks are unavailable. Refresh to try again.');return;}
+chargebackRevision=payload.revision;
+if(payload.pages && (window.adminChargebackPage||1)>payload.pages){window.adminChargebackPage=payload.pages;return loadChargebacks();}
+window.adminChargebacksRendered?.(payload);
 const items=Array.isArray(payload?.items)?payload.items:[];
 chargebacksBody.replaceChildren();
 if(!items.length){
 const row=document.createElement("tr");
-const cell=chargebackCell("No Stripe chargebacks require review.");
+const cell=chargebackCell("No chargebacks match this view.");
 cell.colSpan=10;
 row.appendChild(cell);
 chargebacksBody.appendChild(row);
@@ -3627,14 +3319,14 @@ return;
 }
 items.forEach((item)=>{
 const row=document.createElement("tr");
-row.appendChild(chargebackCell(item?.matter?.title||"Unmatched — reconciliation required"));
+row.appendChild(chargebackCell(item?.matter?.title||"Matter not matched"));
 row.appendChild(chargebackCell(formatCurrencyFromCents(item.chargebackAmount,item.currency)));
 row.appendChild(chargebackCell(formatCurrencyFromCents(item.processorFees,item.currency)));
 row.appendChild(chargebackCell(item.payoutHold?"Held for admin review":item.payoutPosition==="post_payout"?"Already released":"Not held"));
 row.appendChild(chargebackCell(item.stripeMode||"unknown"));
 row.appendChild(chargebackCell(item.processorStatus||"unknown"));
-row.appendChild(chargebackCell(item.administrativeStatus||"pending_review"));
-row.appendChild(chargebackCell(item.evidenceStatus||"needs_reconciliation"));
+row.appendChild(chargebackCell(({pending_review:"Needs review",acknowledged:"Reviewed",hold_cleared:"Hold cleared"})[item.administrativeStatus]||"Needs review"));
+row.appendChild(chargebackCell(item.evidenceStatus === "verified" ? "Verified" : "Needs checking"));
 row.appendChild(chargebackCell(formatCurrencyFromCents(item.netExposure,item.currency)));
 const actions=document.createElement("td");
 actions.className="dispute-actions";
@@ -3658,7 +3350,7 @@ if(item.evidenceStatus!=="verified"){
 const reconcile=document.createElement("button");
 reconcile.type="button";
 reconcile.className="btn secondary";
-reconcile.textContent="Reconcile evidence";
+reconcile.textContent="Check Stripe evidence";
 reconcile.addEventListener("click",()=>runChargebackAction(item.id,"reconcile"));
 actions.appendChild(reconcile);
 }
@@ -3668,11 +3360,11 @@ chargebacksBody.appendChild(row);
 });
 }
 window.loadChargebacks=loadChargebacks;
-refreshChargebacks?.addEventListener("click",()=>loadChargebacks());
+refreshChargebacks?.addEventListener("click",()=>loadChargebacks({fresh:true}));
 
 /* -------- Charts (0 until data) -------- */
 pushChart(document.getElementById("revChart"),{type:"bar",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],backgroundColor:"#b6a47a"}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
-pushChart(document.getElementById("escrowChart"),{type:"doughnut",data:{labels:["In Stripe","Released","Pending"],datasets:[{data:[0,0,0],backgroundColor:["#b6a47a","#e6d9b8","#dcd5c0"]}]},options:{plugins:{legend:{position:"bottom"}}}});
+pushChart(document.getElementById("escrowChart"),{type:"bar",data:{labels:["Principal held","Payouts recorded","Estimated pending payouts"],datasets:[{label:"USD",data:[0,0,0],backgroundColor:["#b6a47a","#e6d9b8","#dcd5c0"]}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,title:{display:true,text:"USD"}}}}});
 
 /* -------- User Management Combo Chart -------- */
 const ctx = document.getElementById("userMgmtComboChart");
@@ -3731,7 +3423,7 @@ tension:0.4,
 fill:true
 }]
 },
-options:{plugins:{legend:{position:"bottom"}},scales:{y:{beginAtZero:true}}}
+options:{maintainAspectRatio:false,plugins:{legend:{position:"bottom"}},scales:{y:{beginAtZero:true}}}
 });
 
 /* -------- Revenue Charts -------- */
@@ -3749,36 +3441,13 @@ borderRadius:6
 ]
 },
 options:{
-plugins:{legend:{position:"bottom"}},
+maintainAspectRatio:false,
+plugins:{legend:{display:false}},
 scales:{
 y:{beginAtZero:true,title:{display:true,text:"USD"}}
 }
 }
 });
-
-/* -------- Accounting Download -------- */
-function downloadCSV(){
-const rows=[["Date","Category","Description","Amount","Type","Status"]];
-document.querySelectorAll("#ledgerBody tr").forEach(tr=>{
-if(tr.children.length!==6)return;
-const cells=[...tr.children].map(td=>td.innerText.trim());
-rows.push(cells);
-});
-const escapeCsvCell=(value)=>{
-let normalized=String(value??"").replace(/\r?\n/g," ").trim();
-if(/^[=+\-@\t\r]/.test(normalized))normalized=`'${normalized}`;
-return `"${normalized.replace(/"/g,'""')}"`;
-};
-const csv=rows.map(r=>r.map(escapeCsvCell).join(",")).join("\r\n");
-const blob=new Blob(["\uFEFF",csv],{type:"text/csv;charset=utf-8"});
-const url=URL.createObjectURL(blob);
-const a=document.createElement("a");
-a.href=url;
-a.download=`LetsParaConnect_MoneyMovement_${new Date().toISOString().slice(0,10)}.csv`;
-a.click();
-URL.revokeObjectURL(url);
-}
-document.getElementById("downloadLedgerCsvBtn")?.addEventListener("click", downloadCSV);
 
 /* -------- Post Analytics Charts -------- */
 const postsTableBody=document.getElementById("postsList");
@@ -4005,14 +3674,7 @@ postsTableBody.innerHTML=`<tr><td colspan="7" class="pending-empty">${escapeHtml
 postsTableState.refresh();
 }
 
-function createActionButton(label,classes,handler){
-const btn=document.createElement("button");
-btn.type="button";
-btn.className=`btn ${classes}`.trim();
-btn.textContent=label;
-btn.addEventListener("click",handler);
-return btn;
-}
+
 
 let openActionMenu = null;
 function closeActionMenu(menu){
@@ -4405,24 +4067,10 @@ showToast(err?.message||"Unable to request edits.","err");
 
 async function archivePost(record){
 if(!record?.id)return;
-const confirmed=await confirmAction("The post will be removed from public listings.",{
-title:"Archive this post?",
-confirmLabel:"Archive post",
-tone:"danger"
-});
-if(!confirmed)return;
 try{
-await fetchCSRF?.();
-const res=await secureFetch(`/api/cases/${encodeURIComponent(record.id)}/archive`,{
-method:"PATCH",
-headers:{Accept:"application/json"},
-body:{archived:true}
-});
-if(!res.ok){
-const payload=await res.json().catch(()=>({}));
-throw new Error(payload?.error||"Unable to archive post.");
-}
-showToast("Post archived.","info");
+const result=await archiveAdminPost(record.id,{confirmAction});
+if(!result)return;
+showToast(result.state==="recorded"?"Post archived.":"This post is already archived.","info");
 loadAdminPosts();
 }catch(err){
 showToast(err?.message||"Unable to archive post.","err");
@@ -4587,7 +4235,7 @@ if(!res.ok){
 const payload=await res.json().catch(()=>({}));
 throw new Error(payload?.error||"Unable to suspend attorney.");
 }
-showToast("Attorney suspended and email sent.","info");
+showToast("Attorney suspended. Notification delivery is not confirmed.","info");
 closeSuspendModal();
 }catch(err){
 showToast(err?.message||"Unable to suspend attorney.","err");
@@ -4620,74 +4268,140 @@ closeSuspendModal();
 }
 });
 const deletePostModal=document.getElementById("deletePostModal");
-const deletePostTitle=document.getElementById("deletePostTitle");
+const deletePostMatter=deletePostModal?.querySelector("[data-delete-matter]");
 const deleteReasonInput=document.getElementById("deleteReason");
 const deleteMessageInput=document.getElementById("deleteMessage");
 const deleteCloseBtn=deletePostModal?.querySelector("[data-delete-close]");
 const deleteCancelBtn=deletePostModal?.querySelector("[data-delete-cancel]");
 const deleteConfirmBtn=deletePostModal?.querySelector("[data-delete-confirm]");
+const deleteReviewBtn=deletePostModal?.querySelector("[data-delete-review]");
+const deleteFeedback=deletePostModal?.querySelector("[data-delete-feedback]");
 let deleteTarget=null;
+
+function deleteStatus(message){
+if(!deleteFeedback)return;
+deleteFeedback.textContent=message;
+deleteFeedback.hidden=!message;
+}
+
+async function reviewDeleteTarget(context){
+if(deleteTarget!==context)return;
+const restoreFocus=document.activeElement===deleteReviewBtn;
+context.controller?.abort();
+context.controller=new AbortController();
+context.review=null;
+context.pending=true;
+deleteConfirmBtn.disabled=true;
+deleteReviewBtn.hidden=true;
+deleteReasonInput.disabled=true;
+deleteMessageInput.disabled=true;
+deleteStatus("Checking this posting…");
+const controller=context.controller;
+const timeout=setTimeout(()=>controller.abort(),15000);
+try{
+const review=await reviewAdminPostingDeletion(context.id,{signal:controller.signal,isCurrent:()=>deleteTarget===context});
+if(deleteTarget!==context)return;
+context.review=review;
+deletePostMatter.textContent=review.title;
+deleteStatus(review.canDelete?"":review.reason);
+deleteConfirmBtn.disabled=!review.canDelete;
+deleteReasonInput.disabled=!review.canDelete;
+deleteMessageInput.disabled=!review.canDelete;
+if(restoreFocus&&[document.body,deleteReviewBtn].includes(document.activeElement)){
+const target=review.canDelete?deleteReasonInput:deleteFeedback;
+if(target===deleteFeedback)target.setAttribute("tabindex","-1");
+target.focus();
+}
+}catch(error){
+if(deleteTarget!==context)return;
+deleteStatus(error.code==="ACCOUNT_CHANGED"?error.message:error.name==="AbortError"?"The posting check timed out. Try again.":error.message);
+if(error.code==="ACCOUNT_CHANGED"){deleteReasonInput.value="";deleteMessageInput.value="";}
+deleteReviewBtn.hidden=false;
+if(restoreFocus&&document.activeElement===document.body)deleteReviewBtn.focus();
+}finally{clearTimeout(timeout);if(deleteTarget===context)context.pending=false;}
+}
 
 function openDeleteModal(record){
 if(!record?.id||!deletePostModal)return;
-deleteTarget={ id: record.id, title: record.title || "Post", authorName: record.authorName || "Attorney" };
-if(deletePostTitle) deletePostTitle.textContent=`Delete ${deleteTarget.title}`;
-if(deleteReasonInput) deleteReasonInput.value="";
-if(deleteMessageInput) deleteMessageInput.value="";
+if(deleteTarget?.sent&&deleteTarget.pending)return;
+if(deleteTarget)closeDeleteModal();
+const context={id:String(record.id),review:null,controller:null,pending:false};
+deleteTarget=context;
+deletePostMatter.textContent=record.title||"Posting";
+deleteReasonInput.value="";
+deleteReasonInput.removeAttribute("aria-invalid");
+deleteMessageInput.value="";
+deleteConfirmBtn.textContent="Delete posting";
+deleteCloseBtn.disabled=false;
+deleteCancelBtn.disabled=false;
 deletePostModal.classList.remove("hidden");
 deletePostModal.setAttribute("aria-hidden","false");
 deletePostModal.removeAttribute("inert");
-activateDialogFocus(deletePostModal,{
-initialFocus:deleteReasonInput,
-onEscape:closeDeleteModal,
-});
+activateDialogFocus(deletePostModal,{initialFocus:deleteCloseBtn,onEscape:closeDeleteModal});
+void reviewDeleteTarget(context);
 }
 
 function closeDeleteModal(){
 if(!deletePostModal)return;
+if(deleteTarget?.sent&&deleteTarget.pending)return;
+deleteTarget?.controller?.abort();
+deleteTarget=null;
 deletePostModal.classList.add("hidden");
 deletePostModal.setAttribute("aria-hidden","true");
 deletePostModal.setAttribute("inert","");
 deactivateDialogFocus(deletePostModal);
-deleteTarget=null;
 }
 
 async function submitDelete(){
-if(!deleteTarget?.id)return;
-const reason=(deleteReasonInput?.value||"").trim();
-const message=(deleteMessageInput?.value||"").trim();
-if(!reason){
-showToast("Please add a deletion reason.","err");
-deleteReasonInput?.focus();
-return;
-}
-if(deleteConfirmBtn){
+const context=deleteTarget;
+if(!context?.review?.canDelete||context.pending)return;
+const reason=deleteReasonInput.value.trim();
+const message=deleteMessageInput.value.trim();
+if(!reason){deleteStatus("Enter a deletion reason.");deleteReasonInput.setAttribute("aria-invalid","true");deleteReasonInput.focus();return;}
+deleteReasonInput.removeAttribute("aria-invalid");
+context.pending=true;
+context.controller=new AbortController();
+const controller=context.controller;
+const timeout=setTimeout(()=>controller.abort(),15000);
 deleteConfirmBtn.disabled=true;
-deleteConfirmBtn.textContent="Deleting...";
-}
+deleteConfirmBtn.textContent="Deleting…";
+deleteReasonInput.disabled=true;
+deleteMessageInput.disabled=true;
+deleteStatus("");
 try{
-await fetchCSRF?.();
-const res=await secureFetch(`/api/admin/cases/${encodeURIComponent(deleteTarget.id)}`,{
-method:"DELETE",
-headers:{Accept:"application/json"},
-body:{reason,message}
-});
-if(!res.ok){
-const payload=await res.json().catch(()=>({}));
-throw new Error(payload?.error||payload?.msg||"Unable to delete post.");
-}
-showToast("Post deleted and email sent.","info");
+await deleteAdminPosting(context.review,{reason,message,signal:controller.signal,isCurrent:()=>deleteTarget===context,onSending:()=>{
+const ownsFocus=deletePostModal.contains(document.activeElement)||document.activeElement===document.body;
+context.sent=true;deleteCloseBtn.disabled=true;deleteCancelBtn.disabled=true;
+if(ownsFocus){deletePostModal.setAttribute("tabindex","-1");deletePostModal.focus({preventScroll:true});}
+}});
+if(deleteTarget!==context)return;
+context.pending=false;
 closeDeleteModal();
-loadAdminPosts();
-}catch(err){
-showToast(err?.message||"Unable to delete post.","err");
+showToast("Posting deleted.","info");
+await loadAdminPosts();
+if(document.activeElement===document.body){
+const heading=document.querySelector("#section-posts h1");
+heading?.setAttribute("tabindex","-1");heading?.focus({preventScroll:true});
+}
+}catch(error){
+if(deleteTarget!==context)return;
+context.review=null;
+deleteStatus(error.code==="ACCOUNT_CHANGED"?error.message:controller.signal.aborted?"Deletion was not confirmed. Review the posting again to check its current state.":error.message);
+if(error.code==="ACCOUNT_CHANGED"){deleteReasonInput.value="";deleteMessageInput.value="";}
+deleteReviewBtn.hidden=false;
+deleteReviewBtn.focus();
 }finally{
-if(deleteConfirmBtn){
-deleteConfirmBtn.disabled=false;
-deleteConfirmBtn.textContent="Delete post";
+clearTimeout(timeout);
+if(deleteTarget===context){context.pending=false;context.sent=false;deleteConfirmBtn.textContent="Delete posting";deleteCloseBtn.disabled=false;deleteCancelBtn.disabled=false;}
 }
 }
+deleteReviewBtn?.addEventListener("click",()=>{if(deleteTarget&&!deleteTarget.pending)void reviewDeleteTarget(deleteTarget);});
+deleteReasonInput?.addEventListener("input",()=>{
+if(deleteReasonInput.hasAttribute("aria-invalid")&&deleteReasonInput.value.trim()){
+deleteReasonInput.removeAttribute("aria-invalid");
+if(deleteFeedback?.textContent==="Enter a deletion reason.")deleteStatus("");
 }
+});
 
 deleteCloseBtn?.addEventListener("click",(event)=>{
 event.preventDefault();
@@ -4802,10 +4516,8 @@ bindCardClick(pendingReviewCard,"pending");
 bindCardClick(flaggedCard,"flagged");
 postsTableState.apply();
 
-Promise.all([loadAdminPosts(), loadFinanceCards()]).finally(() => {
 document.body.classList.remove("is-loading");
 document.body.classList.add("is-ready");
-});
 window.togglePanel = togglePanel;
 const pendingTableBody = document.getElementById('pendingUsersBody');
 const pendingMetric = document.getElementById('pendingUsers');
@@ -4828,7 +4540,6 @@ const refreshApprovedBtn = document.getElementById('refreshApprovedUsers');
 const approvedPrevPageBtn = document.getElementById('approvedPrevPage');
 const approvedNextPageBtn = document.getElementById('approvedNextPage');
 const approvedPageSelect = document.getElementById('approvedPageSelect');
-const approvedPanel = document.getElementById('approvedUsersPanel');
 const deletedTableBody = document.getElementById('deletedUsersBody');
 const deletedCountLabel = document.getElementById('deletedUsersCountLabel');
 const deletedSearch = document.getElementById('deletedSearch');
@@ -4869,7 +4580,6 @@ const massEmailPageSelect = document.getElementById('massEmailPageSelect');
 let pendingUsers = [];
 let pendingRequestId = 0;
 let activeUserId = null;
-let currentModalMode = 'pending';
 let photoReviewItems = [];
 let photoReviewRequestId = 0;
 let approvedUsers = [];
@@ -4885,6 +4595,7 @@ let massEmailUsers = [];
 const massEmailSelected = new Set();
 const USERS_PAGE_SIZE = 5;
 const MASS_EMAIL_PAGE_SIZE = 10;
+let pendingTotal=0, approvedTotal=0, deletedTotal=0;
 let pendingPage = 1;
 let photoReviewPage = 1;
 let approvedPage = 1;
@@ -4909,13 +4620,13 @@ if (reconcileCaseBtn) {
 reconcileCaseBtn.addEventListener("click", async () => {
 const caseId = reconcileCaseInput?.value.trim();
 if (!caseId) {
-showToast("Enter a Matter ID to reconcile.", "err");
-if (reconcileStatus) reconcileStatus.textContent = "Matter ID is required.";
+showToast("Choose a matter first.", "err");
+if (reconcileStatus) reconcileStatus.textContent = "Choose a matter first.";
 return;
 }
 const originalLabel = reconcileCaseBtn.textContent || "Reconcile";
 reconcileCaseBtn.disabled = true;
-reconcileCaseBtn.textContent = "Reconciling…";
+reconcileCaseBtn.textContent = "Checking…";
 if (reconcileStatus) reconcileStatus.textContent = "Checking Stripe status…";
 try {
 await fetchCSRF?.();
@@ -4925,17 +4636,18 @@ headers: { Accept: "application/json" },
 });
 const payload = await res.json().catch(() => ({}));
 if (!res.ok) {
-throw new Error(payload?.error || "Unable to reconcile this Matter.");
+throw new Error(payload?.error || "Unable to check this payment.");
 }
-const statusLabel = payload.status || "—";
-const escrowLabel = payload.escrowStatus || "—";
-const paymentLabel = payload.paymentStatus || payload.paymentIntentStatus || "—";
+const paymentText = value => ({needs_reconciliation:'Needs checking',requires_payment_method:'Payment method needed',requires_action:'Customer action needed',succeeded:'Paid',paid:'Paid',funded:'Funded',unfunded:'Not funded',held:'Held',released:'Released'})[value] || String(value || 'Unavailable').replace(/_/g, ' ');
+const statusLabel = paymentText(payload.status);
+const escrowLabel = paymentText(payload.escrowStatus);
+const paymentLabel = paymentText(payload.paymentStatus || payload.paymentIntentStatus);
 if (reconcileStatus) {
 reconcileStatus.textContent = `Status: ${statusLabel} · Matter funding: ${escrowLabel} · Payment: ${paymentLabel}`;
 }
-showToast("Reconciliation complete.", "info");
+showToast("Payment status updated.", "info");
 } catch (err) {
-const message = err?.message || "Unable to reconcile this Matter.";
+const message = err?.message || "Unable to check this payment.";
 if (reconcileStatus) reconcileStatus.textContent = message;
 showToast(message, "err");
 } finally {
@@ -5015,7 +4727,7 @@ count === 1 ? `1 ${labelBase}` : `${count} ${labelBase}s`;
 const updateApprovedCount = (count = 0) => {
 if (approvedCountLabel) {
 approvedCountLabel.textContent =
-count === 1 ? '1 approved user' : `${count} approved users`;
+count === 1 ? '1 user' : `${count} users`;
 }
 };
 
@@ -5217,10 +4929,10 @@ updatePhotoReviewCount(total);
 
 const renderPendingUsers = () => {
 if (!pendingTableBody) return;
-const total = pendingUsers.length;
+const total = pendingTotal;
 pendingPage = clampPage(pendingPage, total);
 updatePageSelect(pendingPageSelect, total, pendingPage);
-const pageItems = getPageSlice(pendingUsers, pendingPage);
+const pageItems = pendingUsers;
 if (!total) {
 pendingTableBody.innerHTML =
 '<tr><td colspan="4" class="pending-empty">No pending applications found.</td></tr>';
@@ -5261,16 +4973,16 @@ pendingTableBody.appendChild(tr);
 
 const renderApprovedUsers = () => {
 if (!approvedTableBody) return;
-const total = approvedUsers.length;
+const total = approvedTotal;
 approvedPage = clampPage(approvedPage, total);
 updatePageSelect(approvedPageSelect, total, approvedPage);
 const totalPages = getTotalPages(total);
 if (approvedPrevPageBtn) approvedPrevPageBtn.disabled = approvedPage <= 1 || totalPages <= 1;
 if (approvedNextPageBtn) approvedNextPageBtn.disabled = approvedPage >= totalPages || totalPages <= 1;
-const pageItems = getPageSlice(approvedUsers, approvedPage);
+const pageItems = approvedUsers;
 if (!total) {
 approvedTableBody.innerHTML =
-'<tr><td colspan="5" class="pending-empty">No approved users found.</td></tr>';
+'<tr><td colspan="5" class="pending-empty">No users match these filters.</td></tr>';
 return;
 }
 approvedTableBody.innerHTML = '';
@@ -5290,7 +5002,7 @@ emailTd.textContent = user.email || '—';
 emailTd.setAttribute('data-label', 'Email');
 
 const approvedTd = document.createElement('td');
-approvedTd.textContent = formatDate(user.approvedAt || user.updatedAt || user.createdAt);
+approvedTd.textContent = user.disabled ? 'Suspended' : toTitle(user.status);
 approvedTd.setAttribute('data-label', 'Approved');
 
 const actionsTd = document.createElement('td');
@@ -5312,10 +5024,10 @@ approvedTableBody.appendChild(tr);
 
 const renderDeletedUsers = () => {
 if (!deletedTableBody) return;
-const total = deletedUsers.length;
+const total = deletedTotal;
 deletedPage = clampPage(deletedPage, total);
 updatePageSelect(deletedPageSelect, total, deletedPage);
-const pageItems = getPageSlice(deletedUsers, deletedPage);
+const pageItems = deletedUsers;
 if (!total) {
 deletedTableBody.innerHTML =
 '<tr><td colspan="6" class="pending-empty">No deactivated users found.</td></tr>';
@@ -5385,7 +5097,7 @@ const roleTd = document.createElement('td');
 roleTd.textContent = toTitle(entry.actorRole || 'system');
 
 const actionTd = document.createElement('td');
-actionTd.textContent = entry.action || '—';
+actionTd.textContent = (entry.action || '—').replace(/[_.]/g,' ');actionTd.title=entry.action||'';
 
 const targetParts = [];
 if (entry.caseTitle) {
@@ -5411,7 +5123,9 @@ targetTd.appendChild(targetText);
 const detailTd = document.createElement('td');
 const method = entry.method || '';
 const path = entry.path || '';
-detailTd.textContent = path ? `${method} ${path}`.trim() : '—';
+detailTd.textContent=entry.meta?.reason||entry.meta?.note||'';
+const raw=document.createElement('details');const summary=document.createElement('summary');summary.textContent='Recorded details';const pre=document.createElement('pre');pre.textContent=JSON.stringify({action:entry.action,path,method,...entry.meta},null,2);raw.append(summary,pre);detailTd.append(raw);
+const objectId=entry.caseId||(entry.targetType==='case'?entry.targetId:'');const userId=entry.targetType==='user'?entry.targetId:'';if(objectId||userId){const link=document.createElement('button');link.className='btn-link';link.type='button';link.textContent=objectId?'Open matter':'Open account';replaceEventHandler(link, 'click', ()=>objectId?window.openAdminMatter(objectId):window.reviewAdminApplicant(userId));targetTd.append(link);}
 
 [timeTd, actorTd, roleTd, actionTd, targetTd, detailTd].forEach((td) =>
 tr.appendChild(td)
@@ -5737,40 +5451,50 @@ element.__lpcClickHandler = handler;
 element.addEventListener('click', handler);
 };
 
-const openUserModal = (user, { mode = 'pending' } = {}) => {
+let accountOpenRequest = 0;
+const openUserModal = (user, { mode = 'pending', inline = false } = {}) => {
 if (!user || !modal || !modalDetails) return;
+accountOpenRequest++;
 activeUserId = user.id;
-currentModalMode = mode;
+modal.dataset.adminAccountId=String(user.id || user._id || "");
+modal.dataset.adminAccountEmail=user.email || "";
 modalDetails.innerHTML = '';
 modalTitle.textContent = displayName(user);
-modalSubhead.textContent = `${toTitle(user.role)} • Submitted ${formatDate(
-   user.createdAt
- )}`;
+const submittedAt = user.createdAt ? new Date(user.createdAt) : null;
+const submittedLabel = submittedAt && Number.isFinite(submittedAt.getTime()) ? `Submitted ${submittedAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}` : 'Submission date unavailable';
+modalSubhead.textContent = [toTitle(user.role), user.location || user.state || 'Location not provided', submittedLabel].join(' · ');
 
 appendDetailRow('Email', user.email);
-appendDetailRow('Role', toTitle(user.role));
-appendDetailRow('Status', toTitle(user.status));
-appendDetailRow('Availability', user.availability);
-appendDetailRow('Timezone', user.timezone);
-appendDetailRow('State', user.state || user.location);
-appendDetailRow('Location', user.location);
-appendDetailRow('Bar Number', user.barNumber);
-appendDetailRow('LinkedIn', buildFileHref(user.linkedInURL), { link: true, linkLabel: 'Open' });
-appendDetailRow('Resume', buildFileHref(user.resumeURL), { link: true, linkLabel: 'Open' });
-appendDetailRow('Certification', buildFileHref(user.certificateURL), {
+appendDetailRow('Admission', toTitle(user.status));
+appendDetailRow('Account access', user.deleted ? 'Deactivated' : user.disabled ? 'Suspended' : user.status === 'approved' ? 'Enabled' : 'Awaiting approval');
+appendDetailRow('Email verification', user.emailVerified ? 'Verified' : 'Not verified');
+appendDetailRow('Photo review', toTitle(user.profilePhotoStatus || 'unsubmitted'));
+appendDetailRow('Last login', user.lastLoginAt ? formatDate(user.lastLoginAt) : 'No login recorded');
+const appendProfileValue = (label, value, options) => {
+if (value !== undefined && value !== null && String(value).trim() && value !== '—') appendDetailRow(label, value, options);
+};
+appendProfileValue('Admission decisions', (user.audit || []).map(entry => `${entry.action || ''}${entry.note ? ': '+entry.note : ''}`).join('\n'));
+appendProfileValue('Availability', user.availability);
+appendProfileValue('Timezone', user.timezone);
+if (user.location && user.state !== user.location) appendProfileValue('State', user.state);
+appendProfileValue('Bar number', user.barNumber);
+appendProfileValue('LinkedIn', buildFileHref(user.linkedInURL), { link: true, linkLabel: 'Open' });
+appendProfileValue('Resume', buildFileHref(user.resumeURL), { link: true, linkLabel: 'Open' });
+appendProfileValue('Certification', buildFileHref(user.certificateURL), {
 link: true,
 linkLabel: 'Open',
 });
-appendDetailRow('Practice Areas', listText(user.practiceAreas));
-appendDetailRow('Specialties', listText(user.specialties));
-appendDetailRow('Jurisdictions', listText(user.jurisdictions));
-appendDetailRow('Skills', listText(user.skills));
-appendDetailRow('Languages', listText(user.languages));
-appendDetailRow('Years Experience', user.yearsExperience ?? '—');
-appendDetailRow('Bio', user.bio || '—');
-appendDetailRow('About', user.about || '—');
-appendDetailRow('Experience', richListText(user.experience));
-appendDetailRow('Education', richListText(user.education));
+appendProfileValue('Practice areas', listText(user.practiceAreas));
+if (listText(user.specialties) !== listText(user.practiceAreas)) appendProfileValue('Specialties', listText(user.specialties));
+appendProfileValue('Jurisdictions', listText(user.jurisdictions));
+appendProfileValue('Skills', listText(user.skills));
+appendProfileValue('Languages', listText(user.languages));
+appendProfileValue('Admission qualification', ({certificate: 'Paralegal certificate', degree: 'Degree in paralegal studies', law_firm_experience: 'At least 1 year working in a law firm'})[user.paralegalQualification] || 'Not recorded');
+appendProfileValue('Years of experience', user.yearsExperience);
+appendProfileValue('Bio', user.bio);
+if ((user.about || '').trim() !== (user.bio || '').trim()) appendProfileValue('About', user.about);
+appendProfileValue('Experience', richListText(user.experience));
+appendProfileValue('Education', richListText(user.education));
 
 const isApprovedView = mode === 'approved';
 if (approveBtn) approveBtn.classList.toggle('hidden', isApprovedView);
@@ -5788,9 +5512,8 @@ window.open(`${profilePath}?id=${encodeURIComponent(profileId)}`, '_blank', 'noo
 }
 if (roleToggleBtn) {
 const roleValue = String(user.role || '').toLowerCase();
-const canToggle = roleValue === 'attorney' || roleValue === 'paralegal';
 const nextRole = roleValue === 'paralegal' ? 'attorney' : 'paralegal';
-roleToggleBtn.classList.toggle('hidden', !isApprovedView || !canToggle);
+roleToggleBtn.classList.add('hidden');
 roleToggleBtn.textContent = nextRole === 'paralegal' ? 'Make Paralegal' : 'Make Attorney';
 replaceClickHandler(roleToggleBtn, () => {
 submitRoleChange(user.id || user._id, nextRole, roleToggleBtn);
@@ -5805,12 +5528,26 @@ replaceClickHandler(editEmailBtn, () => submitEmailUpdate(user, mode));
 modal.classList.remove('hidden');
 modal.setAttribute('aria-hidden', 'false');
 modal.removeAttribute('inert');
-activateDialogFocus(modal, {
+const accountReview = window.renderAdminAccount?.(user);
+modal.classList.toggle('admin-flow-inline', inline);
+modal.setAttribute('role', inline ? 'region' : 'dialog');
+if (inline) modal.removeAttribute('aria-modal');else modal.setAttribute('aria-modal', 'true');
+if (!inline) activateDialogFocus(modal, {
 initialFocus: closeModalBtn,
 onEscape: closePendingModal,
 });
+return accountReview;
 };
 
+window.reviewAdminApplicant = async (userId, { inline = false, isCurrent = () => true } = {}) => {
+const request = ++accountOpenRequest;
+const response=await secureFetch(`/api/admin/users/${encodeURIComponent(userId)}`, {headers:{Accept:'application/json'}});
+const payload=await response.json();
+if (request !== accountOpenRequest || !isCurrent()) return;
+if(!response.ok) throw new Error(payload.error || 'Unable to open account.');
+await openUserModal(payload.user, {mode:payload.user.status==='approved'?'approved':'pending', inline});
+};
+window.refreshAdminUsers=()=>{approvedPage=1;void loadApprovedUsers();};
 const openPendingModal = (userId) => {
 const user = pendingUsers.find((item) => String(item.id) === String(userId));
 if (!user) return;
@@ -5820,11 +5557,12 @@ openUserModal(user, { mode: 'pending' });
 const openApprovedModal = (userId) => {
 const user = approvedUsers.find((item) => String(item.id) === String(userId));
 if (!user) return;
-openUserModal(user, { mode: 'approved' });
+openUserModal(user, { mode: user.status === 'approved' ? 'approved' : 'pending' });
 };
 
 const closePendingModal = () => {
 if (!modal) return;
+accountOpenRequest++;
 modal.classList.add('hidden');
 modal.setAttribute('aria-hidden', 'true');
 modal.setAttribute('inert', '');
@@ -5852,12 +5590,14 @@ if (!confirmed) return;
 const originalText = btn.textContent;
 btn.disabled = true;
 btn.textContent = isApprove ? 'Approving…' : 'Denying…';
+const decisionUserId = activeUserId;
+window.dispatchEvent(new CustomEvent('admin:work-busy',{detail:{id:decisionUserId,busy:true}}));
 
 try {
 await fetchCSRF();
 const res = await secureFetch(
 `/api/admin/users/${encodeURIComponent(activeUserId)}/${isApprove ? 'approve' : 'deny'}`,
-{ method: 'POST', body: {} }
+{ method: 'POST', body: {note:document.getElementById('adminDecisionNote')?.value||''} }
 );
 let payload = {};
 try {
@@ -5868,6 +5608,7 @@ payload = {};
 if (!res.ok) {
 throw new Error(payload?.msg || payload?.error || 'Unable to update user.');
 }
+window.dispatchEvent(new CustomEvent('admin:admissions-changed',{detail:{id:activeUserId}}));
 showToast(
 isApprove ? 'User approved.' : 'User denied.',
 isApprove ? 'ok' : 'info'
@@ -5879,6 +5620,7 @@ showToast(err?.message || 'Unable to update user.', 'err');
 } finally {
 btn.disabled = false;
 btn.textContent = originalText;
+window.dispatchEvent(new CustomEvent('admin:work-busy',{detail:{id:decisionUserId,busy:false}}));
 }
 };
 
@@ -5963,7 +5705,8 @@ const requestId = ++pendingRequestId;
 setPendingLoading(true);
 pendingTableBody.innerHTML =
 '<tr><td colspan="4" class="pending-empty">Loading pending users…</td></tr>';
-const params = new URLSearchParams({ status: 'pending', limit: '50' });
+const params = new URLSearchParams({ status: 'pending', limit: String(USERS_PAGE_SIZE), page: String(pendingPage) });
+params.set('sort','oldest');
 const roleValue = (pendingRoleFilter?.value || '').toLowerCase();
 if (roleValue && roleValue !== 'all') params.set('role', roleValue);
 const query = pendingSearch?.value.trim();
@@ -5973,12 +5716,15 @@ try {
 const res = await secureFetch(`/api/admin/pending-users?${params.toString()}`, {
 headers: { Accept: 'application/json' },
 });
-const data = res.ok ? await res.json() : { users: [] };
+if(!res.ok) throw new Error('Unable to load users. Please refresh to try again.');
+const data=await res.json();
 if (requestId !== pendingRequestId) return;
 const removalSet = window.removedUserIds instanceof Set ? window.removedUserIds : null;
 pendingUsers = Array.isArray(data.users)
   ? data.users.filter((u)=>!removalSet?.has(String(u.id||u._id||'')))
   : [];
+pendingTotal=Number(data.total)||0;
+if (pendingPage > getTotalPages(pendingTotal)) {pendingPage=getTotalPages(pendingTotal);return loadPendingUsers();}
 renderPendingUsers();
 updatePendingCount(
 typeof data.total === 'number' ? data.total : pendingUsers.length
@@ -5986,7 +5732,7 @@ typeof data.total === 'number' ? data.total : pendingUsers.length
 } catch (err) {
 if (requestId !== pendingRequestId) return;
 pendingUsers = [];
-updatePendingCount(0);
+if(document.getElementById('pendingUsersCountLabel')) document.getElementById('pendingUsersCountLabel').textContent='Unavailable';
 pendingTableBody.innerHTML = `<tr><td colspan="4" class="pending-empty">${escapeHtml(err?.message || 'Unable to load pending users.')}</td></tr>`;
 } finally {
 if (requestId === pendingRequestId) setPendingLoading(false);
@@ -6007,14 +5753,15 @@ try {
 const res = await secureFetch(`/api/admin/profile-photos?${params.toString()}`, {
 headers: { Accept: 'application/json' },
 });
-const data = res.ok ? await res.json() : { items: [] };
+if(!res.ok) throw new Error('Photo reviews are unavailable. Please refresh.');
+const data=await res.json();
 if (requestId !== photoReviewRequestId) return;
 photoReviewItems = Array.isArray(data.items) ? data.items : [];
 renderPhotoReviews();
 } catch (err) {
 if (requestId !== photoReviewRequestId) return;
 photoReviewItems = [];
-updatePhotoReviewCount(0);
+if(photoReviewCountLabel) photoReviewCountLabel.textContent='Photo reviews unavailable';
 photoReviewsBody.innerHTML =
 `<tr><td colspan="6" class="pending-empty">${escapeHtml(err?.message || 'Unable to load photo reviews.')}</td></tr>`;
 } finally {
@@ -6027,8 +5774,9 @@ if (!approvedTableBody) return;
 const requestId = ++approvedRequestId;
 setApprovedLoading(true);
 approvedTableBody.innerHTML =
-'<tr><td colspan="5" class="pending-empty">Loading approved users…</td></tr>';
-const params = new URLSearchParams({ status: 'approved', limit: '50' });
+'<tr><td colspan="5" class="pending-empty">Loading users…</td></tr>';
+const params = new URLSearchParams({ status: 'approved', limit: String(USERS_PAGE_SIZE), page: String(approvedPage) });
+params.set('status', document.getElementById('adminUserStatus')?.value || 'all');
 const roleValue = (approvedRoleFilter?.value || '').toLowerCase();
 if (roleValue && roleValue !== 'all') params.set('role', roleValue);
 const query = approvedSearch?.value.trim();
@@ -6038,9 +5786,12 @@ try {
 const res = await secureFetch(`/api/admin/pending-users?${params.toString()}`, {
 headers: { Accept: 'application/json' },
 });
-const data = res.ok ? await res.json() : { users: [] };
+if(!res.ok) throw new Error('Unable to load users. Please refresh to try again.');
+const data=await res.json();
 if (requestId !== approvedRequestId) return;
 approvedUsers = Array.isArray(data.users) ? data.users : [];
+approvedTotal=Number(data.total)||0;
+if (approvedPage > getTotalPages(approvedTotal)) {approvedPage=getTotalPages(approvedTotal);return loadApprovedUsers();}
 renderApprovedUsers();
 updateApprovedCount(
 typeof data.total === 'number' ? data.total : approvedUsers.length
@@ -6048,7 +5799,7 @@ typeof data.total === 'number' ? data.total : approvedUsers.length
 } catch (err) {
 if (requestId !== approvedRequestId) return;
 approvedUsers = [];
-updateApprovedCount(0);
+if(document.getElementById('approvedUsersCountLabel')) document.getElementById('approvedUsersCountLabel').textContent='Unavailable';
 approvedTableBody.innerHTML = `<tr><td colspan="5" class="pending-empty">${escapeHtml(err?.message || 'Unable to load approved users.')}</td></tr>`;
 } finally {
 if (requestId === approvedRequestId) setApprovedLoading(false);
@@ -6061,7 +5812,7 @@ const requestId = ++deletedRequestId;
 setDeletedLoading(true);
 deletedTableBody.innerHTML =
 '<tr><td colspan="6" class="pending-empty">Loading deactivated users…</td></tr>';
-const params = new URLSearchParams({ status: 'deactivated', limit: '50' });
+const params = new URLSearchParams({ status: 'deactivated', limit: String(USERS_PAGE_SIZE), page: String(deletedPage) });
 const roleValue = (deletedRoleFilter?.value || '').toLowerCase();
 if (roleValue && roleValue !== 'all') params.set('role', roleValue);
 const query = deletedSearch?.value.trim();
@@ -6071,9 +5822,12 @@ try {
 const res = await secureFetch(`/api/admin/pending-users?${params.toString()}`, {
 headers: { Accept: 'application/json' },
 });
-const data = res.ok ? await res.json() : { users: [] };
+if(!res.ok) throw new Error('Unable to load users. Please refresh to try again.');
+const data=await res.json();
 if (requestId !== deletedRequestId) return;
 deletedUsers = Array.isArray(data.users) ? data.users : [];
+deletedTotal=Number(data.total)||0;
+if (deletedPage > getTotalPages(deletedTotal)) {deletedPage=getTotalPages(deletedTotal);return loadDeletedUsers();}
 renderDeletedUsers();
 updateDeletedCount(
 typeof data.total === 'number' ? data.total : deletedUsers.length
@@ -6081,7 +5835,7 @@ typeof data.total === 'number' ? data.total : deletedUsers.length
 } catch (err) {
 if (requestId !== deletedRequestId) return;
 deletedUsers = [];
-updateDeletedCount(0);
+if(document.getElementById('deletedUsersCountLabel')) document.getElementById('deletedUsersCountLabel').textContent='Unavailable';
 deletedTableBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${escapeHtml(err?.message || 'Unable to load deactivated users.')}</td></tr>`;
 } finally {
 if (requestId === deletedRequestId) setDeletedLoading(false);
@@ -6101,12 +5855,14 @@ const targetValue = (auditTargetFilter?.value || '').toLowerCase();
 if (targetValue && targetValue !== 'all') params.set('targetType', targetValue);
 const query = auditSearch?.value.trim();
 if (query) params.set('q', query);
+for(const [key,id] of [['from','adminAuditFrom'],['to','adminAuditTo']]){const value=document.getElementById(id)?.value;if(value)params.set(key,key==='to'?`${value}T23:59:59.999Z`:`${value}T00:00:00.000Z`);}
 
 try {
 const res = await secureFetch(`/api/admin/audit-logs?${params.toString()}`, {
 headers: { Accept: 'application/json' },
 });
-const data = res.ok ? await res.json() : { logs: [] };
+if(!res.ok) throw new Error('Activity history is unavailable. Please refresh.');
+const data=await res.json();
 if (requestId !== auditRequestId) return;
 auditLogs = Array.isArray(data.logs) ? data.logs : [];
 renderAuditLogs();
@@ -6117,7 +5873,7 @@ updateAuditCount(total);
 if (requestId !== auditRequestId) return;
 auditLogs = [];
 updatePageSelect(auditPageSelect, 0, 1, AUDIT_LOG_LIMIT);
-updateAuditCount(0);
+if(auditLogsCountLabel) auditLogsCountLabel.textContent='Activity history unavailable';
 auditLogsBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${escapeHtml(err?.message || 'Unable to load activity logs.')}</td></tr>`;
 } finally {
 if (requestId === auditRequestId) setAuditLoading(false);
@@ -6143,7 +5899,7 @@ loadPendingUsers();
 }));
 pendingPageSelect?.addEventListener('change', () => {
 pendingPage = Number(pendingPageSelect.value) || 1;
-renderPendingUsers();
+loadPendingUsers();
 });
 photoReviewStatusFilter?.addEventListener('change', () => {
 photoReviewPage = 1;
@@ -6169,18 +5925,18 @@ loadApprovedUsers();
 }));
 approvedPageSelect?.addEventListener('change', () => {
 approvedPage = Number(approvedPageSelect.value) || 1;
-renderApprovedUsers();
+loadApprovedUsers();
 });
 approvedPrevPageBtn?.addEventListener('click', () => {
 if (approvedPage <= 1) return;
 approvedPage -= 1;
-renderApprovedUsers();
+loadApprovedUsers();
 });
 approvedNextPageBtn?.addEventListener('click', () => {
-const totalPages = getTotalPages(approvedUsers.length);
+const totalPages = getTotalPages(approvedTotal);
 if (approvedPage >= totalPages) return;
 approvedPage += 1;
-renderApprovedUsers();
+loadApprovedUsers();
 });
 deletedRoleFilter?.addEventListener('change', () => {
 deletedPage = 1;
@@ -6193,7 +5949,7 @@ loadDeletedUsers();
 }));
 deletedPageSelect?.addEventListener('change', () => {
 deletedPage = Number(deletedPageSelect.value) || 1;
-renderDeletedUsers();
+loadDeletedUsers();
 });
 auditRoleFilter?.addEventListener('change', () => {
 auditPage = 1;
@@ -6203,7 +5959,7 @@ auditTargetFilter?.addEventListener('change', () => {
 auditPage = 1;
 loadAuditLogs();
 });
-refreshAuditLogsBtn?.addEventListener('click', () => loadAuditLogs());
+refreshAuditLogsBtn?.addEventListener('click', () => {auditPage=1;loadAuditLogs();});
 auditSearch?.addEventListener('input', debounce(() => {
 auditPage = 1;
 loadAuditLogs();
@@ -6373,17 +6129,13 @@ softRefreshTimer = null;
 const softRefreshAdmin = async () => {
 if (document.hidden || softRefreshInFlight) return;
 softRefreshInFlight = true;
-const tasks = [
-loadFinanceCards(),
-loadAdminPosts(),
-window.loadOverviewActionBoard?.(true),
-loadPendingUsers(),
-loadProfilePhotoReviews(),
-loadApprovedUsers(),
-loadMassEmailUsers(),
-loadDeletedUsers(),
-loadAuditLogs()
-];
+const active=id=>document.getElementById(`section-${id}`)?.classList.contains('visible');
+const tasks=[];
+if(active('overview'))tasks.push(window.loadOverviewActionBoard?.(true));
+if(active('escrow'))tasks.push(loadFinanceCards());
+if(active('posts'))tasks.push(loadAdminPosts());
+if(active('user-management'))tasks.push(loadPendingUsers(),loadProfilePhotoReviews(),loadApprovedUsers(),loadDeletedUsers());
+if(active('activity-logs'))tasks.push(loadAuditLogs());
 await Promise.allSettled(tasks);
 softRefreshInFlight = false;
 };
@@ -6397,12 +6149,10 @@ softRefreshAdmin();
 });
 startSoftRefresh();
 
-loadPendingUsers();
-loadProfilePhotoReviews();
-loadApprovedUsers();
-loadMassEmailUsers();
-loadDeletedUsers();
-loadAuditLogs();
+document.addEventListener('DOMContentLoaded',()=>softRefreshAdmin());
+window.loadAdminPosts=loadAdminPosts;
+window.loadFinanceCards=loadFinanceCards;
+window.loadAuditLogs=loadAuditLogs;
 window.renderPendingUsers = renderPendingUsers;
 window.updatePendingCount = updatePendingCount;
 window.loadPendingUsers = loadPendingUsers;
@@ -6411,7 +6161,22 @@ window.loadApprovedUsers = loadApprovedUsers;
 window.loadDeletedUsers = loadDeletedUsers;
 window.loadMassEmailUsers = loadMassEmailUsers;
 </script>
+<link rel="stylesheet" href="assets/styles/admin-workspace.css">
+<link rel="stylesheet" href="assets/styles/admin-experience.css">
+<link rel="stylesheet" href="assets/styles/admin-flow.css">
+<link rel="stylesheet" href="assets/styles/admin-live.css">
+<link rel="stylesheet" href="assets/styles/admin-menu.css">
+<link rel="stylesheet" href="assets/styles/admin-flat.css">
 <script type="module" src="assets/scripts/admin-dashboard.js"></script>
+<script type="module" src="assets/scripts/admin/workspace.js"></script>
+<script type="module" src="assets/scripts/admin/accounts.js"></script>
+<script type="module" src="assets/scripts/admin/finance.js"></script>
+<script type="module" src="assets/scripts/admin/operations.js"></script>
+<script type="module" src="assets/scripts/admin/experience.js"></script>
+<script type="module" src="assets/scripts/admin/flow.js"></script>
+<script type="module" src="assets/scripts/admin/live.js"></script>
+<script type="module" src="assets/scripts/admin/menu.js"></script>
+<script type="module" src="assets/scripts/admin-matter-archive.mjs"></script>
 <script type="module" src="assets/scripts/utils/support-drawer.js"></script>
 </body>
 </html>

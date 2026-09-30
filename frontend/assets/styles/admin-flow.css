@@ -1,0 +1,145 @@
+/* One record at a time. Detailed workspaces remain available in the sidebar. */
+.admin-guided #adminFlow{max-width:1060px;margin:0 auto 28px;--admin-review-text:max(14px,.875rem);--admin-review-field:max(16px,1rem)}
+.admin-guided .admin-flow-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin:0 0 24px}
+.admin-guided .admin-flow-heading h1{font-family:var(--font-serif);font-size:40px;line-height:1.15;font-weight:500;letter-spacing:-.7px;margin:0;color:var(--ink)}
+.admin-guided .admin-flow-heading h1:focus{outline:none}
+.admin-guided .admin-flow-heading .admin-eyebrow{font-size:var(--admin-review-text)}
+.admin-guided #adminFlowContext{font-size:var(--admin-review-text);color:var(--muted);line-height:1.5;margin:10px 0 0;overflow-wrap:anywhere}
+.admin-guided .admin-flow-controls{display:flex;align-items:center;gap:12px;flex-shrink:0;padding-top:18px}
+.admin-guided #adminFlowProgress{font-size:var(--admin-review-text);color:var(--muted);font-variant-numeric:tabular-nums}
+.admin-guided #adminFlowRefresh{padding:9px;min-width:44px;min-height:44px;font-size:var(--admin-review-text)}
+.admin-guided #adminFlowStatus{font-size:var(--admin-review-text);line-height:1.5;color:var(--ink);margin:0 0 14px}
+.admin-guided #adminFlowStatus:empty{display:none}
+.admin-guided .admin-flow-body{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:clip;padding:24px;box-shadow:0 5px 25px #243d3604;min-width:0}
+.admin-guided .admin-flow-body:empty{display:none}
+.admin-guided .admin-flow-actions{display:flex;gap:12px;align-items:center;justify-content:flex-end;padding:16px 0}
+.admin-guided .admin-flow-actions .btn{min-width:44px;min-height:44px;max-width:100%;font-size:var(--admin-review-text);white-space:normal}
+.admin-guided .admin-flow-actions[hidden]{display:none}
+.admin-guided .admin-flow-more{max-width:1060px;margin:28px auto 0;border-top:1px solid var(--line);padding:15px 0}
+.admin-guided .admin-flow-more>summary{cursor:pointer;color:var(--muted);font-size:12px;padding:8px 0;width:fit-content}
+.admin-guided .admin-flow-more>header{display:none}
+.admin-guided .admin-flow-clear{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:24px;min-height:180px}
+.admin-guided .admin-flow-clear>.admin-icon{height:38px;width:38px;color:var(--muted)}
+.admin-guided #adminFlowReason{font-size:var(--admin-review-text);line-height:1.5;color:var(--muted);margin:8px 0 0;overflow-wrap:anywhere}
+.admin-guided #adminFlowReason:empty{display:none}
+.admin-guided #adminSignupBadge{display:none}
+.admin-guided .admin-flow-follow-up,.admin-guided .admin-flow-saved{padding:20px;border:1px solid var(--line);border-radius:10px;background:var(--card);margin-top:16px;font-size:var(--admin-review-text);line-height:1.5}
+.admin-guided .admin-flow-follow-up[hidden],.admin-guided .admin-flow-saved[hidden]{display:none}
+.admin-guided .admin-flow-follow-up label{display:block;margin-bottom:8px;font-size:var(--admin-review-text)}
+.admin-guided .admin-flow-follow-up .btn,.admin-guided .admin-flow-saved .btn{font-size:var(--admin-review-text);min-height:44px;min-width:44px;white-space:normal}
+.admin-guided .admin-flow-follow-up input{box-sizing:border-box;width:100%;max-width:320px;min-width:0;padding:10px;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px}
+.admin-guided .admin-flow-follow-up p,.admin-guided .admin-flow-saved p{color:var(--muted)}
+.admin-guided .admin-flow-saved summary{cursor:pointer;padding:10px 0;min-height:44px;box-sizing:border-box}
+.admin-guided .admin-follow-up-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
+.admin-guided .admin-follow-up-row>div{min-width:0}
+.admin-guided .admin-follow-up-row span{display:block;color:var(--muted)}
+.admin-guided .admin-follow-up-row button{flex-shrink:0;min-height:44px}
+@media(max-width:480px){.admin-guided .admin-follow-up-row{align-items:flex-start;flex-direction:column}.admin-guided .admin-flow-follow-up .admin-inline-actions{display:flex;flex-wrap:wrap}}
+
+.admin-guided #pendingUserModal.admin-flow-inline{position:static;inset:auto;display:block;background:none;padding:0;z-index:auto;backdrop-filter:none}
+.admin-guided #pendingUserModal.admin-flow-inline.hidden{display:none}
+.admin-guided #pendingUserModal.admin-flow-inline .details-content{display:block;width:100%;height:auto;max-width:none;max-height:none;overflow:visible;border:0;border-radius:0;box-shadow:none;padding:0;background:transparent;animation:none}
+.admin-guided #pendingUserModal.admin-flow-inline .details-header{display:none}
+.admin-guided #pendingUserModal.admin-flow-inline .admin-account-scroll{flex:none;max-height:none;overflow:visible;padding:0;background:transparent}
+.admin-guided #pendingUserModal.admin-flow-inline .admin-application-hero,
+.admin-guided #pendingUserModal.admin-flow-inline .admin-facts{display:none}
+.admin-guided #pendingUserModal.admin-flow-inline .admin-tabs{position:static;padding:0;background:transparent;margin-bottom:22px}
+.admin-guided #pendingUserModal.admin-flow-inline .admin-tabs button{padding:12px 14px}
+.admin-guided #pendingUserModal.admin-flow-inline .admin-application-grid{gap:24px}
+.admin-guided #pendingUserModal.admin-flow-inline .admin-review-card{border:0;padding:0 0 18px;margin:0 0 18px;border-bottom:1px solid var(--line);background:transparent}
+.admin-guided #pendingUserModal.admin-flow-inline .admin-review-card h3{font-size:1rem;margin:0 0 12px}
+.admin-guided #pendingUserModal.admin-flow-inline .admin-review-card p{font-size:var(--admin-review-text);line-height:1.65}
+.admin-guided #pendingUserModal.admin-flow-inline .pending-modal-actions{position:static;background:transparent;padding:18px 0 0;margin:8px 0 0;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px}
+.admin-guided #pendingUserModal.admin-flow-inline .pending-modal-actions #editEmailBtn{margin-right:auto}
+.admin-guided #pendingUserModal.admin-flow-inline :is(.details-content,.admin-account-scroll)>.admin-inline-actions{display:none}
+.admin-guided #pendingUserModal.admin-flow-inline .admin-draft-state{margin:0 0 12px}
+
+.admin-guided .admin-flow-body #adminInboxDetail{display:block;width:100%;max-height:none;min-height:0;overflow:visible;padding:0;border:0;border-radius:0;background:transparent;min-width:0}
+.admin-guided .admin-flow-body #adminInboxDetail>.panel-header,
+.admin-guided .admin-flow-body #adminInboxDetail>.admin-row-meta:not(#adminInquirySummary),
+.admin-guided .admin-flow-body #adminInboxBack{display:none}
+.admin-guided .admin-flow-body .admin-conversation{max-height:300px;margin:18px 0;border-radius:8px}
+.admin-guided .admin-flow-body #adminReplyForm{padding:0;border:0;background:transparent}
+.admin-guided .admin-flow-body #adminReplyForm>h3{font-size:var(--admin-review-field);margin-top:24px}
+.admin-guided .admin-flow-body #adminInboxDetail label{display:block;margin:12px 0 8px}
+.admin-guided .admin-flow-body #adminInboxDetail textarea{display:block;box-sizing:border-box;width:100%;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:12px;font:inherit;font-size:var(--admin-review-field);line-height:1.6;background:var(--card);color:var(--ink)}
+.admin-guided .admin-flow-body #adminReplyText{min-height:116px}
+.admin-guided .admin-flow-body #adminInternalNote{min-height:84px}
+.admin-guided .admin-flow-body .admin-inquiry-identity{margin:0 0 14px}
+.admin-guided .admin-flow-body #adminReplyForm>.admin-inline-actions{justify-content:space-between;margin-top:14px}
+.admin-guided .admin-flow-body .admin-detail-fold{margin-top:15px}
+.admin-guided .admin-flow-body .admin-detail-fold summary{font-size:var(--admin-review-text)}
+.admin-guided .admin-flow-body #adminMatterDetail{display:block;padding:0;border:0;width:100%;background:transparent}
+.admin-guided .admin-flow-body #adminMatterDetail [data-close-matter]{display:none}
+.admin-guided .admin-flow-body #adminMatterDetail>.panel-header{display:none}
+.admin-guided .admin-flow-body>.panel{padding:0;border:0;background:transparent}
+.admin-guided .admin-flow-body>.panel>.panel-header{display:none}
+.admin-guided .admin-flow-body #chargebackPanel select[aria-label="Chargeback review state"],
+.admin-guided .admin-flow-body .pending-controls:has(#disputeTabs){display:none}
+.admin-guided .admin-flow-body #chargebackPanel{margin-top:0!important}
+.admin-guided .admin-flow-body #adminDisputePager,
+.admin-guided .admin-flow-body #adminChargebackPager,
+.admin-guided .admin-flow-body #disputeSearch,
+.admin-guided .admin-flow-body [data-dispute-tab],
+.admin-guided .admin-flow-body #chargebackPanel>select{display:none}
+.admin-guided .admin-flow-body #disputesBody>tr[data-dispute-id]:not(.admin-dispute-detail){display:none}
+.admin-guided .admin-flow-body table:has(#disputesBody) thead{display:none}
+.admin-guided .admin-flow-body .admin-dispute-detail>td{padding:0!important;border:0;background:transparent!important;white-space:normal}
+.admin-guided .admin-flow-body :is(table,.table-wrap):has(#disputesBody){border:0;background:transparent;overflow:visible}
+.admin-guided .admin-flow-body .admin-dispute-detail section{font-family:var(--font-sans);font-size:13px;line-height:1.6;color:var(--ink)}
+.admin-guided .admin-flow-body .admin-dispute-detail section>h3{display:none}
+.admin-guided .admin-flow-body .admin-dispute-detail section>p{margin:0 0 14px}
+.admin-guided .admin-flow-body .admin-dispute-detail section>.admin-inline-actions{margin:18px 0}
+.admin-guided .admin-flow-body .escrow-chart-row{display:block;width:100%}
+.admin-guided .admin-flow-body .escrow-chart-row>.panel:has(#escrowReportChart){display:none}
+.admin-guided .admin-flow-body .escrow-chart-row>.panel{padding:0;border:0;background:transparent}
+.admin-guided .admin-flow-body .escrow-chart-row h2,
+.admin-guided .admin-flow-body #reconcileCaseId,
+.admin-guided .admin-flow-body label[for="reconcileCaseId"]{display:none}
+.admin-guided .admin-flow-body #chargebackPanel .table-wrap{overflow:visible}
+.admin-guided .admin-flow-body #chargebackPanel :is(table,tbody){display:block;width:100%}
+.admin-guided .admin-flow-body #chargebackPanel thead{display:none}
+.admin-guided .admin-flow-body #chargebackPanel tr{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
+.admin-guided .admin-flow-body #chargebackPanel td{display:block;white-space:normal;overflow-wrap:anywhere;padding:14px 0}
+.admin-guided .admin-flow-body #chargebackPanel td:before{content:attr(data-label);display:block;font-size:11px;color:var(--muted);margin-bottom:6px}
+.admin-guided .admin-flow-body #chargebackPanel td.dispute-actions{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
+.admin-guided .admin-flow-body #chargebackPanel td.dispute-actions:before{display:none}
+.admin-guided .admin-flow-body #chargebackPanel td[colspan]{grid-column:1/-1}
+@media(max-width:760px){
+  .admin-guided .admin-flow-heading{display:block;margin-bottom:20px}
+  .admin-guided .admin-flow-heading h1{font-size:32px}
+  .admin-guided .admin-flow-controls{padding-top:14px;justify-content:space-between}
+  .admin-guided .admin-flow-body{padding:18px;border-radius:10px}
+  .admin-guided #pendingUserModal.admin-flow-inline .admin-application-grid{grid-template-columns:1fr;gap:0}
+  .admin-guided .admin-flow-body .admin-conversation{max-height:260px}
+  .admin-guided .admin-flow-body #adminReplyForm>.admin-inline-actions{align-items:stretch;flex-direction:column}
+  .admin-guided .admin-flow-body #adminInboxDetail>.admin-inline-actions{flex-wrap:wrap}
+  .admin-guided #pendingUserModal.admin-flow-inline .pending-modal-actions .btn{flex:1;min-width:90px}
+  .admin-guided .admin-flow-body #chargebackPanel tr{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){.admin-guided #adminFlow *{scroll-behavior:auto}}
+
+@media(max-width:480px){
+  .admin-guided #pendingUserModal.admin-flow-inline .pending-modal-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .admin-guided #pendingUserModal.admin-flow-inline .pending-modal-actions .btn{min-width:0}
+  .admin-guided #pendingUserModal.admin-flow-inline .pending-modal-actions #editEmailBtn{margin-right:0}
+}
+
+/* Optional evidence and automation controls share the daily workspace's reading scale. */
+.admin-today-details,.admin-automation-controls,.admin-automation-technical{max-width:1060px;margin:24px auto;font-size:max(14px,.875rem);line-height:1.55}
+.admin-today-details details,.admin-automation-technical{border-top:1px solid var(--line);padding:12px 0}
+.admin-today-details summary,.admin-automation-technical>summary{cursor:pointer;min-height:44px;padding:10px 0;box-sizing:border-box}
+.admin-today-details p,.admin-policy-row p{color:var(--muted);overflow-wrap:anywhere}
+.admin-activity-row{display:flex;justify-content:space-between;gap:16px;border-top:1px solid var(--line);padding:12px 0}
+.admin-activity-row span{color:var(--muted)}
+.admin-policy-row{display:flex;justify-content:space-between;align-items:center;gap:24px;border-top:1px solid var(--line);padding:20px 0}
+.admin-policy-row>div{min-width:0}
+.admin-policy-row h2{font-family:var(--font-sans);font-size:max(17px,1.0625rem);margin:0}
+.admin-policy-row .btn,.admin-context-nav .btn{min-height:44px;white-space:normal;font-size:max(14px,.875rem)}
+.admin-policy-row .btn{flex-shrink:0}
+.admin-context-nav{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 20px}
+.admin-guided .admin-flow-more [hidden]{display:none!important}
+@media(max-width:600px){.admin-policy-row,.admin-activity-row{flex-direction:column;align-items:flex-start;gap:10px}}
+.admin-guided #adminFlowScope{font-size:var(--admin-review-text);line-height:1.5;color:var(--muted);margin-bottom:16px}
+.admin-automation-technical{width:100%;box-sizing:border-box}
+.admin-automation-controls>.btn{min-height:44px;font-size:max(14px,.875rem)}

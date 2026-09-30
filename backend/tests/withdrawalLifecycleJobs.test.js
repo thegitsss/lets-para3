@@ -1,3 +1,5 @@
+jest.mock("../services/matterReviewNotifications", () => ({ remindOverdue: jest.fn() }));
+jest.mock("../services/attorneyWithdrawal", () => ({ expire: jest.fn() }));
 jest.mock("../models/Case", () => ({
   find: jest.fn(),
   findOneAndUpdate: jest.fn(),
@@ -18,6 +20,8 @@ jest.mock("../utils/notifyUser", () => ({ notifyUser: jest.fn() }));
 const fs = require("fs");
 const path = require("path");
 const Case = require("../models/Case");
+const { expire } = require("../services/attorneyWithdrawal");
+const { remindOverdue } = require("../services/matterReviewNotifications");
 const Job = require("../models/Job");
 const { notifyUser } = require("../utils/notifyUser");
 const {
@@ -43,7 +47,7 @@ describe("withdrawal lifecycle jobs", () => {
     Job.findByIdAndUpdate.mockResolvedValue({ _id: "job-1", status: "open" });
   });
 
-  test("atomically finalizes each eligible withdrawal before running side effects", async () => {
+  test("delegates the expiry and its notices once before running receipt side effects", async () => {
     const now = new Date("2026-08-14T12:00:00.000Z");
     const candidate = {
       _id: "case-1",
@@ -53,37 +57,34 @@ describe("withdrawal lifecycle jobs", () => {
       disputeDeadlineAt: new Date("2026-08-14T11:00:00.000Z"),
       payoutFinalizedAt: null,
       jobId: "job-1",
+      attorneyId: "attorney-1",
+      withdrawnParalegalId: "paralegal-1",
       totalAmount: 40_000,
-      partialPayoutAmount: 10_000,
+      partialPayoutAmount: null,
       disputes: [],
     };
-    const claimed = { ...candidate, payoutFinalizedAt: now, remainingAmount: 30_000 };
+    const claimed = { ...candidate, payoutFinalizedAt: now, remainingAmount: 40_000 };
     Case.find.mockReturnValue(queryResult([candidate]));
-    Case.findOneAndUpdate.mockResolvedValue(claimed);
+    expire.mockResolvedValue({ changed: true, doc: claimed });
 
     await expect(processExpiredWithdrawalWindows({ now, limit: 500 })).resolves.toEqual({
       scanned: 1,
       finalized: 1,
       failed: 0,
     });
-    expect(Case.findOneAndUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ _id: "case-1", payoutFinalizedAt: null }),
-      { $set: expect.objectContaining({
-        payoutFinalizedAt: now,
-        payoutFinalizedType: "expired_zero",
-        remainingAmount: 30_000,
-        status: "paused",
-      }) },
-      { returnDocument: "after", runValidators: true }
-    );
-    expect(Job.findByIdAndUpdate).toHaveBeenCalledWith("job-1", { status: "open" });
+    expect(expire).toHaveBeenCalledWith("case-1", { now });
+    expect(expire).toHaveBeenCalledTimes(1);
+    expect(Job.findByIdAndUpdate).not.toHaveBeenCalled();
+    // The real expiry transaction's two persisted recipients and rollback are
+    // covered in withdrawalDecisionNotificationAtomicity. No immediate resend.
+    expect(notifyUser).not.toHaveBeenCalled();
     const limit = Case.find.mock.results[0].value.sort.mock.results[0].value.limit;
     expect(limit).toHaveBeenCalledWith(100);
   });
 
   test("does not repeat side effects when another runner already claimed the withdrawal", async () => {
     Case.find.mockReturnValue(queryResult([{ _id: "case-1", totalAmount: 40_000 }]));
-    Case.findOneAndUpdate.mockResolvedValue(null);
+    expire.mockResolvedValue({ changed: false });
     await expect(processExpiredWithdrawalWindows()).resolves.toEqual({
       scanned: 1,
       finalized: 0,
@@ -92,7 +93,7 @@ describe("withdrawal lifecycle jobs", () => {
     expect(Job.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 
-  test("claims an overdue dispute before notifying each participant", async () => {
+  test("delegates the overdue reminder and participant obligations once", async () => {
     const now = new Date("2026-08-14T12:00:00.000Z");
     const candidate = {
       _id: "case-2",
@@ -101,38 +102,33 @@ describe("withdrawal lifecycle jobs", () => {
       withdrawnParalegalId: "paralegal-1",
     };
     Case.find.mockReturnValue(queryResult([candidate]));
-    Case.findOneAndUpdate.mockResolvedValue(candidate);
-    notifyUser.mockResolvedValue(undefined);
+    remindOverdue.mockResolvedValue({ changed: true });
 
     await expect(processAdminOverdueDisputes({ now })).resolves.toEqual({
       scanned: 1,
       notified: 1,
       failed: 0,
     });
-    expect(Case.findOneAndUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ _id: "case-2", adminDisputeOverdueNotifiedAt: null }),
-      { $set: { adminDisputeOverdueNotifiedAt: now } },
-      { returnDocument: "after" }
-    );
-    expect(notifyUser).toHaveBeenCalledTimes(2);
+    expect(remindOverdue).toHaveBeenCalledWith("case-2", { now });
+    expect(remindOverdue).toHaveBeenCalledTimes(1);
+    expect(notifyUser).not.toHaveBeenCalled();
   });
 
-  test("restores an overdue dispute for retry if notification delivery fails", async () => {
+  test("reports a failed overdue transaction without clearing a committed claim", async () => {
     const now = new Date("2026-08-14T12:00:00.000Z");
     const candidate = { _id: "case-3", attorneyId: "attorney-1" };
     Case.find.mockReturnValue(queryResult([candidate]));
-    Case.findOneAndUpdate.mockResolvedValue(candidate);
-    notifyUser.mockRejectedValue(new Error("notification failed"));
+    remindOverdue.mockRejectedValue(new Error("notification failed"));
 
     await expect(processAdminOverdueDisputes({ now })).resolves.toEqual({
       scanned: 1,
       notified: 0,
       failed: 1,
     });
-    expect(Case.updateOne).toHaveBeenCalledWith(
-      { _id: "case-3", adminDisputeOverdueNotifiedAt: now },
-      { $set: { adminDisputeOverdueNotifiedAt: null } }
-    );
+    expect(remindOverdue).toHaveBeenCalledWith("case-3", { now });
+    // The real reminder transaction owns rollback; the scheduler must not clear
+    // another worker's committed claim. Atomicity is covered with the real DB.
+    expect(Case.updateOne).not.toHaveBeenCalled();
   });
 
   test("keeps request-time finalization behavior in the shared lifecycle service", async () => {
@@ -144,19 +140,17 @@ describe("withdrawal lifecycle jobs", () => {
       disputeDeadlineAt: new Date("2026-08-14T11:00:00.000Z"),
       payoutFinalizedAt: null,
       totalAmount: 40_000,
-      partialPayoutAmount: 10_000,
+      partialPayoutAmount: null,
       jobId: "job-1",
       disputes: [],
       ensureLifecycleStatus: jest.fn(),
     };
+    expire.mockResolvedValue({ changed: true, doc: { ...caseDoc, payoutFinalizedAt: now, payoutFinalizedType: "expired_zero", remainingAmount: 40000 } });
     await expect(finalizeExpiredDisputeWindow(caseDoc, { now })).resolves.toBe(true);
-    expect(caseDoc).toEqual(expect.objectContaining({
-      payoutFinalizedAt: now,
-      payoutFinalizedType: "expired_zero",
-      remainingAmount: 30_000,
-      status: "paused",
-    }));
-    expect(caseDoc.ensureLifecycleStatus).toHaveBeenCalledWith("paused");
+    expect(expire).toHaveBeenCalledWith("case-4", { now });
+    expect(caseDoc.payoutFinalizedAt).toBeNull();
+    expect(caseDoc.ensureLifecycleStatus).not.toHaveBeenCalled();
+    expect(Job.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 
   test("keeps all recurring business work out of the HTTP entrypoint and route modules", () => {

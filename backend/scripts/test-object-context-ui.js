@@ -2,20 +2,12 @@ const fs = require("fs");
 const path = require("path");
 const assert = require("assert/strict");
 const { chromium } = require("playwright");
+const { prepareMatterModule, fulfillFrontendAsset } = require("./ui-module-fixture");
 
 const repositoryRoot = path.resolve(__dirname, "../..");
 const htmlSource = fs.readFileSync(path.join(repositoryRoot, "frontend/case-detail.html"), "utf8")
   .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
-const caseScript = fs.readFileSync(path.join(repositoryRoot, "frontend/assets/scripts/case-detail.js"), "utf8")
-  .replace(
-    /^import[^\n]+\n/,
-    `const secureFetch = (url, options = {}) => fetch(url, { ...options, credentials: "include", headers: { ...(options.headers || {}), "Content-Type": options.body && !(options.body instanceof FormData) ? "application/json" : undefined }, body: options.body && !(options.body instanceof FormData) && typeof options.body !== "string" ? JSON.stringify(options.body) : options.body });
-const fetchCSRF = async () => "test-csrf";
-const showMsg = (node, message) => { if (node) node.textContent = message || ""; };
-const loadUserHeaderInfo = async () => {};
-const applyRoleVisibility = (role) => document.querySelectorAll("[data-visible]").forEach((node) => { node.hidden = node.dataset.visible !== role; });
-`
-  );
+const caseScript = prepareMatterModule(fs.readFileSync(path.join(repositoryRoot, "frontend/assets/scripts/case-detail.js"), "utf8"));
 const contextScript = fs.readFileSync(path.join(repositoryRoot, "frontend/assets/scripts/context-panel.js"), "utf8");
 const contextStyles = fs.readFileSync(path.join(repositoryRoot, "frontend/assets/styles/context-panel.css"), "utf8");
 const notificationStyles = fs.readFileSync(path.join(repositoryRoot, "frontend/assets/styles/notifications-dashboard.css"), "utf8");
@@ -95,7 +87,7 @@ function matterPayload(role = "attorney") {
 function pageHtml() {
   return htmlSource
     .replace("</head>", `<style>${contextStyles}</style></head>`)
-    .replace("</body>", `<script>${contextScript}</script><script>${caseScript}</script></body>`);
+    .replace("</body>", `<script>${contextScript}</script><script type="module">${caseScript}</script></body>`);
 }
 
 function notificationPageHtml() {
@@ -107,19 +99,30 @@ function notificationPageHtml() {
 }
 
 async function installRoutes(page, counters, role = "attorney") {
+  page.on("pageerror", (error) => console.error("[Context contract page error]", error.message));
   await page.addInitScript((viewerRole) => {
     const id = viewerRole === "attorney" ? "64b000000000000000000207" : "64b000000000000000000208";
     localStorage.setItem("lpc_user", JSON.stringify({ id, role: viewerRole, status: "approved" }));
     window.EventSource = class MockEventSource { addEventListener() {} close() {} };
   }, role);
-  await page.route("http://context.test/**", async (route) => {
+  await page.route("https://context.test/**", async (route) => {
     const url = new URL(route.request().url());
+    if (await fulfillFrontendAsset(route, repositoryRoot)) return;
+    if (url.pathname === "/api/auth/me") {
+      const actor = role === "attorney" ? matterPayload(role).attorney : matterPayload(role).paralegal;
+      await route.fulfill({ json: { user: { ...actor, id: actor._id, status: "approved" } } });
+      return;
+    }
     if (url.pathname === "/case-detail.html") {
       await route.fulfill({ contentType: "text/html", body: pageHtml() });
       return;
     }
     if (url.pathname === "/notification-dashboard.html") {
       await route.fulfill({ contentType: "text/html", body: notificationPageHtml() });
+      return;
+    }
+    if (url.pathname === "/api/notifications/unread-count") {
+      await route.fulfill({ json: { count: counters.notificationReadRequests ? 0 : 1 } });
       return;
     }
     if (url.pathname === "/api/notifications" && route.request().method() === "GET") {
@@ -265,7 +268,7 @@ async function runJourney(browser) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
   await installRoutes(page, counters);
 
-  await page.goto(`http://context.test/case-detail.html?caseId=${matterId}&tab=applications&applicantId=${candidateId}`);
+  await page.goto(`https://context.test/case-detail.html?caseId=${matterId}&tab=applications&applicantId=${candidateId}`);
   await page.waitForFunction(() => document.querySelector(".lpc-context-dialog")?.open);
   assert.match(await page.locator(".lpc-context-sheet").innerText(), /Taylor Candidate/);
   assert.match(await page.locator(".lpc-context-sheet").innerText(), /I can support this production schedule/);
@@ -280,35 +283,35 @@ async function runJourney(browser) {
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => !document.querySelector(".lpc-context-dialog")?.open);
 
-  await page.goto(`http://context.test/case-detail.html?caseId=${matterId}&tab=files&fileId=${fileId}`);
+  await page.goto(`https://context.test/case-detail.html?caseId=${matterId}&tab=files&fileId=${fileId}`);
   await page.waitForFunction(() => document.querySelector(".lpc-context-dialog")?.open);
   const filePanelText = await page.locator(".lpc-context-sheet").innerText();
   assert.match(filePanelText, /production-draft\.pdf/);
   assert.match(filePanelText, /24 KB/);
   assert.doesNotMatch(filePanelText, /storage|bucket|provider|stripe/i);
 
-  await page.goto(`http://context.test/case-detail.html?caseId=${matterId}&tab=messages&messageId=${messageId}`);
+  await page.goto(`https://context.test/case-detail.html?caseId=${matterId}&tab=messages&messageId=${messageId}`);
   await page.waitForSelector(`[data-message-id="${messageId}"].is-deep-linked`);
   assert.equal(await page.locator(".message-card.is-deep-linked").count(), 1);
   assert.match(await page.locator(".message-card.is-deep-linked").innerText(), /revised production draft/i);
   assert.equal(counters.readRequests, 0, "an exact-message link must not bulk-mark the thread read");
 
-  await page.goto(`http://context.test/case-detail.html?caseId=${matterId}&tab=messages&messageId=${staleCandidateId}`);
+  await page.goto(`https://context.test/case-detail.html?caseId=${matterId}&tab=messages&messageId=${staleCandidateId}`);
   await page.waitForFunction(() => document.querySelector("#caseMessageStatus")?.textContent.includes("no longer available"));
   assert.equal(await page.locator(".message-card.is-deep-linked").count(), 0);
   assert.equal(counters.readRequests, 0, "an unavailable message link must not mutate thread read state");
 
-  await page.goto(`http://context.test/case-detail.html?caseId=${matterId}&tab=applications&applicantId=${temporaryCandidateId}`);
+  await page.goto(`https://context.test/case-detail.html?caseId=${matterId}&tab=applications&applicantId=${temporaryCandidateId}`);
   await page.waitForFunction(() => document.querySelector(".lpc-context-state")?.textContent.includes("Unable to load"));
   await page.click(".lpc-context-retry");
   await page.waitForFunction(() => document.querySelector(".lpc-context-title")?.textContent === "Retry Candidate");
   assert.equal(counters.tempPreviewAttempts, 2);
 
-  await page.goto(`http://context.test/case-detail.html?caseId=${matterId}&tab=applications&applicantId=${staleCandidateId}`);
+  await page.goto(`https://context.test/case-detail.html?caseId=${matterId}&tab=applications&applicantId=${staleCandidateId}`);
   await page.waitForFunction(() => document.querySelector(".lpc-context-state")?.textContent.includes("No longer available"));
   assert.match(await page.locator(".lpc-context-state").innerText(), /may no longer have access/i);
 
-  await page.goto(`http://context.test/case-detail.html?caseId=${matterId}&tab=applications`);
+  await page.goto(`https://context.test/case-detail.html?caseId=${matterId}&tab=applications`);
   await page.waitForSelector(".matter-row-preview");
   const unchangedBefore = await page.locator(".case-rail-header").screenshot();
   await page.click(".matter-row-preview");
@@ -331,12 +334,12 @@ async function runJourney(browser) {
   assert.ok(metrics.scrollWidth <= metrics.width + 1);
   const closeBox = await page.locator(".lpc-context-close").boundingBox();
   assert.ok(closeBox && closeBox.width >= 44 && closeBox.height >= 44);
-  await page.screenshot({ path: "/tmp/lpc-prompt3-context-mobile.png", fullPage: true });
+  await page.screenshot({ path: "/tmp/lpc-prompt3-context-mobile.png", fullPage: true, animations: "disabled" });
   await page.close();
 
   const notificationPage = await browser.newPage({ viewport: { width: 1280, height: 820 } });
   await installRoutes(notificationPage, counters);
-  await notificationPage.goto("http://context.test/notification-dashboard.html");
+  await notificationPage.goto("https://context.test/notification-dashboard.html");
   await notificationPage.click("[data-notification-toggle]");
   await notificationPage.waitForSelector(".notif-item");
   assert.match(await notificationPage.locator(".notif-item").innerText(), /Taylor Candidate applied/);
@@ -353,7 +356,7 @@ async function runParalegalJourney(browser) {
   const counters = { readRequests: 0, notificationReadRequests: 0, tempPreviewAttempts: 0 };
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
   await installRoutes(page, counters, "paralegal");
-  await page.goto("http://context.test/notification-dashboard.html");
+  await page.goto("https://context.test/notification-dashboard.html");
   await page.click("[data-notification-toggle]");
   await page.waitForSelector(".notif-item");
   assert.match(await page.locator(".notif-primary-action").innerText(), /View message/);
@@ -362,18 +365,18 @@ async function runParalegalJourney(browser) {
   await page.waitForSelector(`[data-message-id="${messageId}"].is-deep-linked`);
   assert.equal(counters.readRequests, 0);
 
-  await page.goto(`http://context.test/case-detail.html?caseId=${matterId}&tab=files&fileId=${fileId}`);
+  await page.goto(`https://context.test/case-detail.html?caseId=${matterId}&tab=files&fileId=${fileId}`);
   await page.waitForFunction(() => document.querySelector(".lpc-context-dialog")?.open);
   assert.match(await page.locator(".lpc-context-sheet").innerText(), /production-draft\.pdf/);
 
-  await page.goto(`http://context.test/case-detail.html?caseId=${matterId}&tab=applications&applicantId=${candidateId}`);
+  await page.goto(`https://context.test/case-detail.html?caseId=${matterId}&tab=applications&applicantId=${candidateId}`);
   await page.waitForSelector('[data-matter-panel="overview"]:not([hidden])');
   assert.equal(await page.locator('[data-matter-tab="applications"]').isHidden(), true);
   assert.equal(await page.evaluate(() => Boolean(document.querySelector(".lpc-context-dialog")?.open)), false);
   assert.equal(new URL(page.url()).searchParams.get("tab"), "overview");
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`http://context.test/case-detail.html?caseId=${matterId}&tab=files&fileId=${fileId}`);
+  await page.goto(`https://context.test/case-detail.html?caseId=${matterId}&tab=files&fileId=${fileId}`);
   await page.waitForFunction(() => document.querySelector(".lpc-context-dialog")?.open);
   const metrics = await page.locator(".lpc-context-sheet").evaluate((node) => ({
     width: node.getBoundingClientRect().width,
@@ -382,7 +385,7 @@ async function runParalegalJourney(browser) {
   }));
   assert.ok(metrics.width <= metrics.viewport);
   assert.ok(metrics.scrollWidth <= metrics.width + 1);
-  await page.screenshot({ path: "/tmp/lpc-prompt3-paralegal-context-mobile.png", fullPage: true });
+  await page.screenshot({ path: "/tmp/lpc-prompt3-paralegal-context-mobile.png", fullPage: true, animations: "disabled" });
   await page.close();
 }
 

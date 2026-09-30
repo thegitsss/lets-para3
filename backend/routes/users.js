@@ -1,3 +1,4 @@
+const { normalizePrimaryState } = require("../utils/primaryState");
 const { createLogger: createRuntimeLogger, logPromiseFailure } = require("../utils/logger");
 const runtimeLogger = createRuntimeLogger("routes:users");
 // backend/routes/users.js
@@ -14,18 +15,23 @@ const ChecklistTask = require("../models/ChecklistTask");
 const Notification = require("../models/Notification");
 const Job = require("../models/Job");
 const Block = require("../models/Block");
-const WeeklyNote = require("../models/WeeklyNote");
+const pendingHireContext = require("../services/pendingHireContext");
+const accountWriteGuard = require("../utils/accountWriteGuard");
+function pendingHireFailure(error, res) { return res.status(error.status || 503).json({ code: error.publicCode || "PAYMENT_SETUP_UNAVAILABLE", error: "The saved return to your application could not be confirmed. Refresh it before making another change." }); }
+const { WeeklyNotesError, readWeeklyNotes, saveWeeklyNotes } = require("../services/weeklyNotes");
 const { maskProfanity } = require("../utils/badWords");
 const { logAction } = require("../utils/audit");
 const { csrfProtection, respondToCsrfError } = require("../utils/csrf");
 const { createS3Client } = require("../utils/s3Client");
-const { cleanMessage } = require("../utils/sanitize");
 const {
   applyPublicParalegalFilter,
   hasRequiredParalegalFieldsForPublic,
 } = require("../utils/paralegalProfile");
+const { normalizeAccountTheme } = require("../utils/accountPreferences");
 const { buildObjectDeepLink } = require("../services/objectDeepLinks");
 const { normalizeEmail, sendVerificationEmail } = require("../utils/emailVerification");
+const { publishNotificationEvent } = require("../utils/notificationEvents");
+const { publishInteractionAccessRefresh } = require("../utils/interactionAccessEvents");
 const {
   buildAuthenticatedProfilePhotoUrl,
   buildPublicProfilePhotoUrl,
@@ -53,24 +59,25 @@ const {
 // ----------------------------------------
 // Helpers
 // ----------------------------------------
-const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(error => { if (!accountWriteGuard.respond(error, res)) next(error); });
 const isObjId = (id) => mongoose.isValidObjectId(id);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const { normalizeHttpUrl } = require("../utils/httpUrl");
 const normStr = (s, { len = 4000 } = {}) => String(s || "").replace(/[\u0000-\u001F\u007F]/g, "").slice(0, len);
+const normParagraphs = (s, len) => String(s || "").replace(/\r\n?/g, "\n").replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, "").slice(0, len);
 const cleanList = (value) => {
   if (!value) return [];
   const arr = Array.isArray(value) ? value : String(value).split(",");
   return [...new Set(arr.map((v) => normStr(v, { len: 200 }).trim()).filter(Boolean))];
 };
-const cleanCollection = (value, fields = []) => {
+const cleanCollection = (value, fields = [], { multilineFields = [] } = {}) => {
   if (!Array.isArray(value)) return [];
   return value
     .map((entry) => {
       const out = {};
       fields.forEach(([key, maxLen]) => {
         if (entry && typeof entry[key] === "string") {
-          out[key] = normStr(entry[key], { len: maxLen });
+          out[key] = multilineFields.includes(key) ? normParagraphs(entry[key], maxLen) : normStr(entry[key], { len: maxLen });
         }
       });
       return out;
@@ -120,6 +127,10 @@ const normalizeAvailability = (val) => {
   if (typeof val === "boolean") return val ? "Available Now" : "Unavailable";
   return null;
 };
+const literalFilterPattern = (value) => new RegExp(
+  String(value).trim().slice(0, 200).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+  "i"
+);
 const parseParalegalFilters = (query = {}) => {
   const {
     search = "",
@@ -137,17 +148,18 @@ const parseParalegalFilters = (query = {}) => {
   const l = clamp(parseInt(limit, 10) || 20, 1, 100);
   const filter = { role: "paralegal", status: "approved" };
   if (availability) {
-    filter.availability = new RegExp(String(availability).trim(), "i");
+    filter.availability = literalFilterPattern(availability);
   } else if (available !== undefined) {
-    filter.availability = String(available) === "true" ? /available/i : /unavailable|wait/i;
+    const availableClause = require("../utils/availability").buildEffectiveAvailableClause();
+    filter.$and = [String(available) === "true" ? availableClause : { $nor: [availableClause] }];
   }
   if (search) {
-    const rx = new RegExp(String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    const rx = literalFilterPattern(search);
     filter.$or = [{ firstName: rx }, { lastName: rx }, { bio: rx }, { about: rx }];
   }
-  if (practice) filter.practiceAreas = new RegExp(String(practice).trim(), "i");
-  if (skill) filter.skills = new RegExp(String(skill).trim(), "i");
-  if (location) filter.location = new RegExp(String(location).trim(), "i");
+  if (practice) filter.practiceAreas = literalFilterPattern(practice);
+  if (skill) filter.skills = literalFilterPattern(skill);
+  if (location) filter.location = literalFilterPattern(location);
   if (minYears) {
     const years = Math.max(0, parseInt(minYears, 10) || 0);
     filter.yearsExperience = { $gte: years };
@@ -158,8 +170,8 @@ const parseParalegalFilters = (query = {}) => {
 };
 
 const SAFE_PUBLIC_SELECT =
-  "_id role firstName lastName avatarURL profileImage profileImageOriginal pendingProfileImage pendingProfileImageOriginal profilePhotoStatus location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt createdAt updatedAt languages writingSamples status stateExperience";
-const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email pendingEmail pendingEmailRequestedAt phoneNumber onboarding pendingHire`;
+  "_id role firstName lastName avatarURL profileImage profileImageOriginal pendingProfileImage pendingProfileImageOriginal profilePhotoStatus location state specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt createdAt updatedAt languages writingSamples status jurisdictions stateExperience";
+const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email pendingEmail pendingEmailRequestedAt phoneNumber state barNumber timezone onboarding pendingHire +profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey`;
 function protectedDocumentKey(value, ownerId, type) {
   return extractPersonalFileKey(value, {
     ownerId,
@@ -220,6 +232,7 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
     practiceAreas: Array.isArray(src.practiceAreas) ? src.practiceAreas : [],
     skills: Array.isArray(src.skills) ? src.skills : [],
     bestFor: Array.isArray(src.bestFor) ? src.bestFor : [],
+    jurisdictions: Array.isArray(src.jurisdictions) ? src.jurisdictions : [],
     stateExperience: Array.isArray(src.stateExperience) ? src.stateExperience : [],
     yearsExperience:
       typeof src.yearsExperience === "number" ? src.yearsExperience : 0,
@@ -232,8 +245,7 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
     writingSampleKey: writingSampleURL,
     education: Array.isArray(src.education) ? src.education : [],
     experience: Array.isArray(src.experience) ? src.experience : [],
-    availability: src.availability || "",
-    availabilityDetails: src.availabilityDetails || null,
+    ...(isParalegal ? require("../utils/availability").effectiveAvailability(src) : { availability: src.availability || "", availabilityDetails: src.availabilityDetails || null }),
     approvedAt: src.approvedAt || null,
     createdAt: src.createdAt || null,
     bio: src.bio || "",
@@ -242,10 +254,9 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
     languages: cleanLanguages(src.languages || []),
     notificationPrefs: src.notificationPrefs || null,
     preferences: {
-      theme:
-        String(src.preferences && typeof src.preferences === "object" ? src.preferences.theme || "" : "").toLowerCase() === "dark"
-          ? "dark"
-          : "light",
+      theme: normalizeAccountTheme(
+        src.preferences && typeof src.preferences === "object" ? src.preferences.theme : ""
+      ),
       fontSize:
         (src.preferences && typeof src.preferences === "object" && src.preferences.fontSize) ||
         "md",
@@ -256,9 +267,13 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
   };
   if (includeEmail) {
     payload.email = src.email || "";
+    payload.updatedAt = src.updatedAt || null;
     payload.pendingEmail = src.pendingEmail || "";
     payload.pendingEmailRequestedAt = src.pendingEmailRequestedAt || null;
     payload.phoneNumber = src.phoneNumber || "";
+    payload.barNumber = src.barNumber || "";
+    payload.timezone = src.timezone || "America/New_York";
+    payload.profilePhotoRevision = accountWriteGuard.photoRevision(src);
   }
   if (includeStatus) {
     payload.status = src.status || "";
@@ -452,6 +467,10 @@ router.get(
         return res.status(404).json({ error: "Profile photo unavailable." });
       }
       if (targetRole === "paralegal") {
+        if (target.profilePhotoStatus !== "approved") {
+          res.set("Cache-Control", "no-store");
+          return res.status(404).json({ error: "Profile photo unavailable." });
+        }
         const isPublicProfile =
           target.preferences?.hideProfile !== true &&
           hasRequiredParalegalFieldsForPublic(target);
@@ -465,8 +484,7 @@ router.get(
           res.set("Cache-Control", "no-store");
           return res.status(404).json({ error: "Profile photo unavailable." });
         }
-      }
-      if (targetRole !== "attorney") {
+      } else if (targetRole !== "attorney") {
         res.set("Cache-Control", "no-store");
         return res.status(404).json({ error: "Profile photo unavailable." });
       }
@@ -539,6 +557,7 @@ router.get(
 router.get(
   "/me",
   asyncHandler(async (req, res) => {
+    accountWriteGuard.checkOwner(req, req.query);
     const me = await User.findById(req.user.id).select(SAFE_SELF_SELECT).lean();
     if (!me) return res.status(404).json({ error: "Not found" });
     const payload = serializePublicUser(me, { includeEmail: true, includeStatus: true, includePhotoMeta: true });
@@ -591,6 +610,10 @@ router.patch(
       { returnDocument: "after" }
     ).select("onboarding");
     if (!me) return res.status(404).json({ error: "Not found" });
+    publishNotificationEvent(me._id, "notifications", {
+      at: new Date().toISOString(),
+      type: "onboarding_refresh",
+    });
     return res.json({ onboarding: serializeOnboarding(me.onboarding || {}) });
   })
 );
@@ -600,6 +623,10 @@ router.get(
   requireApprovedUser,
   requireRole("attorney", "admin"),
   asyncHandler(async (req, res) => {
+    if (req.query.expectedOwnerId !== undefined) {
+      res.set("Cache-Control", "private, no-store");
+      try { return res.json(await pendingHireContext.read(req)); } catch (error) { return pendingHireFailure(error, res); }
+    }
     const me = await User.findById(req.user.id).select("pendingHire").lean();
     if (!me) return res.status(404).json({ error: "Not found" });
     return res.json({ pendingHire: serializePendingHire(me.pendingHire || {}) });
@@ -613,6 +640,10 @@ router.put(
   requireRole("attorney", "admin"),
   asyncHandler(async (req, res) => {
     const body = req.body || {};
+    if (body.reviewedRevision !== undefined) {
+      res.set("Cache-Control", "private, no-store");
+      try { return res.json(await pendingHireContext.change(req)); } catch (error) { return pendingHireFailure(error, res); }
+    }
     const caseId = String(body.caseId || "").trim();
     if (!isObjId(caseId)) {
       return res.status(400).json({ error: "Invalid caseId" });
@@ -640,6 +671,10 @@ router.delete(
   requireApprovedUser,
   requireRole("attorney", "admin"),
   asyncHandler(async (req, res) => {
+    if (req.body?.reviewedRevision !== undefined) {
+      res.set("Cache-Control", "private, no-store");
+      try { return res.json(await pendingHireContext.change(req, true)); } catch (error) { return pendingHireFailure(error, res); }
+    }
     const me = await User.findByIdAndUpdate(
       req.user.id,
       { $set: { pendingHire: null } },
@@ -652,38 +687,18 @@ router.delete(
   })
 );
 
-function normalizeWeekStart(value) {
-  const date = value ? new Date(value) : new Date();
-  if (Number.isNaN(date.getTime())) return null;
-  const day = date.getDay();
-  const diff = (day + 6) % 7;
-  date.setDate(date.getDate() - diff);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function normalizeWeeklyNotes(notes = []) {
-  const output = Array(7).fill("");
-  notes.forEach((note, idx) => {
-    if (idx >= output.length) return;
-    output[idx] = cleanMessage(String(note || ""), 2000);
-  });
-  return output;
+function weeklyNotesFailure(error, res) {
+  if (!(error instanceof WeeklyNotesError)) throw error;
+  return res.status(error.status).json({ error: error.message, code: error.code });
 }
 
 router.get(
   "/me/weekly-notes",
   requireApprovedUser,
   asyncHandler(async (req, res) => {
-    const weekStart = normalizeWeekStart(req.query.weekStart);
-    if (!weekStart) return res.status(400).json({ error: "Invalid weekStart" });
-    const doc = await WeeklyNote.findOne({ userId: req.user.id, weekStart }).lean();
-    const notes = normalizeWeeklyNotes(doc?.notes || []);
-    return res.json({
-      weekStart: weekStart.toISOString().slice(0, 10),
-      notes,
-      updatedAt: doc?.updatedAt || null,
-    });
+    res.set("Cache-Control", "no-store");
+    try { return res.json(await readWeeklyNotes(req.user.id, req.query.weekStart)); }
+    catch (error) { return weeklyNotesFailure(error, res); }
   })
 );
 
@@ -692,19 +707,9 @@ router.put(
   csrfProtection,
   requireApprovedUser,
   asyncHandler(async (req, res) => {
-    const weekStart = normalizeWeekStart(req.body?.weekStart || req.query?.weekStart);
-    if (!weekStart) return res.status(400).json({ error: "Invalid weekStart" });
-    const notes = normalizeWeeklyNotes(req.body?.notes || []);
-    const doc = await WeeklyNote.findOneAndUpdate(
-      { userId: req.user.id, weekStart },
-      { $set: { notes } },
-      { upsert: true, returnDocument: "after" }
-    );
-    return res.json({
-      weekStart: weekStart.toISOString().slice(0, 10),
-      notes: normalizeWeeklyNotes(doc?.notes || []),
-      updatedAt: doc?.updatedAt || null,
-    });
+    res.set("Cache-Control", "no-store");
+    try { return res.json(await saveWeeklyNotes(req.user.id, req.body)); }
+    catch (error) { return weeklyNotesFailure(error, res); }
   })
 );
 
@@ -738,6 +743,10 @@ router.post(
     await Notification.updateMany(filter, { $set: { read: true, isRead: true } });
     me.notificationsLastViewedAt = new Date();
     await me.save();
+    publishNotificationEvent(me._id, "notifications", {
+      at: me.notificationsLastViewedAt.toISOString(),
+      type: "notification_read_refresh",
+    });
     return res.json({ ok: true, seenAt: me.notificationsLastViewedAt });
   })
 );
@@ -789,8 +798,19 @@ router.post(
     const { userId } = req.body || {};
     if (!isObjId(userId)) return res.status(400).json({ error: "Invalid userId" });
 
+    const activeBlock = await Block.findOne({
+      blockerId: req.user.id,
+      blockedId: userId,
+      ...ACTIVE_BLOCK_FILTER,
+    }).select("sourceCaseId").lean();
+
     // Legacy unblock endpoint. Keep this silent: never notify the other user.
     await deactivateBlock({ blockerId: req.user.id, blockedId: userId });
+    await publishInteractionAccessRefresh({
+      requesterId: req.user.id,
+      targetId: userId,
+      sourceCaseId: activeBlock?.sourceCaseId || null,
+    });
 
     res.json({ ok: true, blocked: false });
   })
@@ -806,12 +826,50 @@ router.patch(
   csrfProtection,
   requireApprovedUser,
   asyncHandler(async (req, res) => {
-    const me = await User.findById(req.user.id).select(
+    accountWriteGuard.checkOwner(req);
+    let me = await User.findById(req.user.id).select(
       "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
     );
     if (!me) return res.status(404).json({ error: "Not found" });
 
     const body = req.body || {};
+    const writableFields = {
+      firstName: ["firstName"], lastName: ["lastName"], email: ["email", "pendingEmail", "pendingEmailRequestedAt"],
+      phoneNumber: ["phoneNumber"], lawFirm: ["lawFirm"], bio: ["bio"], state: ["state", "location"],
+      timezone: ["timezone"], linkedInURL: ["linkedInURL"], firmWebsite: ["firmWebsite"], barNumber: ["barNumber"],
+      practiceAreas: ["practiceAreas"], publications: ["publications"], languages: ["languages"],
+      experience: ["experience"], yearsExperience: ["yearsExperience"], education: ["education"],
+      skills: ["skills"], bestFor: ["bestFor"], stateExperience: ["stateExperience"],
+      availability: ["availability"], resumeURL: ["resumeURL"], certificateURL: ["certificateURL"], writingSampleURL: ["writingSampleURL"],
+    };
+    const requestedFields = Object.fromEntries(Object.entries(writableFields).filter(([key]) => Object.hasOwn(body, key)));
+    const comparisonDependencies = Object.hasOwn(body, "email") ? { pendingEmail: ["pendingEmail"] } : {};
+    if (body.expectedOwnerId !== undefined) {
+      if (Object.hasOwn(body, "bio")) {
+        requestedFields.bio = ["bio", "about"];
+        comparisonDependencies.about = ["about"];
+      }
+      if (Object.hasOwn(body, "practiceAreas")) {
+        requestedFields.practiceAreas = ["practiceAreas", "specialties"];
+        comparisonDependencies.specialties = ["specialties"];
+      }
+      if (me.role === "paralegal" && Object.hasOwn(body, "stateExperience")) {
+        requestedFields.stateExperience = ["stateExperience", "jurisdictions"];
+        comparisonDependencies.jurisdictions = ["jurisdictions"];
+      }
+    }
+    const clearsPhoto = body.avatarURL !== undefined || body.profileImage !== undefined;
+    if (body.expectedOwnerId !== undefined && Object.keys(body).some(key => !Object.hasOwn(writableFields, key) && !["expectedOwnerId", "expectedValues", "expectedPhotoRevision", "avatarURL", "profileImage"].includes(key))) throw accountWriteGuard.invalid();
+    if (body.expectedOwnerId !== undefined) {
+      const unavailable = me.role === "attorney" ? ["education", "skills", "bestFor", "stateExperience", "resumeURL", "certificateURL", "writingSampleURL"] : ["barNumber", "firmWebsite"];
+      if (unavailable.some(key => Object.hasOwn(body, key))) throw accountWriteGuard.invalid();
+    }
+    const accountFilter = accountWriteGuard.prepareWrite(req, me, {
+      fields: requestedFields,
+      current: serializePublicUser(me, { includeEmail: true, includePhotoMeta: true }),
+      photo: clearsPhoto,
+      dependencies: comparisonDependencies,
+    });
     const storageKeysToDelete = [];
     const {
       firstName,
@@ -861,8 +919,11 @@ router.patch(
     if (typeof lawFirm === "string") {
       me.lawFirm = normStr(lawFirm, { len: 300 }).trim();
     }
-    if (typeof body.state === "string") {
-      me.state = normStr(body.state, { len: 120 }).trim();
+    if (Object.hasOwn(body, "state")) {
+      const primaryState = normalizePrimaryState(body.state);
+      if (!primaryState) return res.status(400).json({ error: "Choose a valid primary state." });
+      me.state = primaryState;
+      me.location = primaryState;
     }
     if (typeof body.primaryPracticeArea === "string") {
       me.primaryPracticeArea = normStr(body.primaryPracticeArea, { len: 200 }).trim();
@@ -872,6 +933,7 @@ router.patch(
     }
     if (body.practiceAreas !== undefined) {
       me.practiceAreas = cleanList(body.practiceAreas);
+      if (accountFilter) me.specialties = me.practiceAreas;
     }
     if (body.publications !== undefined) {
       me.publications = cleanList(body.publications);
@@ -881,8 +943,9 @@ router.patch(
     }
 
     if (typeof bio === "string") {
-      const sanitized = normStr(maskProfanity(bio), { len: 4000 });
+      const sanitized = accountFilter ? normParagraphs(maskProfanity(bio), 4000) : normStr(maskProfanity(bio), { len: 4000 });
       me.bio = sanitized;
+      if (accountFilter) me.about = sanitized;
     }
     const availabilityStr = normalizeAvailability(availability);
     if (availabilityStr) me.availability = availabilityStr;
@@ -915,7 +978,14 @@ router.patch(
         me.profilePhotoStatus = "unsubmitted";
       }
     }
-    if (typeof timezone === "string" && timezone.length <= 64) {
+    if (accountFilter && Object.hasOwn(body, "timezone")) {
+      const zone = typeof timezone === "string" ? timezone.trim() : "";
+      try {
+        if (!zone || zone.length > 64) throw new Error("Invalid timezone");
+        new Intl.DateTimeFormat("en", { timeZone: zone });
+      } catch { throw new accountWriteGuard.AccountWriteError(400, "ACCOUNT_VALIDATION", "Choose a valid time zone before saving."); }
+      me.timezone = zone;
+    } else if (typeof timezone === "string" && timezone.length <= 64) {
       me.timezone = timezone;
     }
 
@@ -990,13 +1060,7 @@ router.patch(
       }
       if (body.stateExperience !== undefined) {
         me.stateExperience = cleanList(body.stateExperience);
-      }
-      if (body.experience !== undefined) {
-        me.experience = cleanCollection(body.experience, [
-          ["title", 300],
-          ["years", 120],
-          ["description", 5000]
-        ]);
+        if (accountFilter) me.jurisdictions = me.stateExperience;
       }
       if (body.education !== undefined) {
         me.education = cleanCollection(body.education, [
@@ -1009,12 +1073,12 @@ router.patch(
           ["startYear", 10],
           ["endMonth", 20],
           ["endYear", 10]
-        ]);
+        ], { multilineFields: accountFilter ? ["activities"] : [] });
       }
-      if (body.yearsExperience !== undefined) {
-        const years = Math.max(0, Math.min(80, parseInt(body.yearsExperience, 10) || 0));
-        me.yearsExperience = years;
-      }
+    }
+    if (["attorney", "paralegal"].includes(me.role)) {
+      if (body.experience !== undefined) me.experience = cleanCollection(body.experience, [["title", 300], ["years", 120], ["description", 5000]], { multilineFields: accountFilter ? ["description"] : [] });
+      if (body.yearsExperience !== undefined) me.yearsExperience = Math.max(0, Math.min(80, parseInt(body.yearsExperience, 10) || 0));
     }
     if (body.languages !== undefined) {
       me.languages = cleanLanguages(body.languages);
@@ -1053,10 +1117,7 @@ router.patch(
     }
 
     if (me.role === "attorney") {
-      me.onboarding = {
-        ...(me.onboarding?.toObject ? me.onboarding.toObject() : me.onboarding || {}),
-        attorneyProfileCompleted: true,
-      };
+      me.set("onboarding.attorneyProfileCompleted", true);
     }
 
     const storageTaskIds = await stagePersonalStorageDeletion({
@@ -1065,9 +1126,16 @@ router.patch(
       reason: "profile_personal_file_cleared",
     });
     try {
-      await me.save();
+      if (accountFilter) {
+        me = await accountWriteGuard.saveFields(User, me, [
+          ...Object.values(requestedFields).flat(), ...(clearsPhoto ? accountWriteGuard.PHOTO_FIELDS : []),
+          ...(me.role === "attorney" ? ["onboarding.attorneyProfileCompleted"] : []),
+        ], accountFilter);
+      } else await me.save();
     } catch (error) {
-      await cancelPersonalStorageDeletion(storageTaskIds).catch(
+      // A guarded write may have committed without its acknowledgement. The
+      // deletion worker rechecks current references before deleting anything.
+      await (accountFilter ? activatePersonalStorageDeletion(storageTaskIds) : cancelPersonalStorageDeletion(storageTaskIds)).catch(
         logPromiseFailure(runtimeLogger, "[users] personal storage deletion rollback failed")
       );
       throw error;
@@ -1091,6 +1159,11 @@ router.patch(
       runtimeLogger.error("[users] profile update audit persistence failed", auditError);
     }
 
+    publishNotificationEvent(me._id, "notifications", {
+      at: new Date().toISOString(),
+      type: "profile_refresh",
+    });
+
     return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true, includePhotoMeta: true }));
   })
 );
@@ -1100,7 +1173,8 @@ router.patch(
   csrfProtection,
   requireApprovedUser,
   asyncHandler(async (req, res) => {
-    const me = await User.findById(req.user.id);
+    accountWriteGuard.checkOwner(req);
+    let me = await User.findById(req.user.id);
     if (!me) return res.status(404).json({ error: "Not found" });
     const current = me.notificationPrefs
       ? typeof me.notificationPrefs.toObject === "function"
@@ -1109,14 +1183,25 @@ router.patch(
       : {};
     const updates = req.body || {};
     const allowed = ["inApp", "inAppMessages", "inAppCase", "emailMessages", "emailCase", "email"];
+    const requested = allowed.filter(key => Object.hasOwn(updates, key));
+    const accountFilter = accountWriteGuard.prepareWrite(req, me, {
+      fields: Object.fromEntries(requested.map(key => [key, [`notificationPrefs.${key}`]])),
+      current: Object.fromEntries(allowed.map(key => [key, current[key] !== false])),
+    });
     allowed.forEach((key) => {
       if (Object.prototype.hasOwnProperty.call(updates, key)) {
         current[key] = !!updates[key];
       }
     });
-    me.notificationPrefs = current;
-    await me.save();
-    return res.json({ notificationPrefs: me.notificationPrefs });
+    if (accountFilter) {
+      requested.forEach(key => me.set(`notificationPrefs.${key}`, current[key]));
+      me = await accountWriteGuard.saveFields(User, me, requested.map(key => `notificationPrefs.${key}`), accountFilter);
+    } else { me.notificationPrefs = current; await me.save(); }
+    publishNotificationEvent(me._id, "notifications", {
+      at: new Date().toISOString(),
+      type: "notification_preferences_refresh",
+    });
+    return res.json({ notificationPrefs: me.notificationPrefs, updatedAt: me.updatedAt || null });
   })
 );
 
@@ -1149,6 +1234,10 @@ router.post(
     } catch (auditError) {
       runtimeLogger.error("[users] availability audit persistence failed", auditError);
     }
+    publishNotificationEvent(me._id, "notifications", {
+      at: new Date().toISOString(),
+      type: "availability_refresh",
+    });
     return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true, includePhotoMeta: true }));
   })
 );
@@ -1180,6 +1269,10 @@ router.post(
     } catch (auditError) {
       runtimeLogger.error("[users] email preference audit persistence failed", auditError);
     }
+    publishNotificationEvent(me._id, "notifications", {
+      at: new Date().toISOString(),
+      type: "notification_preferences_refresh",
+    });
     return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true, includePhotoMeta: true }));
   })
 );
@@ -1483,7 +1576,11 @@ paralegalRouter.post(
 
     const body = req.body || {};
     if (typeof body.about === "string") paralegal.about = normStr(maskProfanity(body.about), { len: 4000 });
-    if (typeof body.location === "string") paralegal.location = normStr(body.location, { len: 400 });
+    if (Object.hasOwn(body, "location")) {
+      const location = typeof body.location === "string" ? normStr(body.location, { len: 400 }).trim() : "";
+      if (!location) return res.status(400).json({ error: "Location cannot be blank." });
+      paralegal.location = location;
+    }
     const availabilityStr = normalizeAvailability(body.availability);
     if (availabilityStr) paralegal.availability = availabilityStr;
     if (body.yearsExperience !== undefined) {

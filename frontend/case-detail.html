@@ -4,7 +4,8 @@
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
   <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
-  <link rel="stylesheet" href="assets/styles/global-search.css" />
+  <link rel="stylesheet" href="assets/styles/lpc-dialog-refresh.css?v=20260831-1" />
+  <link rel="stylesheet" href="assets/styles/global-search.css?v=20260831-3" />
   <link rel="stylesheet" href="assets/styles/context-panel.css?v=20260812-paralegal-heading" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
@@ -18,7 +19,7 @@
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
-  <script src="assets/scripts/utils/session.js?v=20260820-1"></script>
+  <script src="assets/scripts/utils/session.js?v=20260902-1"></script>
   <script src="assets/scripts/utils/business-date.js"></script>
   <style>
     :root {
@@ -79,30 +80,9 @@
     }
 
     html.theme-dark,
-    body.theme-dark,
-    html.theme-mountain-dark,
-    body.theme-mountain-dark {
+    body.theme-dark {
       background: #0f172a;
       color: #e6edf7;
-    }
-
-    html.theme-mountain,
-    html.theme-mountain body,
-    body.theme-mountain {
-      --bg: #f8f6f1;
-      --panel: #ffffff;
-      --muted: #7a736a;
-      --sidebar-text: #ffffff;
-      --sidebar-bg: rgba(255, 255, 255, 0.15);
-    }
-
-    html.theme-mountain body.role-attorney,
-    body.role-attorney.theme-mountain {
-      --bg: #ffffff;
-      --panel: #fcfcfc;
-      --muted: #8a8a8a;
-      --sidebar-text: #1a1a1a;
-      --sidebar-bg: #f5f5f5e6;
     }
 
     * {
@@ -190,29 +170,6 @@
       background: transparent;
       pointer-events: none;
       transition: background 0.3s ease;
-    }
-
-    body.theme-mountain .sidebar,
-    html.theme-mountain .sidebar,
-    body.theme-mountain-dark .sidebar,
-    html.theme-mountain-dark .sidebar {
-      background: url("hero-mountain.jpg") center/cover no-repeat;
-      color: #ffffff;
-    }
-
-    body.theme-mountain .sidebar::before,
-    html.theme-mountain .sidebar::before,
-    body.theme-mountain-dark .sidebar::before,
-    html.theme-mountain-dark .sidebar::before {
-      background: rgba(0, 0, 0, 0.45);
-    }
-
-    body.theme-mountain .sidebar > *,
-    html.theme-mountain .sidebar > *,
-    body.theme-mountain-dark .sidebar > *,
-    html.theme-mountain-dark .sidebar > * {
-      position: relative;
-      z-index: 1;
     }
 
     .logo {
@@ -338,63 +295,22 @@
       background: rgba(255, 255, 255, 0.12);
     }
 
-    body.theme-mountain .sidebar nav a,
-    html.theme-mountain .sidebar nav a,
-    body.theme-mountain-dark .sidebar nav a,
-    html.theme-mountain-dark .sidebar nav a {
-      color: #ffffff;
-    }
-
-    body.theme-mountain .sidebar nav a.active,
-    body.theme-mountain .sidebar nav a:hover,
-    body.theme-mountain-dark .sidebar nav a.active,
-    body.theme-mountain-dark .sidebar nav a:hover,
-    html.theme-mountain .sidebar nav a.active,
-    html.theme-mountain .sidebar nav a:hover,
-    html.theme-mountain-dark .sidebar nav a.active,
-    html.theme-mountain-dark .sidebar nav a:hover {
-      background: rgba(255, 255, 255, 0.18);
-    }
-
-    body.theme-mountain .case-nav-caret,
-    body.theme-mountain-dark .case-nav-caret,
     body.theme-dark .case-nav-caret,
-    html.theme-mountain .case-nav-caret,
-    html.theme-mountain-dark .case-nav-caret,
     html.theme-dark .case-nav-caret {
       color: inherit;
     }
 
-    body.theme-mountain .case-nav-dropdown,
-    body.theme-mountain-dark .case-nav-dropdown,
-    html.theme-mountain .case-nav-dropdown,
-    html.theme-mountain-dark .case-nav-dropdown {
-      border-color: rgba(255, 255, 255, 0.35);
-    }
-
-    body.theme-mountain .case-nav-status,
-    body.theme-mountain-dark .case-nav-status,
     body.theme-dark .case-nav-status,
-    html.theme-mountain .case-nav-status,
-    html.theme-mountain-dark .case-nav-status,
     html.theme-dark .case-nav-status {
       color: inherit;
     }
 
-    body.theme-mountain .case-nav-link,
-    body.theme-mountain-dark .case-nav-link,
     body.theme-dark .case-nav-link,
-    html.theme-mountain .case-nav-link,
-    html.theme-mountain-dark .case-nav-link,
     html.theme-dark .case-nav-link {
       color: inherit;
     }
 
-    body.theme-mountain .case-nav-link:hover,
-    body.theme-mountain-dark .case-nav-link:hover,
     body.theme-dark .case-nav-link:hover,
-    html.theme-mountain .case-nav-link:hover,
-    html.theme-mountain-dark .case-nav-link:hover,
     html.theme-dark .case-nav-link:hover {
       background: rgba(255, 255, 255, 0.18);
     }
@@ -428,24 +344,8 @@
       outline: none;
     }
 
-    body.theme-mountain .sidebar-link,
-    html.theme-mountain .sidebar-link,
-    body.theme-mountain-dark .sidebar-link,
-    html.theme-mountain-dark .sidebar-link {
-      color: #ffffff;
-      border-color: rgba(255, 255, 255, 0.4);
-    }
-
-    body.theme-mountain .sidebar-link:hover,
-    body.theme-mountain .sidebar-link:focus,
-    body.theme-mountain-dark .sidebar-link:hover,
-    body.theme-mountain-dark .sidebar-link:focus,
     body.theme-dark .sidebar-link:hover,
     body.theme-dark .sidebar-link:focus,
-    html.theme-mountain .sidebar-link:hover,
-    html.theme-mountain .sidebar-link:focus,
-    html.theme-mountain-dark .sidebar-link:hover,
-    html.theme-mountain-dark .sidebar-link:focus,
     html.theme-dark .sidebar-link:hover,
     html.theme-dark .sidebar-link:focus {
       color: #ffffff;
@@ -709,38 +609,17 @@
     body.theme-dark.role-attorney .user-chip span {
       color: rgba(255,255,255,0.8);
     }
-    body.theme-mountain.role-attorney .user-chip {
-      background: rgba(255,255,255,0.65);
-      border-color: transparent;
-      box-shadow: none;
-    }
-    body.theme-mountain.role-attorney .user-chip strong {
-      color: #1b1b1b;
-    }
-    body.theme-mountain.role-attorney .user-chip span {
-      color: #6b6b6b;
-    }
     body.theme-dark:not(.role-attorney) .user-chip,
-    html.theme-dark body:not(.role-attorney) .user-chip,
-    body.theme-mountain-dark:not(.role-attorney) .user-chip,
-    html.theme-mountain-dark body:not(.role-attorney) .user-chip {
+    html.theme-dark body:not(.role-attorney) .user-chip {
       background: rgba(15,23,42,0.4);
       border-color: transparent;
       box-shadow: none;
     }
-    body.theme-dark:not(.role-attorney) .user-chip strong,
-    body.theme-mountain-dark:not(.role-attorney) .user-chip strong {
+    body.theme-dark:not(.role-attorney) .user-chip strong {
       color: #fff;
     }
-    body.theme-dark:not(.role-attorney) .user-chip span,
-    body.theme-mountain-dark:not(.role-attorney) .user-chip span {
+    body.theme-dark:not(.role-attorney) .user-chip span {
       color: rgba(255, 255, 255, 0.8);
-    }
-    body.theme-mountain:not(.role-attorney) .user-chip strong {
-      color: #1b1b1b;
-    }
-    body.theme-mountain:not(.role-attorney) .user-chip span {
-      color: #6b6b6b;
     }
 
     .profile-dropdown {
@@ -757,9 +636,7 @@
       z-index: 40;
     }
     body.theme-dark .profile-dropdown,
-    html.theme-dark .profile-dropdown,
-    body.theme-mountain-dark .profile-dropdown,
-    html.theme-mountain-dark .profile-dropdown {
+    html.theme-dark .profile-dropdown {
       background: #151b29;
       border-color: rgba(255, 255, 255, 0.12);
     }
@@ -785,9 +662,7 @@
       background: var(--app-surface-contrast);
     }
     body.theme-dark .profile-dropdown button:hover,
-    html.theme-dark .profile-dropdown button:hover,
-    body.theme-mountain-dark .profile-dropdown button:hover,
-    html.theme-mountain-dark .profile-dropdown button:hover {
+    html.theme-dark .profile-dropdown button:hover {
       background: rgba(255, 255, 255, 0.06);
     }
 
@@ -805,9 +680,7 @@
       min-height: 0;
     }
     body.theme-dark .case-workspace,
-    html.theme-dark .case-workspace,
-    body.theme-mountain-dark .case-workspace,
-    html.theme-mountain-dark .case-workspace {
+    html.theme-dark .case-workspace {
       background: #151b29;
       border-color: rgba(255, 255, 255, 0.12);
     }
@@ -821,9 +694,7 @@
       min-height: 0;
     }
     body.theme-dark .case-rail-stack,
-    html.theme-dark .case-rail-stack,
-    body.theme-mountain-dark .case-rail-stack,
-    html.theme-mountain-dark .case-rail-stack {
+    html.theme-dark .case-rail-stack {
       background: #151b29;
       border-right-color: rgba(255, 255, 255, 0.08);
     }
@@ -867,11 +738,7 @@
     body.theme-dark .case-rail-header input,
     body.theme-dark .case-rail-header select,
     html.theme-dark .case-rail-header input,
-    html.theme-dark .case-rail-header select,
-    body.theme-mountain-dark .case-rail-header input,
-    body.theme-mountain-dark .case-rail-header select,
-    html.theme-mountain-dark .case-rail-header input,
-    html.theme-mountain-dark .case-rail-header select {
+    html.theme-dark .case-rail-header select {
       background: #1c2333;
       border-color: rgba(255, 255, 255, 0.12);
       color: var(--app-text);
@@ -947,9 +814,7 @@
       min-height: 0;
     }
     body.theme-dark .case-thread,
-    html.theme-dark .case-thread,
-    body.theme-mountain-dark .case-thread,
-    html.theme-mountain-dark .case-thread {
+    html.theme-dark .case-thread {
       background: #151b29;
       border-right-color: rgba(255, 255, 255, 0.08);
     }
@@ -1119,9 +984,7 @@
     }
 
     body.theme-dark .message-dropzone,
-    body.theme-mountain-dark .message-dropzone,
-    html.theme-dark .message-dropzone,
-    html.theme-mountain-dark .message-dropzone {
+    html.theme-dark .message-dropzone {
       background: rgba(12, 18, 28, 0.75);
       border-color: var(--app-border-soft);
       color: var(--app-text);
@@ -1423,17 +1286,13 @@
     }
 
     body.theme-dark .message-bubble,
-    body.theme-mountain-dark .message-bubble,
-    html.theme-dark .message-bubble,
-    html.theme-mountain-dark .message-bubble {
+    html.theme-dark .message-bubble {
       background: #1f2533;
       color: var(--app-text);
     }
 
     body.theme-dark .message-card.is-outgoing .message-bubble,
-    body.theme-mountain-dark .message-card.is-outgoing .message-bubble,
-    html.theme-dark .message-card.is-outgoing .message-bubble,
-    html.theme-mountain-dark .message-card.is-outgoing .message-bubble {
+    html.theme-dark .message-card.is-outgoing .message-bubble {
       background: #2a3344;
       color: var(--app-text);
     }
@@ -1498,17 +1357,13 @@
     }
 
     body.theme-dark .document-card,
-    body.theme-mountain-dark .document-card,
-    html.theme-dark .document-card,
-    html.theme-mountain-dark .document-card {
+    html.theme-dark .document-card {
       background: rgba(255, 255, 255, 0.06);
       color: var(--app-text);
     }
 
     body.theme-dark .document-card.is-outgoing,
-    body.theme-mountain-dark .document-card.is-outgoing,
-    html.theme-dark .document-card.is-outgoing,
-    html.theme-mountain-dark .document-card.is-outgoing {
+    html.theme-dark .document-card.is-outgoing {
       background: rgba(255, 255, 255, 0.1);
     }
 
@@ -1671,13 +1526,9 @@
     }
 
     body.theme-dark .document-actions button,
-    body.theme-mountain-dark .document-actions button,
     body.theme-dark .document-actions a,
-    body.theme-mountain-dark .document-actions a,
     html.theme-dark .document-actions button,
-    html.theme-mountain-dark .document-actions button,
-    html.theme-dark .document-actions a,
-    html.theme-mountain-dark .document-actions a {
+    html.theme-dark .document-actions a {
       background: #2a3344;
       color: var(--app-text);
     }
@@ -1920,9 +1771,7 @@
       overflow-y: auto;
     }
     body.theme-dark .case-overview-panel,
-    html.theme-dark .case-overview-panel,
-    body.theme-mountain-dark .case-overview-panel,
-    html.theme-mountain-dark .case-overview-panel {
+    html.theme-dark .case-overview-panel {
       background: #151b29;
     }
 
@@ -2538,9 +2387,7 @@
     }
 
     body.theme-dark #caseTaskList input[type="checkbox"],
-    html.theme-dark #caseTaskList input[type="checkbox"],
-    body.theme-mountain-dark #caseTaskList input[type="checkbox"],
-    html.theme-mountain-dark #caseTaskList input[type="checkbox"] {
+    html.theme-dark #caseTaskList input[type="checkbox"] {
       border-color: rgba(255, 255, 255, 0.22);
       background: #151b29;
       box-shadow:
@@ -2549,9 +2396,7 @@
     }
 
     body.theme-dark #caseTaskList input[type="checkbox"]:checked,
-    html.theme-dark #caseTaskList input[type="checkbox"]:checked,
-    body.theme-mountain-dark #caseTaskList input[type="checkbox"]:checked,
-    html.theme-mountain-dark #caseTaskList input[type="checkbox"]:checked {
+    html.theme-dark #caseTaskList input[type="checkbox"]:checked {
       border-color: var(--app-accent);
       background: var(--app-accent);
     }
@@ -2559,11 +2404,7 @@
     body.theme-dark #caseTaskList input[type="checkbox"]:focus,
     body.theme-dark #caseTaskList input[type="checkbox"]:focus-visible,
     html.theme-dark #caseTaskList input[type="checkbox"]:focus,
-    html.theme-dark #caseTaskList input[type="checkbox"]:focus-visible,
-    body.theme-mountain-dark #caseTaskList input[type="checkbox"]:focus,
-    body.theme-mountain-dark #caseTaskList input[type="checkbox"]:focus-visible,
-    html.theme-mountain-dark #caseTaskList input[type="checkbox"]:focus,
-    html.theme-mountain-dark #caseTaskList input[type="checkbox"]:focus-visible {
+    html.theme-dark #caseTaskList input[type="checkbox"]:focus-visible {
       box-shadow:
         inset 0 0 0 1px rgba(255, 255, 255, 0.16),
         0 1px 2px rgba(0, 0, 0, 0.45);
@@ -3508,9 +3349,7 @@
     }
 
     body.theme-dark .matter-stage,
-    body.theme-mountain-dark .matter-stage,
-    html.theme-dark .matter-stage,
-    html.theme-mountain-dark .matter-stage {
+    html.theme-dark .matter-stage {
       background: #151b29;
     }
 
@@ -3579,9 +3418,11 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260820-18" />
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260831-21" />
+  <link rel="stylesheet" href="assets/styles/lpc-product-components.css?v=20260901-1" />
   <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
-  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260812-1" />
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260831-3" />
+  <script defer src="assets/scripts/universal-header.js?v=20260831-3"></script>
   <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
   <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
   <style>
@@ -3596,8 +3437,10 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="assets/styles/paralegal-financials.css" />
+  <link rel="stylesheet" href="assets/styles/matter-workspace-navigation.css" />
 </head>
-<body class="dashboard-no-shadows lpc-product-clean lpc-auth-resource-page case-detail-no-topbar">
+<body class="dashboard-no-shadows lpc-product-clean lpc-auth-resource-page case-detail-no-topbar lpc-static-universal-header lpc-auth-shell-v2">
   <a href="#main" class="skip-link">Skip to main content</a>
   <a href="#case-messages" class="skip-link" id="matterMessagesSkipLink" hidden>Skip to Matter messages</a>
   <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
@@ -3606,17 +3449,18 @@
 
   <div class="case-shell">
     <aside class="sidebar" id="sidebarNav">
-      <div class="logo">Dashboard</div>
+      <div class="logo sidebar-profile-host">
+        <div class="sidebar-profile-cluster" data-lpc-sidebar-profile>
+          <button class="user-chip lpc-sidebar-profile-trigger" type="button" data-lpc-sidebar-profile-trigger aria-label="Open profile menu" aria-haspopup="true" aria-expanded="false">
+            <img class="globalProfileImage lpc-sidebar-profile-trigger-avatar" src="assets/avatar-placeholder.svg" alt="" />
+            <span class="lpc-sidebar-profile-trigger-details"><strong class="globalProfileName">Member</strong></span>
+            <svg class="lpc-profile-trigger-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"></path></svg>
+          </button>
+        </div>
+      </div>
       <nav aria-label="Attorney navigation" data-visible="attorney" hidden>
         <a href="dashboard-attorney.html#home" data-view-target="home">Home</a>
-        <a href="dashboard-attorney.html#cases" class="active case-nav-toggle" data-view-target="cases" data-case-nav-toggle>
-          Matters
-          <span class="case-nav-caret" aria-hidden="true">▾</span>
-        </a>
-        <div class="case-nav-dropdown" data-case-nav-dropdown aria-hidden="true">
-          <div class="case-nav-status" data-case-nav-status>Loading Matters...</div>
-          <ul class="case-nav-list" data-case-nav-list></ul>
-        </div>
+        <a href="dashboard-attorney.html#cases" class="active" data-view-target="cases">Matters</a>
         <a href="dashboard-attorney.html#tasks" data-view-target="tasks">Tasks</a>
         <a href="browse-paralegals.html">Paralegals</a>
         <a href="dashboard-attorney.html#funds" data-view-target="funds">Payments</a>
@@ -3624,56 +3468,36 @@
       <nav aria-label="Paralegal navigation" data-visible="paralegal" hidden>
         <a href="dashboard-paralegal.html#home" data-view-link="home">Home</a>
         <a href="browse-jobs.html">Browse Matters</a>
-        <a href="dashboard-paralegal.html#cases" class="active case-nav-toggle" data-view-link="cases" data-case-nav-toggle>
-          My Matters
-          <span class="case-nav-caret" aria-hidden="true">▾</span>
-        </a>
-        <div class="case-nav-dropdown" data-case-nav-dropdown aria-hidden="true">
-          <div class="case-nav-status" data-case-nav-status>Loading Matters...</div>
-          <ul class="case-nav-list" data-case-nav-list></ul>
-        </div>
+        <a href="dashboard-paralegal.html#cases" class="active" data-view-link="cases">My Matters</a>
         <a href="profile-settings.html">Profile Settings</a>
         <a href="paralegalhelp.html">Help</a>
       </nav>
       <div class="sidebar-bottom">
-        <div class="sidebar-footer">&copy; Let&#8217;s-ParaConnect 2026</div>
+        <div class="sidebar-footer">&copy; Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect 2026</div>
       </div>
     </aside>
     <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
+    <div class="lpc-auth-page-shell">
+    <div class="lpc-universal-header-shell lpc-universal-header-shell--created" role="group" aria-label="Workspace tools" data-lpc-universal-header="true">
+      <div class="lpc-universal-header-controls" data-notification-center="true" aria-label="Search, notifications, and Assistant">
+        <div class="lpc-global-search-host" data-productivity-trigger-host></div>
+        <div class="notification-wrapper"><button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span class="notification-badge" data-notification-badge>0</span></button><div class="notifications-panel notif-panel hidden" role="region" aria-label="Notifications" aria-live="polite" data-notification-panel><div class="notif-header" aria-label="Notifications"></div><div class="notif-scroll" data-notification-list></div><div class="notif-empty" data-notification-empty>Loading…</div><button type="button" class="notif-markall" data-notification-mark>Mark All Read</button></div></div>
+      </div>
+    </div>
     <main class="case-main" id="main" tabindex="-1">
       <div class="case-workspace">
         <div class="case-rail-stack">
           <aside class="case-rail" aria-label="Matter switcher">
             <header class="case-rail-header">
-              <div class="case-rail-title">Matters</div>
-              <select id="case-select" name="case-select" aria-label="Select a Matter"></select>
+              <h1 id="caseTitle" tabindex="-1">Loading Matter…</h1>
+              <div id="matterSwitcher"></div>
             </header>
+            <div id="matterLoadState" role="status" hidden><p id="matterLoadMessage"></p><button type="button" id="matterLoadRetry" class="matter-switch-secondary">Retry</button></div>
           </aside>
         </div>
 
         <article class="matter-stage" aria-label="Matter workspace">
-          <div class="case-topbar-controls" data-notification-center>
-            <div class="notification-wrapper">
-              <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 1-3.46 0"/></svg>
-                <span class="notification-badge" data-notification-badge>0</span>
-              </button>
-              <div class="notifications-panel notif-panel hidden" role="region" aria-label="Notifications" data-notification-panel>
-                <div class="notif-header">Notifications</div>
-                <div class="notif-scroll" data-notification-list></div>
-                <div class="notif-empty" data-notification-empty>No notifications yet.</div>
-                <button class="notif-markall" type="button" data-notification-mark>Mark all read</button>
-              </div>
-            </div>
-          </div>
-          <header class="case-topbar-title" aria-label="Current Matter">
-            <h1 id="caseTitle">Loading Matter</h1>
-            <p class="case-thread-subtitle" id="caseStatusLine" role="status"></p>
-            <p class="case-thread-context" id="caseContextLine"></p>
-            <p class="case-thread-attention" id="caseAttentionLine" hidden></p>
-            <a class="case-next-action" id="caseNextAction" href="dashboard-attorney.html#cases" hidden></a>
-          </header>
           <nav class="matter-tabs" id="matter-tabs" role="tablist" aria-label="Matter sections">
             <button type="button" role="tab" id="matter-tab-overview" aria-controls="matter-panel-overview" aria-selected="true" tabindex="0" data-matter-tab="overview">Overview</button>
             <button type="button" role="tab" id="matter-tab-applications" aria-controls="matter-panel-applications" aria-selected="false" tabindex="-1" data-matter-tab="applications">Applications</button>
@@ -3681,7 +3505,7 @@
             <button type="button" role="tab" id="matter-tab-files" aria-controls="matter-panel-files" aria-selected="false" tabindex="-1" data-matter-tab="files">Files</button>
             <button type="button" role="tab" id="matter-tab-messages" aria-controls="matter-panel-messages" aria-selected="false" tabindex="-1" data-matter-tab="messages">Messages</button>
             <button type="button" role="tab" id="matter-tab-activity" aria-controls="matter-panel-activity" aria-selected="false" tabindex="-1" data-matter-tab="activity">Activity</button>
-            <button type="button" role="tab" id="matter-tab-financials" aria-controls="matter-panel-financials" aria-selected="false" tabindex="-1" data-matter-tab="financials">Financials</button>
+            <button type="button" role="tab" id="matter-tab-financials" aria-controls="matter-panel-financials" aria-selected="false" tabindex="-1" data-matter-tab="financials">Payments</button>
           </nav>
           <p class="matter-tab-live visually-hidden" id="matterTabLive" aria-live="polite"></p>
 
@@ -3751,7 +3575,7 @@
           </section>
 
           <section class="matter-tab-panel" id="matter-panel-files" role="tabpanel" aria-labelledby="matter-tab-files" data-matter-panel="files" hidden>
-            <header class="matter-section-header"><div><p class="matter-section-eyebrow">Matter</p><h2>Files</h2></div><p>Shared deliverables and existing review actions.</p></header>
+            <header class="matter-section-header"><div><p class="matter-section-eyebrow">Matter</p><h2>Files</h2></div><p>Files shared for this Matter.</p></header>
             <section class="case-documents-panel" aria-label="Shared files">
               <div class="matter-files-toolbar"><p id="matterFilesStatus" role="status">Files load when this section opens.</p><button type="button" class="case-action-btn secondary" id="matterAddFilesButton">Add files</button></div>
               <ul id="caseSharedDocuments" class="case-documents-list" aria-live="polite"></ul>
@@ -3790,32 +3614,36 @@
           </section>
 
           <section class="matter-tab-panel" id="matter-panel-financials" role="tabpanel" aria-labelledby="matter-tab-financials" data-matter-panel="financials" hidden>
-            <header class="matter-section-header"><div><p class="matter-section-eyebrow">Matter</p><h2>Financials</h2></div><p>Saved compensation, funding, payout, and receipt information.</p></header>
-            <div class="matter-financial-status"><span>Current state</span><strong id="matterFinancialStatus">Payment status unavailable</strong></div>
-            <dl class="matter-financial-list" id="matterFinancialList"></dl>
-            <p class="matter-section-state" id="matterFinancialNote"></p>
-            <a class="case-action-btn matter-section-action" id="matterReceiptAction" target="_blank" rel="noopener" hidden>View receipt</a>
+            <header class="matter-section-header"><h2>Payments</h2></header>
+            <div id="matterPaymentDetails"></div>
           </section>
         </article>
       </div>
     </main>
+    </div>
   </div>
   <script type="module" src="assets/scripts/utils/notifications.js"></script>
   <script src="assets/scripts/context-panel.js?v=20260812-paralegal-heading"></script>
   <script src="assets/scripts/productivity-command-registry.js"></script>
   <script type="module" src="assets/scripts/case-detail.js"></script>
-  <script src="assets/scripts/global-search.js"></script>
+  <script src="assets/scripts/global-search.js?v=20260831-2"></script>
   <script>
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebarNav = document.getElementById('sidebarNav');
     const sidebarBackdrop = document.getElementById('sidebarBackdrop');
     const closeSidebar = () => {
       document.body.classList.remove('nav-open');
-      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
+      if (sidebarToggle) {
+        sidebarToggle.setAttribute('aria-expanded', 'false');
+        sidebarToggle.setAttribute('aria-label', 'Open menu');
+      }
     };
     const openSidebar = () => {
       document.body.classList.add('nav-open');
-      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'true');
+      if (sidebarToggle) {
+        sidebarToggle.setAttribute('aria-expanded', 'true');
+        sidebarToggle.setAttribute('aria-label', 'Close menu');
+      }
     };
     if (sidebarToggle) {
       sidebarToggle.addEventListener('click', () => {
@@ -3831,6 +3659,15 @@
         if (event.target && event.target.tagName === 'A') closeSidebar();
       });
     }
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && document.body.classList.contains('nav-open')) {
+        closeSidebar();
+        sidebarToggle?.focus({ preventScroll: true });
+      }
+    });
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 1024) closeSidebar();
+    });
     const participantsSection = document.querySelector('.case-participants');
     const participantsToggle = participantsSection?.querySelector('.case-participants-toggle');
     const participantsMedia = window.matchMedia('(max-width: 900px)');

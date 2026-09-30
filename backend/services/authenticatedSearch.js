@@ -4,6 +4,8 @@ const SEARCH_QUERY_MIN = 2;
 const SEARCH_QUERY_MAX = 80;
 const SEARCH_RESULT_LIMIT = 6;
 const SEARCH_CANDIDATE_LIMIT = 36;
+const SEARCH_QUERY_TIMEOUT_MS = 5000;
+const SEARCH_RANK_BATCH_SIZE = 100;
 const SUPPORTED_TYPES = new Set(["matter", "profile"]);
 
 const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -20,10 +22,25 @@ function normalizeSearchQuery(value) {
 }
 
 function parseSearchTypes(value) {
+  if (value !== undefined && typeof value !== "string" && !Array.isArray(value)) return null;
+  if (Array.isArray(value) && value.some((item) => typeof item !== "string")) return null;
   const raw = Array.isArray(value) ? value : String(value || "matter,profile").split(",");
   const types = [...new Set(raw.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean))];
   if (!types.length || types.some((type) => !SUPPORTED_TYPES.has(type))) return null;
   return types;
+}
+
+function validateSearchRead(query = {}, viewer = {}) {
+  const invalid = { status: 400, code: "SEARCH_QUERY_INVALID", error: "Enter one search query and a valid account expectation." };
+  if (Object.keys(query).some((key) => /^(?:q|expectedOwnerId|types)[\[.]/.test(key))) return { error: invalid };
+  if (query.q !== undefined && typeof query.q !== "string") return { error: invalid };
+  if (!Object.hasOwn(query, "expectedOwnerId")) return { ownerId: null };
+  if (typeof query.expectedOwnerId !== "string" || !/^[a-f\d]{24}$/i.test(query.expectedOwnerId)) return { error: invalid };
+  const ownerId = query.expectedOwnerId.toLowerCase();
+  if (ownerId !== normalizeId(viewer.id || viewer._id).toLowerCase()) {
+    return { error: { status: 403, code: "ACCOUNT_CHANGED", error: "Your account changed. Refresh before searching." } };
+  }
+  return { ownerId };
 }
 
 function humanizeStatus(value) {
@@ -195,7 +212,7 @@ function buildMatterAccessFilter(viewer, blockedIds = []) {
 function buildMatterSearchFilter(query, viewer, blockedIds = []) {
   const access = buildMatterAccessFilter(viewer, blockedIds);
   if (!access) return null;
-  const tokens = normalizeSearchQuery(query).split(" ").filter(Boolean).slice(0, 8);
+  const tokens = normalizeSearchQuery(query).split(" ").filter(Boolean);
   return {
     $and: [
       access,
@@ -211,7 +228,6 @@ function buildProfileSearchFilter(query, blockedIds = []) {
   const matchers = String(query || "")
     .split(/\s+/)
     .filter(Boolean)
-    .slice(0, 8)
     .map((token) => new RegExp(escapeRegex(token), "i"));
   const filter = {
     role: "paralegal",
@@ -258,59 +274,102 @@ function rankSearchDocuments(docs = [], query, getPrimary, getFields, getUpdated
     .map((entry) => entry.doc);
 }
 
+const stringValue = (value) => ({ $convert: { input: value, to: "string", onNull: "", onError: "" } });
+const joinValues = (input) => ({ $reduce: { input, initialValue: "", in: { $concat: ["$$value", " ", stringValue("$$this")] } } });
+const profileRankFields = { _id: 1, firstName: 1, lastName: 1, specialties: 1, practiceAreas: 1, location: 1, state: 1, updatedAt: 1 };
+const matterRankFields = { _id: 1, title: 1, practiceArea: 1, updatedAt: 1 };
+
+function searchRankPipeline({ filter, fields, primary, searchable, query }) {
+  // Mongo lowercasing is used only for ASCII metadata. The cursor below handles
+  // Unicode with the same JavaScript NFKC and locale rules as the original ranker.
+  const common = [
+    { $match: filter },
+    { $project: { ...fields, __primary: primary, __searchable: searchable } },
+    { $set: { __unicode: { $regexMatch: { input: "$__searchable", regex: "[^\\x00-\\x7f]" } } } },
+  ];
+  const normalized = { $toLower: { $reduce: {
+    input: { $regexFindAll: { input: "$__primary", regex: "[^\\x00-\\x20\\x7f]+" } },
+    initialValue: "",
+    in: { $concat: ["$$value", { $cond: [{ $eq: ["$$value", ""] }, "", " "] }, "$$this.match"] },
+  } } };
+  const normalizedQuery = normalizeRankText(query);
+  return {
+    ordinary: [...common,
+      { $match: { __unicode: false } },
+      { $set: { __normalized: normalized } },
+      { $set: {
+        __rank: { $switch: { branches: [
+          { case: { $eq: ["$__normalized", { $literal: normalizedQuery }] }, then: 4 },
+          { case: { $eq: [{ $indexOfCP: ["$__normalized", { $literal: normalizedQuery }] }, 0] }, then: 3 },
+        ], default: 2 } },
+        __date: { $convert: { input: "$updatedAt", to: "date", onNull: new Date(0), onError: new Date(0) } },
+      } },
+      { $sort: { __rank: -1, __date: -1, _id: -1 } },
+      { $limit: SEARCH_RESULT_LIMIT },
+      { $project: fields },
+    ],
+    unicode: [...common, { $match: { __unicode: true } }, { $project: fields }],
+  };
+}
+
+async function selectRankedDocuments({ Model, filter, fields, primary, searchable, query, getPrimary, getFields, projection }) {
+  // Aggregations do not cast schema paths. Use the existing find casting so
+  // ObjectId aliases and retained string values have exactly the prior policy.
+  const castFilter = Model.find(filter).cast(Model);
+  const pipeline = searchRankPipeline({ filter: castFilter, fields, primary, searchable, query });
+  const deadline = Date.now() + SEARCH_QUERY_TIMEOUT_MS;
+  const remaining = () => {
+    const time = deadline - Date.now();
+    if (time <= 0) throw Object.assign(new Error("Search query deadline exceeded"), { code: "SEARCH_TIMEOUT" });
+    return time;
+  };
+  const rank = (docs) => rankSearchDocuments(docs, query, getPrimary, getFields, (doc) => doc.updatedAt);
+  const boundedOptions = () => ({ maxTimeMS: remaining(), timeoutMS: remaining(), allowDiskUse: false });
+  let selected = rank(await Model.aggregate(pipeline.ordinary).option(boundedOptions()));
+  const cursor = Model.aggregate(pipeline.unicode).option({ ...boundedOptions(), timeoutMode: "cursorLifetime" }).cursor({ batchSize: SEARCH_RANK_BATCH_SIZE });
+  try {
+    for await (const doc of cursor) {
+      remaining();
+      selected = rank([...selected, doc]);
+    }
+  } finally { await cursor.close(); }
+  remaining();
+  if (!selected.length) return [];
+  // Reauthorize selected rows and project only the current public DTO inputs.
+  const rows = await Model.find({ $and: [filter, { _id: { $in: selected.map((doc) => doc._id) } }] })
+    .select(projection).maxTimeMS(remaining()).setOptions({ timeoutMS: remaining() }).lean();
+  const byId = new Map(rows.map((doc) => [normalizeId(doc), doc]));
+  return selected.map((doc) => byId.get(normalizeId(doc))).filter(Boolean);
+}
+
 async function searchAuthorizedObjects({ query, types, viewer, blockedIds = [], Case, User }) {
   const tasks = [];
   if (types.includes("matter")) {
     const filter = buildMatterSearchFilter(query, viewer, blockedIds);
-    tasks.push(
-      filter
-        ? Case.find(filter)
-            .sort({ updatedAt: -1, _id: -1 })
-            .limit(SEARCH_CANDIDATE_LIMIT)
-            .select({
-              _id: 1,
-              title: 1,
-              status: 1,
-              practiceArea: 1,
-              attorney: 1,
-              attorneyId: 1,
-              paralegal: 1,
-              paralegalId: 1,
-              paralegalAccessRevokedAt: 1,
-              applicants: { $elemMatch: { paralegalId: normalizeId(viewer?.id || viewer?._id), status: { $in: ["pending", "accepted"] } } },
-              pausedReason: 1,
-              relistRequestedAt: 1,
-              paymentReleased: 1,
-              updatedAt: 1,
-            })
-            .lean()
-            .then((docs) => rankSearchDocuments(
-              docs,
-              query,
-              (doc) => doc.title,
-              (doc) => [doc.title, doc.practiceArea],
-              (doc) => doc.updatedAt
-            ))
-            .then((docs) => ["matters", docs.map((doc) => presentMatter(doc, viewer))])
-        : Promise.resolve(["matters", []])
-    );
+    tasks.push(filter ? selectRankedDocuments({
+      Model: Case, filter, fields: matterRankFields, query,
+      primary: stringValue("$title"), searchable: joinValues(["$title", "$practiceArea"]),
+      getPrimary: (doc) => doc.title, getFields: (doc) => [doc.title, doc.practiceArea],
+      projection: {
+        _id: 1, title: 1, status: 1, practiceArea: 1, attorney: 1, attorneyId: 1,
+        paralegal: 1, paralegalId: 1, paralegalAccessRevokedAt: 1,
+        applicants: { $elemMatch: { paralegalId: normalizeId(viewer?.id || viewer?._id), status: { $in: ["pending", "accepted"] } } },
+        pausedReason: 1, relistRequestedAt: 1, paymentReleased: 1, updatedAt: 1,
+      },
+    }).then((docs) => ["matters", docs.map((doc) => presentMatter(doc, viewer))]) : Promise.resolve(["matters", []]));
   }
   if (types.includes("profile") && String(viewer?.role || "").toLowerCase() === "attorney") {
-    tasks.push(
-      User.find(buildProfileSearchFilter(query, blockedIds))
-        .sort({ updatedAt: -1, _id: -1 })
-        .limit(SEARCH_CANDIDATE_LIMIT)
-        .select("_id firstName lastName specialties practiceAreas location state updatedAt")
-        .lean()
-        .then((docs) => rankSearchDocuments(
-          docs,
-          query,
-          (doc) => [doc.firstName, doc.lastName].filter(Boolean).join(" "),
-          (doc) => [doc.firstName, doc.lastName, ...(doc.specialties || []), ...(doc.practiceAreas || []), doc.location, doc.state],
-          (doc) => doc.updatedAt
-        ))
-        .then((docs) => ["profiles", docs.map(presentProfile)])
-    );
+    tasks.push(selectRankedDocuments({
+      Model: User, filter: buildProfileSearchFilter(query, blockedIds), fields: profileRankFields, projection: profileRankFields, query,
+      primary: { $concat: [stringValue("$firstName"), " ", stringValue("$lastName")] },
+      searchable: joinValues({ $concatArrays: [
+        ["$firstName", "$lastName", "$location", "$state"],
+        { $cond: [{ $isArray: "$specialties" }, "$specialties", []] },
+        { $cond: [{ $isArray: "$practiceAreas" }, "$practiceAreas", []] },
+      ] }),
+      getPrimary: (doc) => [doc.firstName, doc.lastName].filter(Boolean).join(" "),
+      getFields: (doc) => [doc.firstName, doc.lastName, ...(doc.specialties || []), ...(doc.practiceAreas || []), doc.location, doc.state],
+    }).then((docs) => ["profiles", docs.map(presentProfile)]));
   }
   const groups = Object.fromEntries(await Promise.all(tasks));
   return { matters: groups.matters || [], profiles: groups.profiles || [] };
@@ -321,6 +380,8 @@ module.exports = {
   SEARCH_QUERY_MAX,
   SEARCH_RESULT_LIMIT,
   SEARCH_CANDIDATE_LIMIT,
+  SEARCH_QUERY_TIMEOUT_MS,
+  SEARCH_RANK_BATCH_SIZE,
   buildMatterAccessFilter,
   buildMatterSearchFilter,
   buildProfileSearchFilter,
@@ -328,6 +389,7 @@ module.exports = {
   matterRelationship,
   normalizeSearchQuery,
   parseSearchTypes,
+  validateSearchRead,
   presentMatter,
   presentMatterContext,
   presentProfile,

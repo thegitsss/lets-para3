@@ -192,6 +192,7 @@
     if (!kind || !id || !adapters.has(kind)) return false;
     const target = ensurePanel();
     returnFocus = options.returnFocus || document.activeElement;
+    target.dialog.dataset.contextKind = kind;
     current = {
       kind,
       id,
@@ -394,6 +395,14 @@
   window.LPCContextPanel = {
     close: closePanel,
     current: () => current,
+    refresh: async (kind, id) => {
+      if (current?.kind !== kind || current?.id !== String(id)) return;
+      const requested = current;
+      await loadCurrent();
+      if (current === requested && panel?.dialog.open) {
+        (panel.footer.querySelector("button, a") || panel.close).focus();
+      }
+    },
     open,
     openMatter,
     openProfile,

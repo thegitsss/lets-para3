@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
-const { execFileSync } = require("child_process");
+const { parse } = require("@babel/parser");
+const traverse = require("@babel/traverse").default;
 
 const repositoryRoot = path.resolve(__dirname, "../..");
 const frontendRoot = path.join(repositoryRoot, "frontend");
@@ -8,13 +9,14 @@ const scriptsRoot = path.join(frontendRoot, "assets", "scripts");
 const stylesRoot = path.join(frontendRoot, "assets", "styles");
 const SOURCE_EXTENSIONS = new Set([".html", ".js", ".mjs", ".css"]);
 const SCRIPT_EXTENSIONS = new Set([".js", ".mjs"]);
+const webAuthnVersion = JSON.parse(fs.readFileSync(path.join(repositoryRoot, "backend/node_modules/@simplewebauthn/browser/package.json"), "utf8")).version;
 const VIRTUAL_FRONTEND_ASSETS = new Map([
   [
     "/assets/vendor/chart-4.5.1.js",
     path.join(repositoryRoot, "backend", "node_modules", "chart.js", "dist", "chart.umd.js"),
   ],
   [
-    "/assets/vendor/simplewebauthn.js",
+    `/assets/vendor/simplewebauthn-${webAuthnVersion}.js`,
     path.join(repositoryRoot, "backend", "node_modules", "@simplewebauthn", "browser", "dist", "bundle", "index.umd.min.js"),
   ],
   [
@@ -200,8 +202,33 @@ function generatedCssWrapperIssue(source = "", sourcePath = "") {
   return /^(?:\s*```(?:css)?\s*$|\s*\/\/|\s*(?:Absolutely|Sure)[—,!:.\s])/im.test(String(source));
 }
 
-function nativeDialogIssue(source = "") {
-  return /(?:^|[^\w.])(?:window\s*\.\s*)?(?:alert|confirm|prompt)\s*\(/m.test(String(source));
+function nativeDialogIssue(source = "", sourcePath = "") {
+  const value = String(source), nativeNames = new Set(["alert", "confirm", "prompt"]);
+  if (path.extname(sourcePath) === ".css") return false;
+  const candidates = path.extname(sourcePath) === ".html" || /^\s*(?:<!doctype\s+html|<html\b|<script\b)/i.test(value)
+    ? [...value.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)].filter(match => !/\btype\s*=\s*["'](?:importmap|application\/(?:ld\+)?json)["']/i.test(match[1])).map(match => match[2])
+    : [value];
+  return candidates.some(candidate => {
+    if (!/\b(?:alert|confirm|prompt)\b/.test(candidate)) return false;
+    let found = false;
+    try {
+      const ast = parse(candidate, { sourceType: "unambiguous" });
+      traverse(ast, {
+        "CallExpression|OptionalCallExpression"(call) {
+          const callee = call.node.callee;
+          if (callee.type === "Identifier" && nativeNames.has(callee.name) && !call.scope.getBinding(callee.name)) found = true;
+          if (["MemberExpression", "OptionalMemberExpression"].includes(callee.type)) {
+            const object = callee.object, name = callee.computed ? callee.property.value : callee.property.name;
+            if (object.type === "Identifier" && ["window", "globalThis", "self"].includes(object.name) && !call.scope.getBinding(object.name) && nativeNames.has(name)) found = true;
+          }
+        },
+      });
+    } catch {
+      // Syntax has a separate gate; do not excuse a native call in invalid code.
+      return /(?:^|[^\w.])(?:window\s*\.\s*)?(?:alert|confirm|prompt)\s*\(/m.test(candidate);
+    }
+    return found;
+  });
 }
 
 function remoteVisualAssetIssue(source = "", sourcePath = "") {
@@ -272,12 +299,31 @@ function resolveNavigationTarget(htmlPath, value = "") {
   return { targetPath, fragment };
 }
 
-function documentSupportsFragment(source = "", fragment = "") {
+function documentSupportsFragment(source = "", fragment = "", htmlPath = "") {
   const value = String(fragment).trim();
   if (!value) return true;
   if (declaredIds(source).has(value)) return true;
   const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (new RegExp(`\\bdata-(?:view|step|view-link)\\s*=\\s*["']${escaped}["']`, "i").test(source)) return true;
+  if (new RegExp(`\\bdata-(?:view|step|view-link|section)\\s*=\\s*["']${escaped}["']`, "i").test(source)) return true;
+  if (value.startsWith("/")) {
+    // V2 renders route contents dynamically. Validate against its actual parser,
+    // only when this document mounts the corresponding application entry point.
+    for (const role of ["attorney", "paralegal"]) {
+      if (htmlPath !== path.join(frontendRoot, `${role}-v2.html`)) continue;
+      const appPath = path.join(scriptsRoot, `${role}-v2/app.mjs`);
+      const mounted = collectHtmlAssetReferences(htmlPath).some(reference => reference.resolved === appPath)
+        && [...source.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)]
+          .some(match => resolveFrontendReference(htmlPath, match[1]) === appPath);
+      if (!mounted) continue;
+      const routes = require(path.join(scriptsRoot, `${role}-v2/${role === "attorney" ? "routes" : "router"}.mjs`));
+      const parseRoute = role === "attorney" ? routes.parseRoute : routes.parseRouteHash;
+      if (parseRoute(`#${value}`).found === true) return true;
+    }
+    const routePath = value.split("?")[0];
+    for (const match of source.matchAll(/\bdata-view\s*=\s*["']([^"']+)["']/gi)) {
+      if (match[1].split("?")[0] === routePath) return true;
+    }
+  }
 
   const [view, filter, ...extra] = value.split(":");
   if (filter && !extra.length) {
@@ -331,7 +377,7 @@ function staticDocumentRelationshipIssues(htmlPath, source = "") {
       const targetSource = resolved.targetPath === htmlPath
         ? source
         : fs.readFileSync(resolved.targetPath, "utf8");
-      if (!documentSupportsFragment(targetSource, fragment)) {
+      if (!documentSupportsFragment(targetSource, fragment, resolved.targetPath)) {
         issues.push(`references missing fragment ${href}`);
       }
     }
@@ -355,53 +401,65 @@ function staticDocumentRelationshipIssues(htmlPath, source = "") {
   return [...new Set(issues)].sort();
 }
 
-function listVersionedOrNewScripts() {
-  const tracked = execFileSync(
-    "git",
-    ["ls-files", "frontend/assets/scripts/*.js", "frontend/assets/scripts/**/*.js", "frontend/assets/scripts/*.mjs", "frontend/assets/scripts/**/*.mjs"],
-    { cwd: repositoryRoot, encoding: "utf8" }
-  )
-    .split("\n")
-    .filter(Boolean);
-  const untracked = execFileSync(
-    "git",
-    ["ls-files", "--others", "--exclude-standard", "frontend/assets/scripts"],
-    { cwd: repositoryRoot, encoding: "utf8" }
-  )
-    .split("\n")
-    .filter((filePath) => SCRIPT_EXTENSIONS.has(path.extname(filePath)));
-  return new Set([...tracked, ...untracked].map((filePath) => path.join(repositoryRoot, filePath)));
-}
-
-function resolveScriptImport(importer, specifier) {
-  const clean = stripUrlSuffix(specifier);
-  if (!clean || !clean.startsWith(".")) return null;
-  let target = path.resolve(path.dirname(importer), clean);
-  if (!path.extname(target)) target += ".js";
-  return target.startsWith(scriptsRoot) && fs.existsSync(target) ? target : null;
+function listFrontendScripts() {
+  return new Set(walk(scriptsRoot).filter(file => SCRIPT_EXTENSIONS.has(path.extname(file))));
 }
 
 function collectReachableScripts(htmlFiles) {
-  const reachable = new Set();
-  const queue = [];
+  const reachable = new Set(), importsByFile = new Map();
+  const importsIn = source => {
+    const values = [];
+    const ast = parse(source, { sourceType: "unambiguous" });
+    traverse(ast, {
+      "ImportDeclaration|ExportNamedDeclaration|ExportAllDeclaration"(entry) {
+        if (entry.node.source) values.push(entry.node.source.value);
+      },
+      CallExpression(entry) {
+        if (entry.node.callee.type === "Import" && entry.node.arguments[0]?.type === "StringLiteral") values.push(entry.node.arguments[0].value);
+      },
+      ImportExpression(entry) { if (entry.node.source.type === "StringLiteral") values.push(entry.node.source.value); },
+    });
+    return values;
+  };
   for (const htmlPath of htmlFiles) {
-    const source = fs.readFileSync(htmlPath, "utf8");
-    for (const match of source.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)) {
-      const resolved = resolveFrontendReference(htmlPath, match[1]);
-      if (resolved?.startsWith(scriptsRoot) && fs.existsSync(resolved)) queue.push(resolved);
+    const source = fs.readFileSync(htmlPath, "utf8"), mappings = new Map(), queue = [], visited = new Set();
+    const scripts = [...source.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)];
+    const keyFor = (importer, value) => value.startsWith(".") ? "/" + path.relative(frontendRoot, path.resolve(path.dirname(importer), value)).split(path.sep).join("/") : value;
+    for (const script of scripts) {
+      if (!/\btype\s*=\s*["']importmap["']/i.test(script[1])) continue;
+      const map = JSON.parse(script[2]);
+      for (const [key, value] of Object.entries(map.imports || {})) mappings.set(keyFor(htmlPath, key), value);
     }
-  }
-  while (queue.length) {
-    const scriptPath = queue.pop();
-    if (reachable.has(scriptPath)) continue;
-    reachable.add(scriptPath);
-    const source = fs.readFileSync(scriptPath, "utf8");
-    for (const match of source.matchAll(/(?:from\s*|import\s*\(|import\s*)["']([^"']+)["']/g)) {
-      const imported = resolveScriptImport(scriptPath, match[1]);
-      if (imported) queue.push(imported);
+    const enqueue = (importer, value, mapped = true) => {
+      let specifier = stripUrlSuffix(value), base = importer;
+      const key = keyFor(importer, specifier);
+      if (mapped && mappings.has(key)) { specifier = mappings.get(key); base = htmlPath; }
+      if (typeof specifier !== "string" || !specifier || /^(?:[a-z]+:|\/\/)/i.test(specifier)) return;
+      if (!specifier.startsWith("/") && !specifier.startsWith(".")) return;
+      const resolved = resolveFrontendReference(base, specifier);
+      if (resolved?.startsWith(scriptsRoot + path.sep) && SCRIPT_EXTENSIONS.has(path.extname(resolved)) && fs.existsSync(resolved)) queue.push(resolved);
+    };
+    for (const script of scripts) {
+      if (/\btype\s*=\s*["'](?:importmap|application\/(?:ld\+)?json)["']/i.test(script[1])) continue;
+      const src = script[1].match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1];
+      if (src) enqueue(htmlPath, src.startsWith(".") || src.startsWith("/") || /^[a-z]+:/i.test(src) ? src : "./" + src, false);
+      else for (const value of importsIn(script[2])) enqueue(htmlPath, value);
+    }
+    while (queue.length) {
+      const scriptPath = queue.pop();
+      if (visited.has(scriptPath)) continue;
+      visited.add(scriptPath); reachable.add(scriptPath);
+      if (!importsByFile.has(scriptPath)) importsByFile.set(scriptPath, importsIn(fs.readFileSync(scriptPath, "utf8")));
+      for (const value of importsByFile.get(scriptPath)) enqueue(scriptPath, value);
     }
   }
   return reachable;
+}
+
+function collectServerReachableScripts() {
+  const { reachableFiles } = require("./check-backend-reachability");
+  return new Set([...reachableFiles({ dependencyRoot: repositoryRoot })]
+    .filter(file => file.startsWith(scriptsRoot + path.sep) && SCRIPT_EXTENSIONS.has(path.extname(file))));
 }
 
 function collectReachableStyles(htmlFiles, reachableScripts = new Set()) {
@@ -437,22 +495,8 @@ function collectReachableStyles(htmlFiles, reachableScripts = new Set()) {
   return reachable;
 }
 
-function listVersionedOrNewStyles() {
-  const tracked = execFileSync(
-    "git",
-    ["ls-files", "frontend/assets/styles/*.css", "frontend/assets/styles/**/*.css"],
-    { cwd: repositoryRoot, encoding: "utf8" }
-  )
-    .split("\n")
-    .filter(Boolean);
-  const untracked = execFileSync(
-    "git",
-    ["ls-files", "--others", "--exclude-standard", "frontend/assets/styles"],
-    { cwd: repositoryRoot, encoding: "utf8" }
-  )
-    .split("\n")
-    .filter((filePath) => path.extname(filePath) === ".css");
-  return new Set([...tracked, ...untracked].map((filePath) => path.join(repositoryRoot, filePath)));
+function listFrontendStyles() {
+  return new Set(walk(stylesRoot).filter(file => path.extname(file) === ".css"));
 }
 
 function runChecks() {
@@ -557,7 +601,7 @@ function runChecks() {
     if (/\.(?:onchange|onclick|onsubmit|onkeydown|onkeyup)\s*=(?!=)/i.test(source)) {
       failures.push(`${relative(sourcePath)} assigns a DOM event handler property instead of using addEventListener`);
     }
-    if (nativeDialogIssue(source)) {
+    if (nativeDialogIssue(source, sourcePath)) {
       failures.push(`${relative(sourcePath)} uses a native browser dialog instead of the accessible product dialog system`);
     }
   }
@@ -591,14 +635,14 @@ function runChecks() {
     }
   }
 
-  const reachable = collectReachableScripts(htmlFiles);
-  for (const scriptPath of listVersionedOrNewScripts()) {
+  const reachable = new Set([...collectReachableScripts(htmlFiles), ...collectServerReachableScripts()]);
+  for (const scriptPath of listFrontendScripts()) {
     if (fs.existsSync(scriptPath) && !reachable.has(scriptPath)) {
       failures.push(`${relative(scriptPath)} is an orphan module with no production entry point`);
     }
   }
   const reachableStyles = collectReachableStyles(htmlFiles, reachable);
-  for (const stylePath of listVersionedOrNewStyles()) {
+  for (const stylePath of listFrontendStyles()) {
     if (fs.existsSync(stylePath) && !reachableStyles.has(stylePath)) {
       failures.push(`${relative(stylePath)} is an orphan stylesheet with no production entry point`);
     }
@@ -621,6 +665,7 @@ module.exports = {
   collectHtmlAssetReferences,
   collectCssAssetReferences,
   collectReachableScripts,
+  collectServerReachableScripts,
   collectReachableStyles,
   clientSessionCompatibilityIssue,
   duplicateStaticIds,

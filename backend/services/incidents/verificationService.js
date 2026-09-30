@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const vm = require("node:vm");
 
 const IncidentArtifact = require("../../models/IncidentArtifact");
 const IncidentInvestigation = require("../../models/IncidentInvestigation");
@@ -183,7 +184,36 @@ function runJavaScriptBuildCheck(source, relativeFile) {
 }
 
 function runNotificationUiVerification(source) {
+  let runtimeError = "";
+  const styles = [];
+  try {
+    // Execute the complete module with startup opt-out and a narrow DOM fixture.
+    // This is a runtime regression check, not browser or visual acceptance.
+    const document = {
+      getElementById: id => styles.find(style => style.id === id) || null,
+      createElement: tag => ({ tagName: String(tag).toUpperCase() }),
+      head: { appendChild: style => { styles.push(style); } },
+    };
+    vm.runInNewContext(`${sanitizeModuleSource(source)}\nensureNotificationStyles();\nensureNotificationStyles();`, {
+      document,
+      window: { __SKIP_NOTIFICATIONS__: true },
+    }, { timeout: 1000 });
+  } catch (error) {
+    runtimeError = String(error?.message || "Notification module execution failed.");
+  }
   const checks = [
+    {
+      key: "runtime-registration",
+      label: runtimeError ? `Notification module execution failed: ${runtimeError}` : "Executes notification style registration without a runtime error.",
+      passed: !runtimeError && styles.length > 0,
+    },
+    {
+      key: "idempotent-registration",
+      label: "Repeated registration creates exactly one named style element with both fade rules.",
+      passed: !runtimeError && styles.length === 1 && styles[0].tagName === "STYLE"
+        && Boolean(styles[0].id) && String(styles[0].textContent).includes(".notif-fade-ready")
+        && String(styles[0].textContent).includes(".notif-fade-in"),
+    },
     {
       key: "style-lookup",
       label: "Looks up the shared notification style id before injecting.",
@@ -254,12 +284,16 @@ function runPreferencesUiVerification(source) {
     {
       key: "preferences-response-guard",
       label: "The preferences flow still handles failed saves before returning.",
-      passed: source.includes('showToast(data.error || "Unable to save preferences.", "err")'),
+      passed:
+        source.includes('showToast(data.error || "Unable to save preferences.", "err")') ||
+        source.includes("Could not save. Your previous setting has been restored."),
     },
     {
       key: "preferences-success-toast",
       label: "The preferences flow still confirms successful saves.",
-      passed: source.includes('showToast("Preferences saved", "ok")'),
+      passed:
+        source.includes('showToast("Preferences saved", "ok")') ||
+        source.includes('setPreferencesSaveStatus(successMessage, "saved")'),
     },
   ];
 
@@ -382,7 +416,7 @@ async function runNotificationStyleVerification({ incident, patch, verification 
       attempts: 1,
       artifactId: uiArtifact._id,
       details: uiResult.ok
-        ? "Static UI verification confirmed the shared notification style injection flow."
+        ? "Notification module execution confirmed style registration and idempotence; rendered browser acceptance is separate."
         : `Missing UI verification signals: ${uiResult.missing.join("; ")}`,
     });
   } else {
@@ -891,4 +925,5 @@ async function runVerification(incident) {
 
 module.exports = {
   runVerification,
+  runNotificationUiVerification,
 };

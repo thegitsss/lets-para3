@@ -24,6 +24,7 @@ const faqCandidateSchema = new Schema(
     draftAnswer: { type: String, trim: true, default: "", maxlength: 12000 },
     summary: { type: String, trim: true, default: "", maxlength: 2000 },
     approvalState: { type: String, enum: FAQ_CANDIDATE_STATES, default: "pending_review", index: true },
+    approvalTaskClaimVersion: { type: Number, default: 0 },
     patternKey: { type: String, trim: true, default: "", index: true },
     category: { type: String, trim: true, default: "", maxlength: 120 },
     audienceScopes: {

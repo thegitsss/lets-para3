@@ -6,6 +6,8 @@ const Incident = require("../../models/Incident");
 const SupportConversation = require("../../models/SupportConversation");
 const SupportMessage = require("../../models/SupportMessage");
 const SupportTicket = require("../../models/SupportTicket");
+const SupportMutation = require("../../models/SupportMutation");
+const { LpcEvent } = require("../../models/LpcEvent");
 const User = require("../../models/User");
 const { createConversationMessage } = require("../support/conversationService");
 const { assertCcoAutonomyHarnessEnabled } = require("../../utils/ccoAutonomyHarnessAccess");
@@ -16,7 +18,7 @@ const SCENARIOS = Object.freeze({
   reopen: {
     key: "reopen",
     label: "Resolved ticket reopen",
-    expectedActionType: "ticket_reopened",
+    expectedOutcome: { requestState: "succeeded", ticketStatus: "in_review", routingOwner: "founder_review", incidentLinked: false },
     userRole: "paralegal",
     sourceSurface: "paralegal",
     sourcePage: "/dashboard-paralegal.html",
@@ -54,7 +56,7 @@ const SCENARIOS = Object.freeze({
   escalation: {
     key: "escalation",
     label: "Conversation escalation",
-    expectedActionType: "ticket_escalated",
+    expectedOutcome: { requestState: "succeeded", ticketStatus: "open", routingOwner: "support_ops", incidentLinked: false },
     userRole: "attorney",
     sourceSurface: "attorney",
     sourcePage: "/dashboard-attorney.html",
@@ -91,7 +93,7 @@ const SCENARIOS = Object.freeze({
   incident_routing: {
     key: "incident_routing",
     label: "Support-to-incident routing",
-    expectedActionType: "incident_routed_from_support",
+    expectedOutcome: { requestState: "succeeded", ticketStatus: "open", routingOwner: "founder_review", incidentLinked: true },
     userRole: "attorney",
     sourceSurface: "attorney",
     sourcePage: "/create-case.html",
@@ -169,7 +171,7 @@ function buildHarnessMetadata({ scenario, adminUser, user, ticketId = null } = {
     support: {
       harnessScenarioKey: scenario.key,
       harnessScenarioLabel: scenario.label,
-      harnessExpectedActionType: scenario.expectedActionType,
+      harnessExpectedOutcome: scenario.expectedOutcome,
       harnessSeededAt: new Date(),
       harnessSeededByAdminId: normalizeId(adminUser?._id || adminUser?.id),
       harnessSeededByAdminEmail: adminUser?.email || "",
@@ -283,7 +285,7 @@ async function seedScenario({ scenario: scenarioInput, adminUser = {} } = {}) {
       ...(conversation.metadata?.support || {}),
       harnessScenarioKey: scenario.key,
       harnessScenarioLabel: scenario.label,
-      harnessExpectedActionType: scenario.expectedActionType,
+      harnessExpectedOutcome: scenario.expectedOutcome,
       harnessRecommendedMessage: scenario.defaultMessage,
       harnessSyntheticUserId: normalizeId(user._id),
       proactiveIssueLabel: scenario.issueLabel,
@@ -300,7 +302,7 @@ async function seedScenario({ scenario: scenarioInput, adminUser = {} } = {}) {
 
   return {
     scenarioKey: scenario.key,
-    expectedActionType: scenario.expectedActionType,
+    expectedOutcome: scenario.expectedOutcome,
     syntheticUserId: normalizeId(user._id),
     conversationId: normalizeId(conversation._id),
     ticketId: normalizeId(ticket._id),
@@ -372,6 +374,17 @@ async function inspectScenario({ conversationId = "", ticketId = "" } = {}) {
         .lean()
     : [];
 
+  const supportRequests = conversation
+    ? await SupportMutation.find({ conversationId: conversation._id, ownerId: conversation.userId })
+      .select('requestId action state active userMessageId assistantMessageId createdAt updatedAt +result')
+      .sort({ createdAt: -1, _id: -1 }).lean()
+    : [];
+  const handoffEvents = ticketIds.length
+    ? await LpcEvent.find({ 'related.supportTicketId': { $in: ticketIds }, 'facts.assistantMutationId': { $exists: true }, eventType: { $in: ['support.ticket.escalated', 'support.submission.created'] } })
+      .select('eventType actor.actorType routing.status related.supportTicketId related.incidentId facts.assistantMutationId occurredAt')
+      .sort({ occurredAt: -1, _id: -1 }).lean()
+    : [];
+
   return {
     conversation: conversation
       ? {
@@ -424,6 +437,16 @@ async function inspectScenario({ conversationId = "", ticketId = "" } = {}) {
       resolution: incident.resolution || {},
       updatedAt: incident.updatedAt || null,
     })),
+    supportRequests: supportRequests.map(request => ({
+      id: normalizeId(request._id), requestId: request.requestId, action: request.action, state: request.state, active: request.active,
+      userMessageId: normalizeId(request.result?.userMessage?.id || request.userMessageId), assistantMessageId: normalizeId(request.result?.assistantMessage?.id || request.assistantMessageId),
+      createdAt: request.createdAt || null, updatedAt: request.updatedAt || null,
+    })),
+    handoffEvents: handoffEvents.map(event => ({
+      id: normalizeId(event._id), eventType: event.eventType, actorType: event.actor?.actorType || '', routingStatus: event.routing?.status || '',
+      ticketId: normalizeId(event.related?.supportTicketId), incidentId: normalizeId(event.related?.incidentId), requestRecordId: event.facts?.assistantMutationId || '',
+      occurredAt: event.occurredAt || null,
+    })),
     autonomousActions: actions.map((action) => ({
       id: normalizeId(action._id),
       agentRole: action.agentRole,
@@ -462,6 +485,11 @@ async function triggerScenario({
     throw error;
   }
 
+  const marker = conversation.metadata?.support || {};
+  const denyUnseeded = () => { throw Object.assign(new Error('Only a seeded synthetic support conversation can be triggered by this harness.'), { statusCode: 403 }); };
+  if (!Object.hasOwn(SCENARIOS, marker.harnessScenarioKey) || normalizeId(marker.harnessSyntheticUserId) !== normalizeId(conversation.userId)
+    || !mongoose.isValidObjectId(marker.harnessSeededByAdminId) || !marker.harnessSeededAt || !Number.isFinite(new Date(marker.harnessSeededAt).getTime())) denyUnseeded();
+
   const scenario = scenarioInput
     ? resolveScenario(scenarioInput)
     : resolveScenario(conversation.metadata?.support?.harnessScenarioKey || "");
@@ -471,6 +499,7 @@ async function triggerScenario({
     error.statusCode = 404;
     throw error;
   }
+  if (!/^cco-autonomy\+[^@]+@lets-paraconnect\.local$/.test(user.email || '') || user.role !== conversation.role) denyUnseeded();
 
   const finalMessage = String(message || scenario.defaultMessage).trim();
   if (!finalMessage) {
@@ -512,7 +541,7 @@ async function triggerScenario({
 
   return {
     scenarioKey: scenario.key,
-    expectedActionType: scenario.expectedActionType,
+    expectedOutcome: scenario.expectedOutcome,
     message: finalMessage,
     payload,
     inspection: await inspectScenario({ conversationId: conversation._id }),

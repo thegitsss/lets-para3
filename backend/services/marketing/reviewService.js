@@ -90,8 +90,8 @@ async function listMarketingApprovalTasks() {
     .lean();
 }
 
-async function approveMarketingPacket({ packetId, actor, note = "" } = {}) {
-  const packet = await MarketingDraftPacket.findById(packetId);
+async function approveMarketingPacket({ packetId, actor, note = "", session = null, afterCommit = null } = {}) {
+  const packet = await MarketingDraftPacket.findById(packetId).session(session);
   if (!packet) {
     throw new Error("Marketing draft packet not found.");
   }
@@ -102,13 +102,13 @@ async function approveMarketingPacket({ packetId, actor, note = "" } = {}) {
     targetType: "marketing_draft_packet",
     targetId: String(packet._id),
     approvalState: "pending",
-  }).lean();
+  }).session(session).lean();
 
   packet.approvalState = "approved";
-  await packet.save();
+  await packet.save({ session });
 
-  await MarketingBrief.updateOne({ _id: packet.briefId }, { $set: { approvalState: "in_queue" } });
-  const brief = await MarketingBrief.findById(packet.briefId).lean();
+  await MarketingBrief.updateOne({ _id: packet.briefId }, { $set: { approvalState: "in_queue" } }, { session });
+  const brief = await MarketingBrief.findById(packet.briefId).session(session).lean();
 
   await ApprovalTask.updateMany(
     {
@@ -124,40 +124,45 @@ async function approveMarketingPacket({ packetId, actor, note = "" } = {}) {
         decidedAt: new Date(),
         decisionNote: note || "Approved.",
       },
-    }
+    },
+    { session }
   );
 
-  await publishApprovalDecisionEvent({
-    decision: "approved",
-    approvalRecordType: "approval_task",
-    approvalRecordId: pendingTask?._id || String(packet._id),
-    approvalTargetType: "marketing_draft_packet",
-    approvalTargetId: String(packet._id),
-    title: `Marketing packet approved: ${packet.workflowType || "draft packet"}`,
-    summary: note || packet.packetSummary || "Marketing packet approved.",
-    actor,
-    related: {
-      approvalTaskId: pendingTask?._id || null,
-      marketingBriefId: packet.briefId || null,
-      marketingDraftPacketId: packet._id,
-    },
-    service: "marketing",
-    sourceSurface: "admin",
-    route: `/api/admin/marketing/draft-packets/${packet._id}/approve`,
-    correlationId: `marketing:${packet.briefId || packet._id}`,
-    founderVisible: true,
-    publicFacing: true,
-    priority: "normal",
-  });
+  const publishDecision = async () => {
+    await publishApprovalDecisionEvent({
+      decision: "approved",
+      approvalRecordType: "approval_task",
+      approvalRecordId: pendingTask?._id || String(packet._id),
+      approvalTargetType: "marketing_draft_packet",
+      approvalTargetId: String(packet._id),
+      title: `Marketing packet approved: ${packet.workflowType || "draft packet"}`,
+      summary: note || packet.packetSummary || "Marketing packet approved.",
+      actor,
+      related: {
+        approvalTaskId: pendingTask?._id || null,
+        marketingBriefId: packet.briefId || null,
+        marketingDraftPacketId: packet._id,
+      },
+      service: "marketing",
+      sourceSurface: "admin",
+      route: `/api/admin/marketing/draft-packets/${packet._id}/approve`,
+      correlationId: `marketing:${packet.briefId || packet._id}`,
+      founderVisible: true,
+      publicFacing: true,
+      priority: "normal",
+    });
 
-  await recordPacketOutcomeEvaluation({
-    packet: packet.toObject ? packet.toObject() : packet,
-    brief,
-    decision: "approved",
-    note,
-    actor,
-    decidedAt: new Date(),
-  });
+    await recordPacketOutcomeEvaluation({
+      packet: packet.toObject ? packet.toObject() : packet,
+      brief,
+      decision: "approved",
+      note,
+      actor,
+      decidedAt: new Date(),
+    });
+  };
+  if (afterCommit) afterCommit.push(publishDecision);
+  else await publishDecision();
 
   return packet;
 }

@@ -47,7 +47,7 @@ describe("release candidate identity", () => {
       const command = args.join(" ");
       if (command === "rev-parse --show-toplevel") return fixtureRoot;
       if (command === "rev-parse HEAD") return commit;
-      if (command === "status --porcelain=v1 --untracked-files=all") return dirty;
+      if (command === "status --porcelain=v1 --untracked-files=normal") return dirty;
       if (args[0] === "ls-files") return REQUIRED_CANDIDATE_FILES.join("\n");
       if (command === "symbolic-ref --quiet --short HEAD") return branch;
       throw new Error(`Unexpected git command: ${command}`);
@@ -133,7 +133,7 @@ describe("release candidate identity", () => {
     ).toThrow(/regular file/);
   });
 
-  test("uses real Git state to accept a clean commit and reject the next dirty change", () => {
+  function commitFixture() {
     const git = (args) =>
       execFileSync("git", args, {
         cwd: fixtureRoot,
@@ -148,18 +148,37 @@ describe("release candidate identity", () => {
       "user.name=LPC Release Test",
       "-c",
       "user.email=release-test@lets-paraconnect.local",
+      "-c",
+      "commit.gpgsign=false",
+      "-c",
+      "core.hooksPath=/dev/null",
       "commit",
       "--quiet",
       "-m",
       "candidate fixture",
     ]);
+    return git;
+  }
 
+  test("uses real Git state to accept a clean commit and reject the next dirty change", () => {
+    const git = commitFixture();
     const manifest = buildCandidateManifest({ repoRoot: fixtureRoot, env: {} });
     expect(manifest.commit).toBe(git(["rev-parse", "HEAD"]));
     expect(Object.keys(manifest.files)).toHaveLength(REQUIRED_CANDIDATE_FILES.length);
 
     fs.appendFileSync(path.join(fixtureRoot, "backend/package.json"), "dirty\n");
     expect(() => buildCandidateManifest({ repoRoot: fixtureRoot, env: {} })).toThrow(/not clean/);
+  });
+
+  test("rejects a large untracked evidence tree without exhausting Git's output buffer", () => {
+    const git = commitFixture();
+    const relativeDirectory = path.join('untracked-evidence', ...Array.from({ length: 6 }, (_, i) => `${i}-${'e'.repeat(70)}`));
+    const directory = path.join(fixtureRoot, relativeDirectory); fs.mkdirSync(directory, { recursive: true });
+    for (let i = 0; i < 1800; i++) fs.writeFileSync(path.join(directory, `${String(i).padStart(4, '0')}-${'capture'.repeat(25)}.txt`), '');
+    const expanded = execFileSync('git', ['status', '--porcelain=v1', '--untracked-files=all'], { cwd: fixtureRoot, encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
+    expect(Buffer.byteLength(expanded)).toBeGreaterThan(1024 * 1024);
+    expect(git(['status', '--porcelain=v1', '--untracked-files=normal'])).toBe('?? untracked-evidence/');
+    expect(() => buildCandidateManifest({ repoRoot: fixtureRoot, env: {} })).toThrow(/Working tree or index is not clean/);
   });
 
   test("writes atomic owner-only evidence only under the release evidence directory", () => {

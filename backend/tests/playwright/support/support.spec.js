@@ -1,4 +1,5 @@
 const { test, expect } = require("playwright/test");
+const { randomUUID } = require("node:crypto");
 const AxeBuilder = require("@axe-core/playwright").default;
 const { SUPPORTED_VIEWPORTS } = require("../../../playwright.browser-matrix");
 
@@ -15,6 +16,40 @@ function resolveSupportAttorneyCredentials(payload = {}) {
   const email = String(payload?.attorney?.email || payload?.credentials?.email || "").trim().toLowerCase();
   const password = String(process.env.CONTROL_ROOM_E2E_SUPPORT_ATTORNEY_PASSWORD || "").trim() || "ControlRoomSupport123!";
   return { email, password };
+}
+
+function supportReplyFixture(route, userMessage, assistantMessage) {
+  const conversationId = new URL(route.request().url()).pathname.split("/")[4];
+  const { requestId } = route.request().postDataJSON();
+  return {
+    ok: true,
+    request: { id: requestId, action: "send", state: "succeeded" },
+    conversation: { id: conversationId, status: "open" },
+    userMessage: { ...userMessage, conversationId },
+    assistantMessage: { ...assistantMessage, conversationId },
+  };
+}
+
+async function startFreshSupportConversation(request) {
+  const sessionResponse = await request.get("/api/auth/me");
+  expect(sessionResponse.ok(), await sessionResponse.text()).toBe(true);
+  const { user } = await sessionResponse.json();
+  const identity = { expectedOwnerId: String(user.id || user._id), expectedRole: "attorney" };
+  const response = await request.get(`/api/support/conversation?${new URLSearchParams(identity)}`);
+  expect(response.ok(), await response.text()).toBe(true);
+  const { conversation } = await response.json();
+  const csrfResponse = await request.get("/api/csrf");
+  expect(csrfResponse.ok(), await csrfResponse.text()).toBe(true);
+  const { csrfToken } = await csrfResponse.json();
+  const requestId = randomUUID();
+  const restarted = await request.post(`/api/support/conversation/${conversation.id}/restart`, {
+    headers: { "X-CSRF-Token": csrfToken },
+    data: { ...identity, requestId, sourcePage: "/dashboard-attorney.html" },
+  });
+  expect(restarted.ok(), await restarted.text()).toBe(true);
+  const result = await restarted.json();
+  expect(result.request).toMatchObject({ id: requestId, action: "restart", state: "succeeded" });
+  expect(result.conversation.id).not.toBe(conversation.id);
 }
 
 async function expectNoHorizontalOverflow(page) {
@@ -86,6 +121,8 @@ test("attorney dashboard renders a complete, usable desktop and mobile home stat
   const toggleBox = await sidebarToggle.boundingBox();
   expect(toggleBox?.width).toBeGreaterThanOrEqual(44);
   expect(toggleBox?.height).toBeGreaterThanOrEqual(44);
+  await page.goto("/dashboard-attorney.html#tasks", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#weeklyNotesGrid .weekly-note-day").first()).toBeVisible();
   const weeklyNotesLayout = await page.evaluate(() => {
     const grid = document.querySelector("#weeklyNotesGrid");
     const card = grid?.querySelector(".weekly-note-day");
@@ -105,6 +142,8 @@ test("attorney dashboard renders a complete, usable desktop and mobile home stat
   await expectNoHorizontalOverflow(page);
   await page.screenshot({ path: "/tmp/lpc-attorney-dashboard-mobile.png", fullPage: true });
 
+  await page.goto("/dashboard-attorney.html#home", { waitUntil: "domcontentloaded" });
+  await expect(onboardingAction).toBeVisible();
   await sidebarToggle.click();
   await expect(page.locator("body")).toHaveClass(/nav-open/);
   await expect(sidebarToggle).toHaveAttribute("aria-expanded", "true");
@@ -163,7 +202,7 @@ test("attorney critical product surfaces render accessibly without overflow or r
     { url: "/create-case.html", heading: "Create a New Matter" },
     { url: "/browse-paralegals.html", heading: "Browse Paralegals" },
     { url: "/help.html", heading: "Help for Attorneys" },
-    { url: "/profile-settings.html", heading: "Account Settings" },
+    { url: "/profile-settings.html", heading: "Settings" },
     { url: "/dashboard-attorney.html#funds", heading: "Payments" },
   ];
 
@@ -263,7 +302,13 @@ test("Matter and public profile detail surfaces render real records accessibly",
     await page.goto(surface.url, { waitUntil: "domcontentloaded" });
     await expect(page).not.toHaveURL(/login\.html/);
     await expect(page.locator("main#main")).toBeVisible();
-    await expect(page.getByRole("heading", { name: surface.heading, exact: true }).first()).toBeVisible();
+    if (surface.url.startsWith("/case-detail.html")) {
+      await expect(page.getByRole("complementary", { name: "Matter switcher" })
+        .getByRole("heading", { name: surface.heading, exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Overview", exact: true })).toBeVisible();
+    } else {
+      await expect(page.getByRole("heading", { name: surface.heading, exact: true }).first()).toBeVisible();
+    }
     await page.waitForTimeout(200);
     await expectNoHorizontalOverflow(page);
     const results = await new AxeBuilder({ page })
@@ -308,18 +353,22 @@ test("attorney sends a Matter invitation through the real profile action", async
   await expect(inviteButton).toBeVisible();
   await inviteButton.click();
 
-  const inviteDialog = page.getByRole("dialog", { name: "Invite to Matter", exact: true });
+  const inviteDialog = page.getByRole("dialog", { name: "Invite Parker Harness", exact: true });
   await expect(inviteDialog).toBeVisible();
-  await inviteDialog.locator("#inviteCaseSelect").selectOption(matterId);
+  await inviteDialog.getByRole("button", { name: "Harness Contract Review", exact: true }).click();
+  await expect(inviteDialog).toHaveAttribute("data-state", "review");
+  await expect(inviteDialog.getByRole("heading", { name: "Harness Contract Review", exact: true })).toBeVisible();
   const inviteResponsePromise = page.waitForResponse((response) => {
     const url = new URL(response.url());
-    return response.request().method() === "POST" && url.pathname === `/api/cases/${matterId}/invite`;
+    return response.request().method() === "POST" && url.pathname === `/api/cases/${matterId}/invite/${paralegalId}`;
   });
-  await inviteDialog.getByRole("button", { name: "Send Invite", exact: true }).click();
+  await inviteDialog.getByRole("button", { name: "Send invitation", exact: true }).click();
   const inviteResponse = await inviteResponsePromise;
   expect(inviteResponse.ok(), await inviteResponse.text()).toBe(true);
+  await expect(inviteDialog).toHaveAttribute("data-state", "sent");
+  await expect(inviteDialog.getByRole("status")).toHaveText("Invitation sent.");
+  await inviteDialog.getByRole("button", { name: "Done", exact: true }).click();
   await expect(inviteDialog).toBeHidden();
-  await expect(page.locator("#toastBanner")).toHaveText("Invite sent.");
   await expect(inviteButton).toBeFocused();
 
   const matterResponse = await page.request.get(`/api/cases/${matterId}`);
@@ -331,28 +380,34 @@ test("attorney sends a Matter invitation through the real profile action", async
   expect(pendingInvite?.status).toBe("invited");
 });
 
-test("Stripe Checkout returns preserve Matter context and explain success or cancellation", async ({ page }) => {
-  const caseId = "64f000000000000000000001";
+test("Stripe Checkout returns preserve Matter context without claiming a payment result", async ({ page }) => {
+  const bootstrap = await page.request.post(
+    "/api/admin/ai-control-room/dev/e2e/bootstrap-attorney?seedMatter=true",
+    { headers: resolveHarnessHeaders() }
+  );
+  expect(bootstrap.ok(), await bootstrap.text()).toBe(true);
+  const caseId = String((await bootstrap.json()).matter?.id || "");
+  expect(caseId).toMatch(/^[a-f0-9]{24}$/);
   await page.goto(`/billing-attorney.html?checkout=success&caseId=${caseId}`, {
     waitUntil: "domcontentloaded",
   });
   await page.waitForURL((url) => url.pathname.endsWith("/dashboard-attorney.html") && url.hash === "#funds");
   await expect(page.getByRole("heading", { name: "Payments", exact: true })).toBeVisible();
   await expect(page.locator("#toastBanner")).toHaveText(
-    "Payment submitted. Funding status will update after Stripe confirms it."
+    "You returned from Checkout. Review the Matter’s current payment status."
   );
   expect(new URL(page.url()).searchParams.has("payment")).toBe(false);
-  expect(new URL(page.url()).searchParams.has("caseId")).toBe(false);
+  expect(new URL(page.url()).searchParams.get("caseId")).toBe(caseId);
 
   await page.goto(`/dashboard-attorney.html?payment=cancel&caseId=${caseId}#funds`, {
     waitUntil: "domcontentloaded",
   });
   await expect(page.getByRole("heading", { name: "Payments", exact: true })).toBeVisible();
   await expect(page.locator("#toastBanner")).toHaveText(
-    "Payment was not completed. No payment was processed."
+    "You returned from Checkout. Review the Matter’s current payment status."
   );
   expect(new URL(page.url()).searchParams.has("payment")).toBe(false);
-  expect(new URL(page.url()).searchParams.has("caseId")).toBe(false);
+  expect(new URL(page.url()).searchParams.get("caseId")).toBe(caseId);
 });
 
 test("legacy candidate review URL preserves Matter context and opens canonical inquiries", async ({ page }) => {
@@ -427,6 +482,7 @@ test("legacy attorney Matter URLs preserve context and converge on canonical wor
 });
 
 test("attorney can open the support drawer and send a support message", async ({ page, browserName }) => {
+  await startFreshSupportConversation(page.request);
   await page.goto("/dashboard-attorney.html", { waitUntil: "domcontentloaded" });
 
   const launcher = page.locator(".support-launcher");
@@ -445,16 +501,34 @@ test("attorney can open the support drawer and send a support message", async ({
   const drawer = page.locator("#supportDrawer");
   const textarea = drawer.locator("[data-support-textarea]");
   await expect(drawer).toBeVisible();
+  const drawerLayout = await drawer.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const composer = element.querySelector(".support-composer")?.getBoundingClientRect();
+    return {
+      top: bounds.top,
+      right: window.innerWidth - bounds.right,
+      bottom: window.innerHeight - bounds.bottom,
+      width: bounds.width,
+      borderRadius: getComputedStyle(element).borderRadius,
+      composerBottom: composer ? bounds.bottom - composer.bottom : null,
+    };
+  });
+  // Firefox can report subpixel rounding below 0.001 CSS pixels at a dock edge.
+  expect(drawerLayout.top).toBeCloseTo(0, 3);
+  expect(drawerLayout.right).toBeCloseTo(0, 3);
+  expect(drawerLayout.bottom).toBeCloseTo(0, 3);
+  expect(drawerLayout.width).toBeCloseTo(420, 3);
+  expect(drawerLayout.borderRadius).toBe("0px");
+  expect(drawerLayout.composerBottom).toBeCloseTo(0, 3);
+  await expect(page.locator("body")).not.toHaveCSS("overflow", "hidden");
+  await expect(page.locator("[data-support-backdrop]")).toHaveCSS("pointer-events", "none");
   await expect(textarea).toBeFocused();
   await expect(drawer.locator("[data-support-title]")).toHaveText("Attorney Assistant");
   await expect(drawer.locator("[data-support-subtitle]")).toBeHidden();
   await expect(drawer).toHaveAttribute("data-support-role", "attorney");
   await expect(drawer.locator(".support-grounded-badge")).toHaveCount(0);
   await expect(drawer.locator("[data-support-composer-hint]")).toHaveCount(0);
-  const pinButton = drawer.locator("[data-support-pin]");
-  await expect(pinButton).toHaveAttribute("aria-pressed", "false");
-  await pinButton.click();
-  await expect(pinButton).toHaveAttribute("aria-pressed", "true");
+  await expect(drawer.locator("[data-support-pin]")).toHaveCount(0);
   await expect(page.locator("body")).toHaveClass(/support-drawer-pinned/);
   await expect(drawer).toHaveAttribute("aria-modal", "false");
   await expect(page.locator("[data-support-backdrop]")).toBeHidden();
@@ -469,10 +543,6 @@ test("attorney can open the support drawer and send a support message", async ({
   });
   expect(dockLayout).not.toBeNull();
   expect(dockLayout.mainRight).toBeLessThanOrEqual(dockLayout.drawerLeft + 1);
-  await pinButton.click();
-  await expect(pinButton).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator("body")).not.toHaveClass(/support-drawer-pinned/);
-  await expect(drawer).toHaveAttribute("aria-modal", "true");
   await expect(drawer.locator(".support-quick-prompt")).toHaveText([
     "Where are Payments?",
     "Where can I see my Matters?",
@@ -548,15 +618,15 @@ test("attorney can open the support drawer and send a support message", async ({
   await textarea.fill("Can I talk to a real person?");
   await drawer.locator("[data-support-submit]").click();
   const humanContactPayload = await (await humanContactResponse).json();
-  expect(humanContactPayload.assistantMessage?.metadata?.primaryAsk).toBe("human_contact");
-  expect(humanContactPayload.assistantMessage?.metadata?.needsEscalation).toBe(false);
+  expect(humanContactPayload.assistantReply?.provider).toBe("human_handoff");
+  expect(humanContactPayload.conversation?.escalation?.ticketId).toBeTruthy();
 
-  const humanContactMessage = drawer.locator(".support-message--assistant").last();
+  const humanContactMessage = drawer.locator(".support-message--notice").last();
   await expect(humanContactMessage.locator(".support-message-bubble")).toContainText(
-    "Our team monitors those messages closely"
+    "Your request has been sent to the LPC team"
   );
   await expect(humanContactMessage.locator("[data-support-inline-link]")).toHaveCount(0);
-  await expect(humanContactMessage.getByRole("button", { name: "Contact Us", exact: true })).toBeVisible();
+  await expect(humanContactMessage.getByRole("button", { name: "Contact Us", exact: true })).toHaveCount(0);
   await expect(humanContactMessage.locator(".support-escalation-card")).toHaveCount(0);
 });
 
@@ -663,16 +733,14 @@ test("profile settings uses its mobile navigation instead of a top-stacked sideb
 test("attorney drawer renders a concise manager answer, verified link, relevant suggestions, and feedback", async ({ page }) => {
   const createdAt = "2026-07-22T16:00:00.000Z";
   const userMessage = {
-    id: "p6-user-message",
-    conversationId: "p6-conversation",
+    id: "64f000000000000000000101",
     sender: "user",
     text: "Where is billing?",
     metadata: { kind: "user_message" },
     createdAt,
   };
   const assistantMessage = {
-    id: "p6-assistant-message",
-    conversationId: "p6-conversation",
+    id: "64f000000000000000000102",
     sender: "assistant",
     text: "Open Payments.",
     metadata: {
@@ -699,10 +767,10 @@ test("attorney drawer renders a concise manager answer, verified link, relevant 
     await route.fulfill({
       status: 201,
       contentType: "application/json",
-      body: JSON.stringify({ ok: true, userMessage, assistantMessage }),
+      body: JSON.stringify(supportReplyFixture(route, userMessage, assistantMessage)),
     });
   });
-  await page.route(/\/api\/support\/conversation\/[^/]+\/messages\/p6-assistant-message\/feedback$/, async (route) => {
+  await page.route(/\/api\/support\/conversation\/[^/]+\/messages\/64f000000000000000000102\/feedback$/, async (route) => {
     const payload = route.request().postDataJSON();
     await route.fulfill({
       status: 200,
@@ -754,19 +822,16 @@ test("attorney drawer renders validation fallback without noisy actions or escal
     await route.fulfill({
       status: 201,
       contentType: "application/json",
-      body: JSON.stringify({
-        ok: true,
-        userMessage: {
-          id: "p6-fallback-user",
-          conversationId: "p6-conversation",
+      body: JSON.stringify(supportReplyFixture(route,
+        {
+          id: "64f000000000000000000103",
           sender: "user",
           text: "How many matters have I completed?",
           metadata: { kind: "user_message" },
           createdAt,
         },
-        assistantMessage: {
-          id: "p6-fallback-assistant",
-          conversationId: "p6-conversation",
+        {
+          id: "64f000000000000000000104",
           sender: "assistant",
           text: "I couldn’t produce a reliable answer from the verified LPC information. Please try again.",
           metadata: {
@@ -782,8 +847,8 @@ test("attorney drawer renders validation fallback without noisy actions or escal
             escalation: null,
           },
           createdAt,
-        },
-      }),
+        }
+      )),
     });
   });
 
@@ -836,6 +901,22 @@ test("approved attorney first login lands on a guided dashboard experience", asy
     await expect(page.locator("#attorneyTourModal")).toBeVisible();
     await expect(page.locator("#attorneyTourTitle")).toContainText("Welcome to Let’s-ParaConnect");
     await expect(page.locator("#attorneyTourText")).toContainText("quick walkthrough");
+    const tourDialogPresentation = await page.locator("#attorneyTourModal").evaluate((modal) => {
+      const modalStyle = getComputedStyle(modal);
+      const heroStyle = getComputedStyle(modal.querySelector(".tour-hero"));
+      return {
+        width: modal.getBoundingClientRect().width,
+        borderRadius: modalStyle.borderRadius,
+        boxShadow: modalStyle.boxShadow,
+        heroHeight: heroStyle.height,
+        heroBackgroundImage: heroStyle.backgroundImage,
+      };
+    });
+    expect(tourDialogPresentation.width).toBeLessThanOrEqual(440);
+    expect(tourDialogPresentation.borderRadius).toBe("3px");
+    expect(tourDialogPresentation.boxShadow).toBe("none");
+    expect(tourDialogPresentation.heroHeight).toBe("6px");
+    expect(tourDialogPresentation.heroBackgroundImage).toBe("none");
     await expect(page.locator("#attorneyOnboardingAttentionCard")).toBeVisible();
     await expect(page.locator("[data-onboarding-attention-title]")).toContainText("Finish your profile");
     await expect(page.locator("[data-onboarding-attention-text]")).toContainText(

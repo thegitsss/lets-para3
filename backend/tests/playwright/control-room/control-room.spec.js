@@ -25,9 +25,19 @@ async function seedHarness(page, data = {}) {
   return response.json();
 }
 
+async function openAdminSection(page, section) {
+  const selector = `[data-section="${section}"]`;
+  const group = page.locator('nav details.admin-nav-group').filter({ has: page.locator(selector) });
+  if (await group.count() && !(await group.evaluate(node => node.open))) {
+    await group.locator('summary').click();
+  }
+  await page.locator('nav').locator(selector).click();
+}
+
 async function openControlRoom(page) {
   await page.goto("/admin-dashboard.html", { waitUntil: "domcontentloaded" });
-  await page.locator('[data-section="ai-control-room"]').click();
+  await expect(page.locator("body")).not.toHaveClass(/is-loading/, { timeout: 30_000 });
+  await openAdminSection(page, "ai-control-room");
   await expect(page.locator("#section-ai-control-room.visible")).toBeVisible();
   await expect.poll(() => page.locator("main#main").evaluate((main) => main.scrollTop)).toBe(0);
   await expect(page.locator("#aiRoomCardGrid .ai-room-card").first()).toBeVisible();
@@ -217,7 +227,7 @@ test("summary and core founder-operating rendering are wired end-to-end", async 
   await expect(cmoCard).toContainText(/posts ready to publish/i);
 });
 
-test("control room remains readable and navigable across the supported viewport matrix", async ({ page }) => {
+test("control room remains readable and navigable across the supported viewport matrix", async ({ page }, info) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const seeded = await seedHarness(page);
   await page.goto("/admin-dashboard.html", { waitUntil: "domcontentloaded" });
@@ -226,14 +236,16 @@ test("control room remains readable and navigable across the supported viewport 
   await expect(page.locator('nav [data-section="overview"]')).toHaveAttribute("aria-current", "page");
   await expect(page.locator("#overviewActionStatus")).not.toContainText(/loading|refreshing/i, { timeout: 30_000 });
   await expect(page.locator("#overviewActionRows")).not.toContainText(/loading/i);
-  const userManagementAction = page.locator("#overviewActionRows .overview-action-row").filter({ hasText: "Open User Management" });
-  await expect(userManagementAction.locator("td:last-child .btn")).toHaveText("Open User Management");
-  expect(await userManagementAction.locator("td:last-child .btn").evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
-  await page.screenshot({ path: "/tmp/lpc-admin-overview-desktop.png", fullPage: true });
+  await expect(page.locator("#adminFlowTitle")).toHaveText("Review application");
+  const approvalAction = page.locator("#adminFlowBody").getByRole("button", { name: "Approve & next", exact: true });
+  await expect(approvalAction).toBeVisible();
+  expect(await approvalAction.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath("lpc-admin-overview-desktop.png"), fullPage: true });
 
-  await page.locator('[data-section="user-management"]').click();
+  await openAdminSection(page, "user-management");
   await expect(page.locator("#section-user-management.visible")).toBeVisible();
   await expect(page.locator('nav [data-section="user-management"]')).toHaveAttribute("aria-current", "page");
+  await page.locator('#section-user-management summary').filter({ hasText: 'Registration reporting & outreach' }).click();
   await expect(page.locator("#massEmailCompleteBtn")).toBeVisible();
   await expect(page.locator("#massEmailAttorneyLaunchSetupBtn")).toBeVisible();
   await expect(page.locator("#massEmailAttorneyLaunchBtn")).toBeHidden();
@@ -253,56 +265,65 @@ test("control room remains readable and navigable across the supported viewport 
   }).format(new Date(`${currentMonth}-01T00:00:00.000Z`));
   await expect.poll(() => page.evaluate(() => window.Chart?.getChart("userMgmtComboChart")?.data?.labels || []))
     .toContain(currentMonthLabel);
-  await page.screenshot({ path: "/tmp/lpc-admin-user-management-desktop.png", fullPage: true });
+  await page.screenshot({ path: info.outputPath("lpc-admin-user-management-desktop.png"), fullPage: true });
 
-  await page.locator('[data-section="approvals-workspace"]').click();
+  await openAdminSection(page, "approvals-workspace");
   await expect(page.locator("#section-approvals-workspace.visible")).toBeVisible();
   await expect(page.locator('nav [data-section="approvals-workspace"]')).toHaveAttribute("aria-current", "page");
   await expect(page.locator("#approvalQueueCountLabel")).toContainText(/visible item|no visible/i, { timeout: 30_000 });
   const visibleApprovalCount = await page.locator("#approvalItemList [data-approval-work-key]").count();
   expect(Number(await page.locator("#approvalTotalCount").innerText())).toBe(visibleApprovalCount);
   expect(Number(await page.locator("#approvalPendingCount").innerText())).toBeLessThanOrEqual(visibleApprovalCount);
-  await page.screenshot({ path: "/tmp/lpc-admin-approvals-desktop.png", fullPage: true });
+  await page.screenshot({ path: info.outputPath("lpc-admin-approvals-desktop.png"), fullPage: true });
 
-  await page.locator('[data-section="finance"]').click();
+  await openAdminSection(page, "finance");
   await expect(page.locator("#section-escrow.visible")).toBeVisible();
   await expect(page.locator("#section-disputes.visible")).toBeVisible();
-  await expect(page.locator("#section-revenue.visible")).toBeVisible();
+  await expect(page.locator("#section-revenue")).toBeHidden();
   await expect(page.locator('nav [data-section="finance"]')).toHaveAttribute("aria-current", "page");
   await expect(page.locator("#disputesBody")).not.toContainText(/loading/i, { timeout: 30_000 });
-  await expect(page.locator("#receiptsBody")).not.toContainText(/loading/i, { timeout: 30_000 });
-  await expect(page.locator("#revenueTotalValue")).not.toHaveText("—");
+  await page.getByRole('group', { name: 'Finance workspace', exact: true }).getByRole('button', { name: 'Reconciliation', exact: true }).click();
+  await expect(page.locator("#section-disputes")).toBeHidden();
   await expect(page.locator("#escrowReportEmpty")).toBeVisible();
   await expect(page.locator("#escrowReportChart")).toBeHidden();
-  await page.screenshot({ path: "/tmp/lpc-admin-finance-desktop.png", fullPage: true });
+  await page.screenshot({ path: info.outputPath("lpc-admin-finance-desktop.png"), fullPage: true });
+  await page.getByRole('group', { name: 'Finance workspace', exact: true }).getByRole('button', { name: 'Payments & receipts', exact: true }).click();
+  await expect(page.locator("#section-revenue.visible")).toBeVisible();
+  await page.locator('#section-revenue summary').filter({ hasText: 'Totals, activity & receipts' }).click();
+  await expect(page.locator("#receiptsBody")).not.toContainText(/loading/i, { timeout: 30_000 });
+  await expect(page.locator("#revenueTotalValue")).not.toHaveText("—");
   await page.locator("#section-revenue").scrollIntoViewIfNeeded();
   await expect(page.locator("#revMainChartEmpty")).toBeVisible();
   await expect(page.locator("#revMainChart")).toBeHidden();
-  await expect(page.locator("#downloadLedgerCsvBtn")).toBeDisabled();
+  await expect(page.locator("#adminFinanceRecordStatus")).toHaveText("No records match these filters.");
+  await expect(page.locator("#adminFinanceRecordList")).toBeEmpty();
+  await expect(page.locator("#adminFinanceRecordPager")).toBeHidden();
+  await expect(page.locator("#adminFinanceExport")).toBeVisible();
+  await expect(page.locator("#adminFinanceExport")).toBeEnabled();
   await expect(page.locator("#receiptPageSelect")).toBeHidden();
-  await page.screenshot({ path: "/tmp/lpc-admin-finance-accounting-desktop.png", fullPage: true });
+  await page.screenshot({ path: info.outputPath("lpc-admin-finance-accounting-desktop.png"), fullPage: true });
 
-  await page.locator('[data-section="posts"]').click();
+  await openAdminSection(page, "posts");
   await expect(page.locator("#section-posts.visible")).toBeVisible();
   await expect(page.locator('nav [data-section="posts"]')).toHaveAttribute("aria-current", "page");
   await expect(page.locator("#postsList")).not.toContainText(/loading/i, { timeout: 30_000 });
   await expect(page.locator("#deadlineChartEmpty")).toBeVisible();
   await expect(page.locator("#postStateChartEmpty")).toBeVisible();
   await expect(page.locator("#postCategoryChartEmpty")).toBeVisible();
-  await page.screenshot({ path: "/tmp/lpc-admin-posts-desktop.png", fullPage: true });
+  await page.screenshot({ path: info.outputPath("lpc-admin-posts-desktop.png"), fullPage: true });
 
-  await page.locator('[data-section="activity-logs"]').click();
+  await openAdminSection(page, "activity-logs");
   await expect(page.locator("#section-activity-logs.visible")).toBeVisible();
   await expect(page.locator('nav [data-section="activity-logs"]')).toHaveAttribute("aria-current", "page");
   await expect(page.locator('nav [data-section].active')).toHaveCount(1);
   await expect(page.locator("#auditLogsBody")).not.toContainText(/loading/i, { timeout: 30_000 });
   await expect(page.locator("#exportAuditLogs")).toHaveText("Export page CSV");
-  await page.screenshot({ path: "/tmp/lpc-admin-activity-desktop.png", fullPage: true });
+  await page.screenshot({ path: info.outputPath("lpc-admin-activity-desktop.png"), fullPage: true });
 
-  await page.locator('[data-section="settings"]').click();
+  await openAdminSection(page, "settings");
   await expect(page.locator("#section-settings.visible")).toBeVisible();
   await expect(page.locator('nav [data-section="settings"]')).toHaveAttribute("aria-current", "page");
-  await page.screenshot({ path: "/tmp/lpc-admin-settings-desktop.png", fullPage: true });
+  await page.screenshot({ path: info.outputPath("lpc-admin-settings-desktop.png"), fullPage: true });
   await expect(page.locator("#settingMaintenanceMode")).not.toBeChecked();
   await expect(page.locator("#saveAdminSettings")).toBeDisabled();
   let settingsWrites = 0;
@@ -321,7 +342,7 @@ test("control room remains readable and navigable across the supported viewport 
   await page.locator("#settingMaintenanceMode").uncheck();
   await expect(page.locator("#saveAdminSettings")).toBeDisabled();
 
-  await page.locator('[data-section="ai-control-room"]').click();
+  await openAdminSection(page, "ai-control-room");
   await expect(page.locator("#section-ai-control-room.visible")).toBeVisible();
   await expect(page.locator("#aiRoomCardGrid .ai-room-card").first()).toBeVisible();
   await expect(page.locator("#aiRoomFocusBody")).toBeVisible();
@@ -345,6 +366,7 @@ test("control room remains readable and navigable across the supported viewport 
     return { overlaps };
   });
   expect(headerControlLayout.overlaps).toBe(false);
+  await openSecondaryDecisionQueue(page);
   const needsDecisionCount = await readSummaryCount(page, "#aiSummaryUrgent");
   const queueRemaining = await readDecisionQueueRemaining(page);
   expect(needsDecisionCount).toBeGreaterThan(0);
@@ -360,7 +382,7 @@ test("control room remains readable and navigable across the supported viewport 
   expect(desktopLayout.scrollWidth).toBeLessThanOrEqual(desktopLayout.viewport + 1);
   expect(desktopLayout.visibleSummaryTiles).toBeGreaterThanOrEqual(5);
   expect(desktopLayout.clippedCards).toBe(0);
-  await page.screenshot({ path: "/tmp/lpc-control-room-desktop.png", fullPage: true });
+  await page.screenshot({ path: info.outputPath("lpc-control-room-desktop.png"), fullPage: true });
 
   for (const viewport of SUPPORTED_VIEWPORTS) {
     await page.setViewportSize(viewport);
@@ -394,11 +416,11 @@ test("control room remains readable and navigable across the supported viewport 
   expect(mobileLayout.menuWidth).toBeGreaterThanOrEqual(44);
   expect(mobileLayout.menuHeight).toBeGreaterThanOrEqual(44);
   expect(mobileLayout.clippedCards).toBe(0);
-  await page.screenshot({ path: "/tmp/lpc-control-room-mobile.png", fullPage: true });
+  await page.screenshot({ path: info.outputPath("lpc-control-room-mobile.png"), fullPage: true });
   await page.locator("#sidebarToggle").click();
   await expect(page.locator("body")).toHaveClass(/nav-open/);
   await expect(page.locator("#sidebarToggle")).toHaveAttribute("aria-expanded", "true");
-  await expect(page.locator("#sidebarNav")).toContainText("AI Control Room");
+  await expect(page.locator('#sidebarNav [data-section="ai-control-room"]')).toHaveText("Automation");
   await expect.poll(() => page.evaluate(() => document.activeElement?.closest("#sidebarNav")?.id || "")).toBe("sidebarNav");
   await page.keyboard.press("Escape");
   await expect(page.locator("body")).not.toHaveClass(/nav-open/);

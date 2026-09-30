@@ -1,3 +1,9 @@
+const { reportOperationalFailure } = require("../utils/operationalFailure");
+const presignedUploads = require("../services/matterPresignedUploads");
+const matterRetirement = require("../services/matterStorageRetirement"), fileRemoval = require("../services/attorneyMatterFileRemoval");
+const matterFileWrites = require("../services/matterFileWrites");
+const attorneyFiles = require("../services/attorneyMatterFiles");
+const { projectRevisionResolutions } = require("../utils/revisionResolution");
 const { createLogger: createRuntimeLogger, logPromiseFailure } = require("../utils/logger");
 const runtimeLogger = createRuntimeLogger("routes:uploads");
 // backend/routes/uploads.js
@@ -6,7 +12,7 @@ const router = express.Router();
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const multer = require("multer");
-const { PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
+const { PutObjectCommand, GetObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { createS3Client } = require("../utils/s3Client");
 const verifyToken = require("../utils/verifyToken");
@@ -17,9 +23,14 @@ const CaseFile = require("../models/CaseFile");
 const Application = require("../models/Application");
 const Job = require("../models/Job");
 const User = require("../models/User");
+const AuditLog = require("../models/AuditLog");
+const matterFileNotifications = require("../services/matterFileNotifications");
+const accountWriteGuard = require("../utils/accountWriteGuard");
 const { logAction } = require("../utils/audit");
 const { notifyUser } = require("../utils/notifyUser");
 const { publishCaseEvent } = require("../utils/caseEvents");
+const { publishNotificationEvent } = require("../utils/notificationEvents");
+const { publishCaseProjectionRefresh } = require("../utils/caseProjectionEvents");
 const sendEmail = require("../utils/email");
 const { normalizeCaseStatus, canUseWorkspace } = require("../utils/caseState");
 const {
@@ -30,6 +41,10 @@ const {
 const { applyPublicParalegalFilter } = require("../utils/paralegalProfile");
 const { isWorkspacePresenceActive } = require("../utils/workspacePresence");
 const { csrfProtection } = require("../utils/csrf");
+const {
+  applyAssignmentVisibility,
+  isRecordVisibleToCurrentAssignment,
+} = require("../utils/matterAssignmentVisibility");
 const {
   ALLOWED_MATTER_MIME_TYPES,
   getObjectMalwareScan,
@@ -55,12 +70,14 @@ const {
   stagePersonalStorageDeletion,
 } = require("../services/personalStorageDeletion");
 
-const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(error => { if (!accountWriteGuard.respond(error, res)) next(error); });
 
 // ----------------------------------------
 // S3 client
 // ----------------------------------------
 const s3 = createS3Client();
+// The browser supplies the bytes after signing. Do not checksum an absent body.
+const presignS3 = createS3Client(process.env, { requestChecksumCalculation: "WHEN_REQUIRED" });
 const BUCKET = process.env.S3_BUCKET;
 if (!BUCKET) {
   runtimeLogger.warn("[uploads] S3_BUCKET not set; presign routes will fail.");
@@ -70,6 +87,10 @@ if (!BUCKET) {
 // Helpers
 // ----------------------------------------
 const isObjId = (id) => mongoose.isValidObjectId(id);
+
+function publishCaseParticipantRefresh(caseDoc, type = "matter_documents_refresh") {
+  publishCaseProjectionRefresh(caseDoc, type, { caseEvent: "" });
+}
 
 function safeSegment(s, { allowSlash = false } = {}) {
   const cleaned = String(s || "")
@@ -119,18 +140,7 @@ async function ensureObjectExists(key) {
 
 async function refreshCaseFileSecurity(record, key, { persist = true, enforce = true } = {}) {
   const scan = await getObjectMalwareScan({ s3, bucket: BUCKET, key });
-  const now = new Date();
-  if (persist && record?._id) {
-    const update = {
-      securityStatus: scan.status,
-      securityScanResult: scan.result,
-      securityCheckedAt: now,
-    };
-    if (["clean", "blocked", "error"].includes(scan.status)) update.securityScannedAt = now;
-    await CaseFile.updateOne({ _id: record._id }, { $set: update }).catch((err) => {
-      runtimeLogger.error("[uploads] file security state update failed", err?.message || err);
-    });
-  }
+  if (persist && record?._id) await matterFileWrites.persistScan(record, key, scan);
   if (enforce && !scan.safe) {
     const error = new Error(
       scan.status === "blocked"
@@ -216,23 +226,6 @@ async function enforceUploadedObjectSecurity(key, explicitCaseId) {
   }
 }
 
-async function deleteUploadedObjects(keys = []) {
-  if (!BUCKET) return;
-  const uniqueKeys = [...new Set(keys.map(normalizeKeyPath).filter(Boolean))];
-  await Promise.all(
-    uniqueKeys.map(async (key) => {
-      try {
-        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
-      } catch (err) {
-        runtimeLogger.error("[uploads] compensating object delete failed", {
-          key,
-          error: err?.message || String(err),
-        });
-      }
-    })
-  );
-}
-
 async function finalizeStorageTaskTransition(operation, label) {
   try {
     await operation();
@@ -244,7 +237,10 @@ async function finalizeStorageTaskTransition(operation, label) {
   }
 }
 
-async function replacePersonalDocument({ user, field, key, putParams, reason }) {
+const personalDocumentGuard = require('../utils/personalDocumentGuard');
+
+async function replacePersonalDocument({ req, user, field, key, putParams, reason }) {
+  const accountFilter = personalDocumentGuard.prepare(req, user, field);
   const ownerId = user._id;
   const oldKey = normalizeOwnedPersonalKey(user[field], ownerId);
   const oldTaskIds = await stagePersonalStorageDeletion({
@@ -260,15 +256,16 @@ async function replacePersonalDocument({ user, field, key, putParams, reason }) 
   try {
     await s3.send(new PutObjectCommand(putParams));
     user[field] = key;
-    await user.save();
+    if (accountFilter) await accountWriteGuard.saveFields(User, user, [field], accountFilter);
+    else await user.save();
   } catch (error) {
     await finalizeStorageTaskTransition(
       () => activatePersonalStorageDeletion(newTaskIds),
       "activate_upload_compensation"
     );
     await finalizeStorageTaskTransition(
-      () => cancelPersonalStorageDeletion(oldTaskIds),
-      "cancel_replaced_object_deletion"
+      () => accountFilter ? activatePersonalStorageDeletion(oldTaskIds) : cancelPersonalStorageDeletion(oldTaskIds),
+      accountFilter ? "reconcile_replaced_document_deletion" : "cancel_replaced_object_deletion"
     );
     throw error;
   }
@@ -396,6 +393,20 @@ async function ensureKeyAccess(req, key, explicitCaseId) {
           ((!!preDocKey && preDocKey === cleaned) ||
             (!!preResponseDocKey && preResponseDocKey === cleaned));
         if (isRequestedPreEngagementDocument) return true;
+        if (isParalegal && cleaned.includes("/documents/")) {
+          const record = await findCaseFileForObject(caseDoc._id, cleaned);
+          if (
+            record &&
+            !isRecordVisibleToCurrentAssignment(record, caseDoc, {
+              role,
+              userId: viewerId,
+              isParalegal: true,
+            })
+          ) {
+            return false;
+          }
+        }
+        if (await matterRetirement.retired(caseDoc._id, cleaned) && !await matterRetirement.referenced(caseDoc._id, cleaned, { viewer: { role, userId: viewerId, isParalegal } })) return false;
         return Boolean(isAttorney || isParalegal);
       } catch {
         return false;
@@ -409,11 +420,19 @@ async function ensureKeyAccess(req, key, explicitCaseId) {
     const viewerRole = String(req.user.role || "").toLowerCase();
     const viewerId = String(req.user.id || req.user._id || "");
     if (viewerRole === "admin") return true;
-    if (viewerRole === "attorney") {
-      if (await attorneyCanAccessPersonalOwner(viewerId, ownerId)) return true;
-      return attorneyCanBrowsePersonalOwner(ownerId);
+    const owner = await User.findById(ownerId).select("_id resumeURL certificateURL writingSampleURL");
+    const current = owner && Object.keys(personalDocumentGuard.TYPES).some(field => personalDocumentGuard.keyOf(owner, field) === cleaned);
+    if (current) {
+      if (viewerRole === "attorney") {
+        if (await attorneyCanAccessPersonalOwner(viewerId, ownerId)) return true;
+        return attorneyCanBrowsePersonalOwner(ownerId);
+      }
+      return ownerId === viewerId;
     }
-    return ownerId === viewerId;
+    const references = require("../services/personalDocumentReferences");
+    if (ownerId === viewerId) return references.hasRetainedResumeReference(ownerId, cleaned);
+    if (viewerRole === "attorney") return references.attorneyCanAccessRecordedResume(req, ownerId, cleaned);
+    return false;
   }
 
   return false;
@@ -439,11 +458,13 @@ const MAX_CERT_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
 const caseFileUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_CASE_FILE_BYTES },
+  // Multipart forms use flat fields; reject oversized numeric bracket indexes.
+  limits: { fileSize: MAX_CASE_FILE_BYTES, fieldArrayIndexLimit: 0 },
 });
 const profilePhotoUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_PROFILE_PHOTO_BYTES },
+  // Multipart forms use flat fields; reject oversized numeric bracket indexes.
+  limits: { fileSize: MAX_PROFILE_PHOTO_BYTES, fieldArrayIndexLimit: 0 },
 });
 
 // ----------------------------------------
@@ -452,12 +473,13 @@ const profilePhotoUpload = multer({
 router.use(verifyToken);
 router.use(requireApproved);
 router.use(requireRole("admin", "attorney", "paralegal"));
+router.use(require("../utils/requestOwner"));
 
 /**
  * POST /api/uploads/presign
- * Body: { contentType, ext, folder?, caseId?, checksumSha256?, contentDisposition? }
- * - returns { url, key, expiresAt }
- * - if caseId is provided, verifies access via requireCaseAccess middleware after quick param parse.
+ * Body: { contentType, ext, size, caseId, checksumSha256?, contentDisposition? }
+ * - returns { url, key, expiresAt, requiredHeaders }; PUT must include the returned headers
+ * - verifies current Matter participation and write authority before issuing a link.
  */
 router.post(
   "/presign",
@@ -470,14 +492,8 @@ router.post(
       if (!caseId || !isObjId(caseId)) {
         return res.status(400).json({ msg: "caseId is required" });
       }
-      const caseDoc = await Case.findById(caseId).select("escrowStatus escrowIntentId status paralegal paralegalId");
-      const escrowStatus = String(caseDoc?.escrowStatus || "").toLowerCase();
-      if (escrowStatus !== "funded") {
-        return res.status(403).json({ msg: "Work begins once Matter funding is confirmed." });
-      }
-      if (!canUseWorkspace(caseDoc)) {
-        return res.status(403).json({ msg: "Uploads unlock once the Matter is funded and in progress." });
-      }
+      const writeReq = { ...req, params: { ...req.params, caseId: String(caseId).toLowerCase() } };
+      const caseDoc = await matterFileWrites.read(writeReq);
 
       if (!contentType || typeof contentType !== "string") {
         return res.status(400).json({ msg: "contentType required" });
@@ -491,7 +507,7 @@ router.post(
       }
 
       const declaredSize = Number(size);
-      if (!Number.isFinite(declaredSize) || declaredSize <= 0) {
+      if (!Number.isSafeInteger(declaredSize) || declaredSize <= 0) {
         return res.status(400).json({ msg: "File size is required" });
       }
       if (declaredSize > MAX_FILE_BYTES) {
@@ -503,7 +519,7 @@ router.post(
         return res.status(400).json({ msg: "The file extension does not match its type." });
       }
       const filename = `${crypto.randomUUID()}.${fileExt}`;
-      const key = `${buildCasePrefix(caseId)}documents/${filename}`.replace(/\/+/g, "/");
+      const key = `${buildCasePrefix(caseDoc._id)}documents/${filename}`.replace(/\/+/g, "/");
 
       // Additional server controls
       const putParams = {
@@ -511,6 +527,7 @@ router.post(
         Key: key,
         ContentType: normalizedContentType,
         ContentLength: declaredSize,
+        IfNoneMatch: "*",
         ACL: "private",
         ...sseParams(),
       };
@@ -529,13 +546,19 @@ router.post(
         }
       }
 
-      const expiresIn = 60; // seconds
+      const expiresIn = 60, signingDate = new Date(Math.floor(Date.now() / 1000) * 1000), expiresAt = new Date(signingDate.getTime() + expiresIn * 1000);
+      await matterFileWrites.run(writeReq, caseDoc, session => presignedUploads.issue({ caseId: caseDoc._id, ownerId: req.user.id, key, bucket: BUCKET, expiresAt }, session));
       const command = new PutObjectCommand(putParams);
-      const url = await getSignedUrl(s3, command, { expiresIn });
-      res.json({ url, key, expiresAt: Date.now() + expiresIn * 1000 });
+      const url = await getSignedUrl(presignS3, command, { expiresIn, signingDate, signableHeaders: new Set(["if-none-match", "content-type"]) });
+      const requiredHeaders = presignedUploads.requiredHeaders(url, putParams);
+      await matterFileWrites.read(writeReq);
+      if (expiresAt <= new Date()) return res.status(503).json({ msg: "The upload link expired while it was being prepared. Request a new upload link." });
+      res.set("Cache-Control", "private, no-store");
+      res.json({ url, key, expiresAt: expiresAt.getTime(), requiredHeaders });
     } catch (e) {
-      runtimeLogger.error("[uploads] presign error", e);
-      res.status(500).json({ msg: "presign error" });
+      if (matterFileWrites.sendError(res, e)) return;
+      runtimeLogger.error("[uploads] presign preparation unavailable", { code: "PRESIGN_UNAVAILABLE" });
+      res.status(503).json({ code: "FILE_PRESIGN_UNAVAILABLE", msg: "The upload link could not be prepared. Request a new upload link." });
     }
   }
 );
@@ -550,6 +573,7 @@ router.get("/view", async (req, res) => {
     const key = normalizeKeyPath(req.query.key);
     if (!key) return res.status(400).json({ msg: "Missing key" });
 
+    if (extractPersonalOwnerId(key)) await personalDocumentGuard.checkCurrentRead(req, key);
     const allowed = await ensureKeyAccess(req, key, req.query.caseId);
     if (!allowed) return res.status(403).json({ msg: "Forbidden" });
 
@@ -564,8 +588,14 @@ router.get("/view", async (req, res) => {
 
     const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
     const url = await getSignedUrl(s3, getCmd, { expiresIn: 60 });
+    if (extractPersonalOwnerId(key)) {
+      await personalDocumentGuard.checkCurrentRead(req, key);
+      if (!await ensureKeyAccess(req, key, req.query.caseId)) return res.status(403).json({ msg: "Forbidden" });
+    }
+    res.set("Cache-Control", "private, no-store");
     res.redirect(url);
   } catch (e) {
+    if (accountWriteGuard.respond(e, res)) return;
     runtimeLogger.error("[uploads] view error", e);
     res.status(500).json({ msg: "view error" });
   }
@@ -585,6 +615,7 @@ router.get("/signed-get", async (req, res) => {
     if (!key) return res.status(400).json({ msg: "Missing key" });
 
     const normalizedKey = normalizeKeyPath(key);
+    if (extractPersonalOwnerId(normalizedKey)) await personalDocumentGuard.checkCurrentRead(req, normalizedKey);
     const allowed = await ensureKeyAccess(req, normalizedKey, caseId);
     if (!allowed) return res.status(403).json({ msg: "Forbidden" });
 
@@ -602,8 +633,14 @@ router.get("/signed-get", async (req, res) => {
     const ttl = Number.isFinite(ttlRaw) ? Math.min(Math.max(ttlRaw, 60), 900) : wantsPreview ? 600 : 60;
     const get = new GetObjectCommand({ Bucket: BUCKET, Key: normalizedKey });
     const url = await getSignedUrl(s3, get, { expiresIn: ttl });
+    if (extractPersonalOwnerId(normalizedKey)) {
+      await personalDocumentGuard.checkCurrentRead(req, normalizedKey);
+      if (!await ensureKeyAccess(req, normalizedKey, req.query.caseId)) return res.status(403).json({ msg: "Forbidden" });
+    }
+    res.set("Cache-Control", "private, no-store");
     res.json({ url });
   } catch (e) {
+    if (accountWriteGuard.respond(e, res)) return;
     runtimeLogger.error(e);
     res.status(500).json({ msg: "signed-get error" });
   }
@@ -614,6 +651,7 @@ router.get("/download", csrfProtection, async (req, res) => {
     const key = normalizeKeyPath(req.query.key);
     if (!key) return res.status(400).json({ msg: "Missing key" });
 
+    if (extractPersonalOwnerId(key)) await personalDocumentGuard.checkCurrentRead(req, key);
     const allowed = await ensureKeyAccess(req, key, req.query.caseId);
     if (!allowed) return res.status(403).json({ msg: "Forbidden" });
 
@@ -627,10 +665,17 @@ router.get("/download", csrfProtection, async (req, res) => {
     }
 
     const expiresIn = 60; // seconds
-    const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+    const attachmentName = { resumeURL: "Resume.pdf", certificateURL: "Certificate.pdf", writingSampleURL: "Writing sample.pdf" }[req.query.documentField];
+    const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: key, ...(extractPersonalOwnerId(key) && req.query.download === "true" && attachmentName ? { ResponseContentDisposition: `attachment; filename="${attachmentName}"` } : {}) });
     const url = await getSignedUrl(s3, getCmd, { expiresIn });
+    if (extractPersonalOwnerId(key)) {
+      await personalDocumentGuard.checkCurrentRead(req, key);
+      if (!await ensureKeyAccess(req, key, req.query.caseId)) return res.status(403).json({ msg: "Forbidden" });
+    }
+    res.set("Cache-Control", "private, no-store");
     res.json({ url, expiresAt: Date.now() + expiresIn * 1000 });
   } catch (e) {
+    if (accountWriteGuard.respond(e, res)) return;
     runtimeLogger.error("[uploads] download error", e);
     res.status(500).json({ msg: "download error" });
   }
@@ -670,6 +715,7 @@ router.post(
   csrfProtection,
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
+    accountWriteGuard.checkOwner(req);
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
     if (!req.file) return res.status(400).json({ msg: "Certificate file is required" });
     if (req.file.mimetype !== "application/pdf") {
@@ -698,6 +744,7 @@ router.post(
       ...sseParams(),
     };
     await replacePersonalDocument({
+      req,
       user,
       field: "certificateURL",
       key,
@@ -711,6 +758,11 @@ router.post(
       runtimeLogger.warn("[uploads] certificate upload audit failed", err?.message || err);
     }
 
+    publishNotificationEvent(user._id, "notifications", {
+      at: new Date().toISOString(),
+      type: "profile_document_refresh",
+    });
+
     return res.json({ success: true, url: key });
   })
 );
@@ -721,6 +773,7 @@ router.post(
   csrfProtection,
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
+    accountWriteGuard.checkOwner(req);
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
     if (!req.file) return res.status(400).json({ msg: "Writing sample file is required" });
     if (req.file.mimetype !== "application/pdf") {
@@ -749,6 +802,7 @@ router.post(
       ...sseParams(),
     };
     await replacePersonalDocument({
+      req,
       user,
       field: "writingSampleURL",
       key,
@@ -762,6 +816,11 @@ router.post(
       runtimeLogger.warn("[uploads] writing sample upload audit failed", err?.message || err);
     }
 
+    publishNotificationEvent(user._id, "notifications", {
+      at: new Date().toISOString(),
+      type: "profile_document_refresh",
+    });
+
     return res.json({ success: true, url: key });
   })
 );
@@ -772,6 +831,7 @@ router.post(
   csrfProtection,
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
+    accountWriteGuard.checkOwner(req);
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
     if (!req.file) return res.status(400).json({ msg: "Résumé file is required" });
     if (req.file.mimetype !== "application/pdf") {
@@ -802,6 +862,7 @@ router.post(
       ...sseParams(),
     };
     await replacePersonalDocument({
+      req,
       user,
       field: "resumeURL",
       key,
@@ -835,6 +896,7 @@ router.post(
     { name: "original", maxCount: 1 },
   ]),
   asyncHandler(async (req, res) => {
+    accountWriteGuard.checkOwner(req);
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
     const getFileFromField = (field) => {
       const list = req.files?.[field];
@@ -880,15 +942,16 @@ router.post(
     const ownerId = String(req.user?.id || req.user?._id || "").trim();
     if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
 
-    const user = await User.findById(ownerId).select(
+    let user = await User.findById(ownerId).select(
       "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
     );
     if (!user) return res.status(404).json({ msg: "User not found" });
+    const accountFilter = accountWriteGuard.photoGuard(req, user)
+      ? accountWriteGuard.captureFilter(user, accountWriteGuard.PHOTO_FIELDS) : null;
     const role = String(user.role || "").toLowerCase();
-    const editExistingRaw = String(req.body?.editExisting || "").trim().toLowerCase();
-    const editExisting = editExistingRaw === "1" || editExistingRaw === "true" || editExistingRaw === "yes";
-    const hasExistingPhoto = Boolean(user.profileImage || user.avatarURL);
-    const requiresReview = role === "paralegal" && !(editExisting && hasExistingPhoto);
+    // Client-supplied image bytes cannot prove an approval-preserving crop.
+    // Retain the approved asset while every paralegal replacement awaits review.
+    const requiresReview = role === "paralegal";
     const queueAdminReview = role === "attorney";
 
     const profileExt = /png/i.test(photoFile.mimetype || "") ? "png" : "jpg";
@@ -980,15 +1043,16 @@ router.post(
         user.profileImageOriginal = originalKey ? approvedOriginalUrl : "";
         user.profilePhotoStatus = "approved";
       }
-      await user.save();
+      if (accountFilter) user = await accountWriteGuard.saveFields(User, user, accountWriteGuard.PHOTO_FIELDS, accountFilter);
+      else await user.save();
     } catch (error) {
       await finalizeStorageTaskTransition(
         () => activatePersonalStorageDeletion(newTaskIds),
         "activate_profile_upload_compensation"
       );
       await finalizeStorageTaskTransition(
-        () => cancelPersonalStorageDeletion(oldTaskIds),
-        "cancel_replaced_profile_deletion"
+        () => accountFilter ? activatePersonalStorageDeletion(oldTaskIds) : cancelPersonalStorageDeletion(oldTaskIds),
+        accountFilter ? "reconcile_replaced_profile_deletion" : "cancel_replaced_profile_deletion"
       );
       throw error;
     }
@@ -1028,6 +1092,11 @@ router.post(
       }
     }
 
+    publishNotificationEvent(user._id, "notifications", {
+      at: new Date().toISOString(),
+      type: "profile_photo_refresh",
+    });
+
     return res.json({
       success: true,
       url: requiresReview ? pendingDisplayUrl : approvedDisplayUrl,
@@ -1037,6 +1106,7 @@ router.post(
       pendingProfileImageOriginal: requiresReview ? user.pendingProfileImageOriginal || "" : "",
       profileImage: requiresReview ? user.profileImage || "" : approvedDisplayUrl,
       profileImageOriginal: user.profileImageOriginal || "",
+      profilePhotoRevision: accountWriteGuard.photoRevision(user),
     });
   })
 );
@@ -1044,14 +1114,16 @@ router.post(
 router.get(
   "/profile-photo/original",
   asyncHandler(async (req, res) => {
+    accountWriteGuard.checkOwner(req, req.query);
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
     const ownerId = String(req.user?.id || req.user?._id || "").trim();
     if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
     const user = await User.findById(ownerId).select(
-      "pendingProfileImageOriginal profileImageOriginal pendingProfileImage profileImage avatarURL " +
+      "pendingProfileImageOriginal profileImageOriginal pendingProfileImage profileImage avatarURL profilePhotoStatus " +
       "+profileImageKey +profileImageOriginalKey +pendingProfileImageKey +pendingProfileImageOriginalKey"
     );
     if (!user) return res.status(404).json({ msg: "User not found" });
+    if (req.query.expectedPhotoRevision !== undefined) accountWriteGuard.photoGuard(req, user, req.query);
     const variant = hasPhotoReference(user, "pending-original") ? "pending-original" : "approved-original";
     const key = resolveProfilePhotoKey(user, {
       bucket: BUCKET,
@@ -1072,17 +1144,40 @@ router.get(
   })
 );
 
+const attorneyMatterUploads = require("../services/attorneyMatterUploads");
+router.get("/case/:caseId/upload-review", requireRole("attorney"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await attorneyMatterUploads.review(req)); } catch (error) { attorneyMatterUploads.sendError(res, error); }
+}));
+router.post("/case/:caseId/reviewed-upload", requireRole("attorney"), csrfProtection, caseFileMiddleware, asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  if (!BUCKET) return attorneyMatterUploads.sendError(res, {});
+  try { res.json(await attorneyMatterUploads.send(req, { putObject: params => s3.send(new PutObjectCommand({ ...params, Bucket: BUCKET, ACL: "private", ...sseParams() })) })); }
+  catch (error) { attorneyMatterUploads.sendError(res, error); }
+}));
+router.get("/case/:caseId/replacement-review/:fileId", requireRole("attorney"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await attorneyMatterUploads.review(req)); } catch (error) { attorneyMatterUploads.sendError(res, error); }
+}));
+router.post("/case/:caseId/reviewed-replacement/:fileId", requireRole("attorney"), csrfProtection, caseFileMiddleware, asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  if (!BUCKET) return attorneyMatterUploads.sendError(res, {});
+  try { res.json(await attorneyMatterUploads.send(req, { putObject: params => s3.send(new PutObjectCommand({ ...params, Bucket: BUCKET, ACL: "private", ...sseParams() })) })); }
+  catch (error) { attorneyMatterUploads.sendError(res, error); }
+}));
+
 router.post(
   "/case/:caseId",
   ensureCaseParticipant(),
   csrfProtection,
   caseFileMiddleware,
-  asyncHandler(async (req, res) => {
+  asyncHandler(matterFileWrites.handle(async (req, res) => {
     const { caseDoc, isAdmin } = await loadCaseForUser(req, req.params.caseId);
     if (isAdmin) {
       return res.status(403).json({ msg: "Administrators can only access the Matter archive." });
     }
     if (!assertWorkspaceReady(caseDoc, res)) return;
+    const writeReview = await matterFileWrites.read(req);
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
     if (!req.file) return res.status(400).json({ msg: "File is required" });
     if (req.file.size > MAX_CASE_FILE_BYTES) {
@@ -1090,6 +1185,35 @@ router.post(
     }
 
     const originalName = normalizeFileName(req.file.originalname, `case-file-${Date.now()}`);
+    const clientUploadId = String(req.body?.clientUploadId || "").trim();
+    if (clientUploadId && !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{15,127}$/.test(clientUploadId)) {
+      return res.status(400).json({ msg: "Invalid upload request id" });
+    }
+    const present = result => ({ file: req.query?.presentation === "matter" ? serializeMatterCaseFile(result.file) : serializeCaseFile(result.file), idempotent: true, ...(result.changedSinceUpload ? { changedSinceUpload: true } : {}) });
+    const prior = await matterFileWrites.prepareUpload(req, writeReview, { name: originalName, clientUploadId, revisionOfFileId: String(req.body?.revisionOfFileId || "").trim(), revisionRequestAt: String(req.body?.revisionRequestAt || ""), onlyRecorded: true });
+    if (prior.recorded) return res.status(200).json(present(prior.recorded));
+    let revisionSource = null;
+    const revisionOfFileId = String(req.body?.revisionOfFileId || "").trim();
+    if (revisionOfFileId) {
+      if (req.user?.role !== "paralegal" || !mongoose.Types.ObjectId.isValid(revisionOfFileId)) {
+        return res.status(400).json({ msg: "Invalid revision reference" });
+      }
+      revisionSource = await CaseFile.findOne(applyAssignmentVisibility(
+        { _id: revisionOfFileId, caseId: caseDoc._id, uploadedByRole: "paralegal", status: "attorney_revision" },
+        caseDoc, { role: req.user.role, userId: req.user.id, isParalegal: true }
+      ));
+      if (!revisionSource) return res.status(409).json({ msg: "This revision request is no longer available. Refresh Files before submitting." });
+      const requestedAt = String(req.body?.revisionRequestAt || "");
+      if (requestedAt !== (revisionSource.revisionRequestedAt?.toISOString() || "")) {
+        return res.status(409).json({ msg: "The revision request changed. Refresh Files and review the latest instructions." });
+      }
+      const visibleFiles = await CaseFile.find(applyAssignmentVisibility(
+        { caseId: caseDoc._id }, caseDoc, { role: req.user.role, userId: req.user.id, isParalegal: true }
+      )).select("caseId uploadedByRole status version revisionRequestedAt revisionOfFileId revisionOfVersion revisionRequestAt approvedAt").lean();
+      if (projectRevisionResolutions(visibleFiles).find(file => String(file._id) === revisionOfFileId)?.revisionResolution) {
+        return res.status(409).json({ msg: "The attorney has already approved a response to this revision request. Refresh Files before submitting." });
+      }
+    }
     try {
       validateMatterFileBuffer({
         buffer: req.file.buffer,
@@ -1102,11 +1226,16 @@ router.post(
       }
       throw err;
     }
-    const safeName = safeSegment(originalName) || `case-file-${Date.now()}`;
-    const key = `${buildCasePrefix(caseDoc._id)}documents/${Date.now()}-${safeName}`.replace(/\/+/g, "/");
+    // Recorded retries remain readable when delivery infrastructure is down.
+    // A new upload must be able to retain its eligible delivery obligation.
+    try { await matterFileNotifications.ready(); }
+    catch (cause) { throw Object.assign(new Error("Uploads are temporarily unavailable. Please try again.", { cause }), { status: 503, publicCode: "FILE_WRITE_DELIVERY_UNAVAILABLE" }); }
+    const pending = await matterFileWrites.prepareUpload(req, writeReview, { name: originalName, clientUploadId, revisionOfFileId, revisionRequestAt: String(req.body?.revisionRequestAt || "") });
+    if (pending.recorded) return res.status(200).json(present(pending.recorded));
+    const key = pending.key;
     const uploadRole = String(req.user?.role || "attorney").toLowerCase();
     const defaultStatus = "pending_review";
-    const version = await nextCaseFileVersion(caseDoc._id, originalName);
+    const version = Math.max(await nextCaseFileVersion(caseDoc._id, originalName), revisionSource ? Number(revisionSource.version || 1) + 1 : 1);
     const putParams = {
       Bucket: BUCKET,
       Key: key,
@@ -1116,11 +1245,23 @@ router.post(
       ACL: "private",
       ...sseParams(),
     };
-    await s3.send(new PutObjectCommand(putParams));
+    try { await s3.send(new PutObjectCommand(putParams)); }
+    catch (error) { await matterRetirement.settleAttempt(pending.operation, "unconfirmed").catch(reportOperationalFailure("routes.uploads.upload_retirement_outcome")); await matterFileWrites.unconfirmedUpload(pending.operation, "failed"); throw error; }
+    await matterRetirement.settleAttempt(pending.operation, "uploaded");
 
-    let entry;
+    let entry, recoveredResult, dispatchNotification = null;
+    let liveRefreshRecipientId = null;
+    let notificationSuppressedByPresence = false;
     try {
-      entry = await CaseFile.create({
+      entry = await matterFileWrites.run(req, writeReview, async (session, currentMatter) => {
+        // A retried, uncommitted transaction must discard its earlier dispatch.
+        dispatchNotification = null;
+        await matterFileWrites.recordUpload(pending.operation, session);
+        if (revisionSource) {
+          const current = await CaseFile.findOne({ _id: revisionSource._id, caseId: caseDoc._id }).session(session);
+          if (!current || current.status !== revisionSource.status || String(current.revisionRequestedAt?.toISOString() || "") !== String(revisionSource.revisionRequestedAt?.toISOString() || "") || Number(current.get("__v") || 0) !== Number(revisionSource.get("__v") || 0)) throw Object.assign(new Error("The revision request changed. Refresh Files before submitting."), { status: 409, publicCode: "FILE_WRITE_REVISION_CHANGED" });
+        }
+        const [stored] = await CaseFile.create([{ _id: pending.operation.fileId,
         caseId: caseDoc._id,
         userId: req.user.id,
         originalName,
@@ -1130,135 +1271,119 @@ router.post(
         previewMimeType: "",
         size: req.file.size || 0,
         previewSize: 0,
+        ...(clientUploadId ? { clientUploadId } : {}),
         securityStatus: malwareScanRequired() ? "pending" : "not_required",
         securityScanResult: malwareScanRequired() ? "PENDING" : "NOT_REQUIRED",
         uploadedByRole: uploadRole,
         status: defaultStatus,
+        revisionOfFileId: revisionSource?._id || null,
+        revisionOfVersion: revisionSource?.version || null,
+        revisionRequestAt: revisionSource?.revisionRequestedAt || null,
         version,
+        }], { session });
+        await AuditLog.logFromReq(req, "file_uploaded", {
+          targetType: "case", targetId: currentMatter._id, caseId: currentMatter._id,
+          meta: { fileId: String(stored._id) }, session,
+        });
+        liveRefreshRecipientId = uploadRole === "attorney"
+          ? currentMatter.paralegal || currentMatter.paralegalId
+          : currentMatter.attorney || currentMatter.attorneyId;
+        notificationSuppressedByPresence = Boolean(liveRefreshRecipientId && await isWorkspacePresenceActive(liveRefreshRecipientId, currentMatter._id, "files"));
+        if (liveRefreshRecipientId && !notificationSuppressedByPresence) {
+          dispatchNotification = await notifyUser(liveRefreshRecipientId, "case_file_uploaded", {
+            caseId: String(currentMatter._id), caseTitle: caseDoc.title || "Untitled Matter",
+            fileId: String(stored._id), fileName: originalName,
+            link: `case-detail.html?caseId=${currentMatter._id}&tab=files&fileId=${stored._id}`,
+          }, { actorUserId: req.user.id, session, deferDispatch: true, fileUpload: { id: pending.operation._id, version } });
+        }
+        return stored;
       });
     } catch (err) {
-      await deleteUploadedObjects([key]);
-      throw err;
+      await matterFileWrites.unconfirmedUpload(pending.operation);
+      const recovered = await matterFileWrites.recoverUpload(req, pending.operation);
+      if (!recovered) throw err;
+      entry = recovered.file;
+      recoveredResult = recovered;
     }
 
-    try {
-      await logAction(req, "file_uploaded", {
-        targetType: "case",
-        targetId: caseDoc._id,
-        meta: { fileId: entry._id, filename: originalName },
-      });
-    } catch (err) {
-      runtimeLogger.warn("[uploads] file upload audit failed", err?.message || err);
-    }
-
-    try {
-      const actorRole = String(req.user?.role || "").toLowerCase();
-      const recipientId =
-        actorRole === "attorney"
-          ? caseDoc.paralegal || caseDoc.paralegalId
-          : actorRole === "paralegal"
-          ? caseDoc.attorney || caseDoc.attorneyId
-          : null;
-      if (recipientId && !isWorkspacePresenceActive(recipientId, caseDoc._id)) {
-        const caseId = String(caseDoc._id);
-        await notifyUser(
-          recipientId,
-          "case_file_uploaded",
-          {
-            caseId,
-            caseTitle: caseDoc.title || "Untitled Matter",
-            fileId: entry._id,
-            fileName: originalName,
-            link: `case-detail.html?caseId=${encodeURIComponent(caseId)}&tab=files`,
-          },
-          { actorUserId: req.user.id }
-        );
-      }
-    } catch (err) {
-      runtimeLogger.warn("[uploads] notifyUser case_file_uploaded failed", err?.message || err);
-    }
-
+    // The stored file can be reconciled by both open workspaces immediately;
+    // only live invalidation follows the commit; email runs in the worker.
     publishCaseEvent(caseDoc._id, "documents", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(caseDoc, "case_file_uploaded_refresh");
+
+    await dispatchNotification?.();
+
+    // Presence suppresses the stored alert, not live state reconciliation.
+    if (liveRefreshRecipientId && notificationSuppressedByPresence) {
+      publishNotificationEvent(liveRefreshRecipientId, "notifications", {
+        at: new Date().toISOString(),
+        type: "case_file_uploaded_refresh",
+      });
+    }
+
+    await matterFileWrites.read(req);
+    if (recoveredResult) return res.status(200).json(present(recoveredResult));
     res.status(201).json({
       file: req.query?.presentation === "matter"
         ? serializeMatterCaseFile(entry)
         : serializeCaseFile(entry),
     });
-  })
+  }))
 );
 
 router.get(
   "/case/:caseId",
   ensureCaseParticipant(),
   asyncHandler(async (req, res) => {
-    const { caseDoc, isAdmin } = await loadCaseForUser(req, req.params.caseId);
+    const { caseDoc, isAdmin, isParalegal } = await loadCaseForUser(req, req.params.caseId);
     if (isAdmin) {
       return res.status(403).json({ msg: "Administrators can only access the Matter archive." });
     }
     if (!assertWorkspaceReady(caseDoc, res)) return;
-    const files = await CaseFile.find({ caseId: caseDoc._id }).sort({ createdAt: -1 }).lean();
+    const attorneyReq = { ...req, query: { expectedOwnerId: String(req.user.id) } };
+    let reviewedMatter = null;
+    try { if (req.user.role === "attorney") reviewedMatter = await attorneyFiles.matter(attorneyReq); }
+    catch (error) { return attorneyFiles.sendError(res, error); }
+    const files = await CaseFile.find(applyAssignmentVisibility(
+      { caseId: caseDoc._id },
+      caseDoc,
+      { role: req.user?.role, userId: req.user?.id, isParalegal }
+    )).sort({ createdAt: -1 }).lean();
     const serializer = req.query?.presentation === "matter"
       ? serializeMatterCaseFile
       : serializeCaseFile;
-    res.json({ files: files.map(serializer) });
+    if (reviewedMatter) {
+      let current;
+      try { current = await attorneyFiles.matter(attorneyReq); } catch (error) { return attorneyFiles.sendError(res, error); }
+      if (attorneyFiles.matterRevision(current) !== attorneyFiles.matterRevision(reviewedMatter)) return attorneyFiles.sendError(res, { status: 409, publicCode: "DOCUMENT_MATTER_CHANGED" });
+    }
+    // Use the raw persisted fields before adding derived revision resolutions.
+    const reviews = new Map(reviewedMatter ? files.map(file => [String(file._id), attorneyFiles.shape(file, reviewedMatter)]) : []);
+    res.set("Cache-Control", "private, no-store");
+    res.json({ files: projectRevisionResolutions(files).map(file => {
+      const serialized = serializer(file), review = reviews.get(String(file._id));
+      return review ? { ...serialized, reviewRevision: review.reviewRevision, reviewOwnerId: String(req.user.id), canReview: review.canReview } : serialized;
+    }) });
   })
 );
 
-router.delete(
-  "/case/:caseId/:fileId",
-  ensureCaseParticipant(),
-  csrfProtection,
-  asyncHandler(async (req, res) => {
-    const { caseDoc, isAdmin, isAttorney } = await loadCaseForUser(req, req.params.caseId);
-    if (isAdmin) {
-      return res.status(403).json({ msg: "Administrators can only access the Matter archive." });
-    }
-    if (!assertWorkspaceReady(caseDoc, res)) return;
-    if (!isAdmin && !isAttorney) {
-      return res.status(403).json({ msg: "Only the Matter attorney can delete documents." });
-    }
-    if (!isObjId(req.params.fileId)) {
-      return res.status(400).json({ msg: "Invalid file id" });
-    }
-    const record = await CaseFile.findOne({ _id: req.params.fileId, caseId: caseDoc._id });
-    if (!record) {
-      return res.status(404).json({ msg: "File not found" });
-    }
-    const plainRecord = decryptCaseFilePayload(record);
-    if (BUCKET && plainRecord.storageKey) {
-      try {
-        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(plainRecord.storageKey) }));
-      } catch (err) {
-        runtimeLogger.warn("[uploads] delete object failed", err?.message || err);
-      }
-    }
-    if (BUCKET && plainRecord.previewKey) {
-      try {
-        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(plainRecord.previewKey) }));
-      } catch (err) {
-        runtimeLogger.warn("[uploads] delete preview object failed", err?.message || err);
-      }
-    }
-    await CaseFile.deleteOne({ _id: record._id });
-    try {
-      await logAction(req, "file_deleted", {
-        targetType: "case",
-        targetId: caseDoc._id,
-        meta: { fileId: record._id, filename: plainRecord.originalName },
-      });
-    } catch (err) {
-      runtimeLogger.warn("[uploads] file delete audit failed", err?.message || err);
-    }
-    publishCaseEvent(caseDoc._id, "documents", { at: new Date().toISOString() });
-    res.json({ ok: true });
-  })
-);
+router.get("/case/:caseId/removal-review/:fileId", requireRole("attorney"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await fileRemoval.review(req)); } catch (error) { fileRemoval.sendError(res, error); }
+}));
+router.post("/case/:caseId/reviewed-removal/:fileId", requireRole("attorney"), csrfProtection, asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await fileRemoval.remove(req)); } catch (error) { fileRemoval.sendError(res, error); }
+}));
+router.delete("/case/:caseId/:fileId", ensureCaseParticipant(), requireRole("attorney"), csrfProtection, asyncHandler(async (req, res) => {
+  try { res.json({ ok: true, ...await fileRemoval.legacy(req, req.params.fileId) }); } catch (error) { fileRemoval.sendError(res, error); }
+}));
 
 router.get(
   "/case/:caseId/:fileId/security-status",
   ensureCaseParticipant(),
   asyncHandler(async (req, res) => {
-    const { caseDoc, isAdmin } = await loadCaseForUser(req, req.params.caseId);
+    const { caseDoc, isAdmin, isParalegal } = await loadCaseForUser(req, req.params.caseId);
     if (isAdmin) {
       return res.status(403).json({ msg: "Administrators can only access the Matter archive." });
     }
@@ -1266,11 +1391,20 @@ router.get(
     if (!isObjId(req.params.fileId)) {
       return res.status(400).json({ msg: "Invalid file id" });
     }
-    const record = await CaseFile.findOne({ _id: req.params.fileId, caseId: caseDoc._id });
+    const record = await CaseFile.findOne(applyAssignmentVisibility(
+      { _id: req.params.fileId, caseId: caseDoc._id },
+      caseDoc,
+      { role: req.user?.role, userId: req.user?.id, isParalegal }
+    ));
     if (!record) return res.status(404).json({ msg: "File not found" });
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
     const plainRecord = decryptCaseFilePayload(record);
+    const previousSecurityStatus = String(record.securityStatus || "");
     const scan = await refreshCaseFileSecurity(record, plainRecord.storageKey, { enforce: false });
+    if (String(scan.status || "") !== previousSecurityStatus) {
+      publishCaseEvent(caseDoc._id, "documents", { at: new Date().toISOString() });
+      publishCaseParticipantRefresh(caseDoc, "case_file_security_refresh");
+    }
     res.set("Cache-Control", "no-store");
     return res.json({
       fileId: String(record._id),
@@ -1286,7 +1420,7 @@ router.get(
   "/case/:caseId/:fileId/download",
   ensureCaseParticipant(),
   asyncHandler(async (req, res) => {
-    const { caseDoc, isAdmin } = await loadCaseForUser(req, req.params.caseId);
+    const { caseDoc, isAdmin, isParalegal } = await loadCaseForUser(req, req.params.caseId);
     if (isAdmin) {
       return res.status(403).json({ msg: "Administrators can only access the Matter archive." });
     }
@@ -1294,26 +1428,53 @@ router.get(
     if (!isObjId(req.params.fileId)) {
       return res.status(400).json({ msg: "Invalid file id" });
     }
-    const record = await CaseFile.findOne({ _id: req.params.fileId, caseId: caseDoc._id });
+    const record = await CaseFile.findOne(applyAssignmentVisibility(
+      { _id: req.params.fileId, caseId: caseDoc._id },
+      caseDoc,
+      { role: req.user?.role, userId: req.user?.id, isParalegal }
+    ));
     if (!record) {
       return res.status(404).json({ msg: "File not found" });
     }
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
     const plainRecord = decryptCaseFilePayload(record);
+    const previousSecurityStatus = String(record.securityStatus || "");
     try {
-      await refreshCaseFileSecurity(record, plainRecord.storageKey);
+      const scan = await refreshCaseFileSecurity(record, plainRecord.storageKey);
+      if (String(scan.status || "") !== previousSecurityStatus) {
+        publishCaseEvent(caseDoc._id, "documents", { at: new Date().toISOString() });
+        publishCaseParticipantRefresh(caseDoc, "case_file_security_refresh");
+      }
     } catch (err) {
+      if (String(record.securityStatus || "") !== previousSecurityStatus) {
+        publishCaseEvent(caseDoc._id, "documents", { at: new Date().toISOString() });
+        publishCaseParticipantRefresh(caseDoc, "case_file_security_refresh");
+      }
       if (err?.statusCode) return res.status(err.statusCode).json({ msg: err.message, code: err.code });
       throw err;
     }
     const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(plainRecord.storageKey) });
     const data = await s3.send(getCmd);
     const filename = plainRecord.originalName || `case-file-${record._id}`;
-    res.setHeader("Content-Type", plainRecord.mimeType || "application/octet-stream");
+    const mimeType = String(plainRecord.mimeType || "application/octet-stream").toLowerCase();
+    const previewableMimeTypes = new Set([
+      "application/pdf",
+      "image/png",
+      "image/jpeg",
+      "image/gif",
+      "text/plain",
+      "text/csv",
+    ]);
+    const previewInline = String(req.query.preview || "").toLowerCase() === "true"
+      && previewableMimeTypes.has(mimeType);
+    res.setHeader("Content-Type", mimeType);
     if (plainRecord.size) {
       res.setHeader("Content-Length", String(plainRecord.size));
     }
-    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader(
+      "Content-Disposition",
+      `${previewInline ? "inline" : "attachment"}; filename="${encodeURIComponent(filename)}"`
+    );
     data.Body.on("error", (err) => {
       runtimeLogger.error("[uploads] download stream error", err);
       res.destroy(err);
@@ -1363,7 +1524,7 @@ async function loadCaseForUser(req, caseId) {
     throw error;
   }
   const doc = await Case.findById(caseId).select(
-    "_id attorney attorneyId paralegal paralegalId title escrowIntentId escrowStatus status paymentReleased readOnly paralegalAccessRevokedAt preEngagement.requestedParalegalId preEngagement.confidentialityDocument.key preEngagement.paralegalConfidentialityDocument.key"
+    "_id attorney attorneyId paralegal paralegalId title escrowIntentId escrowStatus status paymentReleased readOnly paralegalAccessRevokedAt withdrawnParalegalId hiredAt preEngagement.requestedParalegalId preEngagement.confidentialityDocument.key preEngagement.paralegalConfidentialityDocument.key"
   );
   if (!doc) {
     const error = new Error("Matter not found");
@@ -1415,6 +1576,10 @@ function serializeCaseFile(doc) {
     uploadedByRole: plain.uploadedByRole || null,
     status: plain.status || "pending_review",
     version: typeof plain.version === "number" ? plain.version : 1,
+    revisionResolution: plain.revisionResolution || null,
+    revisionOfFileId: plain.revisionOfFileId ? String(plain.revisionOfFileId) : null,
+    revisionOfVersion: plain.revisionOfVersion || null,
+    revisionRequestAt: plain.revisionRequestAt || null,
     revisionNotes: plain.revisionNotes || "",
     revisionRequestedAt: plain.revisionRequestedAt || null,
     approvedAt: plain.approvedAt || null,
@@ -1444,6 +1609,11 @@ function serializeMatterCaseFile(doc) {
     uploadedByRole: file.uploadedByRole,
     status: file.status,
     version: file.version,
+    revisionResolution: file.revisionResolution,
+    revisionOfFileId: file.revisionOfFileId,
+    revisionOfVersion: file.revisionOfVersion,
+    revisionRequestAt: file.revisionRequestAt,
+    revisionNotes: file.revisionNotes,
     revisionRequestedAt: file.revisionRequestedAt,
     approvedAt: file.approvedAt,
     replacedAt: file.replacedAt,

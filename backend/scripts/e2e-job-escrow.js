@@ -3,8 +3,9 @@ const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const http = require("http");
 const path = require("path");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { MongoMemoryReplSet } = require("mongodb-memory-server");
 const mongoose = require("mongoose");
+const { connectE2eDatabase } = require("./e2e-database-fixture");
 const { launchPuppeteer, clickVisible } = require("./puppeteerBrowser");
 
 process.env.NODE_ENV = "test";
@@ -25,7 +26,7 @@ const stripeMock = {
       createdPaymentIntent = {
         ...params,
         id: confirmedHire ? "pi_ui_hire_123" : "pi_test_123",
-        client_secret: confirmedHire ? "cs_ui_hire_123" : "cs_test_123",
+        client_secret: confirmedHire ? "pi_ui_hire_123_secret_synthetic" : "pi_test_123_secret_synthetic",
         status: confirmedHire ? "succeeded" : "requires_payment_method",
         amount_received: confirmedHire ? params.amount : 0,
         livemode: false,
@@ -45,14 +46,33 @@ const stripeMock = {
       };
       return createdPaymentIntent;
     },
-    retrieve: async (intentId) => ({
-      ...createdPaymentIntent,
-      id: intentId || createdPaymentIntent?.id || "pi_test_123",
-      status: "succeeded",
-      amount_received: createdPaymentIntent?.amount,
-      livemode: false,
-      charges: { data: [{ receipt_url: "https://stripe.test/receipt" }] },
-    }),
+    retrieve: async (intentId) => {
+      if (!createdPaymentIntent || intentId !== createdPaymentIntent.id) {
+        throw new Error(`Unknown synthetic PaymentIntent: ${intentId}`);
+      }
+      const chargeId = createdPaymentIntent.charges?.data?.[0]?.id || "ch_test_123";
+      const charge = {
+        id: chargeId,
+        payment_intent: intentId,
+        status: "succeeded", livemode: false,
+        paid: true, captured: true, refunded: false, disputed: false,
+        amount: createdPaymentIntent.amount,
+        amount_captured: createdPaymentIntent.amount,
+        amount_refunded: 0, currency: createdPaymentIntent.currency,
+        receipt_url: "https://stripe.test/receipt",
+        balance_transaction: {
+          id: "txn_test_123", source: chargeId, type: "charge",
+          currency: createdPaymentIntent.currency,
+          amount: createdPaymentIntent.amount,
+          fee: 1445, net: createdPaymentIntent.amount - 1445,
+        },
+      };
+      return {
+        ...createdPaymentIntent,
+        status: "succeeded", amount_received: createdPaymentIntent.amount,
+        latest_charge: charge, charges: { data: [charge] },
+      };
+    },
     cancel: async (intentId) => ({ id: intentId, status: "canceled" }),
   },
   customers: {
@@ -65,11 +85,15 @@ const stripeMock = {
   paymentMethods: {
     retrieve: async (paymentMethodId) => ({
       id: paymentMethodId,
+      customer: "cus_test",
       type: "card",
       card: { brand: "visa", last4: "4242", exp_month: 12, exp_year: 2035 },
     }),
   },
-  refunds: { create: async () => ({ id: "re_test", status: "succeeded" }) },
+  refunds: {
+    create: async () => ({ id: "re_test", status: "succeeded" }),
+    list: async () => ({ data: [], has_more: false }),
+  },
   caseTransferGroup: (caseId) => `case_${caseId}`,
   stripeIdempotencyKey: (operation, ...parts) => `e2e_${operation}_${parts.join("_")}`,
   sanitizeStripeError: (_error, fallback) => fallback,
@@ -84,9 +108,9 @@ const caseLifecycleMock = {
 };
 
 const stripePath = require.resolve("../utils/stripe");
-require.cache[stripePath] = { exports: stripeMock };
+require.cache[stripePath] = { id: stripePath, filename: stripePath, loaded: true, exports: stripeMock };
 const caseLifecyclePath = require.resolve("../services/caseLifecycle");
-require.cache[caseLifecyclePath] = { exports: caseLifecycleMock };
+require.cache[caseLifecyclePath] = { id: caseLifecyclePath, filename: caseLifecyclePath, loaded: true, exports: caseLifecycleMock };
 
 const User = require("../models/User");
 const Case = require("../models/Case");
@@ -144,45 +168,48 @@ async function startServer() {
   app.use(express.static(frontendRoot));
 
   const server = http.createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
+  await new Promise((resolve) => server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, resolve));
   const { port } = server.address();
   return { server, port };
 }
 
 async function main() {
-  const mongo = await MongoMemoryServer.create();
-  await mongoose.connect(mongo.getUri(), { dbName: "e2e" });
+  const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" } });
+  await connectE2eDatabase(mongoose, mongo.getUri());
 
   const { server, port } = await startServer();
-  const baseUrl = `http://localhost:${port}`;
-  let browser;
+  const baseUrl = `http://127.0.0.1:${port}`;
+  let browser, page, hiringRead;
 
   try {
     const attorney = await User.create({
       firstName: "Ava",
       lastName: "Stone",
-      // Use a Stripe-bypass email to allow case posting without a stored payment method.
-      email: "game4funwithme1+1@gmail.com",
+      email: "attorney+job-escrow@example.test",
       password: "Password123!",
       role: "attorney",
       status: "approved",
       state: "CA",
+      stripeCustomerId: "cus_test",
     });
 
     const paralegal = await User.create({
       firstName: "Jamie",
       lastName: "Lopez",
-      email: "samanthasider+paralegal@gmail.com",
+      email: "paralegal+job-escrow@example.test",
       password: "Password123!",
       role: "paralegal",
       status: "approved",
       state: "CA",
+      stripeAccountId: "acct_test_paralegal",
+      stripeOnboarded: true,
+      stripePayoutsEnabled: true,
     });
 
     const cookie = authCookieFor(attorney);
 
     browser = await launchPuppeteer();
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
     await page.setCookie({
       name: "token",
@@ -247,19 +274,25 @@ async function main() {
     }
     await page.keyboard.press("Escape");
     await page.waitForSelector('#previewModal[aria-hidden="true"][inert]');
+    await page.waitForFunction(() => document.getElementById("postBtn")?.disabled === false);
 
     const createResponsePromise = page.waitForResponse((response) => {
       const url = new URL(response.url());
-      return url.pathname === "/api/cases" && response.request().method() === "POST";
+      return url.pathname === "/api/cases/posting/publications" && response.request().method() === "POST";
     });
+    // Preserve an earlier interaction error if cleanup closes this pending wait.
+    // The original promise is still awaited below and still rejects on failure.
+    createResponsePromise.catch(() => {});
     await clickVisible(page, "#postBtn");
+    await page.waitForSelector("#matter-publishing-practice");
+    await page.select("#matter-publishing-practice", "immigration");
+    await page.locator("::-p-text(Confirm and publish Matter)").click();
     const createResponse = await createResponsePromise;
     if (createResponse.status() !== 201) {
-      throw new Error(`Expected UI Matter creation 201, got ${createResponse.status()}`);
+      throw new Error(`Expected UI Matter creation 201, got ${createResponse.status()}: ${await createResponse.text()}`);
     }
     const createdMatterPayload = await createResponse.json();
-    await page.waitForFunction(() => location.pathname === "/dashboard-attorney.html" && location.hash === "#cases");
-    await page.waitForSelector('#casePostedModal.is-active[aria-hidden="false"]');
+    await page.waitForSelector('[aria-label="Publication status"][data-state="complete"]');
 
     const uiPostedCase = await Case.findOne({ title: "Immigration filing support" }).lean();
     if (!uiPostedCase) throw new Error("The real create-Matter UI did not persist a Case record.");
@@ -269,11 +302,11 @@ async function main() {
     if (uiPostedCase.tasks?.length !== 1 || uiPostedCase.tasks[0]?.title !== "Organize supporting exhibits") {
       throw new Error(`Unexpected persisted task scope: ${JSON.stringify(uiPostedCase.tasks)}`);
     }
-    if (String(createdMatterPayload?.id || createdMatterPayload?._id || "") !== String(uiPostedCase._id)) {
+    if (String(createdMatterPayload?.publication?.caseId || "") !== String(uiPostedCase._id)) {
       throw new Error(`Created Matter response did not match persistence: ${JSON.stringify(createdMatterPayload)}`);
     }
-    const postedNoticeText = await page.$eval("#casePostedText", (node) => node.textContent.trim());
-    if (!postedNoticeText.includes("Immigration filing support") || !postedNoticeText.includes("open to applications")) {
+    const postedNoticeText = await page.$eval('[aria-label="Publication status"]', (node) => node.textContent.trim());
+    if (!postedNoticeText.includes("Matter posted") || !postedNoticeText.includes("Publishing does not charge you")) {
       throw new Error(`Missing post-success Matter confirmation: ${postedNoticeText}`);
     }
     if (pageErrors.length) throw new Error(`Create-Matter UI page errors:\n${pageErrors.join("\n")}`);
@@ -307,19 +340,27 @@ async function main() {
       () => document.querySelector("#inviteToCaseBtn")?.dataset?.mode === "hire"
     );
     const hireEntryLabel = await page.$eval("#inviteToCaseBtn", (button) => button.textContent.trim());
-    if (hireEntryLabel !== "Hire for Browser Hire Matter") {
+    if (hireEntryLabel !== "Review hire") {
       throw new Error(`Unexpected hire entry label: ${hireEntryLabel}`);
     }
+    const hiringReadPromise = page.waitForResponse(response => new URL(response.url()).pathname === `/api/cases/${uiHireCase._id}/hiring-review/${paralegal._id}` && response.request().method() === "GET");
+    hiringReadPromise.catch(() => {});
     await clickVisible(page, "#inviteToCaseBtn");
-    await page.waitForSelector('.hire-confirm-overlay.is-visible [data-hire-step="pre-engagement"]');
-    const noneSelected = await page.$eval(
-      '[data-pre-option="none"]',
-      (input) => input.checked === true
-    );
+    const hiringReadResponse = await hiringReadPromise;
+    hiringRead = { status: hiringReadResponse.status(), body: await hiringReadResponse.json() };
+    if (hiringRead.status !== 200 || hiringRead.body.reason !== "ready") throw new Error(`Hiring review was not ready: ${JSON.stringify(hiringRead)}`);
+    await page.waitForSelector('dialog.lpc-engagement-dialog[open] [data-hiring][data-state="ready"]');
+    await page.locator('::-p-aria(Review pre-engagement requirements)').click();
+    await page.waitForSelector('dialog[open] [data-pre-engagement][data-state="ready"]');
+    const noneSelected = await page.$eval('[data-pre-engagement]', section =>
+      section.textContent.includes("No pre-engagement requirements have been recorded for this Matter.") &&
+      section.querySelectorAll('input[type="checkbox"]').length === 2 &&
+      [...section.querySelectorAll('input[type="checkbox"]')].every(input => !input.checked));
     if (!noneSelected) throw new Error("The optional pre-engagement step did not default to None.");
-    await clickVisible(page, "[data-pre-next]");
-    await page.waitForSelector('[data-hire-step="fund-hire"]');
-    const hireSummary = await page.$eval(".hire-confirm-summary", (node) => node.textContent);
+    await page.locator('::-p-aria(Continue to hiring review)').click();
+    await page.waitForSelector('dialog[open] [data-hiring][data-state="ready"]');
+    await page.locator('::-p-aria(Review hiring confirmation)').click();
+    const hireSummary = await page.$eval("dialog[open] [data-hiring]", (node) => node.textContent);
     if (!hireSummary.includes("$800.00") || !hireSummary.includes("$176.00") || !hireSummary.includes("$976.00")) {
       throw new Error(`Unexpected hire fee summary: ${hireSummary}`);
     }
@@ -328,16 +369,13 @@ async function main() {
       return response.request().method() === "POST" &&
         url.pathname === `/api/cases/${uiHireCase._id}/hire/${paralegal._id}`;
     });
-    await clickVisible(page, "[data-hire-confirm]");
+    hireResponsePromise.catch(() => {});
+    await page.locator('::-p-aria(Hire and charge $976.00)').click();
     const hireResponse = await hireResponsePromise;
     if (hireResponse.status() !== 200) {
       throw new Error(`Expected UI hire 200, got ${hireResponse.status()}: ${await hireResponse.text()}`);
     }
-    await page.waitForSelector("[data-hire-success]:not([hidden])");
-    const hireSuccess = await page.$eval("[data-hire-success]", (node) => node.textContent.trim());
-    if (hireSuccess !== "Matter funded. Work can begin.") {
-      throw new Error(`Unexpected hire confirmation: ${hireSuccess}`);
-    }
+    await page.waitForFunction(() => document.querySelector('dialog[open] [data-hiring][data-state="ready"]')?.textContent.includes("This paralegal is assigned, and the Matter's funding is verified."));
     const hiredMatter = await Case.findById(uiHireCase._id).lean();
     if (
       String(hiredMatter?.paralegalId || "") !== String(paralegal._id) ||
@@ -441,7 +479,7 @@ async function main() {
       headers: { Cookie: cookie },
     });
     if (res.status !== 200) {
-      throw new Error(`Expected intent 200, got ${res.status}`);
+      throw new Error(`Expected intent 200, got ${res.status}: ${await res.text()}`);
     }
 
     // Test: Escrow success returns receipt.
@@ -450,14 +488,14 @@ async function main() {
       headers: { Cookie: cookie },
     });
     if (res.status !== 200) {
-      throw new Error(`Expected confirm 200, got ${res.status}`);
+      throw new Error(`Expected confirm 200, got ${res.status}: ${await res.text()}`);
     }
 
     res = await fetch(`${baseUrl}/api/payments/receipt/attorney/${caseDoc._id}`, {
       headers: { Cookie: cookie },
     });
     if (res.status !== 200) {
-      throw new Error(`Expected receipt 200, got ${res.status}`);
+      throw new Error(`Expected receipt 200, got ${res.status}: ${await res.text()}`);
     }
     const contentType = res.headers.get("content-type") || "";
     if (!contentType.includes("application/pdf")) {
@@ -465,6 +503,13 @@ async function main() {
     }
 
     console.log("E2E job posting + escrow validation complete.");
+  } catch (error) {
+    const state = await page?.evaluate(() => ({ url: location.href,
+      dialog: document.querySelector('dialog[open]')?.textContent?.trim(),
+      publication: document.querySelector('[aria-label="Publication status"]')?.textContent?.trim(),
+    })).catch(() => null);
+    console.error("Publishing/hiring failure state:", JSON.stringify({ ...state, hiringRead }));
+    throw error;
   } finally {
     if (browser) await browser.close();
     await new Promise((resolve) => server.close(resolve));

@@ -20,7 +20,7 @@ jest.mock("../utils/stripe", () => {
   };
   return {
     paymentIntents,
-    refunds: { create: jest.fn() },
+    refunds: { create: jest.fn(), list: jest.fn() },
     customers: {
       create: jest.fn(),
       retrieve: jest.fn(),
@@ -102,6 +102,7 @@ beforeEach(async () => {
   stripe.paymentIntents.retrieve.mockReset();
   stripe.paymentIntents.cancel.mockReset();
   stripe.refunds.create.mockReset();
+  stripe.refunds.list.mockReset().mockResolvedValue({ data: [], has_more: false });
   stripe.isTransferablePaymentIntent.mockClear();
   stripe.customers.retrieve.mockReset();
   stripe.customers.create.mockReset();
@@ -173,7 +174,7 @@ describe("Job posting + escrow", () => {
       .send({
         title: "Immigration support",
         practiceArea: "immigration",
-        description: "Need help preparing filings and reviewing documents.",
+        description: "Need help preparing filings.\n\nReview the supporting documents.",
         totalAmount: 400,
         state: "CA",
       });
@@ -183,10 +184,23 @@ describe("Job posting + escrow", () => {
     const created = await Case.findOne({ title: "Immigration support" }).lean();
     expect(created).toBeTruthy();
     expect(created.totalAmount).toBe(40000);
+    expect(created.details).toContain("Need help preparing filings.\n\nReview the supporting documents.");
+    expect(sendEmail).not.toHaveBeenCalled();
+    const PostingNotice = require("../models/MatterPostingNotification");
+    const notice = await PostingNotice.findOne({ caseId: created._id, userId: admin._id }).lean();
+    expect(notice).toMatchObject({ kind: "created", status: "pending", attempts: 0 });
+    expect(String(notice.ownerId)).toBe(String(attorney._id));
+    sendEmail.mockResolvedValueOnce({ accepted: [admin.email] });
+    const delivery = require("../services/matterPostingNotifications");
+    expect(await delivery.processNotices()).toBe(1);
+    expect(await delivery.processNotices()).toBe(0);
+    expect((await PostingNotice.findById(notice._id)).status).toBe("accepted");
+    expect(sendEmail).toHaveBeenCalledTimes(1);
     expect(sendEmail).toHaveBeenCalledWith(
       admin.email,
       "New attorney Matter posted: Immigration support",
-      expect.stringContaining("Review Matter posting in Admin")
+      expect.stringContaining("Review Matter posting in Admin"),
+      expect.objectContaining({ messageId: `<lpc-posting.${notice._id}@lets-paraconnect.com>` })
     );
   });
 
@@ -495,7 +509,9 @@ describe("Job posting + escrow", () => {
 
     stripe.paymentIntents.create.mockResolvedValue({
       id: "pi_test_123",
-      client_secret: "cs_test_123",
+      client_secret: "pi_test_123_secret_synthetic",
+      livemode: false,
+      metadata: { caseId: String(caseDoc._id), attorneyId: String(attorney._id) },
       status: "requires_payment_method",
       amount: 48800,
       currency: "usd",
@@ -506,10 +522,12 @@ describe("Job posting + escrow", () => {
       id: "pi_test_123",
       status: "succeeded",
       amount: 48800,
+      amount_received: 48800,
+      livemode: false,
       currency: "usd",
       transfer_group: `case_${caseDoc._id}`,
       metadata: { caseId: String(caseDoc._id) },
-      latest_charge: { id: "ch_test_123", receipt_url: "https://stripe.test/receipt" },
+      latest_charge: { id: "ch_test_123", status: "succeeded", livemode: false, amount: 48800, balance_transaction: { id: "txn_escrow", source: "ch_test_123", type: "charge", currency: "usd", amount: 48800, fee: 1445, net: 47355 }, receipt_url: "https://stripe.test/receipt", payment_intent: "pi_test_123", currency: "usd", paid: true, captured: true, disputed: false, amount_captured: 48800, amount_refunded: 0 },
     });
 
     const cookie = authCookieFor(attorney);
@@ -520,7 +538,7 @@ describe("Job posting + escrow", () => {
       .send({});
 
     expect(intentRes.status).toBe(200);
-    expect(intentRes.body.clientSecret).toBe("cs_test_123");
+    expect(intentRes.body.clientSecret).toBe("pi_test_123_secret_synthetic");
     expect(stripe.paymentIntents.create).toHaveBeenCalledWith(
       expect.objectContaining({
         amount: 48800,
@@ -555,6 +573,7 @@ describe("Job posting + escrow", () => {
       .set("Cookie", cookie)
       .buffer(true);
 
+    if (receiptRes.status !== 200) throw new Error(`Receipt request failed: ${receiptRes.status} ${JSON.stringify(receiptRes.body)}`);
     expect(receiptRes.status).toBe(200);
     expect(receiptRes.headers["content-type"]).toMatch(/application\/pdf/);
     expect(Buffer.isBuffer(receiptRes.body)).toBe(true);
@@ -600,9 +619,12 @@ describe("Job posting + escrow", () => {
       id: "pi_historical_123",
       status: "succeeded",
       amount: 48800,
+      amount_received: 48800,
+      livemode: false,
       currency: "usd",
       latest_charge: {
         id: "ch_historical_123",
+        payment_intent: "pi_historical_123", currency: "usd", paid: true, captured: true, disputed: false, amount_captured: 48800, amount_refunded: 0,
         payment_method_details: { card: { brand: "visa", last4: "4242" } },
       },
     });
@@ -613,6 +635,7 @@ describe("Job posting + escrow", () => {
       .set("Cookie", cookie)
       .buffer(true);
 
+    if (receiptRes.status !== 200) throw new Error(`Receipt request failed: ${receiptRes.status} ${JSON.stringify(receiptRes.body)}`);
     expect(receiptRes.status).toBe(200);
     expect(caseLifecycle.buildReceiptPdfBuffer).toHaveBeenLastCalledWith(
       expect.objectContaining({

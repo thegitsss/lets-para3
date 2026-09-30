@@ -337,7 +337,7 @@ function renderKnowledgeDetail(item = {}, revisions = []) {
                 String(pendingRevision.revisionNumber || "—")
               )} was created ${escapeHTML(formatDate(pendingRevision.createdAt))}.</p>
               <label class="approval-decision-label">Optional note
-                <textarea class="approval-decision-note" id="knowledgeDecisionNote" rows="3" maxlength="2000" placeholder="Optional approval or rejection note"></textarea>
+                <textarea class="approval-decision-note" id="knowledgeDecisionNote" rows="3" maxlength="2000"></textarea>
               </label>
               <div class="approval-decision-actions">
                 <button class="btn" type="button" data-knowledge-action="approve" data-knowledge-revision-id="${escapeHTML(

@@ -108,6 +108,15 @@
   color: #fff;
 }
 
+.lpc-context-dialog[data-context-kind="file"] .lpc-context-action.is-primary {
+  color: #1b273f;
+}
+
+.lpc-context-dialog[data-context-kind="file"] .lpc-context-header > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .lpc-context-summary {
   margin: 0;
   color: var(--app-muted, #66625c);

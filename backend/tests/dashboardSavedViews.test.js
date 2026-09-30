@@ -21,6 +21,7 @@ describe("dashboard saved views", () => {
       deadline: "overdue",
       updated: "",
       sort: "deadline",
+      archiveStatus: "all",
     });
   });
 

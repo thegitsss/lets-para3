@@ -1,9 +1,9 @@
+const { reportOperationalFailure } = require("../utils/operationalFailure");
 const { createLogger: createRuntimeLogger } = require("../utils/logger");
 const runtimeLogger = createRuntimeLogger("services:applicationService");
 const mongoose = require("mongoose");
 const Application = require("../models/Application");
 const Case = require("../models/Case");
-const Job = require("../models/Job");
 
 const ACTIVE_APPLICATION_FILTER = { status: { $nin: ["accepted", "rejected", "withdrawn"] } };
 
@@ -11,11 +11,12 @@ function applicationSyncError(err) {
   return String(err?.message || err || "Application mirror synchronization failed").slice(0, 1000);
 }
 
-async function markApplicationSynced(applicationId) {
+async function markApplicationSynced(applicationId, { session = null } = {}) {
   if (!applicationId) return;
   await Application.updateOne(
     { _id: applicationId },
-    { $set: { syncStatus: "synced", syncedAt: new Date(), syncError: "" } }
+    { $set: { syncStatus: "synced", syncedAt: new Date(), syncError: "" } },
+    ...(session ? [{ session }] : [])
   );
 }
 
@@ -33,12 +34,9 @@ async function markApplicationNeedsReconciliation(applicationId, err) {
   );
 }
 
-async function syncApplicantsCount(jobId) {
+async function syncApplicantsCount(jobId, { session = null } = {}) {
   if (!mongoose.isValidObjectId(jobId)) return 0;
-  const count = await Application.countDocuments({ jobId, ...ACTIVE_APPLICATION_FILTER });
-  const result = await Job.updateOne({ _id: jobId }, { $set: { applicantsCount: count } });
-  if (!result.matchedCount) throw new Error(`Application references missing job ${String(jobId)}`);
-  return count;
+  return require('./applicationCandidateCounts').refreshCandidateCount(jobId, { session });
 }
 
 async function syncEmbeddedApplication({
@@ -48,14 +46,18 @@ async function syncEmbeddedApplication({
   resumeURL = "",
   linkedInURL = "",
   profileSnapshot = {},
+  requirementConfirmations = [],
   status = "submitted",
   appliedAt = new Date(),
+  session = null,
 }) {
   if (!caseId || !paralegalId) return null;
+  const options = session ? { session } : {};
   if (status === "withdrawn") {
     return Case.updateOne(
       { _id: caseId },
-      { $pull: { applicants: { paralegalId } } }
+      { $pull: { applicants: { paralegalId } } },
+      options
     );
   }
   const embeddedStatus = status === "submitted" ? "pending" : status;
@@ -67,10 +69,12 @@ async function syncEmbeddedApplication({
         "applicants.$.resumeURL": resumeURL,
         "applicants.$.linkedInURL": linkedInURL,
         "applicants.$.profileSnapshot": profileSnapshot,
+        "applicants.$.requirementConfirmations": requirementConfirmations,
         "applicants.$.status": embeddedStatus,
         "applicants.$.appliedAt": appliedAt,
       },
-    }
+    },
+    options
   );
   if (existing.matchedCount) return existing;
   const inserted = await Case.updateOne(
@@ -83,17 +87,19 @@ async function syncEmbeddedApplication({
           resumeURL,
           linkedInURL,
           profileSnapshot,
+          requirementConfirmations,
           status: embeddedStatus,
           appliedAt,
         },
       },
-    }
+    },
+    options
   );
   if (inserted.matchedCount) return inserted;
   const alreadySynchronized = await Case.exists({
     _id: caseId,
     applicants: { $elemMatch: { paralegalId } },
-  });
+  }).session(session);
   return alreadySynchronized
     ? { acknowledged: true, matchedCount: 1, modifiedCount: 0 }
     : inserted;
@@ -148,28 +154,40 @@ async function setApplicationStatus({ jobId, caseId, paralegalId, status }) {
   };
 }
 
-async function syncApplicationMirror({ application, caseId }) {
+async function syncApplicationMirror({ application, caseId, session: parentSession = null }) {
   if (!application?._id) return null;
+  const session = parentSession || await mongoose.startSession();
   try {
+    if (!parentSession) session.startTransaction();
+    // Deferred synchronization may hold an old submitted object after closure
+    // rejected the canonical record. Read and lock the current source instead.
+    const current = await Application.findById(application._id).session(session);
+    if (!current) throw new Error("Application no longer exists during synchronization");
+    await Application.collection.updateOne({ _id: current._id }, { $inc: { __v: 1 } }, { session });
     if (caseId) {
-      const mirrorResult = await syncEmbeddedApplication({
-        caseId,
-        paralegalId: application.paralegalId,
-        coverLetter: application.coverLetter,
-        resumeURL: application.resumeURL || "",
-        linkedInURL: application.linkedInURL || "",
-        profileSnapshot: application.profileSnapshot || {},
-        status: application.status,
-        appliedAt: application.createdAt,
-      });
-      if (!mirrorResult?.matchedCount) {
-        throw new Error(`Application references missing case ${String(caseId)}`);
+      const matter = await Case.findById(caseId).select("status archived").session(session).lean();
+      if (!matter) throw new Error(`Application references missing case ${String(caseId)}`);
+      await Case.collection.updateOne({ _id: matter._id }, { $inc: { __v: 1 } }, { session });
+      // Attorney closure retains canonical application history but rejects its
+      // embedded pending participation. Do not reopen that closed projection.
+      const closed = matter.archived || String(matter.status).toLowerCase() === "closed";
+      if (!(closed && ["submitted", "viewed", "shortlisted", "accepted"].includes(current.status))) {
+        const mirrorResult = await syncEmbeddedApplication({
+          caseId, paralegalId: current.paralegalId, coverLetter: current.coverLetter,
+          resumeURL: current.resumeURL || "", linkedInURL: current.linkedInURL || "",
+          profileSnapshot: current.profileSnapshot || {}, requirementConfirmations:current.requirementConfirmations || [], status: current.status,
+          appliedAt: current.createdAt, session,
+        });
+        if (!mirrorResult?.matchedCount) throw new Error(`Application references missing case ${String(caseId)}`);
       }
     }
-    await syncApplicantsCount(application.jobId);
-    await markApplicationSynced(application._id);
+    await syncApplicantsCount(current.jobId, { session });
+    await markApplicationSynced(current._id, { session });
+    if (!parentSession) await session.commitTransaction();
     return { synced: true };
   } catch (err) {
+    if (parentSession) throw err;
+    if (session.inTransaction()) await session.abortTransaction().catch(reportOperationalFailure("services.applicationService.transaction_abort"));
     try {
       await markApplicationNeedsReconciliation(application._id, err);
     } catch (markErr) {
@@ -182,6 +200,7 @@ async function syncApplicationMirror({ application, caseId }) {
     runtimeLogger.error("[applications] mirror synchronization deferred", application._id, err?.message || err);
     return { synced: false, error: applicationSyncError(err) };
   }
+  finally { if (!parentSession) await session.endSession(); }
 }
 
 async function setApplicationStar({ jobId, caseId, paralegalId, userId, starred }) {

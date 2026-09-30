@@ -5,10 +5,11 @@
   let nukedOnRedirect = false;
   let cachedUser = null;
   let sessionPromise = null;
+  let sessionGeneration = 0;
   let lastSessionFailure = null;
   const LEGACY_TOKEN_KEYS = ["lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"];
   const VALID_THEMES = ["light", "dark"];
-  const THEME_CLASSES_TO_CLEAR = ["theme-light", "theme-dark", "theme-mountain", "theme-mountain-dark"];
+  const THEME_CLASSES_TO_CLEAR = ["theme-light", "theme-dark"];
   const FONT_SIZE_MAP = {
     xs: "15px",
     sm: "16px",
@@ -16,12 +17,9 @@
     lg: "20px",
     xl: "22px"
   };
-  let currentTheme = null;
   let currentFontSize = null;
 
   const SESSION_STRING_FIELDS = [
-    "id",
-    "_id",
     "role",
     "status",
     "firstName",
@@ -47,6 +45,8 @@
   function projectSessionUser(user) {
     if (!user || typeof user !== "object" || Array.isArray(user)) return null;
     const snapshot = {};
+    const id = typeof (user.id || user._id) === "string" ? String(user.id || user._id) : "";
+    if (id) snapshot.id = id;
     SESSION_STRING_FIELDS.forEach((field) => {
       if (typeof user[field] === "string") snapshot[field] = user[field];
     });
@@ -55,7 +55,9 @@
     });
 
     const preferences = {};
-    if (typeof user.preferences?.theme === "string") preferences.theme = user.preferences.theme;
+    if (typeof user.preferences?.theme === "string") {
+      preferences.theme = normalizeTheme(user.preferences.theme);
+    }
     if (typeof user.preferences?.fontSize === "string") preferences.fontSize = user.preferences.fontSize;
     if (Object.keys(preferences).length) snapshot.preferences = preferences;
 
@@ -98,9 +100,8 @@
       const theme = String(stored?.preferences?.theme || "").toLowerCase();
       const fontSize = String(stored?.preferences?.fontSize || "").toLowerCase();
       const hasUser = !!(stored?.id || stored?._id || stored?.email || stored?.role);
-      if (!VALID_THEMES.includes(theme)) return { classes: [], fontSize, theme: "", hasUser };
-      const classes = [`theme-${theme}`];
-      return { classes, fontSize, theme, hasUser };
+      const normalizedTheme = normalizeTheme(theme);
+      return { classes: [`theme-${normalizedTheme}`], fontSize, theme: normalizedTheme, hasUser };
     } catch (_) {
       return null;
     }
@@ -135,7 +136,8 @@
 
   function normalizeTheme(value) {
     const candidate = String(value || "").toLowerCase();
-    return VALID_THEMES.includes(candidate) ? candidate : "light";
+    if (VALID_THEMES.includes(candidate)) return candidate;
+    return /dark$/i.test(candidate) ? "dark" : "light";
   }
 
   function applyClassToBody(classNames) {
@@ -157,7 +159,6 @@
 
   function setThemeClass(theme) {
     const normalized = normalizeTheme(theme);
-    if (currentTheme === normalized) return normalized;
     const classNames = getThemeClasses(normalized);
     if (document.body) {
       applyClassToBody(classNames);
@@ -170,8 +171,7 @@
         { once: true }
       );
     }
-    currentTheme = normalized;
-    applyThemeOverrides(normalized);
+    applyThemeOverrides();
     return normalized;
   }
 
@@ -247,7 +247,7 @@
     if (isLoginPage()) return;
     hasRedirected = true;
     try {
-      window.location.href = "login.html";
+      window.location.href = `login.html?next=${encodeURIComponent(window.location.pathname + window.location.search + window.location.hash)}`;
     } catch (_) {}
   }
 
@@ -296,8 +296,12 @@
   }
 
   async function fetchSession(force = false) {
-    if (force) sessionPromise = null;
+    if (force) {
+      sessionGeneration += 1;
+      sessionPromise = null;
+    }
     if (!sessionPromise) {
+      const requestGeneration = ++sessionGeneration;
       sessionPromise = fetch("/api/auth/me", { credentials: "include" })
         .then(async (res) => {
           const payload = await res.json().catch(() => ({}));
@@ -326,6 +330,7 @@
           return null;
         })
         .then((user) => {
+          if (requestGeneration !== sessionGeneration) return null;
           let resolvedUser = user;
           if (!resolvedUser && shouldPreserveStoredSession()) {
             resolvedUser = readStoredUserRaw();
@@ -358,6 +363,7 @@
   }
 
   function clearStoredSession() {
+    sessionGeneration += 1;
     cachedUser = null;
     sessionPromise = null;
     try {
@@ -381,6 +387,7 @@
 
   window.addEventListener("storage", (event) => {
     if (event.key !== "lpc_user" || event.newValue || !event.oldValue) return;
+    sessionGeneration += 1;
     cachedUser = null;
     sessionPromise = null;
     redirectToLogin();
@@ -527,11 +534,12 @@
       if (user) {
         const snapshot = projectSessionUser(user);
         if (snapshot && Object.keys(snapshot).length) {
-          localStorage.setItem("lpc_user", JSON.stringify(snapshot));
-        } else {
+          const payload = JSON.stringify(snapshot);
+          if (localStorage.getItem("lpc_user") !== payload) localStorage.setItem("lpc_user", payload);
+        } else if (localStorage.getItem("lpc_user")) {
           localStorage.removeItem("lpc_user");
         }
-      } else {
+      } else if (localStorage.getItem("lpc_user")) {
         localStorage.removeItem("lpc_user");
       }
     } catch (_) {}
@@ -558,7 +566,9 @@
     }
   }
 
-  fetchSession().catch((error) => console.warn("[session] background session refresh rejected", error));
+  if (!isLoginPage()) {
+    fetchSession().catch((error) => console.warn("[session] background session refresh rejected", error));
+  }
 
   window.checkSession = checkSession;
   window.redirectUserDashboard = redirectUserDashboard;
@@ -623,7 +633,7 @@
       }
       return user;
     } catch (error) {
-      window.location.href = "login.html";
+      redirectToLogin();
       return null;
     }
   }

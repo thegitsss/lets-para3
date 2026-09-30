@@ -1,6 +1,11 @@
-import { requireAuth, secureFetch } from "./auth.js";
+import { secureFetch } from "./auth.js";
+import { commissionLabel, commissionPaymentLabel, commissionAccount } from "./utils/director-financials.mjs";
 
-requireAuth("director");
+import { createPaymentHistoryReader } from "./utils/director-payment-dialog.mjs";
+
+const financialAccount = commissionAccount("director");
+const paymentReader = createPaymentHistoryReader();
+let portalDataState = "loading";
 
 const stageFilter = document.getElementById("stageFilter");
 const rangeFilter = document.getElementById("rangeFilter");
@@ -88,6 +93,7 @@ let currentPage = 1;
 let statusTimer = null;
 let autoRefreshTimer = null;
 let portalLoadInFlight = false;
+let portalReloadPending = false;
 let recordsSort = { key: "", direction: "asc" };
 let recordSearchQuery = "";
 const selectedRecordIds = new Set();
@@ -261,17 +267,7 @@ function renderRelativeMeta(element, value, label) {
   element.title = `${label}: ${exact}`;
 }
 
-function formatMoney(cents) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((Number(cents) || 0) / 100);
-}
-
-function payoutStatusLabel(record = {}) {
-  const hasCommission = Number(record.commissionEarnedCents || 0) > 0;
-  if (!hasCommission) return "—";
-  const paid = String(record.commissionPayoutStatus || "unpaid").toLowerCase() === "paid";
-  if (!paid) return "Payable";
-  return record.commissionPaidAt ? `Paid ${formatDate(record.commissionPaidAt)}` : "Paid";
-}
+const payoutStatusLabel = commissionPaymentLabel;
 
 function getRecordSortValue(record = {}, key = "") {
   switch (key) {
@@ -441,9 +437,10 @@ function escapeHTML(value) {
     .replace(/'/g, "&#39;");
 }
 
-async function readJsonOrThrow(res, fallback) {
+async function readJsonOrThrow(res, fallback, financial = false) {
   const payload = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(payload?.error || payload?.message || fallback);
+  if (!res.ok) throw Object.assign(new Error(res.status >= 500 ? fallback : payload?.error || payload?.message || fallback), { status: res.status });
+  financialAccount.verify(financial ? payload : undefined);
   return payload;
 }
 
@@ -455,7 +452,7 @@ function renderOverview(payload = {}) {
     Number(counts.attorney_registered || 0) +
     Number(counts.follow_up_needed || 0) +
     Number(counts.follow_up_sent || 0);
-  const completedMatterCount = Math.min(50, Number(counts.commissionableMatterCount || 0));
+  const completedMatterCount = payload.commissionLifetime?.commissionableMatterCount;
   const conversionPct = emailsSent ? Math.round((registered / emailsSent) * 100) : 0;
   const rangeDays = Number(payload.range?.days || getSelectedRangeDays());
   const rangeLabel = rangeDays === 1 ? "today" : rangeDays === 7 ? "last 7 days" : "last 30 days";
@@ -464,7 +461,7 @@ function renderOverview(payload = {}) {
   if (countFollowUpEl) countFollowUpEl.textContent = String(counts.follow_up_sent || 0);
   const countAttentionEl = document.getElementById("countAttention");
   if (countAttentionEl) countAttentionEl.textContent = String(counts.founder_attention || 0);
-  const commissionEarnedCents = Number(counts.commissionEarnedCents || 0);
+  const commissionText = commissionLabel(payload.commissionLifetime);
   renderRelativeMeta(document.getElementById("lastSyncedAt"), payload.lastSyncedAt, "Synced");
   const emptyState = document.getElementById("directorEmptyState");
   if (emptyState) emptyState.classList.toggle("visible", total === 0);
@@ -480,23 +477,22 @@ function renderOverview(payload = {}) {
   const commissionItem = document.getElementById("attentionCommissionItem");
   const attentionCommissionEl = document.getElementById("attentionCommission");
   if (commissionItem && attentionCommissionEl) {
-    const hasEarnedCommission = commissionEarnedCents > 0;
+    const hasEarnedCommission = payload.commissionLifetime?.commissionState !== "none";
     if (attentionStrip) attentionStrip.hidden = !hasEarnedCommission;
     commissionItem.hidden = !hasEarnedCommission;
-    attentionCommissionEl.textContent = commissionEarnedCents > 0 ? formatMoney(commissionEarnedCents) : "—";
+    attentionCommissionEl.textContent = commissionText;
+    attentionCommissionEl.classList.add("commission-value");
   }
 
   const emailsSentEl = document.getElementById("metricEmailsSent");
   const conversionEl = document.getElementById("metricConversionRate");
-  const completedEl = document.getElementById("metricCompletedMatters");
   const completedCapEl = document.getElementById("metricCompletedCap");
   const completedBarEl = document.getElementById("completedMatterBar");
 
   if (emailsSentEl) emailsSentEl.textContent = String(emailsSent);
   if (conversionEl) conversionEl.textContent = `${conversionPct}%`;
-  if (completedEl) completedEl.textContent = String(completedMatterCount);
-  if (completedCapEl) completedCapEl.textContent = `${completedMatterCount}/50`;
-  if (completedBarEl) completedBarEl.style.width = `${Math.min(100, completedMatterCount * 2)}%`;
+  if (completedCapEl) { completedCapEl.textContent = Number.isSafeInteger(completedMatterCount) ? `${completedMatterCount}/50` : "Needs review"; completedCapEl.dataset.state = Number.isSafeInteger(completedMatterCount) ? "recorded" : "needs_review"; }
+  if (completedBarEl) { completedBarEl.hidden = !Number.isSafeInteger(completedMatterCount); completedBarEl.style.width = `${Number.isSafeInteger(completedMatterCount) ? Math.min(100, completedMatterCount * 2) : 0}%`; }
 
   if (payload.profile) {
     if (identityEl) identityEl.textContent = `${payload.profile.displayName || "Director"} · ${payload.profile.zohoEmail}`;
@@ -598,14 +594,13 @@ function renderAnalytics(analytics = {}) {
   const series = Array.isArray(analytics.series) ? analytics.series : [];
   const emailsSent = Number(totals.emailsSent || 0);
   const conversionPct = Number(totals.conversionRatePct || 0);
-  const completedMatterCount = Math.min(50, Number(totals.commissionableMatters || 0));
+  const completedMatterCount = analytics.commissionLifetime?.commissionableMatterCount;
   const registeredCount = Number(totals.registrations || 0);
   const followUpsSent = Number(totals.followUps || 0);
 
   const emailsSentEl = document.getElementById("metricEmailsSent");
   const registeredEl = document.getElementById("metricRegisteredCount");
   const conversionEl = document.getElementById("metricConversionRate");
-  const completedEl = document.getElementById("metricCompletedMatters");
   const completedCapEl = document.getElementById("metricCompletedCap");
   const completedBarEl = document.getElementById("completedMatterBar");
   const followUpsSentEl = document.getElementById("metricFollowUpsSent");
@@ -613,9 +608,8 @@ function renderAnalytics(analytics = {}) {
   if (emailsSentEl) emailsSentEl.textContent = String(emailsSent);
   if (registeredEl) registeredEl.textContent = String(registeredCount);
   if (conversionEl) conversionEl.textContent = `${conversionPct}%`;
-  if (completedEl) completedEl.textContent = String(completedMatterCount);
-  if (completedCapEl) completedCapEl.textContent = `${completedMatterCount}/50`;
-  if (completedBarEl) completedBarEl.style.width = `${Math.min(100, completedMatterCount * 2)}%`;
+  if (completedCapEl) { completedCapEl.textContent = Number.isSafeInteger(completedMatterCount) ? `${completedMatterCount}/50` : "Needs review"; completedCapEl.dataset.state = Number.isSafeInteger(completedMatterCount) ? "recorded" : "needs_review"; }
+  if (completedBarEl) { completedBarEl.hidden = !Number.isSafeInteger(completedMatterCount); completedBarEl.style.width = `${Number.isSafeInteger(completedMatterCount) ? Math.min(100, completedMatterCount * 2) : 0}%`; }
   if (followUpsSentEl) followUpsSentEl.textContent = String(followUpsSent);
 
   document.querySelector(".tiny-line")?.classList.toggle("is-empty", followUpsSent === 0);
@@ -627,6 +621,7 @@ function renderAnalytics(analytics = {}) {
 }
 
 function renderRecords(records = [], { preservePage = false } = {}) {
+  paymentReader.clear();
   const previousPage = currentPage;
   currentRecords = Array.isArray(records) ? records : [];
   currentPage = preservePage ? previousPage : 1;
@@ -636,6 +631,7 @@ function renderRecords(records = [], { preservePage = false } = {}) {
 
 function renderCurrentRecordsPage() {
   if (!recordsBody) return;
+  if (portalDataState !== "ready") { recordsBody.innerHTML = `<tr><td colspan="11">${portalDataState === "loading" ? "Loading records…" : "Records unavailable. Refresh to try again."}</td></tr>`; return; }
   updateSortHeaders();
   const visibleRecords = getFilteredRecords();
   if (!visibleRecords.length) {
@@ -687,8 +683,8 @@ function renderCurrentRecordsPage() {
           <td data-label="Follow-Up" data-responsive-priority="low">${escapeHTML(formatDate(record.followUpSentAt))}</td>
           <td data-label="Registered" data-responsive-priority="medium">${escapeHTML(formatDate(record.registeredAt))}</td>
           <td data-label="Matter" data-responsive-priority="low">${escapeHTML(formatDate(record.firstMatterPostedAt || record.firstMatterCompletedAt))}</td>
-          <td data-label="Commission" data-responsive-priority="medium">${escapeHTML(Number(record.commissionEarnedCents || 0) > 0 ? formatMoney(record.commissionEarnedCents) : "—")}</td>
-          <td data-label="Payout" data-responsive-priority="low">${escapeHTML(payoutStatusLabel(record))}</td>
+          <td class="commission-value" data-label="Commission" data-responsive-priority="medium">${escapeHTML(commissionLabel(record))}</td>
+          <td data-label="Payout">${record.commissionPayments?.history?.length || record.commissionPayments?.legacyState === "needs_review" ? `<button type="button" class="director-payment-open" data-payment-history="${escapeHTML(recordId)}">${escapeHTML(payoutStatusLabel(record))}</button>` : escapeHTML(payoutStatusLabel(record))}</td>
         </tr>
       `;
     })
@@ -718,10 +714,11 @@ function renderPagination() {
 }
 
 async function loadPortal({ silent = false, preservePage = false } = {}) {
-  if (portalLoadInFlight) return;
+  if (portalLoadInFlight) { portalReloadPending = true; return; }
   portalLoadInFlight = true;
-  if (!silent) setStatus("");
+  if (!silent) setStatus("Loading records…");
   try {
+    financialAccount.verify();
     const rangeDays = getSelectedRangeDays();
     const recordParams = new URLSearchParams({
       stage: stageFilter?.value || "",
@@ -729,30 +726,48 @@ async function loadPortal({ silent = false, preservePage = false } = {}) {
       limit: "250",
     });
     const [overviewRes, analyticsRes, recordsRes] = await Promise.all([
-      secureFetch(`/api/director/overview?${new URLSearchParams({ rangeDays: String(rangeDays) })}`, { headers: { Accept: "application/json" } }),
-      secureFetch(`/api/director/analytics?${new URLSearchParams({ days: String(rangeDays) })}`, { headers: { Accept: "application/json" } }),
-      secureFetch(`/api/director/records?${recordParams}`, {
+      secureFetch(financialAccount.url(`/api/director/overview?${new URLSearchParams({ rangeDays: String(rangeDays) })}`), { headers: { Accept: "application/json" } }),
+      secureFetch(financialAccount.url(`/api/director/analytics?${new URLSearchParams({ days: String(rangeDays) })}`), { headers: { Accept: "application/json" } }),
+      secureFetch(financialAccount.url(`/api/director/records?${recordParams}`), {
         headers: { Accept: "application/json" },
       }),
     ]);
-    const overview = await readJsonOrThrow(overviewRes, "Unable to load director overview.");
-    const analytics = await readJsonOrThrow(analyticsRes, "Unable to load director analytics.");
-    const records = await readJsonOrThrow(recordsRes, "Unable to load director records.");
+    const overview = await readJsonOrThrow(overviewRes, "Unable to load director overview.", true);
+    const analytics = await readJsonOrThrow(analyticsRes, "Unable to load director analytics.", true);
+    const records = await readJsonOrThrow(recordsRes, "Unable to load director records.", true);
+    portalDataState = "ready";
+    for (const visual of document.querySelectorAll(".arc-gauge, .dot-grid, .mini-bars, .tiny-line")) visual.hidden = false;
+    const chart = document.querySelector(".performance-chart"); if (chart) chart.hidden = false;
+    document.getElementById("retryDirectorBtn").hidden = true;
     renderOverview(overview);
     renderAnalytics(analytics);
     renderRecords(records.records || [], { preservePage });
-    if (!silent) setStatus("");
+    setStatus("");
   } catch (err) {
-    if (!silent) {
-      renderRecords([], { preservePage });
-      setStatus("Unable to load.", { tone: "error" });
-    } else {
-      console.warn("[director] auto refresh failed", err);
-    }
+    clearFinancialView(err);
   } finally {
     portalLoadInFlight = false;
+    if (portalReloadPending) { portalReloadPending = false; loadPortal({ preservePage }); }
   }
 }
+
+function clearFinancialView(error) {
+  portalDataState = "unavailable";
+  paymentReader.clear();
+  renderRecords([]);
+  for (const element of document.querySelectorAll('[id^="metric"]')) { element.textContent = "—"; element.dataset.state = "unavailable"; }
+  document.getElementById("completedMatterBar").hidden = true;
+  for (const visual of document.querySelectorAll(".arc-gauge, .dot-grid, .mini-bars, .tiny-line")) visual.hidden = true;
+  document.getElementById("attentionStrip").hidden = true;
+  document.getElementById("directorEmptyState").classList.remove("visible");
+  document.getElementById("recordsPagination").hidden = true;
+  const chart = document.querySelector(".performance-chart");
+  if (chart) chart.hidden = true;
+  document.getElementById("retryDirectorBtn").hidden = false;
+  setStatus(error?.message || "Records unavailable. Refresh to try again.", { tone: "error" });
+}
+document.getElementById("retryDirectorBtn")?.addEventListener("click", () => loadPortal());
+window.addEventListener("storage", () => { try { financialAccount.verify(); } catch (error) { clearFinancialView(error); } });
 
 function scheduleAutoRefresh() {
   clearInterval(autoRefreshTimer);
@@ -886,3 +901,13 @@ loadPortal()
   .catch(() => {
     scheduleAutoRefresh();
   });
+
+recordsBody?.addEventListener("click", event => {
+  const button = event.target.closest("[data-payment-history]");
+  if (!button) return;
+  try {
+    financialAccount.verify();
+    const record = currentRecords.find(record => record.id === button.dataset.paymentHistory);
+    if (record && portalDataState === "ready") paymentReader.open(record, button);
+  } catch (error) { paymentReader.clear(); setStatus(error.message, { tone: "error" }); }
+});

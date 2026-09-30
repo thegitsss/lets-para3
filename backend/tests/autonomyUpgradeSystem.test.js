@@ -229,7 +229,7 @@ describe("Autonomy upgrade system", () => {
       expect.objectContaining({
         agentRole: "CMO",
         actionType: "marketing_publish",
-        title: "Let Marketing publish these automatically",
+        title: "Approve matching marketing drafts automatically",
       })
     );
 
@@ -289,6 +289,12 @@ describe("Autonomy upgrade system", () => {
     expect(enableRes.status).toBe(200);
 
     const pending = await createMarketingApprovalItem({ admin, index: 4, taskState: "pending" });
+
+    const before = await request(app).get('/api/admin/ai/control-room/founder').set('Cookie', authCookieFor(admin));
+    expect(before.status).toBe(200);
+    expect((await MarketingDraftPacket.findById(pending.packet._id)).approvalState).toBe('pending_review');
+    expect(await AutonomousAction.countDocuments({ targetId: pending.packet._id })).toBe(0);
+    await require('../services/ai/autonomyPreferenceService').processAutoModeActions();
 
     const founderRes = await request(app)
       .get("/api/admin/ai/control-room/founder")
@@ -365,11 +371,149 @@ describe("Autonomy upgrade system", () => {
       .set("Cookie", authCookieFor(admin));
 
     expect(founderRes.status).toBe(200);
-    expect(founderRes.body.view.autonomyUpgradeSuggestion).toEqual(
-      expect.objectContaining({
-        agentRole: "CTO",
-        actionType: "incident_approval",
-      })
-    );
+    expect(founderRes.body.view.autonomyUpgradeSuggestion?.agentRole).not.toBe('CTO');
   });
+  test('production releases remain owner decisions even with an older auto preference', async () => {
+    const admin = await createAdmin();
+    const pending = await createIncidentApprovalItem({ publicId: 'INC-AUTONOMY-OWNER', status: 'pending', admin });
+    await AutonomyPreference.create({ agentRole: 'CTO', actionType: 'incident_approval', mode: 'auto', learnedFromCount: 20 });
+    const service = require('../services/ai/autonomyPreferenceService');
+    await expect(service.setAutonomyPreferenceMode('CTO', 'incident_approval', 'auto')).rejects.toMatchObject({ statusCode: 409 });
+    const result = await service.processAutoModeActions();
+    expect(result.executedCount).toBe(0);
+    expect((await IncidentApproval.findById(pending.approval._id)).status).toBe('pending');
+    expect(await AutonomousAction.countDocuments({ targetId: pending.approval._id })).toBe(0);
+    const snapshot = await service.getAutonomyPreferencesSnapshot();
+    expect(snapshot.preferences.find(row => row.agentRole === 'CTO')).toMatchObject({ mode: 'manual', configuredMode: 'auto', requiresOwnerDecision: true });
+    expect((await AutonomyPreference.findOne({ agentRole: 'CTO' })).mode).toBe('auto');
+  });
+  test('concurrent automatic passes record one approval and one action', async () => {
+    const admin = await createAdmin();
+    const pending = await createMarketingApprovalItem({ admin, index: 31, taskState: 'pending' });
+    await AutonomyPreference.create({ agentRole: 'CMO', actionType: 'marketing_publish', mode: 'auto', learnedFromCount: 5 });
+    const service = require('../services/ai/autonomyPreferenceService');
+    const results = await Promise.all([service.processAutoModeActions(), service.processAutoModeActions()]);
+    expect(results.reduce((count, result) => count + result.executedCount, 0)).toBe(1);
+    expect(await AutonomousAction.countDocuments({ targetId: pending.packet._id })).toBe(1);
+    expect((await MarketingDraftPacket.findById(pending.packet._id)).approvalState).toBe('approved');
+  });
+  test('daily automatic attempts remain bounded across concurrent passes and a fresh next-day pass', async () => {
+    const admin = await createAdmin();
+    for (let index = 81; index < 84; index++) await createMarketingApprovalItem({ admin, index, taskState: 'pending' });
+    const policy = await AutonomyPreference.create({ agentRole: 'CMO', actionType: 'marketing_publish', mode: 'auto', learnedFromCount: 5, dailyAttemptLimit: 1 });
+    const service = require('../services/ai/autonomyPreferenceService');
+    const results = await Promise.all([service.processAutoModeActions(), service.processAutoModeActions()]);
+    expect(results.reduce((count, result) => count + result.attemptedCount, 0)).toBe(1);
+    expect(await AutonomousAction.countDocuments({})).toBe(1);
+    expect((await service.processAutoModeActions()).attemptedCount).toBe(0);
+    expect((await AutonomyPreference.findById(policy._id)).dailyAttempts).toBe(1);
+    const snapshot = await require('../services/adminActivityService').readAdminActivity();
+    expect(snapshot.policies.find(row => row.role === 'CMO').description).toContain('1 of 1 automatic approval attempts used today (UTC)');
+    await AutonomyPreference.updateOne({ _id: policy._id }, { $set: { executionDay: new Date(Date.now() - 86400000).toISOString().slice(0, 10) } });
+    expect((await service.processAutoModeActions()).executedCount).toBe(1);
+    expect((await AutonomyPreference.findById(policy._id)).dailyAttempts).toBe(1);
+  });
+  test('failed approval execution consumes the daily allowance without recording an approval', async () => {
+    const admin = await createAdmin();
+    await createMarketingApprovalItem({ admin, index: 84, taskState: 'pending' });
+    const policy = await AutonomyPreference.create({ agentRole: 'CMO', actionType: 'marketing_publish', mode: 'auto', learnedFromCount: 5, dailyAttemptLimit: 1 });
+    const save = jest.spyOn(MarketingDraftPacket.prototype, 'save').mockRejectedValue(new Error('Synthetic write failure'));
+    try {
+      expect(await require('../services/ai/autonomyPreferenceService').processAutoModeActions()).toMatchObject({ attemptedCount: 1, failedCount: 1, executedCount: 0 });
+      expect((await AutonomyPreference.findById(policy._id)).dailyAttempts).toBe(1);
+      expect(await AutonomousAction.countDocuments({})).toBe(0);
+    } finally { save.mockRestore(); }
+  });
+  test('an action-record failure rolls the approval and linked records back atomically', async () => {
+    const admin = await createAdmin();
+    const pending = await createMarketingApprovalItem({ admin, index: 32, taskState: 'pending' });
+    await AutonomyPreference.create({ agentRole: 'CMO', actionType: 'marketing_publish', mode: 'auto', learnedFromCount: 5 });
+    const record = jest.spyOn(AutonomousAction, 'create').mockRejectedValue(new Error('Synthetic action-record failure'));
+    try {
+      const result = await require('../services/ai/autonomyPreferenceService').processAutoModeActions();
+      expect(result).toMatchObject({ attemptedCount: 1, failedCount: 1, executedCount: 0 });
+      expect((await MarketingDraftPacket.findById(pending.packet._id)).approvalState).toBe('pending_review');
+      expect((await MarketingBrief.findById(pending.packet.briefId)).approvalState).toBe('draft');
+      expect((await ApprovalTask.findOne({ targetId: String(pending.packet._id) })).approvalState).toBe('pending');
+      const task = await ApprovalTask.findOne({ targetId: String(pending.packet._id) });
+      expect(task.metadata.automationFailure.needsReview).toBe(true);
+      const queue = await require('../services/adminFlowService').nextAdminTask({ owner: admin._id });
+      expect(queue.items.find(item => item.id === String(task._id))).toMatchObject({
+        kind: 'approval', priority: 'high', section: 'approvals-workspace',
+        reason: 'Automatic approval could not finish. Please review this draft before it is used.',
+      });
+      const retry = await require('../services/ai/autonomyPreferenceService').processAutoModeActions();
+      expect(retry).toMatchObject({ attemptedCount: 0, failedCount: 0, executedCount: 0 });
+    } finally { record.mockRestore(); }
+  });
+  test('a same-millisecond owner edit invalidates the reviewed automatic source', async () => {
+    const admin = await createAdmin();
+    const pending = await createMarketingApprovalItem({ admin, index: 33, taskState: 'pending' });
+    await AutonomyPreference.create({ agentRole: 'CMO', actionType: 'marketing_publish', mode: 'auto', learnedFromCount: 5 });
+    const original = AutonomyPreference.findOne.bind(AutonomyPreference);
+    const lookup = jest.spyOn(AutonomyPreference, 'findOne').mockImplementationOnce(query => ({ lean: async () => {
+      await MarketingDraftPacket.collection.updateOne({ _id: pending.packet._id }, { $set: { 'channelDraft.body': 'A newer owner draft' } });
+      return original(query).lean();
+    } }));
+    try {
+      const result = await require('../services/ai/autonomyPreferenceService').processAutoModeActions();
+      expect(result.executedCount).toBe(0);
+      expect((await MarketingDraftPacket.findById(pending.packet._id)).channelDraft.body).toBe('A newer owner draft');
+      expect((await MarketingDraftPacket.findById(pending.packet._id)).approvalState).toBe('pending_review');
+      expect(await AutonomousAction.countDocuments({ targetId: pending.packet._id })).toBe(0);
+    } finally { lookup.mockRestore(); }
+  });
+  test('failed automatic attempts consume the per-pass limit', async () => {
+    const admin = await createAdmin();
+    for (let index = 40; index < 52; index++) await createMarketingApprovalItem({ admin, index, taskState: 'pending' });
+    await AutonomyPreference.create({ agentRole: 'CMO', actionType: 'marketing_publish', mode: 'auto', learnedFromCount: 5 });
+    const save = jest.spyOn(MarketingDraftPacket.prototype, 'save').mockRejectedValue(new Error('Synthetic write failure'));
+    try {
+      const result = await require('../services/ai/autonomyPreferenceService').processAutoModeActions();
+      expect(result).toMatchObject({ attemptedCount: 10, failedCount: 10, executedCount: 0 });
+      expect(save).toHaveBeenCalledTimes(10);
+      expect(await MarketingDraftPacket.countDocuments({ approvalState: 'pending_review' })).toBe(12);
+      expect(await AutonomousAction.countDocuments({})).toBe(0);
+    } finally { save.mockRestore(); }
+  });
+  test('a pause after the transactional policy read prevents that approval from committing', async () => {
+    const admin = await createAdmin();
+    const pending = await createMarketingApprovalItem({ admin, index: 61, taskState: 'pending' });
+    const preference = await AutonomyPreference.create({ agentRole: 'CMO', actionType: 'marketing_publish', mode: 'auto', learnedFromCount: 5 });
+    const mongoose = require('mongoose');
+    const original = mongoose.Query.prototype.exec;
+    let paused = false;
+    const lookup = jest.spyOn(mongoose.Query.prototype, 'exec').mockImplementation(async function (...args) {
+      const result = await original.apply(this, args);
+      if (!paused && this.model === AutonomyPreference && this.op === 'findOne' && this.getOptions().session) {
+        paused = true;
+        await AutonomyPreference.updateOne({ _id: preference._id }, { $set: { mode: 'manual' } });
+      }
+      return result;
+    });
+    try {
+      const result = await require('../services/ai/autonomyPreferenceService').processAutoModeActions();
+      expect(paused).toBe(true);
+      expect(result.executedCount).toBe(0);
+      expect((await MarketingDraftPacket.findById(pending.packet._id)).approvalState).toBe('pending_review');
+      expect(await AutonomousAction.countDocuments({ targetId: pending.packet._id })).toBe(0);
+    } finally { lookup.mockRestore(); }
+  });
+  test("a pause during a pass stops the next item before approval", async () => {
+    const admin = await createAdmin();
+    const pending = await createMarketingApprovalItem({ admin, index: 21, taskState: "pending" });
+    await AutonomyPreference.create({ agentRole: "CMO", actionType: "marketing_publish", mode: "auto", learnedFromCount: 5 });
+    const originalFind = AutonomyPreference.findOne.bind(AutonomyPreference);
+    const lookup = jest.spyOn(AutonomyPreference, "findOne").mockImplementationOnce(query => ({ lean: async () => {
+      await AutonomyPreference.updateOne({ agentRole: "CMO", actionType: "marketing_publish" }, { $set: { mode: "manual" } });
+      return originalFind(query).lean();
+    } }));
+    try {
+      const result = await require('../services/ai/autonomyPreferenceService').processAutoModeActions();
+      expect(result.executedCount).toBe(0);
+      expect((await MarketingDraftPacket.findById(pending.packet._id)).approvalState).toBe("pending_review");
+      expect(await AutonomousAction.countDocuments({ targetId: pending.packet._id })).toBe(0);
+    } finally { lookup.mockRestore(); }
+  });
+
 });

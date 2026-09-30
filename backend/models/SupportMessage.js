@@ -32,6 +32,7 @@ const supportMessageSchema = new Schema(
 );
 
 supportMessageSchema.index({ conversationId: 1, createdAt: 1 });
+supportMessageSchema.index({ conversationId: 1, "metadata.adminReplyRequestId": 1 }, { unique: true, partialFilterExpression: { "metadata.adminReplyRequestId": { $type: "string" } } });
 
 module.exports =
   mongoose.models.SupportMessage ||

@@ -19,13 +19,16 @@ function startStubServer() {
   app.use(express.static(frontendDir));
 
   app.get("/api/csrf", (_req, res) => res.json({ csrfToken: "test-csrf" }));
-  app.post("/api/auth/register", upload.any(), (_req, res) => {
-    res.json({ msg: "Registered successfully. Await admin approval." });
+  app.post("/api/auth/register", upload.any(), (req, res) => {
+    if (req.body.turnstileToken !== "test-token") {
+      return res.status(400).json({ error: "The synthetic verification token is missing." });
+    }
+    res.json({ msg: "Registered successfully. Await admin approval.", emailVerified: false, verificationEmailStatus: "sent" });
   });
 
   const server = http.createServer(app);
   return new Promise((resolve) => {
-    server.listen(0, () => {
+    server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, () => {
       const { port } = server.address();
       resolve({ server, port });
     });
@@ -33,6 +36,16 @@ function startStubServer() {
 }
 
 async function gotoSignup(page, baseUrl) {
+  // This validation fixture uses a synthetic token and registration endpoint.
+  // A live Turnstile script can clear that token after navigation and invoke
+  // remote verification, which is outside this local form-validation check.
+  await page.setRequestInterception(true);
+  page.on("request", request => {
+    if (request.url().startsWith("https://challenges.cloudflare.com/turnstile/")) {
+      return request.respond({ status: 200, contentType: "application/javascript", body: "/* Synthetic token supplied by the local E2E fixture. */" });
+    }
+    return request.continue();
+  });
   await page.goto(`${baseUrl}/signup.html`, { waitUntil: "networkidle0" });
   await page.waitForSelector("#signupForm");
   await page.evaluate(() => {
@@ -65,15 +78,16 @@ async function submitAttorneySignup(page, { barNumber, barState, goodStanding = 
   if (goodStanding) {
     await clickVisible(page, "#attorneyGoodStanding");
   }
+  await page.waitForSelector("#attorneySubmitLegal:not([hidden])");
+  await page.waitForSelector("#attorneyPricingText:not([hidden])");
   await clickVisible(page, "#submitBtn");
-  await page.waitForFunction(() => document.querySelector("#msg.show") || !document.getElementById("signupConfirmation")?.hidden);
-  return page.evaluate(() => document.querySelector("#msg.show")?.textContent.trim()
-    || document.getElementById("signupConfirmation")?.textContent.trim() || "");
+  await page.waitForFunction(() => document.querySelector("#msg.show") || document.querySelector("#signupConfirmation:not([hidden])"));
+  return page.evaluate(() => (document.querySelector("#signupConfirmation:not([hidden])") || document.querySelector("#msg")).textContent.trim());
 }
 
 async function run() {
   const { server, port } = await startStubServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
   const browser = await launchPuppeteer({
     headless: "new",
@@ -127,33 +141,19 @@ async function run() {
       await closeContext(context);
     }
 
-    // The attorney's pricing and legal terms are visible before registration.
+    // Pricing and policy disclosures remain visible before the submit action.
     {
       const context = await createContext();
       const page = await context.newPage();
       configurePage(page);
-      await page.setViewport({ width: 1280, height: 720 });
       await gotoSignup(page, baseUrl);
-      await fillStepOne(page, {
-        firstName: "Test",
-        lastName: "Attorney",
-        email: "pricingack@example.com",
-        password: VALID_PASSWORD,
-      });
-      await page.type("#bar", "CA12345");
-      await page.select("#barState", "CA");
-      const disclosures = await page.evaluate(() => ({
-        pricing: document.getElementById("attorneyPricingText")?.textContent || "",
-        legal: document.getElementById("attorneySubmitLegal")?.textContent || "",
-        pricingVisible: !document.getElementById("attorneyPricingText")?.hidden,
-        legalVisible: !document.getElementById("attorneySubmitLegal")?.hidden,
-      }));
-      if (!disclosures.pricingVisible || !disclosures.pricing.includes("$400") || !disclosures.pricing.includes("22%")) {
-        throw new Error("Attorney pricing disclosure is missing before submission.");
-      }
-      if (!disclosures.legalVisible || !disclosures.legal.includes("Terms of Service") || !disclosures.legal.includes("Privacy Policy")) {
-        throw new Error("Attorney legal disclosure is missing before submission.");
-      }
+      await fillStepOne(page, { firstName: "Test", lastName: "Attorney", email: "pricing@example.com", password: VALID_PASSWORD });
+      await page.waitForSelector("#attorneyPricingText:not([hidden])", { visible: true });
+      const pricing = await page.$eval("#attorneyPricingText", el => el.textContent);
+      if (!pricing.includes("$400") || !pricing.includes("22%")) throw new Error("Attorney pricing disclosure is incomplete.");
+      await page.waitForSelector("#attorneySubmitLegal:not([hidden])", { visible: true });
+      const policyLinks = await page.$$eval("#attorneySubmitLegal a", links => links.map(link => link.getAttribute("href")));
+      if (!policyLinks.includes("terms.html") || !policyLinks.includes("privacy.html")) throw new Error("Signup policy links are missing.");
       await closeContext(context);
     }
 
@@ -188,7 +188,7 @@ async function run() {
     // - NY: "NY-98765"
     // - TX: "TX 12345"
     // - FL: "FLA9876"
-    // Expected result: the registration confirmation is shown.
+    // Expected result: "Application submitted. Await approval." shown.
     const validCases = [
       { state: "CA", bar: "CA12345", email: "validca@example.com" },
       { state: "NY", bar: "NY-98765", email: "validny@example.com" },
@@ -212,7 +212,7 @@ async function run() {
         barNumber: testCase.bar,
         barState: testCase.state,
       });
-      if (!msg.includes("Your registration is with us.")) {
+      if (!msg.includes("Registration received") || !msg.includes("We sent a verification link")) {
         throw new Error(`Expected success message for ${testCase.state}, got: ${msg}`);
       }
       await closeContext(context);

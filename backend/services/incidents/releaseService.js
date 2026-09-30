@@ -495,7 +495,9 @@ function runPreferencesWorkspaceVerification(source) {
     {
       key: "preferences-success-toast",
       label: "The live workspace file still confirms successful preference saves.",
-      passed: source.includes('showToast("Preferences saved", "ok")'),
+      passed:
+        source.includes('showToast("Preferences saved", "ok")') ||
+        source.includes('setPreferencesSaveStatus(successMessage, "saved")'),
     },
   ];
 

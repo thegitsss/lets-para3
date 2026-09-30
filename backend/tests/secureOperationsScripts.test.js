@@ -81,8 +81,8 @@ describe("secure operations scripts", () => {
     });
     expect(() => adminSeedConfiguration({ ...shared, SEED_ADMIN_CONFIRM_EMAIL: "wrong@example.test" }))
       .toThrow(/must exactly match/i);
-    expect(() => adminSeedConfiguration({ ...shared, ADMIN_PASSWORD: "Admin123!" }))
-      .toThrow(/at least 15 characters/i);
+    expect(() => adminSeedConfiguration({ ...shared, ADMIN_PASSWORD: "Admin1!" }))
+      .toThrow(/at least 8 characters/i);
     expect(() => adminSeedConfiguration({ ...shared, MONGO_URI: "" }))
       .toThrow(/exact MongoDB database/i);
 

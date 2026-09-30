@@ -58,7 +58,7 @@ AuditLogSchema.statics.logFromReq = async function logFromReq(req, action, opts 
   const actorId = req.user?.id || req.user?._id;
   const actorRole = req.user?.role || "system";
 
-  return this.create({
+  const record = {
     actor: actorId,
     actorRole,
     action,
@@ -70,7 +70,12 @@ AuditLogSchema.statics.logFromReq = async function logFromReq(req, action, opts 
     method: req.method,
     path: req.originalUrl,
     meta: meta || {},
-  });
+  };
+  if (opts.session) {
+    if (!opts.session.inTransaction()) throw new Error("Audit transaction is not active.");
+    return (await this.create([record], { session: opts.session }))[0];
+  }
+  return this.create(record);
 };
 
 module.exports = mongoose.model("AuditLog", AuditLogSchema);

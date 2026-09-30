@@ -16,7 +16,7 @@ describe("password policy", () => {
   });
 
   test("rejects common and account-specific values", () => {
-    expect(validateNewPassword("Password123!").code).toBe("password_too_short");
+    expect(validateNewPassword("Password123!").code).toBe("password_blocklisted");
     expect(validateNewPassword("passwordpassword").code).toBe("password_blocklisted");
     expect(validateNewPassword("alex.johnson@example.com", {
       user: { email: "alex.johnson@example.com" },

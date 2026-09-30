@@ -1,3 +1,4 @@
+const { letterEmail } = require("../email/layout");
 const { createLogger: createRuntimeLogger } = require("./logger");
 const runtimeLogger = createRuntimeLogger("utils:notifyUser");
 const Notification = require("../models/Notification");
@@ -57,6 +58,7 @@ function buildDisplayMessage(type, payload = {}) {
       return `${actorName || "An attorney"} invited you to ${caseTitle || "a Matter"}`;
     case "case_invite_response": {
       const response = String(payload.response || "").toLowerCase();
+      if (response === "filled") return `The position for ${caseTitle || "this Matter"} has been filled`;
       if (response === "accepted") {
         return `${actorName || "The paralegal"} accepted your invitation${caseTitle ? ` for ${caseTitle}` : ""}. Confirm the hire and fund the Matter to get started.`.trim();
       }
@@ -82,9 +84,9 @@ function buildDisplayMessage(type, payload = {}) {
     case "application_accepted":
       return `Your application for ${caseTitle || "the Matter"} was accepted.`;
     case "application_denied":
-      return caseTitle
-        ? `This role has been filled for ${caseTitle}.`
-        : "This role has been filled.";
+      return payload.outcome === "matter_filled"
+        ? `The role for ${caseTitle || "this Matter"} has been filled`
+        : `Your application for ${caseTitle || "this Matter"} was not selected`;
     case "case_awaiting_funding":
       return `${payload.caseTitle || "A Matter"} is awaiting funding`;
     case "case_work_ready":
@@ -108,18 +110,18 @@ function buildDisplayMessage(type, payload = {}) {
     case "dispute_opened":
       return `A review was opened for ${caseTitle || "a Matter"}.`;
     case "admin_review_overdue":
-      return payload.message || "Our team is still reviewing this request and will follow up soon.";
+      return payload.message || "The LPC review remains open. No decision is recorded.";
     default:
       return "You have a new notification.";
   }
 }
 
-async function resolveActorSnapshot(actorUserId) {
+async function resolveActorSnapshot(actorUserId, session = null) {
   if (!actorUserId) {
     return { actorUserId: null, actorFirstName: "", actorProfileImage: "", actorRole: "" };
   }
   try {
-    const actor = await User.findById(actorUserId).select("firstName profileImage avatarURL role");
+    const actor = await User.findById(actorUserId).select("firstName profileImage avatarURL role").session(session);
     if (!actor) {
       return { actorUserId, actorFirstName: "", actorProfileImage: "", actorRole: "" };
     }
@@ -153,45 +155,11 @@ function emailTemplate(type, payload = {}) {
       return emailTemplates.profileApproved();
     case "profile_photo_approved":
       return (() => {
-        const baseUrl =
-          process.env.EMAIL_BASE_URL || process.env.APP_BASE_URL || "https://www.lets-paraconnect.com";
-        const assetBase = String(baseUrl).replace(/\/+$/, "").replace(/\/profile-settings\.html$/, "");
-        const logoUrl = `${assetBase}/Cleanfav.png`;
-        const html = `
-        <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
-          <tr>
-            <td align="center" style="padding:24px 12px;">
-              <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
-                <tr>
-                  <td align="center" style="padding:24px 24px 8px;">
-                    <table cellpadding="0" cellspacing="0" border="0">
-                      <tr>
-                        <td style="padding-right:12px;">
-                          <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
-                        </td>
-                        <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
-                          Let's-ParaConnect
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                <tr>
-                  <td align="center" style="padding:8px 40px 24px;">
-                    <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;text-align:left;">
-                      Hi &mdash;<br><br>
-                      Great news — your profile photo was approved and is now live on your attorney-facing profile.<br><br>
-                      Your profile is now visible to attorneys. Log in anytime to make updates.<br><br>
-                      Best,<br>
-                      Let&rsquo;s-ParaConnect Team
-                    </div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-        `;
+
+        const html = letterEmail(`<p>Hello,<br><br>
+                      Your profile photo has been approved.<br><br>
+                      Sign in to review your profile or make updates.<br><br>
+                      </p>`);
         return {
           subject: "Profile photo approved",
           html,
@@ -231,7 +199,7 @@ function emailTemplate(type, payload = {}) {
     case "application_denied":
       return {
         subject: "Application update",
-        html: `<p>${safePayload.caseTitle ? `This role has been filled for <strong>${safePayload.caseTitle}</strong>.` : "This role has been filled."}</p><p>Log in to explore other opportunities.</p>`,
+        html: `<p>${payload.outcome === "matter_filled" ? `The role for <strong>${safePayload.caseTitle || "this Matter"}</strong> has been filled.` : `Your application for <strong>${safePayload.caseTitle || "this Matter"}</strong> was not selected.`}</p><p>Log in to explore other opportunities.</p>`,
       };
     case "case_awaiting_funding":
       return {
@@ -248,10 +216,7 @@ function emailTemplate(type, payload = {}) {
         recipientName: payload.recipientName || payload.paralegalName || payload.userName || "",
       });
     case "case_work_ready":
-      return {
-        subject: subjectText(`Work can begin on ${payload.caseTitle || "your Matter"}`),
-        html: `<p>The Matter <strong>${safePayload.caseTitle || "Matter"}</strong> is ready to begin.</p><p>Log in to get started.</p>`,
-      };
+      return emailTemplates.workReady(payload);
     case "pre_engagement_requested":
       return {
         subject: subjectText(`Pre-engagement requested${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`),
@@ -271,12 +236,14 @@ function emailTemplate(type, payload = {}) {
       return emailTemplates.documentUploaded({
         documentName: payload.fileName || "A document",
         caseTitle: payload.caseTitle || "",
+        caseId: payload.caseId,
+        fileId: payload.fileId,
       });
     case "dispute_resolved": {
       const title = safePayload.caseTitle || "the Matter";
       const resolution = safePayload.resolutionLabel || safePayload.resolution || "Resolution";
       const receiptNote =
-        safePayload.receiptNote || "A receipt is available in your dashboard with full payment details.";
+        safePayload.receiptNote || "Sign in to review the decision and any payment details in your Matter.";
       return {
         subject: subjectText(`Review resolved${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`),
         html: `<p>${safePayload.message || `The review for <strong>${title}</strong> was resolved.`}</p><p>Resolution: ${resolution}.</p><p>${receiptNote}</p>`,
@@ -293,7 +260,7 @@ function emailTemplate(type, payload = {}) {
       const title = safePayload.caseTitle || "your Matter";
       return {
         subject: subjectText(`Review update${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`),
-        html: `<p>Our team is still reviewing <strong>${title}</strong>.</p><p>We will follow up as soon as the review is complete. Thank you for your patience.</p>`,
+        html: `<p>The LPC review for <strong>${title}</strong> remains open.</p><p>No decision is recorded. Sign in to read the current review status.</p>`,
       };
     }
     case "account_suspended":
@@ -318,33 +285,10 @@ function emailTemplate(type, payload = {}) {
 }
 
 function shouldWrapNotificationEmail(html = "") {
-  const lower = String(html || "").toLowerCase();
-  if (!lower) return false;
-  if (lower.includes("data-lpc-template=\"full\"")) return false;
-  if (lower.includes("<table") || lower.includes("<style") || lower.includes("<body")) return false;
-  return true;
+  return !String(html).includes('data-lpc-email="letter"');
 }
-
 function wrapNotificationEmail(subject, bodyHtml) {
-  const title = escapeHtml(subjectText(subject, "LPC Notification"));
-  return `
-  <div style="margin:0;padding:24px 12px;background:#f5f6f8;">
-    <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e6e8ee;border-radius:14px;overflow:hidden;">
-      <div style="padding:18px 24px;border-bottom:1px solid #eceff4;background:#fafbfc;">
-        <div style="font-family:Georgia, 'Times New Roman', serif;font-size:20px;letter-spacing:0.02em;color:#111827;">
-          Let's-ParaConnect
-        </div>
-      </div>
-      <div style="padding:22px 24px;font-family:Arial, Helvetica, sans-serif;font-size:15px;line-height:1.6;color:#111827;">
-        <div style="font-weight:600;margin-bottom:10px;">${title}</div>
-        ${bodyHtml || "<p>You have a new notification.</p>"}
-      </div>
-      <div style="padding:14px 24px;border-top:1px solid #eceff4;font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#6b7280;">
-        This is an automated notification from Let's-ParaConnect.
-      </div>
-    </div>
-  </div>
-  `;
+  return letterEmail(bodyHtml || '<p>You have a new notification.</p>', { title: subjectText(subject) });
 }
 
 async function safeSendEmail(to, subject, html) {
@@ -454,7 +398,24 @@ function shouldCreateInAppNotification(user, type) {
 }
 
 async function notifyUser(userId, type, payload = {}, options = {}) {
-  const user = await User.findById(userId);
+  const deferred = options.deferDispatch === true;
+  if ((deferred || options.session) && (!deferred || !options.session?.inTransaction())) throw new Error("Deferred notifications require an active transaction.");
+  if (options.invitationSent && (!deferred || type !== "case_invite")) throw new Error("Invitation email requires its transactional notification.");
+  if (options.invitationResponse && (!deferred || type !== "case_invite_response" || options.invitationSent)) throw new Error("Invitation response email requires its transactional notification.");
+  if (options.postingNotice && (!deferred || !['updated', 'deleted', 'edits_requested', 'review_requested'].includes(options.postingNotice.kind) || type !== (options.postingNotice.kind === 'deleted' ? 'case_deleted' : 'case_update'))) throw new Error("Posting email requires its transactional notification.");
+  if (options.preEngagement && (!deferred || !['requested', 'submitted', 'changes_requested'].includes(options.preEngagement.kind) || type !== `pre_engagement_${options.preEngagement.kind}`)) throw new Error("Pre-engagement email requires its transactional notification.");
+  if (options.applicationSubmission && (!deferred || type !== "application_submitted")) throw new Error("Application email requires a transactional submission notification.");
+  if (options.applicationWithdrawal && (!deferred || type !== "case_update" || payload.outcome !== "application_withdrawn" || options.applicationSubmission)) throw new Error("Application withdrawal email requires its transactional notification.");
+  if (options.fileUpload && (!deferred || type !== "case_file_uploaded")) throw new Error("Upload email requires a transactional file notification.");
+  if (options.workReady && (!deferred || type !== "case_work_ready")) throw new Error("Work email requires a transactional assignment notification.");
+  if (options.paymentAction && (!deferred || type !== "case_update")) throw new Error("Payment email requires a transactional funding notification.");
+  if (options.withdrawalRequest && (!deferred || type !== "case_update")) throw new Error("Withdrawal email requires a transactional withdrawal notification.");
+  if (options.withdrawalDecision && (!deferred || type !== "case_update" || options.withdrawalRequest || !["partial", "reject", "relist", "expired"].includes(options.withdrawalDecision))) throw new Error("Withdrawal decision email requires a transactional decision notification.");
+  if (options.completionNotice && (!deferred || !["case_update", "payout_released"].includes(type) || options.paymentAction || options.withdrawalRequest || options.withdrawalDecision)) throw new Error("Completion email requires a transactional completion notification.");
+  if (options.reviewOpened && (!deferred || type !== "dispute_opened" || options.fileUpload || options.workReady || options.paymentAction || options.withdrawalRequest || options.withdrawalDecision || options.completionNotice)) throw new Error("Review email requires a transactional review notification.");
+  if (options.reviewResolved && (!deferred || type !== "dispute_resolved" || options.fileUpload || options.workReady || options.paymentAction || options.withdrawalRequest || options.withdrawalDecision || options.completionNotice || options.reviewOpened)) throw new Error("Review decision email requires a transactional settlement notification.");
+  if (options.reviewOverdue && (!deferred || type !== "admin_review_overdue" || options.fileUpload || options.workReady || options.paymentAction || options.withdrawalRequest || options.withdrawalDecision || options.completionNotice || options.reviewOpened || options.reviewResolved)) throw new Error("Overdue email requires a transactional reminder notification.");
+  const user = await User.findById(userId).session(options.session || null);
   if (!user) return;
 
   const actorUserId = payload?.actorUserId || options.actorUserId || null;
@@ -462,8 +423,8 @@ async function notifyUser(userId, type, payload = {}, options = {}) {
   if (type === "message" && senderId && String(senderId) === String(userId)) {
     return;
   }
-  const actor = await resolveActorSnapshot(actorUserId);
-  const shouldCreateInApp = shouldCreateInAppNotification(user, type);
+  const actor = await resolveActorSnapshot(actorUserId, options.session || null);
+  const shouldCreateInApp = shouldCreateInAppNotification(user, options.completionNotice ? "case_update" : type);
   let notif = null;
   if (shouldCreateInApp) {
     const payloadWithActor = { ...payload };
@@ -474,7 +435,7 @@ async function notifyUser(userId, type, payload = {}, options = {}) {
       payloadWithActor.actorRole = actor.actorRole;
     }
     const message = buildDisplayMessage(type, { ...payloadWithActor });
-    notif = await Notification.create({
+    const record = {
       userId,
       userRole: user.role || "",
       type,
@@ -487,24 +448,94 @@ async function notifyUser(userId, type, payload = {}, options = {}) {
       read: false,
       isRead: false,
       createdAt: new Date(),
+    };
+    notif = deferred ? (await Notification.create([record], { session: options.session }))[0] : await Notification.create(record);
+  }
+
+  if (options.invitationSent && shouldSendEmailForType(user, type, payload)) {
+    await require("../services/matterInvitationNotifications").stage({
+      caseId: payload.caseId, ownerId: options.invitationSent.ownerId, invitedAt: options.invitationSent.invitedAt,
+      userId, actorUserId,
+    }, options.session);
+  }
+  if (options.applicationSubmission && shouldSendEmailForType(user, type, payload)) {
+    await require("../services/matterApplicationNotifications").stage({
+      applicationId: options.applicationSubmission.applicationId, userId, caseId: payload.caseId,
+    }, options.session);
+  }
+  if (options.invitationResponse && shouldSendEmailForType(user, type, payload)) {
+    await require("../services/matterInvitationNotifications").stageResponse({
+      ...options.invitationResponse, caseId: payload.caseId, paralegalId: payload.paralegalId,
+      userId, actorUserId,
+    }, options.session);
+  }
+  if (options.postingNotice && shouldSendEmailForType(user, type, payload)) {
+    await require('../services/matterPostingNotifications').stage({ ...options.postingNotice, userId }, options.session);
+  }
+  if (options.preEngagement && shouldSendEmailForType(user, type, payload)) {
+    await require('../services/matterPreEngagementNotifications').stage({
+      ...options.preEngagement, caseId: payload.caseId, paralegalId: payload.paralegalId, userId, actorUserId,
+    }, options.session);
+  }
+  if (options.applicationWithdrawal && shouldSendEmailForType(user, type, payload)) {
+    await require("../services/matterApplicationNotifications").stageWithdrawal({
+      applicationId: options.applicationWithdrawal.applicationId || null,
+      userId, caseId: payload.caseId, paralegalId: payload.applicantId,
+    }, options.session);
+  }
+  if (options.fileUpload && shouldSendEmailForType(user, type, payload)) {
+    await require("../services/matterFileNotifications").stage({
+      uploadId: options.fileUpload.id, fileVersion: options.fileUpload.version,
+      userId, actorUserId, caseId: payload.caseId, fileId: payload.fileId,
+    }, options.session);
+  }
+  if (options.workReady && shouldSendEmailForType(user, type, payload)) {
+    await require("../services/matterWorkNotifications").stage({ caseId: payload.caseId, userId }, options.session);
+  }
+  if (options.paymentAction && shouldSendEmailForType(user, type, payload)) {
+    await require("../services/matterPaymentNotifications").stage({ caseId: payload.caseId, userId, paymentIntentId: options.paymentAction.paymentIntentId, paymentStatus: options.paymentAction.paymentStatus }, options.session);
+  }
+  if ((options.withdrawalRequest || options.withdrawalDecision) && shouldSendEmailForType(user, type, payload)) {
+    await require("../services/matterWithdrawalNotifications").stage({ caseId: payload.caseId, userId, kind: options.withdrawalDecision || "request" }, options.session);
+  }
+  // Ordinary payout notifications intentionally suppress their own email. The
+  // completion transaction owns this separate, preference-controlled notice.
+  if (options.completionNotice && shouldSendEmailForType(user, "case_update", payload)) {
+    await require("../services/matterPaymentNotifications").stageCompletionEmail({ caseId: payload.caseId, userId }, options.session);
+  }
+
+  if ((options.reviewOpened || options.reviewResolved || options.reviewOverdue) && shouldSendEmailForType(user, type, payload)) {
+    await require("../services/matterReviewNotifications").stage({ caseId: payload.caseId, userId, userRole: user.role, disputeId: payload.disputeId, kind: options.reviewResolved ? "resolved" : options.reviewOverdue ? "overdue" : "opened" }, options.session);
+  }
+
+  // Assignment writers persist notices in their transaction, then dispatch
+  // only after commit. Existing callers keep their immediate behavior.
+  const dispatch = async () => {
+    // This stream is also the authenticated client's live data-invalidation
+    // channel. Emit even when the member has disabled the in-app notification
+    // record so Home, Work, unread counts, and open multi-tab sessions can
+    // reconcile the underlying domain change immediately. Notification
+    // preferences still control record creation and email delivery.
+    publishNotificationEvent(userId, "notifications", {
+      at: new Date().toISOString(),
+      type: `${type}_refresh`,
     });
-    publishNotificationEvent(userId, "notifications", { at: new Date().toISOString() });
-  }
 
-  let emailPayload = payload;
-  if (type === "payout_released") {
-    const name = `${user.firstName || ""} ${user.lastName || ""}`.trim();
-    if (name && !payload.recipientName) {
-      emailPayload = { ...payload, recipientName: name };
+    let emailPayload = payload;
+    if (type === "payout_released") {
+      const name = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+      if (name && !payload.recipientName) {
+        emailPayload = { ...payload, recipientName: name };
+      }
     }
-  }
 
-  if (shouldSendEmailForType(user, type, emailPayload)) {
-    const { subject, html } = emailTemplate(type, emailPayload);
-    await safeSendEmail(user.email, subject, html);
-  }
-
-  return notif;
+    if (!options.invitationSent && !options.invitationResponse && !options.preEngagement && !options.postingNotice && !options.applicationSubmission && !options.applicationWithdrawal && !options.fileUpload && !options.workReady && !options.paymentAction && !options.withdrawalRequest && !options.withdrawalDecision && !options.completionNotice && !options.reviewOpened && !options.reviewResolved && !options.reviewOverdue && shouldSendEmailForType(user, type, emailPayload)) {
+      const { subject, html } = emailTemplate(type, emailPayload);
+      await safeSendEmail(user.email, subject, html);
+    }
+    return notif;
+  };
+  return deferred ? dispatch : dispatch();
 }
 
 async function createNotification({
@@ -548,4 +579,5 @@ module.exports = {
   notifyUser,
   emailTemplate,
   createNotification,
+  shouldSendEmailForType,
 };

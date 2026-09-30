@@ -23,6 +23,9 @@ const AutonomousAction = require("../models/AutonomousAction");
 const Incident = require("../models/Incident");
 const SupportConversation = require("../models/SupportConversation");
 const SupportTicket = require("../models/SupportTicket");
+const SupportMutation = require("../models/SupportMutation");
+const SupportMessage = require("../models/SupportMessage");
+const { LpcEvent } = require("../models/LpcEvent");
 const User = require("../models/User");
 const supportRouter = require("../routes/support");
 const { routeSupportSubmissionEvent } = require("../services/lpcEvents/supportRoutingService");
@@ -135,6 +138,24 @@ async function postSupportMessage(user, conversationId, payload = {}) {
     .send(payload);
 }
 
+async function expectSavedHandoff(user, conversationId, ticketId, text) {
+  const records = await SupportMutation.find({ ownerId: user._id, conversationId }).select('+result').lean();
+  expect(records).toHaveLength(1);
+  const record = records[0];
+  expect(record).toMatchObject({ action: 'send', state: 'succeeded', active: false });
+  expect((await SupportMessage.findById(record.userMessageId).lean()).text).toBe(text);
+  expect(await SupportMessage.exists({ _id: record.result.assistantMessage.id, conversationId })).toBeTruthy();
+  const events = await LpcEvent.find({ 'facts.assistantMutationId': String(record._id) }).lean();
+  expect(events.map(event => event.eventType).sort()).toEqual(['support.submission.created', 'support.ticket.escalated']);
+  for (const event of events) {
+    expect(event.actor.actorType).toBe('user');
+    expect(String(event.actor.userId)).toBe(String(user._id));
+    expect(String(event.related.supportTicketId)).toBe(String(ticketId));
+    expect(event.routing.status).toBe(event.eventType === 'support.ticket.escalated' ? 'routed' : 'skipped');
+  }
+  expect(await AutonomousAction.countDocuments({ targetId: ticketId })).toBe(0);
+}
+
 beforeAll(async () => {
   await connect();
 });
@@ -154,7 +175,7 @@ beforeEach(async () => {
 });
 
 describe("CCO autonomy phase 2", () => {
-  test("autonomous ticket reopen logs a valid AutonomousAction when confidence passes", async () => {
+  test("a user-reported recurrence reopens the same ticket with its durable request and routing evidence", async () => {
     const user = await createApprovedUser({
       role: "paralegal",
       email: "cco-reopen@lets-paraconnect.test",
@@ -210,21 +231,14 @@ describe("CCO autonomy phase 2", () => {
     expect(res.status).toBe(201);
 
     const refreshedTicket = await SupportTicket.findById(ticket._id).lean();
-    expect(refreshedTicket.status).toBe("open");
-
-    const action = await AutonomousAction.findOne({ actionType: "ticket_reopened" }).lean();
-    expect(action).toEqual(
-      expect.objectContaining({
-        agentRole: "CCO",
-        actionType: "ticket_reopened",
-        targetModel: "SupportTicket",
-        targetId: ticket._id,
-        status: "completed",
-      })
-    );
+    expect(refreshedTicket.status).toBe("in_review");
+    expect(refreshedTicket.resolvedAt).toBeNull();
+    expect(refreshedTicket.resolutionIsStable).toBe(false);
+    expect(await SupportTicket.countDocuments({ conversationId: conversation.id })).toBe(1);
+    await expectSavedHandoff(user, conversation.id, ticket._id, 'This is still broken.');
   });
 
-  test("reopen does not execute autonomously when a disqualifier is present", async () => {
+  test("a payout-related support recurrence stays a human-review request without an autonomous financial action", async () => {
     const user = await createApprovedUser({
       role: "paralegal",
       email: "cco-reopen-money@lets-paraconnect.test",
@@ -286,11 +300,11 @@ describe("CCO autonomy phase 2", () => {
     expect(res.status).toBe(201);
 
     const refreshedTicket = await SupportTicket.findById(ticket._id).lean();
-    expect(refreshedTicket.status).toBe("open");
-    expect(await AutonomousAction.countDocuments({ actionType: "ticket_reopened" })).toBe(0);
+    expect(refreshedTicket.status).toBe("in_review");
+    await expectSavedHandoff(user, conversation.id, ticket._id, 'My payout is still broken.');
   });
 
-  test("autonomous escalation logs correctly when confidence passes", async () => {
+  test("an explicit escalation preserves one existing ticket and records its accepted handoff", async () => {
     const user = await createApprovedUser({
       role: "attorney",
       email: "cco-escalate@lets-paraconnect.test",
@@ -330,20 +344,13 @@ describe("CCO autonomy phase 2", () => {
 
     expect(res.status).toBe(201);
 
-    const action = await AutonomousAction.findOne({ actionType: "ticket_escalated" }).lean();
-    expect(action).toEqual(
-      expect.objectContaining({
-        actionType: "ticket_escalated",
-        targetModel: "SupportTicket",
-        status: "completed",
-      })
-    );
-
     const tickets = await SupportTicket.find({ conversationId: conversation.id }).lean();
+    expect(tickets).toHaveLength(1);
     expect(tickets[0].routingSuggestion.ownerKey).toBe("founder_review");
+    await expectSavedHandoff(user, conversation.id, tickets[0]._id, 'Please escalate this existing issue now.');
   });
 
-  test("escalation does not execute autonomously when below threshold", async () => {
+  test("a first human-help request is recorded without claiming an autonomous action", async () => {
     const user = await createApprovedUser({
       role: "attorney",
       email: "cco-escalate-low@lets-paraconnect.test",
@@ -373,7 +380,8 @@ describe("CCO autonomy phase 2", () => {
 
     expect(res.status).toBe(201);
     expect(await SupportTicket.countDocuments({ conversationId: conversation.id })).toBe(1);
-    expect(await AutonomousAction.countDocuments({ actionType: "ticket_escalated" })).toBe(0);
+    const ticket = await SupportTicket.findOne({ conversationId: conversation.id }).lean();
+    await expectSavedHandoff(user, conversation.id, ticket._id, 'Please escalate this issue.');
   });
 
   test("autonomous incident routing logs correctly when confidence passes", async () => {

@@ -80,8 +80,22 @@ function startStubServer() {
     res.json({ user: PARALEGAL });
   });
 
-  app.get("/api/jobs/open", (_req, res) => {
-    res.json(JOBS);
+  app.get("/api/jobs/open", (req, res) => {
+    const filters = {
+      practice: String(req.query.practice || ""), state: String(req.query.state || ""),
+      minPay: Number(req.query.minPay || 0), sort: String(req.query.sort || "newest"),
+      deadline: String(req.query.deadline || ""), posted: String(req.query.posted || ""), page: 1,
+    };
+    const available = JOBS.filter(job => !applications.some(application => application.jobId._id === job._id))
+      .map(job => ({ ...job, applicationEligibility: { ready: true, allowed: true, blockers: [] } }));
+    const matches = available.filter(job => (!filters.practice || job.practiceArea === filters.practice) &&
+      (!filters.state || job.state === filters.state) && job.budget >= filters.minPay);
+    matches.sort((a, b) => filters.sort === "payHigh" ? b.budget - a.budget : filters.sort === "payLow" ? a.budget - b.budget : Date.parse(b.createdAt) - Date.parse(a.createdAt));
+    res.json({ items: matches, selected: available.find(job => job._id === req.query.matterId) || null,
+      viewerId: PARALEGAL.id, total: matches.length, availableTotal: available.length,
+      page: 1, limit: Number(req.query.limit), totalPages: 1, filters,
+      facets: { states: [...new Set(available.map(job => job.state))], practices: [...new Set(available.map(job => job.practiceArea))] },
+    });
   });
 
   app.get("/api/applications/my", (_req, res) => {
@@ -110,6 +124,8 @@ function startStubServer() {
   app.get("/api/notifications", (_req, res) => {
     res.json({ notifications: [], unread: 0 });
   });
+  app.get("/api/notifications/unread-count", (_req, res) => res.json({ count: 0 }));
+  app.get("/api/notifications/stream", (_req, res) => res.status(204).end());
 
   app.get("/api/users/attorneys/:id", (req, res) => {
     const id = String(req.params.id || "");
@@ -120,7 +136,7 @@ function startStubServer() {
 
   const server = http.createServer(app);
   return new Promise((resolve) => {
-    server.listen(0, () => {
+    server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, () => {
       const { port } = server.address();
       resolve({ server, port, applicationRequests });
     });
@@ -129,7 +145,7 @@ function startStubServer() {
 
 async function run() {
   const { server, port, applicationRequests } = await startStubServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
   const browser = await launchPuppeteer({
     headless: "new",
@@ -254,7 +270,7 @@ async function run() {
     await clickVisible(page, "#applyFilters");
     await page.waitForFunction(() => {
       const text = document.querySelector(".jobs-grid")?.textContent || "";
-      return text.includes("No matters match your filters yet");
+      return text.includes("No matters match these filters.");
     }, { timeout: 5000 });
 
     // Test: Selecting a Matter shows full details.
@@ -342,14 +358,14 @@ async function run() {
       mobileListMetrics.navigationToggleWidth < 44 ||
       mobileListMetrics.navigationToggleHeight < 44 ||
       mobileListMetrics.listScrollTop > 1 ||
-      mobileListMetrics.returnFocusLabel !== "View Matter" ||
+      mobileListMetrics.returnFocusLabel !== "Details" ||
       mobileListMetrics.clippedCards
     ) {
       throw new Error(`Browse Matters mobile list failed: ${JSON.stringify(mobileListMetrics)}`);
     }
     await page.screenshot({ path: "/tmp/lpc-prompt5-paralegal-browse-matters-list-mobile.png", fullPage: true });
     await clickVisible(page, "#sidebarToggle");
-    await page.waitForFunction(() => document.body.classList.contains("nav-open"));
+    await page.waitForFunction(() => document.body.classList.contains("nav-open") && document.querySelector("#sidebarNav")?.getBoundingClientRect().left >= -1);
     const mobileNavigationState = await page.evaluate(() => ({
       expanded: document.querySelector("#sidebarToggle")?.getAttribute("aria-expanded"),
       sidebarLeft: document.querySelector("#sidebarNav")?.getBoundingClientRect().left,
@@ -366,6 +382,13 @@ async function run() {
     await page.waitForFunction(() => !document.body.classList.contains("nav-open"));
     const restoredNavigationFocus = await page.evaluate(() => document.activeElement?.id === "sidebarToggle");
     if (!restoredNavigationFocus) throw new Error("Browse Matters mobile navigation did not restore focus");
+    // Escape restores focus before the closing sidebar animation finishes.
+    // Wait for the real hit target before exercising the next pointer action.
+    await page.waitForFunction(() => {
+      const button = document.querySelector(".job-card .clear-button");
+      const rect = button?.getBoundingClientRect();
+      return rect && document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2) === button;
+    });
 
     // Test: a paralegal submits a real application through the visible dialog.
     const applyingMatter = await page.$eval(".job-card", (card) => ({
@@ -422,6 +445,19 @@ async function run() {
     if (failedLocalAssets.length) throw new Error(`Browse Matters UI asset failures:\n${failedLocalAssets.join("\n")}`);
 
     console.log("E2E matching + discovery validation complete.");
+  } catch (error) {
+    const state = await page.evaluate(() => {
+      const details = document.querySelector(".job-card .clear-button");
+      const rect = details?.getBoundingClientRect();
+      return { url: location.href, bodyClass: document.body.className,
+        grid: document.querySelector(".jobs-grid")?.textContent?.trim(),
+        focused: { tag: document.activeElement?.tagName, id: document.activeElement?.id, className: document.activeElement?.className },
+        pointerTarget: rect ? document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)?.outerHTML?.slice(0, 500) : null,
+      };
+    }).catch(() => ({ unavailable: true }));
+    console.error("Matching failure state:", JSON.stringify(state), "page errors:", pageErrors);
+    await page.screenshot({ path: "/tmp/lpc-prompt5-paralegal-browse-matters-failure.png", fullPage: true }).catch(() => {});
+    throw error;
   } finally {
     await page.close();
     await closeContext(context);

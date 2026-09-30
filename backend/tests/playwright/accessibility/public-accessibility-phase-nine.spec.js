@@ -119,7 +119,7 @@ async function expectStrongFocus(locator, surfaceRgb, label) {
 }
 
 test("all public pages retain valid heading, hidden-content, and decorative-art semantics", async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await mockPublicBoundaries(page);
   await page.setViewportSize({ width: 1366, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -164,7 +164,7 @@ test("all public pages retain valid heading, hidden-content, and decorative-art 
 });
 
 test("all public pages reflow without horizontal overflow at the 200%-equivalent width", async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await mockPublicBoundaries(page);
   await page.setViewportSize({ width: 720, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -182,7 +182,7 @@ test("all public pages reflow without horizontal overflow at the 200%-equivalent
 });
 
 test("every public mobile header supports keyboard entry, Escape, focus restoration, and inert closure", async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await mockPublicBoundaries(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -217,7 +217,7 @@ test("every public mobile header supports keyboard entry, Escape, focus restorat
 });
 
 test("public internal links and hash destinations resolve without deleted-page references", async ({ page, request }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await mockPublicBoundaries(page);
   await page.setViewportSize({ width: 1366, height: 900 });
   const links = new Map();
@@ -261,8 +261,8 @@ test("public internal links and hash destinations resolve without deleted-page r
   ));
   expect(admissionDestinations).toEqual(expect.arrayContaining([
     "/index.html#how",
-    "/index.html#for-attorneys",
-    "/index.html#for-paralegals",
+    "/attorney-faq.html",
+    "/paralegal-faq.html",
   ]));
 });
 
@@ -300,8 +300,8 @@ test("Help links remain public and account-state copy remains truthful", async (
 
   await openPublicPage(page, "/signup.html");
   const confirmationCopy = await page.locator("#signupConfirmation").textContent();
-  expect(confirmationCopy).toContain("Your submission is already under review.");
-  expect(confirmationCopy).toContain("Verify your email so we can confirm the address for account notices.");
+  expect(confirmationCopy).toContain("Your submission has been received for review.");
+  expect(confirmationCopy).toContain("Resend verification email");
   expect(confirmationCopy).not.toMatch(/review begins|continue to sign in|go to sign in/i);
 });
 

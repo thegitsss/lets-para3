@@ -12,6 +12,7 @@ describe("production no-theater policy", () => {
     const runtimePath = path.resolve(__dirname, "../routes/payments.js");
     expect(silentOperationalFailureIssue(runtimePath, "await persist().catch(() => {});" )).toBe(true);
     expect(silentOperationalFailureIssue(runtimePath, "try { await persist(); } catch {}" )).toBe(true);
+    expect(silentOperationalFailureIssue(path.resolve(__dirname, "../services/caseLifecycle.js"), "await persist().catch(() => {});" )).toBe(true);
     expect(
       silentOperationalFailureIssue(
         runtimePath,

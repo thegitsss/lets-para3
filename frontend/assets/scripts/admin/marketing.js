@@ -818,7 +818,7 @@ function renderPacketDetail(packet = null) {
             <h3>Needs Review</h3>
           <p>This draft still needs your approval before it can be used.</p>
           <label class="approval-decision-label">Optional note
-            <textarea class="approval-decision-note" id="marketingDecisionNote" rows="3" maxlength="2000" placeholder="Optional approval or rejection note"></textarea>
+            <textarea class="approval-decision-note" id="marketingDecisionNote" rows="3" maxlength="2000"></textarea>
           </label>
           <div class="approval-decision-actions">
             <button class="btn" type="button" data-marketing-approve-packet="${escapeHTML(packetId)}">Approve Draft</button>

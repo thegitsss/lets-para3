@@ -1,3 +1,5 @@
+const { letterEmail, escape: escapeEmailValue } = require("../email/layout");
+const accountEmails = require("../email/accountTemplates");
 // backend/routes/auth.js
 const express = require("express");
 const router = express.Router();
@@ -6,6 +8,7 @@ const argon2 = require("argon2");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const crypto = require("crypto");
+const { resolve: resolveLoginReturnTarget } = require("../../frontend/assets/scripts/utils/login-return-target");
 const { URLSearchParams } = require("url");
 const multer = require("multer");
 const { PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
@@ -15,6 +18,7 @@ const Notification = require("../models/Notification");
 const AuditLog = require("../models/AuditLog"); // audit trail hooks
 const sendEmail = require("../utils/email");
 const { getAppSettings } = require("../utils/appSettings");
+const workspaceRelease = require("../services/workspaceRelease");
 const { publishNotificationEvent } = require("../utils/notificationEvents");
 const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
 const { ensureApprovedUserAuthReady, isApprovedUser } = require("../utils/authReady");
@@ -26,6 +30,7 @@ const {
 } = require("../services/profilePhotoDelivery");
 const { hasRequiredParalegalFieldsForPublic } = require("../utils/paralegalProfile");
 const verifyToken = require("../utils/verifyToken");
+const { requireGuardedSupportReset } = require("../utils/supportAccountBoundary");
 const { validateNewPassword } = require("../utils/passwordPolicy");
 const { normalizeHttpUrl } = require("../utils/httpUrl");
 const { validateMatterFileBuffer } = require("../utils/fileSecurity");
@@ -55,11 +60,10 @@ const {
   createGoogleOAuthClient,
   verifyTurnstileToken,
 } = require("../services/authProviderClient");
+const { normalizeAccountTheme } = require("../utils/accountPreferences");
 
 const IS_PROD = process.env.NODE_ENV === "production" || process.env.PROD === "true";
 const TWO_FACTOR_ENABLED = String(process.env.ENABLE_TWO_FACTOR || "true").toLowerCase() !== "false";
-const EMAIL_BASE_URL = (process.env.EMAIL_BASE_URL || "").replace(/\/+$/, "");
-const ASSET_BASE_URL = EMAIL_BASE_URL || "https://www.lets-paraconnect.com";
 const GOOGLE_OAUTH_CONTEXT_COOKIE = "lpc_google_oauth";
 const GOOGLE_SIGNUP_HANDOFF_COOKIE = "lpc_google_signup";
 const GOOGLE_LINK_CANDIDATE_COOKIE = "lpc_google_link";
@@ -67,6 +71,7 @@ const GOOGLE_TWO_FACTOR_COOKIE = "lpc_google_2fa";
 const GOOGLE_OAUTH_TTL_MS = 10 * 60 * 1000;
 const GOOGLE_SIGNUP_TTL_MS = 20 * 60 * 1000;
 const authLogger = createLogger("auth");
+
 function resolveCookieDomain(req) {
   if (!IS_PROD || !process.env.COOKIE_DOMAIN) return {};
   const domain = process.env.COOKIE_DOMAIN;
@@ -102,62 +107,11 @@ const INVALID_CREDENTIALS_MSG = "Invalid email or password.";
 const DUMMY_PASSWORD_HASH = argon2.hash(crypto.randomBytes(32).toString("base64url"));
 const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_CERT_FILE_BYTES = 10 * 1024 * 1024;
-const VALID_US_STATES = new Set([
-  "AL",
-  "AK",
-  "AZ",
-  "AR",
-  "CA",
-  "CO",
-  "CT",
-  "DE",
-  "DC",
-  "FL",
-  "GA",
-  "HI",
-  "ID",
-  "IL",
-  "IN",
-  "IA",
-  "KS",
-  "KY",
-  "LA",
-  "ME",
-  "MD",
-  "MA",
-  "MI",
-  "MN",
-  "MS",
-  "MO",
-  "MT",
-  "NE",
-  "NV",
-  "NH",
-  "NJ",
-  "NM",
-  "NY",
-  "NC",
-  "ND",
-  "OH",
-  "OK",
-  "OR",
-  "PA",
-  "RI",
-  "SC",
-  "SD",
-  "TN",
-  "TX",
-  "UT",
-  "VT",
-  "VA",
-  "WA",
-  "WV",
-  "WI",
-  "WY",
-]);
+const { VALID_US_STATES } = require("../utils/primaryState");
 const registrationUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_RESUME_FILE_BYTES },
+  // Multipart forms use flat fields; reject oversized numeric bracket indexes.
+  limits: { fileSize: MAX_RESUME_FILE_BYTES, fieldArrayIndexLimit: 0 },
 });
 
 // S3 client for resume uploads during registration
@@ -181,15 +135,6 @@ function safeSegment(value) {
     .replace(/-+/g, "-");
 }
 
-function buildUnsubscribeToken(user) {
-  if (!user?._id || !process.env.JWT_SECRET) return "";
-  const payload = {
-    purpose: "unsubscribe",
-    uid: String(user._id),
-  };
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "180d" });
-}
-
 function serializeOnboarding(onboarding = {}) {
   return {
     paralegalTourCompleted: Boolean(onboarding?.paralegalTourCompleted),
@@ -209,210 +154,26 @@ function serializePendingHire(pendingHire = {}) {
   };
 }
 
-function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
-  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const token = buildUnsubscribeToken(user);
-  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const unsubscribeLine = unsubscribeUrl
-    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
-    : "Unsubscribe from non-essential emails";
-
-  return `
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr>
-            <td align="center" style="padding:24px 24px 8px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="padding-right:12px;">
-                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
-                  </td>
-                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
-                    Let's-ParaConnect
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 0;">
-              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:34px;letter-spacing:0.06em;color:#6e6e6e;">
-                Reset your password
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:16px 32px 0;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.08em;color:#1f1f1f;line-height:1.6;">
-                We received a request to reset your password. Use this
-                <a href="${resetUrl}" style="color:#1f1f1f;text-decoration:underline;">link</a>
-                to choose a new one. This link expires in 60 minutes and can only be used once.
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:24px 32px 16px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td bgcolor="#0a84ff" style="border-radius:999px;">
-                    <a href="${resetUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
-                      Reset password
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:0 32px 20px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.04em;color:#545454;line-height:1.7;word-break:break-word;">
-                If the button does not work, copy and paste this URL into your browser:<br>
-                <a href="${resetUrl}" target="_blank" rel="noopener" style="color:#1f1f1f;text-decoration:underline;word-break:break-all;">${resetUrl}</a>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 16px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td height="1" style="background:#bfc3c8;line-height:1px;font-size:0;">&nbsp;</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:0 32px 28px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
-                If you did not request a password reset, you can ignore this email and your password will stay the same.
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td bgcolor="#070300" style="padding:26px 32px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#f6f5f1;letter-spacing:-0.01em;">
-                Need help?
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#f6f5f1;line-height:1.4;margin-top:8px;">
-                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a>
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
-                ${unsubscribeLine}. Required account and case notices may still be sent.
-              </div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-  `;
-}
-
 function buildTwoFactorEmailHtml(user, code) {
   const name = user?.firstName ? String(user.firstName).trim() : "there";
-  return `
+  return letterEmail(`
     <div style="font-family: Arial, sans-serif; color: #111;">
-      <p>Hi ${name},</p>
+      <p>Hi ${escapeEmailValue(name)},</p>
       <p>Your verification code is:</p>
-      <p style="font-size: 24px; letter-spacing: 4px; font-weight: bold;">${code}</p>
+      <p style="font-size: 24px; letter-spacing: 4px; font-weight: bold;">${escapeEmailValue(code)}</p>
       <p>This code expires in 15 minutes.</p>
       <p>If you did not attempt to sign in, you can ignore this email.</p>
     </div>
-  `;
+  `);
 }
 
-function buildApplicationSubmissionEmailHtml(user, opts = {}) {
-  const isAttorney = String(user?.role || "").toLowerCase() === "attorney";
-  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
-  const token = buildUnsubscribeToken(user);
-  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
-  const unsubscribeLine = unsubscribeUrl
-    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
-    : "Unsubscribe from non-essential emails";
-
-  return `
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
-          <tr>
-            <td align="center" style="padding:24px 24px 8px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="padding-right:12px;">
-                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
-                  </td>
-                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
-                    Let's-ParaConnect
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 0;">
-              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:34px;letter-spacing:0.06em;color:#6e6e6e;">
-                ${isAttorney ? "Registration received" : "Application received"}
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:16px 32px 0;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.08em;color:#1f1f1f;line-height:1.6;">
-                ${isAttorney
-                  ? "Thank you for registering with Let’s-ParaConnect. We received your attorney information and will email you when your LPC account is ready."
-                  : "Thank you for applying to Let’s-ParaConnect. Our team is reviewing your application and submitted information, and we’ll email you as soon as the review is complete."}
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 16px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td height="1" style="background:#bfc3c8;line-height:1px;font-size:0;">&nbsp;</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:0 32px 28px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
-                ${isAttorney
-                  ? "If any registration information changes before your account is ready, reply to this email and our team will help."
-                  : "We’ll email you when the review is complete. If any submitted information changes before then, reply to this email and our team will help."}
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td bgcolor="#070300" style="padding:26px 32px;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#f6f5f1;letter-spacing:-0.01em;">
-                Need help?
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#f6f5f1;line-height:1.4;margin-top:8px;">
-                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a>
-              </div>
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
-                ${unsubscribeLine}. Required account and case notices may still be sent.
-              </div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-  `;
-}
-
-// ----------------------------------------
-// Helpers
-// ----------------------------------------
+// Route error forwarding and session duration are independent of email templates.
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-
 const TWO_HOURS = "2h";
 const TWO_HOURS_MS = ACCESS_SESSION_TTL_MS;
+
 const FIFTEEN_MIN = 15 * 60 * 1000;
-const RESET_PASSWORD_MINUTES = 60;
+const { RESET_PASSWORD_MINUTES } = accountEmails;
 const DISABLED_ACCOUNT_MSG = "This account has been deactivated.";
 function isDeactivatedUser(user) {
   return !!(user && (user.disabled || user.deleted));
@@ -551,15 +312,20 @@ function verifyGoogleContext(token, purpose) {
   }
 }
 
-function googleErrorRedirect(code, intent = "login") {
+function googleErrorRedirect(code, intent = "login", requestedTarget = "") {
   const page = intent === "signup" ? "/signup.html" : "/login.html";
-  return `${page}?google_error=${encodeURIComponent(code)}`;
+  const next = intent === "login" ? resolveLoginReturnTarget(requestedTarget, "paralegal") || resolveLoginReturnTarget(requestedTarget, "attorney") : "";
+  return `${page}?google_error=${encodeURIComponent(code)}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
 }
 
-function roleDashboard(role) {
-  const normalizedRole = String(role || "").toLowerCase();
+async function roleDashboard(user) {
+  const normalizedRole = String(user?.role || "").toLowerCase();
   if (normalizedRole === "admin") return "/admin-dashboard.html";
   if (normalizedRole === "director") return "/director-portal.html";
+  if (["attorney", "paralegal"].includes(normalizedRole)) {
+    try { return (await workspaceRelease.readDecision(user)).defaultDestination; }
+    catch (error) { authLogger.error("Workspace routing unavailable after sign-in", { name: error?.name || "Error" }); }
+  }
   if (normalizedRole === "paralegal") return "/dashboard-paralegal.html";
   return "/dashboard-attorney.html";
 }
@@ -576,7 +342,10 @@ async function startGoogleTwoFactor(req, res, user) {
     try {
       const html = buildTwoFactorEmailHtml(user, code);
       const text = `Your verification code is ${code}. This code expires in 15 minutes.`;
-      await sendEmail(user.email, "Your verification code", html, { text });
+      const delivery = await sendEmail(user.email, "Your verification code", html, { text, throwOnError: true });
+      if (!delivery || delivery.error || delivery.disabled || (Array.isArray(delivery.accepted) && !delivery.accepted.length)) {
+        throw new Error("Verification email was not accepted.");
+      }
     } catch (err) {
       clearTwoFactorChallenge(user);
       await user.save();
@@ -741,6 +510,7 @@ router.get(
         nonce,
         intent,
         role,
+        next: resolveLoginReturnTarget(req.query?.next, "paralegal", process.env.APP_BASE_URL || "https://lpc.invalid") || resolveLoginReturnTarget(req.query?.next, "attorney", process.env.APP_BASE_URL || "https://lpc.invalid"),
       },
       10
     );
@@ -774,13 +544,14 @@ router.get(
     const rawContext = req.cookies?.[GOOGLE_OAUTH_CONTEXT_COOKIE];
     const context = verifyGoogleContext(rawContext, "google_oauth");
     const intent = context?.intent === "signup" ? "signup" : "login";
+    const errorRedirect = (code, errorIntent = intent) => googleErrorRedirect(code, errorIntent, context?.next);
     res.clearCookie(
       GOOGLE_OAUTH_CONTEXT_COOKIE,
       buildGoogleCookieOptions(req, { path: "/api/auth/google" })
     );
 
     if (!config) {
-      return res.redirect(googleErrorRedirect("unavailable", intent));
+      return res.redirect(errorRedirect("unavailable", intent));
     }
     if (
       !context ||
@@ -791,14 +562,14 @@ router.get(
         targetType: "user",
         meta: { reason: "invalid_state" },
       });
-      return res.redirect(googleErrorRedirect("invalid_state", intent));
+      return res.redirect(errorRedirect("invalid_state", intent));
     }
     if (req.query?.error || !req.query?.code) {
       await AuditLog.logFromReq(req, "auth.google.fail", {
         targetType: "user",
         meta: { reason: req.query?.error ? "provider_denied" : "missing_code" },
       });
-      return res.redirect(googleErrorRedirect("cancelled", intent));
+      return res.redirect(errorRedirect("cancelled", intent));
     }
 
     let profile;
@@ -819,7 +590,7 @@ router.get(
         targetType: "user",
         meta: { reason: "code_exchange_or_identity_verification" },
       });
-      return res.redirect(googleErrorRedirect("oauth_failed", intent));
+      return res.redirect(errorRedirect("oauth_failed", intent));
     }
 
     const providerAccountId = String(profile?.sub || "").trim();
@@ -836,7 +607,7 @@ router.get(
         targetType: "user",
         meta: { reason: "invalid_verified_identity" },
       });
-      return res.redirect(googleErrorRedirect("identity_invalid", intent));
+      return res.redirect(errorRedirect("identity_invalid", intent));
     }
 
     const linkedUser = await User.findOne({
@@ -850,7 +621,7 @@ router.get(
 
     if (linkedUser) {
       if (isDeactivatedUser(linkedUser)) {
-        return res.redirect(googleErrorRedirect("disabled", "login"));
+        return res.redirect(errorRedirect("disabled", "login"));
       }
 
       const settings = await getAppSettings();
@@ -858,7 +629,7 @@ router.get(
         settings?.maintenanceMode &&
         String(linkedUser.role || "").toLowerCase() !== "admin"
       ) {
-        return res.redirect(googleErrorRedirect("maintenance", "login"));
+        return res.redirect(errorRedirect("maintenance", "login"));
       }
 
       if (!isApprovedUser(linkedUser)) {
@@ -868,7 +639,7 @@ router.get(
           meta: { reason: String(linkedUser.status || "pending") },
         });
         return res.redirect(
-          googleErrorRedirect(
+          errorRedirect(
             String(linkedUser.status || "").toLowerCase() === "pending"
               ? "pending"
               : "not_approved",
@@ -880,17 +651,18 @@ router.get(
       let userChanged = ensureApprovedUserAuthReady(linkedUser);
       if (linkedUser.emailVerified !== true) {
         if (userChanged) await linkedUser.save();
-        return res.redirect(googleErrorRedirect("email_unverified", "login"));
+        return res.redirect(errorRedirect("email_unverified", "login"));
       }
       if (linkedUser.twoFactorEnabled && !TWO_FACTOR_ENABLED) {
-        return res.redirect(googleErrorRedirect("two_factor_unavailable", "login"));
+        return res.redirect(errorRedirect("two_factor_unavailable", "login"));
       }
       if (userChanged) await linkedUser.save();
 
       if (linkedUser.twoFactorEnabled && TWO_FACTOR_ENABLED) {
         const sent = await startGoogleTwoFactor(req, res, linkedUser);
-        if (!sent) return res.redirect(googleErrorRedirect("two_factor_unavailable", "login"));
-        return res.redirect("/login.html?google_2fa=1");
+        if (!sent) return res.redirect(errorRedirect("two_factor_unavailable", "login"));
+        const next = resolveLoginReturnTarget(context.next, linkedUser.role);
+        return res.redirect(`/login.html?google_2fa=1${next ? `&next=${encodeURIComponent(next)}` : ""}`);
       }
 
       const lastLoginAt = linkedUser.lastLoginAt ? new Date(linkedUser.lastLoginAt) : null;
@@ -910,7 +682,7 @@ router.get(
           authLogger.warn("[auth.google] welcome notification failed");
         }
       }
-      return res.redirect(roleDashboard(linkedUser.role));
+      return res.redirect(resolveLoginReturnTarget(context.next, linkedUser.role) || await roleDashboard(linkedUser));
     }
 
     const emailOwner = await User.findOne({
@@ -937,7 +709,7 @@ router.get(
         targetId: emailOwner._id,
         meta: { reason: "matching_email_unlinked" },
       });
-      return res.redirect(googleErrorRedirect("matching_email_unlinked", "login"));
+      return res.redirect(errorRedirect("matching_email_unlinked", "login"));
     }
 
     const nameParts = String(profile?.name || "").trim().split(/\s+/).filter(Boolean);
@@ -1046,6 +818,7 @@ router.post(
       state,
       timezone,
       yearsExperience,
+      paralegalQualification,
       googleSignupIntent,
     } = req.body || {};
 
@@ -1133,7 +906,7 @@ router.post(
     const passwordPolicy = validateNewPassword(password, {
       user: { email: normalizedEmail, firstName: safeFirst, lastName: safeLast },
     });
-    if (!passwordPolicy.ok) return res.status(400).json({ msg: passwordPolicy.error, code: passwordPolicy.code });
+    if (!passwordPolicy.ok) return res.status(400).json({ msg: passwordPolicy.error, code: passwordPolicy.code, field: "password" });
 
     const normalizedBarState =
       typeof barState === "string" ? barState.trim().toUpperCase() : "";
@@ -1160,13 +933,17 @@ router.post(
       }
     }
 
+    const qualification = String(paralegalQualification || "").trim();
+    if (roleLc === "paralegal" && !["certificate", "degree", "law_firm_experience"].includes(qualification)) {
+      return res.status(400).json({ msg: "Select your qualification: a paralegal certificate, a degree in paralegal studies, or at least one year working in a law firm." });
+    }
     const parsedYearsExperience = Number(yearsExperience);
     if (
       roleLc === "paralegal" &&
-      (!Number.isInteger(parsedYearsExperience) || parsedYearsExperience < 1 || parsedYearsExperience > 80)
+      (yearsExperience === undefined || String(yearsExperience).trim() === "" || !Number.isInteger(parsedYearsExperience) || parsedYearsExperience < 0 || parsedYearsExperience > 80)
     ) {
       return res.status(400).json({
-        msg: "At least one year of professional paralegal experience is required.",
+        msg: "Enter your completed years of paralegal experience, from 0 to 80.",
       });
     }
     const safeYearsExperience = roleLc === "paralegal" ? parsedYearsExperience : undefined;
@@ -1255,7 +1032,7 @@ router.post(
       role: roleLc,
       status: "pending",
       preferences: {
-        theme: roleLc === "attorney" ? "light" : "mountain",
+        theme: "light",
       },
       barNumber: roleLc === "attorney" ? String(barNumber || "") : "",
       resumeURL: roleLc === "paralegal" ? "" : "",
@@ -1268,6 +1045,7 @@ router.post(
       state: normalizedState,
       timezone: safeTimezone || undefined,
       yearsExperience: roleLc === "paralegal" ? safeYearsExperience : undefined,
+      paralegalQualification: roleLc === "paralegal" ? qualification : "",
       emailVerified: Boolean(googleSignupHandoff),
       authProviders: googleSignupHandoff
         ? [
@@ -1347,8 +1125,8 @@ router.post(
 
     // Email: registration received
     try {
-      const html = buildApplicationSubmissionEmailHtml(user);
-      await sendEmail(user.email, "Registration received", html);
+      const email = accountEmails.applicationReceived(user);
+      await sendEmail(user.email, email.subject, email.html, { text: email.text });
     } catch (error) {
       authLogger.warn("[auth] registration email delivery failed", {
         userId: String(user._id),
@@ -1356,9 +1134,11 @@ router.post(
       });
     }
 
+    let verificationEmailStatus = user.emailVerified ? "not_required" : "not_sent";
     if (!googleSignupHandoff) {
       try {
-        await sendVerificationEmail({ user, email: user.email });
+        const delivery = await sendVerificationEmail({ user, email: user.email });
+        verificationEmailStatus = delivery?.disabled ? "not_sent" : "sent";
       } catch (error) {
         authLogger.warn("[auth] signup verification email delivery failed", {
           userId: String(user._id),
@@ -1377,22 +1157,12 @@ router.post(
     });
 
     try {
-      const baseUrl = String(process.env.APP_BASE_URL || "").replace(/\/+$/, "");
-      const adminLink = baseUrl ? `${baseUrl}/admin-dashboard.html#section-user-management` : "";
-      const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || "New user";
-      const timestamp = new Date().toISOString();
-      const linkHtml = adminLink ? `<p><a href="${adminLink}">Open admin dashboard</a></p>` : "";
-      await sendEmail(
-        "admin@lets-paraconnect.com",
-        "New user signup",
-        `<p>A new user signed up.</p>
-         <p><strong>Name:</strong> ${fullName}<br/>
-         <strong>Role:</strong> ${String(user.role || "").toLowerCase()}<br/>
-         <strong>Timestamp:</strong> ${timestamp}</p>
-         ${linkHtml}`
-      );
-    } catch (err) {
-      authLogger.warn("[auth] admin signup email failed", err?.message || err);
+      const { enqueueAlert, processAlerts } = require('../services/adminAlertService');
+      const key = `signup:${user._id}`;
+      await enqueueAlert({ key, kind: 'signup', targetId: user._id });
+      await processAlerts({ key, limit: 1 });
+    } catch (_) {
+      authLogger.warn("[auth] signup alert queued for worker reconciliation");
     }
 
     await publishEventSafe({
@@ -1434,7 +1204,7 @@ router.post(
       },
     });
 
-    res.json({ msg: "Registered successfully. Await admin approval." });
+    res.json({ msg: "Registered successfully. Await admin approval.", emailVerified: user.emailVerified === true, verificationEmailStatus });
   })
 );
 
@@ -1525,7 +1295,10 @@ router.post(
         try {
           const html = buildTwoFactorEmailHtml(user, code);
           const text = `Your verification code is ${code}. This code expires in 15 minutes.`;
-          await sendEmail(user.email, "Your verification code", html, { text });
+          const delivery = await sendEmail(user.email, "Your verification code", html, { text, throwOnError: true });
+          if (!delivery || delivery.error || delivery.disabled || (Array.isArray(delivery.accepted) && !delivery.accepted.length)) {
+            throw new Error("Verification email was not accepted.");
+          }
         } catch (err) {
           authLogger.error("[2fa] email failed", err?.message || err);
           clearTwoFactorChallenge(user);
@@ -1884,6 +1657,16 @@ router.post(
 // ME
 // GET /api/auth/me  (reads Bearer token)
 // ----------------------------------------
+router.get("/workspace-release", verifyToken, asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    res.json({ workspace: await workspaceRelease.readDecision(req.user) });
+  } catch (error) {
+    if (error?.statusCode === 403) return res.status(403).json({ error: error.message, code: error.code });
+    throw error;
+  }
+}));
+
 router.get(
   "/me",
   verifyToken.optional,
@@ -1929,10 +1712,9 @@ router.get(
           stateExperience: Array.isArray(u.stateExperience) ? u.stateExperience : [],
           disabled: Boolean(u.disabled),
           preferences: {
-            theme:
-              String(u.preferences && typeof u.preferences === "object" ? u.preferences.theme || "" : "").toLowerCase() === "dark"
-                ? "dark"
-                : "light",
+            theme: normalizeAccountTheme(
+              u.preferences && typeof u.preferences === "object" ? u.preferences.theme : ""
+            ),
             fontSize:
               (u.preferences && typeof u.preferences === "object" && u.preferences.fontSize) ||
               "md",
@@ -2055,11 +1837,15 @@ router.post(
 router.post(
   "/request-password-reset",
   csrfProtection,
+  requireGuardedSupportReset,
   asyncHandler(async (req, res) => {
     const { email } = req.body || {};
     if (!isEmail(email)) return res.status(400).json({ msg: "Invalid email" });
 
     const user = await User.findOne({ email: String(email).toLowerCase() });
+    if (req.supportExpectedAccount && (!user || String(user._id) !== req.supportExpectedAccount.ownerId || user.role !== req.supportExpectedAccount.role)) {
+      return res.status(409).json({ code: "SUPPORT_ACCOUNT_TARGET_CHANGED", msg: "Your account details changed. Reload before requesting a reset link." });
+    }
     if (!user) return res.json({ ok: true }); // do not reveal
 
     const resetToken = createPasswordResetToken(user._id);
@@ -2070,9 +1856,8 @@ router.post(
     const baseUrl = (process.env.APP_BASE_URL || "").replace(/\/+$/, "");
     const resetUrl = `${baseUrl}/reset-password.html?token=${resetToken}`;
     try {
-      const html = buildResetPasswordEmailHtml(user, resetUrl);
-      const text = `Reset your password using this link: ${resetUrl}\nThis link expires in 60 minutes and can only be used once.`;
-      await sendEmail(user.email, "Reset your password", html, { text });
+      const email = accountEmails.passwordReset(resetUrl);
+      await sendEmail(user.email, email.subject, email.html, { text: email.text, throwOnError: true });
     } catch (error) {
       authLogger.warn("[auth] password reset email delivery failed", {
         userId: String(user._id),

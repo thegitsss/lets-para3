@@ -25,6 +25,8 @@ const adminRouter = require("../routes/admin");
 const authRouter = require("../routes/auth");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 const sendEmail = require("../utils/email");
+const { addSubscriber: addCaseSubscriber } = require("../utils/caseEvents");
+const { addSubscriber: addNotificationSubscriber } = require("../utils/notificationEvents");
 
 jest.mock("../utils/email", () => {
   const fn = jest.fn();
@@ -59,6 +61,7 @@ function authCookieFor(user) {
 
 beforeAll(async () => {
   await connect();
+  await Promise.all([User.init(), Case.init(), PaymentOperation.init(), Payout.init(), PlatformIncome.init(), FinancialAdjustment.init(), AuditLog.init()]);
 });
 
 afterAll(async () => {
@@ -253,25 +256,13 @@ describe("Admin workflows", () => {
       evidenceStatus: "needs_reconciliation",
       stripeMode: "test",
     });
+    const charge = { id: "ch_admin_reconcile", object: "charge", amount: 48800, amount_captured: 48800, amount_refunded: 0, currency: "usd", status: "succeeded", paid: true, captured: true, livemode: false, payment_intent: "pi_admin_reconcile", metadata: { caseId: String(caseDoc._id) } };
+    const intent = { id: "pi_admin_reconcile", object: "payment_intent", status: "succeeded", amount: 48800, amount_received: 48800, currency: "usd", livemode: false, latest_charge: charge.id, transfer_group: `case_${caseDoc._id}`, metadata: { caseId: String(caseDoc._id) } };
+    mockAdminStripe.charges.retrieve.mockResolvedValue(charge);
+    mockAdminStripe.paymentIntents.retrieve.mockResolvedValue(intent);
     mockAdminStripe.disputes.retrieve.mockResolvedValue({
-      id: "dp_admin_reconcile",
-      amount: 48800,
-      currency: "usd",
-      status: "under_review",
-      livemode: false,
-      charge: {
-        id: "ch_admin_reconcile",
-        amount_refunded: 0,
-        currency: "usd",
-        payment_intent: { id: "pi_admin_reconcile", metadata: { caseId: String(caseDoc._id) } },
-      },
-      balance_transactions: [{
-        id: "txn_admin_reconcile",
-        amount: -48800,
-        fee: 1500,
-        net: -50300,
-        currency: "usd",
-      }],
+      id: "dp_admin_reconcile", object: "dispute", amount: 48800, currency: "usd", status: "under_review", livemode: false, charge: charge.id, payment_intent: intent.id,
+      balance_transactions: [{ id: "txn_admin_reconcile", object: "balance_transaction", source: "dp_admin_reconcile", amount: -48800, fee: 1500, net: -50300, currency: "usd" }],
     });
 
     const response = await request(app)
@@ -394,14 +385,11 @@ describe("Admin workflows", () => {
     const [approvalEmailTo, approvalEmailSubject, approvalEmailHtml] = sendEmail.mock.calls[0];
     expect(approvalEmailTo).toBe(attorney.email);
     expect(approvalEmailSubject).toBe("Welcome to Let’s-ParaConnect");
-    expect(approvalEmailHtml).toContain("Welcome to Let&rsquo;s-ParaConnect");
-    expect(approvalEmailHtml).toContain("Congratulations! We are pleased to inform you that you have been accepted to Let&rsquo;s-ParaConnect.");
-    expect(approvalEmailHtml).toContain("What You Can Use LPC For:");
-    expect(approvalEmailHtml).toContain("Next Steps:");
-    expect(approvalEmailHtml).toContain("Go to Your Dashboard");
-    expect(approvalEmailHtml).toContain("https://www.linkedin.com/company/lets-paraconnect/");
-    expect(approvalEmailHtml).not.toMatch(/facebook|instagram/i);
-    expect(approvalEmailHtml).not.toContain("Attorney launch begins today");
+    expect(approvalEmailHtml).toContain("Welcome to Let’s-ParaConnect!");
+    expect(approvalEmailHtml).toContain("create a Matter outlining the scope");
+    expect(approvalEmailHtml).toContain(">Get started</a>");
+    expect(sendEmail.mock.calls[0][3].text).toContain("/login.html");
+    expect(approvalEmailHtml).not.toMatch(/linkedin|facebook|instagram/i);
 
     const updated = await User.findById(attorney._id);
     expect(updated.status).toBe("approved");
@@ -566,8 +554,8 @@ describe("Admin workflows", () => {
     expect(launchNotice.body).toEqual(expect.objectContaining({ total: 3, sent: 1, skipped: 2, failed: 0 }));
     expect(sendEmail).toHaveBeenCalledTimes(1);
     expect(sendEmail.mock.calls[0][0]).toBe(uploadedPhoto.email);
-    expect(sendEmail.mock.calls[0][1]).toBe("Attorney Access Is Now Open");
-    expect(sendEmail.mock.calls[0][2]).toContain("your paralegal profile");
+    expect(sendEmail.mock.calls[0][1]).toBe("Explore Matters on LPC");
+    expect(sendEmail.mock.calls[0][2]).toContain("You choose which Matters to apply to");
     expect(sendEmail.mock.calls[0][2]).toContain("Stripe Connect payout setup");
     expect(sendEmail.mock.calls[0][2]).not.toMatch(/add a payment method|fund a Matter when you are ready to hire/i);
     expect(sendEmail.mock.calls[0][2]).not.toMatch(/launch begins today/i);
@@ -603,6 +591,8 @@ describe("Admin workflows", () => {
     expect(firstMatterReminder.body).toEqual(expect.objectContaining({ total: 2, sent: 1, skipped: 1, failed: 0 }));
     expect(sendEmail).toHaveBeenCalledTimes(1);
     expect(sendEmail.mock.calls[0][0]).toBe(attorney.email);
+    expect(sendEmail.mock.calls[0][2]).toContain("Have work you’re ready to delegate?");
+    expect(sendEmail.mock.calls[0][2]).not.toMatch(/account is ready|if you have not posted|application is approved/i);
     expect(sendEmail.mock.calls[0][2]).not.toMatch(/facebook|instagram/i);
 
     const obsoleteDecisionCampaign = await request(app)
@@ -822,7 +812,62 @@ describe("Admin workflows", () => {
     expect(retainedApplication).toBeTruthy();
   });
 
-  test("Admin analytics aggregates payment totals for the dashboard", async () => {
+  test("Admin deletion of a never-engaged posting invalidates applicant and deep-link projections immediately", async () => {
+    const [admin, attorney, paralegal] = await User.create([
+      { firstName: "Admin", lastName: "Delete", email: "admin-delete-open@example.com", password: "Password123!", role: "admin", status: "approved", state: "CA" },
+      { firstName: "Avery", lastName: "Delete", email: "attorney-delete-open@example.com", password: "Password123!", role: "attorney", status: "approved", state: "CA" },
+      { firstName: "Jamie", lastName: "Applicant", email: "applicant-delete-open@example.com", password: "Password123!", role: "paralegal", status: "approved", state: "CA" },
+    ]);
+    const caseDoc = await Case.create({
+      title: "Admin removable posting",
+      practiceArea: "probate",
+      details: "This posting has not been hired or funded and can be removed safely.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      applicants: [{ paralegalId: paralegal._id, status: "pending", appliedAt: new Date() }],
+      status: "open",
+      totalAmount: 50000,
+      currency: "usd",
+    });
+    const job = await Job.create({
+      attorneyId: attorney._id,
+      caseId: caseDoc._id,
+      title: caseDoc.title,
+      practiceArea: "probate",
+      description: "This posting has not been hired or funded and can be removed safely.",
+      budget: 500,
+      status: "open",
+    });
+    caseDoc.jobId = job._id;
+    caseDoc.job = job._id;
+    await caseDoc.save();
+    await Application.create({
+      jobId: job._id,
+      paralegalId: paralegal._id,
+      coverLetter: "I am available to assist with this probate Matter.",
+      status: "submitted",
+    });
+
+    const caseSignals = [];
+    const paralegalSignals = [];
+    const stopCase = addCaseSubscriber(caseDoc._id, { write: (value) => caseSignals.push(String(value)) });
+    const stopParalegal = addNotificationSubscriber(paralegal._id, { write: (value) => paralegalSignals.push(String(value)) });
+    const response = await request(app)
+      .delete(`/api/admin/cases/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(admin))
+      .send({ reason: "Duplicate test posting", message: "This listing has been removed." });
+    stopCase();
+    stopParalegal();
+
+    expect(response.status).toBe(200);
+    expect(caseSignals.join("\n")).toContain("matter_deleted_refresh");
+    expect(paralegalSignals.join("\n")).toContain("matter_deleted_refresh");
+    expect(await Case.findById(caseDoc._id)).toBeNull();
+    expect(await Job.findById(job._id)).toBeNull();
+    expect(await Application.findOne({ jobId: job._id })).toBeNull();
+  });
+
+  test("Admin analytics keeps incomplete legacy evidence out of confirmed totals", async () => {
     const admin = await User.create({
       firstName: "Admin",
       lastName: "Owner",
@@ -976,10 +1021,10 @@ describe("Admin workflows", () => {
       .set("Cookie", authCookieFor(admin));
 
     expect(analyticsRes.status).toBe(200);
-    expect(analyticsRes.body.escrowMetrics.totalEscrowReleased).toBe(100000);
-    expect(analyticsRes.body.escrowMetrics.totalEscrowHeld).toBe(50000);
-    expect(analyticsRes.body.revenueMetrics.platformFeesCollected).toBe(60000);
-    expect(analyticsRes.body.payoutMetrics).toEqual({ totalRecorded: 82000, count: 1 });
+    expect(analyticsRes.body.escrowMetrics.totalEscrowReleased).toBe(0);
+    expect(analyticsRes.body.escrowMetrics.totalEscrowHeld).toBeNull();
+    expect(analyticsRes.body.revenueMetrics.platformFeesCollected).toBeNull();
+    expect(analyticsRes.body.payoutMetrics).toMatchObject({ totalRecorded: 0, count: 0, states: { needs_review: 1, reversed: 1 } });
     expect(analyticsRes.body).not.toHaveProperty("taxSummary");
     expect(analyticsRes.body).not.toHaveProperty("expenses");
     expect(analyticsRes.body.pendingPayoutQueue).toHaveLength(1);
@@ -993,8 +1038,8 @@ describe("Admin workflows", () => {
       .set("Cookie", authCookieFor(admin));
 
     expect(payoutsRes.status).toBe(200);
-    expect(payoutsRes.body.totalAmount).toBe(82000);
-    expect(payoutsRes.body.count).toBe(1);
+    expect(payoutsRes.body.totalAmount).toBe(0);
+    expect(payoutsRes.body.count).toBe(0);
 
     const fundingEvidenceRes = await request(app)
       .get("/api/admin/funding-evidence")
@@ -1002,8 +1047,8 @@ describe("Admin workflows", () => {
     expect(fundingEvidenceRes.status).toBe(200);
     expect(fundingEvidenceRes.body.items).toHaveLength(2);
     expect(fundingEvidenceRes.body.totalsByMode).toEqual({
-      live: { count: 1, grossAmount: 122000, processingFeeAmount: 3838, netAmount: 118162 },
-      test: { count: 1, grossAmount: 61000, processingFeeAmount: 1799, netAmount: 59201 },
+      live: { count: 0, grossAmount: 0, processingFeeAmount: 0, netAmount: 0 },
+      test: { count: 0, grossAmount: 0, processingFeeAmount: 0, netAmount: 0 },
     });
 
     const incomeRes = await request(app)
@@ -1011,11 +1056,14 @@ describe("Admin workflows", () => {
       .set("Cookie", authCookieFor(admin));
 
     expect(incomeRes.status).toBe(200);
-    expect(incomeRes.body.totalAmount).toBe(60000);
-    expect(incomeRes.body.count).toBe(2);
+    expect(incomeRes.body.totalAmount).toBeNull();
+    expect(incomeRes.body.count).toBe(0);
+    expect(incomeRes.body.items).toHaveLength(2);
+    expect(incomeRes.body.items.every(row => row.amount === null && row.state === "needs_review")).toBe(true);
+    expect(fundingEvidenceRes.body.summary.requiresReview).toBe(2);
   });
 
-  test("Admin financial reporting start date hides older money totals", async () => {
+  test("Admin reporting start filters old flows but cannot erase an unverified current balance", async () => {
     const originalStart = process.env.ADMIN_FINANCIAL_REPORTING_START_AT;
     process.env.ADMIN_FINANCIAL_REPORTING_START_AT = "2030-01-01T00:00:00Z";
 
@@ -1088,7 +1136,7 @@ describe("Admin workflows", () => {
         .set("Cookie", authCookieFor(admin));
 
       expect(analyticsRes.status).toBe(200);
-      expect(analyticsRes.body.escrowMetrics.totalEscrowHeld).toBe(0);
+      expect(analyticsRes.body.escrowMetrics.totalEscrowHeld).toBeNull();
       expect(analyticsRes.body.escrowMetrics.totalEscrowReleased).toBe(0);
       expect(analyticsRes.body.revenueMetrics.platformFeesCollected).toBe(0);
 

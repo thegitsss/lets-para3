@@ -3,8 +3,9 @@ const http = require("http");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const { clickVisible, launchPuppeteer } = require("./puppeteerBrowser");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { MongoMemoryReplSet } = require("mongodb-memory-server");
 const mongoose = require("mongoose");
+const { connectE2eDatabase } = require("./e2e-database-fixture");
 const {
   CURRENT_PRIVACY_VERSION,
   CURRENT_TERMS_VERSION,
@@ -44,6 +45,7 @@ const stripeMock = {
     retrieve: async (intentId) => ({
       id: intentId,
       status: "succeeded",
+      livemode: false,
       amount: 122000,
       amount_received: 122000,
       currency: "usd",
@@ -58,7 +60,7 @@ const stripeMock = {
   transfers: {
     create: async (payload) => {
       stripeMock._transfers.push(payload);
-      return { id: `tr_${Date.now()}` };
+      return { ...payload, id: `tr_${Date.now()}`, object: "transfer", livemode: false, reversed: false, amount_reversed: 0 };
     },
   },
   refunds: {
@@ -138,11 +140,18 @@ function buildApp(completedMutations) {
   app.use(express.json({ limit: "2mb" }));
   app.use((req, res, next) => {
     if (req.method === "POST") {
+      let failure = null;
+      const originalJson = res.json;
+      res.json = function (body) {
+        if (res.statusCode >= 400) failure = { code: body?.code, error: body?.error || body?.msg };
+        return originalJson.call(this, body);
+      };
       res.once("finish", () => {
         completedMutations.push({
           method: req.method,
           path: req.originalUrl,
           status: res.statusCode,
+          failure,
         });
       });
     }
@@ -181,7 +190,7 @@ async function startServer() {
   const completedMutations = [];
   const app = buildApp(completedMutations);
   const server = http.createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
+  await new Promise((resolve) => server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, resolve));
   const { port } = server.address();
   return { server, port, completedMutations };
 }
@@ -462,7 +471,7 @@ async function clickMutationAndRequireSuccess(page, selector, pathFragment, comp
     { timeout: BROWSER_STEP_TIMEOUT_MS, interval: 25 }
   );
   if (response.status < 200 || response.status >= 300) {
-    throw new Error(`${pathFragment} failed (${response.status})`);
+    throw new Error(`${pathFragment} failed (${response.status}): ${JSON.stringify(response.failure)}`);
   }
 }
 
@@ -544,17 +553,17 @@ async function assertCaseNotification(userId, type, caseId) {
   const found = await Notification.findOne({
     userId,
     type,
-    "payload.caseId": caseId,
+    "payload.caseId": String(caseId),
   }).lean();
   expect(found, `Expected notification ${type} for user ${userId} on case ${caseId}`);
 }
 
 
 async function run() {
-  const mongo = await MongoMemoryServer.create();
-  await mongoose.connect(mongo.getUri(), { dbName: "e2e" });
+  const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" } });
+  await connectE2eDatabase(mongoose, mongo.getUri());
   const { server, port, completedMutations } = await startServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
   let browser;
 
   try {

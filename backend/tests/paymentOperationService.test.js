@@ -26,6 +26,11 @@ function input(overrides = {}) {
 }
 
 describe("payment operation claims", () => {
+  test.each(["pending", "requires_action", "failed", "canceled", null])("a combined settlement cannot be completed with a %s refund", async refundStatus => {
+    const args = input({ kind: "dispute_settlement" }), claim = await claimPaymentOperation(args);
+    await PaymentOperation.updateOne({ _id: claim.operation._id }, { $set: { stripeRefundId: "re_retained", refundStatus, refundEvidenceStatus: "verified", refundVerifiedAt: new Date() } });
+    await expect(succeedPaymentOperation(claim.operation, "tr_123")).rejects.toThrow(/review/); expect((await PaymentOperation.findById(claim.operation._id)).status).toBe("pending");
+  });
   test("only one concurrent claimant acquires a new money operation", async () => {
     const args = input();
     const results = await Promise.all([

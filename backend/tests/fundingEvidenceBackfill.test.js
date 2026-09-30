@@ -1,4 +1,7 @@
 const mongoose = require("mongoose");
+// Backfill argument checks import the CLI; these tests supply their own
+// provider fixtures and must never initialize an environment-backed client.
+jest.mock("../utils/stripe", () => ({}));
 const fs = require("fs");
 const path = require("path");
 const PaymentOperation = require("../models/PaymentOperation");

@@ -1,0 +1,356 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-04",
+  "authority": "existing backend routes and guards",
+  "rules": {
+    "credentials": "same-origin secure cookie/session",
+    "csrf": "required by current backend for protected mutations",
+    "authorization": "server response is authoritative; client presentation never grants access",
+    "retry": "never automatically retry non-idempotent mutations",
+    "money": "preserve exact server cents, currency and reconciliation evidence",
+    "unknownStatus": "fail closed and refresh; never unlock an action"
+  },
+  "families": [
+    {
+      "id": "session",
+      "mount": "/api/auth",
+      "consumers": ["session.js", "auth.js", "universal-header.js", "profile-settings-role-loader.js"],
+      "guards": "route-specific; secure cookie/session authority",
+      "endpoints": [
+        {"method": "GET", "path": "/api/auth/me", "purpose": "session identity, role and account state", "mutation": false},
+        {"method": "POST", "path": "/api/auth/logout", "purpose": "terminate current authenticated session", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/auth/request-password-reset", "purpose": "Assistant-supported recovery action", "mutation": true, "csrf": "current route contract"},
+        {"method": "GET", "path": "/api/csrf", "purpose": "obtain mutation token", "mutation": false}
+      ],
+      "requiredErrors": [401, 403, 429, 500, "network"],
+      "characterization": ["session loss", "wrong role", "pending/denied/disabled/deleted", "multi-tab logout", "BFCache"]
+    },
+    {
+      "id": "attorney-dashboard",
+      "mount": "/api/attorney/dashboard",
+      "consumers": ["attorney-tabs.js"],
+      "guards": "verifyToken + requireApproved + attorney role",
+      "endpoints": [
+        {"method": "GET", "path": "/api/attorney/dashboard", "purpose": "home overview projection", "mutation": false}
+      ],
+      "requiredErrors": [401, 403, 500, "partial-dependent-data", "network"],
+      "characterization": ["empty", "active", "applications", "completed", "deadlines", "payment total comparison"]
+    },
+    {
+      "id": "current-user",
+      "mount": "/api/users",
+      "consumers": ["create-case.html", "attorney-tabs.js", "profile-settings.js", "profile-paralegal.js", "sidebar-profile.js"],
+      "guards": "verifyToken; approved and role gates vary by endpoint",
+      "endpoints": [
+        {"method": "GET", "path": "/api/users/me", "purpose": "authoritative current profile and account projection", "mutation": false},
+        {"method": "PATCH", "path": "/api/users/me", "purpose": "profile update", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/users/me/onboarding", "purpose": "persisted onboarding state", "mutation": false},
+        {"method": "PATCH", "path": "/api/users/me/onboarding", "purpose": "onboarding progress", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/users/me/pending-hire", "purpose": "recover hire after payment-method setup", "mutation": false},
+        {"method": "PUT", "path": "/api/users/me/pending-hire", "purpose": "store pending hire context", "mutation": true, "csrf": true},
+        {"method": "DELETE", "path": "/api/users/me/pending-hire", "purpose": "clear pending hire context", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/users/me/weekly-notes", "purpose": "attorney weekly private notes", "mutation": false},
+        {"method": "PUT", "path": "/api/users/me/weekly-notes", "purpose": "save attorney weekly private notes", "mutation": true, "csrf": true},
+        {"method": "PATCH", "path": "/api/users/me/notification-prefs", "purpose": "notification preference update", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/users/attorneys/:attorneyId", "purpose": "authorized attorney profile", "mutation": false},
+        {"method": "GET", "path": "/api/users/profile-preview/:userId", "purpose": "context panel preview", "mutation": false}
+      ],
+      "requiredErrors": [400, 401, 403, 404, 409, 500, "network"],
+      "characterization": ["partial payload preservation", "alias fields", "safe pending-hire return", "private notes isolation"]
+    },
+    {
+      "id": "account-security-preferences",
+      "mount": "/api/account",
+      "consumers": ["profile-settings.js", "attorney-tabs.js"],
+      "guards": "verifyToken + requireApproved; CSRF on mutations",
+      "endpoints": [
+        {"method": "GET", "path": "/api/account/preferences", "purpose": "theme/font/preferences", "mutation": false},
+        {"method": "POST", "path": "/api/account/preferences", "purpose": "update preferences", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/account/dashboard-views", "purpose": "saved Matter views", "mutation": false},
+        {"method": "POST", "path": "/api/account/dashboard-views", "purpose": "save Matter view", "mutation": true, "csrf": true},
+        {"method": "DELETE", "path": "/api/account/dashboard-views/:scope/:viewId", "purpose": "delete saved view", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/account/update-password", "purpose": "change password", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/account/2fa", "purpose": "2FA status", "mutation": false},
+        {"method": "POST", "path": "/api/account/2fa-toggle", "purpose": "toggle supported 2FA mode", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/account/2fa/authenticator/setup", "purpose": "begin authenticator setup", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/account/2fa/authenticator/confirm", "purpose": "confirm authenticator", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/account/passkeys", "purpose": "list passkeys", "mutation": false},
+        {"method": "POST", "path": "/api/account/passkeys/registration-options", "purpose": "begin passkey registration", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/account/passkeys/register", "purpose": "register passkey", "mutation": true, "csrf": true},
+        {"method": "DELETE", "path": "/api/account/passkeys/:passkeyId", "purpose": "remove passkey", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/account/2fa-backup-codes", "purpose": "generate backup codes", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/account/sessions", "purpose": "list sessions", "mutation": false},
+        {"method": "DELETE", "path": "/api/account/sessions/:sessionId", "purpose": "revoke session", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/account/sessions/revoke-others", "purpose": "revoke other sessions", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/account/deactivate-status", "purpose": "account action eligibility", "mutation": false},
+        {"method": "DELETE", "path": "/api/account/deactivate", "purpose": "deactivate eligible account", "mutation": true, "csrf": true},
+        {"method": "DELETE", "path": "/api/account/delete", "purpose": "request eligible account deletion", "mutation": true, "csrf": true}
+      ],
+      "requiredErrors": [400, 401, 403, 404, 409, 429, 500, "browser-unsupported", "network"],
+      "characterization": ["mountain preferences", "reauthentication", "current-session protection", "active-matter/dispute/payout closure blocks"]
+    },
+    {
+      "id": "case-drafts",
+      "mount": "/api/case-drafts",
+      "consumers": ["create-case.html", "attorney-tabs.js"],
+      "guards": "verifyToken + requireApproved + attorney/admin; CSRF on mutations",
+      "endpoints": [
+        {"method": "GET", "path": "/api/case-drafts", "purpose": "list attorney drafts", "mutation": false},
+        {"method": "GET", "path": "/api/case-drafts/:draftId", "purpose": "resume owned draft", "mutation": false},
+        {"method": "POST", "path": "/api/case-drafts", "purpose": "create draft", "mutation": true, "csrf": true},
+        {"method": "PUT", "path": "/api/case-drafts/:draftId", "purpose": "autosave draft", "mutation": true, "csrf": true},
+        {"method": "DELETE", "path": "/api/case-drafts/:draftId", "purpose": "delete draft", "mutation": true, "csrf": true}
+      ],
+      "requiredErrors": [400, 401, 403, 404, 409, 500, "network"],
+      "characterization": ["two-tab conflict", "offline", "publish succeeds and cleanup fails", "duplicate publish"]
+    },
+    {
+      "id": "cases-lifecycle-workspace",
+      "mount": "/api/cases",
+      "consumers": ["create-case.html", "attorney-tabs.js", "case-detail.js", "browse-paralegals.js", "profile-paralegal.js", "global-search.js"],
+      "guards": "verifyToken + requireApproved + role; ownership/participant/action-specific guards; CSRF on mutations",
+      "endpoints": [
+        {"method": "GET", "path": "/api/cases/search", "purpose": "authenticated role-safe search", "mutation": false},
+        {"method": "POST", "path": "/api/cases", "purpose": "publish Matter and invoke existing posting behavior", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/cases/my", "purpose": "role-specific Matter lists with query projections", "mutation": false},
+        {"method": "GET", "path": "/api/cases/my-active", "purpose": "attorney open/active Matter choices", "mutation": false},
+        {"method": "GET", "path": "/api/cases/:caseId", "purpose": "authorized Matter/workspace projection", "mutation": false},
+        {"method": "PATCH", "path": "/api/cases/:caseId", "purpose": "eligible Matter/task update", "mutation": true, "csrf": true},
+        {"method": "DELETE", "path": "/api/cases/:caseId", "purpose": "delete never-engaged eligible Matter", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/cases/:caseId/status-history", "purpose": "Matter status history", "mutation": false},
+        {"method": "GET", "path": "/api/cases/:caseId/applicants", "purpose": "candidate projection", "mutation": false},
+        {"method": "GET", "path": "/api/cases/:caseId/invites", "purpose": "invitation projection", "mutation": false},
+        {"method": "POST", "path": "/api/cases/:caseId/invite/:paralegalId", "purpose": "directory invitation", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/cases/:caseId/invite", "purpose": "workspace/profile invitation compatibility path", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/cases/:caseId/invite/revoke", "purpose": "revoke pending/accepted invitation per current contract", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/cases/:caseId/applicants/:paralegalId/star", "purpose": "star/shortlist candidate", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/cases/:caseId/applicants/:paralegalId/reject", "purpose": "reject candidate", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/cases/:caseId/applications/:applicantId/preview", "purpose": "authorized application preview", "mutation": false},
+        {"method": "POST", "path": "/api/cases/:caseId/pre-engagement/:paralegalId/request", "purpose": "request pre-engagement answers", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/cases/:caseId/pre-engagement/review", "purpose": "approve or request changes with revision", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/cases/:caseId/hire/:paralegalId", "purpose": "claim hire and fund through existing backend", "mutation": true, "csrf": true, "moneyCritical": true},
+        {"method": "GET", "path": "/api/cases/:caseId/notes", "purpose": "attorney private Matter note", "mutation": false},
+        {"method": "PUT", "path": "/api/cases/:caseId/notes", "purpose": "save attorney private Matter note", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/cases/:caseId/flags/mark-resolved", "purpose": "attorney moderation resolution action", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/cases/:caseId/complete", "purpose": "complete eligible Matter", "mutation": true, "csrf": true, "moneyCritical": true},
+        {"method": "POST", "path": "/api/cases/:caseId/partial-payout", "purpose": "attorney withdrawal payout decision", "mutation": true, "csrf": true, "moneyCritical": true},
+        {"method": "POST", "path": "/api/cases/:caseId/reject-payout", "purpose": "reject withdrawal payout for review", "mutation": true, "csrf": true, "moneyCritical": true},
+        {"method": "POST", "path": "/api/cases/:caseId/relist", "purpose": "request eligible relist after withdrawal", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/cases/:caseId/stream", "purpose": "Matter lifecycle realtime stream", "mutation": false},
+        {"method": "GET", "path": "/api/cases/:caseId/archive/download", "purpose": "authorized archive download", "mutation": false}
+      ],
+      "requiredErrors": [400, 401, 403, 404, 409, 422, 429, 500, 503, "network", "unknown-outcome"],
+      "characterization": ["all exact statuses and aliases", "Case/Job mirror reconciliation", "ownership/access loss", "concurrency", "never auto-retry moneyCritical"]
+    },
+    {
+      "id": "applications",
+      "mount": "/api/applications",
+      "consumers": ["attorney-tabs.js"],
+      "guards": "verifyToken + requireApproved; attorney role for posting-owned views",
+      "endpoints": [
+        {"method": "GET", "path": "/api/applications/my-postings", "purpose": "applications for attorney-owned postings", "mutation": false},
+        {"method": "GET", "path": "/api/applications/for-job/:jobId", "purpose": "legacy attorney/admin Job application projection", "mutation": false}
+      ],
+      "requiredErrors": [401, 403, 404, 500, "needs_reconciliation", "network"],
+      "characterization": ["Application/Case.applicants equivalence", "historical status", "count movement"]
+    },
+    {
+      "id": "messages",
+      "mount": "/api/messages",
+      "consumers": ["attorney-tabs.js", "case-detail.js"],
+      "guards": "verifyToken + requireApproved + attorney/paralegal + Case access; CSRF on mutations",
+      "endpoints": [
+        {"method": "GET", "path": "/api/messages/unread-count", "purpose": "global unread badge", "mutation": false},
+        {"method": "GET", "path": "/api/messages/summary", "purpose": "Matter unread summary", "mutation": false},
+        {"method": "GET", "path": "/api/messages/threads", "purpose": "home recent thread projection", "mutation": false},
+        {"method": "GET", "path": "/api/messages/:caseId", "purpose": "authorized thread and last-viewed behavior", "mutation": false},
+        {"method": "POST", "path": "/api/messages/:caseId", "purpose": "send message", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/messages/:caseId/file", "purpose": "send file message", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/messages/:caseId/read", "purpose": "mark thread read", "mutation": true, "csrf": true},
+        {"method": "PATCH", "path": "/api/messages/:caseId/:messageId", "purpose": "edit authorized message", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/messages/:caseId/:messageId/react", "purpose": "add reaction", "mutation": true, "csrf": true},
+        {"method": "DELETE", "path": "/api/messages/:caseId/:messageId/react", "purpose": "remove reaction", "mutation": true, "csrf": true},
+        {"method": "DELETE", "path": "/api/messages/:caseId/:messageId", "purpose": "soft-delete authorized message", "mutation": true, "csrf": true}
+      ],
+      "requiredErrors": [400, 401, 403, 404, 409, 429, 500, "network"],
+      "characterization": ["unread predicate equivalence", "SSE/poll convergence", "presence and notification preference", "access revocation"]
+    },
+    {
+      "id": "files",
+      "mount": "/api/uploads and /api/cases/:caseId/files",
+      "consumers": ["case-detail.js", "attorney-tabs.js", "profile-paralegal.js", "profile-settings.js"],
+      "guards": "verifyToken + requireApproved + role + participant/owner; CSRF on mutations",
+      "endpoints": [
+        {"method": "POST", "path": "/api/uploads/profile-photo", "purpose": "profile photo upload", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/uploads/profile-photo/original", "purpose": "authorized photo editing source", "mutation": false},
+        {"method": "GET", "path": "/api/uploads/view", "purpose": "authorized inline view compatibility", "mutation": false},
+        {"method": "GET", "path": "/api/uploads/signed-get", "purpose": "authorized signed preview/download", "mutation": false},
+        {"method": "POST", "path": "/api/uploads/case/:caseId", "purpose": "upload Matter file", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/uploads/case/:caseId", "purpose": "Matter file projection", "mutation": false},
+        {"method": "DELETE", "path": "/api/uploads/case/:caseId/:fileId", "purpose": "delete authorized Matter file", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/uploads/case/:caseId/:fileId/security-status", "purpose": "scan status", "mutation": false},
+        {"method": "GET", "path": "/api/uploads/case/:caseId/:fileId/download", "purpose": "authorized file download", "mutation": false},
+        {"method": "POST", "path": "/api/cases/:caseId/files", "purpose": "legacy/embedded Case file upload path", "mutation": true, "csrf": true},
+        {"method": "GET", "path": "/api/cases/:caseId/files/signed-get", "purpose": "legacy signed file path", "mutation": false},
+        {"method": "PATCH", "path": "/api/cases/:caseId/files/:fileId/status", "purpose": "attorney approve/request-revision status", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/cases/:caseId/files/:fileId/revision-request", "purpose": "request file revision", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/cases/:caseId/files/:fileId/replace", "purpose": "replace file with lineage", "mutation": true, "csrf": true}
+      ],
+      "requiredErrors": [400, 401, 403, 404, 409, 413, 415, 422, 429, 500, "scan-pending", "scan-blocked", "scan-error", "network"],
+      "characterization": ["CaseFile/embedded mirror", "scanner callback race", "signed URL expiry", "no persistent attachment cache"]
+    },
+    {
+      "id": "payments",
+      "mount": "/api/payments",
+      "consumers": ["attorney-tabs.js", "billing-lite.js", "case-detail.js", "profile-paralegal.js", "profile-settings.js"],
+      "guards": "verifyToken + requireApproved; attorney role and Case participation/ownership per route; CSRF on mutations",
+      "endpoints": [
+        {"method": "GET", "path": "/api/payments/config", "purpose": "client-safe payment configuration", "mutation": false},
+        {"method": "GET", "path": "/api/payments/payment-method/default", "purpose": "default payment method state", "mutation": false},
+        {"method": "POST", "path": "/api/payments/payment-method/setup-intent", "purpose": "create SetupIntent", "mutation": true, "csrf": true, "moneyCritical": true},
+        {"method": "POST", "path": "/api/payments/payment-method/default", "purpose": "set default payment method", "mutation": true, "csrf": true, "moneyCritical": true},
+        {"method": "POST", "path": "/api/payments/portal", "purpose": "create safe billing portal session", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/payments/start-escrow", "purpose": "legacy/current escrow initiation contract", "mutation": true, "csrf": true, "moneyCritical": true},
+        {"method": "POST", "path": "/api/payments/intent/:caseId", "purpose": "funding intent", "mutation": true, "csrf": true, "moneyCritical": true},
+        {"method": "POST", "path": "/api/payments/confirm/:caseId", "purpose": "funding confirmation", "mutation": true, "csrf": true, "moneyCritical": true},
+        {"method": "POST", "path": "/api/payments/reconcile/:caseId", "purpose": "authorized funding reconciliation", "mutation": true, "csrf": true, "moneyCritical": true},
+        {"method": "PATCH", "path": "/api/payments/:caseId/budget", "purpose": "eligible budget update", "mutation": true, "csrf": true, "moneyCritical": true},
+        {"method": "GET", "path": "/api/payments/summary", "purpose": "authoritative role payment summary", "mutation": false},
+        {"method": "GET", "path": "/api/payments/escrow/active", "purpose": "attorney active escrow table", "mutation": false},
+        {"method": "GET", "path": "/api/payments/escrow/pending", "purpose": "attorney pending escrow projection", "mutation": false},
+        {"method": "GET", "path": "/api/payments/receipt/attorney/:caseId", "purpose": "attorney receipt", "mutation": false},
+        {"method": "GET", "path": "/api/payments/history", "purpose": "attorney payment history", "mutation": false},
+        {"method": "GET", "path": "/api/payments/export/csv", "purpose": "attorney receipt export", "mutation": false},
+        {"method": "GET", "path": "/api/payments/receipts", "purpose": "receipt listing compatibility", "mutation": false}
+      ],
+      "requiredErrors": [400, 401, 403, 404, 409, 422, 429, 500, 502, 503, "provider-timeout", "unknown-outcome", "needs_reconciliation", "network"],
+      "characterization": ["exact cents/currency", "test mode only", "duplicate return/webhook", "Case/Payout/PaymentOperation/ledger/receipt equivalence"]
+    },
+    {
+      "id": "private-checklist",
+      "mount": "/api/checklist",
+      "consumers": ["attorney-tabs.js"],
+      "guards": "verifyToken + requireApproved + attorney role; Case participation when associated; CSRF on mutations",
+      "endpoints": [
+        {"method": "GET", "path": "/api/checklist", "purpose": "private task list/overdue projection", "mutation": false},
+        {"method": "POST", "path": "/api/checklist", "purpose": "create private task", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/checklist/:id/toggle", "purpose": "toggle private task", "mutation": true, "csrf": true},
+        {"method": "DELETE", "path": "/api/checklist/:id", "purpose": "delete private task", "mutation": true, "csrf": true}
+      ],
+      "requiredErrors": [400, 401, 403, 404, 409, 500, "network"],
+      "characterization": ["attorney-private scope", "Case association", "distinction from embedded Case tasks"]
+    },
+    {
+      "id": "events-deadlines",
+      "mount": "/api/events",
+      "consumers": ["scoped lifecycle behavior; current V1 may receive projections through other endpoints"],
+      "guards": "verifyToken + requireApproved + allowed role; Case participation where scoped; CSRF on mutations",
+      "endpoints": [
+        {"method": "GET", "path": "/api/events", "purpose": "authorized event/deadline list", "mutation": false},
+        {"method": "POST", "path": "/api/events", "purpose": "create event/deadline", "mutation": true, "csrf": true},
+        {"method": "PATCH", "path": "/api/events/:id", "purpose": "update event", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/events/:id/attendees", "purpose": "attendee response", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/events/:id/reminders", "purpose": "event reminder", "mutation": true, "csrf": true},
+        {"method": "DELETE", "path": "/api/events/:id", "purpose": "delete authorized event", "mutation": true, "csrf": true}
+      ],
+      "requiredErrors": [400, 401, 403, 404, 409, 500, "network"],
+      "characterization": ["Case deadline vs legacy deadline vs Event", "role visibility", "timezone/date-only"]
+    },
+    {
+      "id": "notifications",
+      "mount": "/api/notifications",
+      "consumers": ["notifications.js", "create-case.html", "case-detail.js"],
+      "guards": "verifyToken + requireApproved",
+      "endpoints": [
+        {"method": "GET", "path": "/api/notifications", "purpose": "notification list", "mutation": false},
+        {"method": "GET", "path": "/api/notifications/unread-count", "purpose": "unread count", "mutation": false},
+        {"method": "GET", "path": "/api/notifications/stream", "purpose": "notification SSE", "mutation": false},
+        {"method": "POST", "path": "/api/notifications/:id/read", "purpose": "mark read", "mutation": true, "csrf": "current route contract"},
+        {"method": "POST", "path": "/api/notifications/read-all", "purpose": "mark all read", "mutation": true, "csrf": "current route contract"},
+        {"method": "DELETE", "path": "/api/notifications", "purpose": "clear notifications", "mutation": true, "csrf": "current route contract"},
+        {"method": "DELETE", "path": "/api/notifications/:id", "purpose": "dismiss notification", "mutation": true, "csrf": "current route contract"},
+        {"method": "POST", "path": "/api/notifications/workspace-presence", "purpose": "presence heartbeat", "mutation": true, "csrf": "current route contract"},
+        {"method": "DELETE", "path": "/api/notifications/workspace-presence", "purpose": "clear presence", "mutation": true, "csrf": "current route contract"}
+      ],
+      "requiredErrors": [401, 403, 404, 409, 429, 500, "stream-disconnect", "network"],
+      "characterization": ["two tabs", "more than 100 unread", "stale action sanitization", "SSE/poll fallback"]
+    },
+    {
+      "id": "blocks",
+      "mount": "/api/blocks",
+      "consumers": ["attorney-tabs.js", "profile-settings.js"],
+      "guards": "verifyToken + requireApproved; qualifying relationship/action rules on mutation",
+      "endpoints": [
+        {"method": "GET", "path": "/api/blocks", "purpose": "active blocks", "mutation": false},
+        {"method": "POST", "path": "/api/blocks", "purpose": "create qualifying future-interaction block", "mutation": true, "csrf": "current route contract"},
+        {"method": "DELETE", "path": "/api/blocks/:blockedId", "purpose": "remove own block", "mutation": true, "csrf": "current route contract"}
+      ],
+      "requiredErrors": [400, 401, 403, 404, 409, 500, "network"],
+      "characterization": ["canonical Block vs legacy blockedUsers", "discovery/profile/message suppression", "multi-tab"]
+    },
+    {
+      "id": "disputes",
+      "mount": "/api/disputes",
+      "consumers": ["case-detail.js"],
+      "guards": "verifyToken + requireApproved + Case participant; action-specific role; CSRF on mutations",
+      "endpoints": [
+        {"method": "GET", "path": "/api/disputes/:caseId", "purpose": "authorized Matter dispute", "mutation": false},
+        {"method": "POST", "path": "/api/disputes/:caseId", "purpose": "open dispute", "mutation": true, "csrf": true, "moneyCritical": true},
+        {"method": "POST", "path": "/api/disputes/:caseId/:disputeId/comment", "purpose": "participant comment", "mutation": true, "csrf": true}
+      ],
+      "requiredErrors": [400, 401, 403, 404, 409, 422, 500, "needs_reconciliation", "network"],
+      "characterization": ["completion/withdrawal race", "access revocation", "admin settlement projection", "Stripe chargeback distinction"]
+    },
+    {
+      "id": "assistant-support",
+      "mount": "/api/support",
+      "consumers": ["support-drawer.js"],
+      "guards": "verifyToken + requireApproved + attorney/paralegal/admin; CSRF on mutations",
+      "endpoints": [
+        {"method": "GET", "path": "/api/support/conversation", "purpose": "load/create current support context per existing contract", "mutation": false},
+        {"method": "GET", "path": "/api/support/conversation/:id/events", "purpose": "Assistant live updates", "mutation": false},
+        {"method": "GET", "path": "/api/support/conversation/:id/messages", "purpose": "Assistant thread", "mutation": false},
+        {"method": "POST", "path": "/api/support/conversation/:id/messages", "purpose": "send support message", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/support/conversation/:id/messages/:messageId/feedback", "purpose": "rate response", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/support/conversation/:id/restart", "purpose": "restart conversation", "mutation": true, "csrf": true},
+        {"method": "POST", "path": "/api/support/conversation/:id/escalate", "purpose": "request human escalation", "mutation": true, "csrf": true}
+      ],
+      "requiredErrors": [400, 401, 403, 404, 409, 429, 500, "stream-disconnect", "network"],
+      "characterization": ["server-authorized evidence", "withdrawn boundary", "safe navigation", "privacy/retention", "ticket state"]
+    },
+    {
+      "id": "candidate-presentation",
+      "mount": "/api/paralegals and /api/public/paralegals",
+      "consumers": ["browse-paralegals.js", "profile-paralegal.js"],
+      "guards": "public presentation policy or authenticated field/action gates",
+      "endpoints": [
+        {"method": "GET", "path": "/api/paralegals/:paralegalId", "purpose": "authenticated candidate profile", "mutation": false},
+        {"method": "GET", "path": "/api/public/paralegals/:paralegalId", "purpose": "public fallback profile", "mutation": false},
+        {"method": "GET", "path": "/api/users/paralegals", "purpose": "authenticated directory compatibility", "mutation": false}
+      ],
+      "requiredErrors": [400, 401, 403, 404, 429, 500, "blocked", "network"],
+      "characterization": ["public/private field boundary", "photo readiness", "blocked profile", "pagination/filter aliases"]
+    },
+    {
+      "id": "incident-intake",
+      "mount": "/api/incidents",
+      "consumers": ["help-incident-intake.js"],
+      "guards": "current incident-intake and CSRF contract",
+      "endpoints": [
+        {"method": "POST", "path": "/api/incidents", "purpose": "attorney help issue report", "mutation": true, "csrf": true}
+      ],
+      "requiredErrors": [400, 401, 403, 413, 429, 500, "network"],
+      "characterization": ["no confidential data leakage", "attachment/description limits", "confirmation and retry"]
+    }
+  ],
+  "knownCompatibilityDependencies": [
+    "Case and Job dual records",
+    "Application and Case.applicants mirrors",
+    "identity, profile, state, practice-area and status aliases",
+    "legacy Case and upload file paths",
+    "in progress and in_progress",
+    "multiple unread projections",
+    "mountain and mountain-dark account preferences",
+    "legacy redirects and query/hash parameters"
+  ]
+}

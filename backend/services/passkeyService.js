@@ -3,6 +3,8 @@ const AuthChallenge = require("../models/AuthChallenge");
 const PasskeyCredential = require("../models/PasskeyCredential");
 const { newChallengeId } = require("./mfaService");
 const webAuthn = require("@simplewebauthn/server");
+const { AccountWriteError } = require("../utils/accountWriteGuard");
+const { withActiveAccountWrite } = require("../utils/activeAccountWrite");
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 
@@ -20,11 +22,14 @@ function relyingParty(req) {
   };
 }
 
-async function replaceActiveChallenge({ userId = null, purpose, challenge, metadata = {} }) {
+async function replaceActiveChallenge({ userId = null, purpose, challenge, metadata = {}, session = null }) {
+  if (userId && !session) return withActiveAccountWrite([userId], activeSession =>
+    replaceActiveChallenge({ userId, purpose, challenge, metadata, session: activeSession }), { requireApproved: false });
   if (userId) {
     await AuthChallenge.updateMany(
       { userId, purpose, consumedAt: null },
-      { $set: { consumedAt: new Date() } }
+      { $set: { consumedAt: new Date() } },
+      ...(session ? [{ session }] : [])
     );
   } else if (purpose === "passkey_authentication") {
     await AuthChallenge.deleteMany({
@@ -34,18 +39,20 @@ async function replaceActiveChallenge({ userId = null, purpose, challenge, metad
     });
   }
   const challengeId = newChallengeId();
-  await AuthChallenge.create({
+  const record = {
     challengeId,
     userId,
     purpose,
     challenge,
     metadata,
     expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS),
-  });
+  };
+  if (session) await AuthChallenge.create([record], { session });
+  else await AuthChallenge.create(record);
   return challengeId;
 }
 
-async function claimChallenge({ challengeId, purpose, userId = null }) {
+async function claimChallenge({ challengeId, purpose, userId = null, session = null }) {
   const filter = {
     challengeId: String(challengeId || ""),
     purpose,
@@ -56,12 +63,12 @@ async function claimChallenge({ challengeId, purpose, userId = null }) {
   const claimed = await AuthChallenge.findOneAndUpdate(
     filter,
     { $set: { consumedAt: new Date() } },
-    { returnDocument: "before" }
+    { returnDocument: "before", ...(session ? { session } : {}) }
   ).select("+challenge +metadata");
   return claimed;
 }
 
-async function registrationOptions(req, user) {
+async function registrationOptions(req, user, { session = null, securityContext } = {}) {
   const { generateRegistrationOptions } = webAuthn;
   const rp = relyingParty(req);
   const credentials = await PasskeyCredential.find({ userId: user._id }).select("credentialId transports").lean();
@@ -83,15 +90,22 @@ async function registrationOptions(req, user) {
     userId: user._id,
     purpose: "passkey_registration",
     challenge: options.challenge,
-    metadata: rp,
+    metadata: { ...rp, ...(securityContext ? { securityContext } : {}) },
+    session,
   });
   return { challengeId, options };
 }
 
-async function verifyRegistration(req, user, { challengeId, response, name }) {
+async function verifyRegistration(req, user, { challengeId, response, name, session = null, securityContext }) {
   const { verifyRegistrationResponse } = webAuthn;
-  const challenge = await claimChallenge({ challengeId, purpose: "passkey_registration", userId: user._id });
+  const challenge = await claimChallenge({ challengeId, purpose: "passkey_registration", userId: user._id, session });
   if (!challenge) throw new Error("Passkey setup expired. Start again.");
+  const bound = challenge.metadata?.securityContext;
+  if (bound || securityContext) {
+    if (!bound || !securityContext || bound.sessionId !== securityContext.sessionId || bound.securityRevision !== securityContext.securityRevision) {
+      throw new AccountWriteError(409, "ACCOUNT_CONFLICT", "Passkey setup belongs to an earlier security review. Start again.");
+    }
+  }
   const rp = challenge.metadata || relyingParty(req);
   const verification = await verifyRegistrationResponse({
     response,
@@ -102,7 +116,7 @@ async function verifyRegistration(req, user, { challengeId, response, name }) {
   });
   if (!verification.verified || !verification.registrationInfo) throw new Error("Passkey verification failed.");
   const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
-  const saved = await PasskeyCredential.create({
+  const record = {
     userId: user._id,
     credentialId: credential.id,
     publicKey: Buffer.from(credential.publicKey),
@@ -111,7 +125,8 @@ async function verifyRegistration(req, user, { challengeId, response, name }) {
     deviceType: credentialDeviceType,
     backedUp: credentialBackedUp,
     name: String(name || "Passkey").trim().slice(0, 80) || "Passkey",
-  });
+  };
+  const saved = session ? (await PasskeyCredential.create([record], { session }))[0] : await PasskeyCredential.create(record);
   return saved;
 }
 

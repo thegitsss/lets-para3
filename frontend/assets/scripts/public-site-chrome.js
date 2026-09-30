@@ -7,13 +7,13 @@
         <a class="home-brand" href="/index.html" aria-label="Let’s-ParaConnect home">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</a>
         <nav class="home-nav home-nav--desktop" aria-label="Primary navigation">
           <a href="/index.html#how">How It Works</a>
-          <a href="/index.html#for-attorneys">For Attorneys</a>
-          <a href="/index.html#for-paralegals">For Paralegals</a>
+          <a href="/attorney-faq.html">For Attorneys</a>
+          <a href="/paralegal-faq.html">For Paralegals</a>
           <a href="/browse-paralegals.html">Browse Paralegals</a>
         </nav>
         <div class="home-header__actions">
-          <a class="header-signin" href="/login.html" data-auth-action data-public-action="text">Sign In</a>
-          <button class="header-signout" type="button" data-logout-action data-public-action="text" hidden>Log Out</button>
+          <a class="header-signin" href="/login.html" data-auth-action data-public-action="text">Sign in</a>
+          <button class="header-signout" type="button" data-logout-action data-public-action="text" hidden>Sign out</button>
           <a class="button button--small button--ink" href="/signup.html" data-signup-action data-public-action="primary" data-action-shape="pill" data-action-size="compact">Create an account</a>
           <button class="mobile-nav-toggle" type="button" aria-expanded="false" aria-controls="mobileNav" aria-label="Open navigation" data-mobile-nav-toggle data-public-action="icon"><span aria-hidden="true"></span><span aria-hidden="true"></span></button>
         </div>
@@ -21,13 +21,13 @@
       <div class="mobile-nav" id="mobileNav" aria-hidden="true" data-mobile-nav>
         <nav aria-label="Mobile navigation">
           <a href="/index.html#how">How It Works</a>
-          <a href="/index.html#for-attorneys">For Attorneys</a>
-          <a href="/index.html#for-paralegals">For Paralegals</a>
+          <a href="/attorney-faq.html">For Attorneys</a>
+          <a href="/paralegal-faq.html">For Paralegals</a>
           <a href="/browse-paralegals.html">Browse Paralegals</a>
         </nav>
         <div class="mobile-nav__actions">
-          <a href="/login.html" data-auth-action data-public-action="text">Sign In</a>
-          <button type="button" data-logout-action data-public-action="text" hidden>Log Out</button>
+          <a href="/login.html" data-auth-action data-public-action="text">Sign in</a>
+          <button type="button" data-logout-action data-public-action="text" hidden>Sign out</button>
           <a class="button button--ink" href="/signup.html" data-signup-action data-public-action="primary" data-action-shape="pill">Create an account</a>
         </div>
       </div>
@@ -38,14 +38,16 @@
       <div class="home-footer__inner">
         <p class="home-footer__statement"><span>Legal work.</span><span>Clearly connected.</span></p>
         <nav class="home-footer__directory" aria-label="Footer navigation">
-          <details open><summary>Platform</summary><div class="home-footer__links"><a href="/index.html#how">How It Works</a><a href="/index.html#for-attorneys">For Attorneys</a><a href="/index.html#for-paralegals">For Paralegals</a><a href="/browse-paralegals.html">Browse Paralegals</a></div></details>
+          <details open><summary>Platform</summary><div class="home-footer__links"><a href="/index.html#how">How It Works</a><a href="/attorney-faq.html">For Attorneys</a><a href="/paralegal-faq.html">For Paralegals</a><a href="/browse-paralegals.html">Browse Paralegals</a></div></details>
           <details open><summary>For Attorneys</summary><div class="home-footer__links"><a href="/signup.html?role=attorney">Post a Matter</a><a href="/attorney-faq.html">Attorney FAQ</a><a href="/contact.html">Contact</a></div></details>
-          <details open><summary>For Paralegals</summary><div class="home-footer__links"><a href="/signup.html?role=paralegal">Apply to Join</a><a href="/paralegal-faq.html">Paralegal FAQ</a><a href="/paralegal-admission.html">Our Vetting Process</a></div></details>
+          <details open><summary>For Paralegals</summary><div class="home-footer__links"><a href="/signup.html?role=paralegal">Apply to Join</a><a href="/paralegal-faq.html">Paralegal FAQ</a><a href="/paralegal-admission.html">Our Application Review</a></div></details>
           <details open><summary>Legal</summary><div class="home-footer__links"><a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a><a href="/accessibility.html">Accessibility</a></div></details>
         </nav>
         <div class="home-footer__bottom">
-          <a class="home-footer__brand" href="/index.html" aria-label="Let’s-ParaConnect home">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</a>
-          <p>Copyright © 2026 Let’s-ParaConnect. All rights reserved.</p>
+          <div class="home-footer__identity">
+            <a class="home-footer__brand" href="/index.html" aria-label="Let’s-ParaConnect home">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+            <p>Copyright © 2026 Let’s-ParaConnect. All rights reserved.</p>
+          </div>
           <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode" data-public-action="icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z"></path></svg><span>Accessibility</span></button>
         </div>
       </div>
@@ -79,11 +81,11 @@
     setMenu(false);
     toggle.focus();
   });
-  window.addEventListener("resize", () => { if (window.innerWidth > 960) setMenu(false); });
+  window.addEventListener("resize", () => { if (window.innerWidth > 1100) setMenu(false); });
   window.addEventListener("scroll", () => header?.classList.toggle("is-scrolled", window.scrollY > 24), { passive: true });
   setMenu(false);
 
-  const footerMedia = window.matchMedia("(max-width: 734px)");
+  const footerMedia = window.matchMedia("(max-width: 900px)");
   const syncFooter = () => document.querySelectorAll(".home-footer__directory details").forEach((item) => { item.open = !footerMedia.matches; });
   syncFooter();
   footerMedia.addEventListener?.("change", syncFooter);
@@ -108,7 +110,7 @@
       user = null;
     }
     const dashboard = dashboardFor(user);
-    document.querySelectorAll("[data-auth-action]").forEach((link) => { link.textContent = dashboard ? "Dashboard" : "Sign In"; link.href = dashboard || "/login.html"; });
+    document.querySelectorAll("[data-auth-action]").forEach((link) => { link.textContent = dashboard ? "Dashboard" : "Sign in"; link.href = dashboard || "/login.html"; });
     document.querySelectorAll("[data-signup-action]").forEach((link) => { link.hidden = Boolean(dashboard); });
     document.querySelectorAll("[data-logout-action]").forEach((button) => { button.hidden = !dashboard; });
   };
@@ -122,7 +124,7 @@
       if (!loggedOut) throw new Error("Logout was not confirmed.");
     } catch {
       button.disabled = false;
-      button.textContent = "Try Log Out Again";
+      button.textContent = "Try signing out again";
     }
   }));
 })();

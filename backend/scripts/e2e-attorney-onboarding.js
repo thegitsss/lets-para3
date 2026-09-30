@@ -3,6 +3,7 @@ const http = require("http");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const { launchPuppeteer } = require("./puppeteerBrowser");
+const { installWorkspaceReads } = require("./e2e-workspace-fixture");
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -11,8 +12,8 @@ function wait(ms) {
 function createState() {
   return {
     user: {
-      id: "attorney-1",
-      _id: "attorney-1",
+      id: "507f1f77bcf86cd799439011",
+      _id: "507f1f77bcf86cd799439011",
       role: "attorney",
       status: "approved",
       firstName: "Ava",
@@ -42,10 +43,10 @@ function buildCase(id) {
     details: "Prepare intake packet and supporting declarations.",
     status: "in progress",
     state: "CA",
-    attorney: "attorney-1",
-    attorneyId: "attorney-1",
-    paralegal: "paralegal-1",
-    paralegalId: "paralegal-1",
+    attorney: "507f1f77bcf86cd799439011",
+    attorneyId: "507f1f77bcf86cd799439011",
+    paralegal: "507f191e810c19729de860ea",
+    paralegalId: "507f191e810c19729de860ea",
     escrowStatus: "funded",
     totalAmount: 40000,
     lockedTotalAmount: 40000,
@@ -65,7 +66,8 @@ async function startStubServer() {
 
   app.use(cookieParser());
   app.use(express.json({ limit: "2mb" }));
-  app.get("/assets/vendor/simplewebauthn.js", (_req, res) => {
+  installWorkspaceReads(app, () => state.user, () => state.cases);
+  app.get("/assets/vendor/simplewebauthn-13.3.0.js", (_req, res) => {
     res.type("application/javascript");
     res.sendFile(path.join(
       __dirname,
@@ -173,7 +175,7 @@ async function startStubServer() {
     const found = [...state.cases, ...state.archivedCases].find(
       (item) => String(item.id || item._id) === caseId
     );
-    return res.json(found || buildCase(caseId || "case-1"));
+    return res.json(found || buildCase(caseId || "507f1f77bcf86cd799439022"));
   });
   app.get("/api/cases/:caseId/stream", (_req, res) => openSse(res));
 
@@ -186,17 +188,18 @@ async function startStubServer() {
   });
 
   app.get("/api/payments/payment-method/default", (_req, res) => {
-    return res.json({ paymentMethod: state.paymentMethod });
+    return res.json({ hasDefault: Boolean(state.paymentMethod), paymentMethod: state.paymentMethod });
   });
 
   app.post("/api/payments/payment-method/default", (req, res) => {
     const paymentMethodId = String(req.body?.paymentMethodId || "pm_test_123");
     state.paymentMethod = {
       id: paymentMethodId,
+      type: "card",
       brand: "visa",
       last4: "4242",
-      expMonth: 12,
-      expYear: 2030,
+      exp_month: 12,
+      exp_year: 2030,
     };
     return res.json({ ok: true, paymentMethod: state.paymentMethod });
   });
@@ -240,7 +243,7 @@ async function startStubServer() {
   app.use("/api", (_req, res) => res.json({}));
 
   const server = http.createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
+  await new Promise((resolve) => server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, resolve));
   const { port } = server.address();
   return { server, port, state };
 }
@@ -346,10 +349,11 @@ async function validateOnboardingFlow(page, baseUrl) {
   await setTestState(baseUrl, {
     paymentMethod: {
       id: "pm_123",
+      type: "card",
       brand: "visa",
       last4: "4242",
-      expMonth: 12,
-      expYear: 2030,
+      exp_month: 12,
+      exp_year: 2030,
     },
   });
 
@@ -370,14 +374,14 @@ async function validateOnboardingFlow(page, baseUrl) {
   );
 
   await setTestState(baseUrl, {
-    cases: [buildCase("case-1")],
+    cases: [buildCase("507f1f77bcf86cd799439022")],
   });
 }
 
 async function validateCaseDetailResponsiveLayout(page, baseUrl) {
   await page.setJavaScriptEnabled(false);
   await page.setViewport({ width: 1000, height: 900 });
-  await page.goto(`${baseUrl}/case-detail.html?caseId=case-1`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseUrl}/case-detail.html?caseId=507f1f77bcf86cd799439022`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".case-workspace", { timeout: 10_000 });
 
   const medium = await page.evaluate(() => {
@@ -440,7 +444,7 @@ async function validateCaseDetailResponsiveLayout(page, baseUrl) {
   }
 
   await page.setViewport({ width: 850, height: 900 });
-  await page.goto(`${baseUrl}/case-detail.html?caseId=case-1`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseUrl}/case-detail.html?caseId=507f1f77bcf86cd799439022`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".case-workspace", { timeout: 10_000 });
 
   const small = await page.evaluate(() => {
@@ -449,8 +453,8 @@ async function validateCaseDetailResponsiveLayout(page, baseUrl) {
     const overview = document.querySelector('[data-matter-panel="overview"]');
     const tabs = document.querySelector(".matter-tabs");
     const firstTab = tabs?.querySelector("button");
-    const matterSelect = document.querySelector("#case-select");
-    if (!workspace || !stage || !overview || !tabs || !firstTab || !matterSelect) return null;
+    const matterTitle = document.querySelector("#caseTitle");
+    if (!workspace || !stage || !overview || !tabs || !firstTab || !matterTitle) return null;
     const hasHorizontalOverflow =
       document.documentElement.scrollWidth > window.innerWidth + 1;
     return {
@@ -458,7 +462,8 @@ async function validateCaseDetailResponsiveLayout(page, baseUrl) {
       stageHeight: stage.getBoundingClientRect().height,
       overviewHeight: overview.getBoundingClientRect().height,
       tabHeight: firstTab.getBoundingClientRect().height,
-      selectHeight: matterSelect.getBoundingClientRect().height,
+      titleHeight: matterTitle.getBoundingClientRect().height,
+      titleContained: matterTitle.getBoundingClientRect().right <= window.innerWidth + 1,
       tabStripContained: tabs.getBoundingClientRect().right <= window.innerWidth + 1,
       hasHorizontalOverflow,
     };
@@ -475,7 +480,8 @@ async function validateCaseDetailResponsiveLayout(page, baseUrl) {
     small.stageHeight <= 0 ||
     small.overviewHeight <= 0 ||
     small.tabHeight < 44 ||
-    small.selectHeight < 44 ||
+    small.titleHeight <= 0 ||
+    !small.titleContained ||
     !small.tabStripContained ||
     small.hasHorizontalOverflow
   ) {
@@ -486,7 +492,7 @@ async function validateCaseDetailResponsiveLayout(page, baseUrl) {
 
 async function run() {
   const { server, port } = await startStubServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
   const browser = await launchPuppeteer({
     headless: "new",
@@ -568,8 +574,8 @@ async function run() {
       sessionStorage.removeItem("lpc_attorney_tour_step");
       sessionStorage.removeItem("lpc_attorney_onboarding_step");
     }, {
-      id: "attorney-1",
-      _id: "attorney-1",
+      id: "507f1f77bcf86cd799439011",
+      _id: "507f1f77bcf86cd799439011",
       firstName: "Ava",
       lastName: "Stone",
       role: "attorney",

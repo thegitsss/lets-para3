@@ -12,6 +12,7 @@ This index separates current launch authority from retained historical work. A h
 
 ## Current product and operating policy
 
+- `LAUNCH_COMPLETION_PLAN.md`: execution index for finishing the full intended product in integrated workflow groups, with acceptance criteria and evidence states; does not replace launch authority.
 - `LPC_PRODUCT_NORTH_STAR.md`: product and interaction principles.
 - `LPC_AI_OPERATING_MANUAL.md`: current AI/operator capability boundaries.
 - `LPC_ADMIN_DASHBOARD_GAP_AUDIT.md`: current admin and Control Room resolution record.

@@ -142,7 +142,7 @@ function startStubServer() {
 
   const server = http.createServer(app);
   return new Promise((resolve) => {
-    server.listen(0, () => {
+    server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, () => {
       const { port } = server.address();
       resolve({ server, port });
     });
@@ -172,7 +172,7 @@ async function login(page, baseUrl, { email, password }) {
 
 async function run() {
   const { server, port } = await startStubServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
   const browser = await launchPuppeteer({
     headless: "new",

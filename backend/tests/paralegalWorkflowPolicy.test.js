@@ -13,7 +13,15 @@ const {
   evaluateWorkspaceAccess,
 } = require("../services/paralegalWorkflowPolicy");
 
-const paralegal = { _id: "para-1", role: "paralegal", status: "approved" };
+const paralegal = {
+  _id: "para-1",
+  role: "paralegal",
+  status: "approved",
+  profileImage: "https://example.test/profile.jpg",
+  stripeAccountId: "acct_synthetic",
+  stripeOnboarded: true,
+  stripePayoutsEnabled: true,
+};
 
 describe("paralegal workflow policy", () => {
   test("allows an approved paralegal to apply only to an open unassigned matter", () => {
@@ -27,24 +35,19 @@ describe("paralegal workflow policy", () => {
       caseDoc: { status: "in progress", paralegalId: "para-2" },
       alreadyApplied: true,
     }).blockers).toEqual(expect.arrayContaining([
-      "open_matter_required",
-      "matter_already_assigned",
-      "application_already_exists",
+      "applications_closed",
+      "paralegal_already_assigned",
+      "duplicate_application",
     ]));
   });
 
-  test("preserves the mutation-route application contract through the shared policy", () => {
+  test("uses the canonical user and Matter contract for application eligibility", () => {
     expect(evaluateApplicationEligibility({
-      attorneyPaymentMethodSaved: true,
-      applicantApproved: true,
+      user: paralegal,
+      caseDoc: { status: "open" },
+      job: { status: "open" },
       partiesBlocked: false,
-      caseStatus: "open",
-      jobStatus: "open",
-      archived: false,
-      paralegalAssigned: false,
       duplicateApplication: false,
-      profilePhotoReady: true,
-      payoutSetupReady: true,
     })).toMatchObject({ ready: true, allowed: true, blockers: [] });
   });
 

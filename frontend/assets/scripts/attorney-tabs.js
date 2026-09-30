@@ -1,10 +1,25 @@
+import { createLegacyAttorneyHome } from "./legacy-attorney-home.mjs";
+import { createHiring } from "./attorney-v2/hiring.mjs";
+import { createPreEngagement } from "./attorney-v2/pre-engagement.mjs";
+import { createMatterApplications } from "./attorney-v2/matter-applications.mjs";
+import { createMatterExport, createMatterExportBatch } from "./attorney-v2/matter-exports.mjs";
+import { createMatterArchive } from "./attorney-v2/matter-archive.mjs";
+import { createMatterDownloads } from "./attorney-v2/matter-downloads.mjs";
+import { createMatterReceipt } from "./attorney-v2/matter-receipts.mjs";
+import { createMatterInvitations } from "./attorney-v2/matter-invitations.mjs";
+import { createMatterModeration } from "./attorney-v2/matter-moderation.mjs";
+import { createMatterNotes } from "./attorney-v2/matter-notes.mjs";
+import { createApiClient } from "./attorney-v2/api-client.mjs";
+import { createPrivateState } from "./attorney-v2/private-state.mjs";
+import { classifySession } from "./attorney-v2/session-boundary.mjs";
 import { secureFetch, loadUserHeaderInfo } from "./auth.js";
 import { scanNotificationCenters } from "./utils/notifications.js";
-import { initCaseFilesView } from "./case-files-view.js";
-import { mountDashboardSavedViews } from "./dashboard-saved-views.js";
+import { mountAttorneySavedViews } from "./attorney-v2/saved-views.mjs";
 import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
 import { confirmAction, showAlert } from "./utils/dialogs.js";
-import { normalizeHttpNavigationUrl, normalizeSameOriginPath } from "./utils/navigation-url.js";
+import { normalizeHttpNavigationUrl } from "./utils/navigation-url.js";
+import { createCurrentDraftInventory } from "./utils/current-draft-inventory.mjs";
+import { safeCurrentMatterReturn } from "./attorney-v2/matter-return.mjs";
 
 const PAGE_ID = window.__ATTORNEY_PAGE__ || "overview";
 const ROLE_SPEC = window.__TAB_ROLE__;
@@ -21,8 +36,6 @@ const HEADER_ONLY_ROUTES = {
 };
 const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
 const CASE_VIEW_FILTERS = ["active", "draft", "archived", "inquiries"];
-const PLATFORM_FEE_PCT = 22;
-const HOME_RECENT_MATTERS_LIMIT = 3;
 const CASE_PAGE_SIZE = 15;
 const ESCROW_PAGE_SIZE = 5;
 const CASE_POSTED_STORAGE_KEY = "lpc_case_posted_notice";
@@ -47,13 +60,8 @@ function getProfileImageUrl(user = {}) {
 const INVITE_AVATAR_FALLBACK = PARALEGAL_AVATAR_FALLBACK;
 
 const overviewSignals = {
-  unreadCount: 0,
-  unfundedCount: 0,
-  casesCreatedCount: 0,
-  completedCasesCount: 0,
-  pendingReviewCount: 0,
-  overdueCount: 0,
-  applicationsCount: 0,
+  casesCreatedCount: null,
+  overdueCount: null,
 };
 
 const state = {
@@ -103,6 +111,10 @@ const state = {
   },
   localDrafts: [],
 };
+let legacyHome = null;
+let homeAttentionRefreshDeferred = false;
+let currentDraftInventory = null;
+let currentMatterInventory = null;
 
 const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
 const ATTORNEY_ONBOARDING_MODAL_SEEN_KEY = "lpc_attorney_onboarding_modal_seen_case";
@@ -161,7 +173,6 @@ let openCaseMenu = null;
 let openCaseMenuTrigger = null;
 let caseMenuKeydownBound = false;
 let matterSavedViews = null;
-let applicationsActionsBound = false;
 let homeTabsBound = false;
 let headerDocListenersBound = false;
 const applicantDrawerCache = new Map();
@@ -173,8 +184,14 @@ let applicantReturnOpening = false;
 const caseApplicationCounts = new Map();
 let applicationsCache = [];
 let applicationsPromise = null;
+let applicationsReadEpoch = 0;
+let applicationParentController = null;
+let applicationParentPromise = null;
 let notificationAutoRefreshBound = false;
 let applicantAutoRefreshTimer = null;
+let applicantAutoRefreshEpoch = 0;
+const applicationRefreshInputs = new Set();
+let pendingApplicationParentStatus = null;
 let overviewPollingBound = false;
 const applicantDrawerRequests = new Map();
 
@@ -194,9 +211,6 @@ const dashboardViewState = {
   tasksInitPromise: null,
   billingInitialized: false,
   billingInitPromise: null,
-  caseTabsBound: false,
-  caseFilesPromise: null,
-  caseFilesReady: false,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -230,6 +244,7 @@ async function bootAttorneyExperience() {
   }
 
   const user = sessionUser;
+  weeklyNoteOwnerId = String(user.id || user._id || "");
   await loadUserHeaderInfo();
   applyRoleVisibility(user);
   if (!state.user) {
@@ -294,23 +309,69 @@ async function bootstrap() {
 function bindNotificationAutoRefresh() {
   if (notificationAutoRefreshBound) return;
   notificationAutoRefreshBound = true;
+  // A background response can arrive after the pointer moves onto a menu button,
+  // before its press or click. Keep that target in place through activation.
+  const finishInput = key => window.setTimeout(() => {
+    applicationRefreshInputs.delete(key);
+    flushApplicationParentStatus();
+  }, 0);
+  const menuTrigger = target => target?.closest?.('[data-cases-wrapper] [data-case-menu-trigger]');
+  document.addEventListener('pointermove', event => {
+    if (menuTrigger(event.target)) applicationRefreshInputs.add(`hover:${event.pointerId}`);
+  }, true);
+  document.addEventListener('pointerout', event => {
+    const trigger = menuTrigger(event.target);
+    if (trigger && trigger !== menuTrigger(event.relatedTarget)) {
+      applicationRefreshInputs.delete(`hover:${event.pointerId}`);
+      flushApplicationParentStatus();
+    }
+  }, true);
+  document.addEventListener('pointercancel', event => {
+    applicationRefreshInputs.delete(`hover:${event.pointerId}`);
+  }, true);
+  // Run after the table's delegated click handler has opened the menu. A
+  // pointer-up timer alone can run before that click reaches the document.
+  document.addEventListener('click', () => {
+    for (const key of applicationRefreshInputs) {
+      if (key.startsWith('hover:')) applicationRefreshInputs.delete(key);
+    }
+    flushApplicationParentStatus();
+  });
+  document.addEventListener('pointerdown', event => {
+    if (event.target.closest('[data-cases-wrapper]')) applicationRefreshInputs.add(`pointer:${event.pointerId}`);
+  }, true);
+  for (const type of ['pointerup', 'pointercancel']) document.addEventListener(type, event => finishInput(`pointer:${event.pointerId}`), true);
+  document.addEventListener('keydown', event => {
+    if (['Enter', ' '].includes(event.key) && event.target.closest('[data-cases-wrapper]')) applicationRefreshInputs.add(`key:${event.key}`);
+  }, true);
+  document.addEventListener('keyup', event => finishInput(`key:${event.key}`), true);
+  window.addEventListener('blur', () => { applicationRefreshInputs.clear(); flushApplicationParentStatus(); });
   window.addEventListener("lpc:notifications-refreshed", (event) => {
     const types = event?.detail?.types;
     if (!Array.isArray(types) || !types.length) return;
     const lowerTypes = new Set(types.map((type) => String(type || "").toLowerCase()));
     if (!lowerTypes.has("application_submitted") && !lowerTypes.has("pre_engagement_submitted")) return;
-    if (applicantReturnContext) return;
     if (applicantAutoRefreshTimer) return;
-    applicantAutoRefreshTimer = window.setTimeout(async () => {
-      applicantAutoRefreshTimer = null;
-      if (applicantReturnContext) return;
+    const ticket = ++applicantAutoRefreshEpoch;
+    const refresh = async () => {
+      if (ticket !== applicantAutoRefreshEpoch) return;
+      let deferred = deferApplicationAutoRefresh();
       try {
-        await refreshApplicationsOverview({ force: true });
+        if (!deferred) deferred = await refreshApplicationsOverview({ force: true }) === false;
       } catch (err) {
         console.warn("Auto-refresh applications failed", err);
+      } finally {
+        if (ticket === applicantAutoRefreshEpoch) applicantAutoRefreshTimer = deferred ? window.setTimeout(refresh, 400) : null;
       }
-    }, 400);
+    };
+    applicantAutoRefreshTimer = window.setTimeout(refresh, 400);
   });
+}
+
+function deferApplicationAutoRefresh() {
+  if (applicantReturnOpening || applicationRefreshInputs.size) return true;
+  return Array.from(document.querySelectorAll('[data-applicants-row]:not(.hidden), .case-actions.open, [role="dialog"], [aria-modal="true"]'))
+    .some(element => element.getClientRects().length && !element.closest('[hidden], [inert]'));
 }
 
 // -------------------------
@@ -334,9 +395,6 @@ function ensureHeaderStyles() {
   body.theme-dark .lpc-shared-header .user-chip{background:rgba(15,23,42,0.4);border-color:transparent;box-shadow:none}
   body.theme-dark .lpc-shared-header .user-chip strong{color:#fff}
   body.theme-dark .lpc-shared-header .user-chip span{color:rgba(255,255,255,0.8)}
-  body.theme-mountain .lpc-shared-header .user-chip{background:rgba(255,255,255,0.65);border-color:transparent;box-shadow:none}
-  body.theme-mountain .lpc-shared-header .user-chip strong{color:#1b1b1b}
-  body.theme-mountain .lpc-shared-header .user-chip span{color:#6b6b6b}
   .lpc-shared-header .profile-dropdown{position:absolute;right:0;top:calc(100% + 10px);background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:16px;box-shadow:0 18px 30px rgba(0,0,0,0.12);display:none;flex-direction:column;min-width:200px;z-index:9999;pointer-events:auto;overflow:visible;color:var(--ink,#1a1a1a)}
   .lpc-shared-header .profile-dropdown.show{display:flex;pointer-events:auto;overflow:visible}
   .lpc-shared-header .profile-dropdown button,
@@ -346,9 +404,7 @@ function ensureHeaderStyles() {
   .lpc-shared-header .profile-dropdown .logout-btn{color:#b91c1c;background:rgba(185,28,28,0.08);border:1px solid rgba(185,28,28,0.2)}
   .lpc-shared-header .profile-dropdown .logout-btn:hover{background:rgba(185,28,28,0.15);color:#991b1b}
   body.theme-dark .lpc-shared-header .profile-dropdown button:hover,
-  body.theme-dark .lpc-shared-header .profile-dropdown a:hover,
-  body.theme-mountain-dark .lpc-shared-header .profile-dropdown button:hover,
-  body.theme-mountain-dark .lpc-shared-header .profile-dropdown a:hover{background:rgba(255,255,255,0.06)}
+  body.theme-dark .lpc-shared-header .profile-dropdown a:hover{background:rgba(255,255,255,0.06)}
   body.theme-dark .lpc-shared-header .profile-dropdown .logout-btn{border-top-color:rgba(255,255,255,0.08)}
   `;
   document.head.appendChild(style);
@@ -601,7 +657,7 @@ function isAttorneyProfileComplete(user = {}) {
 function getAttorneyOnboardingProgress() {
   const profileDone = isAttorneyProfileComplete(state.user || {});
   const paymentDone = state.billing.hasPaymentMethod === true;
-  const caseDone = (state.cases?.length || 0) > 0 || (state.casesArchived?.length || 0) > 0;
+  const caseDone = legacyHome?.state.inventory.phase === "ready" && legacyHome.state.inventory.value.postedCount > 0;
   return { profileDone, paymentDone, caseDone };
 }
 
@@ -1034,124 +1090,14 @@ function maybePromptCaseOnboarding() {
 // -------------------------
 // Overview Page
 // -------------------------
-function setOverviewModuleState(bodyId, { state: moduleState, summary = "", detail = "", action = null } = {}) {
-  const body = document.getElementById(bodyId);
-  if (!body) return;
-  const card = body.closest(".status-item, .mini-deadlines");
-  const stateKey = ["loading", "populated", "empty", "failed"].includes(moduleState) ? moduleState : "loading";
-  body.dataset.state = stateKey;
-  if (card) card.setAttribute("aria-busy", stateKey === "loading" ? "true" : "false");
-  if (stateKey === "loading") {
-    body.innerHTML = `<div class="overview-module-skeleton" aria-label="Loading summary"><span></span><span></span></div>`;
-    return;
-  }
-  if (stateKey === "failed") {
-    body.innerHTML = `<p class="overview-module-error">${sanitize(summary || "Unable to load this summary.")}</p>`;
-    return;
-  }
-  const actionMarkup = action?.href && action?.label
-    ? `<a class="overview-module-action" href="${sanitize(action.href)}"${action.viewTarget ? ` data-view-target="${sanitize(action.viewTarget)}"` : ""}>${sanitize(action.label)}</a>`
-    : "";
-  body.innerHTML = `
-    <p class="overview-module-summary">${sanitize(summary)}</p>
-    ${detail ? `<p class="overview-module-detail">${sanitize(detail)}</p>` : ""}
-    ${actionMarkup}
-  `;
-}
-
-function renderMattersOverview(count) {
-  const safeCount = Math.max(0, Number(count || 0));
-  if (safeCount > 0) {
-    setOverviewModuleState("overviewMattersBody", {
-      state: "populated",
-      summary: pluralizeCount(safeCount, "active matter"),
-    });
-    return;
-  }
-  setOverviewModuleState("overviewMattersBody", {
-    state: "empty",
-    summary: "No active matters.",
-    action: { href: "create-case.html", label: "Create a matter" },
-  });
-}
-
-function renderApplicationsOverview(count) {
-  const safeCount = Math.max(0, Number(count || 0));
-  if (safeCount > 0) {
-    setOverviewModuleState("overviewApplicationsBody", {
-      state: "populated",
-      summary: `${pluralizeCount(safeCount, "application")} awaiting review`,
-    });
-    return;
-  }
-  setOverviewModuleState("overviewApplicationsBody", {
-    state: "empty",
-    summary: "No applications yet.",
-    detail: "Applications will appear here when paralegals apply.",
-  });
-}
-
-function renderMessagesOverview(count) {
-  const safeCount = Math.max(0, Number(count || 0));
-  const countNode = document.getElementById("messageCount");
-  if (countNode) {
-    countNode.textContent = String(safeCount);
-    countNode.hidden = true;
-  }
-  setOverviewModuleState("overviewMessagesBody", {
-    state: safeCount > 0 ? "populated" : "empty",
-    summary: safeCount > 0 ? pluralizeCount(safeCount, "unread message") : "You’re all caught up.",
-  });
-}
-
-function renderCompletedOverview(count) {
-  const safeCount = Math.max(0, Number(count || 0));
-  setOverviewModuleState("overviewCompletedBody", {
-    state: safeCount > 0 ? "populated" : "empty",
-    summary: safeCount > 0 ? pluralizeCount(safeCount, "completed matter") : "No completed matters yet.",
-  });
-}
-
-function renderWeekOverview({ count = 0, deadlines = [] } = {}) {
-  const body = document.getElementById("deadlineList");
-  if (!body) return;
-  const safeCount = Math.max(0, Number(count || 0));
-  const rows = Array.isArray(deadlines) ? deadlines.slice(0, 3) : [];
-  const card = body.closest(".mini-deadlines");
-  body.dataset.state = safeCount > 0 ? "populated" : "empty";
-  card?.setAttribute("aria-busy", "false");
-  if (!safeCount) {
-    body.innerHTML = `<p class="overview-module-summary">No deadlines this week.</p>`;
-    return;
-  }
-  const rowsMarkup = rows.map((deadline) => {
-    const caseId = String(deadline?.caseId || "");
-    const href = caseId ? `case-detail.html?id=${encodeURIComponent(caseId)}` : "#cases";
-    const formattedDate = window.LPCBusinessDate?.format(deadline?.dueDate, { year: undefined }) || String(deadline?.dueDate || "");
-    return `
-      <li class="overview-deadline-row">
-        <a href="${sanitize(href)}">${sanitize(deadline?.title || "Untitled Matter")}</a>
-        <time datetime="${sanitize(deadline?.dueDate || "")}">${sanitize(formattedDate)}</time>
-      </li>`;
-  }).join("");
-  body.innerHTML = `
-    <p class="overview-module-summary overview-deadline-summary">${sanitize(pluralizeCount(safeCount, "deadline"))} this week</p>
-    ${rowsMarkup ? `<ul class="overview-deadline-list">${rowsMarkup}</ul>` : ""}
-  `;
-}
-
 async function initOverviewPage() {
-  let overviewHydrationGeneration = 0;
   let lifecycleRefreshTimer = null;
   const messageBox = document.getElementById("messageBox");
-  const messageCountSpan = document.getElementById("messageCount");
-  const completedJobsList = document.getElementById("completedJobsList");
   const messageSnippet = document.getElementById("messageSnippet");
   const messagePreviewSender = document.getElementById("messagePreviewSender");
   const messagePreviewText = document.getElementById("messagePreviewText");
   const messagePreviewLink = document.getElementById("messagePreviewLink");
   const escrowDetails = document.getElementById("escrowDetails");
-  const caseCards = document.getElementById("caseCards");
   const homeView = document.querySelector(".view-home");
   const quickButtons = document.querySelectorAll("[data-quick-link]");
   const weeklyNotesGrid = document.getElementById("weeklyNotesGrid");
@@ -1183,7 +1129,9 @@ async function initOverviewPage() {
     const action = event.target?.closest?.("[data-attention-action]");
     if (!action) return;
     const actionKey = String(action.dataset.attentionAction || "").toLowerCase();
-    if (actionKey === "messages") {
+    if (actionKey === "refresh") {
+      event.preventDefault(); void hydrateOverview();
+    } else if (actionKey === "messages") {
       event.preventDefault();
       goToMessages(state.latestThreadCaseId);
     }
@@ -1199,29 +1147,29 @@ async function initOverviewPage() {
     messageBox.addEventListener("click", () => {
       goToMessages(state.latestThreadCaseId);
     });
-    messageBox.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        goToMessages(state.latestThreadCaseId);
-      }
-    });
   }
 
-  function updateMessageBubble(count = 0) {
-    if (messageCountSpan) {
-      messageCountSpan.textContent = String(count);
-      messageCountSpan.hidden = true;
-    }
-    renderMessagesOverview(count);
-    updateOverviewSignals({ unreadCount: count });
-  }
-
-  fetchUnreadMessages().catch((error) => {
-    setOverviewModuleState("overviewMessagesBody", { state: "failed", summary: "Unable to load unread messages." });
-    console.warn("[attorney] unread message hydration rejected", error);
+  const homeApi = createApiClient({ onAuthenticationLost: () => { legacyHome?.clear(); clearCaseNoteAccess(); } });
+  legacyHome = createLegacyAttorneyHome({
+    api: homeApi, ownerId: String(state.user?.id || state.user?._id || ""),
+    onReviewMatter: caseId => openCaseNoteModal(caseId, "review"),
+    onChange(sources) {
+      const value = key => sources[key].phase === "ready" ? sources[key].value : null;
+      const inventory = value("inventory"), messages = value("messages");
+      state.billing.hasPaymentMethod = value("payment")?.hasPaymentMethod ?? null;
+      onboardingAttentionHydrated = sources.inventory.phase === "ready" && sources.payment.phase === "ready";
+      overviewSignals.casesCreatedCount = inventory?.postedCount ?? null;
+      overviewSignals.overdueCount = value("overdue");
+      updateOnboardingChecklist();
+      updateMessagePreviewUI({ threads: messages?.threads || [], messageSnippet, messagePreviewSender, messagePreviewText });
+      renderNeedsAttentionQueue();
+    },
   });
-  loadCompletedJobs(completedJobsList).catch((error) => console.warn("[attorney] completed Matter hydration rejected", error));
-  hydrateOverview().catch((error) => console.warn("[attorney] overview hydration rejected", error));
+  document.querySelector('[data-home-refresh]')?.addEventListener('click', () => void hydrateOverview());
+  // Start the requested view before independent Home and weekly-note reads.
+  setupDashboardViewRouter();
+  initHomeTabs();
+  void hydrateOverview();
   setupWeeklyNoteModal();
   void initWeeklyNotes(weeklyNotesGrid, weeklyNotesRange);
   startOverviewPolling();
@@ -1239,43 +1187,13 @@ async function initOverviewPage() {
     goToMessages(state.latestThreadCaseId);
   });
 
-  async function fetchUnreadMessages() {
-    const res = await secureFetch("/api/messages/unread-count", { headers: { Accept: "application/json" }, noRedirect: true });
-    if (!res.ok) throw new Error("Failed to fetch unread messages");
-    const data = await res.json();
-    updateMessageBubble(data.count || 0);
-    return data.count || 0;
-  }
-
   function shouldPollOverview() {
     return document.visibilityState === "visible" && (!homeView || !homeView.hasAttribute("hidden"));
   }
 
   async function refreshOverviewMessages({ force = false } = {}) {
     if (!force && !shouldPollOverview()) return;
-    try {
-      await fetchUnreadMessages();
-    } catch (error) {
-      setOverviewModuleState("overviewMessagesBody", { state: "failed", summary: "Unable to load unread messages." });
-      console.warn("Unable to refresh unread messages", error);
-    }
-    const threads = await fetchThreadsOverview(200);
-    const threadByCase = new Map();
-    (threads || []).forEach((thread) => {
-      const id = thread?.caseId || thread?.case?.id || thread?.id || "";
-      if (id) threadByCase.set(String(id), thread);
-    });
-    state.threadOverview = threadByCase;
-    if (caseCards && Array.isArray(state.overview.cases) && state.overview.cases.length) {
-      renderCaseCards(caseCards, state.overview.cases, threadByCase);
-    }
-    updateMessagePreviewUI({
-      threads,
-      messageSnippet,
-      messagePreviewSender,
-      messagePreviewText,
-      eligibleCaseIds: state.overview.eligibleCaseIds,
-    });
+    await legacyHome.refresh(["messages"]);
   }
 
   function startOverviewPolling() {
@@ -1292,119 +1210,19 @@ async function initOverviewPage() {
   }
 
   async function hydrateOverview() {
-    const generation = ++overviewHydrationGeneration;
-    try {
-      const [
-        dashboardResult,
-        overdueResult,
-        threadsResult,
-        applicationsResult,
-        paymentMethodResult,
-        casesResult,
-        archivedCasesResult,
-      ] = await Promise.allSettled([
-        fetchDashboardData(),
-        fetchOverdueCount(),
-        fetchThreadsOverview(200),
-        loadApplicationsForMyJobs(),
-        hasDefaultPaymentMethod(),
-        loadCasesWithFiles(),
-        loadArchivedCases(),
-      ]);
-      if (generation !== overviewHydrationGeneration) return;
-      const dashboard = dashboardResult.status === "fulfilled" ? dashboardResult.value : null;
-      const overdueCount = overdueResult.status === "fulfilled" ? overdueResult.value : 0;
-      const threads = threadsResult.status === "fulfilled" ? threadsResult.value : [];
-      const apps = applicationsResult.status === "fulfilled" ? applicationsResult.value : [];
-      const hasPaymentMethod = paymentMethodResult.status === "fulfilled" ? paymentMethodResult.value : false;
-      state.billing.hasPaymentMethod = hasPaymentMethod;
-      onboardingAttentionHydrated = true;
-      updateOnboardingChecklist();
-      if (applicationsResult.status === "fulfilled") {
-        applyApplicationsToCases(apps || []);
-        renderApplicationsOverview(filterApplicationsForDisplay(apps || []).length);
-      } else {
-        setOverviewModuleState("overviewApplicationsBody", {
-          state: "failed",
-          summary: "Unable to load applications.",
-        });
-      }
-      if (dashboard) {
-        renderMattersOverview(dashboard?.metrics?.activeCases);
-        renderCompletedOverview(dashboard?.metrics?.completedCases);
-        renderWeekOverview({
-          count: dashboard?.metrics?.weekDeadlines,
-          deadlines: dashboard?.week?.deadlines,
-        });
-      } else {
-        setOverviewModuleState("overviewMattersBody", { state: "failed", summary: "Unable to load active matters." });
-        setOverviewModuleState("overviewCompletedBody", { state: "failed", summary: "Unable to load completed matters." });
-        setOverviewModuleState("deadlineList", { state: "failed", summary: "Unable to load this week’s deadlines." });
-      }
-      const eligibleCaseIds = new Set(
-        filterWorkspaceEligibleCases(state.cases).map((item) => String(item.id || item._id || ""))
-      );
-      const threadByCase = new Map();
-      (threads || []).forEach((thread) => {
-        const id = thread?.caseId || thread?.case?.id || thread?.id || "";
-        if (id) threadByCase.set(String(id), thread);
-      });
-      state.threadOverview = threadByCase;
-      const filteredCaseCards = (dashboard?.activeCases || []).filter((item) => {
-        const id = item?.caseId || item?.id || item?._id;
-        return id && eligibleCaseIds.has(String(id));
-      });
-      state.overview.cases = filteredCaseCards;
-      state.overview.eligibleCaseIds = eligibleCaseIds;
-      if (dashboard) updateMetrics(dashboard.metrics, overdueCount);
-      if (dashboard) {
-        renderCaseCards(caseCards, filteredCaseCards, threadByCase);
-      } else if (caseCards) {
-        caseCards.setAttribute("aria-busy", "false");
-        caseCards.innerHTML = `<div class="matter-row"><div class="matter-main"><div class="matter-title">Unable to load recent matters</div><div class="matter-meta">Refresh the page to try again.</div></div></div>`;
-      }
-      renderEscrowPanel(escrowDetails);
-      updateMessagePreviewUI({
-        threads,
-        messageSnippet,
-        messagePreviewSender,
-        messagePreviewText,
-        eligibleCaseIds,
-      });
-      if (applicationsResult.status === "fulfilled") renderApplications(apps || [], hasPaymentMethod);
-      updateOverviewSignals(
-        buildOverviewSignals({ cases: state.cases, archivedCases: state.casesArchived, apps, overdueCount })
-      );
-      if (casesResult.status === "rejected") console.warn("Unable to load active matter records", casesResult.reason);
-      if (archivedCasesResult.status === "rejected") console.warn("Unable to load archived matter records", archivedCasesResult.reason);
-    } catch (err) {
-      console.warn("Overview hydration failed", err);
-      setOverviewModuleState("overviewMattersBody", { state: "failed", summary: "Unable to load active matters." });
-      setOverviewModuleState("overviewApplicationsBody", { state: "failed", summary: "Unable to load applications." });
-      setOverviewModuleState("overviewCompletedBody", { state: "failed", summary: "Unable to load completed matters." });
-      setOverviewModuleState("deadlineList", { state: "failed", summary: "Unable to load this week’s deadlines." });
-      onboardingAttentionHydrated = true;
-      updateOnboardingChecklist();
-    }
+    await legacyHome.refresh();
+    renderEscrowPanel(escrowDetails);
   }
 
   const scheduleLifecycleOverviewRefresh = () => {
     if (document.visibilityState !== "visible" || lifecycleRefreshTimer) return;
     lifecycleRefreshTimer = window.setTimeout(() => {
       lifecycleRefreshTimer = null;
-      void Promise.all([
-        hydrateOverview(),
-        refreshOverviewMessages({ force: true }),
-      ]).catch((error) => console.warn("Attorney lifecycle refresh failed", error));
+      void hydrateOverview();
     }, 0);
   };
   window.addEventListener("lpc:lifecycle-refresh", scheduleLifecycleOverviewRefresh);
-  window.addEventListener("pageshow", (event) => {
-    if (event.persisted) scheduleLifecycleOverviewRefresh();
-  });
 
-  setupDashboardViewRouter();
-  initHomeTabs();
 }
 
 async function initWeeklyNotes(grid, rangeEl) {
@@ -1416,7 +1234,7 @@ async function initWeeklyNotes(grid, rangeEl) {
   const toggleBtn = document.getElementById("weeklyNotesToggle");
   const monthHeader = document.getElementById("weeklyNotesMonthHeader");
   const cache = new Map();
-  const saveTimers = new Map();
+  let renderGeneration = 0;
   const state = {
     mode: "week",
     weekStart: getWeekStart(new Date()),
@@ -1427,14 +1245,19 @@ async function initWeeklyNotes(grid, rangeEl) {
     if (rangeEl) rangeEl.textContent = label;
   };
 
-  const scheduleSave = (weekKey, notes) => {
-    const existing = saveTimers.get(weekKey);
-    if (existing) window.clearTimeout(existing);
-    const timer = window.setTimeout(() => {
-      saveTimers.delete(weekKey);
-      void persistWeeklyNotes(weekKey, notes);
-    }, 500);
-    saveTimers.set(weekKey, timer);
+  const saveDay = async (weekKey, notes, index, value) => {
+    const next = [...notes]; next[index] = value;
+    const saved = await persistWeeklyNotes(weekKey, next);
+    notes.splice(0, 7, ...saved);
+    render();
+    return saved[index];
+  };
+  const reviewDay = async (weekKey, notes, index) => {
+    const saved = await fetchWeeklyNoteSnapshot(weekKey);
+    return { note: saved.notes[index], accept: () => {
+      weeklyNoteSnapshots.set(weekKey, saved);
+      notes.splice(0, 7, ...saved.notes);
+    } };
   };
 
   const loadWeekNotes = async (weekStart) => {
@@ -1462,7 +1285,7 @@ async function initWeeklyNotes(grid, rangeEl) {
     }
   };
 
-  const renderDayCard = ({ date, note, isOutsideMonth, onSave, showWeekday = true, dateFormat = {} }) => {
+  const renderDayCard = ({ date, note, isOutsideMonth, onSave, onReview, showWeekday = true, dateFormat = {} }) => {
     const day = document.createElement("div");
     day.className = "weekly-note-day";
     if (isSameDay(date, new Date())) day.classList.add("is-today");
@@ -1486,16 +1309,9 @@ async function initWeeklyNotes(grid, rangeEl) {
     let currentNote = note || "";
 
     if (!modalReady) {
-      const textarea = document.createElement("textarea");
-      textarea.className = "weekly-note-input";
-      textarea.rows = 3;
-      textarea.placeholder = "";
-      textarea.value = currentNote;
-      textarea.addEventListener("input", () => {
-        currentNote = textarea.value;
-        onSave(currentNote);
-      });
-      day.append(header, textarea);
+      const text = document.createElement("p");
+      text.textContent = "The note editor is unavailable. Reload this page to try again.";
+      day.append(header, text);
       return day;
     }
 
@@ -1517,10 +1333,10 @@ async function initWeeklyNotes(grid, rangeEl) {
       openWeeklyNoteModal({
         date,
         note: currentNote,
-        onSave: (value) => {
-          currentNote = value;
-          updateBody(value);
-          onSave(value);
+        onReview,
+        onSave: async (value) => {
+          currentNote = await onSave(value);
+          updateBody(currentNote);
         },
       });
     };
@@ -1537,11 +1353,12 @@ async function initWeeklyNotes(grid, rangeEl) {
     return day;
   };
 
-  const renderWeek = async () => {
+  const renderWeek = async (ticket) => {
     const start = getWeekStart(state.weekStart);
     state.weekStart = start;
     const weekKey = formatDateKey(start);
     const notes = await loadWeekNotes(start);
+    if (ticket !== renderGeneration) return;
 
     const visibleDayCount = window.matchMedia("(max-width: 900px)").matches ? 5 : 7;
     const end = addDays(start, visibleDayCount - 1);
@@ -1564,16 +1381,14 @@ async function initWeeklyNotes(grid, rangeEl) {
         isOutsideMonth: false,
         showWeekday: true,
         dateFormat: { month: "short", day: "numeric" },
-        onSave: (value) => {
-          notes[i] = value;
-          scheduleSave(weekKey, notes);
-        },
+        onSave: (value) => saveDay(weekKey, notes, i, value),
+        onReview: () => reviewDay(weekKey, notes, i),
       });
       grid.appendChild(day);
     }
   };
 
-  const renderMonth = async () => {
+  const renderMonth = async (ticket) => {
     const compactMonth = window.matchMedia("(max-width: 900px)").matches;
     const monthStart = getMonthStart(state.monthDate);
     const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
@@ -1609,6 +1424,7 @@ async function initWeeklyNotes(grid, rangeEl) {
       weeks.push(new Date(cursor));
     }
     await Promise.all(weeks.map((weekStart) => loadWeekNotes(weekStart)));
+    if (ticket !== renderGeneration) return;
 
     for (let cursor = new Date(calendarStart); cursor <= calendarEnd; cursor = addDays(cursor, 1)) {
       const weekStart = getWeekStart(cursor);
@@ -1621,19 +1437,27 @@ async function initWeeklyNotes(grid, rangeEl) {
         isOutsideMonth: cursor.getMonth() !== monthStart.getMonth(),
         showWeekday: compactMonth,
         dateFormat: compactMonth ? { month: "short", day: "numeric" } : { day: "numeric" },
-        onSave: (value) => {
-          notes[idx] = value;
-          scheduleSave(weekKey, notes);
-        },
+        onSave: (value) => saveDay(weekKey, notes, idx, value),
+        onReview: () => reviewDay(weekKey, notes, idx),
       });
       grid.appendChild(day);
     }
   };
 
   const render = () => {
-    if (state.mode === "month") return void renderMonth();
-    return void renderWeek();
+    const ticket = ++renderGeneration;
+    void (state.mode === "month" ? renderMonth(ticket) : renderWeek(ticket)).catch(() => {
+      if (ticket !== renderGeneration) return;
+      const message = document.createElement("p"); message.setAttribute("role", "alert");
+      message.textContent = "Weekly notes couldn’t be loaded. Retry to load the saved notes.";
+      const retry = document.createElement("button"); retry.type = "button"; retry.className = "btn secondary"; retry.textContent = "Retry weekly notes";
+      retry.addEventListener("click", render);
+      grid.replaceChildren(message, retry);
+    });
   };
+  window.addEventListener("pagehide", () => { renderGeneration += 1; cache.clear(); grid.replaceChildren(); });
+  window.addEventListener("pageshow", (event) => { if (event.persisted) render(); });
+  window.addEventListener("lpc:weekly-notes-access-lost", () => { renderGeneration += 1; cache.clear(); });
 
   let lastCompact = window.matchMedia("(max-width: 900px)").matches;
   window.addEventListener("resize", () => {
@@ -1686,6 +1510,14 @@ let weeklyNoteSaveBtn = null;
 let weeklyNoteCancelBtn = null;
 let weeklyNoteModalBound = false;
 let weeklyNoteModalOnSave = null;
+let weeklyNoteModalOnReview = null;
+let weeklyNoteModalBusy = false;
+let weeklyNoteModalOriginal = "";
+let weeklyNoteModalFeedback = null;
+const weeklyNoteSnapshots = new Map();
+let weeklyNoteEpoch = 0;
+let weeklyNoteOwnerId = "";
+let weeklyNoteOwnerCheck = null;
 
 let statusHistoryModalRef = null;
 let statusHistoryBodyRef = null;
@@ -1706,7 +1538,7 @@ function ensureWeeklyNoteModal() {
     <div class="note-modal-card">
       <h3 id="weeklyNoteModalTitle" style="font-family:var(--font-serif);font-weight:300;">Weekly Note</h3>
       <div class="weekly-note-modal-date" id="weeklyNoteModalDate"></div>
-      <textarea id="weeklyNoteModalTextarea" placeholder="Add a note for this day."></textarea>
+      <textarea id="weeklyNoteModalTextarea" aria-labelledby="weeklyNoteModalTitle weeklyNoteModalDate"></textarea>
       <div class="note-modal-actions">
         <button type="button" class="btn secondary" data-weekly-note-cancel>Cancel</button>
         <button type="button" class="btn primary" data-weekly-note-save>Save Note</button>
@@ -1731,17 +1563,71 @@ function setupWeeklyNoteModal() {
   weeklyNoteSaveBtn = weeklyNoteModalRef.querySelector("[data-weekly-note-save]");
   weeklyNoteCancelBtn = weeklyNoteModalRef.querySelector("[data-weekly-note-cancel]");
 
+  weeklyNoteTextarea?.setAttribute("maxlength", "2000");
+  weeklyNoteTextarea?.setAttribute("aria-labelledby", "weeklyNoteModalTitle weeklyNoteModalDate");
+  weeklyNoteModalFeedback = document.createElement("div");
+  weeklyNoteModalFeedback.setAttribute("role", "status");
+  weeklyNoteTextarea?.after(weeklyNoteModalFeedback);
+  const checkStoredOwner = (value) => {
+    let owner;
+    try { const user = typeof value === "string" ? JSON.parse(value) : value; owner = String(user?.id || user?._id || ""); } catch { owner = ""; }
+    if (!owner || owner !== weeklyNoteOwnerId) clearWeeklyNoteAccess();
+  };
+  window.addEventListener("storage", (event) => { if (event.key === "lpc_user") checkStoredOwner(event.newValue); });
+  window.addEventListener("lpc:user-updated", (event) => checkStoredOwner(event.detail));
+  window.addEventListener("focus", () => { if (document.visibilityState === "visible") void verifyWeeklyNoteOwner().catch(() => { /* Verification already cleared private notes. */ }); });
+  window.addEventListener("beforeunload", (event) => {
+    if (weeklyNoteModalRef?.classList.contains("hidden")) return;
+    if (weeklyNoteModalBusy || weeklyNoteTextarea?.value !== weeklyNoteModalOriginal) { event.preventDefault(); event.returnValue = ""; }
+  });
+  window.addEventListener("pagehide", () => {
+    weeklyNoteModalBusy = false; weeklyNoteSnapshots.clear(); weeklyNoteEpoch += 1; weeklyNoteOwnerCheck = null;
+    if (weeklyNoteTextarea) weeklyNoteTextarea.value = "";
+    weeklyNoteModalOriginal = ""; weeklyNoteModalFeedback?.replaceChildren(); closeWeeklyNoteModal();
+  });
   weeklyNoteCancelBtn?.addEventListener("click", closeWeeklyNoteModal);
   weeklyNoteModalRef.addEventListener("click", (event) => {
     if (event.target === weeklyNoteModalRef) {
       closeWeeklyNoteModal();
     }
   });
-  weeklyNoteSaveBtn?.addEventListener("click", () => {
-    if (!weeklyNoteModalOnSave) return;
-    const value = weeklyNoteTextarea?.value?.trim() || "";
-    weeklyNoteModalOnSave(value);
-    closeWeeklyNoteModal();
+  weeklyNoteSaveBtn?.addEventListener("click", async () => {
+    if (!weeklyNoteModalOnSave || weeklyNoteModalBusy) return;
+    const value = weeklyNoteTextarea?.value || "";
+    weeklyNoteModalBusy = true; weeklyNoteSaveBtn.disabled = true; weeklyNoteCancelBtn.disabled = true; weeklyNoteTextarea.disabled = true;
+    weeklyNoteModalFeedback.textContent = "Saving note…";
+    try {
+      await weeklyNoteModalOnSave(value);
+      weeklyNoteModalBusy = false; closeWeeklyNoteModal();
+    } catch (error) {
+      if (weeklyNoteModalRef.classList.contains("hidden")) return;
+      weeklyNoteModalFeedback.textContent = error.status === 409 ? "These notes changed elsewhere. Your edit is still here. Review the saved note before trying again." : "Saving wasn’t confirmed. Your edit is still here. Review the saved note before trying again.";
+      const review = document.createElement("button"); review.type = "button"; review.className = "btn secondary"; review.style.minHeight = "44px"; review.textContent = "Review saved note";
+      review.addEventListener("click", async () => {
+        if (!weeklyNoteModalOnReview || weeklyNoteModalBusy) return;
+        review.disabled = true; weeklyNoteModalBusy = true;
+        try {
+          const saved = await weeklyNoteModalOnReview();
+          if (weeklyNoteModalRef.classList.contains("hidden")) return;
+          const label = document.createElement("p"); label.textContent = "Saved note for this day (other days will keep their latest saved notes):";
+          const text = document.createElement("p"); Object.assign(text.style, { whiteSpace: "pre-wrap", overflowWrap: "anywhere", maxHeight: "180px", overflowY: "auto" }); text.tabIndex = 0; text.setAttribute("aria-label", "Saved note"); text.textContent = saved.note || "No saved note.";
+          const choose = (title, replace) => {
+            const control = document.createElement("button"); control.type = "button"; control.className = "btn secondary"; control.style.minHeight = "44px"; control.textContent = title;
+            control.addEventListener("click", () => {
+              saved.accept(); if (replace) weeklyNoteTextarea.value = saved.note;
+              weeklyNoteModalFeedback.textContent = "Review your note above, then select Save Note.";
+              weeklyNoteSaveBtn.disabled = false; weeklyNoteTextarea.focus();
+            }); return control;
+          };
+          const choices = document.createElement("div"); choices.className = "note-modal-actions"; choices.append(choose("Use saved note", true), choose("Keep my edit", false));
+          weeklyNoteModalFeedback.replaceChildren(label, text, choices); text.focus();
+        } catch { if (!weeklyNoteModalRef.classList.contains("hidden")) { review.disabled = false; review.textContent = "Retry reviewing saved note"; } }
+        finally { weeklyNoteModalBusy = false; }
+      });
+      weeklyNoteModalFeedback.append(review);
+    } finally {
+      weeklyNoteModalBusy = false; weeklyNoteCancelBtn.disabled = false; weeklyNoteTextarea.disabled = false;
+    }
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && weeklyNoteModalRef && !weeklyNoteModalRef.classList.contains("hidden")) {
@@ -1750,10 +1636,11 @@ function setupWeeklyNoteModal() {
   });
 }
 
-function openWeeklyNoteModal({ date, note, onSave }) {
+function openWeeklyNoteModal({ date, note, onSave, onReview }) {
   setupWeeklyNoteModal();
   if (!weeklyNoteModalRef) return;
-  weeklyNoteModalOnSave = onSave;
+  weeklyNoteModalOnSave = onSave; weeklyNoteModalOnReview = onReview;
+  weeklyNoteModalOriginal = note || ""; weeklyNoteModalFeedback.replaceChildren(); weeklyNoteSaveBtn.disabled = false;
   if (weeklyNoteModalTitle) {
     weeklyNoteModalTitle.textContent = "Weekly Note";
   }
@@ -1777,13 +1664,13 @@ function openWeeklyNoteModal({ date, note, onSave }) {
 }
 
 function closeWeeklyNoteModal() {
-  if (!weeklyNoteModalRef) return;
+  if (!weeklyNoteModalRef || weeklyNoteModalBusy) return;
   weeklyNoteModalRef.classList.add("hidden");
   weeklyNoteModalRef.setAttribute("aria-hidden", "true");
   weeklyNoteModalRef.setAttribute("inert", "");
   deactivateDialogFocus(weeklyNoteModalRef);
   weeklyNoteModalRef.removeAttribute("aria-busy");
-  weeklyNoteModalOnSave = null;
+  weeklyNoteModalOnSave = null; weeklyNoteModalOnReview = null;
 }
 
 function initStatusHistoryModal() {
@@ -1871,6 +1758,7 @@ async function openStatusHistoryModal(caseId) {
         </ul>
       `;
     }
+    if (payload.complete === false) statusHistoryBodyRef.insertAdjacentHTML("afterbegin", `<p class="info-line">Some history could not be loaded. The events below are incomplete. Close and reopen to try again.</p>`);
   } catch (err) {
     statusHistoryBodyRef.innerHTML = `<div class="info-line">${sanitize(
       err?.message || "Unable to load status history."
@@ -1924,42 +1812,72 @@ function isSameDay(a, b) {
   );
 }
 
-async function fetchWeeklyNotes(weekStart) {
-  try {
-    const res = await secureFetch(`/api/users/me/weekly-notes?weekStart=${encodeURIComponent(weekStart)}`, {
-      headers: { Accept: "application/json" },
-      noRedirect: true,
-    });
-    if (!res.ok) throw new Error("Unable to load weekly notes.");
-    const payload = await res.json().catch(() => ({}));
-    const notes = Array.isArray(payload.notes) ? payload.notes : [];
-    return normalizeWeeklyNotes(notes);
-  } catch (err) {
-    console.warn("Weekly notes load failed", err);
-    return Array(7).fill("");
-  }
-}
-
-async function persistWeeklyNotes(weekStart, notes = []) {
-  try {
-    const res = await secureFetch("/api/users/me/weekly-notes", {
-      method: "PUT",
-      headers: { Accept: "application/json" },
-      body: { weekStart, notes },
-    });
-    if (!res.ok) throw new Error("Unable to save weekly notes.");
-  } catch (err) {
-    console.warn("Weekly notes save failed", err);
-  }
-}
-
-function normalizeWeeklyNotes(notes = []) {
-  const normalized = Array(7).fill("");
-  notes.forEach((note, idx) => {
-    if (idx >= normalized.length) return;
-    normalized[idx] = String(note || "");
+async function fetchWeeklyNoteSnapshot(weekStart) {
+  await verifyWeeklyNoteOwner();
+  const epoch = weeklyNoteEpoch;
+  const res = await secureFetch(`/api/users/me/weekly-notes?weekStart=${encodeURIComponent(weekStart)}`, {
+    headers: { Accept: "application/json" }, noRedirect: true, cache: "no-store",
   });
-  return normalized;
+  if (!res.ok) {
+    if ([401, 403].includes(res.status)) clearWeeklyNoteAccess();
+    throw Object.assign(new Error("Unable to load weekly notes."), { status: res.status });
+  }
+  const payload = await res.json();
+  if (epoch !== weeklyNoteEpoch) throw new Error("Weekly notes session changed.");
+  return validateWeeklyNoteSnapshot(payload, weekStart);
+}
+function validateWeeklyNoteSnapshot(payload, weekStart) {
+  if (payload?.weekStart !== weekStart || typeof payload.revision !== "string" || !payload.revision || !Array.isArray(payload.notes) || payload.notes.length !== 7 || payload.notes.some((note) => typeof note !== "string" || note.length > 2000)) throw new Error("Unable to verify weekly notes.");
+  return { notes: [...payload.notes], revision: payload.revision };
+}
+async function fetchWeeklyNotes(weekStart) {
+  const snapshot = await fetchWeeklyNoteSnapshot(weekStart);
+  weeklyNoteSnapshots.set(weekStart, snapshot);
+  return [...snapshot.notes];
+}
+async function persistWeeklyNotes(weekStart, notes = []) {
+  await verifyWeeklyNoteOwner();
+  const epoch = weeklyNoteEpoch;
+  const snapshot = weeklyNoteSnapshots.get(weekStart);
+  if (!snapshot) throw new Error("Load the saved notes before saving.");
+  const res = await secureFetch("/api/users/me/weekly-notes", {
+    method: "PUT", headers: { Accept: "application/json" }, noRedirect: true,
+    body: { weekStart, notes, revision: snapshot.revision },
+  });
+  if (!res.ok) {
+    if ([401, 403].includes(res.status)) clearWeeklyNoteAccess();
+    throw Object.assign(new Error("Unable to save weekly notes."), { status: res.status });
+  }
+  const payload = await res.json();
+  if (epoch !== weeklyNoteEpoch) throw new Error("Weekly notes session changed.");
+  const saved = validateWeeklyNoteSnapshot(payload, weekStart);
+  weeklyNoteSnapshots.set(weekStart, saved);
+  return [...saved.notes];
+}
+
+async function verifyWeeklyNoteOwner() {
+  if (weeklyNoteOwnerCheck) return weeklyNoteOwnerCheck;
+  const epoch = weeklyNoteEpoch;
+  weeklyNoteOwnerCheck = (async () => {
+    try {
+      const res = await secureFetch("/api/auth/me", { noRedirect: true, cache: "no-store" });
+      if (!res.ok) throw new Error("Unable to verify the notes account.");
+      const payload = await res.json(); const user = payload?.user || payload;
+      if (epoch !== weeklyNoteEpoch || !weeklyNoteOwnerId || String(user?.id || user?._id || "") !== weeklyNoteOwnerId || user?.status !== "approved" || user?.disabled || user?.deleted) throw new Error("The notes account changed.");
+    } catch (error) { if (epoch === weeklyNoteEpoch) clearWeeklyNoteAccess(); throw error; }
+    finally { if (epoch === weeklyNoteEpoch) weeklyNoteOwnerCheck = null; }
+  })();
+  return weeklyNoteOwnerCheck;
+}
+
+function clearWeeklyNoteAccess() {
+  weeklyNoteEpoch += 1; weeklyNoteSnapshots.clear(); weeklyNoteModalBusy = false; weeklyNoteOwnerCheck = null;
+  if (weeklyNoteTextarea) weeklyNoteTextarea.value = "";
+  weeklyNoteModalOriginal = ""; weeklyNoteModalFeedback?.replaceChildren(); closeWeeklyNoteModal();
+  const message = document.createElement("p"); message.setAttribute("role", "alert");
+  message.textContent = "Private notes are no longer available to this account.";
+  document.getElementById("weeklyNotesGrid")?.replaceChildren(message);
+  window.dispatchEvent(new Event("lpc:weekly-notes-access-lost"));
 }
 
 function setupDashboardViewRouter() {
@@ -2092,7 +2010,6 @@ function ensureCasesViewReady() {
   if (dashboardViewState.casesInitPromise) return dashboardViewState.casesInitPromise;
   dashboardViewState.casesInitPromise = (async () => {
     await initCasesPage();
-    bindCaseViewTabs();
     dashboardViewState.casesInitialized = true;
   })()
     .catch((err) => {
@@ -2120,35 +2037,6 @@ function ensureBillingViewReady() {
   return dashboardViewState.billingInitPromise;
 }
 
-function bindCaseViewTabs() {
-  if (dashboardViewState.caseTabsBound) return;
-  const viewButtons = document.querySelectorAll("[data-case-view]");
-  if (!viewButtons.length) return;
-  const sections = {
-    cases: document.getElementById("casesViewSection"),
-    files: document.getElementById("caseFilesSection"),
-  };
-  viewButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const targetView = btn.dataset.caseView;
-      if (!targetView || btn.classList.contains("active")) return;
-      viewButtons.forEach((node) => {
-        const active = node === btn;
-        node.classList.toggle("active", active);
-        node.setAttribute("aria-selected", active ? "true" : "false");
-      });
-      Object.entries(sections).forEach(([key, node]) => {
-        if (!node) return;
-        node.classList.toggle("hidden", key !== targetView);
-      });
-      if (targetView === "files") {
-        void ensureCaseFilesEmbedReady();
-      }
-    });
-  });
-  dashboardViewState.caseTabsBound = true;
-}
-
 function setCaseFilter(filterKey, { render = true, syncHash = true, markSavedView = true } = {}) {
   const key = (filterKey || "").toLowerCase();
   if (!CASE_VIEW_FILTERS.includes(key)) return;
@@ -2157,13 +2045,11 @@ function setCaseFilter(filterKey, { render = true, syncHash = true, markSavedVie
   if (!tabs.length || !tables.length) return;
   state.casesViewFilter = key;
   if (markSavedView) matterSavedViews?.markCustom();
-  if (state.casesPage) {
-    state.casesPage[key] = 0;
-  }
   tabs.forEach((btn) => {
     const active = btn.dataset.caseFilter === key;
     btn.classList.toggle("active", active);
     btn.setAttribute("aria-selected", active ? "true" : "false");
+    btn.tabIndex = active ? 0 : -1;
   });
   tables.forEach((table) => {
     table.classList.toggle("hidden", table.dataset.caseTable !== key);
@@ -2179,69 +2065,9 @@ function setCaseFilter(filterKey, { render = true, syncHash = true, markSavedVie
   }
 }
 
-function ensureCaseFilesEmbedReady() {
-  if (dashboardViewState.caseFilesReady) return Promise.resolve();
-  if (dashboardViewState.caseFilesPromise) return dashboardViewState.caseFilesPromise;
-  dashboardViewState.caseFilesPromise = initCaseFilesView({
-    containerId: "caseFilesEmbedContainer",
-    filters: [
-      { id: "caseFilesEmbedFilterAll", fn: (files) => files },
-      { id: "caseFilesEmbedFilterApproved", fn: (files) => files.filter((f) => f.status === "approved") },
-      { id: "caseFilesEmbedFilterPending", fn: (files) => files.filter((f) => f.status === "pending_review") },
-      { id: "caseFilesEmbedFilterRevisions", fn: (files) => files.filter((f) => f.status === "attorney_revision") },
-    ],
-    emptyCopy: "Awaiting paralegal submissions.",
-    emptySubtext: "Once files arrive, they’ll show up here automatically.",
-    gatedCopy: "Fund a Matter to unlock file review.",
-    unauthorizedCopy: "You need an attorney account to view these files.",
-  })
-    .then(() => {
-      dashboardViewState.caseFilesReady = true;
-    })
-    .catch((err) => {
-      console.warn("Case files embed failed", err);
-    })
-    .finally(() => {
-      dashboardViewState.caseFilesPromise = null;
-    });
-  return dashboardViewState.caseFilesPromise;
-}
-
-async function loadCompletedJobs(container) {
-  if (!container) return;
-  try {
-    await Promise.all([loadCasesWithFiles(), loadArchivedCases()]);
-    const completed = getCompletedDashboardCases();
-    if (!completed.length) {
-      container.innerHTML = '<p class="info-line">No completed matters yet.</p>';
-      return;
-    }
-    container.innerHTML = completed.map((job) => renderCompletedJobCard(job)).join("");
-  } catch (err) {
-    console.warn("Unable to load completed jobs", err);
-    container.innerHTML = '<p class="info-line">Unable to load completed matters.</p>';
-  }
-}
-
-function renderCompletedJobCard(job) {
-  const summary = sanitize(job.briefSummary || job.title || "Completed Matter");
-  const completedAt = job.completedAt ? new Date(job.completedAt).toLocaleDateString() : "Date unavailable";
-  const caseId = job.id || job._id;
-  const archiveLink = caseId
-    ? `<a href="/api/cases/${encodeURIComponent(caseId)}/archive/download" target="_blank" rel="noopener">Download Archive</a>`
-    : '<span class="muted">Archive unavailable</span>';
-  return `
-    <div class="completed-job-card">
-      <div class="info-line"><strong>${summary}</strong></div>
-      <div class="info-line" style="color:var(--muted);">Completed ${completedAt}</div>
-      <div class="downloads">${archiveLink}</div>
-    </div>
-  `;
-}
-
 function goToMessages(caseId) {
   if (!caseId) {
-    notifyMessages("Open an active Matter to view messages.", "info");
+    window.location.hash = "cases";
     return;
   }
   const target = `case-detail.html?caseId=${encodeURIComponent(caseId)}&tab=messages`;
@@ -2261,6 +2087,17 @@ async function initBillingPage() {
   activeBody?.addEventListener("click", onActiveEscrowAction);
   document.querySelector(".escrow-table thead")?.addEventListener("click", onEscrowSortHeaderClick);
   document.querySelector("[data-escrow-pagination]")?.addEventListener("click", onEscrowPaginationClick);
+  document.querySelector('[data-escrow-refresh]')?.addEventListener('click', () => loadActiveEscrows(true));
+  const scroll = document.querySelector('[data-escrow-scroll]');
+  scroll?.addEventListener('keydown', event => {
+    if (event.target !== scroll || event.altKey || event.ctrlKey || event.metaKey || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || scroll.scrollWidth <= scroll.clientWidth) return;
+    event.preventDefault();
+    const left = event.key === 'Home' ? 0 : event.key === 'End' ? scroll.scrollWidth : scroll.scrollLeft + (event.key === 'ArrowLeft' ? -120 : 120);
+    scroll.scrollTo({ left, behavior: 'instant' });
+  });
+  scroll?.addEventListener('focusin', event => {
+    if (event.target !== scroll && scroll.scrollWidth > scroll.clientWidth) event.target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+  });
 
   await loadActiveEscrows();
 }
@@ -2268,25 +2105,42 @@ async function initBillingPage() {
 async function loadActiveEscrows(force = false) {
   const body = document.getElementById("activeEscrowsBody");
   if (!body) return;
-  if (force) body.innerHTML = `<tr><td colspan="6" class="empty-state">Refreshing activity…</td></tr>`;
+  const ownerId = String(state.user?.id || state.user?._id || ''), generation = (state.billing.generation || 0) + 1;
+  state.billing.generation = generation; state.billing.controller?.abort();
+  const controller = new AbortController(); state.billing.controller = controller;
+  const refresh = document.querySelector('[data-escrow-refresh]');
+  if (refresh) refresh.disabled = true;
+  const abort = () => controller.abort(), timer = setTimeout(abort, 30000);
+  window.addEventListener('pagehide', abort, { once: true });
+  state.billing.escrows = []; state.billing.escrowsLoaded = false;
+  body.innerHTML = `<tr><td colspan="6" class="empty-state">${force ? 'Refreshing activity…' : 'Loading activity…'}</td></tr>`;
   try {
-    const res = await secureFetch("/api/payments/escrow/active", { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const payload = await res.json().catch(() => []);
-    const items = Array.isArray(payload?.items) ? payload.items : Array.isArray(payload) ? payload : [];
+    if (!/^[a-f0-9]{24}$/i.test(ownerId)) throw Error('Missing payment owner');
+    const api = createApiClient({ onAuthenticationLost: () => { state.billing.escrows = []; state.billing.escrowsLoaded = false; body.replaceChildren(); } });
+    const items = [], seen = new Set(); let cursor = null, revision, count;
+    do {
+      const payload = await api.readPaymentActivity({ ownerId, signal: controller.signal, limit: 500, ...(cursor !== null ? { cursor, revision } : {}) });
+      if (controller.signal.aborted || generation !== state.billing.generation) return;
+      if (payload?.ownerId !== ownerId || !/^[a-f0-9]{64}$/.test(payload.revision || '') || revision && payload.revision !== revision || !Number.isSafeInteger(payload.count) || payload.count < 0 || payload.count > 10000 || count !== undefined && payload.count !== count || !Array.isArray(payload.items) || payload.items.length > 500) throw Error('Unverified payment page');
+      revision = payload.revision; count = payload.count;
+      for (const item of payload.items) {
+        if (!item || !/^[a-f0-9]{24}$/i.test(item.caseId) || seen.has(item.caseId) || typeof item.caseName !== 'string' || !['active', 'needs_review'].includes(item.status) || item.amountHeld !== null && (!Number.isSafeInteger(item.amountHeld) || item.amountHeld < 0) || item.currency !== null && !/^[A-Z]{3}$/.test(item.currency) || item.fundedAt !== null && (!item.fundedAt || !Number.isFinite(new Date(item.fundedAt).getTime()))) throw Error('Unverified payment record');
+        const knownCurrency = item.currency && Intl.supportedValuesOf('currency').includes(item.currency) && new Intl.NumberFormat('en-US', { style: 'currency', currency: item.currency }).resolvedOptions().maximumFractionDigits === 2;
+        if (item.currency !== null && !knownCurrency || item.status === 'active' && (!knownCurrency || !Number.isSafeInteger(item.amountHeld) || item.amountHeld <= 0 || !item.fundedAt) || item.status === 'needs_review' && item.amountHeld !== null) throw Error('Contradictory payment record');
+        seen.add(item.caseId); items.push(item);
+      }
+      if (payload.nextCursor !== null && (payload.nextCursor !== String(items.length) || !payload.items.length || items.length >= count) || payload.nextCursor === null && items.length !== count) throw Error('Incomplete payment pages');
+      cursor = payload.nextCursor;
+    } while (cursor !== null);
     state.billing.escrows = items;
     state.billing.escrowsLoaded = true;
     state.billing.escrowPage = 0;
     renderActiveEscrows(body, items);
   } catch (err) {
-    console.warn("Unable to load escrow activity", err);
-    if (state.billing.escrowsLoaded) {
-      renderActiveEscrows(body, state.billing.escrows);
-    } else {
-      state.billing.escrows = [];
-      renderActiveEscrows(body, [], { errorMessage: "Unable to load payment activity right now." });
-    }
-  }
+    if (generation !== state.billing.generation) return;
+    state.billing.escrows = []; state.billing.escrowsLoaded = false;
+    renderActiveEscrows(body, [], { errorMessage: 'Payment activity could not be verified. Refresh to try again.' });
+  } finally { clearTimeout(timer); window.removeEventListener('pagehide', abort); if (refresh && generation === state.billing.generation) refresh.disabled = false; }
 }
 
 function renderActiveEscrows(body, escrows = [], options = {}) {
@@ -2298,7 +2152,7 @@ function renderActiveEscrows(body, escrows = [], options = {}) {
     return;
   }
   if (!escrows.length) {
-    body.innerHTML = `<tr><td colspan="6" class="empty-state">No active payments.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="empty-state">No active funded Matters.</td></tr>`;
     updateEscrowSortHeaders();
     updateEscrowPagination(0);
     return;
@@ -2315,7 +2169,7 @@ function renderActiveEscrows(body, escrows = [], options = {}) {
     .map((record) => {
       const caseId = parseCaseId(record);
       const title = sanitize(record.caseTitle || record.caseName || record.title || "Matter");
-      const caseHref = caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "";
+      const caseHref = caseId ? `/attorney-v2.html#/matters/${caseId}/financials` : "";
       const paralegalName = sanitize(
         record.paralegalName ||
           (record.paralegal && [record.paralegal.firstName, record.paralegal.lastName].filter(Boolean).join(" ")) ||
@@ -2325,18 +2179,13 @@ function renderActiveEscrows(body, escrows = [], options = {}) {
       const paralegalHref = paralegalId
         ? buildParalegalProfileUrl(paralegalId, { returnTo: buildBillingReturnUrl() })
         : "";
-      const fundedDate = formatDisplayDate(record.fundedAt || record.createdAt || record.updatedAt);
+      const fundedDate = formatDisplayDate(record.fundedAt);
       const caseStatus = sanitize(formatActiveEscrowCaseStatus(record));
       const status = sanitize(formatActiveEscrowPaymentStatus(record));
-      const amount = formatCurrency(
-        normalizeAmountToCents(
-          record.amountHeld ??
-            record.amount ??
-            record.lockedTotalAmount ??
-            record.totalAmount ??
-            record.budget
-        )
-      );
+      let amount = 'Not confirmed';
+      if (Number.isSafeInteger(record.amountHeld) && record.amountHeld >= 0 && record.currency) {
+        try { amount = new Intl.NumberFormat('en-US', { style: 'currency', currency: record.currency }).format(record.amountHeld / 100); } catch { /* Preserve the unconfirmed amount. */ }
+      }
       return `
         <tr data-case-id="${caseId || ""}">
           <td>${
@@ -2499,20 +2348,17 @@ function compareStrings(left, right) {
 function formatActiveEscrowCaseStatus(record = {}) {
   if (record.archived === true) return "Archived";
   const normalized = normalizeCaseStatus(record.caseStatus || "");
-  if (normalized === "paused") return "Paused";
-  if (normalized === "archived") return "Archived";
-  return "Active";
+  return ({ paused: 'Paused', archived: 'Archived', open: 'Posted', completed: 'Completed', closed: 'Closed', disputed: 'Disputed', 'in progress': 'In progress' })[normalized] || 'Status unavailable';
 }
 
 function formatActiveEscrowPaymentStatus(record = {}) {
   const statusRaw = String(record.status || record.escrowStatus || "").toLowerCase();
-  if (statusRaw.includes("pending") || statusRaw === "awaiting_release") {
-    return "Pending Approval";
-  }
+  const confirmed = { active: 'Funds recorded', needs_review: 'Needs review', pending: 'Funding pending', funding_needed: 'Funding needed', settled: 'Settled' };
+  if (confirmed[statusRaw]) return confirmed[statusRaw];
   if (statusRaw) {
     return statusRaw.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
   }
-  return "In Progress";
+  return "Status unavailable";
 }
 
 function parseEscrowSort(sortValue = "") {
@@ -2576,20 +2422,14 @@ function buildBillingReturnUrl() {
   return "dashboard-attorney.html#funds";
 }
 
-function getUniqueCaseRecords(records = []) {
-  const unique = new Map();
-  records.forEach((item) => {
-    const key = parseCaseId(item);
-    if (!key || unique.has(String(key))) return;
-    unique.set(String(key), item);
-  });
-  return Array.from(unique.values());
-}
+
 
 function getCaseEntryById(caseId) {
   const key = String(caseId || "");
   if (!key) return null;
   return (
+    currentMatterInventory?.state.result?.items.find((item) => String(parseCaseId(item)) === key) ||
+    currentDraftInventory?.state.result?.items.find((item) => !item.localDraft && String(parseCaseId(item)) === key) ||
     state.caseLookup.get(key) ||
     state.cases.find((item) => String(parseCaseId(item)) === key) ||
     state.casesArchived.find((item) => String(parseCaseId(item)) === key) ||
@@ -3003,19 +2843,20 @@ async function initCasesPage() {
   const searchInput = document.querySelector("[data-cases-search]");
   const tabs = document.querySelectorAll("[data-case-filter]");
 
-  try {
-    await Promise.all([loadCasesWithFiles(), loadArchivedCases(), loadApplicationsForMyJobs(), loadCaseDrafts()]);
-  } catch (err) {
-    console.warn("Unable to load cases", err);
-  }
+  // Drawer compatibility caches are independent of the complete Home and Matter
+  // inventories. A pending cache must not block list rows or controls.
+  void Promise.all([loadCasesWithFiles(), loadArchivedCases(), loadApplicationsForMyJobs()])
+    .catch((err) => console.warn("Unable to load Matter summaries", err));
   setupMatterProductivityFilters();
   setupMatterSavedViews();
+  void loadCaseDrafts();
   renderCasesView();
 
   searchInput?.addEventListener("input", (event) => {
     matterSavedViews?.markCustom();
     state.casesSearchTerm = event.target.value.trim().toLowerCase();
-    state.casesPage[state.casesViewFilter] = 0;
+    resetMatterPages();
+    writeMatterFilterStateToUrl();
     renderCasesView();
   });
 
@@ -3025,10 +2866,38 @@ async function initCasesPage() {
       if (!target || target === state.casesViewFilter) return;
       setCaseFilter(target);
     });
+    tab.addEventListener("keydown", (event) => {
+      if (event.altKey || event.ctrlKey || event.metaKey || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const index = Array.from(tabs).indexOf(tab);
+      const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 :
+        (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+      const next = tabs[nextIndex];
+      setCaseFilter(next.dataset.caseFilter);
+      next.focus();
+    });
   });
 
   wrapper.addEventListener("click", onCasesTableClick);
   wrapper.addEventListener("click", onCasesPaginationClick);
+  wrapper.addEventListener("click", (event) => {
+    const matterRefresh = event.target.closest('[data-matters-retry], [data-matters-refresh], [data-matters-last-page]');
+    if (matterRefresh) {
+      if (matterRefresh.hasAttribute('data-matters-last-page')) {
+        state.casesPage[state.casesViewFilter] = Math.max(0, (currentMatterInventory?.state.result?.pages || 1) - 1);
+        writeMatterFilterStateToUrl();
+      }
+      void refreshCurrentMattersFrom(matterRefresh);
+    }
+    const retry = event.target.closest('[data-drafts-retry], [data-drafts-refresh]');
+    if (retry) void refreshDraftInventoryFrom(retry);
+    const last = event.target.closest('[data-drafts-last-page]');
+    if (last) {
+      state.casesPage.draft = Math.max(0, (currentDraftInventory?.state.result?.pages || 1) - 1);
+      writeMatterFilterStateToUrl();
+      void refreshDraftInventoryFrom(last);
+    }
+  });
   wrapper.addEventListener("change", onDraftSelectionChange);
   wrapper.addEventListener("change", onArchivedSelectionChange);
   document.addEventListener("click", (evt) => {
@@ -3061,24 +2930,13 @@ async function initCasesPage() {
     archivedStatusFilter.value = state.archivedStatusFilter || "all";
     archivedStatusFilter.addEventListener("change", (event) => {
       state.archivedStatusFilter = event.target.value || "all";
-      if (state.casesPage) {
-        state.casesPage.archived = 0;
-      }
+      matterSavedViews?.markCustom();
+      if (state.casesPage) state.casesPage.archived = 0;
+      writeMatterFilterStateToUrl();
       renderCasesView();
     });
   }
   setupCaseNoteModal();
-  window.addEventListener("lpc-case-notes-updated", async (event) => {
-    const targetId = event?.detail?.caseId;
-    if (!targetId) return;
-    try {
-      const payload = await fetchCaseNote(targetId);
-      applyNoteToState(targetId, payload);
-      renderCasesView();
-    } catch (err) {
-      console.warn("External note refresh failed", err);
-    }
-  });
 
   showCasePostedPopup();
 }
@@ -3088,19 +2946,30 @@ function readMatterFilterStateFromUrl() {
   const deadline = String(params.get("matterDeadline") || "");
   const updated = String(params.get("matterUpdated") || "");
   const sort = String(params.get("matterSort") || "recent");
+  state.archivedStatusFilter = ["completed", "paused", "archived"].includes(params.get("archiveStatus")) ? params.get("archiveStatus") : "all";
+  const search = document.querySelector("[data-cases-search]");
+  if (search) search.value = String(params.get("q") || "").slice(0, 200);
+  state.casesSearchTerm = String(search?.value || "").trim().toLowerCase();
   state.matterPracticeFilter = String(params.get("matterPractice") || "").slice(0, 120);
   state.matterDeadlineFilter = ["overdue", "7_days", "none"].includes(deadline) ? deadline : "";
   state.matterUpdatedFilter = ["7_days", "30_days"].includes(updated) ? updated : "";
   state.matterSort = ["recent", "deadline", "status", "alphabetical"].includes(sort) ? sort : "recent";
+  for (const view of CASE_VIEW_FILTERS) {
+    const page = params.get(`${view}Page`);
+    state.casesPage[view] = /^[1-9]\d{0,6}$/.test(page || '') && Number(page) <= 1000000 ? Number(page) - 1 : 0;
+  }
 }
 
 function writeMatterFilterStateToUrl() {
   const url = new URL(window.location.href);
   const values = {
+    q: String(document.querySelector("[data-cases-search]")?.value || ""),
+    archiveStatus: state.archivedStatusFilter === "all" ? "" : state.archivedStatusFilter,
     matterPractice: state.matterPracticeFilter,
     matterDeadline: state.matterDeadlineFilter,
     matterUpdated: state.matterUpdatedFilter,
     matterSort: state.matterSort === "recent" ? "" : state.matterSort,
+    ...Object.fromEntries(CASE_VIEW_FILTERS.map(view => [`${view}Page`, state.casesPage[view] ? state.casesPage[view] + 1 : ''])),
   };
   Object.entries(values).forEach(([key, value]) => {
     if (value) url.searchParams.set(key, value);
@@ -3115,7 +2984,8 @@ function populateMatterPracticeFilter(select) {
     ...(state.cases || []),
     ...(state.casesArchived || []),
     ...(state.localDrafts || []),
-  ].map((item) => String(item?.practiceArea || "").trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  ].map((item) => String(item?.practiceArea || "").trim()).filter(Boolean).concat(currentDraftInventory?.state.result?.practices || [], currentMatterInventory?.state.result?.practices || []))].sort((left, right) => left.localeCompare(right));
+  if (state.matterPracticeFilter && !areas.includes(state.matterPracticeFilter)) areas.push(state.matterPracticeFilter);
   select.replaceChildren(new Option("All practice areas", ""));
   areas.forEach((area) => select.add(new Option(area, area)));
   select.value = areas.includes(state.matterPracticeFilter) ? state.matterPracticeFilter : "";
@@ -3174,12 +3044,13 @@ function setupMatterSavedViews() {
   const updated = document.querySelector("[data-matter-updated-filter]");
   const sort = document.querySelector("[data-matter-sort]");
 
-  matterSavedViews = mountDashboardSavedViews({
-    scope: "attorney_matters",
-    picker: "[data-matter-saved-view]",
-    saveButton: "[data-matter-save-view]",
-    deleteButton: "[data-matter-delete-view]",
-    status: "[data-matter-saved-view-status]",
+  matterSavedViews = mountAttorneySavedViews({
+    api: caseNoteApi, privateState: caseNoteState, ownerId: String(state.user?.id || state.user?._id || ""), signal: new AbortController().signal,
+    host: document.querySelector("[data-attorney-saved-view-host]"),
+    picker: document.querySelector("[data-matter-saved-view]"),
+    saveButton: document.querySelector("[data-matter-save-view]"),
+    deleteButton: document.querySelector("[data-matter-delete-view]"),
+    status: document.querySelector("[data-matter-saved-view-status]"),
     builtIns: [
       { id: "active", name: "Active matters", filters: { view: "active", sort: "recent" } },
       { id: "deadlines", name: "Upcoming deadlines", filters: { view: "active", deadline: "7_days", sort: "deadline" } },
@@ -3187,6 +3058,7 @@ function setupMatterSavedViews() {
     ],
     getState: () => ({
       view: state.casesViewFilter,
+      archiveStatus: state.archivedStatusFilter,
       search: String(search?.value || ""),
       practice: state.matterPracticeFilter,
       deadline: state.matterDeadlineFilter,
@@ -3194,6 +3066,9 @@ function setupMatterSavedViews() {
       sort: state.matterSort,
     }),
     applyState: (filters = {}) => {
+      state.archivedStatusFilter = filters.archiveStatus || "all";
+      const archive = document.querySelector("[data-archived-status-filter]");
+      if (archive) archive.value = state.archivedStatusFilter;
       if (search) search.value = String(filters.search || "");
       state.casesSearchTerm = String(filters.search || "").trim().toLowerCase();
       state.matterPracticeFilter = String(filters.practice || "");
@@ -3278,6 +3153,7 @@ async function loadArchivedCases(force = false) {
       console.error(err);
       state.casesArchived = [];
     } finally {
+      if (force && currentMatterInventory) await loadCurrentMatters({ force: true });
       state.casesArchivedPromise = null;
     }
     return state.casesArchived;
@@ -3286,6 +3162,9 @@ async function loadArchivedCases(force = false) {
 }
 
 function renderCasesView() {
+  if (currentDraftInventory) void loadCaseDrafts();
+  if (state.casesViewFilter !== 'draft') void loadCurrentMatters();
+  const focused = document.activeElement, focusedCase = focused?.closest?.('[data-case-id]')?.dataset.caseId;
   if (state.casesViewFilter !== "draft" && state.draftSelection.size) {
     state.draftSelection.clear();
   }
@@ -3295,116 +3174,34 @@ function renderCasesView() {
   pruneDraftSelection();
   pruneArchivedSelection();
   state.localDrafts = readLocalDrafts();
-  const totals = computeCaseCounts();
-  Object.entries(totals).forEach(([key, count]) => {
-    const target = document.querySelector(`[data-case-count="${key}"]`);
-    if (target) target.textContent = String(count);
-  });
-
+  updateCurrentMatterCounts();
   CASE_VIEW_FILTERS.forEach((key) => {
     const body = document.querySelector(`[data-table-body="${key}"]`);
     if (!body) return;
-    const records = getCasesByFilter(key, { applySearch: key === state.casesViewFilter });
-    const totalCount = records.length;
-    const pageIndex = Math.max(0, state.casesPage?.[key] ?? 0);
-    const totalPages = Math.max(1, Math.ceil(totalCount / CASE_PAGE_SIZE));
-    const safeIndex = Math.min(pageIndex, totalPages - 1);
-    if (safeIndex !== pageIndex) {
-      state.casesPage[key] = safeIndex;
-    }
-    const start = safeIndex * CASE_PAGE_SIZE;
-    const pageItems = records.slice(start, start + CASE_PAGE_SIZE);
-    if (!pageItems.length) {
-      const searchActive = state.casesSearchTerm && key === state.casesViewFilter;
-      const filtersActive = Boolean(state.matterPracticeFilter || state.matterDeadlineFilter || state.matterUpdatedFilter);
-      const message = searchActive || filtersActive ? "No matters match these filters. Reset filters to see more." : "No matters in this category yet.";
-      const span = 3;
-      body.innerHTML = `<tr><td colspan="${span}" class="empty-row">${message}</td></tr>`;
-      updateCasesPagination(key, 0);
-      return;
-    }
-    body.innerHTML = pageItems.map((item) => renderCaseRow(item, key)).join("");
-    updateCasesPagination(key, totalCount);
+    if (key === 'draft') renderDraftInventory(body);
+    else if (key === state.casesViewFilter) renderCurrentMatterInventory(body, key);
+    else { body.replaceChildren(); updateCasesPagination(key, 0); }
   });
   updateMatterFilterSummary();
   maybeHighlightArchivedCase();
+  if (focusedCase && !focused.isConnected) focusApplicationParent(focusedCase);
 }
 
-function computeCaseCounts() {
-  const counts = {
-    active: 0,
-    draft: Array.isArray(state.localDrafts) ? state.localDrafts.length : 0,
-    archived: getArchivedBucketCases().length,
-    inquiries: 0,
-  };
-  state.cases.forEach((item) => {
-    const bucket = categorizeCase(item);
-    if (bucket === "archived") return;
-    if (counts[bucket] !== undefined) counts[bucket] += 1;
-  });
-  return counts;
+function updateCurrentMatterCounts() {
+  const result = state.casesViewFilter === 'draft' ? currentDraftInventory?.state.result : currentMatterInventory?.state.result;
+  for (const view of CASE_VIEW_FILTERS) {
+    const count = result?.counts[view === 'inquiries' ? 'applications' : view];
+    const target = document.querySelector(`[data-case-count="${view}"]`);
+    if (!target) continue;
+    target.textContent = count == null ? '—' : String(count);
+    if (count == null) target.setAttribute('aria-label', 'Count unavailable');
+    else target.removeAttribute('aria-label');
+  }
 }
 
-function getCasesByFilter(filterKey, { applySearch = false } = {}) {
-  let source = state.cases;
-  if (filterKey === "archived") {
-    source = getArchivedBucketCases();
-  } else {
-    source = source.filter((item) => categorizeCase(item) === filterKey);
-  }
-  if (filterKey === "draft" && Array.isArray(state.localDrafts) && state.localDrafts.length) {
-    source = [...state.localDrafts, ...source];
-  }
-  let records = [...source];
-  if (applySearch && state.casesSearchTerm) {
-    records = records.filter((item) => matchesCaseSearch(item, state.casesSearchTerm));
-  }
-  if (filterKey === "archived") {
-    records = applyArchivedStatusFilter(records);
-  }
-  records = applyMatterProductivityFilters(records);
-  records.sort(compareMatterRecords);
-  return records;
-}
-
-function applyMatterProductivityFilters(records = []) {
-  const now = Date.now();
-  const sevenDays = 7 * 24 * 60 * 60 * 1000;
-  const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-  return records.filter((item) => {
-    if (state.matterPracticeFilter && String(item?.practiceArea || "") !== state.matterPracticeFilter) return false;
-    const deadlineDate = window.LPCBusinessDate?.matterValue(item) || "";
-    const today = window.LPCBusinessDate?.today() || "";
-    const sevenDaysFromToday = window.LPCBusinessDate?.addDays(today, 7) || "";
-    if (state.matterDeadlineFilter === "none" && deadlineDate) return false;
-    if (state.matterDeadlineFilter === "overdue" && (!deadlineDate || !today || deadlineDate >= today)) return false;
-    if (
-      state.matterDeadlineFilter === "7_days" &&
-      (!deadlineDate || !today || !sevenDaysFromToday || deadlineDate < today || deadlineDate > sevenDaysFromToday)
-    ) return false;
-    const updated = new Date(item?.updatedAt || item?.createdAt || 0).getTime();
-    if (state.matterUpdatedFilter === "7_days" && (!updated || updated < now - sevenDays)) return false;
-    if (state.matterUpdatedFilter === "30_days" && (!updated || updated < now - thirtyDays)) return false;
-    return true;
-  });
-}
-
-function compareMatterRecords(left, right) {
-  const sort = state.matterSort || "recent";
-  if (sort === "alphabetical") return String(left?.title || "").localeCompare(String(right?.title || ""));
-  if (sort === "status") {
-    const leftLabel = CASE_STATUS_LABELS[normalizeCaseStatus(left?.status)] || String(left?.status || "");
-    const rightLabel = CASE_STATUS_LABELS[normalizeCaseStatus(right?.status)] || String(right?.status || "");
-    return leftLabel.localeCompare(rightLabel) || String(left?.title || "").localeCompare(String(right?.title || ""));
-  }
-  if (sort === "deadline") {
-    const leftDeadline = window.LPCBusinessDate?.matterValue(left) || "9999-12-31";
-    const rightDeadline = window.LPCBusinessDate?.matterValue(right) || "9999-12-31";
-    return leftDeadline.localeCompare(rightDeadline) || String(left?.title || "").localeCompare(String(right?.title || ""));
-  }
-  const leftTime = new Date(left?.updatedAt || left?.createdAt || 0).getTime();
-  const rightTime = new Date(right?.updatedAt || right?.createdAt || 0).getTime();
-  return rightTime - leftTime;
+function getCasesByFilter(view) {
+  if (view === 'draft') return currentDraftInventory?.state.result?.items || [];
+  return view === state.casesViewFilter ? currentMatterInventory?.state.result?.items || [] : [];
 }
 
 function updateMatterFilterSummary() {
@@ -3439,28 +3236,13 @@ function updateCasesPagination(filterKey, totalCount) {
   pagination.style.display = totalCount > CASE_PAGE_SIZE ? "flex" : "none";
 }
 
-function applyArchivedStatusFilter(records = []) {
-  const filter = state.archivedStatusFilter || "all";
-  if (filter === "all") return records;
-  return records.filter((item) => {
-    const status = normalizeCaseStatus(item?.status);
-    const isCompleted = isCompletedDashboardCase(item);
-    const isPaused = status === "paused";
-    const isArchived = isArchivedBucketCase(item) && !isCompleted && !isPaused;
-    if (filter === "completed") return isCompleted;
-    if (filter === "paused") return isPaused;
-    if (filter === "archived") return isArchived;
-    return true;
-  });
-}
-
 function onCasesPaginationClick(event) {
   const button = event.target.closest("[data-page-action]");
   if (!button) return;
   const action = button.dataset.pageAction;
   const target = button.dataset.pageTarget;
   if (!target || !state.casesPage) return;
-  const total = getCasesByFilter(target, { applySearch: target === state.casesViewFilter }).length;
+  const total = (target === 'draft' ? currentDraftInventory : currentMatterInventory)?.state.result?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / CASE_PAGE_SIZE));
   const current = Math.max(0, state.casesPage[target] ?? 0);
   let nextIndex = current;
@@ -3468,34 +3250,9 @@ function onCasesPaginationClick(event) {
   if (action === "next") nextIndex = Math.min(totalPages - 1, current + 1);
   if (nextIndex === current) return;
   state.casesPage[target] = nextIndex;
-  renderCasesView();
-}
-
-function categorizeCase(item) {
-  if (item.localDraft) return "draft";
-  if (isArchivedBucketCase(item)) return "archived";
-  const status = String(item.status || "").toLowerCase();
-  const applicantCount = Number(
-    item.applicantsCount ?? (Array.isArray(item.applicants) ? item.applicants.length : item.applicants) ?? 0
-  );
-  if (!item.paralegal && applicantCount > 0) return "inquiries";
-  if (status === "draft") return "draft";
-  return "active";
-}
-
-function matchesCaseSearch(item, term) {
-  if (!term) return true;
-  const haystack = [
-    item.title,
-    item.practiceArea,
-    item.paralegal?.name,
-    item.paralegal?.firstName,
-    item.paralegal?.lastName,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(term);
+  writeMatterFilterStateToUrl();
+  if (target === 'draft') renderCasesView();
+  else void refreshCurrentMattersFrom(button);
 }
 
 function extractApplicantState(rawLocation = "") {
@@ -3638,27 +3395,25 @@ function formatApplicantConflictsResponse(type = "") {
 
 function buildApplicantDrawerRow(applicant, index, caseId) {
   const avatar = applicant.avatar
-    ? `<img src="${sanitize(applicant.avatar)}" alt="${sanitize(applicant.name)} profile photo" />`
+    ? `<img src="${sanitize(applicant.avatar)}" alt="" />`
     : `<span>${sanitize((applicant.name || "P")[0] || "P")}</span>`;
   const appliedText = formatApplicantDate(applicant.appliedAt);
-  const stateText = applicant.state || "—";
-  const experienceText = formatApplicantExperience(applicant.yearsExperience);
-  const metaParts = [appliedText, stateText, experienceText].filter(Boolean);
+  const metaParts = [appliedText].filter(Boolean);
   const metaHtml = metaParts.map((part) => `<span>${sanitize(part)}</span>`).join('<span class="dot">•</span>');
   const preEngagementLabel = formatApplicantPreEngagementStatus(applicant.preEngagement);
   return `
-    <div class="applicant-card" data-applicant-row data-case-id="${sanitize(caseId)}" data-applicant-index="${index}">
-      <div class="applicant-card-top">
-        <div class="applicant-avatar">${avatar}</div>
-        <div class="applicant-card-info">
-          <div class="applicant-card-name">
+    <button type="button" class="applicant-card" data-applicant-row data-case-id="${sanitize(caseId)}" data-applicant-index="${index}" aria-pressed="false">
+      <span class="applicant-card-top">
+        <span class="applicant-avatar">${avatar}</span>
+        <span class="applicant-card-info">
+          <span class="applicant-card-name">
             <span class="applicant-name applicant-name--serif">${sanitize(applicant.name)}</span>
-          </div>
-          <div class="applicant-card-meta">${metaHtml}</div>
-          ${preEngagementLabel ? `<div class="applicant-preengagement-flag">${sanitize(preEngagementLabel)}</div>` : ""}
-        </div>
-      </div>
-    </div>
+          </span>
+          <span class="applicant-card-meta">${metaHtml}</span>
+          ${preEngagementLabel ? `<span class="applicant-preengagement-flag">${sanitize(preEngagementLabel)}</span>` : ""}
+        </span>
+      </span>
+    </button>
   `;
 }
 
@@ -3673,7 +3428,6 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
   const resumeIsHttp = isHttpUrl(resumeURL);
   const resumeKey = resumeIsHttp ? "" : normalizeDocKey(resumeURL);
   const linkedInURL = applicant.linkedInURL || "";
-  const casePractice = titleCaseWords(caseItem?.practiceArea || caseItem?.field || "");
   const locationLabel = applicant.state || extractApplicantState(applicant.location) || "—";
   const experienceShort = formatApplicantExperience(applicant.yearsExperience);
   const experienceLong =
@@ -3685,7 +3439,6 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
   const iconBriefcase = `<svg viewBox="0 0 24 24" focusable="false"><path d="M9 7V6a3 3 0 0 1 6 0v1" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><rect x="4" y="7" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M4 12h16" stroke="currentColor" stroke-width="1.6" fill="none"/></svg>`;
   const iconPin = `<svg viewBox="0 0 24 24" focusable="false"><path d="M12 22s6-6.4 6-11a6 6 0 1 0-12 0c0 4.6 6 11 6 11Z" stroke="currentColor" stroke-width="1.6" fill="none"/><circle cx="12" cy="11" r="2.5" stroke="currentColor" stroke-width="1.6" fill="none"/></svg>`;
   const profileDetails = [];
-  if (casePractice) profileDetails.push(`Practice area: ${casePractice}`);
   if (applicant.specialties?.length) {
     profileDetails.push(`Specialties: ${applicant.specialties.join(", ")}`);
   }
@@ -3785,8 +3538,7 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
             ` : ""}
             ${preEngagement.status === "submitted" ? `
               <div class="applicant-preengagement-actions">
-                <button type="button" class="applicant-detail-chip hire-primary" data-preengagement-review-action="approve" data-case-id="${sanitize(caseId)}" data-paralegal-id="${sanitize(applicant.paralegalId)}">Approve and continue</button>
-                <button type="button" class="applicant-detail-chip" data-preengagement-review-action="request_changes" data-case-id="${sanitize(caseId)}" data-paralegal-id="${sanitize(applicant.paralegalId)}">Request changes</button>
+                <button type="button" class="applicant-detail-chip hire-primary" data-preengagement-review-action="approve" data-case-id="${sanitize(caseId)}" data-paralegal-id="${sanitize(applicant.paralegalId)}">Review response</button>
               </div>
             ` : ""}
           </div>
@@ -3809,7 +3561,7 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
       </div>
       <aside class="applicant-detail-side">
         <div class="applicant-side-card">
-          <div class="applicant-side-name">${sanitize(applicant.name || "Applicant")}</div>
+
           <div class="applicant-side-meta">
             <div><span class="icon" aria-hidden="true">${iconAvailable}</span>${sanitize(availabilityLabel)}</div>
             <div><span class="icon" aria-hidden="true">${iconBriefcase}</span>${sanitize(experienceLong)}</div>
@@ -3837,7 +3589,7 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
 }
 
 function renderCaseRow(item, filterKey = "active") {
-  let client = item.paralegal?.name || item.paralegalNameSnapshot || "Awaiting hire";
+  let client = item.paralegal?.name || item.paralegalNameSnapshot || "";
   const pendingInvites = Array.isArray(item.invites)
     ? item.invites.filter((invite) => String(invite?.status || "pending").toLowerCase() === "pending")
     : [];
@@ -3854,10 +3606,7 @@ function renderCaseRow(item, filterKey = "active") {
     client = "Invitation Sent";
   }
   const practice = titleCaseWords(item.practiceArea || item.field || "General");
-  const created = formatCaseDate(item.createdAt || item.updatedAt);
-  const updated = formatCaseDate(item.updatedAt || item.completedAt || item.createdAt);
-  const displayedDate =
-    filterKey === "draft" ? updated : filterKey === "archived" ? updated : created;
+  const displayedDate = formatCaseDate(item.updatedAt || item.completedAt || item.createdAt);
   const normalizedStatus = normalizeCaseStatus(item.status);
   const isCompletedStatus = normalizedStatus === "completed" || normalizedStatus === "closed";
   const isManualArchived =
@@ -3920,39 +3669,33 @@ function renderCaseRow(item, filterKey = "active") {
           caseId ? "" : ' disabled aria-disabled="true"'
         }>Review ${applicantCount || 0} applicant${applicantCount === 1 ? "" : "s"}</button>`
       : "";
-  const titleMarkup = item.localDraft
-    ? `<a href="create-case.html?draftId=${encodeURIComponent(caseId)}#description">${sanitize(item.title || "Untitled Matter")}</a>`
+  const retainedDraft = !item.localDraft && normalizedStatus === "draft" && !item.archived;
+  const titleMarkup = item.localDraft || retainedDraft
+    ? `<a href="${sanitize(currentDraftEditorHref(caseId, retainedDraft))}">${sanitize(item.title || "Untitled Matter")}</a>`
     : canOpenDetail || previewOnly
     ? `<button type="button" class="case-title-trigger" data-case-action="details" data-case-id="${sanitize(caseId)}">${sanitize(
         item.title || "Untitled Matter"
       )}</button>`
     : `<span>${sanitize(item.title || "Untitled Matter")}</span>`;
-  const primaryAction = item.localDraft
-    ? `<a class="matter-primary-action" href="create-case.html?draftId=${encodeURIComponent(caseId)}#description">Continue draft</a>`
+  const primaryAction = item.localDraft || retainedDraft
+    ? `<a class="matter-primary-action" href="${sanitize(currentDraftEditorHref(caseId, retainedDraft))}">Continue draft</a>`
     : applicantsToggle ||
       `<button type="button" class="matter-primary-action" data-case-action="${
         canViewWorkspace ? "workspace" : "details"
       }" data-case-id="${sanitize(caseId)}">${
-        canViewWorkspace ? "Continue work" : filterKey === "archived" ? "View record" : "Open matter"
+        canViewWorkspace ? "Continue work" : filterKey === "archived" || normalizedStatus === "draft" ? "View record" : "Open matter"
       }</button>`;
-  const nextAction = item.localDraft
-    ? "Finish the matter details and publish when ready"
-    : moderationStatus === "flagged" || moderationStatus === "resolution_requested"
-    ? "Review the flagged listing"
-    : filterKey === "inquiries" && applicantCount
-    ? `${applicantCount} applicant${applicantCount === 1 ? "" : "s"} ready for review`
-    : canViewWorkspace
-    ? "Continue the current work"
-    : hasInvites
-    ? "Waiting for an invitation response"
-    : filterKey === "archived"
-    ? "Review the completed matter record"
-    : "Review the matter and choose the next step";
-  const dateLabel = filterKey === "draft" ? "Edited" : filterKey === "archived" ? "Archived" : "Updated";
+  const nextAction = ["flagged", "resolution_requested"].includes(moderationStatus)
+    ? "Review the requested changes"
+    : "";
+  const dateLabel = filterKey === "draft" ? "Edited" : "Updated";
+  const dateMeta = displayedDate === "—" ? "" : `<span class="matter-meta-item">${dateLabel} ${sanitize(displayedDate)}</span>`;
+  const statusMarkup = filterKey === "draft" && statusKey === "draft" ? "" : `<span class="status ${statusClass}">${statusText}</span>`;
+  const rowStatus = statusMarkup + moderationBadge + withdrawalBadge;
   const deadlineMeta = item.deadline
     ? `<span class="matter-meta-item matter-meta-deadline">Due ${sanitize(formatCaseDate(item.deadline))}</span>`
     : "";
-  const paralegalMeta = filterKey === "draft" ? "" : `<span class="matter-meta-item">${sanitize(client)}</span>`;
+  const paralegalMeta = filterKey === "draft" || !client ? "" : `<span class="matter-meta-item">${sanitize(client)}</span>`;
   const amountMeta = amountDisplay === "—" ? "" : `<span class="matter-meta-item">${sanitize(amountDisplay)}</span>`;
   const drawerRow =
     filterKey === "inquiries"
@@ -3963,7 +3706,7 @@ function renderCaseRow(item, filterKey = "active") {
       <td colspan="3">
         <div class="applicant-drawer" data-applicants-drawer data-case-id="${sanitize(caseId)}">
           <div class="applicant-drawer-header">
-            <div class="applicant-drawer-title">Applicants for ${sanitize(item.title || "Matter")}</div>
+            <div class="applicant-drawer-title">Applicants</div>
             <button type="button" class="applicant-drawer-close" data-applicants-close aria-label="Close applicants">Close</button>
           </div>
           <div class="applicant-drawer-body">
@@ -3982,23 +3725,25 @@ function renderCaseRow(item, filterKey = "active") {
       : "";
   return `
     <tr class="matter-queue-row" data-case-id="${sanitize(caseId)}">
-      <td class="matter-identity">
+      <td class="matter-identity"${rowStatus || nextAction ? "" : ' colspan="2"'}>
         <div class="matter-title-line">${titleMarkup}</div>
         <div class="matter-meta" aria-label="Matter details">
           <span class="matter-meta-item">${sanitize(practice)}</span>
           ${paralegalMeta}
           ${amountMeta}
           ${deadlineMeta}
-          <span class="matter-meta-item">${dateLabel} ${sanitize(displayedDate)}</span>
+          ${dateMeta}
         </div>
       </td>
-      <td class="matter-next-step">
-        <div class="matter-status-line"><span class="status ${statusClass}">${statusText}</span>${moderationBadge}${withdrawalBadge}</div>
-        <span class="matter-next-copy">${sanitize(nextAction)}</span>
-      </td>
+      ${rowStatus || nextAction ? `<td class="matter-next-step">
+        <div class="matter-status-line">${rowStatus}</div>
+        ${nextAction ? `<span class="matter-next-copy">${sanitize(nextAction)}</span>` : ""}
+      </td>` : ""}
       <td class="actions matter-row-actions">
-        ${primaryAction}
-        ${renderCaseMenu(item)}
+        <div class="matter-action-controls">
+          ${primaryAction}
+          ${renderCaseMenu(item)}
+        </div>
       </td>
     </tr>
     ${drawerRow}
@@ -4027,16 +3772,14 @@ function renderCaseMenu(item) {
     !hasAssigned &&
     !hasInvites &&
     !applicantsCount &&
-    (statusKey === "open" || statusKey === "draft" || !statusKey);
+    statusKey === "open";
   const moderationStatus = String(item?.moderationStatus || "none").toLowerCase();
-  const canMarkFlagResolved = item?.canMarkFlagResolved === true;
   if (item.localDraft) {
     return `
     <div class="case-actions" data-case-id="${baseCaseId}">
-      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}" data-case-menu-trigger>⋯</button>
-      <div class="case-menu" id="${menuId}" role="menu" style="width: 180px; min-width: 180px;">
-        <button type="button" class="menu-item" data-case-action="resume-draft" data-case-id="${baseCaseId}">Resume Draft</button>
-        <button type="button" class="menu-item danger" data-case-action="discard-draft" data-case-id="${baseCaseId}">Delete Matter</button>
+      <button class="menu-trigger" type="button" aria-label="More actions for ${sanitize(item.title || "Untitled Matter")}" aria-expanded="false" aria-controls="${menuId}" data-case-menu-trigger>⋯</button>
+      <div class="case-menu" id="${menuId}" role="group" aria-label="Matter actions">
+        <button type="button" class="menu-item danger" data-case-action="discard-draft" data-case-id="${baseCaseId}">Delete draft</button>
       </div>
     </div>
     `;
@@ -4052,23 +3795,12 @@ function renderCaseMenu(item) {
       `<button type="button" class="menu-item" data-case-action="details" data-case-id="${baseCaseId}">View Details</button>`
     );
   }
-  if (moderationStatus === "flagged") {
-    if (canMarkFlagResolved) {
-      parts.push(
-        `<button type="button" class="menu-item" data-case-action="flag-resolved" data-case-id="${baseCaseId}">Flag resolved</button>`
-      );
-    } else {
-      parts.push(
-        `<span class="menu-item" aria-disabled="true">Edit matter to resolve flag</span>`
-      );
-    }
-  } else if (moderationStatus === "resolution_requested") {
-    parts.push(
-      `<span class="menu-item" aria-disabled="true">Awaiting admin review</span>`
-    );
+  if (["flagged", "resolution_requested"].includes(moderationStatus)) {
+    parts.push(`<button type="button" class="menu-item" data-case-action="flag-resolved" data-case-id="${baseCaseId}">Review admin edit request</button>`);
   }
   parts.push(
-    `<button type="button" class="menu-item" data-case-action="status-history" data-case-id="${baseCaseId}">View Status History</button>`
+    `<button type="button" class="menu-item" data-case-action="status-history" data-case-id="${baseCaseId}">View Status History</button>`,
+    `<button type="button" class="menu-item" data-case-action="edit-note" data-case-id="${baseCaseId}">Edit Matter note</button>`
   );
   if (!previewOnly && canOpenDetail && !canViewWorkspace) {
     parts.push(
@@ -4086,19 +3818,12 @@ function renderCaseMenu(item) {
       `<button type="button" class="menu-item" data-case-action="view-invited" data-case-id="${baseCaseId}">View Invited Paralegals</button>`
     );
   }
-  if (hasDeliverables(item) && !item.archived) {
-    parts.push(
-      `<button type="button" class="menu-item" data-case-action="download" data-case-id="${baseCaseId}">Download Files</button>`
-    );
-  }
-  if (isFinal) {
-    parts.push(
-      `<button type="button" class="menu-item" data-case-action="download-receipt" data-case-id="${baseCaseId}">Download Receipt</button>`
-    );
-  }
+  parts.push(`<button type="button" class="menu-item" data-case-action="application-review" data-case-id="${baseCaseId}">Review applications</button>`);
+  parts.push(`<button type="button" class="menu-item" data-case-action="download" data-case-id="${baseCaseId}">Download Files</button>`);
+  parts.push(`<button type="button" class="menu-item" data-case-action="download-receipt" data-case-id="${baseCaseId}">View receipt</button>`);
   if (item.archived) {
     parts.push(
-      `<button type="button" class="menu-item" data-case-action="download-archive" data-case-id="${baseCaseId}">Download Matter</button>`
+      `<button type="button" class="menu-item" data-case-action="download-archive" data-case-id="${baseCaseId}">Review archive download</button>`
     );
     if (!isFinal) {
       parts.push(
@@ -4110,6 +3835,7 @@ function renderCaseMenu(item) {
       `<button type="button" class="menu-item danger" data-case-action="archive" data-case-id="${baseCaseId}">Archive Matter</button>`
     );
   }
+  if (isFinal || (!item.archived && hasAssigned)) parts.push(`<button type="button" class="menu-item" data-case-action="archive-status" data-case-id="${baseCaseId}">View archive status</button>`);
   if (canDelete) {
     parts.push(
       `<button type="button" class="menu-item danger" data-case-action="delete-case" data-case-id="${baseCaseId}">Delete Matter</button>`
@@ -4120,8 +3846,8 @@ function renderCaseMenu(item) {
   }
   return `
     <div class="case-actions" data-case-id="${baseCaseId}">
-      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}" data-case-menu-trigger>⋯</button>
-      <div class="case-menu" id="${menuId}" role="menu" style="width: 180px; min-width: 180px;">
+      <button class="menu-trigger" type="button" aria-label="More actions for ${sanitize(item.title || "Untitled Matter")}" aria-expanded="false" aria-controls="${menuId}" data-case-menu-trigger>⋯</button>
+      <div class="case-menu" id="${menuId}" role="group" aria-label="Matter actions">
         ${parts.join("")}
       </div>
     </div>
@@ -4189,7 +3915,16 @@ function renderApplicantsInDrawer(caseId, applicants = [], drawerEl) {
     return;
   }
   body.innerHTML = visible.map((applicant, index) => buildApplicantDrawerRow(applicant, index, caseId)).join("");
-  drawerEl.querySelectorAll("[data-applicant-row]").forEach((row) => row.classList.remove("is-active"));
+  body.querySelectorAll(".applicant-avatar img").forEach((img) => {
+    const fallback = () => {
+      const initial = document.createElement("span");
+      initial.textContent = visible[Number(img.closest("[data-applicant-index]")?.dataset.applicantIndex)]?.name?.[0] || "P";
+      img.parentElement?.replaceChildren(initial);
+    };
+    img.addEventListener("error", fallback, { once: true });
+    if (img.complete && !img.naturalWidth) fallback();
+  });
+  drawerEl.querySelectorAll("[data-applicant-row]").forEach((row) => { row.classList.remove("is-active"); row.setAttribute("aria-pressed", "false"); });
   showApplicantDetail(caseId, 0, drawerEl);
 }
 
@@ -4262,9 +3997,9 @@ function showApplicantDetail(caseId, index, drawerEl) {
   );
   const applicant = applicants[index];
   if (!applicant) return;
-  drawerEl.querySelectorAll("[data-applicant-row]").forEach((row) => row.classList.remove("is-active"));
+  drawerEl.querySelectorAll("[data-applicant-row]").forEach((row) => { row.classList.remove("is-active"); row.setAttribute("aria-pressed", "false"); });
   const activeRow = drawerEl.querySelector(`[data-applicant-row][data-applicant-index="${index}"]`);
-  if (activeRow) activeRow.classList.add("is-active");
+  if (activeRow) { activeRow.classList.add("is-active"); activeRow.setAttribute("aria-pressed", "true"); }
   const detail = drawerEl.querySelector("[data-applicant-detail]");
   if (!detail) return;
   detail.innerHTML = buildApplicantDetail(applicant, { caseId });
@@ -4306,69 +4041,15 @@ async function openApplicantDocument(key) {
   }
 }
 
-function updateApplicantPreEngagement(caseId, paralegalId, preEngagement) {
-  const applicants = applicantDrawerCache.get(caseId) || [];
-  const next = applicants.map((entry) =>
-    String(entry?.paralegalId || "") === String(paralegalId || "")
-      ? { ...entry, preEngagement: preEngagement || null }
-      : entry
-  );
-  applicantDrawerCache.set(caseId, next);
-}
-
-async function reviewApplicantPreEngagement(caseId, paralegalId, action, button) {
-  if (!caseId || !paralegalId) return;
-  const originalLabel = button?.textContent || "Approve and continue";
-  if (button) {
-    button.disabled = true;
-    button.textContent = action === "approve" ? "Approving..." : "Requesting...";
-  }
-  try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/pre-engagement/review`, {
-      method: "POST",
-      body: { action },
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(payload?.error || "Unable to review pre-engagement.");
-    }
-    updateApplicantPreEngagement(caseId, paralegalId, payload?.preEngagement || null);
-    const drawerEl = getDrawerElement(caseId, document.querySelector(`[data-applicants-toggle][data-case-id="${caseId}"]`));
-    if (drawerEl) {
-      renderApplicantsInDrawer(caseId, applicantDrawerCache.get(caseId) || [], drawerEl);
-      showApplicantDetailById(caseId, paralegalId, drawerEl);
-    }
-    notifyCases(
-      action === "approve" ? "Pre-engagement approved." : "Changes requested for pre-engagement.",
-      "success"
-    );
-    if (action === "approve") {
-      const applicants = applicantDrawerCache.get(caseId) || [];
-      const approvedApplicant = applicants.find(
-        (entry) => String(entry?.paralegalId || "") === String(paralegalId)
-      );
-      await handleHireFromApplications({
-        caseId,
-        paralegalId,
-        paralegalName: approvedApplicant?.name || "Paralegal",
-        button,
-        skipPreEngagementStep: true,
-      });
-    }
-  } catch (err) {
-    notifyCases(err?.message || "Unable to review pre-engagement.", "error");
-    if (button) {
-      button.disabled = false;
-      button.textContent = originalLabel;
-    }
-  }
+async function reviewApplicantPreEngagement(caseId, paralegalId) {
+  await openCaseNoteModal(caseId, "preengagement", null, paralegalId);
 }
 
 function pruneArchivedSelection() {
   if (!state.archivedSelection) state.archivedSelection = new Set();
   if (!state.archivedSelection.size) return;
   const valid = new Set(
-    getArchivedBucketCases()
+    getCasesByFilter('archived')
       .filter((item) => canDeleteCase(item))
       .map((item) => String(parseCaseId(item)))
       .filter(Boolean)
@@ -4378,48 +4059,200 @@ function pruneArchivedSelection() {
   });
 }
 
-async function loadCaseDrafts() {
+function currentMatterTargetId() {
+  const target = state.casesViewFilter === 'archived' && !state.archiveHighlightApplied ? state.archiveHighlightCaseId :
+    state.casesViewFilter === 'inquiries' ? getApplicantContextFromQuery()?.caseId || getApplicantsCaseContextFromQuery()?.caseId : '';
+  return /^[a-f0-9]{24}$/i.test(target || '') ? target.toLowerCase() : '';
+}
+
+function currentMatterFilters() {
+  return {
+    ...currentDraftFilters(),
+    view: state.casesViewFilter === 'inquiries' ? 'applications' : state.casesViewFilter,
+    archiveStatus: state.casesViewFilter === 'archived' ? state.archivedStatusFilter : 'all',
+    page: (state.casesPage[state.casesViewFilter] || 0) + 1,
+    targetId: currentMatterTargetId(),
+  };
+}
+
+function loadCurrentMatters(options, control = document.activeElement?.closest('[data-matters-refresh], [data-page-action]')) {
+  if (state.casesViewFilter === 'draft') return Promise.resolve();
+  if (!currentMatterInventory) currentMatterInventory = createCurrentDraftInventory({
+    ownerId: String(state.user?.id || state.user?._id || ''),
+    read: (filters, options) => caseNoteApi.readMatterInventory(filters, options),
+    verifyOwner: verifyCaseNoteOwner,
+    onChange: () => {
+      buildCaseLookup();
+      queueMicrotask(() => {
+        if (state.casesViewFilter === 'draft') return;
+        const view = state.casesViewFilter, body = document.querySelector(`[data-table-body="${view}"]`);
+        const focused = document.activeElement, focusedCase = body?.contains(focused) ? focused.closest('[data-case-id]')?.dataset.caseId : '';
+        updateCurrentMatterCounts();
+        populateMatterPracticeFilter(document.querySelector('[data-matter-practice-filter]'));
+        if (body) renderCurrentMatterInventory(body, view);
+        if (dashboardViewState.currentView === 'cases') { maybeOpenApplicantFromQuery(); maybeOpenApplicantsCaseFromQuery(); }
+        pruneArchivedSelection();
+        if (focusedCase && !focused.isConnected && dashboardViewState.currentView === 'cases') focusApplicationParent(focusedCase);
+      });
+    },
+  });
+  const read = () => currentMatterInventory.load(currentMatterFilters(), options);
+  // Background reads temporarily disable the persistent refresh and pager
+  // controls. Preserve their focus with the same departure guards as an explicit read.
+  return control ? readCurrentMattersFrom(control, read) : read();
+}
+
+function refreshCurrentMattersFrom(control) {
+  return loadCurrentMatters({ force: true }, control);
+}
+
+async function readCurrentMattersFrom(control, read) {
+  const view = state.casesViewFilter;
+  let departed = false;
+  const track = event => { if (event.target !== control && event.target !== document.body) departed = true; };
+  document.addEventListener('focusin', track); document.addEventListener('pointerdown', track);
   try {
-    const res = await secureFetch("/api/case-drafts?limit=200", {
-      headers: { Accept: "application/json" },
-      noRedirect: true,
-    });
-    if (!res.ok) throw new Error("Draft fetch failed");
-    const payload = await res.json().catch(() => ({}));
-    const items = Array.isArray(payload?.items) ? payload.items : [];
-    state.localDrafts = items.map((item) => ({
-      id: item.id,
-      title: item.title || "Untitled Matter",
-      practiceArea: item.practiceArea || "",
-      details: item.description || "",
-      state: item.state || "",
-      status: "draft",
-      createdAt: item.createdAt || item.updatedAt || new Date().toISOString(),
-      updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
-      localDraft: true,
-    }));
-  } catch (err) {
-    console.warn("Unable to load drafts", err);
-    state.localDrafts = [];
+    await read();
+    if (!departed && state.casesViewFilter === view && dashboardViewState.currentView === 'cases') {
+      const pagination = control.matches('[data-page-action]') && currentMatterInventory?.state.result;
+      const target = pagination && !control.disabled ? control : pagination && document.querySelector(`[data-case-pagination="${view}"] [data-page-action]:not(:disabled)`) || document.querySelector(currentMatterInventory?.state.result ? `[data-matters-refresh="${view}"]` : '[data-matters-retry]');
+      if (target?.getClientRects().length) target.focus();
+    }
+  } finally { document.removeEventListener('focusin', track); document.removeEventListener('pointerdown', track); }
+}
+
+function renderCurrentMatterInventory(body, view) {
+  const inventory = currentMatterInventory?.state;
+  const loading = !inventory || ['idle', 'loading'].includes(inventory.phase);
+  body.setAttribute('aria-busy', String(loading));
+  const refresh = document.querySelector(`[data-matters-refresh="${view}"]`);
+  if (refresh) { refresh.disabled = loading; refresh.hidden = !inventory?.result; }
+  if (!inventory?.result) {
+    body.innerHTML = `<tr><td colspan="3" class="empty-row"><div role="status">${loading ? 'Loading matters…' : 'Matters couldn’t be loaded.'}</div>${loading ? '' : '<button type="button" class="matter-primary-action" data-matters-retry>Retry matters</button>'}</td></tr>`;
+    updateCasesPagination(view, 0); return;
   }
+  const {items, total, page, pages} = inventory.result;
+  if (page > pages) {
+    body.innerHTML = '<tr><td colspan="3" class="empty-row"><div role="status">This page is no longer available. Your matters may have changed.</div><button type="button" class="matter-primary-action" data-matters-last-page>Go to the last page</button></td></tr>';
+    updateCasesPagination(view, 0); return;
+  }
+  if (state.casesPage[view] !== page - 1) { state.casesPage[view] = page - 1; writeMatterFilterStateToUrl(); }
+  const filtered = Boolean(state.casesSearchTerm || state.matterPracticeFilter || state.matterDeadlineFilter || state.matterUpdatedFilter || (view === 'archived' && state.archivedStatusFilter !== 'all'));
+  const message = filtered ? 'No matters match these filters. Reset filters to see more.' : view === 'inquiries' ? 'No applications to review.' : 'No matters in this category yet.';
+  body.innerHTML = items.length ? items.map(item => renderCaseRow(item, view)).join('') : `<tr><td colspan="3" class="empty-row"><div role="status">${message}</div></td></tr>`;
+  const target = currentMatterTargetId();
+  if (target && !items.some(item => String(parseCaseId(item)) === target)) body.insertAdjacentHTML('afterbegin', '<tr><td colspan="3" class="empty-row"><div role="status">The linked Matter isn’t in this view.</div></td></tr>');
+  updateCasesPagination(view, total);
+  maybeHighlightArchivedCase();
+}
+
+function currentDraftFilters() {
+  return {
+    view: 'draft', search: state.casesSearchTerm, practice: state.matterPracticeFilter,
+    deadline: state.matterDeadlineFilter, updated: state.matterUpdatedFilter,
+    sort: state.matterSort, archiveStatus: 'all', page: (state.casesPage.draft || 0) + 1, targetId: '',
+  };
+}
+
+function currentDraftEditorHref(draftId, retained = false) {
+  const returnTo = safeCurrentMatterReturn(`/dashboard-attorney.html${window.location.search}#cases:draft`) || '/dashboard-attorney.html#cases:draft';
+  return `create-case.html?${new URLSearchParams({ [retained ? 'caseDraftId' : 'draftId']: draftId, returnTo })}#description`;
+}
+
+async function refreshDraftInventoryFrom(control) {
+  let departed = false;
+  const track = event => { if (event.target !== control && event.target !== document.body) departed = true; };
+  document.addEventListener('focusin', track);
+  document.addEventListener('pointerdown', track);
+  try {
+    await loadCaseDrafts({ force: true });
+    if (!departed && state.casesViewFilter === 'draft' && dashboardViewState.currentView === 'cases') {
+      const target = document.querySelector(currentDraftInventory?.state.result ? '[data-drafts-refresh]' : '[data-drafts-retry]');
+      if (target?.getClientRects().length) target.focus();
+    }
+  } finally {
+    document.removeEventListener('focusin', track);
+    document.removeEventListener('pointerdown', track);
+  }
+}
+
+function loadCaseDrafts(options) {
+  if (!currentDraftInventory) currentDraftInventory = createCurrentDraftInventory({
+    ownerId: String(state.user?.id || state.user?._id || ''),
+    read: (filters, options) => caseNoteApi.readMatterInventory(filters, options),
+    verifyOwner: verifyCaseNoteOwner,
+    onChange: (value) => {
+      state.localDrafts = value.result?.items.filter(item => item.localDraft) || [];
+      buildCaseLookup();
+      queueMicrotask(() => {
+        populateMatterPracticeFilter(document.querySelector('[data-matter-practice-filter]'));
+        updateCurrentMatterCounts();
+        const body = document.querySelector('[data-table-body="draft"]');
+        const focused = document.activeElement;
+        const focusedCase = body?.contains(focused) ? focused?.closest?.('[data-case-id]')?.dataset.caseId : '';
+        if (body) renderDraftInventory(body);
+        if (focusedCase && !focused.isConnected && state.casesViewFilter === 'draft' && dashboardViewState.currentView === 'cases') focusApplicationParent(focusedCase);
+        pruneDraftSelection();
+      });
+    },
+  });
+  return currentDraftInventory.load(currentDraftFilters(), options);
+}
+
+function renderDraftInventory(body) {
+  const inventory = currentDraftInventory?.state;
+  const loading = !inventory || inventory.phase === 'loading' || inventory.phase === 'idle';
+  body.setAttribute('aria-busy', String(loading));
+  const refresh = document.querySelector('[data-drafts-refresh]');
+  if (refresh) { refresh.disabled = loading; refresh.hidden = !inventory?.result; }
+  if (!inventory?.result) {
+    body.innerHTML = `<tr><td colspan="3" class="empty-row"><div role="status">${loading ? 'Loading drafts…' : 'Drafts couldn’t be loaded.'}</div>${loading ? '' : '<button type="button" class="matter-primary-action" data-drafts-retry>Retry drafts</button>'}</td></tr>`;
+    updateCasesPagination('draft', 0);
+    return;
+  }
+  const { items, total, page, pages } = inventory.result;
+  if (page > pages) {
+    body.innerHTML = '<tr><td colspan="3" class="empty-row"><div role="status">This page is no longer available. Your drafts may have changed.</div><button type="button" class="matter-primary-action" data-drafts-last-page>Go to the last page</button></td></tr>';
+    updateCasesPagination('draft', 0);
+    return;
+  }
+  const filtered = Boolean(state.casesSearchTerm || state.matterPracticeFilter || state.matterDeadlineFilter || state.matterUpdatedFilter);
+  body.innerHTML = items.length ? items.map(item => renderCaseRow(item, 'draft')).join('') : `<tr><td colspan="3" class="empty-row"><div role="status">${filtered ? 'No drafts match these filters. Reset filters to see more.' : 'No unfinished drafts.'}</div></td></tr>`;
+  updateCasesPagination('draft', total);
 }
 
 function readLocalDrafts() {
   return Array.isArray(state.localDrafts) ? state.localDrafts : [];
 }
 
-async function removeLocalDraft(draftId) {
+const pendingDraftDeletions = new Set();
+async function removeLocalDraft(draftId, { skipConfirm = false } = {}) {
   if (!draftId) return;
-  const res = await secureFetch(`/api/case-drafts/${encodeURIComponent(draftId)}`, {
-    method: "DELETE",
-    headers: { Accept: "application/json" },
-    noRedirect: true,
-  });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(payload?.error || "Unable to delete draft.");
-  }
-  state.localDrafts = readLocalDrafts().filter((item) => String(item.id) !== String(draftId));
+  const key = String(draftId), ownerId = String(state.user?.id || state.user?._id || "");
+  if (pendingDraftDeletions.has(key)) throw new Error("Deletion is already being checked for this draft.");
+  pendingDraftDeletions.add(key);
+  try {
+    const draft = readLocalDrafts().find((item) => String(item.id) === key);
+    if (!skipConfirm && !await confirmAction(`Permanently remove “${draft?.title || "Untitled draft"}”? This cannot be undone.`, {
+      title: "Delete this draft?", confirmLabel: "Delete draft", tone: "danger",
+    })) return;
+    const revision = draft?.revision;
+    if (!/^[a-f0-9]{64}$/.test(revision || "")) throw new Error("Refresh your drafts before deleting this draft.");
+    if (!ownerId || await verifyCaseNoteOwner() !== ownerId) throw new Error("Your account changed. Reload Matters before continuing.");
+    let res, payload;
+    try {
+      res = await secureFetch(`/api/case-drafts/${encodeURIComponent(draftId)}`, {
+        method: "DELETE", body: { revision, expectedOwnerId: ownerId }, headers: { Accept: "application/json" }, noRedirect: true,
+      });
+      payload = await res.json().catch(() => null);
+    } catch { throw new Error("Draft deletion was not confirmed. Reload Matters to check before trying again."); }
+    if (!res.ok || payload?.success !== true) throw new Error(!res.ok && typeof payload?.error === "string" ? payload.error : "Draft deletion was not confirmed. Reload Matters to check before trying again.");
+    if (await verifyCaseNoteOwner() !== ownerId) throw new Error("Your account changed. Reload Matters before continuing.");
+    await loadCaseDrafts({ force: true });
+  } catch (error) {
+    if (error?.message === "account_changed") throw new Error("Your account changed. Reload Matters before continuing.");
+    throw error;
+  } finally { pendingDraftDeletions.delete(key); }
 }
 
 function pruneDraftSelection() {
@@ -4510,110 +4343,191 @@ function syncArchivedBulkUI() {
   }
 }
 
-function hasDeliverables(item) {
-  return (
-    (Array.isArray(item.downloadUrl) && item.downloadUrl.length > 0) ||
-    (Array.isArray(item.files) && item.files.length > 0)
-  );
-}
-
 let caseNoteModalRef = null;
-let caseNoteTextarea = null;
-let caseNoteSaveBtn = null;
-let caseNoteCancelBtn = null;
-let caseNoteTargetId = null;
-let caseNoteSaving = false;
+let caseNoteHost = null;
+let caseNoteController = null;
+let caseNoteOwnerId = "";
+let caseNoteEpoch = 0;
+let caseNoteApplicationId = "";
+let caseNoteEngagementReturn = null;
+const caseNoteState = createPrivateState();
+const caseNoteApi = createApiClient({ onAuthenticationLost: () => clearCaseNoteAccess() });
 
+function clearCaseNoteAccess() {
+  legacyHome?.clear();
+  applicationsCache = [];
+  applicationRefreshInputs.clear();
+  applicantAutoRefreshEpoch++; window.clearTimeout(applicantAutoRefreshTimer); applicantAutoRefreshTimer = null;
+  currentDraftInventory?.clear();
+  currentMatterInventory?.clear();
+  applicationsReadEpoch += 1; applicationParentController?.abort(); applicationParentController = null; applicationParentPromise = null;
+  document.querySelector("[data-cases-wrapper]")?.removeAttribute("aria-busy"); setApplicationParentStatus();
+  matterSavedViews?.clear();
+  caseNoteState.clear(); caseNoteApi.clear(); caseNoteOwnerId = ""; closeCaseNoteModal(false); closeCaseInvitesModal();
+  [state.cases, state.casesArchived, [...state.caseLookup.values()]].forEach((items) => items.forEach((item) => { delete item.internalNotes; }));
+}
+async function verifyCaseNoteOwner() {
+  const expected = String(state.user?.id || state.user?._id || "");
+  try {
+    const session = classifySession(await caseNoteApi.get("/api/auth/me"));
+    if (session.state !== "ready" || session.identity.id !== expected || (caseNoteOwnerId && caseNoteOwnerId !== expected)) throw new Error("account_changed");
+    caseNoteOwnerId = expected;
+    return expected;
+  } catch (error) { clearCaseNoteAccess(); throw error; }
+}
 function setupCaseNoteModal() {
+  if (caseNoteHost) return;
   caseNoteModalRef = document.getElementById("caseNoteModal");
   if (!caseNoteModalRef) return;
-  caseNoteTextarea = document.getElementById("caseNoteTextarea") || caseNoteModalRef.querySelector("textarea");
-  caseNoteSaveBtn = caseNoteModalRef.querySelector("[data-note-save]");
-  caseNoteCancelBtn = caseNoteModalRef.querySelector("[data-note-cancel]");
-  caseNoteCancelBtn?.addEventListener("click", closeCaseNoteModal);
-  caseNoteModalRef.addEventListener("click", (event) => {
-    if (event.target === caseNoteModalRef) {
-      closeCaseNoteModal();
-    }
-  });
-  caseNoteSaveBtn?.addEventListener("click", async () => {
-    if (!caseNoteTargetId || caseNoteSaving) return;
-    const note = caseNoteTextarea?.value?.trim() || "";
-    await persistCaseNote(caseNoteTargetId, note);
-  });
+  caseNoteHost = caseNoteModalRef.querySelector("[data-case-note-host]");
+  caseNoteModalRef.querySelector("[data-note-cancel]")?.addEventListener("click", closeCaseNoteModal);
+  caseNoteModalRef.addEventListener("click", (event) => { if (event.target === caseNoteModalRef) closeCaseNoteModal(); });
+  const checkIdentity = (value) => {
+    if (!caseNoteOwnerId) return;
+    try { const user = typeof value === "string" ? JSON.parse(value) : value; if (String(user?.id || user?._id || "") !== caseNoteOwnerId || user?.role !== "attorney") clearCaseNoteAccess(); }
+    catch { clearCaseNoteAccess(); }
+  };
+  window.addEventListener("storage", (event) => { if (event.key === "lpc_user") checkIdentity(event.newValue); });
+  window.addEventListener("lpc:user-updated", (event) => checkIdentity(event.detail));
+  const verify = () => { if (caseNoteOwnerId && document.visibilityState === "visible") void verifyCaseNoteOwner().catch(() => { /* Verification already cleared confidential notes and closed the editor. */ }); };
+  window.addEventListener("focus", verify);
+  document.addEventListener("visibilitychange", verify);
+  window.setInterval(verify, 60000);
+  window.addEventListener("beforeunload", (event) => { if (caseNoteState.hasUnsaved()) { event.preventDefault(); event.returnValue = ""; } });
+  window.addEventListener("pagehide", clearCaseNoteAccess);
 }
-
-function closeCaseNoteModal() {
+function focusApplicationParent(caseId) {
+  const candidates = [
+    ...(caseId ? document.querySelectorAll(`.case-actions[data-case-id="${caseId}"] [data-case-menu-trigger]`) : []),
+    document.querySelector(`[data-case-filter="${state.casesViewFilter}"]`),
+    document.querySelector('[data-cases-search]'),
+  ];
+  candidates.find(control => control?.isConnected && control.getClientRects().length && !control.closest('[inert]'))?.focus();
+}
+function closeCaseNoteModal(restoreFocus = true) {
+  const engagementReturn = caseNoteEngagementReturn; caseNoteEngagementReturn = null;
+  const returnCaseId = caseNoteApplicationId, wasOpen = caseNoteModalRef && !caseNoteModalRef.classList.contains("hidden");
+  caseNoteApplicationId = "";
+  caseNoteEpoch += 1; caseNoteController?.abort(); caseNoteController = null;
+  caseNoteHost?.replaceChildren();
   if (caseNoteModalRef) {
-    caseNoteModalRef.classList.add("hidden");
-    caseNoteModalRef.setAttribute("aria-hidden", "true");
-    caseNoteModalRef.setAttribute("inert", "");
-    deactivateDialogFocus(caseNoteModalRef);
-    caseNoteModalRef.removeAttribute("aria-busy");
-  }
-  caseNoteTargetId = null;
-}
-
-async function openCaseNoteModal(caseId) {
-  if (!caseId || !caseNoteModalRef) return;
-  caseNoteTargetId = caseId;
-  caseNoteModalRef.classList.remove("hidden");
-  caseNoteModalRef.setAttribute("aria-hidden", "false");
-  caseNoteModalRef.removeAttribute("inert");
-  if (caseNoteTextarea) {
-    caseNoteTextarea.value = "";
-  }
-  activateDialogFocus(caseNoteModalRef, {
-    initialFocus: caseNoteTextarea,
-    onEscape: closeCaseNoteModal,
-  });
-  try {
-    const payload = await fetchCaseNote(caseId);
-    if (caseNoteTextarea && payload?.note) {
-      caseNoteTextarea.value = payload.note;
+    caseNoteModalRef.classList.add("hidden"); caseNoteModalRef.setAttribute("aria-hidden", "true"); caseNoteModalRef.setAttribute("inert", "");
+    deactivateDialogFocus(caseNoteModalRef, { restoreFocus: restoreFocus !== false && !returnCaseId }); caseNoteModalRef.removeAttribute("aria-busy");
+    if (wasOpen && returnCaseId && restoreFocus !== false) {
+      const selector = engagementReturn?.mode === "preengagement" ? '[data-preengagement-review-action]' : '[data-hire-paralegal]';
+      const control = engagementReturn && document.querySelector(`[data-applicants-drawer][data-case-id="${returnCaseId}"] ${selector}[data-paralegal-id="${engagementReturn.applicantId}"]`);
+      if (control?.isConnected && control.getClientRects().length && !control.closest('[inert]')) control.focus(); else focusApplicationParent(returnCaseId);
     }
-  } catch (err) {
-    notifyCases(err?.message || "Unable to load notes.", "error");
   }
+  if (homeAttentionRefreshDeferred) { homeAttentionRefreshDeferred = false; renderNeedsAttentionQueue(); }
 }
-
-async function fetchCaseNote(caseId) {
-  const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/notes`, {
-    headers: { Accept: "application/json" },
-    noRedirect: true,
-  });
-  if (!res.ok) throw new Error("Unable to load notes.");
-  return res.json();
+function flushApplicationParentStatus() {
+  if (applicationRefreshInputs.size || !pendingApplicationParentStatus) return;
+  const { message, retryOwnerId, caseId } = pendingApplicationParentStatus;
+  setApplicationParentStatus(message, retryOwnerId, caseId);
+  repositionOpenCaseMenu();
 }
-
-async function persistCaseNote(caseId, note) {
-  caseNoteSaving = true;
-  if (caseNoteSaveBtn) {
-    caseNoteSaveBtn.disabled = true;
-    caseNoteSaveBtn.textContent = "Saving…";
+function setApplicationParentStatus(message = "", retryOwnerId = "", caseId = "") {
+  // This status sits above the Matter rows. Changing its height while targeting
+  // a menu or pressing a control moves it before the native click finishes.
+  if (applicationRefreshInputs.size) {
+    pendingApplicationParentStatus = { message, retryOwnerId, caseId };
+    return;
   }
+  pendingApplicationParentStatus = null;
+  const summary = document.querySelector('[data-application-parent-status]');
+  if (!summary) return;
+  summary.hidden = !message;
+  if (!message) { summary.replaceChildren(); return; }
+  let label = summary.querySelector('[data-application-parent-message]');
+  if (!label) { label = document.createElement('span'); label.dataset.applicationParentMessage = ''; summary.append(label); }
+  label.textContent = message;
+  let retry = summary.querySelector('button');
+  if (retryOwnerId) {
+    if (!retry) {
+      retry = document.createElement('button'); retry.type = 'button'; retry.className = 'matter-filter-reset'; retry.textContent = 'Retry';
+      retry.addEventListener('click', () => { retry.focus(); void refreshApplicationParent(retry.dataset.ownerId, retry.dataset.caseId); });
+      summary.append(document.createTextNode(' '), retry);
+    }
+    retry.dataset.ownerId = retryOwnerId; retry.dataset.caseId = caseId; retry.disabled = false;
+  } else if (retry) retry.disabled = true;
+}
+function refreshApplicationParent(ownerId, caseId = "", { refreshInventory = true } = {}) {
+  applicationParentController?.abort();
+  const controller = new AbortController(), ticket = ++applicationsReadEpoch;
+  applicationParentController = controller; applicationsPromise = null;
+  const retryFocused = !!document.activeElement?.closest?.("[data-application-parent-status]");
+  const wrapper = document.querySelector("[data-cases-wrapper]"); wrapper?.setAttribute("aria-busy", "true");
+  setApplicationParentStatus("Updating applications…");
+  const pending = (async () => {
   try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/notes`, {
-      method: "PUT",
-      headers: { Accept: "application/json" },
-      body: { note },
-    });
-    if (!res.ok) throw new Error("Unable to save note.");
-    const payload = await res.json();
-    applyNoteToState(caseId, payload);
-    renderCasesView();
-    closeCaseNoteModal();
-    notifyCases("Note updated.", "success");
-  } catch (err) {
-    console.warn("Note save failed", err);
-    notifyCases(err?.message || "Unable to save note.", "error");
+    const options = { ownerId, signal: controller.signal };
+    const [apps, updatedMatter] = await Promise.all([caseNoteApi.readReceivedApplications(options), caseId ? caseNoteApi.readWorkspaceMatter(caseId, options) : null]);
+    if (controller.signal.aborted || ticket !== applicationsReadEpoch || caseNoteOwnerId !== ownerId) return;
+    if (!Array.isArray(apps) || apps.some(app => !app || typeof app !== 'object' || !['submitted', 'viewed', 'shortlisted'].includes(app.status))) throw new Error('invalid_applications');
+    if (caseId) {
+      if (String(updatedMatter?._id || updatedMatter?.id || "") !== caseId || ![updatedMatter.attorney, updatedMatter.attorneyId].some(value => String(value?._id || value?.id || value || "") === ownerId) || typeof updatedMatter.status !== 'string') throw new Error('invalid_matter');
+      for (const collection of [state.cases, state.casesArchived]) {
+        const index = collection.findIndex(item => String(item._id || item.id) === caseId);
+        if (index >= 0) collection[index] = updatedMatter;
+      }
+      buildCaseLookup(); applicantDrawerCache.delete(caseId);
+    }
+    applicationsCache = apps;
+    if (refreshInventory) await loadCurrentMatters({ force: true });
+    if (controller.signal.aborted || ticket !== applicationsReadEpoch || caseNoteOwnerId !== ownerId) return;
+    applyApplicationsToCases(apps);
+    if (caseId) renderCasesView();
+    void legacyHome?.refresh(["applications", "inventory"]);
+    setApplicationParentStatus();
+    if (retryFocused && document.activeElement === document.body) focusApplicationParent();
+    return apps;
+  } catch (error) {
+    if (!controller.signal.aborted && ticket === applicationsReadEpoch && caseNoteOwnerId === ownerId) {
+      setApplicationParentStatus(caseId ? 'Matter and applications could not be refreshed.' : 'Applications could not be refreshed.', ownerId, caseId);
+      if (retryFocused && document.activeElement === document.body) document.querySelector('[data-application-parent-status] button')?.focus();
+    }
   } finally {
-    caseNoteSaving = false;
-    if (caseNoteSaveBtn) {
-      caseNoteSaveBtn.disabled = false;
-      caseNoteSaveBtn.textContent = "Save Note";
+    if (applicationParentController === controller) {
+      applicationParentController = null; applicationParentPromise = null; wrapper?.removeAttribute("aria-busy");
+      if ((pendingApplicationParentStatus?.message ?? document.querySelector("[data-application-parent-status]")?.textContent) === "Updating applications…") setApplicationParentStatus();
     }
   }
+  return null;
+  })();
+  applicationParentPromise = pending;
+  return pending;
+}
+
+async function openCaseNoteModal(caseId, mode = "notes", exportIds = null, applicantId = "") {
+  if (!caseNoteHost) setupCaseNoteModal();
+  if (!/^[a-f0-9]{24}$/i.test(caseId || "") || !caseNoteHost) return;
+  closeCaseNoteModal(false); const ticket = caseNoteEpoch;
+  const engagement = ["hiring", "preengagement"].includes(mode);
+  if (engagement && !/^[a-f0-9]{24}$/i.test(applicantId)) return;
+  caseNoteApplicationId = mode === "applications" || engagement ? caseId : "";
+  if (engagement) caseNoteEngagementReturn = { mode, applicantId };
+  caseNoteModalRef.classList.remove("hidden"); caseNoteModalRef.setAttribute("aria-hidden", "false"); caseNoteModalRef.removeAttribute("inert");
+  caseNoteModalRef.querySelector("#caseNoteModalTitle").textContent = mode === "hiring" ? "Review hire" : mode === "preengagement" ? "Review pre-engagement" : mode === "applications" ? "Review applications" : mode === "export" ? "Download Matter archive" : mode === "receipt" ? "Receipt" : mode === "downloads" ? "Files for download" : mode === "archive" ? "Archive and restore" : mode === "review" ? "Review admin edit request" : "Edit Matter Note";
+  caseNoteModalRef.querySelector("#caseNoteModalTitle").setAttribute("aria-level", mode === "export" ? "1" : "3");
+  caseNoteHost.textContent = "Checking access to your Matter…";
+  activateDialogFocus(caseNoteModalRef, { initialFocus: caseNoteModalRef.querySelector("[data-note-cancel]"), onEscape: closeCaseNoteModal });
+  try {
+    const ownerId = await verifyCaseNoteOwner(); if (ticket !== caseNoteEpoch) return;
+    caseNoteController = new AbortController();
+    const options = { api: caseNoteApi, signal: caseNoteController.signal, ownerId, privateState: caseNoteState, current: true, autoReview: true };
+    let assignmentRefreshed = false;
+    const editor = mode === "hiring" ? createHiring(caseId, { applicantId }, { ...options, onRequirements: () => void openCaseNoteModal(caseId, "preengagement", null, applicantId), onReviewed: value => {
+      if (value.assigned && !assignmentRefreshed) { assignmentRefreshed = true; void refreshApplicationParent(ownerId, caseId); }
+    } }) : mode === "preengagement" ? createPreEngagement(caseId, { applicantId }, { ...options, onContinue: () => void openCaseNoteModal(caseId, "hiring", null, applicantId), onRecorded: () => { void refreshApplicationParent(ownerId, caseId); } }) : mode === "applications" ? createMatterApplications(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId, applicantId, current: true, privateState: caseNoteState, onDecisionRecorded: () => { void refreshApplicationParent(ownerId); } }) : mode === "export" ? (exportIds ? createMatterExportBatch(exportIds, { api: caseNoteApi, signal: caseNoteController.signal, ownerId }) : createMatterExport(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId })) : mode === "receipt" ? createMatterReceipt(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId, current: true, onTitleChange: title => { caseNoteModalRef.querySelector("#caseNoteModalTitle").textContent = title; } }) : mode === "downloads" ? createMatterDownloads(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId }) : mode === "archive" ? createMatterArchive(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId, privateState: caseNoteState, current: true, onNavigate: closeCaseNoteModal, onRecorded: async () => {
+      await Promise.all([loadCasesWithFiles(true), loadArchivedCases(true)]); renderCasesView();
+    } }) : mode === "review" ? createMatterModeration(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId, privateState: caseNoteState, current: true, openNotes: () => void openCaseNoteModal(caseId), onRecorded: () => {
+      void Promise.all([loadCasesWithFiles(true), loadArchivedCases(true)]).then(() => renderCasesView()).catch(error => console.warn("Matter refresh after review failed", error));
+    } }) : createMatterNotes(caseId, { api: caseNoteApi, signal: caseNoteController.signal, ownerId, privateState: caseNoteState, onSaved: (payload) => applyNoteToState(caseId, payload) });
+    caseNoteHost.replaceChildren(editor);
+    await editor.readiness;
+    if (ticket === caseNoteEpoch && !engagement) editor.querySelector("textarea:not(:disabled)")?.focus();
+  } catch { notifyCases("Matter controls are unavailable until your sign-in is verified.", "error"); }
 }
 
 function applyNoteToState(caseId, payload) {
@@ -4758,6 +4672,8 @@ function titleCaseWords(value) {
 let caseInvitesModalRef = null;
 let caseInvitesListRef = null;
 let caseInvitesSetup = false;
+let caseInvitesController = null;
+let caseInvitesEpoch = 0;
 
 function setupCaseInvitesModal() {
   if (caseInvitesSetup) return;
@@ -4781,6 +4697,8 @@ function setupCaseInvitesModal() {
 }
 
 function closeCaseInvitesModal() {
+  caseInvitesEpoch += 1; caseInvitesController?.abort(); caseInvitesController = null;
+  caseInvitesListRef?.replaceChildren();
   if (caseInvitesModalRef) {
     caseInvitesModalRef.classList.add("hidden");
     caseInvitesModalRef.setAttribute("aria-hidden", "true");
@@ -4815,8 +4733,8 @@ function getApplicantContextFromQuery() {
   const openApplicant = params.get("openApplicant") === "1";
   const continueHire = params.get("continueHire") === "1";
   if (!returnFromProfile && !openApplicant) return null;
-  if (!caseId || !applicantId) return null;
-  return { caseId, applicantId, continueHire };
+  if (!/^[a-f0-9]{24}$/i.test(caseId) || !/^[a-f0-9]{24}$/i.test(applicantId)) return null;
+  return { caseId, applicantId, continueHire, applicationHistory: params.get("applicationHistory") === "1" };
 }
 
 function getApplicantReturnContext() {
@@ -4842,6 +4760,7 @@ function clearApplicantReturnQuery() {
     url.searchParams.delete("returnFromProfile");
     url.searchParams.delete("openApplicant");
     url.searchParams.delete("continueHire");
+    url.searchParams.delete("applicationHistory");
     const nextQuery = url.searchParams.toString();
     const nextUrl = `${url.pathname}${nextQuery ? `?${nextQuery}` : ""}${url.hash}`;
     window.history.replaceState({}, "", nextUrl);
@@ -4852,20 +4771,35 @@ async function openApplicantFromQuery({ setFilter = true } = {}) {
   if (applicantReturnOpening) return;
   const context = getApplicantReturnContext();
   if (!context) return;
-  const { caseId, applicantId, continueHire } = context;
+  const { caseId, applicantId, continueHire, applicationHistory } = context;
   applicantReturnContext = context;
+  if (applicationHistory) {
+    applicantReturnOpening = true;
+    try {
+      await openCaseNoteModal(caseId, "applications", null, applicantId);
+      applicantReturnResolved = true;
+      clearApplicantReturnQuery();
+    } finally { applicantReturnOpening = false; }
+    return;
+  }
   if (setFilter) {
     setCaseFilter("inquiries", { render: false });
   }
   const toggleBtn = document.querySelector(`[data-applicants-toggle][data-case-id="${caseId}"]`);
-  if (!toggleBtn) return;
+  if (!toggleBtn) {
+    if (continueHire) {
+      clearApplicantReturnQuery(); applicantReturnContext = { caseId, applicantId, continueHire: false }; applicantReturnResolved = true;
+      await handleHireFromApplications({ caseId, paralegalId: applicantId });
+    }
+    return;
+  }
   const drawerRow = getDrawerRow(caseId, toggleBtn);
   const drawerEl = getDrawerElement(caseId, toggleBtn);
   if (!drawerEl) return;
-  const applicants = (applicantDrawerCache.get(caseId) || []).filter(
+  let applicants = (applicantDrawerCache.get(caseId) || []).filter(
     (entry) => !["accepted", "rejected", "withdrawn"].includes(entry.status)
   );
-  const targetIndex = applicants.findIndex((applicant) => String(applicant.paralegalId) === String(applicantId));
+  let targetIndex = applicants.findIndex((applicant) => String(applicant.paralegalId) === String(applicantId));
   const activeRow =
     targetIndex >= 0
       ? drawerEl.querySelector(`[data-applicant-row][data-applicant-index="${targetIndex}"].is-active`)
@@ -4877,7 +4811,7 @@ async function openApplicantFromQuery({ setFilter = true } = {}) {
     !drawerRow.classList.contains("hidden") &&
     activeRow &&
     detail &&
-    !detail.classList.contains("hidden")
+    !detail.classList.contains("hidden") && !continueHire
   ) {
     return;
   }
@@ -4888,6 +4822,8 @@ async function openApplicantFromQuery({ setFilter = true } = {}) {
     } else if (!drawerEl.querySelector("[data-applicant-row]") && !drawerEl.querySelector(".empty-card")) {
       renderApplicantsInDrawer(caseId, applicantDrawerCache.get(caseId) || [], drawerEl);
     }
+    applicants = (applicantDrawerCache.get(caseId) || []).filter(entry => !["accepted", "rejected", "withdrawn"].includes(entry.status));
+    targetIndex = applicants.findIndex(entry => String(entry.paralegalId) === String(applicantId));
     if (drawerRow) {
       openApplicantsDrawer(drawerRow, toggleBtn, { skipAnimation: true });
     }
@@ -4901,7 +4837,7 @@ async function openApplicantFromQuery({ setFilter = true } = {}) {
     if (setFilter) {
       clearApplicantReturnQuery();
     }
-    if (continueHire && targetIndex >= 0) {
+    if (continueHire) {
       clearApplicantReturnQuery();
       applicantReturnContext = { caseId, applicantId, continueHire: false };
       const applicant = applicants[targetIndex] || null;
@@ -4925,6 +4861,7 @@ function restoreApplicantDrawerFromQuery() {
 }
 
 function maybeOpenApplicantFromQuery() {
+  if (currentMatterInventory?.state.phase !== 'ready') return;
   if (applicantReturnResolved) return;
   if (applicantReturnHandled) return;
   const context = getApplicantContextFromQuery();
@@ -4938,7 +4875,7 @@ function getApplicantsCaseContextFromQuery() {
   const params = new URLSearchParams(window.location.search);
   const openApplicants = params.get("openApplicants") === "1";
   const caseId = params.get("caseId") || "";
-  if (!openApplicants || !caseId) return null;
+  if (!openApplicants || !/^[a-f0-9]{24}$/i.test(caseId)) return null;
   return { caseId };
 }
 
@@ -4975,6 +4912,7 @@ async function openApplicantsForCase(caseId) {
 }
 
 function maybeOpenApplicantsCaseFromQuery() {
+  if (currentMatterInventory?.state.phase !== 'ready') return;
   if (applicantsCaseHandled) return;
   const context = getApplicantsCaseContextFromQuery();
   if (!context) return;
@@ -4984,24 +4922,6 @@ function maybeOpenApplicantsCaseFromQuery() {
   });
 }
 
-function formatInvitedDate(value) {
-  const formatted = formatCaseDate(value);
-  return formatted && formatted !== "—" ? `Invited ${formatted}` : "Invitation date unavailable";
-}
-
-function formatInviteStatus(value) {
-  const status = String(value || "").trim();
-  if (!status) return "";
-  return titleCaseWords(status.replace(/_/g, " "));
-}
-
-function getInviteDisplayName(profile = {}) {
-  const name =
-    profile.name ||
-    [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim();
-  return name || "Invited paralegal";
-}
-
 function getApplicantDisplayName(profile = {}, snapshot = {}) {
   const name =
     profile.name ||
@@ -5009,57 +4929,17 @@ function getApplicantDisplayName(profile = {}, snapshot = {}) {
   return name || snapshot.name || "Paralegal";
 }
 
-function shouldFetchInviteDetails(invite = {}) {
-  const profile = invite.profile || {};
-  const hasName = Boolean(profile.name || profile.firstName || profile.lastName);
-  const hasAvatar = Boolean(profile.profileImage || profile.avatarURL);
-  return !hasName || !hasAvatar;
-}
-
-async function fetchInviteDetails(caseId) {
-  try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/invites`, {
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) return null;
-    const payload = await res.json().catch(() => ({}));
-    const invites = Array.isArray(payload?.invites) ? payload.invites : [];
-    return invites.map((invite) => ({
-      profile: invite?.paralegal || {},
-      id: invite?.paralegal?.id || invite?.paralegal?._id || "",
-      invitedAt: invite?.invitedAt || null,
-      respondedAt: invite?.respondedAt || null,
-      status: invite?.status || "",
-    }));
-  } catch {
-    return null;
-  }
-}
-
-function hydrateInviteEntry(entry, invitees = []) {
-  if (!entry || !Array.isArray(invitees)) return;
-  entry.invites = invitees
-    .filter((invite) => invite?.id)
-    .map((invite) => ({
-      paralegalId: invite.id,
-      status: invite.status || "pending",
-      invitedAt: invite.invitedAt || null,
-      respondedAt: invite.respondedAt || null,
-    }));
-}
-
 async function openCaseInvites(caseId) {
-  if (!caseId) return;
+  if (!/^[a-f0-9]{24}$/i.test(caseId || "")) return;
   if (dashboardViewState.currentView !== "cases") {
-    try {
-      window.location.hash = "cases";
-    } catch (error) {
-      console.warn("[attorney] invited-paralegal view switch failed", error);
-    }
+    window.location.hash = "cases";
     showDashboardView("cases", { skipHash: true });
   }
   setupCaseInvitesModal();
   if (!caseInvitesModalRef || !caseInvitesListRef) return;
+  closeCaseInvitesModal();
+  const ticket = ++caseInvitesEpoch;
+  const controller = new AbortController(); caseInvitesController = controller;
   caseInvitesModalRef.classList.remove("hidden");
   caseInvitesModalRef.setAttribute("aria-hidden", "false");
   caseInvitesModalRef.removeAttribute("inert");
@@ -5067,99 +4947,19 @@ async function openCaseInvites(caseId) {
     initialFocus: caseInvitesModalRef.querySelector("[data-case-invites-close]"),
     onEscape: closeCaseInvitesModal,
   });
-  caseInvitesModalRef.setAttribute("aria-busy", "true");
-  caseInvitesListRef.innerHTML = `<p class="muted">Loading invited paralegals…</p>`;
-
-  let entry = state.caseLookup.get(String(caseId));
-  if (!entry) {
-    await loadCasesWithFiles();
-    entry = state.caseLookup.get(String(caseId));
-  }
-  if (!entry) {
-    await loadArchivedCases();
-    entry = state.caseLookup.get(String(caseId));
-  }
-
-  let invitees = Array.isArray(entry?.invites)
-    ? entry.invites.map((invite) => ({
-        profile: invite?.profile || {},
-        id: invite?.paralegalId || "",
-        invitedAt: invite?.invitedAt || null,
-        respondedAt: invite?.respondedAt || null,
-        status: invite?.status || "pending",
-      }))
-    : [];
-  if (!invitees.length && (entry?.pendingParalegal || entry?.pendingParalegalId)) {
-    const pendingProfile =
-      entry.pendingParalegal && typeof entry.pendingParalegal === "object" ? entry.pendingParalegal : null;
-    const pendingId =
-      entry.pendingParalegalId ||
-      pendingProfile?.id ||
-      pendingProfile?._id ||
-      (typeof entry.pendingParalegal === "string" ? entry.pendingParalegal : "");
-    invitees.push({
-      profile: pendingProfile || {},
-      id: pendingId,
-      invitedAt: entry.pendingParalegalInvitedAt,
-      respondedAt: null,
-      status: "pending",
-    });
-  }
-
-  if (invitees.length && invitees.some(shouldFetchInviteDetails)) {
-    const fresh = await fetchInviteDetails(caseId);
-    if (Array.isArray(fresh) && fresh.length) {
-      invitees = fresh;
-      hydrateInviteEntry(entry, fresh);
-    }
-  }
-
-  if (!invitees.length) {
-    caseInvitesListRef.innerHTML = `<p class="muted">No invited paralegals yet.</p>`;
-    caseInvitesModalRef.removeAttribute("aria-busy");
-    return;
-  }
-
-  const itemsHtml = [];
-  for (const invite of invitees) {
-    const profile = invite.profile || {};
-    const id = invite.id || profile.id || profile._id || "";
-    const name = getInviteDisplayName(profile);
-    const avatar = profile.profileImage || profile.avatarURL || INVITE_AVATAR_FALLBACK;
-    const link = buildParalegalProfileUrl(id);
-    const statusLabel = formatInviteStatus(invite.status);
-    itemsHtml.push(`
-      <div class="case-invite-item">
-        <img src="${sanitize(avatar)}" alt="${sanitize(name)} profile photo" />
-        <div class="case-invite-meta">
-          ${sanitizeUrl(link) ? `<a href="${sanitize(sanitizeUrl(link))}">${sanitize(name)}</a>` : `<span>${sanitize(name)}</span>`}
-          <span class="case-invite-date">${sanitize(formatInvitedDate(invite.invitedAt))}</span>
-          ${statusLabel ? `<span class="case-invite-date">${sanitize(statusLabel)}</span>` : ""}
-        </div>
-      </div>
-    `);
-  }
-
-  caseInvitesListRef.innerHTML = itemsHtml.join("");
-  caseInvitesModalRef.removeAttribute("aria-busy");
-}
-
-function openCaseApplications(caseId) {
-  if (!caseId) return;
+  caseInvitesListRef.textContent = "Loading invited paralegals…";
   try {
-    const url = new URL(window.location.href);
-    url.searchParams.set("openApplicants", "1");
-    url.searchParams.set("caseId", caseId);
-    const nextQuery = url.searchParams.toString();
-    const nextUrl = `${url.pathname}${nextQuery ? `?${nextQuery}` : ""}#cases:inquiries`;
-    window.history.replaceState({}, "", nextUrl);
-  } catch {}
-  if (window.location.hash !== "#cases:inquiries") {
-    window.location.hash = "cases:inquiries";
-  } else {
-    showDashboardView("cases", { skipHash: true, caseFilter: "inquiries" });
+    const ownerId = await verifyCaseNoteOwner();
+    if (controller.signal.aborted || ticket !== caseInvitesEpoch) return;
+    const panel = createMatterInvitations(caseId, { api: caseNoteApi, signal: controller.signal, ownerId, current: true });
+    caseInvitesListRef.replaceChildren(panel);
+    await panel.readiness;
+  } catch (error) {
+    if (!controller.signal.aborted && ticket === caseInvitesEpoch) caseInvitesListRef.textContent = "Invitations could not be loaded. Close this dialog and try again.";
   }
 }
+
+
 
 async function openCasePreview(caseId, options = {}) {
   if (!caseId) return;
@@ -5326,12 +5126,12 @@ function onCasesTableClick(event) {
   if (drawerClose) {
     const drawerRow = drawerClose.closest("[data-applicants-row]");
     if (drawerRow) {
-      drawerRow.classList.add("hidden");
       const caseId = drawerRow.getAttribute("data-case-id") || "";
       const toggleBtn = drawerRow
         .closest("tbody")
         ?.querySelector(`[data-applicants-toggle][data-case-id="${caseId}"]`);
-      if (toggleBtn) toggleBtn.setAttribute("aria-expanded", "false");
+      closeApplicantsDrawer(drawerRow, toggleBtn);
+      toggleBtn?.focus();
     }
     return;
   }
@@ -5474,7 +5274,7 @@ async function onDraftBulkAction(event) {
       });
       if (!confirmed) return;
       for (const id of ids) {
-        await removeLocalDraft(id);
+        await removeLocalDraft(id, { skipConfirm: true });
       }
       notifyCases("Drafts deleted.", "success");
     }
@@ -5494,10 +5294,7 @@ async function onArchivedBulkAction(event) {
   if (!ids.length) return;
   try {
     if (action === "download") {
-      ids.forEach((id) => {
-        window.open(`/api/cases/${encodeURIComponent(id)}/archive/download`, "_blank");
-      });
-      notifyCases("Download started for selected Matters.", "success");
+      await openCaseNoteModal(ids[0], "export", ids);
     } else if (action === "delete") {
       const deletableIds = ids.filter((id) => canDeleteCase(getCaseEntryById(id)));
       if (deletableIds.length !== ids.length) {
@@ -5531,8 +5328,8 @@ function positionCaseMenu(wrapper) {
   if (!trigger || !menu) return;
 
   const rect = trigger.getBoundingClientRect();
-  menu.style.minWidth = "180px";
-  menu.style.width = "180px";
+  menu.style.minWidth = "0";
+  menu.style.width = "min(18rem, calc(100vw - 16px))";
   menu.style.visibility = "hidden";
   menu.style.display = "block";
   menu.style.position = "fixed";
@@ -5595,10 +5392,11 @@ function resetCaseMenuStyles(wrapper) {
 }
 
 async function handleCaseAction(action, caseId) {
+  if (action === "application-review") { await openCaseNoteModal(caseId, "applications"); return; }
   if (!caseId) return;
   try {
     if (action === "resume-draft") {
-      window.location.href = `create-case.html?draftId=${encodeURIComponent(caseId)}#description`;
+      window.location.href = currentDraftEditorHref(caseId);
       return;
     } else if (action === "discard-draft") {
       await removeLocalDraft(caseId);
@@ -5647,39 +5445,19 @@ async function handleCaseAction(action, caseId) {
       openCaseNoteModal(caseId);
       return;
     } else if (action === "flag-resolved") {
-      const confirmed = await confirmAction(
-        "Admin will be notified to review the resolution and clear the flag if appropriate.",
-        { title: "Mark this flag as resolved?", confirmLabel: "Mark resolved" }
-      );
-      if (!confirmed) return;
-      const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/flags/mark-resolved`, {
-        method: "POST",
-        headers: { Accept: "application/json" },
-        body: {},
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(payload?.error || "Unable to mark this flag as resolved.");
-      }
-      await loadCasesWithFiles(true);
-      await loadArchivedCases(true);
-      renderCasesView();
-      notifyCases("Admin has been notified that this flag is resolved.", "success");
+      await openCaseNoteModal(caseId, "review");
       return;
     } else if (action === "download") {
-      await downloadCaseDeliverables(caseId);
+      await openCaseNoteModal(caseId, "downloads");
+      return;
     } else if (action === "download-receipt") {
-      window.open(`/api/payments/receipt/attorney/${encodeURIComponent(caseId)}`, "_blank");
+      await openCaseNoteModal(caseId, "receipt");
+      return;
     } else if (action === "download-archive") {
-      window.open(`/api/cases/${encodeURIComponent(caseId)}/archive/download`, "_blank");
-    } else if (action === "archive") {
-      await toggleCaseArchive(caseId, true);
-      renderCasesView();
-      notifyCases("Matter archived.");
-    } else if (action === "restore") {
-      await toggleCaseArchive(caseId, false);
-      renderCasesView();
-      notifyCases("Matter restored.");
+      await openCaseNoteModal(caseId, "export");
+    } else if (action === "archive" || action === "restore" || action === "archive-status") {
+      await openCaseNoteModal(caseId, "archive");
+      return;
     } else if (action === "delete-case") {
       const entry = getCaseEntryById(caseId);
       if (!canDeleteCase(entry)) {
@@ -5695,127 +5473,46 @@ async function handleCaseAction(action, caseId) {
   }
 }
 
-async function downloadCaseDeliverables(caseId) {
-  const entry = state.caseLookup.get(String(caseId));
-  if (!entry) throw new Error("Matter not found");
-  if (Array.isArray(entry.downloadUrl) && entry.downloadUrl.length) {
-    const directDownload = sanitizeDownloadPath(entry.downloadUrl[0]);
-    if (directDownload) {
-      window.open(directDownload, "_blank", "noopener");
-      return;
-    }
-  }
-  const file = Array.isArray(entry.files) ? entry.files[0] : null;
-  if (file?.key) {
-    const url = await getSignedUrl(caseId, file.key);
-    if (url) {
-      window.open(url, "_blank");
-      return;
-    }
-  }
-  throw new Error("No files available to download yet.");
-}
-
-async function toggleCaseArchive(caseId, archived) {
-  const archiveUrl = `/api/cases/${encodeURIComponent(caseId)}/archive`;
-  const caseUrl = `/api/cases/${encodeURIComponent(caseId)}`;
-  const entry = state.caseLookup.get(String(caseId));
-
-  if (archived && hasAssignedParalegal(entry)) {
-    throw new Error("Matters with a hired paralegal cannot be archived.");
-  }
-
-  // Ensure a valid status before unarchiving to avoid enum errors.
-  if (!archived) {
-    if (isFinalCase(entry)) {
-      throw new Error("Completed Matters cannot be restored.");
-    }
-    try {
-      await secureFetch(caseUrl, {
-        method: "PATCH",
-        headers: { Accept: "application/json" },
-        body: { status: "open" },
-      });
-    } catch (err) {
-      console.warn("Pre-unarchive status normalization failed", err);
-    }
-  }
-
-  const attemptArchiveToggle = async (body) => {
-    const res = await secureFetch(archiveUrl, {
-      method: "PATCH",
-      body,
-      headers: { Accept: "application/json" },
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(payload.error || "Unable to update Matter.");
-    }
-    return payload;
-  };
-
-  try {
-    const payload = await attemptArchiveToggle(archived ? { archived } : { archived, status: "open" });
-    if (!archived && payload && !payload.status) payload.status = "open";
-    syncCaseCollections(payload);
-    return;
-  } catch (err) {
-    const message = String(err?.message || "").toLowerCase();
-    const draftError = message.includes("draft");
-    if (!archived && draftError) {
-      // Final fallback: direct case PATCH to clear archived flag with a safe status.
-      try {
-        const res = await secureFetch(caseUrl, {
-          method: "PATCH",
-          headers: { Accept: "application/json" },
-          body: { archived: false, status: "open" },
-        });
-        const payload = await res.json().catch(() => ({}));
-        if (res.ok) {
-          payload.status = payload.status || "open";
-          syncCaseCollections(payload);
-          return;
-        }
-      } catch (innerErr) {
-        console.warn("Direct unarchive fallback failed", innerErr);
-      }
-    }
-    throw err;
-  }
-}
-
+const pendingMatterDeletions = new Set();
 async function deleteArchivedCase(caseId, { skipConfirm = false, silent = false } = {}) {
   if (!caseId) return;
-  if (!skipConfirm) {
-    const confirmed = await confirmAction("This permanently removes the Matter and cannot be undone.", {
-      title: "Delete this Matter?",
-      confirmLabel: "Delete Matter",
-      tone: "danger",
-    });
-    if (!confirmed) return;
-  }
-  const attemptDelete = async () => {
-    const response = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, {
-      method: "DELETE",
-      headers: { Accept: "application/json" },
-    });
-    const payload =
-      response.status === 204
-        ? {}
-        : await response.json().catch(() => ({}));
-    return { response, payload };
-  };
-
-  let { response: res, payload } = await attemptDelete();
-  if (!res.ok) {
-    await loadArchivedCases(true);
-    ({ response: res, payload } = await attemptDelete());
-  }
-  if (!res.ok) {
-    throw new Error(payload.error || "Unable to delete Matter.");
-  }
-  removeCaseFromState(caseId);
-  if (!silent) notifyCases("Matter deleted.", "success");
+  const key = String(caseId), ownerId = String(state.user?.id || state.user?._id || "");
+  if (pendingMatterDeletions.has(key)) throw new Error("Deletion is already being checked for this Matter.");
+  pendingMatterDeletions.add(key);
+  try {
+    if (!skipConfirm) {
+      const title = getCaseEntryById(key)?.title || "Untitled Matter";
+      const confirmed = await confirmAction(`Permanently remove “${title}”? This cannot be undone.`, {
+        title: "Delete this Matter?", confirmLabel: "Delete Matter", tone: "danger",
+      });
+      if (!confirmed) return;
+    }
+    if (!ownerId || await verifyCaseNoteOwner() !== ownerId) throw new Error("Your account changed. Reload Matters before continuing.");
+    let response, payload;
+    try {
+      response = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, {
+        method: "DELETE", body: { expectedOwnerId: ownerId }, headers: { Accept: "application/json" },
+      });
+      payload = response.status === 204 ? null : await response.json().catch(() => null);
+    } catch {
+      throw new Error("Deletion was not confirmed. Reload Matters to check before trying again.");
+    }
+    // A failed or unreadable acknowledgement may follow a committed deletion.
+    // Never retry the mutation, or infer success from absence in a partial list.
+    if (!response.ok || (response.status !== 204 && payload?.ok !== true)) {
+      throw new Error(!response.ok && typeof payload?.error === "string" ? payload.error : "Deletion was not confirmed. Reload Matters to check before trying again.");
+    }
+    if (await verifyCaseNoteOwner() !== ownerId) throw new Error("Your account changed. Reload Matters before continuing.");
+    removeCaseFromState(caseId);
+    // A confirmed deletion belongs to this account. Follow-up list reads must
+    // not delay its acknowledgement.
+    if (!silent) notifyCases("Matter deleted.", "success");
+    if (currentMatterInventory) await loadCurrentMatters({ force: true });
+    if (currentDraftInventory) await loadCaseDrafts({ force: true });
+  } catch (error) {
+    if (error?.message === "account_changed") throw new Error("Your account changed. Reload Matters before continuing.");
+    throw error;
+  } finally { pendingMatterDeletions.delete(key); }
 }
 
 function removeCaseFromState(caseId) {
@@ -5828,27 +5525,6 @@ function removeCaseFromState(caseId) {
   prune(state.casesArchived);
   state.caseLookup.delete(id);
   state.archivedSelection?.delete(id);
-  buildCaseLookup();
-}
-
-function syncCaseCollections(updatedCase) {
-  if (!updatedCase) return;
-  const nextId = String(updatedCase.id || updatedCase._id || "");
-  const existing =
-    state.caseLookup.get(nextId) ||
-    state.cases.find((item) => String(item.id || item._id || item.caseId || "") === nextId) ||
-    state.casesArchived.find((item) => String(item.id || item._id || item.caseId || "") === nextId) ||
-    null;
-  const normalized = Object.assign({}, existing || {}, updatedCase);
-  normalized.id = String(normalized.id || normalized._id);
-  const removeFromList = (list) => {
-    const idx = list.findIndex((item) => String(item.id) === String(normalized.id));
-    if (idx >= 0) list.splice(idx, 1);
-  };
-  removeFromList(state.cases);
-  removeFromList(state.casesArchived);
-  if (isArchivedBucketCase(normalized)) state.casesArchived.push(normalized);
-  else state.cases.push(normalized);
   buildCaseLookup();
 }
 
@@ -5882,10 +5558,6 @@ function resolveCaseBudgetCents(item) {
       item?.budget ??
       0
   );
-}
-
-function isEscrowFundedCase(item) {
-  return !!item?.escrowIntentId && String(item?.escrowStatus || "").toLowerCase() === "funded";
 }
 
 function isDisputeWindowActiveCase(item) {
@@ -5934,14 +5606,7 @@ function notifyCases(message, type = "info") {
   }
 }
 
-function notifyMessages(message, type = "info") {
-  const helper = window.toastUtils;
-  if (helper?.show) {
-    helper.show(message, { targetId: "toastBanner", type });
-  } else {
-    void showAlert(message, { title: type === "error" ? "Action unavailable" : "Notice" });
-  }
-}
+
 
 function notifyTasks(message, type = "info") {
   const helper = window.toastUtils;
@@ -5973,9 +5638,7 @@ function isFinalCase(caseItem) {
   return status === "completed";
 }
 
-function isCompletedDashboardCase(caseItem) {
-  return isFinalCase(caseItem);
-}
+
 
 function hasAssignedParalegal(caseItem) {
   if (!caseItem) return false;
@@ -6028,16 +5691,7 @@ function shouldOpenCasePreviewOnly(caseItem, { filterKey = state.casesViewFilter
   return isArchivedBucketCase(caseItem) || caseItem.archived === true;
 }
 
-function getArchivedBucketCases({ cases = state.cases, archivedCases = state.casesArchived } = {}) {
-  return getUniqueCaseRecords([
-    ...(Array.isArray(archivedCases) ? archivedCases : []),
-    ...(Array.isArray(cases) ? cases.filter((item) => isArchivedBucketCase(item)) : []),
-  ]);
-}
 
-function getCompletedDashboardCases({ cases = state.cases, archivedCases = state.casesArchived } = {}) {
-  return getArchivedBucketCases({ cases, archivedCases }).filter((item) => isCompletedDashboardCase(item));
-}
 
 function isWorkspaceEligibleCase(caseItem) {
   if (!caseItem) return false;
@@ -6061,12 +5715,9 @@ function canOpenCaseDetail(caseItem) {
   return isWorkspaceEligibleCase(caseItem);
 }
 
-function filterWorkspaceEligibleCases(list = []) {
-  if (!Array.isArray(list) || !list.length) return [];
-  return list.filter((item) => isWorkspaceEligibleCase(item));
-}
 
-async function loadCasesWithFiles(force = false) {
+
+async function loadCasesWithFiles(force = false, { refreshInventories = true } = {}) {
   if (force) state.casesPromise = null;
   if (state.casesPromise) {
     await state.casesPromise;
@@ -6080,11 +5731,13 @@ async function loadCasesWithFiles(force = false) {
       const data = await res.json();
       state.cases = Array.isArray(data) ? data : [];
       buildCaseLookup();
+      if (force && refreshInventories && currentDraftInventory) await loadCaseDrafts({ force: true });
       applyApplicationCountsToCases({ render: dashboardViewState.casesInitialized });
     } catch (err) {
       console.error(err);
       state.cases = [];
     } finally {
+      if (force && refreshInventories && currentMatterInventory) await loadCurrentMatters({ force: true });
       state.casesPromise = null;
     }
     return state.cases;
@@ -6094,7 +5747,7 @@ async function loadCasesWithFiles(force = false) {
 
 function buildCaseLookup() {
   state.caseLookup.clear();
-  const combined = [...(state.cases || []), ...(state.casesArchived || [])];
+  const combined = [...(state.cases || []), ...(state.casesArchived || []), ...(currentDraftInventory?.state.result?.items.filter(item => !item.localDraft) || []), ...(currentMatterInventory?.state.result?.items || [])];
   combined.forEach((c) => {
     const primaryId = parseCaseId(c);
     if (primaryId) state.caseLookup.set(String(primaryId), c);
@@ -6163,25 +5816,6 @@ async function blockApplicantFromCase(caseId, paralegalId, paralegalName, drawer
   }
 }
 
-async function getSignedUrl(caseId, key) {
-  const res = await secureFetch(`/api/cases/${caseId}/files/signed-get?key=${encodeURIComponent(key)}`, {
-    headers: { Accept: "application/json" },
-    noRedirect: true,
-  });
-  if (res.status === 401) {
-    throw new Error("Session expired. Please sign in again.");
-  }
-  if (res.status === 404) {
-    return null;
-  }
-  if (!res.ok) {
-    const payload = await res.json().catch(() => ({}));
-    throw new Error(payload?.error || payload?.msg || "Unable to sign file");
-  }
-  const data = await res.json();
-  return data?.url || null;
-}
-
 function toggleModal(modal, show) {
   if (!modal) return;
   modal.classList.toggle("hidden", !show);
@@ -6219,101 +5853,37 @@ function sanitizeUrl(rawUrl, { requiredHost = "" } = {}) {
   });
 }
 
-function sanitizeDownloadPath(path) {
-  return normalizeSameOriginPath(path);
-}
-
 function formatCurrency(amountCents = 0) {
   const dollars = Number(amountCents || 0) / 100;
   return dollars.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
-async function fetchDashboardData() {
-  const res = await secureFetch("/api/attorney/dashboard", { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error("Dashboard fetch failed");
-  return res.json();
-}
-
-async function fetchOverdueCount() {
-  try {
-    const res = await secureFetch("/api/checklist?overdue=true&limit=1", { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("Checklist fetch failed");
-    const data = await res.json();
-    return data.total || 0;
-  } catch (err) {
-    console.warn("Unable to fetch overdue tasks", err);
-    return 0;
-  }
-}
-
-async function fetchThreadsOverview(limit = 10) {
-  try {
-    const res = await secureFetch(`/api/messages/threads?limit=${limit}`, { headers: { Accept: "application/json" }, noRedirect: true });
-    if (!res.ok) throw new Error("Threads fetch failed");
-    const data = await res.json();
-    return Array.isArray(data.threads) ? data.threads : [];
-  } catch (err) {
-    console.warn("Unable to fetch threads", err);
-    return [];
-  }
-}
-
 async function fetchApplicationsForMyJobs() {
-  const res = await secureFetch("/api/applications/my-postings", {
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) throw new Error("Unable to load applications");
-  return res.json();
+  const ownerId = String(state.user?.id || state.user?._id || "");
+  return caseNoteApi.readReceivedApplications({ ownerId });
 }
 
-async function loadApplicationsForMyJobs({ force = false } = {}) {
+async function loadApplicationsForMyJobs({ force = false, refreshInventory = true } = {}) {
+  if (caseNoteOwnerId) {
+    const result = await (applicationParentPromise || refreshApplicationParent(caseNoteOwnerId, "", { refreshInventory }));
+    if (!Array.isArray(result)) throw new Error("Unable to refresh applications");
+    return result;
+  }
   if (force) applicationsPromise = null;
   if (applicationsPromise) return applicationsPromise;
-  applicationsPromise = (async () => {
+  const ticket = ++applicationsReadEpoch;
+  const pending = (async () => {
     const apps = await fetchApplicationsForMyJobs();
-    applicationsCache = Array.isArray(apps) ? apps : [];
+    if (ticket !== applicationsReadEpoch) return applicationsCache;
+    if (!Array.isArray(apps)) throw new Error('Unable to load applications');
+    applicationsCache = apps;
     applyApplicationsToCases(applicationsCache);
     return applicationsCache;
-  })()
-    .finally(() => {
-      applicationsPromise = null;
-    });
-  return applicationsPromise;
-}
-
-function updateMetrics(metrics = {}, overdueCount = 0) {
-  document.querySelectorAll("[data-metric]").forEach((el) => {
-    const key = el.dataset.metric;
-    let text = "--";
-    if (key === "activeCases") {
-      const value = Number(metrics.activeCases || 0);
-      const suffix = value === 1 ? "" : "s";
-      text = `${value} active Matter${suffix}`;
-      const heading = document.getElementById("activeCasesHeading");
-      if (heading && heading.dataset.static !== "true") {
-        heading.textContent = value > 0 ? `You have ${value} active Matter${suffix}` : "";
-      }
-    } else if (key === "overdueTasks") {
-      text = `${overdueCount} overdue task${overdueCount === 1 ? "" : "s"}`;
-    } else if (key === "escrowTotal") {
-      text = `${formatCurrency(metrics.escrowTotal || 0)} pending in Stripe`;
-    }
-    el.textContent = text;
+  })().finally(() => {
+    if (applicationsPromise === pending) applicationsPromise = null;
   });
-}
-
-function filterApplicationsForDisplay(apps = []) {
-  return apps.filter((app) => {
-    if (!app?.caseId) return true;
-    const caseEntry = state.caseLookup.get(String(app.caseId));
-    if (!caseEntry) return false;
-    if (hasAssignedParalegal(caseEntry)) return false;
-    const statusKey = normalizeCaseStatus(caseEntry?.status);
-    if (statusKey === "completed") return false;
-    if (caseEntry?.archived === true) return false;
-    if (caseEntry?.paymentReleased === true) return false;
-    return true;
-  });
+  applicationsPromise = pending;
+  return pending;
 }
 
 function extractCaseIdFromApplication(app = {}) {
@@ -6332,8 +5902,9 @@ function extractCaseIdFromApplication(app = {}) {
 }
 
 function applyApplicationsToCases(apps = []) {
+  if (!Array.isArray(apps)) return;
   caseApplicationCounts.clear();
-  if (!Array.isArray(apps) || !apps.length) return;
+  state.cases.forEach(item => { const caseId = parseCaseId(item); if (caseId) caseApplicationCounts.set(String(caseId), 0); });
   apps.forEach((app) => {
     const caseId = extractCaseIdFromApplication(app);
     if (!caseId) return;
@@ -6359,78 +5930,12 @@ function applyApplicationCountsToCases({ render = false } = {}) {
       caseItem.applicantsCount = nextCount;
     }
   });
-  if (render && didChange && dashboardViewState.casesInitialized) {
+  // Complete inventories own their rows and counts; Home summary reconciliation
+  // must not replace an independently loaded list or detach its open controls.
+  if (render && didChange && dashboardViewState.casesInitialized && !currentMatterInventory && !currentDraftInventory) {
     renderCasesView();
     restoreApplicantDrawerFromQuery();
   }
-}
-
-function buildOverviewSignals({ cases = [], apps = [], archivedCases = [], overdueCount = 0 } = {}) {
-  const reviewCaseIds = new Set();
-  let unfundedCount = 0;
-
-  (cases || []).forEach((caseItem) => {
-    const statusKey = normalizeCaseStatus(caseItem?.status);
-    const hasParalegal = !!(caseItem?.paralegal || caseItem?.paralegalId);
-    const escrowFunded = String(caseItem?.escrowStatus || "").toLowerCase() === "funded";
-    const awaitingFunding = hasParalegal && !escrowFunded && statusKey !== "open";
-    if (awaitingFunding) unfundedCount += 1;
-
-    const caseId = String(caseItem?.id || caseItem?._id || caseItem?.caseId || "");
-    (caseItem?.files || []).forEach((file) => {
-      const fileStatus = String(file?.status || "").toLowerCase();
-      if (fileStatus === "pending_review") {
-        reviewCaseIds.add(caseId || String(reviewCaseIds.size));
-      }
-    });
-  });
-
-  const completedCasesCount = getCompletedDashboardCases({ cases, archivedCases }).length;
-
-  const pendingApplications = filterApplicationsForDisplay(Array.isArray(apps) ? apps : []).filter((app) => {
-    const status = String(app?.status || "").toLowerCase();
-    return !status || status === "submitted" || status === "pending";
-  }).length;
-
-  return {
-    unfundedCount,
-    casesCreatedCount: Array.isArray(cases) ? cases.length : 0,
-    completedCasesCount,
-    pendingReviewCount: reviewCaseIds.size,
-    overdueCount,
-    applicationsCount: pendingApplications,
-  };
-}
-
-function updateOverviewSignals(partial = {}) {
-  Object.assign(overviewSignals, partial);
-  const todayMap = {
-    unfunded: overviewSignals.unfundedCount,
-    casesCreated: overviewSignals.casesCreatedCount,
-    completedCases: overviewSignals.completedCasesCount,
-    pendingReviews: overviewSignals.pendingReviewCount,
-    overdue: overviewSignals.overdueCount,
-    applications: overviewSignals.applicationsCount,
-  };
-  document.querySelectorAll("[data-today]").forEach((el) => {
-    const key = el.dataset.today;
-    if (key && Object.prototype.hasOwnProperty.call(todayMap, key)) {
-      el.textContent = String(todayMap[key]);
-    }
-  });
-
-  const queueMap = {
-    unfunded: overviewSignals.unfundedCount,
-    pendingReviews: overviewSignals.pendingReviewCount,
-    applications: overviewSignals.applicationsCount,
-  };
-  document.querySelectorAll("[data-queue]").forEach((el) => {
-    const key = el.dataset.queue;
-    if (key && Object.prototype.hasOwnProperty.call(queueMap, key)) {
-      el.textContent = String(queueMap[key]);
-    }
-  });
-  renderNeedsAttentionQueue();
 }
 
 function pluralizeCount(count, singular, plural = `${singular}s`) {
@@ -6446,60 +5951,16 @@ function buildNeedsAttentionItems() {
     !isAttorneyOnboardingDismissed() &&
     Boolean(getNextOnboardingStep(progress));
   const hasAnyMatter =
-    Number(overviewSignals.casesCreatedCount || 0) > 0 ||
-    (Array.isArray(state.casesArchived) && state.casesArchived.length > 0);
+    Number(overviewSignals.casesCreatedCount || 0) > 0;
 
   if (!onboardingGuidanceActive && state.billing.hasPaymentMethod === false) {
     items.push({
       key: "payment",
       title: "Add a payment method",
-      meta: "A payment method is required before hiring and funding a paralegal.",
+      meta: "Keep a card ready to fund a Matter when you hire.",
       actionLabel: "Open payments",
       href: "#funds",
       viewTarget: "funds",
-    });
-  }
-
-  if (overviewSignals.applicationsCount > 0) {
-    items.push({
-      key: "applications",
-      title: `${pluralizeCount(overviewSignals.applicationsCount, "application")} ready for review`,
-      meta: "Review interested paralegals while the matter is fresh.",
-      actionLabel: "Review applicants",
-      href: "#cases:inquiries",
-      viewTarget: "cases",
-    });
-  }
-
-  if (overviewSignals.unfundedCount > 0) {
-    items.push({
-      key: "funding",
-      title: `${pluralizeCount(overviewSignals.unfundedCount, "matter")} awaiting funding`,
-      meta: "Funding must be resolved before work can reliably move forward.",
-      actionLabel: "Open payments",
-      href: "#funds",
-      viewTarget: "funds",
-    });
-  }
-
-  if (overviewSignals.unreadCount > 0) {
-    items.push({
-      key: "messages",
-      title: `${pluralizeCount(overviewSignals.unreadCount, "message")} waiting`,
-      meta: "Open the latest matter conversation and respond from the workspace.",
-      actionLabel: "Open messages",
-      action: "messages",
-    });
-  }
-
-  if (overviewSignals.pendingReviewCount > 0) {
-    items.push({
-      key: "files",
-      title: `${pluralizeCount(overviewSignals.pendingReviewCount, "matter")} with files to review`,
-      meta: "Review submitted documents so completion and payment can stay on track.",
-      actionLabel: "Open matters",
-      href: "#cases",
-      viewTarget: "cases",
     });
   }
 
@@ -6507,7 +5968,7 @@ function buildNeedsAttentionItems() {
     items.push({
       key: "overdue",
       title: `${pluralizeCount(overviewSignals.overdueCount, "overdue task")}`,
-      meta: "Review overdue private planning items before they slow down active work.",
+      meta: "",
       actionLabel: "Open tasks",
       href: "#tasks",
       viewTarget: "tasks",
@@ -6524,7 +5985,7 @@ function buildNeedsAttentionItems() {
     });
   }
 
-  if (!onboardingGuidanceActive && !hasAnyMatter && progress.profileDone && state.billing.hasPaymentMethod === true) {
+  if (!onboardingGuidanceActive && legacyHome?.state.inventory.phase === "ready" && !hasAnyMatter && progress.profileDone && state.billing.hasPaymentMethod === true) {
     items.push({
       key: "first-matter",
       title: "Post your first matter",
@@ -6534,23 +5995,24 @@ function buildNeedsAttentionItems() {
     });
   }
 
+  const unavailable = Object.entries(legacyHome?.state || {}).filter(([key, source]) => key !== "inventory" && (source.phase !== "ready" || key === "messages" && source.value.mismatch));
+  if (unavailable.length) items.push({ key: "unavailable", title: unavailable.some(([, source]) => source.phase === "loading") ? "Checking remaining items…" : "Some Home items could not be verified", actionLabel: "Refresh Home", action: "refresh" });
   return items;
 }
 
 function renderNeedsAttentionQueue() {
   const shell = document.getElementById("attorneyNeedsAttention");
   const list = document.getElementById("attorneyNeedsAttentionList");
-  if (!shell || !list) return;
-  if (!onboardingAttentionHydrated) {
-    shell.hidden = false;
-    shell.setAttribute("aria-hidden", "false");
-    return;
-  }
+  if (!shell || !list || !legacyHome) return;
+  if (caseNoteModalRef && !caseNoteModalRef.classList.contains("hidden") && !Object.values(legacyHome.state).every(source => source.phase === "failed")) { homeAttentionRefreshDeferred = true; return; }
+  const focused = list.contains(document.activeElement) ? { text: document.activeElement.textContent, href: document.activeElement.getAttribute("href"), matterId: document.activeElement.closest("[data-home-attention]")?.dataset.homeAttention } : null;
   const items = buildNeedsAttentionItems();
+  const matterNodes = legacyHome?.attentionNodes() || [];
+  const hasMatterItems = matterNodes.length > 0;
   const progress = getAttorneyOnboardingProgress();
   const onboardingGuidanceActive =
     !isAttorneyOnboardingDismissed() && Boolean(getNextOnboardingStep(progress));
-  if (!items.length && onboardingGuidanceActive) {
+  if (!items.length && !hasMatterItems && onboardingGuidanceActive) {
     shell.hidden = true;
     shell.setAttribute("aria-hidden", "true");
     list.textContent = "";
@@ -6559,12 +6021,12 @@ function renderNeedsAttentionQueue() {
   shell.hidden = false;
   shell.setAttribute("aria-hidden", "false");
 
-  if (!items.length) {
+  if (!items.length && !hasMatterItems) {
     list.innerHTML = `
       <div class="queue-item">
         <div>
           <div class="queue-title">All clear</div>
-          <div class="queue-meta">No urgent applications, messages, payment blockers, file reviews, or overdue tasks need action right now.</div>
+
         </div>
         <a class="queue-action" href="create-case.html">New matter</a>
       </div>
@@ -6586,32 +6048,32 @@ function renderNeedsAttentionQueue() {
         <div class="queue-item" data-attention-item="${sanitize(item.key || "")}">
           <div>
             <div class="queue-title">${title}</div>
-            <div class="queue-meta">${meta}</div>
+            ${meta ? `<div class="queue-meta">${meta}</div>` : ""}
           </div>
           ${actionMarkup}
         </div>
       `;
     })
     .join("");
+  list.append(...matterNodes);
+  if (focused && document.activeElement === document.body) {
+    const replacement = Array.from(list.querySelectorAll("a,button")).find(element => element.textContent === focused.text && element.getAttribute("href") === focused.href && element.closest("[data-home-attention]")?.dataset.homeAttention === focused.matterId);
+    const target = replacement || document.getElementById("attorneyNeedsAttentionTitle");
+    if (target) { if (!replacement) target.tabIndex = -1; target.focus(); }
+  }
 }
 
 async function refreshApplicationsOverview({ force = false } = {}) {
-  await loadCasesWithFiles(force);
-  const [apps, hasPaymentMethod] = await Promise.all([
-    loadApplicationsForMyJobs({ force }),
-    hasDefaultPaymentMethod(),
+  await loadApplicationsForMyJobs({ force, refreshInventory: false });
+  await legacyHome?.refresh(["applications", "inventory", "payment"]);
+  // A person may have opened a panel while these background reads were pending.
+  // Keep that interaction intact, then apply the coalesced update after it closes.
+  if (deferApplicationAutoRefresh()) return false;
+  if (force) await Promise.all([
+    currentDraftInventory?.state.phase === 'ready' ? loadCaseDrafts({ force: true }) : null,
+    currentMatterInventory?.state.phase === 'ready' ? loadCurrentMatters({ force: true }) : null,
   ]);
-  state.billing.hasPaymentMethod = hasPaymentMethod;
-  updateOnboardingChecklist();
-  renderApplications(apps || [], hasPaymentMethod);
-  renderApplicationsOverview(filterApplicationsForDisplay(apps || []).length);
-  updateOverviewSignals(
-    buildOverviewSignals({
-      cases: state.cases,
-      apps,
-      overdueCount: overviewSignals.overdueCount,
-    })
-  );
+  return true;
 }
 
 function initHomeTabs() {
@@ -6687,993 +6149,12 @@ function renderEscrowPanel(container) {
   if (!container) return;
   const billingHref = "#funds";
   container.innerHTML = `
-    <div class="info-line">&bull; View payment history and receipts in Payments.</div>
-    <div class="info-line">&bull; Export your history anytime.</div>
     <div class="info-actions" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
       <a class="pill-btn primary" href="${billingHref}" data-view-target="funds">Open Payments</a>
-      <a class="pill-btn" href="/api/payments/export/csv">Download Receipts (CSV)</a>
     </div>
   `;
 }
 
-function formatApplicationBudget(app = {}) {
-  const value = app.budget ?? app.totalAmount ?? app.paymentAmount ?? "";
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return `$${value.toLocaleString()}`;
-  }
-  if (value && Number.isFinite(+value)) {
-    return `$${Number(value).toLocaleString()}`;
-  }
-  if (typeof value === "string" && value.trim()) {
-    const cleaned = value.trim();
-    if (cleaned.startsWith("$")) return cleaned;
-    const parsed = parseFloat(cleaned.replace(/[^0-9.-]/g, ""));
-    if (Number.isFinite(parsed)) {
-      return `$${parsed.toLocaleString()}`;
-    }
-  }
-  return "—";
-}
-
-function getPrimaryApplication(apps = []) {
-  if (!apps.length) return null;
-  let primary = apps[0];
-  let primaryTime = new Date(primary.createdAt || primary.appliedAt || primary.updatedAt || 0).getTime();
-  if (!Number.isFinite(primaryTime)) primaryTime = 0;
-  apps.slice(1).forEach((app) => {
-    const time = new Date(app.createdAt || app.appliedAt || app.updatedAt || 0).getTime();
-    if (Number.isFinite(time) && time > primaryTime) {
-      primary = app;
-      primaryTime = time;
-    }
-  });
-  return primary;
-}
-
-function renderApplications(apps = [], hasPaymentMethod = true) {
-  const container = document.getElementById("applicationsSection");
-  if (!container) return;
-  const filteredApps = filterApplicationsForDisplay(apps);
-  if (!filteredApps.length) {
-    container.innerHTML = `
-      <div class="case-card empty-state">
-        <div class="case-header">
-          <div>
-            <h2>No applications yet</h2>
-            <div class="case-subinfo">Paralegal applications to your postings will appear here.</div>
-          </div>
-        </div>
-      </div>`;
-    return;
-  }
-  const grouped = new Map();
-  filteredApps.forEach((app, index) => {
-    const caseId = extractCaseIdFromApplication(app);
-    const key = caseId || `app-${index}`;
-    const entry = grouped.get(key) || { caseId, apps: [], latestTimestamp: 0 };
-    entry.apps.push(app);
-    const timestamp = new Date(app.createdAt || app.appliedAt || app.updatedAt || 0).getTime();
-    if (Number.isFinite(timestamp)) {
-      entry.latestTimestamp = Math.max(entry.latestTimestamp, timestamp);
-    }
-    grouped.set(key, entry);
-  });
-
-  container.innerHTML = Array.from(grouped.values())
-    .sort((a, b) => (b.latestTimestamp || 0) - (a.latestTimestamp || 0))
-    .map((group) => {
-      const caseId = group.caseId || "";
-      const caseEntry = caseId ? state.caseLookup.get(String(caseId)) : null;
-      const primaryApp = getPrimaryApplication(group.apps) || group.apps[0] || {};
-      const title = sanitize(caseEntry?.title || primaryApp.jobTitle || primaryApp.caseTitle || "Matter");
-      const practiceRaw =
-        caseEntry?.practiceArea ||
-        caseEntry?.field ||
-        primaryApp.practiceArea ||
-        primaryApp.practice ||
-        "General practice";
-      const practice = sanitize(titleCaseWords(practiceRaw));
-      const amountFromCase = caseEntry ? formatCaseAmount(caseEntry) : "—";
-      const amount = amountFromCase !== "—" ? amountFromCase : formatApplicationBudget(primaryApp);
-      const amountText = amount && amount !== "—" ? sanitize(amount) : "—";
-      const applicantsFromCase = caseEntry
-        ? Number(
-            caseEntry.applicantsCount ??
-              (Array.isArray(caseEntry.applicants) ? caseEntry.applicants.length : caseEntry.applicants) ??
-              0
-          )
-        : 0;
-      const applicantCount = Math.max(group.apps.length, applicantsFromCase);
-      const applicantsLabel = applicantCount === 1 ? "1 applicant" : `${applicantCount} applicants`;
-      const paralegalId =
-        primaryApp?.paralegal?.id ||
-        primaryApp?.paralegal?._id ||
-        primaryApp?.paralegalId ||
-        "";
-      const name = sanitize(
-        `${primaryApp?.paralegal?.firstName || ""} ${primaryApp?.paralegal?.lastName || ""}`.trim() ||
-          "Paralegal"
-      );
-      const statusKey = String(primaryApp?.status || "").toLowerCase();
-      const canHire =
-        !!caseId &&
-        !!paralegalId &&
-        !["accepted", "rejected", "withdrawn"].includes(statusKey) &&
-        canHireForCase(caseEntry);
-      const paymentBlocked = hasPaymentMethod === false;
-      const showPaymentGate = paymentBlocked && canHire;
-      let hireDisabledAttr = "";
-      if (showPaymentGate) {
-        hireDisabledAttr = ' disabled aria-disabled="true" title="Add a payment method to hire."';
-      } else if (!canHire) {
-        let reason = "Select an applicant to hire.";
-        if (caseEntry && isRelistHireLocked(caseEntry)) {
-          reason = "Hiring locked until the payout is finalized.";
-        } else if (caseEntry && !canHireForCase(caseEntry)) {
-          reason = "Matter is not ready for hiring.";
-        }
-        hireDisabledAttr = ` disabled aria-disabled="true" title="${sanitize(reason)}"`;
-      }
-      const viewApplicantsHref = caseId
-        ? `dashboard-attorney.html?openApplicants=1&caseId=${encodeURIComponent(caseId)}#cases:inquiries`
-        : "#cases:inquiries";
-      const viewApplicantsAttrs = caseId ? "" : ' aria-disabled="true" tabindex="-1"';
-      return `
-        <div class="case-card applications-summary">
-          <div class="case-header">
-            <div>
-              <h2>${title}</h2>
-              <div class="case-subinfo">${practice}${amountText ? ` • ${amountText}` : ""}</div>
-              <div class="case-subinfo">${applicantsLabel}</div>
-            </div>
-            <div class="case-actions">
-              <button class="chip" type="button" data-hire-paralegal data-case-id="${sanitize(
-                caseId
-              )}" data-paralegal-id="${sanitize(paralegalId)}" data-paralegal-name="${name}"${hireDisabledAttr}>Hire</button>
-              <a class="chip" href="${sanitize(viewApplicantsHref)}" data-view-applicants data-case-id="${sanitize(
-                caseId
-              )}"${viewApplicantsAttrs}>View applicants</a>
-            </div>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-
-  bindApplicationsActions();
-}
-
-function bindApplicationsActions() {
-  if (applicationsActionsBound) return;
-  const container = document.getElementById("applicationsSection");
-  if (!container) return;
-  container.addEventListener("click", (event) => {
-    const viewBtn = event.target.closest("[data-view-applicants]");
-    if (viewBtn) {
-      if (viewBtn.getAttribute("aria-disabled") === "true") {
-        return;
-      }
-      const caseId = viewBtn.dataset.caseId || "";
-      if (!caseId) return;
-      event.preventDefault();
-      openCaseApplications(caseId);
-      return;
-    }
-    const hireBtn = event.target.closest("[data-hire-paralegal]");
-    if (!hireBtn) return;
-    if (hireBtn.hasAttribute("disabled") || hireBtn.getAttribute("aria-disabled") === "true") {
-      return;
-    }
-    event.preventDefault();
-    const caseId = hireBtn.dataset.caseId || "";
-    const paralegalId = hireBtn.dataset.paralegalId || "";
-    const paralegalName = hireBtn.dataset.paralegalName || "Paralegal";
-    if (!caseId || !paralegalId) return;
-    handleHireFromApplications({ caseId, paralegalId, paralegalName, button: hireBtn });
-  });
-  applicationsActionsBound = true;
-}
-
-async function handleHireFromApplications({ caseId, paralegalId, paralegalName, button, skipPreEngagementStep = false }) {
-  if (button) {
-    button.classList.add("is-pressed");
-    window.setTimeout(() => button.classList.remove("is-pressed"), 180);
-  }
-  let caseDetails;
-  try {
-    caseDetails = await getCaseForHire(caseId);
-  } catch (err) {
-    notifyCases(err?.message || "Unable to load matter details.", "error");
-    return;
-  }
-  if (!canHireForCase(caseDetails)) {
-    if (isRelistHireLocked(caseDetails)) {
-      if (!caseDetails?.payoutFinalizedAt) {
-        notifyCases("Payout must be finalized before hiring a new paralegal.", "error");
-      } else {
-        const deadlineText = caseDetails?.disputeDeadlineAt
-          ? new Date(caseDetails.disputeDeadlineAt).toLocaleString()
-          : "after the 24-hour hold ends";
-        notifyCases(`Hiring is locked until ${deadlineText}.`, "error");
-      }
-      return;
-    }
-    if (normalizeCaseStatus(caseDetails?.status) === "paused" && !caseDetails?.relistRequestedAt) {
-      notifyCases("Relist the Matter before hiring a new paralegal.", "error");
-      return;
-    }
-    if (hasAssignedParalegal(caseDetails)) {
-      notifyCases("A paralegal is already hired for this Matter.", "error");
-      return;
-    }
-    const fallbackAmount = resolveCaseBudgetCents(caseDetails);
-    if (!Number.isFinite(fallbackAmount) || fallbackAmount <= 0) {
-      notifyCases("Remaining Matter balance is $0. Hiring is unavailable.", "error");
-      return;
-    }
-    notifyCases("Hiring is unavailable for this Matter right now.", "error");
-    return;
-  }
-  const amountCents = resolveCaseBudgetCents(caseDetails);
-  if (!Number.isFinite(amountCents) || amountCents <= 0) {
-    notifyCases("Payment amount is unavailable for this Matter.", "error");
-    return;
-  }
-
-  const reuseEscrow = isRelistedCase(caseDetails) && isEscrowFundedCase(caseDetails);
-  if (!reuseEscrow) {
-    const paymentReady = await hasDefaultPaymentMethod();
-    if (!paymentReady) {
-      state.billing.hasPaymentMethod = false;
-      notifyCases("Add a payment method to hire before hiring.", "error");
-      return;
-    }
-  }
-
-  openHireConfirmModal({
-    paralegalName,
-    amountCents,
-    feePct: PLATFORM_FEE_PCT,
-    reuseEscrow,
-    skipPreEngagementStep,
-    existingPreEngagement:
-      !skipPreEngagementStep &&
-      caseDetails?.preEngagement &&
-      String(caseDetails.preEngagement.requestedParalegalId || "") === String(paralegalId || "") &&
-      String(caseDetails.preEngagement.status || "").toLowerCase() === "requested"
-        ? caseDetails.preEngagement
-        : null,
-    continueHref: `case-detail.html?caseId=${encodeURIComponent(caseId)}`,
-    onSendPreEngagement: async ({ preEngagement } = {}) => {
-      await savePreEngagementDraft(caseId, paralegalId, preEngagement);
-      await refreshApplicationsOverview({ force: true });
-    },
-    onConfirm: async ({ preEngagement } = {}) => {
-      const originalText = button?.textContent || "Hire";
-      if (button) {
-        button.textContent = "Processing...";
-        button.setAttribute("disabled", "disabled");
-      }
-      try {
-        void preEngagement;
-        await hireParalegal(caseId, paralegalId);
-        await refreshApplicationsOverview({ force: true });
-      } catch (err) {
-        if (button) {
-          button.removeAttribute("disabled");
-          button.textContent = originalText;
-        }
-        throw err;
-      }
-    },
-  });
-}
-
-async function hasDefaultPaymentMethod() {
-  try {
-    const res = await secureFetch("/api/payments/payment-method/default", {
-      headers: { Accept: "application/json" },
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) return false;
-    return !!payload?.paymentMethod;
-  } catch {
-    return false;
-  }
-}
-
-async function getCaseForHire(caseId) {
-  const existing = state.caseLookup.get(String(caseId));
-  if (existing) return existing;
-  const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, { headers: { Accept: "application/json" } });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(payload?.error || "Unable to load matter details.");
-  }
-  return payload;
-}
-
-const DEFAULT_HIRE_ERROR = "Unable to hire paralegal.";
-
-function formatHireErrorMessage(message) {
-  if (!message || typeof message !== "string") return DEFAULT_HIRE_ERROR;
-  const normalized = message.toLowerCase();
-  if (normalized.includes("stripe") && normalized.includes("connect")) {
-    return "This paralegal must connect Stripe before you can hire them.";
-  }
-  if (
-    normalized.includes("stripe") &&
-    (normalized.includes("onboard") || normalized.includes("onboarding") || normalized.includes("payout"))
-  ) {
-    return "This paralegal must complete Stripe onboarding before you can hire them.";
-  }
-  return message;
-}
-
-async function hireParalegal(caseId, paralegalId) {
-  const res = await secureFetch(
-    `/api/cases/${encodeURIComponent(caseId)}/hire/${encodeURIComponent(paralegalId)}`,
-    { method: "POST", body: {} }
-  );
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(payload?.error || DEFAULT_HIRE_ERROR);
-  return payload;
-}
-
-async function savePreEngagementDraft(caseId, paralegalId, preEngagement) {
-  const formData = new FormData();
-  formData.set(
-    "confidentialityAgreementRequired",
-    preEngagement?.confidentialityAgreementSelected ? "true" : "false"
-  );
-  formData.set(
-    "conflictsCheckRequired",
-    preEngagement?.conflictsCheckSelected ? "true" : "false"
-  );
-  formData.set("conflictsDetails", String(preEngagement?.conflictsDetails || ""));
-  if (preEngagement?.confidentialityFile) {
-    formData.append(
-      "confidentialityFile",
-      preEngagement.confidentialityFile,
-      preEngagement.confidentialityFileName || preEngagement.confidentialityFile.name || "confidentiality-agreement"
-    );
-  }
-  const res = await secureFetch(
-    `/api/cases/${encodeURIComponent(caseId)}/pre-engagement/${encodeURIComponent(paralegalId)}/request`,
-    { method: "POST", body: formData }
-  );
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(payload?.error || "Unable to save pre-engagement requirements.");
-  }
-  return payload;
-}
-
-function ensureHireModalStyles() {
-  if (document.getElementById("hire-confirm-styles")) return;
-  const style = document.createElement("style");
-  style.id = "hire-confirm-styles";
-  style.textContent = `
-    .hire-confirm-overlay{position:fixed;inset:0;background:rgba(15,23,42,.4);display:flex;align-items:center;justify-content:center;z-index:1500;opacity:0;visibility:hidden;transition:opacity .16s ease,visibility .16s ease}
-    .hire-confirm-overlay.is-visible{opacity:1;visibility:visible}
-    .hire-confirm-overlay.is-closing{pointer-events:none}
-    .hire-confirm-modal{background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:var(--radius,18px);padding:28px;max-width:580px;width:min(94%,580px);box-shadow:0 24px 50px rgba(0,0,0,.2);display:grid;gap:16px;font-family:'Sarabun',sans-serif;font-weight:300;color:var(--ink,#1a1a1a);font-size:1.05rem;opacity:0;transform:translateY(10px) scale(.985);transition:opacity .16s ease,transform .16s ease}
-    .hire-confirm-overlay.is-visible .hire-confirm-modal{opacity:1;transform:translateY(0) scale(1)}
-    .hire-confirm-stage{transition:opacity .18s ease,transform .18s ease}
-    .hire-confirm-stage.is-leaving,.hire-confirm-stage.is-entering{opacity:0;transform:translateY(8px)}
-    .hire-confirm-modal button,
-    .hire-confirm-modal a{font-family:'Sarabun',sans-serif}
-    .hire-confirm-modal p{font-weight:300;color:var(--muted,#666)}
-    .hire-confirm-title{font-weight:300;font-size:1.6rem;letter-spacing:0.01em;text-align:center}
-    .hire-pre-helper{margin:0 0 16px;color:var(--muted,#666);line-height:1.5}
-    .hire-pre-options{display:grid;gap:10px;margin-bottom:14px}
-    .hire-pre-option{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:var(--radius,14px);background:var(--panel,#fff);cursor:pointer;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease}
-    .hire-pre-option:hover{border-color:rgba(182,164,122,.65);box-shadow:0 10px 24px rgba(15,23,42,.06)}
-    .hire-pre-option.is-selected{border-color:rgba(182,164,122,.85);background:#faf7ef}
-    .hire-pre-option input{margin-top:3px}
-    .hire-pre-option-copy{display:grid;gap:2px}
-    .hire-pre-option-copy strong{font-size:1rem;font-weight:400;color:var(--ink,#1a1a1a)}
-    .hire-pre-reveal{display:grid;gap:10px;margin-top:12px;padding:12px;border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:var(--radius,14px);background:#fbfbfa}
-    .hire-pre-reveal label{font-size:0.9rem;font-weight:400;color:var(--ink,#1a1a1a)}
-    .hire-pre-upload{display:grid;gap:8px}
-    .hire-pre-upload input[type="file"]{display:none}
-    .hire-pre-upload-trigger{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:1px solid var(--line,rgba(0,0,0,0.12));border-radius:999px;background:var(--panel,#fff);color:var(--ink,#1a1a1a);font-weight:400;cursor:pointer;width:max-content}
-    .hire-pre-upload-name{font-size:0.9rem;color:var(--muted,#666)}
-    .hire-pre-reveal textarea{border:1px solid var(--line,rgba(0,0,0,0.12));border-radius:12px;padding:10px;font:inherit;min-height:104px;resize:vertical;background:var(--panel,#fff);color:var(--ink,#1a1a1a)}
-    .hire-pre-reveal textarea.is-invalid{border-color:rgba(185,28,28,.45);background:rgba(254,242,242,.55)}
-    .hire-pre-upload-trigger.is-invalid{border-color:rgba(185,28,28,.45);color:#991b1b;background:rgba(254,242,242,.55)}
-    .hire-pre-field-help{font-size:0.85rem;color:#991b1b;margin-top:-2px}
-    .hire-confirm-summary{border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:var(--radius,14px);padding:14px 18px;display:grid;gap:12px;background:var(--panel,#fff)}
-    .hire-confirm-row{display:flex;justify-content:space-between;gap:16px;align-items:baseline}
-    .hire-confirm-row span{text-transform:uppercase;font-size:0.75rem;letter-spacing:0.08em;color:var(--muted,#666);font-weight:300}
-    .hire-confirm-row strong{font-size:1.3rem;font-weight:300;color:var(--ink,#1a1a1a)}
-    .hire-confirm-total strong{font-weight:400}
-    .hire-confirm-help{display:flex;justify-content:flex-end;margin-top:-6px}
-    .hire-confirm-info{width:40px;height:40px;border-radius:50%;border:1px solid var(--line,rgba(0,0,0,0.08));background:var(--panel,#fff);color:var(--muted,#5f6670);font-size:0.8rem;font-weight: 200;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0;transition:border-color .2s ease,color .2s ease,transform .15s ease}
-    .hire-confirm-info:hover,
-    .hire-confirm-info:focus-visible{border-color:var(--accent,#b6a47a);color:var(--ink,#1a1a1a);transform:translateY(-1px)}
-    .hire-confirm-tooltip{position:absolute;right:0;bottom:calc(100% + 10px);width:min(320px,80vw);padding:12px 14px;border-radius:12px;background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));box-shadow:0 18px 40px rgba(0,0,0,.18);font-size:0.9rem;line-height:1.45;color:var(--ink,#1a1a1a);opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .15s ease,transform .15s ease;z-index:2}
-    .hire-confirm-info:hover .hire-confirm-tooltip,
-    .hire-confirm-info:focus-visible .hire-confirm-tooltip{opacity:1;pointer-events:auto;transform:translateY(0)}
-    .hire-confirm-error{border:1px solid rgba(185,28,28,.4);background:rgba(254,242,242,.9);color:#991b1b;border-radius:10px;padding:8px 10px;font-size:0.9rem}
-    .hire-confirm-error a{color:inherit;text-decoration:underline;font-weight:400}
-    .hire-confirm-error a:hover{color:var(--ink,#1a1a1a)}
-    .hire-confirm-success{border:1px solid rgba(22,163,74,.35);background:rgba(240,253,244,.9);color:#166534;border-radius:10px;padding:8px 10px;font-size:0.9rem}
-    .hire-confirm-terms-link{color:var(--accent,#b6a47a);font-weight:600;text-decoration:none}
-    .hire-confirm-terms-link:hover{color:var(--ink,#1a1a1a)}
-    .hire-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:4px;flex-wrap:wrap}
-    .hire-confirm-actions[hidden]{display:none}
-    @media (max-width:640px){.hire-confirm-info{width:44px;height:44px}}
-    @media (prefers-reduced-motion: reduce){
-      .hire-confirm-overlay,.hire-confirm-modal{transition:none}
-    }
-  `;
-  document.head.appendChild(style);
-}
-
-function openHireConfirmModal({
-  paralegalName,
-  amountCents,
-  feePct,
-  continueHref,
-  onConfirm,
-  onSendPreEngagement,
-  reuseEscrow = false,
-  skipPreEngagementStep = false,
-  existingPreEngagement = null,
-}) {
-  ensureHireModalStyles();
-  const safeName = sanitize(paralegalName || "Paralegal");
-  const feeNote =
-    "Platform fees support LPC’s application and eligibility review, technology and Matter workspace, platform support, applicable Stripe processing costs, and other platform operations. Platform fees are not fees for legal services.";
-  const feeRate = Number(feePct || 0);
-  const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
-  const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
-  const normalizedExistingPreEngagement =
-    existingPreEngagement &&
-    typeof existingPreEngagement === "object" &&
-    String(existingPreEngagement.status || "").toLowerCase() === "requested"
-      ? {
-          status: "requested",
-          confidentialityAgreementRequired: !!existingPreEngagement.confidentialityAgreementRequired,
-          conflictsCheckRequired: !!existingPreEngagement.conflictsCheckRequired,
-          conflictsDetails: String(existingPreEngagement.conflictsDetails || ""),
-          confidentialityDocument: existingPreEngagement.confidentialityDocument || null,
-        }
-      : null;
-  const preEngagementState = {
-    confidentialityAgreement: !!normalizedExistingPreEngagement?.confidentialityAgreementRequired,
-    conflictsCheck: !!normalizedExistingPreEngagement?.conflictsCheckRequired,
-    none: !normalizedExistingPreEngagement,
-    confidentialityFile: null,
-    fileName: String(normalizedExistingPreEngagement?.confidentialityDocument?.name || ""),
-    conflictsDetails: String(normalizedExistingPreEngagement?.conflictsDetails || ""),
-    confidentialityTouched: false,
-    conflictsTouched: false,
-    submitError: "",
-    submitting: false,
-  };
-  const summaryMarkup = reuseEscrow
-    ? `
-        <div class="hire-confirm-row">
-          <span>Remaining balance</span>
-          <strong>${sanitize(formatCurrency(amountCents))}</strong>
-        </div>
-        <div class="hire-confirm-row hire-confirm-total">
-          <span>New charge</span>
-          <strong>${sanitize(formatCurrency(0))}</strong>
-        </div>
-      `
-    : `
-        <div class="hire-confirm-row">
-          <span>Matter amount</span>
-          <strong>${sanitize(formatCurrency(amountCents))}</strong>
-        </div>
-        <div class="hire-confirm-row">
-          <span>Platform fee (${feeRate}%)</span>
-          <strong>${sanitize(formatCurrency(feeCents))}</strong>
-        </div>
-        <div class="hire-confirm-row hire-confirm-total">
-          <span>Total charge</span>
-          <strong>${sanitize(formatCurrency(totalCents))}</strong>
-        </div>
-      `;
-  const infoMarkup = reuseEscrow
-    ? ""
-    : `
-        <div class="hire-confirm-help">
-          <button class="hire-confirm-info" type="button" aria-label="${sanitize(feeNote)}">
-            ?
-            <span class="hire-confirm-tooltip" aria-hidden="true">${sanitize(feeNote)}</span>
-          </button>
-        </div>
-      `;
-  const copy = `You’re about to hire ${safeName}. Your payment will be processed through Stripe upon confirmation. You can review the <a class="hire-confirm-terms-link" href="terms.html#payments">payment terms here</a>.`;
-  const successCopy = reuseEscrow ? "Matter ready. Work can begin." : "Matter funded. Work can begin.";
-  const safeContinueHref = String(continueHref || "").trim();
-  const continueActionMarkup = safeContinueHref
-    ? `<a class="btn primary" href="${sanitize(safeContinueHref)}" data-hire-continue hidden>Continue to Matter</a>`
-    : "";
-  const overlay = document.createElement("div");
-  overlay.className = "hire-confirm-overlay";
-  overlay.innerHTML = `
-    <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
-      <div class="hire-confirm-stage" data-hire-stage></div>
-    </div>
-  `;
-  const stageEl = overlay.querySelector("[data-hire-stage]");
-
-  const close = () => {
-    if (overlay.classList.contains("is-closing")) return;
-    overlay.classList.add("is-closing");
-    overlay.classList.remove("is-visible");
-    overlay.setAttribute("inert", "");
-    deactivateDialogFocus(overlay);
-    const removeOverlay = () => {
-      overlay.removeEventListener("transitionend", handleTransitionEnd);
-      overlay.remove();
-    };
-    const handleTransitionEnd = (event) => {
-      if (event.target === overlay) removeOverlay();
-    };
-    overlay.addEventListener("transitionend", handleTransitionEnd);
-    window.setTimeout(removeOverlay, 200);
-  };
-  const canClose = () => {
-    const successEl = stageEl?.querySelector("[data-hire-success]");
-    if (successEl && !successEl.hidden) return true;
-    const confirmBtn = stageEl?.querySelector("[data-hire-confirm]");
-    if (!confirmBtn) return true;
-    return !confirmBtn.disabled;
-  };
-  const buildPreEngagementDraft = () => {
-    const hasRequirements = preEngagementState.confidentialityAgreement || preEngagementState.conflictsCheck;
-    if (!hasRequirements || preEngagementState.none) return null;
-    return {
-      confidentialityAgreementSelected: !!preEngagementState.confidentialityAgreement,
-      conflictsCheckSelected: !!preEngagementState.conflictsCheck,
-      confidentialityFile: preEngagementState.confidentialityAgreement ? preEngagementState.confidentialityFile || null : null,
-      confidentialityFileName: preEngagementState.confidentialityAgreement ? preEngagementState.fileName || "" : "",
-      conflictsDetails: preEngagementState.conflictsCheck ? String(preEngagementState.conflictsDetails || "") : "",
-    };
-  };
-  const getPreEngagementValidation = () => {
-    const requiresConfidentiality = !!preEngagementState.confidentialityAgreement;
-    const requiresConflicts = !!preEngagementState.conflictsCheck;
-    const missingConfidentialityFile =
-      requiresConfidentiality &&
-      !preEngagementState.confidentialityFile &&
-      !normalizedExistingPreEngagement?.confidentialityDocument?.key;
-    const missingConflictsDetails =
-      requiresConflicts && !String(preEngagementState.conflictsDetails || "").trim();
-    return {
-      missingConfidentialityFile,
-      missingConflictsDetails,
-      showConfidentialityError: missingConfidentialityFile && preEngagementState.confidentialityTouched,
-      showConflictsError: missingConflictsDetails && preEngagementState.conflictsTouched,
-      hasErrors: missingConfidentialityFile || missingConflictsDetails,
-    };
-  };
-  const getPreEngagementPrimaryLabel = () => {
-    if (preEngagementState.none || (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck)) {
-      return "Next: Fund and Hire";
-    }
-    return normalizedExistingPreEngagement ? "Update and resend" : `Send to ${safeName}`;
-  };
-  const renderPreEngagementStep = () => `
-    ${(() => {
-      const validation = getPreEngagementValidation();
-      return `
-    <div data-hire-step="pre-engagement">
-      <div class="hire-confirm-title" id="hireConfirmTitle">Pre-Engagement</div>
-      ${
-        normalizedExistingPreEngagement
-          ? `<div class="hire-confirm-success">Sent to ${safeName}. Awaiting completion from the paralegal.</div>`
-          : ""
-      }
-      <p class="hire-pre-helper">${
-        normalizedExistingPreEngagement
-          ? `Sent to ${safeName}. Awaiting completion from the paralegal.`
-          : "Before moving forward, you may require pre-engagement items for this paralegal."
-      }</p>
-      <div class="hire-pre-options">
-        <label class="hire-pre-option${preEngagementState.confidentialityAgreement ? " is-selected" : ""}">
-          <input type="checkbox" data-pre-option="confidentiality"${preEngagementState.confidentialityAgreement ? " checked" : ""}>
-          <span class="hire-pre-option-copy">
-            <strong>Confidentiality agreement</strong>
-          </span>
-        </label>
-        <label class="hire-pre-option${preEngagementState.conflictsCheck ? " is-selected" : ""}">
-          <input type="checkbox" data-pre-option="conflicts"${preEngagementState.conflictsCheck ? " checked" : ""}>
-          <span class="hire-pre-option-copy">
-            <strong>Conflicts check</strong>
-          </span>
-        </label>
-        <label class="hire-pre-option${preEngagementState.none ? " is-selected" : ""}">
-          <input type="checkbox" data-pre-option="none"${preEngagementState.none ? " checked" : ""}>
-          <span class="hire-pre-option-copy">
-            <strong>None</strong>
-          </span>
-        </label>
-      </div>
-      ${
-        preEngagementState.confidentialityAgreement
-          ? `
-            <div class="hire-pre-reveal">
-              <div class="hire-pre-upload">
-                <label>Upload confidentiality agreement</label>
-                <label class="hire-pre-upload-trigger${validation.showConfidentialityError ? " is-invalid" : ""}" for="hirePreConfidentialityUpload">Choose file</label>
-                <input id="hirePreConfidentialityUpload" type="file" accept=".pdf,.doc,.docx" data-pre-confidentiality-upload>
-                <div class="hire-pre-upload-name">${sanitize(preEngagementState.fileName || "No file selected")}</div>
-                ${
-                  validation.showConfidentialityError
-                    ? `<div class="hire-pre-field-help">Upload a confidentiality agreement to continue.</div>`
-                    : ""
-                }
-              </div>
-            </div>
-          `
-          : ""
-      }
-      ${
-        preEngagementState.conflictsCheck
-          ? `
-            <div class="hire-pre-reveal">
-              <label for="hirePreConflictsDetails">Conflicts check details</label>
-              <textarea id="hirePreConflictsDetails" class="${validation.showConflictsError ? "is-invalid" : ""}" data-pre-conflicts-details placeholder="Enter the names, parties, or details the paralegal should review for conflicts.">${sanitize(
-                preEngagementState.conflictsDetails
-              )}</textarea>
-              ${
-                validation.showConflictsError
-                  ? `<div class="hire-pre-field-help">Enter conflicts check details to continue.</div>`
-                  : ""
-              }
-            </div>
-          `
-          : ""
-      }
-      <div class="hire-confirm-error"${preEngagementState.submitError ? "" : " hidden"} data-pre-error>${sanitize(
-        preEngagementState.submitError || ""
-      )}</div>
-      <div class="hire-confirm-actions">
-        <button class="btn secondary" type="button" data-hire-cancel${preEngagementState.submitting ? " disabled aria-disabled=\"true\"" : ""}>Cancel</button>
-        <button class="btn primary" type="button" data-pre-next${validation.hasErrors || preEngagementState.submitting ? " disabled aria-disabled=\"true\"" : ""}>${sanitize(
-          preEngagementState.submitting ? "Sending..." : getPreEngagementPrimaryLabel()
-        )}</button>
-      </div>
-    </div>
-  `;})()}
-  `;
-  const renderFundHireStep = () => `
-    <div data-hire-step="fund-hire">
-      <div class="hire-confirm-title" id="hireConfirmTitle">Confirm &amp; Hire</div>
-      <p>${copy}</p>
-      <div class="hire-confirm-summary">
-        ${summaryMarkup}
-      </div>
-      ${infoMarkup}
-      <div class="hire-confirm-error" data-hire-error hidden></div>
-      <div class="hire-confirm-success" data-hire-success hidden>${successCopy}</div>
-      <div class="hire-confirm-actions" data-hire-actions>
-        <button class="btn secondary" type="button" data-hire-back>Back</button>
-        <button class="btn secondary" type="button" data-hire-cancel>Cancel</button>
-        <button class="btn primary" type="button" data-hire-confirm>Confirm Hire</button>
-        ${continueActionMarkup}
-      </div>
-    </div>
-  `;
-  const renderPreEngagementSentStep = () => `
-    <div data-hire-step="pre-engagement-sent">
-      <div class="hire-confirm-title" id="hireConfirmTitle">${normalizedExistingPreEngagement ? "Pre-Engagement Updated" : "Pre-Engagement Sent"}</div>
-      <p>${normalizedExistingPreEngagement ? `Updated pre-engagement requirements for ${safeName} have been saved. Hiring and funding will continue after the paralegal completes the requested items and you review them.` : `Pre-engagement requirements for ${safeName} have been sent. Hiring and funding will continue after the paralegal completes the requested items and you review them.`}</p>
-      <div class="hire-confirm-success">${normalizedExistingPreEngagement ? "Pre-engagement requirements updated successfully." : "Pre-engagement requirements sent successfully."}</div>
-      <div class="hire-confirm-actions">
-        <button class="btn secondary" type="button" data-hire-close>Close</button>
-      </div>
-    </div>
-  `;
-  const transitionStage = (html, bindFn) => {
-    if (!stageEl) return;
-    stageEl.classList.add("is-leaving");
-    window.setTimeout(() => {
-      stageEl.innerHTML = html;
-      bindFn?.();
-      stageEl.classList.remove("is-leaving");
-      stageEl.classList.add("is-entering");
-      window.requestAnimationFrame(() => {
-        stageEl.classList.remove("is-entering");
-        stageEl.querySelector('input:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href]')?.focus();
-      });
-    }, 140);
-  };
-  const bindCancel = () => {
-    stageEl?.querySelector("[data-hire-cancel]")?.addEventListener("click", () => {
-      if (canClose()) close();
-    });
-  };
-  const bindPreEngagementSentStep = () => {
-    stageEl?.querySelector("[data-hire-close]")?.addEventListener("click", () => {
-      close();
-    });
-  };
-  const bindPreEngagementStep = () => {
-    bindCancel();
-    stageEl?.querySelectorAll("[data-pre-option]").forEach((input) => {
-      input.addEventListener("change", (event) => {
-        const option = event.target?.dataset?.preOption || "";
-        const checked = !!event.target?.checked;
-        if (option === "none") {
-          preEngagementState.submitError = "";
-          preEngagementState.none = checked || (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck);
-          if (preEngagementState.none) {
-            preEngagementState.confidentialityAgreement = false;
-            preEngagementState.conflictsCheck = false;
-            preEngagementState.confidentialityFile = null;
-            preEngagementState.fileName = "";
-            preEngagementState.confidentialityTouched = false;
-            preEngagementState.conflictsTouched = false;
-          }
-        } else if (option === "confidentiality") {
-          preEngagementState.submitError = "";
-          preEngagementState.confidentialityAgreement = checked;
-          if (checked) preEngagementState.none = false;
-          if (!checked) {
-            preEngagementState.confidentialityFile = null;
-            preEngagementState.fileName = "";
-            preEngagementState.confidentialityTouched = false;
-          }
-        } else if (option === "conflicts") {
-          preEngagementState.submitError = "";
-          preEngagementState.conflictsCheck = checked;
-          if (checked) preEngagementState.none = false;
-          if (!checked) preEngagementState.conflictsTouched = false;
-        }
-        if (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck) {
-          preEngagementState.none = true;
-        }
-        transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-      });
-    });
-    stageEl?.querySelector("[data-pre-confidentiality-upload]")?.addEventListener("click", () => {
-      preEngagementState.confidentialityTouched = true;
-    });
-    stageEl?.querySelector("[data-pre-confidentiality-upload]")?.addEventListener("change", (event) => {
-      const file = event.target?.files?.[0] || null;
-      preEngagementState.confidentialityTouched = true;
-      preEngagementState.submitError = "";
-      preEngagementState.confidentialityFile = file;
-      preEngagementState.fileName = file?.name || "";
-      transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-    });
-    stageEl?.querySelector("[data-pre-conflicts-details]")?.addEventListener("blur", () => {
-      preEngagementState.conflictsTouched = true;
-      transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-    });
-    stageEl?.querySelector("[data-pre-conflicts-details]")?.addEventListener("input", (event) => {
-      preEngagementState.conflictsTouched = true;
-      preEngagementState.submitError = "";
-      preEngagementState.conflictsDetails = event.target?.value || "";
-    });
-    stageEl?.querySelector("[data-pre-next]")?.addEventListener("click", async () => {
-      const draft = buildPreEngagementDraft();
-      if (draft) {
-        preEngagementState.submitError = "";
-        preEngagementState.submitting = true;
-        transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-        try {
-          await onSendPreEngagement?.({ preEngagement: draft });
-          transitionStage(renderPreEngagementSentStep(), bindPreEngagementSentStep);
-        } catch (err) {
-          preEngagementState.submitting = false;
-          preEngagementState.submitError = formatHireErrorMessage(err?.message) || "Unable to save pre-engagement requirements.";
-          transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-        }
-        return;
-      }
-      transitionStage(renderFundHireStep(), bindFundHireStep);
-    });
-  };
-  const bindFundHireStep = () => {
-    bindCancel();
-    const errorEl = stageEl?.querySelector("[data-hire-error]");
-    const successEl = stageEl?.querySelector("[data-hire-success]");
-    const continueEl = stageEl?.querySelector("[data-hire-continue]");
-    const confirmBtn = stageEl?.querySelector("[data-hire-confirm]");
-    const cancelBtn = stageEl?.querySelector("[data-hire-cancel]");
-    const backBtn = stageEl?.querySelector("[data-hire-back]");
-    if (skipPreEngagementStep && backBtn) {
-      backBtn.hidden = true;
-    } else {
-      backBtn?.addEventListener("click", () => {
-        if (confirmBtn?.disabled) return;
-        transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-      });
-    }
-    const setLoading = (isLoading) => {
-      if (confirmBtn) {
-        confirmBtn.disabled = isLoading;
-        const loadingLabel = reuseEscrow ? "Assigning..." : "Charging...";
-        confirmBtn.textContent = isLoading ? loadingLabel : "Confirm Hire";
-      }
-      if (cancelBtn) cancelBtn.disabled = isLoading;
-      if (backBtn) backBtn.disabled = isLoading;
-    };
-    if (errorEl) {
-      errorEl.addEventListener("click", (event) => {
-        const link = event.target?.closest?.("a");
-        if (!link) return;
-        close();
-      });
-    }
-    const showError = (message) => {
-      if (!errorEl) return;
-      if (!message) {
-        errorEl.hidden = true;
-        errorEl.textContent = "";
-        return;
-      }
-      const safe = sanitize(message);
-      const phrase = "update your payment method";
-      if (safe.toLowerCase().includes(phrase)) {
-        const linked = safe.replace(
-          new RegExp(phrase, "i"),
-          `<a href="dashboard-attorney.html#funds">update your payment method</a>`
-        );
-        errorEl.innerHTML = linked;
-      } else {
-        errorEl.textContent = safe;
-      }
-      errorEl.hidden = false;
-    };
-    const showSuccess = () => {
-      if (successEl) successEl.hidden = false;
-      if (confirmBtn) confirmBtn.hidden = true;
-      if (backBtn) backBtn.hidden = true;
-      if (cancelBtn) {
-        cancelBtn.disabled = false;
-        cancelBtn.textContent = "Close";
-      }
-      if (continueEl) continueEl.hidden = false;
-      (continueEl || cancelBtn)?.focus();
-    };
-    confirmBtn?.addEventListener("click", async () => {
-      showError("");
-      setLoading(true);
-      try {
-        await onConfirm?.({ preEngagement: buildPreEngagementDraft() });
-        showSuccess();
-      } catch (err) {
-        showError(formatHireErrorMessage(err?.message));
-        setLoading(false);
-      }
-    });
-  };
-
-  overlay.addEventListener("click", (event) => {
-    if (event.target === overlay && canClose()) close();
-  });
-  document.body.appendChild(overlay);
-  if (skipPreEngagementStep) {
-    stageEl.innerHTML = renderFundHireStep();
-    bindFundHireStep();
-  } else {
-    stageEl.innerHTML = renderPreEngagementStep();
-    bindPreEngagementStep();
-  }
-  activateDialogFocus(overlay, {
-    initialFocus: stageEl.querySelector('input:not([disabled]), button:not([disabled])'),
-    onEscape: () => {
-      if (canClose()) close();
-    },
-  });
-  window.requestAnimationFrame(() => overlay.classList.add("is-visible"));
-}
-
-function renderCaseCards(container, cases = [], threadsByCase = new Map()) {
-  if (!container) return;
-  container.setAttribute("aria-busy", "false");
-  const homeView = document.querySelector(".view-home");
-  if (homeView) {
-    homeView.classList.toggle("home-compact", cases.length <= 2);
-  }
-  const pageCases = cases.slice(0, HOME_RECENT_MATTERS_LIMIT);
-  if (!cases.length) {
-    container.hidden = false;
-    container.innerHTML = `
-      <div class="matter-row">
-        <div class="matter-main">
-          <div class="matter-title">No recent matters</div>
-          <div class="matter-meta">Your latest matters will appear here.</div>
-        </div>
-      </div>
-    `;
-    return;
-  }
-  container.hidden = false;
-  container.innerHTML = pageCases
-    .map((c) => {
-      return buildMatterRowMarkup(c, threadsByCase);
-    })
-    .join("");
-
-  bindMatterRowHandlers(container);
-}
-
-function buildMatterRowMarkup(caseItem, threadsByCase) {
-  const caseId = String(caseItem.caseId || caseItem.id || "");
-  const title = sanitize(caseItem.jobTitle || "Untitled Matter");
-  const paralegalName = caseItem.paralegalName || "Unassigned";
-  const paralegal = sanitize(paralegalName);
-  const paralegalId = parseParalegalId(caseItem);
-  const paralegalHref =
-    paralegalId && paralegalName !== "Unassigned"
-      ? buildParalegalProfileUrl(paralegalId, { returnTo: "dashboard-attorney.html#home" })
-      : "";
-  const practice = sanitize(caseItem.practiceArea || "General");
-  const rawStatus = normalizeCaseStatus(caseItem.status);
-  const status = rawStatus
-    ? rawStatus.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
-    : "Open";
-  const created = caseItem.createdAt ? new Date(caseItem.createdAt).toLocaleDateString() : "";
-  const metaParts = [
-    `<span>${practice}</span>`,
-    paralegalHref
-      ? `<a class="matter-inline-link" href="${sanitize(paralegalHref)}">${paralegal}</a>`
-      : `<span>${paralegal}</span>`,
-    `<span>${sanitize(status)}</span>`,
-    created ? `<span>Created ${sanitize(created)}</span>` : "",
-  ].filter(Boolean);
-  const thread = threadsByCase.get(caseId);
-  const unread = Number(thread?.unread || 0);
-  const rawMessageLabel =
-    unread > 0
-      ? `${unread} new message${unread === 1 ? "" : "s"}${
-          paralegal && paralegal !== "Unassigned" ? ` from ${paralegal}` : ""
-        }`
-      : "";
-  const messageLabel = rawMessageLabel.replace(/^\s*\u{1F4AC}\s*/u, "");
-  return `
-    <div class="matter-row" data-case-id="${caseId}">
-      <div class="matter-main">
-        <div class="matter-title">
-          <button type="button" class="matter-title-link" data-case-link="view" data-case-id="${caseId}">${title}</button>
-        </div>
-        <div class="matter-meta">${metaParts.join('<span class="matter-meta-separator" aria-hidden="true">•</span>')}</div>
-        ${messageLabel ? `<button type="button" class="matter-message" data-case-link="view" data-case-id="${caseId}">${messageLabel}</button>` : ""}
-      </div>
-      <button type="button" class="matter-view" data-case-link="view" data-case-id="${caseId}">View →</button>
-    </div>
-  `;
-}
-
-function bindMatterRowHandlers(container) {
-  if (!container) return;
-  container.querySelectorAll(".matter-row").forEach((row) => {
-    row.addEventListener("click", (evt) => {
-      if (evt.target.closest("[data-case-link]") || evt.target.closest("a")) return;
-      const caseId = row.getAttribute("data-case-id");
-      if (caseId) {
-        const entry = state.caseLookup.get(String(caseId));
-        if (isWorkspaceEligibleCase(entry)) {
-          window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
-        } else {
-          void openCasePreview(caseId);
-        }
-      }
-    });
-  });
-
-  container.querySelectorAll("[data-case-link]").forEach((btn) => {
-    btn.addEventListener("click", (evt) => {
-      evt.stopPropagation();
-      const caseId = btn.getAttribute("data-case-id");
-      if (!caseId) return;
-      const entry = state.caseLookup.get(String(caseId));
-      if (isWorkspaceEligibleCase(entry)) {
-        window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
-      } else {
-        void openCasePreview(caseId);
-      }
-    });
-  });
+async function handleHireFromApplications({ caseId, paralegalId }) {
+  await openCaseNoteModal(caseId, "hiring", null, paralegalId);
 }

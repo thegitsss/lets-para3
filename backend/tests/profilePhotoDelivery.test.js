@@ -260,6 +260,34 @@ describe("Private S3 profile-photo delivery", () => {
     expect(mockSend.mock.calls[0][0].input.Key).toBe(`profile-photos/${id}/profile-1700000000001.jpg`);
   });
 
+  test("a related attorney can read an approved nonpublic photo without exposing private variants or bypassing blocks", async () => {
+    const profile = await createPublicParalegal({ bio: "", preferences: { hideProfile: true } });
+    const attorney = await User.create({ firstName: "Related", lastName: "Attorney", email: "related-photo@example.com", password: "Password123!", role: "attorney", status: "approved", state: "NY" });
+    const Case = require("../models/Case");
+    await Case.collection.insertOne({ attorney: attorney._id, paralegal: profile._id, title: "Photo relationship", status: "in progress" });
+    const get = (suffix = "") => request(app).get(`/api/users/profile-photo/${profile._id}${suffix}`).set("Cookie", authCookieFor(attorney));
+    const photo = await get();
+    expect(photo.status).toBe(200);
+    expect(photo.headers["cache-control"]).toMatch(/^private/);
+    expect(mockSend.mock.calls.at(-1)[0].input.Key).toBe(`profile-photos/${profile._id}/profile-1700000000000.jpg`);
+    for (const variant of ["pending", "pending-original", "approved-original"]) {
+      mockSend.mockClear();
+      expect((await get(`?variant=${variant}`)).status).toBe(404);
+      expect(mockSend).not.toHaveBeenCalled();
+    }
+    for (const changes of [{ profilePhotoStatus: "rejected" }, { status: "pending" }, { disabled: true }, { deleted: true }]) {
+      await User.updateOne({ _id: profile._id }, { $set: { profilePhotoStatus: "approved", status: "approved", disabled: false, deleted: false, ...changes } });
+      mockSend.mockClear();
+      expect((await get()).status).toBe(404);
+      expect(mockSend).not.toHaveBeenCalled();
+    }
+    await User.updateOne({ _id: profile._id }, { $set: { profilePhotoStatus: "approved", status: "approved", disabled: false, deleted: false } });
+    await require("../models/Block").create({ blockerId: profile._id, blockedId: attorney._id, blockerRole: "paralegal", blockedRole: "attorney", active: true });
+    mockSend.mockClear();
+    expect((await get()).status).toBe(404);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
   test.each([
     ["random id", "/api/public/paralegals/not-an-id/photo"],
     ["encoded traversal", "/api/public/paralegals/%2e%2e%2fcases/photo"],

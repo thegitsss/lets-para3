@@ -1,0 +1,148 @@
+/* Shared publication and confirmed deletion outcomes in the current and V2 editors. Shell fonts are retained. */
+[aria-label="Publication status"][hidden], .lpc-draft-save[hidden] { display: none !important; }
+.lpc-draft-editor-header[hidden], .lpc-current-draft .step-panel > header { display: none !important; }
+.lpc-draft-editor-header { margin: 1.25rem 0; }
+.lpc-draft-editor-header p { margin: .75rem 0 0; color: var(--muted, #59677c); line-height: 1.5; }
+.lpc-current-draft .field-instructions { color: var(--muted, #59677c); margin: 0 0 1.25rem; line-height: 1.5; }
+.lpc-current-draft :is(.review-task-list, .preview-tasks) { max-height: none; overflow: visible; }
+.lpc-current-draft :is(.step-panel, .draft-save-recovery, .lpc-draft-save) :is(button, .btn, input:not([type="checkbox"]), select) { min-height: 44px; }
+.lpc-current-draft :is(.step-panel, .draft-save-recovery) :is(button, .btn) { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+.lpc-current-draft [aria-label="Publication status"] select { display: block; width: 100%; margin: .5rem 0; min-width: 0; }
+.lpc-current-draft [aria-label="Publication status"] :is(h2, p, label) { overflow-wrap: anywhere; }
+.lpc-current-draft :is(.step-panel, [aria-label="Publication status"]) :is(h2, input, select, textarea, button) { scroll-margin-block: 1rem; }
+@media (max-width: 1024px) {
+  body.lpc-product-clean.lpc-current-draft > .sidebar-toggle { position: fixed; top: 12px; left: 12px; width: 44px; height: 44px; min-height: 44px; }
+}
+@media (max-width: 700px) {
+  body.lpc-product-clean.lpc-current-draft > .sidebar-toggle { top: 8px; }
+}
+.lpc-draft-save[data-compact="true"] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem 1rem;
+  margin: 1.25rem 0;
+  padding: .75rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--av2-line, var(--line, #e3e8ee));
+  border-radius: 0;
+  background: transparent;
+}
+.lpc-draft-save[data-compact="true"] > [role="status"] { flex: 1 1 12rem; margin: 0; }
+.lpc-draft-save[data-compact="true"] > .av2-actions { margin: 0; }
+.lpc-draft-editor .lpc-draft-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.lpc-draft-editor :is(.av2-draft-fields, .av2-field) { grid-template-columns: minmax(0, 1fr); }
+.lpc-matter-outcome {
+  max-width: 48rem;
+  min-width: 0;
+  background: var(--av2-bg, var(--panel, #fff));
+  color: var(--av2-ink, var(--ink, #182033));
+  border-color: var(--av2-line, var(--line, #e3e8ee));
+}
+.lpc-matter-outcome header h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.lpc-matter-outcome p { margin: 1rem 0; line-height: 1.5; }
+.lpc-matter-outcome .av2-actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-top: 1.25rem; }
+.lpc-matter-outcome :is(a, button) { min-height: 44px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.lpc-matter-outcome a { display: inline-flex; align-items: center; padding: .65rem 1rem; border: 1px solid var(--av2-line, var(--line, #d9e0e8)); border-radius: 6px; color: inherit; text-decoration: none; }
+.lpc-matter-outcome :is(a, button):focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+
+/* The original product skin forces white after theme selection. Apply the
+   established LPC dark palette throughout draft editing and Matter outcomes. */
+body.lpc-product-clean.theme-dark:is(.lpc-current-draft, :has(.lpc-matter-outcome)) {
+  color-scheme: dark;
+  --bg: #111b2a;
+  --panel: #192538;
+  --ink: #f2f5f9;
+  --muted: #b2bccb;
+  --line: #354258;
+  --accent: #b4d2ff;
+  --sidebar-bg: #111b2a;
+  --sidebar-text: #f2f5f9;
+  --app-surface: #111b2a;
+  --app-surface-contrast: #192538;
+  --app-card-muted: #192538;
+  --app-text: #f2f5f9;
+  --app-muted: #b2bccb;
+  --app-border: #354258;
+  --app-border-soft: #354258;
+  --lpc-surface-page: #111b2a;
+  --lpc-surface-canvas: #111b2a;
+  --lpc-surface-panel: #192538;
+  --lpc-surface-raised: #192538;
+  --lpc-surface-subtle: #192538;
+  --lpc-text-primary: #f2f5f9;
+  --lpc-text-secondary: #b2bccb;
+  --lpc-border-subtle: #354258;
+  background: var(--bg) !important;
+  color: var(--ink) !important;
+}
+body.lpc-product-clean.theme-dark:is(.lpc-current-draft, :has(.lpc-matter-outcome)) :is(.main, main#main, .lpc-auth-page-shell, .lpc-universal-header-shell, .topbar, .sidebar) {
+  background: var(--bg) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+body.lpc-product-clean.theme-dark:is(.lpc-current-draft, :has(.lpc-matter-outcome)) :is(.sidebar, .lpc-universal-header-shell) :is(a, button, .logo, .sidebar-footer, .lpc-sidebar-profile-name, .lpc-sidebar-profile-role) {
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+body.lpc-product-clean.theme-dark .lpc-matter-outcome :is(a, button) { background: var(--panel) !important; color: var(--ink) !important; border-color: var(--line) !important; }
+body.lpc-product-clean.theme-dark .lpc-matter-outcome h1 { color: var(--ink) !important; }
+body.lpc-product-clean.theme-dark:is(.lpc-current-draft, :has(.lpc-matter-outcome)) :is(.lpc-universal-header-shell, .sidebar) button { background: var(--bg) !important; }
+body.lpc-product-clean.theme-dark:is(.lpc-current-draft, :has(.lpc-matter-outcome)) .sidebar-toggle { background: var(--bg) !important; color: var(--ink) !important; border-color: var(--line) !important; }
+body.lpc-product-clean.theme-dark:is(.lpc-current-draft, :has(.lpc-matter-outcome)) .sidebar-toggle::before { background: transparent !important; }
+body.lpc-product-clean.lpc-current-draft.theme-dark :is(.step-panel form, .summary, .tips, .compliance-note, .task-list li, .draft-save-recovery:not([data-compact="true"])) {
+  background: var(--panel) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+body.lpc-product-clean.lpc-current-draft.theme-dark :is(input, select, textarea) {
+  background-color: var(--bg) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+body.lpc-product-clean.lpc-current-draft.theme-dark :is(.step-panel, .draft-save-recovery) :is(h1, h2, h3, p, small, strong, label, .description-label) { color: var(--ink) !important; }
+body.lpc-product-clean.lpc-current-draft.theme-dark :is(.field-requirement, .select-arrow, .char-count, .field-instructions, .step span, .auto-note) { color: var(--muted) !important; }
+body.lpc-product-clean.lpc-current-draft.theme-dark :is(.step-panel, .draft-save-recovery, .lpc-draft-save) :is(button, .btn) {
+  background: var(--bg) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+body.lpc-product-clean.lpc-current-draft.theme-dark .step-panel .btn.primary { background: var(--accent) !important; color: #111b2a !important; }
+body.lpc-product-clean.lpc-current-draft.theme-dark .circle { background: var(--bg) !important; color: var(--muted) !important; border-color: var(--line) !important; }
+body.lpc-product-clean.lpc-current-draft.theme-dark .step.active .circle { background: var(--accent) !important; color: #111b2a !important; }
+body.lpc-product-clean.lpc-current-draft.theme-dark .fee-info { color: var(--muted); border-color: var(--muted); }
+body.lpc-product-clean.lpc-current-draft.theme-dark .lpc-draft-editor-header h1 { color: var(--ink) !important; }
+.lpc-current-draft #previewDescription { white-space: pre-wrap; overflow-wrap: anywhere; }
+.lpc-current-draft #previewModal { z-index: 5000; padding: 16px; }
+.lpc-current-draft #previewModal .modal-content {
+  box-sizing: border-box;
+  width: min(700px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: clamp(16px, 4vw, 40px);
+  overflow-wrap: anywhere;
+}
+.lpc-current-draft #previewModal p { flex-wrap: wrap; }
+.lpc-current-draft #previewModal strong { min-width: 0; }
+.lpc-current-draft .preview-fee-details { margin-block: .5rem; }
+.lpc-current-draft .preview-fee-details summary { min-height: 44px; padding-block: .5rem; cursor: pointer; }
+.lpc-current-draft .preview-fee-details summary:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.lpc-current-draft #previewModal :is(button, .btn) { min-height: 44px; white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+body.lpc-product-clean.lpc-current-draft.theme-dark #previewModal :is(.modal-content, h3, p, strong, .description-label, .task-list li) { color: var(--ink) !important; }
+body.lpc-product-clean.lpc-current-draft.theme-dark #previewModal :is(.modal-content, .task-list li) { background: var(--panel) !important; border-color: var(--line) !important; }

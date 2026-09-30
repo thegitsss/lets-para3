@@ -1,6 +1,7 @@
 (function mountProfileClusterInSidebar() {
   const FALLBACK_AVATAR = "assets/avatar-placeholder.svg";
   const PROFILE_SELECTORS = [
+    "#sidebarNav [data-lpc-sidebar-profile-trigger]",
     ".profile-header-controls .profile-menu",
     ".lpc-shared-header .user-chip",
     "#paralegalFloatingCluster .user-profile",
@@ -133,6 +134,7 @@
     });
     document.addEventListener("keydown", (event) => {
       if (event.key !== "Escape" || !menu.classList.contains("show")) return;
+      event.preventDefault();
       menu.classList.remove("show");
       menu.setAttribute("aria-hidden", "true");
       trigger.setAttribute("aria-expanded", "false");
@@ -179,7 +181,7 @@
     installAvatarFallback(identityAvatar);
     const productName = document.createElement("strong");
     productName.className = "lpc-account-menu-product";
-    productName.textContent = "Let's-ParaConnect";
+    productName.innerHTML = 'Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect';
     identity.append(identityAvatar, productName);
 
     const primary = document.createElement("div");
@@ -244,9 +246,9 @@
     if (!host) return false;
     normalizeProfileAvatars(cluster);
     if (host.contains(cluster)) {
+      host.classList.add("sidebar-profile-host");
       normalizeProfileMenu(host);
       normalizeSidebarNavigation(sidebar);
-      setupAttorneyMatterNavigation(sidebar);
       normalizeSidebarFooter(sidebar);
       observeSidebarNavigation(sidebar);
       return true;
@@ -262,7 +264,6 @@
     host.appendChild(profileShell);
     normalizeProfileMenu(profileShell);
     normalizeSidebarNavigation(sidebar);
-    setupAttorneyMatterNavigation(sidebar);
     normalizeSidebarFooter(sidebar);
     observeSidebarNavigation(sidebar);
     return true;
@@ -353,7 +354,7 @@
     const paths = {
       home: '<path d="m3 10 9-7 9 7"></path><path d="M5 9v11h14V9"></path><path d="M9 20v-6h6v6"></path>',
       matters: '<rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M3 12h18"></path>',
-      browse: '<circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path>',
+      browse: '<circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path><path d="M8 11h6"></path><path d="M11 8v6"></path>',
       people: '<circle cx="9" cy="7" r="4"></circle><path d="M2 21a7 7 0 0 1 14 0"></path><path d="M18 8a3 3 0 0 1 0 6"></path><path d="M22 21a5 5 0 0 0-4-4"></path>',
       payments: '<rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M2 10h20"></path><path d="M6 15h2"></path>',
       settings: '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.5 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.5a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15.5 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.12.37.33.7.6 1 .3.25.69.39 1.1.4H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51.6Z"></path>',
@@ -372,12 +373,14 @@
     }
     const text = String(link.textContent || "").trim().toLowerCase();
     const href = String(link.getAttribute("href") || "").toLowerCase();
-    if (text === "home" || text.includes("dashboard") || href.includes("#home") || href.includes("dashboard-")) return "home";
+    if (text === "home" || href.includes("#home")) return "home";
+    if (text.includes("browse")) return "browse";
+    if (text.includes("matter") || text.includes("case") || href.includes("#cases")) return "matters";
+    if (text.includes("dashboard")) return "home";
     if (text.includes("paralegal")) return "people";
     if (text.includes("fund") || text.includes("payment") || text.includes("billing")) return "payments";
     if (text.includes("profile") || text.includes("setting") || text.includes("security") || text.includes("preference")) return "profile";
     if (text.includes("help")) return "help";
-    if (text.includes("browse")) return "browse";
     return "matters";
   }
 
@@ -426,161 +429,11 @@
       !sidebar.querySelector('a[href*="dashboard-paralegal"]');
   }
 
-  function getMatterToggle(sidebar) {
-    const links = Array.from(sidebar.querySelectorAll("nav > a, nav > button"));
-    return links.find((link) => {
-      const label = link.querySelector(".lpc-sidebar-nav-label")?.textContent || link.textContent || "";
-      const href = String(link.getAttribute("href") || "").toLowerCase();
-      const target = String(link.getAttribute("data-view-target") || "").toLowerCase();
-      return String(label).trim().toLowerCase() === "matters" &&
-        (target === "cases" || href.includes("#cases"));
-    }) || null;
-  }
-
-  function matterId(item = {}) {
-    return String(item._id || item.id || "").trim();
-  }
-
-  function renderAttorneyMatters(panel, matters) {
-    const status = panel.querySelector("[data-sidebar-matters-status]");
-    const list = panel.querySelector("[data-sidebar-matters-list]");
-    if (!status || !list) return;
-    list.textContent = "";
-
-    const activeMatters = (Array.isArray(matters) ? matters : []).filter((item) => {
-      const state = String(item?.status || "").trim().toLowerCase();
-      return matterId(item) && item?.archived !== true && item?.paymentReleased !== true &&
-        !["completed", "closed", "cancelled", "canceled"].includes(state);
-    });
-
-    activeMatters.forEach((item) => {
-      const row = document.createElement("li");
-      const link = document.createElement("a");
-      link.className = "lpc-sidebar-matter-link";
-      link.href = `case-detail.html?caseId=${encodeURIComponent(matterId(item))}`;
-      link.textContent = String(item.title || item.name || "Untitled matter").trim();
-      link.title = link.textContent;
-      row.appendChild(link);
-      list.appendChild(row);
-    });
-
-    status.textContent = activeMatters.length ? "" : "No active matters";
-    status.hidden = !!activeMatters.length;
-  }
-
-  async function loadAttorneyMatters(panel) {
-    if (panel.dataset.sidebarMattersLoaded === "true" || panel.dataset.sidebarMattersLoading === "true") return;
-    panel.dataset.sidebarMattersLoading = "true";
-    const status = panel.querySelector("[data-sidebar-matters-status]");
-    if (status) {
-      status.hidden = false;
-      status.textContent = "Loading matters…";
-    }
-    try {
-      const response = await fetch("/api/cases/my-active?limit=100", {
-        credentials: "include",
-        headers: { Accept: "application/json" },
-      });
-      if (!response.ok) throw new Error(`Matter navigation request failed (${response.status})`);
-      const payload = await response.json();
-      renderAttorneyMatters(panel, Array.isArray(payload) ? payload : payload?.items);
-      panel.dataset.sidebarMattersLoaded = "true";
-    } catch (error) {
-      console.warn("Unable to load attorney matter navigation", error);
-      if (status) {
-        status.hidden = false;
-        status.textContent = "Matters unavailable";
-      }
-    } finally {
-      delete panel.dataset.sidebarMattersLoading;
-    }
-  }
-
-  function setMatterPanelOpen(toggle, panel, open) {
-    toggle.classList.toggle("is-open", open);
-    toggle.setAttribute("aria-expanded", String(open));
-    panel.classList.toggle("is-open", open);
-    panel.hidden = !open;
-    if (open) void loadAttorneyMatters(panel);
-  }
-
-  function navigateToMatters(toggle) {
-    const href = String(toggle.getAttribute("href") || "").trim();
-    if (href) window.location.href = href;
-  }
-
-  function setupAttorneyMatterNavigation(sidebar) {
-    if (!isAttorneySidebar(sidebar)) return;
-    const toggle = getMatterToggle(sidebar);
-    if (!toggle || toggle.dataset.sidebarMattersBound === "true") return;
-
-    // The Matter workspace already owns this dropdown on case-detail.html.
-    if (toggle.matches("[data-case-nav-toggle]") && toggle.parentElement?.querySelector("[data-case-nav-dropdown]")) {
-      toggle.addEventListener("click", (event) => {
-        const panel = toggle.parentElement?.querySelector("[data-case-nav-dropdown]");
-        if (!panel?.classList.contains("show")) return;
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        navigateToMatters(toggle);
-      }, { capture: true });
-      toggle.dataset.sidebarMattersBound = "true";
-      return;
-    }
-
-    toggle.dataset.sidebarMattersBound = "true";
-    toggle.classList.add("lpc-attorney-matters-toggle");
-    const panelId = `sidebar-active-matters-${Math.random().toString(36).slice(2, 9)}`;
-    toggle.setAttribute("aria-controls", panelId);
-    toggle.setAttribute("aria-expanded", "false");
-    toggle.insertAdjacentHTML(
-      "beforeend",
-      '<svg class="lpc-sidebar-matters-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="m3 4.5 3 3 3-3"></path></svg>'
-    );
-
-    const panel = document.createElement("div");
-    panel.id = panelId;
-    panel.className = "lpc-sidebar-matters-panel";
-    panel.hidden = true;
-    panel.innerHTML = [
-      '<div class="lpc-sidebar-matters-status" data-sidebar-matters-status role="status">Loading matters…</div>',
-      '<ul class="lpc-sidebar-matters-list" data-sidebar-matters-list></ul>',
-    ].join("");
-    toggle.after(panel);
-
-    toggle.addEventListener("click", (event) => {
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (!panel.hidden) {
-        setMatterPanelOpen(toggle, panel, false);
-        navigateToMatters(toggle);
-        return;
-      }
-      if (document.body.classList.contains("nav-collapsed")) {
-        document.body.classList.remove("nav-collapsed");
-      }
-      setMatterPanelOpen(toggle, panel, true);
-    }, { capture: true });
-
-    document.addEventListener("click", (event) => {
-      if (panel.hidden || toggle.contains(event.target) || panel.contains(event.target)) return;
-      setMatterPanelOpen(toggle, panel, false);
-    });
-
-    document.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape" || panel.hidden) return;
-      setMatterPanelOpen(toggle, panel, false);
-      toggle.focus();
-    });
-  }
-
   function observeSidebarNavigation(sidebar) {
     if (sidebar.dataset.sidebarNavigationObserved) return;
     sidebar.dataset.sidebarNavigationObserved = "true";
     const observer = new MutationObserver(() => {
       normalizeSidebarNavigation(sidebar);
-      setupAttorneyMatterNavigation(sidebar);
     });
     sidebar.querySelectorAll("nav").forEach((nav) => observer.observe(nav, { childList: true }));
   }
@@ -591,7 +444,7 @@
     if (!footer) {
       footer = document.createElement("div");
       footer.className = "sidebar-footer";
-      footer.textContent = "© Let’s-ParaConnect 2026";
+      footer.innerHTML = '© Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect 2026';
       sidebar.appendChild(footer);
     }
     let bottom = sidebar.querySelector(".sidebar-bottom");

@@ -20,6 +20,8 @@ The accessibility and authenticated critical-role suites run against the Chromiu
 
 WebKit is useful Safari-engine coverage, but it is not evidence for a real Safari, iOS, Edge, or Android release. Before launch, the release record must include manual smoke results on the current production versions of Chrome, Edge, Firefox, desktop Safari, iOS Safari, and Android Chrome. The previous-major support promise must be sampled on representative real or managed-cloud devices before a candidate is approved.
 
+Security's shared account journeys run in all three automated engines. The additional `security-webauthn.chromium.spec.js` uses Chromium's CDP virtual authenticator and is selected only by that project; it is not a skipped Firefox or WebKit scenario. Real-device passkey registration, sign-in, cancellation, and removal remain required on supported browsers/devices. Passing virtual-authenticator cryptographic verification does not close that device gate.
+
 ## Responsive contract
 
 Critical authenticated surfaces use one shared automated viewport matrix:

@@ -1,6 +1,8 @@
 import { secureFetch } from "../auth.js";
-import { getStripeConnectStatus, isStripeConnected, STRIPE_GATE_MESSAGE } from "../utils/stripe-connect.js";
+import { STRIPE_GATE_MESSAGE } from "../utils/stripe-connect.js";
 import { showAlert } from "../utils/dialogs.js";
+import { activateDialogFocus, deactivateDialogFocus } from "../utils/dialog-focus.js";
+import { readMatterDiscoveryPage } from "../utils/matter-discovery-page.mjs";
 import {
   getRecommendationIdentityIds,
   publishRecommendationHistoryChange,
@@ -25,14 +27,16 @@ const sidebarNav = document.getElementById("sidebarNav");
 const sidebarBackdrop = document.getElementById("sidebarBackdrop");
 const FALLBACK_AVATAR = "assets/avatar-placeholder.svg";
 const attorneyPreviewCache = new Map();
-const urlParams = new URLSearchParams(window.location.search);
-const explicitCaseId = (urlParams.get("caseId") || urlParams.get("caseID") || urlParams.get("case_id") || "").trim();
-const idParam = (urlParams.get("id") || "").trim();
-
-let allJobs = [];
 let filteredJobs = [];
+let discoveryPage = null;
+let selectedListing = null;
+let discoveryRequest = 0;
+let discoveryController = null;
+const resultCount = document.createElement("p");
+resultCount.className = "results-count";
+resultCount.setAttribute("role", "status");
+document.querySelector(".results-controls")?.prepend(resultCount);
 const APPLY_MAX_CHARS = 2000;
-const APPLIED_STORAGE_KEY = "lpc_applied_jobs";
 const appliedJobs = new Map(); // applyKey -> appliedAt ISO
 let viewerId = "";
 let applyModal = null;
@@ -49,21 +53,14 @@ let applyReturnFocus = null;
 let applyConfirmReturnFocus = null;
 const toast = window.toastUtils;
 let expandedJobId = "";
-let stripeConnected = false;
 let viewerRole = "";
 let allowApply = false;
-let viewerState = "";
-let viewerStateExperience = [];
-let autoStateFilterApplied = false;
 const PAGE_SIZE = 15;
 const PAY_FILTER_STOPS = [400, 500, 600, 700, 800, 900];
 const MIN_CASE_COMPENSATION = PAY_FILTER_STOPS[0];
 const MAX_FILTER_COMPENSATION = PAY_FILTER_STOPS[PAY_FILTER_STOPS.length - 1];
 let currentPage = 1;
-let userPageOverride = false;
-const initialJobParam = (idParam || explicitCaseId || "").trim();
 const PROFILE_PHOTO_REQUIRED_MESSAGE = "Complete your profile before applying.";
-let viewerHasProfilePhoto = false;
 const FLAG_REASONS = [
   { value: "inappropriate", label: "Inappropriate content" },
   { value: "spam", label: "Spam or misleading" },
@@ -77,7 +74,7 @@ let listScrollState = { shell: 0, window: 0 };
 let expandedReturnJobId = "";
 
 function setSidebarOpen(open, { restoreFocus = false } = {}) {
-  const nextOpen = Boolean(open) && window.innerWidth <= 900;
+  const nextOpen = Boolean(open) && window.innerWidth <= 1024;
   document.body.classList.toggle("nav-open", nextOpen);
   sidebarToggle?.setAttribute("aria-expanded", String(nextOpen));
   sidebarToggle?.setAttribute("aria-label", nextOpen ? "Close navigation" : "Open navigation");
@@ -99,7 +96,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 window.addEventListener("resize", () => {
-  if (window.innerWidth > 900 && document.body.classList.contains("nav-open")) setSidebarOpen(false);
+  if (window.innerWidth > 1024 && document.body.classList.contains("nav-open")) setSidebarOpen(false);
 });
 
 const STATE_NAME_MAP = {
@@ -155,13 +152,14 @@ const STATE_NAME_MAP = {
   WI: "Wisconsin",
   WY: "Wyoming",
 };
-const STATE_CODE_MAP = Object.fromEntries(
-  Object.entries(STATE_NAME_MAP).map(([code, name]) => [name.toLowerCase(), code])
-);
-
 // Elements
 const filterToggle = document.getElementById("filterToggle");
 const filterMenu = document.getElementById("filterMenu");
+const filterDialog = document.getElementById("filterDialog");
+const filterClose = document.getElementById("filterClose");
+const mobileFilterQuery = window.matchMedia("(max-width: 960px)");
+const filterRailPosition = document.createComment("Browse filter rail");
+filterMenu?.before(filterRailPosition);
 
 const practiceAreaSelect = document.getElementById("filterPracticeArea");
 const stateSelect = document.getElementById("filterState");
@@ -201,79 +199,6 @@ function readStoredUserId() {
   }
 }
 
-function readStoredProfilePhoto() {
-  try {
-    const raw = localStorage.getItem("lpc_user");
-    if (!raw) return "";
-    const user = JSON.parse(raw);
-    return String(user?.profileImage || user?.avatarURL || "").trim();
-  } catch {
-    return "";
-  }
-}
-
-function readStoredState() {
-  try {
-    const raw = localStorage.getItem("lpc_user");
-    if (!raw) return "";
-    const user = JSON.parse(raw);
-    return String(user?.state || user?.location || "");
-  } catch {
-    return "";
-  }
-}
-
-function readStoredStateExperience() {
-  try {
-    const raw = localStorage.getItem("lpc_user");
-    if (!raw) return [];
-    const user = JSON.parse(raw);
-    return user?.stateExperience || [];
-  } catch {
-    return [];
-  }
-}
-
-function normalizeViewerState(value) {
-  return String(value || "").trim();
-}
-
-function normalizeStateExperience(value) {
-  if (Array.isArray(value)) {
-    return value.map((entry) => String(entry || "").trim()).filter(Boolean);
-  }
-  if (typeof value === "string") {
-    return value
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-  }
-  return [];
-}
-
-function resolveStateOption(rawState, options = []) {
-  const trimmed = String(rawState || "").trim();
-  if (!trimmed) return "";
-  const direct = options.find((value) => value.toLowerCase() === trimmed.toLowerCase());
-  if (direct) return direct;
-  const upper = trimmed.toUpperCase();
-  const mappedName = STATE_NAME_MAP[upper];
-  if (mappedName) {
-    const nameMatch = options.find((value) => value.toLowerCase() === mappedName.toLowerCase());
-    if (nameMatch) return nameMatch;
-  }
-  const mappedCode = STATE_CODE_MAP[trimmed.toLowerCase()];
-  if (mappedCode) {
-    const codeMatch = options.find((value) => value.toLowerCase() === mappedCode.toLowerCase());
-    if (codeMatch) return codeMatch;
-  }
-  return mappedName || mappedCode || trimmed;
-}
-
-function getAppliedStorageKey() {
-  return viewerId ? `${APPLIED_STORAGE_KEY}:${viewerId}` : APPLIED_STORAGE_KEY;
-}
-
 async function resolveViewerRole() {
   const stored = readStoredRole();
   if (stored) return stored;
@@ -297,13 +222,6 @@ async function ensureSession() {
     }
     viewerRole = String(session?.role || session?.user?.role || "").toLowerCase();
     viewerId = String(session?.user?.id || session?.user?._id || session?.id || session?._id || readStoredUserId());
-    viewerHasProfilePhoto = Boolean(
-      session?.user?.profileImage || session?.user?.avatarURL || readStoredProfilePhoto()
-    );
-    viewerState = normalizeViewerState(session?.user?.state || session?.user?.location || readStoredState());
-    viewerStateExperience = normalizeStateExperience(
-      session?.user?.stateExperience || readStoredStateExperience()
-    );
     allowApply = viewerRole === "paralegal";
     sessionReady = true;
     if (!allowApply) {
@@ -348,39 +266,85 @@ function notifyStripeGate(message = STRIPE_GATE_MESSAGE) {
   }
 }
 
-function stripeAllowed() {
-  return stripeConnected;
+function getApplicationEligibility(job = {}) {
+  const eligibility = job?.applicationEligibility;
+  return eligibility && typeof eligibility === "object"
+    ? eligibility
+    : { ready: false, allowed: false, blockers: ["eligibility_unverified"] };
 }
 
-function profilePhotoAllowed() {
-  return viewerHasProfilePhoto;
+function applicationBlockMessage(job = {}) {
+  if (getApplicationEligibility(job).blockers?.includes("posting_verification_required")) return "Applications for this matter are temporarily unavailable.";
+  const eligibility = getApplicationEligibility(job);
+  const blockers = new Set(eligibility.blockers || []);
+  const payoutBlockers = new Set(eligibility.facts?.payoutReadiness?.blockers || []);
+  if (blockers.has("profile_photo_required")) return PROFILE_PHOTO_REQUIRED_MESSAGE;
+  if (payoutBlockers.has("stripe_status_unverified")) {
+    return "Stripe payout status is temporarily unavailable. Try again before applying.";
+  }
+  if (blockers.has("paralegal_payout_setup_required")) return STRIPE_GATE_MESSAGE;
+  if (blockers.has("duplicate_application")) return "You have already applied to this Matter.";
+  if (blockers.has("parties_blocked")) return "This application is unavailable.";
+  if (blockers.has("applications_closed") || blockers.has("paralegal_already_assigned")) {
+    return "Applications are closed for this Matter.";
+  }
+  if (blockers.has("approved_paralegal_required")) return "Your approved paralegal account is required to apply.";
+  return "Application eligibility could not be verified. Refresh and try again.";
 }
 
-async function refreshStripeStatus() {
-  const data = await getStripeConnectStatus();
-  stripeConnected = isStripeConnected(data);
-  return data;
+// One set of controls serves the desktop rail and the native mobile dialog.
+// Moving that set preserves current selections and every bound filter handler.
+function closeFilterMenu({ restoreFocus = true } = {}) {
+  if (!filterMenu || !filterDialog) return;
+  deactivateDialogFocus(filterDialog, { restoreFocus: false });
+  if (filterDialog.open) filterDialog.close();
+  filterMenu.hidden = mobileFilterQuery.matches;
+  filterMenu.classList.remove("active");
+  filterRailPosition.after(filterMenu);
+  filterToggle?.setAttribute("aria-expanded", "false");
+  if (restoreFocus && mobileFilterQuery.matches) filterToggle?.focus();
 }
 
-// Toggle filter menu
-if (filterToggle && filterMenu) {
-  const setFilterMenuOpen = (open) => {
-    filterMenu.classList.toggle("active", open);
-    filterToggle.setAttribute("aria-expanded", open ? "true" : "false");
-  };
+if (filterToggle && filterMenu && filterDialog) {
+  filterMenu.hidden = mobileFilterQuery.matches;
   filterToggle.addEventListener("click", () => {
-    setFilterMenuOpen(!filterMenu.classList.contains("active"));
+    if (!mobileFilterQuery.matches) return;
+    filterMenu.hidden = false;
+    filterDialog.append(filterMenu);
+    filterMenu.classList.add("active");
+    filterToggle.setAttribute("aria-expanded", "true");
+    filterDialog.showModal();
+    activateDialogFocus(filterDialog, {
+      initialFocus: filterClose,
+      returnFocus: filterToggle,
+      onEscape: () => closeFilterMenu(),
+      // showModal() is already visible and focused. A later autofocus frame
+      // would override a fast Tab/Shift+Tab move made after the dialog opens.
+      deferInitialFocus: false,
+    });
   });
-
-  document.addEventListener("click", (e) => {
-    if (!filterMenu.contains(e.target) && !filterToggle.contains(e.target)) {
-      setFilterMenuOpen(false);
+  filterClose?.addEventListener("click", () => closeFilterMenu());
+  filterDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeFilterMenu();
+  });
+  let backdropPressed = false;
+  const outsideDialog = (event) => {
+    const bounds = filterDialog.getBoundingClientRect();
+    return event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom;
+  };
+  filterDialog.addEventListener("pointerdown", (event) => { backdropPressed = outsideDialog(event); });
+  filterDialog.addEventListener("click", (event) => {
+    if (backdropPressed && outsideDialog(event)) closeFilterMenu();
+    backdropPressed = false;
+  });
+  mobileFilterQuery.addEventListener("change", () => {
+    const focusedControl = filterMenu.contains(document.activeElement) ? document.activeElement : null;
+    closeFilterMenu({ restoreFocus: false });
+    if (focusedControl) {
+      if (mobileFilterQuery.matches) filterToggle.focus();
+      else (focusedControl === filterClose ? practiceAreaSelect : focusedControl)?.focus();
     }
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" || !filterMenu.classList.contains("active")) return;
-    setFilterMenuOpen(false);
-    filterToggle.focus();
   });
 }
 
@@ -406,38 +370,26 @@ function updatePayLabel(value) {
 }
 
 // Dynamic filter population
-function populateFilters() {
+function populateFilters(page) {
   if (!practiceAreaSelect || !stateSelect || !minPaySlider) return;
-
-  // Practice areas
-  const areas = [...new Set(allJobs.map((j) => String(j.practiceArea || "").trim()).filter(Boolean))].sort();
+  const filters = page.filters;
+  const choices = (values, active) => [...new Set([...values, ...(active ? [active] : [])])];
+  const titleCase = value => value.replace(/\b[a-z]/g, letter => letter.toUpperCase());
   practiceAreaSelect.replaceChildren(new Option("Any", ""));
-  areas.forEach((area) => practiceAreaSelect.add(new Option(area, area)));
-
-  // States
-  const states = [...new Set(allJobs.map((j) => getJobState(j)).filter(Boolean))];
-  const preferredState = resolveStateOption(viewerState, states);
-  if (preferredState && !states.some((value) => value.toLowerCase() === preferredState.toLowerCase())) {
-    states.push(preferredState);
-  }
-  const experienceStates = normalizeStateExperience(viewerStateExperience);
-  experienceStates.forEach((entry) => {
-    const preferred = resolveStateOption(entry, states);
-    if (preferred && !states.some((value) => value.toLowerCase() === preferred.toLowerCase())) {
-      states.push(preferred);
-    }
-  });
-  states.sort((left, right) => left.localeCompare(right));
+  choices(page.facets.practices, filters.practice).forEach(area => practiceAreaSelect.add(new Option(titleCase(area), area)));
   stateSelect.replaceChildren(new Option("Any", ""));
-  states.forEach((stateName) => stateSelect.add(new Option(stateName, stateName)));
-
-  // Pay slider
+  choices(page.facets.states, filters.state).forEach(state => stateSelect.add(new Option(STATE_NAME_MAP[state] || state, state)));
+  practiceAreaSelect.value = filters.practice;
+  stateSelect.value = filters.state;
   minPaySlider.min = MIN_CASE_COMPENSATION;
   minPaySlider.max = MAX_FILTER_COMPENSATION;
-  minPaySlider.step = 25;
-  minPaySlider.value = MIN_CASE_COMPENSATION;
-  updatePayLabel(MIN_CASE_COMPENSATION);
-
+  minPaySlider.step = 100;
+  minPaySlider.value = filters.minPay;
+  updatePayLabel(filters.minPay);
+  if (deadlineSelect) deadlineSelect.value = filters.deadline;
+  if (postedSelect) postedSelect.value = filters.posted;
+  if (sortSelect) sortSelect.value = filters.sort;
+  updateActiveFilterCount();
 }
 
 // Slider displays
@@ -448,70 +400,17 @@ minPaySlider?.addEventListener("input", () => {
 });
 
 // Apply filters
-function applyFilters(options = {}) {
-  const { render = true } = options;
-  const area = practiceAreaSelect?.value || "";
-  const state = stateSelect?.value || "";
-  const minPay = quantizePayValue(minPaySlider?.value || MIN_CASE_COMPENSATION);
-  const deadlineMode = String(deadlineSelect?.value || "");
-  const postedMode = String(postedSelect?.value || "");
-  const today = window.LPCBusinessDate?.today() || "";
-  const sevenDaysFromToday = window.LPCBusinessDate?.addDays(today, 7) || "";
-  const thirtyDaysFromToday = window.LPCBusinessDate?.addDays(today, 30) || "";
-  const now = Date.now();
-  const day = 24 * 60 * 60 * 1000;
-
-  filteredJobs = allJobs.filter((job) => {
-    if (shouldHideAppliedJob(job)) return false;
-    const payUSD = getJobPayUSD(job);
-    const jobState = getJobState(job);
-    const deadline = window.LPCBusinessDate?.matterValue(job) || "";
-    const posted = new Date(job?.createdAt || 0).getTime();
-
-    if (area && job.practiceArea !== area) return false;
-    if (state && jobState !== state) return false;
-    if (payUSD < minPay) return false;
-    if (deadlineMode === "none" && deadline) return false;
-    if (deadlineMode === "7_days" && (!deadline || !today || deadline < today || deadline > sevenDaysFromToday)) return false;
-    if (deadlineMode === "30_days" && (!deadline || !today || deadline < today || deadline > thirtyDaysFromToday)) return false;
-    if (postedMode === "7_days" && (!posted || posted < now - 7 * day)) return false;
-    if (postedMode === "30_days" && (!posted || posted < now - 30 * day)) return false;
-
-    return true;
-  });
-
+function applyFilters() {
   currentPage = 1;
-  userPageOverride = false;
-  applySort();
+  expandedJobId = "";
+  selectedListing = null;
   syncBrowseFilterUrl();
   updateActiveFilterCount();
-  if (render) {
-    renderJobs();
-    filterMenu?.classList.remove("active");
-    filterToggle?.setAttribute("aria-expanded", "false");
-  }
+  closeFilterMenu({ restoreFocus: false });
+  void fetchJobs({ focusTarget: mobileFilterQuery.matches ? filterToggle : document.querySelector(".results h1") });
 }
 
 applyFiltersBtn?.addEventListener("click", applyFilters);
-
-function applyDefaultStateFilter() {
-  if (autoStateFilterApplied || !viewerState || !stateSelect) return false;
-  const options = Array.from(stateSelect.options || [])
-    .map((opt) => opt.value)
-    .filter(Boolean);
-  const preferred = resolveStateOption(viewerState, options);
-  if (!preferred) return false;
-  stateSelect.value = preferred;
-  autoStateFilterApplied = true;
-  applyFilters({ render: false });
-  if (!filteredJobs.length) {
-    stateSelect.value = "";
-    autoStateFilterApplied = false;
-    applyFilters({ render: false });
-    return false;
-  }
-  return true;
-}
 
 // Clear filters
 function clearFilters() {
@@ -525,33 +424,17 @@ function clearFilters() {
   if (postedSelect) postedSelect.value = "";
   if (sortSelect) sortSelect.value = "newest";
 
-  filteredJobs = allJobs.filter((job) => !shouldHideAppliedJob(job));
-  currentPage = 1;
-  userPageOverride = false;
-  applySort();
-  syncBrowseFilterUrl();
-  updateActiveFilterCount();
-  renderJobs();
-  filterMenu?.classList.remove("active");
-  filterToggle?.setAttribute("aria-expanded", "false");
+  applyFilters();
 }
 
 clearFiltersBtn?.addEventListener("click", clearFilters);
 
 // Helpers
 function getJobPayUSD(job) {
-  if (!job) return 0;
-  if (typeof job.remainingAmount === "number" && job.remainingAmount > 0) {
-    return Math.max(0, job.remainingAmount / 100);
+  for (const field of ["remainingAmount", "lockedTotalAmount", "totalAmount"]) {
+    if (typeof job?.[field] === "number" && Number.isFinite(job[field])) return Math.max(0, job[field] / 100);
   }
-  if (typeof job.lockedTotalAmount === "number" && job.lockedTotalAmount > 0) {
-    return Math.max(0, job.lockedTotalAmount / 100);
-  }
-  if (typeof job.totalAmount === "number" && job.totalAmount > 0) return Math.max(0, job.totalAmount / 100);
-  if (typeof job.payAmount === "number" && job.payAmount > 0) return Math.max(0, job.payAmount);
-  const parsedBudget = Number(job.budget);
-  if (Number.isFinite(parsedBudget) && parsedBudget > 0) return Math.max(0, parsedBudget);
-  return 0;
+  return Math.max(0, Number(job?.payAmount ?? job?.budget) || 0);
 }
 
 function getJobCompensation(job) {
@@ -597,13 +480,6 @@ function formatAppliedLabel(value) {
   return `Applied · ${dateLabel}`;
 }
 
-function isHiddenJob(job) {
-  const title = String(job?.title || job?.caseTitle || "").trim().toLowerCase();
-  const jobId = getJobIdForApply(job);
-  const caseId = getCaseIdForApply(job);
-  return title.includes("job not found") || (!jobId && !caseId);
-}
-
 function isRelistedJob(job) {
   return Boolean(job?.relistRequestedAt);
 }
@@ -621,11 +497,6 @@ function getJobTaskCounts(job) {
 function isPartiallyCompletedRelist(job) {
   const { total, completed } = getJobTaskCounts(job);
   return isRelistedJob(job) && total > 0 && completed > 0 && completed < total;
-}
-
-function shouldHideAppliedJob(job) {
-  if (!isAppliedJob(job)) return false;
-  return !isRelistedJob(job);
 }
 
 function normalizeContentLines(raw) {
@@ -679,29 +550,7 @@ function stripDuplicateStateLine(text, jobState) {
     .join("\n");
 }
 
-function applySort() {
-  const mode = sortSelect?.value || "newest";
-  switch (mode) {
-    case "newest":
-      filteredJobs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-      break;
-    case "deadline":
-      filteredJobs.sort((a, b) => {
-        const left = window.LPCBusinessDate?.matterValue(a) || "9999-12-31";
-        const right = window.LPCBusinessDate?.matterValue(b) || "9999-12-31";
-        return left.localeCompare(right) || new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-      });
-      break;
-    case "payHigh":
-      filteredJobs.sort((a, b) => getJobPayUSD(b) - getJobPayUSD(a));
-      break;
-    case "payLow":
-      filteredJobs.sort((a, b) => getJobPayUSD(a) - getJobPayUSD(b));
-      break;
-    default:
-      break;
-  }
-}
+
 
 function updateActiveFilterCount() {
   const count = [
@@ -723,42 +572,26 @@ function syncBrowseFilterUrl() {
     browseDeadline: deadlineSelect?.value || "",
     browsePosted: postedSelect?.value || "",
     browseSort: (sortSelect?.value || "newest") === "newest" ? "" : sortSelect.value,
+    browsePage: currentPage > 1 ? String(currentPage) : "",
   };
   Object.entries(values).forEach(([key, value]) => {
-    if (value) url.searchParams.set(key, value);
+    if (value || key === "browseState") url.searchParams.set(key, value);
     else url.searchParams.delete(key);
   });
+  ["id", "caseId", "caseID", "case_id"].forEach(key => url.searchParams.delete(key));
+  if (expandedJobId) url.searchParams.set("caseId", expandedJobId);
   window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
-function restoreBrowseFilterUrl() {
-  const params = new URLSearchParams(window.location.search);
-  const practice = String(params.get("browsePractice") || "");
-  const stateValue = String(params.get("browseState") || "");
-  const deadline = String(params.get("browseDeadline") || "");
-  const posted = String(params.get("browsePosted") || "");
-  const sort = String(params.get("browseSort") || "newest");
-  let restored = false;
-  if (practiceAreaSelect && [...practiceAreaSelect.options].some((option) => option.value === practice)) {
-    practiceAreaSelect.value = practice;
-    restored ||= Boolean(practice);
+function discoveryRequestPath() {
+  const current = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams({ view: "browse", limit: String(PAGE_SIZE) });
+  for (const [key, alias] of [["practice", "browsePractice"], ["state", "browseState"], ["minPay", "browseMinPay"], ["deadline", "browseDeadline"], ["posted", "browsePosted"], ["sort", "browseSort"], ["page", "browsePage"]]) {
+    if (current.has(alias)) params.set(key, key === "minPay" ? String(quantizePayValue(current.get(alias))) : current.get(alias));
   }
-  if (stateSelect && [...stateSelect.options].some((option) => option.value === stateValue)) {
-    stateSelect.value = stateValue;
-    restored ||= Boolean(stateValue);
-  }
-  const minPay = quantizePayValue(params.get("browseMinPay") || MIN_CASE_COMPENSATION);
-  if (minPaySlider) {
-    minPaySlider.value = minPay;
-    updatePayLabel(minPay);
-    restored ||= minPay > MIN_CASE_COMPENSATION;
-  }
-  if (deadlineSelect && ["", "7_days", "30_days", "none"].includes(deadline)) deadlineSelect.value = deadline;
-  if (postedSelect && ["", "7_days", "30_days"].includes(posted)) postedSelect.value = posted;
-  if (sortSelect && ["newest", "deadline", "payHigh", "payLow"].includes(sort)) sortSelect.value = sort;
-  restored ||= Boolean(deadline || posted || sort !== "newest");
-  updateActiveFilterCount();
-  return restored;
+  const id = current.get("caseId") || current.get("caseID") || current.get("case_id") || current.get("id");
+  if (id) params.set("matterId", id);
+  return `/api/jobs/open?${params}`;
 }
 
 // Render jobs
@@ -768,7 +601,7 @@ function renderJobs() {
   syncExpansionLayout();
 
   if (expandedJobId) {
-    const expanded = filteredJobs.find((job) => getJobUniqueId(job) === expandedJobId);
+    const expanded = selectedListing || filteredJobs.find((job) => getJobUniqueId(job) === expandedJobId);
     if (expanded) {
       jobsGrid.appendChild(renderExpandedJob(expanded));
       if (pagination) pagination.textContent = "";
@@ -782,22 +615,15 @@ function renderJobs() {
     const empty = document.createElement("p");
     empty.className = "area";
     empty.style.textAlign = "center";
-    empty.textContent = "No matters match your filters yet. Try adjusting filters or check back soon.";
+    empty.textContent = discoveryPage?.availableTotal ? "No matters match these filters." : "No open matters right now.";
     jobsGrid.appendChild(empty);
     if (pagination) pagination.textContent = "";
     return;
   }
 
-  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / PAGE_SIZE));
-  if (expandedJobId && !userPageOverride) {
-    const targetIndex = filteredJobs.findIndex((job) => getJobUniqueId(job) === expandedJobId);
-    if (targetIndex >= 0) {
-      currentPage = Math.min(totalPages, Math.max(1, Math.floor(targetIndex / PAGE_SIZE) + 1));
-    }
-  }
-  if (currentPage > totalPages) currentPage = totalPages;
-  const startIndex = (currentPage - 1) * PAGE_SIZE;
-  const pageItems = filteredJobs.slice(startIndex, startIndex + PAGE_SIZE);
+  const totalPages = discoveryPage?.totalPages || 1;
+  const pageItems = filteredJobs;
+
 
   pageItems.forEach((job, idx) => {
     const card = document.createElement("div");
@@ -807,7 +633,7 @@ function renderJobs() {
     const jobState = getJobState(job);
     const title = escapeHtml(job.title || "Untitled Matter");
     const practice = escapeHtml(job.practiceArea || "General Practice");
-    const when = job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Recently posted";
+    const when = job.createdAt && Number.isFinite(new Date(job.createdAt).getTime()) ? new Date(job.createdAt).toLocaleDateString() : "Date not listed";
     const jobId = getJobIdForApply(job);
     const caseId = getJobUniqueId(job) || jobId;
     const applyKey = getJobIdForApply(job);
@@ -848,7 +674,7 @@ function renderJobs() {
     const caseBtn = document.createElement("button");
     caseBtn.type = "button";
     caseBtn.className = "clear-button";
-    caseBtn.textContent = "View Matter";
+    caseBtn.textContent = "Details";
     caseBtn.dataset.jobId = caseId;
     caseBtn.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -898,9 +724,9 @@ function renderPagination(totalPages) {
   prevBtn.disabled = currentPage <= 1;
   prevBtn.addEventListener("click", () => {
     if (currentPage <= 1) return;
-    userPageOverride = true;
     currentPage -= 1;
-    renderJobs();
+    syncBrowseFilterUrl();
+    void fetchJobs({ focusTarget: document.querySelector(".results h1") });
   });
 
   const info = document.createElement("span");
@@ -914,9 +740,9 @@ function renderPagination(totalPages) {
   nextBtn.disabled = currentPage >= totalPages;
   nextBtn.addEventListener("click", () => {
     if (currentPage >= totalPages) return;
-    userPageOverride = true;
     currentPage += 1;
-    renderJobs();
+    syncBrowseFilterUrl();
+    void fetchJobs({ focusTarget: document.querySelector(".results h1") });
   });
 
   pagination.appendChild(prevBtn);
@@ -925,85 +751,62 @@ function renderPagination(totalPages) {
 }
 
 // Fetch jobs
-async function fetchJobs() {
+async function fetchJobs({ focusTarget = null } = {}) {
   if (!sessionReady) return;
-  try {
-    const res = await fetch("/api/jobs/open", {
-      headers: { Accept: "application/json" },
-      credentials: "include",
-    });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    const data = await res.json();
-    if (Array.isArray(data)) {
-      allJobs = data;
-    } else if (Array.isArray(data?.items)) {
-      allJobs = data.items;
-    } else {
-      allJobs = [];
-    }
-    allJobs = allJobs.filter((job) => !isHiddenJob(job));
-    allJobs = allJobs.filter((job) => !shouldHideAppliedJob(job));
-    filteredJobs = [...allJobs];
-    currentPage = 1;
-    userPageOverride = false;
-
-    populateFilters();
-    const restored = restoreBrowseFilterUrl();
-    const autoFiltered = !restored && applyDefaultStateFilter();
-    if (restored) applyFilters({ render: false });
-    else if (!autoFiltered) applySort();
-    if (initialJobParam) {
-      const match = filteredJobs.find((job) => getJobUniqueId(job) === initialJobParam);
-      if (match) {
-        expandedJobId = getJobUniqueId(match);
-      }
-    }
-    renderJobs();
-  } catch (err) {
-    console.error("Failed to load jobs", err);
-    allJobs = [];
-    filteredJobs = [];
-    if (jobsGrid) {
-      jobsGrid.innerHTML = "";
-      const error = document.createElement("div");
-      error.className = "empty-results";
-      const message = document.createElement("p");
-      message.className = "area";
-      message.textContent = "Available Matters could not be loaded. Your filters are still preserved.";
-      const retry = document.createElement("button");
-      retry.type = "button";
-      retry.className = "pagination-btn";
-      retry.textContent = "Retry";
-      retry.addEventListener("click", () => {
-        retry.disabled = true;
-        retry.textContent = "Retrying…";
-        void fetchJobs();
-      });
-      error.append(message, retry);
-      jobsGrid.appendChild(error);
-    }
+  const request = ++discoveryRequest;
+  discoveryController?.abort();
+  discoveryController = new AbortController();
+  const requestPath = discoveryRequestPath();
+  const requestedId = new URL(requestPath, window.location.origin).searchParams.get("matterId");
+  if (jobsGrid) {
+    jobsGrid.setAttribute("aria-busy", "true");
+    const loading = document.createElement("p"); loading.className = "results-status"; loading.textContent = "Loading matters…";
+    jobsGrid.replaceChildren(loading);
   }
+  if (pagination) pagination.textContent = "";
+  resultCount.textContent = "";
+  try {
+    const res = await secureFetch(requestPath, { headers: { Accept: "application/json" }, signal: discoveryController.signal, suppressToast: true });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const page = readMatterDiscoveryPage(await res.json(), { pageSize: PAGE_SIZE });
+    if (request !== discoveryRequest) return;
+    if (viewerId && page.profile._id !== viewerId) throw new Error("The Matter results belong to a different account.");
+    discoveryPage = page;
+    filteredJobs = page.listings;
+    selectedListing = page.selected;
+    expandedJobId = selectedListing ? getJobUniqueId(selectedListing) : "";
+    currentPage = page.page;
+    populateFilters(page);
+    syncBrowseFilterUrl();
+    resultCount.textContent = `${page.total} open ${page.total === 1 ? "matter" : "matters"}`;
+    if (requestedId && !selectedListing) {
+      const message = document.createElement("p"); message.className = "area"; message.textContent = "This matter is no longer available.";
+      const back = document.createElement("button"); back.type = "button"; back.className = "pagination-btn"; back.textContent = "Back to Browse Matters";
+      back.addEventListener("click", () => { void fetchJobs({ focusTarget: document.querySelector(".results h1") }); });
+      jobsGrid?.replaceChildren(message, back);
+    } else renderJobs();
+    if (focusTarget?.isConnected) { if (focusTarget.matches("h1")) focusTarget.tabIndex = -1; focusTarget.focus({ preventScroll: true }); }
+  } catch (err) {
+    if (request !== discoveryRequest || err?.name === "AbortError") return;
+    console.error("Failed to load jobs", err);
+    filteredJobs = []; discoveryPage = null; selectedListing = null;
+    if (jobsGrid) {
+      const error = document.createElement("div"); error.className = "empty-results";
+      const message = document.createElement("p"); message.className = "area";
+      message.textContent = "Available Matters could not be loaded. Your filters are still preserved.";
+      const retry = document.createElement("button"); retry.type = "button"; retry.className = "pagination-btn"; retry.textContent = "Retry";
+      retry.addEventListener("click", () => { void fetchJobs({ focusTarget: document.querySelector(".results h1") }); });
+      error.append(message, retry); jobsGrid.replaceChildren(error);
+    }
+  } finally { if (request === discoveryRequest) jobsGrid?.removeAttribute("aria-busy"); }
 }
 
-
-ensureSession().then(async (ready) => {
-  if (!ready) return;
-  if (allowApply) {
-    await refreshStripeStatus();
-  }
-  await hydrateAppliedJobs();
-  fetchJobs();
-});
-
+ensureSession().then(ready => { if (ready) void fetchJobs(); });
 sortSelect?.addEventListener("change", () => {
-  currentPage = 1;
-  userPageOverride = false;
-  applySort();
-  syncBrowseFilterUrl();
-  renderJobs();
+  currentPage = 1; expandedJobId = ""; selectedListing = null;
+  syncBrowseFilterUrl(); void fetchJobs({ focusTarget: sortSelect });
 });
+
 
 function openApplyModal(job) {
   if (!job) return;
@@ -1011,8 +814,8 @@ function openApplyModal(job) {
     showToast("Only paralegals can apply to Matters.", "info");
     return;
   }
-  if (!stripeAllowed()) {
-    notifyStripeGate();
+  if (getApplicationEligibility(job).ready !== true) {
+    notifyStripeGate(applicationBlockMessage(job));
     return;
   }
   ensureApplyModal();
@@ -1189,41 +992,7 @@ function updateApplyCounter() {
   }
 }
 
-async function hydrateAppliedJobs() {
-  appliedJobs.clear();
-  const stored = loadAppliedJobs();
-  stored.forEach(([key, appliedAt]) => {
-    const normalizedKey = normalizeId(key);
-    if (normalizedKey) appliedJobs.set(normalizedKey, appliedAt);
-  });
-  if (allowApply) {
-    await loadAppliedJobsFromServer();
-  }
-}
 
-async function loadAppliedJobsFromServer() {
-  if (!allowApply) return;
-  try {
-    const res = await secureFetch("/api/applications/my", { headers: { Accept: "application/json" } });
-    if (!res.ok) return;
-    const apps = await res.json().catch(() => []);
-    if (!Array.isArray(apps)) return;
-    const serverApplied = new Map();
-    apps.forEach((app) => {
-      const job = app?.jobId || {};
-      const jobId = normalizeId(job?._id || job?.id || app?.jobId || "");
-      const appliedAt = app?.createdAt || new Date().toISOString();
-      if (jobId) serverApplied.set(jobId, appliedAt);
-    });
-    appliedJobs.clear();
-    serverApplied.forEach((appliedAt, jobId) => {
-      appliedJobs.set(jobId, appliedAt);
-    });
-    persistAppliedJobs();
-  } catch (err) {
-    console.warn("Unable to load applied jobs", err);
-  }
-}
 
 async function submitApplication() {
   if (!currentApplyJob || !applyTextarea || !applyStatus || !applySubmitBtn) return;
@@ -1303,7 +1072,6 @@ function markJobAsApplied(jobId) {
   const now = new Date().toISOString();
   const normalizedJobId = normalizeId(jobId);
   if (normalizedJobId) appliedJobs.set(normalizedJobId, now);
-  persistAppliedJobs();
   if (normalizedJobId) {
     const selector = `[data-job-id="${escapeAttr(normalizedJobId)}"]`;
     const label = `✓ ${formatAppliedLabel(now)}`;
@@ -1315,51 +1083,10 @@ function markJobAsApplied(jobId) {
   if (currentApplyJob && normalizedJobId) {
     currentApplyJob.appliedAt = now;
   }
-  if (allJobs.length) {
-    allJobs.forEach((job) => {
-      const id = getJobIdForApply(job);
-      if (normalizedJobId && id === normalizedJobId) job.appliedAt = now;
-    });
-  }
-  if (normalizedJobId) {
-    const shouldKeep = (job) => normalizeId(getApplyKey(job)) !== normalizedJobId;
-    allJobs = allJobs.filter(shouldKeep);
-    filteredJobs = filteredJobs.filter(shouldKeep);
-  }
-  renderJobs(); // refresh cards to show applied state/date
+  expandedJobId = ""; selectedListing = null;
+  syncBrowseFilterUrl();
 }
 
-function loadAppliedJobs() {
-  try {
-    const storageKey = getAppliedStorageKey();
-    let raw = sessionStorage.getItem(storageKey);
-    if (!raw && storageKey !== APPLIED_STORAGE_KEY) {
-      raw = sessionStorage.getItem(APPLIED_STORAGE_KEY);
-      if (raw) {
-        sessionStorage.setItem(storageKey, raw);
-        sessionStorage.removeItem(APPLIED_STORAGE_KEY);
-      }
-    }
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      if (parsed.length && Array.isArray(parsed[0])) return parsed;
-      return parsed.map((id) => [id, new Date().toISOString()]); // legacy list, mark now
-    }
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function persistAppliedJobs() {
-  try {
-    const entries = [...appliedJobs.entries()];
-    sessionStorage.setItem(getAppliedStorageKey(), JSON.stringify(entries));
-  } catch {
-    /* ignore */
-  }
-}
 
 async function ensureAttorneyPreview(job) {
   if (!job) return null;
@@ -1421,22 +1148,15 @@ async function openJobModal(job) {
       jobApplyBtn.classList.add("is-disabled");
       jobApplyBtn.removeAttribute("data-stripe-required");
       jobApplyBtn.removeAttribute("data-hover-label");
-    } else if (!profilePhotoAllowed()) {
+    } else if (getApplicationEligibility(job).ready !== true) {
+      const message = applicationBlockMessage(job);
       jobApplyBtn.disabled = false;
       jobApplyBtn.textContent = "Apply for this Matter";
-      jobApplyBtn.title = PROFILE_PHOTO_REQUIRED_MESSAGE;
+      jobApplyBtn.title = message;
       jobApplyBtn.classList.add("is-disabled");
       jobApplyBtn.setAttribute("aria-disabled", "true");
       jobApplyBtn.removeAttribute("data-stripe-required");
       jobApplyBtn.removeAttribute("data-hover-label");
-    } else if (!stripeAllowed()) {
-      jobApplyBtn.disabled = false;
-      jobApplyBtn.textContent = "Apply for this Matter";
-      jobApplyBtn.title = STRIPE_GATE_MESSAGE;
-      jobApplyBtn.classList.add("is-disabled");
-      jobApplyBtn.setAttribute("aria-disabled", "true");
-      jobApplyBtn.dataset.stripeRequired = "true";
-      jobApplyBtn.dataset.hoverLabel = "Stripe Setup Required";
     } else {
       jobApplyBtn.disabled = false;
       jobApplyBtn.textContent = "Apply for this Matter";
@@ -1529,12 +1249,8 @@ jobApplyBtn?.addEventListener("click", (event) => {
     showToast("Only paralegals can apply to Matters.", "info");
     return;
   }
-  if (!profilePhotoAllowed()) {
-    showToast(PROFILE_PHOTO_REQUIRED_MESSAGE, "error");
-    return;
-  }
-  if (!stripeAllowed()) {
-    notifyStripeGate();
+  if (!modalJob || getApplicationEligibility(modalJob).ready !== true) {
+    notifyStripeGate(applicationBlockMessage(modalJob));
     return;
   }
   if (modalJob) {
@@ -1811,10 +1527,6 @@ function getAppliedAt(job) {
   return null;
 }
 
-function isAppliedJob(job) {
-  return Boolean(getAppliedAt(job));
-}
-
 function expandJob(job) {
   const id = getJobUniqueId(job);
   if (!id) {
@@ -1828,12 +1540,16 @@ function expandJob(job) {
   };
   expandedReturnJobId = id;
   expandedJobId = id;
+  selectedListing = job;
+  syncBrowseFilterUrl();
   renderJobs();
   setTimeout(scrollToExpandedCard, 10);
 }
 
 function collapseExpanded() {
   expandedJobId = "";
+  selectedListing = null;
+  syncBrowseFilterUrl();
   renderJobs();
   requestAnimationFrame(() => {
     const shell = document.querySelector(".browse-page-shell");
@@ -1881,25 +1597,15 @@ function buildApplyButton(job, jobId, appliedAt) {
       applyBtn.textContent = `✓ ${formatAppliedLabel(appliedAt)}`;
       applyBtn.removeAttribute("data-stripe-required");
       applyBtn.removeAttribute("data-hover-label");
-    } else if (!profilePhotoAllowed()) {
+    } else if (getApplicationEligibility(job).ready !== true) {
+      const message = applicationBlockMessage(job);
       applyBtn.textContent = "Apply for this Matter";
-      applyBtn.title = PROFILE_PHOTO_REQUIRED_MESSAGE;
+      applyBtn.title = message;
       applyBtn.classList.add("is-disabled");
       applyBtn.setAttribute("aria-disabled", "true");
       applyBtn.addEventListener("click", (event) => {
         event.stopPropagation();
-        showToast(PROFILE_PHOTO_REQUIRED_MESSAGE, "error");
-      });
-    } else if (!stripeAllowed()) {
-      applyBtn.textContent = "Apply for this Matter";
-      applyBtn.title = STRIPE_GATE_MESSAGE;
-      applyBtn.classList.add("is-disabled");
-      applyBtn.setAttribute("aria-disabled", "true");
-      applyBtn.dataset.stripeRequired = "true";
-      applyBtn.dataset.hoverLabel = "Stripe Setup Required";
-      applyBtn.addEventListener("click", (event) => {
-        event.stopPropagation();
-        notifyStripeGate();
+        notifyStripeGate(message);
       });
     } else {
       applyBtn.textContent = "Apply for this Matter";
@@ -1921,14 +1627,17 @@ function renderExpandedJob(job) {
   const appliedAt = getAppliedAt(job);
   const compensation = getJobCompensation(job);
   const jobState = getJobState(job) || "—";
-  const when = job.createdAt
-    ? new Date(job.createdAt).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })
-    : "Recently posted";
+  const postedDate = job.createdAt ? new Date(job.createdAt) : null;
+  const postedLabel = postedDate && Number.isFinite(postedDate.getTime())
+    ? `Posted ${postedDate.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}`
+    : "Date not listed";
   const showPartial = isPartiallyCompletedRelist(job);
-  const rawSummary = job.briefSummary || job.shortDescription || job.practiceArea || "";
-  const summary = scrubStateLines(rawSummary, jobState);
+  const rawSummary = job.briefSummary || job.shortDescription || "";
   const rawDescription = job.description || job.details || job.briefSummary || "";
   const { description, experienceLine } = prepareExpandedContent(rawDescription, jobState);
+  const cleanSummary = scrubStateLines(rawSummary, jobState);
+  const sameText = (left, right) => String(left || "").trim().replace(/\s+/g, " ").toLocaleLowerCase() === String(right || "").trim().replace(/\s+/g, " ").toLocaleLowerCase();
+  const summary = sameText(cleanSummary, description) || sameText(cleanSummary, job.practiceArea) ? "" : cleanSummary;
   const tasks = Array.isArray(job.tasks) ? job.tasks : [];
   const tasksMarkup = `
     <div class="description-label">TASKS</div>
@@ -1978,7 +1687,7 @@ function renderExpandedJob(job) {
           <div class="meta">
             <span>${escapeHtml(jobState)}</span>
             <span>${escapeHtml(compensation)}</span>
-            <span>Posted ${escapeHtml(when)}</span>
+            <span>${escapeHtml(postedLabel)}</span>
           </div>
           ${showPartial ? `<div class="partial-completion-note">This Matter has been partially completed</div>` : ""}
 

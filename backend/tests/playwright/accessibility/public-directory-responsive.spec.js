@@ -8,45 +8,12 @@ const PHASE_THREE_VIEWPORTS = [
   { width: 1920, height: 1080 },
 ];
 
-const PROFILE_ID = "64d2f9a72f3b4c5d6e7f8091";
-const PROFILE_VERSION = "2026-08-28T12:00:00.000Z";
-
-function directoryProfile(overrides = {}) {
-  const id = overrides.id || PROFILE_ID;
-  const title = overrides.title || "Alexandria Montgomery-Worthington the Third";
-  const canonicalUrl = `/profile-paralegal.html?paralegalId=${id}`;
-  return {
-    _id: id,
-    yearsExperience: overrides.yearsExperience ?? 12,
-    avatarURL: overrides.avatarURL ?? "/phase-three-missing-portrait.jpg",
-    presentation: {
-      schemaVersion: 1,
-      source: "server_projection",
-      kind: "card",
-      objectType: "profile",
-      object: { id, title, canonicalUrl, version: PROFILE_VERSION },
-      status: { code: "active", label: "Available", tone: "success" },
-      attention: null,
-      relationship: { code: "public", label: "Public profile" },
-      readOnly: true,
-      actions: [],
-      details: [
-        { label: "Location", value: "Washington, District of Columbia" },
-        { label: "Practice areas", value: "Administrative Law, Intellectual Property" },
-      ],
-      summary: "Supports complex multi-jurisdiction litigation, discovery, and detailed filing calendars for growing legal teams.",
-      freshness: {
-        state: "current",
-        sourceUpdatedAt: PROFILE_VERSION,
-        projectedAt: PROFILE_VERSION,
-      },
-      links: { self: canonicalUrl },
-    },
-  };
-}
+const { directoryProfile } = require("./public-directory-fixture");
 
 async function mockDirectory(page, { user = null, responseMode = "populated" } = {}) {
   let mode = responseMode;
+  let releaseLoading;
+  const loadingGate = new Promise(resolve => { releaseLoading = resolve; });
   await page.route("**/api/auth/me", (route) =>
     route.fulfill({
       status: 200,
@@ -73,7 +40,7 @@ async function mockDirectory(page, { user = null, responseMode = "populated" } =
   );
   await page.route("**/public/paralegals?**", async (route) => {
     if (mode === "loading") {
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await loadingGate;
     }
     if (mode === "error") {
       await route.fulfill({
@@ -98,6 +65,7 @@ async function mockDirectory(page, { user = null, responseMode = "populated" } =
     });
   });
   return {
+    releaseLoading,
     setMode(nextMode) {
       mode = nextMode;
     },
@@ -228,6 +196,7 @@ test("loading, populated, empty, error, fallback-photo, and account-required sta
   await page.setViewportSize({ width: 320, height: 844 });
   await page.goto("/browse-paralegals.html", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#resultsStatus")).toHaveText("Loading paralegals…");
+  directory.releaseLoading();
   await expect(page.locator(".paralegal-card")).toHaveCount(1);
   await expect(page.locator(".paralegal-card img")).toHaveAttribute("src", "/assets/avatar-placeholder.svg");
 

@@ -16,6 +16,7 @@ const caseFileSchema = new Schema(
     previewMimeType: { type: String, trim: true, default: "" },
     size: { type: Number, default: 0 },
     previewSize: { type: Number, default: 0 },
+    clientUploadId: { type: String, trim: true, maxlength: 128, default: undefined, select: false },
     securityStatus: {
       type: String,
       enum: ["pending", "clean", "blocked", "error", "not_required"],
@@ -28,6 +29,9 @@ const caseFileSchema = new Schema(
     uploadedByRole: { type: String, enum: ["attorney", "paralegal", "admin"], default: "attorney" },
     status: { type: String, enum: ["pending_review", "approved", "attorney_revision"], default: "pending_review" },
     version: { type: Number, default: 1 },
+    revisionOfFileId: { type: Types.ObjectId, ref: "CaseFile", default: null },
+    revisionOfVersion: { type: Number, default: null },
+    revisionRequestAt: { type: Date, default: null },
     revisionNotes: { type: String, trim: true, maxlength: 6000, default: "" },
     revisionRequestedAt: { type: Date, default: null },
     approvedAt: { type: Date, default: null },
@@ -47,6 +51,13 @@ const caseFileSchema = new Schema(
 );
 
 caseFileSchema.index({ caseId: 1, createdAt: -1 });
+caseFileSchema.index(
+  { caseId: 1, userId: 1, clientUploadId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clientUploadId: { $type: "string" } },
+  }
+);
 caseFileSchema.index(
   { caseId: 1, storageKeyFingerprint: 1 },
   {

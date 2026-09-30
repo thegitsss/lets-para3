@@ -677,9 +677,7 @@ body.lpc-role-dashboard .view-home .mini-deadlines .info-line {
 }
 
 body.theme-dark,
-html.theme-dark,
-body.theme-mountain-dark,
-html.theme-mountain-dark {
+html.theme-dark {
   --lpc-surface-subtle: rgba(255, 255, 255, 0.055);
   --lpc-accent-soft: rgba(207, 188, 142, 0.16);
   --lpc-danger: #ef9a9a;

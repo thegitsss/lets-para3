@@ -1,0 +1,96 @@
+.view-billing [data-payment-setup] { color:var(--ink); min-width:0; overflow-wrap:anywhere; }
+.view-billing [data-payment-setup] .av2-actions { display:flex; flex-wrap:wrap; gap:.65rem; margin:1rem 0; }
+.view-billing [data-payment-setup] p { line-height:1.5; }
+.view-billing [data-payment-setup] :is(button,a) { color:var(--ink); font:inherit; }
+.view-billing [data-payment-setup] button { min-width:0; min-height:44px; max-width:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:6px; background:var(--panel); padding:.6rem .75rem; cursor:pointer; white-space:normal; }
+.view-billing [data-payment-setup] button:disabled { cursor:default; opacity:.55; }
+.view-billing [data-payment-setup] :is(button,a,input):focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
+.view-billing [data-payment-setup] [hidden] { display:none !important; }
+.view-billing [data-financial-history] { color:var(--ink); min-width:0; overflow-wrap:anywhere; }
+.view-billing [data-financial-history] h2 { margin:0 0 1rem; font-size:1.5rem; font-weight:600; }
+.view-billing [data-financial-history] h3 { font-size:1rem; margin:0 0 .5rem; }
+.view-billing [data-financial-history] p { margin:.5rem 0; line-height:1.5; }
+.view-billing [data-financial-history] a { color:var(--ink); text-decoration:underline; text-underline-offset:.2em; }
+.view-billing [data-financial-history] .av2-payment-filters { display:grid; grid-template-columns:minmax(0,1fr); gap:.5rem; margin:1.25rem 0; }
+.view-billing [data-financial-history] .av2-payment-field { display:grid; gap:.5rem; min-width:0; }
+.view-billing [data-financial-history] .av2-payment-field :is(input,select) { width:100%; }
+.view-billing [data-financial-history] input,
+.view-billing [data-financial-history] select,
+.view-billing [data-financial-history] button { min-width:0; min-height:44px; max-width:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); font:inherit; padding:.6rem .75rem; }
+.view-billing [data-financial-history] button { cursor:pointer; white-space:normal; }
+.view-billing [data-financial-history] select { height:max(44px, calc(1.5em + 1.2rem + 2px)); }
+.view-billing [data-financial-history] button:disabled { cursor:default; opacity:.55; }
+.view-billing [data-financial-history] :is(input,select,button,a):focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
+.view-billing [data-financial-history] .av2-actions { display:flex; flex-wrap:wrap; gap:.65rem; margin:1rem 0; }
+.view-billing [data-financial-history] [hidden] { display:none !important; }
+.view-billing [data-financial-history] .matter-receipt-details { margin:1rem 0; }
+.view-billing [data-financial-history] dt { margin-top:1rem; color:var(--muted); }
+.view-billing [data-financial-history] dd { margin:.25rem 0 0; }
+.view-billing [data-financial-history] .av2-payment-records { list-style:none; padding:0; margin:1.5rem 0; }
+.view-billing [data-financial-history] [data-financial-record] { padding:1rem 0; border-top:1px solid var(--line); }
+@media (min-width:760px) {
+  .view-billing [data-financial-history] .av2-payment-filters { grid-template-columns:minmax(0,1fr) minmax(0,1fr); column-gap:1rem; }
+  .view-billing [data-financial-history] .av2-payment-filters > button { grid-column:1 / -1; justify-self:start; margin-top:.5rem; }
+}
+
+/* The original product skin forces white after the saved theme is applied.
+   Restore the existing LPC dark palette while this Payments surface is open. */
+body.lpc-product-clean.theme-dark:has([data-billing-surface]:not([hidden])) {
+  color-scheme:dark;
+  --bg:#111b2a;
+  --panel:#192538;
+  --ink:#f2f5f9;
+  --muted:#b2bccb;
+  --line:#354258;
+  --accent:#b4d2ff;
+  --sidebar-bg:#111b2a;
+  --sidebar-text:#f2f5f9;
+  --app-surface:#111b2a;
+  --app-surface-contrast:#192538;
+  --app-card-muted:#192538;
+  --app-text:#f2f5f9;
+  --app-muted:#b2bccb;
+  --app-border:#354258;
+  --app-border-soft:#354258;
+  --lpc-surface-page:#111b2a;
+  --lpc-surface-canvas:#111b2a;
+  --lpc-surface-panel:#192538;
+  --lpc-surface-raised:#192538;
+  --lpc-surface-subtle:#192538;
+  --lpc-text-primary:#f2f5f9;
+  --lpc-text-secondary:#b2bccb;
+  --lpc-border-subtle:#354258;
+  background:var(--bg) !important;
+  color:var(--ink) !important;
+}
+body.lpc-product-clean.theme-dark:has([data-billing-surface]:not([hidden])) :is(.main,main#main,.lpc-auth-page-shell,.lpc-universal-header-shell,.topbar,.sidebar) {
+  background:var(--bg) !important;
+  color:var(--ink) !important;
+  border-color:var(--line) !important;
+}
+body.lpc-product-clean.theme-dark:has([data-billing-surface]:not([hidden])) :is(.sidebar,.lpc-universal-header-shell) :is(a,button,.logo,.sidebar-footer,.lpc-sidebar-profile-name,.lpc-sidebar-profile-role) {
+  color:var(--ink) !important;
+  border-color:var(--line) !important;
+}
+body.lpc-product-clean.theme-dark:has([data-billing-surface]:not([hidden])) .view-billing :is(.panel,table,th,td,.info-tooltip,input,select,button,.av2-payment-filters) {
+  background:var(--panel) !important;
+  color:var(--ink) !important;
+  border-color:var(--line) !important;
+}
+body.lpc-product-clean.theme-dark:has([data-billing-surface]:not([hidden])) .view-billing :is(h1,h2,h3,p,dt,dd,label,a,.pill,.info-line,.history-empty) { color:var(--ink) !important; }
+body.lpc-product-clean.theme-dark:has([data-billing-surface]:not([hidden])) :is(.lpc-universal-header-shell,.sidebar) button { background:var(--bg) !important; }
+body.lpc-product-clean.theme-dark:has([data-billing-surface]:not([hidden])) .view-billing :is(button,a,input,select):focus-visible { outline:2px solid var(--accent) !important; outline-offset:3px; }
+body.lpc-product-clean.theme-dark:has([data-billing-surface]:not([hidden])) .sidebar-toggle { background:var(--bg) !important; color:var(--ink) !important; border-color:var(--line) !important; }
+body.lpc-product-clean.theme-dark:has([data-billing-surface]:not([hidden])) .sidebar-toggle::before { background:transparent !important; }
+
+/* Original Payments uses the same guarded card and application-return controls. */
+.view-billing [data-payment-card-host] { min-width:0; color:var(--ink); overflow-wrap:anywhere; }
+.view-billing [data-payment-card-host] h2 { margin:0 0 1rem; font-size:1.5rem; font-weight:600; }
+.view-billing [data-payment-card-host] p { margin:.5rem 0; line-height:1.5; }
+.view-billing [data-payment-card-host] .av2-actions { display:flex; flex-wrap:wrap; gap:.65rem; margin:1rem 0; }
+.view-billing [data-payment-card-host] :is(button,.av2-text-link) { display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; min-height:44px; max-width:100%; padding:.6rem .75rem; border:1px solid var(--line); border-radius:6px; color:var(--ink); background:var(--panel); font:inherit; white-space:normal; text-align:center; }
+.view-billing [data-payment-card-host] button { cursor:pointer; }
+.view-billing [data-payment-card-host] button:disabled { cursor:default; opacity:.55; }
+.view-billing [data-payment-card-host] :is(button,a):focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
+.view-billing [data-payment-card-host] [hidden] { display:none !important; }
+.view-billing [data-payment-hiring-return]:not([hidden]) { border-top:1px solid var(--line); margin-top:1rem; padding-top:1rem; }

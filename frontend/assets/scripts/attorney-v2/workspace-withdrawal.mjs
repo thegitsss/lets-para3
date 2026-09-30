@@ -1,0 +1,70 @@
+import { node, button, link, setRecovery } from "./dom.mjs";
+import { financialRefresh, financialHeading, localFinancialReview } from "./financial-section.mjs";
+import { readWithdrawal, withdrawalBlockers, payoutInput, withdrawalAmounts, withdrawalMoney, withdrawalOutcome, decisionLabel } from "./withdrawal-model.mjs";
+import { timeLabel } from "./workspace-model.mjs";
+export function createWorkspaceWithdrawal(caseId, { api, signal, ownerId, privateState }) {
+  const section = node("section", { "aria-label": "Paralegal withdrawal", "data-workspace-withdrawal": "" }), feedback = node("p", { role: "status" }), body = node("div"), actions = node("div", { className: "av2-actions" });
+  const state = privateState.withdrawals.get(caseId) || { amountText: "", pending: null, busy: false }; privateState.withdrawals.set(caseId, state); state.busy = false;
+  let review = null, confirming = null, reading = false, controller = null, sequence = 0;
+  const refresh = financialRefresh("Refresh withdrawal details", () => void load()), stop = button("Stop waiting for the withdrawal decision", () => controller?.abort()); stop.hidden = true;
+  section.append(financialHeading("Paralegal withdrawal", refresh), feedback, body, actions, node("p", { className: "av2-actions" }, [stop]));
+  const opts = { ownerId, signal }, money = amount => withdrawalMoney(amount, review.currency);
+  function controls() { refresh.disabled = reading || state.busy; refresh.setLabel(state.pending || state.lastRequestId ? "Check withdrawal decision" : "Refresh withdrawal details", Boolean(review && !state.pending)); stop.hidden = !state.busy; for (const item of [...body.querySelectorAll("input,button"), ...actions.querySelectorAll("button")]) item.disabled = state.busy || reading && item.tagName !== "INPUT" && !item.hasAttribute("data-financial-local-review");
+    setRecovery(refresh, section, { pending: Boolean(state.pending || state.lastRequestId && review?.operation?.status !== 'recorded'), label: "Check withdrawal decision" });
+  }
+  function begin(action, amountCents) { confirming = { action, reviewedRevision: review.revision, ...(action === "partial" ? { amountCents } : {}) }; display(); body.querySelector("[data-withdrawal-confirmation]")?.focus(); }
+  function display() {
+    const focusedInput = body.contains(document.activeElement) && document.activeElement.tagName === "INPUT" ? { id: document.activeElement.id, start: document.activeElement.selectionStart, end: document.activeElement.selectionEnd } : null;
+    body.replaceChildren(); actions.replaceChildren(); section.hidden = Boolean(review && !review.applicable && !state.pending); if (!review) { controls(); return; }
+    const fact = (label, value) => node("div", {}, [node("dt", { text: label }), node("dd", { text: value })]);
+    body.append(node("p", { text: `${review.paralegalName} · Withdrawal recorded: ${timeLabel(review.withdrawnAt)}` }), node("p", { text: `${review.work.complete} of ${review.work.total} work items for this assignment were marked complete.` }), node("dl", { className: "av2-matter-facts" }, [fact("Original Matter amount", money(review.originalCents)), fact("Remaining for the Matter", review.balanceVerified ? money(review.remainingCents) : "Amount needs review")]));
+    if (review.state === "review_window") body.append(node("p", { text: `Payment-review window ends: ${timeLabel(review.reviewDeadline)}. The paralegal may request payment review during this window. Relisting follows the recorded outcome.` }));
+    if (review.state === "review_overdue") body.append(node("p", { text: "The review deadline has passed, but no final outcome is recorded yet. Refresh to check for finalization." }));
+    if (review.state === "admin_review") body.append(node("p", { text: `LPC is reviewing the dispute.${review.adminDeadline ? ` Recorded review deadline: ${timeLabel(review.adminDeadline)}.` : ""}` }));
+    if (review.state === "processing" || review.state === "needs_review" && !review.blockers.length) body.append(node("p", { text: review.state === "processing" ? "A withdrawal decision is in progress." : "The withdrawal details need LPC review before another decision." }));
+    if (review.blockers.length) body.append(node("ul", {}, review.blockers.map(key => node("li", { text: withdrawalBlockers[key] }))));
+    if (review.decision) {
+      body.append(node("h3", { text: decisionLabel(review.decision.type) }), node("p", { text: `Recorded: ${timeLabel(review.decision.at)} · Decision amount: ${money(review.decision.amountCents)}` }), node("p", { text: review.decision.payoutState === "none" ? "No payout was issued for this decision." : review.decision.payoutState === "recorded" ? "Payment release recorded. Bank arrival is not confirmed here." : review.decision.payoutState === "reversed" ? "The payout has been reversed. LPC must review the remaining balance before another hire." : "The payout could not be verified. Review the Matter receipts and contact LPC before another decision." }));
+    }
+    if (review.relistedAt) body.append(node("p", { text: `Relisting request recorded: ${timeLabel(review.relistedAt)}.${review.balanceVerified && review.remainingCents === 0 ? " No funds remain for replacement work." : ""}` }));
+    actions.append(link(review.work.complete === 0 ? "Review remaining work" : "Review completed work", `#/matters/${caseId}/work`), link("Review Matter receipts", `#/matters/${caseId}/receipt`));
+    if (review.relistedAt && review.balanceVerified && review.remainingCents > 0 && !review.blockers.length) actions.append(link("Review replacement applications", `#/matters/${caseId}/applications`));
+    if (state.pending) {
+      if (["not_sent", "not_found"].includes(review.operation?.status) && (review.canDecide || review.canRelist)) actions.append(button("Start a fresh withdrawal review", () => { state.pending = null; state.lastRequestId = null; confirming = null; void load(); }));
+    } else if (confirming) {
+      const heading = node("h3", { text: `Confirm the decision for ${review.caseTitle}`, tabindex: "-1", "data-withdrawal-confirmation": "" }); body.append(heading);
+      if (confirming.action === "partial") {
+        const amounts = withdrawalAmounts(review, confirming.amountCents); if (!amounts) { confirming = null; return display(); }
+        body.append(node("dl", { className: "av2-matter-facts" }, [fact("Amount from the Matter funds", money(amounts.grossCents)), fact("Remaining for another paralegal", money(amounts.remainingCents))]));
+        body.append(node("p", { text: amounts.grossCents === 0 ? "This records no payout and makes the remaining work available for applications. It does not start a payment-review window." : `This releases the agreed amount from the existing Matter funds. The remaining work becomes available for applications after the payout and decision are recorded. It does not make another card charge.` }));
+      } else body.append(node("p", { text: confirming.action === "reject" ? "This declines release and starts a 24-hour window for the paralegal to request payment review. It does not issue a payout. If no review is requested, the recorded expiry outcome makes the remaining work available for applications." : "This makes the remaining work available for applications at the recorded remaining amount. It does not make another card charge or change the earlier payout decision." }));
+      actions.append(localFinancialReview(button("Keep reviewing", () => { confirming = null; display(); body.querySelector("input")?.focus(); })), button(confirming.action === "reject" ? "Decline release and start review window" : confirming.action === "relist" ? "Relist remaining work" : confirming.amountCents === 0 ? "Record no payout and relist" : "Record decision and release payment", () => void send()));
+    } else {
+      if (review.canDecide) {
+        const input = node("input", { id: "av2-withdrawal-amount", type: "text", inputmode: "decimal", autocomplete: "off", maxlength: "15" }); input.value = state.amountText; const error = node("p", { role: "status" });
+        input.addEventListener("input", () => { state.amountText = input.value; error.textContent = ""; });
+        const form = node("form", {}, [node("label", { for: input.id, text: `Withdrawal amount · ${review.currency}` }), input, node("p", { text: `Maximum attorney decision: ${money(review.maximumPayoutCents)}.` }), error, localFinancialReview(node("button", { type: "submit", className: "av2-secondary", text: "Review payout amount" }))]);
+        form.addEventListener("submit", event => { event.preventDefault(); if (state.busy || !review?.canDecide) return; const amount = payoutInput(input.value); if (amount === null || !withdrawalAmounts(review, amount)) { error.textContent = amount === null ? "Enter an amount with up to two decimal places." : amount > review.maximumPayoutCents ? "The amount exceeds the available attorney payout." : "A positive payout is not available until funding and the paralegal’s payout setup are verified."; input.focus(); return; } begin("partial", amount); });
+        body.append(form); if (!review.payoutSetupReady) body.append(node("p", { text: "The paralegal’s payout setup is incomplete. A positive payout cannot be recorded yet." })); if (!review.fundingReady) body.append(node("p", { text: "Matter funding must be verified before a positive payout." })); if (review.work.complete > 0 && review.work.complete < review.work.total) actions.append(localFinancialReview(button("Review decline of payment", () => begin("reject"))));
+      }
+      if (review.canRelist) actions.append(localFinancialReview(button("Review relisting", () => begin("relist"))));
+    }
+    controls();
+    if (focusedInput) { const input = body.querySelector("input"); if (input?.id === focusedInput.id && !input.disabled) { input.focus({ preventScroll: true }); input.setSelectionRange(focusedInput.start, focusedInput.end); } }
+  }
+  function failed(error) { review = null; confirming = null; section.hidden = false; section.dataset.state = "error"; body.replaceChildren(); actions.replaceChildren(); if ([401, 403, 404].includes(error.status) || error.kind === "authentication") { privateState.withdrawals.delete(caseId); state.pending = null; state.amountText = ""; feedback.textContent = "Withdrawal details are no longer available to this account."; } else feedback.textContent = error.status === 409 ? "The withdrawal details changed or need review. Refresh before another decision." : "Withdrawal details couldn’t load. Try again."; }
+  async function load({ quiet = false } = {}) {
+    if (reading || state.busy || signal.aborted) return; reading = true; const ticket = ++sequence; controller = new AbortController(); const timer = setTimeout(() => controller?.abort(), 30000); controls(); if (!quiet) feedback.textContent = "Checking withdrawal details…";
+    try { const requestId = state.pending?.requestId || state.lastRequestId, next = readWithdrawal(await api.readWithdrawal(caseId, { ...opts, signal: controller.signal, requestId }), caseId, ownerId); if (signal.aborted || ticket !== sequence) return; if (requestId ? next.operation?.requestId !== requestId || state.pending && next.operation.status !== "not_found" && (next.operation.action !== state.pending.action || next.operation.amountCents !== (state.pending.amountCents ?? null)) : next.operation !== null) throw new Error("unconfirmed_withdrawal_outcome"); const changed = JSON.stringify(review) !== JSON.stringify(next); if (changed) confirming = null; review = next; if (!next.canDecide && !state.pending) state.amountText = ""; section.dataset.state = "ready"; if (next.operation?.status === "recorded" && state.pending) { state.lastRequestId = state.pending.requestId; state.pending = null; state.amountText = ""; } if (changed || !quiet) display(); feedback.textContent = next.operation ? withdrawalOutcome(next.operation) : quiet && changed ? "Withdrawal details changed. Review the current amounts before confirming." : ""; }
+    catch (error) { if (!signal.aborted && ticket === sequence) failed(error); }
+    finally { clearTimeout(timer); if (ticket === sequence) { reading = false; controller = null; controls(); } }
+  }
+  async function send() {
+    if (!confirming || !review || reading || state.busy || signal.aborted) return; state.pending = { ...confirming, requestId: crypto.randomUUID() }; confirming = null; state.busy = true; display(); feedback.textContent = "Recording the withdrawal decision…"; controller = new AbortController(); const timer = setTimeout(() => controller?.abort(), 120000); let confirmed = false;
+    try { const next = readWithdrawal(await api.writeWithdrawal(caseId, state.pending, { ...opts, signal: controller.signal }), caseId, ownerId); if (signal.aborted) return; const result = next.operation; if (!result || result.requestId !== state.pending.requestId || result.action !== state.pending.action || result.amountCents !== (state.pending.amountCents ?? null)) throw new Error("unconfirmed_withdrawal"); review = next; if (!next.canDecide && !state.pending) state.amountText = ""; section.dataset.state = "ready"; if (result.status === "recorded") { state.lastRequestId = state.pending.requestId; state.pending = null; state.amountText = ""; confirmed = true; } display(); feedback.textContent = withdrawalOutcome(result); }
+    catch (error) { if (!signal.aborted) { if ([401, 403, 404].includes(error.status) || error.kind === "authentication") failed(error); else { review = null; display(); feedback.textContent = "The withdrawal decision could not be confirmed. Stopping the wait does not cancel a transfer. Check the decision before taking another action."; section.dataset.state = "unconfirmed"; } } }
+    finally { clearTimeout(timer); controller = null; state.busy = false; controls(); }
+    if (confirmed && !signal.aborted) await load();
+  }
+  section.sync = () => load({ quiet: true }); signal.addEventListener("abort", () => { sequence++; controller?.abort(); state.busy = false; review = null; section.replaceChildren(); }, { once: true }); section.readiness = load(); return section;
+}

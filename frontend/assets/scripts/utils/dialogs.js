@@ -103,6 +103,7 @@ function createDialog({
 }
 
 function presentDialog(config = {}) {
+  const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const parts = createDialog(config);
   const { dialog, field, status, cancelButton, confirmButton } = parts;
   activeDialog = dialog;
@@ -112,8 +113,8 @@ function presentDialog(config = {}) {
     const finish = (result) => {
       if (settled) return;
       settled = true;
-      deactivateDialogFocus(dialog);
       if (dialog.open) dialog.close();
+      deactivateDialogFocus(dialog);
       dialog.remove();
       if (activeDialog === dialog) activeDialog = null;
       resolve(result);
@@ -147,6 +148,7 @@ function presentDialog(config = {}) {
     dialog.showModal();
     activateDialogFocus(dialog, {
       initialFocus: field || (config.tone === "danger" ? cancelButton : confirmButton),
+      returnFocus,
       onEscape: () => finish(null),
     });
   });

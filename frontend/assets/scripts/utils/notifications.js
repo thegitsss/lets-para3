@@ -7,7 +7,9 @@ const MAX_VISIBLE_NOTIFICATION_CARDS = 3;
 const NOTIFICATION_POLL_INTERVAL_MS = 10000;
 const NOTIF_FADE_ENHANCE_KEY = "notifFadeEnhanced";
 const NOTIF_FADE_ITEM_KEY = "notifFadeItemBound";
-let lastKnownUnread = 0;
+let lastKnownUnread = null;
+let notificationCountSequence = 0;
+let notificationMutationVersion = 0;
 let viewportResizeBound = false;
 let notificationEventSource = null;
 let notificationStreamActive = false;
@@ -15,6 +17,8 @@ let notificationRefreshTimer = null;
 let notificationReconnectTimer = null;
 let notificationPollTimer = null;
 let lastNotificationEventAt = 0;
+let notificationPageActive = true;
+const notificationReads = new Set();
 
 function emitNotificationRefresh(payload = {}) {
   if (typeof window === "undefined" || typeof CustomEvent === "undefined") return;
@@ -141,8 +145,61 @@ function isNotificationRead(item = {}) {
   return item?.read === true;
 }
 
-function getUnreadCount(list = []) {
-  return list.filter((item) => item?.read === false).length;
+function currentUnreadCount() {
+  return lastKnownUnread;
+}
+
+async function readAuthoritativeUnread(signal) {
+  const sequence = ++notificationCountSequence;
+  const version = notificationMutationVersion;
+  try {
+    const response = await secureFetch("/api/notifications/unread-count", {
+      method: "GET", credentials: "include", noRedirect: true, signal,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (!Number.isSafeInteger(payload?.count) || payload.count < 0) throw new Error("Invalid unread count");
+    if (signal?.aborted || version !== notificationMutationVersion) throw new DOMException("Canceled", "AbortError");
+    if (sequence === notificationCountSequence) syncNotificationBadges(payload.count);
+    return currentUnreadCount();
+  } catch (error) {
+    if (!signal?.aborted && version === notificationMutationVersion && sequence === notificationCountSequence) {
+      syncNotificationBadges(null);
+    }
+    throw error;
+  }
+}
+
+function notificationFeedback(message = "") {
+  document.querySelectorAll("[data-notification-panel]").forEach(panel => {
+    let feedback = panel.querySelector("[data-notification-feedback]");
+    if (!feedback) {
+      feedback = document.createElement("p");
+      feedback.dataset.notificationFeedback = "";
+      feedback.className = "notif-feedback";
+      feedback.setAttribute("role", "status");
+      panel.appendChild(feedback);
+    }
+    feedback.textContent = message;
+    feedback.hidden = !message;
+  });
+}
+
+async function writeNotification(path, method) {
+  notificationMutationVersion += 1;
+  notificationReads.forEach(controller => controller.abort());
+  notificationFeedback();
+  try {
+    const response = await secureFetch(path, { method, credentials: "include" });
+    if (!response.ok || (await response.json())?.success !== true) throw new Error("Unconfirmed notification update");
+    // A confirmed write remains confirmed if the subsequent count is unavailable.
+    try { await readAuthoritativeUnread(); }
+    catch (error) { console.warn("[notifications] unread count unavailable after update", error); }
+  } catch (error) {
+    notificationFeedback("That update could not be confirmed. Please try again.");
+    scheduleNotificationRefresh();
+    throw error;
+  }
 }
 
 function getAvatarFallback() {
@@ -215,12 +272,20 @@ function formatNotificationMessage(item = {}) {
 }
 
 export async function loadNotifications() {
+  if (!notificationPageActive) return;
+  const controller = new AbortController();
+  notificationReads.add(controller);
   bindNotificationViewportResize();
   try {
-    const res = await fetch("/api/notifications", { credentials: "include" });
+    const [res] = await Promise.all([
+      secureFetch("/api/notifications", { credentials: "include", signal: controller.signal, noRedirect: true }),
+      readAuthoritativeUnread(controller.signal),
+    ]);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
-    const items = (Array.isArray(payload) ? payload : []).map(normalizeNotification);
+    if (controller.signal.aborted || !notificationPageActive) return;
+    if (!Array.isArray(payload)) throw new Error("Invalid notification list");
+    const items = payload.map(normalizeNotification);
 
     const lists = document.querySelectorAll("[data-notification-list]");
     lists.forEach((listEl) => {
@@ -229,7 +294,7 @@ export async function loadNotifications() {
     });
     syncAllNotificationListViewports();
 
-    const unreadCount = getUnreadCount(items);
+    const unreadCount = currentUnreadCount();
     lastKnownUnread = unreadCount;
     syncNotificationBadges(unreadCount);
     emitNotificationRefresh({
@@ -239,7 +304,16 @@ export async function loadNotifications() {
       types: summarizeNotificationTypes(items),
     });
   } catch (err) {
+    if (controller.signal.aborted) return;
+    controller.abort();
+    document.querySelectorAll("[data-notification-list]").forEach(list => {
+      list.replaceChildren();
+      const empty = list.parentElement?.querySelector("[data-notification-empty]");
+      if (empty) { empty.style.display = "block"; empty.textContent = "Notifications unavailable."; }
+    });
     console.warn("[notifications] loadNotifications failed", err);
+  } finally {
+    notificationReads.delete(controller);
   }
 }
 
@@ -250,10 +324,7 @@ export async function loadNotifications() {
 async function markNotificationRead(id) {
   if (!id) return false;
   try {
-    await secureFetch(`/api/notifications/${id}/read`, {
-      method: "POST",
-      credentials: "include",
-    });
+    await writeNotification(`/api/notifications/${encodeURIComponent(id)}/read`, "POST");
     return true;
   } catch (err) {
     console.warn("[notifications] mark single read failed", err);
@@ -277,16 +348,7 @@ function closeAllNotificationPanels() {
 }
 
 function totalUnread() {
-  if (!centers.length) return lastKnownUnread || 0;
-  const ids = new Set();
-  centers.forEach((center, centerIndex) => {
-    (center.notifications || []).forEach((item, itemIndex) => {
-      if (item?.read !== false) return;
-      const id = item?._id || item?.id;
-      ids.add(id ? String(id) : `${centerIndex}-${itemIndex}`);
-    });
-  });
-  return ids.size;
+  return currentUnreadCount();
 }
 
 ensureNotificationStyles();
@@ -329,6 +391,7 @@ if (typeof window !== "undefined") {
 }
 
 function refreshNotificationCenters() {
+  if (!notificationPageActive) return;
   centers.forEach((center) => {
     if (center.loading) return;
     center.loaded = false;
@@ -337,7 +400,7 @@ function refreshNotificationCenters() {
 }
 
 function scheduleNotificationRefresh() {
-  if (notificationRefreshTimer) return;
+  if (!notificationPageActive || notificationRefreshTimer) return;
   notificationRefreshTimer = window.setTimeout(() => {
     notificationRefreshTimer = null;
     if (centers.length) {
@@ -355,7 +418,7 @@ function stopNotificationPolling() {
 }
 
 function startNotificationPolling() {
-  if (notificationPollTimer || document.hidden) return;
+  if (!notificationPageActive || notificationPollTimer || document.hidden) return;
   scheduleNotificationRefresh();
   notificationPollTimer = window.setInterval(() => {
     if (!document.hidden) scheduleNotificationRefresh();
@@ -375,11 +438,12 @@ function stopNotificationStream() {
 }
 
 function startNotificationStream() {
-  if (notificationEventSource || typeof EventSource === "undefined") return false;
+  if (!notificationPageActive || notificationEventSource || typeof EventSource === "undefined") return false;
   const source = new EventSource("/api/notifications/stream");
   notificationEventSource = source;
 
   const onError = () => {
+    if (notificationEventSource !== source || !notificationPageActive) return;
     notificationStreamActive = false;
     stopNotificationStream();
     if (!document.hidden) {
@@ -389,14 +453,34 @@ function startNotificationStream() {
   };
 
   source.addEventListener("open", () => {
+    if (notificationEventSource !== source || !notificationPageActive) return;
     notificationStreamActive = true;
     stopNotificationPolling();
   });
   source.addEventListener("error", onError);
-  source.addEventListener("notifications", () => scheduleNotificationRefresh());
+  source.addEventListener("notifications", () => {
+    if (notificationEventSource === source) scheduleNotificationRefresh();
+  });
   source.addEventListener("ping", () => {});
 
   return true;
+}
+
+function stopNotificationActivity() {
+  notificationPageActive = false;
+  if (notificationRefreshTimer) window.clearTimeout(notificationRefreshTimer);
+  notificationRefreshTimer = null;
+  stopNotificationStream();
+  stopNotificationPolling();
+  for (const controller of notificationReads) controller.abort();
+  notificationReads.clear();
+}
+
+function resumeNotificationActivity() {
+  if (notificationPageActive || document.hidden) return;
+  notificationPageActive = true;
+  scheduleNotificationRefresh();
+  if (!startNotificationStream()) startNotificationPolling();
 }
 
 function createCenter(root) {
@@ -408,6 +492,7 @@ function createCenter(root) {
   const empty = root.querySelector("[data-notification-empty]");
   const markBtn = root.querySelector("[data-notification-mark]");
   let clearBtn = root.querySelector("[data-notification-clear]");
+  if (clearBtn) clearBtn.classList.add("notif-clear");
   if (markBtn) markBtn.textContent = "Mark all as read";
   const header = panel?.querySelector(".notif-header") || null;
   let actionsWrap = panel?.querySelector(".notif-actions") || null;
@@ -475,6 +560,7 @@ function createCenter(root) {
 }
 
 function togglePanel(center) {
+  resumeNotificationActivity();
   if (!center?.panel) return;
   if (center.panel.dataset.toggleLock === "true") return;
   center.panel.dataset.toggleLock = "true";
@@ -510,15 +596,19 @@ function preload(center) {
 
 
 async function fetchNotifications(center, options = {}) {
-  if (center.loading) return;
+  if (!notificationPageActive || center.loading) return;
   center.loading = true;
+  const controller = new AbortController();
+  notificationReads.add(controller);
   try {
-    const res = await secureFetch("/api/notifications", {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      credentials: "include",
-      noRedirect: true,
-    });
+    const [res] = await Promise.all([
+      secureFetch("/api/notifications", {
+        method: "GET", headers: { Accept: "application/json" },
+        credentials: "include", noRedirect: true, signal: controller.signal,
+      }),
+      readAuthoritativeUnread(controller.signal),
+    ]);
+    if (controller.signal.aborted || !notificationPageActive) return;
     if (res.status === 401 || res.status === 403) {
       lastKnownUnread = 0;
       syncNotificationBadges(0);
@@ -528,10 +618,12 @@ async function fetchNotifications(center, options = {}) {
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
-    const items = Array.isArray(payload) ? payload : [];
+    if (controller.signal.aborted || !notificationPageActive) return;
+    if (!Array.isArray(payload)) throw new Error("Invalid notification list");
+    const items = payload;
     const normalized = items.map(normalizeNotification);
     center.notifications = normalized;
-    center.unread = getUnreadCount(center.notifications);
+    center.unread = currentUnreadCount();
     center.loaded = true;
     renderNotifications(center);
     emitNotificationRefresh({
@@ -546,16 +638,21 @@ async function fetchNotifications(center, options = {}) {
     if (options.openAfterLoad && center.panel?.dataset?.pendingShow === "true") {
       center.panel.dataset.pendingShow = "";
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      showPanel(center);
+      if (!controller.signal.aborted && notificationPageActive) showPanel(center);
     }
   } catch (err) {
+    if (controller.signal.aborted) return;
+    controller.abort();
     console.warn("[notifications] load failed", err);
     renderEmpty(center, "Notifications unavailable.");
   } finally {
+    notificationReads.delete(controller);
     center.loading = false;
-    if (center.panel?.dataset?.pendingShow === "true") {
+    if (!controller.signal.aborted && notificationPageActive && center.panel?.dataset?.pendingShow === "true") {
       center.panel.dataset.pendingShow = "";
-      requestAnimationFrame(() => requestAnimationFrame(() => showPanel(center)));
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!controller.signal.aborted && notificationPageActive) showPanel(center);
+      }));
     }
   }
 }
@@ -577,7 +674,7 @@ function showPanel(center) {
 }
 
 function renderNotifications(center) {
-  center.unread = getUnreadCount(center.notifications || []);
+  center.unread = currentUnreadCount();
   updateBadge(center, center.unread);
   if (center.clearBtn) center.clearBtn.hidden = center.notifications.length === 0;
   if (center.markBtn) center.markBtn.hidden = center.unread === 0;
@@ -613,7 +710,7 @@ function renderNotifications(center) {
 
 function renderEmpty(center, text) {
   if (center) {
-    center.unread = getUnreadCount(center.notifications || []);
+    center.unread = currentUnreadCount();
     if (center.clearBtn) center.clearBtn.hidden = true;
     if (center.markBtn) center.markBtn.hidden = true;
   }
@@ -625,28 +722,28 @@ function renderEmpty(center, text) {
     center.list.innerHTML = "";
     center.list.style.removeProperty("--notif-three-card-max-height");
   }
-  updateBadge(center, getUnreadCount(center?.notifications || []));
+  updateBadge(center, currentUnreadCount());
   syncNotificationBadges(totalUnread());
 }
 
 function updateBadge(center, count) {
   if (!center.badge) return;
-  const value = Math.max(0, Number(count) || 0);
-  center.badge.textContent = String(value);
-  center.badge.classList.toggle("show", value > 0);
+  const known = Number.isSafeInteger(count) && count >= 0;
+  center.badge.textContent = known ? String(count) : "!";
+  center.badge.classList.toggle("show", !known || count > 0);
+  center.toggle.setAttribute("aria-label", known
+    ? count > 0 ? `View notifications, ${count} unread` : "View notifications"
+    : "View notifications, unread count unavailable");
 }
 
 async function markNotificationsRead(center) {
-  const hasUnread = (center.notifications || []).some((item) => !isNotificationRead(item));
+  const hasUnread = currentUnreadCount() > 0;
   if (!hasUnread) return;
   try {
-    await secureFetch("/api/notifications/read-all", {
-      method: "POST",
-      credentials: "include",
-    });
+    await writeNotification("/api/notifications/read-all", "POST");
     centers.forEach((c) => {
       c.notifications = (c.notifications || []).map((item) => ({ ...item, read: true, isRead: true }));
-      c.unread = getUnreadCount(c.notifications);
+      c.unread = currentUnreadCount();
       updateBadge(c, c.unread);
       if (c !== center) renderNotifications(c);
     });
@@ -661,6 +758,9 @@ async function clearNotifications(center) {
     renderEmpty(center, "You're all caught up.");
     return;
   }
+  // Safari does not focus a button on pointer activation. Give the dialog an
+  // explicit return target for both pointer and keyboard users.
+  center.clearBtn?.focus();
   const confirmed = await confirmAction("This removes every notification from your notification center.", {
     title: "Clear all notifications?",
     confirmLabel: "Clear all",
@@ -668,16 +768,15 @@ async function clearNotifications(center) {
   });
   if (!confirmed) return;
   try {
-    await secureFetch("/api/notifications", {
-      method: "DELETE",
-      credentials: "include",
-    });
+    await writeNotification("/api/notifications", "DELETE");
+    const restoreToggleFocus = document.activeElement === center.clearBtn;
     centers.forEach((c) => {
       c.notifications = [];
-      c.unread = getUnreadCount(c.notifications);
+      c.unread = currentUnreadCount();
       renderEmpty(c, "You're all caught up.");
     });
     syncNotificationBadges(totalUnread());
+    if (restoreToggleFocus) center.toggle?.focus();
   } catch (err) {
     console.warn("[notifications] clear all failed", err);
   }
@@ -687,12 +786,10 @@ async function dismissNotification(id, options = {}) {
   if (!id) return false;
   const store = Array.isArray(options.store) ? options.store : null;
   try {
-    await secureFetch(`/api/notifications/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
+    await writeNotification(`/api/notifications/${encodeURIComponent(id)}`, "DELETE");
   } catch (err) {
     console.warn("[notifications] dismiss failed", err);
+    return false;
   }
   const targetId = String(id);
   if (store) {
@@ -707,16 +804,16 @@ async function dismissNotification(id, options = {}) {
       (item) => String(item._id || item.id) !== targetId
     );
     if (before !== c.notifications.length) {
-      c.unread = getUnreadCount(c.notifications);
+      c.unread = currentUnreadCount();
       updateBadge(c, c.unread);
       renderNotifications(c);
     }
   });
   if (!centers.length) {
     if (store) {
-      syncNotificationBadges(getUnreadCount(store));
+      syncNotificationBadges(currentUnreadCount());
     } else {
-      syncNotificationBadges(lastKnownUnread || 0);
+      syncNotificationBadges(lastKnownUnread);
     }
     return true;
   }
@@ -729,7 +826,7 @@ function bindGlobalDismiss() {
   dismissBound = true;
   const isNotificationTarget = (event) => {
     const target = event.target;
-    if (target?.closest?.("[data-notification-panel], [data-notification-toggle], .notification-dropdown")) {
+    if (target?.closest?.("[data-notification-panel], [data-notification-toggle], .notification-dropdown, .lpc-dialog")) {
       return true;
     }
     const path = typeof event.composedPath === "function" ? event.composedPath() : [];
@@ -749,7 +846,7 @@ function bindGlobalDismiss() {
     true
   );
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" && !event.defaultPrevented && !event.target?.closest?.(".lpc-dialog")) {
       closeAllNotificationPanels();
     }
   });
@@ -757,6 +854,9 @@ function bindGlobalDismiss() {
 
 function bindMinimalToggleHandler() {
   document.addEventListener("click", (event) => {
+    // A confirmation dialog owns its interaction; keep its originating panel
+    // available for returned focus and any failed-write feedback.
+    if (event.target?.closest?.(".lpc-dialog")) return;
     const toggle = event.target.closest("[data-notification-toggle]");
     const root = toggle?.closest("[data-notification-center]");
     if (root?.dataset?.boundNotificationCenter === "true") return;
@@ -767,7 +867,7 @@ function bindMinimalToggleHandler() {
       return;
     }
     const panel =
-      root.querySelector("[data-notification-panel]") ||
+      root?.querySelector("[data-notification-panel]") ||
       toggle.parentElement?.querySelector("[data-notification-panel]");
     if (!panel) return;
     const willShow = !panel.classList.contains("show");
@@ -852,10 +952,14 @@ if (!notificationsOptOut) {
         startNotificationStream();
       }
     });
-    window.addEventListener("beforeunload", () => {
-      stopNotificationStream();
-      stopNotificationPolling();
-    });
+    window.addEventListener("beforeunload", stopNotificationActivity);
+    window.addEventListener("pagehide", stopNotificationActivity);
+    window.addEventListener("pageshow", resumeNotificationActivity);
+    // A canceled departure leaves this same document active. Resume when the
+    // user returns to it, as well as after a browser back/forward restoration.
+    for (const type of ["focus", "pointerdown", "keydown"]) {
+      window.addEventListener(type, event => { if (event.isTrusted) resumeNotificationActivity(); });
+    }
   };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootNotifications);
@@ -916,8 +1020,12 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
     { once: true }
   );
 
-  const main = document.createElement("div");
+  const main = document.createElement(link ? "a" : "div");
   main.className = "notif-main";
+  if (link) {
+    main.href = link;
+    main.setAttribute("aria-label", `${formatNotificationMessage(normalized)}. ${actionLabel}`);
+  }
   main.appendChild(avatar);
   main.appendChild(dot);
   main.appendChild(copy);
@@ -939,11 +1047,6 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
 
   wrapper.appendChild(main);
   wrapper.appendChild(dismiss);
-  if (link) {
-    wrapper.setAttribute("role", "link");
-    wrapper.tabIndex = 0;
-    wrapper.setAttribute("aria-label", `${formatNotificationMessage(normalized)}. ${actionLabel}`);
-  }
 
   const activateNotification = async () => {
     const id = normalized._id || normalized.id;
@@ -964,7 +1067,7 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
               return { ...n, isRead: true, read: true };
             });
             if (touched) {
-              c.unread = getUnreadCount(c.notifications);
+              c.unread = currentUnreadCount();
               updateBadge(c, c.unread);
               renderNotifications(c);
             }
@@ -982,10 +1085,10 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
           });
           if (touched) {
             store.splice(0, store.length, ...updated);
-            syncNotificationBadges(getUnreadCount(store));
+            syncNotificationBadges(currentUnreadCount());
           }
         } else {
-          syncNotificationBadges(lastKnownUnread || 0);
+          syncNotificationBadges(lastKnownUnread);
         }
       }
     }
@@ -996,10 +1099,11 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
       window.location.href = link;
     }
   };
-  wrapper.addEventListener("click", activateNotification);
-  wrapper.addEventListener("keydown", (event) => {
-    if (!link || !["Enter", " "].includes(event.key)) return;
-    event.preventDefault();
+  main.addEventListener("click", (event) => {
+    // Keep the destination and dismissal as separate controls. Native modified
+    // link clicks retain the browser's open-in-new-tab behavior.
+    if (link && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
+    if (link) event.preventDefault();
     void activateNotification();
   });
 
@@ -1010,7 +1114,7 @@ function renderNotificationList(listEl, emptyEl, items = []) {
   if (!listEl) return;
   listEl.innerHTML = "";
   const normalized = (Array.isArray(items) ? items : []).map(normalizeNotification);
-  syncNotificationBadges(getUnreadCount(normalized));
+  syncNotificationBadges(currentUnreadCount());
   if (!normalized.length) {
     if (emptyEl) {
       emptyEl.style.display = "block";
@@ -1052,9 +1156,22 @@ function renderNotificationList(listEl, emptyEl, items = []) {
 }
 
 function syncNotificationBadges(unreadCount) {
-  lastKnownUnread = Math.max(0, Number(unreadCount) || 0);
-  const label = lastKnownUnread > 0 ? String(lastKnownUnread) : "";
+  lastKnownUnread = Number.isSafeInteger(unreadCount) && unreadCount >= 0 ? unreadCount : null;
+  const label = lastKnownUnread === null ? "!" : lastKnownUnread > 0 ? String(lastKnownUnread) : "";
+  centers.forEach(center => {
+    center.unread = lastKnownUnread;
+    updateBadge(center, lastKnownUnread);
+    if (center.markBtn) center.markBtn.hidden = !(lastKnownUnread > 0);
+  });
   document.querySelectorAll("[data-notification-toggle]").forEach((toggle) => {
+    toggle.setAttribute("aria-label", lastKnownUnread === null
+      ? "View notifications, unread count unavailable"
+      : lastKnownUnread > 0 ? `View notifications, ${lastKnownUnread} unread` : "View notifications");
+    const badge = toggle.querySelector("[data-notification-badge]");
+    if (badge) {
+      badge.textContent = lastKnownUnread === null ? "!" : String(lastKnownUnread);
+      badge.classList.toggle("show", lastKnownUnread === null || lastKnownUnread > 0);
+    }
     if (label) {
       toggle.dataset.count = label;
     } else {

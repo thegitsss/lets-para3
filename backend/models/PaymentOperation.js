@@ -49,6 +49,7 @@ const paymentOperationSchema = new Schema(
         "under_review",
         "won",
         "lost",
+        "prevented",
         "unknown",
         null,
       ],
@@ -75,6 +76,12 @@ const paymentOperationSchema = new Schema(
     payoutHoldClearedAt: { type: Date, default: null },
     payoutHoldClearedBy: { type: Types.ObjectId, ref: "User", default: null },
     refundAmount: { type: Number, default: 0, min: 0 },
+    // Refund evidence is independent of a combined settlement's payout leg.
+    // Missing fields on retained operations remain unverified.
+    refundStatus: { type: String, enum: ["pending", "requires_action", "succeeded", "failed", "canceled", null], default: null },
+    refundEvidenceStatus: { type: String, enum: ["verified", "needs_review", null], default: null },
+    refundVerifiedAt: { type: Date, default: null },
+    refundCreatedAt: { type: Date, default: null },
     transferAmount: { type: Number, default: 0, min: 0 },
     attempts: { type: Number, default: 1, min: 1 },
     lastAttemptAt: { type: Date, default: Date.now },

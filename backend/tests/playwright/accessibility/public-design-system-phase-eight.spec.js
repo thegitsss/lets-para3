@@ -1,4 +1,5 @@
 const { test, expect } = require("playwright/test");
+const { directoryProfile } = require("./public-directory-fixture");
 
 const VIEWPORTS = [
   { name: "compact", width: 320, height: 844 },
@@ -195,8 +196,27 @@ test("Phase 8 reconciles the documented control geometries", async ({ page }) =>
     if (sample.radius) expect(Math.abs(geometry.radius - sample.radius)).toBeLessThanOrEqual(1);
   }
 
+  // Pagination is intentionally hidden for a failed directory read. Measure
+  // its controls against a complete populated response, as the directory
+  // responsiveness suite does, rather than the static server's API 404.
+  await page.route("**/public/paralegals?**", route => {
+    const url = new URL(route.request().url());
+    const pageNumber = Number(url.searchParams.get("page") || 1);
+    const limit = Number(url.searchParams.get("limit") || 10);
+    const profiles = Array.from({ length: 11 }, (_, index) => directoryProfile({
+      id: (index + 1).toString(16).padStart(24, "0"),
+      title: `Geometry Paralegal ${index + 1}`,
+      avatarURL: "/Cleanfav.png",
+    }));
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({
+      items: profiles.slice((pageNumber - 1) * limit, pageNumber * limit),
+      total: profiles.length, pages: Math.ceil(profiles.length / limit), page: pageNumber,
+    }) });
+  });
   await page.goto("/browse-paralegals.html", { waitUntil: "domcontentloaded" });
   await settle(page, { chrome: true });
+  await expect(page.locator("#prevPage")).toBeVisible();
+  await expect(page.locator("#nextPage")).toBeVisible();
   await page.locator("#filterToggle").click();
   await expect(page.locator("#filterMenu")).toBeVisible();
   for (const selector of ["#sortMenuTrigger", "#filterToggle", "#applyFilters", "#clearFilters", "#prevPage", "#nextPage"]) {

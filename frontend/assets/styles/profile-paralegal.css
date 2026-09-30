@@ -2,11 +2,11 @@
 body.lpc-product-clean {
   --profile-accent: #0b4bb3;
   --profile-accent-hover: #093d91;
-  --profile-text: #202124;
-  --profile-muted: #5f6b7a;
-  --profile-border: #dfe3ea;
-  --profile-subtle: #f6f8fb;
-  background: #fff !important;
+  --profile-text: var(--clean-ink, #202124);
+  --profile-muted: var(--clean-muted, #5f6b7a);
+  --profile-border: var(--clean-border, #dfe3ea);
+  --profile-subtle: var(--clean-hover, #f6f8fb);
+  background: var(--clean-surface, #fff) !important;
   color: var(--profile-text) !important;
 }
 
@@ -16,7 +16,7 @@ body.lpc-product-clean .page-shell {
   min-width: 0;
   margin: 0 auto;
   padding: 28px 28px 80px;
-  background: #fff;
+  background: var(--clean-surface, #fff);
   box-shadow: none !important;
 }
 
@@ -34,7 +34,7 @@ body.lpc-product-clean .back-link {
   align-items: center;
   gap: 8px;
   padding: 0 4px;
-  color: #465568;
+  color: var(--clean-muted, #465568);
   font-size: 0.94rem;
   font-weight: 600 !important;
   text-decoration: none;
@@ -126,7 +126,7 @@ body.lpc-product-clean #roleLine {
 body.lpc-product-clean #bioCopy {
   max-width: 720px;
   margin: 18px 0 0;
-  color: #303845;
+  color: var(--clean-ink, #303845);
   line-height: 1.65;
   text-align: left;
   text-justify: auto;
@@ -157,7 +157,7 @@ body.lpc-product-clean .modal-actions button {
   border: 1px solid #cbd2dc;
   border-radius: 6px;
   color: var(--profile-text);
-  background: #fff;
+  background: var(--clean-surface, #fff);
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -172,7 +172,7 @@ body.lpc-product-clean .hero-cta-row #inviteToCaseBtn,
 body.lpc-product-clean .modal-actions .confirm {
   color: #fff;
   background: var(--profile-accent);
-  border-color: var(--profile-accent);
+  border-color: var(--clean-link, var(--profile-accent));
   box-shadow: none;
 }
 
@@ -212,12 +212,12 @@ body.lpc-product-clean #locationMeta .hero-meta-link,
 body.lpc-product-clean #locationMeta .meta-line,
 body.lpc-product-clean #locationMeta .meta-text,
 body.lpc-product-clean .joined-meta-corner #joinedMetaCorner {
-  color: #465568;
+  color: var(--clean-muted, #465568);
   text-shadow: none;
 }
 
 body.lpc-product-clean :where(.doc-chip, .hero-meta-pill a) {
-  color: var(--profile-accent);
+  color: var(--clean-link, var(--profile-accent));
   font-weight: 600 !important;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -255,7 +255,7 @@ body.lpc-product-clean :where(#languagesList, #practiceList) {
 }
 
 body.lpc-product-clean .chip {
-  color: #303845;
+  color: var(--clean-ink, #303845);
   text-shadow: none;
 }
 
@@ -265,7 +265,7 @@ body.lpc-product-clean :where(.edu-inline, .timeline-list, .edu-entry) {
 }
 
 body.lpc-product-clean .best-for-list li {
-  color: #303845;
+  color: var(--clean-ink, #303845);
   text-align: left;
   text-justify: auto;
 }
@@ -300,7 +300,7 @@ body.lpc-product-clean .invite-modal {
   padding: 24px;
   gap: 16px;
   color: var(--profile-text);
-  background: #fff;
+  background: var(--clean-surface, #fff);
   border: 1px solid var(--profile-border);
   border-radius: 8px;
   box-shadow: 0 20px 48px rgba(17, 24, 39, 0.18);
@@ -396,4 +396,9 @@ body.lpc-product-clean .invite-modal select {
   body.lpc-product-clean .modal-actions button {
     width: 100%;
   }
+}
+
+body.lpc-product-clean .profile-avatar-fallback {
+  color: var(--ink);
+  background: var(--clean-hover, #f3f4f6);
 }

@@ -13,6 +13,8 @@ const {
 } = require("../services/platformFeePolicy");
 
 const RENDER_SCHEMA_URL = "https://render.com/schema/render.yaml.json";
+// Reviewed 2026-09-25: upstream adds shared build sources/workflows and tightens
+// buildFilter validation. LPC retains its explicit Node service configuration.
 const RENDER_SCHEMA_SHA256 = "57aa0a1ff9c3b2d0fcb91b790b7b285aef6397adb0c92930e6e601054444cfe5";
 const CANONICAL_ORIGIN = "https://www.lets-paraconnect.com";
 
@@ -123,8 +125,8 @@ function validateServiceBase(service, expected) {
 }
 
 function validateDeploymentContract(blueprint) {
-  if (!Array.isArray(blueprint.services) || blueprint.services.length !== 4) {
-    fail("The production Blueprint must define the web service, incident worker, automation cron, and operations-monitor cron.");
+  if (!Array.isArray(blueprint.services) || blueprint.services.length !== 5) {
+    fail("The production Blueprint must define the web service, incident worker, automation cron, operations-monitor cron, and admin communications worker.");
   }
   const services = new Map(blueprint.services.map((service) => [service?.name, service]));
   if (services.size !== blueprint.services.length) fail("Every production service must have a unique name.");
@@ -132,13 +134,14 @@ function validateDeploymentContract(blueprint) {
   const incidentWorker = services.get("lets-para3-incident-runner");
   const automationCron = services.get("lets-para3-automation");
   const opsCron = services.get("lets-para3-ops-monitor");
-  if (!service || !incidentWorker || !automationCron || !opsCron) fail("One or more required production services are missing.");
+  const communicationsWorker = services.get("lets-para3-admin-communications");
+  if (!service || !incidentWorker || !automationCron || !opsCron || !communicationsWorker) fail("One or more required production services are missing.");
 
   validateServiceBase(service, {
     type: "web",
     name: "lets-para3",
-    buildCommand: "cd backend && node scripts/verify-runtime.js && npm ci",
-    preDeployCommand: "cd backend && npm run migrate:production:apply",
+    buildCommand: "cd backend && node scripts/verify-runtime.js && PUPPETEER_SKIP_DOWNLOAD=true MONGOMS_DISABLE_POSTINSTALL=true npm ci --include=dev && npm run build:frontend",
+    preDeployCommand: "cd backend && npm run migrate:production:apply && npm run admin:communications:indexes",
     startCommand: "cd backend && npm start",
     healthCheckPath: "/api/health",
     maxShutdownDelaySeconds: 30,
@@ -238,9 +241,29 @@ function validateDeploymentContract(blueprint) {
     "LEGAL_APPROVED_PRIVACY_SHA256",
   ]);
   webFixedValues.LINKEDIN_OAUTH_REDIRECT_URI = `${CANONICAL_ORIGIN}/api/admin/marketing/publishing/channel-connections/linkedin_company/oauth/callback`;
+  const communicationSecrets = ["ADMIN_ALERT_EMAIL", "SUPPORT_ZOHO_MAILBOX", "SUPPORT_ZOHO_ACCOUNT_ID", "SUPPORT_ZOHO_INBOX_FOLDER_ID", "SUPPORT_ZOHO_CLIENT_ID", "SUPPORT_ZOHO_CLIENT_SECRET", "SUPPORT_ZOHO_REFRESH_TOKEN", "SUPPORT_ZOHO_API_BASE_URL", "SUPPORT_ZOHO_ACCOUNTS_BASE_URL", "SUPPORT_MAIL_SYNC_SINCE"];
+  for (const name of communicationSecrets) webSecrets.add(name);
   validateEnvironment(service, webFixedValues, webSecrets);
 
   const leanBuild = "cd backend && node scripts/verify-runtime.js && PUPPETEER_SKIP_DOWNLOAD=true MONGOMS_DISABLE_POSTINSTALL=true npm ci";
+  validateServiceBase(communicationsWorker, {
+    type: "worker",
+    name: "lets-para3-admin-communications",
+    plan: "starter",
+    region: "virginia",
+    buildCommand: leanBuild,
+    startCommand: "cd backend && npm run admin:communications",
+    maxShutdownDelaySeconds: 300,
+  });
+  validateEnvironment(communicationsWorker, {
+    NODE_ENV: "production", NODE_VERSION: "24.18.0", APP_BASE_URL: CANONICAL_ORIGIN,
+    EMAIL_BASE_URL: CANONICAL_ORIGIN, EMAIL_DISABLE: "false", PUPPETEER_SKIP_DOWNLOAD: "true",
+    MONGOMS_DISABLE_POSTINSTALL: "true", TZ: "America/New_York",
+  }, new Set([
+    "MONGO_URI", "DATA_ENCRYPTION_KEY", "SMTP_HOST", "SMTP_PORT", "SMTP_SECURE",
+    "SMTP_USER", "SMTP_PASS", "SMTP_FROM_EMAIL", "SMTP_FROM_NAME", ...communicationSecrets,
+  ]));
+
   validateServiceBase(incidentWorker, {
     type: "worker",
     name: "lets-para3-incident-runner",
@@ -343,7 +366,9 @@ async function main() {
   console.log(`[deploy] ${resolvedBlueprint} matches Render's pinned schema and LPC's production contract.`);
 }
 
-main().catch((error) => {
+if (require.main === module) main().catch((error) => {
   console.error(error.message || error);
   process.exitCode = 1;
 });
+
+module.exports = { parseYaml, validateDeploymentContract };

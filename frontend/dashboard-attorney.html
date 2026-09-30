@@ -1,16 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <style>@view-transition { navigation: auto; }</style>
+  <script>
+    (function recoverOriginalCardReturn() {
+      const url = new URL(window.location.href);
+      const keys = ["setup_intent", "setup_intent_client_secret", "redirect_status"];
+      if (!keys.some(key => url.searchParams.has(key))) return;
+      const intent = url.searchParams.get("setup_intent");
+      keys.forEach(key => url.searchParams.delete(key));
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+      const target = new URL("/dashboard-attorney.html", window.location.origin);
+      target.searchParams.set("cardSetup", "1");
+      target.searchParams.set("workspace", "legacy");
+      target.searchParams.set("setup_intent", /^seti_[A-Za-z0-9]{1,200}$/.test(intent || "") ? intent : "unverified");
+      target.hash = "funds";
+      window.history.replaceState(window.history.state, "", target.pathname + target.search + target.hash);
+    })();
+  </script>
+  <script src="assets/scripts/utils/workspace-entry-guard.js"></script>
   <script>
     (function applyEarlyTheme() {
       try {
         const raw = localStorage.getItem("lpc_user");
         if (!raw) return;
         const stored = JSON.parse(raw);
-        const theme = String(stored?.preferences?.theme || "").toLowerCase();
-        if (!theme) return;
-        const classes = theme === "mountain-dark" ? ["theme-mountain-dark", "theme-dark"] : [`theme-${theme}`];
-        classes.forEach((cls) => document.documentElement.classList.add(cls));
+        const storedTheme = String(stored?.preferences?.theme || "").toLowerCase();
+        const theme = storedTheme === "dark" || /dark$/i.test(storedTheme) ? "dark" : "light";
+        document.documentElement.classList.add(`theme-${theme}`);
       } catch (_) {}
     })();
   </script>
@@ -18,7 +35,8 @@
   <link rel="stylesheet" href="assets/styles/fonts.css" />
   <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
   <link rel="stylesheet" href="assets/styles/dashboard-system.css?v=20260820-4" />
-  <link rel="stylesheet" href="assets/styles/global-search.css" />
+  <link rel="stylesheet" href="assets/styles/lpc-dialog-refresh.css?v=20260831-1" />
+  <link rel="stylesheet" href="assets/styles/global-search.css?v=20260831-3" />
   <link rel="stylesheet" href="assets/styles/context-panel.css?v=20260812-paralegal-heading" />
   <link rel="preload" as="image" href="hero-mountain.jpg" />
   <script>
@@ -57,7 +75,7 @@
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
 
-<script src="assets/scripts/utils/session.js?v=20260820-1"></script>
+<script src="assets/scripts/utils/session.js?v=20260902-1"></script>
 <script src="assets/scripts/utils/business-date.js"></script>
   <style>
     .skip-link {
@@ -396,28 +414,6 @@
       transition: background 0.3s ease;
     }
 
-    body.theme-mountain .sidebar,
-    html.theme-mountain .sidebar,
-    body.theme-mountain-dark .sidebar,
-    html.theme-mountain-dark .sidebar {
-      background: var(--bg) url('hero-mountain.jpg') center/cover no-repeat;
-    }
-
-    body.theme-mountain .sidebar::before,
-    html.theme-mountain .sidebar::before,
-    body.theme-mountain-dark .sidebar::before,
-    html.theme-mountain-dark .sidebar::before {
-      background: rgba(0, 0, 0, 0.45);
-    }
-
-    body.theme-mountain .sidebar > *,
-    html.theme-mountain .sidebar > *,
-    body.theme-mountain-dark .sidebar > *,
-    html.theme-mountain-dark .sidebar > * {
-      position: relative;
-      z-index: 1;
-    }
-
     html.theme-dark,
     html.theme-dark body,
     body.theme-dark {
@@ -430,54 +426,13 @@
       --sidebar-text: #f8fbff;
     }
 
-    body.theme-mountain,
-    html.theme-mountain body {
-      --bg: #f8f6f1;
-      --panel: #ffffff;
-      --muted: #7a736a;
-      --sidebar-text: #ffffff;
-    }
-
     body.theme-dark nav a.active,
     body.theme-dark nav a:hover {
       background: rgba(255, 255, 255, 0.12);
     }
 
-    body.theme-mountain nav a,
-    html.theme-mountain nav a,
-    body.theme-mountain-dark nav a,
-    html.theme-mountain-dark nav a {
-      color: #fff;
-    }
-
-    body.theme-mountain nav a.active,
-    body.theme-mountain nav a:hover,
-    body.theme-mountain-dark nav a.active,
-    body.theme-mountain-dark nav a:hover,
-    html.theme-mountain nav a.active,
-    html.theme-mountain nav a:hover,
-    html.theme-mountain-dark nav a.active,
-    html.theme-mountain-dark nav a:hover {
-      background: rgba(255, 255, 255, 0.18);
-    }
-
     body.theme-dark .sidebar-link:hover,
-    body.theme-dark .sidebar-link:focus,
-    body.theme-mountain .sidebar-link:hover,
-    body.theme-mountain .sidebar-link:focus,
-    html.theme-mountain .sidebar-link:hover,
-    html.theme-mountain .sidebar-link:focus,
-    body.theme-mountain-dark .sidebar-link:hover,
-    body.theme-mountain-dark .sidebar-link:focus,
-    html.theme-mountain-dark .sidebar-link:hover,
-    html.theme-mountain-dark .sidebar-link:focus {
-      color: #fff;
-    }
-
-    body.theme-mountain .sidebar-link,
-    html.theme-mountain .sidebar-link,
-    body.theme-mountain-dark .sidebar-link,
-    html.theme-mountain-dark .sidebar-link {
+    body.theme-dark .sidebar-link:focus {
       color: #fff;
     }
 
@@ -694,30 +649,18 @@
     body.theme-dark #attorneyTourModal .tour-title,
     body.theme-dark #attorneyCaseOnboardingModal .tour-title,
     body.theme-dark #casePostedModal .tour-title,
-    body.theme-mountain-dark #attorneyTourModal .tour-title,
-    body.theme-mountain-dark #attorneyCaseOnboardingModal .tour-title,
-    body.theme-mountain-dark #casePostedModal .tour-title,
     html.theme-dark #attorneyTourModal .tour-title,
     html.theme-dark #attorneyCaseOnboardingModal .tour-title,
-    html.theme-dark #casePostedModal .tour-title,
-    html.theme-mountain-dark #attorneyTourModal .tour-title,
-    html.theme-mountain-dark #attorneyCaseOnboardingModal .tour-title,
-    html.theme-mountain-dark #casePostedModal .tour-title {
+    html.theme-dark #casePostedModal .tour-title {
       color: #1a2230;
     }
 
     body.theme-dark #attorneyTourModal .tour-text,
     body.theme-dark #attorneyCaseOnboardingModal .tour-text,
     body.theme-dark #casePostedModal .tour-text,
-    body.theme-mountain-dark #attorneyTourModal .tour-text,
-    body.theme-mountain-dark #attorneyCaseOnboardingModal .tour-text,
-    body.theme-mountain-dark #casePostedModal .tour-text,
     html.theme-dark #attorneyTourModal .tour-text,
     html.theme-dark #attorneyCaseOnboardingModal .tour-text,
-    html.theme-dark #casePostedModal .tour-text,
-    html.theme-mountain-dark #attorneyTourModal .tour-text,
-    html.theme-mountain-dark #attorneyCaseOnboardingModal .tour-text,
-    html.theme-mountain-dark #casePostedModal .tour-text {
+    html.theme-dark #casePostedModal .tour-text {
       color: #4b5563;
     }
 
@@ -826,24 +769,18 @@
     }
 
     body.theme-dark #attorneyTourTooltip .tour-tooltip-title,
-    body.theme-mountain-dark #attorneyTourTooltip .tour-tooltip-title,
-    html.theme-dark #attorneyTourTooltip .tour-tooltip-title,
-    html.theme-mountain-dark #attorneyTourTooltip .tour-tooltip-title {
+    html.theme-dark #attorneyTourTooltip .tour-tooltip-title {
       color: #1a2230;
     }
 
     body.theme-dark #attorneyTourTooltip p,
-    body.theme-mountain-dark #attorneyTourTooltip p,
-    html.theme-dark #attorneyTourTooltip p,
-    html.theme-mountain-dark #attorneyTourTooltip p {
+    html.theme-dark #attorneyTourTooltip p {
       color: #4b5563;
     }
 
     @media (max-width: 1024px) {
       body.theme-dark #attorneyTourTooltip .tour-tooltip-title,
-      body.theme-mountain-dark #attorneyTourTooltip .tour-tooltip-title,
-      html.theme-dark #attorneyTourTooltip .tour-tooltip-title,
-      html.theme-mountain-dark #attorneyTourTooltip .tour-tooltip-title {
+      html.theme-dark #attorneyTourTooltip .tour-tooltip-title {
         font-size: 1.2rem;
         line-height: 1.25;
         text-align: center;
@@ -851,9 +788,7 @@
       }
 
       body.theme-dark #attorneyTourTooltip p,
-      body.theme-mountain-dark #attorneyTourTooltip p,
-      html.theme-dark #attorneyTourTooltip p,
-      html.theme-mountain-dark #attorneyTourTooltip p {
+      html.theme-dark #attorneyTourTooltip p {
         text-align: center;
       }
     }
@@ -1111,12 +1046,10 @@
       opacity: 1;
     }
 
-    body.theme-dark .matter-row:hover,
-    body.theme-mountain-dark .matter-row:hover {
+    body.theme-dark .matter-row:hover {
       background: transparent;
     }
-    body.theme-dark .matter-row::before,
-    body.theme-mountain-dark .matter-row::before {
+    body.theme-dark .matter-row::before {
       background: rgba(148, 163, 184, 0.12);
     }
 
@@ -1460,8 +1393,7 @@
       color: var(--ink);
       outline: none;
     }
-    body.theme-dark .onboarding-attention-card,
-    body.theme-mountain-dark .onboarding-attention-card {
+    body.theme-dark .onboarding-attention-card {
       background: rgba(15, 23, 42, 0.86);
       border-color: rgba(148, 163, 184, 0.38);
     }
@@ -1822,8 +1754,7 @@
       box-shadow: var(--card-shadow);
     }
 
-    body.theme-dark .quick-action-card,
-    body.theme-mountain-dark .quick-action-card {
+    body.theme-dark .quick-action-card {
       background: rgba(15, 23, 42, 0.8);
       border-color: rgba(148, 163, 184, 0.3);
     }
@@ -1966,15 +1897,13 @@
       background: #000;
     }
 
-    body.theme-dark .btn-group button.secondary,
-    body.theme-mountain-dark .btn-group button.secondary {
+    body.theme-dark .btn-group button.secondary {
       background: transparent;
       color: #f8fbff;
       border-color: rgba(255, 255, 255, 0.25);
     }
 
-    body.theme-dark .btn-group button.secondary:hover,
-    body.theme-mountain-dark .btn-group button.secondary:hover {
+    body.theme-dark .btn-group button.secondary:hover {
       background: rgba(255, 255, 255, 0.08);
     }
 
@@ -3684,112 +3613,6 @@
       color:var(--muted);
     }
 
-    .view-cases .case-files-pane{
-      border:1px solid var(--line);
-      border-radius:var(--radius);
-      background:var(--panel);
-      padding:1.5rem;
-      margin-top:1.5rem;
-    }
-
-    .view-cases .case-files-filters{
-      display:flex;
-      gap:.75rem;
-      flex-wrap:wrap;
-      margin-bottom:1.25rem;
-    }
-
-    .view-cases .case-files-filters button{
-      border:1px solid var(--line);
-      border-radius:6px;
-      padding:0.6rem 1.1rem;
-      cursor:pointer;
-      background:var(--panel);
-      font-size:0.9rem;
-      font-family:var(--font-serif);
-      font-weight:300;
-      transition:background-color .2s ease,border-color .2s ease,color .2s ease;
-    }
-
-    .view-cases .case-files-filters button.active{
-      background:var(--accent);
-      color:#fff;
-      border-color:var(--accent);
-    }
-
-    .view-cases .case-files-grid{
-      display:flex;
-      flex-direction:column;
-      gap:1rem;
-    }
-
-    .view-cases .case-files-grid .file-card{
-      border:1px solid var(--line);
-      border-radius:var(--radius);
-      background:var(--panel);
-      padding:1rem 1.25rem;
-      display:flex;
-      flex-direction:column;
-      gap:.6rem;
-    }
-
-    .view-cases .case-files-grid .file-line{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:1rem;
-    }
-
-    .view-cases .case-files-grid .file-name{
-      font-family:var(--font-serif);
-      font-size:1.05rem;
-      word-break:break-word;
-    }
-
-    .view-cases .case-files-grid .file-status{
-      font-size:.85rem;
-      font-weight:600;
-      color:var(--accent);
-      text-transform:capitalize;
-    }
-
-    .view-cases .case-files-grid .file-meta{
-      display:flex;
-      gap:1rem;
-      font-size:.85rem;
-      color:var(--muted);
-      flex-wrap:wrap;
-    }
-
-    .view-cases .case-files-grid .file-actions{
-      display:flex;
-      gap:.75rem;
-      flex-wrap:wrap;
-    }
-
-    .view-cases .case-files-grid .btn-link {
-      color: var(--accent);
-      font-size: 0.9rem;
-      font-weight: 600;
-      text-decoration: none;
-    }
-
-    .view-cases .case-files-grid a.btn-link:hover {
-      text-decoration: underline;
-    }
-
-    .view-cases .case-files-grid .btn-link[aria-disabled="true"] {
-      color: var(--muted);
-      cursor: default;
-      text-decoration: none;
-    }
-
-    .view-cases .case-files-empty{
-      padding:1rem;
-      color:var(--muted);
-      font-size:0.95rem;
-    }
-
     .view-cases .note-cell{
       max-width:260px;
       font-size:0.85rem;
@@ -4549,7 +4372,13 @@
     }
 
     .view-billing .active-funds-panel .table-wrapper {
-      height:320px;
+      min-height:320px;
+      height:auto;
+    }
+
+    .view-billing .active-funds-panel .table-wrapper:focus-visible {
+      outline:2px solid var(--accent);
+      outline-offset:3px;
     }
 
     .view-billing .active-funds-panel .escrow-pagination {
@@ -4561,8 +4390,15 @@
     .view-billing .escrow-table {
       width:100%;
       border-collapse:collapse;
-      min-width:640px;
+      min-width:800px;
       table-layout:fixed;
+    }
+
+    .view-billing .escrow-table .sort-btn {
+      min-height:44px;
+      max-width:100%;
+      flex-wrap:wrap;
+      text-align:left;
     }
 
     .view-billing .escrow-table th,
@@ -4571,9 +4407,8 @@
       text-align:left;
       border-bottom:1px solid var(--line);
       background:var(--panel);
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
+      white-space:normal;
+      overflow-wrap:anywhere;
     }
 
     .view-billing .escrow-table th {
@@ -4584,6 +4419,8 @@
     }
 
     .view-billing .escrow-table td .pill {
+      white-space:normal;
+      max-width:100%;
       display:inline-flex;
       align-items:center;
       padding:0.15rem 0.65rem;
@@ -5049,14 +4886,6 @@
       --main-bg: rgba(12, 16, 27, 1);
     }
 
-    body.theme-mountain {
-      --main-bg: rgba(248, 246, 241, 0.98);
-    }
-
-    body.theme-mountain-dark {
-      --main-bg: rgba(12, 15, 25, 1);
-    }
-
     body:not(.theme-dark) .info-box,
     body:not(.theme-dark) .case-card,
     body:not(.theme-dark) .dashboard-card,
@@ -5443,19 +5272,6 @@
         font-size: 0.85rem;
       }
 
-      .view-cases .case-files-pane {
-        padding: 1rem;
-      }
-
-      .view-cases .case-files-grid .file-line {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      .view-cases .case-files-grid .file-actions {
-        width: 100%;
-      }
-
       .archived-bulk-actions .pill-btn {
         flex: 1 1 100%;
         min-width: 0;
@@ -5488,11 +5304,11 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260820-18" />
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260831-21" />
   <link rel="stylesheet" href="assets/styles/matter-work-queue.css?v=20260820-4" />
   <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
-  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260812-1" />
-  <script defer src="assets/scripts/universal-header.js?v=20260812-1"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260831-3" />
+  <script defer src="assets/scripts/universal-header.js?v=20260831-3"></script>
   <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
   <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
   <link rel="stylesheet" href="assets/styles/attorney-home-layout.css?v=20260821-11" />
@@ -5517,20 +5333,20 @@
     .payments-settings-back-link:hover { text-decoration: underline; text-underline-offset: 3px; }
     .payments-settings-back-link:focus-visible { outline: 2px solid var(--accent, #b6a47a); outline-offset: 2px; }
   </style>
+  <link rel="stylesheet" href="assets/styles/matter-notes.css" />
+  <link rel="stylesheet" href="assets/styles/saved-views.css" />
+  <link rel="stylesheet" href="assets/styles/legacy-payment-history.css" />
 </head>
-<body class="dashboard-no-shadows lpc-role-dashboard lpc-product-clean attorney-dashboard">
+<body class="dashboard-no-shadows lpc-role-dashboard lpc-product-clean attorney-dashboard lpc-static-universal-header">
   <script>
     (function applyStoredTheme() {
       try {
         const raw = localStorage.getItem("lpc_user");
         if (!raw) return;
         const stored = JSON.parse(raw);
-        const theme = String(stored?.preferences?.theme || "").toLowerCase();
-        const allowed = new Set(["light", "dark", "mountain", "mountain-dark"]);
-        if (allowed.has(theme)) {
-          const classes = theme === "mountain-dark" ? ["theme-mountain-dark", "theme-dark"] : [`theme-${theme}`];
-          classes.forEach((cls) => document.body.classList.add(cls));
-        }
+        const storedTheme = String(stored?.preferences?.theme || "").toLowerCase();
+        const theme = storedTheme === "dark" || /dark$/i.test(storedTheme) ? "dark" : "light";
+        document.body.classList.add(`theme-${theme}`);
         const fontKey = String(stored?.preferences?.fontSize || "").toLowerCase();
         const sizeMap = { xs: "15px", sm: "16px", md: "17px", lg: "20px", xl: "22px" };
         if (sizeMap[fontKey]) {
@@ -5552,10 +5368,12 @@
       <a href="#funds" data-view-target="funds"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M2 10h20"></path><path d="M6 15h2"></path></svg><span>Payments</span></a>
     </nav>
     <div class="sidebar-bottom">
-      <div class="sidebar-footer">© Let’s‑ParaConnect 2026</div>
+      <div class="sidebar-footer">© Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect 2026</div>
     </div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+  <div class="lpc-auth-page-shell">
+  <div class="lpc-universal-header-shell lpc-universal-header-shell--created" role="group" aria-label="Workspace tools" data-lpc-universal-header="true"></div>
   <main id="main" tabindex="-1" class="main">
     <div class="topbar">
       <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Show menu" aria-controls="sidebarNav" aria-expanded="false">
@@ -5577,9 +5395,10 @@
       <header class="command-header">
         <div class="command-title">
           <h1>Today</h1>
-          <p class="command-summary"><span id="welcomeGreeting">Welcome</span>, <span id="user-name-heading"></span>. Here’s what needs your attention.</p>
+          <p class="command-summary"><span id="welcomeGreeting">Welcome</span>, <span id="user-name-heading"></span>.</p>
         </div>
         <div class="command-actions">
+          <button type="button" class="legacy-home-control" data-home-refresh>Refresh Home</button>
           <a class="command-create-matter" href="create-case.html">Create Matter</a>
         </div>
       </header>
@@ -5676,15 +5495,15 @@
                   <div class="overview-module-skeleton" aria-label="Loading applications summary"><span></span><span></span></div>
                 </div>
               </div>
-              <div class="status-item status-messages message-box" id="messageBox" role="button" tabindex="0">
-                <div class="status-label">Unread Messages</div>
+              <div class="status-item status-messages">
+                <button type="button" class="status-label status-link legacy-home-message-link" id="messageBox">Unread Messages</button>
                 <div class="overview-module-body" id="overviewMessagesBody" data-state="loading" aria-live="polite">
                   <span id="messageCount" hidden></span>
                   <div class="overview-module-skeleton" aria-label="Loading unread messages"><span></span><span></span></div>
                 </div>
               </div>
               <div class="status-item status-completed">
-                <a class="status-label status-link" href="#cases:archived">Completed Matters</a>
+                <a class="status-label status-link" href="dashboard-attorney.html?archiveStatus=completed#cases:archived">Completed Matters</a>
                 <div class="overview-module-body" id="overviewCompletedBody" data-state="loading" aria-live="polite">
                   <div class="overview-module-skeleton" aria-label="Loading completed matters summary"><span></span><span></span></div>
                 </div>
@@ -5733,7 +5552,6 @@
         <header class="cases-header">
           <div>
             <h1>Matters</h1>
-            <p>Pick up where work needs you.</p>
           </div>
           <button type="button" class="cases-onboarding-skip" id="caseOnboardingSkipBtn" hidden>Skip onboarding</button>
         </header>
@@ -5747,13 +5565,16 @@
             <button type="button" class="lpc-saved-view-button" data-matter-delete-view hidden>Delete</button>
             <span class="lpc-saved-view-status" data-matter-saved-view-status aria-live="polite"></span>
           </div>
-          <div class="filter-tabs" role="tablist" aria-label="Matter filters">
-            <button type="button" class="filter-tab active" data-case-filter="active" role="tab" aria-selected="true">Active (<span data-case-count="active">0</span>)</button>
-            <button type="button" class="filter-tab" data-case-filter="draft" role="tab" aria-selected="false">Draft (<span data-case-count="draft">0</span>)</button>
-            <button type="button" class="filter-tab" data-case-filter="archived" role="tab" aria-selected="false">Archived (<span data-case-count="archived">0</span>)</button>
-            <button type="button" class="filter-tab" data-case-filter="inquiries" role="tab" aria-selected="false">Applicants (<span data-case-count="inquiries">0</span>)</button>
+          <div data-attorney-saved-view-host></div>
+          <div class="filter-tabs">
+            <div class="matter-category-tabs" role="tablist" aria-label="Matter filters">
+              <button type="button" class="filter-tab active" id="matter-tab-active" data-case-filter="active" role="tab" aria-controls="matter-panel-active" aria-selected="true">Active (<span data-case-count="active">0</span>)</button>
+              <button type="button" class="filter-tab" id="matter-tab-draft" data-case-filter="draft" role="tab" aria-controls="matter-panel-draft" aria-selected="false" tabindex="-1">Draft (<span data-case-count="draft">0</span>)</button>
+              <button type="button" class="filter-tab" id="matter-tab-archived" data-case-filter="archived" role="tab" aria-controls="matter-panel-archived" aria-selected="false" tabindex="-1">Archived (<span data-case-count="archived">0</span>)</button>
+              <button type="button" class="filter-tab" id="matter-tab-inquiries" data-case-filter="inquiries" role="tab" aria-controls="matter-panel-inquiries" aria-selected="false" tabindex="-1">Applicants (<span data-case-count="inquiries">0</span>)</button>
+            </div>
             <div class="filter-search">
-              <input type="search" placeholder="Search matters..." data-cases-search aria-label="Search matters" />
+              <input type="search" placeholder="Search matters..." maxlength="200" data-cases-search aria-label="Search matters" />
             </div>
             <details class="matter-filter-menu" data-matter-filter-menu>
               <summary>Refine <span data-matter-filter-count></span></summary>
@@ -5796,8 +5617,10 @@
             </details>
           </div>
 
+          <p class="matter-filter-summary" data-application-parent-status role="status" hidden></p>
           <div data-cases-wrapper>
-            <div class="case-table" data-case-table="active">
+            <div class="case-table" id="matter-panel-active" role="tabpanel" aria-labelledby="matter-tab-active" data-case-table="active">
+              <div class="matter-action-controls"><button type="button" class="matter-primary-action" data-matters-refresh="active" hidden>Refresh active matters</button></div>
               <table aria-label="Active matters">
                 <tbody data-table-body="active">
                   <tr><td colspan="3" class="empty-row">Loading matters…</td></tr>
@@ -5810,7 +5633,8 @@
               </div>
             </div>
 
-            <div class="case-table hidden" data-case-table="draft">
+            <div class="case-table hidden" id="matter-panel-draft" role="tabpanel" aria-labelledby="matter-tab-draft" data-case-table="draft">
+              <div class="matter-action-controls"><button type="button" class="matter-primary-action" data-drafts-refresh>Refresh drafts</button></div>
               <table aria-label="Draft matters">
                 <tbody data-table-body="draft">
                   <tr><td colspan="3" class="empty-row">Loading draft matters…</td></tr>
@@ -5823,10 +5647,11 @@
               </div>
             </div>
 
-            <div class="case-table hidden" data-case-table="archived">
+            <div class="case-table hidden" id="matter-panel-archived" role="tabpanel" aria-labelledby="matter-tab-archived" data-case-table="archived">
               <div class="archived-bulk-bar">
                 <div class="archived-bulk-actions">
-                  <select class="archived-status-filter" data-archived-status-filter>
+                  <button type="button" class="matter-primary-action" data-matters-refresh="archived" hidden>Refresh archived matters</button>
+                  <select class="archived-status-filter" data-archived-status-filter aria-label="Archived status">
                     <option value="all">All statuses</option>
                     <option value="completed">Completed</option>
                     <option value="archived">Archived</option>
@@ -5846,7 +5671,8 @@
               </div>
             </div>
 
-            <div class="case-table hidden" data-case-table="inquiries">
+            <div class="case-table hidden" id="matter-panel-inquiries" role="tabpanel" aria-labelledby="matter-tab-inquiries" data-case-table="inquiries">
+              <div class="matter-action-controls"><button type="button" class="matter-primary-action" data-matters-refresh="inquiries" hidden>Refresh matters with applicants</button></div>
               <table aria-label="Matters with applicants">
                 <tbody data-table-body="inquiries">
                   <tr><td colspan="3" class="empty-row">Loading applicants…</td></tr>
@@ -5866,10 +5692,9 @@
       <div id="caseNoteModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="caseNoteModalTitle" aria-hidden="true" inert>
         <div class="note-modal-card">
           <h3 id="caseNoteModalTitle" style="font-family:var(--font-serif);font-weight:300;">Edit Matter Note</h3>
-          <textarea id="caseNoteTextarea" placeholder="Add internal notes for this matter."></textarea>
+          <div data-case-note-host></div>
           <div class="note-modal-actions">
-            <button type="button" class="btn secondary" data-note-cancel>Cancel</button>
-            <button type="button" class="btn primary" data-note-save>Save Note</button>
+            <button type="button" class="btn secondary" data-note-cancel>Close</button>
           </div>
         </div>
       </div>
@@ -5877,7 +5702,7 @@
         <div class="note-modal-card">
           <h3 id="weeklyNoteModalTitle" style="font-family:var(--font-serif);font-weight:300;">Weekly Note</h3>
           <div class="weekly-note-modal-date" id="weeklyNoteModalDate"></div>
-          <textarea id="weeklyNoteModalTextarea" placeholder="Add a note for this day."></textarea>
+          <textarea id="weeklyNoteModalTextarea" aria-labelledby="weeklyNoteModalTitle weeklyNoteModalDate"></textarea>
           <div class="note-modal-actions">
             <button type="button" class="btn secondary" data-weekly-note-cancel>Cancel</button>
             <button type="button" class="btn primary" data-weekly-note-save>Save Note</button>
@@ -6007,38 +5832,21 @@
           <a class="payments-settings-back-link" id="paymentsSettingsBackLink" href="profile-settings.html" hidden>Back to settings</a>
           <h1>Payments</h1>
         </div>
-        <div class="actions">
-          <button type="button" class="primary-btn" id="openPortalBtn">Open Stripe Portal</button>
-        </div>
       </header>
 
-      <section class="panel payment-method-panel" aria-labelledby="payment-method-heading">
-        <div class="panel-header">
-          <div>
-            <h2 id="payment-method-heading">Payment Method</h2>
-          </div>
-          <div class="panel-actions">
-            <button type="button" class="ghost-btn" id="addPaymentMethodBtn">Add Card</button>
-            <button type="button" class="ghost-btn" id="replacePaymentMethodBtn" hidden>Replace payment method</button>
-          </div>
-        </div>
-        <div id="paymentMethodSummary" class="payment-method-summary"></div>
-        <button type="button" class="info-btn" aria-label="Payment method info">
-          i
-          <span class="info-tooltip" role="tooltip">
-            This card is charged through Stripe when you hire a paralegal. Stripe processes the payment and reports its status until you approve completed work or a platform review or dispute is resolved. Stripe stores the card details; <span class="lpc-brand-name">Let’s-ParaConnect</span> does not store full card numbers.
-          </span>
-        </button>
-      </section>
+      <div class="panel payment-method-panel" data-payment-card-host>
+        <h2 id="payment-method-heading">Payment card</h2>
+        <p role="status">Checking the saved card…</p>
+      </div>
 
       <section class="panel active-funds-panel" aria-labelledby="escrow-heading">
         <div class="panel-header">
           <div>
-            <h2 id="escrow-heading">Funded Matter Payments</h2>
-            <p>Payments pending for ongoing matters.</p>
+            <h2 id="escrow-heading">Matter funds</h2>
           </div>
+          <button type="button" class="btn secondary" data-escrow-refresh aria-label="Refresh Matter funds">Refresh</button>
         </div>
-        <div class="table-wrapper">
+        <div class="table-wrapper" tabindex="0" role="region" aria-labelledby="escrow-heading" data-escrow-scroll>
           <table class="escrow-table" aria-describedby="escrow-heading">
             <colgroup>
               <col style="width:24%" />
@@ -6052,8 +5860,8 @@
               <tr>
                 <th data-escrow-sort-th="case"><button type="button" class="sort-btn" data-escrow-sort-key="case">Matter <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
                 <th data-escrow-sort-th="paralegal"><button type="button" class="sort-btn" data-escrow-sort-key="paralegal">Paralegal <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
-                <th data-escrow-sort-th="amount"><button type="button" class="sort-btn" data-escrow-sort-key="amount">Amount <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
-                <th data-escrow-sort-th="funded"><button type="button" class="sort-btn" data-escrow-sort-key="funded">Funded <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                <th data-escrow-sort-th="amount"><button type="button" class="sort-btn" data-escrow-sort-key="amount">Remaining <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                <th data-escrow-sort-th="funded"><button type="button" class="sort-btn" data-escrow-sort-key="funded">Funding verified <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
                 <th data-escrow-sort-th="case_status"><button type="button" class="sort-btn" data-escrow-sort-key="case_status">Matter Status <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
                 <th data-escrow-sort-th="payment_status"><button type="button" class="sort-btn" data-escrow-sort-key="payment_status">Payment Status <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
               </tr>
@@ -6065,19 +5873,14 @@
         </div>
         <div class="escrow-pagination" data-escrow-pagination>
           <button type="button" class="page-btn" data-escrow-page-action="prev">Previous</button>
-          <span class="page-info" data-escrow-page-info>0 of 0</span>
+          <span class="page-info" data-escrow-page-info aria-live="polite" aria-atomic="true">0 of 0</span>
           <button type="button" class="page-btn" data-escrow-page-action="next">Next</button>
         </div>
       </section>
 
-      <section class="panel" aria-labelledby="history-heading">
-        <div class="panel-header">
-          <div>
-            <h2 id="history-heading">Completed Assignments</h2>
-          </div>
-        </div>
-        <div id="historyList" class="history-list">
-          <div class="history-empty">Loading payment history…</div>
+      <section class="panel" aria-label="Financial history">
+        <div id="historyList">
+          <p role="status">Loading financial history…</p>
         </div>
       </section>
     </section>
@@ -6139,7 +5942,7 @@
       <button type="button" class="tour-close" id="attorneyTourCloseBtn" aria-label="Close tour">×</button>
       <div class="tour-hero" role="presentation"></div>
       <div class="tour-content">
-        <div class="tour-title" id="attorneyTourTitle">Welcome to <span class="lpc-brand-name">Let’s-ParaConnect</span></div>
+        <div class="tour-title" id="attorneyTourTitle">Welcome to <span class="lpc-brand-name">Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect</span></div>
         <p class="tour-text" id="attorneyTourText">
           Here’s a quick walkthrough of the dashboard. We’ll start with the actions that matter most.
         </p>
@@ -6171,20 +5974,6 @@
       </div>
     </div>
   </main>
-
-  <div id="paymentMethodModal" class="payment-modal hidden" aria-hidden="true" inert>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="paymentModalTitle">
-      <h3 id="paymentModalTitle">Add a card</h3>
-      <p>Save a card on file for faster funding.</p>
-      <div id="paymentMethodForm" class="payment-method-form" hidden>
-        <div id="paymentMethodElement" class="payment-element-host"></div>
-        <div class="payment-errors" id="paymentMethodErrors" role="alert"></div>
-        <div class="payment-actions">
-          <button type="button" class="primary-btn" id="savePaymentMethodBtn">Save Card</button>
-          <button type="button" class="ghost-btn" id="cancelPaymentMethodBtn">Cancel</button>
-        </div>
-      </div>
-    </div>
   </div>
 
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
@@ -6319,11 +6108,12 @@
   <script>
     window.__ATTORNEY_PAGE__ = "overview";
   </script>
-<script type="module" src="assets/scripts/attorney-tabs.js?v=20260812-matter-work-queue"></script>
+<script type="module" src="assets/scripts/attorney-tabs.js?v=20260905-matter-notes"></script>
 <script type="module" src="assets/scripts/billing-lite.js?v=20260820-1"></script>
 <script type="module" src="assets/scripts/attorney-dashboard.js"></script>
   <script src="assets/scripts/context-panel.js?v=20260812-paralegal-heading"></script>
   <script src="assets/scripts/productivity-command-registry.js"></script>
-  <script src="assets/scripts/global-search.js"></script>
+  <script src="assets/scripts/global-search.js?v=20260831-2"></script>
+  <script type="module" src="assets/scripts/utils/workspace-entry.mjs"></script>
 </body>
 </html>

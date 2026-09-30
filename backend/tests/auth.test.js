@@ -51,11 +51,22 @@ beforeEach(async () => {
 });
 
 describe("Auth workflows", () => {
+  test("registration retains the account and reports verification delivery failure accurately", async () => {
+    sendEmail.mockImplementation(async (_email, subject) => subject === "Verify your email" ? { error: true, message: "Mail unavailable" } : { ok: true });
+    try {
+      const response = await request(app).post("/api/auth/register").send(validAttorneyPayload);
+      expect({ status: response.status, failureBody: response.status === 200 ? undefined : response.body }).toMatchObject({ status: 200 });
+      expect(response.body).toMatchObject({ emailVerified: false, verificationEmailStatus: "not_sent" });
+      expect(await User.countDocuments({ email: validAttorneyPayload.email })).toBe(1);
+    } finally { sendEmail.mockImplementation(async () => ({ ok: true })); }
+  });
+
   test("Sign up with valid account", async () => {
     const res = await request(app).post("/api/auth/register").send(validAttorneyPayload);
 
     expect(res.status).toBe(200);
     expect(res.body.msg).toMatch(/Registered successfully/i);
+    expect(res.body).toMatchObject({ emailVerified: false, verificationEmailStatus: "sent" });
 
     const user = await User.findOne({ email: validAttorneyPayload.email });
     expect(user).toBeTruthy();
@@ -66,10 +77,10 @@ describe("Auth workflows", () => {
     expect(user.termsAcceptedAt).toBeInstanceOf(Date);
     expect(user.privacyAcknowledgedAt).toBeInstanceOf(Date);
 
-    const registrationEmail = sendEmail.mock.calls.find((call) => call[1] === "Registration received");
+    const registrationEmail = sendEmail.mock.calls.find((call) => call[1] === "Your LPC application was received");
     expect(registrationEmail).toBeTruthy();
-    expect(registrationEmail[2]).toMatch(/Registration received/i);
-    expect(registrationEmail[2]).not.toMatch(/Application received/i);
+    expect(registrationEmail[2]).toContain("We’ve received your application");
+    expect(registrationEmail[3].text).toContain("You can sign in once your application is approved.");
 
     const verificationEmail = sendEmail.mock.calls.find((call) => call[1] === "Verify your email");
     expect(verificationEmail).toBeTruthy();
@@ -105,7 +116,7 @@ describe("Auth workflows", () => {
     expect(res.body.msg).toMatch(/Invalid email/i);
   });
 
-  test("Paralegal signup enforces the one-year experience minimum", async () => {
+  test("Paralegal signup requires an admission qualification", async () => {
     const res = await request(app)
       .post("/api/auth/register")
       .send({
@@ -119,7 +130,28 @@ describe("Auth workflows", () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.msg).toMatch(/at least one year of professional paralegal experience/i);
+    expect(res.body.msg).toMatch(/select your qualification/i);
+    expect(await User.countDocuments()).toBe(0);
+  });
+
+  test.each(["certificate", "degree", "law_firm_experience"])("Paralegal signup accepts %s with zero paralegal years and still requires a resume", async (qualification) => {
+    const res = await request(app).post("/api/auth/register").send({
+      ...validAttorneyPayload, role: "paralegal", email: `${qualification}@example.com`,
+      yearsExperience: 0, paralegalQualification: qualification,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toMatch(/résumé file is required/i);
+    const candidate = new User({ ...validAttorneyPayload, role: "paralegal", yearsExperience: 0, paralegalQualification: qualification });
+    await candidate.save();
+    expect((await User.findById(candidate._id)).paralegalQualification).toBe(qualification);
+  });
+
+  test.each(["", "unrelated_degree", "none"])("Paralegal signup rejects unsupported qualification %s", async (qualification) => {
+    const res = await request(app).post("/api/auth/register").send({
+      ...validAttorneyPayload, role: "paralegal", yearsExperience: 5, paralegalQualification: qualification,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.msg).toMatch(/select your qualification/i);
     expect(await User.countDocuments()).toBe(0);
   });
 
@@ -240,6 +272,26 @@ describe("Auth workflows", () => {
       for (const [name, value] of Object.entries(previous)) {
         if (value === undefined) delete process.env[name];
         else process.env[name] = value;
+      }
+    }
+  });
+
+  test.each(["/case-detail.html?caseId=64b000000000000000000991&tab=messages", "/attorney-v2.html#/matters/new?caseDraftId=64b000000000000000000991"])("cancelled Google sign-in preserves a validated destination for password recovery: %s", async (target) => {
+    const previous = { GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI };
+    Object.assign(process.env, { GOOGLE_CLIENT_ID: "test-google-client", GOOGLE_CLIENT_SECRET: "test-google-secret", GOOGLE_REDIRECT_URI: "https://www.lets-paraconnect.com/api/auth/google/callback" });
+    try {
+      const start = await request(app).get(`/api/auth/google?intent=login&next=${encodeURIComponent(target)}`);
+      const authorization = new URL(start.headers.location);
+      const cookie = start.headers["set-cookie"].find(value => value.startsWith("lpc_google_oauth=")).split(";")[0];
+      const cancelled = await request(app).get(`/api/auth/google/callback?error=access_denied&state=${authorization.searchParams.get("state")}`).set("Cookie", cookie);
+      expect(cancelled.status).toBe(302);
+      const recovery = new URL(cancelled.headers.location, "https://lpc.invalid");
+      expect(recovery.pathname).toBe("/login.html");
+      expect(recovery.searchParams.get("google_error")).toBe("cancelled");
+      expect(recovery.searchParams.get("next")).toBe(target);
+    } finally {
+      for (const [name, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[name]; else process.env[name] = value;
       }
     }
   });
@@ -398,7 +450,8 @@ describe("Auth workflows", () => {
     expect(sendEmail).toHaveBeenCalled();
     const [to, subject] = sendEmail.mock.calls[0];
     expect(to).toBe("taylor.ray@example.com");
-    expect(subject).toMatch(/Reset your password/i);
+    expect(subject).toBe("Reset your LPC password");
+    expect(sendEmail.mock.calls[0][3].text).toContain("/reset-password.html?token=");
   });
 
   test("Password reset token changes the password used for login", async () => {
@@ -441,6 +494,20 @@ describe("Auth workflows", () => {
     });
     expect(newLogin.status).toBe(200);
     expect(newLogin.body.success).toBe(true);
+  });
+
+  test("reset links expire after the advertised 60 minutes", async () => {
+    const user = await User.create({ firstName: "Expired", lastName: "Link", email: "expired.link@example.com", password: "Original passphrase value", role: "attorney", status: "approved", emailVerified: true, state: "CA" });
+    const started = Date.now();
+    await request(app).post("/api/auth/request-password-reset").send({ email: user.email });
+    const token = extractTokenFromEmailCall(sendEmail.mock.calls[0]);
+    const stored = await User.findById(user._id).select("+resetPasswordExpiresAt");
+    expect(stored.resetPasswordExpiresAt.getTime()).toBeGreaterThanOrEqual(started + 60 * 60 * 1000);
+    expect(stored.resetPasswordExpiresAt.getTime()).toBeLessThanOrEqual(Date.now() + 60 * 60 * 1000);
+    await User.updateOne({ _id: user._id }, { $set: { resetPasswordExpiresAt: new Date(Date.now() - 1000) } });
+    const response = await request(app).post("/api/auth/reset-password").send({ token, newPassword: "Replacement passphrase value" });
+    expect(response.status).toBe(400);
+    expect(response.body.msg).toMatch(/invalid or expired/i);
   });
 
   test("Password reset tokens are single-use", async () => {

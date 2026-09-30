@@ -7,9 +7,9 @@ const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const Case = require("../models/Case");
-const User = require("../models/User");
 const AuditLog = require("../models/AuditLog");
-const { notifyUser } = require("../utils/notifyUser");
+const reviewNotices = require("../services/matterReviewNotifications");
+const { publishCaseProjectionRefresh } = require("../utils/caseProjectionEvents");
 const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
 const { csrfProtection, respondToCsrfError } = require("../utils/csrf");
 const { normalizeCaseStatus } = require("../utils/caseState");
@@ -69,6 +69,55 @@ function normalizeDisputeShape(dispute) {
   return shaped;
 }
 
+async function publishDisputeOpened(req, updatedCase, last) {
+    await publishEventSafe({
+      eventType: "dispute.opened",
+      eventFamily: "platform_case",
+      idempotencyKey: `case:${updatedCase._id}:dispute:${last?.disputeId || String(last?._id || "")}:opened`,
+      correlationId: `case:${updatedCase._id}`,
+      actor: {
+        actorType: req.user?.role === "admin" ? "admin" : "user",
+        userId: req.user?.id || req.user?._id || null,
+        role: req.user?.role || "",
+        email: req.user?.email || "",
+        label: req.user?.email || "User",
+      },
+      subject: {
+        entityType: "case",
+        entityId: String(updatedCase._id),
+      },
+      related: {
+        caseId: updatedCase._id,
+        userId: req.user?.id || req.user?._id || null,
+      },
+      source: {
+        surface: req.user?.role === "admin" ? "admin" : req.user?.role || "system",
+        route: `/api/disputes/${updatedCase._id}`,
+        service: "disputes",
+        producer: "route",
+      },
+      facts: {
+        summary: `A dispute was opened for ${updatedCase.title || "this Matter"}.`,
+        disputeId: last?.disputeId || String(last?._id || ""),
+        caseTitle: updatedCase.title || "",
+        after: {
+          disputeId: last?.disputeId || String(last?._id || ""),
+          caseTitle: updatedCase.title || "",
+          message: last?.message || "",
+        },
+      },
+      signals: {
+        confidence: "high",
+        priority: "urgent",
+        moneyRisk: true,
+        founderVisible: true,
+      },
+    });
+
+    publishCaseProjectionRefresh(updatedCase, "matter_dispute_refresh", { discovery: true });
+
+}
+
 // ----------------------------------------
 // All dispute routes require auth + approval
 // ----------------------------------------
@@ -85,7 +134,8 @@ router.get(
   "/admin",
   requireRole("admin"),
   asyncHandler(async (req, res) => {
-    const { status, q = "" } = req.query;
+    const status=String(req.query.status||""), q=String(req.query.q||"").trim().slice(0,200);
+    const escapedQuery=q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
     const { page, limit, skip } = parsePagination(req);
     const finalized = ["1", "true", "yes"].includes(String(req.query.finalized || "").toLowerCase());
 
@@ -108,6 +158,12 @@ router.get(
     ];
 
     const andClauses = [];
+    if (req.query.disputeId !== undefined) {
+      if (typeof req.query.disputeId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(req.query.disputeId)) return res.status(400).json({ error: "Invalid review reference." });
+      andClauses.push({ $or: [{ "disputes.disputeId": req.query.disputeId }, ...(isObjId(req.query.disputeId) ? [{ "disputes._id": new mongoose.Types.ObjectId(req.query.disputeId) }] : [])] });
+    }
+    if (req.query.caseId !== undefined && !isObjId(req.query.caseId)) return res.status(400).json({ error: "Invalid Matter reference." });
+    if(req.query.caseId && isObjId(req.query.caseId))andClauses.push({_id:new mongoose.Types.ObjectId(req.query.caseId)});
     const statusMatch = buildDisputeStatusMatch(status);
     if (statusMatch) {
       andClauses.push(statusMatch);
@@ -115,8 +171,8 @@ router.get(
     if (q.trim()) {
       andClauses.push({
         $or: [
-        { "disputes.message": { $regex: q.trim(), $options: "i" } },
-        { title: { $regex: q.trim(), $options: "i" } },
+        { "disputes.message": { $regex: escapedQuery, $options: "i" } },
+        { title: { $regex: escapedQuery, $options: "i" } },
         ],
       });
     }
@@ -140,7 +196,7 @@ router.get(
     }
 
     const dataPipeline = basePipeline.concat([
-      { $sort: { "disputes.createdAt": -1 } },
+      { $sort: { "disputes.createdAt": 1, _id:1, "disputes.disputeId":1 } },
       { $skip: skip },
       { $limit: limit },
       {
@@ -260,6 +316,25 @@ router.get(
   })
 );
 
+const attorneyDisputes = require("../services/attorneyDisputes");
+router.get("/:caseId/attorney-review", requireRole("attorney"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await attorneyDisputes.read(req)); } catch (error) { attorneyDisputes.sendError(res, error); }
+}));
+router.post("/:caseId/attorney-action", requireRole("attorney"), csrfProtection, asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try {
+    const result = await attorneyDisputes.save(req);
+    for (const dispatch of result.dispatches || []) await dispatch();
+    if (result.changed) {
+      if (result.action === "open") await publishDisputeOpened(req, result.doc, (result.doc.disputes || []).find(value => String(value.disputeId || value._id) === result.disputeId));
+      else publishCaseProjectionRefresh(result.doc, "matter_dispute_comment_refresh");
+    }
+    await attorneyDisputes.actor(req);
+    res.json({ caseId: req.params.caseId, ownerId: req.body.expectedOwnerId, operation: result.operation });
+  } catch (error) { attorneyDisputes.sendError(res, error); }
+}));
+
 /**
  * GET /api/disputes/:caseId
  * List disputes for a single case (must have access to the case).
@@ -276,17 +351,21 @@ router.get(
     if (!c) return res.status(404).json({ error: "Matter not found" });
 
     const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
+    const currentId = value => String(value?._id || value || ""), viewer = String(req.user.id);
+    const isOwner = [c.attorney, c.attorneyId].some(value => currentId(value) === viewer);
+    const isAssigned = !c.paralegalAccessRevokedAt && [c.paralegal, c.paralegalId].some(value => currentId(value) === viewer);
+    const isWithdrawn = currentId(c.withdrawnParalegalId) === viewer;
+    if (!isAdmin && !isOwner && !isAssigned && !isWithdrawn) return res.status(403).json({ error: "This dispute record is not available to your account." });
+    res.set("Cache-Control", "private, no-store");
     const disputes = (c.disputes || []).map((d) => {
       const shaped = {
         ...normalizeDisputeShape(d),
         id: d.disputeId || String(d._id),
       };
-      if (!isAdmin) {
-        delete shaped.adminNotes;
-        delete shaped.adminNotesUpdatedAt;
-        delete shaped.adminNotesUpdatedBy;
-      }
-      return shaped;
+      if (isAdmin) return shaped;
+      const publicRecord = Object.fromEntries(["_id", "id", "disputeId", "message", "amountRequestedCents", "raisedBy", "status", "createdAt", "updatedAt"].filter(key => shaped[key] !== undefined).map(key => [key, shaped[key]]));
+      publicRecord.comments = (Array.isArray(shaped.comments) ? shaped.comments : []).map(comment => Object.fromEntries(["_id", "by", "text", "createdAt", "updatedAt"].filter(key => comment?.[key] !== undefined).map(key => [key, comment[key]])));
+      return publicRecord;
     });
 
     res.json({
@@ -389,121 +468,54 @@ router.post(
               { paralegalId: req.user.id },
             ],
           };
-    const updatedCase = await Case.findOneAndUpdate(
-      {
-        _id: caseId,
-        status: { $in: ["in progress", "in_progress", "paused", "completed"] },
-        escrowIntentId: { $nin: [null, ""] },
-        escrowStatus: "funded",
-        completionClaimStatus: { $nin: ["claimed", "needs_reconciliation"] },
-        disputes: { $not: { $elemMatch: { status: "open" } } },
-        ...participantClause,
-      },
-      {
-        $push: { disputes: dispute },
-        $set: {
-          status: "disputed",
-          pausedReason: "dispute",
-          disputeDeadlineAt: null,
-          adminDisputeDeadlineAt: new Date(now.getTime() + ADMIN_REVIEW_WINDOW_MS),
-          adminDisputeOverdueNotifiedAt: null,
-        },
-      },
-      { returnDocument: "after", runValidators: true }
-    );
-    if (!updatedCase) {
-      const latest = await Case.findById(caseId).select("disputes status escrowIntentId escrowStatus").lean();
-      if ((latest?.disputes || []).some((entry) => String(entry?.status || "open").toLowerCase() === "open")) {
-        return res.status(409).json({ error: "An open dispute already exists for this matter." });
-      }
-      return res.status(409).json({
-        error: "The matter changed before the review could be opened. Refresh and try again.",
-        code: "DISPUTE_CONFLICT",
-      });
-    }
-    const last = updatedCase.disputes.find((entry) => String(entry.disputeId) === disputeId);
-
-    await AuditLog.logFromReq(req, "dispute.create", {
-      targetType: "case",
-      targetId: updatedCase._id,
-      caseId: updatedCase._id,
-      meta: { disputeId: last?.disputeId || String(last?._id) },
-    });
-
+    const session = await mongoose.startSession();
+    let updatedCase, last, dispatches = [];
     try {
-      const disputeId = last?.disputeId || (last?._id ? String(last._id) : "");
-      const caseTitle = updatedCase.title || "Untitled Matter";
-      const payload = {
-        title: "Review opened",
-        message: `A review has been opened for the Matter: ${caseTitle}.`,
-        caseId: String(updatedCase._id),
-        disputeId,
-        caseTitle,
-      };
-      const recipients = new Set();
-      const attorneyId = updatedCase.attorney || updatedCase.attorneyId;
-      const paralegalId = updatedCase.paralegal || updatedCase.paralegalId;
-      if (attorneyId) recipients.add(String(attorneyId));
-      if (paralegalId) recipients.add(String(paralegalId));
-      if (updatedCase.withdrawnParalegalId) recipients.add(String(updatedCase.withdrawnParalegalId));
+      await session.withTransaction(async () => {
+        updatedCase = await Case.findOneAndUpdate(
+            {
+              _id: caseId,
+              status: { $in: ["in progress", "in_progress", "paused", "completed"] },
+              escrowIntentId: { $nin: [null, ""] },
+              escrowStatus: "funded",
+              completionClaimStatus: { $nin: ["claimed", "needs_reconciliation"] },
+              withdrawalClaimStatus: { $nin: ["claimed", "needs_reconciliation"] },
+              withdrawalClaimToken: { $in: [null, ""] },
+              disputes: { $not: { $elemMatch: { status: "open" } } },
+              ...participantClause,
+            },
+            {
+              $push: { disputes: dispute },
+              $set: {
+                status: "disputed",
+                pausedReason: "dispute",
+                disputeDeadlineAt: null,
+                adminDisputeDeadlineAt: new Date(now.getTime() + ADMIN_REVIEW_WINDOW_MS),
+                adminDisputeOverdueNotifiedAt: null,
+              },
+            },
+            { returnDocument: "after", runValidators: true, session }
+          );
+          if (!updatedCase) throw Object.assign(new Error("The Matter changed before the review could be opened. Refresh and check its review record."), { status: 409, code: "DISPUTE_CONFLICT" });
+          last = updatedCase.disputes.find((entry) => String(entry.disputeId) === disputeId);
 
-      const admins = await User.find({ role: "admin", status: "approved" }).select("_id").lean();
-      admins.forEach((admin) => {
-        if (admin?._id) recipients.add(String(admin._id));
-      });
+          await AuditLog.logFromReq(req, "dispute.create", {
+            session,
+            targetType: "case",
+            targetId: updatedCase._id,
+            caseId: updatedCase._id,
+            meta: { disputeId: last?.disputeId || String(last?._id) },
+          });
 
-      await Promise.all(
-        Array.from(recipients).map((userId) =>
-          notifyUser(userId, "dispute_opened", payload, { actorUserId: req.user.id })
-        )
-      );
-    } catch (err) {
-      runtimeLogger.warn("[disputes] notify dispute opened failed", err?.message || err);
-    }
+          dispatches = await reviewNotices.stageOpening(updatedCase, last, session, req.user.id);
+      }, { readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, maxCommitTimeMS: 10000 });
+    } catch (error) {
+      if (error.code === "DISPUTE_CONFLICT") return res.status(409).json({ error: error.message, code: error.code });
+      throw error;
+    } finally { await session.endSession(); }
+    for (const dispatch of dispatches) await dispatch();
 
-    await publishEventSafe({
-      eventType: "dispute.opened",
-      eventFamily: "platform_case",
-      idempotencyKey: `case:${updatedCase._id}:dispute:${last?.disputeId || String(last?._id || "")}:opened`,
-      correlationId: `case:${updatedCase._id}`,
-      actor: {
-        actorType: req.user?.role === "admin" ? "admin" : "user",
-        userId: req.user?.id || req.user?._id || null,
-        role: req.user?.role || "",
-        email: req.user?.email || "",
-        label: req.user?.email || "User",
-      },
-      subject: {
-        entityType: "case",
-        entityId: String(updatedCase._id),
-      },
-      related: {
-        caseId: updatedCase._id,
-        userId: req.user?.id || req.user?._id || null,
-      },
-      source: {
-        surface: req.user?.role === "admin" ? "admin" : req.user?.role || "system",
-        route: `/api/disputes/${updatedCase._id}`,
-        service: "disputes",
-        producer: "route",
-      },
-      facts: {
-        summary: `A dispute was opened for ${updatedCase.title || "this Matter"}.`,
-        disputeId: last?.disputeId || String(last?._id || ""),
-        caseTitle: updatedCase.title || "",
-        after: {
-          disputeId: last?.disputeId || String(last?._id || ""),
-          caseTitle: updatedCase.title || "",
-          message: last?.message || "",
-        },
-      },
-      signals: {
-        confidence: "high",
-        priority: "urgent",
-        moneyRisk: true,
-        founderVisible: true,
-      },
-    });
+    await publishDisputeOpened(req, updatedCase, last);
 
     res.status(201).json({
       ok: true,
@@ -565,6 +577,8 @@ router.post(
       caseId: c._id,
       meta: { disputeId },
     });
+
+    publishCaseProjectionRefresh(c, "matter_dispute_comment_refresh");
 
     res.status(201).json({ ok: true });
   })
@@ -644,10 +658,12 @@ router.patch(
 // ----------------------------------------
 // Route-level error fallback
 // ----------------------------------------
-router.use((err, _req, res, _next) => {
+router.use((err, req, res, _next) => {
   if (respondToCsrfError(err, res)) return;
   runtimeLogger.error(err);
-  res.status(500).json({ error: "Server error" });
+  res.status(500).json({ error: ["GET", "HEAD"].includes(req.method)
+    ? "Dispute details could not be loaded. Refresh to check again."
+    : "The dispute change could not be confirmed. Refresh and check its saved status before trying again." });
 });
 
 module.exports = router;

@@ -2,16 +2,88 @@ const fs = require("fs");
 const path = require("path");
 
 describe("profile settings preferences save regression", () => {
-  test("preferences save handler posts to the account preferences endpoint", () => {
+  test("account theme normalization exposes only the current appearances", () => {
+    const {
+      SUPPORTED_ACCOUNT_THEMES,
+      normalizeAccountTheme,
+      parseAccountTheme,
+    } = require("../utils/accountPreferences");
+
+    expect(SUPPORTED_ACCOUNT_THEMES).toEqual(["light", "dark", "system"]);
+    for (const theme of SUPPORTED_ACCOUNT_THEMES) {
+      expect(parseAccountTheme(theme)).toBe(theme);
+      expect(normalizeAccountTheme(theme)).toBe(theme);
+    }
+    expect(parseAccountTheme(" DARK ")).toBe("dark");
+    expect(parseAccountTheme("unsupported")).toBeNull();
+    expect(normalizeAccountTheme("unsupported")).toBe("light");
+    expect(normalizeAccountTheme("retired-dashboard-dark")).toBe("dark");
+    expect(normalizeAccountTheme("unsupported", "dark")).toBe("dark");
+  });
+
+  test("preferences save immediately through a sequenced account-preference writer", () => {
     const source = fs.readFileSync(
       path.join(__dirname, "../../frontend/assets/scripts/profile-settings.js"),
       "utf8"
     );
 
     expect(source).toContain('secureFetch("/api/account/preferences", {');
-    expect(source).toContain("body: payload");
+    expect(source).toContain("let preferenceMutationQueue = Promise.resolve()");
+    expect(source).toContain("preferenceMutationQueue.then(operation)");
+    expect(source).toContain("queueAccountPreferenceWrite({ state }");
+    expect(source).toContain("theme: normalizeSelectableTheme");
     expect(source).not.toContain("LPC-INCIDENT-TEST: intentional preferences save regression marker.");
-    expect(source).toContain("showToast(\"Preferences saved\", \"ok\")");
+    expect(source).toContain("Could not save. Your previous setting has been restored.");
+    expect(source).toContain("loadPreferences({ preserveStatus: true })");
+    expect(source).toContain('if (!preserveStatus) setPreferencesSaveStatus("Changes save automatically.", "idle")');
+    expect(source).not.toContain('const prefBtn = document.getElementById("savePreferencesBtn")');
+  });
+
+  test("retired themes cannot be selected or emitted by current account surfaces", () => {
+    const html = fs.readFileSync(path.join(__dirname, "../../frontend/profile-settings.html"), "utf8");
+    const route = fs.readFileSync(path.join(__dirname, "../routes/account.js"), "utf8");
+    const preferences = fs.readFileSync(path.join(__dirname, "../utils/accountPreferences.js"), "utf8");
+    const session = fs.readFileSync(
+      path.join(__dirname, "../../frontend/assets/scripts/utils/session.js"),
+      "utf8"
+    );
+    const authRoute = fs.readFileSync(path.join(__dirname, "../routes/auth.js"), "utf8");
+    const usersRoute = fs.readFileSync(path.join(__dirname, "../routes/users.js"), "utf8");
+
+    expect((html.match(/data-theme-preview=/g) || [])).toHaveLength(2);
+    expect(html).toContain('data-theme-preview="light"');
+    expect(html).toContain('data-theme-preview="dark"');
+    expect(preferences).toContain('"light"');
+    expect(preferences).toContain('"dark"');
+    expect(route).toContain("parseAccountTheme(theme)");
+    expect(session).toContain('const VALID_THEMES = ["light", "dark"]');
+    expect(session).toContain('return [`theme-${theme}`]');
+    expect(authRoute).toContain("theme: normalizeAccountTheme(");
+    expect(usersRoute).toContain("theme: normalizeAccountTheme(");
+  });
+
+  test("restored profile drafts expire and remain tied to the server profile they extend", () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, "../../frontend/assets/scripts/profile-settings.js"),
+      "utf8"
+    );
+
+    expect(source).toContain("const PROFILE_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000");
+    expect(source).toContain("serverFingerprint: getProfileSettingsServerFingerprint()");
+    expect(source).toContain("draftServerFingerprint !== currentServerFingerprint");
+    expect(source).toMatch(/if \(draft\) \{[\s\S]{0,120}setParalegalProfileDirty\(true\)/);
+    expect(source).not.toMatch(/document\.addEventListener\(\s*"click",[\s\S]{0,240}scheduleProfileSettingsDraftPersist/);
+  });
+
+  test("programmatic profile editors use the same dirty-state authority as direct inputs", () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, "../../frontend/assets/scripts/profile-settings.js"),
+      "utf8"
+    );
+
+    expect(source).toContain("function markParalegalProfileChanged()");
+    expect((source.match(/markParalegalProfileChanged\(\)/g) || []).length).toBeGreaterThanOrEqual(10);
+    expect(source).toContain('profileSaveStatus.textContent = paralegalProfileDirty ? "Unsaved changes" : "All changes saved."');
   });
 
   test("attorney save normalizes URL fields and preserves API errors", () => {

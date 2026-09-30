@@ -2,6 +2,10 @@ const PaymentOperation = require("../models/PaymentOperation");
 const { operationFingerprint } = require("../utils/paymentOperationFingerprint");
 
 const STALE_PENDING_MS = 10 * 60 * 1000;
+const TRANSFER_OPERATION_KINDS = Object.freeze(["case_payout", "partial_payout", "dispute_settlement"]);
+const unresolvedTransfer = { kind: { $in: TRANSFER_OPERATION_KINDS }, evidenceStatus: "needs_reconciliation", stripeTransferId: { $in: ["", null] } };
+const quarantinedTransfer = { kind: { $in: TRANSFER_OPERATION_KINDS }, evidenceStatus: "quarantined" };
+const verifiedRefundForTransfer = { $or: [{ stripeRefundId: { $in: ["", null] } }, { refundStatus: "succeeded", refundEvidenceStatus: "verified", refundVerifiedAt: { $type: "date" } }] };
 
 async function claimPaymentOperation({ operationKey, caseId, kind, fingerprint, amount = 0, currency = "usd" }) {
   const normalizedFingerprint = operationFingerprint(fingerprint);
@@ -27,8 +31,17 @@ async function claimPaymentOperation({ operationKey, caseId, kind, fingerprint, 
   if (existing.fingerprint !== normalizedFingerprint) {
     return { acquired: false, conflict: true, operation: existing };
   }
+  if (TRANSFER_OPERATION_KINDS.includes(existing.kind) && existing.evidenceStatus === "quarantined") {
+    return { acquired: false, inProgress: true, needsReconciliation: true, operation: existing };
+  }
+  if (await require("./refundRequestService").hasUnresolvedRefundRequest(existing)) {
+    return { acquired: false, inProgress: true, needsReconciliation: true, operation: existing };
+  }
   if (existing.status === "succeeded") {
     return { acquired: false, completed: true, operation: existing };
+  }
+  if (TRANSFER_OPERATION_KINDS.includes(existing.kind) && existing.evidenceStatus === "needs_reconciliation" && !existing.stripeTransferId) {
+    return { acquired: false, inProgress: true, needsReconciliation: true, operation: existing };
   }
   const stale = !existing.lastAttemptAt || now.getTime() - existing.lastAttemptAt.getTime() >= STALE_PENDING_MS;
   if (existing.status === "pending" && !stale) {
@@ -39,6 +52,10 @@ async function claimPaymentOperation({ operationKey, caseId, kind, fingerprint, 
     {
       _id: existing._id,
       fingerprint: normalizedFingerprint,
+      attempts: existing.attempts,
+      evidenceStatus: existing.evidenceStatus ?? null,
+      stripeTransferId: existing.stripeTransferId || { $in: ["", null] },
+      $nor: [unresolvedTransfer, quarantinedTransfer],
       $or: [
         { status: { $in: ["failed", "needs_reconciliation"] } },
         { status: "pending", lastAttemptAt: { $lte: new Date(now.getTime() - STALE_PENDING_MS) } },
@@ -57,8 +74,8 @@ async function claimPaymentOperation({ operationKey, caseId, kind, fingerprint, 
 
 async function succeedPaymentOperation(operation, stripeObjectId, { session } = {}) {
   if (!operation?._id) return null;
-  return PaymentOperation.findByIdAndUpdate(
-    operation._id,
+  const saved = await PaymentOperation.findOneAndUpdate(
+    { _id: operation._id, ...(operation.attempts ? { attempts: operation.attempts } : {}), $nor: [unresolvedTransfer, quarantinedTransfer], $and: [verifiedRefundForTransfer] },
     {
       $set: {
         status: "succeeded",
@@ -67,8 +84,10 @@ async function succeedPaymentOperation(operation, stripeObjectId, { session } = 
         completedAt: new Date(),
       },
     },
-    { returnDocument: "after", ...(session ? { session } : {}) }
+    { returnDocument: "after", ...(session ? { session } : { writeConcern: { w: "majority" } }) }
   );
+  if (!saved) throw new Error("The payment operation changed or requires payment review before it can be completed.");
+  return saved;
 }
 
 async function failPaymentOperation(
@@ -82,12 +101,25 @@ async function failPaymentOperation(
     lastError: String(err?.message || err || "Unknown payment operation error").slice(0, 2000),
   };
   if (stripeObjectId) update.stripeObjectId = String(stripeObjectId);
-  return PaymentOperation.findByIdAndUpdate(
-    operation._id,
+  const attempt = { _id: operation._id, ...(operation.attempts ? { attempts: operation.attempts } : {}), status: { $ne: "succeeded" } };
+  const options = { returnDocument: "after", ...(session ? { session } : { writeConcern: { w: "majority" } }) };
+  const quarantined = await PaymentOperation.findOneAndUpdate(
+    { ...attempt, ...quarantinedTransfer }, { $set: { status: "needs_reconciliation" } }, options
+  );
+  if (quarantined) return quarantined;
+  // A caller's generic failure must never make an unknown transfer retryable.
+  const held = await PaymentOperation.findOneAndUpdate(
+    { ...attempt, ...unresolvedTransfer },
+    { $set: { ...update, status: "needs_reconciliation" } },
+    options
+  );
+  if (held) return held;
+  return PaymentOperation.findOneAndUpdate(
+    { ...attempt, $nor: [unresolvedTransfer, quarantinedTransfer] },
     {
       $set: update,
     },
-    { returnDocument: "after", ...(session ? { session } : {}) }
+    options
   );
 }
 
@@ -114,7 +146,9 @@ async function recordPaymentOperationEvidence(
 }
 
 module.exports = {
+  verifiedRefundForTransfer,
   STALE_PENDING_MS,
+  TRANSFER_OPERATION_KINDS,
   claimPaymentOperation,
   failPaymentOperation,
   operationFingerprint,

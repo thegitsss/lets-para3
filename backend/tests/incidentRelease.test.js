@@ -478,7 +478,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   restorePhase7BEnv();
-  await closeDatabase();
+  try { await closeDatabase(); }
+  finally { require("./helpers/incidentGitFixture").cleanupIncidentGitFixture(); }
 });
 
 beforeEach(async () => {
@@ -1467,3 +1468,4 @@ describe("Incident release runner", () => {
     expect(updatedIncident.orchestration.nextJobType).toBe("none");
   });
 });
+jest.mock("child_process", () => require("./helpers/incidentGitFixture").isolatedChildProcess(jest.requireActual("child_process")));

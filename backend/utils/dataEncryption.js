@@ -141,6 +141,7 @@ function encryptMessageFields(doc) {
 function decryptMessagePayload(message) {
   if (!message) return message;
   const output = typeof message.toObject === "function" ? message.toObject({ virtuals: true }) : { ...message };
+  delete output.clientMessageId;
   if (output.text) output.text = decryptString(output.text);
   if (output.transcript) output.transcript = decryptString(output.transcript);
   if (output.fileName) output.fileName = decryptString(output.fileName);

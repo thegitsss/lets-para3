@@ -107,14 +107,14 @@ async function startStubServer() {
   app.use("/api", (_req, res) => res.json({}));
 
   const server = http.createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
+  await new Promise((resolve) => server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, resolve));
   const { port } = server.address();
   return { server, port };
 }
 
 async function run() {
   const { server, port } = await startStubServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
   const browser = await launchPuppeteer({
     headless: "new",
@@ -126,7 +126,9 @@ async function run() {
   page.setDefaultTimeout(60_000);
   page.setDefaultNavigationTimeout(60_000);
 
+  const pageErrors = [];
   page.on("pageerror", (err) => {
+    pageErrors.push(err?.message || String(err));
     console.error("[pageerror]", err?.message || err);
   });
 
@@ -199,11 +201,14 @@ async function run() {
       { timeout: 15_000 }
     );
 
-    console.log("Paralegal dashboard tour smoke test passed.");
+    await page.waitForSelector("#profileForm", { visible: true, timeout: 15_000 });
+    await page.waitForSelector("#profileTourTooltip.is-active", { visible: true, timeout: 15_000 });
   } finally {
     await browser.close();
     await new Promise((resolve) => server.close(resolve));
   }
+  if (pageErrors.length) throw new Error(`Paralegal tour page errors: ${pageErrors.join("; ")}`);
+  console.log("Paralegal dashboard tour and its Profile Settings destination passed without page errors.");
 }
 
 run().catch((err) => {

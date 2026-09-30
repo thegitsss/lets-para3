@@ -3,21 +3,55 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Matter-Based Paralegal Support | Let’s-ParaConnect</title>
-  <meta name="description" content="Let’s-ParaConnect helps attorneys turn overflow legal work into clearly scoped matters and connect directly with vetted independent paralegals." />
+  <title>Matter-Based Paralegal Services | Let’s-ParaConnect</title>
+  <meta name="description" content="Let’s-ParaConnect provides software for matter postings, applications, shared workspaces, and payments. Attorneys and independent paralegals choose whether to work together." />
   <link rel="canonical" href="https://www.lets-paraconnect.com/" />
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="Matter-Based Paralegal Support | Let’s-ParaConnect" />
-  <meta property="og:description" content="Define the matter, review vetted independent paralegals, work together, and manage completion in one organized platform." />
+  <meta property="og:title" content="Matter-Based Paralegal Services | Let’s-ParaConnect" />
+  <meta property="og:description" content="Define the matter, review applications from approved independent paralegals, work together, and manage completion in one organized platform." />
   <meta property="og:url" content="https://www.lets-paraconnect.com/" />
   <meta name="twitter:card" content="summary" />
   <meta name="theme-color" content="#FFFFFF" />
 
   <link rel="stylesheet" href="assets/styles/fonts.css?v=20260826-full-sarabun" />
   <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
-  <link rel="stylesheet" href="assets/styles/public-site-chrome.css?v=20260828-phase8" />
-  <link rel="stylesheet" href="assets/styles/homepage.css?v=20260828-phase4-source-geometry" />
-  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20260828-phase4-source-geometry" />
+  <link rel="stylesheet" href="assets/styles/public-site-chrome.css?v=20260925-narrow-footer" />
+  <link rel="stylesheet" href="assets/styles/homepage.css?v=20260929-workflow-leading" />
+  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20260925-contrast" />
+  <link rel="stylesheet" href="assets/styles/homepage-readable-type.css?v=20260924-original-hero" />
+  <link rel="stylesheet" href="assets/styles/homepage-serif-type.css?v=20260929-workflow-wrap" />
+  <style>
+    body.lpc-home--editorial { --lpc-gold: #6495ed; --lpc-focus: #6495ed; }
+    .lpc-home--editorial .editorial-hero__qualifier { color: #4775bd; }
+    body.lpc-home--editorial,
+    .lpc-home--editorial :is(.home-header, .mobile-nav, .editorial-hero, .path-scene--attorney) {
+      background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+        radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+      background-attachment: fixed;
+    }
+    .lpc-home--editorial .home-header {
+      background: radial-gradient(ellipse at 4% 0%, rgba(220, 230, 251, .72), transparent 46%),
+        radial-gradient(ellipse at 100% 100%, rgba(204, 217, 229, .72), transparent 50%),
+        rgba(237, 240, 243, .72);
+      background-attachment: fixed;
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+    .lpc-home--editorial .home-header.is-past-hero { background: rgba(255, 255, 255, .72); }
+    .lpc-home--editorial .home-header,
+    .lpc-home--editorial .home-header.is-scrolled {
+      border-bottom: 0;
+      box-shadow: 0 7px 22px rgba(21, 28, 37, .025);
+    }
+    .lpc-home--editorial .fee-card--hybrid { background: #fff; color: #27394d; }
+    .lpc-home--editorial .fee-card--hybrid .fee-card__row > h4 { color: #27394d; }
+    .lpc-home--editorial .fee-card--hybrid .fee-card__row > p,
+    .lpc-home--editorial .fee-card--hybrid > small { color: #596b80; }
+    .lpc-home--editorial .fee-card--hybrid .fee-card__row,
+    .lpc-home--editorial .fee-card--hybrid > small { border-top-color: #e2e8f0; }
+  </style>
+  <link rel="stylesheet" href="assets/styles/homepage-assistant.css?v=20260925-spotlight" />
+  <link rel="stylesheet" href="assets/styles/homepage-map.css?v=20260929-dot-pulse-1" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -39,14 +73,14 @@
 
       <nav class="home-nav home-nav--desktop" aria-label="Primary navigation">
         <a href="#how">How It Works</a>
-        <a href="#for-attorneys">For Attorneys</a>
-        <a href="#for-paralegals">For Paralegals</a>
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
         <a href="browse-paralegals.html">Browse Paralegals</a>
       </nav>
 
       <div class="home-header__actions">
-        <a class="header-signin" href="login.html" id="authAction" data-auth-action data-public-action="text">Sign In</a>
-        <button class="header-signout" type="button" id="logoutAction" data-logout-action data-public-action="text" hidden>Log Out</button>
+        <a class="header-signin" href="login.html" id="authAction" data-auth-action data-public-action="text">Sign in</a>
+        <button class="header-signout" type="button" id="logoutAction" data-logout-action data-public-action="text" hidden>Sign out</button>
         <a class="button button--small button--ink" href="signup.html" id="signupAction" data-signup-action data-public-action="primary" data-action-shape="pill" data-action-size="compact">Create an account</a>
         <button
           class="mobile-nav-toggle"
@@ -66,13 +100,13 @@
     <div class="mobile-nav" id="mobileNav" aria-hidden="true" data-mobile-nav>
       <nav aria-label="Mobile navigation">
         <a href="#how">How It Works</a>
-        <a href="#for-attorneys">For Attorneys</a>
-        <a href="#for-paralegals">For Paralegals</a>
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
         <a href="browse-paralegals.html">Browse Paralegals</a>
       </nav>
       <div class="mobile-nav__actions">
-        <a href="login.html" data-auth-action data-public-action="text">Sign In</a>
-        <button type="button" data-logout-action data-public-action="text" hidden>Log Out</button>
+        <a href="login.html" data-auth-action data-public-action="text">Sign in</a>
+        <button type="button" data-logout-action data-public-action="text" hidden>Sign out</button>
         <a class="button button--ink" href="signup.html" data-signup-action data-public-action="primary" data-action-shape="pill">Create an account</a>
       </div>
     </div>
@@ -100,17 +134,17 @@
           </div>
 
           <div class="editorial-hero__details">
-            <p class="editorial-hero__support">Let’s-ParaConnect is a platform where attorneys and independent U.S. paralegals work together on clearly scoped matters. Delegate overflow work matter by matter—without the commitment of a full-time hire.</p>
+            <p class="editorial-hero__support">Let’s-ParaConnect is a platform where attorneys and independent paralegals can work together on individual matters. Delegate your firm’s overflow work matter by matter—without the commitment of a full-time hire.</p>
             <div class="action-row editorial-hero__actions">
               <a class="button button--ink" href="signup.html" data-post-matter-action data-public-action="primary" data-action-shape="pill">Post a matter</a>
               <a class="text-action" href="browse-paralegals.html" data-public-action="text">Browse paralegals</a>
             </div>
-            <p class="editorial-hero__publishing">Publish free. Fund only when you hire.</p>
+            <p class="editorial-hero__publishing">Post for free. Fund only when you hire.</p>
           </div>
         </div>
 
         <div class="editorial-hero__reassurance">
-          <p>Vetted U.S. paralegals <span aria-hidden="true">|</span> Attorney-supervised <span aria-hidden="true">|</span> Approval-based payments</p>
+          <p><strong>INCREASE CAPACITY</strong> <span aria-hidden="true">|</span> <strong>GAIN FLEXIBILITY</strong> <span aria-hidden="true">|</span> <strong>DELEGATE</strong></p>
         </div>
       </div>
 
@@ -121,7 +155,6 @@
         <div class="workflow__intro-title">
           <h2 id="workflow-title">One matter.<br />One workspace.</h2>
         </div>
-        <p class="workflow__intro-support">Let’s-ParaConnect is a matter-based platform where attorneys hire and work with vetted independent U.S. paralegals, one matter at a time. Delegate your overflow work and get your time back.</p>
       </div>
 
       <div class="workflow__story">
@@ -129,7 +162,7 @@
           <div class="workflow-mobile-stage__sticky">
             <div class="workflow-mobile-stage__heading">
               <span class="workflow-mobile-stage__number">01</span>
-              <h3>Scope the work.</h3>
+              <h3>Scope the work</h3>
               <p>Define the deliverables, timing, and expectations.</p>
             </div>
             <div class="workflow-mobile-stage__canvas" data-mobile-workflow-stage></div>
@@ -140,7 +173,7 @@
           <article class="workflow-chapter is-active" data-workflow-chapter="1">
             <span class="workflow-chapter__number">01</span>
             <div>
-              <h3>Scope the work.</h3>
+              <h3>Scope the work</h3>
               <p>Define the deliverables, timing, and expectations.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="1"></div>
@@ -149,8 +182,8 @@
           <article class="workflow-chapter" data-workflow-chapter="2">
             <span class="workflow-chapter__number">02</span>
             <div>
-              <h3>Review applicants.</h3>
-              <p>Compare experience, availability, and fit.</p>
+              <h3>Review fit, check conflicts</h3>
+              <p>Compare applicants and request an optional conflicts check from your selected paralegal before hiring.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="2"></div>
           </article>
@@ -158,7 +191,7 @@
           <article class="workflow-chapter" data-workflow-chapter="3">
             <span class="workflow-chapter__number">03</span>
             <div>
-              <h3>Work together.</h3>
+              <h3>Work together</h3>
               <p>Keep messages, files, and progress connected to the matter.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="3"></div>
@@ -167,7 +200,7 @@
           <article class="workflow-chapter" data-workflow-chapter="4">
             <span class="workflow-chapter__number">04</span>
             <div>
-              <h3>Review deliverables.</h3>
+              <h3>Review <span class="keep-together">deliverables</span></h3>
               <p>Check the submitted work and request revisions if needed.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="4"></div>
@@ -176,8 +209,8 @@
           <article class="workflow-chapter" data-workflow-chapter="5">
             <span class="workflow-chapter__number">05</span>
             <div>
-              <h3>Confirm completion.</h3>
-              <p>Approve the final work and mark the matter complete.</p>
+              <h3>Confirm completion</h3>
+              <p>Approve the final work and release the paralegal’s payout together.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="5"></div>
           </article>
@@ -185,8 +218,8 @@
           <article class="workflow-chapter" data-workflow-chapter="6">
             <span class="workflow-chapter__number">06</span>
             <div>
-              <h3>Close the matter.</h3>
-              <p>Release payment and keep the completed record in one place.</p>
+              <h3>Close the matter</h3>
+              <p>Keep the payment record and download your archive.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="6"></div>
           </article>
@@ -198,45 +231,42 @@
               <span class="product-wordmark">LPC</span>
               <span class="matter-identity matter-identity--compact">
                 <strong>Medical Records Chronology</strong>
-                <small>Personal Injury</small>
+                <small>Personal Injury · Example</small>
               </span>
-              <span class="status-chip">Accepting Applications</span>
             </div>
 
             <div class="workflow-state is-active" data-state="1" aria-hidden="false">
               <div class="state-heading">
-                <p class="interface-label">Matter created</p>
-                <h4>Accepting Applications</h4>
+                <h4>Accepting applications</h4>
               </div>
               <div class="form-grid">
-                <label class="field field--wide"><span>Matter title</span><strong>Medical Records Chronology</strong></label>
-                <label class="field"><span>Practice area</span><strong>Personal Injury</strong></label>
-                <label class="field"><span>Applications</span><strong>0, accepting</strong></label>
-                <label class="field field--wide field--tall"><span>Scope</span><strong>Build a treatment chronology from medical records, organized by provider and date.</strong></label>
-                <label class="field field--wide"><span>Deliverables</span><strong>Medical records chronology, Source index</strong></label>
+                <div class="field"><span>Compensation</span><strong>$650.00</strong></div>
+                <div class="field"><span>Applications</span><strong>2</strong></div>
+                <div class="field field--wide field--tall"><span>Scope</span><strong>Build a treatment chronology from medical records, organized by provider and date.</strong></div>
+                <div class="field field--wide"><span>Deliverables</span><strong>Medical records chronology, Source index</strong></div>
               </div>
             </div>
 
             <div class="workflow-state" data-state="2" aria-hidden="true">
               <div class="state-heading state-heading--row">
-                <div><p class="interface-label">Applications received</p><h4>3 applications received</h4></div>
+                <div><h4>3 applications</h4></div>
               </div>
               <div class="applicant-list">
                 <article class="applicant-row is-featured">
-                  <span class="avatar avatar--nr">01</span>
-                  <div class="applicant-row__identity"><strong>Application received</strong><span>Litigation, 10+ years</span></div>
+                  <span class="avatar avatar--nr">NR</span>
+                  <div class="applicant-row__identity"><strong>Natalie Rivera</strong><span>Litigation · 10+ years</span></div>
                   <div class="applicant-row__skills"><span>Personal Injury</span><span>Medical Records</span></div>
                   <div class="match-score"><strong>Submitted today</strong></div>
                 </article>
                 <article class="applicant-row">
-                  <span class="avatar avatar--em">02</span>
-                  <div class="applicant-row__identity"><strong>Application received</strong><span>Records review, 8+ years</span></div>
+                  <span class="avatar avatar--em">EM</span>
+                  <div class="applicant-row__identity"><strong>Emily Morgan</strong><span>Records review · 8+ years</span></div>
                   <div class="applicant-row__skills"><span>Chronologies</span><span>Discovery</span></div>
                   <div class="match-score"><strong>Submitted today</strong></div>
                 </article>
                 <article class="applicant-row">
-                  <span class="avatar avatar--jp">03</span>
-                  <div class="applicant-row__identity"><strong>Application received</strong><span>Litigation support, 7+ years</span></div>
+                  <span class="avatar avatar--jp">JP</span>
+                  <div class="applicant-row__identity"><strong>Jordan Parker</strong><span>Litigation · 7+ years</span></div>
                   <div class="applicant-row__skills"><span>Records Review</span><span>Clio</span></div>
                   <div class="match-score"><strong>Submitted yesterday</strong></div>
                 </article>
@@ -246,49 +276,43 @@
             <div class="workflow-state" data-state="3" aria-hidden="true">
               <div class="workspace-grid">
                 <section class="workspace-chat">
-                  <div class="panel-heading"><div><p class="interface-label">Shared workspace</p><strong>Matter activity</strong></div></div>
-                  <div class="message message--received"><p>Medical records chronology updated. Provider indexing is complete.<small>10:24 AM</small></p></div>
-                  <div class="message message--sent"><p>Two treatment gaps were flagged for the final review.<small>10:31 AM</small></p></div>
+                  <div class="panel-heading"><strong>Messages</strong></div>
+                  <div class="message message--received"><p>The provider index is ready.<small>10:24 AM</small></p></div>
+                  <div class="message message--sent"><p>Please flag any treatment gaps.<small>10:31 AM</small></p></div>
                   <div class="message-composer">Write a message… <span>Send</span></div>
                 </section>
                 <aside class="workspace-details">
-                  <div class="detail-block"><p class="interface-label">Deadline</p><strong>August 18</strong><span>On schedule</span></div>
-                <div class="detail-block"><p class="interface-label">Tasks</p><label><i class="is-done" aria-hidden="true"></i> Organize providers</label><label><i aria-hidden="true">2</i> Medical records chronology</label><label><i aria-hidden="true">3</i> Source index</label></div>
-                  <div class="detail-block"><p class="interface-label">Files in progress</p><span class="compact-file">DOCX <b>Chronology-draft.docx</b></span><span class="compact-file">PDF <b>Source-index-draft.pdf</b></span></div>
+                  <div class="detail-block"><p class="interface-label">Deadline</p><strong>August 18</strong></div>
+                <div class="detail-block"><p class="interface-label">Tasks</p><label><i class="is-done" aria-hidden="true"></i> Provider index</label><label><i aria-hidden="true">2</i> Chronology</label><label><i aria-hidden="true">3</i> Source index</label></div>
+                  <div class="detail-block workflow-files"><p class="interface-label">Files in progress</p><span class="compact-file"><b>Chronology-draft.docx</b></span><span class="compact-file"><b>Source-index-draft.pdf</b></span></div>
                 </aside>
               </div>
             </div>
 
             <div class="workflow-state" data-state="4" aria-hidden="true">
               <div class="completion-state">
-                <div class="completion-mark" aria-hidden="true"></div>
-                <p class="interface-label">Work submitted</p>
-                <h4>Awaiting Review</h4>
-                <p>Both deliverables were submitted on August 17 and are ready for review.</p>
+                <h4>Ready for review</h4>
+                <p>Submitted August 17</p>
                 <div class="completion-files">
-                  <span><i>PDF</i><b>Medical Records Chronology.pdf</b><small>Submitted Aug 17</small></span>
-                  <span><i>PDF</i><b>Source Index.pdf</b><small>Submitted Aug 17</small></span>
+                  <span><i>PDF</i><b>Medical Records Chronology.pdf</b></span>
+                  <span><i>PDF</i><b>Source Index.pdf</b></span>
                 </div>
                 <div class="payment-summary">
-                  <span><small>Review status</small><strong>Ready for confirmation</strong></span>
-                  <button type="button" tabindex="-1">Confirm completion</button>
+                  <span class="workflow-preview-action">Review files</span>
                 </div>
               </div>
             </div>
 
             <div class="workflow-state" data-state="5" aria-hidden="true">
               <div class="completion-state">
-                <div class="completion-mark" aria-hidden="true"></div>
-                <p class="interface-label">Matter completed</p>
-                <h4>Completed</h4>
-                <p>Work is approved, all matter requirements are complete, and both final files remain in the workspace.</p>
+                <h4>Ready to close</h4>
+                <p>Approve the completed work to begin payment release.</p>
                 <div class="completion-files">
-                  <span><i>PDF</i><b>Medical Records Chronology.pdf</b><small>Approved</small></span>
-                  <span><i>PDF</i><b>Source Index.pdf</b><small>Approved</small></span>
+                  <span><i>PDF</i><b>Medical Records Chronology.pdf</b></span>
+                  <span><i>PDF</i><b>Source Index.pdf</b></span>
                 </div>
                 <div class="payment-summary">
-                  <span><small>Payment status</small><strong>Ready for release</strong></span>
-                  <button type="button" tabindex="-1">Release payment</button>
+                  <span class="workflow-preview-action">Approve completed work</span>
                 </div>
               </div>
             </div>
@@ -296,28 +320,23 @@
             <div class="workflow-state" data-state="6" aria-hidden="true">
               <div class="completion-state completion-state--released">
                 <div class="completion-mark" aria-hidden="true"></div>
-                <p class="interface-label">Payment released</p>
-                <h4>Payment Released</h4>
-                <p>The payment was released, and the completed work remains in the workspace.</p>
-                <div class="completion-files">
-                  <span><i>PDF</i><b>Medical Records Chronology.pdf</b><small>Retained</small></span>
-                  <span><i>PDF</i><b>Source Index.pdf</b><small>Retained</small></span>
-                </div>
+                <h4>Payment released</h4>
+                <p>Save your matter records—messages, documents, and receipts—in one download.</p>
                 <div class="payment-summary">
-                  <span><small>Payment status</small><strong>Released</strong></span>
-                  <button type="button" tabindex="-1" aria-disabled="true">Matter complete</button>
+                  <span><small>Funded matter amount</small><strong>$650.00</strong></span>
+                  <span class="workflow-preview-action">Download matter records</span>
                 </div>
               </div>
             </div>
 
             <div class="matter-rail matter-rail--workflow" data-matter-rail="1" aria-label="Matter progress">
               <span class="matter-rail__line"></span>
-              <div class="is-active"><i>1</i><span>Accepting</span></div>
-              <div><i>2</i><span>Applications</span></div>
-              <div><i>3</i><span>In progress</span></div>
+              <div class="is-active"><i>1</i><span>Post</span></div>
+              <div><i>2</i><span>Choose</span></div>
+              <div><i>3</i><span>Work</span></div>
               <div><i>4</i><span>Review</span></div>
-              <div><i>5</i><span>Completed</span></div>
-              <div><i>6</i><span>Payment released</span></div>
+              <div><i>5</i><span>Approve</span></div>
+              <div><i>6</i><span>Finish</span></div>
             </div>
           </div>
         </div>
@@ -325,190 +344,45 @@
     </section>
 
     <div class="feature-sequence">
-    <section class="paths" aria-labelledby="paths-title">
-      <canvas class="matter-field matter-field--paths" data-matter-field="paths" aria-hidden="true"></canvas>
-      <div class="paths__heading">
-        <p class="eyebrow">Two perspectives</p>
-        <h2 id="paths-title">The same matter.<br />Seen from both sides.</h2>
-      </div>
-
-      <div class="paths__split">
-        <div class="audience-connection" data-audience-connection aria-hidden="true">
-          <span></span>
-          <b>Connected matter</b>
-          <span></span>
-        </div>
-
-        <article class="path-scene path-scene--attorney" id="for-attorneys">
-          <div class="path-scene__copy">
-            <p class="eyebrow">Attorney workspace</p>
-            <h3>Ready for review.</h3>
-            <p>Review completed deliverables in one place. Approve the work or request revisions.</p>
-          </div>
-          <div class="audience-interface" aria-label="Attorney workspace preview">
-            <div class="audience-interface__topbar">
-              <span class="product-wordmark">LPC</span>
-              <span class="matter-identity matter-identity--compact">
-                <span>Attorney workspace</span>
-                <strong>Medical Records Chronology</strong>
-                <small>Personal Injury</small>
-              </span>
-              <span class="status-chip">Awaiting Review</span>
-            </div>
-            <div class="audience-interface__body audience-interface__body--review">
-              <article class="audience-matter">
-                <div class="audience-matter__heading">
-                  <div><p class="interface-label">Submitted deliverables</p><h4>Medical Records Chronology</h4></div>
-                </div>
-                <div class="audience-matter__meta">
-                  <span><small>Practice area</small><strong>Personal Injury</strong></span>
-                  <span><small>Compensation</small><strong>$650.00</strong></span>
-                  <span><small>Due</small><strong>August 18</strong></span>
-                </div>
-              </article>
-              <div class="audience-attention">
-                <span aria-hidden="true">!</span>
-                <div><small>2 deliverables submitted</small><strong>Medical Records Chronology.pdf, Source Index.pdf</strong></div>
-                <b>Review</b>
-              </div>
-            </div>
-          </div>
-        </article>
-
-        <article class="path-scene path-scene--paralegal" id="for-paralegals">
-          <div class="path-scene__copy">
-            <p class="eyebrow eyebrow--light">Paralegal workspace</p>
-            <h3>Work that stays connected.</h3>
-            <p>The matter, submitted files, completion, and payment remain connected in one record.</p>
-          </div>
-          <div class="audience-interface audience-interface--dark" aria-label="Paralegal workspace preview">
-            <div class="audience-interface__topbar">
-              <span class="product-wordmark">LPC</span>
-              <span>Paralegal workspace</span>
-              <span class="status-chip">Completed</span>
-            </div>
-            <div class="audience-interface__body">
-              <article class="available-project">
-                <div>
-                  <p class="interface-label">Completed matter</p>
-                  <h4>Medical Records Chronology</h4>
-                  <p>Chronology and source index submitted, approved, and retained in the workspace.</p>
-                </div>
-                <div class="available-project__terms">
-                  <span><small>Practice area</small><strong>Personal Injury</strong></span>
-                  <span><small>Status</small><strong>Completed</strong></span>
-                  <span><small>Payment</small><strong>Released</strong></span>
-                </div>
-              </article>
-              <article class="active-assignment">
-                <div class="audience-matter__heading">
-                  <div><p class="interface-label">Recent matter</p><h4>Medical Records Chronology</h4></div>
-                  <span class="status-chip">Completed</span>
-                </div>
-                <div class="assignment-tasks">
-                  <label><i class="is-done" aria-hidden="true"></i><span>Medical Records Chronology.pdf</span></label>
-                  <label><i class="is-done" aria-hidden="true"></i><span>Source Index.pdf</span></label>
-                  <label><i class="is-done" aria-hidden="true"></i><span>Matter completed</span></label>
-                </div>
-              </article>
-              <div class="audience-payment audience-payment--dark">
-                <div><small>Completed matter</small><strong>Medical Records Chronology</strong></div>
-                <div><small>Compensation</small><strong>$650 matter compensation</strong></div>
-              </div>
-            </div>
-          </div>
-        </article>
-      </div>
-    </section>
-    <section class="assistant-showcase" id="assistant" data-assistant-view="attorney" aria-labelledby="assistant-title">
-      <div class="assistant-showcase__intro">
-        <p class="eyebrow">The LPC Assistant</p>
-        <h2 id="assistant-title">Find what you need.</h2>
-        <p>Ask about deadlines, assigned paralegals, files, approvals, or payment across your active matters. The LPC Assistant brings the relevant details into one clear answer.</p>
-      </div>
-
-      <div class="assistant-stage" aria-label="LPC Assistant answering a question about a matter deadline">
-        <div class="assistant-workspace">
-          <header class="assistant-workspace__topbar">
-            <span class="product-wordmark">LPC</span>
-            <span class="matter-identity matter-identity--compact">
-              <span data-assistant-record-label>Active matters</span>
-              <strong>Attorney workspace</strong>
-              <small>3 open matters</small>
-            </span>
-            <span class="assistant-launcher-demo" aria-label="Open Attorney Assistant">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path>
-                <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-2.9 2.7-2.9 4"></path>
-                <path d="M12 17h.01"></path>
-              </svg>
-            </span>
-          </header>
-          <div class="assistant-workspace__body">
-            <div class="assistant-workspace__nav" aria-hidden="true">
-              <span class="is-active">Overview</span>
-              <span>Matters</span>
-              <span>Messages</span>
-              <span>Billing</span>
-            </div>
-            <article class="assistant-workspace__matter">
-              <p class="interface-label">Active matters</p>
-              <h3>3 active matters</h3>
-              <div class="assistant-matter-list">
-                <article>
-                  <div><strong>Henderson v. Walker</strong><small>Personal Injury</small></div>
-                  <div class="assistant-matter-detail assistant-matter-detail--deadline"><small>Next deadline</small><strong>August 23</strong></div>
-                  <div class="assistant-matter-detail assistant-matter-detail--assigned"><small>Assigned paralegal</small><strong>Alexandra Reed</strong></div>
-                  <span>In progress</span>
-                </article>
-                <article>
-                  <div><strong>Carson Estate</strong><small>Probate</small></div>
-                  <div><small>Filing due</small><strong>August 26</strong></div>
-                  <div><small>Assigned paralegal</small><strong>Natalie Bennett</strong></div>
-                  <span>Awaiting documents</span>
-                </article>
-                <article>
-                  <div><strong>Northstar Ventures</strong><small>Business</small></div>
-                  <div><small>Draft due</small><strong>September 2</strong></div>
-                  <div><small>Assigned paralegal</small><strong>Cameron Ellis</strong></div>
-                  <span>In review</span>
-                </article>
-              </div>
-            </article>
-          </div>
-        </div>
-
-        <article class="assistant-preview">
-          <header class="assistant-preview__header">
-            <span class="assistant-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+    <section class="assistant-spotlight" id="assistant" aria-labelledby="assistant-title">
+      <div class="assistant-spotlight__inner">
+        <div class="assistant-spotlight__copy">
+          <p class="assistant-spotlight__eyebrow"><span aria-hidden="true">✦</span> THE LPC ASSISTANT</p>
+          <h2 id="assistant-title">Less searching.<br /><em>More clarity.</em></h2>
+          <p class="assistant-spotlight__description">Ask about your active matters. Get the details—and a way back to the work.</p>
+          <div class="assistant-spotlight__examples" role="group" aria-label="Explore example Assistant answers">
             <div>
-              <strong data-assistant-role>Attorney Assistant</strong>
-            </div>
-          </header>
-          <div class="assistant-preview__thread">
-            <div class="assistant-exchange assistant-exchange--first">
-              <div class="assistant-message assistant-message--user" data-assistant-question>
-                When is my next deadline?
-              </div>
-              <div class="assistant-message assistant-message--assistant">
-                <span class="assistant-message__mark" aria-hidden="true">LPC</span>
-                <p data-assistant-answer>Your next deadline is for Henderson v. Walker, due Tuesday, the 23rd.</p>
-                <a href="login.html" data-assistant-action>Open the active matter</a>
-              </div>
+              <button type="button" data-public-action="secondary" data-assistant-example="deadlines" aria-pressed="true">Deadlines</button>
+              <button type="button" data-public-action="secondary" data-assistant-example="people" aria-pressed="false">Your paralegals</button>
+              <button type="button" data-public-action="secondary" data-assistant-example="review" aria-pressed="false">Work to review</button>
             </div>
           </div>
-          <div class="assistant-preview__suggestions" aria-hidden="true">
-            <span>Which matter is due next?</span>
-            <span>Who is assigned?</span>
+        </div>
+        <div class="assistant-spotlight__visual">
+          <div class="assistant-demo">
+            <header class="assistant-demo__header">
+              <span class="assistant-demo__icon" aria-hidden="true">✦</span>
+              <div><strong>LPC Assistant</strong><span>Connected to your matters</span></div>
+              <span class="assistant-demo__online" aria-hidden="true"></span>
+            </header>
+            <div class="assistant-demo__conversation" aria-live="polite" aria-atomic="true">
+              <p class="assistant-demo__question" data-demo-question>What’s my next deadline?</p>
+              <div class="assistant-demo__answer">
+                <span class="assistant-demo__answer-label">LPC ASSISTANT</span>
+                <p data-demo-answer>Your next deadline is August 23 for Henderson v. Walker.</p>
+                <div class="assistant-demo__fact"><span data-demo-fact-label>Next deadline</span><strong data-demo-fact>August 23</strong><span data-demo-detail>Henderson v. Walker</span></div>
+              </div>
+            </div>
+            <a class="assistant-demo__source" href="login.html">
+              <span class="assistant-demo__file" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6"/></svg></span>
+              <span><small>GO TO THE MATTER</small><strong data-demo-matter>Henderson v. Walker</strong></span>
+              <span aria-hidden="true">↗</span>
+            </a>
+            <div class="assistant-demo__composer" aria-hidden="true"><span>Ask about your matters…</span><span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></span></div>
           </div>
-          <div class="assistant-preview__composer" aria-hidden="true">
-            <span>Ask about your active matters</span>
-            <i>↑</i>
-          </div>
-          <small class="assistant-showcase__disclaimer">Provides workspace information—not legal advice or decisions.</small>
-        </article>
+        </div>
       </div>
-
+      <p class="assistant-spotlight__disclaimer">Workspace information, not legal advice or decisions.</p>
     </section>
 
     </div>
@@ -517,8 +391,8 @@
       <div class="trust-band__inner">
         <article>
           <span aria-hidden="true">01</span>
-          <h2>Approved paralegals</h2>
-          <p>Every paralegal completes LPC’s application and eligibility review before joining the platform. Attorneys independently evaluate qualifications and fit.</p>
+          <h2>Approval-based access</h2>
+          <p>Every paralegal completes LPC’s application and eligibility review before joining the platform.</p>
         </article>
         <article>
           <span aria-hidden="true">02</span>
@@ -528,8 +402,25 @@
         <article>
           <span aria-hidden="true">03</span>
           <h2>Structured payments</h2>
-          <p>Funding, completion, and payment status remain connected to the matter record.</p>
+          <p>Funding, completion, and payment status remain connected to the matter.</p>
         </article>
+      </div>
+    </section>
+
+    <section class="paralegal-map" aria-labelledby="paralegal-map-title">
+      <div class="paralegal-map__inner">
+        <div class="paralegal-map__intro">
+          <p class="paralegal-map__eyebrow">The network today</p>
+          <h2 id="paralegal-map-title">Paralegals across the map</h2>
+          <p>An ever-growing network of experienced, independent paralegals across the country. All in one place.</p>
+        </div>
+        <div class="paralegal-map__stage">
+          <div class="paralegal-map__canvas" data-paralegal-map></div>
+          <div class="paralegal-map__status" data-map-status role="status"><a class="paralegal-map__stat" href="browse-paralegals.html" aria-label="Browse paralegal profiles" data-public-action="primary"><strong data-map-total>—</strong><span class="paralegal-map__stat-detail"><span class="paralegal-map__stat-copy"><span data-map-summary>Loading the map…</span><span data-map-growth hidden>and growing.</span><span class="paralegal-map__stat-cue" aria-hidden="true">Browse profiles</span></span><span class="paralegal-map__stat-arrow" aria-hidden="true">↗</span></span></a></div>
+          <p class="paralegal-map__note">Dots show approved members; locations are illustrative.</p>
+          <button class="paralegal-map__retry" type="button" data-map-retry hidden>Try again</button>
+          <noscript><p class="paralegal-map__status">Enable JavaScript to view the network map.</p></noscript>
+        </div>
       </div>
     </section>
 
@@ -541,18 +432,18 @@
 
       <div class="clarity-section__grid">
         <aside class="fee-card fee-card--hybrid" aria-labelledby="fee-card-title">
-          <h3 id="fee-card-title">What it costs.</h3>
+          <h3 id="fee-card-title">Platform fees.</h3>
           <div class="fee-card__row">
             <span>To get started</span>
             <strong>$0</strong>
-            <h4>Publish for free.</h4>
-            <p>No payment method is required to publish. Add one securely through Stripe when you hire. Matters start at $400 in compensation for your paralegal’s work.</p>
+            <h4>Post for free.</h4>
+            <p>Post a matter without adding a payment method. When you find the right paralegal, you’ll add one to hire them. Compensation for the paralegal’s work starts at $400 per matter.</p>
           </div>
           <div class="fee-card__row">
             <span>For attorneys</span>
             <strong>22%</strong>
             <h4>Added when you hire.</h4>
-            <p>The attorney platform fee is added to the matter amount when you hire a paralegal. Payment processing is included in the displayed total.</p>
+            <p>When you’re ready to hire, Stripe charges your matter amount plus your 22% platform fee. After you confirm the work is complete, the paralegal’s payout is sent through Stripe Connect, directly to their account.</p>
           </div>
           <div class="fee-card__row">
             <span>For paralegals</span>
@@ -560,32 +451,33 @@
             <h4>Deducted before payout.</h4>
             <p>The paralegal platform fee is deducted from the matter amount before payout, after completed work is approved.</p>
           </div>
-          <small>Platform fees support LPC’s application and eligibility review, technology and matter workspace, platform support, applicable Stripe processing costs, and other platform operations. Platform fees are not fees for legal services.</small>
-          <small>Payments are securely processed by Stripe. LPC does not store card or payment information.</small>
+          <small>Payments are securely processed by Stripe. LPC does not store full card details.</small>
         </aside>
 
         <div class="home-faq">
           <p class="interface-label">Common questions</p>
           <h3>Answers before you get started.</h3>
           <div class="home-faq__questions">
-            <div class="home-faq__column">
-              <details name="homepage-faq" data-faq-order="1">
-                <summary>Does LPC assign a paralegal to an attorney?<span class="home-faq__icon" aria-hidden="true"></span></summary>
-                <p>No. Attorneys review applications and profiles, then decide whether and whom to engage.</p>
-              </details>
-              <details name="homepage-faq" data-faq-order="2">
-                <summary>Who defines the work and compensation?<span class="home-faq__icon" aria-hidden="true"></span></summary>
-                <p>The attorney defines the matter’s scope, deliverables, timing, and offered compensation.</p>
-              </details>
-              <details name="homepage-faq" data-faq-order="3">
-                <summary>Is Let’s-ParaConnect a law firm or staffing agency?<span class="home-faq__icon" aria-hidden="true"></span></summary>
-                <p>No. LPC is a technology platform. It does not provide legal advice, assign professionals, or supervise legal work.</p>
-              </details>
-              <details name="homepage-faq" data-faq-order="4">
-                <summary>How are payments handled?<span class="home-faq__icon" aria-hidden="true"></span></summary>
-                <p>The attorney funds the matter when hiring. After the attorney approves completed work, the platform instructs Stripe Connect to transfer the paralegal compensation to the paralegal’s connected account.</p>
-              </details>
-            </div>
+            <details name="homepage-faq" data-faq-order="1">
+              <summary>Does LPC assign a paralegal to an attorney?<span class="home-faq__icon" aria-hidden="true"></span></summary>
+              <p>No. Attorneys review applications and profiles, then decide whether and whom to engage.</p>
+            </details>
+            <details name="homepage-faq" data-faq-order="2">
+              <summary>Who defines the work and compensation?<span class="home-faq__icon" aria-hidden="true"></span></summary>
+              <p>The attorney defines the matter’s scope, deliverables, timing, and offered compensation.</p>
+            </details>
+            <details name="homepage-faq" data-faq-order="3">
+              <summary>Is Let’s-ParaConnect a law firm or staffing agency?<span class="home-faq__icon" aria-hidden="true"></span></summary>
+              <p>No. LPC is a technology platform. It does not provide legal advice, assign professionals, or supervise legal work.</p>
+            </details>
+            <details name="homepage-faq" data-faq-order="4">
+              <summary>How are payments handled?<span class="home-faq__icon" aria-hidden="true"></span></summary>
+              <p>The attorney funds the Matter through Stripe when hiring. LPC uses Stripe Connect to facilitate payment processing and route the payout to the paralegal after completion is confirmed in the platform or a platform review is resolved.</p>
+            </details>
+            <details name="homepage-faq" data-faq-order="5">
+              <summary>Can I request a conflicts check before hiring?<span class="home-faq__icon" aria-hidden="true"></span></summary>
+              <p>Yes. You can request a conflicts check or confidentiality agreement from a selected paralegal before hiring. These tools are optional; attorneys remain responsible for the professional obligations that apply to their Matter.</p>
+            </details>
           </div>
           <div class="home-faq__links">
             <a href="attorney-faq.html">
@@ -605,7 +497,6 @@
       <canvas class="matter-field matter-field--closing" data-matter-field="closing" aria-hidden="true"></canvas>
       <div class="closing-scene__content">
         <h2 id="closing-title">Start with the role that brings you here.</h2>
-        <p>Join LPC as an attorney seeking matter-based support or as a paralegal ready to apply to open matters.</p>
         <div class="role-actions">
           <a class="role-action" href="signup.html?role=attorney" data-public-action="secondary" data-action-shape="control">
             <span>For attorneys</span>
@@ -630,8 +521,8 @@
           <summary>Platform</summary>
           <div class="home-footer__links">
             <a href="#how">How It Works</a>
-            <a href="#for-attorneys">For Attorneys</a>
-            <a href="#for-paralegals">For Paralegals</a>
+            <a href="attorney-faq.html">For Attorneys</a>
+            <a href="paralegal-faq.html">For Paralegals</a>
             <a href="browse-paralegals.html">Browse Paralegals</a>
           </div>
         </details>
@@ -648,7 +539,7 @@
           <div class="home-footer__links">
             <a href="signup.html?role=paralegal">Apply to Join</a>
             <a href="paralegal-faq.html">Paralegal FAQ</a>
-            <a href="/paralegal-admission.html">Our Vetting Process</a>
+            <a href="/paralegal-admission.html">Our Application Review</a>
           </div>
         </details>
         <details open>
@@ -661,8 +552,10 @@
         </details>
       </nav>
       <div class="home-footer__bottom">
-        <a class="home-footer__brand" href="index.html" aria-label="Let’s-ParaConnect home">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</a>
-        <p>Copyright © 2026 Let’s-ParaConnect. All rights reserved.</p>
+        <div class="home-footer__identity">
+          <a class="home-footer__brand" href="index.html" aria-label="Let’s-ParaConnect home">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+          <p>Copyright © 2026 Let’s-ParaConnect. All rights reserved.</p>
+        </div>
         <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode" data-public-action="icon">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg>
           <span>Accessibility</span>
@@ -671,7 +564,9 @@
     </div>
   </footer>
 
-  <script src="assets/scripts/homepage.js?v=20260828-phase4-source-geometry" defer></script>
+  <script src="assets/scripts/homepage-map.js?v=20260929-dot-pulse-1" defer></script>
+  <script src="assets/scripts/homepage.js?v=20260924-header-section" defer></script>
+  <script src="assets/scripts/homepage-assistant.js?v=20260929-review-copy" defer></script>
   <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
 </html>

@@ -356,9 +356,14 @@ function evaluateArchiveReadiness(input = {}) {
   if (input.storageChecked !== true) blockers.push("archive_storage_unverified");
   else if (input.storageObjectExists !== true) blockers.push("archive_object_missing");
   if (caseDoc.purgedAt) blockers.push("archive_purged");
+  const final = ["completed", "closed"].includes(status);
+  const recordedDeadline = caseDoc.purgeScheduledFor || (final && caseDoc.completedAt ? calculateArchivePurgeAt(caseDoc.completedAt) : null);
+  const retentionEndsAt = recordedDeadline ? new Date(recordedDeadline) : null;
+  if ((final && !retentionEndsAt) || retentionEndsAt && Number.isNaN(retentionEndsAt.getTime())) blockers.push("archive_retention_unconfirmed");
+  else if (retentionEndsAt && retentionEndsAt <= new Date(input.now || Date.now())) blockers.push("archive_retention_expired");
   return result(ATTORNEY_WORKFLOW_STAGES.ARCHIVE_DOWNLOAD, blockers, {
     archiveReadyAt: caseDoc.archiveReadyAt || null,
-    purgeScheduledFor: caseDoc.purgeScheduledFor || null,
+    purgeScheduledFor: retentionEndsAt && !Number.isNaN(retentionEndsAt.getTime()) ? retentionEndsAt.toISOString() : null,
     purgedAt: caseDoc.purgedAt || null,
   }, { applicable });
 }

@@ -16,6 +16,7 @@ const mountByFile = {
   "adminMarketing.js": "/api/admin/marketing",
   "adminSales.js": "/api/admin/sales",
   "adminSupport.js": "/api/admin/support",
+  "adminWorkspace.js": "/api/admin/workspace",
   "aiAdmin.js": "/api/admin/ai",
   "applications.js": "/api/applications",
   "auth.js": "/api/auth",
@@ -33,6 +34,7 @@ const mountByFile = {
   "incidents.js": "/api/incidents",
   "jobs.js": "/api/jobs",
   "messages.js": "/api/messages",
+  "matterPostings.js": "/api/cases/posting",
   "notifications.js": "/api/notifications",
   "paralegals.js": "/api/paralegals",
   "payments.js": "/api/payments",
@@ -44,6 +46,16 @@ const mountByFile = {
   "uploads.js": "/api/uploads",
   "users.js": "/api/users and /api/paralegals",
 };
+
+// This configured child router inherits authentication and approval at its
+// actual mount. Its own role guard remains authoritative for the role column.
+function inheritedGuards(file) {
+  if (file !== "matterPostings.js") return "";
+  const parent = fs.readFileSync(path.join(routesDir, "cases.js"), "utf8");
+  const mount = parent.indexOf('router.use("/posting", require("./matterPostings")');
+  if (mount < 0) throw new Error("Matter posting mount was not found; update its security inventory.");
+  return parent.slice(0, mount);
+}
 
 const fileRateLimitNotes = {
   "auth.js": "App-level limits for login/register/reset/resend.",
@@ -170,6 +182,7 @@ const rows = [];
 for (const file of files) {
   const abs = path.join(routesDir, file);
   const src = fs.readFileSync(abs, "utf8");
+  const inherited = inheritedGuards(file);
   let match;
   while ((match = ROUTE_RE.exec(src))) {
     const method = match[1].toUpperCase();
@@ -185,11 +198,11 @@ for (const file of files) {
       ? "no/public"
       :
       /verifyToken|auth\b|router\.use\(verifyToken|router\.use\(auth|requireControlRoomE2eHarnessSecret|requireCcoAutonomyHarnessEnabled|stripe\.webhooks\.constructEvent/.test(
-        `${beforeLineText}\n${call}`
+        `${inherited}\n${beforeLineText}\n${call}`
       )
         ? "yes"
         : "no/public";
-    const approved = !publicTelemetry && /requireApproved|requireApprovedUser|router\.use\(requireApproved/.test(`${beforeLineText}\n${call}`)
+    const approved = !publicTelemetry && /requireApproved|requireApprovedUser|router\.use\(requireApproved/.test(`${inherited}\n${beforeLineText}\n${call}`)
       ? "yes"
       : "no/public-or-special";
     const roleMatch = `${beforeLineText}\n${call}`.match(/requireRole\(([^)]*)\)/);

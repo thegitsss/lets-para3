@@ -1,0 +1,183 @@
+.paralegal-financials { min-width: 0; max-width: 100%; color: inherit; }
+.v2-payouts { box-sizing: border-box; width: 100%; max-width: 1120px; margin-inline: auto; padding: clamp(20px, 4vw, 48px); color: var(--v2-ink, #273449); }
+.v2-payouts h1 { margin: 0 0 24px; font-size: clamp(1.5rem, 2.4vw, 2rem); font-weight: 500; line-height: 1.2; }
+.v2-payouts .ph-history-actions { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--v2-border, #cbd5e1); }
+.v2-payouts .ph-link { color: inherit; text-underline-offset: 4px; }
+.ld-desktop .ph-history { min-width: 0; padding: 0 var(--original-gutter, 24px) 32px; }
+.ld-desktop .ph-history-content { display: grid; gap: 16px; }
+.ph-history-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; }
+.ph-history-actions > a { display: inline-flex; align-items: center; min-height: 44px; max-width: 100%; overflow-wrap: anywhere; }
+.paralegal-financials table { width: 100%; border-collapse: collapse; font: inherit; color: inherit; background: transparent; }
+.paralegal-financials th, .paralegal-financials td { padding: 12px 8px; text-align: right; overflow-wrap: anywhere; border-bottom: 1px solid var(--v2-border, #cbd5e1); background: transparent; }
+.paralegal-financials th:first-child { text-align: left; }
+.paralegal-financials th { font-weight: 500; }
+.paralegal-financials .pf-note { font-size: .875rem; line-height: 1.5; }
+.paralegal-financials .pf-record-status { margin-block: 16px; }
+.paralegal-financials .pf-estimates { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--v2-border, #cbd5e1); }
+.paralegal-financials h3 { margin: 0 0 12px; font-size: 1rem; }
+.paralegal-financials button { font: inherit; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 5px; min-height: 44px; padding: 8px 14px; cursor: pointer; }
+.paralegal-financials :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.paralegal-financials .pf-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 640px) {
+  .paralegal-financials :is(table, tbody, tr, th, td) { display: block; width: auto; }
+  .paralegal-financials thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .paralegal-financials tbody th { padding-inline: 0; padding-top: 18px; font-weight: 600; }
+  .paralegal-financials td { display: flex; justify-content: space-between; gap: 16px; padding-inline: 0; }
+  .paralegal-financials td::before { content: attr(data-period); text-align: left; }
+}
+.paralegal-history-payout { min-width: 0; overflow-wrap: anywhere; }
+.paralegal-history-payout .pf-receipt-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.paralegal-history-payout details { margin-top: 12px; }
+.paralegal-history-payout details .pf-receipt-choice { padding-block: 12px; border-top: 1px solid var(--v2-border, #cbd5e1); }
+.paralegal-history-payout summary { cursor: pointer; padding-block: 8px; }
+.paralegal-history-payout button { color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 3px; background: transparent; border: 0; cursor: pointer; padding: 8px 0; text-align: left; }
+.paralegal-history-payout :is(button, summary):focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.paralegal-history-payout small { font-size: .875rem; }
+.paralegal-history-payout p { margin-block: 4px; }
+#paralegalFinancialSummary { grid-column: 1 / -1; min-width: 0; }
+body.lpc-product-clean #paralegalCasesView .btn-link:not([aria-disabled="true"]) { color: var(--lpc-ui-blue); }
+/* The original compensation panel keeps its established dark surface in both
+   themes. Its table must not inherit the global light-table text override. */
+body.lpc-product-clean .private-office-compensation .paralegal-financials,
+body.lpc-product-clean .private-office-compensation .paralegal-financials :is(table, thead, tbody, tr, th, td) {
+  color: #f5f0e6 !important;
+  background: transparent !important;
+}
+body.lpc-product-clean .private-office-compensation .paralegal-financials :is(th, td) { border-color: #607587; }
+.v2-work-history-row:has(> .paralegal-history-payout) {
+  grid-template-columns: 38px minmax(0, 1fr) minmax(220px, .75fr);
+  grid-template-rows: min-content 1fr;
+  align-items: start;
+}
+.v2-work-history-row > .paralegal-history-payout { grid-column: 3; grid-row: 1 / span 2; }
+.v2-work-history-row:has(> .paralegal-history-payout) > .v2-work-history-actions { grid-column: 2; grid-row: 2; justify-content: flex-start; }
+.paralegal-history-payout .pf-note { font-size: .875rem; line-height: 1.5; }
+@media (max-width: 1000px) {
+  .v2-work-history-row:has(> .paralegal-history-payout) { grid-template-columns: 30px minmax(0, 1fr); grid-template-rows: auto; }
+  .v2-work-history-row > .paralegal-history-payout { grid-column: 2; grid-row: auto; }
+  .v2-work-history-row:has(> .paralegal-history-payout) > .v2-work-history-actions { grid-column: 2; grid-row: auto; }
+}
+/* The original shared product skin forces white after theme selection. Keep
+   the surrounding history workspace consistent with the selected dark theme. */
+body.lpc-product-clean.theme-dark:is(:has(#paralegalCasesView:not([hidden])), .case-detail-no-topbar) {
+  color-scheme: dark;
+  --bg: #111b2a;
+  --panel: #192538;
+  --ink: #f2f5f9;
+  --muted: #b2bccb;
+  --line: #354258;
+  --accent: #b4d2ff;
+  --sidebar-bg: var(--bg);
+  --sidebar-text: var(--ink);
+  --app-surface: var(--bg);
+  --app-surface-contrast: var(--panel);
+  --app-card-muted: var(--panel);
+  --app-text: var(--ink);
+  --app-muted: var(--muted);
+  --app-border: var(--line);
+  --app-border-soft: var(--line);
+  --lpc-surface-page: var(--bg);
+  --lpc-surface-canvas: var(--bg);
+  --lpc-surface-panel: var(--panel);
+  --lpc-surface-raised: var(--panel);
+  --lpc-surface-subtle: var(--panel);
+  --lpc-text-primary: var(--ink);
+  --lpc-text-secondary: var(--muted);
+  --lpc-border-subtle: var(--line);
+  --lpc-ui-ink: var(--ink);
+  --lpc-ui-muted: var(--muted);
+  --lpc-ui-line: var(--line);
+  --lpc-ui-line-strong: #607587;
+  --lpc-ui-soft: var(--panel);
+  --lpc-ui-blue: var(--accent);
+  --lpc-ui-blue-hover: #cee1ff;
+  background: var(--bg) !important;
+  color: var(--ink) !important;
+}
+body.lpc-product-clean.theme-dark:is(:has(#paralegalCasesView:not([hidden])), .case-detail-no-topbar) :is(main#main, .lpc-auth-page-shell, .lpc-universal-header-shell, .sidebar) {
+  background: var(--bg) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+body.lpc-product-clean.theme-dark:is(:has(#paralegalCasesView:not([hidden])), .case-detail-no-topbar) :is(.sidebar, .lpc-universal-header-shell) :is(a, button, .logo, .sidebar-footer, .lpc-sidebar-profile-name, .lpc-sidebar-profile-role) {
+  color: var(--ink) !important;
+}
+body.lpc-product-clean.theme-dark:is(:has(#paralegalCasesView:not([hidden])), .case-detail-no-topbar) :is(.sidebar, .lpc-universal-header-shell) button {
+  background: var(--bg) !important;
+}
+body.lpc-product-clean.theme-dark:is(:has(#paralegalCasesView:not([hidden])), .case-detail-no-topbar) .lpc-sidebar-section-label { color: var(--muted) !important; }
+body.lpc-product-clean.theme-dark #paralegalCasesView :is(.file-card, .empty-state, .applied-controls-panel, .lpc-saved-view-toolbar, input, select, button) {
+  background: var(--panel) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+body.lpc-product-clean.theme-dark #paralegalCasesView :is(h1, h2, h3, p, label, a, .section-title, .info-line, .case-files-empty) { color: var(--ink) !important; }
+body.lpc-product-clean.theme-dark #paralegalCasesView :is(.file-card, .cases-column, .cases-hairline) { border-color: var(--line) !important; }
+body.lpc-product-clean.theme-dark #paralegalCasesView .paralegal-history-payout button { background: transparent !important; }
+body.lpc-product-clean.theme-dark #paralegalCasesView .file-card { background: transparent !important; }
+.matter-payment-details { max-width: 48rem; min-width: 0; }
+.matter-payment-state { margin: 0 0 1rem; }
+.matter-payment-amounts { margin: 0 0 1.5rem; }
+.matter-payment-amounts > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; padding: .85rem 0; border-bottom: 1px solid var(--line, #d8dee7); }
+.lpc-v2 .matter-payment-amounts > div { border-color: var(--v2-line); }
+.matter-payment-amounts dt, .matter-payment-amounts dd { margin: 0; overflow-wrap: anywhere; }
+.matter-payment-amounts dd { font-variant-numeric: tabular-nums; }
+.matter-payment-amounts [data-amount-code="net"] dd { font-weight: 600; }
+.matter-payment-details .paralegal-history-payout { min-width: 0; width: auto; }
+.matter-payment-details > button, .matter-payment-details .paralegal-history-payout button { font: inherit; color: inherit; background: transparent; border: 0; padding: .4rem 0; text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
+.matter-payment-details button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.matter-payment-details button:disabled { cursor: wait; opacity: .7; }
+@media (max-width: 420px) {
+  .matter-payment-amounts > div { grid-template-columns: minmax(0, 1fr); gap: .3rem; }
+}
+
+/* Both original financial workspaces use the same selected palette. */
+body.lpc-product-clean.case-detail-no-topbar:not(.theme-dark) {
+  --muted: #596579;
+  --app-muted: var(--muted);
+  --lpc-ui-muted: var(--muted);
+  --lpc-text-secondary: var(--muted);
+}
+body.lpc-product-clean.case-detail-no-topbar.theme-dark :is(.case-workspace, .case-rail-stack, .matter-stage, .matter-tabs, .matter-tab-panel) {
+  color: var(--ink) !important;
+  background: var(--panel) !important;
+  border-color: var(--line) !important;
+}
+body.lpc-product-clean.case-detail-no-topbar.theme-dark :is(h1, h2, h3, h4, h5, h6, .matter-tabs button, .case-nav-link, .case-select-label, .matter-section-header p) { color: var(--ink) !important; }
+body.lpc-product-clean.case-detail-no-topbar.theme-dark :is(select, input, textarea) { color: var(--ink) !important; background: var(--panel) !important; border-color: var(--line) !important; }
+body.lpc-product-clean.case-detail-no-topbar.theme-dark .matter-payment-details :is(p, dt, dd, strong, small, button) { color: var(--ink) !important; }
+
+/* The original Matter embeds the same receipt controls as the attorney shell. */
+#matterPaymentDetails .matter-receipt { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+#matterPaymentDetails .matter-receipt h3 { margin: 1rem 0 .75rem; }
+#matterPaymentDetails .matter-receipt-details { display: grid; grid-template-columns: minmax(8rem, .65fr) minmax(0, 1fr); gap: .6rem 1rem; margin: 1rem 0; }
+#matterPaymentDetails .matter-receipt-details :is(dt, dd) { margin: 0; min-width: 0; }
+#matterPaymentDetails .matter-note-actions { display: flex; flex-wrap: wrap; gap: .65rem; margin: 1rem 0; }
+#matterPaymentDetails .matter-note-button { font: inherit; color: inherit; background: transparent; padding: .5rem .8rem; border: 1px solid var(--line); border-radius: 3px; cursor: pointer; }
+#matterPaymentDetails .matter-note-button:disabled { opacity: .7; cursor: wait; }
+#matterPaymentDetails .matter-note-button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+#matterPaymentDetails .matter-note-primary { font-weight: 600; }
+#matterPaymentDetails [data-receipt-choice] { margin: 1rem 0; padding: .75rem 0; border-bottom: 1px solid var(--line); }
+#matterPaymentDetails [data-receipt-choice] button { font: inherit; color: inherit; background: transparent; border: 0; text-decoration: underline; text-underline-offset: .2em; padding: .5rem 0; cursor: pointer; }
+@media (max-width: 600px) {
+  #matterPaymentDetails .matter-receipt-details { grid-template-columns: minmax(0, 1fr); gap: .3rem; }
+  #matterPaymentDetails .matter-receipt-details dd { margin-bottom: .85rem; }
+}
+
+/* Completion keeps the same selected dark palette as the financial record. */
+body.dashboard-no-shadows.theme-dark #caseCompletedModal {
+  background: #192538 !important;
+  color: #f2f5f9 !important;
+  border-color: #354258 !important;
+}
+body.dashboard-no-shadows.theme-dark #caseCompletedModal .tour-title { color: #f2f5f9 !important; }
+body.dashboard-no-shadows.theme-dark #caseCompletedModal :is(.tour-text, .tour-close) { color: #b8c4d5 !important; }
+body.dashboard-no-shadows.theme-dark #caseCompletedModal .tour-hero { background: #8fbaff !important; }
+body.dashboard-no-shadows.theme-dark #caseCompletedModal .tour-btn.primary {
+  color: #111b2a !important;
+  background: #b8d4ff !important;
+  border-color: #b8d4ff !important;
+}
+body.dashboard-no-shadows.theme-dark #caseCompletedModal .tour-btn.primary:hover { background: #d3e4ff !important; }
+body.dashboard-no-shadows.theme-dark #caseCompletedModal .tour-close:hover { color: #f2f5f9 !important; background: #354258 !important; }
+body.dashboard-no-shadows.theme-dark #caseCompletedModal button:focus-visible { outline-color: #b8d4ff !important; }

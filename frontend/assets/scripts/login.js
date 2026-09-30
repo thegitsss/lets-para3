@@ -1,4 +1,5 @@
 import { persistSession } from "./auth.js";
+import "./utils/login-return-target.js";
 import { showAlert } from "./utils/dialogs.js";
 
 const API_BASE = "/api";
@@ -17,6 +18,30 @@ const resolveDashboardTarget = (userOrRole) => {
   if (normalizedRole === "director") return "director-portal.html";
   if (normalizedRole === "paralegal") return "dashboard-paralegal.html";
   return "dashboard-attorney.html";
+};
+
+const resolveRequestedMemberTarget = (userOrRole) => {
+  const user = userOrRole && typeof userOrRole === "object" ? userOrRole : null;
+  const normalizedRole = String(user?.role || userOrRole || "").toLowerCase();
+  if (!["attorney", "paralegal"].includes(normalizedRole)) return "";
+
+  const requested = new URLSearchParams(window.location.search).get("next");
+  if (!requested) return "";
+  return window.LPCLoginReturn.resolve(requested, normalizedRole, window.location.origin);
+};
+
+const googleReturnTarget = resolveRequestedMemberTarget("paralegal") || resolveRequestedMemberTarget("attorney");
+const googleLoginLink = document.querySelector('a[href="/api/auth/google?intent=login"]');
+if (googleReturnTarget && googleLoginLink) googleLoginLink.href = `/api/auth/google?intent=login&next=${encodeURIComponent(googleReturnTarget)}`;
+
+const resolvePostLoginTarget = async (userOrRole) => {
+  const requested = resolveRequestedMemberTarget(userOrRole);
+  if (requested) return requested;
+  if (userOrRole && typeof userOrRole === "object" && ["attorney", "paralegal"].includes(userOrRole.role)) {
+    const { defaultWorkspaceDestination } = await import("./utils/workspace-release.mjs");
+    return await defaultWorkspaceDestination(userOrRole) || resolveDashboardTarget(userOrRole);
+  }
+  return resolveDashboardTarget(userOrRole);
 };
 
 const maybeRedirectFromStoredUser = async () => {
@@ -39,12 +64,7 @@ const maybeRedirectFromStoredUser = async () => {
     try {
       const session = await window.checkSession(undefined, { redirectOnFail: false });
       if (session?.user) {
-        const targetRole = session.role || role;
-        if (window.redirectUserDashboard) {
-          window.redirectUserDashboard(targetRole);
-        } else {
-          window.location.href = resolveDashboardTarget(targetRole);
-        }
+        window.location.href = await resolvePostLoginTarget({ ...session.user, role: session.user.role || session.role || role });
         return true;
       }
     } catch (error) {
@@ -170,7 +190,7 @@ const initLogin = () => {
     const data = await verifyRes.json().catch(() => ({}));
     if (!verifyRes.ok) throw new Error(data?.error || "Passkey sign-in failed.");
     persistSession({ user: data.user || null });
-    window.location.href = resolveDashboardTarget(data.user);
+    window.location.href = await resolvePostLoginTarget(data.user);
   };
 
   passkeyLoginBtn?.addEventListener("click", async () => {
@@ -294,7 +314,7 @@ const initLogin = () => {
     try {
       if (loginButton) {
         loginButton.disabled = true;
-        loginButton.textContent = "Logging in…";
+        loginButton.textContent = "Signing in…";
       }
       const csrfToken = await fetchCsrfToken();
       const res = await fetchWithTimeout(`${API_BASE}/auth/login`, {
@@ -316,7 +336,7 @@ const initLogin = () => {
 
       if (!res.ok) {
         clearLocalSession();
-        const msg = data?.error || data?.msg || data?.message || "Login failed";
+        const msg = data?.error || data?.msg || data?.message || "Sign-in failed";
         notify(msg);
         return;
       }
@@ -330,14 +350,14 @@ const initLogin = () => {
       shouldRestoreButton = false;
       persistSession({ user: data.user || null });
 
-      window.location.href = resolveDashboardTarget(data.user);
+      window.location.href = await resolvePostLoginTarget(data.user);
     } catch (err) {
       console.error(err);
       clearLocalSession();
       if (err?.name === "AbortError") {
-        notify("Login timed out. Please try again.");
+        notify("Sign-in timed out. Please try again.");
       } else {
-        notify("Network error during login");
+        notify("A network error interrupted sign-in. Please try again.");
       }
     } finally {
       if (shouldRestoreButton) {
@@ -411,7 +431,7 @@ const initLogin = () => {
           return;
         }
         persistSession({ user: payload.user || null });
-        window.location.href = resolveDashboardTarget(payload.user);
+        window.location.href = await resolvePostLoginTarget(payload.user);
       } catch (err) {
         if (err?.name === "AbortError") {
           if (toastHelper) {

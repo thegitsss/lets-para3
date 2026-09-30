@@ -1,3 +1,13 @@
+const presignedUploads = require("../services/matterPresignedUploads");
+const matterRetirement = require("../services/matterStorageRetirement"), fileRemoval = require("../services/attorneyMatterFileRemoval");
+const matterFileWrites = require("../services/matterFileWrites");
+const attorneyCompletion = require("../services/attorneyCompletion");
+const attorneyWithdrawal = require("../services/attorneyWithdrawal");
+const completionPayoutEvidence = require("../services/completionPayoutEvidence");
+const matterExports = require("../services/matterExports");
+const { createReadStream: createExportReadStream } = require("fs");
+const { pipeline: exportPipeline } = require("stream/promises");
+const { projectRevisionResolutions } = require("../utils/revisionResolution");
 // backend/routes/cases.js
 const router = require("express").Router();
 const crypto = require("crypto");
@@ -12,24 +22,33 @@ const { createS3Client } = require("../utils/s3Client");
 const { createLogger, logPromiseFailure } = require("../utils/logger");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const Case = require("../models/Case");
+const matterModeration = require("../services/matterModeration");
+const postingNotices = require("../services/matterPostingNotifications");
+const matterNotes = require("../services/matterNotes");
 const Job = require("../models/Job");
 const Application = require("../models/Application");
 const createApplicationForJob = require("./applications").createApplicationForJob;
+const { captureResumeReference } = require("../utils/resumeReferenceWrite");
 const CaseFile = require("../models/CaseFile");
 const User = require("../models/User");
-const Payout = require("../models/Payout");
+const withdrawalNotices = require("../services/matterWithdrawalNotifications");
+const { withActiveAccountWrite, lockActiveAccounts } = require("../utils/activeAccountWrite");
+const { deletePostingRecords } = require("../services/matterDeletion");
 const PaymentOperation = require("../models/PaymentOperation");
-const Notification = require("../models/Notification");
 const logger = createLogger("cases");
-const sendEmail = require("../utils/email");
-const emailTemplates = require("../email/templates");
 const { notifyUser } = require("../utils/notifyUser");
+const reviewNotices = require("../services/matterReviewNotifications");
+const { reportOperationalFailure } = require("../utils/operationalFailure");
 const stripe = require("../utils/stripe");
-const { cleanText, cleanTitle, cleanMessage } = require("../utils/sanitize");
+const { cleanText, cleanTitle, cleanMessage, cleanPlainText } = require("../utils/sanitize");
 const { logAction } = require("../utils/audit");
 const AuditLog = require("../models/AuditLog");
 const { generateArchiveZip, buildReceiptPdfBuffer, uploadPdfToS3, getReceiptKey } = require("../services/caseLifecycle");
 const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
+const legacyApplications = require("../services/legacyApplicationProjections");
+const { refs: applicationRefs } = require("../services/applicationIdentity");
+const { PENDING_STATUSES: pendingApplicationStatuses } = require("../services/accountApplicationProjections");
+const { parseMinimumYears } = require("../services/experienceRequirement");
 const { buildAuthenticatedProfilePhotoUrl } = require("../services/profilePhotoDelivery");
 const { currentStripeMode, pickStripeMode, stripeModeFromLivemode } = require("../utils/stripeMode");
 const { validatePaymentIntentForCase } = require("../utils/paymentIntegrity");
@@ -42,11 +61,9 @@ const {
 const {
   upsertPayoutLedger,
   upsertPlatformIncomeLedger,
+  withPayoutTransaction,
 } = require("../services/paymentLedgerService");
 const {
-  setApplicationStar,
-  setApplicationStatus,
-  syncApplicantsCount,
 } = require("../services/applicationService");
 const {
   respondToInvitation,
@@ -67,11 +84,14 @@ const {
   normalizeId,
 } = require("../utils/blocks");
 const { addSubscriber, publishCaseEvent } = require("../utils/caseEvents");
+const { publishMatterDiscoveryEvent } = require("../utils/matterDiscoveryEvents");
+const { publishCaseProjectionRefresh } = require("../utils/caseProjectionEvents");
 const {
   SEARCH_QUERY_MIN,
   SEARCH_QUERY_MAX,
   normalizeSearchQuery,
   parseSearchTypes,
+  validateSearchRead,
   presentMatterContext,
   searchAuthorizedObjects,
 } = require("../services/authenticatedSearch");
@@ -84,19 +104,19 @@ const {
   MIN_MATTER_AMOUNT_CENTS,
   WITHDRAWAL_REVIEW_WINDOW_MS,
   evaluateCompletionEligibility,
-  evaluateArchiveReadiness,
   evaluateHiringEligibility,
   evaluateInvitationEligibility,
   evaluateMatterPosting,
   evaluatePreEngagementRequest,
   evaluateTerminationEligibility,
-  evaluateWithdrawalAndRelist,
   isAttorneyPaymentMethodRequired,
 } = require("../services/attorneyWorkflowPolicy");
 const {
   evaluateInvitationEligibility: evaluateParalegalInvitationAcceptance,
   evaluatePreEngagementSubmission,
   evaluateWithdrawalEligibility,
+  hasPredecessorWithdrawalSettlement,
+  currentAssignmentScopeProgress,
 } = require("../services/paralegalWorkflowPolicy");
 const {
   decryptCaseFilePayload,
@@ -124,6 +144,11 @@ const {
   finalizeExpiredDisputeWindow,
   generateWithdrawalReceipts,
 } = require("../services/withdrawalLifecycle");
+const {
+  applyAssignmentVisibility,
+  isRecordVisibleToCurrentAssignment,
+  resolveCurrentParalegalAssignmentBoundary,
+} = require("../utils/matterAssignmentVisibility");
 
 const STRIPE_BYPASS_PARALEGAL_EMAILS = createDevOnlyEmailSet([
   "samanthasider+11@gmail.com",
@@ -170,13 +195,32 @@ const PRACTICE_AREAS = [
   "technology",
 ];
 
-async function claimCaseHire(caseId, paralegalId) {
+async function claimCaseHire(reviewedCase, paralegalId, strictReview = null, req = null) {
+  return withActiveAccountWrite([req?.user?.id, reviewedCase.attorney, reviewedCase.attorneyId, paralegalId], async session => {
+  const caseId = reviewedCase._id;
+  // Application decisions increment the Matter version in their transaction.
+  // Bind the claim to the Matter examined before payment-method lookup so a
+  // decision committed during that lookup cannot be overwritten by this hire.
+  const reviewedVersion = reviewedCase.get("__v") ?? 0;
+  const versionClause = reviewedVersion === 0
+    ? { $or: [{ __v: 0 }, { __v: { $exists: false } }] }
+    : { __v: reviewedVersion };
   const token = crypto.randomUUID();
   const claimedAt = new Date();
+  if (strictReview) {
+    const raw = await Case.collection.findOneAndUpdate(strictReview.filter, { $set: {
+      hiringClaimToken: token, hiringClaimParalegalId: new mongoose.Types.ObjectId(paralegalId), hiringClaimedAt: claimedAt, hiringClaimStatus: "claimed",
+      hiringClaimPaymentIntentId: strictReview.dto.canResume ? strictReview.facts.hiringClaimPaymentIntentId : "",
+      hiringClaimAmount: strictReview.dto.canResume ? strictReview.facts.hiringClaimAmount : 0, hiringClaimError: "", updatedAt: claimedAt,
+    }, $inc: { __v: 1 } }, { returnDocument: "after", session });
+    return { acquired: !!raw, caseDoc: raw ? Case.hydrate(raw) : null, replacementSource: raw, token, claimedAt };
+  }
   let caseDoc = await Case.findOneAndUpdate(
     {
       _id: caseId,
+      archived: { $ne: true },
       $and: [
+        versionClause,
         { $or: [{ paralegal: null }, { paralegal: { $exists: false } }] },
         { $or: [{ paralegalId: null }, { paralegalId: { $exists: false } }] },
         {
@@ -198,13 +242,15 @@ async function claimCaseHire(caseId, paralegalId) {
         hiringClaimError: "",
       },
     },
-    { returnDocument: "after" }
+    { returnDocument: "after", session }
   );
   if (!caseDoc) {
     caseDoc = await Case.findOneAndUpdate(
       {
         _id: caseId,
+        archived: { $ne: true },
         $and: [
+          versionClause,
           { $or: [{ paralegal: null }, { paralegal: { $exists: false } }] },
           { $or: [{ paralegalId: null }, { paralegalId: { $exists: false } }] },
         ],
@@ -220,10 +266,13 @@ async function claimCaseHire(caseId, paralegalId) {
           hiringClaimError: "",
         },
       },
-      { returnDocument: "after" }
+      { returnDocument: "after", session }
     );
   }
-  return { acquired: Boolean(caseDoc), caseDoc, token, claimedAt };
+  const replacementSource = caseDoc?.status === "paused" && caseDoc.pausedReason === "paralegal_withdrew"
+    ? await Case.collection.findOne({ _id: caseId, hiringClaimToken: token }, { session }) : null;
+  return { acquired: Boolean(caseDoc), caseDoc, replacementSource, token, claimedAt };
+  }, { ownerId: req?.user?.id, authVersion: req?.auth?.payload?.av });
 }
 
 async function recordCaseHirePaymentEvidence(caseId, token, paymentIntent, amount) {
@@ -329,10 +378,13 @@ async function claimCaseCompletion(caseId, actorId, { isAdmin = false } = {}) {
 
 async function recordCaseCompletionTransferEvidence(caseId, token, transferId) {
   if (!transferId) return null;
-  return Case.updateOne(
-    { _id: caseId, completionClaimToken: token },
-    { $set: { completionClaimTransferId: String(transferId) } }
+  const result = await Case.updateOne(
+    { _id: caseId, completionClaimToken: token, completionClaimStatus: { $in: ["claimed", "needs_reconciliation"] }, completionClaimTransferId: { $in: ["", null, String(transferId)] } },
+    { $set: { completionClaimTransferId: String(transferId) } },
+    { writeConcern: { w: "majority" } }
   );
+  if (!result.matchedCount) throw new Error("The completion claim changed before its transfer could be recorded.");
+  return result;
 }
 
 async function releaseCaseCompletionClaim(caseId, token) {
@@ -379,7 +431,8 @@ const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
 }, {});
 const preEngagementUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: PRE_ENGAGEMENT_MAX_FILE_BYTES },
+  // Multipart forms use flat fields; reject oversized numeric bracket indexes.
+  limits: { fileSize: PRE_ENGAGEMENT_MAX_FILE_BYTES, fieldArrayIndexLimit: 0 },
 });
 
 function preEngagementSseParams() {
@@ -508,32 +561,24 @@ async function hasActiveCaseCandidate(caseDoc, paralegalId) {
   if (!caseDoc?._id || !isObjId(paralegalId)) return false;
   let jobId = resolveCaseJobId(caseDoc);
   if (!jobId) {
-    const job = await Job.findOne({ caseId: caseDoc._id }).select("_id").lean();
-    jobId = job?._id || null;
+    const jobs = await Job.collection.find({ caseId: { $in: [caseDoc._id, String(caseDoc._id)] } }, { projection: { _id: 1 } }).limit(2).toArray();
+    if (jobs.length > 1) return false;
+    jobId = jobs[0]?._id || null;
   }
-  const [canonicalApplication, embeddedCandidate, acceptedInvite] = await Promise.all([
-    jobId
-      ? Application.findOne({ jobId, paralegalId }).select("status").lean()
-      : null,
-    Case.exists({
-      _id: caseDoc._id,
-      applicants: {
-        $elemMatch: {
-          paralegalId,
-          status: { $in: ["pending", "accepted"] },
-        },
-      },
-    }),
-    Case.exists({
-      _id: caseDoc._id,
-      invites: { $elemMatch: { paralegalId, status: "accepted" } },
-    }),
+  if (jobId && !isObjId(String(jobId))) return false;
+  const refs = applicationRefs;
+  const [canonical, candidateCase] = await Promise.all([
+    jobId ? Application.collection.find({ jobId: { $in: refs(jobId) }, paralegalId: { $in: refs(paralegalId) } }, { projection: { status: 1 } }).limit(2).toArray() : [],
+    Case.collection.findOne({ _id: caseDoc._id }, { projection: { applicants: 1, invites: 1, withdrawnApplicantIds: 1 } }),
   ]);
-  if (canonicalApplication) {
-    return ["submitted", "viewed", "shortlisted", "accepted"].includes(
-      String(canonicalApplication.status || "").toLowerCase()
-    );
-  }
+  if (!candidateCase) return false;
+  const activeStatuses = ["pending", "submitted", "viewed", "shortlisted", "accepted"];
+  const embeddedCandidate = candidateCase.applicants?.some(entry => String(entry.paralegalId) === String(paralegalId) && activeStatuses.includes(entry.status));
+  const acceptedInvite = candidateCase.invites?.some(entry => String(entry.paralegalId) === String(paralegalId) && entry.status === "accepted");
+  const withdrawn = candidateCase.withdrawnApplicantIds?.some(ref => String(ref) === String(paralegalId));
+  if (canonical.length > 1) return false;
+  // Earlier canonical-only applications remain valid; a removed mirror cannot revive one mid-withdrawal.
+  if (canonical.length) return (embeddedCandidate || !withdrawn) && ["submitted", "viewed", "shortlisted", "accepted"].includes(String(canonical[0].status || "").toLowerCase());
   return Boolean(embeddedCandidate || acceptedInvite);
 }
 
@@ -648,15 +693,7 @@ function areAllScopeTasksComplete(caseDoc) {
 }
 
 function countCompletedScopeTasks(caseDoc) {
-  if (!caseDoc) return 0;
-  const list = Array.isArray(caseDoc.tasks) ? caseDoc.tasks : [];
-  if (!list.length) return 0;
-  return list.reduce((count, task) => {
-    const completed = normalizeTaskCompletion(
-      typeof task === "object" ? task?.completed ?? task?.done ?? task?.isCompleted : false
-    );
-    return count + (completed ? 1 : 0);
-  }, 0);
+  return currentAssignmentScopeProgress(caseDoc || {}).completedTaskCount;
 }
 
 function serializeScopeTasks(tasks) {
@@ -723,15 +760,6 @@ function mergeTaskCompletion(existingTasks, incomingTasks) {
       createdAt: task?.createdAt,
     };
   });
-}
-
-function safeArchiveName(title) {
-  const cleaned = String(title || "")
-    .replace(/[\u0000-\u001F\u007F]/g, "")
-    .replace(/[^a-z0-9._-]+/gi, "-")
-    .replace(/-+/g, "-")
-    .trim();
-  return (cleaned || "case-archive").slice(0, 80);
 }
 
 const DOLLARS_RX = /[^0-9.\-]/g;
@@ -1033,97 +1061,72 @@ function isDisputeWindowActive(caseDoc, now = new Date()) {
   return now.getTime() < new Date(caseDoc.disputeDeadlineAt).getTime();
 }
 
-async function markJobAssigned(caseDoc) {
-  const jobId = resolveCaseJobId(caseDoc);
-  if (!jobId) return null;
-  try {
-    const job = await Job.findByIdAndUpdate(jobId, { status: "assigned" });
-    if (!job) throw new Error(`Matter posting ${String(jobId)} is unavailable`);
-    await Case.updateOne(
-      { _id: caseDoc._id },
-      {
-        $set: {
-          postingSyncStatus: "synced",
-          postingSyncedAt: new Date(),
-          postingSyncError: "",
-        },
-      }
-    );
-  } catch (err) {
-    try {
-      await Application.updateMany(
-        { jobId },
-        {
-          $set: {
-            syncStatus: "needs_reconciliation",
-            syncedAt: null,
-            syncError: String(err?.message || err).slice(0, 1000),
-          },
-        }
-      );
-    } catch (markerError) {
-      logger.error("[cases] application reconciliation marker failed", { jobId, error: markerError });
-    }
-    await Case.updateOne(
-      { _id: caseDoc._id },
-      {
-        $set: {
-          postingSyncStatus: "needs_reconciliation",
-          postingSyncedAt: null,
-          postingSyncError: String(err?.message || err).slice(0, 1000),
-        },
-      }
-    ).catch(logPromiseFailure(logger, "[cases] job reconciliation marker failed", { jobId }));
-    logger.error("[cases] job assignment synchronization deferred", jobId, err?.message || err);
-  }
-  return jobId;
+async function markJobAssigned(caseDoc, jobId, session) {
+  if (!session?.inTransaction()) throw new Error("Hiring synchronization requires a transaction.");
+  if (!jobId) return;
+  const job = await Job.collection.updateOne(
+    { _id: { $in: applicationRefs(jobId) } },
+    { $set: { status: "assigned", updatedAt: new Date() } },
+    { session }
+  );
+  if (job.matchedCount !== 1) throw new Error("The Matter posting could not be assigned.");
+  const synced = await Case.collection.updateOne(
+    { _id: caseDoc._id },
+    { $set: { postingSyncStatus: "synced", postingSyncedAt: new Date(), postingSyncError: "" } },
+    { session }
+  );
+  if (synced.matchedCount !== 1) throw new Error("The Matter posting result could not be recorded.");
 }
 
-async function rejectJobApplications(jobId, hiredParalegalId) {
-  if (!jobId || !hiredParalegalId) return;
-  try {
-    await Application.updateOne(
-      { jobId, paralegalId: hiredParalegalId, status: { $ne: "accepted" } },
-      {
-        $set: { status: "accepted", syncStatus: "synced", syncedAt: new Date(), syncError: "" },
-        $push: {
-          statusHistory: {
-            $each: [{ to: "accepted", reason: "paralegal_hired", at: new Date() }],
-            $slice: -50,
-          },
-        },
-      }
-    );
-    await Application.updateMany(
-      { jobId, paralegalId: { $ne: hiredParalegalId }, status: { $nin: ["rejected", "withdrawn"] } },
-      {
-        $set: { status: "rejected", syncStatus: "synced", syncedAt: new Date(), syncError: "" },
-        $push: {
-          statusHistory: {
-            $each: [{ to: "rejected", reason: "matter_filled", at: new Date() }],
-            $slice: -50,
-          },
-        },
-      }
-    );
-    await syncApplicantsCount(jobId);
-  } catch (err) {
-    try {
-      await Application.updateMany(
-        { jobId },
-        {
-          $set: {
-            syncStatus: "needs_reconciliation",
-            syncedAt: null,
-            syncError: String(err?.message || err).slice(0, 1000),
-          },
-        }
-      );
-    } catch (markerError) {
-      logger.error("[cases] rejected-application reconciliation marker failed", { jobId, error: markerError });
+async function stageHiredApplications(req, caseDoc, hiredParalegalId) {
+  // Reuse the authoritative identity join: canonical retained outcomes take
+  // precedence over earlier mirrors, including raw string references.
+  const snapshot = await legacyApplications.begin(req, [caseDoc]);
+  const rows = snapshot.rows.get(String(caseDoc._id).toLowerCase()) || [];
+  const byPerson = new Map(rows.map(row => [row.personId, row]));
+  const hiredId = String(hiredParalegalId).toLowerCase();
+  const rejectedApplicantIds = new Set();
+  for (const mirror of caseDoc.applicants || []) {
+    const personId = String(mirror.paralegalId || "").toLowerCase();
+    const row = byPerson.get(personId);
+    if (!row) continue;
+    const status = String(row.record.status || "").toLowerCase();
+    if (personId === hiredId) mirror.status = "accepted";
+    else if (row.canonical ? pendingApplicationStatuses.has(status) : status === "pending") {
+      mirror.status = "rejected";
+      rejectedApplicantIds.add(personId);
     }
-    logger.warn("[cases] Unable to update application statuses after hire", err?.message || err);
   }
+  for (const row of rows) {
+    if (row.personId !== hiredId && row.canonical && pendingApplicationStatuses.has(String(row.record.status || "").toLowerCase())) rejectedApplicantIds.add(row.personId);
+  }
+  return { rejectedApplicantIds, jobId: snapshot.postings.get(String(caseDoc._id).toLowerCase())?._id || null };
+}
+
+async function rejectJobApplications(jobId, hiredParalegalId, session) {
+  if (!session?.inTransaction()) throw new Error("Hiring synchronization requires a transaction.");
+  if (!jobId || !hiredParalegalId) return;
+  const refs = applicationRefs, now = new Date();
+  const jobFilter = { jobId: { $in: refs(jobId) } };
+  await Application.collection.updateOne(
+    { ...jobFilter, paralegalId: { $in: refs(hiredParalegalId) }, status: { $in: [...pendingApplicationStatuses] } },
+    {
+      $set: { status: "accepted", syncStatus: "synced", syncedAt: now, syncError: "", updatedAt: now },
+      $push: { statusHistory: { $each: [{ to: "accepted", reason: "paralegal_hired", at: now }], $slice: -50 } },
+    },
+    { session }
+  );
+  await Application.collection.updateMany(
+    { ...jobFilter, paralegalId: { $nin: refs(hiredParalegalId) }, status: { $in: [...pendingApplicationStatuses] } },
+    {
+      $set: { status: "rejected", syncStatus: "synced", syncedAt: now, syncError: "", updatedAt: now },
+      $push: { statusHistory: { $each: [{ to: "rejected", reason: "matter_filled", at: now }], $slice: -50 } },
+    },
+    { session }
+  );
+  const count = await Application.collection.countDocuments({ ...jobFilter, status: { $in: [...pendingApplicationStatuses] } }, { session });
+  const counted = await Job.collection.updateOne({ _id: { $in: refs(jobId) } }, { $set: { applicantsCount: count, updatedAt: now } }, { session });
+  if (counted.matchedCount !== 1) throw new Error("The Matter posting count could not be updated.");
 }
 
 function parseDeadline(raw) {
@@ -1132,7 +1135,7 @@ function parseDeadline(raw) {
 
 function buildDetails(description, questions = []) {
   const parts = [];
-  const base = cleanString(description || "", { len: 100_000 });
+  const base = cleanPlainText(description || "", { max: 100_000 });
   if (base) parts.push(base);
   if (questions.length) {
     parts.push(`Screening questions:\n- ${questions.join("\n- ")}`);
@@ -1149,14 +1152,6 @@ function buildBriefSummary({ state, employmentType, experience }) {
   if (safeEmployment) bits.push(`Engagement: ${safeEmployment}`);
   if (safeExperience) bits.push(`Experience: ${safeExperience}`);
   return bits.join(" • ");
-}
-
-function minimumYearsFromExperience(value) {
-  const match = String(value || "").match(/\d+(?:\.\d+)?/);
-  if (!match) return 0;
-  const years = Number(match[0]);
-  if (!Number.isFinite(years)) return 0;
-  return Math.min(80, Math.max(0, years));
 }
 
 function summarizeUser(person) {
@@ -1338,7 +1333,7 @@ function seedLegacyInvite(caseDoc) {
   }
 }
 
-function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
+function caseSummary(doc, { includeFiles = false, viewerRole = "", viewerId = "", applicationCount } = {}) {
   const isAdmin = String(viewerRole || "").toLowerCase() === "admin";
   const paralegal = summarizeUser(doc.paralegal || doc.paralegalId);
   const pendingParalegal = summarizeUser(doc.pendingParalegal || doc.pendingParalegalId);
@@ -1348,6 +1343,18 @@ function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
   const stateValue = doc.state || doc.locationState || "";
   const normalizedStatus = normalizeCaseStatusValue(doc.status);
   const invites = listCaseInvites(doc);
+  const visibleEmbeddedFiles = Array.isArray(doc.files)
+    ? doc.files.filter((file) => isRecordVisibleToCurrentAssignment(file, doc, {
+        role: viewerRole,
+        userId: viewerId,
+        isParalegal: String(viewerRole || "").toLowerCase() === "paralegal",
+      }))
+    : [];
+  const replacementAssignmentBoundary = resolveCurrentParalegalAssignmentBoundary(doc, {
+    role: viewerRole,
+    userId: viewerId,
+    isParalegal: String(viewerRole || "").toLowerCase() === "paralegal",
+  });
   const summary = {
     _id: doc._id,
     id: String(doc._id),
@@ -1359,7 +1366,9 @@ function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
     experience: doc.experiencePreference || "",
     experiencePreference: doc.experiencePreference || "",
     minimumYearsExperience: Number(doc.minimumYearsExperience || 0),
+    requirements: doc.requirements || [],
     tasks: serializeScopeTasks(doc.tasks),
+    taskRevision: Number(doc.taskRevision || 0),
     tasksLocked: !!doc.tasksLocked,
     status: normalizedStatus,
     pausedReason: doc.pausedReason || null,
@@ -1383,9 +1392,9 @@ function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
     currency: doc.currency || "usd",
     assignedTo: paralegal,
     acceptedParalegal: !!paralegal,
-    applicants: countPendingApplicants(doc),
-    applicantsCount: countPendingApplicants(doc),
-    filesCount: !isAdmin && Array.isArray(doc.files) ? doc.files.length : 0,
+    applicants: applicationCount ?? countPendingApplicants(doc),
+    applicantsCount: applicationCount ?? countPendingApplicants(doc),
+    filesCount: !isAdmin ? visibleEmbeddedFiles.length : 0,
     jobId: doc.jobId || null,
     attorney,
     paralegal,
@@ -1398,7 +1407,9 @@ function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
     completedAt: doc.completedAt || null,
     briefSummary: doc.briefSummary || "",
     archived: !!doc.archived,
-    downloadUrl: !isAdmin && Array.isArray(doc.downloadUrl) ? doc.downloadUrl : [],
+    downloadUrl: !isAdmin && !replacementAssignmentBoundary && Array.isArray(doc.downloadUrl)
+      ? doc.downloadUrl
+      : [],
     readOnly: !!doc.readOnly,
     paralegalAccessRevokedAt: doc.paralegalAccessRevokedAt || null,
     archiveReadyAt: doc.archiveReadyAt || null,
@@ -1408,7 +1419,7 @@ function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
     paralegalNameSnapshot: doc.paralegalNameSnapshot || "",
     updatedAt: doc.updatedAt,
     createdAt: doc.createdAt,
-    internalNotes: shapeInternalNote(doc.internalNotes),
+    ...(isAdmin || String(viewerRole).toLowerCase() === "attorney" ? { internalNotes: shapeInternalNote(doc.internalNotes) } : {}),
     termination: {
       status: doc.terminationStatus || "none",
       reason: doc.terminationReason || "",
@@ -1457,9 +1468,61 @@ function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
     };
   }
   if (includeFiles && !isAdmin) {
-    summary.files = Array.isArray(doc.files) ? doc.files.map(normalizeFile) : [];
+    summary.files = visibleEmbeddedFiles.map(normalizeFile);
   }
   return summary;
+}
+
+const CASE_LIST_FIELDS = "title details practiceArea status pausedReason pausedAt disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType withdrawnParalegalId relistRequestedAt relistPending remainingAmount escrowStatus deadline deadlineDate zoomLink paymentReleased escrowIntentId applicants files jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt invites hiredAt completedAt briefSummary archived downloadUrl internalNotes totalAmount lockedTotalAmount currency tasks taskRevision tasksLocked moderationStatus moderationFlaggedAt moderationFlaggedBy moderationResolutionRequestedAt moderationResolutionRequestedBy moderationPostingBaseline moderationEditRequest title details practiceArea state locationState experiencePreference minimumYearsExperience totalAmount deadline deadlineDate tasks";
+
+// Raw owner-reference reads preserve the ObjectId/string aliases already
+// supported by the application feeds; presentation still uses the same fields.
+async function readCaseList(query, { select, sort = { updatedAt: -1 }, limit, skip = 0, populate = [] } = {}) {
+  const projection = select ? Object.fromEntries(select.split(' ').filter(Boolean).map(key => [key, 1])) : undefined;
+  const cursor = Case.collection.find(query, { projection, maxTimeMS: 15000 }).sort(sort).skip(skip);
+  if (limit) cursor.limit(limit);
+  const docs = await cursor.toArray();
+  if (populate.length) await Case.populate(docs, populate);
+  return docs;
+}
+
+async function presentCaseList(docs, { role, viewerId, includeFiles, fileDetails = true, req }) {
+  const applications = await legacyApplications.begin(req, docs);
+  let filesByCase = new Map();
+  if (includeFiles && docs.length) {
+    const caseIds = docs.map((doc) => doc._id);
+    const fileQuery = CaseFile.find({ caseId: { $in: caseIds } }).sort({ createdAt: -1 });
+    if (!fileDetails) fileQuery.select('caseId createdAt');
+    const files = await fileQuery.lean();
+    const caseById = new Map(docs.map((doc) => [String(doc._id), doc]));
+    files.forEach((file) => {
+      const key = String(file.caseId);
+      if (!isRecordVisibleToCurrentAssignment(file, caseById.get(key), {
+        role,
+        userId: viewerId,
+        isParalegal: role === "paralegal",
+      })) return;
+      if (!filesByCase.has(key)) filesByCase.set(key, []);
+      filesByCase.get(key).push(fileDetails ? normalizeFile(file) : file);
+    });
+  }
+
+  const result = docs.map((doc) => {
+    const summary = caseSummary(doc, {
+      includeFiles: false,
+      viewerRole: role,
+      viewerId,
+      applicationCount: applications.counts.get(String(doc._id).toLowerCase()),
+    });
+    if (includeFiles) {
+      const files = filesByCase.get(String(doc._id)) || [];
+      if (fileDetails) summary.files = files;
+      summary.filesCount = files.length;
+    }
+    return summary;
+  });
+  await applications.verify();
+  return result;
 }
 
 function normalizeFile(file) {
@@ -1486,6 +1549,7 @@ function normalizeFile(file) {
     uploadedAt: file.createdAt || file.updatedAt || file.uploadedAt || null,
     status: file.status || "pending_review",
     version: typeof file.version === "number" ? file.version : 1,
+    revisionResolution: file.revisionResolution || null,
     revisionNotes: decryptString(file.revisionNotes || ""),
     revisionRequestedAt: file.revisionRequestedAt || null,
     approvedAt: file.approvedAt || null,
@@ -1493,98 +1557,42 @@ function normalizeFile(file) {
   };
 }
 
-function hasModerationRevision(doc) {
-  if (!doc?.moderationFlaggedAt || !doc?.updatedAt) return false;
-  const flaggedAt = new Date(doc.moderationFlaggedAt).getTime();
-  const updatedAt = new Date(doc.updatedAt).getTime();
-  if (!Number.isFinite(flaggedAt) || !Number.isFinite(updatedAt)) return false;
-  return updatedAt > flaggedAt;
-}
+function hasModerationRevision(doc) { return matterModeration.hasRevision(doc); }
 
-async function sendCaseNotification(userId, type, caseDoc, payload = {}, options = {}) {
-  if (!userId) return;
-  try {
-    const actorUserId = options.actorUserId || payload.actorUserId || null;
-    await notifyUser(
-      userId,
-      type,
-      Object.assign(
-        {
-          caseId: caseDoc?._id,
-          caseTitle: caseDoc?.title || "Untitled Matter",
-        },
-        payload || {}
-      ),
-      { actorUserId }
-    );
-  } catch (err) {
-    logger.warn("[cases] notifyUser failed", err);
-  }
-}
-
-async function sendCaseUpdateEmail(recipient, caseDoc, summary) {
-  if (!recipient?.email) return;
-  try {
-    const template = emailTemplates.caseUpdate({
-      caseTitle: caseDoc?.title || "your Matter",
-      summary,
+async function sendInvitationWithNotices(res, options) {
+  try { return await sendInvitation(options); }
+  catch (error) {
+    if (!['ACCOUNT_WRITE_UNCONFIRMED', 'INVITATION_NOTICE_UNAVAILABLE'].includes(error.publicCode)) throw error;
+    logger.warn('[cases] invitation write needs review', { caseId: options.caseDoc?._id, code: error.publicCode });
+    res.status(503).json({
+      code: error.publicCode,
+      error: error.publicCode === 'ACCOUNT_WRITE_UNCONFIRMED'
+        ? 'The invitation result could not be confirmed. Check its saved status before sending another invitation.'
+        : 'The invitation could not be saved with its notices. Review the Matter before trying again.',
     });
-    await sendEmail(recipient.email, template.subject, template.html);
-  } catch (err) {
-    logger.warn("[cases] case update email failed", err?.message || err);
+    return null;
   }
 }
 
-async function sendAdminJobPostedEmails(attorney, caseDoc, amountCents) {
-  try {
-    const admins = await User.find({
-      role: "admin",
-      status: "approved",
-      email: { $exists: true, $ne: "" },
-    })
-      .select("email")
-      .lean();
-    if (!admins.length) return;
-
-    const attorneyName =
-      [attorney?.firstName, attorney?.lastName].filter(Boolean).join(" ").trim() ||
-      attorney?.email ||
-      "An attorney";
-    const baseUrl = String(
-      process.env.EMAIL_BASE_URL || process.env.APP_BASE_URL || "https://www.lets-paraconnect.com"
-    ).replace(/\/+$/, "");
-    const template = emailTemplates.adminJobPosted({
-      caseTitle: caseDoc?.title || "Untitled Matter",
-      attorneyName,
-      attorneyEmail: attorney?.email || "",
-      practiceArea: caseDoc?.practiceArea || "",
-      budget: formatCurrency(amountCents),
-      link: `${baseUrl}/admin-dashboard.html#posts`,
-    });
-
-    await Promise.allSettled(
-      admins.map((admin) => sendEmail(admin.email, template.subject, template.html))
-    );
-  } catch (err) {
-    logger.warn("[cases] admin job-posted email failed", err?.message || err);
+async function dispatchPostingNotice(dispatch) {
+  try { await dispatch?.(); } catch (error) { logger.warn('[cases] saved posting notice dispatch failed', error?.name); }
+}
+async function retainModerationChange(work) {
+  // Preserve the existing bounded append-to-latest-note behavior. Each fresh
+  // transaction still checks the original posting/moderation snapshot; only a
+  // private note change can be absorbed without accepting a stale review.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try { return await withActiveAccountWrite([], work); }
+    catch (error) { if (error.publicCode !== 'ACCOUNT_WRITE_CHANGED' || attempt === 2) throw error; }
   }
 }
+function postingUpdateRecipients(doc, isAdmin = false, exactStatus = false) {
+  if (isAdmin || doc.paralegalId || doc.hiredAt) return [];
+  return [...new Set((doc.applicants || []).filter(item => (exactStatus ? String(item.status || 'pending') : String(item.status || 'pending').toLowerCase()) === 'pending').map(item => String(item.paralegalId?._id || item.paralegalId || '')).filter(Boolean))];
+}
 
-async function hasCaseNotification(userId, type, caseDoc, payload = {}) {
-  if (!userId || !caseDoc?._id) return false;
-  const query = {
-    userId,
-    type,
-    "payload.caseId": caseDoc._id,
-  };
-  if (payload.summary) {
-    query["payload.summary"] = payload.summary;
-  }
-  if (payload.amount) {
-    query["payload.amount"] = payload.amount;
-  }
-  const existing = await Notification.findOne(query).select("_id").lean();
-  return !!existing;
+function publishCaseParticipantRefresh(caseDoc, type = "case_refresh", additionalUserIds = []) {
+  publishCaseProjectionRefresh(caseDoc, type, { additionalUserIds, discovery: true, caseEvent: "" });
 }
 
 function buildCaseLink(caseDoc) {
@@ -1720,87 +1728,28 @@ async function verifyCaseDocumentObject({ caseId, key, declaredSize, declaredMim
 }
 
 async function refreshMatterFileScan(file, key) {
+  const stored = file?._id ? await CaseFile.collection.findOne({ _id: file._id }, { projection: { storageKey: 1, version: 1 } }) : null;
+  if (file?._id && (!stored || stored.storageKey !== file.storageKey || Number(stored.version || 1) !== Number(file.version || 1))) throw Object.assign(new Error("The document changed before its security check."), { status: 409, publicCode: "DOWNLOAD_CHANGED" });
   const scan = await getObjectMalwareScan({ s3, bucket: S3_BUCKET, key });
-  const now = new Date();
   if (file?._id) {
-    const update = {
-      securityStatus: scan.status,
-      securityScanResult: scan.result,
-      securityCheckedAt: now,
-    };
-    if (["clean", "blocked", "error"].includes(scan.status)) update.securityScannedAt = now;
-    await CaseFile.updateOne({ _id: file._id }, { $set: update });
+    try { await matterFileWrites.persistScan(file, key, scan); }
+    catch (error) { throw Object.assign(new Error("The document changed during its security check."), { status: error.status || 503, publicCode: "DOWNLOAD_CHANGED" }); }
   }
   return scan;
 }
 
-async function ensureFundsReleased(req, caseDoc) {
-  const activeParalegalId = caseDoc.paralegal?._id || caseDoc.paralegalId || caseDoc.paralegal || null;
-  const existingPayout = await Payout.findOne(
-    activeParalegalId ? { caseId: caseDoc._id, paralegalId: activeParalegalId } : { caseId: caseDoc._id }
-  )
-    .select("amountPaid transferId createdAt")
-    .sort({ createdAt: -1 })
-    .lean();
-  if (existingPayout) {
+async function ensureFundsReleased(req, caseDoc, options = {}) {
+  await options.beforeTransfer?.();
+  const evidence = await completionPayoutEvidence.inspect(caseDoc);
+  if (evidence.state === "needs_review") throw completionPayoutEvidence.reconciliationError();
+  if (evidence.state === "recorded") {
+    const payout = evidence.payout;
     caseDoc.paymentReleased = true;
-    if (!caseDoc.payoutTransferId) caseDoc.payoutTransferId = existingPayout.transferId;
+    caseDoc.payoutTransferId = payout.transferId;
     caseDoc.payoutStatus = "paid";
     caseDoc.payoutFailureReason = "";
-    caseDoc.paidOutAt = caseDoc.paidOutAt || existingPayout.createdAt || new Date();
-    return { payout: existingPayout.amountPaid, transferId: existingPayout.transferId, alreadyReleased: true };
-  }
-  const operationKey = `case_payout:${String(caseDoc._id)}`;
-  const recordedOperation = await PaymentOperation.findOne({
-    operationKey,
-    $or: [
-      { stripeTransferId: { $nin: [null, ""] } },
-      { stripeObjectId: { $nin: [null, ""] } },
-    ],
-  });
-  if (caseDoc.payoutTransferId || caseDoc.paymentReleased || recordedOperation) {
-    const operation = recordedOperation || await PaymentOperation.findOne({ operationKey });
-    if (!operation && (!caseDoc.paymentReleased || !caseDoc.paidOutAt)) {
-      throw new Error("Payout evidence is incomplete and requires admin reconciliation.");
-    }
-    const transferId = caseDoc.payoutTransferId || operation?.stripeTransferId || operation?.stripeObjectId || "";
-    const paralegal = caseDoc.paralegal;
-    const attorneyObjectId = caseDoc.attorney?._id || caseDoc.attorneyId || caseDoc.attorney;
-    const paralegalObjectId = paralegal?._id || caseDoc.paralegalId || caseDoc.paralegal;
-    const budgetCents = Number(caseDoc.remainingAmount ?? caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
-    const paralegalFeePct = resolveParalegalFeePct(caseDoc);
-    const paralegalFee = Math.max(0, Math.round((budgetCents * paralegalFeePct) / 100));
-    const attorneyFee = computeAttorneyFeeAmount(budgetCents, caseDoc);
-    const payout = Number(operation?.transferAmount || operation?.amount || Math.max(0, budgetCents - paralegalFee));
-    if (!transferId || !paralegalObjectId || !attorneyObjectId || !Number.isFinite(payout) || payout <= 0) {
-      throw new Error("Payout evidence is incomplete and requires admin reconciliation.");
-    }
-    const stripeMode = pickStripeMode(caseDoc.stripeMode, currentStripeMode());
-    await Promise.all([
-      upsertPayoutLedger({
-        operationKey,
-        caseId: caseDoc._id,
-        paralegalId: paralegalObjectId,
-        amountPaid: payout,
-        transferId,
-        stripeMode,
-      }),
-      upsertPlatformIncomeLedger({
-        operationKey,
-        caseId: caseDoc._id,
-        attorneyId: attorneyObjectId,
-        paralegalId: paralegalObjectId,
-        feeAmount: Math.max(0, attorneyFee + paralegalFee),
-        stripeMode,
-      }),
-    ]);
-    if (operation) await succeedPaymentOperation(operation, transferId);
-    caseDoc.paymentReleased = true;
-    caseDoc.payoutTransferId = transferId;
-    caseDoc.payoutStatus = "paid";
-    caseDoc.payoutFailureReason = "";
-    caseDoc.paidOutAt = caseDoc.paidOutAt || operation?.completedAt || operation?.updatedAt || new Date();
-    return { payout, transferId, alreadyReleased: true, reconciled: true };
+    caseDoc.paidOutAt = caseDoc.paidOutAt || payout.createdAt;
+    return { payout: payout.amountPaid, transferId: payout.transferId, alreadyReleased: true };
   }
   const paralegal = caseDoc.paralegal;
   const bypassStripe = isStripeBypassPair(req, caseDoc, paralegal);
@@ -1836,6 +1785,11 @@ async function ensureFundsReleased(req, caseDoc) {
   } catch (err) {
     logger.error("[cases] payment intent lookup failed", err?.message || err);
     throw new Error("Unable to verify Matter funding. Please try again.");
+  }
+  // Compare with the retained mode before assigning provider projections. A
+  // missing or contradictory mode cannot authorize a new transfer.
+  if (typeof paymentIntent?.livemode !== "boolean" || !require("../services/retainedPayoutMode").inspect(caseDoc, null, { livemode: paymentIntent.livemode })) {
+    throw Object.assign(new Error("The payment provider mode could not be verified for this Matter."), { code: "PAYOUT_RECONCILIATION_REQUIRED", statusCode: 409 });
   }
   if (!caseDoc.paymentIntentId) caseDoc.paymentIntentId = paymentIntent.id;
   if (!caseDoc.escrowIntentId) caseDoc.escrowIntentId = paymentIntent.id;
@@ -1890,21 +1844,22 @@ async function ensureFundsReleased(req, caseDoc) {
   if (payoutClaim.conflict) {
     throw new Error("Payout details conflict with an existing payment operation. Admin review is required.");
   }
+  if (payoutClaim.needsReconciliation) {
+    throw new Error("This payout needs payment review before another release can be requested.");
+  }
   if (payoutClaim.inProgress) {
     throw new Error("This payout is already being processed. Please wait before trying again.");
   }
-  if (payoutClaim.completed) {
+  if (payoutClaim.completed || payoutClaim.operation.stripeTransferId || payoutClaim.operation.stripeObjectId) {
+    // A competing request may have recorded a transfer after the initial read.
+    // Require its paid ledger; never synthesize success from its identifier.
+    const recorded = await completionPayoutEvidence.requireRecorded(caseDoc);
     caseDoc.paymentReleased = true;
-    caseDoc.payoutTransferId = payoutClaim.operation.stripeObjectId;
+    caseDoc.payoutTransferId = recorded.payout.transferId;
     caseDoc.payoutStatus = "paid";
     caseDoc.payoutFailureReason = "";
-    caseDoc.paidOutAt = caseDoc.paidOutAt || payoutClaim.operation.completedAt || new Date();
-    return {
-      payout: payoutClaim.operation.amount,
-      transferId: payoutClaim.operation.stripeObjectId,
-      alreadyReleased: true,
-      reconciled: true,
-    };
+    caseDoc.paidOutAt = caseDoc.paidOutAt || recorded.payout.createdAt;
+    return { payout: recorded.payout.amountPaid, transferId: recorded.payout.transferId, alreadyReleased: true };
   }
   caseDoc.payoutStatus = "pending";
 
@@ -1917,6 +1872,7 @@ async function ensureFundsReleased(req, caseDoc) {
       caseId: String(caseDoc._id),
       attorneyId: String(caseDoc.attorney?._id || caseDoc.attorneyId || ""),
       paralegalId: String(paralegal._id || caseDoc.paralegalId || ""),
+      operationKey: payoutClaim.operation.operationKey,
       description: "Matter completion payout",
     },
   };
@@ -1924,6 +1880,10 @@ async function ensureFundsReleased(req, caseDoc) {
     transferPayload.source_transaction = charge.id;
   }
 
+  if (options.beforeTransfer) {
+    try { await options.beforeTransfer(); }
+    catch (error) { await failPaymentOperation(payoutClaim.operation, error); throw error; }
+  }
   let transfer;
   try {
     if (payoutClaim.operation.stripeTransferId) {
@@ -1933,6 +1893,9 @@ async function ensureFundsReleased(req, caseDoc) {
         caseId: caseDoc._id,
         stripeClient: stripe,
         payload: transferPayload,
+        operation: payoutClaim.operation,
+        stripeMode: pickStripeMode(stripeModeFromLivemode(paymentIntent.livemode), caseDoc.stripeMode, currentStripeMode()),
+        onTransfer: async known => { transfer = known; await options.afterTransfer?.(known.id); },
         stripeOptions: {
           idempotencyKey: stripe.stripeIdempotencyKey(
             "case_completion_payout",
@@ -1946,22 +1909,26 @@ async function ensureFundsReleased(req, caseDoc) {
       });
     }
   } catch (err) {
-    await failPaymentOperation(payoutClaim.operation, err).catch(
+    const needsReconciliation = Boolean(transfer?.id || err?.payoutTransferAttempted);
+    await failPaymentOperation(payoutClaim.operation, err, { needsReconciliation, stripeObjectId: transfer?.id || "" }).catch(
       logPromiseFailure(logger, "[cases] failed payout operation could not be marked", { caseId: caseDoc._id })
     );
     await Case.updateOne(
-      { _id: caseDoc._id },
-      { $set: { payoutStatus: "failed", payoutFailureReason: String(err?.message || err).slice(0, 500) } }
+      { _id: caseDoc._id, paymentReleased: { $ne: true }, payoutStatus: { $nin: ["failed", "reversed", "needs_reconciliation"] }, payoutTransferId: { $in: ["", null, caseDoc.payoutTransferId || "", transfer?.id || ""] } },
+      { $set: { payoutStatus: needsReconciliation ? "needs_reconciliation" : "failed", payoutFailureReason: String(err?.message || err).slice(0, 500) } }
     ).catch(logPromiseFailure(logger, "[cases] payout failure state persistence failed", { caseId: caseDoc._id }));
     logger.error("Payout transfer failed.", {
       name: String(err?.name || "Error").slice(0, 80),
       code: String(err?.code || err?.type || "PAYOUT_TRANSFER_FAILED").slice(0, 100),
     });
+    if (err?.publicCode) throw err;
     const message = stripe.sanitizeStripeError(
       err,
-      "We couldn't release the payment right now. Please try again shortly."
+      needsReconciliation ? "This payout needs payment review before another release can be requested." : "We couldn't release the payment right now. Please try again shortly."
     );
-    throw new Error(message);
+    const failure = new Error(message);
+    if (needsReconciliation) failure.code = "PAYOUT_RECONCILIATION_REQUIRED";
+    throw failure;
   }
   try {
     await recordPaymentOperationEvidence(payoutClaim.operation, {
@@ -1976,17 +1943,18 @@ async function ensureFundsReleased(req, caseDoc) {
       caseId: caseDoc._id,
     }));
     await Case.updateOne(
-      { _id: caseDoc._id },
+      { _id: caseDoc._id, payoutStatus: { $nin: ["reversed", "failed"] }, payoutFailureReason: { $in: [null, ""] }, payoutTransferId: { $in: [null, "", transfer.id] } },
       {
         $set: {
           payoutTransferId: transfer.id,
           payoutStatus: "needs_reconciliation",
-          payoutFailureReason: "Stripe transfer succeeded but transfer evidence did not persist.",
+          payoutFailureReason: "The transfer was created, but its records require reconciliation before completion.",
         },
       }
     ).catch(logPromiseFailure(logger, "[cases] payout evidence reconciliation case marker failed", {
       caseId: caseDoc._id,
     }));
+    if (err.publicCode) throw err;
     throw new Error("The transfer was created, but its evidence requires reconciliation before completion.");
   }
 
@@ -2009,24 +1977,25 @@ async function ensureFundsReleased(req, caseDoc) {
   const stripeMode = pickStripeMode(caseDoc.stripeMode, currentStripeMode());
 
   try {
-    await Promise.all([
-      upsertPayoutLedger({
+    await withPayoutTransaction(async session => {
+      await upsertPayoutLedger({
         operationKey: `case_payout:${String(caseDoc._id)}`,
         paralegalId: paralegalObjectId,
         caseId: caseDoc._id,
         amountPaid: payout,
         transferId: transfer.id,
         stripeMode,
-      }),
-      upsertPlatformIncomeLedger({
+      }, { session });
+      await upsertPlatformIncomeLedger({
         operationKey: `case_payout:${String(caseDoc._id)}`,
         caseId: caseDoc._id,
         attorneyId: attorneyObjectId,
         paralegalId: paralegalObjectId,
         feeAmount: Math.max(0, (caseDoc.feeAttorneyAmount || attorneyFee || 0) + (paralegalFee || 0)),
         stripeMode,
-      }),
-    ]);
+      }, { session });
+      await succeedPaymentOperation(payoutClaim.operation, transfer.id, { session });
+    });
   } catch (err) {
     await failPaymentOperation(payoutClaim.operation, err, {
       needsReconciliation: true,
@@ -2035,7 +2004,7 @@ async function ensureFundsReleased(req, caseDoc) {
       caseId: caseDoc._id,
     }));
     await Case.updateOne(
-      { _id: caseDoc._id },
+      { _id: caseDoc._id, payoutStatus: { $nin: ["reversed", "failed"] }, payoutFailureReason: { $in: [null, ""] }, payoutTransferId: { $in: [null, "", transfer.id] } },
       {
         $set: {
           payoutTransferId: transfer.id,
@@ -2049,63 +2018,6 @@ async function ensureFundsReleased(req, caseDoc) {
     throw new Error("The transfer was created, but payout records need reconciliation before completion.");
   }
 
-  await succeedPaymentOperation(payoutClaim.operation, transfer.id);
-
-  const payoutDisplay = `$${(payout / 100).toFixed(2)}`;
-  try {
-    const link = "dashboard-paralegal.html#cases-completed";
-    const payload = {
-      caseId: String(caseDoc._id),
-      caseTitle: caseDoc.title || "Matter",
-      amount: payoutDisplay,
-      link,
-      receiptUrl: `/api/payments/receipt/paralegal/${encodeURIComponent(caseDoc._id)}`,
-      message:
-        "Your payout was released to Stripe. Check your Stripe account for the current payout status and estimated arrival; timing depends on your payout schedule and financial institution.",
-    };
-    const alreadySent = await hasCaseNotification(paralegalObjectId, "payout_released", caseDoc, payload);
-    if (!alreadySent) {
-      await sendCaseNotification(
-        paralegalObjectId,
-        "payout_released",
-        caseDoc,
-        payload,
-        { actorUserId: req.user?.id }
-      );
-    }
-  } catch (notificationError) {
-    logger.warn("[cases] payout notification failed", { caseId: caseDoc._id, error: notificationError });
-  }
-
-  try {
-    const completedDateStr = completedAt.toLocaleDateString("en-US");
-    const feeDisplay = `$${(paralegalFee / 100).toFixed(2)}`;
-    const totalDisplay = `$${(budgetCents / 100).toFixed(2)}`;
-    if (caseDoc.attorney?.email) {
-      const attorneyName = `${caseDoc.attorney.firstName || ""} ${caseDoc.attorney.lastName || ""}`.trim() || "there";
-      const template = emailTemplates.caseCompletedAttorney({
-        attorneyName,
-        caseTitle: caseDoc.title || "your Matter",
-        completedDate: completedDateStr,
-      });
-      await sendEmail(caseDoc.attorney.email, template.subject, template.html);
-    }
-    if (paralegal.email) {
-      const paraName = `${paralegal.firstName || ""} ${paralegal.lastName || ""}`.trim() || "there";
-      const template = emailTemplates.payoutReleased({
-        caseTitle: caseDoc.title || "your Matter",
-        amount: payoutDisplay,
-        totalDisplay,
-        feeDisplay,
-        feePct: resolveParalegalFeePct(caseDoc),
-        recipientName: paraName,
-      });
-      await sendEmail(paralegal.email, template.subject, template.html);
-    }
-  } catch (err) {
-    logger.warn("[cases] payout email error", err?.message || err);
-  }
-
   await logAction(req, "case.release", {
     targetType: "case",
     targetId: caseDoc._id,
@@ -2116,7 +2028,7 @@ async function ensureFundsReleased(req, caseDoc) {
   return { payout, transferId: transfer.id };
 }
 
-async function createPartialPayoutTransfer(req, caseDoc, paralegal, grossAmount) {
+async function createPartialPayoutTransfer(req, caseDoc, paralegal, grossAmount, review = null) {
   const { gross, feePct, feeAmount, net } = computeParalegalFeeFromGross(grossAmount, caseDoc);
   if (gross <= 0 || net <= 0) {
     return { transferId: null, payout: 0, feePct, feeAmount, pending: false };
@@ -2151,6 +2063,7 @@ async function createPartialPayoutTransfer(req, caseDoc, paralegal, grossAmount)
     logger.error("[cases] payment intent lookup failed", err?.message || err);
     throw new Error("Unable to verify Matter funding. Please try again.");
   }
+  if (review && (typeof paymentIntent?.livemode !== "boolean" || ["live", "test"].includes(caseDoc.stripeMode) && caseDoc.stripeMode !== (paymentIntent.livemode ? "live" : "test"))) throw new Error("The payment provider mode does not match this Matter.");
   if (!caseDoc.paymentIntentId) caseDoc.paymentIntentId = paymentIntent.id;
   if (!caseDoc.escrowIntentId) caseDoc.escrowIntentId = paymentIntent.id;
   if (!caseDoc.currency) caseDoc.currency = paymentIntent.currency || caseDoc.currency || "usd";
@@ -2176,7 +2089,7 @@ async function createPartialPayoutTransfer(req, caseDoc, paralegal, grossAmount)
   caseDoc.paymentStatus = paymentIntent.status || caseDoc.paymentStatus || "succeeded";
 
   const partialClaim = await claimPaymentOperation({
-    operationKey: `partial_payout:${String(caseDoc._id)}:${String(paralegal._id || caseDoc.withdrawnParalegalId || "")}`,
+    operationKey: review?.operationKey || `partial_payout:${String(caseDoc._id)}:${String(paralegal._id || caseDoc.withdrawnParalegalId || "")}`,
     caseId: caseDoc._id,
     kind: "partial_payout",
     fingerprint: {
@@ -2193,10 +2106,14 @@ async function createPartialPayoutTransfer(req, caseDoc, paralegal, grossAmount)
   if (partialClaim.conflict) {
     throw new Error("Partial payout details conflict with an existing payment operation. Admin review is required.");
   }
+  if (partialClaim.needsReconciliation) {
+    throw new Error("This payout needs payment review before another release can be requested.");
+  }
   if (partialClaim.inProgress) {
     throw new Error("This partial payout is already being processed. Please wait before trying again.");
   }
   if (partialClaim.completed) {
+    if (review) throw new Error("A prior payout operation requires review before another decision.");
     return {
       transferId: partialClaim.operation.stripeObjectId,
       payout: partialClaim.operation.amount,
@@ -2218,6 +2135,7 @@ async function createPartialPayoutTransfer(req, caseDoc, paralegal, grossAmount)
       caseId: String(caseDoc._id),
       attorneyId: String(caseDoc.attorney?._id || caseDoc.attorneyId || ""),
       paralegalId: String(paralegal._id || ""),
+      operationKey: partialClaim.operation.operationKey,
       description: "Matter withdrawal partial payout",
     },
   };
@@ -2227,35 +2145,46 @@ async function createPartialPayoutTransfer(req, caseDoc, paralegal, grossAmount)
 
   let transfer;
   try {
+    if (review) { await review.beforeTransfer(); if (partialClaim.operation.stripeTransferId) throw new Error("An earlier transfer requires review."); }
     if (partialClaim.operation.stripeTransferId) {
       transfer = { id: partialClaim.operation.stripeTransferId };
     } else {
+      review?.onAttempt();
       transfer = await createPayoutTransfer({
         caseId: caseDoc._id,
         stripeClient: stripe,
         payload: transferPayload,
+        operation: partialClaim.operation,
+        stripeMode: pickStripeMode(stripeModeFromLivemode(paymentIntent.livemode), caseDoc.stripeMode, currentStripeMode()),
+        onTransfer: async known => { transfer = known; await review?.afterTransfer(known.id); },
         stripeOptions: {
           idempotencyKey: stripe.stripeIdempotencyKey(
             "withdrawal_partial_payout",
             caseDoc._id,
             paralegal._id,
             net,
-            paymentIntent.id
+            paymentIntent.id,
+            ...(review ? [review.operationKey] : [])
           ),
         },
         bypassTransfer: bypassStripe ? { id: `bypass_${caseDoc._id}_${paralegal._id}` } : null,
       });
     }
+    if (review) {
+      if (!/^tr_[A-Za-z0-9_]+$/.test(transfer?.id || "")) throw new Error("The transfer result could not be verified.");
+      if (transfer.object !== "transfer" || transfer.amount !== net || transfer.currency !== caseDoc.currency || String(transfer.destination?.id || transfer.destination || "") !== paralegal.stripeAccountId || transfer.transfer_group !== transferPayload.transfer_group || transfer.metadata?.caseId !== String(caseDoc._id) || transfer.metadata?.paralegalId !== String(paralegal._id) || String(transfer.source_transaction?.id || transfer.source_transaction || "") !== String(charge?.id || "") || transfer.livemode !== paymentIntent.livemode || transfer.reversed !== false || transfer.amount_reversed !== 0) throw new Error("The returned transfer does not match the reviewed withdrawal payout.");
+    }
   } catch (err) {
-    await failPaymentOperation(partialClaim.operation, err).catch(
+    await failPaymentOperation(partialClaim.operation, err, { needsReconciliation: Boolean(review || transfer?.id || err?.payoutTransferAttempted), stripeObjectId: transfer?.id || "" }).catch(
       logPromiseFailure(logger, "[cases] failed partial payout operation could not be marked", {
         caseId: caseDoc._id,
       })
     );
     logger.error("[cases] partial payout transfer failed", err?.message || err);
+    if (err?.publicCode) throw err;
     const message = stripe.sanitizeStripeError(
       err,
-      "We couldn't release the payment right now. Please try again shortly."
+      transfer?.id || err?.payoutTransferAttempted ? "This payout needs payment review before another release can be requested." : "We couldn't release the payment right now. Please try again shortly."
     );
     throw new Error(message);
   }
@@ -2271,15 +2200,53 @@ async function createPartialPayoutTransfer(req, caseDoc, paralegal, grossAmount)
     pending: false,
     paymentOperationId: partialClaim.operation._id,
     paymentOperationKey: partialClaim.operation.operationKey,
+    stripeMode: caseDoc.stripeMode,
+    funding: { paymentIntentId: caseDoc.paymentIntentId, escrowIntentId: caseDoc.escrowIntentId, currency: caseDoc.currency, stripeMode: caseDoc.stripeMode, fundingIntegrityStatus: caseDoc.fundingIntegrityStatus, fundingIntegrityFailure: caseDoc.fundingIntegrityFailure, fundingVerifiedAt: caseDoc.fundingVerifiedAt, escrowStatus: caseDoc.escrowStatus, paymentStatus: caseDoc.paymentStatus },
+  };
+}
+
+function withdrawalOptions(req) {
+  return {
+    transfer: (doc, person, amount, review) => createPartialPayoutTransfer(req, doc, person, amount, review),
+    async afterCommit(raw, outcome) {
+      const doc = Case.hydrate(raw), withdrawnId = raw.withdrawnParalegalId;
+      publishCaseEvent(raw._id, "case", { at: new Date().toISOString() });
+      publishCaseParticipantRefresh(doc, outcome.action === "reject" ? "matter_withdrawal_review_refresh" : outcome.action === "relist" ? "matter_relisted_refresh" : "matter_payout_refresh", [withdrawnId]);
+      if (outcome.action === "partial") {
+        try { await Case.populate(doc, [{ path: "attorney", select: "firstName lastName" }, { path: "withdrawnParalegalId", select: "firstName lastName" }]); await generateWithdrawalReceipts(doc, { grossAmount: outcome.amountCents }); } catch (error) { logger.warn("[cases] withdrawal receipt generation failed", error?.message || error); }
+      }
+    },
   };
 }
 
 // ----------------------------------------
 // All case routes require auth + platform roles
 // ----------------------------------------
+router.use("/search", (_req, res, next) => { res.set("Cache-Control", "private, no-store"); next(); });
 router.use(verifyToken);
 router.use(requireApproved);
 router.use(requireRole("admin", "attorney", "paralegal"));
+router.use("/assigned-choices", require("./paralegalMatterChoices"));
+router.use("/workspace-choices", require("./workspaceMatterChoices"));
+router.use("/inventory", require("./attorneyMatterInventory")({
+  presentCases: (docs, req) => presentCaseList(docs, { role: "attorney", viewerId: req.user.id, includeFiles: true, fileDetails: false, req }),
+  caseProjection: Object.fromEntries(CASE_LIST_FIELDS.split(' ').filter(field => !['files', 'downloadUrl', 'internalNotes'].includes(field)).map(field => [field, 1])),
+}));
+
+router.use("/posting", require("./matterPostings")({
+  practiceAreas: PRACTICE_AREAS, normalizePracticeArea, normalizeStatus: normalizeCaseStatusValue,
+  parseDeadline, hasPendingInvites, buildBriefSummary,
+  beforeCommit(req, type, doc, session) {
+    return postingNotices.retain(req, { create: 'created', update: 'updated', delete: 'deleted' }[type], doc, session, { recipients: type === 'update' ? postingUpdateRecipients(doc, false, true) : [] });
+  },
+  async afterCommit(_req, type, doc, recipients = []) {
+    const event = type === "create" ? "matter_published_refresh" : type === "delete" ? "matter_deleted_refresh" : "matter_updated_refresh";
+    publishMatterDiscoveryEvent(event);
+    publishCaseEvent(doc._id, "case", { at: new Date().toISOString(), type: event });
+    publishCaseParticipantRefresh(doc, event, recipients);
+    if (type === "update") publishCaseEvent(doc._id, "tasks", { at: new Date().toISOString() });
+  },
+}));
 
 const authenticatedSearchRateLimit = createAuthenticatedSearchRateLimiter();
 
@@ -2287,10 +2254,15 @@ router.get(
   "/search",
   authenticatedSearchRateLimit,
   asyncHandler(async (req, res) => {
-    res.set("Cache-Control", "no-store");
+    res.set("Cache-Control", "private, no-store");
     const viewerRole = String(req.user?.role || "").toLowerCase();
     if (!["attorney", "paralegal"].includes(viewerRole)) {
       return res.status(403).json({ error: "Search is available to attorneys and paralegals." });
+    }
+    const guard = validateSearchRead(req.query, req.user);
+    if (guard.error) {
+      const { status, ...body } = guard.error;
+      return res.status(status).json(body);
     }
     const query = normalizeSearchQuery(req.query.q);
     if (query.length < SEARCH_QUERY_MIN) {
@@ -2311,7 +2283,7 @@ router.get(
       Case,
       User,
     });
-    return res.json({ query, types, results });
+    return res.json({ query, types, results, ...(guard.ownerId ? { ownerId: guard.ownerId } : {}) });
   })
 );
 
@@ -2369,33 +2341,37 @@ router.get(
     };
     const auditActions = Object.keys(actionMap);
     let logs = [];
+    let complete = true;
     try {
       logs = await AuditLog.find({ case: caseDoc._id, action: { $in: auditActions } })
         .sort({ createdAt: 1 })
+        .populate("actor", "firstName lastName")
         .lean();
     } catch (err) {
       logs = [];
+      complete = false;
     }
 
     const items = [];
     const addedEntries = new Set();
     const hasLabel = (label) => items.some((item) => item.label === label);
     const hasStatusKey = (statusKey) => items.some((item) => item.statusKey === statusKey);
-    const pushItem = (label, at, statusKey) => {
+    const pushItem = (label, at, statusKey, actorName = "") => {
       if (!label || !at) return;
       const date = new Date(at);
       if (Number.isNaN(date.getTime())) return;
       const iso = date.toISOString();
       const sig = `${label}|${iso}`;
       if (addedEntries.has(sig)) return;
-      items.push({ label, at: iso, statusKey: statusKey || null });
+      items.push({ label, at: iso, statusKey: statusKey || null, ...(actorName ? { actorName } : {}) });
       addedEntries.add(sig);
     };
 
     logs.forEach((entry) => {
       const mapping = actionMap[entry.action];
       if (!mapping) return;
-      pushItem(mapping.label, entry.createdAt, mapping.statusKey);
+      const actorName = [entry.actor?.firstName, entry.actor?.lastName].filter(Boolean).join(" ");
+      pushItem(mapping.label, entry.createdAt, mapping.statusKey, actorName);
     });
 
     if (!hasStatusKey("open")) {
@@ -2460,6 +2436,7 @@ router.get(
       caseId: String(caseDoc._id),
       caseTitle: caseDoc.title || "Untitled Matter",
       items,
+      complete,
     });
   })
 );
@@ -2488,170 +2465,12 @@ router.get(
       .populate("applicants.paralegalId", "firstName lastName email role profileImage avatarURL");
     if (!doc) return res.status(404).json({ error: "Matter not found" });
 
-    const role = String(req.user?.role || "").toLowerCase();
-    const isAdmin = role === "admin";
-    const canSeeStars = role === "attorney" || isAdmin;
 
-    let applicants = Array.isArray(doc.applicants)
-      ? doc.applicants.map((entry) => {
-          const paralegalDoc =
-            entry.paralegalId && typeof entry.paralegalId === "object" ? entry.paralegalId : null;
-          const relatedInvite = listCaseInvites(doc).find(
-            (invite) =>
-              normalizeInviteParalegalId(invite?.paralegalId) ===
-              String(entry.paralegalId?._id || entry.paralegalId || "")
-          );
-          const coverLetter =
-            entry.note ||
-            (normalizeInviteStatus(relatedInvite?.status) === "accepted" ? "Accepted invitation" : "");
-          const baseSnapshot = shapeParalegalSnapshot(paralegalDoc || {});
-          const storedSnapshot =
-            entry.profileSnapshot && typeof entry.profileSnapshot === "object"
-              ? entry.profileSnapshot
-              : {};
-          const profileSnapshot = {
-            ...baseSnapshot,
-            ...storedSnapshot,
-            profileImage: baseSnapshot.profileImage || "",
-          };
-          const resumeURL = entry.resumeURL || paralegalDoc?.resumeURL || "";
-          const linkedInURL = entry.linkedInURL || paralegalDoc?.linkedInURL || "";
-          const starred =
-            canSeeStars &&
-            Array.isArray(entry.starredBy) &&
-            entry.starredBy.some((id) => String(id) === String(req.user.id));
-          return {
-            status: entry.status,
-            appliedAt: entry.appliedAt,
-            note: coverLetter,
-            coverLetter,
-            resumeURL,
-            linkedInURL,
-            profileSnapshot,
-            applicationId: null,
-            starred,
-            paralegalId: entry.paralegalId ? String(entry.paralegalId._id || entry.paralegalId) : null,
-            paralegal: summarizeUser(entry.paralegalId),
-            preEngagement:
-              doc.preEngagement &&
-              doc.preEngagement.requestedParalegalId &&
-              String(doc.preEngagement.requestedParalegalId) ===
-                String(entry.paralegalId?._id || entry.paralegalId || "") &&
-              ["submitted", "approved", "changes_requested"].includes(
-                String(doc.preEngagement.status || "").toLowerCase()
-              )
-                ? {
-                    status: doc.preEngagement.status || "submitted",
-                    confidentialityAgreementRequired: !!doc.preEngagement.confidentialityAgreementRequired,
-                    conflictsCheckRequired: !!doc.preEngagement.conflictsCheckRequired,
-                    conflictsDetails: doc.preEngagement.conflictsDetails || "",
-                    confidentialityDocument: doc.preEngagement.confidentialityDocument || null,
-                    paralegalConfidentialityDocument: doc.preEngagement.paralegalConfidentialityDocument || null,
-                    confidentialityAcknowledged: !!doc.preEngagement.confidentialityAcknowledged,
-                    confidentialityAcknowledgedAt: doc.preEngagement.confidentialityAcknowledgedAt || null,
-                    conflictsResponseType: doc.preEngagement.conflictsResponseType || "",
-                    conflictsDisclosureText: doc.preEngagement.conflictsDisclosureText || "",
-                    submittedAt: doc.preEngagement.submittedAt || null,
-                    reviewedAt: doc.preEngagement.reviewedAt || null,
-                    reviewedBy: doc.preEngagement.reviewedBy ? String(doc.preEngagement.reviewedBy) : null,
-                  }
-                : null,
-          };
-        })
-      : [];
+    const applicationSnapshot = await legacyApplications.begin(req, [doc], { detailed: true });
+    const applicants = legacyApplications.present(applicationSnapshot, doc._id, req.user, { withPreEngagement: true });
 
-    const jobId = doc.jobId || doc.job || null;
-    if (jobId) {
-      const jobApps = await Application.find({ jobId })
-        .populate("paralegalId", "firstName lastName email role profileImage avatarURL")
-        .lean();
-      if (jobApps.length) {
-        const mapped = jobApps
-          .map((app) => {
-            const paralegalDoc = app.paralegalId && typeof app.paralegalId === "object" ? app.paralegalId : null;
-            const paralegalId = paralegalDoc?._id || app.paralegalId || null;
-            const relatedInvite = listCaseInvites(doc).find(
-              (invite) => normalizeInviteParalegalId(invite?.paralegalId) === String(paralegalId || "")
-            );
-            const coverLetter =
-              app.coverLetter ||
-              (normalizeInviteStatus(relatedInvite?.status) === "accepted" ? "Accepted invitation" : "");
-            const starred =
-              canSeeStars &&
-              Array.isArray(app.starredBy) &&
-              app.starredBy.some((id) => String(id) === String(req.user.id));
-            return {
-              status: app.status || "submitted",
-              appliedAt: app.createdAt,
-              note: coverLetter,
-              coverLetter,
-              resumeURL: app.resumeURL || "",
-              linkedInURL: app.linkedInURL || "",
-              profileSnapshot: {
-                ...(app.profileSnapshot || {}),
-                ...shapeParalegalSnapshot(paralegalDoc || {}),
-              },
-              applicationId: app._id ? String(app._id) : null,
-              starred,
-              paralegalId: paralegalId ? String(paralegalId) : null,
-              paralegal: summarizeUser(paralegalDoc),
-              preEngagement:
-                doc.preEngagement &&
-                doc.preEngagement.requestedParalegalId &&
-                paralegalId &&
-                String(doc.preEngagement.requestedParalegalId) === String(paralegalId) &&
-                ["submitted", "approved", "changes_requested"].includes(
-                  String(doc.preEngagement.status || "").toLowerCase()
-                )
-                  ? {
-                      status: doc.preEngagement.status || "submitted",
-                      confidentialityAgreementRequired: !!doc.preEngagement.confidentialityAgreementRequired,
-                      conflictsCheckRequired: !!doc.preEngagement.conflictsCheckRequired,
-                      conflictsDetails: doc.preEngagement.conflictsDetails || "",
-                      confidentialityDocument: doc.preEngagement.confidentialityDocument || null,
-                      paralegalConfidentialityDocument: doc.preEngagement.paralegalConfidentialityDocument || null,
-                      confidentialityAcknowledged: !!doc.preEngagement.confidentialityAcknowledged,
-                      confidentialityAcknowledgedAt: doc.preEngagement.confidentialityAcknowledgedAt || null,
-                      conflictsResponseType: doc.preEngagement.conflictsResponseType || "",
-                      conflictsDisclosureText: doc.preEngagement.conflictsDisclosureText || "",
-                      submittedAt: doc.preEngagement.submittedAt || null,
-                      reviewedAt: doc.preEngagement.reviewedAt || null,
-                      reviewedBy: doc.preEngagement.reviewedBy ? String(doc.preEngagement.reviewedBy) : null,
-                    }
-                  : null,
-            };
-          });
-        const canonicalByParalegal = new Map();
-        applicants.forEach((entry, index) => {
-          const key = entry.paralegalId ? `paralegal:${String(entry.paralegalId)}` : `legacy:${index}`;
-          canonicalByParalegal.set(key, entry);
-        });
-        mapped.forEach((entry, index) => {
-          const key = entry.paralegalId
-            ? `paralegal:${String(entry.paralegalId)}`
-            : `application:${entry.applicationId || index}`;
-          if (String(entry.status || "").toLowerCase() === "withdrawn") {
-            canonicalByParalegal.delete(key);
-          } else {
-            canonicalByParalegal.set(key, entry);
-          }
-        });
-        applicants = [...canonicalByParalegal.values()];
-      }
-    }
-
-    if (String(req.user?.role || "").toLowerCase() === "attorney") {
-      const blockedIds = await getBlockedUserIds(req.user.id);
-      if (blockedIds.length) {
-        const blockedSet = new Set(blockedIds.map((id) => String(id)));
-        applicants = applicants.filter((entry) => !blockedSet.has(String(entry.paralegalId || "")));
-      }
-    }
-    if (String(req.user?.role || "").toLowerCase() === "paralegal") {
-      const viewerId = String(req.user?.id || req.user?._id || "");
-      applicants = applicants.filter((entry) => String(entry.paralegalId || "") === viewerId);
-    }
-
+    await applicationSnapshot.verify();
+    res.set("Cache-Control", "private, no-store");
     res.json({
       id: String(doc._id),
       _id: doc._id,
@@ -2716,6 +2535,20 @@ router.get(
 );
 
 // Invitations (must run before ensureCaseParticipant to allow pending paralegals)
+const matterInvitationActions = require("../services/matterInvitationActions");
+function invitationReviewNoStore(_req, res, next) { res.set("Cache-Control", "private, no-store"); next(); }
+function invitationReviewError(res, error) { return res.status(error.status || 503).json({ code: error.publicCode || "INVITATION_UNAVAILABLE", error: "The invitation could not be verified. Review the Matter and invitation status before trying again." }); }
+router.get("/invitation-options/:paralegalId", invitationReviewNoStore, async (req, res) => {
+  try { return res.json(await matterInvitationActions.options(req)); } catch (error) { return invitationReviewError(res, error); }
+});
+router.get("/:caseId/invitation-review/:paralegalId", invitationReviewNoStore, async (req, res) => {
+  try { return res.json(await matterInvitationActions.read(req, STRIPE_BYPASS_PARALEGAL_EMAILS)); } catch (error) { return invitationReviewError(res, error); }
+});
+async function reviewedInvitation(req, res, paralegalId) {
+  if (req.body?.reviewedRevision === undefined) return undefined;
+  try { return await matterInvitationActions.reviewed(req, paralegalId, STRIPE_BYPASS_PARALEGAL_EMAILS); }
+  catch (error) { invitationReviewError(res, error); return null; }
+}
 router.post(
   "/:caseId/invite/:paralegalId",
   csrfProtection,
@@ -2801,16 +2634,17 @@ router.post(
       return res.status(400).json({ error: "This invitation is not ready to send.", blockers: invitationPolicy.blockers });
     }
 
-    const invitationResult = await sendInvitation({
-      caseDoc,
-      paralegalId: paralegal._id,
-    });
+    const reviewed = await reviewedInvitation(req, res, paralegal._id);
+    if (reviewed === null) return;
+    const invitationResult = await sendInvitationWithNotices(res, { caseDoc, paralegalId: paralegal._id, reviewed, actorId: req.user.id, authVersion: req.authVersion });
+    if (!invitationResult) return;
     if (!invitationResult.sent) {
       const messages = {
         already_pending: "An invitation is already pending for this paralegal.",
         already_accepted: "This paralegal has already accepted.",
         already_assigned: "A paralegal is already assigned to this Matter.",
         matter_closed: "This Matter is no longer accepting invitations.",
+        ownership_conflict: "Matter ownership needs review before invitations can be sent.",
       };
       return res.status(409).json({
         error: messages[invitationResult.reason] || "The invitation could not be sent because the matter changed.",
@@ -2819,37 +2653,11 @@ router.post(
     }
     const updatedCase = await Case.findById(caseDoc._id);
     publishCaseEvent(caseDoc._id, "case", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(updatedCase || caseDoc, "matter_invitation_sent_refresh", [paralegal._id]);
 
-    if (invitationResult.lockedNow) {
-      try {
-        const caseAttorneyId = caseDoc.attorneyId || caseDoc.attorney || null;
-        if (caseAttorneyId) {
-          const link = buildCaseLink(updatedCase || caseDoc);
-          await sendCaseNotification(
-            caseAttorneyId,
-            "case_budget_locked",
-            updatedCase || caseDoc,
-            { link },
-            { actorUserId: req.user.id }
-          );
-        }
-      } catch (notificationError) {
-        logger.warn("[cases] budget-lock notification failed", { caseId: caseDoc._id, error: notificationError });
-      }
-    }
+    await invitationResult.dispatch?.().catch(error => logger.warn("[cases] saved invitation refresh deferred", { caseId: caseDoc._id, error }));
 
-    const inviterName = formatPersonName(req.user) || "An attorney";
-    await sendCaseNotification(
-      paralegal._id,
-      "case_invite",
-      updatedCase || caseDoc,
-      {
-        inviterName,
-      },
-      { actorUserId: req.user.id }
-    );
-
-    return res.json(caseSummary(updatedCase || caseDoc, { viewerRole: req.user?.role }));
+    return res.json({ ...caseSummary(updatedCase || caseDoc, { viewerRole: req.user?.role }), ...(invitationResult.confirmation ? { invitationConfirmation: invitationResult.confirmation } : {}) });
   })
 );
 
@@ -2868,7 +2676,7 @@ router.post(
     }
     if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid Matter ID" });
 
-    const caseDoc = await Case.findById(caseId);
+    const { caseDoc, legacyInvitation } = await require("../services/legacyInvitationResponse").load(caseId, role === "admin" && isObjId(req.body?.paralegalId) ? req.body.paralegalId : req.user.id);
     if (!caseDoc) return res.status(404).json({ error: "Matter not found" });
     if (isFinalCaseDoc(caseDoc)) {
       return res.status(400).json({ error: "Completed Matters cannot be modified." });
@@ -2877,7 +2685,6 @@ router.post(
     const paralegalId = role === "admin" && req.body?.paralegalId && isObjId(req.body.paralegalId)
       ? req.body.paralegalId
       : req.user.id;
-    seedLegacyInvite(caseDoc);
     const inviteRecord = listCaseInvites(caseDoc).find(
       (invite) => String(invite.paralegalId) === String(paralegalId)
     );
@@ -2895,7 +2702,7 @@ router.post(
     const paralegalProfile = await User.findById(paralegalId).select(
       "firstName lastName email stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled resumeURL linkedInURL availability availabilityDetails location languages specialties yearsExperience bio profileImage avatarURL"
     );
-    const paralegalName = formatPersonName(paralegalProfile) || "Paralegal";
+    const resumeReference = paralegalProfile ? captureResumeReference(paralegalProfile) : null;
 
     if (decision === "accept" && inviteRecord.status === "pending") {
       if (!hasScopeTasks(caseDoc)) {
@@ -2920,8 +2727,13 @@ router.post(
     const respondedAt = new Date();
     const invitationResult = await respondToInvitation({
       caseId,
+      legacyInvitation,
+      actorId: req.user.id,
+      authVersion: req.authVersion,
       paralegalId,
       decision,
+      resumeReference,
+      requirementAnswers: req.body?.requirementAnswers,
       respondedAt,
       lockedTotalAmount: caseDoc.lockedTotalAmount ?? caseDoc.totalAmount,
       amountLockedAt: caseDoc.amountLockedAt || respondedAt,
@@ -2943,28 +2755,10 @@ router.post(
 
     const updatedCase = await Case.findById(caseId);
     if (invitationResult.updated) {
-      await sendCaseNotification(
-        attorneyId,
-        "case_invite_response",
-        updatedCase || caseDoc,
-        { response: decision === "accept" ? "accepted" : "declined", paralegalId, paralegalName },
-        { actorUserId: paralegalId }
-      );
-      if (decision === "decline") {
-        await sendCaseNotification(
-          paralegalId,
-          "case_invite_response",
-          updatedCase || caseDoc,
-          {
-            message: `You declined the invitation for ${(updatedCase || caseDoc)?.title || "this Matter"}.`,
-            response: "declined",
-            paralegalId,
-            paralegalName,
-          },
-          { actorUserId: paralegalId }
-        );
-      }
+      publishCaseEvent(caseDoc._id, "case", { at: new Date().toISOString() });
+      publishCaseParticipantRefresh(updatedCase || caseDoc, "matter_invitation_response_refresh", [paralegalId]);
     }
+    await invitationResult.dispatch?.().catch(error => logger.warn("[cases] saved invitation response refresh deferred", { caseId, error }));
 
     return res.json({
       ...caseSummary(updatedCase || caseDoc, { viewerRole: req.user?.role }),
@@ -2976,35 +2770,43 @@ router.post(
 
 router.get(
   "/:caseId/invites",
-  requireCaseAccess("caseId", { project: "invites pendingParalegalId pendingParalegalInvitedAt attorney attorneyId" }),
+  (_req, res, next) => { res.set("Cache-Control", "private, no-store"); next(); },
+  requireCaseAccess("caseId"),
   asyncHandler(async (req, res) => {
+    const actorId = String(req.user.id || req.user._id);
+    if (req.query.expectedOwnerId !== undefined && req.query.expectedOwnerId !== actorId) {
+      return res.status(403).json({ error: "The signed-in account changed.", code: "INVITATION_ACCOUNT_CHANGED" });
+    }
     if (!req.acl?.isAttorney && req.user.role !== "admin") {
-      return res.status(403).json({ error: "Only attorneys can view invited paralegals." });
+      return res.status(403).json({ error: "Only the Matter attorney can view invited paralegals." });
     }
-    seedLegacyInvite(req.case);
-    const inviteList = listCaseInvites(req.case);
-    if (!inviteList.length) {
-      return res.json({ invites: [] });
-    }
-    const inviteIds = inviteList.map((invite) => invite.paralegalId).filter(Boolean);
-    const profiles = await User.find({ _id: { $in: inviteIds } })
-      .select("firstName lastName email role avatarURL profileImage")
-      .lean();
-    const profileMap = new Map(profiles.map((profile) => [String(profile._id), profile]));
-    const invites = inviteList
-      .map((invite) => ({
-        paralegal: summarizeUser(profileMap.get(String(invite.paralegalId))) || { id: invite.paralegalId },
-        status: invite.status,
-        invitedAt: invite.invitedAt || null,
-        respondedAt: invite.respondedAt || null,
-      }))
-      .sort((a, b) => {
-        const aTime = a.invitedAt ? new Date(a.invitedAt).getTime() : 0;
-        const bTime = b.invitedAt ? new Date(b.invitedAt).getTime() : 0;
-        return bTime - aTime;
-      });
-    return res.json({ invites });
+    try { return res.json(await require("../services/matterInvitations").read(req)); }
+    catch (error) { return invitationReviewError(res, error); }
   })
+);
+
+router.get(
+  "/:caseId/application-inventory",
+  (_req, res, next) => { res.set("Cache-Control", "private, no-store"); next(); },
+  requireCaseAccess("caseId"),
+  async (req, res) => {
+    try { return res.json(await require("../services/applicationInventory").read(req)); }
+    catch (error) {
+      return res.status(error.status || 503).json({ code: error.publicCode || "APPLICATION_REVIEW_UNAVAILABLE", error: error.publicCode ? error.message : "Applications could not be loaded. Refresh to try again." });
+    }
+  }
+);
+
+router.get(
+  "/:caseId/application-review",
+  (_req, res, next) => { res.set("Cache-Control", "private, no-store"); next(); },
+  requireCaseAccess("caseId"),
+  async (req, res) => {
+    try { return res.json(await require("../services/matterApplications").read(req)); }
+    catch (error) {
+      return res.status(error.status || 503).json({ code: error.publicCode || "APPLICATION_REVIEW_UNAVAILABLE", error: error.publicCode ? error.message : "Applications could not be loaded. Refresh to try again." });
+    }
+  }
 );
 
 const ensureCaseParticipantMiddleware = ensureCaseParticipant();
@@ -3025,7 +2827,6 @@ router.post(
   requireRole("admin", "attorney"),
   csrfProtection,
   asyncHandler(async (req, res) => {
-    const role = String(req.user?.role || "").toLowerCase();
     const {
       title,
       practiceArea,
@@ -3088,7 +2889,10 @@ router.post(
     if (!postingPolicy.ready) {
       return res.status(400).json({ error: "This matter is not ready to publish.", blockers: postingPolicy.blockers });
     }
-    const created = await Case.create({
+    let created, publicationDispatch;
+    try {
+      created = await withActiveAccountWrite([req.user.id], async session => {
+        const [created] = await Case.create([{
       title: safeTitle,
       practiceArea: normalizedPractice,
       details: narrative,
@@ -3102,7 +2906,7 @@ router.post(
       state: normalizedState,
       locationState: normalizedState,
       experiencePreference: cleanString(experience || "", { len: 200 }),
-      minimumYearsExperience: minimumYearsFromExperience(experience),
+      minimumYearsExperience: parseMinimumYears(experience),
       tasks: normalizedTasks,
       briefSummary: buildBriefSummary({ state: normalizedState, employmentType, experience }),
       updates: [
@@ -3112,17 +2916,10 @@ router.post(
           by: req.user.id,
         },
       ],
-    });
+        }], { session });
 
-    await created.populate([
-      { path: "paralegal", select: "firstName lastName email role avatarURL" },
-      { path: "attorney", select: "firstName lastName email role avatarURL" },
-    ]);
-
-    let createdJob = null;
-    try {
       const budgetDollars = Math.max(1, Math.round((amountCents || 0) / 100) || 0);
-      createdJob = await Job.create({
+        const [createdJob] = await Job.create([{
         caseId: created._id,
         attorneyId: req.user.id,
         title: created.title,
@@ -3134,34 +2931,25 @@ router.post(
         locationState: normalizedState,
         experiencePreference: created.experiencePreference || "",
         minimumYearsExperience: Number(created.minimumYearsExperience || 0),
-      });
+        }], { session });
       created.jobId = createdJob._id;
-      await created.save();
+      await created.save({ session });
+        publicationDispatch = await postingNotices.retain(req, "created", created, session);
+        return created;
+      }, { ownerId: req.user.id, authVersion: req.auth?.payload?.av });
     } catch (jobErr) {
-      if (createdJob?._id) {
-        await Job.deleteOne({ _id: createdJob._id }).catch(
-          logPromiseFailure(logger, "[cases] failed posting Job rollback", { caseId: created._id })
-        );
-      }
-      await Case.deleteOne({ _id: created._id, status: "open", escrowIntentId: { $in: [null, ""] } })
-        .catch(logPromiseFailure(logger, "[cases] failed posting Matter rollback", { caseId: created._id }));
-      logger.error("[cases] posting creation rolled back", created._id, jobErr?.message || jobErr);
-      return res.status(503).json({
-        error: "Unable to publish this matter right now. No posting was created; please try again.",
-        code: "POSTING_CREATION_FAILED",
-      });
+      if (jobErr.publicCode) throw jobErr;
+      logger.error("[cases] posting creation rolled back", jobErr?.message || jobErr);
+      return res.status(503).json({ error: "Unable to publish this matter right now. No posting was created; please try again.", code: "POSTING_CREATION_FAILED" });
     }
+    await created.populate([
+      { path: "paralegal", select: "firstName lastName email role avatarURL" },
+      { path: "attorney", select: "firstName lastName email role avatarURL" },
+    ]);
 
-    if (role === "attorney") {
-      await sendAdminJobPostedEmails(created.attorney || req.user, created, amountCents);
-    }
+    await dispatchPostingNotice(publicationDispatch);
 
-    try {
-      await logAction(req, "case.create", { targetType: "case", targetId: created._id });
-    } catch (auditError) {
-      logger.error("[cases] Matter creation audit persistence failed", { caseId: created._id, error: auditError });
-    }
-
+    publishMatterDiscoveryEvent("matter_published_refresh");
     res.status(201).json(caseSummary(created, { viewerRole: req.user?.role }));
   })
 );
@@ -3191,13 +2979,12 @@ router.get(
       },
     };
     if (req.user.role !== "admin") {
-      filter.attorney = req.user.id;
+      filter.$or = [{ attorney: { $in: applicationRefs(req.user.id) } }, { attorneyId: { $in: applicationRefs(req.user.id) } }];
     }
 
-    const docs = await Case.find(filter)
-      .sort({ createdAt: -1 })
-      .select("title practiceArea status pausedReason pausedAt disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType withdrawnParalegalId relistRequestedAt relistPending remainingAmount totalAmount lockedTotalAmount currency applicants paralegal hiredAt createdAt briefSummary details escrowStatus escrowIntentId");
+    const docs = await readCaseList(filter, { select: "title practiceArea status pausedReason pausedAt disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType withdrawnParalegalId relistRequestedAt relistPending remainingAmount totalAmount lockedTotalAmount currency applicants paralegal hiredAt createdAt briefSummary details escrowStatus escrowIntentId", sort: { createdAt: -1 }, populate: [] });
 
+    const applications = await legacyApplications.begin(req, docs);
     const items = docs.map((doc) => ({
       id: doc._id,
       title: doc.title,
@@ -3207,7 +2994,7 @@ router.get(
       remainingAmount: resolveRemainingAmount(doc),
       currency: doc.currency || "usd",
       applicants: doc.applicants || [],
-      applicantsCount: countPendingApplicants(doc),
+      applicantsCount: applications.counts.get(String(doc._id).toLowerCase()),
       paralegal: doc.paralegal || null,
       hiredAt: doc.hiredAt || null,
       escrowStatus: doc.escrowStatus || null,
@@ -3216,6 +3003,8 @@ router.get(
       briefSummary: doc.briefSummary || "",
     }));
 
+    await applications.verify();
+    res.set("Cache-Control", "private, no-store");
     res.json({ items });
   })
 );
@@ -3240,11 +3029,11 @@ router.get(
       query.status = { $in: statusFilter };
     }
     if (req.query.attorney && isObjId(req.query.attorney)) {
-      query.$or = [{ attorney: req.query.attorney }, { attorneyId: req.query.attorney }];
+      query.$or = [{ attorney: { $in: applicationRefs(req.query.attorney) } }, { attorneyId: { $in: applicationRefs(req.query.attorney) } }];
     }
 
     const scopedCount = (condition) =>
-      Case.countDocuments(Object.keys(query).length ? { $and: [query, condition] } : condition);
+      Case.collection.countDocuments(Object.keys(query).length ? { $and: [query, condition] } : condition);
     const activePostCondition = {
       archived: { $ne: true },
       paymentReleased: { $ne: true },
@@ -3261,19 +3050,15 @@ router.get(
     };
 
     const [docs, total, active, archived, flagged] = await Promise.all([
-      Case.find(query)
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .skip(skip)
-      .populate("attorney", "firstName lastName email role"),
-      Case.countDocuments(query),
+      readCaseList(query, { sort: { createdAt: -1 }, limit, skip, populate: [{ path: "attorney", select: "firstName lastName email role" }] }),
+      Case.collection.countDocuments(query),
       scopedCount(activePostCondition),
       scopedCount({ archived: true }),
       scopedCount(moderationCondition),
     ]);
 
-    const cases = docs.map((doc) => {
-      const summary = caseSummary(doc, { viewerRole: req.user?.role });
+    const summaries = await presentCaseList(docs, { role: req.user.role, viewerId: req.user.id, includeFiles: false, req });
+    const cases = summaries.map((summary) => {
       const attorney = summary.attorney;
       const authorName =
         attorney?.name ||
@@ -3313,7 +3098,7 @@ router.get(
       : null;
     const filter = {};
     const ownershipFilters = [];
-    const allVariants = userObjectId ? [userObjectId, userId] : [userId];
+    const allVariants = userObjectId ? applicationRefs(userId) : [userId];
     const includeAttorneyFilters = () => {
       allVariants.forEach((value) => {
         ownershipFilters.push({ attorney: value }, { attorneyId: value });
@@ -3342,8 +3127,8 @@ router.get(
       );
     } else {
       // admin: optional filter by attorney/paralegal query params
-      if (req.query.attorney && isObjId(req.query.attorney)) filter.attorney = req.query.attorney;
-      if (req.query.paralegal && isObjId(req.query.paralegal)) filter.paralegal = req.query.paralegal;
+      if (req.query.attorney && isObjId(req.query.attorney)) filter.attorney = { $in: applicationRefs(req.query.attorney) };
+      if (req.query.paralegal && isObjId(req.query.paralegal)) filter.paralegal = { $in: applicationRefs(req.query.paralegal) };
     }
 
     if (role === "attorney" || role === "admin") {
@@ -3390,39 +3175,9 @@ router.get(
       ];
     }
 
-    const docs = await Case.find(filter)
-      .sort({ updatedAt: -1 })
-      .limit(limit)
-      .select(
-        "title details practiceArea status pausedReason pausedAt disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType withdrawnParalegalId relistRequestedAt relistPending remainingAmount escrowStatus deadline deadlineDate zoomLink paymentReleased escrowIntentId applicants files jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt invites hiredAt completedAt briefSummary archived downloadUrl internalNotes totalAmount lockedTotalAmount currency tasks tasksLocked moderationStatus moderationFlaggedAt moderationFlaggedBy moderationResolutionRequestedAt moderationResolutionRequestedBy"
-      )
-      .populate("paralegalId", "firstName lastName email role avatarURL")
-      .populate("attorneyId", "firstName lastName email role avatarURL")
-      .populate("paralegal", "firstName lastName email role avatarURL")
-      .populate("attorney", "firstName lastName email role avatarURL")
-      .populate("internalNotes.updatedBy", "firstName lastName email role avatarURL")
-      .lean();
+    const docs = await readCaseList(filter, { select: CASE_LIST_FIELDS, sort: { updatedAt: -1 }, limit: limit, populate: [{ path: 'paralegalId', select: 'firstName lastName email role avatarURL' }, { path: 'attorneyId', select: 'firstName lastName email role avatarURL' }, { path: 'paralegal', select: 'firstName lastName email role avatarURL' }, { path: 'attorney', select: 'firstName lastName email role avatarURL' }, { path: 'internalNotes.updatedBy', select: 'firstName lastName email role avatarURL' }] });
 
-    let filesByCase = new Map();
-    if (includeFiles && docs.length) {
-      const caseIds = docs.map((doc) => doc._id);
-      const files = await CaseFile.find({ caseId: { $in: caseIds } }).sort({ createdAt: -1 }).lean();
-      files.forEach((file) => {
-        const key = String(file.caseId);
-        if (!filesByCase.has(key)) filesByCase.set(key, []);
-        filesByCase.get(key).push(normalizeFile(file));
-      });
-    }
-
-    const payload = docs.map((doc) => {
-      const summary = caseSummary(doc, { includeFiles: false, viewerRole: role });
-      if (includeFiles) {
-        const files = filesByCase.get(String(doc._id)) || [];
-        summary.files = files;
-        summary.filesCount = files.length;
-      }
-      return summary;
-    });
+    const payload = await presentCaseList(docs, { role, viewerId: req.user?.id, includeFiles, req });
 
     res.json(payload);
   })
@@ -3434,24 +3189,14 @@ router.get(
   asyncHandler(async (req, res) => {
     const limit = clamp(parseInt(req.query.limit, 10) || 50, 1, 200);
     const filter = {
-      $or: [{ attorney: req.user.id }, { attorneyId: req.user.id }],
+      $or: [{ attorney: { $in: applicationRefs(req.user.id) } }, { attorneyId: { $in: applicationRefs(req.user.id) } }],
       archived: { $ne: true },
       status: { $nin: ["completed", "closed", "cancelled"] },
     };
-    const docs = await Case.find(filter)
-      .sort({ updatedAt: -1 })
-      .limit(limit)
-      .select(
-        "title practiceArea status pausedReason pausedAt disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType withdrawnParalegalId relistRequestedAt relistPending remainingAmount escrowStatus deadline deadlineDate zoomLink paymentReleased escrowIntentId jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt invites moderationStatus moderationFlaggedAt moderationFlaggedBy moderationResolutionRequestedAt moderationResolutionRequestedBy"
-      )
-      .populate("attorney", "firstName lastName email role avatarURL")
-      .populate("attorneyId", "firstName lastName email role avatarURL")
-      .populate("paralegal", "firstName lastName email role avatarURL")
-      .populate("paralegalId", "firstName lastName email role avatarURL")
-      .populate("pendingParalegalId", "firstName lastName email role avatarURL")
-      .lean();
+    const docs = await readCaseList(filter, { select: "title practiceArea status pausedReason pausedAt disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType withdrawnParalegalId relistRequestedAt relistPending remainingAmount escrowStatus deadline deadlineDate zoomLink paymentReleased escrowIntentId jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt invites moderationStatus moderationFlaggedAt moderationFlaggedBy moderationResolutionRequestedAt moderationResolutionRequestedBy moderationPostingBaseline moderationEditRequest title details practiceArea state locationState experiencePreference minimumYearsExperience totalAmount deadline deadlineDate tasks", sort: { updatedAt: -1 }, limit: limit, populate: [{ path: 'attorney', select: 'firstName lastName email role avatarURL' }, { path: 'attorneyId', select: 'firstName lastName email role avatarURL' }, { path: 'paralegal', select: 'firstName lastName email role avatarURL' }, { path: 'paralegalId', select: 'firstName lastName email role avatarURL' }, { path: 'pendingParalegalId', select: 'firstName lastName email role avatarURL' }] });
 
-    res.json({ items: docs.map((doc) => caseSummary(doc, { viewerRole: req.user?.role })) });
+    const items = await presentCaseList(docs, { role: req.user.role, viewerId: req.user.id, includeFiles: false, req });
+    res.json({ items });
   })
 );
 
@@ -3510,41 +3255,9 @@ router.get(
   "/invited-to",
   requireRole("paralegal"),
   asyncHandler(async (req, res) => {
-    const limit = clamp(parseInt(req.query.limit, 10) || 50, 1, 200);
-    const filter = {
-      archived: { $ne: true },
-      $or: [
-        { "invites.paralegalId": req.user.id, "invites.status": "pending" },
-        { pendingParalegalId: req.user.id },
-      ],
-    };
-    const blockedIds = await getBlockedUserIds(req.user.id);
-    if (blockedIds.length) {
-      filter.attorney = { $nin: blockedIds };
-      filter.attorneyId = { $nin: blockedIds };
-    }
-    const docs = await Case.find(filter)
-      .sort({ updatedAt: -1 })
-      .limit(limit)
-      .select(
-        "title details briefSummary practiceArea state locationState tasks totalAmount lockedTotalAmount currency status escrowStatus deadline deadlineDate zoomLink paymentReleased escrowIntentId jobId createdAt updatedAt attorney attorneyId pendingParalegalId pendingParalegalInvitedAt invites"
-      )
-      .populate("attorney", "firstName lastName email role avatarURL")
-      .populate("attorneyId", "firstName lastName email role avatarURL")
-      .lean();
-
-    const items = docs.reduce((list, doc) => {
-      const invite = listCaseInvites(doc).find(
-        (entry) => entry.status === "pending" && String(entry.paralegalId) === String(req.user.id)
-      );
-      if (!invite) return list;
-      const summary = caseSummary(doc, { viewerRole: req.user?.role });
-      summary.inviteStatus = invite.status;
-      summary.inviteInvitedAt = invite.invitedAt || null;
-      list.push(summary);
-      return list;
-    }, []);
-    res.json({ items });
+    res.set("Cache-Control", "private, no-store");
+    try { return res.json(await require("../services/receivedInvitationInventory").read(req, caseSummary)); }
+    catch (error) { return invitationReviewError(res, error); }
   })
 );
 
@@ -3589,118 +3302,85 @@ router.get(
   "/my-completed",
   requireRole("paralegal"),
   asyncHandler(async (req, res) => {
-    const limit = clamp(parseInt(req.query.limit, 10) || 100, 1, 500);
-    const userId = req.user.id;
-    const userObjectId = mongoose.Types.ObjectId.isValid(userId)
-      ? new mongoose.Types.ObjectId(userId)
-      : null;
-    const allVariants = userObjectId ? [userObjectId, userId] : [userId];
-    const paralegalFilters = [];
-    allVariants.forEach((value) => {
-      paralegalFilters.push({ paralegal: value }, { paralegalId: value });
-    });
-    const filter = {
-      $or: [
-        {
-          $and: [
-            { $or: paralegalFilters },
-            { $or: [{ status: "completed" }, { paymentReleased: true }] },
-          ],
-        },
-        { withdrawnParalegalId: userObjectId || userId },
-      ],
-    };
-
-    const docs = await Case.find(filter)
-      .sort({ completedAt: -1, paidOutAt: -1, updatedAt: -1 })
-      .limit(limit)
-      .select(
-        "title status paymentReleased completedAt paidOutAt updatedAt attorney attorneyId withdrawnParalegalId pausedReason disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType currency disputes disputeSettlement"
-      )
-      .populate("attorney", "firstName lastName email role")
-      .populate("attorneyId", "firstName lastName email role");
-
-    for (const doc of docs) {
-      const isWithdrawn =
-        doc.withdrawnParalegalId && String(doc.withdrawnParalegalId) === String(userId);
-      if (!isWithdrawn) continue;
-      try {
-        const expired = await finalizeExpiredDisputeWindow(doc);
-        if (expired) {
-          await doc.save();
+    res.set("Cache-Control", "private, no-store");
+    try {
+      const account = require("../services/financialAccountBoundary"), { fingerprint } = require("../services/matterDraftRevision");
+      await account.read(req, "paralegal", req.query.expectedOwnerId);
+      const invalid = () => { throw Object.assign(new Error("Invalid history page."), { status: 400, code: "PAYOUT_HISTORY_INVALID" }); };
+      const changed = () => { throw Object.assign(new Error("History changed. Refresh to load the current records."), { status: 409, code: "PAYOUT_PROJECTION_CHANGED" }); };
+      if (req.query.reviewContexts !== undefined && req.query.reviewContexts !== "1") invalid();
+      const reviewContexts = req.query.reviewContexts === "1";
+      if (req.query.limit !== undefined && (typeof req.query.limit !== "string" || !/^[1-9]\d{0,2}$/.test(req.query.limit) || Number(req.query.limit) > 500)) invalid();
+      const limit = Number(req.query.limit || 100), cursor = req.query.cursor;
+      if (cursor !== undefined && (typeof cursor !== "string" || !/^[a-f0-9]{64}:[1-9]\d{0,3}$/.test(cursor))) invalid();
+      const [expectedRevision, rawOffset] = cursor ? cursor.split(":") : [], offset = Number(rawOffset || 0);
+      const userId = String(req.user.id), variants = [new mongoose.Types.ObjectId(userId), userId];
+      const filter = { $or: [
+        { $and: [{ $or: [{ paralegal: { $in: variants } }, { paralegalId: { $in: variants } }] }, { $or: [{ status: { $in: ["completed", "closed"] } }, { paymentReleased: true }] }] },
+        { $and: [{ $or: [{ paralegal: { $in: variants } }, { paralegalId: { $in: variants } }] }, { status: "disputed", pausedReason: "dispute", terminationStatus: "disputed", terminationDisputeId: { $type: "string" }, paralegalAccessRevokedAt: { $type: "date" } }] },
+        { withdrawnParalegalId: { $in: variants } }, { "withdrawalHistory.withdrawnParalegalId": { $in: variants } },
+      ] };
+      // Use the raw collection so supported retained string IDs remain visible.
+      // The bounded full scope also detects insertions/removals between pages.
+      const readScope = () => Case.collection.find(filter, { projection: { _id: 1, completedAt: 1, paidOutAt: 1, updatedAt: 1 } }).sort({ completedAt: -1, paidOutAt: -1, updatedAt: -1, _id: -1 }).limit(10001).toArray();
+      let docs = await readScope();
+      if (docs.length > 10000) throw Object.assign(new Error("History is too large to verify in this view. Contact LPC support."), { status: 503, code: "PAYOUT_HISTORY_LIMIT" });
+      if (offset && offset >= docs.length) changed();
+      // Keep the existing expiry behavior on the requested initial page only.
+      // Cursor reads are read-only and never expand automatic financial writes.
+      if (!cursor) {
+        let refresh = false;
+        for (const selected of docs.slice(0, limit)) {
+          const doc = await Case.findById(selected._id);
+          if (!doc?.withdrawnParalegalId || String(doc.withdrawnParalegalId) !== userId) continue;
+          try { if (await finalizeExpiredDisputeWindow(doc)) refresh = true; }
+          catch (error) { logger.warn("[cases] withdrawal expiry finalize failed", error?.message || error); }
         }
-      } catch (err) {
-        logger.warn("[cases] withdrawal expiry finalize failed", err?.message || err);
+        if (refresh) docs = await readScope();
       }
+      if (docs.length > 10000) throw Object.assign(new Error("History is too large to verify in this view. Contact LPC support."), { status: 503, code: "PAYOUT_HISTORY_LIMIT" });
+      const scopeRevision = fingerprint(docs), report = await require("../services/paralegalHistoryProjection").read(req, docs);
+      const revision = fingerprint([scopeRevision, report.revision, ...(reviewContexts ? ["review-contexts-v1"] : [])]);
+      if (expectedRevision && expectedRevision !== revision) changed();
+      const blockLookup = buildBlockLookup(userId, await getBlocksForUser(userId));
+      const byId = new Map(report.items.map(item => [String(item.caseId), item]));
+      const items = await Promise.all(docs.slice(offset, offset + limit).map(async record => {
+        const { source, ...item } = byId.get(String(record._id));
+        const counterpartyId = normalizeId(source.attorney || source.attorneyId);
+        const blockStatus = await getCaseInteractionBlockStatus(source, req.user, counterpartyId ? blockLookup.get(counterpartyId) || null : null);
+        // Cached clients know only withdrawal review wording. They retain the
+        // record without receiving a state they would incorrectly label.
+        const compatible = !reviewContexts && item.reviewKind === "termination" ? { ...item, reviewState: null, reviewKind: null } : item;
+        return { ...compatible, blockStatus };
+      }));
+      await report.verify();
+      if (scopeRevision !== fingerprint(await readScope())) changed();
+      await account.read(req, "paralegal", req.query.expectedOwnerId);
+      const end = offset + items.length;
+      res.json({ ownerId: report.ownerId, revision, items, page: { total: docs.length, limit, offset, hasMore: end < docs.length, nextCursor: end < docs.length ? `${revision}:${end}` : null } });
+    } catch (error) {
+      res.status(error.status || error.statusCode || 503).json({ code: error.publicCode || error.code || "PAYOUT_HISTORY_UNAVAILABLE", error: error.publicCode || error.code ? error.message : "Work history could not be verified. Refresh to try again." });
     }
-
-    const caseIds = docs.map((doc) => doc._id);
-    const payoutFilter = {
-      caseId: { $in: caseIds },
-      paralegalId: userObjectId || userId,
-    };
-    const payouts = caseIds.length
-      ? await Payout.find(payoutFilter).select("caseId amountPaid createdAt").lean()
-      : [];
-    const payoutMap = new Map(payouts.map((payout) => [String(payout.caseId), payout]));
-    const activeBlocks = await getBlocksForUser(userId);
-    const blockLookup = buildBlockLookup(userId, activeBlocks);
-
-    const items = await Promise.all(docs.map(async (doc) => {
-      const withdrawnId = doc.withdrawnParalegalId || null;
-      const isWithdrawn =
-        withdrawnId && String(withdrawnId) === String(userId);
-      const payout = payoutMap.get(String(doc._id));
-      const attorneyName =
-        formatPersonName(doc.attorney || doc.attorneyId) ||
-        doc.attorneyNameSnapshot ||
-        "Attorney";
-      const statusKey = normalizeCaseStatusValue(doc.status);
-      const isDisputed = statusKey === "disputed" || doc.pausedReason === "dispute";
-      const disputeActive =
-        !!doc.disputeDeadlineAt &&
-        !doc.payoutFinalizedAt &&
-        new Date(doc.disputeDeadlineAt).getTime() > Date.now();
-      let paymentAmount = (payout?.amountPaid || 0) / 100;
-      if (isWithdrawn) {
-        const gross = Number(doc.partialPayoutAmount ?? 0);
-        const net = computeParalegalFeeFromGross(gross, doc).net;
-        paymentAmount = net / 100;
-      }
-      const counterpartyId = normalizeId(doc.attorney || doc.attorneyId);
-      const blockStatus = await getCaseInteractionBlockStatus(
-        doc,
-        req.user,
-        counterpartyId ? blockLookup.get(counterpartyId) || null : null
-      );
-      return {
-        caseId: doc._id,
-        title: doc.title || "Untitled Matter",
-        attorneyName,
-        completedAt: doc.completedAt || doc.paidOutAt || doc.updatedAt,
-        paymentAmount,
-        isWithdrawn: !!isWithdrawn,
-        disputeDeadlineAt: doc.disputeDeadlineAt || null,
-        canDispute: !!isWithdrawn && disputeActive && !isDisputed,
-        isDisputed,
-        payoutFinalizedAt: doc.payoutFinalizedAt || null,
-        payoutFinalizedType: doc.payoutFinalizedType || null,
-        receiptAvailable: !isWithdrawn || !!doc.payoutFinalizedAt,
-        currency: doc.currency || "usd",
-        blockStatus,
-      };
-    }));
-
-    res.json({ items });
   })
 );
+
+router.get("/:caseId/work-review", requireCaseAccess("caseId"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  const work = require("../services/attorneyMatterWork");
+  try { return res.json(await work.read(req)); } catch (error) { return work.sendError(res, error); }
+}));
+router.post("/:caseId/work-review", csrfProtection, requireCaseAccess("caseId"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  const work = require("../services/attorneyMatterWork");
+  try { return res.json(await work.update(req)); } catch (error) { return work.sendError(res, error); }
+}));
 
 router.patch(
   "/:caseId",
   csrfProtection,
   requireCaseAccess(
     "caseId",
-    { project: "title details practiceArea totalAmount lockedTotalAmount currency status briefSummary experiencePreference minimumYearsExperience invites pendingParalegalId pendingParalegalInvitedAt applicants tasks taskRevision tasksLocked hiredAt paralegalId completionClaimStatus jobId" }
+    { project: "title details practiceArea state locationState deadline deadlineDate totalAmount lockedTotalAmount currency status briefSummary experiencePreference minimumYearsExperience invites pendingParalegalId pendingParalegalInvitedAt applicants tasks taskRevision tasksLocked hiredAt paralegalId completionClaimStatus jobId withdrawnParalegalId" }
   ),
   asyncHandler(async (req, res) => {
     const isAdmin = !!req.acl?.isAdmin;
@@ -3712,9 +3392,24 @@ router.patch(
     const tasksInputProvided = Object.prototype.hasOwnProperty.call(body, "tasks");
     const normalizedTasks = tasksInputProvided ? normalizeScopeTasks(body.tasks) : null;
     const tasksOnlyUpdate =
-      tasksInputProvided && Object.keys(body).every((key) => key === "tasks");
+      tasksInputProvided && Object.keys(body).every((key) => ["tasks", "expectedTaskRevision"].includes(key));
+    // Read earlier string/alias task formats without allowing Mongoose defaults
+    // or a cast failure to turn a retained scope into an empty array.
+    if (tasksOnlyUpdate) {
+      const storedWork = await Case.collection.findOne({ _id: doc._id }, { projection: { tasks: 1 } });
+      if (!storedWork) return res.status(404).json({ error: "Matter not found" });
+      doc.tasks = serializeScopeTasks(storedWork.tasks);
+    }
     const completionOnlyUpdate =
       tasksOnlyUpdate && isCompletionOnlyTaskUpdate(doc.tasks, normalizedTasks);
+    if (body.expectedTaskRevision !== undefined && (!Number.isSafeInteger(body.expectedTaskRevision) || body.expectedTaskRevision < 0)) return res.status(400).json({ error: "Invalid task revision." });
+    const matterWork = require("../services/attorneyMatterWork");
+    let workSnapshot = null;
+    if (completionOnlyUpdate) {
+      try { workSnapshot = await matterWork.legacySnapshot(doc, body.expectedTaskRevision); }
+      catch (error) { return res.status(error.status || 503).json({ code: "TASK_UPDATE_CONFLICT", error: "The task list or Matter access changed. Refresh before trying again." }); }
+      if (!isAdmin && (workSnapshot.readOnly || workSnapshot.archived)) return res.status(403).json({ error: "This Matter's work cannot be modified." });
+    }
     const amountInput =
       body.totalAmount ?? body.budget ?? body.compensationAmount ?? body.compAmount;
     if (typeof amountInput !== "undefined" && amountInput !== null && doc.lockedTotalAmount != null) {
@@ -3768,7 +3463,7 @@ router.patch(
     }
     const updatedDetails = typeof body.details === "string" ? body.details : typeof body.description === "string" ? body.description : null;
     if (updatedDetails) {
-      const sanitizedDetails = cleanString(updatedDetails, { len: 100_000 });
+      const sanitizedDetails = cleanPlainText(updatedDetails, { max: 100_000 });
       doc.details = sanitizedDetails;
       touched = true;
     }
@@ -3793,7 +3488,7 @@ router.patch(
     if (typeof body.experience === "string" || typeof body.experiencePreference === "string") {
       const preference = cleanString(body.experience ?? body.experiencePreference ?? "", { len: 200 });
       doc.experiencePreference = preference;
-      doc.minimumYearsExperience = minimumYearsFromExperience(preference);
+      doc.minimumYearsExperience = parseMinimumYears(preference);
       touched = true;
     }
     if (typeof body.deadline !== "undefined") {
@@ -3836,97 +3531,53 @@ router.patch(
       return res.status(400).json({ error: "No valid changes provided." });
     }
 
+    const postingSaved = await withActiveAccountWrite([], async session => {
     if (completionOnlyUpdate) {
-      const expectedTaskRevision = Number(doc.taskRevision || 0);
-      const taskRevisionClause = expectedTaskRevision === 0
-        ? { $or: [{ taskRevision: 0 }, { taskRevision: { $exists: false } }] }
-        : { taskRevision: expectedTaskRevision };
-      const saved = await Case.findOneAndUpdate(
-        {
-          _id: doc._id,
-          ...taskRevisionClause,
-          $and: [
-            {
-              $or: [
-                { completionClaimStatus: null },
-                { completionClaimStatus: { $exists: false } },
-              ],
-            },
-          ],
-        },
-        {
-          $set: { tasks: serializeScopeTasks(doc.tasks) },
-          $inc: { taskRevision: 1 },
-        },
-        { returnDocument: "after", runValidators: true }
+      const saved = await Case.collection.updateOne(
+        { ...matterWork.snapshotFilter(workSnapshot), $and: [{ $or: [{ completionClaimStatus: null }, { completionClaimStatus: { $exists: false } }] }] },
+        { $set: { tasks: matterWork.preserveCompletion(workSnapshot.tasks, normalizedTasks.map(task => task.completed)), updatedAt: new Date() }, $inc: { taskRevision: 1, __v: 1 } }, { session }
       );
-      if (!saved) {
-        return res.status(409).json({
-          error: "The task list changed or completion has started. Refresh before trying again.",
-          code: "TASK_UPDATE_CONFLICT",
-        });
+      if (saved.modifiedCount !== 1) {
+        throw Object.assign(new Error("The task list changed or completion has started. Refresh before trying again."), { status: 409, publicCode: "TASK_UPDATE_CONFLICT" });
       }
-      doc = saved;
+      doc = await Case.findById(doc._id).session(session);
+      if (!doc || !isAdmin && ![doc.attorney, doc.attorneyId].some(id => String(id || "") === String(req.user.id))) throw Object.assign(new Error("Matter access changed."), { status: 403 });
     } else {
-      await doc.save();
+      await doc.save({ session });
     }
     if (!completionOnlyUpdate && doc.jobId) {
       await Job.updateOne(
         { _id: doc.jobId },
         {
           $set: {
+            title: doc.title,
+            practiceArea: doc.practiceArea || "",
+            description: doc.details || "",
+            budget: Math.round(Number(doc.totalAmount || 0) / 100),
+            state: doc.state || doc.locationState || "",
+            locationState: doc.locationState || doc.state || "",
             experiencePreference: doc.experiencePreference || "",
             minimumYearsExperience: Number(doc.minimumYearsExperience || 0),
           },
-        }
+        }, { session }
       );
     }
+      const dispatch = await postingNotices.retain(req, 'updated', doc, session, { recipients: postingUpdateRecipients(doc, isAdmin), auditMeta: isAdmin && beforeAmount !== doc.totalAmount ? { amountOverride: { from: beforeAmount, to: doc.totalAmount }, adminId: req.user.id } : undefined });
+      return { caseDoc: doc, dispatch };
+    });
+    doc = postingSaved.caseDoc;
     await doc.populate([
       { path: "paralegal", select: "firstName lastName email role avatarURL" },
       { path: "attorney", select: "firstName lastName email role avatarURL" },
     ]);
 
-    try {
-      await logAction(req, "case.update", {
-        targetType: "case",
-        targetId: doc._id,
-        meta: isAdmin && beforeAmount !== doc.totalAmount ? { amountOverride: { from: beforeAmount, to: doc.totalAmount }, adminId: req.user.id } : undefined,
-      });
-    } catch (auditError) {
-      logger.error("[cases] Matter update audit persistence failed", { caseId: doc._id, error: auditError });
-    }
+    await dispatchPostingNotice(postingSaved.dispatch);
+
+    publishCaseEvent(doc._id, "case", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(doc, "matter_updated_refresh");
 
     if (tasksInputProvided) {
       publishCaseEvent(doc._id, "tasks", { at: new Date().toISOString() });
-    }
-
-    if (!isAdmin && !doc.paralegalId && !doc.hiredAt) {
-      const applicantIds = Array.isArray(doc.applicants)
-        ? doc.applicants
-            .filter((app) => String(app?.status || "pending").toLowerCase() === "pending")
-            .map((app) => app?.paralegalId?._id || app?.paralegalId)
-            .filter(Boolean)
-        : [];
-      if (applicantIds.length) {
-        const uniqueApplicants = [...new Set(applicantIds.map((id) => String(id)))];
-        const rawJobId = doc.jobId || doc.job || "";
-        const jobId =
-          typeof rawJobId === "object"
-            ? rawJobId._id || rawJobId.id || ""
-            : rawJobId;
-        const link = jobId
-          ? `dashboard-paralegal.html?highlightJobId=${encodeURIComponent(String(jobId))}#cases`
-          : "dashboard-paralegal.html#cases";
-        const payload = {
-          link,
-          summary: "A Matter you applied to was updated.",
-        };
-        await Promise.allSettled(
-          uniqueApplicants.map((userId) =>
-            sendCaseNotification(userId, "case_update", doc, payload, { actorUserId: req.user?.id })
-          )
-        );
-      }
     }
 
     res.json(caseSummary(doc, { viewerRole: req.user?.role }));
@@ -3936,14 +3587,23 @@ router.patch(
 router.delete(
   "/:caseId",
   csrfProtection,
+  (req, res, next) => {
+    if (Object.keys(req.body || {}).some(key => key.startsWith("expectedOwnerId") && key !== "expectedOwnerId")) {
+      return res.status(400).json({ code: "MATTER_DELETE_INVALID", error: "Reload Matters before deleting this posting." });
+    }
+    if (req.body?.expectedOwnerId !== undefined && req.body.expectedOwnerId !== String(req.user?.id || req.user?._id || "")) {
+      return res.status(403).json({ code: "MATTER_DELETE_ACCOUNT_CHANGED", error: "The signed-in account changed. Reload Matters before continuing." });
+    }
+    next();
+  },
   requireCaseAccess("caseId", {
-    project: "status archived paralegal paralegalId attorney attorneyId title escrowStatus escrowIntentId paymentIntentId paymentReleased payoutTransferId payoutFinalizedAt disputes hiredAt jobId job",
+    project: "status archived paralegal paralegalId attorney attorneyId title escrowStatus escrowIntentId paymentIntentId paymentReleased payoutTransferId payoutFinalizedAt disputes hiredAt jobId job applicants.paralegalId invites.paralegalId pendingParalegalId",
   }),
   asyncHandler(async (req, res) => {
     if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
       return res.status(403).json({ error: "Only the Matter attorney can delete this Matter" });
     }
-    const doc = req.case;
+    let doc = req.case;
     const statusKey = normalizeCaseStatusValue(doc.status);
     const hasParalegal = !!(doc.paralegal || doc.paralegalId);
     if (hasParalegal || doc.hiredAt) {
@@ -3967,6 +3627,11 @@ router.delete(
     if (statusKey !== "open") {
       return res.status(409).json({ error: "Only open, never-engaged postings can be permanently deleted." });
     }
+    const deletionFields = "attorney attorneyId status archived paralegal paralegalId hiredAt escrowStatus escrowIntentId paymentIntentId paymentReleased payoutTransferId payoutFinalizedAt disputes hiringClaimToken hiringClaimStatus fundingRequestKey __v".split(" ");
+    const deletionFacts = await Case.collection.findOne({ _id: doc._id }, { projection: Object.fromEntries(deletionFields.map(key => [key, 1])) });
+    if (!deletionFacts || deletionFacts.hiringClaimToken || deletionFacts.hiringClaimStatus || deletionFacts.fundingRequestKey || deletionFacts.paralegal || deletionFacts.paralegalId || deletionFacts.hiredAt || deletionFacts.escrowIntentId || deletionFacts.paymentIntentId || deletionFacts.paymentReleased || deletionFacts.escrowStatus === "funded" || deletionFacts.payoutTransferId || deletionFacts.payoutFinalizedAt || deletionFacts.disputes?.length || normalizeCaseStatusValue(deletionFacts.status) !== "open" || String(deletionFacts.attorney || "") !== String(doc.attorney || "") || String(deletionFacts.attorneyId || "") !== String(doc.attorneyId || "")) {
+      return res.status(409).json({ error: "This Matter changed or has a funding attempt that must be resolved before deletion." });
+    }
 
     const reasonRaw = typeof req.body?.reason === "string" ? req.body.reason : "";
     const messageRaw = typeof req.body?.message === "string" ? req.body.message : "";
@@ -3974,60 +3639,24 @@ router.delete(
     const message = cleanText(messageRaw, { max: 4000 });
     const attorneyRef = doc.attorneyId || doc.attorney || null;
 
-    await Case.deleteOne({ _id: doc._id });
-    const relatedJobIds = [doc.jobId, doc.job].filter(Boolean);
-    let jobIdsForCleanup = relatedJobIds.map((id) => String(id));
+    let deletionResult;
     try {
-      const extraJobs = await Job.find({ caseId: doc._id }).select("_id").lean();
-      extraJobs.forEach((job) => {
-        const id = job?._id ? String(job._id) : "";
-        if (id && !jobIdsForCleanup.includes(id)) jobIdsForCleanup.push(id);
-      });
-    } catch (jobListErr) {
-      logger.warn("[cases] Unable to load related jobs for cleanup", doc._id, jobListErr);
+      deletionResult = await withActiveAccountWrite([req.user.id], async session => {
+        const source = await Case.collection.findOne({ _id: doc._id, ...Object.fromEntries(deletionFields.map(key => [key, deletionFacts[key] === undefined ? { $exists: false } : { $eq: deletionFacts[key] }])) }, { session });
+        if (!source) throw Object.assign(new Error("This Matter changed. Refresh before trying to delete it."), { status: 409, publicCode: "MATTER_DELETE_CHANGED" });
+        const result = await deletePostingRecords(source, session);
+        const dispatch = await postingNotices.retain(req, 'deleted', result.doc, session, { notifyOwner: !!req.acl?.isAdmin && !!attorneyRef && !!(reason || message), reason, message });
+        return { ...result, dispatch };
+      }, { ownerId: req.user.id, authVersion: req.auth?.payload?.av });
+    } catch (error) {
+      if (!error.publicCode) logger.error("[cases] posting deletion could not be confirmed", { caseId: doc._id, error: error.name });
+      return res.status(error.status || 503).json({ code: error.publicCode || "MATTER_DELETE_UNCONFIRMED", error: error.publicCode ? error.message : "Deletion could not be confirmed. Check this Matter before trying again." });
     }
-    try {
-      if (jobIdsForCleanup.length) {
-        await Job.deleteMany({ _id: { $in: jobIdsForCleanup } });
-      } else {
-        await Job.deleteMany({ caseId: doc._id });
-      }
-    } catch (jobErr) {
-      logger.warn("[cases] Unable to clean up related jobs for deleted case", doc._id, jobErr);
-    }
-    try {
-      if (jobIdsForCleanup.length) {
-        await Application.deleteMany({ jobId: { $in: jobIdsForCleanup } });
-      }
-    } catch (appErr) {
-      logger.warn("[cases] Unable to clean up applications for deleted case", doc._id, appErr);
-    }
-    try {
-      await logAction(req, "case.delete", {
-        targetType: "case",
-        targetId: doc._id,
-        meta: req.acl?.isAdmin ? { reason: reason || "", message: message || "" } : undefined,
-      });
-    } catch (auditError) {
-      logger.error("[cases] Matter deletion audit persistence failed", { caseId: doc._id, error: auditError });
-    }
-    if (req.acl?.isAdmin && attorneyRef && (reason || message)) {
-      try {
-        await notifyUser(
-          attorneyRef,
-          "case_deleted",
-          {
-            caseTitle: doc.title || "Untitled Matter",
-            reason: reason || "Policy review",
-            customNote: message || "",
-            message: `Your Matter posting "${doc.title || "Untitled Matter"}" was removed by an administrator.`,
-          },
-          { actorUserId: req.user?.id || req.user?._id || null }
-        );
-      } catch (err) {
-        logger.warn("[cases] notifyUser case_deleted failed", err?.message || err);
-      }
-    }
+    doc = deletionResult.doc;
+    const affectedParalegalIds = deletionResult.recipients;
+    await dispatchPostingNotice(deletionResult.dispatch);
+    publishCaseEvent(doc._id, "case", { at: new Date().toISOString(), type: "matter_deleted_refresh" });
+    publishCaseParticipantRefresh(doc, "matter_deleted_refresh", [...affectedParalegalIds]);
     res.json({ ok: true });
   })
 );
@@ -4046,10 +3675,18 @@ router.patch(
       return res.status(403).json({ error: "Only the Matter attorney or an administrator may update the meeting link" });
     }
     const { zoomLink } = req.body || {};
+    if (typeof zoomLink !== 'string' || zoomLink.length > 2000) {
+      return res.status(400).json({ error: "Enter a valid Zoom meeting link, or leave it empty to remove it." });
+    }
     const doc = await Case.findById(req.params.caseId).select("zoomLink title");
     if (!doc) return res.status(404).json({ error: "Matter not found" });
 
     doc.zoomLink = cleanString(zoomLink || "", { len: 2000 });
+    try { await doc.validate(['zoomLink']); }
+    catch (error) {
+      if (error.name !== 'ValidationError') throw error;
+      return res.status(400).json({ error: "Enter a valid HTTPS Zoom meeting link." });
+    }
     await doc.save();
 
     try {
@@ -4063,6 +3700,8 @@ router.patch(
       logger.error("[cases] meeting-link audit persistence failed", { caseId: doc._id, error: auditError });
     }
 
+    publishCaseEvent(doc._id, "case", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(doc, "matter_meeting_refresh");
     res.json({ ok: true, zoomLink: doc.zoomLink });
   })
 );
@@ -4111,12 +3750,13 @@ router.post(
       });
     }
 
-    const reason = cleanMessage(req.body?.reason || "", { len: 2000 });
+    const reason = cleanMessage(req.body?.reason || "", 2000);
     const now = new Date();
     const disputeId = new mongoose.Types.ObjectId().toString();
+    const requester = req.acl?.isAdmin ? "Administrator" : "Attorney";
     const message = reason
-      ? `Attorney requested termination: ${reason}`
-      : "Attorney requested termination of this Matter.";
+      ? `${requester} requested termination: ${reason}`
+      : `${requester} requested termination of this Matter.`;
     const ownerClause = req.acl?.isAdmin
       ? {}
       : {
@@ -4125,47 +3765,88 @@ router.post(
             { attorneyId: req.user.id },
           ],
         };
-    const updatedCase = await Case.findOneAndUpdate(
-      {
-        _id: doc._id,
-        status: { $in: ["in progress", "in_progress"] },
-        archived: { $ne: true },
-        readOnly: { $ne: true },
-        completionClaimStatus: { $nin: ["claimed", "needs_reconciliation"] },
-        $and: [
-          { $or: [{ paralegal: { $ne: null } }, { paralegalId: { $ne: null } }] },
-          { disputes: { $not: { $elemMatch: { status: "open" } } } },
-          { terminationStatus: { $in: [null, "", "none", "resolved"] } },
-        ],
-        ...ownerClause,
-      },
-      {
-        $push: {
-          disputes: {
-            disputeId,
-            message,
-            raisedBy: req.user.id,
-            status: "open",
-            comments: [],
-            createdAt: now,
-            updatedAt: now,
+    let updatedCase, dispatchers = [];
+    const session = await mongoose.startSession();
+    try {
+      await reviewNotices.ready();
+      await session.withTransaction(async () => {
+        dispatchers = [];
+        await lockActiveAccounts([req.user.id], session, { ownerId: req.user.id, authVersion: req.authVersion });
+        const actor = await User.findById(req.user.id).select("role").session(session).lean();
+        if (actor?.role !== (req.acl?.isAdmin ? "admin" : "attorney")) throw Object.assign(new Error("This account changed. Sign in again before continuing."), { status: 403 });
+        updatedCase = await Case.findOneAndUpdate(
+          {
+            _id: doc._id,
+            attorney: doc.attorney?._id || doc.attorney || null,
+            attorneyId: doc.attorneyId || null,
+            paralegal: doc.paralegal?._id || doc.paralegal || null,
+            paralegalId: doc.paralegalId || null,
+            hiredAt: doc.hiredAt || null,
+            status: { $in: ["in progress", "in_progress"] },
+            archived: { $ne: true },
+            readOnly: { $ne: true },
+            completionClaimStatus: { $nin: ["claimed", "needs_reconciliation"] },
+            $and: [
+              { $or: [{ paralegal: { $ne: null } }, { paralegalId: { $ne: null } }] },
+              { disputes: { $not: { $elemMatch: { status: "open" } } } },
+              { terminationStatus: { $in: [null, "", "none", "resolved"] } },
+            ],
+            ...ownerClause,
           },
-        },
-        $set: {
-          status: "disputed",
-          pausedReason: "dispute",
-          disputeDeadlineAt: null,
-          terminationRequestedAt: now,
-          terminationRequestedBy: req.user.id,
-          terminationReason: reason,
-          terminationStatus: "disputed",
-          terminationDisputeId: disputeId,
-          terminatedAt: null,
-          paralegalAccessRevokedAt: now,
-        },
-      },
-      { returnDocument: "after", runValidators: true }
-    );
+          {
+            $push: {
+              disputes: {
+                disputeId,
+                message,
+                raisedBy: req.user.id,
+                status: "open",
+                comments: [],
+                createdAt: now,
+                updatedAt: now,
+              },
+            },
+            $set: {
+              status: "disputed",
+              pausedReason: "dispute",
+              disputeDeadlineAt: null,
+              terminationRequestedAt: now,
+              terminationRequestedBy: req.user.id,
+              terminationReason: reason,
+              terminationStatus: "disputed",
+              terminationDisputeId: disputeId,
+              terminatedAt: null,
+              paralegalAccessRevokedAt: now,
+            },
+          },
+          { returnDocument: "after", runValidators: true, session }
+        );
+        if (!updatedCase) return;
+        await AuditLog.logFromReq(req, "case.terminate", {
+          targetType: "case", targetId: updatedCase._id, caseId: updatedCase._id,
+          meta: { mode: "disputed", disputeId }, session,
+        });
+        // Preserve termination's existing single-recipient policy.
+        const affectedParalegalId = updatedCase.paralegal || updatedCase.paralegalId;
+        if (!affectedParalegalId) throw new Error("The affected paralegal could not be verified.");
+        const dispatch = await notifyUser(affectedParalegalId, "dispute_opened", {
+          caseId: String(updatedCase._id), caseTitle: updatedCase.title || "Untitled Matter",
+          title: "Matter review opened",
+          message: `A termination review has been opened for the Matter: ${updatedCase.title || "Untitled Matter"}.`,
+          disputeId,
+        }, { actorUserId: req.user.id, session, deferDispatch: true, reviewOpened: true });
+        if (typeof dispatch !== "function") throw new Error("The review notification recipient is unavailable.");
+        dispatchers.push(dispatch);
+      }, { readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, maxCommitTimeMS: 10000 });
+    } catch (error) {
+      reportOperationalFailure("routes.cases.termination_review")(error);
+      return res.status(error.status || 503).json({
+        code: error.status ? "TERMINATION_ACCOUNT_CHANGED" : "TERMINATION_REVIEW_UNAVAILABLE",
+        error: error.status ? error.message : "The termination request could not be confirmed. Refresh to check its status.",
+      });
+    } finally {
+      updatedCase?.$session(null);
+      await session.endSession();
+    }
     if (!updatedCase) {
       const latest = await Case.findById(doc._id)
         .populate("paralegal", "firstName lastName email role avatarURL")
@@ -4195,25 +3876,14 @@ router.post(
       { path: "terminationRequestedBy", select: "firstName lastName email role" },
     ]);
 
-    try {
-      await logAction(req, "case.terminate", {
-        targetType: "case",
-        targetId: updatedCase._id,
-        caseId: updatedCase._id,
-        meta: { mode: "disputed", disputeId },
-      });
-    } catch (auditError) {
-      logger.error("[cases] withdrawal dispute audit persistence failed", {
-        caseId: updatedCase._id,
-        error: auditError,
-      });
-    }
-
     const payload = {
       ok: true,
       requiresAdmin: true,
       case: caseSummary(updatedCase, { viewerRole: req.user?.role }),
     };
+    for (const dispatch of dispatchers) await dispatch().catch(reportOperationalFailure("routes.cases.termination_refresh"));
+    publishCaseEvent(updatedCase._id, "case", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(updatedCase, "matter_termination_refresh");
     res.status(202).json(payload);
   })
 );
@@ -4227,9 +3897,9 @@ router.post(
   "/:caseId/files",
   csrfProtection,
   requireCaseAccess("caseId", {
-    project: "files status paralegal paralegalId escrowIntentId escrowStatus archived readOnly paralegalAccessRevokedAt",
+    project: "files status paralegal paralegalId escrowIntentId escrowStatus archived readOnly paralegalAccessRevokedAt withdrawnParalegalId hiredAt",
   }),
-  asyncHandler(async (req, res) => {
+  asyncHandler(matterFileWrites.handle(async (req, res) => {
     if (req.acl?.isAdmin) {
       return res.status(403).json({ error: "Administrators can only access the Matter archive." });
     }
@@ -4237,8 +3907,17 @@ router.post(
     if (!key || typeof key !== "string") return res.status(400).json({ error: "key is required" });
     const doc = req.case;
     if (!requireMatterDocumentWorkspace(doc, res)) return;
+    const writeReview = await matterFileWrites.read(req);
     const storageKey = normalizeCaseStorageKey(key);
-    const exists = await CaseFile.findOne(buildCaseFileKeyQuery({ caseId: doc._id, storageKey }))
+    const exists = await CaseFile.findOne(applyAssignmentVisibility(
+      buildCaseFileKeyQuery({ caseId: doc._id, storageKey }),
+      doc,
+      {
+        role: req.user?.role,
+        userId: req.user?.id,
+        isParalegal: req.acl?.isParalegal === true,
+      }
+    ))
       .select("_id")
       .lean();
     if (exists) return res.status(200).json({ ok: true });
@@ -4253,9 +3932,6 @@ router.post(
         "FILE_EXTENSION_MISMATCH",
         "FILE_SIGNATURE_MISMATCH",
       ].includes(err?.code)) {
-        await deletePreEngagementObject(storageKey).catch(
-          logPromiseFailure(logger, "[cases] invalid document object cleanup failed", { caseId: doc._id })
-        );
         return res.status(400).json({ error: err.message, code: err.code });
       }
       if (err?.name === "NotFound" || err?.name === "NoSuchKey" || err?.$metadata?.httpStatusCode === 404) {
@@ -4271,7 +3947,9 @@ router.post(
     let created = false;
     const version = await nextCaseFileVersion(doc._id, filename);
     try {
-      await CaseFile.create({
+      await matterFileWrites.run(req, writeReview, async session => {
+        await matterRetirement.assertAttachable(doc._id, storageKey, session);
+        const entries = await CaseFile.create([{
         caseId: doc._id,
         userId: req.user.id,
         originalName: filename,
@@ -4285,13 +3963,12 @@ router.post(
         uploadedByRole: uploadRole,
         status,
         version,
+      }], { session });
+        await presignedUploads.attach(req, storageKey, entries[0]._id, session); return entries;
       });
       created = true;
     } catch (err) {
       if (Number(err?.code) !== 11000) {
-        await deletePreEngagementObject(storageKey).catch(
-          logPromiseFailure(logger, "[cases] unattached document object cleanup failed", { caseId: doc._id })
-        );
         throw err;
       }
     }
@@ -4306,10 +3983,13 @@ router.post(
       } catch (auditError) {
         logger.error("[cases] document attachment audit persistence failed", { caseId: doc._id, error: auditError });
       }
+      publishCaseEvent(doc._id, "documents", { at: new Date().toISOString() });
+      publishCaseParticipantRefresh(doc, "matter_documents_refresh");
     }
 
+    await matterFileWrites.read(req);
     res.status(created ? 201 : 200).json({ ok: true });
-  })
+  }))
 );
 
 /**
@@ -4317,61 +3997,93 @@ router.post(
  * Body: { key }
  * Removes the file metadata from the case.
  */
-router.delete(
-  "/:caseId/files",
-  csrfProtection,
-  requireCaseAccess("caseId", {
-    project: "files status paralegal paralegalId escrowIntentId escrowStatus archived readOnly paralegalAccessRevokedAt",
-  }),
-  asyncHandler(async (req, res) => {
-    if (req.acl?.isAdmin) {
-      return res.status(403).json({ error: "Administrators can only access the Matter archive." });
-    }
-    const { key } = req.body || {};
-    if (!key || typeof key !== "string") return res.status(400).json({ error: "key is required" });
-    const doc = req.case;
-    if (!requireMatterDocumentWorkspace(doc, res)) return;
-    const storageKey = normalizeCaseStorageKey(key);
-    if (!isCaseDocumentStorageKey(doc._id, storageKey)) {
-      return res.status(400).json({ error: "The document key does not belong to this Matter." });
-    }
-    const record = await CaseFile.findOne(buildCaseFileKeyQuery({ caseId: doc._id, storageKey }));
-    if (!record) {
-      return res.status(404).json({ error: "File not found on Matter" });
-    }
-    const plainRecord = decryptCaseFilePayload(record);
-    if (S3_BUCKET && plainRecord.storageKey) {
-      try {
-        const keyPath = String(plainRecord.storageKey).replace(/^\/+/, "");
-        await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: keyPath }));
-      } catch (err) {
-        logger.warn("[cases] file delete error", err?.message || err);
-      }
-    }
-    if (S3_BUCKET && plainRecord.previewKey) {
-      try {
-        const keyPath = String(plainRecord.previewKey).replace(/^\/+/, "");
-        await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: keyPath }));
-      } catch (err) {
-        logger.warn("[cases] file preview delete error", err?.message || err);
-      }
-    }
-    await CaseFile.deleteOne({ _id: record._id });
+router.delete("/:caseId/files", csrfProtection, asyncHandler(async (req, res) => {
+  try {
+    if (req.user?.role !== "attorney") return res.status(403).json({ error: "Only the Matter attorney can remove documents." });
+    const doc = await matterFileWrites.read(req), key = normalizeCaseStorageKey(req.body?.key);
+    if (!isCaseDocumentStorageKey(doc._id, key)) return res.status(400).json({ error: "The document key does not belong to this Matter." });
+    const record = await CaseFile.findOne(buildCaseFileKeyQuery({ caseId: doc._id, storageKey: key }));
+    if (!record) return res.status(404).json({ error: "File not found on Matter" });
+    res.json({ ok: true, ...await fileRemoval.legacy(req, record._id) });
+  } catch (error) { fileRemoval.sendError(res, error); }
+}));
 
-    try {
-      await logAction(req, "case.file.remove", {
-        targetType: "case",
-        targetId: doc._id,
-        caseId: doc._id,
-        meta: { key: storageKey },
-      });
-    } catch (auditError) {
-      logger.error("[cases] document removal audit persistence failed", { caseId: doc._id, error: auditError });
-    }
+const matterDownloads = require("../services/matterDownloads");
+const downloadNoStore = (_req, res, next) => { res.set("Cache-Control", "private, no-store"); next(); };
+const downloadOperation = (writeResponse, readFile = matterDownloads.readFile, validateKey = isCaseDocumentStorageKey) => async (req, res) => {
+  let object;
+  try {
+    if (!writeResponse) return res.json(await matterDownloads.list(req));
+    const { record, file } = await readFile(req);
+    const preview = req.query.preview === "true";
+    const audio = req.query.play === "true" && file.inlineAudioMimeType;
+    if (req.query.play !== undefined && !audio) return res.status(400).json({ code: "DOWNLOAD_AUDIO_UNAVAILABLE", error: "This attachment cannot be played here." });
+    if (req.query.preview !== undefined && (!preview || file.mimeType !== "application/pdf")) return res.status(400).json({ code: "DOWNLOAD_PREVIEW_UNAVAILABLE", error: "This document cannot be previewed here. Download it to review its contents." });
+    const key = normalizeCaseStorageKey(file.storageKey);
+    if (!validateKey(req.params.caseId, key)) return res.status(409).json({ code: "DOWNLOAD_UNAVAILABLE", error: "This file's stored reference needs review." });
+    if (!S3_BUCKET) return res.status(503).json({ code: "DOWNLOAD_STORAGE", error: "File storage is temporarily unavailable." });
+    const scan = await refreshMatterFileScan(record, key);
+    if (!scan.safe) return res.status(scan.status === "blocked" ? 422 : scan.status === "error" ? 503 : 423).json({ code: scan.status === "blocked" ? "DOWNLOAD_BLOCKED" : scan.status === "error" ? "DOWNLOAD_SCAN_ERROR" : "DOWNLOAD_SCAN_PENDING", error: "This file has not passed its current security check." });
+    await readFile(req);
+    object = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: key }));
+    // Ownership, lifecycle and the exact file can change while storage responds.
+    await readFile(req);
+    if (req.aborted || res.destroyed) { object.Body?.destroy?.(); return; }
+    if (!object.Body || typeof object.Body.pipe !== "function") throw new Error("File stream unavailable");
+    const name = String(file.originalName || "Matter file").replace(/[\u0000-\u001f\u007f\\/]/g, "-").slice(0, 180);
+    res.set("Content-Type", preview ? "application/pdf" : audio || "application/octet-stream");
+    res.set("X-Content-Type-Options", "nosniff");
+    res.set("Content-Disposition", `${preview || audio ? "inline" : "attachment"}; filename="matter-file"; filename*=UTF-8''${encodeURIComponent(name).replace(/'/g, "%27")}`);
+    if (Number.isSafeInteger(object.ContentLength) && object.ContentLength >= 0) res.set("Content-Length", String(object.ContentLength));
+    res.on("close", () => object.Body?.destroy?.());
+    object.Body.on("error", error => { logger.error("[cases] Matter file stream failed", { caseId: req.params.caseId, fileId: req.params.fileId, error }); res.destroy(error); });
+    object.Body.on("end", () => {
+      void logAction(req, preview || audio ? "file_viewed" : "file_downloaded", { targetType: "case", targetId: req.params.caseId, meta: { fileId: req.params.fileId, filename: name, ...(req.params.messageId ? { messageId: req.params.messageId } : {}), ...(req.params.index !== undefined ? { historyIndex: Number(req.params.index) } : {}) } }).catch(error => logger.warn("[cases] file download audit failed", { caseId: req.params.caseId, error }));
+    });
+    object.Body.pipe(res);
+  } catch (error) {
+    object?.Body?.destroy?.();
+    if (res.headersSent) { res.destroy(error); return; }
+    if (error.publicCode) return res.status(error.status).json({ code: error.publicCode, error: error.message });
+    if (["NoSuchKey", "NotFound"].includes(error.name || error.code) || error?.$metadata?.httpStatusCode === 404) return res.status(404).json({ code: "DOWNLOAD_FILE_NOT_FOUND", error: "This file is no longer in storage." });
+    logger.error("[cases] Matter file download unavailable", { caseId: req.params.caseId, error });
+    return res.status(503).json({ code: "DOWNLOAD_UNAVAILABLE", error: "The file request could not be completed. Try again when your connection and file status are ready." });
+  }
+};
+const attorneyEarlierFiles = require("../services/attorneyEarlierFiles");
+router.get("/:caseId/earlier-files", downloadNoStore, requireCaseAccess("caseId"), async (req, res) => {
+  try { res.json(await attorneyEarlierFiles.read(req)); }
+  catch (error) { res.status(error.status || 503).json({ code: error.publicCode || "DOCUMENT_EARLIER_UNAVAILABLE", error: "Earlier Matter files could not be verified. Refresh Files before continuing." }); }
+});
+router.get("/:caseId/earlier-files/:referenceId/download", downloadNoStore, requireCaseAccess("caseId"), downloadOperation(true, attorneyEarlierFiles.readDownload, attorneyEarlierFiles.isAllowedKey));
+router.get("/:caseId/downloads", downloadNoStore, requireCaseAccess("caseId"), downloadOperation(false));
+router.get("/:caseId/downloads/:fileId", downloadNoStore, requireCaseAccess("caseId"), downloadOperation(true));
+router.get("/:caseId/message-attachments/:messageId", downloadNoStore, requireCaseAccess("caseId"), downloadOperation(true, require("../services/attorneyMessageAttachments").readDownload));
+router.get("/:caseId/retained-messages", downloadNoStore, requireCaseAccess("caseId"), async (req, res) => {
+  try { res.json(await require("../services/attorneyRetainedConversation").read(req)); }
+  catch (error) { require("../services/attorneyConversation").sendError(res, error); }
+});
 
-    res.json({ ok: true });
-  })
-);
+const attorneyMatterFileHistory = require("../services/attorneyMatterFileHistory");
+router.get("/:caseId/files/:fileId/history", downloadNoStore, requireCaseAccess("caseId"), async (req, res) => {
+  try { res.json(await attorneyMatterFileHistory.list(req)); } catch (error) { res.status(error.status || 503).json({ code: error.publicCode || "DOCUMENT_HISTORY_UNAVAILABLE", error: "Document history could not be verified. Refresh Files before continuing." }); }
+});
+router.get("/:caseId/files/:fileId/history/:index/download", downloadNoStore, requireCaseAccess("caseId"), downloadOperation(true, attorneyMatterFileHistory.readDownload));
+
+const attorneyMatterFiles = require("../services/attorneyMatterFiles");
+router.get("/:caseId/files/review", downloadNoStore, requireCaseAccess("caseId"), async (req, res) => {
+  try { res.json(await attorneyMatterFiles.list(req)); }
+  catch (error) { attorneyMatterFiles.sendError(res, error); }
+});
+router.post("/:caseId/files/:fileId/review", downloadNoStore, csrfProtection, requireCaseAccess("caseId"), async (req, res) => {
+  try {
+    res.json(await attorneyMatterFiles.update(req, { verifySecurity: async record => {
+      const file = decryptCaseFilePayload(record), key = normalizeCaseStorageKey(file.storageKey);
+      if (!isCaseDocumentStorageKey(req.params.caseId, key)) return false;
+      return (await refreshMatterFileScan(record, key)).safe;
+    } }));
+  } catch (error) { attorneyMatterFiles.sendError(res, error); }
+});
 
 /**
  * GET /api/cases/:caseId/files/signed-get?key=
@@ -4379,7 +4091,9 @@ router.delete(
  */
 router.get(
   "/:caseId/files/signed-get",
-  requireCaseAccess("caseId", { project: "files paymentReleased" }),
+  requireCaseAccess("caseId", {
+    project: "files paymentReleased paralegal paralegalId withdrawnParalegalId hiredAt",
+  }),
   asyncHandler(async (req, res) => {
     if (req.acl?.isAdmin) {
       return res.status(403).json({ error: "Administrators can only access the Matter archive." });
@@ -4394,9 +4108,15 @@ router.get(
     if (!req.acl?.isAdmin && isCaseClosedForFiles(doc)) {
       return res.status(403).json({ error: "Files are no longer available. Download the archive instead." });
     }
-    const file = await CaseFile.findOne(
-      buildCaseFileKeyQuery({ caseId: doc._id, storageKey })
-    );
+    const file = await CaseFile.findOne(applyAssignmentVisibility(
+      buildCaseFileKeyQuery({ caseId: doc._id, storageKey }),
+      doc,
+      {
+        role: req.user?.role,
+        userId: req.user?.id,
+        isParalegal: req.acl?.isParalegal === true,
+      }
+    ));
     if (!file) return res.status(404).json({ error: "File not found" });
 
     try {
@@ -4436,7 +4156,7 @@ router.patch(
   requireCaseAccess("caseId", {
     project: "files status paralegal paralegalId escrowIntentId escrowStatus archived readOnly paralegalAccessRevokedAt",
   }),
-  asyncHandler(async (req, res) => {
+  asyncHandler(matterFileWrites.handle(async (req, res) => {
     if (req.acl?.isAdmin) {
       return res.status(403).json({ error: "Administrators can only access the Matter archive." });
     }
@@ -4445,6 +4165,7 @@ router.patch(
     }
     const doc = req.case;
     if (!requireMatterDocumentWorkspace(doc, res)) return;
+    const writeReview = await matterFileWrites.read(req);
     const file = await CaseFile.findOne({ _id: req.params.fileId, caseId: doc._id });
     if (!file) return res.status(404).json({ error: "File not found" });
 
@@ -4464,12 +4185,12 @@ router.patch(
       }
     }
     if (typeof notes === "string") {
-      file.revisionNotes = cleanString(notes, { len: 2000 });
+      file.revisionNotes = cleanPlainText(notes, { max: 2000 });
       if (file.revisionNotes) file.revisionRequestedAt = now;
     }
 
     try {
-      await file.save();
+      await matterFileWrites.run(req, writeReview, session => file.save({ session }));
     } catch (err) {
       if (err?.name === "VersionError") {
         return res.status(409).json({
@@ -4491,8 +4212,10 @@ router.patch(
     }
 
     publishCaseEvent(doc._id, "documents", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(doc, "matter_documents_refresh");
+    await matterFileWrites.read(req);
     res.json({ file: normalizeFile(file.toObject ? file.toObject() : file) });
-  })
+  }))
 );
 
 router.post(
@@ -4501,7 +4224,7 @@ router.post(
   requireCaseAccess("caseId", {
     project: "files status paralegal paralegalId escrowIntentId escrowStatus archived readOnly paralegalAccessRevokedAt",
   }),
-  asyncHandler(async (req, res) => {
+  asyncHandler(matterFileWrites.handle(async (req, res) => {
     if (req.acl?.isAdmin) {
       return res.status(403).json({ error: "Administrators can only access the Matter archive." });
     }
@@ -4510,17 +4233,18 @@ router.post(
     }
     const doc = req.case;
     if (!requireMatterDocumentWorkspace(doc, res)) return;
+    const writeReview = await matterFileWrites.read(req);
     const file = await CaseFile.findOne({ _id: req.params.fileId, caseId: doc._id });
     if (!file) return res.status(404).json({ error: "File not found" });
 
-    const note = cleanString(req.body?.notes || "", { len: 2000 });
+    const note = cleanPlainText(req.body?.notes || "", { max: 2000 });
     file.revisionNotes = note;
     file.revisionRequestedAt = new Date();
     file.status = "pending_review";
     file.approvedAt = null;
 
     try {
-      await file.save();
+      await matterFileWrites.run(req, writeReview, session => file.save({ session }));
     } catch (err) {
       if (err?.name === "VersionError") {
         return res.status(409).json({
@@ -4542,8 +4266,10 @@ router.post(
     }
 
     publishCaseEvent(doc._id, "documents", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(doc, "matter_documents_refresh");
+    await matterFileWrites.read(req);
     res.json({ file: normalizeFile(file.toObject ? file.toObject() : file) });
-  })
+  }))
 );
 
 router.post(
@@ -4552,7 +4278,7 @@ router.post(
   requireCaseAccess("caseId", {
     project: "files status paralegal paralegalId escrowIntentId escrowStatus archived readOnly paralegalAccessRevokedAt",
   }),
-  asyncHandler(async (req, res) => {
+  asyncHandler(matterFileWrites.handle(async (req, res) => {
     if (req.acl?.isAdmin) {
       return res.status(403).json({ error: "Administrators can only access the Matter archive." });
     }
@@ -4563,6 +4289,7 @@ router.post(
     if (!key || typeof key !== "string") return res.status(400).json({ error: "key is required" });
     const doc = req.case;
     if (!requireMatterDocumentWorkspace(doc, res)) return;
+    const writeReview = await matterFileWrites.read(req);
     const storageKey = normalizeCaseStorageKey(key);
     const file = await CaseFile.findOne({ _id: req.params.fileId, caseId: doc._id });
     if (!file) return res.status(404).json({ error: "File not found" });
@@ -4577,14 +4304,6 @@ router.post(
         "FILE_EXTENSION_MISMATCH",
         "FILE_SIGNATURE_MISMATCH",
       ].includes(err?.code)) {
-        const existingForKey = await CaseFile.findOne(buildCaseFileKeyQuery({ caseId: doc._id, storageKey }))
-          .select("_id")
-          .lean();
-        if (!existingForKey) {
-          await deletePreEngagementObject(storageKey).catch(
-            logPromiseFailure(logger, "[cases] invalid replacement object cleanup failed", { caseId: doc._id })
-          );
-        }
         return res.status(400).json({ error: err.message, code: err.code });
       }
       if (err?.name === "NotFound" || err?.name === "NoSuchKey" || err?.$metadata?.httpStatusCode === 404) {
@@ -4604,6 +4323,8 @@ router.post(
     file.size = Number.isFinite(Number(objectMetadata?.ContentLength))
       ? Number(objectMetadata.ContentLength)
       : Number.isFinite(Number(size)) ? Number(size) : 0;
+    const retiredPreviewKey = decryptCaseFilePayload(file).previewKey;
+    file.previewKey = ""; file.previewMimeType = ""; file.previewSize = 0;
     file.replacedAt = new Date();
     file.userId = req.user.id;
     file.uploadedByRole = req.user.role || "attorney";
@@ -4618,16 +4339,14 @@ router.post(
     file.securityCheckedAt = null;
 
     try {
-      await file.save();
+      await matterFileWrites.run(req, writeReview, async session => {
+        await matterRetirement.assertAttachable(doc._id, storageKey, session);
+        await matterFileWrites.preserveUploadReceipt(await CaseFile.collection.findOne({ _id: file._id }, { session }), session);
+        if (retiredPreviewKey) await matterRetirement.stage({ caseId: doc._id, key: retiredPreviewKey, reason: "preview_replaced", putOutcome: "unconfirmed" }, session);
+        await presignedUploads.attach(req, storageKey, file._id, session);
+        await file.save({ session });
+      });
     } catch (err) {
-      const existingForKey = await CaseFile.findOne(buildCaseFileKeyQuery({ caseId: doc._id, storageKey }))
-        .select("_id")
-        .lean();
-      if (!existingForKey || String(existingForKey._id) === String(file._id)) {
-        await deletePreEngagementObject(storageKey).catch(
-          logPromiseFailure(logger, "[cases] conflicted replacement object cleanup failed", { caseId: doc._id })
-        );
-      }
       if (err?.name === "VersionError" || Number(err?.code) === 11000) {
         return res.status(409).json({
           error: "This document was replaced by another request. Refresh and try again.",
@@ -4648,8 +4367,10 @@ router.post(
     }
 
     publishCaseEvent(doc._id, "documents", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(doc, "matter_documents_refresh");
+    await matterFileWrites.read(req);
     res.json({ file: normalizeFile(file.toObject ? file.toObject() : file) });
-  })
+  }))
 );
 
 router.post(
@@ -4694,8 +4415,8 @@ router.post(
       jobId = await ensureCaseJobOpen(doc);
       await Case.updateOne({ _id: doc._id }, { $set: { jobId } });
     }
-    const coverLetter = cleanString(req.body?.note || req.body?.coverLetter || "", { len: 2000 });
-    const application = await createApplicationForJob(jobId, req.user, coverLetter);
+    const coverLetter = cleanPlainText(req.body?.note || req.body?.coverLetter || "", { max: 2000 });
+    const application = await createApplicationForJob(jobId, req.user, coverLetter, req.body?.requirementAnswers);
     try {
       await logAction(req, "case.apply", {
         targetType: "case",
@@ -4709,151 +4430,30 @@ router.post(
   })
 );
 
-router.post(
-  "/:caseId/applicants/:paralegalId/star",
-  verifyToken,
-  csrfProtection,
-  requireCaseAccess("caseId", { project: "applicants attorney attorneyId jobId job" }),
-  asyncHandler(async (req, res) => {
-    if (!req.acl?.isAttorney && req.user.role !== "admin") {
-      return res.status(403).json({ error: "Only attorneys can star applications." });
+const applicationDecisions = require("../services/applicationDecisions");
+const applicationDecisionNoStore = (_req, res, next) => { res.set("Cache-Control", "private, no-store"); next(); };
+async function recordApplicationDecision(req, res, legacyAction) {
+  try {
+    const result = await applicationDecisions.persist(req, { legacyAction });
+    if (!result.repeated) {
+      publishCaseProjectionRefresh(result.doc, result.receipt.action === "reject" ? "application_rejected_refresh" : "application_shortlist_refresh", { additionalUserIds: [result.receipt.applicantId], caseEvent: "case", discovery: result.receipt.action === "reject" });
     }
-    const caseDoc = req.case;
-    if (!caseDoc) return res.status(404).json({ error: "Matter not found" });
-    const ownerId = String(caseDoc.attorneyId || caseDoc.attorney || "");
-    if (ownerId && String(req.user.id) !== ownerId && req.user.role !== "admin") {
-      return res.status(403).json({ error: "You are not the attorney for this Matter." });
-    }
-
-    const paralegalId = req.params.paralegalId;
-    if (!isObjId(paralegalId)) {
-      return res.status(400).json({ error: "Invalid paralegal id" });
-    }
-
-    const jobId = caseDoc.jobId || caseDoc.job || null;
-    const userId = String(req.user.id);
-    const requested = req.body?.starred;
-    const desired = typeof requested === "boolean" ? requested : null;
-
-    const embeddedCaseEntry = Array.isArray(caseDoc.applicants)
-      ? caseDoc.applicants.find((app) => String(app.paralegalId) === String(paralegalId))
-      : null;
-
-    const canonicalApplication = jobId
-      ? await Application.findOne({ jobId, paralegalId })
-      : null;
-    const applicationDoc = canonicalApplication &&
-      ["submitted", "viewed", "shortlisted"].includes(String(canonicalApplication.status || "").toLowerCase())
-      ? canonicalApplication
-      : null;
-    const caseEntry = canonicalApplication ? null : embeddedCaseEntry;
-
-    if (!caseEntry && !applicationDoc) {
-      return res.status(404).json({ error: "Application not found." });
-    }
-
-    const caseStarred =
-      caseEntry &&
-      Array.isArray(caseEntry.starredBy) &&
-      caseEntry.starredBy.some((id) => String(id) === userId);
-    const appStarred =
-      applicationDoc &&
-      Array.isArray(applicationDoc.starredBy) &&
-      applicationDoc.starredBy.some((id) => String(id) === userId);
-    const shouldStar = typeof desired === "boolean" ? desired : !(caseStarred || appStarred);
-
-    await setApplicationStar({
-      jobId,
-      caseId: caseDoc._id,
-      paralegalId,
-      userId: req.user.id,
-      starred: shouldStar,
-    });
-
-    res.json({ ok: true, starred: shouldStar });
-  })
-);
-
-router.post(
-  "/:caseId/applicants/:paralegalId/reject",
-  verifyToken,
-  csrfProtection,
-  requireCaseAccess("caseId", { project: "title applicants attorney attorneyId jobId job" }),
-  asyncHandler(async (req, res) => {
-    if (!req.acl?.isAttorney && req.user.role !== "admin") {
-      return res.status(403).json({ error: "Only attorneys can remove applicants." });
-    }
-    const caseDoc = req.case;
-    if (!caseDoc) return res.status(404).json({ error: "Matter not found" });
-    const ownerId = String(caseDoc.attorneyId || caseDoc.attorney || "");
-    if (ownerId && String(req.user.id) !== ownerId && req.user.role !== "admin") {
-      return res.status(403).json({ error: "You are not the attorney for this Matter." });
-    }
-
-    const paralegalId = req.params.paralegalId;
-    if (!isObjId(paralegalId)) {
-      return res.status(400).json({ error: "Invalid paralegal id" });
-    }
-
-    const embeddedCaseEntry = Array.isArray(caseDoc.applicants)
-      ? caseDoc.applicants.find((app) => String(app.paralegalId) === String(paralegalId))
-      : null;
-    const jobId = caseDoc.jobId || caseDoc.job || null;
-    let applicationDoc = null;
-    let canonicalApplication = null;
-    if (jobId) {
-      canonicalApplication = await Application.findOne({ jobId, paralegalId });
-      if (
-        canonicalApplication &&
-        ["submitted", "viewed", "shortlisted"].includes(
-          String(canonicalApplication.status || "").toLowerCase()
-        )
-      ) {
-        applicationDoc = canonicalApplication;
-      }
-    }
-    const caseEntry = canonicalApplication ? null : embeddedCaseEntry;
-
-    if (!caseEntry && !applicationDoc) {
-      return res.status(404).json({ error: "Application not found." });
-    }
-
-    await setApplicationStatus({
-      jobId,
-      caseId: caseDoc._id,
-      paralegalId,
-      status: "rejected",
-    });
-
-    try {
-      await logAction(req, "case.applicant.rejected", {
-        targetType: "case",
-        targetId: caseDoc._id,
-        caseId: caseDoc._id,
-        meta: { paralegalId },
-      });
-    } catch (auditError) {
-      logger.error("[cases] applicant rejection audit persistence failed", { caseId: caseDoc._id, error: auditError });
-    }
-
-    try {
-      await sendCaseNotification(
-        paralegalId,
-        "application_denied",
-        caseDoc,
-        { link: "dashboard-paralegal.html" },
-        { actorUserId: req.user.id }
-      );
-    } catch (notificationError) {
-      logger.warn("[cases] applicant rejection notification failed", {
-        caseId: caseDoc._id,
-        error: notificationError,
-      });
-    }
-
-    res.json({ ok: true, updated: true });
-  })
-);
+    return res.json({ ...(legacyAction ? { ok: true, updated: true, starred: result.receipt.starred } : {}), receipt: result.receipt });
+  } catch (error) {
+    return res.status(error.status || 503).json({ code: error.publicCode || "APPLICATION_REVIEW_DECISION_UNCONFIRMED", error: "The application decision was not confirmed. Check its saved result before trying again." });
+  }
+}
+router.get("/:caseId/application-review/:applicantId/decision", applicationDecisionNoStore, requireCaseAccess("caseId"), async (req, res) => {
+  try { return res.json(await applicationDecisions.review(req)); }
+  catch (error) { return res.status(error.status || 503).json({ code: error.publicCode || "APPLICATION_REVIEW_DECISION_UNAVAILABLE", error: "Application decisions could not be loaded. Refresh the applications to try again." }); }
+});
+router.get("/:caseId/application-review/:applicantId/decision/:requestId", applicationDecisionNoStore, requireCaseAccess("caseId"), async (req, res) => {
+  try { return res.json(await applicationDecisions.findReceipt(req)); }
+  catch (error) { return res.status(error.status || 503).json({ code: error.publicCode || "APPLICATION_REVIEW_DECISION_UNAVAILABLE", error: "The saved application decision could not be checked." }); }
+});
+router.post("/:caseId/application-review/:applicantId/decision", applicationDecisionNoStore, csrfProtection, requireCaseAccess("caseId"), (req, res) => recordApplicationDecision(req, res));
+router.post("/:caseId/applicants/:paralegalId/star", applicationDecisionNoStore, verifyToken, csrfProtection, requireCaseAccess("caseId"), (req, res) => recordApplicationDecision(req, res, "star"));
+router.post("/:caseId/applicants/:paralegalId/reject", applicationDecisionNoStore, verifyToken, csrfProtection, requireCaseAccess("caseId"), (req, res) => recordApplicationDecision(req, res, "reject"));
 
 router.post(
   "/:caseId/invite",
@@ -4900,6 +4500,7 @@ router.post(
       return res.status(403).json({ error: "You are not the attorney for this Matter." });
     }
     const ownerId = String(req.user.id);
+    const ownerAliases = { attorney: caseDoc.attorney?._id || caseDoc.attorney, attorneyId: caseDoc.attorneyId?._id || caseDoc.attorneyId };
     if (
       normalizeId(caseDoc.attorney) !== ownerId ||
       normalizeId(caseDoc.attorneyId) !== ownerId
@@ -4930,16 +4531,17 @@ router.post(
       }
     }
 
-    const invitationResult = await sendInvitation({
-      caseDoc,
-      paralegalId: invitee._id,
-    });
+    const reviewed = await reviewedInvitation(req, res, invitee._id);
+    if (reviewed === null) return;
+    const invitationResult = await sendInvitationWithNotices(res, { caseDoc, paralegalId: invitee._id, reviewed, ownerAliases, actorId: req.user.id, authVersion: req.authVersion });
+    if (!invitationResult) return;
     if (!invitationResult.sent) {
       const messages = {
         already_pending: "An invitation is already pending for this paralegal.",
         already_accepted: "This paralegal has already accepted.",
         already_assigned: "A paralegal has already been assigned to this Matter.",
         matter_closed: "This Matter is no longer accepting invitations.",
+        ownership_conflict: "Matter ownership needs review before invitations can be sent.",
       };
       return res.status(409).json({
         error: messages[invitationResult.reason] || "The invitation could not be sent because the matter changed.",
@@ -4949,28 +4551,8 @@ router.post(
     const updatedCase = await Case.findById(caseDoc._id)
       .populate("attorney", "firstName lastName email role")
       .populate("attorneyId", "firstName lastName email role");
-
-    if (invitationResult.lockedNow) {
-      try {
-        const caseAttorneyId =
-          caseDoc.attorneyId?._id || caseDoc.attorneyId || caseDoc.attorney?._id || caseDoc.attorney || null;
-        if (caseAttorneyId) {
-          const link = buildCaseLink(updatedCase || caseDoc);
-          await sendCaseNotification(
-            caseAttorneyId,
-            "case_budget_locked",
-            updatedCase || caseDoc,
-            { link },
-            { actorUserId: req.user.id }
-          );
-        }
-      } catch (notificationError) {
-        logger.warn("[cases] invitation budget-lock notification failed", {
-          caseId: caseDoc._id,
-          error: notificationError,
-        });
-      }
-    }
+    publishCaseEvent(caseDoc._id, "case", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(updatedCase || caseDoc, "matter_invitation_sent_refresh", [invitee._id]);
 
     try {
       await logAction(req, "paralegal_invited", {
@@ -4986,20 +4568,16 @@ router.post(
       });
     }
 
-    const attorneyName = formatPersonName((updatedCase || caseDoc).attorney || (updatedCase || caseDoc).attorneyId) || "An attorney";
-    await sendCaseNotification(
-      invitee._id,
-      "case_invite",
-      updatedCase || caseDoc,
-      {
-        inviterName: attorneyName,
-      },
-      { actorUserId: req.user.id }
-    );
+    await invitationResult.dispatch?.().catch(error => logger.warn("[cases] saved invitation refresh deferred", { caseId: caseDoc._id, error }));
 
-    res.json({ success: true });
+    res.json({ success: true, ...(invitationResult.confirmation ? { invitationConfirmation: invitationResult.confirmation } : {}) });
   })
 );
+
+router.post("/:caseId/requirements/decline",csrfProtection,requireRole("paralegal"),asyncHandler(async(req,res)=>{
+  try {res.json(await require('../services/matterRequirements').declineRequirements({caseId:req.params.caseId,userId:req.user.id,authVersion:req.authVersion,requirements:req.body?.requirements,confirmed:req.body?.confirmed}));}
+  catch(error){res.status(error.status||503).json({error:error.status?error.message:'The decision could not be confirmed. Try again.'});}
+}));
 
 router.post(
   "/:caseId/invite/accept",
@@ -5008,10 +4586,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
     if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid Matter ID" });
-    const caseDoc = await Case.findById(caseId)
-      .populate("attorney", "firstName lastName email role")
-      .populate("attorneyId", "firstName lastName email role")
-      .populate("pendingParalegalId", "firstName lastName email role");
+    const { caseDoc, legacyInvitation } = await require("../services/legacyInvitationResponse").load(caseId, req.user.id);
+    if (caseDoc) await caseDoc.populate([{ path: "attorney", select: "firstName lastName email role" }, { path: "attorneyId", select: "firstName lastName email role" }, { path: "pendingParalegalId", select: "firstName lastName email role" }]);
     if (!caseDoc) return res.status(404).json({ error: "Matter not found" });
     if (isFinalCaseDoc(caseDoc)) {
       return res.status(400).json({ error: "Completed Matters cannot be modified." });
@@ -5025,7 +4601,6 @@ router.post(
       return res.status(403).json({ error: BLOCKED_MESSAGE });
     }
 
-    seedLegacyInvite(caseDoc);
     const inviteRecord = listCaseInvites(caseDoc).find(
       (invite) => String(invite.paralegalId) === String(req.user.id)
     );
@@ -5036,6 +4611,7 @@ router.post(
     const paralegal = await User.findById(req.user.id).select(
       "firstName lastName email stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled resumeURL linkedInURL availability availabilityDetails location languages specialties yearsExperience bio profileImage avatarURL"
     );
+    const resumeReference = paralegal ? captureResumeReference(paralegal) : null;
     if (inviteRecord.status === "pending" && !paralegal?.stripeAccountId) {
       return res.status(403).json({ error: "Connect Stripe before accepting invitations." });
     }
@@ -5073,8 +4649,13 @@ router.post(
     const respondedAt = new Date();
     const invitationResult = await respondToInvitation({
       caseId,
+      legacyInvitation,
+      actorId: req.user.id,
+      authVersion: req.authVersion,
       paralegalId: req.user.id,
       decision: "accept",
+      resumeReference,
+      requirementAnswers: req.body?.requirementAnswers,
       respondedAt,
       lockedTotalAmount: caseDoc.lockedTotalAmount ?? caseDoc.totalAmount,
       amountLockedAt: caseDoc.amountLockedAt || respondedAt,
@@ -5094,6 +4675,10 @@ router.post(
       });
     }
     const updatedCase = await Case.findById(caseId);
+    if (invitationResult.updated) {
+      publishCaseEvent(caseDoc._id, "case", { at: new Date().toISOString() });
+      publishCaseParticipantRefresh(updatedCase || caseDoc, "matter_invitation_accepted_refresh", [req.user.id]);
+    }
 
     if (invitationResult.updated) try {
       await logAction(req, "paralegal_invite_accepted", {
@@ -5108,19 +4693,7 @@ router.post(
       });
     }
 
-    if (caseAttorneyId && invitationResult.updated) {
-      await sendCaseNotification(
-        caseAttorneyId,
-        "case_invite_response",
-        updatedCase || caseDoc,
-        {
-          response: "accepted",
-          paralegalId: req.user.id,
-          paralegalName: formatPersonName(paralegal),
-        },
-        { actorUserId: req.user.id }
-      );
-    }
+    await invitationResult.dispatch?.().catch(error => logger.warn("[cases] saved invitation response refresh deferred", { caseId, error }));
 
     res.json({
       success: true,
@@ -5150,6 +4723,8 @@ router.post(
     const invitationResult = await revokeAcceptedInvitation({
       caseId,
       paralegalId: req.user.id,
+      actorId: req.user.id,
+      authVersion: req.authVersion,
     });
     if (!invitationResult.revoked && !invitationResult.idempotent) {
       return res.status(409).json({
@@ -5162,17 +4737,11 @@ router.post(
     }
     if (invitationResult.revoked) {
       const updatedCase = await Case.findById(caseId);
-      await sendCaseNotification(
-        req.user.id,
-        "case_invite_response",
-        updatedCase || caseDoc,
-        {
-          response: "declined",
-          message: `You revoked your application for ${(updatedCase || caseDoc)?.title || "this Matter"}.`,
-        },
-        { actorUserId: req.user.id }
-      );
+      publishCaseEvent(caseDoc._id, "case", { at: new Date().toISOString() });
+      publishCaseParticipantRefresh(updatedCase || caseDoc, "matter_invitation_revoked_refresh", [req.user.id]);
     }
+    await invitationResult.dispatch?.().catch(error => logger.warn("[cases] saved invitation response refresh deferred", { caseId, error }));
+
     res.json({
       success: true,
       alreadyProcessed: invitationResult.idempotent === true,
@@ -5188,25 +4757,24 @@ router.post(
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
     if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid Matter ID" });
-    const caseDoc = await Case.findById(caseId)
-      .populate("attorney", "firstName lastName email role")
-      .populate("attorneyId", "firstName lastName email role")
-      .populate("pendingParalegalId", "firstName lastName email role");
+    const { caseDoc, legacyInvitation } = await require("../services/legacyInvitationResponse").load(caseId, req.user.id);
+    if (caseDoc) await caseDoc.populate([{ path: "attorney", select: "firstName lastName email role" }, { path: "attorneyId", select: "firstName lastName email role" }, { path: "pendingParalegalId", select: "firstName lastName email role" }]);
     if (!caseDoc) return res.status(404).json({ error: "Matter not found" });
     if (isFinalCaseDoc(caseDoc)) {
       return res.status(400).json({ error: "Completed Matters cannot be modified." });
     }
-    seedLegacyInvite(caseDoc);
     const inviteRecord = listCaseInvites(caseDoc).find(
       (invite) => String(invite.paralegalId) === String(req.user.id)
     );
     if (!inviteRecord || !["pending", "declined"].includes(inviteRecord.status)) {
       return res.status(400).json({ error: "No pending invitation for this Matter." });
     }
-    const paralegal = await User.findById(req.user.id).select("firstName lastName");
     const respondedAt = new Date();
     const invitationResult = await respondToInvitation({
       caseId,
+      legacyInvitation,
+      actorId: req.user.id,
+      authVersion: req.authVersion,
       paralegalId: req.user.id,
       decision: "decline",
       respondedAt,
@@ -5218,6 +4786,10 @@ router.post(
       });
     }
     const updatedCase = await Case.findById(caseId);
+    if (invitationResult.updated) {
+      publishCaseEvent(caseDoc._id, "case", { at: new Date().toISOString() });
+      publishCaseParticipantRefresh(updatedCase || caseDoc, "matter_invitation_declined_refresh", [req.user.id]);
+    }
 
     if (invitationResult.updated) try {
       await logAction(req, "paralegal_declined", {
@@ -5232,36 +4804,7 @@ router.post(
       });
     }
 
-    const attorneyId = caseDoc.attorney?._id || caseDoc.attorneyId || null;
-    if (attorneyId && invitationResult.updated) {
-      await sendCaseNotification(
-        attorneyId,
-        "case_invite_response",
-        updatedCase || caseDoc,
-        {
-          response: "declined",
-          paralegalId: req.user.id,
-          paralegalName: formatPersonName(paralegal),
-        },
-        { actorUserId: req.user.id }
-      );
-    }
-
-    // Let the paralegal know their decline was recorded
-    if (invitationResult.updated) {
-      await sendCaseNotification(
-        req.user.id,
-        "case_invite_response",
-        updatedCase || caseDoc,
-        {
-          message: `You declined the invitation for ${(updatedCase || caseDoc)?.title || "this Matter"}.`,
-          response: "declined",
-          paralegalId: req.user.id,
-          paralegalName: formatPersonName(paralegal),
-        },
-        { actorUserId: req.user.id }
-      );
-    }
+    await invitationResult.dispatch?.().catch(error => logger.warn("[cases] saved invitation response refresh deferred", { caseId, error }));
 
     res.json({
       success: true,
@@ -5285,16 +4828,17 @@ router.post(
 
     const caseDoc = await Case.findById(caseId)
       .populate("paralegal", "firstName lastName email role stripeAccountId stripeOnboarded stripePayoutsEnabled")
+      .populate("withdrawnParalegalId", "firstName lastName")
       .populate("attorney", "firstName lastName email role");
     if (!caseDoc) return res.status(404).json({ error: "Matter not found" });
     if (isFinalCaseDoc(caseDoc)) {
       return res.status(400).json({ error: "Completed Matters cannot be modified." });
     }
 
-    const paralegalRef = caseDoc.paralegalId || caseDoc.paralegal;
+    const paralegalRef = normalizeId(caseDoc.paralegalId || caseDoc.paralegal);
     if (
       !paralegalRef &&
-      String(caseDoc.withdrawnParalegalId || "") === String(req.user.id) &&
+      normalizeId(caseDoc.withdrawnParalegalId) === String(req.user.id) &&
       caseDoc.pausedReason === "paralegal_withdrew"
     ) {
       return res.json({
@@ -5308,6 +4852,9 @@ router.post(
     }
     if (!paralegalRef || String(paralegalRef) !== String(req.user.id)) {
       return res.status(403).json({ error: "You are not assigned to this Matter" });
+    }
+    if (caseDoc.attorney && caseDoc.attorneyId && normalizeId(caseDoc.attorney) !== normalizeId(caseDoc.attorneyId)) {
+      return res.status(409).json({ error: "The Matter owner could not be verified. Refresh before withdrawing.", code: "WITHDRAWAL_CONFLICT" });
     }
     const normalizedStatus = normalizeCaseStatusValue(caseDoc.status);
     if (["disputed", "closed", "completed"].includes(normalizedStatus)) {
@@ -5331,7 +4878,7 @@ router.post(
 
     const now = new Date();
     const completedCount = countCompletedScopeTasks(caseDoc);
-    const totalTasks = Array.isArray(caseDoc.tasks) ? caseDoc.tasks.length : 0;
+    const totalTasks = currentAssignmentScopeProgress(caseDoc).totalTaskCount;
     const withdrawingParalegal = caseDoc.paralegal;
     const updateFields = {
       paralegalNameSnapshot:
@@ -5368,27 +4915,75 @@ router.post(
       });
     }
     const expectedTaskRevision = Number(caseDoc.taskRevision || 0);
+    const hasPredecessorSettlement = hasPredecessorWithdrawalSettlement(caseDoc);
+    const predecessorSettlement = hasPredecessorSettlement ? {
+      withdrawnParalegalId: caseDoc.withdrawnParalegalId?._id || caseDoc.withdrawnParalegalId,
+      paralegalNameSnapshot: formatPersonName(caseDoc.withdrawnParalegalId),
+      payoutFinalizedAt: caseDoc.payoutFinalizedAt,
+      payoutFinalizedType: caseDoc.payoutFinalizedType,
+      partialPayoutAmount: caseDoc.partialPayoutAmount,
+      remainingAmount: caseDoc.remainingAmount,
+      feeParalegalPct: caseDoc.feeParalegalPct,
+      feeAttorneyPct: caseDoc.feeAttorneyPct,
+      payoutTransferId: caseDoc.payoutTransferId,
+      pausedAt: caseDoc.pausedAt,
+    } : null;
     const taskRevisionClause = expectedTaskRevision === 0
       ? { $or: [{ taskRevision: 0 }, { taskRevision: { $exists: false } }] }
       : { taskRevision: expectedTaskRevision };
-    let updatedCase = await Case.findOneAndUpdate(
-      {
-        _id: caseDoc._id,
-        status: { $in: ["in progress", "in_progress"] },
-        payoutFinalizedAt: null,
-        completionClaimStatus: { $nin: ["claimed", "needs_reconciliation"] },
-        disputes: { $not: { $elemMatch: { status: "open" } } },
-        tasks: { $elemMatch: { completed: { $ne: true } } },
-        ...taskRevisionClause,
-        $and: [
-          { $or: [{ paralegal: req.user.id }, { paralegalId: req.user.id }] },
-        ],
-      },
-      { $set: updateFields },
-      { returnDocument: "after", runValidators: true }
-    )
-      .populate("attorney", "firstName lastName email role")
-      .populate("withdrawnParalegalId", "firstName lastName email role stripeAccountId stripeOnboarded stripePayoutsEnabled");
+    let updatedCase, dispatchers = [];
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        dispatchers = [];
+        await lockActiveAccounts([req.user.id], session, { ownerId: req.user.id, authVersion: req.authVersion });
+        const actor = await User.findById(req.user.id).select("role").session(session).lean();
+        if (actor?.role !== "paralegal") throw Object.assign(new Error("This account changed. Sign in again before continuing."), { status: 403 });
+        updatedCase = await Case.findOneAndUpdate(
+          {
+            _id: caseDoc._id,
+            status: { $in: ["in progress", "in_progress"] },
+            paymentReleased: { $ne: true },
+            hiredAt: caseDoc.hiredAt || null,
+            attorney: caseDoc.attorney?._id || caseDoc.attorney || null,
+            attorneyId: caseDoc.attorneyId || null,
+            payoutFinalizedAt: hasPredecessorSettlement ? caseDoc.payoutFinalizedAt : null,
+            ...(hasPredecessorSettlement ? { withdrawnParalegalId: predecessorSettlement.withdrawnParalegalId, hiredAt: caseDoc.hiredAt } : {}),
+            completionClaimStatus: { $nin: ["claimed", "needs_reconciliation"] },
+            disputes: { $not: { $elemMatch: { status: "open" } } },
+            tasks: { $elemMatch: { completed: { $ne: true } } },
+            ...taskRevisionClause,
+            $and: [
+              { $or: [{ paralegal: req.user.id }, { paralegalId: req.user.id }] },
+              { $or: [{ paralegal: req.user.id }, { paralegal: null }] },
+              { $or: [{ paralegalId: req.user.id }, { paralegalId: null }] },
+            ],
+          },
+          { $set: updateFields, ...(predecessorSettlement ? { $push: { withdrawalHistory: predecessorSettlement } } : {}) },
+          { returnDocument: "after", runValidators: true, session }
+        );
+        if (!updatedCase) return;
+        if (completedCount === 0) await ensureCaseJobOpen(updatedCase, { session });
+        await AuditLog.logFromReq(req, "case.withdrawal.requested", {
+          targetType: "case", targetId: updatedCase._id, caseId: updatedCase._id,
+          meta: { completedCount, totalTasks }, session,
+        });
+        const attorneyId = updatedCase.attorney?._id || updatedCase.attorneyId;
+        const outcome = completedCount === 0 ? "zero_auto" : "awaiting_attorney_decision";
+        for (const [userId, role] of [[attorneyId, "attorney"], [req.user.id, "paralegal"]]) {
+          if (!userId) throw new Error("Withdrawal recipient could not be verified.");
+          const dispatch = await notifyUser(userId, "case_update", {
+            caseId: String(updatedCase._id), caseTitle: updatedCase.title || "Untitled Matter",
+            outcome: "paralegal_withdrawn", summary: withdrawalNotices.withdrawalSummary(outcome, role),
+          }, { actorUserId: req.user.id, session, deferDispatch: true, withdrawalRequest: true });
+          if (!dispatch) throw new Error("Withdrawal recipient is unavailable.");
+          dispatchers.push(dispatch);
+        }
+      }, { readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, maxCommitTimeMS: 10000 });
+    } finally {
+      updatedCase?.$session(null);
+      await session.endSession();
+    }
     if (!updatedCase) {
       const latest = await Case.findById(caseId).lean();
       if (
@@ -5412,60 +5007,21 @@ router.post(
       });
     }
     if (completedCount === 0) {
-      await ensureCaseJobOpen(updatedCase);
       try {
+        await updatedCase.populate("attorney", "firstName lastName role");
+        await updatedCase.populate("withdrawnParalegalId", "firstName lastName role");
         await generateWithdrawalReceipts(updatedCase, { grossAmount: 0 });
       } catch (err) {
         logger.warn("[cases] withdrawal receipt generation failed", err?.message || err);
       }
     }
     publishCaseEvent(updatedCase._id, "case", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(updatedCase, "matter_withdrawn_refresh", [req.user.id]);
 
-    try {
-      await logAction(req, "case.withdrawal.requested", {
-        targetType: "case",
-        targetId: updatedCase._id,
-        caseId: updatedCase._id,
-        meta: { completedCount, totalTasks },
-      });
-    } catch (auditError) {
-      logger.error("[cases] withdrawal request audit persistence failed", {
-        caseId: updatedCase._id,
-        error: auditError,
-      });
+    for (const dispatch of dispatchers) {
+      try { await dispatch(); }
+      catch (error) { logger.warn("[cases] Withdrawal refresh failed; saved notices remain available.", { caseId: updatedCase._id, error }); }
     }
-
-    const attorneySummary =
-      completedCount === 0
-        ? "Paralegal withdrew before any tasks were completed. No payout will be issued and the Matter was relisted."
-        : "Paralegal withdrew. Choose a partial payout or close without release.";
-    const paralegalSummary =
-      completedCount === 0
-        ? `You withdrew from ${updatedCase.title || "this Matter"}. No payout will be issued and the Matter was relisted.`
-        : `You withdrew from ${updatedCase.title || "this Matter"}.`;
-
-    const attorneyId = updatedCase.attorney?._id || updatedCase.attorneyId || null;
-    if (attorneyId) {
-      await sendCaseNotification(
-        attorneyId,
-        "case_update",
-        updatedCase,
-        { summary: attorneySummary },
-        { actorUserId: req.user.id }
-      );
-    }
-    await sendCaseNotification(
-      req.user.id,
-      "case_update",
-      updatedCase,
-      { summary: paralegalSummary },
-      { actorUserId: req.user.id }
-    );
-
-    await Promise.all([
-      attorneyId ? sendCaseUpdateEmail(updatedCase.attorney, updatedCase, attorneySummary) : Promise.resolve(null),
-      sendCaseUpdateEmail(withdrawingParalegal, updatedCase, paralegalSummary),
-    ]);
 
     res.json({
       ok: true,
@@ -5481,167 +5037,51 @@ router.post(
   })
 );
 
-/**
- * POST /api/cases/:caseId/reject-payout
- * Attorney closes without release after withdrawal (starts 24-hour relist hold).
- */
-router.post(
-  "/:caseId/reject-payout",
-  csrfProtection,
-  requireCaseAccess("caseId"),
-  asyncHandler(async (req, res) => {
-    if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
-      return res.status(403).json({ error: "Only the Matter attorney may reject a payout." });
-    }
-    const { caseId } = req.params;
-    const doc = await Case.findById(caseId).populate("attorney", "firstName lastName email role");
-    if (!doc) return res.status(404).json({ error: "Matter not found" });
-    if (isFinalCaseDoc(doc)) {
-      return res.status(400).json({ error: "Completed Matters cannot be modified." });
-    }
+/** Attorney withdrawal decisions share the same guarded operation in V1 and V2. */
+router.post("/:caseId/reject-payout", csrfProtection, requireCaseAccess("caseId"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { const value = await attorneyWithdrawal.legacy(req, "reject", withdrawalOptions(req)); res.json({ ok: value.operation?.status === "recorded", disputeDeadlineAt: value.reviewDeadline, withdrawalReview: value }); } catch (error) { attorneyWithdrawal.sendError(res, error); }
+}));
 
-    const statusKey = normalizeCaseStatusValue(doc.status);
-    if (statusKey === "disputed") {
-      return res.status(400).json({ error: "This Matter is already locked and cannot be closed without release." });
-    }
-    if (doc.pausedReason !== "paralegal_withdrew") {
-      return res.status(400).json({ error: "Only withdrawn Matters can be closed without release." });
-    }
-    if (doc.payoutFinalizedAt) {
-      return res.status(400).json({ error: "Payout has already been finalized for this Matter." });
-    }
-    if (doc.disputeDeadlineAt && isDisputeWindowActive(doc)) {
-      return res.status(400).json({ error: "A 24-hour hold is already active for this Matter." });
-    }
+router.post("/:caseId/relist", csrfProtection, requireCaseAccess("caseId"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { const value = await attorneyWithdrawal.legacy(req, "relist", withdrawalOptions(req)); res.json({ ok: value.operation?.status === "recorded", relistPending: false, relistRequestedAt: value.relistedAt, withdrawalReview: value }); } catch (error) { attorneyWithdrawal.sendError(res, error); }
+}));
 
-    const completedCount = countCompletedScopeTasks(doc);
-    const totalTasks = Array.isArray(doc.tasks) ? doc.tasks.length : 0;
-    if (completedCount === 0) {
-      return res.status(400).json({ error: "No completed tasks. A $0 payout was already issued." });
+const matterPreEngagement = require("../services/matterPreEngagement");
+const preEngagementNotices = require("../services/matterPreEngagementNotifications");
+router.get("/:caseId/pre-engagement/review/:applicantId", applicationDecisionNoStore, requireCaseAccess("caseId"), async (req, res) => {
+  try { return res.json(await matterPreEngagement.read(req)); }
+  catch (error) { return res.status(error.status || 503).json({ code: error.publicCode || "PRE_ENGAGEMENT_UNAVAILABLE", error: "Pre-engagement requirements could not be loaded. Refresh to review the saved request." }); }
+});
+async function reviewedPreEngagement(req, res, applicantId, operation) {
+  // Existing clients keep their existing contract. V2 sends the exact reviewed
+  // fingerprint and target; these requests must not fall back to a fresh write.
+  if (req.body?.reviewedRevision === undefined) return { legacy: true };
+  try {
+    const review = await matterPreEngagement.reviewed(req, applicantId);
+    if (!review.dto[operation === "request" ? "canRequest" : req.body?.action === "approve" ? "canApprove" : "canReview"]) {
+      res.status(409).json({ code: "PRE_ENGAGEMENT_INELIGIBLE", error: "This application or Matter no longer permits that pre-engagement action." });
+      return null;
     }
-    if (completedCount >= totalTasks && totalTasks > 0) {
-      return res.status(400).json({ error: "All tasks are complete; use Complete & Release Payment instead." });
-    }
-
-    const now = new Date();
-    doc.disputeDeadlineAt = new Date(now.getTime() + DISPUTE_WINDOW_MS);
-    doc.partialPayoutAmount = null;
-    doc.payoutFinalizedType = null;
-    doc.payoutFinalizedAt = null;
-    doc.adminDisputeDeadlineAt = null;
-    doc.adminDisputeOverdueNotifiedAt = null;
-    doc.relistRequestedAt = null;
-    doc.relistPending = false;
-    doc.remainingAmount = resolveRemainingAmount(doc);
-    doc.pausedReason = "paralegal_withdrew";
-    doc.ensureLifecycleStatus("paused");
-
-    await doc.save();
-
-    try {
-      await logAction(req, "case.withdrawal.reject", {
-        targetType: "case",
-        targetId: doc._id,
-        caseId: doc._id,
-        meta: { completedCount, totalTasks },
-      });
-    } catch (auditError) {
-      logger.error("[cases] withdrawal rejection audit persistence failed", { caseId: doc._id, error: auditError });
-    }
-
-    try {
-      const attorneyId = doc.attorney?._id || doc.attorneyId || null;
-      if (attorneyId) {
-        await sendCaseNotification(
-          attorneyId,
-          "case_update",
-          doc,
-          {
-            summary:
-              "Release was declined. A 24-hour review window is now active. The paralegal may request payment for submitted deliverables during this time. If no request is made, the Matter will automatically relist after 24 hours.",
-          },
-          { actorUserId: req.user.id }
-        );
-      }
-      const withdrawnId = doc.withdrawnParalegalId || null;
-      if (withdrawnId) {
-        await sendCaseNotification(
-          withdrawnId,
-          "case_update",
-          doc,
-          {
-            summary: "The Matter was closed without release. You may request a review within 24 hours.",
-          },
-          { actorUserId: req.user.id }
-        );
-      }
-    } catch (notificationError) {
-      logger.warn("[cases] withdrawal rejection notification failed", { caseId: doc._id, error: notificationError });
-    }
-
-    res.json({ ok: true, disputeDeadlineAt: doc.disputeDeadlineAt });
-  })
-);
-
-/**
- * POST /api/cases/:caseId/relist
- * Attorney relists a paused case for new applicants.
- */
-router.post(
-  "/:caseId/relist",
-  csrfProtection,
-  requireCaseAccess("caseId"),
-  asyncHandler(async (req, res) => {
-    if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
-      return res.status(403).json({ error: "Only the Matter attorney may relist this Matter." });
-    }
-    const { caseId } = req.params;
-    const doc = await Case.findById(caseId).populate("attorney", "firstName lastName email role");
-    if (!doc) return res.status(404).json({ error: "Matter not found" });
-
-    try {
-      const expired = await finalizeExpiredDisputeWindow(doc);
-      if (expired) {
-        await doc.save();
-      }
-    } catch (err) {
-      logger.warn("[cases] dispute window finalize failed", err?.message || err);
-    }
-
-    const relistPolicy = evaluateWithdrawalAndRelist({ caseDoc: doc }).relist;
-    if (!relistPolicy.ready) {
-      return res.status(400).json({
-        error: "This matter is not ready to relist.",
-        blockers: relistPolicy.blockers,
-      });
-    }
-
-    const now = new Date();
-    doc.relistRequestedAt = doc.relistRequestedAt || now;
-    doc.relistPending = false;
-    await ensureCaseJobOpen(doc);
-    await doc.save();
-
-    try {
-      const attorneyId = doc.attorney?._id || doc.attorneyId || null;
-      if (attorneyId) {
-        await sendCaseNotification(
-          attorneyId,
-          "case_update",
-          doc,
-          {
-            summary: "Matter relisted and ready for hiring.",
-          },
-          { actorUserId: req.user.id }
-        );
-      }
-    } catch (notificationError) {
-      logger.warn("[cases] Matter relist notification failed", { caseId: doc._id, error: notificationError });
-    }
-
-    res.json({ ok: true, relistPending: doc.relistPending, relistRequestedAt: doc.relistRequestedAt });
-  })
-);
+    return review;
+  } catch (error) {
+    res.status(error.status || 503).json({ code: error.publicCode || "PRE_ENGAGEMENT_UNAVAILABLE", error: "The pre-engagement request changed or could not be verified. Review the saved request before continuing." });
+    return null;
+  }
+}
+async function commitPreEngagement(review, filter, update, options) {
+  if (review.legacy) return Case.findOneAndUpdate(filter, update, options);
+  const values = {};
+  for (const [field, input] of Object.entries(update.$set)) {
+    const schemaType = Case.schema.path(field), value = schemaType.cast(input);
+    await schemaType.doValidate(value, null);
+    values[field] = value?.toObject ? value.toObject() : value;
+  }
+  // Use the raw reviewed filter to preserve BSON/text aliases and exact earlier
+  // records. Only validated pre-engagement fields and the timestamp are written.
+  return Case.collection.findOneAndUpdate(review.filter, { $set: { ...values, updatedAt: new Date() }, $inc: { __v: 1 } }, { returnDocument: "after", ...(options.session ? { session: options.session } : {}) });
+}
 
 /**
  * POST /api/cases/:caseId/pre-engagement/:paralegalId/request
@@ -5690,13 +5130,15 @@ router.post(
     if (String(paralegal.role || "").toLowerCase() !== "paralegal") {
       return res.status(400).json({ error: "Pre-engagement items can only be requested from a paralegal." });
     }
-    if (!(await hasActiveCaseCandidate(selectedCase, paralegalId))) {
+    const initialReview = await reviewedPreEngagement(req, res, paralegalId, "request");
+    if (!initialReview) return;
+    if (initialReview.legacy && !(await hasActiveCaseCandidate(selectedCase, paralegalId))) {
       return res.status(400).json({ error: "Select an active applicant or accepted invite first." });
     }
     if (await isBlockedBetween(attorneyOnCase, paralegal._id)) {
       return res.status(403).json({ error: BLOCKED_MESSAGE });
     }
-    const previousPreEngagement = selectedCase.preEngagement || null;
+    const previousPreEngagement = (initialReview.legacy ? selectedCase.preEngagement : initialReview.facts.preEngagement) || null;
     const canReuseConfidentialityDocument = Boolean(
       previousPreEngagement?.confidentialityDocument?.key &&
       String(previousPreEngagement.requestedParalegalId || "") === String(paralegalId) &&
@@ -5788,7 +5230,14 @@ router.post(
       requestedAt,
       requestedBy: req.user.id,
     };
-    selectedCase = await Case.findOneAndUpdate(
+    const finalReview = await reviewedPreEngagement(req, res, paralegalId, "request");
+    if (!finalReview) {
+      if (req.file && confidentialityDocument?.key && confidentialityDocument.key !== previousPreEngagement?.confidentialityDocument?.key) {
+        await deletePreEngagementObject(confidentialityDocument.key).catch(error => logger.error("[cases] unconfirmed pre-engagement upload cleanup failed", error?.name));
+      }
+      return;
+    }
+    const savedRequest = await preEngagementNotices.save(session => commitPreEngagement(finalReview,
       {
         _id: caseId,
         archived: { $ne: true },
@@ -5814,10 +5263,16 @@ router.post(
         ],
       },
       { $set: { preEngagement: nextPreEngagement } },
-      { returnDocument: "after", runValidators: true }
-    );
+      { returnDocument: "after", runValidators: true, session }
+    ), { actorUserId: req.user.id, kind: "requested", applicationId: await findPreEngagementApplicationId(caseId, paralegalId) }).catch(async error => {
+      if (error.publicCode === "PRE_ENGAGEMENT_NOTICE_UNAVAILABLE" && req.file && confidentialityDocument?.key && confidentialityDocument.key !== previousPreEngagement?.confidentialityDocument?.key) {
+        await deletePreEngagementObject(confidentialityDocument.key).catch(cleanupError => logger.error("[cases] rolled-back pre-engagement upload cleanup failed", cleanupError?.name));
+      }
+      throw error;
+    });
+    selectedCase = savedRequest.matter;
     if (!selectedCase) {
-      if (confidentialityDocument?.key) {
+      if (req.file && confidentialityDocument?.key && confidentialityDocument.key !== previousPreEngagement?.confidentialityDocument?.key) {
         await deletePreEngagementObject(confidentialityDocument.key).catch((err) => {
           logger.error("[cases] Failed to clean up superseded pre-engagement upload", err?.message || err);
         });
@@ -5837,19 +5292,10 @@ router.post(
       });
     }
 
-    try {
-      const applicationId = await findPreEngagementApplicationId(caseId, paralegal._id);
-      await notifyUser(paralegal._id, "pre_engagement_requested", {
-        actorUserId: req.user.id,
-        caseId: String(selectedCase._id),
-        caseTitle: selectedCase.title || "this application",
-        applicationId: applicationId || undefined,
-        paralegalId: String(paralegal._id),
-        status: "requested",
-      });
-    } catch (err) {
-      logger.warn("[cases] Failed to notify paralegal of pre-engagement request", err?.message || err);
-    }
+    publishCaseEvent(selectedCase._id, "case", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(selectedCase, "pre_engagement_requested_refresh", [paralegal._id]);
+
+    await savedRequest.dispatch?.().catch(error => logger.warn("[cases] saved pre-engagement request refresh deferred", error?.name));
 
     return res.json({
       success: true,
@@ -5892,6 +5338,16 @@ router.post(
     }
     if (String(preEngagement.requestedParalegalId) !== String(req.user.id || "")) {
       return res.status(403).json({ error: "You are not the requested paralegal for this Matter." });
+    }
+
+    if (req.body?.expectedPreEngagementRevision !== undefined) {
+      const displayed = String(req.body.expectedPreEngagementRevision);
+      if (!/^(0|[1-9]\d*)$/.test(displayed) || !Number.isSafeInteger(Number(displayed))) {
+        return res.status(400).json({ code: "PRE_ENGAGEMENT_REVISION_INVALID", error: "The displayed requirements could not be verified. Refresh and review them again." });
+      }
+      if (Number(displayed) !== Math.max(0, Number(preEngagement.revision || 0))) {
+        return res.status(409).json({ code: "PRE_ENGAGEMENT_CONFLICT", error: "The requirements changed since you opened them. Review the updated request before submitting." });
+      }
     }
 
     const confidentialityAcknowledged = parseBooleanField(req.body?.confidentialityAcknowledged);
@@ -5969,7 +5425,7 @@ router.post(
         : "";
     const previousSignedDocumentKey = preEngagement.paralegalConfidentialityDocument?.key || "";
     const nextRevision = Math.max(0, Number(preEngagement.revision || 0)) + 1;
-    const updatedCase = await Case.findOneAndUpdate(
+    const savedResponse = await preEngagementNotices.save(session => Case.findOneAndUpdate(
       {
         _id: caseId,
         archived: { $ne: true },
@@ -5995,8 +5451,15 @@ router.post(
           "preEngagement.reviewedBy": null,
         },
       },
-      { returnDocument: "after", runValidators: true }
-    );
+      { returnDocument: "after", runValidators: true, session }
+    ), { actorUserId: req.user.id, kind: "submitted" }).catch(async error => {
+      const uploadedKey = String(paralegalConfidentialityDocument?.key || "");
+      if (error.publicCode === "PRE_ENGAGEMENT_NOTICE_UNAVAILABLE" && req.file && uploadedKey && uploadedKey !== previousSignedDocumentKey) {
+        await deletePreEngagementObject(uploadedKey).catch(cleanupError => logger.error("[cases] rolled-back response upload cleanup failed", cleanupError?.name));
+      }
+      throw error;
+    });
+    const updatedCase = savedResponse.matter;
     if (!updatedCase) {
       const uploadedKey = String(paralegalConfidentialityDocument?.key || "");
       if (uploadedKey && uploadedKey !== String(previousSignedDocumentKey || "")) {
@@ -6019,25 +5482,10 @@ router.post(
     }
     const savedPreEngagement = updatedCase.preEngagement;
 
-    try {
-      const rawAttorneyId = updatedCase.attorney || updatedCase.attorneyId || null;
-      const attorneyId =
-        rawAttorneyId && typeof rawAttorneyId === "object" && rawAttorneyId._id
-          ? String(rawAttorneyId._id)
-          : String(rawAttorneyId || "");
-      if (attorneyId) {
-        await notifyUser(attorneyId, "pre_engagement_submitted", {
-          actorUserId: req.user.id,
-          caseId: String(updatedCase._id),
-          caseTitle: updatedCase.title || "your Matter",
-          applicantId: String(savedPreEngagement.requestedParalegalId),
-          paralegalId: String(savedPreEngagement.requestedParalegalId),
-          status: "submitted",
-        });
-      }
-    } catch (err) {
-      logger.warn("[cases] Failed to notify attorney of pre-engagement submission", err?.message || err);
-    }
+    publishCaseEvent(updatedCase._id, "case", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(updatedCase, "pre_engagement_submitted_refresh", [req.user.id]);
+
+    await savedResponse.dispatch?.().catch(error => logger.warn("[cases] saved pre-engagement response refresh deferred", error?.name));
 
     return res.json({
       success: true,
@@ -6067,7 +5515,9 @@ router.post(
     if (isFinalCaseDoc(caseDoc)) {
       return res.status(400).json({ error: "Completed Matters cannot be modified." });
     }
-    const preEngagement = caseDoc.preEngagement || null;
+    const initialReview = await reviewedPreEngagement(req, res, req.body?.applicantId, "review");
+    if (!initialReview) return;
+    const preEngagement = (initialReview.legacy ? caseDoc.preEngagement : initialReview.facts.preEngagement) || null;
     if (!preEngagement || !preEngagement.requestedParalegalId) {
       return res.status(400).json({ error: "No pre-engagement submission is available for review." });
     }
@@ -6104,7 +5554,9 @@ router.post(
 
     const reviewedAt = new Date();
     const nextRevision = Math.max(0, Number(preEngagement.revision || 0)) + 1;
-    const updatedCase = await Case.findOneAndUpdate(
+    const finalReview = await reviewedPreEngagement(req, res, req.body?.applicantId, "review");
+    if (!finalReview) return;
+    const savedReview = await preEngagementNotices.save(session => commitPreEngagement(finalReview,
       {
         _id: caseId,
         archived: { $ne: true },
@@ -6125,11 +5577,12 @@ router.post(
           "preEngagement.reviewedBy": req.user.id,
         },
       },
-      { returnDocument: "after", runValidators: true }
-    );
+      { returnDocument: "after", runValidators: true, session }
+    ), { actorUserId: req.user.id, kind: desiredStatus === "changes_requested" ? desiredStatus : null, applicationId: await findPreEngagementApplicationId(caseId, preEngagement.requestedParalegalId) });
+    const updatedCase = savedReview.matter;
     if (!updatedCase) {
       const latest = await Case.findById(caseId).select("preEngagement").lean();
-      if (String(latest?.preEngagement?.status || "").toLowerCase() === desiredStatus) {
+      if (finalReview.legacy && String(latest?.preEngagement?.status || "").toLowerCase() === desiredStatus) {
         return res.json({
           success: true,
           alreadyProcessed: true,
@@ -6143,21 +5596,10 @@ router.post(
     }
     const savedPreEngagement = updatedCase.preEngagement;
 
-    if (savedPreEngagement.status === "changes_requested") {
-      try {
-        const applicationId = await findPreEngagementApplicationId(caseId, savedPreEngagement.requestedParalegalId);
-        await notifyUser(savedPreEngagement.requestedParalegalId, "pre_engagement_changes_requested", {
-          actorUserId: req.user.id,
-          caseId: String(updatedCase._id),
-          caseTitle: updatedCase.title || "this application",
-          applicationId: applicationId || undefined,
-          paralegalId: String(savedPreEngagement.requestedParalegalId),
-          status: "changes_requested",
-        });
-      } catch (err) {
-        logger.warn("[cases] Failed to notify paralegal of pre-engagement changes request", err?.message || err);
-      }
-    }
+    publishCaseEvent(updatedCase._id, "case", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(updatedCase, "pre_engagement_reviewed_refresh", [savedPreEngagement.requestedParalegalId]);
+
+    await savedReview.dispatch?.().catch(error => logger.warn("[cases] saved pre-engagement review refresh deferred", error?.name));
 
     return res.json({
       success: true,
@@ -6165,6 +5607,88 @@ router.post(
     });
   })
 );
+
+const matterHiringReview = require("../services/matterHiringReview");
+const hiringReviewOptions = () => ({ stripeClient: stripe, bypassEmails: STRIPE_BYPASS_PARALEGAL_EMAILS });
+function hiringFailure(error, res) { return res.status(error.status || 503).json({ code: error.publicCode || "HIRING_UNAVAILABLE", error: "Hiring and funding could not be verified. Refresh the review before continuing." }); }
+router.get("/:caseId/hiring-review/:applicantId", requireCaseAccess("caseId"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { return res.json(await matterHiringReview.read(req, hiringReviewOptions())); } catch (error) { return hiringFailure(error, res); }
+}));
+function hiringConfirmation(review) { return { caseId: review.dto.caseId, applicantId: review.dto.applicantId, reviewedRevision: review.dto.revision, mode: review.dto.canResume ? "finish_hire" : review.dto.relisted ? "replacement" : "hire_and_fund", chargeCents: review.dto.canResume ? 0 : review.dto.chargeCents, budgetCents: review.dto.budgetCents, remainingCents: review.dto.remainingCents }; }
+async function stageHireNotifications(doc, { req, paralegalId, paralegalName, pendingInvitees, rejectedApplicantIds }, session) {
+  const notices = [
+    [paralegalId, "case_work_ready", { link: buildCaseLink(doc) }],
+    ...[...rejectedApplicantIds].map(userId => [userId, "application_denied", { link: "dashboard-paralegal.html", outcome: "matter_filled" }]),
+    ...pendingInvitees.map(userId => [userId, "case_invite_response", { response: "filled", paralegalId, paralegalName }]),
+  ];
+  const dispatchers = [], recipients = new Set();
+  for (const [userId, type, payload] of notices) {
+    const recipient = String(userId).toLowerCase();
+    if (recipients.has(recipient)) continue;
+    recipients.add(recipient);
+    const dispatch = await notifyUser(userId, type, { caseId: doc._id, caseTitle: doc.title || "Untitled Matter", ...payload }, { actorUserId: req.user.id, session, deferDispatch: true, workReady: type === "case_work_ready" });
+    if (dispatch) dispatchers.push(dispatch);
+  }
+  return dispatchers;
+}
+async function dispatchHireNotifications(dispatchers, caseId) {
+  for (const dispatch of dispatchers) {
+    try { await dispatch(); }
+    catch (error) { logger.warn("[case-hire] committed notification dispatch failed", { caseId, error }); }
+  }
+}
+async function saveReviewedHire(doc, review, claim, { req, jobId, paralegalId, replacementBefore = null, pendingInvitees = [], rejectedApplicantIds = new Set(), paralegalName = "" }) {
+  if (review) {
+    const where = { ...review.filter, __v: (review.facts.__v ?? 0) + 1, hiringClaimToken: claim.token, hiringClaimStatus: "claimed" };
+    for (const key of Object.keys(where)) if ((key.startsWith("hiringClaim") && !["hiringClaimToken", "hiringClaimStatus"].includes(key)) || key.startsWith("fundingRequest")) delete where[key];
+    doc.$where = where;
+  }
+  // The charge is already verified outside this transaction. Assignment,
+  // posting and canonical outcomes commit together; a rollback leaves the
+  // existing claim recovery able to finish using that charge without retrying it.
+  let dispatchers = [];
+  await withActiveAccountWrite([req.user.id, doc.attorney, doc.attorneyId, doc.paralegal, doc.paralegalId], async session => {
+    if (replacementBefore) await require("../services/replacementWithdrawal").stage(doc, replacementBefore, claim.token, { session, reviewedRevision: review?.withdrawalRevision });
+    await doc.save({ session });
+    await markJobAssigned(doc, jobId, session);
+    await rejectJobApplications(jobId, paralegalId, session);
+    dispatchers = await stageHireNotifications(doc, { req, paralegalId, paralegalName, pendingInvitees, rejectedApplicantIds }, session);
+    return doc;
+  }, { ownerId: req.user.id, authVersion: req.auth?.payload?.av });
+  return dispatchers;
+}
+async function releaseUnchargedReviewedHire(doc, review, claim, error) {
+  if (review.dto.canResume) return markCaseHireNeedsReconciliation(doc._id, claim.token, error, { id: review.facts.hiringClaimPaymentIntentId }, review.dto.chargeCents);
+  return releaseCaseHireClaim(doc._id, claim.token);
+}
+async function failedHiringCharge(req, doc, applicantId, claim, error, paymentIntent, totalCharge, customerId, res) {
+  let intent = paymentIntent || error?.payment_intent || null;
+  let canceled = false;
+  try {
+    if (typeof intent?.id === "string" && /^pi_[A-Za-z0-9_]+$/.test(intent.id)) {
+      const requestedIntentId = intent.id;
+      intent = await stripe.paymentIntents.retrieve(requestedIntentId);
+      if (intent?.id !== requestedIntentId) throw new Error("The charge response did not match the attempted payment.");
+      const matches = value => value?.metadata?.caseId === String(doc._id) && value.metadata?.attorneyId === String(req.user.id) && value.metadata?.paralegalId === String(applicantId) && String(value.customer?.id || value.customer || "") === customerId && value.amount === totalCharge && value.currency === (doc.currency || "usd") && Number(value.amount_received || 0) === 0;
+      if (matches(intent)) {
+        if (["requires_payment_method", "requires_confirmation", "requires_action"].includes(intent.status)) intent = await stripe.paymentIntents.cancel(intent.id);
+        canceled = intent.id === requestedIntentId && matches(intent) && intent.status === "canceled";
+      }
+      if (canceled) {
+        await PaymentOperation.updateOne({ operationKey: `hire-card-failure:${intent.id}` }, { $setOnInsert: { operationKey: `hire-card-failure:${intent.id}`, caseId: doc._id, kind: "funding", fingerprint: buildFundingFingerprint({ caseId: doc._id, amount: totalCharge, currency: doc.currency || "usd", mode: "hire-card-failure", targetId: String(applicantId) }), status: "failed", amount: totalCharge, currency: doc.currency || "usd", stripeObjectId: intent.id, stripePaymentIntentId: intent.id, lastError: "The provider confirmed cancellation without a completed charge.", completedAt: new Date() } }, { upsert: true });
+        const cleared = await Case.collection.updateOne({ _id: doc._id, hiringClaimToken: claim.token, hiringClaimStatus: "claimed" }, { $set: { fundingRequestKey: "", fundingRequestFingerprint: "" } });
+        if (!cleared.matchedCount) throw new Error("Hire claim changed during charge cancellation.");
+        await releaseCaseHireClaim(doc._id, claim.token);
+        return res.status(402).json({ code: "HIRING_CARD_NOT_CHARGED", error: "The card charge did not complete. Review the saved card before trying again." });
+      }
+    }
+  } catch (recoveryError) {
+    logger.warn("[case-hire] reviewed charge outcome requires reconciliation", { caseId: doc._id, error: recoveryError });
+  }
+  await markCaseHireNeedsReconciliation(doc._id, claim.token, error || new Error("Charge outcome could not be verified."), intent, totalCharge);
+  return res.status(409).json({ code: "HIRING_CHARGE_UNCONFIRMED", error: "The charge outcome needs verification before another hiring attempt." });
+}
 
 /**
  * POST /api/cases/:caseId/hire/:paralegalId
@@ -6184,6 +5708,11 @@ router.post(
       return res.status(400).json({ error: "Invalid caseId or paralegalId" });
     }
 
+    res.set("Cache-Control", "private, no-store");
+    let reviewedHire = null;
+    if (req.body?.reviewedRevision !== undefined) {
+      try { reviewedHire = await matterHiringReview.reviewed(req, hiringReviewOptions()); } catch (error) { return hiringFailure(error, res); }
+    }
     let selectedCase = await Case.findById(caseId);
     if (!selectedCase) return res.status(404).json({ error: "Matter not found" });
     if (isFinalCaseDoc(selectedCase)) {
@@ -6192,7 +5721,7 @@ router.post(
     if (selectedCase.paralegalId || selectedCase.paralegal) {
       return res.status(400).json({ error: "A paralegal has already been hired" });
     }
-    if (!(await hasActiveCaseCandidate(selectedCase, paralegalId))) {
+    if (!reviewedHire && !(await hasActiveCaseCandidate(selectedCase, paralegalId))) {
       return res.status(400).json({ error: "Select an active applicant or accepted invite to hire." });
     }
     if (!hasScopeTasks(selectedCase)) {
@@ -6209,6 +5738,9 @@ router.post(
     if (!attorneyOnCase || attorneyOnCase !== String(req.user.id)) {
       return res.status(403).json({ error: "You are not the attorney for this Matter" });
     }
+
+    try { await legacyApplications.begin(req, [selectedCase]); }
+    catch (error) { return hiringFailure(error, res); }
 
     const relistEligible =
       normalizeCaseStatusValue(selectedCase.status) === "paused" &&
@@ -6240,7 +5772,8 @@ router.post(
     try {
       const expired = await finalizeExpiredDisputeWindow(selectedCase);
       if (expired) {
-        await selectedCase.save();
+        selectedCase = await Case.findById(caseId);
+        if (!selectedCase || String(selectedCase.attorney || selectedCase.attorneyId) !== attorneyOnCase || selectedCase.paralegal || selectedCase.paralegalId || isFinalCaseDoc(selectedCase)) return res.status(409).json({ error: "The Matter changed during withdrawal finalization. Review it before hiring." });
       }
     } catch (err) {
       logger.warn("[cases] dispute window finalize failed", err?.message || err);
@@ -6283,15 +5816,22 @@ router.post(
         return res.status(400).json({ error: "Remaining Matter amount is invalid." });
       }
 
-      const hireClaim = await claimCaseHire(selectedCase._id, paralegalId);
+      if (reviewedHire) {
+        try { reviewedHire = await matterHiringReview.reviewed(req, hiringReviewOptions()); } catch (error) { return hiringFailure(error, res); }
+      }
+      const hireClaim = await claimCaseHire(selectedCase, paralegalId, reviewedHire, req);
       if (!hireClaim.acquired) {
         return res.status(409).json({
-          error: "Another hire is already being processed for this matter.",
+          error: "The Matter changed or another hire is being processed. Refresh the application before hiring.",
           code: "HIRE_IN_PROGRESS",
         });
       }
       selectedCase = hireClaim.caseDoc;
+      if (reviewedHire) {
+        try { await matterHiringReview.verifyParties(req, reviewedHire); } catch (error) { await releaseUnchargedReviewedHire(selectedCase, reviewedHire, hireClaim, error); return hiringFailure(error, res); }
+      }
 
+      const replacementBefore = hireClaim.replacementSource;
       seedLegacyInvite(selectedCase);
       const pendingInvitees = listCaseInvites(selectedCase)
         .filter((invite) => invite.status === "pending" && String(invite.paralegalId) !== String(paralegalId))
@@ -6308,6 +5848,7 @@ router.post(
       markOtherInvites(selectedCase, paralegalId, "declined");
       syncLegacyPendingFields(selectedCase);
       selectedCase.hiredAt = new Date();
+      selectedCase.assignmentCompletedTaskIndexes = selectedCase.tasks.flatMap((task, index) => task.completed ? [index] : []);
       selectedCase.tasksLocked = true;
       selectedCase.paralegalNameSnapshot = formatPersonName(paralegal);
       selectedCase.escrowStatus = "funded";
@@ -6317,113 +5858,35 @@ router.post(
       selectedCase.relistPending = false;
       clearCaseHireClaim(selectedCase);
 
-      let hiredWasApplicant = false;
-      const rejectedApplicantIds = new Set();
-      if (Array.isArray(selectedCase.applicants) && selectedCase.applicants.length) {
-        selectedCase.applicants.forEach((app) => {
-          const applicantId = String(app.paralegalId || "");
-          if (!applicantId) return;
-          if (applicantId === String(paralegalId)) {
-            app.status = "accepted";
-            hiredWasApplicant = true;
-          } else {
-            app.status = "rejected";
-            rejectedApplicantIds.add(applicantId);
-          }
-        });
-      }
-
-      const rawJobId = selectedCase.jobId || selectedCase.job || null;
-      const jobId =
-        rawJobId && typeof rawJobId === "object" ? rawJobId._id || rawJobId.id || rawJobId : rawJobId;
-      if (jobId) {
-        const jobApps = await Application.find({ jobId, status: { $ne: "withdrawn" } })
-          .select("paralegalId")
-          .lean();
-        jobApps.forEach((app) => {
-          const applicantId = String(app.paralegalId || "");
-          if (!applicantId) return;
-          if (applicantId === String(paralegalId)) {
-            hiredWasApplicant = true;
-          } else {
-            rejectedApplicantIds.add(applicantId);
-          }
-        });
-      }
+      let rejectedApplicantIds, jobId, hireNotices;
 
       try {
-        await selectedCase.save();
+        ({ rejectedApplicantIds, jobId } = await stageHiredApplications(req, selectedCase, paralegalId));
+        hireNotices = await saveReviewedHire(selectedCase, reviewedHire, hireClaim, { replacementBefore, req, jobId, paralegalId, pendingInvitees, rejectedApplicantIds, paralegalName: formatPersonName(paralegal) });
       } catch (err) {
         await releaseCaseHireClaim(selectedCase._id, hireClaim.token).catch(
           logPromiseFailure(logger, "[case-hire] claim release after save failure failed", {
             caseId: selectedCase._id,
           })
         );
+        if (err.publicCode) return hiringFailure(err, res);
         throw err;
       }
-      await markJobAssigned(selectedCase);
       await selectedCase.populate([
         { path: "paralegal", select: "firstName lastName email role avatarURL" },
         { path: "attorney", select: "firstName lastName email role avatarURL" },
       ]);
 
-      await Promise.all(
-        pendingInvitees.map((inviteeId) =>
-          sendCaseNotification(
-            inviteeId,
-            "case_invite_response",
-            selectedCase,
-            {
-              response: "filled",
-              paralegalId,
-              paralegalName: formatPersonName(paralegal),
-            },
-            { actorUserId: req.user.id }
-          )
-        )
+      publishCaseEvent(selectedCase._id, "case", { at: new Date().toISOString() });
+      publishCaseParticipantRefresh(
+        selectedCase,
+        "matter_hired_refresh",
+        [paralegalId, ...pendingInvitees, ...rejectedApplicantIds]
       );
 
-      if (jobId) {
-        await rejectJobApplications(jobId, paralegalId);
-      }
+      await dispatchHireNotifications(hireNotices, selectedCase._id);
 
-      try {
-        const link = buildCaseLink(selectedCase);
-        if (hiredWasApplicant) {
-          await sendCaseNotification(
-            paralegalId,
-            "application_accepted",
-            selectedCase,
-            { link },
-            { actorUserId: req.user.id }
-          );
-        }
-        await sendCaseNotification(
-          paralegalId,
-          "case_work_ready",
-          selectedCase,
-          { link },
-          { actorUserId: req.user.id }
-        );
-        if (rejectedApplicantIds.size) {
-          const rejectLink = "dashboard-paralegal.html";
-          await Promise.all(
-            [...rejectedApplicantIds].map((id) =>
-              sendCaseNotification(
-                id,
-                "application_denied",
-                selectedCase,
-                { link: rejectLink },
-                { actorUserId: req.user.id }
-              )
-            )
-          );
-        }
-      } catch (err) {
-        logger.warn("[case-hire] notification error", err?.message || err);
-      }
-
-      res.json({ success: true, relisted: true });
+      res.json({ success: true, relisted: true, ...(reviewedHire ? { hiringConfirmation: hiringConfirmation(reviewedHire) } : {}) });
       return;
     }
 
@@ -6445,10 +5908,10 @@ router.post(
     }
 
     const customerId = await ensureStripeCustomer(attorney);
-    const defaultPaymentMethodId = await fetchDefaultPaymentMethodId(customerId);
+    const defaultPaymentMethodId = reviewedHire?.dto.canResume ? null : await fetchDefaultPaymentMethodId(customerId);
     if (
       isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.HIRE_AND_FUND) &&
-      !defaultPaymentMethodId
+      !defaultPaymentMethodId && !reviewedHire?.dto.canResume
     ) {
       return res.status(400).json({ error: "Add a payment method before hiring." });
     }
@@ -6462,21 +5925,28 @@ router.post(
         String(paralegal.status || "").toLowerCase() === "approved",
       paralegalPayoutSetupReady:
         bypassStripe || Boolean(paralegal.stripeAccountId && paralegal.stripeOnboarded && paralegal.stripePayoutsEnabled),
-      paymentMethodSaved: Boolean(defaultPaymentMethodId),
+      paymentMethodSaved: Boolean(defaultPaymentMethodId) || !!reviewedHire?.dto.canResume,
     });
     if (!hiringPolicy.ready) {
       return res.status(400).json({ error: "This matter is not ready to hire and fund.", blockers: hiringPolicy.blockers });
     }
 
-    const hireClaim = await claimCaseHire(selectedCase._id, paralegalId);
+    if (reviewedHire) {
+      try { reviewedHire = await matterHiringReview.reviewed(req, hiringReviewOptions()); } catch (error) { return hiringFailure(error, res); }
+      if (reviewedHire.dto.chargeCents !== totalCharge || String(reviewedHire.user.stripeCustomerId || "") !== customerId || !reviewedHire.dto.canResume && reviewedHire.dto.card?.id !== defaultPaymentMethodId) return res.status(409).json({ code: "HIRING_CHANGED", error: "The reviewed charge or payment card changed." });
+    }
+    const hireClaim = await claimCaseHire(selectedCase, paralegalId, reviewedHire, req);
     if (!hireClaim.acquired) {
       return res.status(409).json({
-        error: "Another hire is already being processed for this matter.",
+        error: "The Matter changed or another hire is being processed. Refresh the application before hiring.",
         code: "HIRE_IN_PROGRESS",
       });
     }
     selectedCase = hireClaim.caseDoc;
 
+    if (reviewedHire) {
+      try { await matterHiringReview.verifyParties(req, reviewedHire); } catch (error) { await releaseUnchargedReviewedHire(selectedCase, reviewedHire, hireClaim, error); return hiringFailure(error, res); }
+    }
     let paymentIntent = null;
     let forceNewFundingKey = false;
     const recoverableFundingIntentId =
@@ -6511,6 +5981,8 @@ router.post(
               code: "HIRE_RECONCILIATION_REQUIRED",
             });
           }
+        } else if (reviewedHire?.dto.canResume) {
+          throw new Error("The reviewed funding is no longer a completed charge.");
         } else if (existing && !["succeeded", "canceled"].includes(existing.status)) {
           await stripe.paymentIntents.cancel(existing.id);
           forceNewFundingKey = true;
@@ -6535,6 +6007,10 @@ router.post(
       }
     }
 
+    if (!paymentIntent && reviewedHire?.dto.canResume) {
+      await markCaseHireNeedsReconciliation(selectedCase._id, hireClaim.token, new Error("Reviewed funding could not be reused."), { id: recoverableFundingIntentId }, totalCharge);
+      return res.status(409).json({ code: "HIRING_RECONCILIATION", error: "The earlier funding needs review before the hire can be finished." });
+    }
     if (!paymentIntent) {
       try {
         const idempotencyKey = await resolveFundingIdempotencyKey(selectedCase, totalCharge, {
@@ -6565,31 +6041,12 @@ router.post(
           { idempotencyKey }
         );
       } catch (err) {
-        await releaseCaseHireClaim(selectedCase._id, hireClaim.token).catch(
-          logPromiseFailure(logger, "[case-hire] claim release after charge failure failed", {
-            caseId: selectedCase._id,
-          })
-        );
-        const message = stripe.sanitizeStripeError(
-          err,
-          "Unable to charge the card on file. Please try again or update your payment method."
-        );
-        return res.status(402).json({ error: message });
+        return failedHiringCharge(req, selectedCase, paralegalId, hireClaim, err, null, totalCharge, customerId, res);
       }
     }
 
     if (!paymentIntent || paymentIntent.status !== "succeeded") {
-      try {
-        if (paymentIntent?.id) await stripe.paymentIntents.cancel(paymentIntent.id);
-      } catch (err) {
-        logger.warn("[case-hire] Unable to cancel failed payment intent", err?.message || err);
-      }
-      await releaseCaseHireClaim(selectedCase._id, hireClaim.token).catch(
-        logPromiseFailure(logger, "[case-hire] claim release after unsuccessful charge failed", {
-          caseId: selectedCase._id,
-        })
-      );
-      return res.status(402).json({ error: "Unable to charge the card on file. Please try again." });
+      return failedHiringCharge(req, selectedCase, paralegalId, hireClaim, null, paymentIntent, totalCharge, customerId, res);
     }
 
     const transferablePayment = stripe.isTransferablePaymentIntent(paymentIntent, {
@@ -6705,7 +6162,8 @@ router.post(
         }));
       }
       return res.status(502).json({
-        error: "The charge could not be verified for this matter and was reversed. Please try again.",
+        error: compensated ? "The charge could not be verified. A refund was requested; check the payment status before continuing." : "The charge and attempted refund need verification before another hiring attempt.",
+        ...(reviewedHire ? { code: "HIRING_RECONCILIATION" } : {}),
       });
     }
     selectedCase.fundingIntegrityStatus = "verified";
@@ -6729,46 +6187,16 @@ router.post(
     markOtherInvites(selectedCase, paralegalId, "declined");
     syncLegacyPendingFields(selectedCase);
     selectedCase.hiredAt = new Date();
+    selectedCase.assignmentCompletedTaskIndexes = selectedCase.tasks.flatMap((task, index) => task.completed ? [index] : []);
     selectedCase.tasksLocked = true;
     selectedCase.paralegalNameSnapshot = formatPersonName(paralegal);
     selectedCase.transitionTo(IN_PROGRESS_STATUS);
     clearCaseHireClaim(selectedCase);
-    let hiredWasApplicant = false;
-    const rejectedApplicantIds = new Set();
-    if (Array.isArray(selectedCase.applicants) && selectedCase.applicants.length) {
-      selectedCase.applicants.forEach((app) => {
-        const applicantId = String(app.paralegalId || "");
-        if (!applicantId) return;
-        if (applicantId === String(paralegalId)) {
-          app.status = "accepted";
-          hiredWasApplicant = true;
-        } else {
-          app.status = "rejected";
-          rejectedApplicantIds.add(applicantId);
-        }
-      });
-    }
-
-    const rawJobId = selectedCase.jobId || selectedCase.job || null;
-    const jobId =
-      rawJobId && typeof rawJobId === "object" ? rawJobId._id || rawJobId.id || rawJobId : rawJobId;
-    if (jobId) {
-      const jobApps = await Application.find({ jobId, status: { $ne: "withdrawn" } })
-        .select("paralegalId")
-        .lean();
-      jobApps.forEach((app) => {
-        const applicantId = String(app.paralegalId || "");
-        if (!applicantId) return;
-        if (applicantId === String(paralegalId)) {
-          hiredWasApplicant = true;
-        } else {
-          rejectedApplicantIds.add(applicantId);
-        }
-      });
-    }
+    let rejectedApplicantIds, jobId, hireNotices;
 
     try {
-      await selectedCase.save();
+      ({ rejectedApplicantIds, jobId } = await stageHiredApplications(req, selectedCase, paralegalId));
+      hireNotices = await saveReviewedHire(selectedCase, reviewedHire, hireClaim, { req, jobId, paralegalId, pendingInvitees, rejectedApplicantIds, paralegalName: formatPersonName(paralegal) });
     } catch (err) {
       await markCaseHireNeedsReconciliation(
         selectedCase._id,
@@ -6780,7 +6208,7 @@ router.post(
         caseId: selectedCase._id,
       }));
       return res.status(500).json({
-        error: "The payment succeeded, but the hire needs reconciliation. Please retry; you will not be charged again.",
+        error: "The charge succeeded, but the hire has not been confirmed. Refresh the hiring review before continuing.",
         code: "HIRE_RECONCILIATION_REQUIRED",
       });
     }
@@ -6793,126 +6221,53 @@ router.post(
       caseId: selectedCase._id,
       paymentIntentId: paymentIntent.id,
     }));
-    await markJobAssigned(selectedCase);
     await selectedCase.populate([
       { path: "paralegal", select: "firstName lastName email role avatarURL" },
       { path: "attorney", select: "firstName lastName email role avatarURL" },
     ]);
 
-    await Promise.all(
-      pendingInvitees.map((inviteeId) =>
-        sendCaseNotification(
-          inviteeId,
-          "case_invite_response",
-          selectedCase,
-          {
-            response: "filled",
-            paralegalId,
-            paralegalName: formatPersonName(paralegal),
-          },
-          { actorUserId: req.user.id }
-        )
-      )
+    publishCaseEvent(selectedCase._id, "case", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(
+      selectedCase,
+      "matter_hired_refresh",
+      [paralegalId, ...pendingInvitees, ...rejectedApplicantIds]
     );
 
-    if (jobId) {
-      await rejectJobApplications(jobId, paralegalId);
-    }
+    await dispatchHireNotifications(hireNotices, selectedCase._id);
 
-    try {
-      const link = buildCaseLink(selectedCase);
-      if (hiredWasApplicant) {
-        await sendCaseNotification(
-          paralegalId,
-          "application_accepted",
-          selectedCase,
-          { link },
-          { actorUserId: req.user.id }
-        );
-      }
-      if (rejectedApplicantIds.size) {
-        const rejectLink = "dashboard-paralegal.html";
-        await Promise.all(
-          [...rejectedApplicantIds].map((id) =>
-            sendCaseNotification(
-              id,
-              "application_denied",
-              selectedCase,
-              { link: rejectLink },
-              { actorUserId: req.user.id }
-            )
-          )
-        );
-      }
-      await sendCaseNotification(
-        paralegalId,
-        "case_work_ready",
-        selectedCase,
-        { link },
-        { actorUserId: req.user.id }
-      );
-    } catch (notificationError) {
-      logger.warn("[case-hire] post-hire notification delivery failed", {
-        caseId: selectedCase._id,
-        error: notificationError,
-      });
-    }
-
-    res.json(caseSummary(selectedCase, { viewerRole: req.user?.role }));
+    res.json({ ...caseSummary(selectedCase, { viewerRole: req.user?.role }), ...(reviewedHire ? { hiringConfirmation: hiringConfirmation(reviewedHire) } : {}) });
   })
 );
 
-/**
- * PATCH /api/cases/:caseId/archive
- * Body: { archived?: boolean }
- * Marks a case archived/unarchived (attorney or admin only).
- */
-router.patch(
-  "/:caseId/archive",
-  csrfProtection,
-  requireCaseAccess("caseId"),
-  asyncHandler(async (req, res) => {
-    if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
-      return res.status(403).json({ error: "Only the Matter attorney can archive this Matter" });
+// Archive is one reviewed visibility change, with a receipt for lost responses.
+// It never runs the generic status editor or silently retries a client mutation.
+const matterArchive = require("../services/matterArchive");
+const archiveNoStore = (_req, res, next) => { res.set("Cache-Control", "no-store"); next(); };
+const archiveOperation = (write) => async (req, res) => {
+  try {
+    const actorId = String(req.user.id);
+    const expectedOwner = write ? req.body?.expectedOwnerId : req.query.expectedOwnerId;
+    if ((write || expectedOwner !== undefined) && expectedOwner !== actorId) return res.status(403).json({ code: "ARCHIVE_ACCOUNT_CHANGED", error: "The signed-in account changed. Reload before continuing." });
+    if (!req.acl?.isAttorney && !req.acl?.isAdmin) return res.status(403).json({ error: "Only the Matter attorney can change its archive status." });
+    const doc = await matterArchive.read(Case, req.params.caseId, actorId, req.acl.isAdmin);
+    if (!write) return res.json(matterArchive.shape(doc, actorId));
+    const result = await matterArchive.change(Case, doc, actorId, req.body);
+    if (!result.replayed) {
+      const type = result.doc.archived ? "case.archive" : "case.restore";
+      publishCaseEvent(doc._id, "case", { at: new Date().toISOString() });
+      publishCaseParticipantRefresh(result.doc, "matter_archive_refresh");
+      try { await logAction(req, type, { targetType: "case", targetId: doc._id, caseId: doc._id }); }
+      catch (error) { logger.error("[cases] archive audit persistence failed", { caseId: doc._id, error }); }
     }
-    const { archived } = req.body || {};
-    const shouldArchive = typeof archived === "boolean" ? archived : true;
-    const doc = await Case.findById(req.params.caseId)
-      .populate("paralegal", "firstName lastName email role avatarURL")
-      .populate("paralegalId", "firstName lastName email role avatarURL")
-      .populate("attorney", "firstName lastName email role avatarURL")
-      .populate("attorneyId", "firstName lastName email role avatarURL");
-    if (!doc) return res.status(404).json({ error: "Matter not found" });
-    const statusKey = String(doc.status || "").toLowerCase();
-    const isFinalCase = statusKey === "completed" || doc.paymentReleased === true;
-    if (!shouldArchive && isFinalCase) {
-      return res.status(400).json({ error: "Completed Matters cannot be restored." });
-    }
-
-    // Normalize status when unarchiving to avoid enum errors on legacy "draft" values.
-    if (!shouldArchive) {
-      const statusKey = String(doc.status || "").toLowerCase();
-      if (!statusKey || statusKey === "draft") {
-        // Legacy draft records predate the persisted lifecycle and cannot be
-        // transitioned through the current graph; normalize only this repair.
-        doc.status = "open";
-      }
-    }
-    doc.archived = shouldArchive;
-    await doc.save();
-    try {
-      await logAction(req, shouldArchive ? "case.archive" : "case.restore", {
-        targetType: "case",
-        targetId: doc._id,
-        caseId: doc._id,
-      });
-    } catch (auditError) {
-      logger.error("[cases] archive state audit persistence failed", { caseId: doc._id, error: auditError });
-    }
-
-    res.json(caseSummary(doc, { viewerRole: req.user?.role }));
-  })
-);
+    return res.json({ ok: true, archive: matterArchive.shape(result.doc, actorId), replayed: result.replayed });
+  } catch (error) {
+    if (error.publicCode) return res.status(error.status).json({ code: error.publicCode, error: error.message });
+    logger.error("[cases] archive operation could not be confirmed", error);
+    return res.status(503).json({ code: "ARCHIVE_UNCONFIRMED", error: "The archive result could not be confirmed. Check its current status before trying again." });
+  }
+};
+router.get("/:caseId/archive", archiveNoStore, requireCaseAccess("caseId"), archiveOperation(false));
+router.patch("/:caseId/archive", archiveNoStore, csrfProtection, requireCaseAccess("caseId"), archiveOperation(true));
 
 /**
  * POST /api/cases/:caseId/flag
@@ -6995,29 +6350,23 @@ router.post(
       return res.status(400).json({ error: "Invalid Matter ID" });
     }
     const note = cleanText(req.body?.note || "", { max: 2000 });
-    const doc = await Case.findById(caseId).select(
-      "flags internalNotes title attorney attorneyId archived status moderationStatus moderationFlaggedAt moderationFlaggedBy moderationResolutionRequestedAt moderationResolutionRequestedBy"
-    );
+    const doc = await Case.collection.findOne({ _id: new mongoose.Types.ObjectId(caseId) });
     if (!doc) return res.status(404).json({ error: "Matter not found" });
+    const noteSnapshot = matterNotes.moderationSnapshot(doc);
     doc.flags = [];
     doc.moderationStatus = "none";
+    doc.moderationPostingBaseline = null; doc.moderationEditRequest = "";
     doc.moderationFlaggedAt = null;
     doc.moderationFlaggedBy = null;
     doc.moderationResolutionRequestedAt = null;
     doc.moderationResolutionRequestedBy = null;
     const now = new Date();
     const stamp = now.toISOString();
-    const existingNotes = doc.internalNotes?.text ? String(doc.internalNotes.text) : "";
     const entry = note
       ? `[${stamp}] Admin resolved flag: ${note}`
       : `[${stamp}] Admin resolved flag.`;
-    const combined = existingNotes ? `${existingNotes}\n\n${entry}` : entry;
-    doc.internalNotes = {
-      text: combined.slice(-10000),
-      updatedBy: req.user?.id || req.user?._id || null,
-      updatedAt: now,
-    };
-    await doc.save();
+    const appended = await matterNotes.appendModerationNote(Case, doc, noteSnapshot, entry, new mongoose.Types.ObjectId(req.user.id), now);
+    if (!appended.ok) return res.status(409).json({ error: appended.code === "NOTE_LIMIT" ? "The note has reached its limit. Review and shorten it before adding admin feedback." : "Matter changed. Reload and review before trying again.", code: appended.code });
     try {
       await logAction(req, "case.flag.resolved", {
         targetType: "case",
@@ -7051,54 +6400,48 @@ router.post(
     if (!message) {
       return res.status(400).json({ error: "Provide a request message." });
     }
-    const doc = await Case.findById(caseId).select(
-      "title attorney attorneyId internalNotes archived status moderationStatus moderationFlaggedAt moderationFlaggedBy moderationResolutionRequestedAt moderationResolutionRequestedBy"
-    );
+    const doc = await Case.collection.findOne({ _id: new mongoose.Types.ObjectId(caseId) });
     if (!doc) return res.status(404).json({ error: "Matter not found" });
+    const noteSnapshot = matterNotes.moderationSnapshot(doc);
     if (doc.archived) return res.status(400).json({ error: "This Matter is archived." });
     const attorneyId = doc.attorneyId || doc.attorney || null;
     if (!attorneyId) return res.status(400).json({ error: "Attorney not found for this Matter." });
 
-    const summary = `Admin requested edits: ${message}`;
-    try {
-      await notifyUser(attorneyId, "case_update", {
-        caseId: doc._id,
-        caseTitle: doc.title || "Untitled Matter",
-        summary,
-        link: `dashboard-attorney.html?previewCaseId=${encodeURIComponent(String(doc._id))}#cases`,
-      }, { actorUserId: req.user?.id || req.user?._id || null });
-    } catch (notificationError) {
-      logger.warn("[cases] requested-edits notification failed", { caseId: doc._id, error: notificationError });
-    }
-
     const now = new Date();
     const stamp = now.toISOString();
-    const existingNotes = doc.internalNotes?.text ? String(doc.internalNotes.text) : "";
     const entry = `[${stamp}] Admin requested edits: ${message}`;
-    const combined = existingNotes ? `${existingNotes}\n\n${entry}` : entry;
-    doc.internalNotes = {
-      text: combined.slice(-10000),
-      updatedBy: req.user?.id || req.user?._id || null,
-      updatedAt: now,
-    };
     doc.moderationStatus = "flagged";
+    doc.moderationPostingBaseline = matterModeration.postingFingerprint(doc);
+    doc.moderationEditRequest = message;
     doc.moderationFlaggedAt = now;
     doc.moderationFlaggedBy = req.user?.id || req.user?._id || null;
     doc.moderationResolutionRequestedAt = null;
     doc.moderationResolutionRequestedBy = null;
-    await doc.save();
-    try {
-      await logAction(req, "case.flag.request_edits", {
-        targetType: "case",
-        targetId: doc._id,
-        caseId: doc._id,
-        meta: { message },
-      });
-    } catch (auditError) {
-      logger.error("[cases] requested-edits audit persistence failed", { caseId: doc._id, error: auditError });
-    }
+    const appended = await retainModerationChange(async session => {
+      const result = await matterNotes.appendModerationNote(Case, doc, noteSnapshot, entry, new mongoose.Types.ObjectId(req.user.id), now, { session });
+      if (!result.ok) return result;
+      return { ...result, dispatch: await postingNotices.retain(req, "edits_requested", doc, session) };
+    });
+    if (!appended.ok) return res.status(409).json({ error: appended.code === "NOTE_LIMIT" ? "The note has reached its limit. Review and shorten it before adding admin feedback." : "Matter changed. Reload and review before trying again.", code: appended.code });
+    await dispatchPostingNotice(appended.dispatch);
 
     res.json({ ok: true });
+  })
+);
+
+// This owner/admin projection excludes reporter identities and other private flags.
+router.get(
+  "/:caseId/flags/review",
+  requireCaseAccess("caseId"),
+  asyncHandler(async (req, res) => {
+    if (!req.acl?.isAttorney && !req.acl?.isAdmin) return res.status(403).json({ error: "Only the Matter attorney may review this admin request." });
+    if (req.query.expectedOwnerId && req.query.expectedOwnerId !== String(req.user.id)) return res.status(403).json({ error: "Verify your account.", code: "MODERATION_ACCOUNT_CHANGED" });
+    const doc = await Case.collection.findOne({ _id: new mongoose.Types.ObjectId(req.params.caseId) });
+    if (!doc) return res.status(404).json({ error: "Matter not found" });
+    const owner = doc.attorneyId || doc.attorney;
+    if (!req.acl.isAdmin && String(owner) !== String(req.user.id)) return res.status(403).json({ error: "Matter access changed." });
+    res.set("Cache-Control", "no-store");
+    res.json(matterModeration.shape(doc, String(req.user.id)));
   })
 );
 
@@ -7115,10 +6458,19 @@ router.post(
       return res.status(403).json({ error: "Only the Matter attorney may mark this flag as resolved." });
     }
     const { caseId } = req.params;
-    const doc = await Case.findById(caseId).select(
-      "title attorney attorneyId internalNotes archived status updatedAt moderationStatus moderationFlaggedAt moderationFlaggedBy moderationResolutionRequestedAt moderationResolutionRequestedBy"
-    );
+    res.set("Cache-Control", "no-store");
+    if (req.body?.expectedOwnerId !== String(req.user.id)) return res.status(403).json({ error: "Verify your account before requesting review.", code: "MODERATION_ACCOUNT_CHANGED" });
+    if (!/^[a-f0-9]{64}$/.test(req.body?.revision || "") || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(req.body?.requestId || "")) return res.status(428).json({ error: "Review the latest admin request before submitting.", code: "MODERATION_REVIEW_REQUIRED" });
+    const doc = await Case.collection.findOne({ _id: new mongoose.Types.ObjectId(caseId) });
     if (!doc) return res.status(404).json({ error: "Matter not found" });
+    if (!req.acl.isAdmin && String(doc.attorneyId || doc.attorney) !== String(req.user.id)) return res.status(403).json({ error: "Matter access changed." });
+    if (doc.moderationReviewReceipt?.requestId === req.body.requestId) {
+      if (doc.moderationReviewReceipt.revision !== req.body.revision) return res.status(409).json({ error: "This request was already used for a different review.", code: "MODERATION_CONFLICT" });
+      return res.json({ ok: true, review: matterModeration.shape(doc, String(req.user.id)), replayed: true });
+    }
+    if (matterModeration.revisionFor(doc) !== req.body.revision) return res.status(409).json({ error: "The Matter or admin request changed. Check and review it again.", code: "MODERATION_CONFLICT" });
+    const noteSnapshot = matterNotes.moderationSnapshot(doc);
+    if (doc.readOnly) return res.status(409).json({ error: "This Matter is read-only.", code: "MODERATION_INELIGIBLE" });
     if (doc.archived) return res.status(400).json({ error: "This Matter is archived." });
     if (String(doc.moderationStatus || "none") !== "flagged") {
       return res.status(400).json({ error: "This Matter is not currently flagged for edits." });
@@ -7129,53 +6481,28 @@ router.post(
 
     const now = new Date();
     doc.moderationStatus = "resolution_requested";
+    doc.moderationReviewReceipt = { requestId: req.body.requestId, revision: req.body.revision, requestedAt: now };
     doc.moderationResolutionRequestedAt = now;
     doc.moderationResolutionRequestedBy = req.user?.id || req.user?._id || null;
 
     const stamp = now.toISOString();
-    const existingNotes = doc.internalNotes?.text ? String(doc.internalNotes.text) : "";
     const entry = `[${stamp}] Attorney marked flag resolved and requested admin review.`;
-    doc.internalNotes = {
-      text: existingNotes ? `${existingNotes}\n\n${entry}`.slice(-10000) : entry,
-      updatedBy: req.user?.id || req.user?._id || null,
-      updatedAt: now,
-    };
-    await doc.save();
+    const appended = await retainModerationChange(async session => {
+      const result = await matterNotes.appendModerationNote(Case, doc, noteSnapshot, entry, new mongoose.Types.ObjectId(req.user.id), now, { session });
+      if (!result.ok) return result;
+      return { ...result, dispatch: await postingNotices.retain(req, "review_requested", doc, session) };
+    });
+    if (!appended.ok) return res.status(409).json({ error: appended.code === "NOTE_LIMIT" ? "The note has reached its limit. Review and shorten it before adding admin feedback." : "Matter changed. Reload and review before trying again.", code: appended.code });
+    await dispatchPostingNotice(appended.dispatch);
 
-    try {
-      const admins = await User.find({ role: "admin", status: "approved" }).select("_id").lean();
-      await Promise.all(
-        admins.map((admin) =>
-          notifyUser(
-            admin._id,
-            "case_update",
-            {
-              caseId: doc._id,
-              caseTitle: doc.title || "Untitled Matter",
-              summary: "Attorney marked this flagged post as resolved and requested admin review.",
-              link: "admin-dashboard.html#posts",
-            },
-            { actorUserId: req.user?.id || req.user?._id || null }
-          )
-        )
-      );
-    } catch (notificationError) {
-      logger.warn("[cases] flag-resolution admin notification failed", { caseId: doc._id, error: notificationError });
-    }
-
-    try {
-      await logAction(req, "case.flag.mark_resolved", {
-        targetType: "case",
-        targetId: doc._id,
-        caseId: doc._id,
-      });
-    } catch (auditError) {
-      logger.error("[cases] flag-resolution request audit persistence failed", { caseId: doc._id, error: auditError });
-    }
-
-    res.json({ ok: true, moderationStatus: doc.moderationStatus });
+    res.json({ ok: true, moderationStatus: doc.moderationStatus, review: matterModeration.shape(doc, String(req.user.id)) });
   })
 );
+
+router.get("/:caseId/completion-review", requireRole("attorney"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await attorneyCompletion.read(req)); } catch (error) { attorneyCompletion.sendError(res, error); }
+}));
 
 /**
  * POST /api/cases/:caseId/complete
@@ -7190,7 +6517,13 @@ router.post(
       return res.status(403).json({ error: "Only the Matter attorney may close this Matter." });
     }
     const { caseId } = req.params;
-    const doc = await Case.findById(caseId)
+    res.set("Cache-Control", "private, no-store");
+    let strictReview = null;
+    if (["expectedOwnerId", "requestId", "confirmation"].some(key => Object.hasOwn(req.body || {}, key))) {
+      try { strictReview = await attorneyCompletion.prepare(req); } catch (error) { return attorneyCompletion.sendError(res, error); }
+      if (strictReview.recovered) return res.json({ review: strictReview.recovered, recovered: true });
+    }
+    let doc = await Case.findById(caseId)
       .populate(
         "paralegal",
         "firstName lastName email role stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled"
@@ -7199,6 +6532,8 @@ router.post(
     if (!doc) return res.status(404).json({ error: "Matter not found" });
     const statusKey = normalizeCaseStatusValue(doc.status);
     if (statusKey === "completed") {
+      try { await completionPayoutEvidence.requireRecorded(doc); }
+      catch { return res.status(409).json({ error: "This Matter is closed, but its payout records need administrative reconciliation.", code: "PAYOUT_RECONCILIATION_REQUIRED" }); }
       if (doc.completionClaimStatus || doc.completionClaimToken) {
         await Case.updateOne(
           { _id: doc._id, status: "completed" },
@@ -7245,9 +6580,11 @@ router.post(
         blockers: completionPolicy.blockers,
       });
     }
-    const completionClaim = await claimCaseCompletion(caseId, req.user.id, {
-      isAdmin: req.acl?.isAdmin === true,
-    });
+    const initialPayoutEvidence = await completionPayoutEvidence.inspect(doc);
+    if (initialPayoutEvidence.state === "needs_review") return res.status(409).json({ error: completionPayoutEvidence.reconciliationError().message, code: "PAYOUT_RECONCILIATION_REQUIRED" });
+    let completionClaim;
+    try { completionClaim = strictReview ? await attorneyCompletion.claim(req, strictReview) : await claimCaseCompletion(caseId, req.user.id, { isAdmin: req.acl?.isAdmin === true }); }
+    catch (error) { return attorneyCompletion.sendError(res, error); }
     if (!completionClaim.acquired) {
       const latest = await Case.findById(caseId)
         .select("status completionClaimStatus completionClaimedAt disputes")
@@ -7265,6 +6602,11 @@ router.post(
             : "Completion is already running or the matter changed. Refresh before trying again.",
         code: "COMPLETION_CONFLICT",
       });
+    }
+    if (strictReview) {
+      doc = completionClaim.caseDoc;
+      await doc.populate("paralegal", "firstName lastName email role stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled");
+      await doc.populate("attorney", "firstName lastName email role");
     }
     const completionToken = completionClaim.token;
     const completionTime = new Date();
@@ -7292,12 +6634,20 @@ router.post(
       });
     }
     try {
-      releaseResult = await ensureFundsReleased(req, doc);
+      releaseResult = await ensureFundsReleased(req, doc, {
+        ...(strictReview ? { beforeTransfer: () => attorneyCompletion.beforeRelease(req, strictReview, completionClaim) } : {}),
+        afterTransfer: async transferId => {
+          await recordCaseCompletionTransferEvidence(caseId, completionToken, transferId);
+          if (strictReview) await attorneyCompletion.afterTransfer(req, transferId);
+        },
+      });
+      await completionPayoutEvidence.requireRecorded(doc);
     } catch (err) {
       await markCaseCompletionFailure(caseId, completionToken, err, doc.payoutTransferId).catch(
         logPromiseFailure(logger, "[cases] payout-failure completion marker failed", { caseId })
       );
-      if (payoutEvidenceExists) {
+      if (strictReview && err.publicCode) return attorneyCompletion.sendError(res, err);
+      if (payoutEvidenceExists || err.code === "PAYOUT_RECONCILIATION_REQUIRED") {
         return res.status(409).json({
           error: err.message || "Payout records require reconciliation before this matter can be completed.",
           code: "PAYOUT_RECONCILIATION_REQUIRED",
@@ -7345,9 +6695,19 @@ router.post(
 
     doc.archiveZipKey = archiveMeta.key;
     doc.archiveReadyAt = archiveMeta.readyAt;
+    let completionDispatches = [];
     try {
-      doc.transitionTo("completed");
-      await doc.save();
+      if (strictReview) completionDispatches = await attorneyCompletion.finish(req, strictReview, completionClaim, doc) || [];
+      else {
+        completionDispatches = await withPayoutTransaction(async session => {
+          const current = await Case.findById(caseId).session(session).lean();
+          if (!current || current.completionClaimToken !== completionToken || ["failed", "reversed", "needs_reconciliation"].includes(current.payoutStatus)) throw completionPayoutEvidence.reconciliationError();
+          const evidence = await completionPayoutEvidence.requireRecorded(doc, { session });
+          await upsertPayoutLedger({ operationKey: `case_payout:${caseId}`, caseId, paralegalId: evidence.payout.paralegalId, amountPaid: evidence.payout.amountPaid, transferId: evidence.payout.transferId, stripeMode: evidence.payout.stripeMode }, { session });
+          doc.transitionTo("completed"); await doc.save({ session });
+          return require("../services/matterPaymentNotifications").stageCompletion(doc, session, req.user.id);
+        });
+      }
     } catch (err) {
       await markCaseCompletionFailure(
         caseId,
@@ -7356,7 +6716,7 @@ router.post(
         releaseResult?.transferId || doc.payoutTransferId
       ).catch(logPromiseFailure(logger, "[cases] completion lifecycle reconciliation marker failed", { caseId }));
       await Case.updateOne(
-        { _id: doc._id },
+        { _id: doc._id, completionClaimToken: completionToken, payoutStatus: { $nin: ["reversed", "failed"] }, payoutFailureReason: { $in: [null, ""] }, payoutTransferId: { $in: [null, "", releaseResult?.transferId || doc.payoutTransferId] } },
         {
           $set: {
             payoutTransferId: releaseResult?.transferId || doc.payoutTransferId || "",
@@ -7365,6 +6725,7 @@ router.post(
           },
         }
       ).catch(logPromiseFailure(logger, "[cases] completion lifecycle payout marker failed", { caseId }));
+      if (strictReview && err.publicCode === "WORKSPACE_COMPLETION_ACCOUNT_CHANGED") return attorneyCompletion.sendError(res, err);
       return res.status(503).json({
         error: "The payout was released, but completion records require reconciliation.",
         code: "PAYOUT_RECONCILIATION_REQUIRED",
@@ -7384,28 +6745,7 @@ router.post(
       logger.warn("[cases] receipt generation failed", err?.message || err);
     }
 
-    try {
-      const link = "dashboard-attorney.html#cases:archived";
-      const attorneyId = doc.attorney?._id || doc.attorneyId || doc.attorney || null;
-      if (attorneyId) {
-        const payload = {
-          link,
-          summary: "Payment released. Matter completed and archived.",
-        };
-        const alreadySent = await hasCaseNotification(attorneyId, "case_update", doc, payload);
-        if (!alreadySent) {
-          await sendCaseNotification(
-            attorneyId,
-            "case_update",
-            doc,
-            payload,
-            { actorUserId: req.user?.id }
-          );
-        }
-      }
-    } catch (notificationError) {
-      logger.warn("[cases] completion notification failed", { caseId: doc._id, error: notificationError });
-    }
+    for (const dispatch of completionDispatches) await dispatch();
 
     await logAction(req, "case.complete.archive", {
       targetType: "case",
@@ -7414,9 +6754,14 @@ router.post(
       meta: { purgeScheduledFor: doc.purgeScheduledFor },
     });
     publishCaseEvent(doc._id, "case", { at: new Date().toISOString() });
+    publishCaseParticipantRefresh(doc, "matter_completed_refresh");
 
+    if (strictReview) {
+      try { await attorneyCompletion.actor(req); } catch (error) { return attorneyCompletion.sendError(res, error); }
+    }
     res.json({
       ok: true,
+      ...(strictReview ? { requestId: req.body.requestId, completionRecorded: true } : {}),
       downloadPath: `/api/cases/${encodeURIComponent(doc._id)}/archive/download`,
       purgeScheduledFor: doc.purgeScheduledFor,
       archiveReadyAt: doc.archiveReadyAt,
@@ -7424,233 +6769,24 @@ router.post(
   })
 );
 
-/**
- * POST /api/cases/:caseId/partial-payout
- * Attorney sets a partial payout for a withdrawn paralegal.
- * Body: { amount } in dollars (or amountCents).
- */
-router.post(
-  "/:caseId/partial-payout",
-  csrfProtection,
-  requireCaseAccess("caseId"),
-  asyncHandler(async (req, res) => {
-    if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
-      return res.status(403).json({ error: "Only the Matter attorney may set a partial payout." });
-    }
-    const { caseId } = req.params;
-    let amountCents = null;
-    if (typeof req.body?.amountCents !== "undefined") {
-      amountCents = Number(req.body.amountCents);
-    } else {
-      amountCents = dollarsToCents(req.body?.amount);
-    }
-    if (!Number.isFinite(amountCents) || amountCents < 0) {
-      return res.status(400).json({ error: "Enter a valid payout amount." });
-    }
-
-    const doc = await Case.findById(caseId)
-      .populate("attorney", "firstName lastName email role")
-      .populate("paralegal", "firstName lastName email role stripeAccountId stripeOnboarded stripePayoutsEnabled")
-      .populate("withdrawnParalegalId", "firstName lastName email role stripeAccountId stripeOnboarded stripePayoutsEnabled");
-    if (!doc) return res.status(404).json({ error: "Matter not found" });
-
-    try {
-      const expired = await finalizeExpiredDisputeWindow(doc);
-      if (expired) {
-        await doc.save();
-      }
-    } catch (err) {
-      logger.warn("[cases] dispute window finalize failed", err?.message || err);
-    }
-
-    if (doc.payoutFinalizedAt) {
-      return res.status(400).json({ error: "Payout has already been finalized for this Matter." });
-    }
-    const statusKey = normalizeCaseStatusValue(doc.status);
-    if (statusKey === "disputed") {
-      return res.status(400).json({ error: "This Matter is locked and cannot be updated right now." });
-    }
-    if (isDisputeWindowActive(doc)) {
-      return res.status(400).json({ error: "Payout cannot be set during the 24-hour hold." });
-    }
-    if (doc.disputeDeadlineAt && req.user?.role !== "admin") {
-      return res.status(400).json({
-        error: "Payout decisions are locked after close without release. Admin will finalize.",
-      });
-    }
-    if (doc.pausedReason !== "paralegal_withdrew") {
-      return res.status(400).json({ error: "Partial payouts are only available after a withdrawal." });
-    }
-
-    const remainingAmount = resolveRemainingAmount(doc) ?? doc.lockedTotalAmount ?? doc.totalAmount ?? 0;
-    if (!Number.isFinite(remainingAmount) || remainingAmount < 0) {
-      return res.status(400).json({ error: "Matter amount is invalid." });
-    }
-    if (amountCents > remainingAmount) {
-      return res.status(400).json({ error: "Payout exceeds the remaining Matter amount." });
-    }
-    const totalAmount = doc.lockedTotalAmount ?? doc.totalAmount ?? remainingAmount;
-    const capCents = Math.max(0, Math.round(Number(totalAmount || 0) * 0.7));
-    if (req.user?.role !== "admin" && amountCents > capCents) {
-      return res.status(400).json({ error: "Payout exceeds the 70% cap for attorney partial payouts." });
-    }
-    const withdrawnParalegal =
-      doc.withdrawnParalegalId && typeof doc.withdrawnParalegalId === "object"
-        ? doc.withdrawnParalegalId
-        : null;
-    if (!withdrawnParalegal && doc.withdrawnParalegalId) {
-      // Attempt fallback lookup
-      const fallback = await User.findById(doc.withdrawnParalegalId).select(
-        "firstName lastName email role stripeAccountId stripeOnboarded stripePayoutsEnabled"
-      );
-      if (fallback) doc.withdrawnParalegalId = fallback;
-    }
-    const payoutParalegal =
-      (doc.withdrawnParalegalId && typeof doc.withdrawnParalegalId === "object"
-        ? doc.withdrawnParalegalId
-        : null) || withdrawnParalegal;
-    if (!payoutParalegal) {
-      return res.status(400).json({ error: "Withdrawn paralegal record is missing." });
-    }
-
-    let transferResult = { transferId: null, payout: 0, feePct: resolveParalegalFeePct(doc), feeAmount: 0, pending: false };
-    if (amountCents > 0) {
-      transferResult = await createPartialPayoutTransfer(req, doc, payoutParalegal, amountCents);
-    }
-
-    const now = new Date();
-    doc.partialPayoutAmount = amountCents;
-    const isAdmin = req.user?.role === "admin";
-    doc.payoutFinalizedType = isAdmin ? "admin" : "partial_attorney";
-    doc.payoutFinalizedAt = now;
-    doc.disputeDeadlineAt = null;
-    doc.adminDisputeDeadlineAt = null;
-    doc.adminDisputeOverdueNotifiedAt = null;
-    doc.relistRequestedAt = doc.relistRequestedAt || now;
-    doc.relistPending = false;
-    doc.remainingAmount = Math.max(0, Math.round(remainingAmount - amountCents));
-    doc.pausedReason = "paralegal_withdrew";
-    doc.ensureLifecycleStatus("paused");
-    await ensureCaseJobOpen(doc);
-
-    if (amountCents > 0 && transferResult?.transferId) {
-      try {
-        await upsertPayoutLedger({
-          operationKey:
-            transferResult.paymentOperationKey ||
-            `partial_payout:${String(doc._id)}:${String(payoutParalegal._id || doc.withdrawnParalegalId)}`,
-          paralegalId: payoutParalegal._id || doc.withdrawnParalegalId,
-          caseId: doc._id,
-          amountPaid: transferResult.payout || 0,
-          transferId: transferResult.transferId,
-          stripeMode: pickStripeMode(doc.stripeMode, currentStripeMode()),
-        });
-        await upsertPlatformIncomeLedger({
-          operationKey:
-            transferResult.paymentOperationKey ||
-            `partial_payout:${String(doc._id)}:${String(payoutParalegal._id || doc.withdrawnParalegalId)}`,
-          caseId: doc._id,
-          attorneyId: doc.attorney?._id || doc.attorneyId || doc.attorney,
-          paralegalId: payoutParalegal._id || doc.withdrawnParalegalId,
-          feeAmount: transferResult.feeAmount || 0,
-          stripeMode: pickStripeMode(doc.stripeMode, currentStripeMode()),
-        });
-        await doc.save();
-        if (transferResult.paymentOperationId) {
-          await succeedPaymentOperation(
-            { _id: transferResult.paymentOperationId },
-            transferResult.transferId
-          );
-        }
-      } catch (err) {
-        if (transferResult.paymentOperationId) {
-          await failPaymentOperation(
-            { _id: transferResult.paymentOperationId },
-            err,
-            { needsReconciliation: true, stripeObjectId: transferResult.transferId }
-          ).catch(logPromiseFailure(logger, "[cases] withdrawal settlement operation marker failed", {
-            caseId: doc._id,
-          }));
-        }
-        doc.payoutStatus = "needs_reconciliation";
-        doc.payoutFailureReason = "Stripe transfer succeeded but the local payout ledger did not finalize.";
-        await doc.save().catch(logPromiseFailure(logger, "[cases] withdrawal reconciliation state persistence failed", {
-          caseId: doc._id,
-        }));
-        return res.status(503).json({
-          error: "The transfer was created, but payout records require reconciliation.",
-          code: "PAYOUT_RECONCILIATION_REQUIRED",
-        });
-      }
-    } else {
-      await doc.save();
-    }
-
-    try {
-      await generateWithdrawalReceipts(doc, { grossAmount: amountCents });
-    } catch (err) {
-      logger.warn("[cases] withdrawal receipt generation failed", err?.message || err);
-    }
-
-    try {
-      await logAction(req, "case.withdrawal.payout", {
-        targetType: "case",
-        targetId: doc._id,
-        caseId: doc._id,
-        meta: {
-          grossAmount: amountCents,
-          netAmount: transferResult?.payout || 0,
-          transferId: transferResult?.transferId || null,
-          pending: !!transferResult?.pending,
-        },
-      });
-    } catch (auditError) {
-      logger.error("[cases] withdrawal payout audit persistence failed", { caseId: doc._id, error: auditError });
-    }
-
-    const attorneyId = doc.attorney?._id || doc.attorneyId || null;
-    if (attorneyId) {
-      await sendCaseNotification(
-        attorneyId,
-        "case_update",
-        doc,
-        {
-          summary: "Partial payout set. Matter relisted for applicants.",
-        },
-        { actorUserId: req.user.id }
-      );
-    }
-    const withdrawnId =
-      doc.withdrawnParalegalId && typeof doc.withdrawnParalegalId === "object"
-        ? doc.withdrawnParalegalId._id
-        : doc.withdrawnParalegalId;
-    if (withdrawnId) {
-      await sendCaseNotification(
-        withdrawnId,
-        "case_update",
-        doc,
-        {
-          summary: "Partial payout finalized. Your withdrawal is complete.",
-        },
-        { actorUserId: req.user.id }
-      );
-    }
-
-    res.json({
-      ok: true,
-      payout: transferResult?.payout || 0,
-      transferId: transferResult?.transferId || null,
-      remainingAmount: doc.remainingAmount,
-      relistPending: doc.relistPending,
-    });
-  })
-);
+router.get("/:caseId/withdrawal-review", requireRole("attorney"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await attorneyWithdrawal.read(req)); } catch (error) { attorneyWithdrawal.sendError(res, error); }
+}));
+router.post("/:caseId/withdrawal-decision", requireRole("attorney"), csrfProtection, asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await attorneyWithdrawal.execute(req, withdrawalOptions(req))); } catch (error) { attorneyWithdrawal.sendError(res, error); }
+}));
+router.post("/:caseId/partial-payout", csrfProtection, requireCaseAccess("caseId"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { const value = await attorneyWithdrawal.legacy(req, "partial", withdrawalOptions(req)); res.json({ ok: value.operation?.status === "recorded", payout: value.decision?.netCents || 0, transferId: value.legacyTransferId, remainingAmount: value.remainingCents, relistPending: false, withdrawalReview: value }); } catch (error) { attorneyWithdrawal.sendError(res, error); }
+}));
 
 router.get(
   "/:caseId/applications/:applicantId/preview",
   asyncHandler(async (req, res) => {
     const caseId = String(req.params.caseId || "");
-    const applicantId = String(req.params.applicantId || "");
+    const applicantId = String(req.params.applicantId || "").toLowerCase();
     if (!isObjId(caseId) || !isObjId(applicantId)) {
       return res.status(400).json({ error: "Invalid application reference" });
     }
@@ -7658,7 +6794,7 @@ router.get(
     if (!["attorney", "paralegal"].includes(role)) {
       return res.status(404).json({ error: "Application not found" });
     }
-    const doc = await Case.findById(caseId)
+    let doc = await Case.findById(caseId)
       .select(
         "_id title attorney attorneyId applicants invites pendingParalegalId pendingParalegalInvitedAt preEngagement jobId"
       )
@@ -7666,54 +6802,31 @@ router.get(
     if (!doc) return res.status(404).json({ error: "Application not found" });
     const viewerId = String(req.user?.id || req.user?._id || "");
     const attorneyIds = [doc.attorney, doc.attorneyId]
-      .map((value) => String(value?._id || value || ""))
+      .map((value) => String(value?._id || value || "").toLowerCase())
       .filter(Boolean);
     const attorneyId = attorneyIds[0] || "";
     const isOwner = role === "attorney" && attorneyIds.includes(viewerId);
     const isSelf = role === "paralegal" && viewerId === applicantId;
     if (!isOwner && !isSelf) return res.status(404).json({ error: "Application not found" });
+    const applicationSnapshot = await legacyApplications.begin(req, [doc], { detailed: true });
+    doc = applicationSnapshot.matters[0];
     if (await isBlockedBetween(attorneyId, applicantId)) {
       return res.status(404).json({ error: "Application not found" });
     }
 
-    const embedded = (Array.isArray(doc.applicants) ? doc.applicants : []).find(
-      (entry) => String(entry?.paralegalId?._id || entry?.paralegalId || entry?.paralegal?._id || entry?.paralegal || "") === applicantId
-    );
-    const invite = (Array.isArray(doc.invites) ? doc.invites : []).find(
-      (entry) => String(entry?.paralegalId?._id || entry?.paralegalId || "") === applicantId
-    );
-    const appStatus = String(embedded?.status || "").toLowerCase();
+    const selected = applicationSnapshot.rows.get(String(doc._id).toLowerCase())?.find(row => row.personId === applicantId);
+    const application = selected?.canonical ? selected.record : null;
+    const embedded = selected && !selected.canonical ? selected.record : null;
+    const invite = (Array.isArray(doc.invites) ? doc.invites : []).find(entry => String(entry?.paralegalId || "").toLowerCase() === applicantId);
+    const appStatus = String(selected?.record.status || "").toLowerCase();
     const inviteStatus = String(invite?.status || "").toLowerCase();
-    if (isSelf && embedded && !["pending", "accepted"].includes(appStatus)) {
-      return res.status(404).json({ error: "Application not found" });
-    }
-    if (isSelf && !embedded && inviteStatus !== "pending") {
-      return res.status(404).json({ error: "Application not found" });
-    }
-    if (!embedded && !invite && String(doc.pendingParalegalId || "") !== applicantId) {
-      return res.status(404).json({ error: "Application not found" });
-    }
-
-    const [application, candidate] = await Promise.all([
-      doc.jobId
-        ? Application.findOne({ jobId: doc.jobId, paralegalId: applicantId, status: { $ne: "withdrawn" } })
-            .select("_id coverLetter status createdAt profileSnapshot")
-            .lean()
-        : Promise.resolve(null),
-      User.findOne({
-        _id: applicantId,
-        role: "paralegal",
-        disabled: { $ne: true },
-        deleted: { $ne: true },
-      })
-        .select(
-          "_id firstName lastName bio about practiceAreas specialties skills experience yearsExperience location state status"
-        )
-        .lean(),
-    ]);
+    if (selected?.blocked || appStatus === "withdrawn" || isSelf && selected && !["pending", "submitted", "viewed", "shortlisted", "accepted"].includes(appStatus)) return res.status(404).json({ error: "Application not found" });
+    if (isSelf && !selected && inviteStatus !== "pending") return res.status(404).json({ error: "Application not found" });
+    if (!selected && !invite && String(doc.pendingParalegalId || "").toLowerCase() !== applicantId) return res.status(404).json({ error: "Application not found" });
+    const candidate = applicationSnapshot.people.find(person => String(person._id).toLowerCase() === applicantId && person.role === "paralegal" && person.status === "approved" && !person.disabled && !person.deleted);
     if (!candidate) return res.status(404).json({ error: "Application not found" });
     const preEngagement =
-      doc.preEngagement && String(doc.preEngagement.requestedParalegalId || "") === applicantId
+      doc.preEngagement && String(doc.preEngagement.requestedParalegalId || "").toLowerCase() === applicantId
         ? {
             status: String(doc.preEngagement.status || "requested").toLowerCase(),
             requestedAt: doc.preEngagement.requestedAt || null,
@@ -7724,10 +6837,11 @@ router.get(
     const name = `${candidate.firstName || ""} ${candidate.lastName || ""}`.trim() || "Paralegal candidate";
     const submittedAt = application?.createdAt || embedded?.appliedAt || invite?.invitedAt || doc.pendingParalegalInvitedAt || null;
     const status = String(application?.status || embedded?.status || invite?.status || "pending").toLowerCase();
+    await applicationSnapshot.verify();
     res.set("Cache-Control", "no-store");
     return res.json({
       application: {
-        id: application?._id ? String(application._id) : null,
+        id: application?._id ? String(application._id).toLowerCase() : null,
         candidateId: applicantId,
         candidateName: name,
         matterTitle: doc.title || "Matter",
@@ -7764,11 +6878,11 @@ router.get(
     if (!req.acl?.isAttorney && req.user.role !== "admin") {
       return res.status(403).json({ error: "Only attorneys can view notes" });
     }
-    const doc = await Case.findById(req.case.id)
-      .select("internalNotes")
-      .populate("internalNotes.updatedBy", "firstName lastName email role avatarURL");
+    const doc = await Case.collection.findOne({ _id: new mongoose.Types.ObjectId(req.case.id) });
     if (!doc) return res.status(404).json({ error: "Matter not found" });
-    return res.json(shapeInternalNote(doc.internalNotes));
+    if (req.user.role !== "admin" && ![doc.attorney, doc.attorneyId].some((id) => String(id) === String(req.user.id))) return res.status(403).json({ error: "Matter access changed." });
+    res.set("Cache-Control", "no-store");
+    return res.json(matterNotes.shapeNote(doc));
   })
 );
 
@@ -7781,17 +6895,30 @@ router.put(
     if (!req.acl?.isAttorney && req.user.role !== "admin") {
       return res.status(403).json({ error: "Only attorneys can update notes" });
     }
-    const doc = await Case.findById(req.case.id).select("internalNotes");
+    if (req.body?.expectedOwnerId !== String(req.user.id)) {
+      return res.status(403).json({ error: "Verify your account before saving.", code: "NOTE_ACCOUNT_CHANGED" });
+    }
+    const text = matterNotes.normalizeNote(req.body?.note);
+    if (text === null) return res.status(400).json({ error: "Provide a note of at most 10,000 characters.", code: "NOTE_INVALID" });
+    if (typeof req.body?.revision !== "string" || !/^[a-f0-9]{64}$/.test(req.body.revision)) {
+      return res.status(428).json({ error: "Reload notes before saving.", code: "NOTE_REVISION_REQUIRED" });
+    }
+    const doc = await Case.collection.findOne({ _id: new mongoose.Types.ObjectId(req.case.id) });
     if (!doc) return res.status(404).json({ error: "Matter not found" });
-    const text = cleanMessage(req.body?.note || "", 10_000);
-    doc.internalNotes = {
-      text,
-      updatedBy: req.user.id,
-      updatedAt: new Date(),
-    };
-    await doc.save();
-    await doc.populate("internalNotes.updatedBy", "firstName lastName email role avatarURL");
-    return res.json(shapeInternalNote(doc.internalNotes));
+    // ACL was read separately: protect a changed owner before using the raw snapshot.
+    if (req.user.role !== "admin" && ![doc.attorney, doc.attorneyId].some((id) => String(id) === String(req.user.id))) {
+      return res.status(403).json({ error: "Matter access changed." });
+    }
+    if (matterNotes.revisionFor(doc) !== req.body.revision) {
+      return res.status(409).json({ error: "Notes changed. Review the saved version.", code: "NOTE_CONFLICT" });
+    }
+    const original = doc.internalNotes;
+    const next = { ...(original && typeof original === "object" ? original : {}), text, updatedBy: new mongoose.Types.ObjectId(req.user.id), updatedAt: new Date() };
+    // Notes have their own timestamp. A note save is not an edit of the public posting.
+    const result = await Case.collection.updateOne({ _id: doc._id, ...matterNotes.ownerFilter(doc), internalNotes: matterNotes.exact(original) }, { $set: { internalNotes: next } });
+    if (!result.matchedCount) return res.status(409).json({ error: "Notes changed. Review the saved version.", code: "NOTE_CONFLICT" });
+    res.set("Cache-Control", "no-store");
+    return res.json(matterNotes.shapeNote({ ...doc, internalNotes: next }));
   })
 );
 
@@ -7815,9 +6942,20 @@ router.get(
       "status paralegal attorney applicants archived withdrawnParalegalId paralegalNameSnapshot pausedReason disputeDeadlineAt payoutFinalizedAt relistRequestedAt preEngagement",
   }),
   asyncHandler(async (req, res) => {
-    const doc = await Case.findById(req.params.caseId)
+    const workspaceBoundary = require("../services/attorneyWorkspaceBoundary");
+    const matterFinancials = require("../services/matterFinancials");
+    let workspaceSnapshot;
+    try {
+      if (req.user.role === "paralegal") {
+        await matterFinancials.actor(req);
+        if (Object.keys(req.query).some(key => key !== "expectedOwnerId")) return res.status(400).json({ error: "Invalid Matter query." });
+        workspaceSnapshot = null;
+        res.set("Cache-Control", "private, no-store");
+      } else workspaceSnapshot = await workspaceBoundary.begin(req, res);
+    } catch (error) { return workspaceBoundary.sendError(res, error); }
+    const readMatter = () => Case.findById(req.params.caseId)
       .select(
-        "title status practiceArea details state locationState deadline deadlineDate zoomLink paymentReleased paidOutAt escrowIntentId escrowStatus totalAmount lockedTotalAmount amountLockedAt remainingAmount currency feeAttorneyAmount feeParalegalAmount feeAttorneyPct feeParalegalPct files attorney attorneyId paralegal paralegalId applicants invites pendingParalegalId pendingParalegalInvitedAt hiredAt completedAt createdAt updatedAt briefSummary archived downloadUrl terminationReason terminationStatus terminationRequestedAt terminationRequestedBy terminationDisputeId terminatedAt paralegalAccessRevokedAt archiveReadyAt archiveDownloadedAt purgeScheduledFor readOnly jobId job tasks tasksLocked pausedReason pausedAt disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType withdrawnParalegalId paralegalNameSnapshot relistRequestedAt relistPending disputes disputeSettlement moderationStatus moderationFlaggedAt moderationFlaggedBy moderationResolutionRequestedAt moderationResolutionRequestedBy preEngagement"
+        "title status practiceArea details state locationState deadline deadlineDate zoomLink paymentReleased paidOutAt escrowIntentId escrowStatus totalAmount lockedTotalAmount amountLockedAt remainingAmount currency feeAttorneyAmount feeParalegalAmount feeAttorneyPct feeParalegalPct files attorney attorneyId paralegal paralegalId applicants invites pendingParalegalId pendingParalegalInvitedAt hiredAt completedAt createdAt updatedAt briefSummary archived downloadUrl terminationReason terminationStatus terminationRequestedAt terminationRequestedBy terminationDisputeId terminatedAt paralegalAccessRevokedAt archiveReadyAt archiveDownloadedAt purgeScheduledFor readOnly jobId job tasks taskRevision tasksLocked pausedReason pausedAt disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType completionClaimStatus withdrawnParalegalId paralegalNameSnapshot relistRequestedAt relistPending disputes disputeSettlement moderationStatus moderationFlaggedAt moderationFlaggedBy moderationResolutionRequestedAt moderationResolutionRequestedBy preEngagement"
       )
       .populate("paralegal", "firstName lastName email role")
       .populate("attorney", "firstName lastName email role")
@@ -7825,121 +6963,25 @@ router.get(
       .populate("withdrawnParalegalId", "firstName lastName email role")
       .populate("applicants.paralegalId", "firstName lastName email role")
       .populate("terminationRequestedBy", "firstName lastName email role");
+    let doc = await readMatter();
     if (!doc) return res.status(404).json({ error: "Matter not found" });
     const role = String(req.user?.role || "").toLowerCase();
     const isAdmin = role === "admin";
-    const canSeeStars = role === "attorney" || isAdmin;
     try {
       const expired = await finalizeExpiredDisputeWindow(doc);
-      if (expired) {
-        await doc.save();
-      }
+      if (expired) doc = await readMatter();
     } catch (err) {
       logger.warn("[cases] dispute window finalize failed", err?.message || err);
     }
+    if (!doc) return res.status(404).json({ error: "Matter not found" });
     const statusKey = String(doc.status || "").toLowerCase();
     if (role === "paralegal" && (statusKey === "completed" || doc.paymentReleased === true)) {
-      return res.status(403).json({ error: "Completed Matters are no longer accessible." });
+      return res.status(403).json({ code: "MATTER_COMPLETED", error: "Completed Matters are no longer accessible." });
     }
 
-    let applicants = Array.isArray(doc.applicants)
-      ? doc.applicants.map((entry) => {
-          const paralegalDoc =
-            entry.paralegalId && typeof entry.paralegalId === "object" ? entry.paralegalId : null;
-          const coverLetter = entry.note || "";
-          const baseSnapshot = shapeParalegalSnapshot(paralegalDoc || {});
-          const storedSnapshot =
-            entry.profileSnapshot && typeof entry.profileSnapshot === "object"
-              ? entry.profileSnapshot
-              : {};
-          const profileSnapshot = {
-            ...baseSnapshot,
-            ...storedSnapshot,
-            profileImage: baseSnapshot.profileImage || "",
-          };
-          const resumeURL = entry.resumeURL || paralegalDoc?.resumeURL || "";
-          const linkedInURL = entry.linkedInURL || paralegalDoc?.linkedInURL || "";
-          const starred =
-            canSeeStars &&
-            Array.isArray(entry.starredBy) &&
-            entry.starredBy.some((id) => String(id) === String(req.user.id));
-          return {
-            status: entry.status,
-            appliedAt: entry.appliedAt,
-            note: coverLetter,
-            coverLetter,
-            resumeURL,
-            linkedInURL,
-            profileSnapshot,
-            applicationId: null,
-            starred,
-            paralegalId: entry.paralegalId ? String(entry.paralegalId._id || entry.paralegalId) : null,
-            paralegal: summarizeUser(entry.paralegalId),
-          };
-        })
-      : [];
+    const applicationSnapshot = await legacyApplications.begin(req, [doc], { detailed: true });
+    const applicants = legacyApplications.present(applicationSnapshot, doc._id, req.user, {});
 
-    const jobId = doc.jobId || doc.job || null;
-    if (jobId) {
-      const jobApps = await Application.find({ jobId })
-        .populate("paralegalId", "firstName lastName email role profileImage avatarURL")
-        .lean();
-      if (jobApps.length) {
-        const mapped = jobApps
-          .map((app) => {
-            const paralegalDoc = app.paralegalId && typeof app.paralegalId === "object" ? app.paralegalId : null;
-            const paralegalId = paralegalDoc?._id || app.paralegalId || null;
-            const starred =
-              canSeeStars &&
-              Array.isArray(app.starredBy) &&
-              app.starredBy.some((id) => String(id) === String(req.user.id));
-            return {
-              status: app.status || "submitted",
-              appliedAt: app.createdAt,
-              note: app.coverLetter || "",
-              coverLetter: app.coverLetter || "",
-              resumeURL: app.resumeURL || "",
-              linkedInURL: app.linkedInURL || "",
-              profileSnapshot: {
-                ...(app.profileSnapshot || {}),
-                ...shapeParalegalSnapshot(paralegalDoc || {}),
-              },
-              applicationId: app._id ? String(app._id) : null,
-              starred,
-              paralegalId: paralegalId ? String(paralegalId) : null,
-              paralegal: summarizeUser(paralegalDoc),
-            };
-          });
-        const canonicalByParalegal = new Map();
-        applicants.forEach((entry, index) => {
-          const key = entry.paralegalId ? `paralegal:${String(entry.paralegalId)}` : `legacy:${index}`;
-          canonicalByParalegal.set(key, entry);
-        });
-        mapped.forEach((entry, index) => {
-          const key = entry.paralegalId
-            ? `paralegal:${String(entry.paralegalId)}`
-            : `application:${entry.applicationId || index}`;
-          if (String(entry.status || "").toLowerCase() === "withdrawn") {
-            canonicalByParalegal.delete(key);
-          } else {
-            canonicalByParalegal.set(key, entry);
-          }
-        });
-        applicants = [...canonicalByParalegal.values()];
-      }
-    }
-
-    if (String(req.user?.role || "").toLowerCase() === "attorney") {
-      const blockedIds = await getBlockedUserIds(req.user.id);
-      if (blockedIds.length) {
-        const blockedSet = new Set(blockedIds.map((id) => String(id)));
-        applicants = applicants.filter((entry) => !blockedSet.has(String(entry.paralegalId || "")));
-      }
-    }
-    if (role === "paralegal") {
-      const viewerId = String(req.user?.id || req.user?._id || "");
-      applicants = applicants.filter((entry) => String(entry.paralegalId || "") === viewerId);
-    }
     const blockStatus = await getCaseInteractionBlockStatus(doc, req.user);
     const workspaceParticipant = !!req.acl?.isAttorney || !!req.acl?.isParalegal;
     const matterAttorneyId = normalizeId(doc.attorneyId || doc.attorney);
@@ -7951,6 +6993,9 @@ router.get(
     if ((blockStatus.blocked || applicantPairBlocked) && !workspaceParticipant && !req.acl?.isAdmin) {
       return res.status(404).json({ error: "Matter not found" });
     }
+    const storedWork = workspaceParticipant ? await Case.collection.findOne({ _id: doc._id }, { projection: { tasks: 1, taskRevision: 1 } }) : null;
+    if (workspaceParticipant && !storedWork) return res.status(404).json({ error: "Matter not found" });
+    const visibleTasks = workspaceParticipant ? serializeScopeTasks(storedWork.tasks) : [];
     const requestedPreEngagementId = doc.preEngagement?.requestedParalegalId
       ? String(doc.preEngagement.requestedParalegalId)
       : "";
@@ -7959,11 +7004,38 @@ router.get(
     const completionPolicy = req.acl?.isAttorney
       ? evaluateCompletionEligibility({ caseDoc: doc, ownerAuthorized: true })
       : null;
-    const matterExperience = buildMatterExperience(doc, {
+    const withdrawalPolicy = req.acl?.isParalegal
+      ? evaluateWithdrawalEligibility({
+          user: { ...req.user, _id: req.user.id, role: "paralegal" },
+          caseDoc: doc,
+        })
+      : null;
+    const currentFiles = projectRevisionResolutions(workspaceParticipant && !isAdmin
+      ? await CaseFile.find(applyAssignmentVisibility({ caseId: doc._id }, doc, {
+          role, userId: req.user.id, isParalegal: req.acl?.isParalegal === true,
+        })).sort({ createdAt: -1 }).lean()
+      : []);
+    const submissions = currentFiles.filter((file) => file.uploadedByRole === "paralegal");
+    const submissionSummary = workspaceParticipant && !isAdmin ? {
+      totalFiles: currentFiles.length,
+      awaitingReview: submissions.filter((file) => file.status === "pending_review").length,
+      revisions: submissions.filter((file) => file.status === "attorney_revision" && !file.revisionResolution).length,
+      approved: submissions.filter((file) => file.status === "approved").length,
+    } : null;
+    let financialView = null;
+    try {
+      if (workspaceParticipant && !isAdmin) {
+        res.set("Cache-Control", "private, no-store");
+        financialView = await matterFinancials.read(req, doc);
+      }
+    } catch (error) { return workspaceBoundary.sendError(res, error); }
+    const matterExperience = buildMatterExperience({ ...doc.toObject(), tasks: workspaceParticipant ? visibleTasks : doc.tasks, files: currentFiles }, {
       viewer: req.user,
       acl: req.acl,
       applicants,
-      policies: { completion: completionPolicy },
+      pendingApplicationCount: role === "attorney" ? applicationSnapshot.counts.get(String(doc._id).toLowerCase()) : undefined,
+      policies: { completion: completionPolicy, withdrawal: withdrawalPolicy },
+      financials: financialView?.value || null,
     });
     const legacyMatterContext = presentMatterContext(doc, req.user);
     const matterContext = workspaceParticipant || isAdmin
@@ -7987,6 +7059,13 @@ router.get(
         }
       : doc.attorney || null;
 
+    try {
+      await workspaceBoundary.finish(req, workspaceSnapshot);
+      await applicationSnapshot.verify();
+      if (financialView) await financialView.verify();
+      else if (role === "paralegal") await matterFinancials.actor(req);
+    }
+    catch (error) { return workspaceBoundary.sendError(res, error); }
     res.json({
       id: String(doc._id),
       _id: doc._id,
@@ -8017,10 +7096,17 @@ router.get(
       hiredAt: workspaceParticipant ? doc.hiredAt || null : null,
       completedAt: workspaceParticipant ? doc.completedAt || null : null,
       briefSummary: doc.briefSummary || "",
-      tasks: workspaceParticipant ? serializeScopeTasks(doc.tasks) : [],
+      tasks: visibleTasks,
+      taskRevision: workspaceParticipant ? Number(storedWork.taskRevision || 0) : null,
       tasksLocked: workspaceParticipant ? !!doc.tasksLocked : false,
       archived: !!doc.archived,
-      downloadUrl: isAdmin || !workspaceParticipant ? [] : Array.isArray(doc.downloadUrl) ? doc.downloadUrl : [],
+      downloadUrl: isAdmin || !workspaceParticipant || resolveCurrentParalegalAssignmentBoundary(doc, {
+        role,
+        userId: req.user?.id,
+        isParalegal: req.acl?.isParalegal === true,
+      })
+        ? []
+        : Array.isArray(doc.downloadUrl) ? doc.downloadUrl : [],
       readOnly: !!doc.readOnly,
       paralegalAccessRevokedAt: workspaceParticipant ? doc.paralegalAccessRevokedAt || null : null,
       archiveReadyAt: workspaceParticipant ? doc.archiveReadyAt || null : null,
@@ -8032,13 +7118,9 @@ router.get(
           ? summarizeUser(doc.paralegal) || (doc.paralegal ? { id: String(doc.paralegal) } : null)
           : null,
       paralegalNameSnapshot: workspaceParticipant ? doc.paralegalNameSnapshot || "" : "",
-      files: isAdmin || !workspaceParticipant
-        ? []
-        : Array.isArray(doc.files)
-          ? doc.files
-              .map(normalizeFile)
-              .map(({ key: _key, storageKey: _storageKey, previewKey: _previewKey, ...safeFile }) => safeFile)
-          : [],
+      files: currentFiles.map(normalizeFile)
+        .map(({ key: _key, storageKey: _storageKey, previewKey: _previewKey, ...safeFile }) => safeFile),
+      submissionSummary,
       applicants,
       blockStatus: workspaceParticipant || req.acl?.isAdmin
         ? blockStatus
@@ -8083,84 +7165,56 @@ router.get(
   })
 );
 
-router.get(
-  "/:caseId/archive/download",
-  requireCaseAccess("caseId"),
-  asyncHandler(async (req, res) => {
-    if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
-      return res.status(403).json({ error: "Only the attorney can download the archive." });
-    }
-    const doc = await Case.findById(req.params.caseId)
-      .select(
-        "archiveZipKey title practiceArea status deadline deadlineDate createdAt updatedAt completedAt lockedTotalAmount totalAmount currency paymentReleased briefSummary zoomLink archived readOnly files attorney attorneyId paralegal paralegalId attorneyNameSnapshot paralegalNameSnapshot"
-      )
-      .populate("attorney", "firstName lastName email role")
-      .populate("paralegal", "firstName lastName email role")
-      .lean();
-    if (!doc) {
-      return res.status(404).json({ error: "Archive not available" });
-    }
-    const archiveLifecyclePolicy = evaluateArchiveReadiness({ caseDoc: doc, storageChecked: false });
-    if (!archiveLifecyclePolicy.applicable) {
-      return res.status(400).json({ error: "Archive downloads are available after completion or archival." });
-    }
-    let archiveKey = doc.archiveZipKey || "";
-    let generatedOnDemand = false;
-    if (!archiveKey || !String(archiveKey).includes("archive-v2.zip")) {
-      try {
-        const regen = await generateArchiveZip(doc);
-        archiveKey = regen.key;
-        generatedOnDemand = true;
-      } catch (err) {
-        logger.error("[cases] archive regenerate error", err);
-        return res.status(500).json({ error: "Archive not ready" });
-      }
-    }
-    if (!archiveKey) {
-      return res.status(404).json({ error: "Archive not found" });
-    }
-    if (!S3_BUCKET) {
-      return res.status(500).json({ error: "Storage misconfigured" });
-    }
-    const key = String(archiveKey).replace(/^\/+/, "");
-    let stream;
-    try {
-      const cmd = new GetObjectCommand({ Bucket: S3_BUCKET, Key: key });
-      stream = await s3.send(cmd);
-    } catch (err) {
-      logger.error("[cases] archive fetch error", err);
-      return res.status(404).json({ error: "Archive not found" });
-    }
-    const archivePolicy = evaluateArchiveReadiness({
-      caseDoc: { ...doc, archiveZipKey: archiveKey },
-      storageChecked: true,
-      storageObjectExists: true,
-    });
-    if (!archivePolicy.ready) {
-      return res.status(409).json({ error: "Archive is not available.", blockers: archivePolicy.blockers });
-    }
+const applicationResumeOperation = download => async (req, res) => {
+  const controller = new AbortController(); req.resumeSignal = controller.signal;
+  const cancel = () => controller.abort(); res.once("close", cancel);
+  const resumes = require("../services/applicationResumes");
+  try {
+    const result = await resumes.read(req, download);
+    if (controller.signal.aborted || res.destroyed) return;
+    if (!download) return res.json(result);
+    res.set("Content-Type", "application/pdf"); res.set("X-Content-Type-Options", "nosniff");
+    res.set("Content-Disposition", 'attachment; filename="Application resume.pdf"');
+    return res.send(result.buffer);
+  } catch (error) {
+    if (controller.signal.aborted || res.destroyed) return;
+    const result = resumes.errorResponse(error); return res.status(result.status).json(result.body);
+  } finally { res.removeListener("close", cancel); }
+};
+const applicationResumeNoStore = (_req, res, next) => { res.set("Cache-Control", "private, no-store"); next(); };
+router.get("/:caseId/application-review/:applicantId/resume", applicationResumeNoStore, requireCaseAccess("caseId"), applicationResumeOperation(false));
+router.get("/:caseId/application-review/:applicantId/resume/download", applicationResumeNoStore, requireCaseAccess("caseId"), applicationResumeOperation(true));
 
-    res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="${safeArchiveName(doc.title)}.zip"`);
-
-    stream.Body.on("error", (err) => {
-      logger.error("[cases] archive stream error", err);
-      res.destroy(err);
-    });
-
-    if (generatedOnDemand) {
-      stream.Body.on("end", async () => {
-        try {
-          await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: key }));
-        } catch (err) {
-          logger.warn("[cases] archive delete error", err?.message || err);
-        }
-      });
-    }
-
-    stream.Body.pipe(res);
-  })
-);
+const exportNoStore = (_req, res, next) => { res.set("Cache-Control", "private, no-store"); next(); };
+const exportOperation = download => async (req, res) => {
+  const controller = new AbortController(); req.exportSignal = controller.signal;
+  const cancel = () => controller.abort(); res.once("close", cancel);
+  let artifact, stream;
+  try {
+    if (!download) return res.json((await matterExports.snapshot(req)).value);
+    artifact = await matterExports.prepare(req);
+    if (controller.signal.aborted || res.destroyed) return;
+    res.set("Content-Type", "application/zip"); res.set("Content-Length", String(artifact.size)); res.set("X-Content-Type-Options", "nosniff");
+    res.set("Content-Disposition", `attachment; filename="matter-archive.zip"; filename*=UTF-8''${encodeURIComponent(artifact.value.filename.toWellFormed()).replace(/'/g, "%27")}`);
+    stream = createExportReadStream(artifact.path);
+    await exportPipeline(stream, res, { signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted || res.destroyed) return;
+    if (res.headersSent) { res.destroy(error); return; }
+    const missing = ["NoSuchKey", "NotFound"].includes(error.name) || error.$metadata?.httpStatusCode === 404;
+    const changed = error.name === "PreconditionFailed" || error.$metadata?.httpStatusCode === 412;
+    const security = ({ FILE_SCAN_PENDING: "EXPORT_SCAN_PENDING", FILE_SECURITY_BLOCKED: "EXPORT_BLOCKED", FILE_SCAN_ERROR: "EXPORT_SCAN_ERROR" })[error.code];
+    const code = error.publicCode || security || (missing ? "EXPORT_SOURCE_MISSING" : changed ? "EXPORT_SOURCE_CHANGED" : "EXPORT_UNAVAILABLE");
+    const status = error.status || error.statusCode || (missing ? 404 : changed ? 409 : 503);
+    if (status >= 500) logger.error("[cases] Matter archive unavailable", { caseId: req.params.caseId, error });
+    return res.status(status).json({ code, error: "The Matter archive could not be prepared. Refresh its details before trying again." });
+  } finally {
+    res.removeListener("close", cancel); stream?.destroy();
+    if (artifact) await artifact.cleanup().catch(error => logger.error("[cases] temporary archive cleanup failed", { error }));
+  }
+};
+router.get("/:caseId/archive/export", exportNoStore, requireCaseAccess("caseId"), exportOperation(false));
+router.get("/:caseId/archive/download", exportNoStore, requireCaseAccess("caseId"), exportOperation(true));
 
 // ----------------------------------------
 // Route-level error fallback
@@ -8169,8 +7223,10 @@ router.use((err, _req, res, _next) => {
   if (respondToCsrfError(err, res)) return;
   const status = Number.isInteger(err?.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
   if (status >= 500) logger.error("[cases] route error:", err);
+  const noticeUnavailable = ["INVITATION_RESPONSE_NOTICE_UNAVAILABLE", "PRE_ENGAGEMENT_NOTICE_UNAVAILABLE", "POSTING_NOTICE_UNAVAILABLE"].includes(err?.publicCode);
   res.status(status).json({
-    error: status < 500 ? err.message : "Server error",
+    error: status < 500 || noticeUnavailable ? err.message : "Server error",
+    ...(noticeUnavailable || err?.publicCode === "TASK_UPDATE_CONFLICT" ? { code: err.publicCode } : {}),
     ...(Array.isArray(err?.blockers) ? { blockers: err.blockers } : {}),
   });
 });

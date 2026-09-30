@@ -1,6 +1,6 @@
 /* Shared crop-dialog structure used before role hydration and by paralegal settings. */
 .photo-crop-card .photo-crop-subtitle {
-  color: #5f6877 !important;
+  color: var(--clean-muted, #5f6877) !important;
 }
 
 .photo-crop-footer {
@@ -344,7 +344,7 @@ body.attorney-classic .settings-destination-copy strong {
 }
 
 body.attorney-classic .settings-destination-copy > span {
-  color: #5f6877;
+  color: var(--clean-muted, #5f6877);
   font-size: 0.8rem;
   line-height: 1.42;
 }
@@ -421,7 +421,7 @@ body.attorney-classic .attorney-section-page-header h2 {
 body.attorney-classic .attorney-panel-header p,
 body.attorney-classic .attorney-section-page-header p {
   margin: 5px 0 0;
-  color: #5f6877;
+  color: var(--clean-muted, #5f6877);
   font-size: 0.8rem;
   line-height: 1.45;
 }
@@ -477,7 +477,7 @@ body.attorney-classic .attorney-photo-label {
 
 body.attorney-classic .attorney-photo-copy > p {
   margin: 0 0 8px;
-  color: #5f6877;
+  color: var(--clean-muted, #5f6877);
   font-size: 0.76rem;
 }
 
@@ -598,7 +598,7 @@ body.attorney-classic .field-error {
 
 body.attorney-classic .field-help,
 body.attorney-classic .field-count {
-  color: #5f6877;
+  color: var(--clean-muted, #5f6877);
 }
 
 body.attorney-classic .field-count {
@@ -649,6 +649,15 @@ body.attorney-classic #attorneyNotificationToggles .toggle-row:last-child {
   border-bottom: 1px solid var(--line);
 }
 
+/* Deep links land below the fixed member header, including focused fields. */
+body.attorney-classic #settingsContent [id] {
+  scroll-margin-block-start: 84px;
+}
+
+body.attorney-classic #settingsContent :is(input, select, textarea)[id] {
+  scroll-margin-block-start: 120px;
+}
+
 body.attorney-classic .pref-title {
   color: var(--ink);
   font-size: 0.84rem;
@@ -657,7 +666,7 @@ body.attorney-classic .pref-title {
 
 body.attorney-classic .pref-desc {
   margin-top: 3px;
-  color: #5f6877;
+  color: var(--clean-muted, #5f6877);
   font-size: 0.74rem;
 }
 
@@ -702,7 +711,7 @@ body.attorney-classic .attorney-save-status {
 }
 
 body.attorney-classic .attorney-save-status[data-state="success"] {
-  color: #166534;
+  color: var(--clean-success, #166534);
 }
 
 body.attorney-classic :where(button, a, input, textarea, select, [role="button"]):focus-visible {
@@ -771,7 +780,7 @@ body.attorney-classic #securitySection .settings-block h3 {
 body.attorney-classic #securitySection .settings-block > .muted,
 body.attorney-classic #securitySection .settings-block > .security-card-title + p {
   max-width: 720px;
-  color: #5f6877;
+  color: var(--clean-muted, #5f6877);
   font-size: 0.8rem;
 }
 
@@ -885,7 +894,7 @@ body.attorney-classic #securitySection :where(
   .blocked-users-summary-meta,
   .blocked-users-summary-caret
 ) {
-  color: #5f6877;
+  color: var(--clean-muted, #5f6877);
 }
 
 body.attorney-classic #securitySection .security-extras {
@@ -926,7 +935,7 @@ body.attorney-classic #preferencesSection .pref-row-copy > label {
 
 body.attorney-classic #preferencesSection .pref-row-copy > p {
   margin: 0;
-  color: #5f6877;
+  color: var(--clean-muted, #5f6877);
   font-size: 0.74rem;
   line-height: 1.45;
 }

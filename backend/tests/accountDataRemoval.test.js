@@ -5,6 +5,7 @@ const Case = require("../models/Case");
 const PlatformIncome = require("../models/PlatformIncome");
 const StorageDeletionTask = require("../models/StorageDeletionTask");
 const User = require("../models/User");
+const SupportMutation = require("../models/SupportMutation");
 const {
   finalizeAccountDataRemoval,
   getDurableAccountRecordSummary,
@@ -47,6 +48,15 @@ afterAll(async () => {
 beforeEach(clearDatabase);
 
 describe("account personal-data removal", () => {
+  test("removes private Assistant receipts and captured retry input with their owner", async () => {
+    const owner = await createUser(), other = await createUser();
+    for (const user of [owner, other]) await SupportMutation.create({ ownerId: user._id, conversationId: new mongoose.Types.ObjectId(), role: user.role,
+      requestId: require('node:crypto').randomUUID(), action: 'send', fingerprint: 'synthetic', input: { text: 'Private saved question', sourcePage: '', pageContext: {} },
+      state: 'retryable', active: true, prepared: { assistantReply: { text: 'Private draft reply' } } });
+    await finalizeAccountDataRemoval(owner._id);
+    expect(await SupportMutation.countDocuments({ ownerId: owner._id })).toBe(0);
+    expect(await SupportMutation.countDocuments({ ownerId: other._id })).toBe(1);
+  });
   test("minimizes direct identifiers but preserves matter and financial ledgers", async () => {
     const attorney = await createUser({
       firstName: "Avery",

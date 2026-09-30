@@ -81,8 +81,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const newPassword = document.getElementById("newPassword")?.value || "";
     const confirmPassword = document.getElementById("confirmPassword")?.value || "";
 
-    if (newPassword.length < 15 || newPassword.length > 128) {
-      setMessage("Use a password between 15 and 128 characters.", "error");
+    if (newPassword.length < 8 || newPassword.length > 128) {
+      setMessage("Use a password between 8 and 128 characters.", "error");
       return;
     }
 

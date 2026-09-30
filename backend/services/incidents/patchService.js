@@ -32,6 +32,7 @@ const PREFERENCES_REGRESSION_MARKER = "LPC-INCIDENT-TEST: intentional preference
 const PREFERENCES_REGRESSION_BLOCK = `      // ${PREFERENCES_REGRESSION_MARKER}\n      showToast("Unable to save preferences.", "err");\n      return;\n`;
 const PREFERENCES_INSECURE_REQUEST = `      const res = await fetch("/api/account/preferences", {\n        method: "POST",\n        headers: { "Content-Type": "application/json" },\n        credentials: "include",\n        body: JSON.stringify(payload)\n      });\n`;
 const PREFERENCES_SECURE_REQUEST = `      const res = await secureFetch("/api/account/preferences", {\n        method: "POST",\n        body: payload,\n      });\n`;
+const PREFERENCES_AUTOSAVE_MARKER = "const queueAccountPreferenceWrite";
 
 function compactLowerText(value, maxLength = 2000) {
   return compactText(value, maxLength).toLowerCase();
@@ -77,7 +78,7 @@ const PATCH_RECIPES = Object.freeze([
       if (repaired.includes(PREFERENCES_INSECURE_REQUEST)) {
         repaired = repaired.replace(PREFERENCES_INSECURE_REQUEST, PREFERENCES_SECURE_REQUEST);
       }
-      if (!repaired.includes(PREFERENCES_SECURE_REQUEST)) {
+      if (!repaired.includes(PREFERENCES_SECURE_REQUEST) && !repaired.includes(PREFERENCES_AUTOSAVE_MARKER)) {
         throw new Error("The preferences save request could not be repaired safely in the isolated worktree.");
       }
       if (repaired !== source) fs.writeFileSync(target, repaired, "utf8");
@@ -114,7 +115,7 @@ const PATCH_RECIPES = Object.freeze([
         throw new Error("Notification styles stub was not found in the worktree.");
       }
 
-      const replacement = `function ensureNotificationStyles() {\n  if (document.getElementById(NOTIFICATION_STYLE_ID)) return;\n  const style = document.createElement("style");\n  style.id = NOTIFICATION_STYLE_ID;\n  style.textContent = \`\n  .notif-fade-ready{opacity:0;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease}\n  .notif-fade-in{opacity:1;transform:translateY(0)}\n  \`;\n  document.head.appendChild(style);\n}\n`;
+      const replacement = `function ensureNotificationStyles() {\n  const NOTIFICATION_STYLE_ID = "lpc-notification-fade-styles";\n  if (document.getElementById(NOTIFICATION_STYLE_ID)) return;\n  const style = document.createElement("style");\n  style.id = NOTIFICATION_STYLE_ID;\n  style.textContent = \`\n  .notif-fade-ready{opacity:0;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease}\n  .notif-fade-in{opacity:1;transform:translateY(0)}\n  \`;\n  document.head.appendChild(style);\n}\n`;
 
       fs.writeFileSync(target, source.replace(needle, replacement), "utf8");
 

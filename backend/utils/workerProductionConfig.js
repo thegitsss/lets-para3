@@ -99,7 +99,47 @@ function assertOpsMonitorConfiguration(env = process.env) {
   }
 }
 
+function assertAdminCommunicationsConfiguration(env = process.env) {
+  if (env.NODE_ENV !== "production") return;
+  const scope = "admin communications worker";
+  assertRenderReleaseIdentity(env, scope);
+  assertMongo(env, scope);
+  assertEncryption(env, scope);
+  assertEmail(env, scope);
+  requireNames(env, [
+    "APP_BASE_URL", "ADMIN_ALERT_EMAIL", "SUPPORT_ZOHO_MAILBOX",
+    "SUPPORT_ZOHO_ACCOUNT_ID", "SUPPORT_ZOHO_INBOX_FOLDER_ID",
+    "SUPPORT_ZOHO_CLIENT_ID", "SUPPORT_ZOHO_CLIENT_SECRET", "SUPPORT_ZOHO_REFRESH_TOKEN",
+  ], scope);
+  for (const name of ["ADMIN_ALERT_EMAIL", "SUPPORT_ZOHO_MAILBOX", "SMTP_FROM_EMAIL"]) {
+    if (!/^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$/.test(present(env, name))) {
+      throw new Error(`[config] ${scope} requires one valid ${name} address.`);
+    }
+  }
+  for (const name of ["SUPPORT_ZOHO_ACCOUNT_ID", "SUPPORT_ZOHO_INBOX_FOLDER_ID"]) {
+    if (!/^\d+$/.test(present(env, name))) throw new Error(`[config] ${scope} requires a numeric ${name}.`);
+  }
+  for (const [name, fallback] of [
+    ["APP_BASE_URL", ""],
+    ["SUPPORT_ZOHO_API_BASE_URL", "https://mail.zoho.com/api"],
+    ["SUPPORT_ZOHO_ACCOUNTS_BASE_URL", "https://accounts.zoho.com"],
+  ]) {
+    let url;
+    try { url = new URL(present(env, name) || fallback); } catch { url = null; }
+    if (!url || url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
+      throw new Error(`[config] ${scope} requires a plain HTTPS ${name}.`);
+    }
+  }
+  if (present(env, "SUPPORT_MAIL_SYNC_SINCE")) {
+    const since = new Date(env.SUPPORT_MAIL_SYNC_SINCE);
+    if (!Number.isFinite(since.getTime()) || since > new Date()) {
+      throw new Error(`[config] ${scope} requires a valid past SUPPORT_MAIL_SYNC_SINCE date.`);
+    }
+  }
+}
+
 module.exports = {
+  assertAdminCommunicationsConfiguration,
   assertAutomationConfiguration,
   assertIncidentWorkerConfiguration,
   assertOpsMonitorConfiguration,

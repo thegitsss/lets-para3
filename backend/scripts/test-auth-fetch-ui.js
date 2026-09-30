@@ -32,6 +32,10 @@ async function installHarness(browser, mode) {
       await route.fulfill({ contentType: "text/javascript; charset=utf-8", body: authSource });
       return;
     }
+    if (["/assets/scripts/utils/help-storage.mjs", "/assets/scripts/utils/document-navigation.mjs"].includes(url.pathname)) {
+      await route.fulfill({ contentType: "text/javascript; charset=utf-8", body: fs.readFileSync(path.resolve(__dirname, "../../frontend", url.pathname.slice(1)), "utf8") });
+      return;
+    }
     if (url.pathname === "/api/csrf") {
       state.csrfCalls += 1;
       await route.fulfill({
@@ -142,7 +146,6 @@ async function verifyProjectedSessionPersistence(page) {
   });
   assert.deepEqual(result, {
     id: "user-1",
-    _id: "user-1",
     role: "paralegal",
     status: "approved",
     firstName: "Avery",
@@ -196,7 +199,8 @@ async function run() {
     {
       const { page, state } = await installHarness(browser, "unauthorized");
       await postMutation(page).catch(() => null);
-      await page.waitForURL("**/login.html");
+      await page.waitForURL(url => url.pathname === "/login.html");
+      assert.equal(new URL(page.url()).searchParams.get("next"), "/test", "session expiry must retain the safe return destination");
       assert.equal(state.mutationCalls, 1);
       assert.equal(await page.evaluate(() => localStorage.getItem("lpc_user")), null, "401 must clear the invalid session");
       await page.close();
@@ -205,7 +209,8 @@ async function run() {
     {
       const { page, state } = await installHarness(browser, "expired-session");
       await postMutation(page).catch(() => null);
-      await page.waitForURL("**/login.html");
+      await page.waitForURL(url => url.pathname === "/login.html");
+      assert.equal(new URL(page.url()).searchParams.get("next"), "/test", "session expiry must retain the safe return destination");
       assert.equal(state.mutationCalls, 1);
       assert.equal(await page.evaluate(() => localStorage.getItem("lpc_user")), null, "an explicit revoked-session 403 must clear the stale session");
       await page.close();

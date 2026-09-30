@@ -113,7 +113,7 @@ const SOURCE_REGISTRY = Object.freeze([
             sourceKey: "platform_faq_core",
             label: "frontend/attorney-faq.html",
             filePath: "frontend/attorney-faq.html",
-            locator: "Approved paralegals",
+            locator: "Approval-based access",
             excerpt: "Every paralegal completes LPC’s application and eligibility review before joining the platform.",
           },
         ],
@@ -393,7 +393,7 @@ const SOURCE_REGISTRY = Object.freeze([
         content: {
           audience: "paralegals",
           summary:
-            "Use this value card when explaining LPC to paralegals: approved paralegals can pursue clearly scoped matter work with choice, fit, and a workflow that supports remote collaboration.",
+            "Use this value card when explaining LPC to paralegals: approved paralegals can pursue clearly scoped matter work with choice and a workflow that supports remote collaboration.",
           statement:
             "Approved paralegals can connect with attorneys seeking support on clearly scoped matters, choose which matters to pursue, and use LPC’s workflow for remote collaboration.",
           supportingPoints: [
@@ -475,7 +475,7 @@ const SOURCE_REGISTRY = Object.freeze([
   },
   {
     sourceKey: "paralegal_admission",
-    title: "Our Vetting Process Page",
+    title: "Our Application Review Page",
     filePath: "frontend/paralegal-admission.html",
     items: [
       {
@@ -491,9 +491,9 @@ const SOURCE_REGISTRY = Object.freeze([
           summary:
             "Paralegal applications are reviewed as a whole using the legal-support experience, completeness, consistency, location, and attorney-directed work described in the submitted materials.",
           statement:
-            "LPC reviews submitted application materials for completeness, internal consistency, U.S. location, at least one year of professional paralegal experience, alignment with attorney-directed matter work, and current platform requirements.",
+            "LPC reviews submitted application materials for completeness, internal consistency, U.S. location, a paralegal certificate, a degree in paralegal studies, or at least one year of experience working in a law firm, alignment with attorney-directed matter work, and current platform requirements.",
           supportingPoints: [
-            "Do not describe application review as independent credential authentication, a background check, or an endorsement.",
+            "Before paralegal approval, verify the qualification used for admission with the issuing institution, an official verification service, or an independently located law-firm contact. Obtain permission for employment checks and explicit permission before contacting a current employer. Record the source, date, and outcome. Do not describe this limited check as a general background check or endorsement.",
           ],
         },
         citations: [
@@ -503,7 +503,7 @@ const SOURCE_REGISTRY = Object.freeze([
             filePath: "frontend/paralegal-admission.html",
             locator: "Admissions review section",
             excerpt:
-              "LPC reviews each submitted application as a whole. The review considers whether the application and required résumé are complete and internally consistent, whether the applicant meets LPC’s location and experience requirements, and whether the submitted information supports attorney-directed matter work.",
+              "LPC reviews each submitted application as a whole. The review considers whether the application and required résumé are complete and internally consistent, whether the applicant meets LPC’s location and qualification requirements, and whether the submitted information supports attorney-directed matter work.",
           },
         ],
       },
@@ -522,7 +522,7 @@ const SOURCE_REGISTRY = Object.freeze([
           statement:
             "Platform access requires an LPC approval decision based on the submitted application and current platform requirements.",
           supportingPoints: [
-            "Approval is not independent credential verification, a background check, an endorsement, or a promise of work.",
+            "Paralegal approval requires verification of the qualification used for admission. It is not a general background check, an endorsement, or a promise of work.",
           ],
         },
         citations: [
@@ -550,7 +550,7 @@ const SOURCE_REGISTRY = Object.freeze([
             "Use this response when someone asks why LPC is approval-based. Explain the manual access decision without implying credential authentication, endorsement, scarcity, or guaranteed quality.",
           objection: "Why is LPC approval-based?",
           approvedResponse:
-            "LPC uses approval-based access and reviews submitted application materials before granting access to protected workflows. Approval is an access decision, not independent credential verification, a background check, an endorsement, or a promise of work.",
+            "LPC uses approval-based access and reviews submitted application materials before granting access to protected workflows. Paralegal approval requires verification of the qualification used for admission. It is not a general background check, an endorsement, or a promise of work.",
           supportingPoints: [
             "Describe the actual review boundary and avoid scarcity or quality-guarantee language.",
           ],

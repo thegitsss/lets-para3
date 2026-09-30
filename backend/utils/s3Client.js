@@ -35,8 +35,11 @@ function buildS3ClientConfig(env = process.env) {
   };
 }
 
-function createS3Client(env = process.env) {
-  return new S3Client(buildS3ClientConfig(env));
+function createS3Client(env = process.env, { requestChecksumCalculation } = {}) {
+  return new S3Client({
+    ...buildS3ClientConfig(env),
+    ...(requestChecksumCalculation ? { requestChecksumCalculation } : {}),
+  });
 }
 
 module.exports = {

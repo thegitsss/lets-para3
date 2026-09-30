@@ -4,6 +4,19 @@ This checklist applies to the exact production candidate commit. A checked imple
 
 The latest local evidence snapshot and current NO-GO decision are recorded in `docs/LAUNCH_CERTIFICATION_CURRENT.md`.
 
+## 0. Let's-ParaConnect product and trust acceptance
+
+Owner direction, September 28, 2026: LPC must earn the confidence users expect from established products such as Apple, Google, OpenAI, Facebook and X. Their names are a quality reference, not evidence of LPC's readiness or a promise of uninterrupted service. Passing tests alone does not satisfy this standard. These requirements apply to the whole product: public pages, both professional roles, administration, emails, shared services and operations.
+
+- [ ] **Recognizably LPC.** Inspect the actual candidate for consistent typography, cornflower accents, hierarchy, spacing, terminology and interaction behavior. Review dense and sparse real-world content, long names, empty states, errors and supported screen sizes. No clipping, unexplained whitespace, placeholder filler, layout jumps or inconsistent legacy presentation remains in required journeys.
+- [ ] **Clear without coaching.** An attorney can understand the work, choose a paralegal, confirm costs, review delivery and resolve an issue. A paralegal can understand eligibility, pursue a Matter, complete work and understand payment. Validate the entire journey, including emails and return links; internal implementation details do not substitute for useful instructions. Copy accurately describes independent choices and LPC's actual responsibilities.
+- [ ] **Actions earn trust.** Every visible control has a verified result. Saving, sending, uploading, hiring and payment confirmation accurately reflect persisted state. Slow responses, retries, refreshes, multiple tabs and interrupted sessions cannot silently discard work, duplicate consequential actions or expose another person's information. Uncertain outcomes remain explicit and recoverable.
+- [ ] **Fast and accessible in practice.** Meet the existing candidate performance and accessibility gates on representative devices, connections and data volumes. Inspect keyboard use, focus, zoom, touch targets, loading feedback and reduced motion. Test results are supplemented by direct visual and interaction review.
+- [ ] **Trust survives a failure.** Verify monitoring, actionable owner alerts, provider interruption handling, durable background work, reconciliation, backup restoration and rollback on production-like infrastructure. Record measurable service objectives and recovery limits with evidence; do not substitute an aspiration of zero outages for these controls.
+- [ ] **Release claims are earned.** Finish implementation across LPC, then verify one frozen candidate end to end. Retain failures and distinguish focused local checks from complete candidate, device, provider and production evidence. All existing stop-ship gates still apply. No launch shortcut is justified by schedule pressure or an impressive aggregate test count.
+
+The implementation owner is responsible for finding and correcting inconsistencies across related surfaces, presenting concrete reviewable results, and keeping unresolved requirements visible. Samantha should not have to discover routine defects or direct each individual polish correction.
+
 ## 1. Release identity and change control
 
 - [x] CI validates its own trigger, permission, pinned-action, timeout, job, command, dependency-review, CodeQL, and full-history secret-scan contract.

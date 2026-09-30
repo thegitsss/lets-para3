@@ -1,7 +1,19 @@
+import { showSaveParalegalDialog } from "./attorney-v2/saved-paralegals.mjs";
+import { renderMatterPayments, readMatterFinancials } from "./utils/matter-financials.mjs";
+import { createMatterReceipt } from "./attorney-v2/matter-receipts.mjs";
+import { createApiClient } from "./attorney-v2/api-client.mjs";
 import { secureFetch, fetchCSRF, showMsg, loadUserHeaderInfo, applyRoleVisibility } from "./auth.js";
+import { createWorkspacePresenceLease } from "./utils/workspace-presence-lease.mjs";
+import { createWorkspaceMatterSwitcher } from "./utils/workspace-matter-switcher.mjs";
 
-const caseList = document.getElementById("caseList");
-const caseListStatus = document.getElementById("caseListStatus");
+const workspacePresenceLease = createWorkspacePresenceLease();
+const matterSwitcherHost = document.getElementById("matterSwitcher");
+const matterStage = document.querySelector(".matter-stage");
+const matterLoadState = document.getElementById("matterLoadState");
+const matterLoadMessage = document.getElementById("matterLoadMessage");
+const matterLoadRetry = document.getElementById("matterLoadRetry");
+let matterSwitcher, matterSwitcherKey = "", workspaceOwnerId = "", caseDetailController;
+
 const caseTitle = document.getElementById("caseTitle");
 const caseStatusLine = document.getElementById("caseStatusLine");
 const caseContextLine = document.getElementById("caseContextLine");
@@ -16,10 +28,17 @@ const matterApplicationsState = document.getElementById("matterApplicationsState
 const matterApplicationsAction = document.getElementById("matterApplicationsAction");
 const matterActivityList = document.getElementById("matterActivityList");
 const matterActivityState = document.getElementById("matterActivityState");
-const matterFinancialStatus = document.getElementById("matterFinancialStatus");
-const matterFinancialList = document.getElementById("matterFinancialList");
-const matterFinancialNote = document.getElementById("matterFinancialNote");
-const matterReceiptAction = document.getElementById("matterReceiptAction");
+const matterPaymentDetails = document.getElementById("matterPaymentDetails");
+let matterPaymentController = null, matterPaymentKey = "";
+const matterReceiptApi = createApiClient({ onAuthenticationLost: () => clearMatterFinancials("This account can no longer access the payment details.") });
+const matterPaymentApi = {
+  get: (url, options) => fetchJSON(url, { ...options, cache: "no-store", noRedirect: true }),
+  async blob(url, options) {
+    const response = await secureFetch(url, { ...options, cache: "no-store", noRedirect: true });
+    if (!response.ok) throw Object.assign(new Error("Receipt unavailable"), { status: response.status });
+    return response.blob();
+  },
+};
 const matterFilesStatus = document.getElementById("matterFilesStatus");
 const matterAddFilesButton = document.getElementById("matterAddFilesButton");
 const caseJurisdiction = document.getElementById("caseJurisdiction");
@@ -65,16 +84,10 @@ const casePartialPayoutButton = document.getElementById("casePartialPayoutButton
 const caseRelistButton = document.getElementById("caseRelistButton");
 const casePausedStatus = document.getElementById("casePausedStatus");
 const caseThread = document.getElementById("case-messages");
-const caseSelect = document.getElementById("case-select");
-const caseTabs = document.querySelectorAll(".case-rail-tabs button");
 const backButton = document.querySelector("[data-back-button]");
 const profileToggle = document.querySelector("[data-profile-toggle]");
 const profileMenu = document.querySelector("[data-profile-menu]");
 const accountSettingsBtn = document.querySelector("[data-account-settings]");
-const caseNavToggles = document.querySelectorAll("[data-case-nav-toggle]");
-const caseNavDropdowns = document.querySelectorAll("[data-case-nav-dropdown]");
-const caseNavLists = document.querySelectorAll("[data-case-nav-list]");
-const caseNavStatuses = document.querySelectorAll("[data-case-nav-status]");
 
 const MESSAGE_POLL_INTERVAL = 3000;
 const WORKSPACE_PRESENCE_HEARTBEAT_MS = 20000;
@@ -108,13 +121,10 @@ try {
 } catch (_) {}
 
 const state = {
-  cases: [],
-  caseOptions: [],
   activeCaseId: "",
-  unreadByCase: new Map(),
-  filter: "active",
-  search: "",
   pendingAttachments: [],
+  composerOwnerId: "",
+  messageDraftsByCase: new Map(),
   optimisticDocuments: [],
   caseDocumentsById: new Map(),
   messageCacheByCase: new Map(),
@@ -129,7 +139,7 @@ const state = {
   messagePollTimer: null,
   messagePolling: false,
   threadResetAt: null,
-  sending: false,
+  sendingByCase: new Set(),
   completing: false,
   disputing: false,
   workspaceEnabled: false,
@@ -257,11 +267,12 @@ function dismissPopupOverlay(overlay) {
 async function sendWorkspacePresenceHeartbeat(caseId) {
   if (!caseId) return;
   try {
-    await secureFetch("/api/notifications/workspace-presence", {
+    const response = await secureFetch("/api/notifications/workspace-presence", {
       method: "POST",
-      body: { caseId },
+      body: { caseId, ...workspacePresenceLease.next() },
       noRedirect: true,
     });
+    if (!response.ok || (await response.json())?.success !== true) throw new Error("Unconfirmed workspace presence heartbeat");
   } catch (error) {
     reportWorkspacePresenceFailure("heartbeat", error);
   }
@@ -270,11 +281,12 @@ async function sendWorkspacePresenceHeartbeat(caseId) {
 async function clearWorkspacePresence(caseId) {
   if (!caseId) return;
   try {
-    await secureFetch("/api/notifications/workspace-presence", {
+    const response = await secureFetch("/api/notifications/workspace-presence", {
       method: "DELETE",
-      body: { caseId },
+      body: { caseId, ...workspacePresenceLease.next() },
       noRedirect: true,
     });
+    if (!response.ok || (await response.json())?.success !== true) throw new Error("Unconfirmed workspace presence clear");
   } catch (error) {
     reportWorkspacePresenceFailure("clear", error);
   }
@@ -445,6 +457,9 @@ async function parseJSON(res) {
 }
 
 async function fetchJSON(url, options = {}) {
+  if ((options.method || "GET").toUpperCase() === "GET" && /^\/api\/cases\/[a-f0-9]{24}$/i.test(url)) {
+    url += `?${new URLSearchParams({ expectedOwnerId: getCurrentUserId() })}`;
+  }
   const res = await secureFetch(url, options);
   const data = await parseJSON(res);
   if (!res.ok) {
@@ -479,13 +494,6 @@ async function fetchWithFallback(urls, options = {}) {
   }
   if (lastError) throw lastError;
   throw new Error("Request failed");
-}
-
-function normalizeCaseList(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.cases)) return payload.cases;
-  if (Array.isArray(payload?.items)) return payload.items;
-  return [];
 }
 
 function normalizeMessages(payload) {
@@ -526,10 +534,10 @@ function applyFileSecurityUpdate(caseId, fileId, update = {}) {
   return file;
 }
 
-async function refreshFileSecurityStatus(caseId, fileId) {
+async function refreshFileSecurityStatus(caseId, fileId, { signal } = {}) {
   const data = await fetchJSON(
     `/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(fileId)}/security-status`,
-    { cache: "no-store", noRedirect: true }
+    { cache: "no-store", noRedirect: true, signal }
   );
   const file = applyFileSecurityUpdate(caseId, fileId, {
     securityStatus: data?.securityStatus,
@@ -1161,9 +1169,7 @@ function ensureWithdrawalNoticeModalStyles() {
       border-color:rgba(182,164,122,.35);
     }
     html.theme-dark .decision-card.decision-deny,
-    body.theme-dark .decision-card.decision-deny,
-    html.theme-mountain-dark .decision-card.decision-deny,
-    body.theme-mountain-dark .decision-card.decision-deny{
+    body.theme-dark .decision-card.decision-deny{
       background:var(--app-surface);
       border-color:var(--app-border);
     }
@@ -1288,9 +1294,7 @@ function ensurePartialPayoutModalStyles() {
     .case-payout-overlay.is-visible{opacity:1}
     .case-payout-overlay.is-visible .case-payout-modal{opacity:1;transform:translateY(0) scale(1)}
     body.theme-dark .case-payout-modal,
-    html.theme-dark .case-payout-modal,
-    body.theme-mountain-dark .case-payout-modal,
-    html.theme-mountain-dark .case-payout-modal{
+    html.theme-dark .case-payout-modal{
       background:#1c2333;
       border-color:rgba(255,255,255,.12);
       box-shadow:0 20px 40px rgba(0,0,0,.35);
@@ -1406,22 +1410,14 @@ function ensurePartialPayoutModalStyles() {
     }
     body.theme-dark .case-payout-subcopy,
     html.theme-dark .case-payout-subcopy,
-    body.theme-mountain-dark .case-payout-subcopy,
-    html.theme-mountain-dark .case-payout-subcopy,
     body.theme-dark .case-payout-help-text,
     html.theme-dark .case-payout-help-text,
-    body.theme-mountain-dark .case-payout-help-text,
-    html.theme-mountain-dark .case-payout-help-text,
     body.theme-dark .case-payout-hint,
-    html.theme-dark .case-payout-hint,
-    body.theme-mountain-dark .case-payout-hint,
-    html.theme-mountain-dark .case-payout-hint{
+    html.theme-dark .case-payout-hint{
       color:rgba(226,232,240,.85);
     }
     body.theme-dark .case-payout-summary .summary-label,
-    html.theme-dark .case-payout-summary .summary-label,
-    body.theme-mountain-dark .case-payout-summary .summary-label,
-    html.theme-mountain-dark .case-payout-summary .summary-label{
+    html.theme-dark .case-payout-summary .summary-label{
       color:rgba(226,232,240,.85);
     }
   `;
@@ -1854,45 +1850,31 @@ function ensureFlagMenuStyles() {
       transform:translateY(0) scale(1);
     }
     body.theme-dark .case-flag-modal,
-    html.theme-dark .case-flag-modal,
-    body.theme-mountain-dark .case-flag-modal,
-    html.theme-mountain-dark .case-flag-modal{
+    html.theme-dark .case-flag-modal{
       background:#151b29;
       color:var(--app-text);
       border-color:rgba(255,255,255,.12);
     }
     body.theme-dark .case-flag-modal::before,
-    html.theme-dark .case-flag-modal::before,
-    body.theme-mountain-dark .case-flag-modal::before,
-    html.theme-mountain-dark .case-flag-modal::before{
+    html.theme-dark .case-flag-modal::before{
       background:rgba(182,164,122,.12);
     }
     body.theme-dark .case-flag-actions .case-action-btn,
-    html.theme-dark .case-flag-actions .case-action-btn,
-    body.theme-mountain-dark .case-flag-actions .case-action-btn,
-    html.theme-mountain-dark .case-flag-actions .case-action-btn{
+    html.theme-dark .case-flag-actions .case-action-btn{
       background:rgba(255,255,255,.06);
       border-color:rgba(255,255,255,.12);
       color:var(--app-text);
     }
     body.theme-dark .case-flag-actions .case-action-btn.secondary,
-    html.theme-dark .case-flag-actions .case-action-btn.secondary,
-    body.theme-mountain-dark .case-flag-actions .case-action-btn.secondary,
-    html.theme-mountain-dark .case-flag-actions .case-action-btn.secondary{
+    html.theme-dark .case-flag-actions .case-action-btn.secondary{
       background:transparent;
     }
     body.theme-dark .case-flag-info,
     html.theme-dark .case-flag-info,
-    body.theme-mountain-dark .case-flag-info,
-    html.theme-mountain-dark .case-flag-info,
     body.theme-dark .case-flag-muted,
     html.theme-dark .case-flag-muted,
-    body.theme-mountain-dark .case-flag-muted,
-    html.theme-mountain-dark .case-flag-muted,
     body.theme-dark .case-flag-note,
-    html.theme-dark .case-flag-note,
-    body.theme-mountain-dark .case-flag-note,
-    html.theme-mountain-dark .case-flag-note{
+    html.theme-dark .case-flag-note{
       color:#9aa7c4;
     }
     @media (prefers-reduced-motion: reduce){
@@ -2202,22 +2184,6 @@ function shouldAllowCaseDetail(caseData) {
   return status === "paused" || status === "disputed";
 }
 
-const CASE_SELECT_EXCLUDE_STATUSES = new Set([
-  "draft",
-  "completed",
-  "closed",
-  "disputed",
-  "archived",
-]);
-
-function isSelectableCase(caseData) {
-  if (!caseData) return false;
-  if (caseData.archived === true) return false;
-  const status = normalizeCaseStatus(caseData?.status);
-  if (CASE_SELECT_EXCLUDE_STATUSES.has(status)) return false;
-  return true;
-}
-
 function workspaceLockCopy(caseState, caseData) {
   if (caseState === CASE_STATES.DRAFT) {
     return "Draft Matters stay in the planning view.";
@@ -2295,19 +2261,13 @@ function getParalegalCompletionRedirect(caseData) {
 
 function setParalegalCompletionToast(caseData) {
   try {
-    const title = "Matter Completed";
     const caseTitle = String(caseData?.title || caseData?.jobTitle || "").trim();
-    const message = caseTitle
-      ? `“${caseTitle}” has been marked complete and moved to Completed Matters.`
-      : "Your Matter has been marked complete and moved to Completed Matters.";
-    sessionStorage.setItem(
-      "lpc-case-completed-toast",
-      JSON.stringify({ title, message })
-    );
+    sessionStorage.setItem("lpc-case-completed-toast", JSON.stringify({ caseTitle }));
   } catch (err) {}
 }
 
-function redirectParalegalCompletionFallback(caseId, caseTitle) {
+function redirectParalegalCompletionFallback(caseId, caseTitle, error) {
+  if (error?.data?.code !== "MATTER_COMPLETED" && error?.data?.error !== "Completed Matters are no longer accessible.") return false;
   if (getCurrentUserRole() !== "paralegal") return false;
   const safeId = String(caseId || "").trim();
   if (!safeId) return false;
@@ -2355,6 +2315,7 @@ function removeWorkspaceActions() {
 }
 
 function purgeRevokedWorkspaceState(caseId, message = "Your access to this workspace has changed.") {
+  clearMatterFinancials(message);
   const revokedCaseId = String(caseId || state.activeCaseId || "");
   state.caseLoadSequence += 1;
   state.matterSectionSequence += 1;
@@ -2367,6 +2328,8 @@ function purgeRevokedWorkspaceState(caseId, message = "Your access to this works
   setWorkspaceEnabled(false, message);
   removeWorkspaceActions();
   if (revokedCaseId) {
+    state.messageDraftsByCase.delete(revokedCaseId);
+    if (messageInput && revokedCaseId === state.activeCaseId) messageInput.value = "";
     state.messageCacheByCase.delete(revokedCaseId);
     state.caseDocumentsById.delete(revokedCaseId);
     state.messageSnapshots.delete(revokedCaseId);
@@ -2400,7 +2363,7 @@ function setWorkspaceEnabled(enabled, message) {
   const sendBtn = messageForm?.querySelector('button[type="submit"]');
   if (messageInput) messageInput.disabled = !enabled;
   if (messageAttachment) messageAttachment.disabled = !enabled;
-  if (sendBtn) sendBtn.disabled = !enabled;
+  if (sendBtn) sendBtn.disabled = !enabled || state.sendingByCase.has(state.activeCaseId);
   if (messageForm) {
     messageForm.setAttribute("aria-disabled", enabled ? "false" : "true");
   }
@@ -2436,104 +2399,29 @@ function renderWorkspaceLocked(message) {
   });
 }
 
-async function loadCases() {
-  showMsg(caseListStatus, "Loading Matters...");
-  setCaseNavStatus("Loading Matters...");
-  const data = await fetchWithFallback(["/api/cases/my?limit=200", "/api/cases/my", "/api/cases"]);
-  const allCases = normalizeCaseList(data);
-  state.caseOptions = allCases.filter((item) => isSelectableCase(item));
-  state.cases = state.caseOptions;
-  if (!state.caseOptions.length) {
-    showMsg(caseListStatus, "");
-    setCaseNavStatus("No active Matters.");
-  } else {
-    showMsg(caseListStatus, "");
-    setCaseNavStatus("");
-  }
-  renderCaseList();
-  populateCaseSelect();
-  renderCaseNavList();
+function saveMessageDraft(caseId = state.activeCaseId) {
+  if (!caseId || state.composerOwnerId !== getCurrentUserId()) return null;
+  const draft = state.messageDraftsByCase.get(caseId) || { text: "", attachments: [], pendingMessage: null };
+  draft.text = messageInput?.value || ""; draft.attachments = state.pendingAttachments;
+  state.messageDraftsByCase.set(caseId, draft);
+  return draft;
 }
 
-async function loadUnreadCounts() {
-  try {
-    const data = await fetchJSON("/api/messages/summary");
-    const entries = Array.isArray(data?.items) ? data.items : [];
-    state.unreadByCase = new Map(entries.map((item) => [String(item.caseId), Number(item.unread) || 0]));
-  } catch {
-    state.unreadByCase = new Map();
-  }
-  renderCaseList();
-}
-
-function renderCaseList() {
-  if (!caseList) return;
-  emptyNode(caseList);
-  const search = state.search.trim().toLowerCase();
-  const source = state.caseOptions.length ? state.caseOptions : state.cases;
-  const filtered = source.filter((item) => {
-    const title = String(item?.title || "");
-    const matchesSearch = !search || title.toLowerCase().includes(search);
-    const unread = state.unreadByCase.get(String(getCaseId(item))) || 0;
-    const matchesFilter = state.filter === "unread" ? unread > 0 : true;
-    return matchesSearch && matchesFilter;
-  });
-
-  if (!filtered.length) {
-    const empty = document.createElement("li");
-    empty.textContent = search ? "No matching Matters." : "";
-    caseList.appendChild(empty);
-    return;
-  }
-
-  filtered.forEach((item) => {
-    const caseId = String(getCaseId(item));
-    const title = item?.title || "Matter";
-    const status = formatCaseStatus(item?.status, item);
-    const preview = item?.briefSummary || item?.details || "";
-
-    const li = document.createElement("li");
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "case-card";
-    button.dataset.caseId = caseId;
-    if (caseId && caseId === state.activeCaseId) {
-      button.setAttribute("aria-current", "true");
-    }
-
-    const titleNode = document.createElement("span");
-    titleNode.className = "case-title";
-    titleNode.textContent = title;
-
-    const metaNode = document.createElement("span");
-    metaNode.className = "case-meta";
-    metaNode.textContent = status ? `Status: ${status}` : "Status: -";
-
-    const previewNode = document.createElement("span");
-    previewNode.className = "case-preview";
-    previewNode.textContent = preview || "Select to view the conversation.";
-
-    button.append(titleNode, metaNode, previewNode);
-
-    const unreadCount = state.unreadByCase.get(caseId) || 0;
-    if (unreadCount > 0) {
-      const unread = document.createElement("span");
-      unread.className = "case-unread";
-      unread.textContent = String(unreadCount);
-      unread.setAttribute(
-        "aria-label",
-        `${unreadCount} unread message${unreadCount === 1 ? "" : "s"}`
-      );
-      button.appendChild(unread);
-    }
-
-    li.appendChild(button);
-    caseList.appendChild(li);
-  });
+function activateMessageDraft(previousId, nextId) {
+  const ownerId = getCurrentUserId();
+  if (state.composerOwnerId === ownerId) saveMessageDraft(previousId);
+  else state.messageDraftsByCase.clear();
+  state.composerOwnerId = ownerId;
+  const next = state.messageDraftsByCase.get(nextId);
+  if (messageInput) messageInput.value = next?.text || "";
+  if (messageAttachment) messageAttachment.value = "";
+  state.pendingAttachments = next?.attachments || [];
+  autoResizeMessageInput(); renderPendingAttachment();
 }
 
 function setActiveCase(caseId, { historyMode = "replace", tab = "" } = {}) {
   const previousCaseId = String(state.activeCaseId || "");
+  activateMessageDraft(previousCaseId, caseId);
   state.activeCaseId = caseId;
   syncActiveCaseUrl(caseId, { historyMode, tab });
   if (previousCaseId && previousCaseId !== String(caseId || "")) {
@@ -2541,10 +2429,7 @@ function setActiveCase(caseId, { historyMode = "replace", tab = "" } = {}) {
   }
   if (caseThread) caseThread.dataset.caseId = caseId || "";
   if (messageList) messageList.dataset.caseId = caseId || "";
-  state.pendingAttachments = [];
-  renderPendingAttachment();
-  renderCaseList();
-  updateCaseSelectSelection();
+  mountMatterSwitcher();
 }
 
 function syncActiveCaseUrl(caseId, { historyMode = "replace", tab = "" } = {}) {
@@ -2896,7 +2781,6 @@ function applyResolvedRoleVisibility(roleValue) {
   });
   document.body.classList.toggle("role-attorney", role === "attorney");
   document.body.classList.toggle("role-paralegal", role === "paralegal");
-  if (role === "attorney") normalizeAttorneyCaseTheme();
   return true;
 }
 
@@ -2923,24 +2807,6 @@ async function hydrateRoleVisibility() {
   }
 }
 
-function normalizeAttorneyCaseTheme() {
-  const body = document.body;
-  const root = document.documentElement;
-  if (!body || !root) return;
-  if (!body.classList.contains("role-attorney")) return;
-  const overrides = {
-    "--bg": "#ffffff",
-    "--panel": "#fcfcfc",
-    "--muted": "#5f6670",
-    "--sidebar-text": "#1a1a1a",
-    "--sidebar-bg": "#f5f5f5e6",
-    "--app-background": "#ffffff",
-  };
-  Object.entries(overrides).forEach(([key, value]) => {
-    body.style.setProperty(key, value);
-    root.style.setProperty(key, value);
-  });
-}
 
 function resolveUploader(documentData) {
   if (!documentData) return null;
@@ -3008,7 +2874,7 @@ function formatUploaderName(documentData, caseData = state.activeCase) {
   return "Unknown";
 }
 
-function uploadAttachment(entry, caseId, note) {
+function uploadAttachment(entry, caseId, note, ownerId) {
   const endpoint = `/api/uploads/case/${encodeURIComponent(caseId)}?presentation=matter`;
   const token = window.__CSRF__ || "";
 
@@ -3019,6 +2885,7 @@ function uploadAttachment(entry, caseId, note) {
       xhr.open("POST", url, true);
       xhr.withCredentials = true;
       if (token) xhr.setRequestHeader("X-CSRF-Token", token);
+      xhr.setRequestHeader("X-LPC-Owner-Id", ownerId);
       xhr.upload.addEventListener("progress", (event) => {
         if (!event.lengthComputable) return;
         entry.progress = Math.round((event.loaded / event.total) * 100);
@@ -3032,24 +2899,29 @@ function uploadAttachment(entry, caseId, note) {
       });
       xhr.addEventListener("load", () => {
         if (xhr.status >= 200 && xhr.status < 300) {
+          if (ownerId !== getCurrentUserId()) { entry.xhr = null; reject(Object.assign(new Error("The signed-in account changed."), { data: { code: "ACCOUNT_CHANGED" } })); return; }
           let uploadedFile = null;
           try {
             const parsed = JSON.parse(xhr.responseText || "{}");
             uploadedFile = parsed?.file || parsed?.document || parsed?.item || null;
           } catch {}
+          if (!/^[a-f0-9]{24}$/i.test(String(uploadedFile?.id || "")) || String(uploadedFile?.caseId || "") !== String(caseId)) {
+            entry.xhr = null;
+            reject(new Error("Upload could not be confirmed. Retry to check the recorded upload.")); return;
+          }
           entry.status = "uploaded";
           entry.progress = 100;
           entry.xhr = null;
           entry.error = "";
           renderPendingAttachment();
           if (uploadedFile) addOptimisticDocument(uploadedFile, caseId);
-          flashMessageStatus("Upload complete. Security scanning is in progress.", 3500);
+          if (caseId === state.activeCaseId && ownerId === getCurrentUserId()) flashMessageStatus("Upload complete. Security scanning is in progress.", 3500);
           resolve(uploadedFile);
           return;
         }
-        let errorMessage = `Upload failed (${xhr.status}).`;
+        let errorMessage = `Upload failed (${xhr.status}).`, errorData = null;
         try {
-          const parsed = JSON.parse(xhr.responseText || "{}");
+          const parsed = JSON.parse(xhr.responseText || "{}"); errorData = parsed;
           errorMessage = parsed?.msg || parsed?.error || parsed?.message || errorMessage;
         } catch {
           if (xhr.responseText && xhr.responseText.trim()) {
@@ -3057,7 +2929,7 @@ function uploadAttachment(entry, caseId, note) {
           }
         }
         const error = new Error(errorMessage);
-        error.status = xhr.status;
+        error.status = xhr.status; error.data = errorData;
         entry.error = errorMessage;
         entry.xhr = null;
         reject(error);
@@ -3071,6 +2943,7 @@ function uploadAttachment(entry, caseId, note) {
       const formData = new FormData();
       formData.append("file", entry.file);
       formData.append("caseId", caseId);
+      formData.append("clientUploadId", entry.id);
       if (note) formData.append("note", note);
       xhr.send(formData);
     });
@@ -3228,7 +3101,7 @@ function renderPendingAttachment() {
 
 function buildAttachmentEntry(file, id) {
   return {
-    id: id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    id: id || crypto.randomUUID(),
     file,
     status: "pending",
     progress: 0,
@@ -3500,23 +3373,33 @@ function getDocumentUploadRole(documentData) {
   );
 }
 
-async function updateCaseFileStatus(caseId, fileId, status) {
+async function updateCaseFileStatus(caseId, fileId, status, displayed) {
   if (!caseId || !fileId || !status) return null;
-  await fetchCSRF().catch(() => "");
-  return fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/files/${encodeURIComponent(fileId)}/status`, {
-    method: "PATCH",
-    body: { status },
+  const expectedOwnerId = displayed?.reviewOwnerId;
+  if (!expectedOwnerId || expectedOwnerId !== getCurrentUserId() || !/^[a-f0-9]{64}$/.test(displayed?.reviewRevision || "")) {
+    throw new Error("Refresh Files to review the current document before changing its approval.");
+  }
+  await fetchCSRF();
+  if (expectedOwnerId !== getCurrentUserId()) throw new Error("The attorney account changed. Reload this Matter.");
+  const response = await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/files/${encodeURIComponent(fileId)}/review`, {
+    method: "POST",
+    body: { expectedOwnerId, reviewedRevision: displayed.reviewRevision, status, notes: status === "attorney_revision" ? String(displayed.revisionNotes || "") : "" },
   });
+  if (expectedOwnerId !== getCurrentUserId()) throw new Error("The attorney account changed. Reload this Matter.");
+  if (response?.file?.id !== fileId || response.file.status !== status || !/^[a-f0-9]{64}$/.test(response.file.reviewRevision || "")) throw new Error("The review could not be confirmed. Refresh Files to check the saved document.");
+  return response.file;
 }
 
-async function queueDocumentForResend({ caseId, docId, fileName, mimeType, storageKey }) {
+async function queueDocumentForResend({ caseId, docId, fileName, mimeType, storageKey, downloadRevision, expectedOwnerId }) {
   if (!caseId || typeof File === "undefined") return false;
   const attempts = [];
   if (docId) {
-    const downloadUrl = `/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(docId)}/download`;
+    const downloadUrl = downloadRevision
+      ? `/api/cases/${encodeURIComponent(caseId)}/downloads/${encodeURIComponent(docId)}?${new URLSearchParams({ expectedOwnerId, revision: downloadRevision })}`
+      : `/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(docId)}/download`;
     attempts.push(async () => secureFetch(downloadUrl, { method: "GET" }));
   }
-  if (storageKey) {
+  if (storageKey && !downloadRevision) {
     attempts.push(async () => {
       const signedUrl = await getSignedDownloadUrl({ caseId, storageKey });
       if (!signedUrl) return null;
@@ -3533,6 +3416,7 @@ async function queueDocumentForResend({ caseId, docId, fileName, mimeType, stora
       throw new Error("Unable to fetch document for resend.");
     }
     const blob = await res.blob();
+    if (expectedOwnerId && expectedOwnerId !== getCurrentUserId()) throw new Error("The attorney account changed. Reload this Matter.");
     const file = new File([blob], fileName || "document", {
       type: mimeType || blob.type || "",
     });
@@ -3630,7 +3514,7 @@ async function updateTaskCompletion(taskIndex, checked, checkbox) {
     await fetchCSRF().catch(() => "");
     const updated = await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}`, {
       method: "PATCH",
-      body: { tasks: payload },
+      body: { tasks: payload, ...(Number.isSafeInteger(state.activeCase.taskRevision) ? { expectedTaskRevision: state.activeCase.taskRevision } : {}) },
     });
     state.activeCase = { ...state.activeCase, ...updated };
   } catch (err) {
@@ -4019,7 +3903,7 @@ function registerMatterContextPanelAdapters() {
       ],
     };
   });
-  window.LPCContextPanel.register("file", async ({ id, params }) => {
+  window.LPCContextPanel.register("file", async ({ id, params, signal }) => {
     const caseId = String(params?.caseId || state.activeCaseId || "");
     const key = matterSectionKey(caseId, "files");
     if (!state.loadedMatterSections.has(key)) await loadMatterDocuments(caseId);
@@ -4035,32 +3919,44 @@ function registerMatterContextPanelAdapters() {
     return {
       eyebrow: "Matter File",
       title: fileName,
-      summary: "File metadata is shown here. Opening the file uses LPC's existing authorized download flow.",
+      summary: security.ready ? "" : security.status === "blocked"
+        ? "This file did not pass its security check."
+        : security.status === "error"
+          ? "The security check could not finish. Check its status again."
+          : "This file will be available after its security check.",
       facts: [
         { label: "Type", value: file.mimeType || file.mime || "File" },
         { label: "Size", value: formatContextFileSize(file.size) },
         { label: "Shared", value: file.createdAt ? formatDate(file.createdAt) : "" },
         { label: "Version", value: file.version ? String(file.version) : "" },
-        { label: "Review status", value: file.status ? humanizePreviewStatus(file.status) : "" },
-        { label: "Security", value: security.label },
+        { label: "Review status", value: file.uploadedByRole === "paralegal"
+          ? ({ pending_review: "Awaiting attorney review", approved: "Approved", attorney_revision: "Changes requested" }[file.status] || "") : "" },
+        { label: "Security", value: security.status === "not_required" ? "" : security.label },
         { label: "Shared by", value: file.uploadedByRole ? humanizePreviewStatus(file.uploadedByRole) : "" },
       ],
       actions: security.ready ? [{
         label: "Open file",
         primary: true,
         onClick: () => openMatterDocument(file, caseId),
-      }] : security.status === "pending" ? [{
-        label: "Check scan status",
+      }] : ["pending", "error"].includes(security.status) ? [{
+        label: "Check status",
         primary: true,
-        onClick: async () => {
+        onClick: async (event) => {
+          const button = event.currentTarget;
+          const feedback = button.closest(".lpc-context-dialog")?.querySelector(".lpc-context-summary");
+          button.disabled = true;
+          button.textContent = "Checking…";
           try {
-            const scan = await refreshFileSecurityStatus(caseId, id);
-            const presentation = getFileSecurityPresentation(scan);
-            showDocumentActionMessage(presentation.ready
-              ? "Security scan complete. Reopen file details to continue."
-              : `${presentation.label}. ${presentation.detail}`);
+            await refreshFileSecurityStatus(caseId, id, { signal });
+            if (!signal.aborted) await window.LPCContextPanel.refresh("file", id);
           } catch (error) {
-            showDocumentActionMessage(error?.message || "Unable to refresh file security status.");
+            if (signal.aborted || !button.isConnected) return;
+            if (feedback) {
+              feedback.setAttribute("role", "alert");
+              feedback.textContent = "The file status could not be checked. Try again.";
+            }
+            button.disabled = false;
+            button.textContent = "Check status";
           }
         },
       }] : [],
@@ -4142,25 +4038,32 @@ function renderMatterActivity(experience) {
   });
 }
 
+function clearMatterFinancials(message = "Loading payment details…") {
+  matterPaymentController?.abort(); matterPaymentController = null; matterPaymentKey = "";
+  if (matterPaymentDetails) { const note = document.createElement("p"); note.textContent = message; matterPaymentDetails.replaceChildren(note); }
+}
 function renderMatterFinancials(experience) {
-  if (!matterFinancialStatus || !matterFinancialList || !matterFinancialNote || !matterReceiptAction) return;
-  const financials = experience?.financials || null;
-  emptyNode(matterFinancialList);
-  matterFinancialStatus.textContent = String(financials?.status || "Payment status unavailable");
-  (Array.isArray(financials?.amounts) ? financials.amounts : []).forEach((amount) => {
-    const row = document.createElement("div");
-    const term = document.createElement("dt");
-    const value = document.createElement("dd");
-    term.textContent = String(amount?.label || "Amount");
-    value.textContent = formatMatterMoney(amount?.cents, financials?.currency);
-    row.append(term, value);
-    matterFinancialList.append(row);
+  if (!matterPaymentDetails) return;
+  const ownerId = getCurrentUserId(), caseId = state.activeCaseId, role = getCurrentUserRole();
+  let value;
+  try { value = readMatterFinancials(experience?.financials, { ownerId, caseId, role }); }
+  catch { clearMatterFinancials("Payment details could not be verified. Refresh this Matter to try again."); return; }
+  const key = `${ownerId}:${caseId}:${value.revision}`;
+  if (key === matterPaymentKey && matterPaymentController && !matterPaymentController.signal.aborted) return;
+  clearMatterFinancials(); matterPaymentKey = key; matterPaymentController = new AbortController();
+  const signal = matterPaymentController.signal, isCurrent = () => !signal.aborted && ownerId === getCurrentUserId() && caseId === state.activeCaseId;
+  const content = renderMatterPayments(value, { ownerId, caseId, role, api: matterPaymentApi, signal, isCurrent,
+    onRefresh: () => loadCase(caseId, { tab: "financials" }),
+    onReceipts: role === "attorney" ? (trigger) => {
+      if (!isCurrent() || matterPaymentDetails.querySelector("[data-matter-receipt]")) return;
+      const receipt = createMatterReceipt(caseId, { api: matterReceiptApi, signal, ownerId, current: true, showMatterTitle: false });
+      matterPaymentDetails.append(receipt);
+      trigger.hidden = true;
+      receipt.tabIndex = -1;
+      receipt.focus();
+    } : null,
   });
-  matterFinancialNote.textContent = String(financials?.note || "Financial information is not available for this view.");
-  const receiptHref = safeMatterExperienceHref(financials?.receiptHref);
-  matterReceiptAction.hidden = !receiptHref;
-  if (receiptHref) matterReceiptAction.href = receiptHref;
-  else matterReceiptAction.removeAttribute("href");
+  matterPaymentDetails.replaceChildren(content);
 }
 
 function renderMatterExperience(data) {
@@ -4221,6 +4124,9 @@ function renderMatterLoadFailure(message) {
   state.productivitySummary = {};
   window.LPCProductivityContext = {};
   if (caseTitle) caseTitle.textContent = "Matter unavailable";
+  if (matterStage) matterStage.hidden = true;
+  if (matterLoadState) matterLoadState.hidden = false;
+  if (matterLoadMessage) matterLoadMessage.textContent = message || "The requested Matter could not be loaded.";
   if (caseStatusLine) caseStatusLine.textContent = "This Matter could not be opened.";
   if (caseContextLine) caseContextLine.textContent = String(message || "It may have moved or your access may have changed.");
   if (caseAttentionLine) caseAttentionLine.hidden = true;
@@ -4272,7 +4178,7 @@ function renderCaseOverview(data) {
   if (caseEscrowAmount) {
     caseEscrowAmount.textContent = compensation
       ? formatMatterMoney(compensation.cents, data?.matterExperience?.financials?.currency)
-      : formatCurrency(escrowAmountRaw, currency);
+      : data?.matterExperience?.financials ? "Unavailable" : formatCurrency(escrowAmountRaw, currency);
   }
   if (caseEscrowStatus) {
     caseEscrowStatus.textContent = data?.matterExperience?.financials?.status || escrowStatus || "-";
@@ -4544,11 +4450,7 @@ function updateWithdrawalSection(caseData) {
   if (isWithdrawn) {
     showSection = true;
     if (caseData?.payoutFinalizedAt) {
-      const payoutLabel = formatCurrency(
-        Number(caseData?.partialPayoutAmount || 0) / 100,
-        String(caseData?.currency || "USD").toUpperCase()
-      );
-      statusMessage = `Withdrawal finalized with a payout of ${payoutLabel}.`;
+      statusMessage = "Withdrawal finalized. View Payments for the recorded outcome.";
     } else {
       statusMessage = "Withdrawal recorded.";
     }
@@ -4724,6 +4626,10 @@ async function handleCompleteCase() {
       readOnly: true,
     });
     if (completionRedirect) {
+      const savedParalegalId = normalizeUserId(caseData?.paralegal || caseData?.paralegalId);
+      if (getCurrentUserRole() === 'attorney' && /^[a-f0-9]{24}$/i.test(savedParalegalId || '')) {
+        await showSaveParalegalDialog(savedParalegalId, { api: createApiClient(), ownerId: getCurrentUserId() });
+      }
       window.location.href = completionRedirect;
       return;
     }
@@ -5283,7 +5189,7 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
       const isApproved = statusValue === "approved";
       const isRevision = statusValue === "attorney_revision";
       approveButton.setAttribute("aria-pressed", String(isApproved));
-      approveButton.disabled = !docId || !security.ready;
+      approveButton.disabled = !docId || !security.ready || documentData.canReview !== true || !documentData.reviewRevision;
       const approveText = document.createElement("span");
       approveText.textContent = isApproved ? "Approved" : "Approve";
       if (isApproved) approveButton.classList.add("is-approved");
@@ -5294,13 +5200,27 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
       requestButton.type = "button";
       requestButton.className = "case-documents-request";
       requestButton.setAttribute("aria-pressed", String(isRevision));
-      requestButton.disabled = !docId || !security.ready;
+      requestButton.disabled = !docId || !security.ready || documentData.canReview !== true || !documentData.reviewRevision;
       const requestText = document.createElement("span");
       requestText.textContent = isRevision ? "Revisions requested" : "Request revisions";
       if (isRevision) requestButton.classList.add("is-requested");
       requestButton.append(requestText);
       actions.append(requestButton);
+      const refreshReview = document.createElement("button");
+      refreshReview.type = "button";
+      refreshReview.className = "case-documents-request";
+      refreshReview.textContent = "Refresh Files";
+      refreshReview.addEventListener("click", async () => {
+        refreshReview.disabled = true;
+        try { await loadMatterDocuments(caseId, { force: true }); }
+        catch (_) { refreshReview.disabled = false; }
+      });
       li.append(actions);
+      const reviewFeedback = document.createElement("p");
+      reviewFeedback.className = "case-overview-note";
+      reviewFeedback.setAttribute("role", "status");
+      reviewFeedback.dataset.documentReviewFeedback = docId;
+      li.append(reviewFeedback);
 
       const setActionState = (nextStatus) => {
         const approved = normalizeRole(nextStatus) === "approved";
@@ -5311,13 +5231,14 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
         requestText.textContent = revision ? "Revisions requested" : "Request revisions";
         approveButton.classList.toggle("is-approved", approved);
         requestButton.classList.toggle("is-requested", revision);
-        approveButton.disabled = !docId || !security.ready;
-        requestButton.disabled = !docId || !security.ready;
+        approveButton.disabled = !docId || !security.ready || documentData.canReview !== true || !documentData.reviewRevision;
+        requestButton.disabled = !docId || !security.ready || documentData.canReview !== true || !documentData.reviewRevision;
       };
 
       const setBusy = (busyLabel) => {
         approveButton.disabled = true;
         requestButton.disabled = true;
+        reviewFeedback.textContent = "Recording document review…";
         if (busyLabel === "approve") approveText.textContent = "Updating...";
         if (busyLabel === "request") requestText.textContent = "Updating...";
       };
@@ -5328,12 +5249,16 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
         const nextStatus = normalizeRole(documentData.status) === "approved" ? "pending_review" : "approved";
         setBusy("approve");
         try {
-          await updateCaseFileStatus(caseId, docId, nextStatus);
-          documentData.status = nextStatus;
+          const saved = await updateCaseFileStatus(caseId, docId, nextStatus, documentData);
+          Object.assign(documentData, { status: saved.status, reviewRevision: saved.reviewRevision, canReview: saved.canReview, revisionNotes: saved.notes, revisionRequestedAt: saved.requestedAt, approvedAt: saved.approvedAt });
           setActionState(nextStatus);
+          reviewFeedback.textContent = nextStatus === "approved" ? "Document approved." : nextStatus === "attorney_revision" ? "Revisions requested." : "Document returned to awaiting review.";
         } catch (err) {
+          documentData.reviewRevision = null;
           setActionState(previousStatus);
-          showMsg(messageStatus, err.message || "Unable to update document.");
+          actions.append(refreshReview);
+          reviewFeedback.textContent = err.message || "The review could not be confirmed. Refresh Files to check the saved document.";
+          showMsg(messageStatus, reviewFeedback.textContent);
         }
       });
 
@@ -5343,16 +5268,20 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
         const nextStatus = normalizeRole(documentData.status) === "attorney_revision" ? "pending_review" : "attorney_revision";
         setBusy("request");
         try {
-          await updateCaseFileStatus(caseId, docId, nextStatus);
-          documentData.status = nextStatus;
+          const saved = await updateCaseFileStatus(caseId, docId, nextStatus, documentData);
+          Object.assign(documentData, { status: saved.status, reviewRevision: saved.reviewRevision, canReview: saved.canReview, revisionNotes: saved.notes, revisionRequestedAt: saved.requestedAt, approvedAt: saved.approvedAt });
           setActionState(nextStatus);
+          reviewFeedback.textContent = nextStatus === "approved" ? "Document approved." : nextStatus === "attorney_revision" ? "Revisions requested." : "Document returned to awaiting review.";
           if (nextStatus === "attorney_revision") {
-            await queueDocumentForResend({ caseId, docId, fileName, mimeType, storageKey });
+            await queueDocumentForResend({ caseId, docId, fileName, mimeType, storageKey, downloadRevision: saved.revision, expectedOwnerId: documentData.reviewOwnerId });
             applyRevisionMessageTemplate(fileName);
           }
         } catch (err) {
+          documentData.reviewRevision = null;
           setActionState(previousStatus);
-          showMsg(messageStatus, err.message || "Unable to update document.");
+          actions.append(refreshReview);
+          reviewFeedback.textContent = err.message || "The review could not be confirmed. Refresh Files to check the saved document.";
+          showMsg(messageStatus, reviewFeedback.textContent);
         }
       });
     }
@@ -5614,10 +5543,6 @@ async function loadMatterMessages(caseId, { force = false } = {}) {
     renderSharedDocuments(documents, caseId);
     renderThreadItems(messages, documents, caseId);
     markCaseMessagesRead(caseId, messages);
-    if (!getRequestedMessageId() && state.unreadByCase.has(caseId)) {
-      state.unreadByCase.set(caseId, 0);
-      renderCaseList();
-    }
     return messages;
   } catch (error) {
     if (sequence !== state.matterSectionSequence || caseId !== state.activeCaseId) return [];
@@ -5653,9 +5578,22 @@ async function ensureMatterSectionData(section, { force = false } = {}) {
 
 async function loadCase(caseId, options = {}) {
   if (!caseId) return;
+  if (getCurrentUserId() !== workspaceOwnerId) { clearWorkspaceAccount(); return; }
+  clearMatterFinancials();
+  caseDetailController?.abort();
+  const controller = new AbortController(); caseDetailController = controller;
+  let timedOut = false;
+  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 30000);
+  if (matterLoadState) matterLoadState.hidden = true;
+  if (caseId !== state.activeCaseId || !state.activeCase) {
+    if (matterStage) matterStage.hidden = true;
+    if (caseTitle) caseTitle.textContent = "Loading Matter…";
+    state.activeCase = null;
+  }
   const caseLoadSequence = ++state.caseLoadSequence;
   state.matterSectionSequence += 1;
   state.workspaceReadable = false;
+  setWorkspaceEnabled(false, null);
   stopMessagePolling();
   stopCaseStream();
   setActiveCase(caseId, {
@@ -5669,16 +5607,18 @@ async function loadCase(caseId, options = {}) {
   }
   try {
     const caseData = await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}`, {
-      noRedirect: true,
+      noRedirect: true, signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (caseLoadSequence !== state.caseLoadSequence || caseId !== state.activeCaseId) return;
+    if (getCurrentUserId() !== workspaceOwnerId) { clearWorkspaceAccount(); return; }
+    if (getCaseId(caseData) !== String(caseId)) throw new Error("The requested Matter could not be verified.");
     if (getCurrentUserRole() === "paralegal" && isWithdrawnViewer(caseData)) {
       window.location.href = "dashboard-paralegal.html#cases";
       return;
     }
     state.activeCase = caseData;
     updateThreadReset(caseData);
-    renderCaseNavList();
     if (showParalegalCompletionOverlay(caseData)) {
       return;
     }
@@ -5696,6 +5636,7 @@ async function loadCase(caseId, options = {}) {
     const caseState = resolveCaseState(caseData);
     renderParticipants(caseData);
     renderCaseOverview(caseData);
+    if (matterStage) matterStage.hidden = false;
     updateCompleteAction(caseData, caseState);
     maybePromptAttorneyWithdrawalDecision(caseData);
     const workspace = getWorkspaceState(caseData, caseState);
@@ -5722,15 +5663,19 @@ async function loadCase(caseId, options = {}) {
       if (!streamStarted) startMessagePolling();
     }
     await ensureMatterSectionData(state.activeMatterTab);
+    if (caseLoadSequence !== state.caseLoadSequence || caseId !== state.activeCaseId) return;
     syncRequestedContextPanel();
     if (!revealRequestedMessage({ reportMissing: true }) && !getRequestedMessageId()) {
       showMsg(messageStatus, "");
     }
+    if (options.focus && caseLoadSequence === state.caseLoadSequence) caseTitle?.focus();
   } catch (err) {
-    if (caseLoadSequence !== state.caseLoadSequence) return;
+    if (caseLoadSequence !== state.caseLoadSequence || controller.signal.aborted && !timedOut) return;
+    if (getCurrentUserId() !== workspaceOwnerId || /ACCOUNT_CHANGED$/.test(String(err.data?.code || ""))) { clearWorkspaceAccount(); return; }
+    if (timedOut) err = new Error("This Matter is taking too long to load. Try again.");
     if ((err?.status === 403 || err?.status === 404) && getCurrentUserRole() === "paralegal") {
       purgeRevokedWorkspaceState(caseId);
-      if (redirectParalegalCompletionFallback(caseId, state.activeCase?.title || "")) {
+      if (redirectParalegalCompletionFallback(caseId, state.activeCase?.title || "", err)) {
         return;
       }
       window.location.href = "dashboard-paralegal.html#cases";
@@ -5738,6 +5683,9 @@ async function loadCase(caseId, options = {}) {
     }
     renderMatterLoadFailure(err.message);
     showMsg(messageStatus, err.message || "Unable to load Matter.");
+  } finally {
+    clearTimeout(timeout);
+    if (caseDetailController === controller) caseDetailController = null;
   }
 }
 
@@ -5801,7 +5749,7 @@ function getDocumentSnapshot(documents = []) {
       latestKey = doc?.id || doc?._id || getDocumentKey(doc) || latestKey;
     }
   });
-  return { count: Array.isArray(documents) ? documents.length : 0, latestTime, latestKey };
+  return { count: Array.isArray(documents) ? documents.length : 0, latestTime, latestKey, signature: JSON.stringify(documents) };
 }
 
 function getTaskSnapshot(caseData) {
@@ -5830,6 +5778,7 @@ function hasMessageSnapshotChanged(previous, next) {
 function hasDocumentSnapshotChanged(previous, next) {
   if (!previous) return true;
   return (
+    previous.signature !== next.signature ||
     previous.count !== next.count ||
     previous.latestTime !== next.latestTime ||
     previous.latestKey !== next.latestKey
@@ -5941,7 +5890,7 @@ async function refreshCaseRealtime(options = null) {
   const fetchDocuments = options ? !!options.documents : true;
   const fetchTasks = options ? !!options.tasks : true;
   const caseId = state.activeCaseId;
-  if (!caseId || state.sending || state.messagePolling) {
+  if (!caseId || state.sendingByCase.has(caseId) || state.messagePolling) {
     if (options) {
       state.pendingRealtime = mergeRealtimeFlags(state.pendingRealtime, options);
     }
@@ -6016,10 +5965,11 @@ async function refreshCaseRealtime(options = null) {
           noRedirect: true,
         });
       } catch (err) {
+        clearMatterFinancials("Payment details could not be refreshed. Refresh this Matter to try again.");
         console.warn("Unable to refresh case data", err);
         if ((err?.status === 403 || err?.status === 404) && getCurrentUserRole() === "paralegal") {
           purgeRevokedWorkspaceState(caseId);
-          if (redirectParalegalCompletionFallback(caseId, state.activeCase?.title || "")) {
+          if (redirectParalegalCompletionFallback(caseId, state.activeCase?.title || "", err)) {
             return true;
           }
         }
@@ -6065,10 +6015,6 @@ async function refreshCaseRealtime(options = null) {
       renderThreadItems(threadMessages, mergedDocuments, caseId);
       if (messagesOk) {
         markCaseMessagesRead(caseId, threadMessages);
-        if (!getRequestedMessageId() && state.unreadByCase.has(caseId)) {
-          state.unreadByCase.set(caseId, 0);
-          renderCaseList();
-        }
       }
     }
 
@@ -6111,79 +6057,54 @@ async function refreshCaseRealtime(options = null) {
 
 async function handleSendMessage(event) {
   event.preventDefault();
-  const caseId = state.activeCaseId;
-  if (!caseId) return;
-  state.forceScrollToBottom = true;
-  const text = (messageInput?.value || "").trim();
-  const attachments = state.pendingAttachments.filter((entry) => entry.status === "pending");
+  const caseId = state.activeCaseId, ownerId = getCurrentUserId();
+  if (!caseId || !state.workspaceEnabled || state.sendingByCase.has(caseId) || ownerId !== workspaceOwnerId) return;
+  const draft = saveMessageDraft();
+  if (!draft) return;
+  const rawText = draft.text, text = rawText.trim();
+  const attachments = draft.attachments.filter(entry => entry.status === "pending" || entry.status === "failed");
   if (!text && !attachments.length) return;
-  if (state.sending) return;
-  state.sending = true;
-  showMsg(messageStatus, attachments.length ? "Preparing uploads..." : "");
-
+  if (text.length > 2000) { showMsg(messageStatus, "Messages can contain up to 2,000 characters."); return; }
+  const isCurrent = () => ownerId === getCurrentUserId() && caseId === state.activeCaseId;
+  const verifyOwner = () => { if (ownerId !== getCurrentUserId() || ownerId !== state.composerOwnerId) throw new Error("The signed-in account changed. Reload your workspace."); };
+  const sending = state.sendingByCase; sending.add(caseId);
+  let uploaded = 0, messageSent = false;
+  setWorkspaceEnabled(state.workspaceEnabled, null); state.forceScrollToBottom = true;
+  showMsg(messageStatus, attachments.length ? "Preparing uploads…" : "");
   try {
     if (attachments.length) {
-      await fetchCSRF(true).catch(() => "");
-      const total = attachments.length;
-      let current = 0;
-      for (const entry of attachments) {
-        current += 1;
-        updateUploadStatus(current, total);
-        entry.status = "uploading";
-        entry.progress = 0;
-        renderPendingAttachment();
-        try {
-          await uploadAttachment(entry, caseId, text);
-        } catch (err) {
-          if (err.code === "canceled") {
-            continue;
-          }
-          throw err;
-        }
+      await fetchCSRF(true); verifyOwner();
+      for (let index = 0; index < attachments.length; index++) {
+        verifyOwner(); const entry = attachments[index];
+        if (isCurrent()) updateUploadStatus(index + 1, attachments.length);
+        entry.status = "uploading"; entry.progress = 0; renderPendingAttachment();
+        try { await uploadAttachment(entry, caseId, text, ownerId); uploaded += 1; }
+        catch (error) { if (error.code !== "canceled") throw error; }
       }
-      state.pendingAttachments = state.pendingAttachments.filter((entry) => entry.status !== "uploaded");
-      renderPendingAttachment();
+      draft.attachments = draft.attachments.filter(entry => entry.status !== "uploaded");
+      if (isCurrent()) { state.pendingAttachments = draft.attachments; renderPendingAttachment(); }
     }
-
     if (text) {
-      await fetchJSON(`/api/messages/${encodeURIComponent(caseId)}`, {
-        method: "POST",
-        body: { text, content: text, caseId },
+      verifyOwner();
+      if (draft.pendingMessage?.text !== text) draft.pendingMessage = { text, clientMessageId: crypto.randomUUID() };
+      const receipt = await fetchJSON(`/api/messages/${encodeURIComponent(caseId)}`, {
+        method: "POST", headers: { "X-LPC-Owner-Id": ownerId },
+        body: { text, content: text, caseId, clientMessageId: draft.pendingMessage.clientMessageId },
       });
-      messageInput.value = "";
-      autoResizeMessageInput();
+      verifyOwner();
+      const saved = receipt?.message;
+      if (!/^[a-f0-9]{24}$/i.test(String(saved?._id || saved?.id || "")) || String(saved?.caseId || "") !== String(caseId) || normalizeUserId(saved?.senderId) !== ownerId || saved?.clientMessageId !== draft.pendingMessage.clientMessageId) throw new Error("Message could not be confirmed. Retry to check the recorded message.");
+      draft.pendingMessage = null; messageSent = true;
+      if (isCurrent()) {
+        if (messageInput?.value === rawText) messageInput.value = "";
+        draft.text = messageInput?.value || ""; autoResizeMessageInput();
+      } else if (draft.text === rawText) draft.text = "";
     }
-
-    await loadMatterMessages(caseId, { force: true });
-    flashMessageStatus("Sent");
-  } catch (err) {
-    showMsg(messageStatus, err.message || "Unable to send update.");
-  } finally {
-    state.sending = false;
-  }
-}
-
-function handleCaseListClick(event) {
-  const button = event.target.closest(".case-card");
-  if (!button) return;
-  const caseId = button.dataset.caseId;
-  if (!caseId || caseId === state.activeCaseId) return;
-  loadCase(caseId, { historyMode: "push", tab: "overview" });
-}
-
-function handleCaseSelect(event) {
-  const selectedId = String(event.target.value || "");
-  if (!selectedId || selectedId === state.activeCaseId) return;
-  loadCase(selectedId, { historyMode: "push", tab: "overview" });
-}
-
-function handleTabClick(event) {
-  const tab = event.target;
-  if (!tab || !tab.hasAttribute("role")) return;
-  const label = String(tab.textContent || "").toLowerCase();
-  state.filter = label.includes("unread") ? "unread" : "active";
-  caseTabs.forEach((btn) => btn.setAttribute("aria-selected", btn === tab ? "true" : "false"));
-  renderCaseList();
+    if (isCurrent() && (uploaded || messageSent)) { await loadMatterMessages(caseId, { force: true }); if (isCurrent()) flashMessageStatus(messageSent ? "Sent" : `${uploaded} ${uploaded === 1 ? "file uploaded" : "files uploaded"}`); }
+  } catch (error) {
+    if (error.data?.code === "ACCOUNT_CHANGED") clearWorkspaceAccount();
+    else if (isCurrent()) showMsg(messageStatus, error.message || "Unable to send update.");
+  } finally { sending.delete(caseId); if (isCurrent()) setWorkspaceEnabled(state.workspaceEnabled, null); }
 }
 
 function handleMatterTabClick(event) {
@@ -6210,6 +6131,7 @@ function handleMatterHistoryChange() {
   const params = new URLSearchParams(window.location.search);
   const caseId = String(params.get("caseId") || "");
   const tab = getRequestedMatterTab();
+  if (!caseId) { showMatterChooser(); return; }
   if (caseId && caseId !== state.activeCaseId) {
     void loadCase(caseId, { historyMode: "none", tab });
     return;
@@ -6217,137 +6139,55 @@ function handleMatterHistoryChange() {
   activateMatterTab(tab, { historyMode: "none", focus: false });
 }
 
-function setCaseNavStatus(message) {
-  caseNavStatuses.forEach((node) => {
-    if (node) node.textContent = message;
+function disposeMatterSwitcher() {
+  matterSwitcher?.dispose(); matterSwitcher = null; matterSwitcherKey = "";
+}
+
+function clearWorkspaceAccount() {
+  disposeMatterSwitcher(); caseDetailController?.abort(); caseDetailController = null;
+  state.caseLoadSequence += 1; state.matterSectionSequence += 1;
+  stopCaseStream(); stopMessagePolling(); stopWorkspacePresence(); clearMatterFinancials();
+  state.activeCase = null; state.activeCaseId = ""; state.workspaceReadable = false;
+  for (const draft of state.messageDraftsByCase.values()) draft.attachments.forEach(entry => entry.xhr?.abort());
+  state.messageDraftsByCase.clear(); state.composerOwnerId = ""; state.sendingByCase = new Set();
+  state.pendingAttachments = []; state.optimisticDocuments = [];
+  state.messageCacheByCase.clear(); state.caseDocumentsById.clear();
+  state.messageSnapshots.clear(); state.documentSnapshots.clear(); state.taskSnapshots.clear();
+  if (messageInput) messageInput.value = "";
+  if (matterStage) { matterStage.hidden = true; matterStage.replaceChildren(); }
+  if (matterLoadState) matterLoadState.hidden = true;
+  if (caseTitle) caseTitle.textContent = "Workspace unavailable";
+  const reload = document.createElement("button"); reload.type = "button";
+  reload.className = "matter-switch-secondary"; reload.textContent = "Reload workspace";
+  reload.addEventListener("click", () => window.location.reload());
+  matterSwitcherHost?.replaceChildren(reload);
+}
+
+function mountMatterSwitcher() {
+  if (!matterSwitcherHost) return;
+  const ownerId = getCurrentUserId(), role = getCurrentUserRole();
+  if (workspaceOwnerId && ownerId !== workspaceOwnerId) { clearWorkspaceAccount(); return; }
+  workspaceOwnerId ||= ownerId;
+  const currentId = state.activeCaseId, key = `${ownerId}:${role}:${currentId}`;
+  if (matterSwitcher && key === matterSwitcherKey) return;
+  disposeMatterSwitcher(); matterSwitcherKey = key;
+  matterSwitcher = createWorkspaceMatterSwitcher({
+    host: matterSwitcherHost, ownerId, role, currentId,
+    api: { get: (url, options) => fetchJSON(url, { ...options, noRedirect: true, cache: "no-store" }) },
+    onChoose: id => void loadCase(id, { historyMode: "push", tab: "overview", focus: true }),
+    onAccountChanged: clearWorkspaceAccount,
   });
 }
 
-function getActiveCases(list = []) {
-  return (list || []).filter((item) => {
-    const status = String(item?.status || "").toLowerCase();
-    if (item?.isArchived) return false;
-    if (status === "archived") return false;
-    return true;
-  });
-}
-
-function populateCaseSelect() {
-  if (!caseSelect) return;
-  const optionsList = [];
-  const active = state.activeCase;
-  const activeId = active ? getCaseId(active) : "";
-  const selectableCases = state.caseOptions.length ? state.caseOptions : state.cases;
-  if (active && activeId && !selectableCases.some((item) => getCaseId(item) === activeId)) {
-    optionsList.push(active);
-  }
-  optionsList.push(...selectableCases);
-
-  if (!optionsList.length) {
-    caseSelect.innerHTML = "";
-    const emptyOption = document.createElement("option");
-    emptyOption.value = "";
-    emptyOption.textContent = "No active Matters";
-    caseSelect.appendChild(emptyOption);
-    caseSelect.disabled = true;
-    return;
-  }
-
-  const sorted = [...optionsList].sort((a, b) => {
-    const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
-    const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
-    return bTime - aTime;
-  });
-
-  caseSelect.disabled = false;
-  caseSelect.innerHTML = "";
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = "Select a Matter";
-  caseSelect.appendChild(placeholder);
-  sorted.forEach((item) => {
-    const id = getCaseId(item);
-    if (!id) return;
-    const option = document.createElement("option");
-    option.value = id;
-    option.textContent = item?.title || "Matter";
-    caseSelect.appendChild(option);
-  });
-  updateCaseSelectSelection();
-}
-
-function updateCaseSelectSelection() {
-  if (!caseSelect) return;
-  const activeId = state.activeCaseId || "";
-  if (!activeId) {
-    caseSelect.value = "";
-    return;
-  }
-  const hasOption = Array.from(caseSelect.options).some((option) => option.value === activeId);
-  if (!hasOption) {
-    populateCaseSelect();
-    return;
-  }
-  caseSelect.value = activeId;
-}
-
-function renderCaseNavList() {
-  if (!caseNavLists.length) return;
-  const source = state.caseOptions.length ? state.caseOptions : state.cases;
-  let activeCases = getActiveCases(source);
-  const currentCase = state.activeCase;
-  if (currentCase) {
-    const currentId = getCaseId(currentCase);
-    const alreadyListed = currentId
-      ? activeCases.some((item) => getCaseId(item) === currentId)
-      : false;
-    if (!alreadyListed) {
-      activeCases = [currentCase, ...activeCases];
-    }
-  }
-  caseNavLists.forEach((list) => {
-    if (!list) return;
-    emptyNode(list);
-    if (!activeCases.length) return;
-    activeCases.forEach((item) => {
-      const caseId = getCaseId(item);
-      const title = String(item?.title || item?.name || "Untitled Matter");
-      const li = document.createElement("li");
-      const link = document.createElement("a");
-      link.className = "case-nav-link";
-      link.textContent = title;
-      link.href = caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "case-detail.html";
-      li.appendChild(link);
-      list.appendChild(li);
-    });
-  });
-  setCaseNavStatus(activeCases.length ? "" : "No active Matters.");
-}
-
-function initCaseNavDropdowns() {
-  caseNavToggles.forEach((toggle) => {
-    toggle.addEventListener("click", (event) => {
-      const dropdown = toggle.parentElement?.querySelector("[data-case-nav-dropdown]");
-      if (!dropdown) return;
-      const hasModifier = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
-      if (!hasModifier) {
-        event.preventDefault();
-      }
-      const shouldOpen = !dropdown.classList.contains("show");
-      dropdown.classList.toggle("show", shouldOpen);
-      dropdown.setAttribute("aria-hidden", shouldOpen ? "false" : "true");
-      toggle.classList.toggle("is-open", shouldOpen);
-    });
-  });
-
-  document.addEventListener("click", (event) => {
-    if (event.target.closest("[data-case-nav-toggle]")) return;
-    caseNavDropdowns.forEach((dropdown) => {
-      dropdown.classList.remove("show");
-      dropdown.setAttribute("aria-hidden", "true");
-    });
-    caseNavToggles.forEach((toggle) => toggle.classList.remove("is-open"));
-  });
+function showMatterChooser() {
+  caseDetailController?.abort(); caseDetailController = null;
+  state.caseLoadSequence += 1; state.matterSectionSequence += 1;
+  stopCaseStream(); stopMessagePolling(); stopWorkspacePresence(); clearMatterFinancials();
+  setActiveCase("", { historyMode: "none" }); state.activeCase = null; state.workspaceReadable = false;
+  if (matterStage) matterStage.hidden = true;
+  if (matterLoadState) matterLoadState.hidden = true;
+  if (caseTitle) caseTitle.textContent = "Your Matters";
+  mountMatterSwitcher(); matterSwitcher?.open();
 }
 
 function getDefaultBackUrl() {
@@ -6435,14 +6275,13 @@ function initTasksHelpPopover() {
 function init() {
   syncThemeFromSession();
   hydrateRoleVisibility();
-  normalizeAttorneyCaseTheme();
   loadUserHeaderInfo().catch((error) => console.warn("[matter] header hydration rejected", error));
   initBackButton();
   initProfileMenu();
   ensureCompleteButtonBinding();
   initTasksHelpPopover();
-  initCaseNavDropdowns();
   registerMatterContextPanelAdapters();
+  matterLoadRetry?.addEventListener("click", () => { if (state.activeCaseId) void loadCase(state.activeCaseId, { historyMode: "replace", tab: state.activeMatterTab }); });
   if (messageForm) {
     messageForm.addEventListener("submit", handleSendMessage);
   }
@@ -6454,7 +6293,7 @@ function init() {
       if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.repeat) return;
       event.preventDefault();
       event.stopPropagation();
-      if (state.sending) return;
+      if (state.sendingByCase.has(state.activeCaseId)) return;
       handleSendMessage({ preventDefault() {} });
     });
   }
@@ -6483,7 +6322,9 @@ function init() {
     stopWorkspacePresence();
   });
   window.addEventListener("pageshow", (event) => {
-    if (!event.persisted || !state.activeCaseId) return;
+    if (!event.persisted) return;
+    mountMatterSwitcher();
+    if (!state.activeCaseId) return;
     void loadCase(state.activeCaseId, { historyMode: "replace", tab: state.activeMatterTab, suppressStatus: true });
   });
   window.addEventListener("lpc:lifecycle-refresh", (event) => {
@@ -6494,17 +6335,17 @@ function init() {
     purgeRevokedWorkspaceState(caseId, "Refreshing workspace access…");
     void loadCase(caseId, { historyMode: "replace", tab: state.activeMatterTab, suppressStatus: true });
   });
+  window.addEventListener("storage", event => { if (event.key === "lpc_user" || event.key === null) { clearMatterFinancials("The account changed. Refresh this Matter to continue."); if (getCurrentUserId() !== workspaceOwnerId) clearWorkspaceAccount(); } });
+  window.addEventListener("pagehide", () => {
+    clearMatterFinancials(); disposeMatterSwitcher(); caseDetailController?.abort(); caseDetailController = null;
+    state.caseLoadSequence += 1; state.matterSectionSequence += 1;
+    stopCaseStream(); stopMessagePolling(); stopWorkspacePresence();
+  });
   window.addEventListener("beforeunload", () => {
     stopCaseStream();
     stopMessagePolling();
     stopWorkspacePresence();
   });
-  if (caseList) {
-    caseList.addEventListener("click", handleCaseListClick);
-  }
-  if (caseSelect) {
-    caseSelect.addEventListener("change", handleCaseSelect);
-  }
   if (caseDisputeButton) {
     caseDisputeButton.addEventListener("click", handleFlagAction);
   }
@@ -6544,33 +6385,10 @@ function init() {
     void ensureMatterSectionData(retry.dataset.matterRetry, { force: true });
   });
   window.addEventListener("popstate", handleMatterHistoryChange);
-  caseTabs.forEach((tab) => tab.addEventListener("click", handleTabClick));
-  const params = new URLSearchParams(window.location.search);
-  const fromQuery = params.get("caseId");
-  if (fromQuery) {
-    loadCase(fromQuery);
-    loadCases()
-      .then(loadUnreadCounts)
-      .catch((err) => {
-        showMsg(caseListStatus, err.message || "Unable to load Matter list.");
-      });
-    return;
-  }
-  loadCases()
-    .then(loadUnreadCounts)
-    .then(() => {
-      const source = state.caseOptions.length ? state.caseOptions : state.cases;
-      const initial = source[0] ? getCaseId(source[0]) : "";
-      if (initial) {
-        loadCase(initial);
-        return;
-      }
-      showMsg(caseListStatus, "");
-      setCaseNavStatus("No active Matters.");
-    })
-    .catch((err) => {
-      showMsg(caseListStatus, err.message || "Unable to load Matters.");
-    });
+  const fromQuery = new URLSearchParams(window.location.search).get("caseId");
+  workspaceOwnerId = getCurrentUserId();
+  if (fromQuery) void loadCase(fromQuery);
+  else showMatterChooser();
 }
 
 window.LPCMatterNavigation = Object.freeze({

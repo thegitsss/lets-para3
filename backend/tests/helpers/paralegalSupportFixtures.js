@@ -45,7 +45,7 @@ function syntheticUser({ _id = objectId(), role, label, payoutReady = false }) {
     yearsExperience: role === "paralegal" ? 7 : null,
     bio: "Synthetic Package 6 paralegal assistant fixture. This is not a customer record.",
     resumeURL: role === "paralegal" ? "/synthetic/package6/resume.pdf" : "",
-    preferences: { theme: "mountain", fontSize: "md", hideProfile: false },
+    preferences: { theme: "light", fontSize: "md", hideProfile: false },
     notificationPrefs: { email: true, inApp: true, browser: false },
     onboarding: {
       paralegalTourCompleted: true,

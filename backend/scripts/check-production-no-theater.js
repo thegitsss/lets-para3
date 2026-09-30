@@ -286,9 +286,6 @@ const OPERATIONAL_DOCUMENT_FORBIDDEN_PATTERNS = [
     reason: "describes the governed Control Room as wholly read-only",
   },
 ];
-const SILENT_FAILURE_EXEMPTIONS = new Set([
-  path.join(backendRoot, "services", "caseLifecycle.js"),
-]);
 const LEGACY_CASE_USER_COPY_PATTERN =
   /(?:\b(?:error|msg|message|summary|reason|label|title|copy|recommendation|category|description)\s*(?::|=)\s*|\b(?:throw new Error|new Error|showToast|notify|showAlert|setStatus)\s*\()\s*["'`][^"'`\n]*\b(?:case|job)(?:s)?\b/i;
 const LEGACY_CASE_FALLBACK_PATTERN =
@@ -320,7 +317,7 @@ function silentOperationalFailureIssue(filePath, source = "") {
   const isBackendRuntime = backendRuntimeRoots.some(
     (root) => filePath === root || filePath.startsWith(`${root}${path.sep}`)
   );
-  return isBackendRuntime && !SILENT_FAILURE_EXEMPTIONS.has(filePath) && SILENT_FAILURE_PATTERN.test(String(source));
+  return isBackendRuntime && SILENT_FAILURE_PATTERN.test(String(source));
 }
 
 function legacyCaseUserCopyIssue(filePath, source = "") {

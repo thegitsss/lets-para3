@@ -79,9 +79,14 @@ describe("Recommendation dependency and tab synchronization", () => {
       path.resolve(__dirname, "../../frontend/assets/scripts/views/browse-jobs.js"),
       "utf8"
     );
-    expect(dashboard).toMatch(/loadExclusions: \(\) => fetchJson\('\/api\/applications\/recommendation-exclusions'\)/);
-    expect(dashboard).toMatch(/window\.addEventListener\('pageshow',[\s\S]*event\.persisted[\s\S]*refreshDashboardFromServer\('pageshow', \{ force: true \}\)/);
-    expect(dashboard).toMatch(/document\.addEventListener\('visibilitychange',[\s\S]*refreshDashboardFromServer\('visible', \{ force: true \}\)/);
+    expect(dashboard).toContain("readOwnedHome('recommendations', options => fetchJson('/api/jobs/recommended', options))");
+    expect(dashboard).not.toMatch(/rankRecommendedMatters|isHistoricallyExcluded/);
+    expect(browse).not.toMatch(/lpc_applied_jobs|persistAppliedJobs/);
+    expect(dashboard).toMatch(/const resume = reason => \{\s*dashboardDeparting = false;\s*refreshDashboardFromServer\(reason, \{ force: true \}\);/);
+    expect(dashboard).toMatch(/window\.addEventListener\('pageshow',[\s\S]*event\.persisted\) resume\('pageshow'\)/);
+    expect(dashboard).toMatch(/document\.addEventListener\('visibilitychange',[\s\S]*document\.visibilityState === 'visible'\) resume\('visible'\)/);
+    expect(dashboard).toMatch(/loadAppliedJobs\(\{ preservePage: true, silent: true \}\)/);
+    expect(dashboard).toMatch(/loadRecommendedMatters\(\{ silent: true \}\)/);
     expect(dashboard).toMatch(/window\.addEventListener\('lpc:lifecycle-refresh',[\s\S]*refreshDashboardFromServer\('lifecycle', \{ force: true \}\)/);
     expect(dashboard).toMatch(/subscribeRecommendationHistoryChanges\([\s\S]*handleRecommendationHistoryChange/);
     expect(browse).toMatch(/publishRecommendationHistoryChange\(\{/);
@@ -157,6 +162,47 @@ describe("Recommendation dependency and tab synchronization", () => {
       );
     }
   );
+
+  test("silent refresh preserves the rendered recommendation state while dependencies reload", async () => {
+    const state = loadRecommendationState();
+    const loading = jest.fn();
+    const ready = jest.fn();
+    const loader = state.createRecommendationStateLoader({
+      loadProfile: () => Promise.resolve({ state: "CA" }),
+      loadJobs: () => Promise.resolve([{ id: "case-1" }]),
+      loadExclusions: () => Promise.resolve({ matterIds: [] }),
+      onLoading: loading,
+      onReady: ready,
+    });
+
+    await loader.refresh({ silent: true });
+
+    expect(loading).not.toHaveBeenCalled();
+    expect(ready).toHaveBeenCalledWith(
+      {
+        profile: { state: "CA" },
+        jobs: [{ id: "case-1" }],
+        exclusions: { matterIds: [] },
+      },
+      { silent: true }
+    );
+  });
+
+  test("silent refresh also preserves the rendered state when a dependency fails", async () => {
+    const state = loadRecommendationState();
+    const unavailable = jest.fn();
+    const loader = state.createRecommendationStateLoader({
+      loadProfile: () => Promise.resolve({ state: "CA" }),
+      loadJobs: () => Promise.reject(new Error("temporary failure")),
+      loadExclusions: () => Promise.resolve({ matterIds: [] }),
+      onError: unavailable,
+    });
+
+    const result = await loader.refresh({ silent: true });
+
+    expect(unavailable).not.toHaveBeenCalled();
+    expect(result.error).toEqual(expect.objectContaining({ message: "temporary failure" }));
+  });
 
   test("a slower stale refresh cannot restore an old recommendation", async () => {
     const state = loadRecommendationState();

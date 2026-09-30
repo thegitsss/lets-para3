@@ -393,7 +393,7 @@ async function createOrActivateBlock({
   sourceDisputeId = "",
   sourceType = "legacy",
   reason = "",
-}) {
+}, { session = null } = {}) {
   const directQuery = getDirectBlockQuery(blockerId, blockedId);
   const payload = {
     blockerRole: normalizeRole(blockerRole),
@@ -406,18 +406,20 @@ async function createOrActivateBlock({
     deactivatedAt: null,
   };
 
-  const existing = await Block.findOne(directQuery);
+  const existing = await Block.findOne(directQuery).session(session);
   if (existing) {
     existing.set(payload);
-    await existing.save();
+    existing.increment();
+    await existing.save({ session });
     return { created: false, block: existing };
   }
 
-  const created = await Block.create({
+  const value = {
     blockerId,
     blockedId,
     ...payload,
-  });
+  };
+  const created = session ? (await Block.create([value], { session }))[0] : await Block.create(value);
   return { created: true, block: created };
 }
 
@@ -429,6 +431,7 @@ async function deactivateBlock({ blockerId, blockedId }) {
   if (!existing) return false;
   existing.active = false;
   existing.deactivatedAt = new Date();
+  existing.increment();
   await existing.save();
   return true;
 }

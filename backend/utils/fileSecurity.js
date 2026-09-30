@@ -142,10 +142,11 @@ function classifyMalwareScanResult(value, { required = malwareScanRequired() } =
   return { status: "pending", result: result || "PENDING", safe: false };
 }
 
-async function getObjectMalwareScan({ s3, bucket, key, required = malwareScanRequired() } = {}) {
+async function getObjectMalwareScan({ s3, bucket, key, versionId, signal, required = malwareScanRequired() } = {}) {
   if (!required) return classifyMalwareScanResult("", { required: false });
   if (!s3 || !bucket || !key) throw new Error("Malware scan verification requires S3, bucket, and key.");
-  const response = await s3.send(new GetObjectTaggingCommand({ Bucket: bucket, Key: String(key) }));
+  const command = new GetObjectTaggingCommand({ Bucket: bucket, Key: String(key), ...(versionId ? { VersionId: versionId } : {}) });
+  const response = signal ? await s3.send(command, { abortSignal: signal }) : await s3.send(command);
   const tag = (response?.TagSet || []).find((entry) => entry?.Key === GUARDDUTY_TAG_KEY);
   return classifyMalwareScanResult(tag?.Value, { required: true });
 }

@@ -33,7 +33,6 @@ const {
 } = require("../services/ai/controlRoomDecisionPolicy");
 const {
   getAutonomyPreferencesSnapshot,
-  processAutoModeActions,
   setAutonomyPreferenceMode,
 } = require("../services/ai/autonomyPreferenceService");
 const {
@@ -168,9 +167,9 @@ function buildAdmissionsMissingFields(user = {}) {
 
   if (role === "paralegal") {
     if (!String(user.resumeURL || "").trim()) missing.push("resume");
-    if (!String(user.certificateURL || "").trim()) missing.push("certificate");
-    if (!Number.isFinite(Number(user.yearsExperience)) || Number(user.yearsExperience) <= 0) {
-      missing.push("experience history");
+    if (!user.paralegalQualification && !String(user.certificateURL || "").trim() &&
+        (!Number.isFinite(Number(user.yearsExperience)) || Number(user.yearsExperience) < 1)) {
+      missing.push("admission qualification");
     }
   }
 
@@ -347,7 +346,7 @@ async function getAdmissionsSnapshot() {
     disabled: { $ne: true },
   })
     .select(
-      "firstName lastName email role createdAt emailVerified termsAccepted barNumber lawFirm firmWebsite state resumeURL certificateURL yearsExperience"
+      "firstName lastName email role createdAt emailVerified termsAccepted barNumber lawFirm firmWebsite state resumeURL certificateURL yearsExperience paralegalQualification"
     )
     .sort({ createdAt: 1 })
     .lean();
@@ -545,7 +544,7 @@ async function getLifecycleSnapshot() {
     disabled: { $ne: true },
   })
     .select(
-      "firstName lastName email role status createdAt approvedAt lastLoginAt emailVerified termsAccepted barNumber lawFirm firmWebsite state resumeURL certificateURL yearsExperience stripeAccountId stripeOnboarded stripePayoutsEnabled"
+      "firstName lastName email role status createdAt approvedAt lastLoginAt emailVerified termsAccepted barNumber lawFirm firmWebsite state resumeURL certificateURL yearsExperience paralegalQualification stripeAccountId stripeOnboarded stripePayoutsEnabled"
     )
     .lean();
   const users = allUsers.filter((user) => !isSyntheticUserRecord(user));
@@ -3127,7 +3126,6 @@ function buildIncidentFocus(incidents) {
 }
 
 async function getControlRoomSourceData() {
-  await processAutoModeActions();
   const [
     admissions,
     support,

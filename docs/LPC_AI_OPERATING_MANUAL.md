@@ -1,6 +1,7 @@
 # LPC AI Operating Manual
 
 Founder/operator manual for Samantha  
+Admin workflow, design, and communications updated September 7, 2026. See the [operating scope](audits/admin-2026-09-06/implementation/README.md) and [admin experience redesign](audits/admin-2026-09-07-design/README.md).
 Codebase basis: current Let’s-ParaConnect admin dashboard, support system, marketing system, AI admin routes, and scheduler behavior in this repository.
 
 ## 1. Executive Overview
@@ -40,41 +41,30 @@ Overall architecture:
 
 ### Major admin areas currently present
 
-The current sidebar includes these sections:
+The daily sidebar has five destinations: Overview, Users, Matters, Support & inquiries, and Finance.
 
-- Overview
-- AI Control Room
-- Approvals
-- Knowledge Studio
-- Marketing Drafts
-- Support Ops
-- Engineering
-- Sales Workspace
-- User Management
-- Photo Reviews
-- Stripe
-- Disputes
-- Revenue
-- Posts
-- Activity Logs
-- Settings
+Growth contains Marketing, Sales, Directors, and Content review. System & tools contains Engineering, Automation (the existing AI Control Room), Support knowledge, Posting moderation, Activity log, and Settings. Director Oversight links back to the same five daily destinations. Existing backend decision policies and canonical handlers remain in force.
 
 ### Overview
 
-This is the classic admin layer. It is not primarily AI-driven. It gives you:
+A fresh admin visit opens with **new signups awaiting Samantha’s approval**, oldest first. Open an application to inspect admission and access state, the role’s current requirements, document-safety checks, notes, and communication history. Approval and denial remain explicit decisions. A request for more information leaves the application pending and creates an inquiry with a recorded email outcome.
 
-- total users
-- Stripe payment state
-- active Matters
-- pending approvals
-- payout and income cards
-- open disputes
-- payment overview
-- revenue reporting
-- recent Matter posts
-- admin activity logs
+Contact form submissions, requests for a human, and recent questions appear beside signup review on desktop and immediately after it on mobile. Matter and money exceptions link to their operating queues. Growth/system work and platform reporting are collapsed below daily work. The app/database reachability check is not a certification of payment, storage, or email-provider health.
 
-This is your platform operations home base, not your agent workspace.
+The admin uses LPC’s serif and sans-serif typography, navy navigation, warm surfaces, and restrained gold accents. Cmd/Ctrl+K opens workspace search; arrow keys navigate results and Escape returns focus. Application review opens in a focused panel with qualifications, documents, readiness checks, and decision controls kept in view. Mobile inquiry navigation switches between list and conversation while preserving unsent reply drafts. Settlement confirmation itemizes the server-calculated financial outcome and defaults focus to Cancel.
+
+### Daily workspaces
+
+- **Users:** separate Applications, All users, Photo review, and Deactivated tabs; denied and suspended filters; account readiness, suspend/reinstate with a reason and impact preview, review notes, and communication history.
+- **Matters:** paginated search and filters for the complete matter collection. Open shared scope, lifecycle, applications, files/submissions, shared deadlines, support, financial state, and activity. Posting moderation actions operate on the selected matter. Attorney-private notes and private calendar entries are excluded.
+- **Support & inquiries:** contact submissions, human requests, and other support sources. Read the conversation and reply first. Ownership, next action, follow-up date, internal notes, and technical context are secondary controls. Filter assigned/unassigned and overdue work.
+- **Finance:** separate matter-dispute and processor-chargeback queues, selected dispute details, and a final named-party amount preview. Payments & receipts has complete paginated records and filtered CSV exports; charts and sampled activity are folded away. Reconciliation can open from the selected matter.
+
+Assistant handoffs are two-way inside LPC: team replies appear in the user’s Assistant conversation. Contact/application information requests are emailed through the configured provider. Support mailbox synchronization is implemented locally and requires dedicated Zoho read credentials plus the separate communications worker before live replies return to admin. Exact outbound Message-ID references and the expected sender link incoming replies to an inquiry; unmatched email opens a separate inquiry. Attachments remain in the support mailbox. A provider-accepted outcome is not proof of delivery to the recipient’s inbox.
+
+Reply, information-request, and review-note drafts save privately to the current admin account, expire after 30 days of inactivity, and protect against overwrites from another tab. A saved reply request ID prevents duplicate sends after a lost response. Reusable reply starters remain editable and require an explicit send.
+
+The Email & owner alerts disclosure reports connection state, scan coverage, worker heartbeat, queued alerts, and failed or unconfirmed sends. Owner alerts cover pending signups, contact submissions, human requests, incoming email, and overdue inquiry follow-ups. The existing signup alert attempts delivery immediately; remaining alerts and safe retries require the standalone worker. The default owner address remains admin@lets-paraconnect.com, configurable through ADMIN_ALERT_EMAIL. See [communications implementation and activation](audits/admin-2026-09-07-communications/README.md) for setup, tests, and operating limits.
 
 ### AI Control Room
 
@@ -283,23 +273,12 @@ Safety level language used in this manual:
 
 ### What Samantha should check each morning
 
-Start in this order:
+1. **Overview → New signups awaiting your approval.** Review the oldest applications, request missing information where needed, and record decisions.
+2. **Support & inquiries.** Address contact submissions, human requests, and overdue follow-ups. Read the conversation before responding.
+3. **Matter and money exceptions.** Investigate overdue/stalled work and payment issues through linked records. Review financial evidence and the exact proposed outcome before confirming any settlement.
+4. **Growth and System & tools**, when an item requires attention. Marketing approval remains distinct from publishing; engineering and other governed actions retain their existing review requirements.
 
-1. `AI Control Room`
-2. `Marketing Drafts` founder layer
-3. `Engineering`
-4. `Support Ops`
-5. `Incident Workspace` inside the AI Control Room
-6. `Approvals`
-
-The reason for that order:
-
-- AI Control Room tells you where the pressure is.
-- Founder Daily Log tells you what marketing needs your approval or post action.
-- Engineering tells you whether a user-reported product issue is only queued, actively diagnosed, blocked, ready for test, or resolved.
-- Support Ops tells you whether support-owned users are blocked right now.
-- Incident Workspace tells you whether there is a broader technical pattern behind those support and engineering signals.
-- Approvals is where you cleanly clear governed review work.
+The broader Automation summary remains available as a secondary operational view. It does not replace the application and inquiry queues.
 
 ### How to use the Founder Daily Log
 
@@ -356,29 +335,10 @@ Approve only when:
 
 ### How to handle urgent support issues
 
-Go to `Support Ops` and review:
+Open **Support & inquiries**, select the question, and read the conversation. Replies to an Assistant handoff appear in the same user conversation; replies to contact submissions use email. Review the recorded send outcome before retrying.
 
-- open blockers
-- account-access tickets
-- money-sensitive tickets
-- any support-owned tickets still waiting for human reply
+Use **Ownership & follow-up** to assign an operator, record the next action, and set a follow-up time. Internal notes and status changes remain separate from the user-visible reply. Technical facts and linked engineering incidents are under **Context & technical details**. A repaired engineering incident does not automatically resolve an unanswered human/contact inquiry.
 
-Then separately check `Engineering` for:
-
-- newly created incident-backed issues
-- auto-started CTO diagnosis
-- issues marked `Blocked`, `Ready for Test`, or `Resolved`
-
-Then:
-
-1. open the ticket detail
-2. review the latest support facts snapshot
-3. review the recommended response packet
-4. add an internal note if needed
-5. send a team reply manually if you are ready
-6. move the ticket status intentionally
-
-The system can draft, classify, and auto-route. It does not remove the need for human judgment on sensitive replies.
 
 ### How to review technical incidents
 

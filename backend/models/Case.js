@@ -15,10 +15,18 @@ const {
  * Enums & Helpers
  * -----------------------------------------*/
 const DISPUTE_STATUS = ["open", "resolved", "rejected"];
-const APPLICANT_STATUS = ["pending", "accepted", "rejected"];
+const APPLICANT_STATUS = ["pending", "accepted", "rejected", "withdrawn"];
 const FILE_STATUS = ["pending_review", "approved", "attorney_revision"];
 
-const ZOOM_REGEX = /^https:\/\/.*zoom\.us\/[^\s]+$/i;
+function validZoomLink(value) {
+  if (!value) return true;
+  if (typeof value !== 'string' || value.length > 2000 || /\s/.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password && !url.port
+      && (url.hostname === 'zoom.us' || url.hostname.endsWith('.zoom.us')) && url.pathname.length > 1;
+  } catch { return false; }
+}
 const {
   DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT,
   DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT,
@@ -108,10 +116,14 @@ const applicantSchema = new Schema(
     status: { type: String, enum: APPLICANT_STATUS, default: "pending", index: true },
     starredBy: [{ type: Types.ObjectId, ref: "User" }],
     appliedAt: { type: Date, default: Date.now },
+    withdrawnAt: { type: Date },
+    withdrawalRevision: { type: String, match: /^[a-f0-9]{64}$/ },
+    statusHistory: { type: [new Schema({ from: String, to: String, reason: String, actorId: { type: Types.ObjectId, ref: "User" }, at: Date }, { _id: false })], default: undefined },
     note: { type: String, trim: true, maxlength: 10_000 }, // optional cover note
     resumeURL: { type: String, trim: true, default: "" },
     linkedInURL: { type: String, trim: true, default: "" },
     profileSnapshot: { type: profileSnapshotSchema, default: () => ({}) },
+    requirementConfirmations: {type:[new Schema({requirement:String,meets:Boolean},{_id:false})],default:[]},
   },
   { _id: false }
 );
@@ -216,7 +228,11 @@ const caseSchema = new Schema(
     experiencePreference: { type: String, trim: true, maxlength: 200, default: "" },
     minimumYearsExperience: { type: Number, min: 0, max: 80, default: 0 },
     tasks: { type: [scopeTaskSchema], default: [] },
+    requirements: { type: [{ type: String, trim: true, maxlength: 200 }], default: [], validate: value => value.length <= 12 },
     tasksLocked: { type: Boolean, default: false, index: true },
+    // Task order/content is locked during an assignment. Preserve earlier
+    // approvals without treating them as work done by a replacement.
+    assignmentCompletedTaskIndexes: { type: [Number], default: undefined },
     status: { type: String, enum: CASE_STATUS_ENUM, default: "open", index: true },
 
     // Timeline
@@ -246,6 +262,11 @@ const caseSchema = new Schema(
     adminDisputeDeadlineAt: { type: Date, default: null },
     adminDisputeOverdueNotifiedAt: { type: Date, default: null },
     partialPayoutAmount: { type: Number, default: null, min: 0 }, // cents (gross before paralegal fee)
+    withdrawalClaimToken: { type: String, default: "", trim: true, select: false },
+    withdrawalClaimStatus: { type: String, enum: ["claimed", "needs_reconciliation", null], default: null, select: false },
+    withdrawalClaimedAt: { type: Date, default: null, select: false },
+    withdrawalClaimTransferId: { type: String, default: "", trim: true, select: false },
+    withdrawalClaimAmount: { type: Number, default: null, min: 0, select: false },
     payoutFinalizedAt: { type: Date, default: null },
     payoutFinalizedType: {
       type: String,
@@ -253,11 +274,27 @@ const caseSchema = new Schema(
       default: null,
     },
     withdrawnParalegalId: { type: Types.ObjectId, ref: "User", default: null },
+    withdrawalHistory: {
+      type: [new Schema({
+        withdrawnParalegalId: { type: Types.ObjectId, ref: "User", required: true },
+        paralegalNameSnapshot: String,
+        payoutFinalizedAt: Date,
+        payoutFinalizedType: String,
+        partialPayoutAmount: Number,
+        remainingAmount: Number,
+        feeParalegalPct: Number,
+        feeAttorneyPct: Number,
+        payoutTransferId: String,
+        pausedAt: Date,
+      }, { _id: false })],
+      default: [],
+    },
     relistRequestedAt: { type: Date, default: null },
     relistPending: { type: Boolean, default: false },
     remainingAmount: { type: Number, default: null, min: 0 }, // cents remaining for relist
     briefSummary: { type: String, trim: true, maxlength: 1000, default: "" },
     archived: { type: Boolean, default: false, index: true },
+    archiveReceipt: { type: Schema.Types.Mixed, default: null, select: false },
     downloadUrl: [{ type: String, trim: true }],
     readOnly: { type: Boolean, default: false, index: true },
     paralegalAccessRevokedAt: { type: Date, default: null },
@@ -320,13 +357,15 @@ const caseSchema = new Schema(
       default: "",
       trim: true,
       validate: {
-        validator: (v) => !v || ZOOM_REGEX.test(v),
+        validator: validZoomLink,
         message: "zoomLink must be a valid https://*.zoom.us/... URL",
       },
     },
 
     // Applications & files
     applicants: [applicantSchema],
+    // Retains a withdrawal interlock while the canonical Application is synchronizing.
+    withdrawnApplicantIds: { type: [Types.ObjectId], default: undefined, select: false },
     files: [fileSchema],
     disputes: [disputeSchema],
     flags: { type: [flagSchema], default: [] },
@@ -336,6 +375,9 @@ const caseSchema = new Schema(
       default: "none",
       index: true,
     },
+    moderationPostingBaseline: { type: String, default: null },
+    moderationEditRequest: { type: String, maxlength: 2000, default: "" },
+    moderationReviewReceipt: { type: Schema.Types.Mixed, default: null },
     moderationFlaggedAt: { type: Date, default: null },
     moderationFlaggedBy: { type: Types.ObjectId, ref: "User", default: null },
     moderationResolutionRequestedAt: { type: Date, default: null },
@@ -434,6 +476,7 @@ caseSchema.index({ "invites.syncStatus": 1, updatedAt: 1 });
 caseSchema.index({ postingSyncStatus: 1, updatedAt: 1 });
 caseSchema.index({ completionClaimStatus: 1, completionClaimedAt: 1 });
 caseSchema.index({ status: 1, createdAt: -1 });
+caseSchema.index({ job: 1 }); // Retained reverse posting links used by discovery.
 caseSchema.index({ "applicants.paralegalId": 1, createdAt: -1 }); // helpful when showing "my applications"
 
 /** ----------------------------------------
@@ -461,10 +504,21 @@ caseSchema.pre("validate", function () {
   if (this.paralegal && this.paralegalId && referenceId(this.paralegal) !== referenceId(this.paralegalId)) {
     throw new Error("paralegal and paralegalId must reference the same user.");
   }
-  this.status = normalizeCaseStatus(this.status);
-  const normalizedDeadline = normalizeDateOnly(this.deadlineDate || this.deadline);
-  this.deadlineDate = normalizedDeadline;
-  this.deadline = normalizedDeadline ? dateOnlyToUtcDate(normalizedDeadline) : null;
+  if (this.isNew || this.isSelected("status") || this.isModified("status")) {
+    this.status = normalizeCaseStatus(this.status);
+  }
+  // A partial read cannot establish an omitted deadline alias. Keep the
+  // existing normalization for new/full reads and explicit deadline edits.
+  if (
+    this.isNew ||
+    (this.isSelected("deadlineDate") && this.isSelected("deadline")) ||
+    this.isModified("deadlineDate") ||
+    this.isModified("deadline")
+  ) {
+    const normalizedDeadline = normalizeDateOnly(this.deadlineDate || this.deadline);
+    this.deadlineDate = normalizedDeadline;
+    this.deadline = normalizedDeadline ? dateOnlyToUtcDate(normalizedDeadline) : null;
+  }
 
   if (Array.isArray(this.applicants) && this.applicants.length > 1) {
     const seen = new Set();
@@ -484,26 +538,25 @@ caseSchema.pre("validate", function () {
   }
 });
 
-// Normalize money fields to integer cents and non-negative
+// Normalize loaded or explicitly assigned money fields to integer cents.
+// A partial Case document must not replace unselected persisted amounts with zero.
 caseSchema.pre("save", function () {
-  this.totalAmount = cents(this.totalAmount);
-  if (this.lockedTotalAmount != null) {
-    this.lockedTotalAmount = cents(this.lockedTotalAmount);
+  const normalizeAmount = (path, { optional = false } = {}) => {
+    if (!this.isSelected(path) && !this.isModified(path)) return;
+    const value = this.get(path);
+    if (optional && value == null) return;
+    this.set(path, cents(value));
+  };
+  for (const path of ["totalAmount", "feeAttorneyAmount", "feeParalegalAmount"]) {
+    normalizeAmount(path);
   }
-  if (this.partialPayoutAmount != null) {
-    this.partialPayoutAmount = cents(this.partialPayoutAmount);
+  for (const path of ["lockedTotalAmount", "partialPayoutAmount", "remainingAmount"]) {
+    normalizeAmount(path, { optional: true });
   }
-  if (this.remainingAmount != null) {
-    this.remainingAmount = cents(this.remainingAmount);
-  }
-  this.feeAttorneyAmount = cents(this.feeAttorneyAmount);
-  this.feeParalegalAmount = cents(this.feeParalegalAmount);
   if (this.disputeSettlement) {
-    this.disputeSettlement.grossAmount = cents(this.disputeSettlement.grossAmount);
-    this.disputeSettlement.feeAttorneyAmount = cents(this.disputeSettlement.feeAttorneyAmount);
-    this.disputeSettlement.feeParalegalAmount = cents(this.disputeSettlement.feeParalegalAmount);
-    this.disputeSettlement.payoutAmount = cents(this.disputeSettlement.payoutAmount);
-    this.disputeSettlement.refundAmount = cents(this.disputeSettlement.refundAmount);
+    for (const field of ["grossAmount", "feeAttorneyAmount", "feeParalegalAmount", "payoutAmount", "refundAmount"]) {
+      normalizeAmount(`disputeSettlement.${field}`);
+    }
   }
 });
 

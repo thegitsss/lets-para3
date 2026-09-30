@@ -1,4 +1,6 @@
-const { MongoClient, MongoNetworkError } = require("mongodb");
+// Use the driver shipped with this checkout's Mongoose installation. Resolving
+// an undeclared top-level mongodb package can pick up a user's global install.
+const { MongoClient, MongoNetworkError } = require("mongoose").mongo;
 const { releaseStateFile } = require("./mongoHarnessState");
 
 function isExpectedShutdownDisconnect(error) {
@@ -56,14 +58,19 @@ module.exports = async function globalMongoTeardown() {
 
     if (clientReady) {
       const mongoInstance = mongoServer.instanceInfo?.instance;
-      const processExitPromise = observeProcessExit(mongoInstance?.mongodProcess);
+      // Attach the rejection handler immediately: shutdown itself can take time.
+      const processExitPromise = observeProcessExit(mongoInstance?.mongodProcess)
+        .then((exit) => ({ exit }), (error) => ({ error }));
       try {
         await client.db("admin").command({ shutdown: 1, force: true, timeoutSecs: 1 });
       } catch (err) {
         if (!isExpectedShutdownDisconnect(err)) cleanupErrors.push(err);
       }
       try {
-        const exit = await processExitPromise;
+        await client.close();
+        const outcome = await processExitPromise;
+        if (outcome.error) throw outcome.error;
+        const exit = outcome.exit;
         if (exit.code !== 0 || exit.signal) {
           cleanupErrors.push(
             new Error(`The shared Jest mongod process exited abnormally (${JSON.stringify(exit)}).`)
@@ -77,7 +84,8 @@ module.exports = async function globalMongoTeardown() {
         cleanupErrors.push(err);
       }
     }
-    await mongoServer.stop({ doCleanup: true, force: true }).catch((err) => cleanupErrors.push(err));
+    const processOwner = global.__LPC_JEST_MONGO_REPLICA_SET__ || mongoServer;
+    await processOwner.stop({ doCleanup: true, force: true }).catch((err) => cleanupErrors.push(err));
     await client.close().catch((err) => cleanupErrors.push(err));
   }
 
@@ -87,10 +95,12 @@ module.exports = async function globalMongoTeardown() {
     cleanupErrors.push(err);
   } finally {
     delete global.__LPC_JEST_MONGO_SERVER__;
+    delete global.__LPC_JEST_MONGO_REPLICA_SET__;
   }
 
   if (cleanupErrors.length) {
-    throw new AggregateError(cleanupErrors, "The shared Jest Mongo harness did not clean up completely.");
+    const details = cleanupErrors.map((error) => `${error.name}: ${error.message}`).join("; ");
+    throw new AggregateError(cleanupErrors, `The shared Jest Mongo harness did not clean up completely. ${details}`);
   }
 };
 

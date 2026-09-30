@@ -2,8 +2,10 @@ const { devices } = require("playwright/test");
 
 const CURRENT_BROWSER_PROJECTS = Object.freeze([
   { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-  { name: "firefox", use: { ...devices["Desktop Firefox"] } },
-  { name: "webkit", use: { ...devices["Desktop Safari"] } },
+  // CDP-only fixtures have an explicit filename so broader suite configs keep
+  // the same capability boundary as their dedicated component config.
+  { name: "firefox", testIgnore: "**/*.chromium.spec.js", use: { ...devices["Desktop Firefox"] } },
+  { name: "webkit", testIgnore: "**/*.chromium.spec.js", use: { ...devices["Desktop Safari"] } },
 ]);
 
 const SUPPORTED_VIEWPORTS = Object.freeze([

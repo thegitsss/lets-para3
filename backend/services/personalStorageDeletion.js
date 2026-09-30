@@ -6,6 +6,7 @@ const { extractPersonalFileKey } = require("../utils/personalFileReference");
 const { extractProfilePhotoKey } = require("./profilePhotoDelivery");
 const { createLogger } = require("../utils/logger");
 const { createS3Client } = require("../utils/s3Client");
+const { hasRetainedResumeReference } = require("./personalDocumentReferences");
 
 const logger = createLogger("personal-storage-deletion");
 const HOLD_RECOVERY_MS = 10 * 60 * 1000;
@@ -160,9 +161,8 @@ async function reconcileHeldTasks({ now = new Date(), limit = 50, env = process.
   let cancelled = 0;
   for (const task of held) {
     const user = await User.findById(task.ownerId).select(USER_STORAGE_FIELDS);
-    const stillReferenced = user
-      ? collectUserPersonalStorageKeys(user, env).includes(task.key)
-      : false;
+    const stillReferenced = (user && collectUserPersonalStorageKeys(user, env).includes(task.key))
+      || await hasRetainedResumeReference(task.ownerId, task.key, env);
     if (stillReferenced) {
       const result = await cancelPersonalStorageDeletion([task._id], { now });
       cancelled += result.cancelled;
@@ -215,7 +215,8 @@ async function processPersonalStorageDeletionTasks(
         throw unsafe;
       }
       const owner = await User.findById(task.ownerId).select(USER_STORAGE_FIELDS);
-      if (owner && collectUserPersonalStorageKeys(owner, env).includes(task.key)) {
+      if ((owner && collectUserPersonalStorageKeys(owner, env).includes(task.key))
+        || await hasRetainedResumeReference(task.ownerId, task.key, env)) {
         await StorageDeletionTask.updateOne(
           { _id: task._id, status: "processing", lockToken: task.lockToken },
           {

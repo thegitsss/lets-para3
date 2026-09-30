@@ -58,8 +58,8 @@ const expectEffectiveDate = (content, version, documentName) => {
 expectEffectiveDate(terms, CURRENT_TERMS_VERSION, "Terms");
 expectEffectiveDate(privacy, CURRENT_PRIVACY_VERSION, "Privacy");
 expectText(terms, /id="section-24"[\s\S]*24\. Definitions/, "Terms are missing the consolidated general provisions and definitions.");
-expectText(privacy, /AI-assisted support[\s\S]*OpenAI[\s\S]*store: false/i, "Privacy policy is missing the factual AI-support disclosure.");
-expectText(supportDrawer, /AI support uses OpenAI[\s\S]*confidential or privileged matter content/, "The support composer is missing its AI data boundary.");
+expectText(privacy, /AI-assisted support[\s\S]*OpenAI[\s\S]*optional storage of AI responses[\s\S]*monitor abuse/i, "Privacy policy is missing the factual AI-support disclosure.");
+expectText(supportDrawer, /AI can make mistakes\. Check important information\.[\s\S]*href=["']\/privacy\.html["']/, "The support composer is missing its AI fallibility notice or Privacy link.");
 expectText(signup, /privacyAcknowledged[\s\S]*true/, "Signup does not submit a separate privacy acknowledgement.");
 rejectText(privacy, /Indemnification|Waiver of Jury Trial|Choice of Law and Venue|LIMITATIONS OF LIABILITY/i, "Contract terms remain in the Privacy Policy.");
 

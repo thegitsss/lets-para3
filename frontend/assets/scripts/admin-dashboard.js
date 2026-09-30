@@ -1,3 +1,5 @@
+import { readFinancial, money as financialMoney, stateLabel, providerLabel, unitAmount, reportAmount } from './admin/financial-read.js';
+import { confirmAdminSettlement } from './admin/settlement-dialog.js';
 import { secureFetch } from "./auth.js";
 import {
   fetchIncidentList,
@@ -14,7 +16,7 @@ import { confirmAction, showAlert } from "./utils/dialogs.js";
 import "./admin/knowledge.js";
 import "./admin/engineering.js";
 import "./admin/marketing.js";
-import "./admin/support.js";
+import "./admin/inbox.js";
 import "./admin/sales.js";
 import "./admin/approvals.js";
 
@@ -26,12 +28,11 @@ revenue: null,
   escrowReport: null,
 };
 
-let analyticsInFlight = false;
+let analyticsInFlight = null;
+let analyticsSequence = 0;
 let latestAnalytics = null;
-let lastAnalyticsRenderAt = 0;
 let adminSettingsCache = null;
 let settingsBound = false;
-const ANALYTICS_COOLDOWN_MS = 30_000;
 const removedUserIds = new Set();
 let recentUsersCache = [];
 const NEW_USERS_PAGE_SIZE = 5;
@@ -54,40 +55,21 @@ let overviewActionsQueuedForceRefresh = false;
 let lastOverviewActionsAt = 0;
 const OVERVIEW_ACTIONS_COOLDOWN_MS = 15_000;
 
-const CURRENCY = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-});
-
 async function loadAnalytics() {
-if (analyticsInFlight) return null;
-analyticsInFlight = true;
-try {
-const res = await fetch("/api/admin/analytics", {
-credentials: "include",
-headers: { Accept: "application/json" },
-});
-if (!res.ok) {
-console.error("Failed to load analytics");
-return null;
-}
-return await res.json();
-} catch (err) {
-console.error("Failed to load analytics", err);
-return null;
-} finally {
-analyticsInFlight = false;
-}
+  if (!analyticsInFlight) {
+    const pending = readFinancial('/api/admin/analytics').finally(() => { if (analyticsInFlight === pending) analyticsInFlight = null; });
+    analyticsInFlight = pending;
+  }
+  return analyticsInFlight;
 }
 
 function cacheCharts() {
 if (!window.Chart?.getChart) return;
-chartCache.userLine = Chart.getChart("userChart") || chartCache.userLine;
-chartCache.combo = Chart.getChart("userMgmtComboChart") || chartCache.combo;
-chartCache.escrow = Chart.getChart("escrowChart") || chartCache.escrow;
-chartCache.revenue = Chart.getChart("revMainChart") || chartCache.revenue;
-  chartCache.escrowReport = Chart.getChart("escrowReportChart") || chartCache.escrowReport;
+chartCache.userLine = window.Chart.getChart("userChart") || chartCache.userLine;
+chartCache.combo = window.Chart.getChart("userMgmtComboChart") || chartCache.combo;
+chartCache.escrow = window.Chart.getChart("escrowChart") || chartCache.escrow;
+chartCache.revenue = window.Chart.getChart("revMainChart") || chartCache.revenue;
+  chartCache.escrowReport = window.Chart.getChart("escrowReportChart") || chartCache.escrowReport;
 }
 
 function updateText(selector, value) {
@@ -96,11 +78,7 @@ const el = document.querySelector(selector);
 if (el) el.textContent = value;
 }
 
-function formatCurrency(value) {
-  const cents = Number(value);
-  if (!Number.isFinite(cents)) return "—";
-  return CURRENCY.format(cents / 100);
-}
+function formatCurrency(value, currency = 'USD') { return financialMoney(value, currency); }
 
 function formatNumber(value) {
 if (!Number.isFinite(Number(value))) return "0";
@@ -310,7 +288,7 @@ function buildOverviewActions(summary = {}) {
           reason:
             disputesOpen > 0
               ? "Disputes are manual money-risk work and should not sit unresolved."
-              : "You can skip Finance unless you are checking reporting or receipts.",
+              : "No open matter disputes. Other payment exceptions may still require review.",
           buttonLabel: "Open Finance",
           target: {
             section: "finance",
@@ -453,13 +431,13 @@ function buildOverviewActions(summary = {}) {
         },
   ];
 
-  return rows.sort((left, right) => right.weight - left.weight);
+  return rows.filter(row => ['support','finance','engineering'].includes(row.key) && row.priority !== 'clear').sort((left,right)=>right.weight-left.weight);
 }
 
 function renderOverviewActionBoard(actions = [], { warningMessage = "" } = {}) {
   if (!overviewActionRowsEl) return;
   if (!actions.length && !warningMessage) {
-    overviewActionRowsEl.innerHTML = `<tr><td colspan="4" class="overview-action-empty">No overview actions are available right now.</td></tr>`;
+    overviewActionRowsEl.innerHTML = `<tr><td colspan="4" class="overview-action-empty">No other work is waiting in these queues.</td></tr>`;
     return;
   }
 
@@ -1467,9 +1445,9 @@ function buildAIControlRoomGroupedDecisionCopy({ actionType = "", count = 0 } = 
     return {
       title: `${count} LinkedIn posts ready`,
       explanation: `Approve or reject all ${count} posts together in the existing marketing workflow.`,
-      proposedAction: `Apply the current publish decision path to all ${count} LinkedIn posts.`,
+      proposedAction: `Apply the current approval decision path to all ${count} LinkedIn posts.`,
       actionHelperText: `Yes applies the existing approve path to all ${count} posts. No applies the existing reject path to all ${count} posts.`,
-      yesLabel: "Yes, publish all",
+      yesLabel: "Approve drafts",
       noLabel: "No, keep all out",
     };
   }
@@ -2378,6 +2356,8 @@ async function renderIncidentWorkspace(force = false) {
 async function openIncidentInAdminRoom(incidentId) {
   const selectedId = String(incidentId || "").trim();
   if (!selectedId) return;
+  const technicalDetails = document.querySelector(".admin-automation-technical");
+  if (technicalDetails) technicalDetails.open = true;
   window.activateAdminSection?.("ai-control-room");
   await renderAIControlRoom(true);
   await selectIncidentForWorkspace(selectedId, true);
@@ -2390,11 +2370,13 @@ async function openIncidentInAdminRoom(incidentId) {
   document.getElementById("incidentWorkspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+window.loadAdminAutomationDetails = renderAIControlRoom;
 window.loadIncidentWorkspace = renderIncidentWorkspace;
 window.openIncidentInAdminRoom = openIncidentInAdminRoom;
 
 async function renderAIControlRoom(force = false) {
-  if (!document.getElementById("section-ai-control-room")) return;
+  // The daily Automation surface reads status only. Legacy diagnostics are loaded on demand.
+  if (!document.querySelector("#section-ai-control-room .admin-automation-technical[open]")) return;
 
   const refreshBadge = document.getElementById("aiRoomRefreshBadge");
   const timestamp = document.getElementById("aiRoomTimestamp");
@@ -2630,11 +2612,7 @@ if (Number.isNaN(date.getTime())) return value;
 return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
-function formatCurrencyValue(value) {
-  const cents = Number(value);
-  if (!Number.isFinite(cents)) return "—";
-  return CURRENCY.format(cents / 100);
-}
+function formatCurrencyValue(value, currency = 'USD') { return financialMoney(value, currency); }
 
 function buildPersonLabel(person = {}) {
   if (!person) return "—";
@@ -2988,30 +2966,31 @@ return String(value)
 
 function populateMetrics(data) {
 const { userMetrics = {}, escrowMetrics = {}, revenueMetrics = {}, caseMetrics = {}, payoutMetrics = {} } = data || {};
+const currency = financialReportUnit(data)?.currency || 'USD';
 
 updateText("#totalUsers", formatNumber(userMetrics.totalUsers));
 updateText("#activeCases", formatNumber(caseMetrics.activeCases));
 updateText("#pendingUsers", formatNumber(userMetrics.pendingApprovals));
-updateText("#escrowTotal", formatCurrency(escrowMetrics.totalEscrowHeld));
+updateText("#escrowTotal", reportAmount(escrowMetrics.held, currency));
+updateText("#accountingHeldValue", reportAmount(escrowMetrics.held, currency));
 
 updateText("#metricAttorneys", formatNumber(userMetrics.totalAttorneys));
 updateText("#metricParalegals", formatNumber(userMetrics.totalParalegals));
 updateText("#metricPending", formatNumber(userMetrics.pendingApprovals));
 
-populateQuickStats(userMetrics, caseMetrics, escrowMetrics);
-updateText("#revenueTotalValue", formatCurrency(revenueMetrics.totalRevenue));
-updateText("#fundsReleasedValue", formatCurrency(escrowMetrics.totalEscrowReleased));
-updateText("#pendingPayoutsValue", formatCurrency(escrowMetrics.pendingPayouts));
-updateText("#payoutsRecordedValue", formatCurrency(payoutMetrics.totalRecorded));
+populateQuickStats(userMetrics, caseMetrics, escrowMetrics, currency);
+updateText("#revenueTotalValue", reportAmount(revenueMetrics, currency));
+updateText("#fundsReleasedValue", reportAmount(escrowMetrics.payouts, currency));
+updateText("#pendingPayoutsValue", reportAmount(escrowMetrics.pending, currency));
 
-updateText("#payoutTotal", formatCurrency(payoutMetrics.totalRecorded));
+updateText("#payoutTotal", reportAmount(payoutMetrics, currency));
 const payoutCountEl = document.getElementById("payoutCount");
 if (payoutCountEl) {
 const payoutCount = Number(payoutMetrics.count) || 0;
 payoutCountEl.textContent = `${payoutCount.toLocaleString()} payout${payoutCount === 1 ? "" : "s"} recorded`;
 }
 
-updateText("#incomeTotal", formatCurrency(revenueMetrics.platformFeesCollected));
+updateText("#incomeTotal", reportAmount(revenueMetrics, currency));
 const incomeCountEl = document.getElementById("incomeCount");
 if (incomeCountEl) {
 const incomeCount = Number(revenueMetrics.platformFeeCount) || 0;
@@ -3019,15 +2998,15 @@ incomeCountEl.textContent = `${incomeCount.toLocaleString()} income record${inco
 }
 }
 
-function populateQuickStats(userMetrics = {}, caseMetrics = {}, escrowMetrics = {}) {
+function populateQuickStats(userMetrics = {}, caseMetrics = {}, escrowMetrics = {}, currency = 'USD') {
 const nodes = document.querySelectorAll(".quick-stats div");
 const configs = [
 { label: "Total Users", value: formatNumber(userMetrics.totalUsers) },
 { label: "Pending Approvals", value: formatNumber(userMetrics.pendingApprovals) },
 { label: "Active Matters", value: formatNumber(caseMetrics.activeCases) },
 { label: "Completed Matters", value: formatNumber(caseMetrics.completedCases) },
-  { label: "Matter funding in progress", value: formatCurrency(escrowMetrics.totalEscrowHeld) },
-  { label: "Matter payments released", value: formatCurrency(escrowMetrics.totalEscrowReleased) },
+  { label: "Principal held", value: reportAmount(escrowMetrics.held, currency) },
+  { label: "Payouts recorded", value: reportAmount(escrowMetrics.payouts, currency) },
 ];
 nodes.forEach((node, index) => {
 const strong = node.querySelector("strong") || node.appendChild(document.createElement("strong"));
@@ -3050,14 +3029,15 @@ const chart = chartCache.revenue;
 if (!chart) return;
 const entries = revenueMetrics.monthlyRevenue || [];
 const labels = entries.map((entry) => formatMonthLabel(entry.month));
-const revenueData = entries.map((entry) => Math.round((Number(entry.revenue) || 0) / 100));
-const hasRevenue = revenueData.some((value) => value !== 0);
+const revenueData = entries.map((entry) => entry.revenue / 100);
+const hasRevenue = revenueMetrics.chartAvailable === true && revenueData.some((value) => value !== 0);
 const emptyState = document.getElementById("revMainChartEmpty");
 chart.canvas.hidden = !hasRevenue;
-if (emptyState) emptyState.hidden = hasRevenue;
+if (emptyState) { emptyState.hidden = hasRevenue; emptyState.textContent = revenueMetrics.chartAvailable === false ? "Separate currencies, modes, or unresolved records cannot form one revenue chart." : "No recorded platform fees in this window."; }
 
 chart.data.labels = labels;
 if (chart.data.datasets[0]) chart.data.datasets[0].data = revenueData;
+styleFinancialChart(chart, revenueMetrics.chartUnit);
 chart.update("none");
 }
 
@@ -3065,8 +3045,6 @@ function populateLedger(data) {
 const tbody = document.getElementById("ledgerBody");
 if (!tbody) return;
 const entries = data?.ledger || [];
-const downloadButton = document.getElementById("downloadLedgerCsvBtn");
-if (downloadButton) downloadButton.disabled = entries.length === 0;
 if (!entries.length) {
 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted)">No ledger entries found.</td></tr>';
 return;
@@ -3074,13 +3052,13 @@ return;
 tbody.innerHTML = "";
 entries.forEach((entry) => {
 const row = document.createElement("tr");
-const statusLabel = toTitle(entry.status || "Pending");
+const statusLabel = stateLabel(entry.state || entry.status);
 const statusSlug = statusLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 row.innerHTML = `
-     <td>${formatDate(entry.date)}</td>
-     <td>${entry.category || "—"}</td>
-     <td>${entry.description || "—"}</td>
-     <td>${formatCurrency(entry.amount)}</td>
+     <td>${escapeHTML(formatDate(entry.date))}</td>
+     <td>${escapeHTML(entry.category || "—")}</td>
+     <td>${escapeHTML(entry.description || "—")}</td>
+     <td>${escapeHTML(formatCurrency(entry.amount, entry.currency))}<small>${escapeHTML(providerLabel(entry.stripeMode))}</small></td>
      <td>${toTitle(entry.type || "income")}</td>
      <td><span class="status ${statusSlug}">${statusLabel}</span></td>
    `;
@@ -3095,6 +3073,7 @@ const receiptPageSelect = document.getElementById("receiptPageSelect");
 const RECEIPTS_PAGE_SIZE = 10;
 let receiptSearchTimer = null;
 let receiptPage = 1;
+let receiptSequence = 0, receiptRevision = null, receiptFilter = null;
 
 function updateReceiptPagination(total = 0) {
   if (!receiptPageSelect) return;
@@ -3127,15 +3106,15 @@ function renderReceipts(items = []) {
       const caseTitle = escapeHTML(item.caseTitle || "Untitled Matter");
       const party = escapeHTML(item.party || "—");
       const type = escapeHTML(item.type || "Receipt");
-      const amount = formatCurrencyValue(item.amountCents);
+      const amount = formatCurrencyValue(item.amountCents, item.currency);
       return `
         <tr>
           <td>${escapeHTML(issuedAt)}</td>
           <td><span class="receipt-id">${receiptId}</span></td>
           <td>${caseTitle}</td>
           <td>${party}</td>
-          <td>${type}</td>
-          <td>${escapeHTML(amount)}</td>
+          <td>${type}<small>${escapeHTML(stateLabel(item.state))}</small></td>
+          <td>${escapeHTML(amount)}<small>${escapeHTML(providerLabel(item.stripeMode))}</small></td>
         </tr>
       `;
     })
@@ -3144,25 +3123,23 @@ function renderReceipts(items = []) {
 
 async function loadReceipts() {
   if (!receiptsBody) return;
-  receiptsBody.innerHTML =
-    '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Loading receipts…</td></tr>';
+  const seq = ++receiptSequence;
+  receiptsBody.innerHTML = '<tr><td colspan="6">Loading receipts…</td></tr>';
   try {
     const q = String(receiptSearchInput?.value || "").trim();
-    const params = new URLSearchParams({ limit: String(RECEIPTS_PAGE_SIZE), page: String(receiptPage) });
-    if (q) params.set("q", q);
-    const res = await secureFetch(`/api/payments/receipts?${params.toString()}`, {
-      headers: { Accept: "application/json" },
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(payload?.error || "Unable to load receipts.");
-    const items = Array.isArray(payload?.items) ? payload.items : [];
-    updateReceiptPagination(payload?.total ?? items.length);
-    renderReceipts(items);
+    if (q !== receiptFilter || receiptPage === 1) { receiptRevision = null; receiptFilter = q; }
+    const params = new URLSearchParams({ limit: String(RECEIPTS_PAGE_SIZE), page: String(receiptPage), q });
+    if (receiptRevision) params.set('revision', receiptRevision);
+    const payload = await readFinancial(`/api/payments/receipts?${params}`);
+    if (seq !== receiptSequence) return;
+    if (!Array.isArray(payload.items) || !Number.isSafeInteger(payload.total)) throw new Error('Receipt records could not be verified. Refresh to try again.');
+    receiptRevision = payload.revision;
+    updateReceiptPagination(payload.total);
+    renderReceipts(payload.items);
   } catch (err) {
-    updateReceiptPagination(0);
-    receiptsBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted)">${escapeHTML(
-      err?.message || "Unable to load receipts."
-    )}</td></tr>`;
+    if (seq !== receiptSequence) return;
+    receiptRevision = null; updateReceiptPagination(0);
+    receiptsBody.innerHTML = `<tr><td colspan="6">${escapeHTML(err?.message || 'Receipts are unavailable. Refresh to try again.')}</td></tr>`;
   }
 }
 
@@ -3178,7 +3155,7 @@ return;
 payouts.forEach((payout) => {
 const item = document.createElement("li");
 const deadline = payout.matterDeadline ? ` · matter deadline ${formatDate(payout.matterDeadline)}` : " · matter deadline not set";
-item.textContent = `${formatCurrency(payout.amount)} to ${payout.recipient || "Recipient"}${deadline}`;
+item.textContent = `${payout.state === "recorded" ? `Estimated ${formatCurrency(payout.amount, payout.currency)}` : "Needs review"} · ${payout.recipient || "Name unavailable"} · ${providerLabel(payout.stripeMode)}${deadline}`;
 container.appendChild(item);
 });
 }
@@ -3208,18 +3185,36 @@ chartCache.userLine.update("none");
 }
 }
 
-function populateEscrowChart(data) {
-cacheCharts();
-const chart = chartCache.escrow;
-if (!chart) return;
-const { escrowMetrics = {} } = data || {};
-const held = Math.round((Number(escrowMetrics.totalEscrowHeld) || 0) / 100);
-const released = Math.round((Number(escrowMetrics.totalEscrowReleased) || 0) / 100);
-const pending = Math.round((Number(escrowMetrics.pendingPayouts) || 0) / 100);
-if (chart.data.datasets[0]) {
-chart.data.datasets[0].data = [held, released, pending];
-chart.update("none");
+function financialReportUnit(data) {
+  const metrics = data?.escrowMetrics || {};
+  const groups = [metrics.held, metrics.payouts, metrics.pending, data?.revenueMetrics].flatMap(report => report?.currencies || []);
+  const units = new Map(groups.map(group => [`${group.currency}:${group.stripeMode}`, group]));
+  return units.size === 1 ? [...units.values()][0] : null;
 }
+
+function styleFinancialChart(chart, unit) {
+  const styles = getComputedStyle(document.body), ink = styles.getPropertyValue('--ink').trim(), line = styles.getPropertyValue('--line').trim();
+  const fontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) * .75;
+  for (const axis of Object.values(chart.options.scales || {})) {
+    axis.ticks.color = ink;
+    axis.ticks.font = { size: fontSize };
+    axis.grid.color = line;
+    axis.title.color = ink;
+  }
+  if (chart.options.scales?.y) chart.options.scales.y.title = { display: true, color: ink, text: unit ? `${unit.currency} · ${providerLabel(unit.stripeMode)}s` : 'Amount' };
+  if (chart.options.plugins?.legend?.labels) { chart.options.plugins.legend.labels.color = ink; chart.options.plugins.legend.labels.font = { size: fontSize }; }
+}
+
+function populateEscrowChart(data) {
+  cacheCharts();
+  const chart = chartCache.escrow;
+  if (!chart) return;
+  const metrics = data?.escrowMetrics || {}, unit = financialReportUnit({ escrowMetrics: metrics });
+  const values = [metrics.held, metrics.payouts, metrics.pending].map(report => unitAmount(report, unit?.currency, unit?.stripeMode));
+  const units = new Set([metrics.held, metrics.payouts, metrics.pending].flatMap(report => (report?.currencies || []).map(group => `${group.currency}:${group.stripeMode}`)));
+  const available = values.every(Number.isSafeInteger) && units.size <= 1;
+  chart.canvas.hidden = !available;
+  if (chart.data.datasets[0]) { chart.data.datasets[0].data = available ? values.map(value => value / 100) : []; styleFinancialChart(chart, unit); chart.update('none'); }
 }
 
 function populateEscrowReportChart(data) {
@@ -3230,15 +3225,16 @@ function populateEscrowReportChart(data) {
   const months = Array.isArray(trends.months) ? trends.months : [];
   const labels = months.map((m) => formatMonthLabel(m));
   const held = (Array.isArray(trends.held) ? trends.held : []).map((v) =>
-    Math.round((Number(v) || 0) / 100)
+    v / 100
   );
   const released = (Array.isArray(trends.released) ? trends.released : []).map((v) =>
-    Math.round((Number(v) || 0) / 100)
+    v / 100
   );
-  const hasActivity = held.some((value) => value !== 0) || released.some((value) => value !== 0);
+  const available = trends.chartAvailable === true;
+  const hasActivity = available && (held.some((value) => value !== 0) || released.some((value) => value !== 0));
   const emptyState = document.getElementById("escrowReportEmpty");
   chart.canvas.hidden = !hasActivity;
-  if (emptyState) emptyState.hidden = hasActivity;
+  if (emptyState) { emptyState.hidden = hasActivity; emptyState.textContent = available ? "No recorded funding or payouts in this window." : "Separate currencies, modes, or unresolved records cannot form one payment chart."; }
 
   if (!chart.data.datasets[0]) {
     chart.data.datasets[0] = {
@@ -3262,8 +3258,11 @@ function populateEscrowReportChart(data) {
   }
 
   chart.data.labels = labels;
+  chart.data.datasets[0].label = "Funding recorded";
+  chart.data.datasets[1].label = "Payouts recorded";
   chart.data.datasets[0].data = months.map((_, idx) => held[idx] || 0);
   chart.data.datasets[1].data = months.map((_, idx) => released[idx] || 0);
+  styleFinancialChart(chart, trends.unit);
   chart.update("none");
 }
 
@@ -3283,8 +3282,8 @@ if (newUsersPageSelect) {
 
 function applyAnalyticsPayload(data) {
 latestAnalytics = data;
-lastAnalyticsRenderAt = Date.now();
 populateMetrics(data);
+populateFinancialGroups(data);
 populateCharts(data);
 populateEscrowReportChart(data);
 populateLedger(data);
@@ -3294,16 +3293,45 @@ populateEscrowChart(data);
 populateNewUsers(data);
 }
 
+function populateFinancialGroups(data) {
+  const node = document.getElementById('adminFinancialGroups'), status = document.getElementById('adminFinancialReportStatus');
+  if (!node || !status) return;
+  const reports = [['Principal held', data.escrowMetrics.held], ['Payouts recorded', data.escrowMetrics.payouts], ['Platform fees recorded', data.revenueMetrics], ['Estimated pending payouts', data.escrowMetrics.pending]];
+  const groups = new Map();
+  for (const [, report] of reports) for (const group of report?.currencies || []) groups.set(`${group.currency}:${group.stripeMode}`, group);
+  document.getElementById('adminFinancialSummary').hidden = groups.size > 1;
+  node.innerHTML = groups.size > 1 ? [...groups.values()].map(group => `<section class="panel"><h3>${escapeHTML(group.currency)} · ${escapeHTML(providerLabel(group.stripeMode))}s</h3><dl class="admin-facts">${reports.map(([label, report]) => `<div><dt>${escapeHTML(label)}</dt><dd>${escapeHTML(financialMoney(unitAmount(report, group.currency, group.stripeMode), group.currency))}</dd></div>`).join('')}</dl></section>`).join('') : '';
+  const review = Math.max(...reports.map(([, report]) => report?.requiresReview || 0));
+  const testOnly = groups.size === 1 && [...groups.values()][0].stripeMode === 'test';
+  const windowLabel = data.from ? `Activity since ${new Date(data.from).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })}; principal held is current.` : '';
+  status.textContent = [testOnly ? 'Test records — no money moved.' : '', review ? 'Some financial records need review.' : '', windowLabel].filter(Boolean).join(' ');
+}
+function clearFinancialReports(message = 'Loading financial reports…') {
+  analyticsSequence++;
+  latestAnalytics = null;
+  for (const id of ['escrowTotal', 'accountingHeldValue', 'revenueTotalValue', 'fundsReleasedValue', 'pendingPayoutsValue', 'payoutTotal', 'incomeTotal']) updateText(`#${id}`, '—');
+  for (const id of ['payoutCount', 'incomeCount', 'adminFinancialReportStatus']) updateText(`#${id}`, message);
+  document.getElementById('adminFinancialGroups')?.replaceChildren();
+  const ledger = document.getElementById('ledgerBody');
+  if (ledger) ledger.innerHTML = `<tr><td colspan="6">${escapeHTML(message)}</td></tr>`;
+  cacheCharts();
+  for (const key of ['escrow', 'revenue', 'escrowReport']) if (chartCache[key]?.canvas) chartCache[key].canvas.hidden = true;
+  const queue = document.querySelector('.payout-schedule'); if (queue) { const item = document.createElement('li'); item.textContent = message; queue.replaceChildren(item); }
+}
 async function hydrateAnalytics() {
-const now = Date.now();
-if (latestAnalytics && now - lastAnalyticsRenderAt < ANALYTICS_COOLDOWN_MS) {
-return latestAnalytics;
+  clearFinancialReports();
+  const sequence = analyticsSequence;
+  try { const data = await loadAnalytics(); if (sequence !== analyticsSequence) return null; applyAnalyticsPayload(data); return data; }
+  catch (error) { if (sequence === analyticsSequence) clearFinancialReports(error.message || 'Financial reports are unavailable. Refresh to try again.'); return null; }
 }
-const data = await loadAnalytics();
-if (!data) return null;
-applyAnalyticsPayload(data);
-return data;
-}
+window.refreshAdminFinancialReports = hydrateAnalytics;
+const financialThemeObserver = new MutationObserver(() => {
+  if (!latestAnalytics) return;
+  populateCharts(latestAnalytics); populateEscrowChart(latestAnalytics); populateEscrowReportChart(latestAnalytics);
+});
+for (const target of [document.documentElement, document.body]) financialThemeObserver.observe(target, { attributes: true, attributeFilter: ['class', 'style'] });
+window.addEventListener('admin:financial-source-changed', () => { analyticsInFlight = null; clearFinancialReports('Financial records changed. Refresh before continuing.'); receiptSequence++; receiptRevision = null; if (receiptsBody) receiptsBody.replaceChildren(); });
+window.addEventListener('admin:financial-account-changed', () => { analyticsInFlight = null; clearFinancialReports('The signed-in account changed. Refresh before continuing.'); receiptSequence++; receiptRevision = null; if (receiptsBody) receiptsBody.replaceChildren(); });
 
 function destroyCharts() {
 cacheCharts();
@@ -3628,21 +3656,26 @@ function setActiveDisputeStatus(status) {
 
 async function loadDisputes() {
   if (!disputesBody) return;
-  const status = getActiveDisputeStatus();
+  const linkedReview = new URL(location.href).searchParams.get('review');
+  const status = linkedReview ? 'all' : window.adminFlowDisputeCaseId ? 'open' : getActiveDisputeStatus();
   renderDisputeHeader(status);
   disputesBody.innerHTML = `<tr><td colspan="${getDisputeColspan(status)}" class="pending-empty">Loading disputes…</td></tr>`;
   try {
-    const q = String(disputeSearchInput?.value || "").trim();
-    const params = new URLSearchParams({ status, limit: "50" });
+    const q = window.adminFlowDisputeCaseId ? '' : String(disputeSearchInput?.value || "").trim();
+    const params = new URLSearchParams({ status, limit: "25", page:String(window.adminDisputePage||1) });
+    if (window.adminFlowDisputeCaseId) { params.set('caseId', window.adminFlowDisputeCaseId); params.set('status', 'open'); }
     if (status === "resolved") params.set("finalized", "true");
-    if (q) params.set("q", q);
+    if (linkedReview) { params.set('disputeId', linkedReview); params.set('status', 'all'); params.set('page', '1'); params.delete('caseId'); const linkedMatter = new URL(location.href).searchParams.get('reviewMatter'); if (linkedMatter) params.set('caseId', linkedMatter); params.delete('finalized'); }
+    else if (q) params.set("q", q);
     const res = await secureFetch(`/api/disputes/admin?${params.toString()}`, {
       headers: { Accept: "application/json" },
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(payload?.error || "Unable to load disputes.");
     const items = Array.isArray(payload?.items) ? payload.items : [];
+    if(payload.pages && (window.adminDisputePage||1)>payload.pages){window.adminDisputePage=payload.pages;return loadDisputes();}
     renderDisputes(items, status);
+    window.adminDisputesRendered?.(items,payload,status);
   } catch (err) {
     disputesBody.innerHTML = `<tr><td colspan="${getDisputeColspan(getActiveDisputeStatus())}" class="pending-empty">${escapeHTML(
       err?.message || "Unable to load disputes."
@@ -3650,9 +3683,9 @@ async function loadDisputes() {
   }
 }
 
-async function settleDispute({ action, caseId, disputeId, payoutAmountCents, grossAmountCents }) {
+async function settleDispute({ action, caseId, disputeId, payoutAmountCents, grossAmountCents, previewRevision }) {
   if (!caseId || !disputeId) return;
-  const body = { action, disputeId };
+  const body = { action, disputeId, previewRevision };
   if (Number.isFinite(payoutAmountCents)) {
     body.payoutAmountCents = payoutAmountCents;
   } else if (Number.isFinite(grossAmountCents)) {
@@ -3807,29 +3840,24 @@ if (disputesBody) {
       }
     }
 
-    const confirmText =
-      actionKey === "refund"
-        ? "Refund the attorney and close this dispute?"
-        : actionKey === "release-full"
-        ? "Release full payout to the paralegal and close this dispute?"
-        : "Release the partial payout to the paralegal and close this dispute?";
-    if (!(await confirmAction(confirmText, {
-      title: "Settle this dispute?",
-      confirmLabel: actionKey === "refund" ? "Issue refund" : "Release payout",
-      tone: "danger",
-    }))) return;
-
-    const action =
-      actionKey === "refund"
-        ? "refund"
-        : actionKey === "release-full"
-        ? "release_full"
-        : "release_partial";
+    const action=actionKey==='refund'?'refund':actionKey==='release-full'?'release_full':'release_partial';
+    let preview;
+    try {
+      button.disabled=true;
+      const params=new URLSearchParams({action,disputeId});if(Number.isFinite(payoutAmountCents))params.set('payoutAmountCents',payoutAmountCents);
+      const response=await secureFetch(`/api/admin/workspace/finance/dispute-preview/${encodeURIComponent(caseId)}?${params}`,{headers:{Accept:'application/json'}});
+      preview=await response.json();if(!response.ok)throw new Error(preview.error||'Unable to preview this settlement.');
+    }catch(error){showToast(error.message,'err');return;}finally{button.disabled=false;}
+    if(!await confirmAdminSettlement(preview))return;
 
     try {
       button.disabled = true;
-      const payload = await settleDispute({ action, caseId, disputeId, payoutAmountCents });
-      if (payload?.refundId) {
+      const payload = await settleDispute({ action, caseId, disputeId, payoutAmountCents, previewRevision:preview.previewRevision });
+      if(preview.withdrawal && preview.payoutAmount===0){
+        showToast("Dispute settled with zero payout. Remaining matter funds were preserved.","success");
+      } else if(payload?.pending){
+        showToast("Settlement recorded. The payout is still pending.","info");
+      } else if (payload?.refundId) {
         showToast("Dispute settled. Refund issued.", "success");
       } else {
         showToast("Dispute settled. Payout released.", "success");
@@ -3874,12 +3902,12 @@ const user = await bootAdminDashboard();
 if (!user) return;
 
 bindSettingsActions();
-await loadAdminSettings();
-await hydrateAnalytics();
-await loadDisputeSummary();
-await loadOverviewActionBoard(true);
-	await loadReceipts();
-	await renderAIControlRoom();
+await Promise.allSettled([loadDisputeSummary(),loadOverviewActionBoard(true)]);
+const loadOnEntry=(id,load)=>{const section=document.getElementById(id);if(!section)return;let loaded=false;const enter=()=>{if(!loaded&&section.classList.contains("visible")&&!section.hidden){loaded=true;Promise.resolve(load()).catch(error=>{loaded=false;showToast(error.message||"This workspace could not be loaded.","err");});}};new MutationObserver(enter).observe(section,{attributes:true,attributeFilter:["class","hidden"]});enter();};
+loadOnEntry("section-settings",loadAdminSettings);
+loadOnEntry("section-escrow",hydrateAnalytics);
+loadOnEntry("section-revenue",()=>Promise.all([hydrateAnalytics(),loadReceipts()]));
+loadOnEntry("section-ai-control-room",renderAIControlRoom);
 
 if (receiptRefreshBtn) {
 receiptRefreshBtn.addEventListener("click", () => {
@@ -3888,6 +3916,9 @@ loadReceipts();
 }
 if (receiptSearchInput) {
 receiptSearchInput.addEventListener("input", () => {
+receiptSequence++; receiptRevision = null;
+if (receiptPageSelect) receiptPageSelect.disabled = true;
+if (receiptsBody) receiptsBody.innerHTML = '<tr><td colspan="6">Searching receipts…</td></tr>';
 if (receiptSearchTimer) window.clearTimeout(receiptSearchTimer);
 receiptSearchTimer = window.setTimeout(() => {
 receiptPage = 1;

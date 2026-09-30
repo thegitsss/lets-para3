@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const { clickVisible, launchPuppeteer } = require("./puppeteerBrowser");
+const { installWorkspaceReads } = require("./e2e-workspace-fixture");
 
 const ATTORNEY = {
   id: "507f1f77bcf86cd799439011",
@@ -81,6 +82,7 @@ function startStubServer() {
     const userId = sessions.get(token);
     return userById.get(userId) || null;
   }
+  installWorkspaceReads(app, getSessionUser);
 
   app.get("/api/csrf", (_req, res) => res.json({ csrfToken: "test-csrf" }));
 
@@ -178,7 +180,7 @@ function startStubServer() {
 
   const server = http.createServer(app);
   return new Promise((resolve) => {
-    server.listen(0, () => {
+    server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, () => {
       const { port } = server.address();
       resolve({ server, port });
     });
@@ -211,7 +213,7 @@ async function api(page, { method, path, body }) {
 
 async function run() {
   const { server, port } = await startStubServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
   const browser = await launchPuppeteer({
     headless: "new",

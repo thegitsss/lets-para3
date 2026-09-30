@@ -41,7 +41,8 @@ module.exports = defineConfig({
         cwd: __dirname,
         reuseExistingServer: false,
         port: Number(configuredPort),
-        timeout: 120_000,
+        // Includes disposable collection/index provisioning before HTTP opens.
+        timeout: 240_000,
         env: {
           ...process.env,
           PORT: String(configuredPort),

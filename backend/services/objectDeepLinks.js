@@ -41,9 +41,20 @@ function buildMatterLink({ caseId, tab = "overview", applicantId, fileId, messag
 
 function buildObjectDeepLink(object = {}) {
   const type = String(object.type || "").trim().toLowerCase();
+  if (type === "matter_review") {
+    const caseId = encodeId(object.caseId), disputeId = String(object.disputeId || "");
+    if (!caseId || !["attorney", "paralegal", "admin"].includes(object.role) || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(disputeId)) return "";
+    if (object.role === "admin") return `/admin-dashboard.html?review=${encodeURIComponent(disputeId)}&reviewMatter=${caseId}#finance`;
+    if (object.role === "paralegal" && object.retained) return buildObjectDeepLink({ type: "completed_matter", caseId, role: object.role });
+    return buildMatterLink({ caseId, tab: "financials" });
+  }
   if (type === "matter") return buildMatterLink({ caseId: object.caseId, tab: object.tab || "overview" });
   if (type === "application") {
     return buildMatterLink({ caseId: object.caseId, tab: "applications", applicantId: object.applicantId });
+  }
+  if (type === "retained_application") {
+    const caseId = encodeId(object.caseId), applicantId = encodeId(object.applicantId);
+    return caseId && applicantId ? `/dashboard-attorney.html?caseId=${caseId}&applicantId=${applicantId}&openApplicant=1&applicationHistory=1#cases:inquiries` : "";
   }
   if (type === "file") {
     return buildMatterLink({ caseId: object.caseId, tab: "files", fileId: object.fileId });
@@ -62,7 +73,8 @@ function buildObjectDeepLink(object = {}) {
   }
   if (type === "paralegal_application") {
     const applicationId = encodeId(object.applicationId);
-    return applicationId ? `/dashboard-paralegal.html?applicationId=${applicationId}#cases` : "";
+    const jobId = encodeId(object.jobId);
+    return applicationId ? `/dashboard-paralegal.html?applicationId=${applicationId}#cases` : jobId ? `/dashboard-paralegal.html?jobId=${jobId}#cases` : "";
   }
   if (type === "completed_matter") {
     const caseId = encodeId(object.caseId);

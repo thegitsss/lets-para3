@@ -199,6 +199,7 @@ function makeVerifier(required = true) {
         orgId: user.orgId,
       };
       req.authSessionId = user.sessionId;
+      req.authVersion = user.authVersion;
     } catch (err) {
       return next(err);
     }

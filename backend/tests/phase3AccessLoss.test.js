@@ -56,7 +56,12 @@ const paralegalDashboardRouter = require("../routes/paralegalDashboard");
 const adminRouter = require("../routes/admin");
 const { getSupportContextSnapshot } = require("../services/support/contextResolverService");
 const { executeParalegalSupportTool } = require("../ai/paralegalSupportAgentTools");
-const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
+const { addSubscriber: addCaseSubscriber } = require("../utils/caseEvents");
+const { addSubscriber: addNotificationSubscriber } = require("../utils/notificationEvents");
+const { clearDatabase } = require("./helpers/db");
+const mongoose = require("mongoose");
+const { MongoMemoryReplSet } = require("mongodb-memory-server");
+let mongo;
 const {
   createPhase2Actors,
   createPhase3ActiveMatter,
@@ -81,8 +86,15 @@ app.use("/api/paralegal/dashboard", paralegalDashboardRouter);
 app.use("/api/admin", adminRouter);
 app.use((err, _req, res, _next) => res.status(500).json({ error: err?.message || "Server error" }));
 
-beforeAll(connect);
-afterAll(closeDatabase);
+beforeAll(async () => {
+  mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" } });
+  await mongoose.connect(mongo.getUri("phase3-access-loss"));
+  // The first rejection transaction reads these collections. Finish their
+  // startup index work before exercising the request, so the fixture does not
+  // race a background collection/index build against its transaction snapshot.
+  for (const model of [User, Case, Job, Application, Block, require("../models/ApplicationDecision")]) await model.init();
+}, 60000);
+afterAll(async () => { await mongoose.disconnect(); await mongo?.stop(); });
 beforeEach(clearDatabase);
 
 function ids(items = []) {
@@ -120,10 +132,18 @@ describe("Phase 3 loss-of-access characterization", () => {
   test("1. rejection removes the active application but preserves history and recommendation exclusion", async () => {
     const actors = await createPhase2Actors();
     const matter = await createPhase3OpenMatter({ actors, applicantIds: [actors.paralegal._id] });
+    const caseSignals = [];
+    const paralegalSignals = [];
+    const stopCase = addCaseSubscriber(matter.caseDoc._id, { write: (value) => caseSignals.push(String(value)) });
+    const stopParalegal = addNotificationSubscriber(actors.paralegal._id, { write: (value) => paralegalSignals.push(String(value)) });
     const rejected = await request(app)
       .post(`/api/cases/${matter.caseDoc._id}/applicants/${actors.paralegal._id}/reject`)
       .set("Cookie", actors.cookies.attorney);
+    stopCase();
+    stopParalegal();
     expect(rejected.status).toBe(200);
+    expect(caseSignals.join("\n")).toContain("application_rejected_refresh");
+    expect(paralegalSignals.join("\n")).toContain("application_rejected_refresh");
     expect((await Application.findById(matter.applications[0]._id).lean()).status).toBe("rejected");
     const dashboard = await request(app).get("/api/paralegal/dashboard").set("Cookie", actors.cookies.paralegal);
     expect(ids(dashboard.body.myApplications)).not.toContain(String(matter.applications[0]._id));
@@ -231,10 +251,7 @@ describe("Phase 3 loss-of-access characterization", () => {
     const notifications = await request(app).get("/api/notifications").set("Cookie", actors.cookies.paralegal);
     expect(notifications.status).toBe(200);
     const staleDeepLink = notifications.body.find((item) => String(item.id) === String(matter.notification._id));
-    expect(staleDeepLink).toMatchObject({
-      message: "This notification is no longer available.",
-      action: { label: "", href: "" },
-    });
+    expect(staleDeepLink).toBeUndefined();
   });
 
   test("6. an attorney dispute closes active workspace and exposes the dispute to admin", async () => {

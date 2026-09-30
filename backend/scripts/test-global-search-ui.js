@@ -90,6 +90,9 @@ async function installPage(page, role = "attorney") {
 async function runRoleJourney(browser, role) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   await installPage(page, role);
+  if (role === "paralegal") {
+    assert.equal(await page.locator(".lpc-global-search-trigger").getAttribute("aria-label"), "Search your workspace");
+  }
 
   const storageBefore = await page.evaluate(() => ({ local: { ...localStorage }, session: { ...sessionStorage } }));
   await page.keyboard.press(process.platform === "darwin" ? "Meta+k" : "Control+k");
@@ -302,9 +305,9 @@ async function captureVisualComparison(browser) {
           };
           return {
             body: styleFor("body"),
-            heading: styleFor("h1"),
+            heading: styleFor(viewerRole === "paralegal" ? ".private-office-header__title h1.private-office-label" : "h1"),
             button: styleFor(viewerRole === "attorney" ? "[data-matter-save-view]" : ".home-availability-button"),
-            regular: styleFor(viewerRole === "attorney" ? ".queue-meta" : ".home-feed-hero p"),
+            regular: styleFor(viewerRole === "attorney" ? ".queue-meta" : ".private-office-secondary-state"),
             logo: styleFor(".logo"),
             userName: styleFor("#user-name-heading"),
             footer: styleFor(".sidebar-footer"),
@@ -318,21 +321,25 @@ async function captureVisualComparison(browser) {
           if (!style) return;
           assert.match(style?.family || "", /Söhne/i, `${target.role} ${name} typography must use the approved authenticated-workspace Söhne display family`);
         });
-        const expectedHeadingFamily = target.role === "paralegal" ? /Cormorant Garamond/i : /Söhne/i;
+        const expectedHeadingFamily = target.role === "paralegal" ? /Sarabun/i : /Söhne/i;
         assert.match(
           typography.heading?.family || "",
           expectedHeadingFamily,
           `${target.role} heading typography must use its approved dashboard display family`
         );
         if (typography.userName) {
-          const expectedUserNameFamily = target.role === "attorney" ? /Sarabun/i : /Cormorant Garamond/i;
+          const expectedUserNameFamily = /Sarabun/i;
           assert.match(
             typography.userName.family || "",
             expectedUserNameFamily,
             `${target.role} userName typography must inherit from its approved summary or heading context`
           );
         }
-        assert.ok(typography.heading.weight >= 300 && typography.heading.weight <= 400, `${target.role} heading typography: ${JSON.stringify(typography.heading)}`);
+        if (target.role === "paralegal") {
+          assert.equal(typography.heading.weight, 400, `Paralegal operational heading: ${JSON.stringify(typography.heading)}`);
+        } else {
+          assert.ok(typography.heading.weight >= 300 && typography.heading.weight <= 400, `Attorney display heading: ${JSON.stringify(typography.heading)}`);
+        }
         assert.ok(typography.button.weight >= 200 && typography.button.weight <= 400, `${target.role} button typography: ${JSON.stringify(typography.button)}`);
         assert.ok(typography.button.size >= 13, `${target.role} button typography: ${JSON.stringify(typography.button)}`);
         assert.ok(typography.regular.weight >= 200 && typography.regular.weight <= 400, `${target.role} regular typography: ${JSON.stringify(typography.regular)}`);

@@ -12,15 +12,15 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/global-search.css" rel="stylesheet" />
-  <script src="assets/scripts/utils/session.js?v=20260820-1"></script>
+  <link href="assets/styles/global-search.css?v=20260831-3" rel="stylesheet" />
+  <script src="assets/scripts/utils/session.js?v=20260902-1"></script>
   <script src="assets/scripts/utils/business-date.js"></script>
   <style>
     body.browse-jobs-page {
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
-      color: #1a2230;
-      background: #ffffff !important;
+      color: var(--clean-ink, #1a2230);
+      background: var(--clean-surface, #ffffff) !important;
       margin: 0;
       min-height: 100vh;
       display: flex;
@@ -43,7 +43,7 @@
       justify-content: center;
       padding: 0;
       color: #202124;
-      background: #ffffff;
+      background: var(--clean-surface, #ffffff);
       border: 1px solid #e5e7eb;
       border-radius: 8px;
       box-shadow: none;
@@ -75,7 +75,7 @@
     aside.filter {
       width: 210px;
       flex-shrink: 0;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       border: 1px solid rgba(26, 34, 48, 0.08);
       border-radius: 18px;
       padding: 0.9rem;
@@ -106,9 +106,9 @@
       padding: 0.45rem 0.6rem;
       border: 1px solid rgba(26, 34, 48, 0.12);
       border-radius: 8px;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       font-size: 0.9rem;
-      color: #475569;
+      color: var(--clean-muted, #475569);
     }
 
     .filter-group select:focus,
@@ -125,7 +125,7 @@
       gap: 0.4rem;
     }
 
-    .slider-field span { font-size: 0.85rem; color: #475569; }
+    .slider-field span { font-size: 0.85rem; color: var(--clean-muted, #475569); }
     input[type="range"] {
       flex: 1;
       accent-color: #0a84ff;
@@ -143,7 +143,7 @@
       border-radius: 999px;
       border: 1px solid #887244;
       background: transparent;
-      color: #887244;
+      color: var(--clean-link, #887244);
       cursor: pointer;
       letter-spacing: 0.04em;
     }
@@ -162,7 +162,7 @@
       margin-inline-start: -12px;
       font-size: 0.85rem;
       letter-spacing: 0.02em;
-      color: #5f6b7c;
+      color: var(--clean-muted, #5f6b7c);
       text-decoration: underline;
       text-decoration-thickness: 1px;
       text-underline-offset: 0.16em;
@@ -170,7 +170,7 @@
 
     .filter-actions #clearFilters:hover,
     .filter-actions #clearFilters:focus-visible {
-      color: #465264;
+      color: var(--clean-ink, #465264);
       text-decoration-thickness: 2px;
     }
 
@@ -215,7 +215,7 @@
       border-radius: 999px;
       padding: 0.35rem 0.9rem;
       font-size: 0.95rem;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
     }
@@ -233,7 +233,7 @@
     .job-card {
       border: 1px solid rgba(26, 34, 48, 0.08);
       border-left: 4px solid #887244;
-      background: #fff;
+      background: var(--clean-surface, #fff);
       padding: 1.4rem 1.6rem;
       border-radius: 18px;
       box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
@@ -255,7 +255,7 @@
     }
 
     .job-card .area {
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.95rem;
       margin-bottom: 0.4rem;
     }
@@ -264,7 +264,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 0.65rem;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.9rem;
       margin-bottom: 0.8rem;
     }
@@ -272,7 +272,7 @@
     .partial-completion-note {
       margin-top: 0.35rem;
       margin-bottom: 0.8rem;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.85rem;
     }
 
@@ -285,12 +285,12 @@
     .job-card-footer {
       margin-top: 0.6rem;
       font-size: 0.82rem;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
     }
 
     .flag-button {
       border: 1px solid rgba(26, 34, 48, 0.15);
-      background: #fff;
+      background: var(--clean-surface, #fff);
       color: #8b6a2f;
       width: 28px;
       height: 28px;
@@ -318,7 +318,7 @@
       top: 48px;
       right: 16px;
       width: min(260px, 82vw);
-      background: #ffffff;
+      background: var(--clean-surface, #ffffff);
       border: 1px solid rgba(26, 34, 48, 0.12);
       border-radius: 16px;
       box-shadow: 0 24px 50px rgba(15, 23, 42, 0.16);
@@ -334,7 +334,7 @@
     }
 
     .flag-menu-subtitle {
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.85rem;
       margin-bottom: 10px;
     }
@@ -344,7 +344,7 @@
       align-items: flex-start;
       gap: 8px;
       font-size: 0.92rem;
-      color: #1a2230;
+      color: var(--clean-ink, #1a2230);
       margin-bottom: 8px;
     }
 
@@ -381,8 +381,8 @@
 
     .flag-cancel {
       border: 1px solid #d1d5db;
-      background: #ffffff;
-      color: #6b7280;
+      background: var(--clean-surface, #ffffff);
+      color: var(--clean-muted, #6b7280);
       padding: 6px 14px;
       border-radius: 999px;
       cursor: pointer;
@@ -412,7 +412,7 @@
       font-size: 0.9rem;
       cursor: pointer;
       background: transparent;
-      color: #887244;
+      color: var(--clean-link, #887244);
       letter-spacing: 0.02em;
       min-height: 44px;
     }
@@ -465,7 +465,8 @@
       animation: jobExpandIn 420ms cubic-bezier(.2,.7,.2,1);
       transform-origin: center top;
       position: relative;
-      padding-bottom: 110px;
+      width: 100%;
+      box-sizing: border-box;
     }
     .job-card .pill-label {
       display: inline-flex;
@@ -503,13 +504,13 @@
       height: 30px;
       border-radius: 999px;
       border: 1px solid rgba(26, 34, 48, 0.18);
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       font-size: 0.95rem;
-      background: #fff;
+      background: var(--clean-surface, #fff);
     }
     .apply-info-disclosure summary::-webkit-details-marker {
       display: none;
@@ -547,11 +548,11 @@
       gap: 1rem;
       margin-top: 1rem;
       }
-    .expanded-body .lede { color: #475569; margin: 0 0 0.65rem; line-height: 1.6; }
+    .expanded-body .lede { color: var(--clean-muted, #475569); margin: 0 0 0.65rem; line-height: 1.6; }
     .description-label {
       font-size: 0.95rem;
       letter-spacing: 0.16em;
-      color: #475569;
+      color: var(--clean-muted, #475569);
       margin-top: 0.6rem;
     }
     .expanded-body .main-description {
@@ -563,7 +564,7 @@
     }
     .job-task-list {
       margin: 0.6rem 0 0 1.2rem;
-      color: #475569;
+      color: var(--clean-muted, #475569);
       line-height: 1.6;
       display: grid;
       gap: 6px;
@@ -585,7 +586,7 @@
     }
     .ghost-button {
       border: 1px solid rgba(26, 34, 48, 0.15);
-      background: #fff;
+      background: var(--clean-surface, #fff);
       color: #0f172a;
     }
     .apply-info-title {
@@ -609,21 +610,29 @@
       color: #0f172a;
       line-height: 1.35;
     }
+    .expanded-footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(26, 34, 48, 0.08);
+    }
     .posted-by {
       display: grid;
       grid-template-columns: auto auto 1fr;
       align-items: center;
       gap: 10px;
-      margin-top: 16px;
-      padding-top: 12px;
-      border-top: 1px solid rgba(26, 34, 48, 0.08);
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
     .posted-label {
       grid-column: 1 / -1;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       font-size: 0.78rem;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
     }
     .posted-avatar {
       width: 42px;
@@ -641,20 +650,17 @@
       font-size: 1.1rem;
     }
     .posted-firm {
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.98rem;
       font-family: 'Cormorant Garamond', serif;
       text-decoration: none;
     }
-    .posted-count { color: #475569; font-size: 0.9rem; }
+    .posted-count { color: var(--clean-muted, #475569); font-size: 0.9rem; }
     .expanded-footer-actions {
-      position: absolute;
-      right: 16px;
-      bottom: 16px;
       display: flex;
-      flex-direction: column;
+      flex-wrap: wrap;
       gap: 8px;
-      align-items: flex-end;
+      align-items: center;
     }
     @keyframes jobExpandIn {
       0% { opacity: 0; transform: translateY(18px) scale(.96); box-shadow: 0 12px 32px rgba(10,15,25,0.08); }
@@ -690,7 +696,7 @@
 
     #pagination {
       text-align: center;
-      color: #6b7280;
+      color: var(--clean-muted, #6b7280);
       font-size: 0.95rem;
       display: flex;
       align-items: center;
@@ -701,8 +707,8 @@
 
     .pagination-btn {
       border: 1px solid rgba(26, 34, 48, 0.2);
-      background: #ffffff;
-      color: #1a2230;
+      background: var(--clean-surface, #ffffff);
+      color: var(--clean-ink, #1a2230);
       padding: 0.35rem 1.1rem;
       border-radius: 999px;
       font-size: 0.85rem;
@@ -759,7 +765,7 @@
         border: 1px solid rgba(26, 34, 48, 0.2);
         border-radius: 999px;
         background: transparent;
-        color: #1a2230;
+        color: var(--clean-ink, #1a2230);
         cursor: pointer;
         font-size: 0.9rem;
       }
@@ -791,39 +797,59 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260820-18" />
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260831-21" />
+  <link rel="stylesheet" href="assets/styles/lpc-product-components.css?v=20260901-1" />
   <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
-  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260812-1" />
-  <script defer src="assets/scripts/universal-header.js?v=20260812-1"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260902-5" />
+  <script defer src="assets/scripts/universal-header.js?v=20260831-3"></script>
   <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
   <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
 </head>
-<body class="browse-jobs-page lpc-product-clean lpc-auth-resource-page">
+<body class="browse-jobs-page dashboard-no-shadows lpc-product-clean lpc-auth-resource-page lpc-static-universal-header lpc-auth-shell-v2">
   <a class="skip-link" href="#main">Skip to main content</a>
   <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open navigation" aria-controls="sidebarNav" aria-expanded="false">
     <span class="lpc-mobile-menu-icon" aria-hidden="true"></span>
   </button>
   <aside class="sidebar" id="sidebarNav" aria-label="Dashboard navigation">
-    <div class="logo">Dashboard</div>
+    <div class="logo sidebar-profile-host">
+      <div class="sidebar-profile-cluster" data-lpc-sidebar-profile>
+        <button class="user-chip lpc-sidebar-profile-trigger" type="button" data-lpc-sidebar-profile-trigger aria-label="Open profile menu" aria-haspopup="true" aria-expanded="false">
+          <img class="globalProfileImage lpc-sidebar-profile-trigger-avatar" src="assets/avatar-placeholder.svg" alt="" />
+          <span class="lpc-sidebar-profile-trigger-details"><strong class="globalProfileName">Member</strong></span>
+          <svg class="lpc-profile-trigger-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"></path></svg>
+        </button>
+      </div>
+    </div>
+    <script src="assets/scripts/sidebar-first-paint.js?v=20260902-2"></script>
     <nav>
-      <a href="dashboard-paralegal.html#home">Home</a>
-      <a href="browse-jobs.html" class="active" aria-current="page">Browse Matters</a>
-      <a href="dashboard-paralegal.html#cases">My Matters &amp; Applications</a>
-      <a href="profile-settings.html">Profile Settings</a>
-      <a href="paralegalhelp.html">Help</a>
+      <a href="dashboard-paralegal.html#home" class="lpc-sidebar-nav-link"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"></path><path d="M5 9v11h14V9"></path><path d="M9 20v-6h6v6"></path></svg><span class="lpc-sidebar-nav-label">Home</span></a>
+      <a href="browse-jobs.html" class="active lpc-sidebar-nav-link" aria-current="page"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path><path d="M8 11h6"></path><path d="M11 8v6"></path></svg><span class="lpc-sidebar-nav-label">Browse Matters</span></a>
+      <a href="dashboard-paralegal.html#cases" class="lpc-sidebar-nav-link"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M3 12h18"></path></svg><span class="lpc-sidebar-nav-label">My Matters &amp; Applications</span></a>
+      <div class="lpc-sidebar-section-label">Account</div>
+      <a href="profile-settings.html" class="lpc-sidebar-nav-link lpc-sidebar-nav-link--secondary"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg><span class="lpc-sidebar-nav-label">Profile Settings</span></a>
+      <a href="paralegalhelp.html" class="lpc-sidebar-nav-link lpc-sidebar-nav-link--secondary"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9a2.7 2.7 0 1 1 4.6 1.9c-1.1.9-2.1 1.3-2.1 3.1"></path><path d="M12 18h.01"></path></svg><span class="lpc-sidebar-nav-label">Help</span></a>
     </nav>
     <div class="sidebar-bottom">
-      <div class="sidebar-footer">© Let’s-ParaConnect 2026</div>
+      <div class="sidebar-footer">© Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect 2026</div>
     </div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
-  <div class="browse-page-shell">
+  <div class="browse-page-shell lpc-auth-page-shell">
+  <div class="lpc-universal-header-shell lpc-universal-header-shell--created" role="group" aria-label="Workspace tools" data-lpc-universal-header="true">
+    <div class="lpc-universal-header-controls" data-notification-center="true" aria-label="Search, notifications, and Assistant">
+      <div class="lpc-global-search-host" data-productivity-trigger-host></div>
+      <div class="notification-wrapper"><button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span class="notification-badge" data-notification-badge>0</span></button><div class="notifications-panel notif-panel hidden" role="region" aria-label="Notifications" aria-live="polite" data-notification-panel><div class="notif-header" aria-label="Notifications"></div><div class="notif-scroll" data-notification-list></div><div class="notif-empty" data-notification-empty>Loading…</div><button type="button" class="notif-markall" data-notification-mark>Mark All Read</button></div></div>
+    </div>
+  </div>
   <main id="main" tabindex="-1" class="jobs-shell">
     <div class="layout">
       <aside class="filter" id="filterMenu">
-        <h2>Refine Results</h2>
+        <div class="browse-filter-heading">
+          <h2 id="filterHeading">Filters</h2>
+          <button type="button" id="filterClose" class="browse-filter-close" aria-label="Close filters">Close</button>
+        </div>
         <div class="filter-group">
-          <label for="filterPracticeArea">Practice Area</label>
+          <label for="filterPracticeArea">Practice area</label>
           <select id="filterPracticeArea">
             <option value="">Any</option>
           </select>
@@ -835,7 +861,7 @@
           </select>
         </div>
         <div class="filter-group">
-          <label for="filterMinPay">Minimum Compensation</label>
+          <label for="filterMinPay">Minimum compensation</label>
           <div class="slider-field">
             <input type="range" id="filterMinPay" min="400" max="900" step="25" value="400" />
             <span id="minPayValue">$400</span>
@@ -878,7 +904,7 @@
               <option value="payHigh">Highest pay</option>
               <option value="payLow">Lowest pay</option>
             </select>
-            <button type="button" class="filter-toggle" id="filterToggle" aria-controls="filterMenu" aria-expanded="false">Filters <span id="activeFilterCount"></span></button>
+            <button type="button" class="filter-toggle" id="filterToggle" aria-controls="filterDialog" aria-haspopup="dialog" aria-expanded="false">Filters <span id="activeFilterCount"></span></button>
           </div>
         </div>
         <div id="jobs-grid" class="jobs-grid">
@@ -891,11 +917,13 @@
 
   </div>
 
+  <dialog id="filterDialog" class="browse-filter-dialog" aria-labelledby="filterHeading"></dialog>
+
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
 
   <script src="assets/scripts/utils/toast.js?v=20260208"></script>
   <script src="assets/scripts/productivity-command-registry.js"></script>
-  <script src="assets/scripts/global-search.js"></script>
+  <script src="assets/scripts/global-search.js?v=20260831-2"></script>
   <script type="module" src="assets/scripts/views/browse-jobs.js"></script>
 </body>
 </html>

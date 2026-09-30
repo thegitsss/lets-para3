@@ -31,11 +31,12 @@ function normalizeDashboardViewFilters(scope, input = {}) {
   if (scope === "attorney_matters") {
     return {
       view: allowed(source.view, ["active", "draft", "archived", "inquiries"], "active"),
-      search: cleanText(source.search, 80),
+      search: cleanText(source.search, 200),
       practice: cleanText(source.practice, 120),
       deadline: allowed(source.deadline, ["", "overdue", "7_days", "none"]),
       updated: allowed(source.updated, ["", "7_days", "30_days"]),
       sort: allowed(source.sort, ["recent", "deadline", "status", "alphabetical"], "recent"),
+      archiveStatus: allowed(source.archiveStatus, ["all", "completed", "paused", "archived"], "all"),
     };
   }
   return {
@@ -49,6 +50,7 @@ function normalizeDashboardViewFilters(scope, input = {}) {
 
 function normalizeDashboardSavedView(input = {}) {
   const scope = cleanText(input.scope, 80).toLowerCase();
+  if (scope === "attorney_matters" && (typeof input.name !== "string" || input.name.length > MAX_VIEW_NAME_LENGTH || (input.filters?.search && (typeof input.filters.search !== "string" || input.filters.search.length > 200)) || (input.filters?.practice && (typeof input.filters.practice !== "string" || input.filters.practice.length > 120)))) throw new DashboardSavedViewError("SAVED_VIEW_INVALID");
   const name = cleanText(input.name, MAX_VIEW_NAME_LENGTH);
   if (!name) throw new DashboardSavedViewError("dashboard_view_name_required");
   const id = cleanText(input.id, 80);

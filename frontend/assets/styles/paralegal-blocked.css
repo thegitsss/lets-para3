@@ -1,0 +1,27 @@
+/* Scoped blocked-user controls within Paralegal Security settings. */
+.pv2-blocked { min-width: 0; color: var(--v2-ink); }
+.pv2-blocked-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+.pv2-blocked-header h2 { margin: 0; font-size: 1.125rem; font-weight: 600; }
+.pv2-blocked :is(h2,h3), .pv2-blocked-dialog h2 { color: var(--v2-ink); font-family: var(--v2-font-sans); }
+.pv2-blocked *, .pv2-blocked-dialog * { box-sizing: border-box; }
+.pv2-blocked button, .pv2-blocked-dialog button { font: inherit; cursor: pointer; max-width: 100%; overflow-wrap: anywhere; }
+.pv2-blocked button:disabled, .pv2-blocked-dialog button:disabled { cursor: not-allowed; opacity: .65; }
+.pv2-blocked :is(a,button,summary):focus-visible, .pv2-blocked-dialog button:focus-visible, .pv2-blocked h2:focus { outline: 2px solid var(--v2-ink); outline-offset: 3px; }
+.pv2-blocked-dialog { box-sizing: border-box; width: min(540px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; border: 1px solid var(--v2-line); border-radius: 12px; color: var(--v2-ink); background: var(--v2-white); }
+.pv2-blocked-dialog::backdrop { background: #101b2b88; }
+.pv2-blocked-dialog h2 { margin: 0 0 12px; font-size: 1.35rem; }
+.pv2-blocked-dialog .pv2-actions { margin-top: 20px; }
+@media(max-width:480px) { .pv2-blocked-dialog { padding: 18px; } }
+.pv2-blocked-list { margin-top: 8px; }
+.pv2-blocked-row { display: flex; align-items: start; justify-content: space-between; gap: 16px 24px; border-bottom: 1px solid var(--v2-line); padding: 20px 0; }
+.pv2-blocked-row > div { min-width: 0; }
+.pv2-blocked-row h3 { font-size: 1rem; margin: 0; overflow-wrap: anywhere; }
+.pv2-blocked-row p { margin: 6px 0 0; line-height: 1.6; overflow-wrap: anywhere; }
+.pv2-blocked-row > button { flex-shrink: 0; max-width: 100%; overflow-wrap: anywhere; }
+.pv2-blocked-reason { margin-top: 6px; }
+.pv2-blocked-reason summary { min-height: 44px; padding: 10px 0; cursor: pointer; color: var(--v2-blue); }
+.pv2-blocked-reason p { white-space: pre-wrap; }
+.pv2-blocked-pages { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 20px; }
+.pv2-blocked-dialog h2, .pv2-blocked-dialog p { overflow-wrap: anywhere; }
+.pv2-blocked-dialog p { line-height: 1.6; }
+@media (max-width: 600px) { .pv2-blocked-row { align-items: start; flex-wrap: wrap; } .pv2-blocked-row > div { flex: 1 1 100%; } }

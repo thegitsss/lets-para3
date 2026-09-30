@@ -1,4 +1,6 @@
 const { test, expect } = require("playwright/test");
+const AxeBuilder = require("@axe-core/playwright").default;
+const mapStates = require("../../../../frontend/assets/data/us-states.json");
 
 const REQUIRED_VIEWPORTS = [
   { width: 320, height: 844 },
@@ -11,13 +13,28 @@ const REQUIRED_VIEWPORTS = [
 const MOBILE_VIEWPORTS = REQUIRED_VIEWPORTS.slice(0, 2);
 
 const WORKFLOW_TITLES = [
-  "Scope the work.",
-  "Review applicants.",
-  "Work together.",
-  "Review deliverables.",
-  "Confirm completion.",
-  "Close the matter.",
+  "Scope the work",
+  "Review fit, check conflicts",
+  "Work together",
+  "Review deliverables",
+  "Confirm completion",
+  "Close the matter",
 ];
+
+test("network dots pulse sparingly and respect reduced motion", async ({ page }) => {
+  await page.route("**/api/public/paralegals/state-counts", route => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ states: Object.fromEntries(mapStates.map(state => [state.code, ["CA", "NY"].includes(state.code) ? 14 : 0])), approvedTotal: 28 }),
+  }));
+  await page.goto("/index.html", { waitUntil: "domcontentloaded" });
+  await page.locator(".paralegal-map__canvas").scrollIntoViewIfNeeded();
+  await expect(page.locator(".paralegal-map__pin")).toHaveCount(28);
+  const halos = page.locator(".paralegal-map__halo");
+  await expect(halos).toHaveCount(3);
+  await expect.poll(() => halos.first().evaluate(node => getComputedStyle(node).animationName)).toBe("paralegal-map-dot-pulse");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect.poll(() => halos.first().evaluate(node => getComputedStyle(node).animationName)).toBe("none");
+});
 
 async function settlePage(page) {
   await page.waitForFunction(() => document.body.classList.contains("home-motion-ready"));
@@ -59,6 +76,74 @@ async function overflowSnapshot(page) {
   });
 }
 
+test("workflow examples keep one Matter identity and readable truthful states at every scroll step", async ({ page }, info) => {
+  test.setTimeout(180_000);
+  const errors = []; page.on("pageerror", error => errors.push(error.message));
+  await page.goto("/index.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".workflow__intro-title")).not.toContainText("Illustrative example");
+  await expect(page.locator(".paralegal-map__stat")).toContainText("Browse profiles");
+  await expect(page.locator(".paralegal-map__note")).toContainText("locations are illustrative");
+  for (const width of [320, 390, 1440]) {
+    await page.setViewportSize({ width, height: width <= 640 ? 844 : 1000 });
+    await page.goto("/index.html", { waitUntil: "domcontentloaded" }); await settlePage(page);
+    const scope = width <= 640 ? ".workflow-mobile-stage__canvas" : ".workflow-canvas";
+    for (let step = 1; step <= 6; step++) {
+      const target = await page.locator(`[data-workflow-chapter="${step}"]`).evaluate(chapter => scrollY + chapter.getBoundingClientRect().top + chapter.offsetHeight / 2 - innerHeight * 0.48);
+      await page.evaluate(top => scrollTo({ top, behavior: "instant" }), target);
+      const panel = page.locator(`${scope} .workflow-state[data-state="${step}"]`);
+      await expect(panel).toHaveAttribute("aria-hidden", "false");
+      await expect.poll(() => panel.evaluate(el => { const style = getComputedStyle(el); return style.opacity === "1" && ["none", "blur(0px)"].includes(style.filter); })).toBe(true);
+      const visible = page.locator(scope);
+      const header = (width <= 640 ? panel : visible).locator(".product-topbar");
+      await expect(header.locator(".matter-identity strong")).toHaveText("Medical Records Chronology");
+      await expect(header.locator(".workflow-example-label")).toHaveCount(0);
+      await expect(panel.locator("button, input, textarea")).toHaveCount(0);
+      if (step === 5) { await expect(panel.locator(".workflow-preview-action")).toHaveText("Approve completed work"); await expect(panel).not.toContainText("Release payment"); await expect(panel.locator("h4")).toHaveText("Ready to close"); }
+      if (step === 6) { await expect(panel).toContainText("Funded matter amount"); await expect(panel).toContainText("$650.00"); await expect(panel.locator("h4")).toHaveText("Payment released"); await expect(panel).not.toContainText("Matter complete"); }
+      const scan = await new AxeBuilder({ page }).include(scope).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze(); expect(scan.violations).toEqual([]);
+      const overflow = await panel.evaluate(el => {
+        const root = el.getBoundingClientRect();
+        return [...el.querySelectorAll("h4, strong, b, .field, .applicant-row, .workflow-preview-action")]
+          .filter(node => node.getClientRects().length && getComputedStyle(node).visibility !== "hidden")
+          .map(node => ({ text: node.textContent.trim(), display: getComputedStyle(node).display, rect: node.getBoundingClientRect().toJSON(), scroll: node.scrollWidth, client: node.clientWidth }))
+          // Inline elements have no clientWidth; Firefox still reports their scrollWidth.
+          // Compare those against their rendered box, while retaining panel bounds.
+          .filter(node => node.rect.left < root.left - 1 || node.rect.right > root.right + 1 || node.rect.bottom > root.bottom + 1 || node.scroll > (node.display === "inline" ? node.rect.width : node.client) + 1);
+      });
+      expect(overflow, `Workflow step ${step} at ${width}px`).toEqual([]);
+      if (width <= 640) {
+        if (step === 1) expect(await panel.locator('.form-grid').evaluate(grid => [...grid.querySelectorAll('.field--wide')].every(field => field.getBoundingClientRect().width >= grid.getBoundingClientRect().width - 1))).toBe(true);
+        const textSize = await panel.evaluate(el => {
+          const scale = Number(el.querySelector('.workflow-mobile-stage__frame')?.style.getPropertyValue('--mobile-workflow-scale')) || 1;
+          const sizes = selector => [...el.querySelectorAll(selector)].filter(node => node.getClientRects().length && getComputedStyle(node).visibility !== 'hidden').map(node => parseFloat(getComputedStyle(node).fontSize) * scale);
+          return { body: Math.min(...sizes('.field strong, .message p, .completion-files b, .completion-state > p, .applicant-row__identity strong')), labels: Math.min(...sizes('.field > span, .message small, .payment-summary small, .applicant-row__identity > span')) };
+        });
+        expect(textSize.body).toBeGreaterThanOrEqual(13.5); expect(textSize.labels).toBeGreaterThanOrEqual(12);
+      }
+      await page.screenshot({ path: info.outputPath(`workflow-${width}-${step}.png`), animations: "disabled" });
+    }
+  }
+  expect(errors).toEqual([]);
+});
+
+test("workflow copy remains readable with enlarged text and reduced motion", async ({ page }, info) => {
+  test.setTimeout(120_000);
+  await page.emulateMedia({ reducedMotion: "reduce" }); await page.setViewportSize({ width: 390, height: 1000 });
+  await page.goto("/index.html"); await settlePage(page);
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  for (let step = 1; step <= 6; step++) {
+    const selector = `.workflow-chapter[data-workflow-chapter="${step}"]`; const chapter = page.locator(selector);
+    await chapter.scrollIntoViewIfNeeded(); await expect(chapter.locator(".workflow-preview-context")).toBeVisible();
+    const scan = await new AxeBuilder({ page }).include(selector).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze(); expect(scan.violations).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    expect(await chapter.evaluate(root => [...root.querySelectorAll("h4, .field, .applicant-row, .workflow-preview-action")].every(node => node.scrollWidth <= node.clientWidth + 1))).toBe(true);
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.screenshot({ path: info.outputPath(`workflow-large-text-${step}.png`), animations: "disabled" });
+    await chapter.evaluate(el => scrollTo({ top: scrollY + el.getBoundingClientRect().bottom - innerHeight + 24, behavior: 'instant' }));
+    await page.screenshot({ path: info.outputPath(`workflow-large-text-${step}-bottom.png`), animations: "disabled" });
+  }
+});
+
 test("homepage motion never expands the document width at any required viewport", async ({ page }) => {
   test.setTimeout(120_000);
   for (const viewport of REQUIRED_VIEWPORTS) {
@@ -66,7 +151,7 @@ test("homepage motion never expands the document width at any required viewport"
     await page.goto("/index.html", { waitUntil: "domcontentloaded" });
     await settlePage(page);
     const samples = await page.evaluate(() => {
-      const selectors = [".editorial-hero", ".workflow", ".paths", ".assistant-showcase", ".clarity-section", ".closing-scene"];
+      const selectors = [".editorial-hero", ".workflow", ".assistant-spotlight", ".clarity-section", ".closing-scene"];
       const maximum = Math.max(0, document.documentElement.scrollHeight - innerHeight);
       return [...new Set([
         0,
@@ -92,208 +177,57 @@ test("homepage motion never expands the document width at any required viewport"
   }
 });
 
-test("mobile workflow and long-form sections remain continuous rather than blank", async ({ page }) => {
+test("mobile workflow keeps all six chapters and current homepage sections readable", async ({ page }) => {
   for (const viewport of MOBILE_VIEWPORTS) {
     await page.setViewportSize(viewport);
-    await page.goto("/index.html", { waitUntil: "domcontentloaded" });
-    await settlePage(page);
-
-    const geometry = await page.evaluate(() => {
-      const rect = (selector) => document.querySelector(selector).getBoundingClientRect();
-      const workflowStory = rect(".workflow__story");
-      const chapters = Array.from(document.querySelectorAll(".workflow-chapter"));
-      const chapterRects = chapters.map((chapter) => chapter.getBoundingClientRect());
-      const chapterStyles = chapters.map((chapter) => {
-        const style = getComputedStyle(chapter);
-        return {
-          background: style.backgroundColor,
-          borders: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
-        };
-      });
-      const pathsHeadingStyle = getComputedStyle(document.querySelector(".paths__heading"));
-      const paths = rect(".paths");
-      const pathsHeading = rect(".paths__heading");
-      const pathsSplit = rect(".paths__split");
-      const pathScenes = Array.from(document.querySelectorAll(".path-scene")).map((scene) => scene.getBoundingClientRect());
-      const assistantStyle = getComputedStyle(document.querySelector(".assistant-showcase"));
-      const clarityStyle = getComputedStyle(document.querySelector(".clarity-section"));
-      return {
-        viewportHeight: innerHeight,
-        viewportWidth: document.documentElement.clientWidth,
-        scrollWidth: document.documentElement.scrollWidth,
-        workflowStoryHeight: workflowStory.height,
-        chapterSeams: chapterRects.slice(0, -1).map((chapter, index) => chapterRects[index + 1].top - chapter.bottom),
-        chapterStyles,
-        pathsPadding: {
-          top: parseFloat(pathsHeadingStyle.paddingTop),
-          bottom: parseFloat(pathsHeadingStyle.paddingBottom),
-        },
-        pathsSeams: [
-          pathsSplit.top - pathsHeading.bottom,
-          pathScenes[1].top - pathScenes[0].bottom,
-          paths.bottom - pathsSplit.bottom,
-        ],
-        assistantPadding: {
-          top: parseFloat(assistantStyle.paddingTop),
-          bottom: parseFloat(assistantStyle.paddingBottom),
-        },
-        clarityPadding: {
-          top: parseFloat(clarityStyle.paddingTop),
-          bottom: parseFloat(clarityStyle.paddingBottom),
-        },
-      };
-    });
-
-    expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.viewportWidth);
-    expect(geometry.workflowStoryHeight / geometry.viewportHeight).toBeGreaterThanOrEqual(547 / 100);
-    expect(geometry.workflowStoryHeight / geometry.viewportHeight).toBeLessThanOrEqual(550 / 100);
-    geometry.chapterSeams.forEach((gap) => expect(Math.abs(gap)).toBeLessThanOrEqual(1));
-    geometry.chapterStyles.forEach((style) => {
-      expect(style.background).toBe("rgba(0, 0, 0, 0)");
-      style.borders.forEach((border) => expect(border).toBe("0px"));
-    });
-    expect(Math.abs(geometry.pathsPadding.top - geometry.pathsPadding.bottom)).toBeLessThanOrEqual(1);
-    geometry.pathsSeams.forEach((gap) => expect(Math.abs(gap)).toBeLessThanOrEqual(1));
-    expect(Math.abs(geometry.assistantPadding.top - geometry.assistantPadding.bottom)).toBeLessThanOrEqual(1);
-    expect(Math.abs(geometry.clarityPadding.top - geometry.clarityPadding.bottom)).toBeLessThanOrEqual(1);
-
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/index.html"); await settlePage(page);
     const chapters = page.locator(".workflow-chapter");
-    for (let index = 0; index < WORKFLOW_TITLES.length; index += 1) {
-      const target = await chapters.nth(index).evaluate((chapter) => {
-        const rect = chapter.getBoundingClientRect();
-        return window.scrollY + rect.top + (rect.height / 2) - (window.innerHeight * 0.48);
-      });
-      await page.evaluate((top) => window.scrollTo({ top, behavior: "auto" }), target);
-      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-      await expect(page.locator(".workflow-mobile-stage__heading h3")).toHaveText(WORKFLOW_TITLES[index]);
-      await expect(page.locator(".workflow-mobile-stage__canvas .workflow-state.is-active")).toHaveCount(1);
+    await expect(chapters).toHaveCount(6);
+    for (let i = 0; i < WORKFLOW_TITLES.length; i++) {
+      await chapters.nth(i).scrollIntoViewIfNeeded();
+      await expect(chapters.nth(i).locator("h3")).toHaveText(WORKFLOW_TITLES[i]);
+      await expect(chapters.nth(i).locator(".workflow-mobile-canvas")).toBeVisible();
     }
-
-    await page.locator(".assistant-showcase").scrollIntoViewIfNeeded();
-    const preview = page.locator(".assistant-preview");
-    await expect(preview).toBeVisible();
-    await expect(preview.locator("[data-assistant-role]")).toHaveText("Attorney Assistant");
-    await expect(preview.locator("[data-assistant-question]")).toHaveText("When is my next deadline?");
-    await expect(preview.locator("[data-assistant-answer]")).toContainText("Henderson v. Walker");
-    await expect(preview.locator("[data-assistant-action]")).toHaveText("Open the active matter");
-    await expect(preview.locator(".assistant-preview__suggestions span")).toHaveCount(2);
-    await expect(preview.locator(".assistant-preview__composer")).toBeVisible();
-    await expect(preview.locator(".assistant-showcase__disclaimer")).toBeVisible();
+    for (const selector of [".assistant-spotlight", ".trust-band", ".clarity-section", ".closing-scene"]) {
+      const section = page.locator(selector); await section.scrollIntoViewIfNeeded();
+      await expect(section).toBeVisible();
+      expect(await section.evaluate(el => [...el.querySelectorAll("h2, h3, p, a, button")].every(node => {
+        if (!node.getClientRects().length) return true;
+        const rect = node.getBoundingClientRect();
+        return rect.left >= -1 && rect.right <= innerWidth + 1 && node.scrollWidth <= node.clientWidth + 1;
+      })), `${selector} content fits at ${viewport.width}px`).toBe(true);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   }
 });
 
-test("approved motion ownership remains intact without moving Answers Before You Get Started", async ({ page }) => {
+test("homepage FAQ stays readable and Assistant source link has visible keyboard focus", async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 900 });
-  await page.goto("/index.html", { waitUntil: "domcontentloaded" });
-  await settlePage(page);
-
+  await page.goto("/index.html"); await settlePage(page);
   await expect(page.locator(".home-faq")).not.toHaveAttribute("data-motion-layer");
-  await expect(page.locator(".closing-scene .role-actions")).toHaveAttribute("data-motion-layer", "rise");
-  await expect(page.locator(".matter-field--paths")).toHaveCount(1);
-  await expect(page.locator(".paths > .matter-field--paths")).toHaveCount(1);
-  await expect(page.locator(".editorial-hero .matter-field--paths")).toHaveCount(0);
-
-  const pathsCanvas = page.locator(".matter-field--paths");
-  const beforeTransform = await pathsCanvas.evaluate((canvas) => getComputedStyle(canvas).transform);
-  await page.locator(".paths__heading").scrollIntoViewIfNeeded();
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  const pathsState = await pathsCanvas.evaluate((canvas) => {
-    const probe = document.createElement("canvas");
-    probe.width = 160;
-    probe.height = 160;
-    const context = probe.getContext("2d", { willReadFrequently: true });
-    const sourceHeight = Math.min(canvas.height, Math.round(innerHeight * Math.min(devicePixelRatio || 1, 1.5)));
-    context.drawImage(canvas, 0, 0, canvas.width, sourceHeight, 0, 0, probe.width, probe.height);
-    const pixels = context.getImageData(0, 0, probe.width, probe.height).data;
-    let cornflowerPixels = 0;
-    for (let index = 0; index < pixels.length; index += 4) {
-      const red = pixels[index];
-      const green = pixels[index + 1];
-      const blue = pixels[index + 2];
-      const alpha = pixels[index + 3];
-      if (alpha > 10 && blue > red + 30 && blue > green + 20) cornflowerPixels += 1;
-    }
-    return {
-      transform: getComputedStyle(canvas).transform,
-      cornflowerPixels,
-    };
-  });
-  expect(pathsState.transform).not.toBe(beforeTransform);
-  expect(pathsState.cornflowerPixels).toBeGreaterThan(0);
-
-  const assistantLink = page.locator(".assistant-message--assistant a");
-  await assistantLink.focus();
-  const focusGeometry = await assistantLink.evaluate((link) => {
-    const linkRect = link.getBoundingClientRect();
-    const previewRect = link.closest(".assistant-preview").getBoundingClientRect();
-    return {
-      leftSpace: linkRect.left - previewRect.left,
-      rightSpace: previewRect.right - linkRect.right,
-      topSpace: linkRect.top - previewRect.top,
-      bottomSpace: previewRect.bottom - linkRect.bottom,
-    };
-  });
-  Object.values(focusGeometry).forEach((space) => expect(space).toBeGreaterThanOrEqual(4));
+  const link = page.locator(".assistant-demo__source");
+  await link.scrollIntoViewIfNeeded(); await link.focus();
+  await expect(link).toBeFocused();
+  expect(await link.evaluate(el => parseFloat(getComputedStyle(el).outlineWidth))).toBeGreaterThanOrEqual(2);
+  await expect(link).toHaveAttribute("href", "login.html");
+  const question = page.locator('.home-faq summary').filter({ hasText: 'conflicts check' });
+  await question.click();
+  await expect(question.locator('..')).toHaveAttribute('open', '');
 });
 
-test("reduced motion removes pinned empty space and leaves every section readable", async ({ page }) => {
+test("reduced motion leaves all current homepage sections and workflow content available", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.setViewportSize({ width: 320, height: 844 });
-  await page.goto("/index.html", { waitUntil: "domcontentloaded" });
-  await settlePage(page);
-
-  await expect(page.locator("body")).not.toHaveClass(/home-cinematic-motion/);
-  await expect(page.locator("[data-motion-layer]")).toHaveCount(0);
-  await expect(page.locator(".workflow-mobile-stage")).toBeHidden();
-  await expect(page.locator(".workflow-chapter")).toHaveCount(6);
-  await expect(page.locator(".workflow-chapter .workflow-mobile-canvas")).toHaveCount(6);
-
-  const reducedState = await page.evaluate(() => {
-    const story = document.querySelector(".workflow__story").getBoundingClientRect();
-    const chapters = document.querySelector(".workflow-chapters").getBoundingClientRect();
-    const chapterStates = Array.from(document.querySelectorAll(".workflow-chapter")).map((chapter) => {
-      const rect = chapter.getBoundingClientRect();
-      const canvas = chapter.querySelector(".workflow-mobile-canvas");
-      return {
-        height: rect.height,
-        visibility: getComputedStyle(chapter).visibility,
-        opacity: getComputedStyle(chapter).opacity,
-        canvasDisplay: getComputedStyle(canvas).display,
-      };
-    });
-    return {
-      viewportWidth: document.documentElement.clientWidth,
-      scrollWidth: document.documentElement.scrollWidth,
-      storyHeight: story.height,
-      chaptersHeight: chapters.height,
-      pathsTransform: getComputedStyle(document.querySelector(".matter-field--paths")).transform,
-      closingTransform: getComputedStyle(document.querySelector(".matter-field--closing")).transform,
-      chapterStates,
-    };
-  });
-
-  expect(reducedState.scrollWidth).toBeLessThanOrEqual(reducedState.viewportWidth);
-  expect(Math.abs(reducedState.storyHeight - reducedState.chaptersHeight)).toBeLessThanOrEqual(1);
-  expect(reducedState.pathsTransform).toBe("none");
-  expect(reducedState.closingTransform).toBe("none");
-  reducedState.chapterStates.forEach((state) => {
-    expect(state.height).toBeGreaterThan(0);
-    expect(state.visibility).toBe("visible");
-    expect(state.opacity).toBe("1");
-    expect(state.canvasDisplay).toBe("block");
-  });
-
-  for (const selector of [
-    ".editorial-hero",
-    ".workflow",
-    ".paths",
-    ".assistant-showcase",
-    ".trust-band",
-    ".clarity-section",
-    ".closing-scene",
-  ]) {
-    const section = page.locator(selector);
-    await section.scrollIntoViewIfNeeded();
-    await expect(section).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/index.html"); await settlePage(page);
+  for (const selector of [".editorial-hero", ".workflow", ".assistant-spotlight", ".trust-band", ".clarity-section", ".closing-scene"]) {
+    await page.locator(selector).scrollIntoViewIfNeeded();
+    await expect(page.locator(selector)).toBeVisible();
   }
+  for (const chapter of await page.locator('.workflow-chapter').all()) {
+    await chapter.scrollIntoViewIfNeeded();
+    await expect(chapter).toHaveCSS('opacity', '1');
+    await expect(chapter.locator('.workflow-mobile-canvas')).toBeVisible();
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 });

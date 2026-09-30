@@ -1,10 +1,31 @@
-const { test, expect } = require("playwright/test");
+const { test, expect } = require("../support-session-fixture");
 const AxeBuilder = require("@axe-core/playwright").default;
 const { SUPPORTED_VIEWPORTS } = require("../../../playwright.browser-matrix");
 
 function resolveHarnessHeaders() {
   const secret = String(process.env.AI_CONTROL_ROOM_E2E_HARNESS_SECRET || "").trim();
   return secret ? { "x-ai-control-room-e2e-secret": secret } : {};
+}
+
+async function seedHarnessInvitation(request) {
+  const response = await request.post("/api/admin/ai-control-room/dev/e2e/bootstrap-paralegal?seedInvitation=true&resetMatter=true", { headers: resolveHarnessHeaders() });
+  expect(response.ok(), await response.text()).toBe(true);
+  const fixture = await response.json();
+  expect(String(fixture?.matter?.id || "")).toMatch(/^[a-f0-9]{24}$/);
+  expect(fixture.invitation).toEqual({ sent: true, alreadyPending: false });
+  return fixture;
+}
+
+function supportReplyFixture(route, userMessage, assistantMessage) {
+  const conversationId = new URL(route.request().url()).pathname.split("/")[4];
+  const { requestId } = route.request().postDataJSON();
+  return {
+    ok: true,
+    request: { id: requestId, action: "send", state: "succeeded" },
+    conversation: { id: conversationId, status: "open" },
+    userMessage: { ...userMessage, conversationId },
+    assistantMessage: { ...assistantMessage, conversationId },
+  };
 }
 
 async function expectNoHorizontalOverflow(page) {
@@ -15,22 +36,22 @@ async function expectNoHorizontalOverflow(page) {
   expect(layout.contentWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
 }
 
-test("paralegal dashboard renders a complete, usable desktop and mobile home state", async ({ page }) => {
+test("paralegal dashboard renders a complete, usable desktop and mobile home state", async ({ page }, testInfo) => {
+  const fixture = await seedHarnessInvitation(page.request);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/dashboard-paralegal.html", { waitUntil: "domcontentloaded" });
 
-  await expect(page.locator("#user-name-heading")).toHaveText(/\S+/);
-  await expect(page.locator(".summary .skeleton-line")).toHaveCount(0);
-  await expect(page.locator(".case-panels .skeleton-card")).toHaveCount(0);
+  await expect(page.locator(".private-office-greeting, #welcomeGreeting, #user-name-heading")).toHaveCount(0);
+  await expect(page.locator("#homeWorkSection")).not.toHaveAttribute("aria-busy", "true");
   await expect(page.locator("[data-paralegal-priority-count]")).not.toHaveText("Loading…");
   await expect(page.locator("[data-paralegal-priority-list]")).not.toContainText("Checking your workspace");
-  await expect(page.locator("[data-paralegal-priority-list] .lpc-priority-item").first()).toBeVisible();
-  await expect(page.locator("#messageBox")).toBeDisabled();
-  await expect(page.locator("#messageLabel")).toHaveText("No unread messages");
-  for (const metric of await page.locator(".summary .info-value").allTextContents()) {
-    expect(metric.trim()).not.toEqual("");
-  }
+  await expect(page.locator("[data-paralegal-priority-list]")).toHaveAttribute("data-state", "ready");
+  const invitation = page.locator("[data-paralegal-priority-list] .office-inbox-item").filter({ hasText: fixture.matter.title });
+  await expect(invitation).toBeVisible();
+  await expect(invitation.getByRole("link", { name: "Review invitation", exact: true })).toHaveAttribute("href", `dashboard-paralegal.html?inviteCase=${fixture.matter.id}#home`);
+  await expect(page.locator(".private-office-desk")).toBeVisible();
+  await expect(page.locator(".private-office-compensation")).toContainText("No payouts recorded.");
   await expect.poll(() => page.locator(".sidebar-profile-cluster img").evaluate((image) => ({
     complete: image.complete,
     naturalWidth: image.naturalWidth,
@@ -46,14 +67,17 @@ test("paralegal dashboard renders a complete, usable desktop and mobile home sta
   await expect(page.locator("#availabilityModal")).toHaveAttribute("aria-hidden", "true");
   await expect(availabilityButton).toBeFocused();
   await availabilityButton.click();
+  await expect(page.locator("#availabilityModal")).toHaveAttribute("aria-hidden", "false");
+  await expect(page.locator("#availabilityStatusInput")).toBeFocused();
   await expect(page.locator("#availabilityStatusInput")).toHaveValue("unavailable");
   await expect(page.locator("#availabilityDateInput")).toHaveValue(futureDate);
-  await expect(page.locator("#availabilityCurrentSummary")).toContainText("Available on");
+  await expect(page.locator("#availabilityNext")).toContainText("Available on");
+  await expect(page.locator("#availabilityNext")).toHaveAttribute("data-date", futureDate);
   await page.locator("#availabilityStatusInput").selectOption("available");
   await page.locator("#saveAvailabilityBtn").click();
   await expect(page.locator("#availabilityModal")).toHaveAttribute("aria-hidden", "true");
   await expectNoHorizontalOverflow(page);
-  await page.screenshot({ path: "/tmp/lpc-paralegal-dashboard-desktop.png", fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath("paralegal-dashboard-desktop.png"), fullPage: true });
 
   await page.setViewportSize({ width: 390, height: 844 });
   const sidebarToggle = page.locator("#sidebarToggle");
@@ -62,25 +86,21 @@ test("paralegal dashboard renders a complete, usable desktop and mobile home sta
   expect(toggleBox?.width).toBeGreaterThanOrEqual(44);
   expect(toggleBox?.height).toBeGreaterThanOrEqual(44);
   const mobileMetrics = await page.evaluate(() => {
-    const summary = document.querySelector(".summary");
-    const card = document.querySelector(".summary .info-box");
+    const desk = document.querySelector(".private-office-desk");
+    const calendar = document.querySelector(".private-office-calendar");
     return {
-      columns: summary ? getComputedStyle(summary).gridTemplateColumns.split(" ").length : 0,
-      cardHeight: card?.getBoundingClientRect().height || 0,
+      deskWidth: desk?.getBoundingClientRect().width || 0,
+      calendarTop: calendar?.getBoundingClientRect().top || 0,
       priorityTop: document.querySelector("#paralegalPriorityQueue")?.getBoundingClientRect().top || 0,
-      earningsToggleWidth: document.querySelector("#earningsToggle")?.getBoundingClientRect().width || 0,
-      earningsToggleHeight: document.querySelector("#earningsToggle")?.getBoundingClientRect().height || 0,
     };
   });
-  expect(mobileMetrics.columns).toBe(2);
-  expect(mobileMetrics.cardHeight).toBeLessThanOrEqual(140);
-  expect(mobileMetrics.priorityTop).toBeLessThanOrEqual(700);
-  expect(mobileMetrics.earningsToggleWidth).toBeGreaterThanOrEqual(44);
-  expect(mobileMetrics.earningsToggleHeight).toBeGreaterThanOrEqual(44);
+  expect(mobileMetrics.deskWidth).toBeLessThanOrEqual(390);
+  expect(mobileMetrics.calendarTop).toBeGreaterThan(0);
+  expect(mobileMetrics.priorityTop).toBeGreaterThan(mobileMetrics.calendarTop);
   await expect(page.locator("#sidebarNav")).toHaveAttribute("aria-hidden", "true");
   await expect(page.locator("#sidebarNav")).toHaveAttribute("inert", "");
   await expectNoHorizontalOverflow(page);
-  await page.screenshot({ path: "/tmp/lpc-paralegal-dashboard-mobile.png", fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath("paralegal-dashboard-mobile.png"), fullPage: true });
 
   await sidebarToggle.click();
   await expect(page.locator("body")).toHaveClass(/nav-open/);
@@ -88,7 +108,7 @@ test("paralegal dashboard renders a complete, usable desktop and mobile home sta
   await expect(page.locator("#sidebarNav")).toHaveAttribute("aria-hidden", "false");
   await expect(page.locator("#sidebarNav")).not.toHaveAttribute("inert", "");
   await expect(page.locator('#sidebarNav [aria-label="Open profile menu"]')).toBeFocused();
-  await page.screenshot({ path: "/tmp/lpc-paralegal-dashboard-mobile-menu.png", fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath("paralegal-dashboard-mobile-menu.png"), fullPage: true });
   await page.keyboard.press("Escape");
   await expect(page.locator("body")).not.toHaveClass(/nav-open/);
   await expect(sidebarToggle).toHaveAttribute("aria-expanded", "false");
@@ -116,6 +136,73 @@ test("paralegal dashboard has no automated WCAG A/AA violations", async ({ page 
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveAttribute("aria-hidden", "true");
   await expect(launcher).toBeFocused();
+});
+
+test("returning to the browser tab refreshes data without replacing the settled dashboard with loading UI", async ({ page }) => {
+  await page.goto("/dashboard-paralegal.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#homeWorkSection")).not.toHaveAttribute("aria-busy", "true");
+  await expect(page.locator("#appliedJobsList")).not.toContainText("Loading applications");
+
+  await page.evaluate(() => {
+    const root = document.querySelector("main#main");
+    const deskContainer = document.querySelector("#assignmentList");
+    const innerHTMLDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
+    window.__lpcResumeDeskWrites = [];
+    if (deskContainer && innerHTMLDescriptor) {
+      Object.defineProperty(deskContainer, "innerHTML", {
+        configurable: true,
+        get() {
+          return innerHTMLDescriptor.get.call(this);
+        },
+        set(value) {
+          window.__lpcResumeDeskWrites.push(new Error("desk content replaced").stack);
+          innerHTMLDescriptor.set.call(this, value);
+        },
+      });
+    }
+    window.__lpcSettledDeskContent = document.querySelector("#assignmentList")?.firstElementChild || null;
+    window.__lpcSettledRecommendations = document.querySelector("#recommendedMattersList")?.firstElementChild || null;
+    window.__lpcSettledApplications = document.querySelector("#appliedJobsList")?.firstElementChild || null;
+    const loadingCopy = [
+      "Preparing your desk",
+      "Checking for matching matters",
+      "Loading applications",
+    ];
+    window.__lpcResumeLoadingStates = [];
+    window.__lpcResumeObserver = new MutationObserver(() => {
+      const text = root?.textContent || "";
+      loadingCopy.forEach((copy) => {
+        if (text.includes(copy)) window.__lpcResumeLoadingStates.push(copy);
+      });
+    });
+    window.__lpcResumeObserver.observe(root, { childList: true, subtree: true, characterData: true });
+  });
+
+  const refreshed = page.waitForResponse((response) =>
+    response.url().includes("/api/paralegal/dashboard") && response.request().method() === "GET"
+  );
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await refreshed;
+  await page.waitForTimeout(250);
+
+  const result = await page.evaluate(() => {
+    window.__lpcResumeObserver?.disconnect();
+    return {
+      loadingStates: window.__lpcResumeLoadingStates,
+      headerVisible: Boolean(document.querySelector('[data-lpc-universal-header="true"]')?.getClientRects().length),
+      mainVisible: Boolean(document.querySelector("main#main")?.getClientRects().length),
+      deskPreserved: window.__lpcSettledDeskContent === document.querySelector("#assignmentList")?.firstElementChild,
+      recommendationsPreserved: window.__lpcSettledRecommendations === document.querySelector("#recommendedMattersList")?.firstElementChild,
+      applicationsPreserved: window.__lpcSettledApplications === document.querySelector("#appliedJobsList")?.firstElementChild,
+      deskWrites: window.__lpcResumeDeskWrites,
+    };
+  });
+  expect(result.loadingStates).toEqual([]);
+  expect(result.headerVisible).toBe(true);
+  expect(result.mainVisible).toBe(true);
+  expect(result.deskPreserved, JSON.stringify(result.deskWrites, null, 2)).toBe(true);
+  expect(result.recommendationsPreserved).toBe(true);
+  expect(result.applicationsPreserved).toBe(true);
 });
 
 test("paralegal critical product surfaces render accessibly without overflow or runtime failures", async ({ page }) => {
@@ -168,6 +255,29 @@ test("paralegal critical product surfaces render accessibly without overflow or 
   expect(serverFailures).toEqual([]);
 });
 
+test("Phase 5 surfaces share the quiet LPC component treatment", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+
+  await page.goto("/browse-jobs.html", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "Browse matters", exact: true })).toBeVisible();
+  await expect(page.locator("aside.filter")).toHaveCSS("border-radius", "0px");
+  await expect(page.locator("aside.filter")).toHaveCSS("box-shadow", "none");
+  await expect(page.locator(".results-header")).toHaveCSS("box-shadow", "none");
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+
+  await page.goto("/dashboard-paralegal.html#cases", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "My Matters & Applications", exact: true })).toBeVisible();
+  await expect(page.locator("#appliedJobsList .case-card").first()).toHaveCSS("box-shadow", "none");
+  await expect(page.locator(".apps-column")).toHaveCSS("border-left-color", "rgb(220, 227, 234)");
+
+  await page.goto("/profile-settings.html#security", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "Security", exact: true }).first()).toBeVisible();
+  await expect(page.locator("#settingsContent")).toBeVisible();
+  await expect(page.locator("#securitySection .settings-block").first()).toHaveCSS("box-shadow", "none");
+  await expectNoHorizontalOverflow(page);
+});
+
 test("legacy paralegal workflow URLs preserve context and converge on the canonical dashboard", async ({ page }) => {
   const objectId = "64f000000000000000000004";
   const redirects = [
@@ -199,9 +309,17 @@ test("legacy paralegal workflow URLs preserve context and converge on the canoni
       if (url.pathname.endsWith("/dashboard-paralegal.html")) canonicalRequests.push(url);
     };
     page.on("request", recordNavigationRequest);
-    await page.goto(redirect.from, { waitUntil: "domcontentloaded" });
+    await page.goto(redirect.from, { waitUntil: "commit" }).catch((error) => {
+      // Firefox can report the source navigation as interrupted when the
+      // redirect script commits the canonical destination immediately.
+      if (!/interrupted by another navigation/i.test(String(error?.message || error))) throw error;
+    });
     await page.waitForURL(
-      (url) => url.pathname.endsWith("/dashboard-paralegal.html"),
+      (url) => (
+        url.pathname.endsWith("/dashboard-paralegal.html")
+        && url.hash === redirect.hash
+        && url.searchParams.get(redirect.parameter) === objectId
+      ),
       { waitUntil: "domcontentloaded" }
     );
     page.off("request", recordNavigationRequest);
@@ -214,15 +332,8 @@ test("legacy paralegal workflow URLs preserve context and converge on the canoni
 });
 
 test("paralegal accepts a Matter invitation through the real dashboard action", async ({ page }) => {
-  const bootstrap = await page.request.post(
-    "/api/admin/ai-control-room/dev/e2e/bootstrap-paralegal?seedInvitation=true&resetMatter=true",
-    { headers: resolveHarnessHeaders() }
-  );
-  expect(bootstrap.ok(), await bootstrap.text()).toBe(true);
-  const fixture = await bootstrap.json();
-  const matterId = String(fixture?.matter?.id || "");
-  expect(matterId).toMatch(/^[a-f0-9]{24}$/);
-  expect(fixture?.invitation).toEqual({ sent: true, alreadyPending: false });
+  const fixture = await seedHarnessInvitation(page.request);
+  const matterId = String(fixture.matter.id);
 
   const pageErrors = [];
   const serverFailures = [];
@@ -238,7 +349,7 @@ test("paralegal accepts a Matter invitation through the real dashboard action", 
   });
   const inviteOverlay = page.locator("#inviteOverlay");
   await expect(inviteOverlay).toHaveAttribute("aria-hidden", "false");
-  await expect(page.locator("#inviteCaseTitle")).toHaveText("You've been invited to a Matter");
+  await expect(page.locator("#inviteCaseTitle")).toHaveText("Invitation");
   await expect(page.locator("#inviteJobTitle")).toHaveText("Harness Contract Review");
   await expect(page.locator("#inviteDetails")).toContainText("Review a commercial services agreement");
   const acceptButton = page.getByRole("button", { name: "Accept Invitation", exact: true });
@@ -264,7 +375,7 @@ test("paralegal accepts a Matter invitation through the real dashboard action", 
     "You accepted this invitation. The attorney must confirm hire and fund the Matter next."
   );
   await expect(page.getByRole("button", { name: "Accepted", exact: true })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Revoke application", exact: true })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Withdraw application", exact: true })).toBeFocused();
 
   const pendingInvitesResponse = await page.request.get("/api/cases/invited-to");
   expect(pendingInvitesResponse.ok(), await pendingInvitesResponse.text()).toBe(true);
@@ -295,7 +406,7 @@ function assistantReply({
 }) {
   return {
     id,
-    conversationId: "p6-paralegal-conversation",
+    conversationId: "64f000000000000000007100",
     sender: "assistant",
     text,
     metadata: {
@@ -314,17 +425,17 @@ function assistantReply({
   };
 }
 
-test("paralegal drawer renders a concise manager answer, one action, and working feedback", async ({ page, browserName }) => {
+test("paralegal drawer renders a concise manager answer, one action, and working feedback", async ({ page }, testInfo) => {
   const userMessage = {
-    id: "p6-paralegal-user",
-    conversationId: "p6-paralegal-conversation",
+    id: "64f000000000000000007101",
+    conversationId: "64f000000000000000007100",
     sender: "user",
     text: "Where can I see completed cases?",
     metadata: { kind: "user_message" },
     createdAt: "2026-07-23T16:00:00.000Z",
   };
   const responseMessage = assistantReply({
-    id: "p6-paralegal-answer",
+    id: "64f000000000000000007102",
     text: "Start by browsing open cases here. Review the case details, then submit an application for work that matches your experience.",
     navigation: {
       ctaLabel: "Completed cases",
@@ -343,11 +454,11 @@ test("paralegal drawer renders a concise manager answer, one action, and working
     await route.fulfill({
       status: 201,
       contentType: "application/json",
-      body: JSON.stringify({ ok: true, userMessage, assistantMessage: responseMessage }),
+      body: JSON.stringify(supportReplyFixture(route, userMessage, responseMessage)),
     });
   });
   await page.route(
-    /\/api\/support\/conversation\/[^/]+\/messages\/p6-paralegal-answer\/feedback$/,
+    /\/api\/support\/conversation\/[^/]+\/messages\/64f000000000000000007102\/feedback$/,
     async (route) => {
       const payload = route.request().postDataJSON();
       await route.fulfill({
@@ -357,6 +468,7 @@ test("paralegal drawer renders a concise manager answer, one action, and working
           ok: true,
           message: {
             ...responseMessage,
+            conversationId: new URL(route.request().url()).pathname.split("/")[4],
             metadata: {
               ...responseMessage.metadata,
               feedback: {
@@ -374,7 +486,7 @@ test("paralegal drawer renders a concise manager answer, one action, and working
   await page.locator(".support-launcher").click();
   const drawer = page.locator("#supportDrawer");
   await expect(drawer).toBeVisible();
-  await expect(drawer.locator("[data-support-title]")).toHaveText("Paralegal Assistant");
+  await expect(drawer.locator("[data-support-title]")).toHaveText("LPC Assistant");
   await expect(drawer.locator("[data-support-subtitle]")).toBeHidden();
 
   await drawer.locator("[data-support-textarea]").fill("Where can I see completed cases?");
@@ -393,7 +505,7 @@ test("paralegal drawer renders a concise manager answer, one action, and working
   await expect(answer.locator(".support-suggested-reply")).toHaveText("Where is my latest payout?");
   await expect(answer.getByRole("button", { name: "Helpful", exact: true })).toBeVisible();
   await expect(answer.getByRole("button", { name: "Not helpful", exact: true })).toBeVisible();
-  await page.screenshot({ path: `/tmp/lpc-paralegal-assistant-${browserName}.png`, fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath("paralegal-assistant.png"), fullPage: true });
 
   await answer.getByRole("button", { name: "Helpful", exact: true }).click();
   await expect(answer.getByRole("button", { name: "Helpful", exact: true })).toHaveAttribute(
@@ -416,7 +528,7 @@ test("desktop sidebar grip collapses and restores the paralegal navigation", asy
 
 test("paralegal drawer renders the safe fallback without links, actions, suggestions, or review cards", async ({ page }) => {
   const fallbackMessage = assistantReply({
-    id: "p6-paralegal-fallback",
+    id: "64f000000000000000007104",
     text: "I can’t verify that information right now. Please try again shortly.",
     provider: "openai_manager_paralegal_safe_fallback",
   });
@@ -427,18 +539,14 @@ test("paralegal drawer renders the safe fallback without links, actions, suggest
     await route.fulfill({
       status: 201,
       contentType: "application/json",
-      body: JSON.stringify({
-        ok: true,
-        userMessage: {
-          id: "p6-paralegal-fallback-user",
-          conversationId: "p6-paralegal-conversation",
+      body: JSON.stringify(supportReplyFixture(route, {
+          id: "64f000000000000000007103",
+          conversationId: "64f000000000000000007100",
           sender: "user",
           text: "Has it hit my bank?",
           metadata: { kind: "user_message" },
           createdAt: "2026-07-23T16:05:00.000Z",
-        },
-        assistantMessage: fallbackMessage,
-      }),
+        }, fallbackMessage)),
     });
   });
 

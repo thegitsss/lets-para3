@@ -25,14 +25,6 @@ function normalizeOnboarding(raw = {}) {
   };
 }
 
-function getCachedOnboarding(user) {
-  if (user?.onboarding && typeof user.onboarding === "object") {
-    onboardingState = normalizeOnboarding(user.onboarding);
-    return onboardingState;
-  }
-  return onboardingState || normalizeOnboarding({});
-}
-
 async function loadOnboardingState(user) {
   if (user?.onboarding && typeof user.onboarding === "object") {
     onboardingState = normalizeOnboarding(user.onboarding);
@@ -71,6 +63,7 @@ async function updateOnboardingState(updates = {}, { markFirstLoginComplete = fa
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(payload?.error || "Unable to update onboarding state.");
+    if (Object.entries(updates).some(([key, value]) => payload.onboarding?.[key] !== value)) throw new Error("Onboarding update was not confirmed.");
     onboardingState = normalizeOnboarding(payload.onboarding || {});
     if (typeof window.updateSessionUser === "function") {
       const nextUser = { onboarding: onboardingState };
@@ -80,15 +73,15 @@ async function updateOnboardingState(updates = {}, { markFirstLoginComplete = fa
     return onboardingState;
   } catch (err) {
     console.warn("Unable to update onboarding state", err);
-    return getCachedOnboarding({});
+    return null;
   }
 }
 
-function markTourCompleted() {
-  try {
-    sessionStorage.setItem("lpc_attorney_tour_completed", "1");
-  } catch (_) {}
-  void updateOnboardingState({ attorneyTourCompleted: true }, { markFirstLoginComplete: true });
+async function markTourCompleted() {
+  const saved = await updateOnboardingState({ attorneyTourCompleted: true }, { markFirstLoginComplete: true });
+  if (!saved?.attorneyTourCompleted) return false;
+  try { sessionStorage.setItem("lpc_attorney_tour_completed", "1"); } catch (_) {}
+  return true;
 }
 
 function isVisibleForTour(target) {
@@ -229,7 +222,6 @@ async function initAttorneyTour(user = {}, options = {}) {
     clearTourProgress();
     return;
   }
-  if (!force) markTourCompleted();
 
   const steps = [
     {
@@ -482,8 +474,8 @@ async function initAttorneyTour(user = {}, options = {}) {
       if (stepTitleEl) stepTitleEl.textContent = step.title || "";
       stepTextEl.textContent = step.text || "";
       backBtn.disabled = index === 0;
-      backBtn.style.visibility = index === 0 ? "hidden" : "visible";
-      nextBtn.textContent = index === tourSteps.length - 1 ? "Let's Get Started" : "Next";
+      backBtn.style.visibility = "visible";
+      nextBtn.textContent = index === tourSteps.length - 1 ? "Finish tour" : "Next";
 
       showOverlay();
       ensureSidebarVisibleForTarget(target);
@@ -551,9 +543,22 @@ async function initAttorneyTour(user = {}, options = {}) {
     if (stepIndex <= 0) return showIntro();
     showStep(stepIndex - 1);
   });
-  nextBtn.addEventListener("click", () => {
+  const completionError = document.createElement("p");
+  completionError.setAttribute("role", "alert");
+  completionError.className = "tour-completion-error";
+  completionError.hidden = true;
+  tooltip.append(completionError);
+  let savingCompletion = false;
+  nextBtn.addEventListener("click", async () => {
+    if (savingCompletion) return;
     if (stepIndex < tourSteps.length - 1) return showStep(stepIndex + 1);
-    completeTour();
+    savingCompletion = true; completionError.hidden = true;
+    nextBtn.disabled = true; backBtn.disabled = true;
+    const saved = await markTourCompleted();
+    savingCompletion = false; nextBtn.disabled = false; backBtn.disabled = false;
+    if (!overlay.classList.contains("is-active")) return;
+    if (saved) completeTour();
+    else { completionError.textContent = "Couldn’t save tour completion. Try again."; completionError.hidden = false; nextBtn.focus(); }
   });
 
   window.addEventListener("resize", () => {

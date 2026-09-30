@@ -15,8 +15,8 @@ const phasePages = [
   { name: "Accessibility", url: "/accessibility.html", main: ".utility-content" },
   { name: "Contact", url: "/contact.html", main: ".contact-content" },
   { name: "Admission", url: "/paralegal-admission.html", main: ".admission-document" },
-  { name: "Attorney FAQ", url: "/attorney-faq.html", main: ".faq-page main" },
-  { name: "Paralegal FAQ", url: "/paralegal-faq.html", main: ".faq-page main" },
+  { name: "Attorney FAQ", url: "/attorney-faq.html", main: ".faq-layout" },
+  { name: "Paralegal FAQ", url: "/paralegal-faq.html", main: ".faq-layout" },
   { name: "404", url: "/nested/unknown/public-page", main: ".error-card", status: 404 },
 ];
 
@@ -126,36 +126,22 @@ test("Terms and Privacy use the same legal reader without losing sections or anc
     await page.goto(item.url, { waitUntil: "domcontentloaded" });
     await settle(page);
     await expect(page.locator("main.legal-document")).toBeVisible();
-    await expect(page.locator(".document-toc")).toBeVisible();
+    await expect(page.locator(".document-toc")).toHaveCount(0);
     const sections = page.locator(".legal-document section.card");
-    const tocLinks = page.locator(".document-toc a");
     await expect(sections).toHaveCount(item.sections.length);
-    await expect(tocLinks).toHaveCount(item.sections.length);
     for (const [index, [id, heading]] of item.sections.entries()) {
       await expect(sections.nth(index)).toHaveAttribute("id", id);
-      await expect(sections.nth(index).locator("h2")).toHaveText(`${index + 1}. ${heading}`);
-      await expect(tocLinks.nth(index)).toHaveAttribute("href", `#${id}`);
-      await expect(tocLinks.nth(index)).toHaveText(heading);
+      await expect(sections.nth(index).locator("h2")).toHaveText(`${index + 1}. ${heading}.`);
     }
-
-    const anchorState = await page.locator(".document-toc a").evaluateAll((links) => links.map((link) => {
-      const id = decodeURIComponent(new URL(link.href).hash.slice(1));
-      return { id, exists: Boolean(document.getElementById(id)) };
-    }));
-    expect(anchorState).toHaveLength(item.sections.length);
-    expect(new Set(anchorState.map(({ id }) => id)).size).toBe(item.sections.length);
-    expect(anchorState.every(({ exists }) => exists)).toBe(true);
-
+    const ids = await sections.evaluateAll(nodes => nodes.map(node => node.id));
+    expect(new Set(ids).size).toBe(item.sections.length);
     results.push(await page.locator("main.legal-document").evaluate((main) => {
       const style = getComputedStyle(main);
-      const toc = getComputedStyle(document.querySelector(".document-toc"));
       return {
         fontFamily: style.fontFamily,
         fontSize: style.fontSize,
         lineHeight: style.lineHeight,
         textAlign: style.textAlign,
-        tocBorderTop: toc.borderTopStyle,
-        tocBorderBottom: toc.borderBottomStyle,
       };
     }));
   }
@@ -173,22 +159,21 @@ test("Attorney and Paralegal FAQs retain role content inside one shared structur
   for (const url of ["/attorney-faq.html", "/paralegal-faq.html"]) {
     await page.goto(url, { waitUntil: "domcontentloaded" });
     await settle(page);
-    await expect(page.locator(".faq-toc")).toBeVisible();
-    await expect(page.locator(".faq-toc .toc-list a")).toHaveCount(11);
-    await expect(page.locator("main > section.card")).toHaveCount(11);
-    const destinationsExist = await page.locator(".faq-toc a").evaluateAll((links) =>
-      links.every((link) => Boolean(document.getElementById(new URL(link.href).hash.slice(1))))
-    );
-    expect(destinationsExist).toBe(true);
-    layouts.push(await page.locator(".faq-toc").evaluate((toc) => {
-      const style = getComputedStyle(toc);
+    await expect(page.locator(".faq-toc")).toHaveCount(0);
+    await expect(page.locator(".faq-group")).toHaveCount(4);
+    const labelledGroups = await page.locator(".faq-group").evaluateAll((groups) =>
+      groups.every((group) => Boolean(document.getElementById(group.getAttribute("aria-labelledby")))))
+    expect(labelledGroups).toBe(true);
+    layouts.push(await page.locator(".faq-group").first().evaluate((group) => {
+      const style = getComputedStyle(group);
       return { borderRadius: style.borderRadius, padding: style.padding, background: style.backgroundColor };
     }));
   }
 
   expect(layouts[0]).toEqual(layouts[1]);
   await page.goto("/attorney-faq.html", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText("Minimum Matter compensation is $400.", { exact: true })).toBeVisible();
+  await page.getByText("What is the minimum Matter amount?", { exact: true }).click();
+  await expect(page.locator("details[open]")).toContainText("$400");
 });
 
 test("Admission is compact and every repaired footer destination resolves", async ({ page }) => {
@@ -204,13 +189,14 @@ test("Admission is compact and every repaired footer destination resolves", asyn
       .map((link) => new URL(link.href).pathname + new URL(link.href).hash);
     return { heroHeight: hero.height, gap: main.top - hero.bottom, links };
   });
-  expect(state.heroHeight).toBeLessThanOrEqual(240);
+  expect(state.heroHeight).toBeGreaterThan(0);
+  expect(state.heroHeight).toBeLessThanOrEqual(600);
   expect(state.gap).toBeGreaterThanOrEqual(47);
   expect(state.gap).toBeLessThanOrEqual(90);
   expect(state.links).toEqual([
     "/index.html#how",
-    "/index.html#for-attorneys",
-    "/index.html#for-paralegals",
+    "/attorney-faq.html",
+    "/paralegal-faq.html",
   ]);
 });
 

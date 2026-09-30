@@ -43,7 +43,17 @@ function publishNotificationEvent(userId, event = "notifications", payload = {})
   }
 }
 
+// Used only when a persisted deletion arrives without a MongoDB pre-image, so
+// the owning user cannot be identified. The payload remains an opaque refresh
+// signal; each connected browser re-fetches its own authorized projection.
+function publishAllNotificationEvents(event = "notifications", payload = {}) {
+  [...subscribers.keys()].forEach((userId) => {
+    publishNotificationEvent(userId, event, payload);
+  });
+}
+
 module.exports = {
   addSubscriber,
+  publishAllNotificationEvents,
   publishNotificationEvent,
 };

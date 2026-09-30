@@ -221,3 +221,6 @@ h1 {
     transition: none;
   }
 }
+html { min-width: 0; }
+:root { --error-gold: #416eaf; }
+.error-card { min-width: 0; overflow-wrap: anywhere; }

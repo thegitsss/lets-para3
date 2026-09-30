@@ -9,6 +9,7 @@ const jwt = require("jsonwebtoken");
 
 const User = require("../models/User");
 const verifyToken = require("../utils/verifyToken");
+const { recordContactSubmission } = require("../services/support/adminInboxService");
 const sendEmail = require("../utils/email");
 const { logAction } = require("../utils/audit");
 const {
@@ -158,7 +159,7 @@ const US_STATE_CODE_TO_NAME = Object.fromEntries(
 );
 
 const PUBLIC_PAR_FIELDS =
-  "_id firstName lastName avatarURL profileImage location state stateExperience specialties practiceAreas bestFor yearsExperience linkedInURL education bio about availability approvedAt createdAt updatedAt";
+  "_id firstName lastName avatarURL profileImage location state stateExperience specialties practiceAreas bestFor yearsExperience linkedInURL education bio about availability availabilityDetails approvedAt createdAt updatedAt";
 
 function getStateSearchTerms(value = "") {
   const raw = String(value || "").trim();
@@ -190,21 +191,7 @@ function buildLocationFilter(value = "") {
 }
 
 function buildAvailableParalegalFilter() {
-  return [
-    {
-      $or: [
-        { "availabilityDetails.status": { $exists: false } },
-        { "availabilityDetails.status": { $ne: "unavailable" } },
-      ],
-    },
-    {
-      $or: [
-        { availability: { $exists: false } },
-        { availability: "" },
-        { availability: { $not: /^unavailable/i } },
-      ],
-    },
-  ];
+  return [require("../utils/availability").buildEffectiveAvailableClause()];
 }
 
 function serializeParalegal(userDoc) {
@@ -229,7 +216,7 @@ function serializeParalegal(userDoc) {
     education: Array.isArray(src.education) ? src.education : [],
     bio: src.bio || "",
     about: src.about || "",
-    availability: src.availability || "",
+    ...require("../utils/availability").effectiveAvailability(src),
     approvedAt: src.approvedAt || null,
     createdAt: src.createdAt || null,
   };
@@ -259,12 +246,18 @@ router.post(
       if (!name || !email || !subject || !message) {
         return res.status(400).json({ msg: "Missing required fields" });
       }
-      if (!isEmail(email)) return res.status(400).json({ msg: "Invalid email" });
-
       const msgStr = String(message);
       if (msgStr.length > 2000) {
         return res.status(400).json({ msg: "Message too long (max 2000 chars)" });
       }
+
+      if ([name, email, subject, message, role].some(value => typeof value !== "string") ||
+          !name.trim() || !subject.trim() || !message.trim() || name.length > 240 || subject.length > 280 || email.length > 320) {
+        return res.status(400).json({ msg: "Please check your contact details and message." });
+      }
+      if (!isEmail(email.trim())) return res.status(400).json({ msg: "Invalid email" });
+      // Persist every inquiry before acknowledging it, independent of email or AI routing.
+      const contactTicket = await recordContactSubmission({ name: name.trim(), email: email.trim(), role, subject: subject.trim(), message: message.trim() });
 
       // reCAPTCHA disabled in localhost/dev mode
 
@@ -306,7 +299,7 @@ router.post(
       } else {
         // sendEmail(to, subject, html, { text, replyTo })
         try {
-          await sendEmail(to, safeSubject, html, { text, replyTo: email });
+          await sendEmail(to, safeSubject, html, { text, replyTo: email, headers: { "Auto-Submitted": "auto-generated" } });
         } catch (e) {
           // non-fatal for UX; we still proceed
           runtimeLogger.error("[contact] sendEmail failed:", e?.message || e);
@@ -368,6 +361,7 @@ router.post(
       if (looksLikeSupportSubmission({ subject, message })) {
         await publishEventSafe({
           eventType: "support.submission.created",
+          related: { supportTicketId: contactTicket._id },
           eventFamily: "support",
           actor: {
             actorType: "user",
@@ -404,7 +398,7 @@ router.post(
         });
       }
 
-      return res.json({ ok: true });
+      return res.json({ ok: true, reference: `SUP-${String(contactTicket._id).slice(-6).toUpperCase()}` });
     } catch (e) {
       runtimeLogger.error("contact error", e);
       return res.status(500).json({ msg: "Server error" });

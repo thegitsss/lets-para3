@@ -82,11 +82,12 @@ const US_STATE_NAME_BY_ABBR = Object.fromEntries(
 );
 
 const PUBLIC_PAR_FIELDS =
-  `${PROFILE_SOURCE_SELECT} bestFor linkedInURL education approvedAt createdAt`;
+  `${PROFILE_SOURCE_SELECT} availabilityDetails bestFor linkedInURL education approvedAt createdAt`;
 
 function serializeParalegal(userDoc) {
   if (!userDoc) return null;
-  const src = userDoc.toObject ? userDoc.toObject() : userDoc;
+  const raw = userDoc.toObject ? userDoc.toObject() : userDoc;
+  const src = { ...raw, ...require("../utils/availability").effectiveAvailability(raw) };
   let presentation;
   try {
     const profileSource = Object.fromEntries(PROFILE_SOURCE_FIELDS
@@ -128,6 +129,34 @@ function serializeParalegal(userDoc) {
     presentation,
   };
 }
+
+// Anonymous network totals include approved accounts regardless of directory readiness.
+// Never return member identities, profile visibility, or precise locations.
+router.get("/state-counts", rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false }), asyncHandler(async (_req, res) => {
+  const filter = { role: "paralegal", status: "approved", disabled: { $ne: true }, deleted: { $ne: true } };
+  const groups = await User.aggregate([
+    { $match: filter },
+    { $group: { _id: { state: "$state", location: "$location", stateExperience: "$stateExperience" }, count: { $sum: 1 } } },
+  ]);
+  const states = Object.fromEntries([...Object.values(US_STATE_ABBR), "DC"].map(code => [code, 0]));
+  const approvedTotal = groups.reduce((sum, group) => sum + group.count, 0);
+  const normalize = value => {
+    const token = String(value || "").trim().toUpperCase();
+    if (Object.hasOwn(states, token)) return token;
+    if (token === "DISTRICT OF COLUMBIA" || token === "WASHINGTON DC" || token === "WASHINGTON, DC") return "DC";
+    return Object.entries(US_STATE_ABBR).find(([name]) => name.toUpperCase() === token)?.[1];
+  };
+  for (const group of groups) {
+    const explicit = String(group._id.state || "").trim();
+    const experience = Array.isArray(group._id.stateExperience)
+      ? group._id.stateExperience.map(normalize).find(Boolean)
+      : undefined;
+    const code = normalize(explicit) || experience || normalize(String(group._id.location || "").split(",").pop());
+    if (code) states[code] += group.count;
+  }
+  res.set("Cache-Control", "public, max-age=300");
+  res.json({ states, total: Object.values(states).reduce((sum, count) => sum + count, 0), approvedTotal });
+}));
 
 router.get(
   "/:profileId/photo",

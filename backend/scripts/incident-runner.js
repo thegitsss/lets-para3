@@ -178,7 +178,11 @@ async function runIncidentRunnerOnce(
     return { ok: false, reason: "db_not_ready", processed: 0, results: [] };
   }
 
-  const results = [];
+  // Drain committed Assistant handoffs with the existing incident worker.
+  // Routing is durable across web/worker restarts and never runs in a send transaction.
+  const processSupportRouting = dependencies.processSupportRouting || require('../services/support/mutationRoutingService').processPendingSupportRouting;
+  const supportRouting = await processSupportRouting({ maxJobs: config.maxJobs });
+  const results = (supportRouting.results || []).map(result => ({ ...result, jobType: 'support_routing' }));
 
   for (let count = 0; count < config.maxJobs; count += 1) {
     // eslint-disable-next-line no-await-in-loop
@@ -247,6 +251,7 @@ async function runIncidentRunnerLoop(options = {}, dependencies = {}) {
         claimJob: dependencies.claimJob,
         processJob: dependencies.processJob,
         isDbReady: dependencies.isDbReady,
+        processSupportRouting: dependencies.processSupportRouting,
       }));
   const sleep = dependencies.sleep || waitForStopAwareDelay;
   const log = dependencies.logger || logger;

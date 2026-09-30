@@ -9,6 +9,7 @@ const Event = require("../models/Event");
 const { logAction } = require("../utils/audit");
 const { assertCaseParticipant } = require("../middleware/ensureCaseParticipant");
 const { csrfProtection, respondToCsrfError } = require("../utils/csrf");
+const { publishNotificationEvent } = require("../utils/notificationEvents");
 
 // ----------------------------------------
 // Helpers
@@ -25,6 +26,13 @@ function parsePagination(req, { maxLimit = 200, defaultLimit = 100 } = {}) {
 
 function clampDate(s, fallbackMs) {
   return s ? new Date(s) : new Date(Date.now() + fallbackMs);
+}
+
+function publishOwnerRefresh(ownerId, type) {
+  publishNotificationEvent(ownerId, "notifications", {
+    at: new Date().toISOString(),
+    type,
+  });
 }
 
 async function ensureEventCaseAccess(req, res, caseId) {
@@ -46,6 +54,25 @@ router.use(verifyToken);
 router.use(requireApproved);
 router.use(requireRole("admin", "attorney", "paralegal"));
 
+const attorneyMatterDates = require("../services/attorneyMatterDates");
+const paralegalMatterDates = require("../services/paralegalMatterDates");
+router.get("/paralegal/matters/:caseId/review", requireRole("paralegal"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await paralegalMatterDates.read(req)); } catch (error) { paralegalMatterDates.sendError(res, error); }
+}));
+router.post("/paralegal/matters/:caseId/reviewed-action", requireRole("paralegal"), csrfProtection, asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await paralegalMatterDates.save(req)); } catch (error) { paralegalMatterDates.sendError(res, error); }
+}));
+router.get("/matters/:caseId/review", requireRole("attorney"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await attorneyMatterDates.read(req)); } catch (error) { attorneyMatterDates.sendError(res, error); }
+}));
+router.post("/matters/:caseId/reviewed-action", requireRole("attorney"), csrfProtection, asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await attorneyMatterDates.save(req)); } catch (error) { attorneyMatterDates.sendError(res, error); }
+}));
+
 /**
  * GET /api/events
  * Query:
@@ -59,8 +86,15 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     const owner = req.user.id;
+    res.set("Cache-Control", "private, no-store");
+    if (req.query.expectedOwnerId !== undefined && req.query.expectedOwnerId !== String(owner)) {
+      return res.status(403).json({ error: "The workspace account changed.", code: "EVENT_ACCOUNT_CHANGED" });
+    }
     const from = clampDate(req.query.from, -7 * 24 * 3600e3);
     const to = clampDate(req.query.to, 45 * 24 * 3600e3);
+    if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || from > to) {
+      return res.status(400).json({ error: "Choose a valid date range." });
+    }
     const { type, caseId, q = "" } = req.query;
     const { page, limit, skip } = parsePagination(req);
 
@@ -81,13 +115,14 @@ router.get(
     }
 
     const [items, total] = await Promise.all([
-      Event.find(filter).sort({ start: 1 }).skip(skip).limit(limit).lean(),
+      Event.find(filter).sort({ start: 1, _id: 1 }).skip(skip).limit(limit).lean(),
       Event.countDocuments(filter),
     ]);
 
     items.forEach((i) => (i.id = String(i._id)));
 
     res.json({
+      ownerId: String(owner),
       page,
       limit,
       total,
@@ -153,6 +188,8 @@ router.post(
       meta: { type: ev.type, caseId: ev.caseId || null },
     });
 
+    publishOwnerRefresh(req.user.id, "calendar_event_created_refresh");
+
     res.status(201).json({ id: String(ev._id) });
   })
 );
@@ -170,6 +207,10 @@ router.patch(
 
     const ev = await Event.findOne({ _id: id, owner: req.user.id });
     if (!ev) return res.status(404).json({ error: "Not found" });
+    if (ev.caseId) {
+      const ok = await ensureEventCaseAccess(req, res, ev.caseId);
+      if (!ok) return;
+    }
 
     const assign = (k, v) => {
       if (v === undefined) return;
@@ -216,6 +257,7 @@ router.patch(
 
     await ev.save();
     await logAction(req, "calendar.event.update", { targetType: "event", targetId: ev._id });
+    publishOwnerRefresh(req.user.id, "calendar_event_updated_refresh");
     res.json({ ok: true });
   })
 );
@@ -233,12 +275,17 @@ router.post(
 
     const ev = await Event.findOne({ _id: id, owner: req.user.id });
     if (!ev) return res.status(404).json({ error: "Not found" });
+    if (ev.caseId) {
+      const ok = await ensureEventCaseAccess(req, res, ev.caseId);
+      if (!ok) return;
+    }
 
     const att = req.body || {};
     ev.addAttendee(att);
     await ev.save();
 
     await logAction(req, "calendar.event.attendee.add", { targetType: "event", targetId: ev._id });
+    publishOwnerRefresh(req.user.id, "calendar_event_updated_refresh");
     res.status(201).json({ ok: true });
   })
 );
@@ -256,12 +303,17 @@ router.post(
 
     const ev = await Event.findOne({ _id: id, owner: req.user.id });
     if (!ev) return res.status(404).json({ error: "Not found" });
+    if (ev.caseId) {
+      const ok = await ensureEventCaseAccess(req, res, ev.caseId);
+      if (!ok) return;
+    }
 
     const { minutesBefore = 30, method = "email" } = req.body || {};
     ev.addReminder(minutesBefore, method);
     await ev.save();
 
     await logAction(req, "calendar.event.reminder.add", { targetType: "event", targetId: ev._id });
+    publishOwnerRefresh(req.user.id, "calendar_event_updated_refresh");
     res.status(201).json({ ok: true });
   })
 );
@@ -278,9 +330,14 @@ router.delete(
 
     const ev = await Event.findOne({ _id: id, owner: req.user.id });
     if (!ev) return res.status(404).json({ error: "Not found" });
+    if (ev.caseId) {
+      const ok = await ensureEventCaseAccess(req, res, ev.caseId);
+      if (!ok) return;
+    }
 
     await ev.deleteOne();
     await logAction(req, "calendar.event.delete", { targetType: "event", targetId: ev._id });
+    publishOwnerRefresh(req.user.id, "calendar_event_deleted_refresh");
     res.json({ ok: true });
   })
 );

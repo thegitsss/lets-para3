@@ -51,7 +51,7 @@ export function deactivateDialogFocus(root, { restoreFocus = true } = {}) {
   }
 }
 
-export function activateDialogFocus(root, { initialFocus = null, returnFocus = null, onEscape = null } = {}) {
+export function activateDialogFocus(root, { initialFocus = null, returnFocus = null, onEscape = null, deferInitialFocus = true } = {}) {
   if (!(root instanceof HTMLElement)) return;
   deactivateDialogFocus(root, { restoreFocus: false });
   const resolvedReturnFocus =
@@ -90,5 +90,7 @@ export function activateDialogFocus(root, { initialFocus = null, returnFocus = n
 
   dialogFocusState.set(root, { handleKeydown, returnFocus: resolvedReturnFocus });
   document.addEventListener("keydown", handleKeydown, true);
-  window.requestAnimationFrame(() => resolveFocusTarget(root, initialFocus)?.focus());
+  const focusInitial = () => resolveFocusTarget(root, initialFocus)?.focus();
+  if (deferInitialFocus) window.requestAnimationFrame(focusInitial);
+  else focusInitial();
 }

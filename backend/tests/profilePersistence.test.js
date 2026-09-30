@@ -252,6 +252,28 @@ describe("Profile persistence + cross-device state", () => {
     expect(secondSession.body.linkedInURL).toBe("https://www.linkedin.com/in/priya-ng");
   });
 
+  test("Paralegal self profile preserves legacy jurisdiction evidence for the V2 compatibility read", async () => {
+    const paralegal = await User.create({
+      firstName: "Legacy",
+      lastName: "Jurisdiction",
+      email: "legacy.jurisdiction@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "NY",
+      jurisdictions: ["New York", "New Jersey"],
+      stateExperience: [],
+    });
+
+    const response = await request(app)
+      .get("/api/users/me")
+      .set("Cookie", authCookieFor(paralegal));
+
+    expect(response.status).toBe(200);
+    expect(response.body.jurisdictions).toEqual(["New York", "New Jersey"]);
+    expect(response.body.stateExperience).toEqual([]);
+  });
+
   test("Paralegal profile rejects non-LinkedIn and executable profile URLs", async () => {
     const paralegal = await User.create({
       firstName: "Secure",
@@ -334,10 +356,12 @@ describe("Profile persistence + cross-device state", () => {
     const weekStart = "2026-02-09";
     const notes = ["Draft motion outline", "", "", "", "", "", ""]; // Monday note
 
+    const initial = await request(app).get(`/api/users/me/weekly-notes?weekStart=${weekStart}`).set("Cookie", cookie);
+    expect(initial.body.weekStart).toBe(weekStart);
     const putRes = await request(app)
       .put(`/api/users/me/weekly-notes`)
       .set("Cookie", cookie)
-      .send({ weekStart, notes });
+      .send({ weekStart, notes, revision: initial.body.revision });
 
     expect(putRes.status).toBe(200);
     expect(putRes.body.notes[0]).toBe("Draft motion outline");

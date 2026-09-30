@@ -6,3 +6,4 @@ process.env.DATA_ENCRYPTION_KEY =
 process.env.APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:5050";
 process.env.EMAIL_DISABLE = "true";
 process.env.ENABLE_CSRF = "false";
+require("./helpers/supertestLoopback").isolateSupertestLoopback();

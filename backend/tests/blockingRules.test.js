@@ -13,6 +13,8 @@ const blocksRouter = require("../routes/blocks");
 const messagesRouter = require("../routes/messages");
 const usersRouter = require("../routes/users");
 const { BLOCKED_MESSAGE } = require("../utils/blocks");
+const { addSubscriber: addCaseSubscriber } = require("../utils/caseEvents");
+const { addSubscriber: addNotificationSubscriber } = require("../utils/notificationEvents");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 const app = (() => {
@@ -139,13 +141,44 @@ describe("Finalized block rules", () => {
       currency: "usd",
     });
 
-    const createRes = await request(app)
-      .post("/api/blocks")
-      .set("Cookie", authCookieFor(attorney))
-      .send({ caseId: withdrawnCase._id.toString() });
+    const laterCase = await Case.create({
+      title: "Later matter",
+      practiceArea: "family law",
+      details: "Any later messaging should be blocked.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      status: "in progress",
+      escrowStatus: "funded",
+      escrowIntentId: "pi_blocked_message",
+      totalAmount: 62000,
+      currency: "usd",
+    });
+    const targetEvents = [];
+    const activeMatterEvents = [];
+    const unsubscribeTarget = addNotificationSubscriber(paralegal._id, {
+      write: (value) => targetEvents.push(String(value)),
+    });
+    const unsubscribeMatter = addCaseSubscriber(laterCase._id, {
+      write: (value) => activeMatterEvents.push(String(value)),
+    });
+
+    let createRes;
+    try {
+      createRes = await request(app)
+        .post("/api/blocks")
+        .set("Cookie", authCookieFor(attorney))
+        .send({ caseId: withdrawnCase._id.toString() });
+    } finally {
+      unsubscribeTarget();
+      unsubscribeMatter();
+    }
 
     expect(createRes.status).toBe(201);
     expect(createRes.body.block?.sourceType).toBe("withdrawal_zero_payout");
+    expect(targetEvents.join("\n")).toContain("authorization_refresh");
+    expect(activeMatterEvents.join("\n")).toContain("authorization_refresh");
 
     const storedBlock = await Block.findOne({
       blockerId: attorney._id,
@@ -163,21 +196,6 @@ describe("Finalized block rules", () => {
     expect(profileRes.body).toMatchObject({
       error: BLOCKED_MESSAGE,
       blockedByProfileOwner: false,
-    });
-
-    const laterCase = await Case.create({
-      title: "Later matter",
-      practiceArea: "family law",
-      details: "Any later messaging should be blocked.",
-      attorney: attorney._id,
-      attorneyId: attorney._id,
-      paralegal: paralegal._id,
-      paralegalId: paralegal._id,
-      status: "in progress",
-      escrowStatus: "funded",
-      escrowIntentId: "pi_blocked_message",
-      totalAmount: 62000,
-      currency: "usd",
     });
 
     const messageRes = await request(app)
@@ -301,4 +319,15 @@ describe("Finalized block rules", () => {
     const notifications = await Notification.find({ userId: { $in: [attorney._id, paralegal._id] } }).lean();
     expect(notifications).toHaveLength(0);
   });
+});
+
+test('a contextual block with a different reviewed owner cannot be saved', async () => {
+  const attorney = await createApprovedUser({ email: 'owner@contextual-block.test', role: 'attorney' });
+  const paralegal = await createApprovedUser({ email: 'paralegal@contextual-block.test', role: 'paralegal' });
+  const matter = await Case.create({ title: 'Reviewed applicant', details: 'Existing contextual applicant relationship.', practiceArea: 'immigration', attorney: attorney._id, attorneyId: attorney._id, status: 'open', applicants: [{ paralegalId: paralegal._id, status: 'pending' }] });
+  const response = await request(app).post('/api/blocks').set('Cookie', authCookieFor(attorney))
+    .send({ caseId: String(matter._id), paralegalId: String(paralegal._id), expectedOwnerId: String(paralegal._id) });
+  expect({ status: response.status, body: response.body }).toMatchObject({ status: 403, body: { code: 'ACCOUNT_CHANGED' } });
+  expect(await Block.countDocuments()).toBe(0);
+  expect(await Notification.countDocuments()).toBe(0);
 });

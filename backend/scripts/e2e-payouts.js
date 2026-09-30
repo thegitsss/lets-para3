@@ -2,8 +2,9 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const http = require("http");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { MongoMemoryReplSet } = require("mongodb-memory-server");
 const mongoose = require("mongoose");
+const { connectE2eDatabase } = require("./e2e-database-fixture");
 
 process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret";
@@ -20,6 +21,7 @@ const stripeMock = {
     retrieve: async (intentId) => ({
       id: intentId,
       status: "succeeded",
+      livemode: false,
       amount: 122000,
       amount_received: 122000,
       currency: "usd",
@@ -58,6 +60,7 @@ require.cache[caseLifecyclePath] = { exports: caseLifecycleMock };
 const User = require("../models/User");
 const Case = require("../models/Case");
 const Payout = require("../models/Payout");
+const PaymentOperation = require("../models/PaymentOperation");
 const casesRouter = require("../routes/cases");
 const paymentsRouter = require("../routes/payments");
 
@@ -80,17 +83,17 @@ async function startServer() {
   app.use("/api/payments", paymentsRouter);
 
   const server = http.createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
+  await new Promise((resolve) => server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, resolve));
   const { port } = server.address();
   return { server, port };
 }
 
 async function main() {
-  const mongo = await MongoMemoryServer.create();
-  await mongoose.connect(mongo.getUri(), { dbName: "e2e" });
+  const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" } });
+  await connectE2eDatabase(mongoose, mongo.getUri());
 
   const { server, port } = await startServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
   try {
     const attorney = await User.create({
@@ -144,7 +147,8 @@ async function main() {
       body: JSON.stringify({}),
     });
     if (res.status !== 200) {
-      throw new Error(`Expected 200, got ${res.status}`);
+      const operation = await PaymentOperation.findOne({ caseId: caseDoc._id }).select("lastError").lean();
+      throw new Error(`Expected 200, got ${res.status}: ${await res.text()}; retained error=${operation?.lastError || "none"}`);
     }
 
     const payload = stripeMock._lastTransferPayload;
@@ -198,8 +202,17 @@ async function main() {
       headers: { "Content-Type": "application/json", Cookie: cookie },
       body: JSON.stringify({}),
     });
-    if (res.status !== 400) {
-      throw new Error(`Expected 400 for failed payout, got ${res.status}`);
+    const failure = await res.json();
+    if (res.status !== 409 || failure.code !== "PAYOUT_RECONCILIATION_REQUIRED") {
+      throw new Error(`Expected payout reconciliation 409, got ${res.status}: ${JSON.stringify(failure)}`);
+    }
+    const [failedMatter, failedPayout, failedOperation] = await Promise.all([
+      Case.findById(caseFail._id).lean(), Payout.findOne({ caseId: caseFail._id }).lean(),
+      PaymentOperation.findOne({ operationKey: `case_payout:${caseFail._id}` }).lean(),
+    ]);
+    if (failedPayout || failedMatter.paymentReleased || failedMatter.payoutTransferId ||
+        failedMatter.payoutStatus !== "needs_reconciliation" || failedOperation?.status !== "needs_reconciliation") {
+      throw new Error("An unconfirmed transfer was not retained for reconciliation without recording a payout.");
     }
 
     console.log("E2E payouts validation complete.");

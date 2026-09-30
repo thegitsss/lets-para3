@@ -31,11 +31,13 @@ describe("Phase 3 frontend stale-state contract", () => {
     expect(source).toMatch(/window\.addEventListener\("lpc:lifecycle-refresh"/);
   });
 
-  test("attorney Home uses generation protection and refreshes on lifecycle and bfcache signals", () => {
+  test("attorney Home rejects superseded reads and refreshes on lifecycle and bfcache signals", () => {
     const source = frontendSource("assets/scripts/attorney-tabs.js");
-    expect(source).toMatch(/const generation = \+\+overviewHydrationGeneration/);
-    expect(source).toMatch(/if \(generation !== overviewHydrationGeneration\) return/);
+    const home = frontendSource("assets/scripts/legacy-attorney-home.mjs");
+    expect(source).toContain('createLegacyAttorneyHome');
+    expect(source).toContain('await legacyHome.refresh()');
+    expect(home).toContain('if (pending.get(key) !== controller || suspended || lost) return;');
     expect(source).toMatch(/window\.addEventListener\("lpc:lifecycle-refresh", scheduleLifecycleOverviewRefresh\)/);
-    expect(source).toMatch(/event\.persisted\) scheduleLifecycleOverviewRefresh\(\)/);
+    expect(home).toContain("window.addEventListener('pageshow', event => { if (event.persisted && !lost) { suspended = false; void refresh(); } });");
   });
 });

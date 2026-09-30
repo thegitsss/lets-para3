@@ -1,7 +1,15 @@
 (() => {
   const legalHero = document.querySelector(".privacy-hero, .terms-hero");
   const artwork = legalHero?.querySelector(".utility-hero__art");
-  if (!legalHero || !artwork) return;
+  if (!legalHero) return;
+  if (!artwork) {
+    const header = document.querySelector('[data-public-header]');
+    if (header && 'IntersectionObserver' in window) {
+      new IntersectionObserver(([entry]) => header.classList.toggle('is-past-hero', !entry.isIntersecting),
+        { rootMargin: '-72px 0px 0px 0px' }).observe(legalHero);
+    }
+    return;
+  }
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let frameId = 0;

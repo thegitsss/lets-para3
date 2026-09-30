@@ -2,6 +2,7 @@
   "use strict";
 
   const header = document.querySelector("[data-home-header]");
+  const headerHero = document.querySelector(".editorial-hero");
   const mobileToggle = document.querySelector("[data-mobile-nav-toggle]");
   const mobileNav = document.querySelector("[data-mobile-nav]");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -28,6 +29,8 @@
     header.style.setProperty("--header-foreground", useInkForeground ? "rgb(26, 34, 48)" : "rgb(255, 255, 255)");
     header.classList.toggle("has-ink", useInkForeground);
     header.classList.toggle("is-scrolled", progress >= 0.98);
+    header.classList.toggle("is-past-hero", !!headerHero &&
+      headerHero.getBoundingClientRect().bottom <= header.getBoundingClientRect().bottom);
   };
 
   syncHeaderSurface();
@@ -635,26 +638,23 @@
   const workflowMobileCount = document.querySelector("[data-workflow-mobile-count]");
   const mobileWorkflowQuery = window.matchMedia("(max-width: 640px)");
   const desktopRail = desktopCanvas?.querySelector(".matter-rail");
-  const desktopWorkflowStatus = desktopCanvas?.querySelector(".product-topbar .status-chip");
   const mobileWorkflowStage = document.querySelector("[data-mobile-workflow-stage]");
   const mobileWorkflowStageHeading = document.querySelector(".workflow-mobile-stage__heading");
   const mobileWorkflowStageNumber = mobileWorkflowStageHeading?.querySelector(".workflow-mobile-stage__number");
   const mobileWorkflowStageTitle = mobileWorkflowStageHeading?.querySelector("h3");
   const mobileWorkflowStageCopy = mobileWorkflowStageHeading?.querySelector("p");
-  const workflowStatusLabels = {
-    1: "Accepting Applications",
-    2: "Applications Received",
-    3: "In Progress",
-    4: "Awaiting Review",
-    5: "Completed",
-    6: "Payment Released",
-  };
   let activeWorkflowState = "1";
+  const mobilePreview = (source) => {
+    const clone = source.cloneNode(true);
+    const context = desktopCanvas?.querySelector(".product-topbar")?.cloneNode(true);
+    if (context) { context.classList.add("workflow-preview-context"); clone.prepend(context); }
+    return clone;
+  };
   const stateForMobile = (state) => {
     const source = desktopStates.find((panel) => panel.dataset.state === state);
     const target = document.querySelector(`[data-mobile-workflow-state="${state}"]`);
     if (!source || !target || target.childElementCount) return;
-    const clone = source.cloneNode(true);
+    const clone = mobilePreview(source);
     clone.classList.add("is-active");
     clone.removeAttribute("aria-hidden");
     target.appendChild(clone);
@@ -664,7 +664,7 @@
 
   if (mobileWorkflowStage && !mobileWorkflowStage.childElementCount) {
     desktopStates.forEach((source) => {
-      const clone = source.cloneNode(true);
+      const clone = mobilePreview(source);
       const frame = document.createElement("div");
       frame.className = "workflow-mobile-stage__frame";
       while (clone.firstChild) frame.appendChild(clone.firstChild);
@@ -706,9 +706,6 @@
     desktopCanvas.dataset.workflowState = state;
     desktopCanvas.dataset.scrollDirection = direction;
     if (workflowChapters) workflowChapters.dataset.workflowState = state;
-    if (desktopWorkflowStatus) {
-      desktopWorkflowStatus.textContent = workflowStatusLabels[state] || "Matter active";
-    }
     if (workflowMobileCount) workflowMobileCount.textContent = `Step ${state} of ${chapters.length}`;
     if (mobileWorkflowStage) {
       mobileWorkflowStage.querySelectorAll(".workflow-state").forEach((panel) => {
@@ -721,7 +718,7 @@
     const activeChapter = chapters.find((chapter) => chapter.dataset.workflowChapter === state);
     if (activeChapter && mobileWorkflowStageHeading) {
       if (mobileWorkflowStageNumber) mobileWorkflowStageNumber.textContent = String(state).padStart(2, "0");
-      if (mobileWorkflowStageTitle) mobileWorkflowStageTitle.textContent = activeChapter.querySelector("h3")?.textContent || "";
+      if (mobileWorkflowStageTitle) mobileWorkflowStageTitle.innerHTML = activeChapter.querySelector("h3")?.innerHTML || "";
       if (mobileWorkflowStageCopy) mobileWorkflowStageCopy.textContent = activeChapter.querySelector("p")?.textContent || "";
       mobileWorkflowStageHeading.classList.remove("is-changing");
       void mobileWorkflowStageHeading.offsetWidth;
@@ -1132,7 +1129,7 @@
       String(user?.role || "").toLowerCase() === "attorney";
 
     document.querySelectorAll("[data-auth-action]").forEach((link) => {
-      link.textContent = authenticated ? "Dashboard" : "Sign In";
+      link.textContent = authenticated ? "Dashboard" : "Sign in";
       link.href = authenticated ? dashboard : "login.html";
       if (authenticated) link.setAttribute("data-authenticated", "true");
       else link.removeAttribute("data-authenticated");
@@ -1163,7 +1160,7 @@
       if (!loggedOut) throw new Error("Logout was not confirmed by the server.");
     } catch {
       logout.disabled = false;
-      logout.textContent = "Try Log Out Again";
+      logout.textContent = "Try signing out again";
     }
   });
 

@@ -143,6 +143,7 @@ function startStubServer() {
   app.get("/api/users/me", (_req, res) => {
     res.json(USERS.attorney);
   });
+  app.get("/api/auth/me", (_req, res) => res.json({ user: USERS.attorney }));
 
   app.get("/api/messages/summary", (_req, res) => {
     res.json({ items: [{ caseId: CASE_ID, unread: 0 }] });
@@ -150,6 +151,9 @@ function startStubServer() {
 
   app.get("/api/notifications", (_req, res) => {
     res.json(notifications);
+  });
+  app.get("/api/notifications/unread-count", (_req, res) => {
+    res.json({ count: notifications.filter(item => !item.read).length });
   });
 
   app.get("/api/notifications/stream", (req, res) => {
@@ -385,7 +389,7 @@ function startStubServer() {
 
   const server = http.createServer(app);
   return new Promise((resolve) => {
-    server.listen(0, () => {
+    server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, () => {
       const { port } = server.address();
       resolve({ server, port });
     });
@@ -418,7 +422,7 @@ async function waitForStreamState(baseUrl, predicate, label, timeoutMs = 12000) 
 
 async function run() {
   const { server, port } = await startStubServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
   const browser = await launchPuppeteer({
     headless: "new",
@@ -444,15 +448,15 @@ async function run() {
     try {
       await page.waitForFunction(
         () => {
-          const title = document.getElementById("caseTitle");
+          const title = document.querySelector("#caseTitle");
           return Boolean(title && /Realtime Validation Case/i.test(title.textContent || ""));
         },
         { timeout: 20_000 }
       );
     } catch (error) {
       const state = await page.evaluate(() => ({
-        title: document.getElementById("caseTitle")?.textContent || "",
-        status: document.getElementById("caseStatusLine")?.textContent || "",
+        title: document.querySelector("#caseTitle")?.textContent || "",
+        status: document.getElementById("messagePanelBanner")?.textContent || "",
         message: document.getElementById("caseMessageStatus")?.textContent || "",
         url: location.href,
       }));
@@ -529,7 +533,7 @@ async function run() {
       broadcast: true,
     });
     await page.waitForFunction(
-      () => /Status:\s*Paused/i.test(document.getElementById("caseStatusLine")?.textContent || ""),
+      () => /paused/i.test(document.getElementById("messagePanelBanner")?.textContent || ""),
       { timeout: 10_000 }
     );
     await api(baseUrl, "/api/test/set-case-status", {
@@ -537,7 +541,7 @@ async function run() {
       broadcast: true,
     });
     await page.waitForFunction(
-      () => /Status:\s*In progress/i.test(document.getElementById("caseStatusLine")?.textContent || ""),
+      () => document.getElementById("caseCompleteButton")?.disabled === false,
       { timeout: 10_000 }
     );
 
@@ -596,7 +600,7 @@ async function run() {
       { timeout: 12_000 }
     );
     await page.waitForFunction(
-      () => /Status:\s*Paused/i.test(document.getElementById("caseStatusLine")?.textContent || ""),
+      () => /paused/i.test(document.getElementById("messagePanelBanner")?.textContent || ""),
       { timeout: 12_000 }
     );
     await page.waitForFunction(

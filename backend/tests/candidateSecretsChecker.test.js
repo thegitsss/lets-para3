@@ -1,8 +1,10 @@
 const fs = require("fs");
+const { execFileSync } = require("child_process");
 const os = require("os");
 const path = require("path");
 const {
   MAX_SCANNED_FILE_BYTES,
+  listCandidateFiles,
   findSecretViolations,
 } = require("../scripts/check-candidate-secrets");
 
@@ -23,6 +25,20 @@ describe("candidate secret checker", () => {
     fs.writeFileSync(absolute, content);
     return relative;
   }
+
+  test("lists and scans every candidate when Git output exceeds the default subprocess buffer", () => {
+    execFileSync("git", ["init", "--quiet"], { cwd: fixtureRoot, stdio: "pipe" });
+    const parent = `${"a".repeat(180)}/${"b".repeat(180)}`;
+    for (let index = 0; index < 2400; index++) writeFixture(`${parent}/record-${String(index).padStart(4, "0")}-${"c".repeat(100)}.txt`, "");
+    const last = writeFixture(`${parent}/zz-final-secret.txt`, ["sk", "test", "x".repeat(24)].join("_"));
+    const files = listCandidateFiles(fixtureRoot);
+    expect(files).toHaveLength(2401);
+    expect(Buffer.byteLength(files.join("\0"))).toBeGreaterThan(1024 * 1024);
+    expect(files).toContain(last);
+    const violations = findSecretViolations(files, fixtureRoot);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toMatch(new RegExp(`^${last}:`));
+  });
 
   test("rejects secret-bearing filenames even when their content looks harmless", () => {
     const relative = writeFixture("config/.env.production", "EXAMPLE=true\n");

@@ -38,7 +38,26 @@ function baseMatter(overrides = {}) {
 }
 
 describe("Matter experience presenter", () => {
-  test("gives the owner all seven safe sections without provider or opposing fee data", () => {
+  test.each(['completed', 'closed', 'cancelled', 'expired'])('a %s Matter does not direct its paralegal to continue work', status => {
+    const result = buildMatterExperience(baseMatter({ status }), { viewer: { id: ids.assigned, role: 'paralegal' }, acl: { isParalegal: true } });
+    expect(result.header.primaryAction).toEqual({ code: 'view_financials', label: 'View financials', tab: 'financials' });
+    expect(result.sections.map(section => section.id)).toContain('financials');
+  });
+  test.each(['paused', 'disputed'])('a %s Matter directs its paralegal to the recorded status', status => {
+    const result = buildMatterExperience(baseMatter({ status }), { viewer: { id: ids.assigned, role: 'paralegal' }, acl: { isParalegal: true } });
+    expect(result.header.primaryAction).toEqual({ code: 'view_activity', label: 'View Matter status', tab: 'activity' });
+  });
+  test("a predecessor settlement does not expose a payout receipt for the replacement", () => {
+    const result = buildMatterExperience(baseMatter({
+      withdrawnParalegalId: ids.other,
+      payoutFinalizedAt: new Date("2026-01-02T00:00:00Z"),
+      payoutFinalizedType: "partial_attorney",
+      remainingAmount: 60000,
+    }), { viewer: { id: ids.assigned, role: "paralegal" }, acl: { isParalegal: true } });
+    expect(result.financials.receiptHref).toBeNull();
+  });
+
+  test("gives the owner all eight safe sections without provider or opposing fee data", () => {
     const applicants = [{
       paralegalId: ids.applicant,
       paralegal: { firstName: "Taylor", lastName: "Candidate", email: "private@example.com" },
@@ -62,7 +81,7 @@ describe("Matter experience presenter", () => {
     });
 
     expect(result.sections.map((section) => section.id)).toEqual([
-      "overview", "applications", "work", "files", "messages", "activity", "financials",
+      "overview", "applications", "work", "files", "messages", "deadlines", "activity", "financials",
     ]);
     expect(result.header.primaryAction).toEqual({
       code: "review_task",
@@ -74,7 +93,7 @@ describe("Matter experience presenter", () => {
     expect(result.overview.paralegalId).toBe(ids.assigned);
     expect(result.applications.items[0]).toEqual(expect.objectContaining({ name: "Taylor Candidate", status: "pending" }));
     expect(result.applications.items[1]).toEqual(expect.objectContaining({ name: "Indigo Invitee", status: "invited" }));
-    expect(result.financials.amounts.map((item) => item.code)).toEqual(["compensation", "attorney_fee"]);
+    expect(result.financials.amounts).toEqual([]);
     const serialized = JSON.stringify(result);
     expect(serialized).not.toMatch(/pi_private|escrowIntent|private@example|cover letter|resume/i);
     expect(result.overview.summary).toBe("Prepare discovery responses.");
@@ -91,14 +110,50 @@ describe("Matter experience presenter", () => {
       viewer: { id: ids.assigned, role: "paralegal" },
       acl: { isParalegal: true },
       applicants: [],
+      policies: {
+        withdrawal: {
+          allowed: true,
+          blockers: [],
+          facts: { completedTaskCount: 1, totalTaskCount: 2, outcomeRequiresReview: true },
+        },
+      },
     });
 
     expect(result.sections.map((section) => section.id)).toEqual([
-      "overview", "work", "files", "messages", "activity", "financials",
+      "overview", "work", "files", "messages", "deadlines", "activity", "financials",
     ]);
     expect(result.applications).toBeNull();
-    expect(result.financials.amounts.map((item) => item.code)).toEqual(["compensation", "paralegal_fee"]);
+    expect(result.financials.amounts).toEqual([]);
+    expect(result.work.withdrawal).toEqual({
+      allowed: true,
+      blockers: [],
+      completedTaskCount: 1,
+      totalTaskCount: 2,
+      outcomeRequiresReview: true,
+    });
+    expect(result.work.dispute).toEqual({ allowed: true, blockers: [] });
     expect(JSON.stringify(result)).not.toMatch(/Other Candidate|attorney_fee|22000/);
+  });
+
+  test("only exposes the existing funded-work dispute action when its route preconditions are met", () => {
+    const viewer = { id: ids.assigned, role: "paralegal" };
+    const acl = { isParalegal: true };
+    expect(buildMatterExperience(baseMatter(), { viewer, acl }).work.dispute).toEqual({
+      allowed: true,
+      blockers: [],
+    });
+    expect(buildMatterExperience(baseMatter({ escrowStatus: "awaiting_funding" }), { viewer, acl }).work.dispute).toEqual({
+      allowed: false,
+      blockers: ["funded_work_required"],
+    });
+    expect(buildMatterExperience(baseMatter({ disputes: [{ status: "open" }] }), { viewer, acl }).work.dispute).toEqual({
+      allowed: false,
+      blockers: ["open_dispute"],
+    });
+    expect(buildMatterExperience(baseMatter({ completionClaimStatus: "claimed" }), { viewer, acl }).work.dispute).toEqual({
+      allowed: false,
+      blockers: ["completion_in_progress"],
+    });
   });
 
   test("candidate and invitee views stay self-only and omit post-hire workspace facts", () => {
@@ -144,5 +199,12 @@ describe("Matter experience presenter", () => {
     expect(result.sections.map((section) => section.id)).toEqual(["overview", "activity"]);
     expect(result.financials).toBeNull();
     expect(result.work).toBeNull();
+  });
+});
+
+describe("Matter financial authority", () => {
+  test.each([false, true])("Case and settlement flags cannot create a payout projection (released=%s)", paymentReleased => {
+    const result = buildMatterExperience(baseMatter({ paymentReleased, disputeSettlement: { payoutAmount: 41000, feeParalegalAmount: 9000 } }), { viewer: { id: ids.assigned, role: "paralegal" }, acl: { isParalegal: true } });
+    expect(result.financials).toMatchObject({ status: "Payment details unavailable", amounts: [], receiptHref: null });
   });
 });

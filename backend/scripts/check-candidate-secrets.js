@@ -24,7 +24,7 @@ function listCandidateFiles(root = repositoryRoot) {
   const listed = spawnSync(
     "git",
     ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-    { cwd: root, encoding: "buffer" }
+    { cwd: root, encoding: "buffer", maxBuffer: 64 * 1024 * 1024 }
   );
   if (listed.status !== 0) {
     const err = new Error("Unable to inspect candidate files.");

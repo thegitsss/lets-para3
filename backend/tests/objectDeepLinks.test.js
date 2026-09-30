@@ -50,3 +50,10 @@ describe("authenticated object deep links", () => {
     expect(parseMatterDeepLink("//evil.example/case-detail.html?caseId=" + CASE_ID)).toBeNull();
   });
 });
+
+test("review links reject malformed identities and retain the administrator's exact Matter and review", () => {
+ const value = { type: "matter_review", caseId: CASE_ID, disputeId: "review:earlier.1", role: "admin" };
+ expect(buildObjectDeepLink(value)).toBe(`/admin-dashboard.html?review=review%3Aearlier.1&reviewMatter=${CASE_ID}#finance`);
+ for (const change of [{ role: "unknown" }, { caseId: "invalid" }, { disputeId: "//external.test" }, { disputeId: "" }]) expect(buildObjectDeepLink({ ...value, ...change })).toBe("");
+ expect(buildObjectDeepLink({ ...value, role: "paralegal", retained: true })).toBe(`/dashboard-paralegal.html?highlightCase=${CASE_ID}#cases-completed`);
+});

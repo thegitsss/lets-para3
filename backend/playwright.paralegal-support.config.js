@@ -38,11 +38,14 @@ module.exports = defineConfig({
         cwd: __dirname,
         reuseExistingServer: false,
         port: Number(configuredPort),
-        timeout: 120_000,
+        // Full schema provisioning can precede HTTP readiness in local runs.
+        // Browser and API request deadlines remain unchanged.
+        timeout: 240_000,
         env: {
           ...process.env,
           PORT: String(configuredPort),
           NODE_ENV: process.env.NODE_ENV || "test",
+          PLAYWRIGHT_MONGO_REPLICA_SET: "true",
         },
       },
 });

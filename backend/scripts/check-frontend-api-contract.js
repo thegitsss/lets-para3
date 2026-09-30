@@ -36,11 +36,21 @@ function routeMatches(endpoint, registered, { prefix = false } = {}) {
   return true;
 }
 
-function routeDeclarations(filePath, routerName = "router") {
+function routeDeclarations(filePath, routerName = "router", seen = new Set()) {
+  if (seen.has(filePath)) return [];
+  seen = new Set([...seen, filePath]);
   const source = fs.readFileSync(filePath, "utf8");
   const escaped = routerName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const pattern = new RegExp(`${escaped}\\.(?:get|post|put|patch|delete)\\s*\\(\\s*(["'\\x60])([^"'\\x60]+)\\1`, "g");
-  return [...source.matchAll(pattern)].map((match) => match[2]);
+  const routes = [...source.matchAll(pattern)].map((match) => match[2]);
+  // Follow locally required nested routers, including configured router factories.
+  // Keep the real prefix so a child route cannot satisfy an unrelated API path.
+  const nested = new RegExp(`${escaped}\\.use\\(\\s*(["'])([^"']+)\\1\\s*,\\s*require\\(["'](\\.[^"']+)["']\\)`, "g");
+  for (const match of source.matchAll(nested)) {
+    const target = require.resolve(path.resolve(path.dirname(filePath), match[3]));
+    for (const route of routeDeclarations(target, "router", seen)) routes.push(joinRoute(match[2], route));
+  }
+  return routes;
 }
 
 function mountedRoutes() {

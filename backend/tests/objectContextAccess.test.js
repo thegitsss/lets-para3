@@ -224,8 +224,9 @@ describe("contextual Application and Profile projections", () => {
       .get("/api/notifications")
       .set("Cookie", authCookieFor(paralegal));
     expect(revokedFeed.status).toBe(200);
-    expect(revokedFeed.body[0].available).toBe(false);
-    expect(revokedFeed.body[0].action).toEqual({ label: "", href: "" });
-    expect(revokedFeed.body[0].message).toBe("This notification is no longer available.");
+    expect(revokedFeed.body).toEqual([]);
+    const unread = await request(app).get("/api/notifications/unread-count").set("Cookie", authCookieFor(paralegal));
+    expect(unread.status).toBe(200);
+    expect(unread.body.count).toBe(0);
   });
 });

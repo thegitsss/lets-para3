@@ -168,7 +168,7 @@
     wrap.dataset.lpcGlobalSearch = "";
     const trigger = el("button", "lpc-global-search-trigger");
     trigger.type = "button";
-    const paralegalSearchLabel = "Search matters, applications, and messages";
+    const paralegalSearchLabel = "Search your workspace";
     trigger.setAttribute("aria-label", canSearchProfiles ? "Search" : paralegalSearchLabel);
     trigger.setAttribute("aria-haspopup", "dialog");
     trigger.setAttribute("aria-expanded", "false");
@@ -400,10 +400,12 @@
       const viewportHeight = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
       const triggerBox = trigger.getBoundingClientRect();
       const gutter = viewportWidth <= 640 ? 8 : 12;
-      const preferredWidth = viewportWidth <= 640 ? viewportWidth - gutter * 2 : Math.max(triggerBox.width, 400);
-      const width = Math.min(400, preferredWidth, viewportWidth - gutter * 2);
-      const left = Math.min(Math.max(triggerBox.left, gutter), viewportWidth - width - gutter);
-      const top = Math.min(Math.max(triggerBox.top, gutter), viewportHeight - 96);
+      const preferredWidth = viewportWidth <= 640 ? viewportWidth - gutter * 2 : 360;
+      const width = viewportWidth <= 640
+        ? preferredWidth
+        : Math.min(360, preferredWidth, viewportWidth - gutter * 2);
+      const left = Math.min(Math.max(triggerBox.right - width, gutter), viewportWidth - width - gutter);
+      const top = Math.min(Math.max(triggerBox.bottom + 8, gutter), viewportHeight - 96);
       dialog.style.setProperty("--lpc-search-left", `${Math.round(left)}px`);
       dialog.style.setProperty("--lpc-search-top", `${Math.round(top)}px`);
       dialog.style.setProperty("--lpc-search-width", `${Math.round(width)}px`);

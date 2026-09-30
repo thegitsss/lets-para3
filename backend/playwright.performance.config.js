@@ -23,7 +23,7 @@ module.exports = defineConfig({
     { name: "mobile", use: { ...devices["Pixel 5"] } },
   ],
   webServer: {
-    command: "PORT=5055 node scripts/serve-frontend-accessibility.js",
+    command: "npm run build:frontend && PORT=5055 node scripts/serve-frontend-accessibility.js --built",
     cwd: __dirname,
     reuseExistingServer: false,
     port: 5055,

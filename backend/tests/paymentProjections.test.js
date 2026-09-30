@@ -24,7 +24,7 @@ async function user(role, suffix) {
 }
 
 describe("canonical dashboard payment projections", () => {
-  test("attorney dashboard and payment summary use Case funding evidence instead of an absent Payment model", async () => {
+  test("attorney summaries do not turn unsupported Case funding and completion flags into recorded money", async () => {
     const attorney = await user("attorney", "summary");
     await Case.create([
       {
@@ -66,18 +66,19 @@ describe("canonical dashboard payment projections", () => {
       },
     ]);
 
-    await expect(getAttorneyPaymentSummary(attorney._id)).resolves.toEqual({
-      totalSpent: 48800,
-      activeEscrow: 40000,
-      activeFunds: 40000,
-      pendingCharges: 0,
-      averageJobCost: 40000,
+    await expect(getAttorneyPaymentSummary(attorney._id)).resolves.toMatchObject({
+      totalSpent: null,
+      activeEscrow: null,
+      activeFunds: null,
+      pendingCharges: null,
+      averageJobCost: null,
       completedJobsCount: 1,
       pendingJobsCount: 0,
+      requiresReview: 2,
     });
   });
 
-  test("earnings count paid Payout evidence once and exclude failed or reversed ledgers", async () => {
+  test("earnings count retained paid evidence once and exclude estimates, failed and reversed records", async () => {
     const attorney = await user("attorney", "earnings");
     const paralegal = await user("paralegal", "earnings");
     const paidAt = new Date("2026-08-20T12:00:00.000Z");
@@ -91,6 +92,7 @@ describe("canonical dashboard payment projections", () => {
         paralegalId: paralegal._id,
         status: "completed",
         paymentReleased: true,
+        payoutTransferId: "tr_paid_projection",
         totalAmount: 40000,
         lockedTotalAmount: 40000,
       },
@@ -128,7 +130,7 @@ describe("canonical dashboard payment projections", () => {
         paralegalId: paralegal._id,
         amountPaid: 32800,
         transferId: "tr_paid_projection",
-        status: "paid",
+        status: "paid", stripeMode: "test",
         createdAt: paidAt,
       },
       {
@@ -144,14 +146,14 @@ describe("canonical dashboard payment projections", () => {
     const totals = await getParalegalEarnings(paralegal._id, {
       now: new Date("2026-08-30T12:00:00.000Z"),
     });
-    expect(totals).toEqual({ month: 492, last30: 492, total: 492 });
+    expect(totals).toEqual({ month: 328, last30: 328, total: 328 });
 
     await Payout.create({
       caseId: fallbackCase._id,
       paralegalId: paralegal._id,
       amountPaid: 16400,
       transferId: "tr_withdrawal_projection",
-      status: "paid",
+      status: "paid", stripeMode: "test",
       createdAt: paidAt,
     });
     const deduped = await getParalegalEarnings(paralegal._id, {
@@ -160,7 +162,7 @@ describe("canonical dashboard payment projections", () => {
     expect(deduped).toEqual({ month: 492, last30: 492, total: 492 });
   });
 
-  test("a relisted paralegal payout does not suppress the withdrawn paralegal's historical fallback", async () => {
+  test("a replacement payout cannot prove the withdrawn paralegal was paid", async () => {
     const attorney = await user("attorney", "relist");
     const withdrawn = await user("paralegal", "withdrawn");
     const replacement = await user("paralegal", "replacement");
@@ -187,12 +189,14 @@ describe("canonical dashboard payment projections", () => {
       paralegalId: replacement._id,
       amountPaid: 16400,
       transferId: "tr_replacement_projection",
-      status: "paid",
+      status: "paid", stripeMode: "test",
       createdAt: paidAt,
     });
 
     await expect(getParalegalEarnings(withdrawn._id, {
       now: new Date("2026-08-30T12:00:00.000Z"),
-    })).resolves.toEqual({ month: 164, last30: 164, total: 164 });
+    })).resolves.toEqual({ month: 0, last30: 0, total: 0 });
+    await Payout.create({ caseId: caseDoc._id, paralegalId: withdrawn._id, amountPaid: 16400, transferId: "tr_original_withdrawal", status: "paid", stripeMode: "test", createdAt: paidAt });
+    await expect(getParalegalEarnings(withdrawn._id, { now: new Date("2026-08-30T12:00:00.000Z") })).resolves.toEqual({ month: 164, last30: 164, total: 164 });
   });
 });

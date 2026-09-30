@@ -240,6 +240,18 @@
     .emails-card { grid-area: emails; }
     .open-card { grid-area: open; }
     .completed-card { grid-area: completed; }
+    .completed-card .metric-body { grid-template-columns: minmax(0, 1fr); }
+    .performance-chart__empty { display: none; }
+    .performance-chart.is-empty .performance-chart__empty {
+      display: grid;
+      position: absolute;
+      inset: 0;
+      place-content: center;
+      gap: 0.5rem;
+      padding: 1rem;
+      text-align: center;
+      color: var(--director-muted);
+    }
     .conversion-card { grid-area: conversion; }
     .unsub-card { grid-area: unsub; }
     .director-performance {
@@ -1172,6 +1184,7 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="assets/styles/director-financials.css" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -1225,12 +1238,11 @@
         </article>
 
         <article class="metric-card completed-card">
-          <h2>Completed Matters</h2>
+          <h2>Commission cap</h2>
           <div class="metric-body">
             <div>
-              <div class="metric-delta">Completed</div>
-              <strong class="metric-value" id="metricCompletedMatters">0</strong>
-              <div class="metric-note"><span id="metricCompletedCap">0/50</span> completed matters</div>
+              <strong class="metric-value" id="metricCompletedCap">—</strong>
+              <div class="metric-note">Lifetime commissionable Matters</div>
             </div>
             <div class="completed-progress">
               <div class="completed-progress-track"><span class="completed-progress-fill" id="completedMatterBar"></span></div>
@@ -1320,14 +1332,15 @@
         <div class="director-sync-group" role="group" aria-label="Synchronization status">
           <p class="sync-meta" id="lastSyncedAt"></p>
         </div>
-        <p class="director-status" id="directorStatus"></p>
+        <p class="director-status" id="directorStatus" role="status"></p>
+        <button class="director-retry" id="retryDirectorBtn" type="button" hidden>Refresh records</button>
         <div class="director-empty-state" id="directorEmptyState">
           <strong>Ready for outreach</strong>
           Import today after sending outreach from Zoho.
         </div>
         <div class="attention-strip" id="attentionStrip" role="group" aria-label="Director earnings" hidden>
           <div class="attention-item" id="attentionCommissionItem" hidden>
-            <span>Commission earned</span>
+            <span>Lifetime commission</span>
             <strong id="attentionCommission">—</strong>
           </div>
         </div>
@@ -1362,7 +1375,7 @@
                 <th aria-sort="none" data-responsive-priority="medium"><button type="button" class="director-sort-btn" data-sort-key="registered">Registered</button></th>
                 <th aria-sort="none" data-responsive-priority="low"><button type="button" class="director-sort-btn" data-sort-key="matter">Matter</button></th>
                 <th aria-sort="none" data-responsive-priority="medium"><button type="button" class="director-sort-btn" data-sort-key="commission">Commission</button></th>
-                <th data-responsive-priority="low">Payout</th>
+                <th>Payout</th>
               </tr>
             </thead>
             <tbody id="recordsBody">

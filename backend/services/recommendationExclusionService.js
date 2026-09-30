@@ -14,35 +14,53 @@ function objectIds(values = []) {
     .map((value) => new mongoose.Types.ObjectId(value));
 }
 
+const references = values => objectIds(values).flatMap(value => [value, String(value)]);
+
 /**
  * Returns every known Job and Case identity associated with the paralegal's
- * canonical Application history. Application status is intentionally not a
- * filter: applying once permanently excludes the Matter from Recommendations.
+ * application history. Canonical Application records are authoritative, while
+ * retained Case.applicants entries are treated as historical evidence when an
+ * older or partially synchronized workflow has no canonical Application.
+ * Application status is intentionally not a filter: applying once permanently
+ * excludes the Matter from Recommendations.
  *
  * Browse visibility and direct-application authorization remain separate.
  */
 async function getHistoricalRecommendationExclusions(paralegalId) {
   if (!mongoose.isValidObjectId(paralegalId)) {
-    return { applicationCount: 0, jobIds: [], caseIds: [], matterIds: [] };
+    return {
+      applicationCount: 0,
+      legacyApplicantEvidenceCount: 0,
+      jobIds: [],
+      caseIds: [],
+      matterIds: [],
+    };
   }
 
-  const applications = await Application.find({ paralegalId })
-    .select("jobId")
-    .lean();
-  const jobIds = new Set();
-  applications.forEach((application) => addId(jobIds, application.jobId));
-
-  const historicalJobObjectIds = objectIds(jobIds);
-  if (!historicalJobObjectIds.length) {
-    return { applicationCount: applications.length, jobIds: [], caseIds: [], matterIds: [] };
-  }
-
-  const [historicalJobs, linkedCases] = await Promise.all([
-    Job.find({ _id: { $in: historicalJobObjectIds } }).select("_id caseId").lean(),
-    Case.find({ jobId: { $in: historicalJobObjectIds } }).select("_id jobId").lean(),
+  const viewerReferences = references([paralegalId]);
+  const [applications, applicantCases] = await Promise.all([
+    Application.collection.find({ paralegalId: { $in: viewerReferences } }, { projection: { jobId: 1 } }).toArray(),
+    Case.collection.find({ applicants: { $elemMatch: { paralegalId: { $in: viewerReferences } } } },
+      { projection: { _id: 1, jobId: 1, job: 1, "applicants.paralegalId": 1 } }).toArray(),
   ]);
-
+  const jobIds = new Set();
   const caseIds = new Set();
+  applications.forEach((application) => addId(jobIds, application.jobId));
+  applicantCases.forEach((caseDoc) => {
+    addId(caseIds, caseDoc._id);
+    addId(jobIds, caseDoc.jobId);
+    addId(jobIds, caseDoc.job);
+  });
+
+  const historicalJobObjectIds = objectIds(jobIds), historicalJobReferences = references(jobIds);
+  const [historicalJobs, linkedCases] = historicalJobObjectIds.length
+    ? await Promise.all([
+        Job.find({ _id: { $in: historicalJobObjectIds } }).select("_id caseId").lean(),
+        Case.collection.find({ $or: [{ jobId: { $in: historicalJobReferences } }, { job: { $in: historicalJobReferences } }] },
+          { projection: { _id: 1, jobId: 1, job: 1 } }).toArray(),
+      ])
+    : [[], []];
+
   historicalJobs.forEach((job) => {
     addId(jobIds, job._id);
     addId(caseIds, job.caseId);
@@ -50,17 +68,19 @@ async function getHistoricalRecommendationExclusions(paralegalId) {
   linkedCases.forEach((caseDoc) => {
     addId(caseIds, caseDoc._id);
     addId(jobIds, caseDoc.jobId);
+    addId(jobIds, caseDoc.job);
   });
 
   const caseObjectIds = objectIds(caseIds);
   if (caseObjectIds.length) {
     const [currentCases, currentJobs] = await Promise.all([
-      Case.find({ _id: { $in: caseObjectIds } }).select("_id jobId").lean(),
-      Job.find({ caseId: { $in: caseObjectIds } }).select("_id caseId").lean(),
+      Case.collection.find({ _id: { $in: caseObjectIds } }, { projection: { _id: 1, jobId: 1, job: 1 } }).toArray(),
+      Job.collection.find({ caseId: { $in: references(caseIds) } }, { projection: { _id: 1, caseId: 1 } }).toArray(),
     ]);
     currentCases.forEach((caseDoc) => {
       addId(caseIds, caseDoc._id);
       addId(jobIds, caseDoc.jobId);
+      addId(jobIds, caseDoc.job);
     });
     currentJobs.forEach((job) => {
       addId(caseIds, job.caseId);
@@ -72,6 +92,7 @@ async function getHistoricalRecommendationExclusions(paralegalId) {
   const sortedCaseIds = [...caseIds].sort();
   return {
     applicationCount: applications.length,
+    legacyApplicantEvidenceCount: applicantCases.length,
     jobIds: sortedJobIds,
     caseIds: sortedCaseIds,
     matterIds: [...new Set([...sortedCaseIds, ...sortedJobIds])].sort(),

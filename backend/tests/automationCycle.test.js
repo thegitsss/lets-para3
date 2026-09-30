@@ -3,8 +3,10 @@ const { isFullCycle, runAutomationCycle } = require("../scripts/run-automation-c
 function dependencies(overrides = {}) {
   return {
     readMaintenanceMode: jest.fn().mockResolvedValue(false),
+    processAutoModeActions: jest.fn().mockResolvedValue({ executedCount: 0, attemptedCount: 0, failedCount: 0 }),
     autoImportDirectorMail: jest.fn().mockResolvedValue({ failed: 0, scannedDirectors: 0 }),
     purgeExpiredCases: jest.fn().mockResolvedValue(undefined),
+    processMatterStorageRetirements: jest.fn(async () => ({ deleted: 0 })),
     processPersonalStorageDeletionTasks: jest.fn().mockResolvedValue({ deleted: 0, retried: 0 }),
     processExpiredWithdrawalWindows: jest.fn().mockResolvedValue({ scanned: 0, finalized: 0, failed: 0 }),
     processAdminOverdueDisputes: jest.fn().mockResolvedValue({ scanned: 0, notified: 0, failed: 0 }),
@@ -31,6 +33,7 @@ describe("scheduled automation cycle", () => {
     expect(lightDeps.autoImportDirectorMail).toHaveBeenCalledTimes(1);
     expect(lightDeps.purgeExpiredCases).toHaveBeenCalledTimes(1);
     expect(lightDeps.processPersonalStorageDeletionTasks).toHaveBeenCalledTimes(1);
+    expect(lightDeps.processMatterStorageRetirements).toHaveBeenCalledTimes(1);
     expect(lightDeps.processExpiredWithdrawalWindows).toHaveBeenCalledWith({
       now: new Date("2026-08-13T12:05:00.000Z"),
     });
@@ -38,6 +41,7 @@ describe("scheduled automation cycle", () => {
       now: new Date("2026-08-13T12:05:00.000Z"),
     });
     expect(lightDeps.generateMonitoringReport).not.toHaveBeenCalled();
+    expect(lightDeps.processAutoModeActions).not.toHaveBeenCalled();
 
     const fullDeps = dependencies();
     const full = await runAutomationCycle({
@@ -48,6 +52,8 @@ describe("scheduled automation cycle", () => {
     expect(full.fullCycle).toBe(true);
     expect(fullDeps.autoImportDirectorMail).toHaveBeenCalledTimes(1);
     expect(fullDeps.generateMonitoringReport).toHaveBeenCalledTimes(1);
+    expect(fullDeps.processAutoModeActions).toHaveBeenCalledTimes(1);
+    expect(fullDeps.processMatterStorageRetirements).toHaveBeenCalledTimes(1);
     expect(fullDeps.prepareFounderDailyLogIfDue).toHaveBeenCalledWith(expect.objectContaining({
       schedulerState: expect.objectContaining({ generatedFromScheduler: true }),
     }));
@@ -140,4 +146,13 @@ describe("scheduled automation cycle", () => {
     expect(isFullCycle(new Date("2026-08-13T12:00:00.000Z"))).toBe(true);
     expect(isFullCycle(new Date("2026-08-13T12:05:00.000Z"))).toBe(false);
   });
+  test('failed routine approvals remain visible while independent scheduled work continues', async () => {
+    const deps = dependencies({ processAutoModeActions: jest.fn(async () => ({ executedCount: 1, attemptedCount: 3, failedCount: 2 })) });
+    const result = await runAutomationCycle({ now: new Date('2026-09-29T12:00:00Z'), dependencies: deps });
+    expect(result.ok).toBe(false);
+    expect(result.failures).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'governedApprovals' })]));
+    expect(deps.prepareFounderDailyLogIfDue).toHaveBeenCalledTimes(1);
+  });
 });
+
+test("unconfirmed Matter storage work fails the cycle without stopping independent tasks", async () => { const deps = dependencies({ processMatterStorageRetirements: jest.fn(async () => ({ failed: 1 })) }); const result = await runAutomationCycle({ now: new Date("2026-09-08T12:05:00Z"), dependencies: deps }); expect(result.ok).toBe(false); expect(result.failures[0].name).toBe("matterStorageRetirement"); expect(deps.autoImportDirectorMail).toHaveBeenCalledTimes(1); });

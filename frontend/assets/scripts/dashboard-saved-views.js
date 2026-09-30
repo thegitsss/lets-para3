@@ -45,6 +45,7 @@ export function mountDashboardSavedViews(config = {}) {
   const builtIns = Array.isArray(config.builtIns) ? config.builtIns : [];
   if (!scope || !picker || !saveButton) return null;
 
+  const owner = () => String(config.getOwner?.() || "");
   let savedViews = [];
   let selectedId = "";
   let loading = false;
@@ -77,19 +78,23 @@ export function mountDashboardSavedViews(config = {}) {
 
   async function load() {
     if (loading) return;
+    const ownerId = owner();
+    if (!ownerId) { setStatus("Verify your account before loading saved views", "error"); return; }
     loading = true;
     setStatus("Loading views…");
     try {
-      const response = await secureFetch(`/api/account/dashboard-views?scope=${encodeURIComponent(scope)}`, {
+      const response = await secureFetch(`/api/account/dashboard-views?scope=${encodeURIComponent(scope)}&expectedOwnerId=${encodeURIComponent(ownerId)}`, {
         headers: { Accept: "application/json" },
         cache: "no-store",
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || "Unable to load saved views");
-      savedViews = Array.isArray(payload.views) ? payload.views : [];
+      if (owner() !== ownerId || payload.ownerId !== ownerId || payload.scope !== scope || !Array.isArray(payload.views) || payload.views.some(view => !/^[a-f0-9]{64}$/.test(view.revision || ""))) throw new Error("Saved views could not be verified");
+      savedViews = payload.views;
       populatePicker();
       setStatus(savedViews.length ? `${savedViews.length} saved` : "Views sync to your account");
     } catch (error) {
+      savedViews = [];
       populatePicker();
       setStatus("Saved views are temporarily unavailable", "error");
     } finally {
@@ -108,14 +113,16 @@ export function mountDashboardSavedViews(config = {}) {
     if (view?.filters) applyState({ ...view.filters }, view);
   }
 
-  async function save(name) {
+  async function save(name, ownerId, requestId, filters) {
+    if (!ownerId || owner() !== ownerId) throw new Error("Your account changed. Refresh before saving this view.");
     const response = await secureFetch("/api/account/dashboard-views", {
       method: "POST",
       headers: { Accept: "application/json" },
-      body: { scope, name, filters: getState() },
+      body: { scope, name, filters, expectedOwnerId: ownerId, id: requestId, revision: null },
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload?.error || "Unable to save this view");
+    if (owner() !== ownerId) return;
     savedViews = [...savedViews.filter((view) => view.id !== payload.view.id), payload.view]
       .sort((left, right) => left.name.localeCompare(right.name));
     populatePicker(`saved:${payload.view.id}`);
@@ -124,6 +131,7 @@ export function mountDashboardSavedViews(config = {}) {
 
   picker.addEventListener("change", () => select(picker.value));
   saveButton.addEventListener("click", () => {
+    const ownerId = owner(), requestId = crypto.randomUUID(), filters = { ...getState() };
     const prompt = createNameDialog();
     prompt.dialog.addEventListener("close", () => prompt.dialog.remove(), { once: true });
     prompt.dialog.querySelector("form")?.addEventListener("submit", async (event) => {
@@ -137,7 +145,7 @@ export function mountDashboardSavedViews(config = {}) {
       submit.disabled = true;
       prompt.status.textContent = "Saving…";
       try {
-        await save(name);
+        await save(name, ownerId, requestId, filters);
         prompt.dialog.close("saved");
       } catch (error) {
         prompt.status.textContent = error?.message || "Unable to save this view.";
@@ -150,6 +158,7 @@ export function mountDashboardSavedViews(config = {}) {
 
   deleteButton?.addEventListener("click", async () => {
     if (!selectedId.startsWith("saved:")) return;
+    const ownerId = owner();
     const viewId = selectedId.slice(6);
     const view = savedViews.find((item) => String(item.id) === viewId);
     if (!view) return;
@@ -159,14 +168,17 @@ export function mountDashboardSavedViews(config = {}) {
       tone: "danger",
     });
     if (!confirmed) return;
+    if (!ownerId || owner() !== ownerId) { setStatus("Your account changed. Refresh before deleting this view.", "error"); return; }
     deleteButton.disabled = true;
     try {
       const response = await secureFetch(`/api/account/dashboard-views/${encodeURIComponent(scope)}/${encodeURIComponent(viewId)}`, {
         method: "DELETE",
+        body: { expectedOwnerId: ownerId, revision: view.revision },
         headers: { Accept: "application/json" },
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.error || "Unable to delete this view");
+      if (owner() !== ownerId) return;
       savedViews = savedViews.filter((item) => String(item.id) !== viewId);
       populatePicker(builtIns[0] ? `builtin:${builtIns[0].id}` : "custom");
       setStatus("View deleted", "success");

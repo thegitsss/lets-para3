@@ -182,7 +182,34 @@ function findRelatedOperations(operations, operationKey, evidence) {
   );
 }
 
-async function inspectFundingCandidate({ caseDoc, operations = [], stripeClient, paymentIntent: suppliedPaymentIntent }) {
+// A failed lookup after hire can leave a request-only funding record. Current
+// captured evidence may finish that exact request in a guarded transaction;
+// conflicting, reviewed or partially recorded operations retain manual review.
+function captureRecoveryUpdate(operation, evidence, now = new Date()) {
+  const absent = value => value === undefined || value === null || value === "";
+  const emptyFields = [
+    "stripeChargeId", "stripeBalanceTransactionId", "grossAmount", "processingFeeAmount", "netAmount",
+    "livemode", "evidenceVerifiedAt", "completedAt", "evidenceStatus", "administrativeStatus",
+    "stripeTransferId", "stripeRefundId", "stripeDisputeId", "stripeEventId", "processorStatus",
+    "acknowledgedAt", "acknowledgedBy", "refundStatus", "refundEvidenceStatus", "refundVerifiedAt",
+  ];
+  if (!operation || operation.kind !== "funding" || operation.status !== "needs_reconciliation"
+    || !["charge_unmatched", "balance_transaction_unmatched"].includes(operation.lastError)
+    || operation.operationKey !== fundingOperationKey(evidence.caseId, evidence.stripePaymentIntentId)
+    || String(operation.caseId) !== evidence.caseId || operation.stripePaymentIntentId !== evidence.stripePaymentIntentId
+    || operation.stripeObjectId !== evidence.stripePaymentIntentId
+    || operation.fingerprint !== operationFingerprint({ caseId: evidence.caseId, paymentIntentId: evidence.stripePaymentIntentId })
+    || operation.amount !== evidence.grossAmount || operation.currency !== evidence.currency
+    || operation.attempts !== 1 || ![undefined, null, "", "unknown"].includes(operation.stripeMode)
+    || !emptyFields.every(field => absent(operation[field]))
+    || operation.refundAmount != null && operation.refundAmount !== 0
+    || operation.transferAmount != null && operation.transferAmount !== 0) return null;
+  // Collection updates do not apply Mongoose casts. Keep the existing Case
+  // reference and its BSON type while completing only provider evidence.
+  return { ...Object.fromEntries(EVIDENCE_FIELDS.map(field => [field, evidence[field]])), fingerprint: operationFingerprint(evidence), status: "succeeded", lastError: "", completedAt: now, evidenceVerifiedAt: now };
+}
+
+async function inspectFundingCandidate({ caseDoc, operations = [], stripeClient, paymentIntent: suppliedPaymentIntent, allowCaptureRecovery = false }) {
   const caseId = String(caseDoc?._id || caseDoc?.id || "");
   let ids = distinctFundingIntentIds(caseDoc);
   const base = { caseId, caseRef: maskIdentifier(caseId), reasons: [], refundedAmount: 0 };
@@ -298,6 +325,9 @@ async function inspectFundingCandidate({ caseDoc, operations = [], stripeClient,
   if (!related.length) return { ...base, action: "create", evidence, operationKey };
 
   const existing = related[0];
+  if (allowCaptureRecovery && captureRecoveryUpdate(existing, evidence)) {
+    return { ...base, action: "recover", evidence, operationKey, operationId: existing._id };
+  }
   if (existing.kind !== "funding" || existing.operationKey !== operationKey || existing.status !== "succeeded") {
     return { ...base, action: "review", reasons: ["existing_operation_conflict"], evidence, operationKey };
   }
@@ -604,6 +634,7 @@ async function buildFundingEvidenceReport({
 }
 
 module.exports = {
+  captureRecoveryUpdate,
   EVIDENCE_FIELDS,
   buildEvidence,
   buildFundingEvidenceReport,

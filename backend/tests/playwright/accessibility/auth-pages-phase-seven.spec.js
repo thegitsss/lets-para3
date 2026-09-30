@@ -78,6 +78,9 @@ test("auth pages share one responsive family across the Phase 7 viewport matrix"
         const artStyle = getComputedStyle(art);
         return {
           viewportWidth: document.documentElement.clientWidth,
+          entryLayout: document.body.classList.contains("auth-entry"),
+          recoveryLayout: document.body.classList.contains("password-recovery-page"),
+          containerWidth: document.querySelector(".overlay")?.clientWidth,
           contentWidth: document.documentElement.scrollWidth,
           panelLeft: panelRect.left,
           panelRight: panelRect.right,
@@ -91,14 +94,21 @@ test("auth pages share one responsive family across the Phase 7 viewport matrix"
         .toBeLessThanOrEqual(layout.viewportWidth + 1);
 
       if (viewport.width <= 768) {
-        expect(layout.artDisplay, `${authPage.name} retains a mobile art tail`).toBe("none");
+        expect(layout.artDisplay, `${authPage.name} has the intended mobile artwork`).toBe(layout.entryLayout || layout.recoveryLayout ? "none" : "block");
         expect(layout.panelLeft).toBeGreaterThanOrEqual(-1);
         expect(layout.panelRight).toBeLessThanOrEqual(layout.viewportWidth + 1);
-        expect(layout.panelWidth).toBeGreaterThanOrEqual(layout.viewportWidth - 2);
+        const cardInset = layout.entryLayout ? (viewport.width <= 360 ? 24 : 32) : (viewport.width <= 360 ? 24 : 40);
+        const expectedWidth = layout.entryLayout ? layout.viewportWidth - cardInset : Math.min(470, layout.viewportWidth - cardInset);
+        expect(layout.panelWidth).toBeGreaterThanOrEqual(expectedWidth - 2);
+        expect(layout.panelWidth).toBeLessThanOrEqual(expectedWidth + 2);
       } else {
-        expect(layout.artVisible, `${authPage.name} lost its desktop art panel`).toBe(true);
-        expect(layout.panelWidth / layout.viewportWidth).toBeGreaterThan(0.4);
-        expect(layout.panelWidth / layout.viewportWidth).toBeLessThan(0.44);
+        expect(layout.artVisible, `${authPage.name} has the intended desktop artwork`).toBe(!layout.recoveryLayout);
+        if (layout.entryLayout) {
+          expect(layout.panelWidth / (layout.containerWidth - 20)).toBeCloseTo(0.48, 2);
+        } else {
+          expect(layout.panelWidth).toBeCloseTo(470, 0);
+          expect(Math.abs(layout.panelLeft - (layout.viewportWidth - layout.panelWidth) / 2)).toBeLessThanOrEqual(1);
+        }
       }
 
       for (const selector of authPage.controls) {
@@ -111,7 +121,8 @@ test("auth pages share one responsive family across the Phase 7 viewport matrix"
             radius: parseFloat(style.borderTopLeftRadius),
           };
         });
-        expect(geometry.height, `${authPage.name}: ${selector} height`).toBeGreaterThanOrEqual(49);
+        const minimumHeight = layout.entryLayout && viewport.width > 768 ? 44 : 49;
+        expect(geometry.height, `${authPage.name}: ${selector} height`).toBeGreaterThanOrEqual(minimumHeight);
         expect(geometry.radius, `${authPage.name}: ${selector} radius`).toBeGreaterThanOrEqual(7);
         expect(geometry.radius, `${authPage.name}: ${selector} radius`).toBeLessThanOrEqual(9);
       }
@@ -248,7 +259,7 @@ test("verification and submitted application states tell the truth without a sig
     return route.fulfill({
       status: 201,
       contentType: "application/json",
-      body: JSON.stringify({ ok: true }),
+      body: JSON.stringify({ ok: true, verificationEmailStatus: "sent", emailVerified: false }),
     });
   });
 
@@ -291,9 +302,9 @@ test("verification and submitted application states tell the truth without a sig
   await expect(page.locator("#signupConfirmation")).toBeVisible();
   await expect(page.locator("#signupForm")).toBeHidden();
   await expect(page.locator("#signupIntroduction")).toBeHidden();
-  await expect(page.locator("#signupConfirmation")).toContainText("Your submission is already under review.");
-  await expect(page.locator("#signupConfirmation")).toContainText("Verify your email so we can confirm the address for account notices.");
-  await expect(page.locator("#signupConfirmation a")).toHaveText("Return home");
+  await expect(page.locator("#signupConfirmation")).toContainText("Your submission is under review.");
+  await expect(page.locator("#signupConfirmation")).toContainText("Verify your address for account notices.");
+  await expect(page.getByRole("link", { name: "Return home" })).toBeVisible();
   await expect(page.locator("#signupConfirmation")).not.toContainText(/sign in|three steps|creating an account is free|✓|✅/i);
   expect(registrationRequests).toBe(1);
   await expectNoAxeViolations(page);

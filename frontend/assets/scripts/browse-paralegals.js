@@ -1,7 +1,9 @@
+import { createSavedParalegals } from "./attorney-v2/saved-paralegals.mjs";
+import { createApiClient } from "./attorney-v2/api-client.mjs";
+import { createLegacyInvitationDialog } from "./utils/legacy-invitation-dialog.mjs";
 import { secureFetch, logout } from "./auth.js?v=20260812-state-filter-owner";
 import { normalizePresentation } from "./authenticated-object-search.mjs";
 import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
-import { showAlert } from "./utils/dialogs.js";
 
 const states = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","District of Columbia","Florida","Georgia",
@@ -42,13 +44,8 @@ const elements = {
   specialtyList: document.getElementById("specialtyList"),
   prevPage: document.getElementById("prevPage"),
   nextPage: document.getElementById("nextPage"),
+  pagination: document.getElementById("pagination"),
   paginationLabel: document.getElementById("paginationLabel"),
-  inquireModal: document.getElementById("inquireModal"),
-  jobList: document.getElementById("jobList"),
-  inquireMessage: document.getElementById("inquireMessage"),
-  cancelInquire: document.getElementById("cancelInquire"),
-  confirmInquire: document.getElementById("confirmInquire"),
-  selectedParalegalText: document.getElementById("selectedParalegalText"),
   filterMenu: document.getElementById("filterMenu"),
   filterToggle: document.getElementById("filterToggle"),
   filterCount: document.getElementById("filterCount"),
@@ -85,11 +82,9 @@ const state = {
   canInvite: false,
 };
 
-let availableCases = [];
-let activeParalegal = null;
+let invitationDialog;
 let filterFetchTimer = null;
 let sidebarProfileLoadPromise = null;
-const toast = window.toastUtils;
 const AUTH_LOCK_CLASS = "auth-locked";
 const AUTH_BLOCKER_READY_CLASS = "auth-blocker-ready";
 
@@ -117,6 +112,24 @@ async function init() {
   syncAuthenticatedShell();
   syncAuthButtons();
   toggleAuthBlocker();
+  const savedLink = document.querySelector('[data-saved-paralegal-link]');
+  if (savedLink) savedLink.hidden = !state.canInvite;
+  if (new URLSearchParams(location.search).get('view') === 'saved') {
+    if (!state.canInvite) { elements.results.textContent = 'Sign in with an approved attorney account to view your saved paralegals.'; return; }
+    document.body.classList.add('lpc-saved-list-page');
+    document.getElementById('browse-paralegals-title').textContent = 'Saved paralegals';
+    if (savedLink) { savedLink.textContent = 'Browse paralegals'; savedLink.href = 'browse-paralegals.html'; }
+    document.querySelector('.results-header').hidden = true;
+    elements.results.style.display = 'block';
+    const controller = new AbortController();
+    const reset = () => { controller.abort(); location.reload(); };
+    window.addEventListener('pagehide', () => controller.abort(), { once: true });
+    window.addEventListener('storage', event => { if (event.key === 'lpc_user' || event.key === null) reset(); });
+    window.addEventListener('lpc:user-updated', event => { const next = normalizeId(event.detail?.user || event.detail); if (next && next !== normalizeId(state.viewer)) reset(); });
+    const api = createApiClient({ onAuthenticationLost: () => { controller.abort(); location.href = '/login.html'; } });
+    const list = createSavedParalegals({ api, signal: controller.signal, ownerId: normalizeId(state.viewer), legacy: true });
+    elements.results.replaceChildren(list); await list.readiness; return;
+  }
   initStateDropdown();
   initSpecialtyDropdown();
   bindFilterEvents();
@@ -125,12 +138,6 @@ async function init() {
   bindFilterButtons();
   bindModalEvents();
   updateFilterCount();
-
-  if (state.canInvite) {
-    await loadCases();
-  } else {
-    renderCaseOptions();
-  }
 
   await loadParalegals();
 }
@@ -248,7 +255,7 @@ async function hydrateViewer() {
   state.viewer = user;
   state.viewerRole = String(role || "").toLowerCase();
   state.isLoggedIn = Boolean(user);
-  state.canInvite = state.viewerRole === "attorney";
+  state.canInvite = state.viewerRole === "attorney" && state.viewer?.status === "approved" && !state.viewer?.disabled && !state.viewer?.deleted;
 }
 
 function syncAuthButtons() {
@@ -584,30 +591,8 @@ function handleFilterOptionListKeydown(event, { input, list, toggleSelection }) 
 
 
 function bindModalEvents() {
-  elements.cancelInquire?.addEventListener("click", closeInquireModal);
-  elements.inquireModal?.addEventListener("click", (event) => {
-    if (event.target === elements.inquireModal) {
-      closeInquireModal();
-    }
-  });
-  elements.confirmInquire?.addEventListener("click", sendInquiry);
-  elements.jobList?.addEventListener("change", (event) => {
-    if (event.target.matches("input[name='jobOption']")) {
-      clearFieldError(elements.jobList);
-    }
-  });
-  elements.inquireMessage?.addEventListener("input", () => clearFieldError(elements.inquireMessage));
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeInquireModal();
-  });
-  elements.authBlocker?.addEventListener("click", (event) => {
-    if (event.target === elements.authBlocker) {
-      closeAuthBlocker();
-    }
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeAuthBlocker();
-  });
+  elements.authBlocker?.addEventListener("click", event => { if (event.target === elements.authBlocker) closeAuthBlocker(); });
+  document.addEventListener("keydown", event => { if (event.key === "Escape") closeAuthBlocker(); });
 }
 
 function initStateDropdown() {
@@ -882,40 +867,12 @@ async function loadParalegals(options = {}) {
   } catch (error) {
     console.error(error);
     renderParalegals([]);
+    if (elements.pagination) elements.pagination.hidden = true;
     setResultsStatus(error.message || "Unable to load paralegals right now.", true);
   }
 }
 
-async function loadCases() {
-  try {
-    const res = await secureFetch("/api/cases/my-active", {
-      headers: { Accept: "application/json" },
-    });
-    const payload = await res.json().catch(() => ({}));
-    const items = Array.isArray(payload?.items)
-      ? payload.items
-      : Array.isArray(payload)
-      ? payload
-      : [];
-    availableCases = items.filter((item) => {
-      const archived = Boolean(item.archived);
-      const assigned = Boolean(
-        item.acceptedParalegal ||
-          item.assignedTo?.id ||
-          item.assignedTo?._id ||
-          item.paralegal?.id ||
-          item.paralegal?._id ||
-          item.paralegal ||
-          item.paralegalId
-      );
-      return !archived && !assigned;
-    });
-  } catch (error) {
-    console.warn("Unable to load cases", error);
-    availableCases = [];
-  }
-  renderCaseOptions();
-}
+
 
 function renderParalegals(items) {
   elements.results.innerHTML = "";
@@ -944,7 +901,7 @@ function buildParalegalCard(paralegal) {
   });
   if (!presentation) return null;
   const name = presentation.object.title;
-  const location = presentation.details.find((item) => item.label === "Location")?.value || "Location not specified";
+  const location = presentation.details.find((item) => item.label === "Location")?.value || "";
   const specialties = (presentation.details.find((item) => item.label === "Practice areas")?.value || "").split(", ").filter(Boolean).slice(0, 2);
   const experience = formatExperience(paralegal.yearsExperience);
   const avatar = paralegal.avatarURL || AVATAR_PLACEHOLDER;
@@ -984,8 +941,8 @@ function buildParalegalCard(paralegal) {
   content.appendChild(heading);
 
   const intro = document.createElement("p");
-  intro.textContent = `${specialties[0] || "Generalist"} · ${location}`;
-  content.appendChild(intro);
+  intro.textContent = [specialties[0], location].filter(Boolean).join(" · ");
+  if (intro.textContent) content.appendChild(intro);
 
   if (presentation.summary) {
     const bio = document.createElement("p");
@@ -1008,8 +965,8 @@ function buildParalegalCard(paralegal) {
     inquireBtn.className = "action-btn invite-btn";
     inquireBtn.dataset.publicAction = "primary";
     inquireBtn.dataset.actionShape = "pill";
-    inquireBtn.textContent = "Invite to matter";
-    inquireBtn.addEventListener("click", () => openInquireModal({ id: paralegalId, name }));
+    inquireBtn.textContent = "Invite to Matter";
+    inquireBtn.addEventListener("click", () => openInquireModal({ id: paralegalId, name }, inquireBtn));
     actions.appendChild(inquireBtn);
   }
   if (actions.children.length) {
@@ -1051,6 +1008,7 @@ function setResultsStatus(message, isError = false) {
 function updatePagination(data = {}) {
   state.total = Number(data.total || 0);
   state.pages = Number(data.pages || 1) || 1;
+  if (elements.pagination) elements.pagination.hidden = state.pages <= 1;
   updatePaginationLabel();
   if (elements.prevPage) elements.prevPage.disabled = state.page <= 1;
   if (elements.nextPage) elements.nextPage.disabled = state.page >= state.pages;
@@ -1058,154 +1016,20 @@ function updatePagination(data = {}) {
 
 function updatePaginationLabel() {
   if (!elements.paginationLabel) return;
-  const from = state.total ? (state.page - 1) * state.limit + 1 : 0;
-  const to = Math.min(state.page * state.limit, state.total);
-  const range = state.total ? `${from}-${to}` : "0";
-  elements.paginationLabel.textContent = `Page ${state.page} of ${Math.max(state.pages, 1)} • Showing ${range} of ${state.total}`;
+  elements.paginationLabel.textContent = `Page ${state.page} of ${Math.max(state.pages, 1)}`;
 }
 
-function openInquireModal(paralegal) {
-  activeParalegal = paralegal;
-  if (!elements.inquireModal) return;
-  clearFieldError(elements.jobList);
-  clearFieldError(elements.inquireMessage);
-  elements.selectedParalegalText.textContent = `Select an open Matter for ${paralegal.name}.`;
-  elements.inquireMessage.value = "";
-  const firstOption = elements.jobList.querySelector("input[name='jobOption']");
-  if (firstOption) firstOption.checked = false;
-  elements.confirmInquire.disabled = !availableCases.length;
-  elements.inquireModal.classList.add("show");
-  elements.inquireModal.setAttribute("aria-hidden", "false");
-  elements.inquireModal.removeAttribute("inert");
-  activateDialogFocus(elements.inquireModal, {
-    initialFocus: firstOption || elements.inquireMessage || elements.cancelInquire,
-    onEscape: closeInquireModal,
-  });
+function openInquireModal(paralegal, trigger) {
+  if (!state.canInvite) return;
+  invitationDialog ||= createLegacyInvitationDialog({ ownerId: normalizeId(state.viewer), request: secureFetch });
+  invitationDialog.open({ paralegalId: paralegal.id, name: paralegal.name, trigger });
 }
 
-function closeInquireModal() {
-  activeParalegal = null;
-  elements.inquireModal?.classList.remove("show");
-  elements.inquireModal?.setAttribute("aria-hidden", "true");
-  elements.inquireModal?.setAttribute("inert", "");
-  deactivateDialogFocus(elements.inquireModal);
-  elements.inquireMessage.value = "";
-  clearFieldError(elements.jobList);
-  clearFieldError(elements.inquireMessage);
-  const checked = elements.jobList?.querySelector("input[name='jobOption']:checked");
-  if (checked) checked.checked = false;
-}
 
-function renderCaseOptions() {
-  if (!elements.jobList) return;
-  if (!availableCases.length) {
-    elements.jobList.innerHTML = "<p>No open Matters are available. Create a Matter before inviting a paralegal.</p>";
-    elements.confirmInquire.disabled = true;
-    return;
-  }
-  const targetId = String(
-    normalizeId(activeParalegal) ||
-      normalizeId(activeParalegal?.paralegal) ||
-      normalizeId(activeParalegal?.user) ||
-      normalizeId(activeParalegal?.person)
-  );
-  const options = availableCases.map((c) => {
-    const caseId = c.id || c._id;
-    const inviteEntries = Array.isArray(c.invites) ? c.invites : [];
-    const matchingInvite = inviteEntries.find(
-      (invite) => normalizeId(invite?.paralegalId) && String(normalizeId(invite.paralegalId)) === targetId
-    );
-    const inviteStatus = String(matchingInvite?.status || "").toLowerCase();
-    const assignedId =
-      normalizeId(c.assignedTo?.id) ||
-      normalizeId(c.assignedTo?._id) ||
-      normalizeId(c.paralegalId) ||
-      normalizeId(c.paralegal?.id) ||
-      normalizeId(c.paralegal?._id) ||
-      normalizeId(c.paralegal);
-    const assigned = Boolean(assignedId || c.acceptedParalegal);
-    const invited = targetId && (inviteStatus === "pending" || inviteStatus === "accepted");
-    const disabled = invited || assigned;
-    const statusLabel = invited
-      ? "Invitation already sent to this paralegal"
-      : assigned
-      ? "A paralegal is already assigned"
-      : "";
-    return { caseId, title: c.title || "Untitled matter", disabled, statusLabel };
-  });
-  const visibleOptions = options.filter((opt) => opt.statusLabel !== "A paralegal is already assigned");
-  const hasSelectable = visibleOptions.some((opt) => !opt.disabled);
-  if (!visibleOptions.length) {
-    elements.jobList.innerHTML = "<p>No open Matters are available. Create a Matter before inviting a paralegal.</p>";
-    elements.confirmInquire.disabled = true;
-    return;
-  }
-  elements.jobList.innerHTML = visibleOptions
-    .map(
-      (opt) => `
-      <label class="job-option${opt.disabled ? " disabled" : ""}">
-        <input type="radio" name="jobOption" value="${escapeHTML(opt.caseId)}" ${opt.disabled ? "disabled" : ""} aria-disabled="${opt.disabled ? "true" : "false"}">
-        <span>${escapeHtml(opt.title)}${opt.statusLabel ? ` — ${escapeHtml(opt.statusLabel)}` : ""}</span>
-      </label>`
-    )
-    .join("");
-  elements.confirmInquire.disabled = !hasSelectable;
-}
 
-async function sendInquiry() {
-  if (!activeParalegal || !elements.jobList) return;
-  const selected = elements.jobList.querySelector("input[name='jobOption']:checked");
-  clearFieldError(elements.jobList);
-  if (!selected) {
-    showFieldError(elements.jobList, "Select an open Matter before sending.");
-    showToast("Select an open Matter first.", "err");
-    return;
-  }
-  const message = (elements.inquireMessage.value || "").trim();
-  const targetId = normalizeId(activeParalegal) || normalizeId(activeParalegal?.paralegal) || normalizeId(activeParalegal?.user) || normalizeId(activeParalegal?.person);
-  const caseMeta = availableCases.find((c) => String(c.id || c._id) === String(selected.value));
-  if (caseMeta && targetId) {
-    const inviteEntries = Array.isArray(caseMeta.invites) ? caseMeta.invites : [];
-    const matchingInvite = inviteEntries.find(
-      (invite) => normalizeId(invite?.paralegalId) && String(normalizeId(invite.paralegalId)) === targetId
-    );
-    const inviteStatus = String(matchingInvite?.status || "").toLowerCase();
-    const assignedId =
-      normalizeId(caseMeta.assignedTo?.id) ||
-      normalizeId(caseMeta.assignedTo?._id) ||
-      normalizeId(caseMeta.paralegalId) ||
-      normalizeId(caseMeta.paralegal?.id) ||
-      normalizeId(caseMeta.paralegal?._id) ||
-      normalizeId(caseMeta.paralegal);
-    if (inviteStatus === "pending" || inviteStatus === "accepted") {
-      showToast("Invitation already sent to this paralegal for this Matter.", "err");
-      return;
-    }
-    if (assignedId || caseMeta.acceptedParalegal) {
-      showToast("A paralegal is already assigned to this Matter.", "err");
-      return;
-    }
-  }
-  try {
-    const res = await secureFetch(
-      `/api/cases/${encodeURIComponent(selected.value)}/invite/${encodeURIComponent(activeParalegal.id)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseId: selected.value, message }),
-      }
-    );
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || "Unable to send invite");
-    }
-    showToast("Invite sent successfully.", "ok");
-    closeInquireModal();
-  } catch (error) {
-    console.error(error);
-    showToast(error.message || "Unable to send invite", "err");
-  }
-}
+
+
+
 
 function parseExperience(value = "") {
   const match = value.match(/\d+/);
@@ -1225,53 +1049,4 @@ function formatExperience(years) {
   if (num <= 0) return "Under a year";
   if (num >= 10) return "10+ years";
   return `${Math.round(num)}+ years`;
-}
-
-
-function escapeHtml(value = "") {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function showFieldError(target, message) {
-  if (!target) return;
-  clearFieldError(target);
-  target.classList?.add("input-error");
-  if (typeof target.setAttribute === "function") {
-    target.setAttribute("aria-invalid", "true");
-  }
-  const error = document.createElement("div");
-  error.className = "field-error";
-  error.textContent = message;
-  const wrapper = target.closest(".field") || target.closest("[data-field-wrapper]");
-  if (wrapper) wrapper.appendChild(error);
-  else target.insertAdjacentElement("afterend", error);
-}
-
-function clearFieldError(target) {
-  if (!target) return;
-  target.classList?.remove("input-error");
-  if (typeof target.removeAttribute === "function") {
-    target.removeAttribute("aria-invalid");
-  }
-  const wrapper = target.closest(".field") || target.closest("[data-field-wrapper]");
-  if (wrapper) {
-    const existing = wrapper.querySelector(".field-error");
-    if (existing) existing.remove();
-    return;
-  }
-  const next = target.nextElementSibling;
-  if (next?.classList.contains("field-error")) next.remove();
-}
-
-function showToast(message, type = "info") {
-  if (toast?.show) {
-    toast.show(message, { targetId: "toastBanner", type });
-  } else {
-    void showAlert(message, { title: type === "err" || type === "error" ? "Action unavailable" : "Notice" });
-  }
 }
