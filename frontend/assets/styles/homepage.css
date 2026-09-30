@@ -5893,8 +5893,9 @@ body.accessibility-mode [tabindex]:focus-visible {
     inset: 0;
     min-height: 0;
     padding: 20px 16px 24px;
-    border: 0;
-    background: transparent;
+    border: 1px solid rgba(26, 34, 48, 0.12);
+    border-radius: 16px;
+    background: #fff;
     overflow: hidden;
     transform: none;
     transition:
@@ -6001,6 +6002,44 @@ body.accessibility-mode [tabindex]:focus-visible {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Keep the six steps readable if the interactive preview script is delayed. */
+@media (max-width: 640px) and (prefers-reduced-motion: no-preference) {
+  .lpc-home:not(.workflow-enhanced) .workflow__story {
+    min-height: 0;
+  }
+
+  .lpc-home:not(.workflow-enhanced) .workflow-mobile-stage {
+    display: none;
+  }
+
+  .lpc-home:not(.workflow-enhanced) .workflow-chapters {
+    gap: 12px;
+    padding: 0 var(--page-gutter);
+  }
+
+  .lpc-home:not(.workflow-enhanced) .workflow-chapter,
+  .lpc-home:not(.workflow-enhanced) .workflow-chapter:first-child {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 12px;
+    padding: 22px;
+    border: 1px solid rgba(26, 34, 48, 0.12);
+    border-radius: 16px;
+    background: #fff;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .lpc-home:not(.workflow-enhanced) .workflow-chapter > * {
+    visibility: visible;
+  }
+
+  .lpc-home:not(.workflow-enhanced) .workflow-mobile-canvas {
+    display: none;
   }
 }
 
