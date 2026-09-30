@@ -1,4 +1,5 @@
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const crypto = require("crypto");
 const User = require("../models/User");
 const AuditLog = require("../models/AuditLog");
@@ -18,7 +19,9 @@ const dashboard = role => role === "paralegal" ? "/dashboard-paralegal.html" : "
 const target = (value, role) => resolveReturnTarget(value, role) || dashboard(role);
 const errorPage = (code, intent) => `${intent === "signup" ? "/signup.html" : "/login.html"}?google_error=${encodeURIComponent(code)}`;
 
-router.get("/google", (req, res) => {
+const googleStartLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
+
+router.get("/google", googleStartLimiter, (req, res) => {
   const config = configuration();
   if (!config) return res.status(503).json({ msg: "Google sign-in is temporarily unavailable." });
   const intent = req.query.intent === "signup" ? "signup" : "login";

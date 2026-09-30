@@ -98,25 +98,6 @@ function shouldPublishLifecycleMutation(url, opts = {}) {
 
 setupLifecycleSync();
 
-const SESSION_STRING_FIELDS = [
-  "role",
-  "status",
-  "firstName",
-  "lastName",
-  "name",
-  "avatarURL",
-  "profileImage",
-  "pendingProfileImage",
-  "profilePhotoStatus",
-];
-const SESSION_BOOLEAN_FIELDS = ["disabled", "deleted", "isFirstLogin"];
-const ONBOARDING_BOOLEAN_FIELDS = [
-  "paralegalTourCompleted",
-  "paralegalProfileTourCompleted",
-  "attorneyTourCompleted",
-  "attorneyProfileCompleted",
-];
-
 export function projectSessionUser(user) {
   if (typeof window !== "undefined" && typeof window.projectSessionUser === "function") {
     return window.projectSessionUser(user);
@@ -125,20 +106,27 @@ export function projectSessionUser(user) {
   const snapshot = {};
   const id = typeof (user.id || user._id) === "string" ? String(user.id || user._id) : "";
   if (id) snapshot.id = id;
-  SESSION_STRING_FIELDS.forEach((field) => {
-    if (typeof user[field] === "string") snapshot[field] = user[field];
-  });
-  SESSION_BOOLEAN_FIELDS.forEach((field) => {
-    if (typeof user[field] === "boolean") snapshot[field] = user[field];
-  });
+  if (typeof user.role === "string") snapshot.role = user.role;
+  if (typeof user.status === "string") snapshot.status = user.status;
+  if (typeof user.firstName === "string") snapshot.firstName = user.firstName;
+  if (typeof user.lastName === "string") snapshot.lastName = user.lastName;
+  if (typeof user.name === "string") snapshot.name = user.name;
+  if (typeof user.avatarURL === "string") snapshot.avatarURL = user.avatarURL;
+  if (typeof user.profileImage === "string") snapshot.profileImage = user.profileImage;
+  if (typeof user.pendingProfileImage === "string") snapshot.pendingProfileImage = user.pendingProfileImage;
+  if (typeof user.profilePhotoStatus === "string") snapshot.profilePhotoStatus = user.profilePhotoStatus;
+  if (typeof user.disabled === "boolean") snapshot.disabled = user.disabled;
+  if (typeof user.deleted === "boolean") snapshot.deleted = user.deleted;
+  if (typeof user.isFirstLogin === "boolean") snapshot.isFirstLogin = user.isFirstLogin;
   const preferences = {};
   if (typeof user.preferences?.theme === "string") preferences.theme = user.preferences.theme;
   if (typeof user.preferences?.fontSize === "string") preferences.fontSize = user.preferences.fontSize;
   if (Object.keys(preferences).length) snapshot.preferences = preferences;
   const onboarding = {};
-  ONBOARDING_BOOLEAN_FIELDS.forEach((field) => {
-    if (typeof user.onboarding?.[field] === "boolean") onboarding[field] = user.onboarding[field];
-  });
+  if (typeof user.onboarding?.paralegalTourCompleted === "boolean") onboarding.paralegalTourCompleted = user.onboarding.paralegalTourCompleted;
+  if (typeof user.onboarding?.paralegalProfileTourCompleted === "boolean") onboarding.paralegalProfileTourCompleted = user.onboarding.paralegalProfileTourCompleted;
+  if (typeof user.onboarding?.attorneyTourCompleted === "boolean") onboarding.attorneyTourCompleted = user.onboarding.attorneyTourCompleted;
+  if (typeof user.onboarding?.attorneyProfileCompleted === "boolean") onboarding.attorneyProfileCompleted = user.onboarding.attorneyProfileCompleted;
   if (Object.keys(onboarding).length) snapshot.onboarding = onboarding;
   return snapshot;
 }

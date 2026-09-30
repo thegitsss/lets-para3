@@ -85,7 +85,12 @@ export function publishRecommendationHistoryChange(payload = {}) {
     nonce: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   };
   try {
-    window.localStorage?.setItem(RECOMMENDATION_HISTORY_STORAGE_KEY, JSON.stringify(detail));
+    // Cross-tab refresh needs the viewer and a change signal, not Matter IDs.
+    window.localStorage?.setItem(RECOMMENDATION_HISTORY_STORAGE_KEY, JSON.stringify({
+      viewerId: detail.viewerId,
+      changedAt: detail.changedAt,
+      nonce: detail.nonce,
+    }));
   } catch {
     // Server refresh remains the authority when browser storage is unavailable.
   }

@@ -5,7 +5,6 @@ const { PassThrough } = require("stream");
 const fs = require("fs");
 const path = require("path");
 const archiver = require("archiver");
-const puppeteer = require("puppeteer");
 const {
   S3Client,
   GetObjectCommand,
@@ -33,7 +32,7 @@ const PURGE_INTERVAL_MS = Math.max(30_000, Number(process.env.CASE_PURGE_INTERVA
 const PURGE_BATCH_LIMIT = Math.max(1, Math.min(10, Number(process.env.CASE_PURGE_BATCH_LIMIT || 3)));
 let purgeWorkerStarted = false;
 
-function resolvePuppeteerExecutablePath() {
+function resolvePuppeteerExecutablePath(puppeteer) {
   const envPath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || "";
   if (envPath && fs.existsSync(envPath)) return envPath;
 
@@ -768,7 +767,8 @@ function buildReceiptHtml(payload = {}) {
 }
 
 async function renderHtmlToPdf(html, options = {}) {
-  const executablePath = resolvePuppeteerExecutablePath() || undefined;
+  const puppeteer = (await import("puppeteer")).default;
+  const executablePath = resolvePuppeteerExecutablePath(puppeteer) || undefined;
   const browser = await puppeteer.launch({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],

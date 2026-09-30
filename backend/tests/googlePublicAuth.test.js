@@ -1,8 +1,7 @@
-const express = require("express");
-const cookieParser = require("cookie-parser");
 const request = require("supertest");
 const User = require("../models/User");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
+const { buildTestApp } = require("./helpers/testApp");
 
 jest.mock("../utils/email", () => jest.fn(async () => ({ ok: true })));
 jest.mock("../utils/googleOAuth", () => ({
@@ -10,13 +9,7 @@ jest.mock("../utils/googleOAuth", () => ({
   verifiedProfile: jest.fn(),
 }));
 const { verifiedProfile } = require("../utils/googleOAuth");
-const authRouter = require("../routes/auth");
-
-const app = express();
-app.use(cookieParser());
-app.use(express.json());
-app.use("/api/auth", authRouter);
-app.use((error, _req, res, _next) => res.status(500).json({ error: error.message }));
+const app = buildTestApp();
 
 beforeAll(async () => { await connect(); });
 afterAll(async () => { await closeDatabase(); });

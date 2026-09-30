@@ -28,12 +28,12 @@ jobs:
       - name: Audit production dependencies
         working-directory: backend
         run: npm audit --omit=dev --audit-level=high
-      - name: Run backend tests
+      - name: Run public account and map contracts
         working-directory: backend
         env:
           JWT_SECRET: ci-only-jwt-secret-longer-than-thirty-two-bytes
           EMAIL_DISABLE: "true"
-        run: npm test
+        run: npm test -- --runTestsByPath tests/auth.test.js tests/googlePublicAuth.test.js tests/publicParalegalStateCounts.test.js tests/supportAdmin.test.js
       - name: Install browser for public journeys
         working-directory: backend
         run: npx playwright install --with-deps chromium

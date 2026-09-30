@@ -75,7 +75,6 @@ const csrfProtection = csrf({
 
 app.use("/api/auth/login", rateLimit({ windowMs: 60 * 1000, max: 10 }));
 app.use("/api/auth/register", rateLimit({ windowMs: 60 * 1000, max: 10 }));
-app.use("/api/auth/google", rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false }));
 app.use(
   "/api/auth/request-password-reset",
   rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false })
