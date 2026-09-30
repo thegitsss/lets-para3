@@ -3,38 +3,6 @@ body.lpc-product-clean.theme-dark #sidebarToggle {
   color: var(--clean-ink, #eef3f9) !important;
 }
 
-@view-transition {
-  navigation: auto;
-}
-
-/* Same-origin dashboard documents replace one another only after the next
-   document has painted. Keeping these snapshots animation-free makes the
-   navigation feel like a persistent application shell instead of a page fade. */
-body.lpc-auth-shell-v2 :where(.sidebar, #sidebarNav) {
-  view-transition-name: lpc-member-sidebar;
-}
-
-body.lpc-auth-shell-v2 .lpc-universal-header-shell {
-  view-transition-name: lpc-member-header;
-}
-
-body.lpc-auth-shell-v2 :where(main#main, .case-main) {
-  view-transition-name: lpc-member-content;
-}
-
-::view-transition-group(lpc-member-sidebar),
-::view-transition-group(lpc-member-header),
-::view-transition-group(lpc-member-content),
-::view-transition-old(lpc-member-sidebar),
-::view-transition-new(lpc-member-sidebar),
-::view-transition-old(lpc-member-header),
-::view-transition-new(lpc-member-header),
-::view-transition-old(lpc-member-content),
-::view-transition-new(lpc-member-content) {
-  animation: none;
-  mix-blend-mode: normal;
-}
-
 body.lpc-product-clean .lpc-auth-page-shell {
   min-width: 0;
   height: 100vh;

@@ -392,8 +392,11 @@ async function openMatterActions(page, baseUrl, caseId) {
   let overlay = await page.$(".case-flag-overlay.is-visible");
   if (!overlay) {
     await browserOperation("open work tab", () => clickVisible(page, '[data-matter-tab="work"]'));
-    await browserOperation("wait for work panel", () =>
-      page.waitForSelector('[data-matter-panel="work"]:not([hidden])', { visible: true })
+    await browserOperation("wait for work panel or matter actions", () =>
+      page.waitForFunction(() => {
+        const panel = document.querySelector('[data-matter-panel="work"]');
+        return Boolean(document.querySelector(".case-flag-overlay.is-visible") || panel && !panel.hidden);
+      }, { timeout: BROWSER_STEP_TIMEOUT_MS })
     );
     await new Promise((resolve) => setTimeout(resolve, 100));
     overlay = await page.$(".case-flag-overlay.is-visible");

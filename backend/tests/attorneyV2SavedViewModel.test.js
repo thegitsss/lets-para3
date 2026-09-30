@@ -15,7 +15,7 @@ test("unfinished view requests stay in route memory and clear at the account bou
 `));
 test("saved-view reads and writes verify account ownership, use CSRF, and never automatically repeat writes", () => check(`
   const owner='a'.repeat(24), calls=[]; let foreign=false;
-  const api=createApiClient({fetchImpl:async(path,options)=>{calls.push({path,...options}); return {ok:options.method==='GET',status:options.method==='GET'?200:409,json:async()=>path==='/api/auth/me'?{user:{id:foreign?'b'.repeat(24):owner,role:'attorney',status:'approved'}}:path==='/api/csrf'?{csrfToken:'synthetic'}:{code:'SAVED_VIEW_CONFLICT'}};}});
+  const api=createApiClient({fetchImpl:async(path,options)=>{calls.push({path,...options}); return {ok:options.method==='GET',status:options.method==='GET'?200:409,headers:{get:()=>null},json:async()=>path==='/api/auth/me'?{user:{id:foreign?'b'.repeat(24):owner,role:'attorney',status:'approved'}}:path==='/api/csrf'?{csrfToken:'synthetic'}:{code:'SAVED_VIEW_CONFLICT'}};}});
   await api.readMatterViews({ownerId:owner}); assert.equal(calls.at(-1).path,'/api/account/dashboard-views?scope=attorney_matters&expectedOwnerId='+owner);
   calls.length=0; await assert.rejects(api.deleteMatterView('legacy-id','a'.repeat(64),{ownerId:owner}),e=>e.code==='SAVED_VIEW_CONFLICT'); assert.equal(calls.length,3); assert.equal(calls.at(-1).method,'DELETE'); assert.equal(calls.at(-1).headers['X-CSRF-Token'],'synthetic'); assert.equal(JSON.parse(calls.at(-1).body).expectedOwnerId,owner);
   foreign=true; calls.length=0; await assert.rejects(api.readMatterViews({ownerId:owner})); assert.equal(calls.length,1); await assert.rejects(api.saveMatterView({name:'Private'},{ownerId:owner})); assert.equal(calls.length,2);

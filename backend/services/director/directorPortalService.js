@@ -10,6 +10,7 @@ const User = require("../../models/User");
 const { COMMISSION_CAP } = require("./commissionCap");
 const commissionEvidence = require("./commissionEvidence");
 const sendEmail = require("../../utils/email");
+const { removeAngleMarkup } = require("../../utils/sanitize");
 const {
   buildDirectorFollowUpHtml,
   buildDirectorFollowUpText,
@@ -347,7 +348,7 @@ async function sendDirectorOutreach({ user = {}, attorneyName = "", attorneyEmai
   const subject = String(profile.outreachSubject || DIRECTOR_OUTREACH_SUBJECT).trim() || DIRECTOR_OUTREACH_SUBJECT;
   const text = templateText
     ? renderOutreachTemplate(templateText, normalizedName)
-    : renderOutreachTemplate(templateHtml, normalizedName).replace(/<br\s*\/?>/gi, "\n").replace(/<\/?[^>]+>/g, "");
+    : removeAngleMarkup(renderOutreachTemplate(templateHtml, normalizedName).replace(/<br\s*\/?>/gi, "\n"));
   const html = templateHtml ? renderOutreachTemplate(templateHtml, normalizedName) : textToHtml(text);
   const now = new Date();
 

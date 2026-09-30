@@ -32,7 +32,8 @@ describe("Paralegal V2 Matter workspace", () => {
 
   test("active links enter V2 and completed history does not offer a broken workspace link", () => {
     const work = read("frontend/assets/scripts/paralegal-v2/work-view.mjs");
-    expect(work).toMatch(/paralegal-v2\.html#\/matter\/\$\{encodeURIComponent\(id\)\}\?tab=overview/);
+    expect(work).toMatch(/withMatterReturn\(`\/matter\/\$\{encodeURIComponent\(id\)\}\?tab=overview`/);
+    expect(work).toContain('href: `paralegal-v2.html#${href}`');
     expect(work).toMatch(/text: "Open workspace"/);
     expect(work).not.toMatch(/text: "View record"/);
     const activeRowStart = work.indexOf("function activeMatterRow");

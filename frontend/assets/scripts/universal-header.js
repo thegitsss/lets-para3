@@ -1,22 +1,4 @@
 (function initializeUniversalAuthenticatedHeader() {
-  // These destinations can reveal without accepting an outgoing snapshot.
-  // Keep their navigation ordinary: Chromium can otherwise reject the native
-  // transition while the new settings, shell or Matter document is opening.
-  let transitionBoundaryStyle = null;
-  const restoreTransitionBoundary = () => {
-    transitionBoundaryStyle?.remove();
-    transitionBoundaryStyle = null;
-  };
-  window.navigation?.addEventListener("navigate", (event) => {
-    restoreTransitionBoundary();
-    const destination = new URL(event.destination.url);
-    if (destination.origin !== window.location.origin || !["/attorney-v2.html", "/paralegal-v2.html", "/profile-settings.html", "/case-detail.html"].includes(destination.pathname)) return;
-    transitionBoundaryStyle = document.createElement("style");
-    transitionBoundaryStyle.textContent = "@view-transition { navigation: none; }";
-    document.head.append(transitionBoundaryStyle);
-  });
-  window.navigation?.addEventListener("navigateerror", restoreTransitionBoundary);
-  window.addEventListener("pageshow", restoreTransitionBoundary);
   const scriptUrl = document.currentScript?.src || window.location.href;
   const assetUrl = (relative) => new URL(relative, scriptUrl).href;
   let controls = null;

@@ -10,7 +10,7 @@ const Job = require("../models/Job");
 const Case = require("../models/Case");
 const User = require("../models/User");
 const auth = require("../utils/verifyToken");
-const { cleanPlainText } = require("../utils/sanitize");
+const { cleanPlainText, removeAngleMarkup } = require("../utils/sanitize");
 const { requireApproved, requireRole } = require("../utils/authz");
 const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
 const { captureResumeReference, withResumeReferenceWrite } = require("../utils/resumeReferenceWrite");
@@ -47,7 +47,7 @@ const mutatingGuards = [...authenticatedGuards, protectMutations];
 
 function sanitizeMessage(value, { max = 2000 } = {}) {
   if (typeof value !== "string") return "";
-  return cleanPlainText(value.replace(/<[^>]*>/g, ""), { max: Math.max(1, max) });
+  return cleanPlainText(removeAngleMarkup(value), { max: Math.max(1, max) });
 }
 
 

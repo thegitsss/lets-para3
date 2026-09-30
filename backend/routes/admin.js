@@ -11,6 +11,7 @@ const { createLogger, logPromiseFailure } = require("../utils/logger");
 const { createS3Client } = require("../utils/s3Client");
 const User = require("../models/User");
 const Case = require("../models/Case");
+const { CASE_STATUS_ENUM } = require("../utils/caseState");
 const Job = require("../models/Job");
 const AuditLog = require("../models/AuditLog");
 const PaymentOperation = require("../models/PaymentOperation");
@@ -1605,12 +1606,20 @@ res.json({ ok: true, id, ...result });
 router.get("/cases", asyncHandler(async (req, res) => {
 const { status, attorney, paralegal, q } = req.query;
 const { skip, limit, page } = parsePagination(req, { defaultLimit: 25 });
+if (status !== undefined && (typeof status !== "string" || !CASE_STATUS_ENUM.includes(status)) ||
+    attorney !== undefined && (typeof attorney !== "string" || !isObjId(attorney)) ||
+    paralegal !== undefined && (typeof paralegal !== "string" || !isObjId(paralegal))) {
+  return res.status(400).json({ error: "Choose valid case filters." });
+}
+if (q !== undefined && (typeof q !== "string" || q.length > 200)) {
+  return res.status(400).json({ error: "Choose a valid case search." });
+}
 
 const filter = {};
 if (status) filter.status = status;
 if (attorney && isObjId(attorney)) filter.attorney = attorney;
 if (paralegal && isObjId(paralegal)) filter.paralegal = paralegal;
-if (q && q.trim()) filter.title = new RegExp(q.trim(), "i");
+if (q && q.trim()) filter.title = new RegExp(escapeRegex(q.trim()), "i");
 
 const [items, total] = await Promise.all([
 Case.find(filter)
