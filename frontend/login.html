@@ -496,7 +496,6 @@ button[type="submit"]:focus-visible,
             </div>
 
             <button type="submit" class="login-btn" data-public-action="primary" data-action-shape="control">Sign in</button>
-            <button type="button" class="login-btn passkey-login-btn" id="passkeyLoginBtn" data-public-action="secondary" data-action-shape="control">Sign in with a passkey</button>
 
   <div class="login-actions">
     <p>
@@ -522,9 +521,6 @@ button[type="submit"]:focus-visible,
           <div class="login-actions">
             <p>
               <button type="button" class="link-button" id="twoFactorBackupToggle" data-public-action="text">Use a backup code</button>
-            </p>
-            <p id="twoFactorPasskeyAction" hidden>
-              <button type="button" class="link-button" id="twoFactorPasskeyBtn" data-public-action="text">Use a passkey</button>
             </p>
             <button type="button" class="link-button" id="twoFactorBackBtn" data-public-action="text">Back to sign in</button>
           </div>
@@ -593,7 +589,6 @@ button[type="submit"]:focus-visible,
       );
     })();
   </script>
-  <script src="/assets/vendor/simplewebauthn-13.3.0.js"></script>
   <script type="module" src="assets/scripts/login.js"></script>
   <script src="assets/scripts/auth-illustration-fit.js?v=20260924-window-fit"></script>
 </body>

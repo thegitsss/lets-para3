@@ -285,6 +285,7 @@ const initLogin = () => {
         maintenance: "The platform is in maintenance mode. Please try again soon.",
         email_unverified: "Please verify your email before signing in.",
         two_factor_unavailable: "Unable to send a verification code. Please try again.",
+        two_factor_password: "For this account, please sign in with your email and password to complete two-step verification.",
         unavailable: "Google sign-in is temporarily unavailable.",
       };
       notify(messages[errorCode] || "Google sign-in could not be completed.");

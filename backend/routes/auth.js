@@ -15,6 +15,8 @@ const Notification = require("../models/Notification");
 const AuditLog = require("../models/AuditLog"); // audit trail hooks
 const sendEmail = require("../utils/email");
 const { getAppSettings } = require("../utils/appSettings");
+const { router: googleRouter, installGoogleCallback, linkPendingIdentity } = require("./googleAuth");
+const { SIGNUP_COOKIE, cookieOptions: googleCookieOptions, verifyContext: verifyGoogleContext, equal: googleEqual } = require("../utils/googleOAuth");
 const { publishNotificationEvent } = require("../utils/notificationEvents");
 const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
 const { ensureApprovedUserAuthReady, isApprovedUser } = require("../utils/authReady");
@@ -499,6 +501,9 @@ async function verifyTurnstile(token, remoteIp) {
   }
 }
 
+installGoogleCallback({ signAccess, authCookieOptions: buildAuthCookieOptions, accessTtlMs: TWO_HOURS_MS });
+router.use(googleRouter);
+
 // ----------------------------------------
 // REGISTER
 // POST /api/auth/register
@@ -537,6 +542,7 @@ router.post(
       state,
       timezone,
       yearsExperience,
+      googleSignupIntent,
     } = req.body || {};
 
     const settings = await getAppSettings();
@@ -548,6 +554,13 @@ router.post(
     }
 
     const normalizedEmail = String(email || "").toLowerCase().trim();
+    const googleHandoff = verifyGoogleContext(req.cookies?.[SIGNUP_COOKIE], "google_signup");
+    if (String(googleSignupIntent || "").toLowerCase() === "true" && !googleHandoff) {
+      return res.status(401).json({ msg: "Google signup session expired. Please try again." });
+    }
+    if (googleHandoff && (!googleEqual(normalizedEmail, googleHandoff.email) || !googleHandoff.sub)) {
+      return res.status(400).json({ msg: "Google signup identity does not match this form." });
+    }
     const bypassCaptcha = normalizedEmail && bypassList.includes(normalizedEmail);
 
     const resolvedTurnstileToken =
@@ -643,6 +656,9 @@ router.post(
         return res.status(400).json({ msg: "User already exists" });
       }
     }
+    if (googleHandoff && await User.exists({ authProviders: { $elemMatch: { provider: "google", providerAccountId: googleHandoff.sub } } })) {
+      return res.status(409).json({ msg: "This Google account is already connected." });
+    }
 
     if (roleLc === "paralegal" && resumeFile) {
       if (resumeFile.mimetype !== "application/pdf") {
@@ -679,6 +695,8 @@ router.post(
       lastName: safeLast,
       email: String(email || "").toLowerCase(),
       password: String(password),
+      emailVerified: Boolean(googleHandoff),
+      authProviders: googleHandoff ? [{ provider: "google", providerAccountId: googleHandoff.sub }] : [],
       role: roleLc,
       status: "pending",
       preferences: {
@@ -735,6 +753,7 @@ router.post(
     }
 
     await user.save();
+    if (googleHandoff) res.clearCookie(SIGNUP_COOKIE, googleCookieOptions(req));
 
     // Email: registration received
     try {
@@ -912,6 +931,7 @@ router.post(
     const isFirstLogin = !lastLoginAt || (approvedAt && lastLoginAt < approvedAt);
     user.recordLoginSuccess();
     await user.save();
+    await linkPendingIdentity(req, res, user);
     const token = signAccess(user);
     res.cookie("token", token, buildAuthCookieOptions(req, { maxAge: TWO_HOURS_MS }));
     await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
@@ -990,6 +1010,7 @@ router.post(
     user.twoFactorExpiresAt = null;
     user.recordLoginSuccess();
     await user.save();
+    await linkPendingIdentity(req, res, user);
 
     const token = signAccess(user);
     res.cookie("token", token, buildAuthCookieOptions(req, { maxAge: TWO_HOURS_MS }));
@@ -1069,6 +1090,7 @@ router.post(
     user.twoFactorExpiresAt = null;
     user.recordLoginSuccess();
     await user.save();
+    await linkPendingIdentity(req, res, user);
 
     const token = signAccess(user);
     res.cookie("token", token, buildAuthCookieOptions(req, { maxAge: TWO_HOURS_MS }));
