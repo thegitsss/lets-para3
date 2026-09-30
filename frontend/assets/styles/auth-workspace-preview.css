@@ -37,7 +37,6 @@
 .lpc-closeup__status { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #496995; }
 .lpc-closeup__status i { width: 6px; height: 6px; border-radius: 50%; background: #6495ed; }
 .lpc-closeup__open { padding: 5px 9px; border: 1px solid #dce6f6; background: #edf3ff; border-radius: 5px; font-size: 11px; color: #395e96; }
-.lpc-closeup__open b { margin-left: 9px; font-weight: 400; }
 .lpc-closeup--profile { z-index: 2; right: -3px; top: 72px; width: 46%; padding: 17px; transform: rotate(3deg); }
 .lpc-closeup__person { display: flex; align-items: center; gap: 10px; margin-top: 18px; }
 .lpc-closeup__avatar { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border: 3px solid #fff; border-radius: 50%; background: linear-gradient(135deg, #c1d5f6, #e5eeff); box-shadow: 0 0 0 1px #dce6f6; color: #45658f; font-size: 13px; }

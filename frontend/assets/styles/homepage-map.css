@@ -124,7 +124,8 @@
   transform: translateY(0);
   transition-delay: 0s;
 }
-.paralegal-map__stat-arrow { color: #9fc0ff; font-size: 1.35rem; line-height: 1; transition: transform .2s ease; }
+.paralegal-map__stat-arrow { display: grid; place-items: center; color: #9fc0ff; transition: transform .2s ease; }
+.paralegal-map__stat-arrow svg { width: 20px; height: 20px; }
 .paralegal-map__stat:hover .paralegal-map__stat-arrow { transform: translate(3px, -3px); }
 .paralegal-map__note { max-width: 620px; margin: 22px auto 0; color: #9aaec9; font-size: .78rem; line-height: 1.55; }
 .paralegal-map__retry {
