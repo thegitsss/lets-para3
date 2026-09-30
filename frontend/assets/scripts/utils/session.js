@@ -242,6 +242,12 @@
     return path.endsWith("/login.html") || path.endsWith("login.html") || href.includes("login.html");
   }
 
+  function isPublicPage() {
+    const path = String(window.location?.pathname || "").toLowerCase();
+    return document.body?.dataset?.publicPage === "true" ||
+      ["/contact.html", "/browse-paralegals.html", "/help.html", "/paralegalhelp.html", "/login.html", "/signup.html"].includes(path);
+  }
+
   async function clearServerSession() {
     try {
       const csrfResponse = await fetch("/api/csrf", { credentials: "include" });
@@ -272,6 +278,10 @@
   function handleDisabledAccount(message) {
     rememberDisabled(message);
     void clearServerSession();
+    if (isPublicPage()) {
+      clearStoredSession();
+      return;
+    }
     invalidateAndRedirect();
   }
 
@@ -374,12 +384,12 @@
     sessionGeneration += 1;
     cachedUser = null;
     sessionPromise = null;
-    redirectToLogin();
+    if (!isPublicPage()) redirectToLogin();
   });
 
   function reauthorizeVisibleSession(source) {
     fetchSession(true).then((user) => {
-      if (!user && !shouldPreserveStoredSession()) invalidateAndRedirect();
+      if (!user && !shouldPreserveStoredSession() && !isPublicPage()) invalidateAndRedirect();
     }).catch((error) => {
       console.warn(`[session] ${source} reauthorization failed`, error);
     });
