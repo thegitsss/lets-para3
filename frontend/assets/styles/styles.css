@@ -1,14 +1,10 @@
-Absolutely—here’s a fully rewritten `frontend/assets/styles.css` with the fixes and upgrades applied (consistent tokens, stronger accessibility/focus states, responsive tweaks, dark/compact modes refined, safer defaults, and a few missing states like disabled/active/hover). You can drop this in as a full replacement.
-
-```css
 /* ========================================================================
    Global Design Tokens
    ===================================================================== */
 
-///new styles///
+/* Shared component styles */
 
-
-///header///
+/* Header */
 header {
   border-bottom: 1px solid var(--line, #e5e7eb);
   background: white;
@@ -227,23 +223,6 @@ html {
   top: 12px;
 }
 
-/* GPU Layer Promotion for Smooth Scrolling */
-.hero-section,
-.hero-slide,
-.section,
-.hiw-card,
-.fade-in,
-.fade-element,
-.w-slider,
-.w-slide,
-.parallax-layer,
-.observed-element,
-.animated-block {
-  will-change: transform, opacity;
-  transform: translateZ(0);
-  backface-visibility: hidden;
-}
-
 body {
   scroll-behavior: smooth;
   overscroll-behavior-y: contain;
@@ -409,6 +388,34 @@ body.accessibility-mode textarea:focus-visible,
 body.accessibility-mode select:focus-visible {
   outline: 3px solid #b4975a;
   outline-offset: 2px;
+}
+
+html.accessibility-mode {
+  scroll-behavior: auto !important;
+}
+
+html.accessibility-mode *,
+html.accessibility-mode *::before,
+html.accessibility-mode *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .accessibility-toggle {

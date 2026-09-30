@@ -1,288 +1,89 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="lpc-homepage">
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0B2A4A">
 <link href="assets/styles/styles.css" rel="stylesheet" />
-<link href="assets/styles/hero-pages.css" rel="stylesheet" />
+<link href="assets/styles/hero-pages.css?v=20260826-uniform-heroes" rel="stylesheet" />
+<link href="assets/styles/public-site-chrome.css?v=20260925-narrow-footer" rel="stylesheet" />
+<link href="assets/styles/utility-pages.css?v=20260828-phase-six" rel="stylesheet" />
+<script src="assets/scripts/public-site-chrome.js?v=20260924-responsive-fixes" defer></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Contact Support – Let’s-ParaConnect</title>
+  <meta name="description" content="Contact Let’s-ParaConnect support for help with accounts, platform access, Matters, or general questions." />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
-  <script src="assets/scripts/utils/session.js"></script>
+  <script src="assets/scripts/utils/session.js?v=20260902-1"></script>
 
-  <style>
-    .gold{color:var(--gold);}
-    .header-logo .accent-apostrophe,
-    .header-logo .accent-dash{color:var(--gold);}
-    :root {
-      --ink: #1a2230;
-      --line: #e8edf3;
-      --gold: #887244;
-      --bg: #ffffff;
-    }
-
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--ink);
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 300;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-
-    main {
-      max-width: 880px;
-      margin: 10px auto 80px;
-      padding: 0 24px;
-      flex: 1;
-    }
-
-    h1 {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-size: 36px;
-      letter-spacing: 1.2px;
-      margin-bottom: 12px;
-    }
-
-    p.muted {
-      font-size: 16px;
-      color: #5c6b7a;
-      margin-bottom: 40px;
-    }
-
-    form {
-      display: grid;
-      gap: 24px;
-    }
-
-    .contact-shell {
-      position: relative;
-      display: inline-block;
-    }
-
-    .contact-details {
-      position: absolute;
-      top: 0;
-      left: calc(100% + 32px);
-      width: 240px;
-      color: var(--ink);
-      border-left: 1px solid var(--line);
-      padding-left: 24px;
-      font-size: 14px;
-    }
-
-    .contact-heading {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-size: 16px;
-      letter-spacing: 0.3px;
-      margin: 0 0 10px;
-      color: var(--ink);
-    }
-
-    .contact-block {
-      margin-bottom: 32px;
-    }
-
-    .contact-block p {
-      margin: 0 0 8px;
-    }
-
-    .contact-links a {
-      color: var(--ink);
-      text-decoration: none;
-      margin-right: 10px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      font-size: 14px;
-      line-height: 1;
-      vertical-align: middle;
-    }
-
-    .contact-links a:last-child {
-      margin-right: 0;
-    }
-
-    .contact-links .icon {
-      width: 16px;
-      height: 16px;
-      display: block;
-    }
-
-    .contact-links .icon rect,
-    .contact-links .icon circle,
-    .contact-links .icon path {
-      stroke: currentColor;
-      fill: none;
-      stroke-width: 1.5;
-    }
-
-    .contact-links svg {
-      width: 16px;
-      height: 16px;
-      display: block;
-      fill: currentColor;
-      stroke: none;
-    }
-
-    .contact-details .support-email-link {
-      color: var(--gold);
-    }
-
-    .field-group {
-      display: flex;
-      gap: 24px;
-      flex-wrap: wrap;
-    }
-
-    .field {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-width: 240px;
-    }
-
-    label {
-      margin-bottom: 6px;
-      font-size: 14px;
-    }
-
-    footer {
-      border-top: none !important;
-      margin-top: 0;
-    }
-
-    input, select, textarea {
-      font-family: 'Sarabun', sans-serif;
-      padding: 12px;
-      font-size: 16px;
-      border: 1px solid var(--line);
-      background: white;
-      color: var(--ink);
-      outline: none;
-    }
-
-    input:focus-visible, select:focus-visible, textarea:focus-visible {
-      outline: 2px solid var(--gold);
-      outline-offset: 2px;
-    }
-
-    textarea {
-      resize: vertical;
-      min-height: 120px;
-    }
-
-    .actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 12px;
-    }
-
-    .btn {
-      font-family: 'Sarabun', sans-serif;
-      font-size: 14px;
-      font-weight: 300;
-      padding: 10px 24px;
-      border: 1px solid var(--ink);
-      background: transparent;
-      color: var(--ink);
-      cursor: pointer;
-    }
-
-    .btn:focus-visible {
-      outline: 2px solid var(--gold);
-      outline-offset: 2px;
-    }
-
-    .btn.primary {
-      background: var(--ink);
-      color: white;
-    }
-
-    .form-status {
-      font-size: 14px;
-      padding: 10px 12px;
-      border-radius: 6px;
-      border: 1px solid transparent;
-      display: none;
-    }
-
-    .form-status.show {
-      display: block;
-    }
-
-    .form-status.success {
-      background: #f2f7f3;
-      border-color: #c7e6d1;
-      color: #1f5a35;
-    }
-
-    .form-status.error {
-      background: #fff4f4;
-      border-color: #f2c9c9;
-      color: #8b1f1f;
-    }
-    @media (max-width: 768px) {
-      .contact-details {
-        position: static;
-        width: auto;
-        border-left: none;
-        padding-left: 0;
-        margin-top: 24px;
-      }
-
-      .actions {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      .btn {
-        width: 100%;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="assets/styles/public-page-refresh.css?v=20260925" />
 </head>
-<body>
+<body class="utility-page utility-page--contact public-page-refresh">
   <a class="skip-link" href="#main">Skip to main content</a>
-<!-- Header -->
-<header>
-  <div class="header-inner">
-    <nav class="nav-left" aria-label="Primary">
-      <a href="index.html#who-we-are">About</a>
-      <a href="index.html#how">How It Works</a>
-    </nav>
+  <header class="home-header" data-home-header data-public-header>
+    <div class="home-header__inner">
+      <a class="home-brand" href="index.html" aria-label="Let’s-ParaConnect home">
+        Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect
+      </a>
 
-    <a href="index.html" class="header-logo">
-      Let<span class="accent-apostrophe">’</span>s<span class="accent-dash">-</span>ParaConnect
-    </a>
+      <nav class="home-nav home-nav--desktop" aria-label="Primary navigation">
+        <a href="index.html#how">How It Works</a>
+        <a href="attorney-faq.html">For Attorneys</a>
+        <a href="paralegal-faq.html">For Paralegals</a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      </nav>
 
-    <div class="header-actions">
-<a class="pill" href="login.html" id="authAction">Sign In</a>
+      <div class="home-header__actions">
+        <a class="header-signin" href="login.html" id="authAction" data-auth-action>Sign In</a>
+        <button class="header-signout" type="button" id="logoutAction" data-logout-action hidden>Log Out</button>
+        <a class="button button--small button--ink" href="signup.html" id="signupAction" data-signup-action>Create an account</a>
+        <button
+          class="mobile-nav-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="mobileNav"
+          aria-label="Open navigation"
+          data-mobile-nav-toggle
+        >
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </button>
+      </div>
     </div>
+
+    <div class="mobile-nav" id="mobileNav" aria-hidden="true" data-mobile-nav>
+      <nav aria-label="Mobile navigation">
+        <a href="index.html#how">How It Works <span aria-hidden="true">↘</span></a>
+        <a href="attorney-faq.html">For Attorneys <span aria-hidden="true">↘</span></a>
+        <a href="paralegal-faq.html">For Paralegals <span aria-hidden="true">↘</span></a>
+        <a href="browse-paralegals.html">Browse Paralegals</a>
+      </nav>
+      <div class="mobile-nav__actions">
+        <a href="login.html" data-auth-action>Sign In</a>
+        <button type="button" data-logout-action hidden>Log Out</button>
+        <a class="button button--ink" href="signup.html" data-signup-action>Create an account</a>
+      </div>
     </div>
   </header>
 
-  <div class="hero-banner" role="presentation" aria-hidden="true"></div>
+  <section class="hero-banner utility-hero" aria-labelledby="contact-title">
+    <div class="utility-hero__inner">
+      <div class="utility-hero__copy">
+        <h1 id="contact-title">Contact Support</h1>
+      </div>
+    </div>
+    <div class="utility-hero__art" data-matter-field-host aria-hidden="true"></div>
+  </section>
 
-  <main tabindex="-1" aria-labelledby="contact-title" id="main">
-    <h1 id="contact-title">Contact Support</h1>
-    <p class="muted">Questions, or support—send us a note and we’ll get back to you shortly.</p>
-
+  <main class="utility-content contact-content" tabindex="-1" aria-labelledby="contact-title" id="main">
     <div class="contact-shell">
       <form id="contactForm" novalidate>
         <input type="text" id="hp" name="hp" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;" />
@@ -319,8 +120,7 @@
         </div>
 
         <div class="actions">
-          <button type="reset" class="btn">Clear Form</button>
-          <button type="submit" class="btn primary">Submit Message</button>
+          <button type="submit" class="btn primary" data-public-action="primary" data-action-shape="pill">Submit message</button>
         </div>
         <div id="formStatus" class="form-status" role="status" aria-live="polite"></div>
       </form>
@@ -333,9 +133,9 @@
 
         <div class="contact-block">
           <p class="contact-heading">Talk to us</p>
-          <p>+1 (302)-281-4353</p>
-          <p><a class="support-email-link" href="mailto:help@lets-paraconnect.com" style="text-decoration:none;">help@lets-paraconnect.com</a></p>
-          <p>Monday–Friday, 9:00 AM – 5:00 PM EST</p>
+          <p><a class="contact-action-link" href="tel:+13022814353">+1 (302) 281-4353</a></p>
+          <p><a class="contact-action-link" href="mailto:help@lets-paraconnect.com">help@lets-paraconnect.com</a></p>
+          <p>Monday–Friday, 9:00 AM – 5:00 PM Eastern Time</p>
         </div>
 
         <div class="contact-block">
@@ -344,125 +144,106 @@
             <a href="https://www.linkedin.com/company/lets-paraconnect/" target="_blank" rel="noopener" aria-label="LinkedIn">
               in
             </a>
-            <a href="https://www.facebook.com/LetsParaConnect/" target="_blank" rel="noopener" aria-label="Facebook">
-              f
-            </a>
-            <a href="https://www.instagram.com/letsparaconnect/" target="_blank" rel="noopener" aria-label="Instagram">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="3" y="3" width="18" height="18" rx="5"></rect>
-                <circle cx="12" cy="12" r="4.5"></circle>
-                <circle cx="17" cy="7" r="1"></circle>
-              </svg>
-            </a>
           </p>
         </div>
       </aside>
     </div>
   </main>
+  <footer class="home-footer" data-public-footer>
+    <div class="home-footer__inner">
+      <p class="home-footer__statement"><span>Legal work.</span><span>Clearly connected.</span></p>
+      <nav class="home-footer__directory" aria-label="Footer navigation">
+        <details open>
+          <summary>Platform</summary>
+          <div class="home-footer__links">
+            <a href="index.html#how">How It Works</a>
+            <a href="attorney-faq.html">For Attorneys</a>
+            <a href="paralegal-faq.html">For Paralegals</a>
+            <a href="browse-paralegals.html">Browse Paralegals</a>
+          </div>
+        </details>
+        <details open>
+          <summary>For Attorneys</summary>
+          <div class="home-footer__links">
+            <a href="signup.html?role=attorney">Post a Matter</a>
+            <a href="attorney-faq.html">Attorney FAQ</a>
+            <a href="contact.html">Contact</a>
+          </div>
+        </details>
+        <details open>
+          <summary>For Paralegals</summary>
+          <div class="home-footer__links">
+            <a href="signup.html?role=paralegal">Apply to Join</a>
+            <a href="paralegal-faq.html">Paralegal FAQ</a>
+            <a href="/paralegal-admission.html">Our Application Review</a>
+          </div>
+        </details>
+        <details open>
+          <summary>Legal</summary>
+          <div class="home-footer__links">
+            <a href="terms.html">Terms</a>
+            <a href="privacy.html">Privacy</a>
+            <a href="accessibility.html">Accessibility</a>
+          </div>
+        </details>
+      </nav>
+      <div class="home-footer__bottom">
+        <a class="home-footer__brand" href="index.html" aria-label="Let’s-ParaConnect home">Let<span aria-hidden="true" class="home-brand__apostrophe">’</span>s-ParaConnect</a>
+        <p>Copyright © 2026 Let’s-ParaConnect. All rights reserved.</p>
+        <button type="button" class="accessibility-toggle" aria-pressed="false" aria-label="Accessibility mode">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg>
+          <span>Accessibility</span>
+        </button>
+      </div>
+    </div>
+  </footer>
 
-<footer class="footer">
-  <div class="footer-inner">
-    <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
-    <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
-    <nav>
-      <a href="privacy.html">Privacy Policy</a>
-      <span>|</span>
-      <a href="terms.html">Terms</a>
-      <span>|</span>
-      <a href="/paralegal-admission.html">Admissions</a>
-      <span>|</span>
-      <a href="contact.html">Contact</a>
-      <span>|</span>
-      <a href="accessibility.html">Accessibility</a>
-    </nav>
-    <div class="region">United States</div>
-  </div>
-</footer>
-<script type="module" src="assets/scripts/hero-parallax.js"></script>
-<script>
-  (async function syncHeaderAuth() {
-    const authAction = document.getElementById('authAction');
-    if (!authAction) return;
-
-    function applySignedOutState() {
-      authAction.href = 'login.html';
-      authAction.textContent = 'Sign In';
-      authAction.style.display = 'inline-flex';
-    }
-
-    function applySignedInState(roleValue) {
-      const role = String(roleValue || '').toLowerCase();
-      const dashboardHref =
-        role === 'paralegal'
-          ? 'dashboard-paralegal.html'
-          : role === 'admin'
-          ? 'admin-dashboard.html'
-          : 'dashboard-attorney.html';
-      authAction.href = dashboardHref;
-      authAction.textContent = 'RETURN TO DASHBOARD';
-      authAction.style.display = 'inline-flex';
-    }
-
-    let cachedUser = null;
-    try {
-      cachedUser = JSON.parse(localStorage.getItem('lpc_user') || 'null');
-    } catch {}
-    if (cachedUser && typeof cachedUser === 'object') {
-      applySignedInState(cachedUser.role);
-    } else {
-      applySignedOutState();
-    }
-
-    let session = null;
-    try {
-      session = typeof window.getSessionData === 'function' ? await window.getSessionData() : null;
-    } catch {}
-
-    const user = session?.user || null;
-    const role = String(session?.role || user?.role || '').toLowerCase();
-    if (!user) {
-      try {
-        const stored = JSON.parse(localStorage.getItem('lpc_user') || 'null');
-        if (stored && typeof stored === 'object') {
-          applySignedInState(stored.role);
-          return;
-        }
-      } catch {}
-      applySignedOutState();
-      return;
-    }
-
-    applySignedInState(role);
-  })();
-</script>
-<script>
-  function alignContactDetails() {
-    const shell = document.querySelector('.contact-shell');
-    const details = document.querySelector('.contact-details');
-    const textarea = document.getElementById('message');
-    if (!shell || !details || !textarea) return;
-    if (window.matchMedia('(max-width: 768px)').matches) {
-      details.style.top = '';
-      return;
-    }
-    const shellRect = shell.getBoundingClientRect();
-    const textareaRect = textarea.getBoundingClientRect();
-    const detailsHeight = details.offsetHeight || 0;
-    const targetTop = Math.max(0, textareaRect.bottom - shellRect.top - detailsHeight);
-    details.style.top = `${targetTop}px`;
-  }
-
-  window.addEventListener('load', () => {
-    requestAnimationFrame(alignContactDetails);
-  });
-  window.addEventListener('resize', () => {
-    requestAnimationFrame(alignContactDetails);
-  });
-</script>
+<script src="assets/scripts/public-matter-field.js" defer></script>
 <script>
   const form = document.getElementById('contactForm');
   const statusEl = document.getElementById('formStatus');
   const submitBtn = form?.querySelector('button[type="submit"]');
+  const contactDraftKey = 'lpc.contactDraft.v1';
+  const contactDraftFields = ['name', 'email', 'role', 'subject', 'message'];
+
+  function readContactDraft() {
+    try {
+      return JSON.parse(sessionStorage.getItem(contactDraftKey) || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  function restoreContactDraft() {
+    if (!form) return;
+    const draft = readContactDraft();
+    contactDraftFields.forEach((fieldName) => {
+      const field = form.elements.namedItem(fieldName);
+      if (field && typeof draft[fieldName] === 'string') field.value = draft[fieldName];
+    });
+  }
+
+  function saveContactDraft() {
+    if (!form) return;
+    const draft = {};
+    contactDraftFields.forEach((fieldName) => {
+      const field = form.elements.namedItem(fieldName);
+      if (field) draft[fieldName] = String(field.value || '');
+    });
+    try {
+      sessionStorage.setItem(contactDraftKey, JSON.stringify(draft));
+    } catch {
+      // Draft recovery is optional; submission remains available if storage is blocked.
+    }
+  }
+
+  function clearContactDraft() {
+    try {
+      sessionStorage.removeItem(contactDraftKey);
+    } catch {
+      // No action is needed when browser storage is unavailable.
+    }
+  }
 
   async function fetchCsrfToken() {
     try {
@@ -483,6 +264,10 @@
   }
 
   if (form) {
+    restoreContactDraft();
+    form.addEventListener('input', saveContactDraft);
+    form.addEventListener('change', saveContactDraft);
+
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!form.checkValidity()) {
@@ -492,13 +277,13 @@
 
       const formData = new FormData(form);
       const payload = Object.fromEntries(formData.entries());
-      const originalLabel = submitBtn?.textContent || 'Submit Message';
+      const originalLabel = submitBtn?.textContent || 'Submit message';
 
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Sending...';
+        submitBtn.textContent = 'Sending…';
       }
-      setStatus('Sending your message...', '');
+      setStatus('Sending your message…', '');
 
       try {
         const csrfToken = await fetchCsrfToken();
@@ -514,7 +299,8 @@
 
         const data = await res.json().catch(() => ({}));
         if (res.ok && data?.ok) {
-          setStatus('Message sent. We will get back to you shortly.', 'success');
+          setStatus('Message sent. We’ll reply to the email address you provided.', 'success');
+          clearContactDraft();
           form.reset();
         } else {
           const msg = data?.msg || 'We could not send your message. Please try again.';
@@ -531,6 +317,6 @@
     });
   }
 </script>
-  <script src="assets/scripts/accessibility-toggle.js"></script>
+  <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
 </html>
