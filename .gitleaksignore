@@ -12,3 +12,28 @@
 7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:backend/tests/stripeSafety.test.js:stripe-access-token:34
 7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:backend/tests/workerProductionConfig.test.js:generic-api-key:11
 7f8c5bb99666f2f8b37d47f8ec698dd790d7ccd2:backend/tests/productionOrigin.test.js:generic-api-key:36
+
+# Reviewed 2026-09-30: synthetic fixtures, public site keys, identifier names, and docs examples.
+# Exact historical fingerprints only; current and future findings remain enabled.
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:backend/scripts/e2e-job-escrow.js:generic-api-key:29
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:backend/playwright.admin-financials.config.js:generic-api-key:16
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:backend/tests/jobEscrow.test.js:generic-api-key:512
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:backend/tests/helpers/financialLifecycleBrowserServer.js:generic-api-key:10
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:backend/tests/helpers/paralegalFinancialBrowserServer.js:generic-api-key:7
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:backend/tests/playwright/assistant-completion/real-server.cjs:generic-api-key:10
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:backend/tests/playwright/attorney-help/backend-server.cjs:generic-api-key:9
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:backend/tests/playwright/attorney-v2/playwright.config.js:generic-api-key:38
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:backend/tests/playwright/attorney-v2/security.spec.js:generic-api-key:22
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:backend/tests/playwright/payment-summary/real-server.cjs:generic-api-key:7
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:backend/tests/playwright/report-status/real-server.js:generic-api-key:12
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:backend/tests/playwright/workspace-search/real-server.js:generic-api-key:11
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:docs/attorney-v2/PHASE4_FILE_DOWNLOADS.md:generic-api-key:45
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:docs/attorney-v2/CHECKLIST_COVERAGE.json:generic-api-key:13
+97e0d49416a1da33576bb9178b613bc1cc5c8dc9:frontend/assets/scripts/attorney-v2/matter-creation.mjs:generic-api-key:4
+cc1691b94ca309865f3cbb5895a9d72fe808c4fa:backend/services/marketing/publishService.js:linkedin-client-secret:6
+cc1691b94ca309865f3cbb5895a9d72fe808c4fa:backend/services/marketing/publishingCycleService.js:linkedin-client-id:133
+cc1691b94ca309865f3cbb5895a9d72fe808c4fa:backend/tests/lpcPhase3.test.js:generic-api-key:197
+cc1691b94ca309865f3cbb5895a9d72fe808c4fa:backend/tests/lpcPhase3.test.js:generic-api-key:222
+cc1691b94ca309865f3cbb5895a9d72fe808c4fa:backend/tests/lpcPhase3.test.js:generic-api-key:236
+c8ca742b0ca22482aa3ba86fcf8f5ef8397b59a0:frontend/signup.html:generic-api-key:22
+c8ca742b0ca22482aa3ba86fcf8f5ef8397b59a0:frontend/login.html:generic-api-key:23
