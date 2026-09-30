@@ -675,6 +675,10 @@
     });
   }
 
+  if (desktopStates.length && mobileWorkflowStage?.querySelectorAll(".workflow-state").length === desktopStates.length) {
+    document.body.classList.add("workflow-enhanced");
+  }
+
   const fitMobileWorkflowState = () => {
     if (!mobileWorkflowQuery.matches || !mobileWorkflowStage) return;
     const panel = mobileWorkflowStage.querySelector(".workflow-state.is-active");
