@@ -2,6 +2,7 @@ const { reportOperationalFailure } = require("../utils/operationalFailure");
 const mongoose = require("mongoose"), Event = require("../models/Event"), Case = require("../models/Case"), AuditLog = require("../models/AuditLog");
 const { fingerprint } = require("./matterDraftRevision");
 const { publishNotificationEvent } = require("../utils/notificationEvents");
+const { isEmailAddressShape } = require("../utils/emailAddressShape");
 const logger = require("../utils/logger").createLogger("attorney-matter-dates");
 function createMatterCalendar({ access: files, role, kind, eventType = null, validateInput } = {}) {
 const id = value => String(value || ""), validId = value => typeof value === "string" && /^[a-f0-9]{24}$/i.test(value);
@@ -86,7 +87,7 @@ function input(req) {
     if (values.required !== undefined && typeof values.required !== "boolean") fail(400, "INVALID");
     if (!values.name?.trim() && !values.email?.trim() && !validId(values.user)) fail(400, "INVALID");
   }
-  if (action === "attendee" && (values.email !== undefined && (typeof values.email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) || values.user !== undefined && !validId(values.user))) fail(400, "INVALID");
+  if (action === "attendee" && (values.email !== undefined && (typeof values.email !== "string" || !isEmailAddressShape(values.email)) || values.user !== undefined && !validId(values.user))) fail(400, "INVALID");
   if (action === "reminder" && values.minutesBefore !== undefined && (!Number.isSafeInteger(values.minutesBefore) || values.minutesBefore < 0 || values.minutesBefore > 20160)) fail(400, "INVALID");
   return { body, action, values, fingerprint: fingerprint(stable([action, body.eventId || null, values])) };
 }

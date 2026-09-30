@@ -19,11 +19,11 @@ function compactText(value = "", max = 500) {
 
 function decodeEntities(value = "") {
   return String(value || "")
-    .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
 }
 
 function clipSentence(value = "", max = 180) {
