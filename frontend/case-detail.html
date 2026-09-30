@@ -3653,6 +3653,27 @@
         </div>
 
         <article class="matter-stage" aria-label="Matter workspace">
+          <div class="case-topbar-controls" data-notification-center>
+            <div class="notification-wrapper">
+              <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 1-3.46 0"/></svg>
+                <span class="notification-badge" data-notification-badge>0</span>
+              </button>
+              <div class="notifications-panel notif-panel hidden" role="region" aria-label="Notifications" data-notification-panel>
+                <div class="notif-header">Notifications</div>
+                <div class="notif-scroll" data-notification-list></div>
+                <div class="notif-empty" data-notification-empty>No notifications yet.</div>
+                <button class="notif-markall" type="button" data-notification-mark>Mark all read</button>
+              </div>
+            </div>
+          </div>
+          <header class="case-topbar-title" aria-label="Current Matter">
+            <h1 id="caseTitle">Loading Matter</h1>
+            <p class="case-thread-subtitle" id="caseStatusLine" role="status"></p>
+            <p class="case-thread-context" id="caseContextLine"></p>
+            <p class="case-thread-attention" id="caseAttentionLine" hidden></p>
+            <a class="case-next-action" id="caseNextAction" href="dashboard-attorney.html#cases" hidden></a>
+          </header>
           <nav class="matter-tabs" id="matter-tabs" role="tablist" aria-label="Matter sections">
             <button type="button" role="tab" id="matter-tab-overview" aria-controls="matter-panel-overview" aria-selected="true" tabindex="0" data-matter-tab="overview">Overview</button>
             <button type="button" role="tab" id="matter-tab-applications" aria-controls="matter-panel-applications" aria-selected="false" tabindex="-1" data-matter-tab="applications">Applications</button>

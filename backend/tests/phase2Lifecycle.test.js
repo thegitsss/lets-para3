@@ -735,10 +735,11 @@ describe("Phase 2 payment-at-hire contract", () => {
       .send({ text: "The filing package is ready for your review." });
     expect(sentMessage.status).toBe(201);
     const messageId = sentMessage.body.message._id || sentMessage.body.message.id;
+    const persistedMessage = await Message.findById(messageId).lean();
     const readMessage = await request(app)
       .post(`/api/messages/${caseDoc._id}/read`)
       .set("Cookie", actors.cookies.attorney)
-      .send({ upTo: "2026-09-02T12:00:00.000Z" });
+      .send({ upTo: persistedMessage.createdAt.toISOString() });
     expect(readMessage.status).toBe(200);
     expect((await Message.findById(messageId).lean()).readBy.map(String)).toContain(String(actors.attorney._id));
     await assertLifecycleCheckpoint({

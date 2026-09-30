@@ -461,7 +461,7 @@ async function checkPaymentReconciliationQueue() {
 
 async function checkFinancialExceptionQueue() {
   const mongoUri = process.env.MONGO_URI || process.env.MONGO_URL || process.env.DATABASE_URL;
-  if (!mongoUri) {
+  if (!mongoUri && mongoose.connection.readyState !== 1) {
     return {
       ok: true,
       code: "financial_exception_check_skipped",

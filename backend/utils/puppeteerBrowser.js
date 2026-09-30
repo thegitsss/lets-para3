@@ -63,7 +63,8 @@ async function launchPuppeteer(options = {}) {
   const executablePath = options.executablePath
     ? requireBrowserExecutable(options.executablePath, "Requested Puppeteer")
     : await resolvePuppeteerExecutablePath();
-  return puppeteer.launch({ ...options, executablePath });
+  const ciArgs = process.env.CI ? ["--no-sandbox", "--disable-setuid-sandbox"] : [];
+  return puppeteer.launch({ ...options, args: [...ciArgs, ...(options.args || [])], executablePath });
 }
 
 module.exports = {

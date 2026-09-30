@@ -117,6 +117,7 @@ describe("release candidate identity", () => {
       buildCandidateManifest({
         repoRoot: fixtureRoot,
         gitRunner: gitRunner(),
+        env: {},
         npmVersionReader: () => "11.15.0",
       })
     ).toThrow(/npm 11\.16\.0 is required/);
@@ -128,7 +129,7 @@ describe("release candidate identity", () => {
     fs.symlinkSync(path.join(fixtureRoot, ".node-version"), termsPath);
 
     expect(() =>
-      buildCandidateManifest({ repoRoot: fixtureRoot, gitRunner: gitRunner() })
+      buildCandidateManifest({ repoRoot: fixtureRoot, gitRunner: gitRunner(), env: {} })
     ).toThrow(/regular file/);
   });
 
