@@ -57,7 +57,7 @@
         if (!geometryResponse.ok) throw new Error('Map unavailable');
         const geometry = await geometryResponse.json();
         states = geometry.sort((a, b) => a.name.localeCompare(b.name));
-        render();
+        await render();
       }
       const response = await fetch('/api/public/paralegals/state-counts', { credentials: 'omit', signal: AbortSignal.timeout(15000) });
       if (!response.ok) throw new Error('Counts unavailable');
@@ -66,7 +66,7 @@
       counts = data.states;
       const mappedTotal = states.reduce((sum, state) => sum + counts[state.code], 0);
       if (!Number.isSafeInteger(data.approvedTotal) || data.approvedTotal < mappedTotal) throw new Error('Invalid network total');
-      render();
+      await render();
       canvas.classList.add('is-live');
       lastLoadedAt = Date.now();
       setStatus(data.approvedTotal.toLocaleString(), data.approvedTotal
@@ -82,7 +82,7 @@
       loading = false;
     }
   }
-  function render() {
+  async function render() {
       pinIndex = 0;
       canvas.classList.remove('is-live');
       const svg = svgNode('svg', { viewBox: '0 0 975 610', role: 'img', 'aria-label': 'US paralegal network. Each pin represents an approved paralegal in that state.' });
@@ -90,11 +90,11 @@
       svg.append(outlines);
       canvas.replaceChildren(svg);
       scheduleParallax();
-      states.forEach(state => {
+      for (const state of states) {
         const outline = svgNode('path', { d: state.path, 'data-state': state.code });
         outlines.append(outline);
         const count = counts[state.code] || 0;
-        if (!count) return;
+        if (!count) continue;
         const group = svgNode('g', { class: 'paralegal-map__pins', 'data-state': state.code, 'aria-label': `${state.name}: ${count} approved paralegals`, role: 'img' });
         const box = outline.getBBox();
         const points = [];
@@ -132,12 +132,25 @@
           probe.x = candidate[0]; probe.y = candidate[1];
           if (outline.isPointInFill(probe)) candidates.push(candidate);
         }
+        // Yield during geometry checks so scrolling and entrance animations can paint.
+        const interiorPoints = async inset => {
+          const result = [];
+          let sliceStart = performance.now();
+          for (const point of candidates) {
+            if (hasClearance(point, inset)) result.push(point);
+            if (performance.now() - sliceStart >= 6) {
+              await new Promise(resolve => setTimeout(resolve, 0));
+              sliceStart = performance.now();
+            }
+          }
+          return result;
+        };
         let inset = 10;
-        let interior = candidates.filter(point => hasClearance(point, inset));
+        let interior = await interiorPoints(inset);
         // Narrow states receive the largest feasible inset and proportionally smaller dots.
         while (!interior.length && inset > .5) {
           inset *= .8;
-          interior = candidates.filter(point => hasClearance(point, inset));
+          interior = await interiorPoints(inset);
         }
         const placed = [];
         points.forEach((point, index) => {
@@ -165,9 +178,20 @@
           pinIndex++;
         });
         svg.append(group);
-      });
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
 
   }
   retry.addEventListener('click', load);
-  load();
+  // The map is well below the fold. Its geometry must not compete with the hero.
+  if ('IntersectionObserver' in window) {
+    const loadObserver = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      loadObserver.disconnect();
+      void load();
+    }, { rootMargin: '600px 0px' });
+    loadObserver.observe(mapSection);
+  } else {
+    window.addEventListener('load', () => setTimeout(load, 2000), { once: true });
+  }
 })();
