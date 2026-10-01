@@ -5817,7 +5817,7 @@ body.accessibility-mode [tabindex]:focus-visible {
 
   .lpc-home .workflow__story {
     width: 100%;
-    min-height: calc(456 * var(--mobile-scroll-vh, 1svh));
+    min-height: calc(6 * 76svh);
     position: relative;
     overflow: visible;
   }
@@ -5831,7 +5831,7 @@ body.accessibility-mode [tabindex]:focus-visible {
   }
 
   .lpc-home .workflow-mobile-stage__sticky {
-    height: calc(100 * var(--mobile-scroll-vh, 1svh) - var(--header-height));
+    height: calc(100svh - var(--header-height));
     position: sticky;
     top: var(--header-height);
     display: grid;
@@ -5935,7 +5935,7 @@ body.accessibility-mode [tabindex]:focus-visible {
   .lpc-home .workflow-chapter,
   .lpc-home .workflow-chapter:first-child {
     width: 100%;
-    min-height: calc(76 * var(--mobile-scroll-vh, 1svh));
+    min-height: 76svh;
     min-width: 0;
     display: block;
     padding: 0;
@@ -5961,7 +5961,7 @@ body.accessibility-mode [tabindex]:focus-visible {
   .lpc-home .hero-bridge,
   .lpc-home .paths__heading,
   .lpc-home .closing-scene {
-    min-height: calc(100 * var(--mobile-scroll-vh, 1svh) - var(--header-height));
+    min-height: calc(100svh - var(--header-height));
   }
 
   .lpc-home .hero-bridge,
@@ -5971,15 +5971,15 @@ body.accessibility-mode [tabindex]:focus-visible {
 
   /* Give Step 6 the same full beat as Steps 1–5, then let the sticky stage exit. */
   .lpc-home .workflow__story {
-    min-height: calc(556 * var(--mobile-scroll-vh, 1svh) - var(--header-height));
+    min-height: calc(556svh - var(--header-height));
   }
 
   .lpc-home .workflow-chapter:last-child {
-    min-height: calc(76 * var(--mobile-scroll-vh, 1svh));
+    min-height: 76svh;
   }
 
   .lpc-home .workflow-chapters {
-    padding-bottom: calc(100 * var(--mobile-scroll-vh, 1svh) - var(--header-height));
+    padding-bottom: calc(100svh - var(--header-height));
   }
 
   .lpc-home .paths__heading {

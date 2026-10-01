@@ -13,11 +13,13 @@
   <meta name="twitter:card" content="summary" />
   <meta name="theme-color" content="#FFFFFF" />
 
+  <link rel="preload" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="assets/styles/fonts.css?v=20260826-full-sarabun" />
   <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <link rel="stylesheet" href="assets/styles/public-site-chrome.css?v=20260930-responsive-footer" />
-  <link rel="stylesheet" href="assets/styles/homepage.css?v=20261001-mobile-scroll" />
-  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20261001-hero-first-paint" />
+  <link rel="stylesheet" href="assets/styles/homepage.css?v=20261001-approved" />
+  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20261001-approved" />
   <link rel="stylesheet" href="assets/styles/homepage-readable-type.css?v=20260924-original-hero" />
   <link rel="stylesheet" href="assets/styles/homepage-serif-type.css?v=20260929-workflow-wrap" />
   <style>
@@ -52,7 +54,7 @@
   </style>
   <link rel="stylesheet" href="assets/styles/homepage-assistant.css?v=20260930-no-glyph-icons" />
   <link rel="stylesheet" href="assets/styles/homepage-map.css?v=20260930-retry-target" />
-  <link rel="stylesheet" href="assets/styles/homepage-mobile-hero.css?v=20261001-mobile-scroll" />
+  <link rel="stylesheet" href="assets/styles/homepage-mobile-hero.css?v=20261001-approved" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -62,7 +64,8 @@
   <script>
     document.documentElement.classList.add("js");
   </script>
-  <link rel="stylesheet" href="assets/styles/homepage-workflow-mobile.css?v=20261001-carousel" />
+  <link rel="stylesheet" href="assets/styles/homepage-mobile-reference.css?v=20261001-approved" />
+  <script src="assets/scripts/homepage-entrance.js?v=20261001-approved" defer></script>
 </head>
 <body class="lpc-home lpc-home--hybrid lpc-home--editorial public-site-chrome home-motion-ready">
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -157,6 +160,10 @@
         <div class="workflow__intro-title">
           <h2 id="workflow-title">One matter.<br />One workspace.</h2>
         </div>
+        <div class="workflow__intro-support workflow-notes-feature">
+          <strong>Just type a few notes.</strong>
+          <p>LPC builds your matter for you—title, scope, and tasks included. Review and edit the draft, then post when you’re ready.</p>
+        </div>
       </div>
 
       <div class="workflow__story">
@@ -164,24 +171,19 @@
           <div class="workflow-mobile-stage__sticky">
             <div class="workflow-mobile-stage__heading">
               <span class="workflow-mobile-stage__number">01</span>
-              <h3>Scope the work</h3>
-              <p>Define the deliverables, timing, and expectations.</p>
+              <h3>Scope</h3>
+              <p>Type brief notes. LPC drafts your matter for you to review and post.</p>
             </div>
             <div class="workflow-mobile-stage__canvas" data-mobile-workflow-stage></div>
           </div>
-        </div>
-
-        <div class="workflow-carousel-controls" aria-label="Workflow navigation">
-          <span data-workflow-mobile-count aria-live="polite">Step 1 of 6</span>
-          <div><button type="button" data-workflow-prev aria-label="Previous workflow step">&#8592;</button><button type="button" data-workflow-next aria-label="Next workflow step">&#8594;</button></div>
         </div>
 
         <div class="workflow-chapters" role="group" aria-label="Matter workflow steps" tabindex="0">
           <article class="workflow-chapter is-active" data-workflow-chapter="1">
             <span class="workflow-chapter__number">01</span>
             <div>
-              <h3>Scope the work</h3>
-              <p>Define the deliverables, timing, and expectations.</p>
+              <h3>Scope</h3>
+              <p>Type brief notes. LPC drafts your matter for you to review and post.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="1"></div>
           </article>
@@ -190,7 +192,7 @@
             <span class="workflow-chapter__number">02</span>
             <div>
               <h3>Review fit, check conflicts</h3>
-              <p>Compare applicants and request an optional conflicts check from your selected paralegal before hiring.</p>
+              <p>Compare applicants and request an optional conflicts check from your selected paralegal before engaging.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="2"></div>
           </article>
@@ -198,7 +200,7 @@
           <article class="workflow-chapter" data-workflow-chapter="3">
             <span class="workflow-chapter__number">03</span>
             <div>
-              <h3>Work together</h3>
+              <h3>Work</h3>
               <p>Keep messages, files, and progress connected to the matter.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="3"></div>
@@ -207,7 +209,7 @@
           <article class="workflow-chapter" data-workflow-chapter="4">
             <span class="workflow-chapter__number">04</span>
             <div>
-              <h3>Review <span class="keep-together">deliverables</span></h3>
+              <h3>Review</h3>
               <p>Check the submitted work and request revisions if needed.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="4"></div>
@@ -216,7 +218,7 @@
           <article class="workflow-chapter" data-workflow-chapter="5">
             <span class="workflow-chapter__number">05</span>
             <div>
-              <h3>Confirm completion</h3>
+              <h3>Complete</h3>
               <p>Approve the final work and release the paralegal’s payout together.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="5"></div>
@@ -225,8 +227,8 @@
           <article class="workflow-chapter" data-workflow-chapter="6">
             <span class="workflow-chapter__number">06</span>
             <div>
-              <h3>Close the matter</h3>
-              <p>Keep the payment record and download your archive.</p>
+              <h3>Close</h3>
+              <p>Keep the payment record and download your archive, including messages and documents.</p>
             </div>
             <div class="workflow-mobile-canvas" data-mobile-workflow-state="6"></div>
           </article>
@@ -243,14 +245,14 @@
             </div>
 
             <div class="workflow-state is-active" data-state="1" aria-hidden="false">
-              <div class="state-heading">
-                <h4>Accepting applications</h4>
-              </div>
-              <div class="form-grid">
-                <div class="field"><span>Compensation</span><strong>$650.00</strong></div>
-                <div class="field"><span>Applications</span><strong>2</strong></div>
-                <div class="field field--wide field--tall"><span>Scope</span><strong>Build a treatment chronology from medical records, organized by provider and date.</strong></div>
-                <div class="field field--wide"><span>Deliverables</span><strong>Medical records chronology, Source index</strong></div>
+              <div class="workflow-create-preview">
+                <h4>Start a new Matter.</h4>
+                <p class="workflow-create-preview__prompt">Start with your notes. We’ll put them in order.</p>
+                <div class="workflow-create-preview__notes">1,200 pages of medical records. Need a treatment chronology and gaps in care.</div>
+                <div class="workflow-create-preview__actions">
+                  <span class="workflow-create-preview__build">Build my Matter <span aria-hidden="true">→</span></span>
+                  <span class="workflow-create-preview__manual">Enter details manually</span>
+                </div>
               </div>
             </div>
 
@@ -286,7 +288,7 @@
                   <div class="panel-heading"><strong>Messages</strong></div>
                   <div class="message message--received"><p>The provider index is ready.<small>10:24 AM</small></p></div>
                   <div class="message message--sent"><p>Please flag any treatment gaps.<small>10:31 AM</small></p></div>
-                  <div class="message-composer">Write a message… <span>Send</span></div>
+                  <div class="message-composer">Write a message… <span aria-label="Send message"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m21 3-7 18-4-7-7-4 18-7Z"/><path d="m10 14 11-11"/></svg></span></div>
                 </section>
                 <aside class="workspace-details">
                   <div class="detail-block"><p class="interface-label">Deadline</p><strong>August 18</strong></div>
@@ -298,9 +300,9 @@
 
             <div class="workflow-state" data-state="4" aria-hidden="true">
               <div class="completion-state">
-                <h4>Ready for review</h4>
                 <p>Submitted August 17</p>
                 <div class="completion-files">
+                  <span><i>DOCX</i><b>Treatment Summary.docx</b></span>
                   <span><i>PDF</i><b>Medical Records Chronology.pdf</b></span>
                   <span><i>PDF</i><b>Source Index.pdf</b></span>
                 </div>
@@ -312,7 +314,6 @@
 
             <div class="workflow-state" data-state="5" aria-hidden="true">
               <div class="completion-state">
-                <h4>Ready to close</h4>
                 <p>Approve the completed work to begin payment release.</p>
                 <div class="completion-files">
                   <span><i>PDF</i><b>Medical Records Chronology.pdf</b></span>
@@ -330,7 +331,7 @@
                 <h4>Payment released</h4>
                 <p>Save your matter records—messages, documents, and receipts—in one download.</p>
                 <div class="payment-summary">
-                  <span><small>Funded matter amount</small><strong>$650.00</strong></span>
+                  <span class="workflow-payout"><strong>$650.00</strong><small>via Stripe</small></span>
                   <span class="workflow-preview-action">Download matter records</span>
                 </div>
               </div>
@@ -393,26 +394,6 @@
 
     </div>
 
-    <section class="trust-band" aria-label="Why attorneys and paralegals use Let’s-ParaConnect">
-      <div class="trust-band__inner">
-        <article>
-          <span aria-hidden="true">01</span>
-          <h2>Approval-based access</h2>
-          <p>Every paralegal completes LPC’s application and eligibility review before joining the platform.</p>
-        </article>
-        <article>
-          <span aria-hidden="true">02</span>
-          <h2>Everything stays connected</h2>
-          <p>Scope, messages, files, completion, and payment activity stay connected to the same matter.</p>
-        </article>
-        <article>
-          <span aria-hidden="true">03</span>
-          <h2>Structured payments</h2>
-          <p>Funding, completion, and payment status remain connected to the matter.</p>
-        </article>
-      </div>
-    </section>
-
     <section class="paralegal-map" aria-labelledby="paralegal-map-title">
       <div class="paralegal-map__inner">
         <div class="paralegal-map__intro">
@@ -422,8 +403,8 @@
         </div>
         <div class="paralegal-map__stage">
           <div class="paralegal-map__canvas" data-paralegal-map></div>
-          <div class="paralegal-map__status" data-map-status role="status"><a class="paralegal-map__stat" href="browse-paralegals.html" aria-label="Browse paralegal profiles" data-public-action="primary"><strong data-map-total>—</strong><span class="paralegal-map__stat-detail"><span class="paralegal-map__stat-copy"><span data-map-summary>Loading the map…</span><span data-map-growth hidden>and growing.</span><span class="paralegal-map__stat-cue" aria-hidden="true">Browse profiles</span></span><span class="paralegal-map__stat-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M5 19 19 5M8 5h11v11"/></svg></span></span></a></div>
-          <p class="paralegal-map__note">Each dot represents an approved paralegal in that state. Placement within the state is approximate.</p>
+          <div class="paralegal-map__status" data-map-status role="status"><a class="paralegal-map__stat" href="browse-paralegals.html" aria-label="Browse paralegals" data-public-action="primary"><strong data-map-total>—</strong><span class="paralegal-map__stat-detail"><span class="paralegal-map__stat-copy"><span data-map-summary>Loading the map…</span><span data-map-growth hidden>and growing.</span><span class="paralegal-map__stat-cue" aria-hidden="true">Browse</span></span><span class="paralegal-map__stat-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M5 19 19 5M8 5h11v11"/></svg></span></span></a></div>
+          <p class="paralegal-map__note">Dots show approved paralegals in each state.</p>
           <button class="paralegal-map__retry" type="button" data-map-retry hidden>Try again</button>
           <noscript><p class="paralegal-map__status">Enable JavaScript to view the network map.</p></noscript>
         </div>
@@ -449,7 +430,7 @@
             <span>For attorneys</span>
             <strong>22%</strong>
             <h4>Added when you hire.</h4>
-            <p>When you’re ready to hire, Stripe charges your matter amount plus LPC’s 22% platform fee. After you confirm the work is complete, the paralegal’s share of the matter amount is sent through Stripe Connect directly to the paralegal.</p>
+            <p>You set the matter amount. When you’re ready to hire, that amount plus LPC’s 22% platform fee is processed through <a class="stripe-link" href="https://stripe.com" target="_blank" rel="noopener noreferrer">Stripe</a>. After you confirm all work for the matter is complete, Stripe releases payment directly to the paralegal.</p>
           </div>
           <div class="fee-card__row">
             <span>For paralegals</span>
@@ -457,7 +438,7 @@
             <h4>Deducted before payout.</h4>
             <p>The paralegal platform fee is deducted from the matter amount before payout, after completed work is approved.</p>
           </div>
-          <small>Payments are securely processed by Stripe. LPC does not store full card details.</small>
+          <small>Payments are securely processed by <a class="stripe-link" href="https://stripe.com" target="_blank" rel="noopener noreferrer">Stripe</a>. LPC does not store full card details.</small>
         </aside>
 
         <div class="home-faq">
@@ -515,6 +496,7 @@
             <i aria-hidden="true"></i>
           </a>
         </div>
+        <p class="closing-access-note">Approval-based access: every paralegal completes LPC’s application and eligibility review before joining.</p>
       </div>
     </section>
   </main>
@@ -571,7 +553,7 @@
   </footer>
 
   <script src="assets/scripts/homepage-map.js?v=20260929-dot-pulse-1" defer></script>
-  <script src="assets/scripts/homepage.js?v=carousel-20261001-mobile-scroll" defer></script>
+  <script src="assets/scripts/homepage.js?v=20261001-approved" defer></script>
   <script src="assets/scripts/homepage-assistant.js?v=20260929-review-copy" defer></script>
   <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>

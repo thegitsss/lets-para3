@@ -1,6 +1,5 @@
 @media (max-width: 640px) {
   .lpc-home--editorial .editorial-hero {
-    min-height: max(720px, calc(100 * var(--mobile-scroll-vh, 1svh)));
     padding-top: calc(var(--header-height) + 24px);
     padding-bottom: 28px;
   }
