@@ -57,7 +57,6 @@
         if (!geometryResponse.ok) throw new Error('Map unavailable');
         const geometry = await geometryResponse.json();
         states = geometry.sort((a, b) => a.name.localeCompare(b.name));
-        await render();
       }
       const response = await fetch('/api/public/paralegals/state-counts', { credentials: 'omit', signal: AbortSignal.timeout(15000) });
       if (!response.ok) throw new Error('Counts unavailable');
@@ -80,15 +79,23 @@
       }
     } finally {
       loading = false;
+      canvas.removeAttribute('aria-busy');
     }
   }
   async function render() {
       pinIndex = 0;
-      canvas.classList.remove('is-live');
+      canvas.setAttribute('aria-busy', 'true');
+      const previousSvg = canvas.querySelector('svg');
       const svg = svgNode('svg', { viewBox: '0 0 975 610', role: 'img', 'aria-label': 'US paralegal network. Each pin represents an approved paralegal in that state.' });
+      svg.style.visibility = 'hidden';
+      if (previousSvg) {
+        svg.style.position = 'absolute';
+        svg.style.inset = '0';
+      }
       const outlines = svgNode('g', { class: 'paralegal-map__outlines' });
+      const pinGroups = document.createDocumentFragment();
       svg.append(outlines);
-      canvas.replaceChildren(svg);
+      canvas.append(svg);
       scheduleParallax();
       for (const state of states) {
         const outline = svgNode('path', { d: state.path, 'data-state': state.code });
@@ -177,10 +184,13 @@
           group.append(pin);
           pinIndex++;
         });
-        svg.append(group);
+        pinGroups.append(group);
         await new Promise(resolve => setTimeout(resolve, 0));
       }
-
+      svg.append(pinGroups);
+      svg.removeAttribute('style');
+      canvas.replaceChildren(svg);
+      scheduleParallax();
   }
   retry.addEventListener('click', load);
   // The map is well below the fold. Its geometry must not compete with the hero.
