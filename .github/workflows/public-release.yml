@@ -47,6 +47,7 @@ jobs:
           node scripts/test-public-auth-navigation-ui.js
           node scripts/test-homepage-mobile-scroll-ui.js
           node scripts/test-homepage-first-paint-ui.js
+          node scripts/test-homepage-carousel-ui.js
           npm run test:e2e:auth
 
   codeql:

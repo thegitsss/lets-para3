@@ -62,6 +62,7 @@
   <script>
     document.documentElement.classList.add("js");
   </script>
+  <link rel="stylesheet" href="assets/styles/homepage-workflow-mobile.css?v=20261001-carousel" />
 </head>
 <body class="lpc-home lpc-home--hybrid lpc-home--editorial public-site-chrome home-motion-ready">
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -168,6 +169,11 @@
             </div>
             <div class="workflow-mobile-stage__canvas" data-mobile-workflow-stage></div>
           </div>
+        </div>
+
+        <div class="workflow-carousel-controls" aria-label="Workflow navigation">
+          <span data-workflow-mobile-count aria-live="polite">Step 1 of 6</span>
+          <div><button type="button" data-workflow-prev aria-label="Previous workflow step">&#8592;</button><button type="button" data-workflow-next aria-label="Next workflow step">&#8594;</button></div>
         </div>
 
         <div class="workflow-chapters" role="group" aria-label="Matter workflow steps" tabindex="0">
@@ -565,7 +571,7 @@
   </footer>
 
   <script src="assets/scripts/homepage-map.js?v=20260929-dot-pulse-1" defer></script>
-  <script src="assets/scripts/homepage.js?v=20261001-mobile-scroll" defer></script>
+  <script src="assets/scripts/homepage.js?v=carousel-20261001-mobile-scroll" defer></script>
   <script src="assets/scripts/homepage-assistant.js?v=20260929-review-copy" defer></script>
   <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>
