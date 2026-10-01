@@ -1,13 +1,14 @@
 const path = require("path");
 const express = require("express");
 const request = require("supertest");
+const rateLimit = require("express-rate-limit");
 const { createWebNotFoundHandler } = require("../utils/webNotFound");
 
 const frontendDirectory = path.resolve(__dirname, "../../frontend");
 
 describe("public not-found behavior", () => {
   const app = express();
-  app.use(createWebNotFoundHandler(frontendDirectory));
+  app.use(rateLimit({ windowMs: 60 * 1000, max: 120 }), createWebNotFoundHandler(frontendDirectory));
 
   test("returns a useful no-store HTML page with a real 404 status", async () => {
     const response = await request(app).get("/definitely-not-a-real-page");
@@ -32,7 +33,7 @@ describe("public document routing", () => {
   const app = express();
   app.use(express.static(path.resolve(__dirname, "../../public")));
   app.use(express.static(frontendDirectory));
-  app.use(createWebNotFoundHandler(frontendDirectory));
+  app.use(rateLimit({ windowMs: 60 * 1000, max: 120 }), createWebNotFoundHandler(frontendDirectory));
   test.each([
     ["/verify-email.html", "verificationPanel"],
     ["/account-closure.html", "closure-title"],

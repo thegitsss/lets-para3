@@ -275,7 +275,10 @@ app.use("/api", (_req, res) => {
 
 app.use(express.static(PUBLIC_DIR));
 app.use(express.static(FRONTEND_DIR));
-app.use(createWebNotFoundHandler(FRONTEND_DIR));
+app.use(
+  rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false }),
+  createWebNotFoundHandler(FRONTEND_DIR)
+);
 
 // 7) Error + 404 Handlers
 app.use((req, res) => res.status(404).send("Not found"));
