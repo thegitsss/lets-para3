@@ -90,9 +90,9 @@ services:
       - key: TZ
         value: America/New_York
       - key: LEGAL_APPROVED_TERMS_VERSION
-        value: "2026-09-25"
+        value: "2026-10-01"
       - key: LEGAL_APPROVED_PRIVACY_VERSION
-        value: "2026-09-25"
+        value: "2026-10-01"
       - key: LEGAL_COUNSEL_APPROVAL_ID
         sync: false
       - key: LEGAL_APPROVED_TERMS_SHA256
