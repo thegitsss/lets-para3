@@ -2,8 +2,13 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const express = require('express');
 const browsers = require('playwright');
+const geometry = require('../../frontend/assets/data/us-states.json');
+const counts = Object.fromEntries(geometry.map(state => [state.code, state.code === 'TX' ? 26 : 1]));
+const mappedTotal = Object.values(counts).reduce((sum,count)=>sum+count,0);
 (async () => {
-  const app = express(); app.use(express.static(path.resolve(__dirname, '../../frontend')));
+  const app = express();
+  app.get('/api/public/paralegals/state-counts', (req,res)=>res.json({states:counts,total:mappedTotal,approvedTotal:mappedTotal+2}));
+  app.use(express.static(path.resolve(__dirname, '../../frontend')));
   const server = await new Promise(resolve => { const s=app.listen(0,'127.0.0.1',()=>resolve(s)); });
   try {
     for (const name of (process.env.LPC_BROWSERS || 'chromium,webkit').split(',')) {
@@ -12,6 +17,8 @@ const browsers = require('playwright');
         for (const mode of ['late-script','failed-script','slow-fonts','no-script','reduced']) {
           console.log('[first-frame]',name,mode);
           const page = await browser.newPage({viewport:{width:428,height:926},javaScriptEnabled:mode!=='no-script',reducedMotion:mode==='reduced'?'reduce':'no-preference'});
+          let mapRequests = 0;
+          page.on('request', r=>{if(r.url().includes('/api/public/paralegals/state-counts'))mapRequests++;});
           if (mode==='late-script') await page.route('**/homepage-entrance.js*',async r=>{await new Promise(resolve=>setTimeout(resolve,2600));await r.continue().catch(()=>{});});
           if (mode==='failed-script') await page.route('**/homepage-entrance.js*',r=>r.abort());
           if (mode==='slow-fonts') await page.route('**/*.woff2',async r=>{await new Promise(resolve=>setTimeout(resolve,2600));await r.continue().catch(()=>{});});
@@ -49,6 +56,14 @@ const browsers = require('playwright');
           assert.equal(await page.locator('.editorial-hero__actions').evaluate(e=>getComputedStyle(e).opacity),'1');
           // Late scripts must not hide or replay an already revealed hero.
           for(let i=0;i<3;i++) {assert.equal(await page.locator('.editorial-hero__line').first().evaluate(e=>getComputedStyle(e).opacity),'1');await page.waitForTimeout(50);}
+          assert.equal(mapRequests,0,'Offscreen map does not run during the hero entrance');
+          if(mode==='late-script') {
+            await page.locator('.paralegal-map').scrollIntoViewIfNeeded();
+            await page.waitForSelector('.paralegal-map__canvas.is-live',{timeout:30000});
+            assert.equal(await page.locator('.paralegal-map__pin').count(),mappedTotal);
+            assert.equal(await page.locator('[data-map-total]').innerText(),String(mappedTotal+2));
+            assert.equal(mapRequests,1);
+          }
           await page.close();
         }
         console.log(`[first-frame] ${name}: gradual stagger with delayed/failed JS, slow fonts, no JS, and reduced motion passed`);
