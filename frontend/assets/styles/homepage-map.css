@@ -44,8 +44,19 @@
   content: '';
 }
 .paralegal-map__canvas { position: relative; width: min(100%, 1140px); aspect-ratio: 975 / 610; margin: 0 auto; }
+.paralegal-map__outline {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  transform: translate3d(0, var(--map-parallax-y, 0px), 0) scale(1.08);
+  transform-origin: center;
+  will-change: transform;
+}
 .paralegal-map__canvas svg {
   display: block;
+  position: absolute;
+  inset: 0;
   width: 100%; height: auto;
   overflow: visible;
   pointer-events: none;
@@ -54,6 +65,7 @@
   will-change: transform;
 }
 .paralegal-map__outlines path { fill: transparent; stroke: #a9bad4; stroke-width: 1.15; }
+.paralegal-map__canvas svg .paralegal-map__outlines path { stroke: none; }
 .paralegal-map__pin circle { fill: #a9c8ff; stroke: none; }
 .paralegal-map__halo { opacity: 0; transform-box: fill-box; transform-origin: center; }
 .paralegal-map__canvas.is-live.is-visible .paralegal-map__halo {
@@ -146,7 +158,7 @@
   .paralegal-map__intro > p:last-child { margin-top: 23px; }
   .paralegal-map__stage { padding-top: 56px; }
   .paralegal-map__canvas { width: calc(100% + 40px); margin-left: -20px; }
-  .paralegal-map__canvas svg { transform: translate3d(0, var(--map-parallax-y, 0px), 0) scale(1.02); }
+  .paralegal-map__canvas :is(svg, .paralegal-map__outline) { transform: translate3d(0, var(--map-parallax-y, 0px), 0) scale(1.02); }
   .paralegal-map__outlines path { stroke-width: 1.8; }
   .paralegal-map__status, .paralegal-map__note { padding-inline: 6px; }
   .paralegal-map__stat strong { font-size: clamp(4rem, 17vw, 5.5rem); }
@@ -155,7 +167,7 @@
 @media (prefers-reduced-motion: reduce) {
   .paralegal-map__stat-cue { transition: none; }
   .paralegal-map__stat:hover .paralegal-map__stat-cue { transition-delay: 0s; }
-  .paralegal-map__canvas svg, .lpc-home .paralegal-map .paralegal-map__canvas svg { transform: none; will-change: auto; }
+  .paralegal-map__canvas :is(svg, .paralegal-map__outline), .lpc-home .paralegal-map .paralegal-map__canvas :is(svg, .paralegal-map__outline) { transform: none; will-change: auto; }
   .paralegal-map__stat-arrow { transition: none; }
   .paralegal-map__canvas.is-live:not(.is-visible) .paralegal-map__dot { opacity: 1; }
   .paralegal-map__canvas.is-live.is-visible .paralegal-map__dot,
