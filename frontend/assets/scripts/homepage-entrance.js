@@ -39,29 +39,30 @@
     }));
   }
   const reveal = () => {
-    const alreadyVisible = getComputedStyle(hero.querySelector(".editorial-hero__inner")).opacity === "1";
+    // CSS is already revealing the hero. Only enhance physical lines before
+    // any text appears; a late script must never hide or restart visible text.
+    const entrance = groups[0]?.getAnimations().find(a => a.animationName === 'hero-first-frame-enter');
+    const elapsed = entrance ? Number(entrance.currentTime ?? 0) : Infinity;
+    hero.classList.add('hero-entrance-ready');
+    if (motion.matches || document.body.classList.contains('accessibility-mode') || elapsed >= 400) return;
     title.setAttribute('aria-label', groups.map(e => e.textContent.trim()).join(' '));
     groups.forEach(e => { linesFor(e); e.setAttribute('aria-hidden', 'true'); });
-    hero.classList.add('hero-entrance-ready');
-    if (alreadyVisible || motion.matches || document.body.classList.contains('accessibility-mode')) return;
+    hero.classList.add('hero-lines-ready');
     const lineStagger = innerWidth <= 640 ? 33 : 100;
-    const targets = [
-      ...[...hero.querySelectorAll('.hero-motion-line')].map((el, i) => [el, 400 + i * lineStagger]),
-      [hero.querySelector('.editorial-hero__qualifier'), 400],
-      [hero.querySelector('.editorial-hero__support'), 600],
-      [hero.querySelector('.editorial-hero__actions'), 850],
-      [hero.querySelector('.editorial-hero__publishing'), 883],
-      [hero.querySelector('.editorial-hero__reassurance'), 916],
-    ];
-    animations = targets.filter(([el]) => el).map(([el, delay]) => el.animate([
-      { opacity: 0, filter: 'blur(10px)', transform: 'translateY(20%)' },
-      { opacity: 1, filter: 'blur(0px)', transform: 'translateY(0%)' },
-    ], { duration: 1000, delay, easing: 'cubic-bezier(.25,.1,.25,1)', fill: 'both' }));
+    const startTime = document.timeline.currentTime - elapsed;
+    animations = [...hero.querySelectorAll('.hero-motion-line')].map((el, i) => {
+      const animation = el.animate([
+        { opacity: 0, filter: 'blur(10px)', transform: 'translateY(20%)' },
+        { opacity: 1, filter: 'blur(0px)', transform: 'translateY(0%)' },
+      ], { duration: 1000, delay: 400 + i * lineStagger, easing: 'cubic-bezier(.25,.1,.25,1)', fill: 'both' });
+      animation.startTime = startTime;
+      return animation;
+    });
     Promise.all(animations.map(a => a.finished.catch(() => {}))).then(() => animations.forEach(a => a.cancel()));
   };
-  // Fonts get a bounded head start; an unavailable font cannot hold up the hero.
+  // Font readiness only improves line measurement; it never gates visibility.
   const fontReady = document.fonts ? document.fonts.ready : Promise.resolve();
-  Promise.race([fontReady, new Promise(resolve => setTimeout(resolve, 600))]).then(reveal);
+  Promise.race([fontReady, new Promise(resolve => setTimeout(resolve, 200))]).then(reveal);
   motion.addEventListener('change', () => { if (motion.matches) animations.forEach(a => a.cancel()); });
   // Once revealed, resizing restores natural wrapping without replaying the entrance.
   let width = innerWidth;

@@ -1,11 +1,29 @@
 /* Linear's phone/tablet swipe and hero motion, with LPC's approved heading-first cards.
    328px card width, 8px gutter/gap, start snapping; 1s blur/rise hero entrance. */
-.lpc-home--editorial .editorial-hero :is(.editorial-hero__qualifier-words > span, .editorial-hero__line, .editorial-hero__support, .editorial-hero__support::before, .editorial-hero__actions, .editorial-hero__publishing, .editorial-hero__reassurance) { animation: none !important; }
+/* Start on the first styled frame, independently of script and font loading. */
+.lpc-home--editorial .editorial-hero__inner { opacity: 1; visibility: visible; }
+.lpc-home--editorial .editorial-hero :is(.editorial-hero__qualifier-words > span, .editorial-hero__support::before) { animation: none !important; }
 .hero-motion-line { display: block; }
-/* A short CSS fallback also reveals content when the entrance script fails. */
-@keyframes hero-readable-fallback { to { opacity: 1; } }
+@keyframes hero-first-frame-enter {
+  from { opacity: 0; filter: blur(10px); transform: translateY(20%); }
+  to { opacity: 1; filter: blur(0); transform: translateY(0); }
+}
 @media (prefers-reduced-motion: no-preference) {
-  .js .editorial-hero:not(.hero-entrance-ready) .editorial-hero__inner { opacity: 0; animation: hero-readable-fallback 0s 1800ms forwards; }
+  .lpc-home--editorial:not(.accessibility-mode) .editorial-hero :is(.editorial-hero__qualifier, .editorial-hero__line, .editorial-hero__support, .editorial-hero__actions, .editorial-hero__publishing, .editorial-hero__reassurance) {
+    animation: hero-first-frame-enter 1000ms cubic-bezier(.25,.1,.25,1) var(--hero-enter-delay, 400ms) both !important;
+  }
+  .lpc-home--editorial .editorial-hero__line--two { --hero-enter-delay: 500ms; }
+  .lpc-home--editorial .editorial-hero__support { --hero-enter-delay: 600ms; }
+  .lpc-home--editorial .editorial-hero__actions { --hero-enter-delay: 850ms; }
+  .lpc-home--editorial .editorial-hero__publishing { --hero-enter-delay: 883ms; }
+  .lpc-home--editorial .editorial-hero__reassurance { --hero-enter-delay: 916ms; }
+  .lpc-home--editorial .editorial-hero.hero-lines-ready .editorial-hero__line { animation: none !important; }
+}
+@media (max-width: 640px) {
+  .lpc-home--editorial .editorial-hero__line--two { --hero-enter-delay: 466ms; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lpc-home--editorial .editorial-hero :is(.editorial-hero__qualifier, .editorial-hero__line, .editorial-hero__support, .editorial-hero__actions, .editorial-hero__publishing, .editorial-hero__reassurance) { animation: none !important; }
 }
 @media (max-width: 960px) {
   .lpc-home .workflow__story { display: block; width: 100%; min-height: 0; }

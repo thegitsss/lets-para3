@@ -46,6 +46,7 @@ jobs:
           export PUPPETEER_EXECUTABLE_PATH="$(node -p "require('playwright').chromium.executablePath()")"
           node scripts/test-public-auth-navigation-ui.js
           LPC_BROWSERS=chromium node scripts/test-homepage-mobile-reference-ui.js
+          LPC_BROWSERS=chromium node scripts/test-homepage-first-frame-ui.js
           npm run test:e2e:auth
 
   codeql:
