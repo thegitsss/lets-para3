@@ -66,6 +66,29 @@ const mappedTotal = Object.values(counts).reduce((sum,count)=>sum+count,0);
           }
           await page.close();
         }
+        for (const width of [390, 1440]) {
+          console.log('[map-first-frame]', name, width);
+          const page = await browser.newPage({ viewport: { width, height: 844 } });
+          await page.route('**/api/public/paralegals/state-counts', async route => {
+            await new Promise(resolve => setTimeout(resolve, 4000));
+            await route.continue().catch(() => {});
+          });
+          await page.goto(`http://127.0.0.1:${server.address().port}`, { waitUntil: 'domcontentloaded' });
+          await page.locator('.paralegal-map').scrollIntoViewIfNeeded();
+          await page.waitForFunction(() => {
+            const outline = document.querySelector('.paralegal-map__outline');
+            return outline?.complete && outline.naturalWidth > 0;
+          });
+          assert.equal(await page.locator('.paralegal-map__canvas.is-live').count(), 0,
+            'Map outline must be visible before network counts resolve');
+          assert.equal(await page.locator('.paralegal-map__outline').isVisible(), true);
+          assert.equal(await page.getByText('Loading the map…').count(), 0);
+          await page.waitForSelector('.paralegal-map__canvas.is-live', { timeout: 30000 });
+          assert.equal(await page.locator('.paralegal-map__outline').count(), 1,
+            'Static map outline must remain while pins reveal');
+          assert.equal(await page.locator('.paralegal-map__pin').count(), mappedTotal);
+          await page.close();
+        }
         console.log(`[first-frame] ${name}: gradual stagger with delayed/failed JS, slow fonts, no JS, and reduced motion passed`);
       } finally { await browser.close(); }
     }

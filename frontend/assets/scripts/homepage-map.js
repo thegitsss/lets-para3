@@ -30,16 +30,14 @@
   let parallaxFrame = 0;
   function updateParallax() {
     parallaxFrame = 0;
-    const svg = canvas.querySelector('svg');
-    if (!svg) return;
     if (reducedMotionPreference.matches) {
-      svg.style.setProperty('--map-parallax-y', '0px');
+      canvas.style.setProperty('--map-parallax-y', '0px');
       return;
     }
     const rect = mapSection.getBoundingClientRect();
     const progress = Math.max(0, Math.min(1, (innerHeight - rect.top) / (innerHeight + rect.height)));
     const travel = innerWidth <= 600 ? 65 : 115;
-    svg.style.setProperty('--map-parallax-y', `${Math.round((.5 - progress) * travel * 2)}px`);
+    canvas.style.setProperty('--map-parallax-y', `${Math.round((.5 - progress) * travel * 2)}px`);
   }
   function scheduleParallax() {
     if (!parallaxFrame) parallaxFrame = requestAnimationFrame(updateParallax);
@@ -94,10 +92,6 @@
       const previousSvg = canvas.querySelector('svg');
       const svg = svgNode('svg', { viewBox: '0 0 975 610', role: 'img', 'aria-label': 'US paralegal network. Each pin represents an approved paralegal in that state.' });
       svg.style.visibility = 'hidden';
-      if (previousSvg) {
-        svg.style.position = 'absolute';
-        svg.style.inset = '0';
-      }
       const outlines = svgNode('g', { class: 'paralegal-map__outlines' });
       const pinGroups = document.createDocumentFragment();
       svg.append(outlines);
@@ -167,8 +161,8 @@
         pinGroups.append(group);
       }
       svg.append(pinGroups);
-      svg.removeAttribute('style');
-      canvas.replaceChildren(svg);
+      svg.style.visibility = '';
+      if (previousSvg) previousSvg.remove();
       scheduleParallax();
   }
   retry.addEventListener('click', load);
