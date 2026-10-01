@@ -33,7 +33,7 @@ jobs:
         env:
           JWT_SECRET: ci-only-jwt-secret-longer-than-thirty-two-bytes
           EMAIL_DISABLE: "true"
-        run: npm test -- --runTestsByPath tests/auth.test.js tests/googlePublicAuth.test.js tests/publicParalegalStateCounts.test.js tests/supportAdmin.test.js
+        run: npm test -- --runTestsByPath tests/auth.test.js tests/googlePublicAuth.test.js tests/publicParalegalStateCounts.test.js tests/supportAdmin.test.js tests/webNotFound.test.js
       - name: Install browser for public journeys
         working-directory: backend
         run: npx playwright install --with-deps chromium

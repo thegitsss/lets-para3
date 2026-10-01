@@ -129,6 +129,7 @@
 .paralegal-map__stat:hover .paralegal-map__stat-arrow { transform: translate(3px, -3px); }
 .paralegal-map__note { max-width: 620px; margin: 22px auto 0; color: #9aaec9; font-size: .78rem; line-height: 1.55; }
 .paralegal-map__retry {
+  min-height: 44px;
   margin: 18px auto 0;
   padding: 9px 18px;
   border: 1px solid #829abd;
