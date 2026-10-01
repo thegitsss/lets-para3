@@ -82,3 +82,6 @@
 @media (max-width: 640px) {
   .lpc-home .workflow-chapters .workflow-mobile-canvas .field--wide { grid-column: 1 / -1; }
 }
+@media (max-width: 380px) {
+  .lpc-home .workflow-chapters .workflow-mobile-canvas .workspace-details { grid-template-columns: 1fr; }
+}
