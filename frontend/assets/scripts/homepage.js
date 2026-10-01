@@ -733,6 +733,8 @@
     desktopCanvas.dataset.workflowState = state;
     desktopCanvas.dataset.scrollDirection = direction;
     if (workflowChapters) workflowChapters.dataset.workflowState = state;
+    document.querySelector("[data-workflow-prev]")?.toggleAttribute("disabled", state === "1");
+    document.querySelector("[data-workflow-next]")?.toggleAttribute("disabled", Number(state) === chapters.length);
     if (workflowMobileCount) workflowMobileCount.textContent = `Step ${state} of ${chapters.length}`;
     if (mobileWorkflowStage) {
       mobileWorkflowStage.querySelectorAll(".workflow-state").forEach((panel) => {
@@ -786,6 +788,13 @@
       });
     };
 
+    document.querySelectorAll("[data-workflow-prev], [data-workflow-next]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const delta = button.hasAttribute("data-workflow-next") ? 1 : -1;
+        centerWorkflowChapter(chapters[clamp(Number(activeWorkflowState) - 1 + delta, 0, chapters.length - 1)]);
+      });
+    });
+
     const syncWorkflowSwipe = () => {
       workflowSwipeFrame = 0;
       if (!mobileWorkflowQuery.matches) return;
@@ -829,6 +838,7 @@
 
     const syncWorkflowState = () => {
       workflowFrame = 0;
+      if (mobileWorkflowQuery.matches) return;
       const activationLine = window.innerHeight * 0.48;
       const direction = window.scrollY >= previousWorkflowScrollY ? "down" : "up";
       previousWorkflowScrollY = window.scrollY;
