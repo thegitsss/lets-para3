@@ -7,29 +7,6 @@
   const mobileNav = document.querySelector("[data-mobile-nav]");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value));
-  // iOS browser chrome can resize the viewport during a swipe. Keep the
-  // long pinned workflow stable until the layout width changes (rotation).
-  const mobileScrollViewport = window.matchMedia("(max-width: 640px) and (pointer: coarse)");
-  let mobileScrollWidth = 0;
-  const syncMobileScrollViewport = () => {
-    if (!mobileScrollViewport.matches) {
-      document.documentElement.style.removeProperty("--mobile-scroll-vh");
-      mobileScrollWidth = 0;
-      return;
-    }
-    if (mobileScrollWidth === window.innerWidth) return;
-    mobileScrollWidth = window.innerWidth;
-    const probe = document.createElement("div");
-    probe.style.cssText = "position:fixed;width:0;height:100svh;visibility:hidden;pointer-events:none";
-    document.body.appendChild(probe);
-    const height = probe.getBoundingClientRect().height || window.innerHeight;
-    probe.remove();
-    document.documentElement.style.setProperty("--mobile-scroll-vh", `${height / 100}px`);
-  };
-  syncMobileScrollViewport();
-  window.addEventListener("resize", syncMobileScrollViewport, { passive: true });
-  mobileScrollViewport.addEventListener("change", syncMobileScrollViewport);
-
   const footerDirectoryMedia = window.matchMedia("(max-width: 900px)");
   const footerDirectories = Array.from(document.querySelectorAll(".home-footer__directory details"));
   const syncFooterDirectories = () => {
@@ -65,7 +42,7 @@
   const syncEditorialParallax = () => {
     editorialParallaxFrame = 0;
     if (!editorialDetails) return;
-    const motionDisabled = reducedMotion.matches || document.body.classList.contains("accessibility-mode");
+    const motionDisabled = window.matchMedia("(max-width: 640px)").matches || reducedMotion.matches || document.body.classList.contains("accessibility-mode");
     const progress = motionDisabled ? 0 : clamp(window.scrollY / Math.max(1, window.innerHeight * 0.52));
     editorialDetails.style.setProperty("--editorial-copy-x", `${(24 * progress).toFixed(1)}px`);
     editorialDetails.style.setProperty("--editorial-copy-y", `${(145 * progress).toFixed(1)}px`);
@@ -703,7 +680,7 @@
   }
 
   const fitMobileWorkflowState = () => {
-    if (!mobileWorkflowQuery.matches || !mobileWorkflowStage) return;
+    if (!mobileWorkflowStage || !mobileWorkflowStage.offsetParent) return;
     const panel = mobileWorkflowStage.querySelector(".workflow-state.is-active");
     const frame = panel?.querySelector(".workflow-mobile-stage__frame");
     if (!panel || !frame) return;
@@ -733,8 +710,6 @@
     desktopCanvas.dataset.workflowState = state;
     desktopCanvas.dataset.scrollDirection = direction;
     if (workflowChapters) workflowChapters.dataset.workflowState = state;
-    document.querySelector("[data-workflow-prev]")?.toggleAttribute("disabled", state === "1");
-    document.querySelector("[data-workflow-next]")?.toggleAttribute("disabled", Number(state) === chapters.length);
     if (workflowMobileCount) workflowMobileCount.textContent = `Step ${state} of ${chapters.length}`;
     if (mobileWorkflowStage) {
       mobileWorkflowStage.querySelectorAll(".workflow-state").forEach((panel) => {
@@ -745,7 +720,7 @@
       window.requestAnimationFrame(fitMobileWorkflowState);
     }
     const activeChapter = chapters.find((chapter) => chapter.dataset.workflowChapter === state);
-    if (activeChapter && mobileWorkflowStageHeading) {
+    if (activeChapter && mobileWorkflowStageHeading?.offsetParent) {
       if (mobileWorkflowStageNumber) mobileWorkflowStageNumber.textContent = String(state).padStart(2, "0");
       if (mobileWorkflowStageTitle) mobileWorkflowStageTitle.innerHTML = activeChapter.querySelector("h3")?.innerHTML || "";
       if (mobileWorkflowStageCopy) mobileWorkflowStageCopy.textContent = activeChapter.querySelector("p")?.textContent || "";
@@ -781,29 +756,21 @@
 
     const centerWorkflowChapter = (chapter, behavior = "smooth") => {
       if (!chapter || !mobileWorkflowQuery.matches) return;
-      const left = chapter.offsetLeft - ((workflowChapters.clientWidth - chapter.offsetWidth) / 2);
+      const left = chapter.offsetLeft - 8;
       workflowChapters.scrollTo({
         left: Math.max(0, left),
         behavior: reducedMotion.matches ? "auto" : behavior,
       });
     };
 
-    document.querySelectorAll("[data-workflow-prev], [data-workflow-next]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const delta = button.hasAttribute("data-workflow-next") ? 1 : -1;
-        centerWorkflowChapter(chapters[clamp(Number(activeWorkflowState) - 1 + delta, 0, chapters.length - 1)]);
-      });
-    });
-
     const syncWorkflowSwipe = () => {
       workflowSwipeFrame = 0;
       if (!mobileWorkflowQuery.matches) return;
-      const viewportCenter = workflowChapters.scrollLeft + (workflowChapters.clientWidth / 2);
+      const viewportStart = workflowChapters.scrollLeft + 8;
       const direction = workflowChapters.scrollLeft >= previousWorkflowScrollLeft ? "down" : "up";
       previousWorkflowScrollLeft = workflowChapters.scrollLeft;
       const closestChapter = chapters.reduce((closest, chapter) => {
-        const chapterCenter = chapter.offsetLeft + (chapter.offsetWidth / 2);
-        const distance = Math.abs(viewportCenter - chapterCenter);
+        const distance = Math.abs(viewportStart - chapter.offsetLeft);
         return distance < closest.distance ? { chapter, distance } : closest;
       }, { chapter: chapters[0], distance: Number.POSITIVE_INFINITY }).chapter;
       const state = closestChapter.dataset.workflowChapter || "1";
