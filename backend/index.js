@@ -4,6 +4,7 @@ require("dotenv").config();
 // 1) Core + Libs
 const express = require("express");
 const path = require("path");
+const { createWebNotFoundHandler } = require("./utils/webNotFound");
 const mongoose = require("mongoose");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
@@ -274,9 +275,7 @@ app.use("/api", (_req, res) => {
 
 app.use(express.static(PUBLIC_DIR));
 app.use(express.static(FRONTEND_DIR));
-app.get(/^(?!\/api(?:\/|$)).*/, (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/index.html"));
-});
+app.use(createWebNotFoundHandler(FRONTEND_DIR));
 
 // 7) Error + 404 Handlers
 app.use((req, res) => res.status(404).send("Not found"));

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Verify your email – Let’s-ParaConnect</title>
+  <link rel="stylesheet" href="assets/styles/fonts.css">
+  <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="assets/styles/auth-secondary.css?v=20260925-background-card">
+</head>
+<body class="auth-secondary verify-email-page">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="auth-secondary__header"><a class="auth-secondary__brand" href="index.html">Let<span class="auth-secondary__brand-mark">’</span>s-ParaConnect</a></header>
+  <main class="verify-email-layout" id="main" tabindex="-1" aria-labelledby="verificationTitle">
+    <div class="verification-art overlay" aria-hidden="true">
+      <canvas class="auth-matter-field" data-auth-matter-field></canvas>
+    </div>
+    <section class="verification-panel" id="verificationPanel" data-state="loading">
+      <div class="verification-panel__inner">
+        <p class="verification-eyebrow" id="verificationEyebrow">Account security</p>
+        <h1 id="verificationTitle">Verifying your email.</h1>
+        <p class="verification-status" id="verificationStatus" role="status" aria-live="polite">Please wait while we verify this link.</p>
+        <p class="verification-action-row"><a id="verificationAction" href="index.html" data-public-action="text" hidden>Return home</a></p>
+      </div>
+    </section>
+  </main>
+  <script src="assets/scripts/auth-matter-field.js" defer></script>
+  <script src="assets/scripts/verify-email.js"></script>
+  <script type="module" src="assets/scripts/web-vitals-rum.js"></script>
+</body>
+</html>

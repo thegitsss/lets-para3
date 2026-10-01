@@ -171,6 +171,13 @@ body.public-site-chrome.nav-open { overflow: hidden; }
   .public-site-chrome .mobile-nav__actions > .button { min-height:44px; font-size: 0.95rem; }
 }
 
+/* Give the directory its own row before four link columns become cramped. */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .public-site-chrome .home-footer__inner { grid-template-columns: minmax(0, 1fr); }
+  .public-site-chrome .home-footer__statement { padding-bottom: 30px; }
+  .public-site-chrome .home-footer__directory { padding-top: 0; }
+}
+
 @media (max-width: 900px) {
   .public-site-chrome .home-footer { padding-bottom: 18px; }
   .public-site-chrome .home-footer__inner { display: block; }
@@ -178,7 +185,7 @@ body.public-site-chrome.nav-open { overflow: hidden; }
   .public-site-chrome .home-footer__directory { display: block; padding: 0 0 28px; }
   .public-site-chrome .home-footer details { border-bottom: 1px solid rgba(248, 246, 239, 0.18); }
   .public-site-chrome .home-footer summary { min-height: 44px; position: relative; padding: 14px 22px 14px 0; cursor: pointer; }
-  .public-site-chrome .home-footer summary::after { position: absolute; top: 50%; right: 2px; content: "+"; font-size: 0.95rem; font-weight: 300; transform: translateY(-50%); }
+  .public-site-chrome .home-footer summary::after { position: absolute; top: 50%; right: 4px; width: 16px; height: 16px; line-height: 16px; text-align: center; content: "+"; font-size: 0.95rem; font-weight: 300; transform: translateY(-50%); }
   .public-site-chrome .home-footer details[open] summary::after { transform: translateY(-50%) rotate(45deg); }
   .public-site-chrome .home-footer__links { display: none; margin: 0; padding: 0 14px 15px; gap: 10px; }
   .public-site-chrome .home-footer details[open] .home-footer__links { display: flex; }
