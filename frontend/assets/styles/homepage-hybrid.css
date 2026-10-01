@@ -842,68 +842,17 @@ html.accessibility-mode .lpc-home--hybrid .hero-scroll {
 
 .editorial-hero__reassurance span {margin-inline:.48em;color:#6495ed}
 
-@keyframes editorial-hero-word-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 10px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
+/* Keep every hero element readable from the first paint. A single short
+   entrance avoids revealing the qualifier while the rest waits off-screen. */
+@keyframes editorial-hero-enter {
+  from { opacity: .85; transform: translate3d(0, 6px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
-
-@keyframes editorial-hero-group-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 18px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes editorial-hero-rule-enter {
-  from {opacity:0;transform:scaleY(0)}
-  to {opacity:.64;transform:scaleY(1)}
-}
-
-.js .lpc-home--editorial:not(.home-motion-ready) :is(.home-header,.editorial-hero__inner) {visibility:hidden}
 
 @media (prefers-reduced-motion: no-preference) {
-  .js .lpc-home--editorial.home-motion-ready .editorial-hero__qualifier-words > span {
-    animation: editorial-hero-word-enter 360ms cubic-bezier(.25,.1,.25,1) calc(50ms + (var(--word-index) * 50ms)) both;
+  .js .lpc-home--editorial .editorial-hero__inner {
+    animation: editorial-hero-enter 360ms ease-out;
   }
-
-  .js .lpc-home--editorial.home-motion-ready .editorial-hero__line--one {
-    animation: editorial-hero-group-enter 640ms cubic-bezier(.25,.1,.25,1) 360ms both;
-  }
-
-  .js .lpc-home--editorial.home-motion-ready .editorial-hero__line--two {
-    animation: editorial-hero-group-enter 640ms cubic-bezier(.25,.1,.25,1) 530ms both;
-  }
-
-  .js .lpc-home--editorial.home-motion-ready .editorial-hero__support {
-    animation: editorial-hero-group-enter 630ms cubic-bezier(.25,.1,.25,1) 700ms both;
-  }
-
-  .js .lpc-home--editorial.home-motion-ready .editorial-hero__support::before {
-    animation: editorial-hero-rule-enter 530ms cubic-bezier(.22,.61,.36,1) 750ms both;
-  }
-
-  .js .lpc-home--editorial.home-motion-ready .editorial-hero__actions {
-    animation: editorial-hero-group-enter 630ms cubic-bezier(.25,.1,.25,1) 860ms both;
-  }
-
-  .js .lpc-home--editorial.home-motion-ready .editorial-hero__publishing {
-    animation: editorial-hero-group-enter 630ms cubic-bezier(.25,.1,.25,1) 1050ms both;
-  }
-
-  .js .lpc-home--editorial.home-motion-ready .editorial-hero__reassurance {
-    animation: editorial-hero-group-enter 630ms cubic-bezier(.25,.1,.25,1) 1120ms both;
-  }
-
 }
 
 @media (min-width:641px) and (max-height:820px) {.editorial-hero__main{transform:translateY(-18px)}}
