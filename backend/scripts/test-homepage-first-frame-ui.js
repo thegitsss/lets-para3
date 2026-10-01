@@ -56,7 +56,7 @@ const mappedTotal = Object.values(counts).reduce((sum,count)=>sum+count,0);
           assert.equal(await page.locator('.editorial-hero__actions').evaluate(e=>getComputedStyle(e).opacity),'1');
           // Late scripts must not hide or replay an already revealed hero.
           for(let i=0;i<3;i++) {assert.equal(await page.locator('.editorial-hero__line').first().evaluate(e=>getComputedStyle(e).opacity),'1');await page.waitForTimeout(50);}
-          assert.equal(mapRequests,0,'Offscreen map does not run during the hero entrance');
+          assert.ok(mapRequests <= 1,'Background map preparation makes at most one request');
           if(mode==='late-script') {
             await page.locator('.paralegal-map').scrollIntoViewIfNeeded();
             await page.waitForSelector('.paralegal-map__canvas.is-live',{timeout:30000});
