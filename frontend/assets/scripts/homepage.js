@@ -7,6 +7,29 @@
   const mobileNav = document.querySelector("[data-mobile-nav]");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value));
+  // iOS browser chrome can resize the viewport during a swipe. Keep the
+  // long pinned workflow stable until the layout width changes (rotation).
+  const mobileScrollViewport = window.matchMedia("(max-width: 640px) and (pointer: coarse)");
+  let mobileScrollWidth = 0;
+  const syncMobileScrollViewport = () => {
+    if (!mobileScrollViewport.matches) {
+      document.documentElement.style.removeProperty("--mobile-scroll-vh");
+      mobileScrollWidth = 0;
+      return;
+    }
+    if (mobileScrollWidth === window.innerWidth) return;
+    mobileScrollWidth = window.innerWidth;
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:fixed;width:0;height:100svh;visibility:hidden;pointer-events:none";
+    document.body.appendChild(probe);
+    const height = probe.getBoundingClientRect().height || window.innerHeight;
+    probe.remove();
+    document.documentElement.style.setProperty("--mobile-scroll-vh", `${height / 100}px`);
+  };
+  syncMobileScrollViewport();
+  window.addEventListener("resize", syncMobileScrollViewport, { passive: true });
+  mobileScrollViewport.addEventListener("change", syncMobileScrollViewport);
+
   const footerDirectoryMedia = window.matchMedia("(max-width: 900px)");
   const footerDirectories = Array.from(document.querySelectorAll(".home-footer__directory details"));
   const syncFooterDirectories = () => {
