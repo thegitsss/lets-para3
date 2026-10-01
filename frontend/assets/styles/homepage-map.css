@@ -43,7 +43,7 @@
   pointer-events: none;
   content: '';
 }
-.paralegal-map__canvas { position: relative; width: min(100%, 1140px); margin: 0 auto; }
+.paralegal-map__canvas { position: relative; width: min(100%, 1140px); aspect-ratio: 975 / 610; margin: 0 auto; }
 .paralegal-map__canvas svg {
   display: block;
   width: 100%; height: auto;
