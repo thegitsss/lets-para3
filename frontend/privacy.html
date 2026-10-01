@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <link rel="stylesheet" href="assets/styles/styles.css" />
   <link rel="stylesheet" href="assets/styles/hero-pages.css?v=20260826-uniform-heroes" />
-  <link rel="stylesheet" href="assets/styles/public-site-chrome.css?v=20260925-narrow-footer" />
+  <link rel="stylesheet" href="assets/styles/public-site-chrome.css?v=20260930-responsive-footer" />
   <link rel="stylesheet" href="assets/styles/legal-documents.css?v=20260828-shared-legal" />
   <link href="assets/styles/admission-hero.css?v=20260925-faq-match" rel="stylesheet" />
   <link href="assets/styles/terms-page.css?v=20260925-simple-lists" rel="stylesheet" />
@@ -58,7 +58,7 @@
   </section>
 
   <main class="legal-document" id="main" tabindex="-1" aria-labelledby="privacy-title">
-    <p class="utility-hero__meta legal-effective-date">Effective September 25, 2026</p>
+    <p class="utility-hero__meta legal-effective-date">Effective October 1, 2026</p>
     <p>
       This Privacy Policy describes how Let’s-ParaConnect, Inc. (“Let’s-ParaConnect,” “LPC,” “we,” “us,” or “our”)
       handles personal information when you visit, create an account, or use the Let’s-ParaConnect platform and related support services (the “Platform”).
@@ -66,7 +66,7 @@
 
 <section id="scope" class="card">
       <h2>1. Scope.</h2>
-      <p>This policy applies to information handled through the Platform. It does not govern third-party websites or services that LPC does not control. Those services publish their own privacy notices.</p>
+      <p>This policy applies to visitors to the public website and directory, applicants, Attorneys, Paralegals, and people who contact LPC. It covers the Attorney and Paralegal portals, Matter workspaces, account settings, LPC Assistant, and support and administrative operations. Features and access depend on your role, account status, and the version available to you. This policy does not govern third-party websites or services that LPC does not control; those services publish their own privacy notices.</p>
     </section>
 
     <section id="information" class="card">
@@ -74,29 +74,35 @@
       <h3>Information you provide.</h3>
       <ul>
         <li>Account and contact information, including name, email address, phone number, state, and time zone.</li>
-        <li>Professional profile and application information, including licensing details, qualifications, résumé, certificates, work history, writing samples, and profile photographs.</li>
-        <li>Matter postings, applications, assignments, tasks, messages, files, disputes, and other content you submit through the Platform.</li>
-        <li>Support requests, incident reports, and conversations with LPC support.</li>
-        <li>Payment and payout status received from our payment processor. LPC does not store full card numbers or bank-account credentials.</li>
+        <li>Professional profile and admission information, including bar and licensing details, firm information, qualifications, résumé, certificates or degrees, work history, writing samples, photographs, practice areas, skills, state experience, availability, and professional links.</li>
+        <li>Matter drafts and postings, applications, invitations, conflicts-check responses, confidentiality acknowledgements and documents, assignments, scope tasks, deadlines, calendar entries, meeting links, messages and reactions, files and versions, review or revision notes, completion records, and withdrawal, termination, or dispute submissions.</li>
+        <li>Saved profiles and views, private notes where available, notification and visibility preferences, and other content or settings you choose to save.</li>
+        <li>Contact-form submissions, support requests and replies, incident reports, LPC Assistant conversations, and feedback on Assistant answers.</li>
+        <li>Payment and payout records, including transaction identifiers, amounts, fees, refunds, receipts, connected-account readiness, and limited payment-method details such as card brand and last four digits received from Stripe. Payment credentials and connected-account identity, bank, or tax information are submitted through Stripe’s applicable flows. LPC does not store full card numbers or bank-account credentials.</li>
+        <li>Authentication and acknowledgement records, including password hashes, verification and recovery records, multi-factor authentication settings, and the versions and dates of your Terms acceptance and Privacy acknowledgement. If you register a passkey, LPC stores its public credential and associated device, name, and usage information; LPC does not receive your device’s fingerprint or face scan.</li>
       </ul>
       <h3>Information collected automatically.</h3>
       <ul>
         <li>IP address, browser and device type, approximate region, request time, page or feature used, and security or diagnostic events.</li>
         <li>Cookie-based session identifiers and account preferences needed to authenticate you, protect the Platform, and remember your choices.</li>
+        <li>Activity records such as timestamps, message read status, file upload and review status, security-check results, and records of actions taken in a Matter or account.</li>
+        <li>Policy acceptance records identifying the Terms accepted and Privacy Policy acknowledged, their document fingerprints, the time, and the associated account and session. LPC retains the corresponding policy copies so an earlier acknowledgement can be verified.</li>
         <li>Limited performance measurements described in Section 7.</li>
       </ul>
       <h3>Information from other sources.</h3>
-      <p>We may receive identity and account information from a sign-in provider you choose and payment, payout, and connected-account information from Stripe. To verify an application, we may also receive qualification, licensing, or employment information from schools, official verification services, licensing authorities, or law firms, as applicable. These checks confirm admission eligibility; they are not a general background check.</p>
+      <p>If you choose Google sign-in where available, we receive the Google account identifier, verified email address, and available name information needed to authenticate or create your LPC account. Google sign-in does not give LPC access to your Gmail or Google Drive content. We receive payment, payout, and connected-account information from Stripe, and information other users provide about shared work, applications, or support issues.</p>
+      <p>To verify an application, we may also receive qualification, licensing, or employment information from schools, official verification services, licensing authorities, or law firms, as applicable. These checks confirm admission eligibility; they are not a general background check.</p>
     </section>
 
     <section id="use" class="card">
       <h2>3. How we use information.</h2>
       <ul>
-        <li>Provide accounts, profile discovery, Matter applications and invitations, Matter workspaces, messaging, file sharing, payments, payouts, notifications, and support.</li>
+        <li>Provide accounts, public and signed-in profile discovery, Matter applications and invitations, pre-engagement checks, Matter workspaces, messaging, file review and sharing, deadlines, payments, payouts, records and exports, notifications, and support.</li>
         <li>Manually review every user’s application, verify the qualifications or professional information needed for admission, and confirm eligibility before granting platform access.</li>
         <li>Authenticate users, prevent fraud and abuse, investigate incidents, enforce Platform rules, and protect users and LPC.</li>
         <li>Operate, debug, measure, and improve Platform reliability, accessibility, usability, and performance.</li>
         <li>Communicate about account activity, matters, transactions, security, support, and policy changes.</li>
+        <li>Provide relevant search results, suggested opportunities, availability information, and account or Matter summaries based on profile information, preferences, and authorized activity. These tools assist discovery and organization; users decide whether to apply, hire, or work together.</li>
         <li>Comply with legal obligations, respond to lawful requests, resolve disputes, and enforce agreements.</li>
       </ul>
     </section>
@@ -105,46 +111,54 @@
       <h2>4. How we disclose information.</h2>
       <p>LPC does not sell or rent personal information for marketing purposes. We may disclose information as follows:</p>
       <ul>
-        <li><strong>Other Platform users.</strong> Professional profile information and Matter-related information are shown to authorized users for profile discovery, applications, invitations, and collaboration. Users control certain profile visibility settings.</li>
-        <li><strong>Service providers.</strong> Vendors process limited information for hosting, storage, database, email, security monitoring, support, and other Platform operations under their applicable agreements with LPC.</li>
+        <li><strong>Public profiles.</strong> Approved Paralegals who meet the directory’s profile and photograph requirements may appear in public browsing and profile pages unless their profile is hidden. Visitors who are not signed in may see their name, approved photograph, location or state, biography, experience, practice areas, education, availability, and other published professional information. The public directory does not provide access to private Matter files, payment credentials, or admission documents.</li>
+        <li><strong>Other Platform users.</strong> Authorized users may see relevant professional profiles, application materials and permitted professional documents, invitation and pre-engagement records, shared messages and files, deadlines, work-review status, and applicable financial information. Access depends on role and the application or Matter relationship. Information designated as a private note is restricted from the other participant’s ordinary workspace view.</li>
+        <li><strong>LPC administration.</strong> Authorized LPC personnel may access information needed for admissions, photo or content moderation, support, dispute or payment review, security, and Platform operations. Support conversations and escalated records may be reviewed for these purposes. Private workspace content is not a public listing.</li>
+        <li><strong>Service providers.</strong> Vendors process information needed for hosting, storage, database, email, authentication, fraud prevention, file-security checks, monitoring, AI-assisted support, and other Platform operations under their applicable agreements with LPC. Where enabled, Cloudflare Turnstile processes browser and network signals to help protect forms from automated abuse.</li>
         <li><strong>Application verification.</strong> We may share the limited applicant information needed to confirm a qualification, license, or employment history with the relevant institution, verification service, licensing authority, or law firm. We confirm law-firm experience with the applicant’s permission and will not contact a current employer without explicit permission.</li>
-        <li><strong>Payments.</strong> Stripe processes payment methods, transactions, connected-account onboarding, and payouts under Stripe’s terms and privacy policy.</li>
+        <li><strong>Payments.</strong> Stripe processes payment methods, transactions, connected-account onboarding, and payouts under its applicable terms and <a href="https://stripe.com/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</li>
         <li><strong>Legal and safety.</strong> We may preserve or disclose information when reasonably necessary to comply with law, respond to lawful process, investigate misconduct, protect rights or safety, or secure the Platform.</li>
         <li><strong>Business transfers.</strong> Information may be transferred as part of a merger, financing, acquisition, reorganization, bankruptcy, or sale of assets, subject to applicable law.</li>
         <li><strong>At your direction.</strong> We disclose information when you direct us to do so or give permission.</li>
       </ul>
       <p>We may use and disclose aggregated or de-identified statistics that do not reasonably identify an individual.</p>
+      <h3>Directory visibility and the homepage map.</h3>
+      <p>You can hide an eligible Paralegal profile from discovery in Account Settings. This does not remove it from existing applications, engagements, or records accessible to authorized users, or erase copies someone previously obtained. The homepage map uses aggregate state counts of approved, active Paralegal accounts, including accounts with hidden profiles or incomplete directory profiles. Counts use supplied state, location, or state-experience information; accounts without a usable state are not placed on the map. Map data does not include names, profile identifiers, or street addresses, and dot locations are illustrative rather than individual locations.</p>
     </section>
 
     <section id="matter-assistant" class="card">
-      <h2>5. Matter-workspace LPC Assistant.</h2>
-      <p>When a signed-in user chooses the LPC Assistant to ask about a Matter workspace, LPC processes the user’s prompt, relevant Assistant conversation history, page and account role, and read-only Matter information the user is authorized to access. Depending on the question, that context may include Matter titles, status and deadlines; participant, application, and invitation information; tasks; file names, review status, and revision notes; and completion, payment, or payout status.</p>
+      <h2>5. LPC Assistant in accounts and Matter workspaces.</h2>
+      <p>When a signed-in user chooses LPC Assistant, LPC processes the user’s prompt, relevant Assistant conversation history, page and account role, and account or Matter information the user is authorized to access. The Assistant can use the current workspace or authorized information across the user’s account. Depending on the question, context may include profile or account-readiness facts; Matter titles, status, deadlines, and calendar information; participant, application, invitation, and pre-engagement information; tasks; file names, review status, and revision notes; message activity and limited message previews; and completion, payment, or payout information.</p>
       <p>LPC retrieves this authorized context from LPC’s systems and sends the prompt and relevant context to OpenAI, acting as LPC’s AI service provider, so the Assistant can generate an answer. File contents are not sent merely because a file exists in the workspace. However, text a user types or pastes into the Assistant is transmitted as written. Users should submit only information they are authorized to process through the Matter workspace.</p>
       <p>LPC disables optional storage of AI responses at OpenAI. This does not immediately delete all conversation records. OpenAI may still retain information to monitor abuse or for other purposes permitted by its service terms and account settings, and states that information sent through its business services is not used to train its models by default. Other LPC service providers may process this information as necessary for hosting, databases, storage, security, and operation of the Platform under their applicable agreements with LPC.</p>
-      <p>The LPC Assistant provides workspace information only. It does not provide legal advice or make decisions. AI responses can be incomplete or wrong, so users should verify important information against the Matter workspace.</p>
+      <p>The Assistant provides Platform information, navigation, and support. It does not provide legal advice or make professional, hiring, work-approval, or payment decisions for users. Conversation, feedback, and support-routing actions may be recorded. AI responses can be incomplete or wrong; verify important information against the current account, Matter, and payment records.</p>
     </section>
 
     <section id="ai-support" class="card">
       <h2>6. AI-assisted support.</h2>
       <p>
-        When you choose LPC’s AI-assisted support, LPC sends the text you enter, the active support-chat history, the page and account role you are using, and limited facts you are authorized to access to OpenAI so it can generate a response. LPC excludes known sensitive fields such as passwords, payment credentials, private file-access details, and document contents from the account information automatically shared with OpenAI. Your own message is sent as written, so do not enter client-confidential or privileged matter content, passwords, payment details, or documents in the support assistant.
+        When you choose LPC’s AI-assisted support, LPC sends the text you enter, the active support-chat history, the page and account role you are using, and relevant facts you are authorized to access to OpenAI so it can generate a response. LPC excludes password and payment credentials, private file-access details, and document contents from the account context automatically supplied to the Assistant. Your own message is sent as written; do not enter passwords, payment credentials, or unnecessary client-confidential or privileged content. Use the authorized Matter file and messaging tools to exchange work documents.
       </p>
       <p>
         LPC disables optional storage of AI responses at OpenAI. LPC’s own conversation records follow the retention policy in Section 8. OpenAI may still retain information to monitor abuse or for other purposes permitted by its service terms and account settings. OpenAI states that information sent through its business services is not used to train its models by default. See <a href="https://openai.com/enterprise-privacy/" target="_blank" rel="noopener">OpenAI’s enterprise privacy information</a> for current provider details.
       </p>
       <p>AI responses can be incomplete or wrong. Verify important information and use the Matter workspace—not the support assistant—for Matter content and files.</p>
+      <h3>Support and operational review.</h3>
+      <p>LPC also uses automated and AI-assisted tools to organize inquiries, summarize relevant records, prepare replies, and investigate reported technical problems. Support submissions, related account or Matter status, and relevant diagnostic information may be processed by LPC and service providers such as OpenAI for those purposes, including when an issue comes from a contact form or is escalated from an Assistant conversation. This processing is separate from deciding to use a chat feature. LPC retains support tickets, replies, routing and review records, and delivery status as needed to address the issue and maintain an operational record.</p>
+      <p>Automated tools may assist with routine steps. Consequential admission, account, dispute, and payment decisions remain subject to the applicable authorized review process. A draft response or automated summary is not a final decision or proof that an action was carried out.</p>
     </section>
 
     <section id="cookies" class="card">
       <h2>7. Cookies and performance data.</h2>
-      <p>LPC uses essential cookies to keep you signed in, protect requests, and support sign-in flows. We also use storage in your browser to remember preferences and maintain support-session information. Some browser storage lasts only for the session; other settings may remain until cleared. Blocking or clearing cookies or browser storage can sign you out, reset preferences, or prevent account features from working.</p>
+      <p>LPC uses essential cookies to keep you signed in, protect requests, and support sign-in flows. We also use storage in your browser to remember preferences, preserve supported draft or view state, and maintain support-session information. Some browser storage lasts only for the session; other settings may remain until cleared. Blocking or clearing cookies or browser storage can sign you out, reset preferences, discard locally saved information, or prevent account features from working. Clearing browser storage does not delete records already saved to LPC’s systems.</p>
       <p>For service-performance monitoring, the Platform measures Core Web Vitals (loading speed, interaction responsiveness, and visual stability), the page path without query parameters, a broad mobile or desktop classification, navigation type, and general connection class. Performance samples do not include an account identifier, session identifier, full URL, form contents, message contents, or interaction recordings. Individual samples are automatically removed from the active database after approximately 35 days and are used in aggregate to find and correct reliability and usability problems.</p>
     </section>
 
     <section id="retention" class="card">
       <h2>8. Retention and account deactivation.</h2>
       <p>We retain information for as long as reasonably necessary to provide the Platform, complete transactions, maintain financial and audit records, meet legal obligations, resolve disputes, enforce agreements, prevent fraud, and protect Platform integrity. Retention depends on the record type and the reason it is needed.</p>
-      <p>Assistant conversations and associated messages—including Matter-workspace LPC Assistant and support-assistant messages—remain in the active database for up to 183 days after the conversation’s last message. Starting or restarting an Assistant conversation resets its active conversational context but does not immediately delete earlier records. The scheduled cleanup removes eligible conversation and message records.</p>
+      <p>Assistant conversations and associated messages, including Matter-workspace LPC Assistant and support-assistant messages, become eligible for cleanup after 183 days without a new message. Scheduled cleanup removes eligible conversation and message records along with associated conversation-request records; an active request may delay removal. Starting or restarting an Assistant conversation resets its active conversational context but does not immediately delete earlier records. Information separately preserved in support tickets, incident reports, dispute records, or audit records follows the retention needs for those records.</p>
+      <p>Files and downloadable archives for completed Matters are scheduled for removal six months after completion. The Matter’s retention deadline controls download availability. Scheduled cleanup removes stored Matter files and archive objects; it does not erase the entire Matter, its financial history, or separately retained messages, support, dispute, and audit records. Closing or archiving a Matter in a list does not itself start or extend that file-removal schedule. Download any records you need while they remain available and keep your own copies as required for your professional obligations.</p>
       <p>Self-serve account deactivation disables access and removes the account from active participation. It does not automatically delete your profile information or files, completed Matters, transaction records, or audit evidence. To request deletion of personal information, use the privacy-request process in Section 10. We may need to retain some records for the reasons described above.</p>
       <p>File deletion is handled separately from account deactivation. Files approved for removal are processed through LPC’s deletion workflow. Deleted information may remain temporarily in backups or security logs until the applicable retention period ends.</p>
     </section>
@@ -156,8 +170,11 @@
 
     <section id="choices" class="card">
       <h2>10. Your choices and privacy requests.</h2>
-      <p>You can update profile and account information, manage notification preferences, control certain profile visibility, review active sessions, and deactivate an eligible account from Account Settings. Depending on where you live, applicable law may provide rights to request access, correction, deletion, portability, or restriction of certain personal information, or to appeal a privacy-request decision.</p>
+      <p>You can update profile and account information, manage the notification preferences offered to your role, hide an eligible Paralegal profile from discovery, manage available passkeys and multi-factor authentication, review or revoke active sessions, and deactivate an eligible account from Account Settings. Notification choices do not necessarily stop essential account, security, transaction, or service notices. Deactivation may be unavailable while an active Matter, dispute, payment, payout, or other financial obligation remains unresolved.</p>
+      <p>You may use the Platform’s ordinary account and Matter tools without asking LPC Assistant a question. If you do use the Assistant, the processing in Sections 5 and 6 applies. Depending on where you live, applicable law may provide rights to request access, correction, deletion, portability, or restriction of certain personal information, or to appeal a privacy-request decision.</p>
       <p>Submit a request through the <a href="contact.html">LPC contact form</a> and identify it as a privacy request. We may need to verify your identity and authority before acting. We will respond as required by applicable law. Some information may be exempt from a request or retained for legal, security, transactional, or other permitted reasons.</p>
+      <p>Where applicable law provides these rights, you may request information about our collection and disclosures, obtain a copy, correct inaccurate information, request deletion, or exercise an applicable opt-out or sensitive-information right. An authorized agent may submit a request with proof of authority; we may separately verify your identity as allowed by law. Provide enough information to locate your account, but do not send passwords, full payment details, or client files with the initial request. We will explain a denial and available appeal rights. To appeal, submit the contact form marked “Privacy appeal” and identify the original request. You may also contact your state’s privacy regulator or attorney general. LPC will not retaliate against you for exercising a protected privacy right.</p>
+      <p>The availability and scope of state privacy rights depend on the law’s coverage, your circumstances, and applicable exceptions. A Privacy Policy acknowledgement confirms receipt of this notice; it is not blanket consent to unrelated processing or a waiver of statutory rights.</p>
     </section>
 
     <section id="children" class="card">
@@ -167,7 +184,7 @@
 
     <section id="changes" class="card">
       <h2>12. Changes to this policy.</h2>
-      <p>We may update this Privacy Policy as the Platform, vendors, or legal requirements change. The effective date at the top identifies the current policy. LPC may notify account holders of material changes and may require a new acknowledgement before further account use.</p>
+      <p>We may update this Privacy Policy as the Platform, vendors, or legal requirements change. The effective date identifies the current policy. LPC presents revised policies through the account policy-review process and records the version, document fingerprint, and acknowledgement time. Acknowledgement is separate from accepting the Terms of Service. We will provide notice of material changes and obtain additional consent where required before materially expanding uses of previously collected information. Simply posting a new policy does not supply that consent.</p>
     </section>
 
     <section id="contact" class="card">
