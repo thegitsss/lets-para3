@@ -1,4 +1,4 @@
-/* Linear's mobile swipe and hero motion, with LPC's approved heading-first cards.
+/* Linear's phone/tablet swipe and hero motion, with LPC's approved heading-first cards.
    328px card width, 8px gutter/gap, start snapping; 1s blur/rise hero entrance. */
 .lpc-home--editorial .editorial-hero :is(.editorial-hero__qualifier-words > span, .editorial-hero__line, .editorial-hero__support, .editorial-hero__support::before, .editorial-hero__actions, .editorial-hero__publishing, .editorial-hero__reassurance) { animation: none !important; }
 .hero-motion-line { display: block; }
@@ -7,11 +7,7 @@
 @media (prefers-reduced-motion: no-preference) {
   .js .editorial-hero:not(.hero-entrance-ready) .editorial-hero__inner { opacity: 0; animation: hero-readable-fallback 0s 1800ms forwards; }
 }
-@media (max-width: 640px) {
-  html.lpc-homepage { scroll-snap-type: none !important; scroll-behavior: auto; }
-  body.lpc-home--editorial, .lpc-home--editorial :is(.home-header, .mobile-nav, .editorial-hero, .path-scene--attorney) { background-attachment: scroll; }
-  .lpc-home--editorial .editorial-hero { min-height: max(720px, 100svh); }
-  .lpc-home--editorial .editorial-hero__details { transform: none !important; }
+@media (max-width: 960px) {
   .lpc-home .workflow__story { display: block; width: 100%; min-height: 0; }
   .lpc-home .workflow-mobile-stage, .lpc-home .workflow-mobile-nav { display: none; }
   .lpc-home .workflow-chapters {
@@ -72,8 +68,7 @@
   .lpc-home .workflow-chapters:focus-visible { outline: 2px solid #6495ed; outline-offset: -2px; }
   .lpc-home .workflow { padding-bottom: 80px; }
 }
-@media (max-width: 640px) {
-  .lpc-home--editorial .editorial-hero { min-height: max(720px, var(--mobile-stable-height, 100svh)); }
+@media (max-width: 960px) {
   .lpc-home .workflow-chapters .workflow-chapter h3 { color: #1b2534; opacity: 1; }
   .lpc-home .workflow-chapters .workflow-chapter > div:not(.workflow-mobile-canvas) > p { position: absolute; top: 304px; left: 24px; right: 24px; max-width: 250px; margin: 0; line-height: 20px; }
   .lpc-home .workflow-chapters .workflow-chapter__number { z-index: 1; }
@@ -83,11 +78,6 @@
   .lpc-home .workflow-chapters .workflow-mobile-canvas .message--sent p { color: #fff; }
 }
 
-@media (max-width: 640px) {
-  .lpc-home .closing-scene { min-height: calc(var(--mobile-stable-height, 100svh) - var(--header-height)); }
-  .lpc-home--editorial .home-header { background: rgba(237, 240, 243, .96); }
-  .lpc-home--editorial .home-header.is-past-hero { background: rgba(255, 255, 255, .96); }
-}
 
 /* The same notes-first composer attorneys use to start a Matter. */
 .lpc-home .workflow-notes-feature strong { display: block; margin-bottom: 12px; color: #203550; font: 500 22px/1.35 'Sarabun', sans-serif; }
@@ -99,7 +89,7 @@
 .lpc-home .workflow-create-preview__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 16px; }
 .lpc-home .workflow-create-preview__build { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 5px; background: #203550; color: white; font: 500 13px/20px 'Sarabun', sans-serif; }
 .lpc-home .workflow-create-preview__manual { color: #647080; font: 400 13px/20px 'Sarabun', sans-serif; }
-@media (max-width: 640px) {
+@media (max-width: 960px) {
   .lpc-home .workflow-notes-feature { max-width: 390px; }
   .lpc-home .workflow-notes-feature strong { font-size: 19px; margin-bottom: 8px; }
   .lpc-home .workflow-notes-feature p { font-size: 16px; line-height: 1.6; }
@@ -116,14 +106,14 @@
 .lpc-home .workflow-create-preview__actions { justify-content: center; }
 .lpc-home .workflow-state .workflow-preview-action { align-self: center; justify-self: center; margin-inline: auto; }
 .lpc-home .workflow-state .message-composer span { display: inline-flex; align-items: center; justify-content: center; }
-@media (max-width: 640px) {
+@media (max-width: 960px) {
   .lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-list { gap: 6px; }
   .lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row { padding: 4px 6px; }
   .lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row__identity :is(strong,span) { line-height: 16px; }
   .lpc-home .workflow-chapters .workflow-mobile-canvas .message-composer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 6px 8px; border: 1px solid #dce2ea; border-radius: 6px; font-size: 11px; }
   .lpc-home .workflow-chapters .workflow-mobile-canvas .message-composer span { padding: 5px; border-radius: 4px; background: #203550; color: #fff; }
 }
-@media (max-width: 640px) {
+@media (max-width: 960px) {
   .lpc-home .workflow-chapters .workflow-mobile-canvas .completion-files i { padding: 3px; font-size: 9px; line-height: 14px; }
   .lpc-home .workflow-chapters .workflow-mobile-canvas .completion-files > span { padding: 6px 8px; }
 }
@@ -133,3 +123,21 @@
 .lpc-home .closing-scene .closing-scene__content > .closing-access-note { max-width: 540px; margin: 24px auto 0; font: 300 14px/1.6 "Sarabun", sans-serif; text-align: center; }
 
 .lpc-home .fee-card a.stripe-link, .lpc-home .fee-card a.stripe-link:hover, .lpc-home .fee-card a.stripe-link:visited { color: #6495ed; text-decoration: none; }
+
+@media (max-width: 640px) {
+  html.lpc-homepage { scroll-snap-type: none !important; scroll-behavior: auto; }
+  body.lpc-home--editorial, .lpc-home--editorial :is(.home-header, .mobile-nav, .editorial-hero, .path-scene--attorney) { background-attachment: scroll; }
+  .lpc-home--editorial .editorial-hero { min-height: max(720px, 100svh); }
+  .lpc-home--editorial .editorial-hero__details { transform: none !important; }
+  .lpc-home--editorial .editorial-hero { min-height: max(720px, var(--mobile-stable-height, 100svh)); }
+  .lpc-home .closing-scene { min-height: calc(var(--mobile-stable-height, 100svh) - var(--header-height)); }
+  .lpc-home--editorial .home-header { background: rgba(237, 240, 243, .96); }
+  .lpc-home--editorial .home-header.is-past-hero { background: rgba(255, 255, 255, .96); }
+}
+/* Shared preview refinements apply to the desktop presentation as well. */
+.lpc-home .workflow-create-preview__actions { flex-direction: column; gap: 8px; }
+.lpc-home .workflow-state .completion-state--released .payment-summary { flex-direction: column; align-items: center; }
+.lpc-home .workflow-canvas.product-shell {
+  background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+    radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+}

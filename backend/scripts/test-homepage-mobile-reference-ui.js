@@ -10,8 +10,8 @@ const browsers = require('playwright');
     for (const name of (process.env.LPC_BROWSERS || 'chromium,webkit').split(',')) {
       const browser = await browsers[name].launch();
       try {
-        for (const width of [320, 390, 428, 640, 768, 1440]) {
-          const page = await browser.newPage({ viewport: {width,height:926}, isMobile:width<=640,hasTouch:width<=640 });
+        for (const width of [320, 390, 428, 640, 641, 768, 820, 960, 961, 1024, 1440, 2560]) {
+          const page = await browser.newPage({ viewport: {width,height:926}, isMobile:width<=960,hasTouch:width<=960 });
           await page.route('**/api/**', r => r.fulfill({contentType:'application/json',body:'{"user":null,"states":[],"total":0}'}));
           await page.goto(origin, {waitUntil:'domcontentloaded'});
           await page.waitForSelector('.hero-entrance-ready');
@@ -21,7 +21,7 @@ const browsers = require('playwright');
           await page.waitForTimeout(2200);
           assert.equal(await page.locator('.editorial-hero__inner').evaluate(e=>getComputedStyle(e).opacity),'1');
           assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No document overflow');
-          if (width<=640) {
+          if (width<=960) {
             const rail = page.locator('.workflow-chapters');
             const geometry = await rail.evaluate(e=>({h:e.offsetHeight,gap:getComputedStyle(e).gap,snap:getComputedStyle(e).scrollSnapType,children:[...e.children].map(c=>{const heading=c.querySelector('h3');const h=heading.getBoundingClientRect();const preview=c.lastElementChild.getBoundingClientRect();const caption=c.children[1].querySelector('p').getBoundingClientRect();return {w:c.offsetWidth,h:c.offsetHeight,center:getComputedStyle(heading).textAlign,headingGap:preview.top-h.bottom,captionTop:caption.top-c.getBoundingClientRect().top,captionGap:caption.top-preview.bottom,bottomSpace:c.getBoundingClientRect().bottom-caption.bottom,overflow:c.scrollHeight-c.clientHeight};})}));
             assert.equal(geometry.h,382);assert.equal(geometry.gap,'8px');assert.equal(geometry.snap,'x mandatory');
@@ -33,7 +33,7 @@ const browsers = require('playwright');
             const initial = await page.locator('#assistant').evaluate(e=>e.getBoundingClientRect().top);
             const landmarks = () => page.locator('main > section, footer').evaluateAll(es=>es.map(e=>({top:e.offsetTop,height:e.offsetHeight})));
             const originalLandmarks = await landmarks();
-            for (const height of [826,926,846,926]) { await page.setViewportSize({width,height});await page.waitForTimeout(80);assert.ok(Math.abs(await page.locator('#assistant').evaluate(e=>e.getBoundingClientRect().top)-initial)<1,'No jump at Assistant when toolbar height changes'); assert.deepEqual(await landmarks(),originalLandmarks,'All sections through the footer remain stable'); }
+            for (const height of (width<=640 ? [826,926,846,926] : [])) { await page.setViewportSize({width,height});await page.waitForTimeout(80);assert.ok(Math.abs(await page.locator('#assistant').evaluate(e=>e.getBoundingClientRect().top)-initial)<1,'No jump at Assistant when toolbar height changes'); assert.deepEqual(await landmarks(),originalLandmarks,'All sections through the footer remain stable'); }
             assert.equal(await rail.evaluate(e=>e.scrollLeft),position,'Vertical scrolling preserves card position');
             if (name==='chromium'&&width===428) {
               const client=await page.context().newCDPSession(page);
@@ -43,10 +43,37 @@ const browsers = require('playwright');
               assert.ok(await rail.evaluate(e=>e.scrollLeft)>250,'Native horizontal swipe');assert.ok(Math.abs(await page.evaluate(()=>scrollY)-y)<3,'Horizontal swipe does not move page');
               await swipe(210,520,210,230);assert.ok(await page.evaluate(()=>scrollY)>y+150,'Vertical swipe over cards continues into Assistant');
             }
-            await page.setViewportSize({width:926,height:428});
+            await page.setViewportSize({width:1024,height:768});
             await page.waitForFunction(() => document.querySelectorAll('.hero-motion-line').length === 0);
             assert.equal(await page.locator('h1').innerText(),'Your caseload grew.\nYour payroll doesn’t have to.','Rotation preserves whole words');
-          } else assert.equal(await page.locator('.workflow-chapters').evaluate(e=>getComputedStyle(e).display),'grid');
+           } else {
+            assert.equal(await page.locator('.workflow-chapters').evaluate(e=>getComputedStyle(e).display),'grid');
+            for (let step=1;step<=6;step++) {
+              await page.locator(`[data-workflow-chapter="${step}"]`).evaluate(e=>scrollTo({top:e.getBoundingClientRect().top+scrollY-innerHeight*.25,behavior:'instant'}));
+              await page.waitForFunction(step=>document.querySelector('[data-workflow-canvas]').dataset.workflowState===String(step),step);
+              const panel=page.locator(`.workflow-canvas > [data-state="${step}"]`);
+              await page.waitForTimeout(750);
+              assert.equal(await panel.getAttribute('aria-hidden'),'false');
+              assert.ok(await panel.isVisible());
+              assert.ok(await panel.evaluate(e=>e.scrollWidth<=e.clientWidth+1),'Desktop preview content fits horizontally');
+              const centered = await panel.evaluate(e=>{
+                const action=e.querySelector('.workflow-create-preview__build, .workflow-preview-action');
+                if(!action)return true;
+                const parent=action.closest('.workflow-create-preview, .completion-state');
+                const a=action.getBoundingClientRect(),p=parent.getBoundingClientRect();
+                return Math.abs((a.left+a.width/2)-(p.left+p.width/2))<2;
+              });
+              assert.ok(centered,'Navy action remains centered on desktop');
+            }
+          }
+          assert.deepEqual(await page.locator('.workflow-chapter h3').allTextContents(),['Scope','Review fit, check conflicts','Work','Review','Complete','Close']);
+          const preview = width<=960 ? '.workflow-chapters .workflow-mobile-canvas' : '.workflow-canvas';
+          assert.ok(!(await page.locator(preview).allTextContents()).join(' ').includes('Example'));
+          assert.equal(await page.locator(`${preview} [data-state="2"] .applicant-row`).count(),3);
+          assert.equal(await page.locator(`${preview} [data-state="3"] .message-composer svg`).count(),1);
+          assert.ok((await page.locator(`${preview} [data-state="4"]`).textContent()).includes('Treatment Summary.docx'));
+          assert.equal(await page.locator(`${preview} [data-state="5"] h4`).count(),0);
+          assert.ok((await page.locator(`${preview} [data-state="6"]`).textContent()).includes('via Stripe'));
           await page.close();
         }
         for (const mode of ['reduced','no-script','failed-entrance','slow-fonts']) {

@@ -636,7 +636,7 @@
   const chapters = Array.from(document.querySelectorAll("[data-workflow-chapter]"));
   const workflowChapters = document.querySelector(".workflow-chapters");
   const workflowMobileCount = document.querySelector("[data-workflow-mobile-count]");
-  const mobileWorkflowQuery = window.matchMedia("(max-width: 640px)");
+  const mobileWorkflowQuery = window.matchMedia("(max-width: 960px)");
   const desktopRail = desktopCanvas?.querySelector(".matter-rail");
   const mobileWorkflowStage = document.querySelector("[data-mobile-workflow-stage]");
   const mobileWorkflowStageHeading = document.querySelector(".workflow-mobile-stage__heading");
