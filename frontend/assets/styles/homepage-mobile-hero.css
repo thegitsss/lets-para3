@@ -42,6 +42,10 @@
     line-height: 1.55;
   }
 
+  .lpc-home--editorial .editorial-hero__support-intro {
+    display: none;
+  }
+
   .lpc-home--editorial .editorial-hero__support::before {
     display: none;
   }
