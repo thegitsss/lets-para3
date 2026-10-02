@@ -164,7 +164,7 @@
 /* Let the two headline sentences have the screen before the example arrives. */
 .lpc-home .matter-builder { padding-top: 0; }
 .lpc-home .matter-builder__opening {
-  min-height: min(100svh, 900px);
+  min-height: min(var(--home-stable-viewport, 100svh), 900px);
   display: grid;
   place-items: center;
 }
@@ -180,14 +180,14 @@
 .lpc-home .matter-builder__line--lpc { margin-top: .12em; }
 
 .lpc-home.matter-builder-motion-ready:not(.accessibility-mode) .matter-builder__opening {
-  height: 175svh;
+  height: calc(var(--home-stable-viewport, 100svh) * 1.75);
   min-height: 0;
   display: block;
 }
 .lpc-home.matter-builder-motion-ready:not(.accessibility-mode) .matter-builder__opening-sticky {
   position: sticky;
   top: 0;
-  height: 100svh;
+  height: var(--home-stable-viewport, 100svh);
   display: grid;
   place-items: center;
 }
@@ -210,8 +210,8 @@
 
 @media (max-width: 760px) {
   .lpc-home .matter-builder { padding-top: 0; }
-  .lpc-home .matter-builder__opening { min-height: 82svh; }
-  .lpc-home.matter-builder-motion-ready:not(.accessibility-mode) .matter-builder__opening { height: 155svh; }
+  .lpc-home .matter-builder__opening { min-height: calc(var(--home-stable-viewport, 100svh) * .82); }
+  .lpc-home.matter-builder-motion-ready:not(.accessibility-mode) .matter-builder__opening { height: calc(var(--home-stable-viewport, 100svh) * 1.55); }
   .lpc-home .matter-builder__opening h2 { font-size: clamp(3.1rem, 10vw, 5rem); }
 }
 

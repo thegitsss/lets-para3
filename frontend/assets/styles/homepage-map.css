@@ -8,7 +8,7 @@
   isolation: isolate;
 }
 .paralegal-map__inner { width: min(100%, 1200px); margin: 0 auto; }
-.paralegal-map__inner::after { display: block; height: 75svh; content: ''; }
+.paralegal-map__inner::after { display: block; height: calc(var(--home-stable-viewport, 100svh) * .75); content: ''; }
 .paralegal-map__intro { max-width: 850px; margin: 0 auto; }
 .paralegal-map__eyebrow {
   margin: 0 0 22px;
@@ -36,7 +36,7 @@
 .paralegal-map__stage {
   position: sticky;
   top: var(--header-height, 72px);
-  min-height: calc(100svh - var(--header-height, 72px));
+  min-height: calc(var(--home-stable-viewport, 100svh) - var(--header-height, 72px));
   box-sizing: border-box;
   display: flex;
   flex-direction: column;

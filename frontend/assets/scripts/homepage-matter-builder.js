@@ -6,6 +6,13 @@
   const notes = opening.querySelector('.matter-builder__line--notes');
   const lpc = opening.querySelector('.matter-builder__line--lpc');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let layoutWidth = 0;
+  const syncStableViewport = () => {
+    if (Math.abs(window.innerWidth - layoutWidth) < 2) return;
+    layoutWidth = window.innerWidth;
+    document.documentElement.style.setProperty('--home-stable-viewport', `${window.innerHeight}px`);
+  };
+  syncStableViewport();
   const clamp = value => Math.max(0, Math.min(1, value));
   const smoothstep = (start, end, value) => {
     const t = clamp((value - start) / (end - start));
@@ -44,7 +51,7 @@
   };
 
   window.addEventListener('scroll', schedule, { passive: true });
-  window.addEventListener('resize', schedule, { passive: true });
+  window.addEventListener('resize', () => { syncStableViewport(); schedule(); }, { passive: true });
   reducedMotion.addEventListener('change', syncPreference);
   syncPreference();
 })();
