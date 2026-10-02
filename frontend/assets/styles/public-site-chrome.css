@@ -137,7 +137,7 @@ body.public-site-chrome.nav-open { overflow: hidden; }
 .public-site-chrome .home-footer__statement span { display: block; }
 .public-site-chrome .home-footer__directory { display: grid; padding: 62px 0 70px; grid-template-columns: repeat(4, 1fr); gap: clamp(24px, 3vw, 52px); }
 .public-site-chrome .home-footer details { min-width: 0; }
-.public-site-chrome .home-footer summary { color: #a99a77; cursor: default; font: 600 11.2px/1.5 "Sarabun", sans-serif; letter-spacing: 0.09em; list-style: none; text-transform: uppercase; }
+.public-site-chrome .home-footer summary { color: #a8c8ff; cursor: default; font: 600 11.2px/1.5 "Sarabun", sans-serif; letter-spacing: 0.09em; list-style: none; text-transform: uppercase; }
 .public-site-chrome .home-footer summary::-webkit-details-marker { display: none; }
 .public-site-chrome .home-footer__links { display: flex; align-items: flex-start; flex-direction: column; gap: 12px; margin-top: 18px; }
 .public-site-chrome .home-footer a { color: rgba(248, 246, 239, 0.84); font: 200 12.16px/1.4 "Sarabun", sans-serif; text-decoration: none; }
