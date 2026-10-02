@@ -8,6 +8,7 @@
   isolation: isolate;
 }
 .paralegal-map__inner { width: min(100%, 1200px); margin: 0 auto; }
+.paralegal-map__inner::after { display: block; height: 75svh; content: ''; }
 .paralegal-map__intro { max-width: 850px; margin: 0 auto; }
 .paralegal-map__eyebrow {
   margin: 0 0 22px;
@@ -32,7 +33,16 @@
   font-size: clamp(1rem, 1.6vw, 1.25rem);
   line-height: 1.6;
 }
-.paralegal-map__stage { position: relative; padding: 66px 0 26px; }
+.paralegal-map__stage {
+  position: sticky;
+  top: var(--header-height, 72px);
+  min-height: calc(100svh - var(--header-height, 72px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 28px 0;
+}
 .paralegal-map__stage::before {
   position: absolute;
   top: 24%; left: 18%; width: 64%; height: 50%;
@@ -43,7 +53,7 @@
   pointer-events: none;
   content: '';
 }
-.paralegal-map__canvas { position: relative; width: min(100%, 1140px); aspect-ratio: 975 / 610; margin: 0 auto; }
+.paralegal-map__canvas { position: relative; width: min(100%, 760px); aspect-ratio: 975 / 610; margin: 0 auto; }
 .paralegal-map__outline {
   display: block;
   width: 100%;
@@ -156,7 +166,7 @@
   .lpc-home .paralegal-map { padding: 88px 20px 90px; }
   .lpc-home .paralegal-map h2 { font-size: clamp(3rem, 10vw, 4.5rem); }
   .paralegal-map__intro > p:last-child { margin-top: 23px; }
-  .paralegal-map__stage { padding-top: 56px; }
+  .paralegal-map__stage { padding-block: 32px; }
   .paralegal-map__canvas { width: calc(100% + 40px); margin-left: -20px; }
   .paralegal-map__canvas :is(svg, .paralegal-map__outline) { transform: translate3d(0, var(--map-parallax-y, 0px), 0) scale(1.02); }
   .paralegal-map__outlines path { stroke-width: 1.8; }
@@ -165,6 +175,8 @@
   .paralegal-map__stat-copy { max-width: 165px; font-size: 1rem; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .paralegal-map__inner::after { display: none; }
+  .paralegal-map__stage { position: relative; top: auto; min-height: 0; }
   .paralegal-map__stat-cue { transition: none; }
   .paralegal-map__stat:hover .paralegal-map__stat-cue { transition-delay: 0s; }
   .paralegal-map__canvas :is(svg, .paralegal-map__outline), .lpc-home .paralegal-map .paralegal-map__canvas :is(svg, .paralegal-map__outline) { transform: none; will-change: auto; }
@@ -173,3 +185,5 @@
   .paralegal-map__canvas.is-live.is-visible .paralegal-map__dot,
   .paralegal-map__canvas.is-live.is-visible .paralegal-map__halo { animation: none; }
 }
+html.accessibility-mode .paralegal-map__inner::after { display: none; }
+html.accessibility-mode .paralegal-map__stage { position: relative; top: auto; min-height: 0; }
