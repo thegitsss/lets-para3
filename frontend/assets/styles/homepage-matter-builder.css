@@ -160,3 +160,61 @@
   .lpc-home .matter-builder__panel { padding: 22px; }
   .lpc-home .matter-builder__panel--notes > p { font-size: 20px; }
 }
+
+/* Let the two headline sentences have the screen before the example arrives. */
+.lpc-home .matter-builder { padding-top: 0; }
+.lpc-home .matter-builder__opening {
+  min-height: min(100svh, 900px);
+  display: grid;
+  place-items: center;
+}
+.lpc-home .matter-builder__opening-sticky {
+  width: 100%;
+  text-align: center;
+}
+.lpc-home .matter-builder__opening h2 {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.lpc-home .matter-builder__line { display: block; }
+.lpc-home .matter-builder__line--lpc { margin-top: .12em; }
+
+.lpc-home.matter-builder-motion-ready:not(.accessibility-mode) .matter-builder__opening {
+  height: 175svh;
+  min-height: 0;
+  display: block;
+}
+.lpc-home.matter-builder-motion-ready:not(.accessibility-mode) .matter-builder__opening-sticky {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  display: grid;
+  place-items: center;
+}
+.lpc-home.matter-builder-motion-ready:not(.accessibility-mode) .matter-builder__line {
+  opacity: var(--matter-line-opacity, 0);
+  filter: blur(var(--matter-line-blur, 14px));
+  transform: translate3d(0, var(--matter-line-rise, 62px), 0) scale(var(--matter-line-scale, .88));
+  transform-origin: center;
+  will-change: opacity, filter, transform;
+}
+.lpc-home.matter-builder-motion-ready:not(.accessibility-mode) .matter-builder__details {
+  opacity: 0;
+  transform: translateY(56px);
+  transition: opacity .65s ease, transform .65s cubic-bezier(.2,.7,.2,1);
+}
+.lpc-home.matter-builder-motion-ready:not(.accessibility-mode) .matter-builder__details.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (max-width: 760px) {
+  .lpc-home .matter-builder { padding-top: 0; }
+  .lpc-home .matter-builder__opening { min-height: 82svh; }
+  .lpc-home.matter-builder-motion-ready:not(.accessibility-mode) .matter-builder__opening { height: 155svh; }
+  .lpc-home .matter-builder__opening h2 { font-size: clamp(3.1rem, 10vw, 5rem); }
+}
+
+@media (max-width: 390px) {
+  .lpc-home .matter-builder__opening h2 { font-size: clamp(2.75rem, 12vw, 3.4rem); }
+}

@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="assets/styles/fonts.css?v=20260826-full-sarabun" />
   <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <link rel="stylesheet" href="assets/styles/public-site-chrome.css?v=20261001-periwinkle-footer" />
-  <link rel="stylesheet" href="assets/styles/homepage.css?v=20261001-workflow-constellation" />
+  <link rel="stylesheet" href="assets/styles/homepage.css?v=20261002-staged-matter-opening" />
   <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20261001-approved" />
   <link rel="stylesheet" href="assets/styles/homepage-readable-type.css?v=20260924-original-hero" />
   <link rel="stylesheet" href="assets/styles/homepage-serif-type.css?v=20260929-workflow-wrap" />
@@ -65,7 +65,7 @@
     document.documentElement.classList.add("js");
   </script>
   <link rel="stylesheet" href="assets/styles/homepage-mobile-reference.css?v=20261001-first-frame" />
-  <link rel="stylesheet" href="assets/styles/homepage-matter-builder.css?v=20261001" />
+  <link rel="stylesheet" href="assets/styles/homepage-matter-builder.css?v=20261001-scroll-preview" />
   <script src="assets/scripts/homepage-entrance.js?v=20261001-first-frame" defer></script>
 </head>
 <body class="lpc-home lpc-home--hybrid lpc-home--editorial public-site-chrome home-motion-ready">
@@ -158,31 +158,38 @@
 
     <section class="matter-builder" aria-labelledby="matter-builder-title">
       <div class="matter-builder__inner">
-        <div class="matter-builder__heading">
-          <p class="matter-builder__eyebrow">A simpler way to start</p>
-          <h2 id="matter-builder-title">Your notes.<br /><em>LPC builds your Matter.</em></h2>
-          <p>Tell LPC what needs doing in a few rough notes. It drafts the title, scope, and tasks. You can review and edit everything before posting.</p>
+        <div class="matter-builder__opening">
+          <div class="matter-builder__opening-sticky">
+            <h2 id="matter-builder-title"><span class="matter-builder__line matter-builder__line--notes">Your notes.</span><span class="matter-builder__line matter-builder__line--lpc"><em>LPC builds your Matter.</em></span></h2>
+          </div>
         </div>
 
-        <div class="matter-builder__example">
-          <div class="matter-builder__panel matter-builder__panel--notes">
-            <span class="matter-builder__label">Your notes</span>
-            <p>1,200 pages of medical records. Need a treatment chronology and gaps in care.</p>
+        <div class="matter-builder__details">
+          <div class="matter-builder__heading">
+            <p class="matter-builder__eyebrow">A simpler way to start</p>
+            <p>Tell LPC what needs doing in a few rough notes. It drafts the title, scope, and tasks. You can review and edit everything before posting.</p>
           </div>
-          <div class="matter-builder__arrow" aria-hidden="true">→</div>
-          <div class="matter-builder__panel matter-builder__panel--draft">
-            <span class="matter-builder__label">LPC’s draft matter</span>
-            <h3>Medical Records Chronology</h3>
-            <p>Review medical records, create a treatment chronology, and identify gaps in care.</p>
-            <span class="matter-builder__tasks-label">Tasks</span>
-            <ul>
-              <li>Organize medical records</li>
-              <li>Build treatment chronology</li>
-              <li>Flag gaps in care</li>
-            </ul>
+
+          <div class="matter-builder__example">
+            <div class="matter-builder__panel matter-builder__panel--notes">
+              <span class="matter-builder__label">Your notes</span>
+              <p>1,200 pages of medical records. Need a treatment chronology and gaps in care.</p>
+            </div>
+            <div class="matter-builder__arrow" aria-hidden="true">→</div>
+            <div class="matter-builder__panel matter-builder__panel--draft">
+              <span class="matter-builder__label">LPC’s draft matter</span>
+              <h3>Medical Records Chronology</h3>
+              <p>Review medical records, create a treatment chronology, and identify gaps in care.</p>
+              <span class="matter-builder__tasks-label">Tasks</span>
+              <ul>
+                <li>Organize medical records</li>
+                <li>Build treatment chronology</li>
+                <li>Flag gaps in care</li>
+              </ul>
+            </div>
           </div>
+          <p class="matter-builder__assurance">You make the final edits and choose when to post.</p>
         </div>
-        <p class="matter-builder__assurance">You make the final edits and choose when to post.</p>
       </div>
     </section>
 
@@ -586,7 +593,8 @@
   </footer>
 
   <script src="assets/scripts/homepage-map.js?v=20261001-immediate-outline" defer></script>
-  <script src="assets/scripts/homepage.js?v=20261001-all-widths" defer></script>
+  <script src="assets/scripts/homepage.js?v=20261001-workflow-constellation-preview" defer></script>
+  <script src="assets/scripts/homepage-matter-builder.js?v=20261001-scroll-preview" defer></script>
   <script src="assets/scripts/homepage-assistant.js?v=20260929-review-copy" defer></script>
   <script src="assets/scripts/accessibility-toggle.js" defer></script>
 </body>

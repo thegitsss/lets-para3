@@ -554,18 +554,16 @@ html.accessibility-mode .js .home-reveal {
 
 .workflow__constellation {
   position: absolute;
-  inset: 0 0 auto;
-  height: min(900px, 100%);
-  overflow: hidden;
+  inset: 0;
+  overflow: clip;
   pointer-events: none;
 }
 
 .matter-field--workflow {
-  position: absolute;
-  inset: 0;
+  position: sticky;
+  top: 0;
+  display: block;
   opacity: 0.82;
-  transform: translate3d(0, var(--paths-field-y, 0), 0);
-  will-change: transform;
 }
 
 .workflow__intro,
@@ -574,12 +572,7 @@ html.accessibility-mode .js .home-reveal {
 }
 
 @media (max-width: 600px) {
-  .workflow__constellation { height: min(500px, 100%); }
   .matter-field--workflow { opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .matter-field--workflow { transform: none; will-change: auto; }
 }
 
 .workflow__intro {

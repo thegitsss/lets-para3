@@ -135,6 +135,7 @@
       this.canvas = canvas;
       this.context = canvas.getContext("2d", { alpha: true });
       this.mode = canvas.dataset.matterField || "hero";
+      this.isWorkflowField = canvas.classList.contains("matter-field--workflow");
       this.section = canvas.closest("[data-matter-field-host]") || canvas.closest("section");
       this.width = 0;
       this.height = 0;
@@ -157,6 +158,7 @@
       if ("ResizeObserver" in window) {
         this.resizeObserver = new ResizeObserver(this.resize);
         this.resizeObserver.observe(this.section);
+        if (this.isWorkflowField) window.addEventListener("resize", this.resize, { passive: true });
       } else {
         window.addEventListener("resize", this.resize, { passive: true });
       }
@@ -205,6 +207,7 @@
     syncParallax() {
       this.parallaxFrameId = 0;
       if (!["paths", "closing"].includes(this.mode)) return;
+      if (this.isWorkflowField) return;
       const motionDisabled = reducedMotion.matches || document.body.classList.contains("accessibility-mode");
       if (motionDisabled) {
         this.canvas.style.setProperty("--paths-field-y", "0px");
@@ -253,7 +256,9 @@
     resize() {
       const rect = this.section.getBoundingClientRect();
       const width = Math.max(1, Math.round(rect.width));
-      const height = Math.max(1, Math.round(rect.height));
+      const height = this.isWorkflowField
+        ? Math.min(900, Math.max(1, window.innerHeight))
+        : Math.max(1, Math.round(rect.height));
       const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
 
       if (width === this.width && height === this.height && this.canvas.width === Math.round(width * dpr)) {
