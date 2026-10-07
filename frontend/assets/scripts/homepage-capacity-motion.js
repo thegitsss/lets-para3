@@ -14,6 +14,16 @@
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let context = null;
   let refreshFrame = 0;
+  const mobile = matchMedia('(max-width: 767px)');
+  let viewportWidth = innerWidth;
+  const configureRefresh = () => {
+    // The scene already uses a stable mobile scroll distance. Browser toolbar
+    // changes must not revert/rebuild its animation during a touch gesture.
+    ScrollTrigger.config({ autoRefreshEvents: mobile.matches && ScrollTrigger.isTouch
+      ? 'none' : 'visibilitychange,DOMContentLoaded,load,resize' });
+  };
+  configureRefresh();
+  mobile.addEventListener('change', configureRefresh);
 
   function syncMotion() {
     const enabled = !reduced.matches && !document.body.classList.contains('accessibility-mode');
@@ -27,17 +37,17 @@
       const timeline = gsap.timeline();
       // Keep the mountain at its natural size as it rises. A bottom-anchored
       // zoom made the peak grow out of frame and appear to stretch vertically.
-      timeline.to(papers, { y: '-40%', duration: .52, ease: 'power1.out' }, 0);
-      timeline.to(smoke, { y: '0%', duration: 1, ease: 'power1.out' }, 0);
+      timeline.fromTo(papers, { y: '0%' }, { y: '-40%', duration: .52, ease: 'power1.out' }, 0);
+      timeline.fromTo(smoke, { y: '70%' }, { y: '0%', duration: 1, ease: 'power1.out' }, 0);
       clouds.forEach((cloud, index) => {
-        timeline.to(cloud, { x: index ? '15%' : '-15%', duration: 1, ease: 'power1.out' }, 0);
+        timeline.fromTo(cloud, { x: '0%' }, { x: index ? '15%' : '-15%', duration: 1, ease: 'power1.out' }, 0);
       });
-      timeline.to(inner, { y: '20%', scale: .9, duration: 1, ease: 'power1.out' }, 0);
-      timeline.to(inner, { opacity: 0, duration: .2, ease: 'power1.out' }, 0);
-      timeline.to(outline, { opacity: 1, duration: .01, ease: 'power1.out' }, .1);
-      timeline.to(paths, { strokeDashoffset: 0, autoRound: false, duration: .3, ease: 'power1.out' }, .1);
+      timeline.fromTo(inner, { y: '0%', scale: 1 }, { y: '20%', scale: .9, duration: 1, ease: 'power1.out' }, 0);
+      timeline.fromTo(inner, { opacity: 1 }, { opacity: 0, duration: .2, ease: 'power1.out' }, 0);
+      timeline.fromTo(outline, { opacity: 0 }, { opacity: 1, duration: .01, ease: 'power1.out' }, .1);
+      timeline.fromTo(paths, { strokeDashoffset: 1 }, { strokeDashoffset: 0, autoRound: false, duration: .3, ease: 'power1.out' }, .1);
       timeline.to(outline, { opacity: 0, duration: .2, ease: 'power1.out' }, .28);
-      timeline.to(composite, { opacity: 1, duration: .1, ease: 'power1.out' }, .3);
+      timeline.fromTo(composite, { opacity: 0 }, { opacity: 1, duration: .1, ease: 'power1.out' }, .3);
       ScrollTrigger.create({
         trigger: hook,
         animation: timeline,
@@ -55,7 +65,7 @@
     if (refreshFrame) return;
     refreshFrame = requestAnimationFrame(() => {
       refreshFrame = 0;
-      if (context) ScrollTrigger.refresh();
+      if (context) ScrollTrigger.refresh(true);
     });
   }
 
@@ -65,6 +75,15 @@
     attributeFilter: ['class'],
   });
   addEventListener('pageshow', scheduleRefresh);
+  addEventListener('load', scheduleRefresh, { once: true });
+  addEventListener('resize', () => {
+    if (innerWidth === viewportWidth) return;
+    viewportWidth = innerWidth;
+    scheduleRefresh();
+  }, { passive: true });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) scheduleRefresh();
+  });
   if ('ResizeObserver' in window) {
     const observer = new ResizeObserver(scheduleRefresh);
     observer.observe(document.querySelector('.editorial-hero') || scene);

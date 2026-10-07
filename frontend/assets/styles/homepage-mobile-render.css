@@ -2,6 +2,26 @@
    No image, animation, or desktop rule changes. */
 .lpc-home :is(.mobile-capacity-wash, .mobile-section-backdrop) { display: none; }
 @media (max-width: 767px) {
+  /* The layout and animation still use the approved small-viewport height.
+     Paint the cloud edge into the space exposed when browser chrome retracts,
+     instead of showing a rectangular slice of the section background there. */
+  .lpc-home .hook-find .type-hook__scene {
+    --capacity-paint-overflow: max(0px, calc(100dvh - var(--capacity-scene-height)));
+    overflow-x: clip;
+    overflow-y: visible;
+    clip-path: inset(0 0 calc(-1 * var(--capacity-paint-overflow)));
+  }
+  .lpc-home .hook-find .type-hook__scene::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    height: var(--capacity-paint-overflow);
+    z-index: -2;
+    pointer-events: none;
+    background: #fff;
+  }
   body.lpc-home--editorial {
     isolation: isolate;
     background: #edf0f3;
@@ -97,22 +117,14 @@
         radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%);
       background-attachment: scroll, fixed, fixed;
     }
-    .lpc-home--editorial .hero-capacity { isolation: isolate; }
-    .lpc-home .mobile-section-backdrop {
-      display: block;
-      position: absolute;
-      inset: 0;
-      z-index: -4;
-      pointer-events: none;
-      clip-path: inset(0);
-    }
-    .lpc-home .mobile-section-backdrop::before {
-      content: '';
-      position: fixed;
-      inset: 0;
+    /* iOS must not allocate fixed descendants inside section-sized clips.
+       Restore the same gradients on their original painting surfaces. */
+    .lpc-home--editorial :is(.editorial-hero, .path-scene--attorney, .hero-capacity) {
       background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
         radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
-      transform: translateZ(0);
+      background-attachment: fixed;
     }
+    .lpc-home .mobile-capacity-wash { display: none; }
+    .lpc-home .hook-find::before { display: block; }
   }
 }
