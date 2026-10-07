@@ -1533,7 +1533,12 @@ body.lpc-home.lpc-home--hybrid .completion-files > span > i { color: #385f9e; }
 
 
 /* Original photograph, with its ridge in front of the arriving typography. */
-.lpc-home .closing-cloud-region { position: relative; isolation: isolate; background: #fff; }
+.lpc-home .closing-cloud-region {
+  position: relative;
+  isolation: isolate;
+  /* Keep clipped and backdrop-filtered layers on the same dark backing. */
+  background: #07131f;
+}
 .lpc-home .closing-cloud-region .closing-scene {
   --closing-scene-height: max(740px, 100svh);
   position: relative; isolation: isolate; overflow: hidden; display: block;
@@ -1610,7 +1615,8 @@ body.lpc-home .closing-scene #closing-title {
   height: calc(var(--closing-scene-height) * .75);
   min-height: 0;
   overflow: visible;
-  clip-path: inset(0 0 -55svh);
+  /* The mountain layers clip themselves; avoid a second rectangular clip
+     across the sticky sky and its backdrop-filtered role buttons. */
 }
 .lpc-home .closing-scene__mountain,
 .lpc-home .closing-scene__ridge {

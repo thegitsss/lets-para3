@@ -25,9 +25,9 @@
     context = gsap.context(() => {
       gsap.set(paths, { strokeDashoffset: 1 });
       const timeline = gsap.timeline();
-      // Restore the mountain's pre-redesign rise; both copies stay aligned.
-      // The clouds and logo retain the complete reveal and cloud-cover ending.
-      timeline.to(papers, { y: '-40%', scale: 1.3, duration: .52, ease: 'power1.out' }, 0);
+      // Keep the mountain at its natural size as it rises. A bottom-anchored
+      // zoom made the peak grow out of frame and appear to stretch vertically.
+      timeline.to(papers, { y: '-40%', duration: .52, ease: 'power1.out' }, 0);
       timeline.to(smoke, { y: '0%', duration: 1, ease: 'power1.out' }, 0);
       clouds.forEach((cloud, index) => {
         timeline.to(cloud, { x: index ? '15%' : '-15%', duration: 1, ease: 'power1.out' }, 0);
