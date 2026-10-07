@@ -588,6 +588,23 @@
   });
   window.addEventListener("hashchange", () => revealAnchorTargetImmediately());
   if (window.location.hash) window.requestAnimationFrame(() => revealAnchorTargetImmediately());
+  if (window.location.hash === "#how") {
+    // Native fragment positioning can be lost while the scroll scenes measure.
+    // Land on the workflow heading after that initial layout has settled.
+    let interrupted = false;
+    const interrupt = () => { interrupted = true; };
+    const inputEvents = ["wheel", "touchstart", "pointerdown", "keydown"];
+    inputEvents.forEach((name) => window.addEventListener(name, interrupt, { once: true, passive: true }));
+    const pageLoaded = document.readyState === "complete" ? Promise.resolve()
+      : new Promise((resolve) => window.addEventListener("load", resolve, { once: true }));
+    Promise.all([pageLoaded, document.fonts ? document.fonts.ready : Promise.resolve()])
+      .then(() => window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        if (!interrupted && window.location.hash === "#how") {
+          document.getElementById("how")?.scrollIntoView({ block: "start", behavior: "instant" });
+        }
+        inputEvents.forEach((name) => window.removeEventListener(name, interrupt));
+      })));
+  }
 
   if (reducedMotion.matches || !("IntersectionObserver" in window)) {
     revealTargets.forEach((element) => element.classList.add("is-revealed"));
