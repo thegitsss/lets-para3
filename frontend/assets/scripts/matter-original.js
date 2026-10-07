@@ -16,6 +16,7 @@
   const status = ['YOUR STARTING POINT', 'YOUR NOTES → YOUR MATTER', ''];
   const actions = ['Build my Matter', 'Preview', 'Post Matter'];
   const previewStart = .64;
+  let previewThreshold = previewStart;
   let stage = 0, frame = 0, scrollStart = 0, scrollDistance = 1;
   let measureFrame = 0;
   const disclosure = '';
@@ -192,7 +193,7 @@
     const progress = Math.max(0, Math.min(1, (scrollY - scrollStart) / scrollDistance));
 
     if (reduced.matches) return;
-    let next = progress < .26 ? 0 : progress < previewStart ? 1 : 2;
+    let next = progress < .26 ? 0 : progress < previewThreshold ? 1 : 2;
     if (next === 2 && !validate()) next = 1;
     transitionTo(next);
   }
@@ -278,6 +279,13 @@
     // The document ends its sticky travel at Preview instead of holding 03
     // for the unused last 36 percent of the original 260vh scroll range.
     scrollDistance = Math.max(1, Math.round(height + viewportHeight * 2.6) - Math.max(height, viewportHeight));
+    // Mobile's draft is shifted upward to fit its controls. Give the final
+    // preview time to return into view before the existing sticky release;
+    // releasing and starting its entrance together sends 03 offscreen.
+    // Keep Draft's .43 navigation target and the original section length.
+    previewThreshold = innerWidth <= 760
+      ? Math.max(.45, previewStart - Math.max(oversize, viewportHeight * .5) / scrollDistance)
+      : previewStart;
     setStyle(journey, '--matter-release-distance', `${oversize + scrollDistance * previewStart}px`);
     updateFromScroll();
     setStyle(film, '--builder-bottom', `${builderBottom}px`);
@@ -294,7 +302,7 @@
     if (reduced.matches) { setStage(next); return; }
     // Land at the start of Preview, before its natural scroll-out. The extra
     // pixel avoids falling back into Draft when a browser rounds scrollY.
-    const target = scrollStart + scrollDistance * [0, .43, previewStart][next] + (next === 2 ? 1 : 0);
+    const target = scrollStart + scrollDistance * [0, .43, previewThreshold][next] + (next === 2 ? 1 : 0);
     scrollTo({top:target, behavior:reduced.matches ? 'instant' : 'smooth'});
   }
   builderSkip.addEventListener('click', () => {
