@@ -1059,6 +1059,8 @@
 /* Keep the persistent navigation clear of the demonstration heading. */
 /* Leave room for external actions, replay controls, focus rings and shadows. */
 .lpc-home .matter-scroll-journey .matter-film{padding-top:calc(var(--header-height,72px) + 1px);padding-bottom:32px;}
+/* The taller mobile stage already clears its actions; preserve the note-card position. */
+@media (max-width:760px){.lpc-home .matter-scroll-journey .matter-film{padding-bottom:1px;}}
 
 /* Stable stage geometry with a reversible fade-and-slide between scenes. */
 :where(.matter-scroll-journey) .matter-stage-scene{position:absolute;inset:0;}
