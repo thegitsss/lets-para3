@@ -33,7 +33,7 @@
       0.3,
       0.4
     ],
-    "foregroundMovement": "y: -40%, scale: 1.3",
+    "foregroundMovement": "y: -40%, fixed scale: 1",
     "cloudMovement": "left: -15%, right: 15%",
     "scrubSeconds": 0.1,
     "note": "Reference re-reviewed through the complete ending on desktop and mobile. The original whitewashed mountain filter is preserved. Find-style moving side clouds and foreground mist remain unfeathered; a separate document-scrolling cloud bank covers the logo as Matter enters. The hook overlaps the following section by one stable viewport, with no extra static tail.",
@@ -58,7 +58,7 @@
     },
     "brandAdaptation": "LPC ink-blue outline and ink-backed pale mountain texture maintain readable letterforms against the original whitewashed mountain; the brand apostrophe remains blue.",
     "foregroundMovementDuration": 0.52,
-    "foregroundAppearance": "Original whitewashed SVG, original viewport feather at 18/74 percent, and full mountain retained behind the wordmark; restored independently of the new sky, clouds, and logo timeline."
+    "foregroundAppearance": "Original whitewashed SVG and viewport feather, with a fixed natural scale throughout the rise. Both mountain copies stay aligned; the new sky, clouds, logo timing, and cloud-cover ending are preserved."
   },
   "sky.webp": {
     "source": "https://www.findrealestate.com/_next/static/media/back.f53e9773.jpg",
