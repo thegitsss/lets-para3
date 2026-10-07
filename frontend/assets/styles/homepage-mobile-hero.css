@@ -15,7 +15,7 @@
 
   .lpc-home--editorial .editorial-hero__qualifier {
     margin-bottom: 16px;
-    font-size: 1.1rem;
+    font-size: 1.25rem;
   }
 
   .lpc-home--editorial .editorial-hero h1 {
@@ -54,7 +54,6 @@
     margin-top: 22px;
   }
 
-  .lpc-home--editorial .editorial-hero__actions .text-action,
   .lpc-home--editorial .editorial-hero__reassurance {
     display: none;
   }
@@ -70,4 +69,9 @@
   .lpc-home--editorial .editorial-hero__line--two {
     font-size: 1em;
   }
+}
+
+@media (max-width:640px) {
+  .lpc-home--editorial .editorial-hero__actions { flex-wrap: wrap; }
+  .lpc-home--editorial .editorial-hero__actions .text-action { display:inline-flex; }
 }

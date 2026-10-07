@@ -13,9 +13,9 @@ html {
   scroll-padding-top: calc(var(--header-height) + 24px);
 }
 
-html.is-lazy-scrolling {
-  scroll-behavior: auto;
-}
+html.lenis { height: auto; }
+html.lenis.lenis-smooth { scroll-behavior: auto !important; }
+html.lenis.lenis-stopped { overflow: clip; }
 
 body {
   margin: 0;
@@ -552,29 +552,6 @@ html.accessibility-mode .js .home-reveal {
     linear-gradient(180deg, #fff 0%, #fbfaf7 46%, #fff 100%);
 }
 
-.workflow__constellation {
-  position: absolute;
-  inset: 0;
-  overflow: clip;
-  pointer-events: none;
-}
-
-.matter-field--workflow {
-  position: sticky;
-  top: 0;
-  display: block;
-  opacity: 0.82;
-}
-
-.workflow__intro,
-.workflow__story {
-  position: relative;
-}
-
-@media (max-width: 600px) {
-  .matter-field--workflow { opacity: 1; }
-}
-
 .workflow__intro {
   width: min(var(--content-max), 100%);
   margin: 0 auto 96px;
@@ -888,7 +865,7 @@ html.accessibility-mode .js .home-reveal {
 .applicant-row {
   min-height: 94px;
   display: grid;
-  grid-template-columns: 34px minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(116px, 0.6fr);
+  grid-template-columns: auto minmax(130px, 1fr) minmax(130px, 1fr) auto;
   align-items: center;
   gap: 15px;
   padding: 15px;
@@ -5916,9 +5893,8 @@ body.accessibility-mode [tabindex]:focus-visible {
     inset: 0;
     min-height: 0;
     padding: 20px 16px 24px;
-    border: 1px solid rgba(26, 34, 48, 0.12);
-    border-radius: 16px;
-    background: #fff;
+    border: 0;
+    background: transparent;
     overflow: hidden;
     transform: none;
     transition:
@@ -6139,10 +6115,4 @@ body.accessibility-mode [tabindex]:focus-visible {
     scroll-snap-align: start;
   }
 
-}
-
-/* Keep the workflow's constellation visible behind the phone heading and cards. */
-@media (max-width: 640px) {
-  .lpc-home .workflow__intro,
-  .lpc-home .workflow__story { background: transparent; }
 }

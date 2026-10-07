@@ -1,0 +1,11 @@
+{
+  "name": "gsap",
+  "version": "3.13.0",
+  "source": "https://gsap.com/",
+  "distribution": "https://cdn.jsdelivr.net/npm/gsap@3.13.0/",
+  "files": [
+    "gsap.min.js",
+    "ScrollTrigger.min.js"
+  ],
+  "purpose": "Match the scrolling and reveal timing measured on findrealestate.com on 2026-10-06."
+}

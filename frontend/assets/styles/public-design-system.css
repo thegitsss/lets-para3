@@ -2,12 +2,12 @@
   /* LPC public color roles */
   --lpc-ink: #1a2230;
   --lpc-ink-hover: #1d2b3b;
-  --lpc-gold: #b4975a;
+  --lpc-gold: #6495ed;
   --lpc-paper: #ffffff;
   --lpc-cloud: #f3f1ec;
   --lpc-muted: #626a74;
   --lpc-line: rgba(26, 34, 48, 0.14);
-  --lpc-focus: #887244;
+  --lpc-focus: #416eaf;
 
   /* Public layout roles */
   --lpc-gutter-compact: 20px;
