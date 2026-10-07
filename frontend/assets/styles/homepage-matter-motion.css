@@ -1,0 +1,1152 @@
+@font-face { font-family: "LPC Notes"; src: url("../fonts/lpc-mathilde.otf") format("opentype"); font-weight: 400; font-display: swap; }
+.matter-scroll-journey{color-scheme: light; --ink: #233b5a; --blue: #537fca; --accent: #6495ed; --muted: #627187; --paper: #fffefa; --ease: cubic-bezier(.22,1,.36,1); font-family: Sarabun, Arial, sans-serif; color: var(--ink); background: rgb(239, 241, 244); font-synthesis: none;}
+:where(.matter-scroll-journey) *{box-sizing: border-box;}
+.matter-scroll-journey{margin: 0px; min-width: 320px;}
+:where(.matter-scroll-journey) button,:where(.matter-scroll-journey) input,:where(.matter-scroll-journey) a{-webkit-tap-highlight-color: transparent;}
+:where(.matter-scroll-journey) button,:where(.matter-scroll-journey) input{font: inherit;}
+:where(.matter-scroll-journey) button,:where(.matter-scroll-journey) a{touch-action: manipulation;}
+:where(.matter-scroll-journey) button{cursor: pointer;}
+:where(.matter-scroll-journey) button:focus-visible,:where(.matter-scroll-journey) a:focus-visible,:where(.matter-scroll-journey) input:focus-visible{outline: 2px solid var(--blue); outline-offset: 5px;}
+:where(.matter-scroll-journey) button:disabled{cursor: default;}
+:where(.matter-scroll-journey) .site-mast{height: 91px; max-width: 1440px; padding: 0px 5%; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 24px;}
+:where(.matter-scroll-journey) .site-mast > a:first-child{font: 400 29px "Cormorant Garamond", Georgia, serif; letter-spacing: -0.03em; color: var(--ink); text-decoration: none;}
+:where(.matter-scroll-journey) .site-mast > span{font-size: 8px; letter-spacing: 0.19em; color: var(--muted);}
+:where(.matter-scroll-journey) .mast-action{font-size: 12px; color: var(--ink); text-decoration: none; border-bottom: 1px solid rgb(174, 188, 205); padding: 8px 0px;}
+:where(.matter-scroll-journey) .mast-action span{margin-left: 20px;}
+:where(.matter-scroll-journey) .matter-film{overflow: hidden; isolation: isolate;}
+:where(.matter-scroll-journey) .film-heading{text-align: center; margin: 24px auto 0px; padding: 0px 20px; position: relative; z-index: 5;}
+:where(.matter-scroll-journey) .eyebrow{font-size: 9px; letter-spacing: 0.2em; color: rgb(89, 111, 141); margin: 0px 0px 15px;}
+:where(.matter-scroll-journey) .film-heading h2{font: 400 clamp(48px, 5.2vw, 76px) / 1.05 "Cormorant Garamond", Georgia, serif; letter-spacing: -0.046em; margin: 0px;}
+:where(.matter-scroll-journey) .film-heading h2 em{font-weight: 400; color: rgb(85, 127, 187);}
+:where(.matter-scroll-journey) .film-heading > p:last-child{color: rgb(95, 111, 132); font-size: 14px; line-height: 1.6; margin: 15px 0px 0px;}
+:where(.matter-scroll-journey) .mobile-break{display: none;}
+:where(.matter-scroll-journey) .stage{height: 570px; max-width: 1240px; margin: 0px auto; position: relative; perspective: 1700px;}
+:where(.matter-scroll-journey) .stage::before{content: ""; position: absolute; inset: 3% -12% -4%; background: radial-gradient(at 50% 53%, rgb(217, 225, 237) 0px, rgba(230, 235, 242, 0.4) 40%, transparent 68%); z-index: -2;}
+:where(.matter-scroll-journey) .stage-grid{position: absolute; inset: 13% -15% 2%; background-image: linear-gradient(rgba(107, 133, 165, 0.063) 1px, transparent 1px), linear-gradient(90deg, rgba(107, 133, 165, 0.063) 1px, transparent 1px); background-size: 38px 38px; transform: rotateX(65deg) rotateZ(-12deg); mask-image: radial-gradient(rgb(0, 0, 0), transparent 66%); opacity: 0.9; transition: transform 1.6s var(--ease);}
+:where(.matter-scroll-journey) .drawing{position: absolute; width: 100%; height: 100%; inset: 0px; overflow: visible; color: rgb(117, 147, 182); pointer-events: none;}
+:where(.matter-scroll-journey) .drawing-architecture{opacity: 0.46; transform-origin: 980px 330px; transition: transform 1.8s var(--ease),opacity 1.5s;}
+:where(.matter-scroll-journey) .ink-trail{opacity: 0.4; stroke-dashoffset: 0;}
+:where(.matter-scroll-journey) .orbit-caption{position: absolute; left: 6.5%; top: 130px; font: 400 26px / 1.15 "Cormorant Garamond", Georgia, serif; letter-spacing: -0.02em; z-index: 2; transition: opacity .6s,transform 1s var(--ease);}
+:where(.matter-scroll-journey) .fine-number{display: block; font: 10px Sarabun, sans-serif; color: rgb(84, 125, 179); margin-bottom: 18px; letter-spacing: 0.16em;}
+:where(.matter-scroll-journey) .orbit-caption em{color: rgb(84, 125, 179);}
+:where(.matter-scroll-journey) .caption-review,:where(.matter-scroll-journey) .caption-post{display: none;}
+:where(.matter-scroll-journey) .matter-sheet{position: absolute; top: 64px; left: 50%; margin-left: -260px; width: 520px; height: 440px; background: var(--paper); border: 1px solid rgb(209, 217, 226); border-radius: 2px; box-shadow: rgba(35, 59, 90, 0.03) 0px 3px 4px, rgba(35, 59, 90, 0.145) 0px 15px 22px -13px, rgba(35, 59, 90, 0.22) 15px 40px 55px -24px; transform: translate(-22px, 0px) rotateX(9deg) rotateY(-9deg) rotateZ(-7deg); transform-style: preserve-3d; transition: transform 1.7s var(--ease),height 1.4s var(--ease),box-shadow 1.4s; z-index: 4;}
+:where(.matter-scroll-journey) .paper-rule{position: absolute; inset: 75px 0px 72px; background: repeating-linear-gradient(transparent 0px, transparent 39px, rgba(117, 150, 188, 0.133) 39px, rgba(117, 150, 188, 0.133) 40px); transition: opacity 0.7s;}
+:where(.matter-scroll-journey) .paper-rule::after{content: ""; position: absolute; left: 27px; top: -10px; bottom: -20px; width: 1px; background: rgba(100, 149, 237, 0.25);}
+:where(.matter-scroll-journey) .sheet-heading{position: absolute; inset: 0px 0px auto; display: flex; align-items: center; height: 51px; gap: 14px; padding: 0px 28px; border-bottom: 1px solid rgb(211, 220, 229);}
+:where(.matter-scroll-journey) .sheet-monogram{font: 400 25px "Cormorant Garamond", Georgia, serif; letter-spacing: -0.06em;}
+:where(.matter-scroll-journey) .sheet-context{font-size: 7px; letter-spacing: 0.13em; color: rgb(102, 122, 146);}
+:where(.matter-scroll-journey) .sheet-stage{margin-left: auto; font-size: 10px; color: rgb(90, 122, 166);}
+:where(.matter-scroll-journey) .sheet-state{position: absolute; top: 68px; left: 32px; right: 32px; display: flex; align-items: center; gap: 6px; font-size: 8px; letter-spacing: 0.06em; opacity: 0; transition: opacity 0.6s;}
+:where(.matter-scroll-journey) .status-light{width: 5px; height: 5px; border-radius: 50%; background: var(--accent);}
+:where(.matter-scroll-journey) .sample-label{margin-left: auto; font-size: 7px; color: rgb(114, 130, 152);}
+:where(.matter-scroll-journey) .matter-title{position: absolute; top: 79px; left: 40px; right: 28px; height: 54px; transition: top 1.3s var(--ease),left 1.3s var(--ease);}
+:where(.matter-scroll-journey) .hand-title{font: 400 39px/1 var(--notes-font,'LPC Notes'),cursive; display: block; color: rgb(46, 74, 112); transform: rotate(-1deg); transition: opacity .35s,transform .8s var(--ease);}
+:where(.matter-scroll-journey) .matter-title h2{position: absolute; top: 0px; left: 0px; font: 400 32px / 1.2 "Cormorant Garamond", Georgia, serif; margin: 0px; letter-spacing: -0.025em; opacity: 0; transform: translateY(12px); transition: opacity .8s .35s,transform 1s var(--ease) .2s;}
+:where(.matter-scroll-journey) .matter-location{position: absolute; top: 45px; font-size: 10px; color: rgb(97, 117, 141); opacity: 0; transition: opacity 0.8s 0.4s;}
+:where(.matter-scroll-journey) .matter-location span{padding: 0px 9px; color: rgb(178, 190, 203);}
+:where(.matter-scroll-journey) .scope-label{position: absolute; top: 172px; left: 32px; font-size: 8px; letter-spacing: 0.12em; color: rgb(99, 118, 142); opacity: 0; transition: opacity 0.8s;}
+:where(.matter-scroll-journey) .fragment{position: absolute; left: 40px; right: 30px; height: 37px; transition: top 1.3s var(--ease),left 1.3s var(--ease),transform 1.3s var(--ease); transform-origin: 0px 50%;}
+:where(.matter-scroll-journey) .fragment-one{top: 140px; transform: rotate(1deg);}
+:where(.matter-scroll-journey) .fragment-two{top: 184px; left: 62px; transform: rotate(-2deg);}
+:where(.matter-scroll-journey) .fragment-three{top: 228px; left: 50px; transform: rotate(-1deg);}
+:where(.matter-scroll-journey) .hand{font: 400 30px/1.2 var(--notes-font,'LPC Notes'),cursive; display: block; white-space: nowrap; transition: opacity .4s,transform .8s var(--ease); color: rgb(54, 87, 128);}
+:where(.matter-scroll-journey) .fragment-three .hand{color: rgb(90, 130, 189);}
+:where(.matter-scroll-journey) .typeset{position: absolute; left: 22px; top: 1px; font-size: 13px; line-height: 24px; opacity: 0; transform: translateY(9px); transition: opacity .7s .35s,transform 1.2s var(--ease) .15s;}
+:where(.matter-scroll-journey) .fragment-index{position: absolute; top: 8px; left: 0px; font-size: 7px; color: rgb(105, 136, 177); opacity: 0; transition: opacity 0.6s 0.4s;}
+:where(.matter-scroll-journey) .resolve-mark{position: absolute; right: 0px; top: 6px; color: rgb(107, 146, 200); font-size: 11px; opacity: 0; transition: opacity 0.6s 0.8s;}
+:where(.matter-scroll-journey) .addition{position: absolute; top: 273px; left: 32px; right: 32px; padding: 7px 10px; font-size: 11px; opacity: 0; transform: translateY(8px); background: rgb(237, 243, 255); border-left: 2px solid rgb(100, 149, 237); transition: opacity .7s,transform .9s var(--ease); display: flex; align-items: center; gap: 8px;}
+:where(.matter-scroll-journey) .added-label{margin-left: auto; font-size: 6px; letter-spacing: 0.08em; color: rgb(99, 133, 178); white-space: nowrap;}
+:where(.matter-scroll-journey) .amount-field,:where(.matter-scroll-journey) .deadline-field{position: absolute; top: 280px; left: 42px; width: 200px; transition: top 1.3s var(--ease),left 1.3s var(--ease);}
+:where(.matter-scroll-journey) .deadline-field{top: 326px; left: 76px;}
+:where(.matter-scroll-journey) .amount-field label,:where(.matter-scroll-journey) .deadline-field label{font-size: 7px; letter-spacing: 0.1em; display: block; opacity: 0; color: rgb(100, 120, 144); transition: opacity 0.5s;}
+:where(.matter-scroll-journey) .hand-amount,:where(.matter-scroll-journey) .hand-deadline{position: absolute; top: 0px; left: 0px; transform: rotate(-2deg);}
+:where(.matter-scroll-journey) .hand-deadline{font-size: 29px;}
+:where(.matter-scroll-journey) .amount-input,:where(.matter-scroll-journey) .deadline-input,:where(.matter-scroll-journey) .posted-date{display: flex; align-items: center; gap: 2px; opacity: 0; position: absolute; top: 16px; left: 0px; transition: opacity 0.7s 0.4s;}
+:where(.matter-scroll-journey) .amount-input{font: 400 31px / 1 "Cormorant Garamond", Georgia, serif; padding: 2px 5px 2px 0px;}
+:where(.matter-scroll-journey) .amount-input input{font: inherit; width: 77px; border-width: 0px 0px 1px; border-style: none none solid; border-color: currentcolor currentcolor rgb(200, 216, 238); border-image: none; background: none; color: var(--ink); appearance: textfield; padding: 0px;}
+:where(.matter-scroll-journey) .amount-input input::-webkit-inner-spin-button{appearance: none;}
+:where(.matter-scroll-journey) .term-edit{font: 14px Sarabun, sans-serif; color: rgb(114, 150, 196); margin-left: 6px;}
+:where(.matter-scroll-journey) .deadline-input input{font: 12px Sarabun, sans-serif; color: var(--ink); background: transparent; border-width: 0px 0px 1px; border-style: none none solid; border-color: currentcolor currentcolor rgb(200, 216, 238); border-image: none; padding: 5px 0px; max-width: 148px;}
+:where(.matter-scroll-journey) .amount-field small,:where(.matter-scroll-journey) .deadline-field small{position: absolute; top: 58px; left: 0px; white-space: nowrap; font-size: 8px; color: rgb(99, 119, 143); opacity: 0; transition: opacity 0.6s 0.5s;}
+:where(.matter-scroll-journey) .note-aside{position: absolute; right: 21px; bottom: 104px; font: 400 25px var(--notes-font,'LPC Notes'),cursive; transform: rotate(9deg); color: rgb(102, 129, 165); transition: opacity 0.6s, transform 0.9s;}
+:where(.matter-scroll-journey) .note-aside svg{position: absolute; width: 95px; right: 0px; top: 23px; fill: none; stroke: currentcolor; stroke-width: 1.4;}
+:where(.matter-scroll-journey) .sheet-bottom{position: absolute; bottom: 0px; left: 0px; right: 0px; height: 61px; border-top: 1px solid rgb(211, 220, 229); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0px 27px; transition: background 0.8s;}
+:where(.matter-scroll-journey) .sheet-action{display: flex; align-items: center; justify-content: space-between; gap: 30px; padding: 10px 15px; background: rgb(41, 70, 104); color: rgb(255, 255, 255); border: 0px; min-height: 36px; font-size: 10px; min-width: 153px; transition: background 0.2s;}
+:where(.matter-scroll-journey) .sheet-action:hover{background: rgb(66, 109, 164);}
+:where(.matter-scroll-journey) .sheet-action > span:last-child{font-size: 16px;}
+:where(.matter-scroll-journey) .review-assurance,:where(.matter-scroll-journey) .post-assurance{font-size: 9px; color: rgb(99, 119, 143);}
+:where(.matter-scroll-journey) .post-assurance{display: none;}
+:where(.matter-scroll-journey) .sheet-binding{position: absolute; right: -1px; top: -1px; width: 24px; height: 24px; background: linear-gradient(225deg, rgb(220, 228, 239) 0px, rgb(220, 228, 239) 48%, rgb(194, 206, 220) 49%, rgb(194, 206, 220) 50%, rgb(246, 247, 249) 51%); box-shadow: rgba(35, 59, 90, 0.063) -2px 2px 3px;}
+:where(.matter-scroll-journey) .document-stack{position: absolute; left: 50%; top: 97px; width: 520px; height: 407px; margin-left: -260px; z-index: 1;}
+:where(.matter-scroll-journey) .source-sheet{position: absolute; inset: 0px; background: rgb(248, 250, 253); border: 1px solid rgb(198, 210, 226); box-shadow: rgba(35, 59, 90, 0.267) 5px 15px 25px -18px; padding: 38px 33px; transition: transform 1.8s var(--ease),opacity 1s; transform: rotate(5deg) translate(13px, -1px); transform-origin: 50% 85%;}
+:where(.matter-scroll-journey) .hoa-sheet{transform: rotate(11deg) translate(26px, -6px); background: rgb(229, 237, 248);}
+:where(.matter-scroll-journey) .source-tab{position: absolute; right: 20px; top: -21px; height: 22px; background: rgb(215, 228, 247); padding: 5px 15px 0px; font-size: 8px; letter-spacing: 0.12em; border-width: 1px 1px 0px; border-style: solid solid none; border-color: rgb(198, 210, 226) rgb(198, 210, 226) currentcolor; border-image: none; border-radius: 4px 4px 0px 0px;}
+:where(.matter-scroll-journey) .hoa-sheet .source-tab{background: rgb(191, 209, 235); right: 104px;}
+:where(.matter-scroll-journey) .source-heading{font: 400 25px "Cormorant Garamond", Georgia, serif; max-width: 280px;}
+:where(.matter-scroll-journey) .source-sub{display: block; font-size: 7px; letter-spacing: 0.1em; margin-top: 20px; color: rgb(114, 133, 157);}
+:where(.matter-scroll-journey) .source-lines{height: 140px; margin-top: 25px; background: repeating-linear-gradient(rgba(157, 175, 194, 0.17) 0px, rgba(157, 175, 194, 0.17) 1px, transparent 1px, transparent 13px); max-width: 85%;}
+:where(.matter-scroll-journey) .source-mark{font: 400 23px var(--notes-font,'LPC Notes'),cursive; color: rgb(101, 137, 187); display: block; margin-top: 20px;}
+:where(.matter-scroll-journey) .editor-note,:where(.matter-scroll-journey) .handoff-label{position: absolute; left: calc(50% + 318px); top: 230px; display: flex; flex-direction: column; gap: 12px; font-size: 12px; line-height: 1.6; color: rgb(93, 115, 144); opacity: 0; transform: translateX(24px); transition: opacity 1s,transform 1.4s var(--ease); pointer-events: none;}
+:where(.matter-scroll-journey) .editor-note-heading{font: 400 28px var(--notes-font,'LPC Notes'),cursive; color: rgb(84, 127, 191); white-space: nowrap;}
+:where(.matter-scroll-journey) .editor-signature{font: 400 24px var(--notes-font,'LPC Notes'),cursive; transform: rotate(-5deg); margin-top: 2px;}
+:where(.matter-scroll-journey) .editor-note-line,:where(.matter-scroll-journey) .handoff-line{position: absolute; width: 90px; height: 26px; border-top: 1px solid rgb(127, 159, 200); left: -108px; top: 8px; transform: rotate(-8deg); transform-origin: right center;}
+:where(.matter-scroll-journey) .editor-note-line::after,:where(.matter-scroll-journey) .handoff-line::after{content: ""; position: absolute; left: 0px; top: -3px; width: 5px; height: 5px; border-radius: 50%; background: rgb(127, 159, 200);}
+:where(.matter-scroll-journey) .handoff-label{top: 194px;}
+:where(.matter-scroll-journey) .handoff-role{font-size: 8px; letter-spacing: 0.15em; color: rgb(85, 127, 184);}
+:where(.matter-scroll-journey) .handoff-label strong{font: 400 30px / 1.1 "Cormorant Garamond", Georgia, serif; color: var(--ink); letter-spacing: -0.02em;}
+:where(.matter-scroll-journey) .handoff-line{width: 70px; left: -87px; transform: rotate(0deg);}
+:where(.matter-scroll-journey) .stage-footnote{position: absolute; left: 50%; bottom: 11px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; color: rgb(102, 126, 156); font-size: 10px; white-space: nowrap;}
+:where(.matter-scroll-journey) .stage-footnote-line{height: 1px; width: 24px; background: rgb(123, 156, 199);}
+:where(.matter-scroll-journey) .film-controls{max-width: 920px; display: flex; align-items: center; gap: 35px; margin: 0px auto; padding: 0px 25px;}
+:where(.matter-scroll-journey) .chapters{display: flex; flex: 1 1 0%; gap: 24px;}
+:where(.matter-scroll-journey) .chapters button{border-width: 1px 0px 0px; border-style: solid none none; border-color: rgb(191, 203, 217) currentcolor currentcolor; border-image: none; background: none; position: relative; flex: 1 1 0%; text-align: left; padding: 17px 0px 0px; display: flex; align-items: flex-start; gap: 13px; color: rgb(103, 121, 146); min-height: 61px;}
+:where(.matter-scroll-journey) .chapter-num{font-size: 9px; color: rgb(103, 137, 182); margin-top: 3px;}
+:where(.matter-scroll-journey) .chapters strong{font-size: 12px; font-weight: 400;}
+:where(.matter-scroll-journey) .chapters small{display: block; font-size: 9px; color: rgb(116, 133, 155); margin-top: 5px;}
+:where(.matter-scroll-journey) .chapters i{position: absolute; top: -1px; left: 0px; height: 2px; width: 0px; background: rgb(100, 149, 237); transition: width .65s var(--ease);}
+:where(.matter-scroll-journey) .chapters button[aria-current]{color: rgb(35, 59, 90);}
+:where(.matter-scroll-journey) .chapters button[aria-current] i{width: 100%;}
+:where(.matter-scroll-journey) .play-control{border: 1px solid rgb(193, 207, 223); background: rgb(245, 247, 250); border-radius: 50%; height: 54px; width: 54px; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: rgb(69, 108, 159);}
+:where(.matter-scroll-journey) .play-control [data-play-icon]{font-size: 11px;}
+:where(.matter-scroll-journey) .play-control [data-play-label]{font-size: 7px;}
+:where(.matter-scroll-journey) .demo-disclosure{text-align: center; font-size: 9px; color: rgb(106, 126, 151); padding: 0px 20px; margin: 21px 0px 30px; min-height: 14px;}
+:where(.matter-scroll-journey) .site-footer{max-width: 1310px; border-top: 1px solid rgb(203, 213, 224); margin: 0px auto; padding: 24px 30px 28px; display: flex; justify-content: space-between; gap: 20px; font-size: 11px; color: rgb(103, 125, 151);}
+:where(.matter-scroll-journey) .site-footer a{color: rgb(54, 92, 140); text-decoration: none;}
+:where(.matter-scroll-journey) .site-footer a span{margin-left: 20px;}
+:where(.matter-scroll-journey) [data-stage="1"] .matter-sheet{transform: translate(-38px, -10px) rotateX(0deg) rotateY(0deg) rotateZ(0deg); height: 467px; box-shadow: rgba(35, 59, 90, 0.024) 0px 4px 7px, rgba(35, 59, 90, 0.22) 10px 32px 50px -24px;}
+:where(.matter-scroll-journey) [data-stage="1"] .title-sheet{transform: translate(-166px, -5px) rotate(-13deg);}
+:where(.matter-scroll-journey) [data-stage="1"] .hoa-sheet{transform: translate(115px, -26px) rotate(12deg);}
+:where(.matter-scroll-journey) [data-stage="1"] .drawing-architecture{transform: translate(90px, 0px) scale(0.9); opacity: 0.2;}
+:where(.matter-scroll-journey) [data-stage="1"] .editor-note{opacity: 1; transform: none;}
+:where(.matter-scroll-journey) [data-stage="1"] .caption-notes,:where(.matter-scroll-journey) [data-stage="2"] .caption-notes{display: none;}
+:where(.matter-scroll-journey) [data-stage="1"] .caption-review{display: block;}
+:where(.matter-scroll-journey) [data-stage="2"] .caption-post{display: block;}
+:where(.matter-scroll-journey) [data-stage="1"] .orbit-caption{transform: translate(-15px, -19px);}
+:where(.matter-scroll-journey) [data-stage="1"] .paper-rule,:where(.matter-scroll-journey) [data-stage="2"] .paper-rule,:where(.matter-scroll-journey) [data-stage="1"] .hand,:where(.matter-scroll-journey) [data-stage="2"] .hand,:where(.matter-scroll-journey) [data-stage="1"] .hand-title,:where(.matter-scroll-journey) [data-stage="2"] .hand-title{opacity: 0; transform: translateY(-8px);}
+:where(.matter-scroll-journey) [data-stage="1"] .matter-title,:where(.matter-scroll-journey) [data-stage="2"] .matter-title{top: 93px; left: 32px;}
+:where(.matter-scroll-journey) [data-stage="1"] .matter-title h2,:where(.matter-scroll-journey) [data-stage="2"] .matter-title h2,:where(.matter-scroll-journey) [data-stage="1"] .typeset,:where(.matter-scroll-journey) [data-stage="2"] .typeset{opacity: 1; transform: none;}
+:where(.matter-scroll-journey) [data-stage="1"] .sheet-state,:where(.matter-scroll-journey) [data-stage="2"] .sheet-state,:where(.matter-scroll-journey) [data-stage="1"] .scope-label,:where(.matter-scroll-journey) [data-stage="2"] .scope-label,:where(.matter-scroll-journey) [data-stage="1"] .matter-location,:where(.matter-scroll-journey) [data-stage="2"] .matter-location,:where(.matter-scroll-journey) [data-stage="1"] .fragment-index,:where(.matter-scroll-journey) [data-stage="2"] .fragment-index,:where(.matter-scroll-journey) [data-stage="1"] .resolve-mark,:where(.matter-scroll-journey) [data-stage="2"] .resolve-mark{opacity: 1;}
+:where(.matter-scroll-journey) [data-stage="1"] .fragment,:where(.matter-scroll-journey) [data-stage="2"] .fragment{left: 32px; right: 32px; transform: none;}
+:where(.matter-scroll-journey) [data-stage="1"] .fragment-one,:where(.matter-scroll-journey) [data-stage="2"] .fragment-one{top: 189px;}
+:where(.matter-scroll-journey) [data-stage="1"] .fragment-two,:where(.matter-scroll-journey) [data-stage="2"] .fragment-two{top: 216px;}
+:where(.matter-scroll-journey) [data-stage="1"] .fragment-three,:where(.matter-scroll-journey) [data-stage="2"] .fragment-three{top: 243px;}
+:where(.matter-scroll-journey) [data-stage="1"] .amount-field,:where(.matter-scroll-journey) [data-stage="2"] .amount-field{top: 322px; left: 32px;}
+:where(.matter-scroll-journey) [data-stage="1"] .deadline-field,:where(.matter-scroll-journey) [data-stage="2"] .deadline-field{top: 322px; left: 280px;}
+:where(.matter-scroll-journey) [data-stage="1"] .amount-field label,:where(.matter-scroll-journey) [data-stage="2"] .amount-field label,:where(.matter-scroll-journey) [data-stage="1"] .deadline-field label,:where(.matter-scroll-journey) [data-stage="2"] .deadline-field label,:where(.matter-scroll-journey) [data-stage="1"] .amount-input,:where(.matter-scroll-journey) [data-stage="2"] .amount-input,:where(.matter-scroll-journey) [data-stage="1"] .deadline-input,:where(.matter-scroll-journey) [data-stage="1"] .amount-field small,:where(.matter-scroll-journey) [data-stage="2"] .amount-field small,:where(.matter-scroll-journey) [data-stage="1"] .deadline-field small,:where(.matter-scroll-journey) [data-stage="2"] .deadline-field small{opacity: 1;}
+:where(.matter-scroll-journey) [data-stage="1"] .note-aside,:where(.matter-scroll-journey) [data-stage="2"] .note-aside{opacity: 0; transform: translateX(12px) rotate(12deg);}
+:where(.matter-scroll-journey) [data-stage="1"].edits-visible .addition,:where(.matter-scroll-journey) [data-stage="2"] .addition{opacity: 1; transform: none;}
+:where(.matter-scroll-journey) [data-stage="1"].edits-visible .amount-input{background: rgb(234, 241, 253); transition: background 0.7s;}
+:where(.matter-scroll-journey) [data-stage="2"] .matter-sheet{transform: translate(-35px, -10px); height: 467px; box-shadow: rgb(239, 243, 249) 0px 0px 0px 6px, rgb(200, 215, 233) 0px 0px 0px 7px, rgba(35, 59, 90, 0.25) 0px 24px 50px -22px;}
+:where(.matter-scroll-journey) [data-stage="2"] .title-sheet{transform: translate(-26px, -4px) rotate(-4deg);}
+:where(.matter-scroll-journey) [data-stage="2"] .hoa-sheet{transform: translate(3px, -6px) rotate(2deg);}
+:where(.matter-scroll-journey) [data-stage="2"] .drawing-architecture{transform: translate(70px, -20px) scale(0.98); opacity: 0.28;}
+:where(.matter-scroll-journey) [data-stage="2"] .handoff-label{opacity: 1; transform: none;}
+:where(.matter-scroll-journey) [data-stage="2"] .sheet-bottom{background: rgb(237, 243, 252);}
+:where(.matter-scroll-journey) [data-stage="2"] .review-assurance{display: none;}
+:where(.matter-scroll-journey) [data-stage="2"] .post-assurance{display: block;}
+:where(.matter-scroll-journey) [data-stage="2"] .added-label,:where(.matter-scroll-journey) [data-stage="2"] .term-edit{visibility: hidden;}
+:where(.matter-scroll-journey) [data-stage="2"] .addition{background: none; border-color: transparent; padding-left: 0px;}
+:where(.matter-scroll-journey) [data-stage="2"] .addition > span:first-child{font-size: 0px;}
+:where(.matter-scroll-journey) [data-stage="2"] .addition > span:first-child::after{content: "04"; font-size: 7px; color: rgb(105, 136, 177);}
+:where(.matter-scroll-journey) [data-stage="2"] .amount-input input{border: 0px;}
+:where(.matter-scroll-journey) [data-stage="2"] .deadline-input{opacity: 0; visibility: hidden;}
+:where(.matter-scroll-journey) [data-stage="2"] .posted-date{font: 400 31px / 1.1 "Cormorant Garamond", Georgia, serif; opacity: 1; top: 18px;}
+:where(.matter-scroll-journey) [data-stage="2"] .stage-grid{transform: rotateX(65deg) rotateZ(0deg);}
+@media (min-width: 1500px){:where(.matter-scroll-journey) .film-heading{margin-top: 40px;}
+:where(.matter-scroll-journey) .stage{margin-top: 12px;}}
+@media (max-width: 1100px){:where(.matter-scroll-journey) .stage{max-width: 1000px;}
+:where(.matter-scroll-journey) .orbit-caption{left: 3%; font-size: 22px; top: 118px;}
+:where(.matter-scroll-journey) .matter-sheet{margin-left: -235px; width: 470px;}
+:where(.matter-scroll-journey) .document-stack{margin-left: -235px; width: 470px;}
+:where(.matter-scroll-journey) .editor-note,:where(.matter-scroll-journey) .handoff-label{left: calc(50% + 253px); font-size: 11px;}
+:where(.matter-scroll-journey) .editor-note-heading{font-size: 24px;}
+:where(.matter-scroll-journey) .editor-note-line{width: 48px; left: -58px;}
+:where(.matter-scroll-journey) .handoff-label strong{font-size: 26px;}
+:where(.matter-scroll-journey) .handoff-line{width: 36px; left: -48px;}
+:where(.matter-scroll-journey) [data-stage="1"] .deadline-field,:where(.matter-scroll-journey) [data-stage="2"] .deadline-field{left: 255px;}
+:where(.matter-scroll-journey) [data-stage="1"] .title-sheet{transform: translate(-100px, 0px) rotate(-13deg);}
+:where(.matter-scroll-journey) [data-stage="1"] .hoa-sheet{transform: translate(65px, -20px) rotate(10deg);}
+:where(.matter-scroll-journey) .source-heading{font-size: 22px;}
+:where(.matter-scroll-journey) .source-sheet{padding: 38px 25px;}
+:where(.matter-scroll-journey) .caption-review{max-width: 125px;}
+:where(.matter-scroll-journey) .caption-post{max-width: 140px;}}
+@media (max-width: 850px){:where(.matter-scroll-journey) .site-mast > span{display: none;}
+:where(.matter-scroll-journey) .stage{height: 550px;}
+:where(.matter-scroll-journey) .orbit-caption{display: none;}
+:where(.matter-scroll-journey) .editor-note,:where(.matter-scroll-journey) .handoff-label{display: none;}
+:where(.matter-scroll-journey) .matter-sheet{transform: translate(-7px, 0px) rotateX(5deg) rotateY(-5deg) rotateZ(-6deg);}
+:where(.matter-scroll-journey) [data-stage="1"] .matter-sheet,:where(.matter-scroll-journey) [data-stage="2"] .matter-sheet{transform: translate(0px, -10px);}
+:where(.matter-scroll-journey) .drawing{opacity: 0.6;}
+:where(.matter-scroll-journey) .film-controls{max-width: 720px; gap: 20px;}
+:where(.matter-scroll-journey) .chapters{gap: 17px;}
+:where(.matter-scroll-journey) .film-heading{margin-top: 25px;}
+:where(.matter-scroll-journey) .film-heading h2{font-size: 58px;}
+:where(.matter-scroll-journey) .site-mast{height: 78px;}}
+@media (max-width: 600px){:where(.matter-scroll-journey) .site-mast{height: 65px; padding: 0px 23px;}
+:where(.matter-scroll-journey) .site-mast > a:first-child{font-size: 24px;}
+:where(.matter-scroll-journey) .mast-action{font-size: 10px;}
+:where(.matter-scroll-journey) .mast-action span{margin-left: 8px;}
+:where(.matter-scroll-journey) .film-heading{margin-top: 25px; padding: 0px 20px;}
+:where(.matter-scroll-journey) .eyebrow{font-size: 7px; letter-spacing: 0.16em; margin-bottom: 13px;}
+:where(.matter-scroll-journey) .film-heading h2{font-size: 49px; line-height: 0.98; letter-spacing: -0.045em;}
+:where(.matter-scroll-journey) .mobile-break{display: block;}
+:where(.matter-scroll-journey) .film-heading > p:last-child{font-size: 11px; margin-top: 14px; line-height: 1.6;}
+:where(.matter-scroll-journey) .stage{height: 514px; margin-top: 0px; perspective: 1400px;}
+:where(.matter-scroll-journey) .stage::before{inset: 0px -30%;}
+:where(.matter-scroll-journey) .stage-grid{inset: 0px -50%; background-size: 26px 26px;}
+:where(.matter-scroll-journey) .drawing{width: 950px; max-width: none; left: calc(50% - 450px); height: 520px; opacity: 0.28;}
+:where(.matter-scroll-journey) .matter-sheet{width: calc(100% - 58px); max-width: 410px; margin-left: 0px; left: 29px; top: 46px; height: 405px; transform: rotate(-4deg) rotateY(-4deg); box-shadow: rgba(35, 59, 90, 0.25) 10px 23px 35px -20px;}
+:where(.matter-scroll-journey) .document-stack{width: calc(100% - 58px); max-width: 410px; left: 29px; top: 57px; height: 392px; margin-left: 0px;}
+:where(.matter-scroll-journey) .source-sheet{padding: 30px 20px;}
+:where(.matter-scroll-journey) .source-tab{right: 15px; top: -17px; height: 18px; font-size: 6px; padding: 4px 10px 0px;}
+:where(.matter-scroll-journey) .hoa-sheet .source-tab{right: 80px;}
+:where(.matter-scroll-journey) .title-sheet{transform: rotate(3deg) translate(5px, 0px);}
+:where(.matter-scroll-journey) .hoa-sheet{transform: rotate(7deg) translate(7px, 0px);}
+:where(.matter-scroll-journey) .source-heading{font-size: 19px;}
+:where(.matter-scroll-journey) .source-sub{font-size: 6px;}
+:where(.matter-scroll-journey) .source-mark{font-size: 21px;}
+:where(.matter-scroll-journey) .sheet-heading{height: 43px; padding: 0px 20px; gap: 10px;}
+:where(.matter-scroll-journey) .sheet-monogram{font-size: 24px;}
+:where(.matter-scroll-journey) .sheet-context{font-size: 6px; letter-spacing: 0.1em;}
+:where(.matter-scroll-journey) .sheet-stage{font-size: 8px;}
+:where(.matter-scroll-journey) .paper-rule{inset: 66px 0px 59px; background: repeating-linear-gradient(transparent 0px, transparent 36px, rgba(117, 150, 188, 0.133) 36px, rgba(117, 150, 188, 0.133) 37px);}
+:where(.matter-scroll-journey) .paper-rule::after{left: 17px;}
+:where(.matter-scroll-journey) .matter-title{top: 69px; left: 27px; right: 15px;}
+:where(.matter-scroll-journey) .hand-title{font-size: 32px;}
+:where(.matter-scroll-journey) .fragment{left: 24px; right: 20px; height: 36px;}
+:where(.matter-scroll-journey) .fragment-one{top: 125px;}
+:where(.matter-scroll-journey) .fragment-two{top: 164px; left: 35px;}
+:where(.matter-scroll-journey) .fragment-three{top: 206px; left: 29px;}
+:where(.matter-scroll-journey) .hand{font-size: 25px;}
+:where(.matter-scroll-journey) .fragment-one .hand{font-size: 23px; letter-spacing: -0.03em;}
+:where(.matter-scroll-journey) .amount-field{left: 25px; top: 258px; width: 155px;}
+:where(.matter-scroll-journey) .deadline-field{left: 34px; top: 301px; width: 155px;}
+:where(.matter-scroll-journey) .hand-amount{font-size: 28px;}
+:where(.matter-scroll-journey) .hand-deadline{font-size: 27px;}
+:where(.matter-scroll-journey) .note-aside{right: 15px; bottom: 99px; font-size: 20px; transform: rotate(10deg);}
+:where(.matter-scroll-journey) .note-aside svg{width: 63px;}
+:where(.matter-scroll-journey) .sheet-bottom{height: 56px; padding: 0px 18px; gap: 8px;}
+:where(.matter-scroll-journey) .sheet-action{font-size: 9px; padding: 8px 10px; gap: 13px; min-width: 126px; min-height: 34px;}
+:where(.matter-scroll-journey) .review-assurance,:where(.matter-scroll-journey) .post-assurance{font-size: 8px; max-width: 115px; line-height: 1.4;}
+:where(.matter-scroll-journey) .sheet-binding{height: 20px; width: 20px;}
+:where(.matter-scroll-journey) .sheet-state{top: 58px; left: 20px; right: 20px; font-size: 7px;}
+:where(.matter-scroll-journey) .sample-label{font-size: 6px;}
+:where(.matter-scroll-journey) .matter-title h2{font-size: 28px;}
+:where(.matter-scroll-journey) .matter-location{top: 37px; font-size: 8px;}
+:where(.matter-scroll-journey) .matter-location span{padding: 0px 5px;}
+:where(.matter-scroll-journey) .scope-label{top: 145px; left: 20px; font-size: 7px;}
+:where(.matter-scroll-journey) .fragment-index{font-size: 6px; top: 7px;}
+:where(.matter-scroll-journey) .typeset{font-size: 11px; left: 18px; line-height: 23px;}
+:where(.matter-scroll-journey) .resolve-mark{font-size: 10px;}
+:where(.matter-scroll-journey) .addition{top: 242px; left: 20px; right: 20px; font-size: 9px; padding: 7px 6px; gap: 5px;}
+:where(.matter-scroll-journey) .added-label{font-size: 5px; letter-spacing: 0px;}
+:where(.matter-scroll-journey) .amount-field label,:where(.matter-scroll-journey) .deadline-field label{font-size: 6px;}
+:where(.matter-scroll-journey) .amount-input{top: 15px; font-size: 29px;}
+:where(.matter-scroll-journey) .amount-input input{width: 62px;}
+:where(.matter-scroll-journey) .term-edit{font-size: 12px; margin-left: 2px;}
+:where(.matter-scroll-journey) .deadline-input{top: 16px;}
+:where(.matter-scroll-journey) .deadline-input input{font-size: 10px; width: 119px;}
+:where(.matter-scroll-journey) .amount-field small,:where(.matter-scroll-journey) .deadline-field small{top: 54px; font-size: 7px;}
+:where(.matter-scroll-journey) .stage-footnote{bottom: 6px; font-size: 9px;}
+:where(.matter-scroll-journey) [data-stage="1"] .matter-sheet,:where(.matter-scroll-journey) [data-stage="2"] .matter-sheet{transform: translateY(-4px); height: 431px;}
+:where(.matter-scroll-journey) [data-stage="1"] .title-sheet{transform: translate(-25px, 0px) rotate(-7deg);}
+:where(.matter-scroll-journey) [data-stage="1"] .hoa-sheet{transform: translate(24px, 0px) rotate(6deg);}
+:where(.matter-scroll-journey) [data-stage="2"] .title-sheet{transform: translate(-8px, 0px) rotate(-3deg);}
+:where(.matter-scroll-journey) [data-stage="2"] .hoa-sheet{transform: translate(5px, -4px) rotate(2deg);}
+:where(.matter-scroll-journey) [data-stage="1"] .matter-title,:where(.matter-scroll-journey) [data-stage="2"] .matter-title{top: 82px; left: 20px;}
+:where(.matter-scroll-journey) [data-stage="1"] .fragment,:where(.matter-scroll-journey) [data-stage="2"] .fragment{left: 20px; right: 20px;}
+:where(.matter-scroll-journey) [data-stage="1"] .fragment-one,:where(.matter-scroll-journey) [data-stage="2"] .fragment-one{top: 165px;}
+:where(.matter-scroll-journey) [data-stage="1"] .fragment-two,:where(.matter-scroll-journey) [data-stage="2"] .fragment-two{top: 190px;}
+:where(.matter-scroll-journey) [data-stage="1"] .fragment-three,:where(.matter-scroll-journey) [data-stage="2"] .fragment-three{top: 215px;}
+:where(.matter-scroll-journey) [data-stage="1"] .amount-field,:where(.matter-scroll-journey) [data-stage="2"] .amount-field{top: 294px; left: 20px; width: 135px;}
+:where(.matter-scroll-journey) [data-stage="1"] .deadline-field,:where(.matter-scroll-journey) [data-stage="2"] .deadline-field{top: 294px; left: 54%; width: 43%;}
+:where(.matter-scroll-journey) [data-stage="2"] .posted-date{font-size: 29px;}
+:where(.matter-scroll-journey) .film-controls{padding: 0px 23px; gap: 14px; margin-top: 10px;}
+:where(.matter-scroll-journey) .chapters{gap: 12px;}
+:where(.matter-scroll-journey) .chapters button{gap: 6px; padding-top: 12px; min-height: 54px;}
+:where(.matter-scroll-journey) .chapters strong{font-size: 10px;}
+:where(.matter-scroll-journey) .chapters small{display: none;}
+:where(.matter-scroll-journey) .chapter-num{font-size: 7px; margin-top: 2px;}
+:where(.matter-scroll-journey) .play-control{height: 40px; width: 40px;}
+:where(.matter-scroll-journey) .play-control [data-play-icon]{font-size: 9px;}
+:where(.matter-scroll-journey) .play-control [data-play-label]{font-size: 6px;}
+:where(.matter-scroll-journey) .demo-disclosure{font-size: 8px; line-height: 1.5; margin-top: 12px; margin-bottom: 23px;}
+:where(.matter-scroll-journey) .site-footer{padding: 20px 23px; font-size: 10px; line-height: 1.5;}
+:where(.matter-scroll-journey) .site-footer > span{max-width: 160px;}
+:where(.matter-scroll-journey) .site-footer a{white-space: nowrap;}
+:where(.matter-scroll-journey) .site-footer a span{margin-left: 7px;}}
+@media (min-width: 469px) and (max-width: 600px){:where(.matter-scroll-journey) .matter-sheet,:where(.matter-scroll-journey) .document-stack{left: 50%; margin-left: -205px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) .site-mast{padding: 0px 18px;}
+:where(.matter-scroll-journey) .site-mast > a:first-child{font-size: 22px;}
+:where(.matter-scroll-journey) .film-heading h2{font-size: 43px;}
+:where(.matter-scroll-journey) .eyebrow{font-size: 6px;}
+:where(.matter-scroll-journey) .matter-sheet,:where(.matter-scroll-journey) .document-stack{left: 20px; width: calc(100% - 40px);}
+:where(.matter-scroll-journey) .hand-title{font-size: 30px;}
+:where(.matter-scroll-journey) .fragment-one .hand{font-size: 21px;}
+:where(.matter-scroll-journey) .hand{font-size: 23px;}
+:where(.matter-scroll-journey) .note-aside{font-size: 17px; right: 10px;}
+:where(.matter-scroll-journey) .sheet-context{font-size: 5.5px;}
+:where(.matter-scroll-journey) .sample-label{font-size: 5px;}
+:where(.matter-scroll-journey) .sheet-state{font-size: 6px;}
+:where(.matter-scroll-journey) .matter-title h2{font-size: 26px;}
+:where(.matter-scroll-journey) .typeset{font-size: 10px;}
+:where(.matter-scroll-journey) .addition{font-size: 8px;}
+:where(.matter-scroll-journey) .added-label{font-size: 4.5px;}
+:where(.matter-scroll-journey) .deadline-input input{width: 107px; font-size: 9px;}
+:where(.matter-scroll-journey) .film-controls{padding: 0px 17px; gap: 10px;}
+:where(.matter-scroll-journey) .chapters{gap: 8px;}
+:where(.matter-scroll-journey) .chapters strong{font-size: 9px;}
+:where(.matter-scroll-journey) .chapter-num{font-size: 6px;}
+:where(.matter-scroll-journey) .play-control{width: 36px; height: 36px;}
+:where(.matter-scroll-journey) .sheet-action{min-width: 116px;}
+:where(.matter-scroll-journey) .amount-field small,:where(.matter-scroll-journey) .deadline-field small{font-size: 6.5px;}
+:where(.matter-scroll-journey) .site-footer{padding: 18px; font-size: 9px;}
+:where(.matter-scroll-journey) .site-footer > span{max-width: 137px;}}
+@media (prefers-reduced-motion: reduce){:where(.matter-scroll-journey) *,:where(.matter-scroll-journey) ::before,:where(.matter-scroll-journey) ::after{animation: auto ease 0s 1 normal none running none !important; transition: none !important; scroll-behavior: auto !important;}
+:where(.matter-scroll-journey) .matter-sheet{transform: none;}
+:where(.matter-scroll-journey) .source-sheet{transform: none;}
+:where(.matter-scroll-journey) .hoa-sheet{transform: translate(6px, -6px);}
+:where(.matter-scroll-journey) .stage-grid{transform: none; opacity: 0.3;}}
+:where(.matter-scroll-journey) .editor-note,:where(.matter-scroll-journey) .handoff-label{z-index: 5;}
+:where(.matter-scroll-journey) [data-stage="1"] .orbit-caption{opacity: 0;}
+:where(.matter-scroll-journey) .editor-note{left: calc(50% + 290px); top: 248px; max-width: 185px;}
+:where(.matter-scroll-journey) .editor-note-heading{white-space: normal; line-height: 1.05; font-size: 27px;}
+:where(.matter-scroll-journey) .editor-note-line{width: 42px; left: -55px;}
+:where(.matter-scroll-journey) [data-stage="1"] .source-heading{font-size: 19px; max-width: 125px;}
+:where(.matter-scroll-journey) [data-stage="1"] .source-sub{max-width: 100px; line-height: 1.6;}
+:where(.matter-scroll-journey) [data-stage="1"] .source-mark{font-size: 20px; max-width: 110px; line-height: 1.15;}
+@media (min-width: 851px) and (max-width: 1100px){:where(.matter-scroll-journey) .editor-note{left: calc(50% + 238px); max-width: 155px;}
+:where(.matter-scroll-journey) .editor-note-heading{font-size: 24px;}
+:where(.matter-scroll-journey) .editor-note-line{width: 25px; left: -33px;}
+:where(.matter-scroll-journey) .handoff-label{max-width: 175px;}}
+@media (max-width: 600px){:where(.matter-scroll-journey) .typeset{font-size: 12px;}
+:where(.matter-scroll-journey) .chapters strong{font-size: 11px;}
+:where(.matter-scroll-journey) .source-heading,:where(.matter-scroll-journey) .source-sub,:where(.matter-scroll-journey) .source-mark{visibility: hidden;}
+:where(.matter-scroll-journey) .stage-footnote{font-size: 9px;}
+:where(.matter-scroll-journey) .addition{font-size: 10px;}
+:where(.matter-scroll-journey) .added-label{font-size: 5px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) .typeset{font-size: 11px;}
+:where(.matter-scroll-journey) .chapters strong{font-size: 9px;}
+:where(.matter-scroll-journey) .addition{font-size: 9px;}
+:where(.matter-scroll-journey) .added-label{display: none;}}
+:where(.matter-scroll-journey) .sheet-action [hidden]{display: none !important;}
+:where(.matter-scroll-journey) .amount-input,:where(.matter-scroll-journey) .posted-date,:where(.matter-scroll-journey) [data-stage="2"] .posted-date{font-family: Sarabun, Arial, sans-serif; font-weight: 400; font-size: 26px; line-height: 1.2;}
+:where(.matter-scroll-journey) .amount-input input{font-family: inherit; font-weight: inherit; font-size: inherit;}
+:where(.matter-scroll-journey) .deadline-input input{font-family: Sarabun, Arial, sans-serif; font-weight: 400;}
+:where(.matter-scroll-journey) [data-stage="1"] .sheet-action{min-width: 100px; min-height: 32px; padding: 6px 15px; font-size: 14px; justify-content: center; gap: 0px;}
+:where(.matter-scroll-journey) [data-stage="1"] .sheet-action > span:first-child{font-size: 14px;}
+@media (max-width: 600px){:where(.matter-scroll-journey) .amount-input,:where(.matter-scroll-journey) [data-stage="2"] .posted-date{font-size: 24px;}
+:where(.matter-scroll-journey) [data-stage="1"] .sheet-action{min-width: 88px; min-height: 30px; padding: 5px 13px;}}
+:where(.matter-scroll-journey) .hand,:where(.matter-scroll-journey) .hand-title,:where(.matter-scroll-journey) .fragment-three .hand,:where(.matter-scroll-journey) .note-aside,:where(.matter-scroll-journey) .source-mark,:where(.matter-scroll-journey) .editor-note-heading,:where(.matter-scroll-journey) .editor-signature{color: rgb(48, 48, 46); font-weight: 400;}
+:where(.matter-scroll-journey) .hand-title{font-size: 34px;}
+:where(.matter-scroll-journey) .hand{font-size: 26px;}
+:where(.matter-scroll-journey) .hand-deadline{font-size: 26px;}
+:where(.matter-scroll-journey) .note-aside{font-size: 21px;}
+:where(.matter-scroll-journey) .sheet-action,:where(.matter-scroll-journey) [data-stage="1"] .sheet-action{min-width: 0px; min-height: 36px; padding: 7px 11px; font: 400 14px / 1.2 Sarabun, Arial, sans-serif; gap: 7px; justify-content: center; border-radius: 0px; white-space: nowrap;}
+:where(.matter-scroll-journey) .sheet-action > span:first-child,:where(.matter-scroll-journey) [data-stage="1"] .sheet-action > span:first-child{font-size: 14px;}
+:where(.matter-scroll-journey) .sheet-action > span:last-child{font-size: 15px;}
+:where(.matter-scroll-journey) .play-control{width: auto; height: 36px; min-width: 78px; flex-direction: row; gap: 7px; border: 0px; border-radius: 0px; background: rgb(41, 70, 104); color: rgb(255, 255, 255); padding: 7px 11px;}
+:where(.matter-scroll-journey) .play-control:hover{background: rgb(66, 109, 164);}
+:where(.matter-scroll-journey) .play-control [data-play-label]{font: 400 14px / 1.2 Sarabun, Arial, sans-serif;}
+:where(.matter-scroll-journey) .play-control [data-play-icon]{font-size: 12px;}
+@media (max-width: 600px){:where(.matter-scroll-journey) .hand-title{font-size: 29px;}
+:where(.matter-scroll-journey) .hand{font-size: 23px;}
+:where(.matter-scroll-journey) .fragment-one .hand{font-size: 21px;}
+:where(.matter-scroll-journey) .hand-deadline{font-size: 24px;}
+:where(.matter-scroll-journey) .note-aside{font-size: 18px;}
+:where(.matter-scroll-journey) .sheet-action,:where(.matter-scroll-journey) [data-stage="1"] .sheet-action{padding: 7px 10px; min-width: 0px; min-height: 36px; gap: 6px;}
+:where(.matter-scroll-journey) .play-control{min-width: 0px; padding: 7px 9px;}
+:where(.matter-scroll-journey) .play-control [data-play-label]{font-size: 12px;}
+:where(.matter-scroll-journey) .film-controls{gap: 12px;}
+:where(.matter-scroll-journey) .chapters{gap: 9px;}
+:where(.matter-scroll-journey) .chapters button{gap: 5px;}
+:where(.matter-scroll-journey) .chapters strong{font-size: 10px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) .hand-title{font-size: 27px;}
+:where(.matter-scroll-journey) .fragment-one .hand{font-size: 18px;}
+:where(.matter-scroll-journey) .hand{font-size: 21px;}
+:where(.matter-scroll-journey) .hand-deadline{font-size: 22px;}
+:where(.matter-scroll-journey) .note-aside{font-size: 16px;}
+:where(.matter-scroll-journey) .review-assurance,:where(.matter-scroll-journey) .post-assurance{font-size: 7px; max-width: 92px;}
+:where(.matter-scroll-journey) .chapters button{flex-direction: column; gap: 3px;}
+:where(.matter-scroll-journey) .chapters strong{font-size: 9px;}
+:where(.matter-scroll-journey) .film-controls{gap: 9px;}}
+
+
+
+
+:where(.matter-scroll-journey) .hand,:where(.matter-scroll-journey) .hand-title,:where(.matter-scroll-journey) .fragment-three .hand,:where(.matter-scroll-journey) .note-aside,:where(.matter-scroll-journey) .source-mark,:where(.matter-scroll-journey) .editor-note-heading,:where(.matter-scroll-journey) .editor-signature{font-weight: var(--notes-weight,400);}
+:where(.matter-scroll-journey) .typeset{left: 0px;}
+:where(.matter-scroll-journey) .addition{gap: 0px;}
+:where(.matter-scroll-journey) .site-footer{justify-content: flex-end;}
+:where(.matter-scroll-journey) [data-stage="2"] .addition{padding-left: 0px;}
+
+
+
+
+@media (max-width: 600px){:where(.matter-scroll-journey) [data-pen="nothing"] .fragment-one .hand{font-size: 19px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) [data-pen="nothing"] .fragment-one .hand{font-size: 17px;}}
+:where(.matter-scroll-journey) [data-pen="mathilde"] .hand-title{font-size: 54px; line-height: 1;}
+:where(.matter-scroll-journey) [data-pen="mathilde"] .hand{font-size: 43px; line-height: 0.95;}
+:where(.matter-scroll-journey) [data-pen="mathilde"] .note-aside{font-size: 34px; line-height: 1;}
+:where(.matter-scroll-journey) [data-pen="mathilde"] .source-mark{font-size: 32px; line-height: 1;}
+:where(.matter-scroll-journey) [data-pen="mathilde"] .editor-note-heading{font-size: 43px; line-height: 0.95;}
+:where(.matter-scroll-journey) [data-pen="mathilde"] .editor-signature{font-size: 38px; line-height: 1;}
+@media (max-width: 600px){:where(.matter-scroll-journey) [data-pen="mathilde"] .hand-title{font-size: 46px;}
+:where(.matter-scroll-journey) [data-pen="mathilde"] .hand{font-size: 36px;}
+:where(.matter-scroll-journey) [data-pen="mathilde"] .fragment-one .hand{font-size: 33px;}
+:where(.matter-scroll-journey) [data-pen="mathilde"] .note-aside{font-size: 29px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) [data-pen="mathilde"] .hand-title{font-size: 43px;}
+:where(.matter-scroll-journey) [data-pen="mathilde"] .hand{font-size: 33px;}
+:where(.matter-scroll-journey) [data-pen="mathilde"] .fragment-one .hand{font-size: 29px;}
+:where(.matter-scroll-journey) [data-pen="mathilde"] .note-aside{font-size: 26px;}}
+:where(.matter-scroll-journey) .sheet-monogram[data-step-title]{letter-spacing: -0.025em; white-space: nowrap;}
+.matter-scroll-journey{height: calc(var(--film-height,900px) + 260svh); position: relative;}
+.matter-scroll-journey .matter-film{position: sticky; top: var(--film-top,0px); padding-top: 1px; padding-bottom: 1px;}
+:where(.matter-scroll-journey) .film-heading h2{font-size: clamp(40px, 4.6vw, 66px); line-height: 1.04;}
+:where(.matter-scroll-journey) .film-heading h2 em{font-style: italic; font-synthesis: style;}
+:where(.matter-scroll-journey) .scroll-instruction{display: flex; gap: 9px; align-items: center; white-space: nowrap; font-size: 11px; color: rgb(98, 113, 135);}
+:where(.matter-scroll-journey) .scroll-instruction > span{font-size: 17px;}
+:where(.matter-scroll-journey) [data-stage="0"] .matter-sheet{background: rgb(255, 252, 237); border-color: rgb(222, 220, 207);}
+:where(.matter-scroll-journey) [data-stage="0"] .sheet-heading{border-top: 7px solid rgb(231, 225, 203); border-bottom-color: rgb(218, 220, 203);}
+:where(.matter-scroll-journey) [data-stage="0"] .sheet-binding{display: none;}
+:where(.matter-scroll-journey) [data-stage="0"] .paper-rule{background: repeating-linear-gradient(transparent 0px, transparent 39px, rgba(123, 157, 195, 0.16) 39px, rgba(123, 157, 195, 0.16) 40px);}
+:where(.matter-scroll-journey) [data-stage="0"] .paper-rule::after{width: 4px; background: none; border-left: 1px solid rgba(189, 133, 128, 0.267); border-right: 1px solid rgba(189, 133, 128, 0.2);}
+:where(.matter-scroll-journey) [data-stage="0"] .sheet-bottom{border-top-color: rgb(216, 219, 201);}
+@media (max-width: 600px){:where(.matter-scroll-journey) .film-heading h2{font-size: 39px;}
+:where(.matter-scroll-journey) .scroll-instruction{font-size: 9px; gap: 5px;}
+:where(.matter-scroll-journey) .film-controls{gap: 13px;}
+:where(.matter-scroll-journey) .scroll-instruction > span{font-size: 14px;}
+:where(.matter-scroll-journey) [data-stage="0"] .paper-rule{background: repeating-linear-gradient(transparent 0px, transparent 36px, rgba(123, 157, 195, 0.16) 36px, rgba(123, 157, 195, 0.16) 37px);}}
+@media (max-width: 360px){:where(.matter-scroll-journey) .film-heading h2{font-size: 35px;}
+:where(.matter-scroll-journey) .scroll-instruction{font-size: 8px;}}
+@media (max-width: 600px){:where(.matter-scroll-journey) .scroll-instruction{display: none;}
+:where(.matter-scroll-journey) .film-controls .chapters{gap: 14px;}
+:where(.matter-scroll-journey) .film-controls .chapters button{flex-direction: row; gap: 7px;}
+:where(.matter-scroll-journey) .film-controls .chapters strong{white-space: nowrap;}}
+:where(.matter-scroll-journey) .stage{height: 640px; margin-top: 20px;}
+:where(.matter-scroll-journey) .stage > .chapters{position: absolute; left: 50%; top: 5px; transform: translateX(-50%); width: 620px; max-width: 90%; display: flex; gap: 26px; z-index: 8;}
+:where(.matter-scroll-journey) .stage > .chapters button{font-family: "LPC Notes", cursive; flex: 1 1 0%; align-items: center; border: 0px; padding: 0px 0px 6px; gap: 9px; min-height: 43px; color: rgb(115, 116, 119); white-space: nowrap;}
+:where(.matter-scroll-journey) .stage > .chapters strong{font: 400 36px / 1 "LPC Notes", cursive;}
+:where(.matter-scroll-journey) .stage > .chapters .chapter-num{font: 400 31px / 1 "LPC Notes", cursive; color: inherit; margin: 0px;}
+:where(.matter-scroll-journey) .stage > .chapters button[aria-current]{color: rgb(48, 48, 46);}
+:where(.matter-scroll-journey) .stage > .chapters i{top: auto; bottom: 0px; height: 1px; background: rgb(115, 116, 119); transform: rotate(-1deg);}
+:where(.matter-scroll-journey) .matter-sheet{top: 110px; scale: 1.09; transform-origin: 50% 50%;}
+:where(.matter-scroll-journey) .document-stack{top: 143px; scale: 1.09; transform-origin: 50% 50%;}
+:where(.matter-scroll-journey) .orbit-caption{top: 176px;}
+:where(.matter-scroll-journey) .editor-note{top: 294px;}
+:where(.matter-scroll-journey) .handoff-label{top: 240px;}
+:where(.matter-scroll-journey) .demo-disclosure{margin-top: 5px;}
+:where(.matter-scroll-journey) [data-stage="0"] .matter-sheet{background: rgb(255, 253, 233); border-color: rgb(222, 217, 196); isolation: isolate;}
+:where(.matter-scroll-journey) [data-stage="0"] .sheet-heading{border-top: 0px; border-bottom: 0px; padding-top: 6px;}
+:where(.matter-scroll-journey) [data-stage="0"] .paper-rule{inset: 74px 0px 57px; background: repeating-linear-gradient(transparent 0px, transparent 32px, rgba(129, 156, 181, 0.26) 32px, rgba(129, 156, 181, 0.26) 33px);}
+:where(.matter-scroll-journey) [data-stage="0"] .paper-rule::after{left: 29px; top: -61px; bottom: -56px; width: 3px; border-left: 1px solid rgba(187, 119, 118, 0.376); border-right: 1px solid rgba(187, 119, 118, 0.22);}
+:where(.matter-scroll-journey) [data-stage="0"] .sheet-bottom{border-top: 0px; background: none;}
+:where(.matter-scroll-journey) .pad-tear{display: none;}
+:where(.matter-scroll-journey) [data-stage="0"] .pad-tear{display: block; position: absolute; left: -1px; right: -1px; top: -9px; height: 14px; background: rgb(255, 253, 233); clip-path: polygon(0px 55%, 2% 32%, 4% 48%, 6% 23%, 9% 45%, 11% 35%, 14% 50%, 17% 22%, 19% 41%, 22% 30%, 25% 47%, 28% 25%, 30% 42%, 33% 33%, 35% 53%, 38% 26%, 41% 44%, 44% 19%, 46% 38%, 49% 29%, 52% 49%, 54% 24%, 57% 39%, 60% 27%, 62% 50%, 65% 34%, 68% 46%, 71% 22%, 74% 43%, 77% 31%, 80% 48%, 83% 23%, 86% 42%, 89% 30%, 92% 48%, 95% 24%, 98% 41%, 100% 30%, 100% 100%, 0px 100%); z-index: 2;}
+:where(.matter-scroll-journey) [data-stage="0"] .matter-sheet{border-top-color: transparent;}
+@media (max-width: 1100px) and (min-width: 851px){:where(.matter-scroll-journey) .editor-note{top: 294px;}
+:where(.matter-scroll-journey) .matter-sheet,:where(.matter-scroll-journey) .document-stack{scale: 1.07;}}
+@media (max-width: 850px){:where(.matter-scroll-journey) .stage{height: 622px;}
+:where(.matter-scroll-journey) .stage > .chapters{width: 550px;}
+:where(.matter-scroll-journey) .stage > .chapters strong{font-size: 33px;}
+:where(.matter-scroll-journey) .matter-sheet,:where(.matter-scroll-journey) .document-stack{scale: 1.07;}}
+@media (max-width: 600px){:where(.matter-scroll-journey) .stage{height: 580px; margin-top: 18px;}
+:where(.matter-scroll-journey) .stage > .chapters{top: 0px; width: calc(100% - 36px); max-width: none; gap: 10px;}
+:where(.matter-scroll-journey) .stage > .chapters button{gap: 4px; justify-content: center; min-height: 34px;}
+:where(.matter-scroll-journey) .stage > .chapters strong{font-size: 24px;}
+:where(.matter-scroll-journey) .stage > .chapters .chapter-num{font-size: 22px;}
+:where(.matter-scroll-journey) .matter-sheet{top: 90px; scale: 1.035;}
+:where(.matter-scroll-journey) .document-stack{top: 101px; scale: 1.035;}
+:where(.matter-scroll-journey) [data-stage="0"] .paper-rule{inset: 65px 0px 53px; background: repeating-linear-gradient(transparent 0px, transparent 32px, rgba(129, 156, 181, 0.26) 32px, rgba(129, 156, 181, 0.26) 33px);}
+:where(.matter-scroll-journey) [data-stage="0"] .paper-rule::after{left: 17px; top: -55px; bottom: -52px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) .stage > .chapters{width: calc(100% - 24px); gap: 5px;}
+:where(.matter-scroll-journey) .stage > .chapters strong{font-size: 21px;}
+:where(.matter-scroll-journey) .stage > .chapters .chapter-num{font-size: 20px;}
+:where(.matter-scroll-journey) .stage > .chapters button{gap: 3px;}
+:where(.matter-scroll-journey) .matter-sheet,:where(.matter-scroll-journey) .document-stack{scale: 1.025;}}
+:where(.matter-scroll-journey) .stage > .chapters button{gap: 18px;}
+@media (max-width: 600px){:where(.matter-scroll-journey) .stage > .chapters button{gap: 10px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) .stage > .chapters button{gap: 8px;}}
+:where(.matter-scroll-journey) [data-stage="0"] .paper-rule{background: repeating-linear-gradient(transparent 0px, transparent 16px, rgba(129, 156, 181, 0.19) 16px, rgba(129, 156, 181, 0.19) 17px);}
+:where(.matter-scroll-journey) .demo-disclosure:empty{display: none;}
+@media (min-width: 1101px){:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-heading,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-heading,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-heading{font-size: 20px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-monogram,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-monogram,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-monogram{font-size: 32px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .matter-location,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .matter-location,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .matter-location{font-size: 13px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-field small,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-field small,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-field small{font-size: 10px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .matter-title h2,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .matter-title h2,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .matter-title h2{font-size: 40px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .typeset{font-size: 16px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition{font-size: 14px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-field label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-field label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-field label{font-size: 9px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .posted-date,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .posted-date,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .posted-date{font-size: 33px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-input input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-input input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-input input{font-size: 15px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .post-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .post-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .post-assurance{font-size: 11px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action > span:first-child,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action > span:first-child,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action > span:first-child{font-size: 18px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action > span:last-child,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action > span:last-child,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action > span:last-child{font-size: 19px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand-title,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand-title,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand-title{font-size: 68px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .fragment-one .hand,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand-deadline,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .fragment-one .hand,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand-deadline,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .fragment-one .hand,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand-deadline{font-size: 54px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .note-aside,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .note-aside,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .note-aside{font-size: 43px;}}
+@media (min-width: 851px) and (max-width: 1100px){:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-heading,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-heading,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-heading{font-size: 20px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-monogram,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-monogram,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-monogram{font-size: 31px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .matter-location,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .matter-location,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .matter-location{font-size: 12px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-field small,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-field small,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-field small{font-size: 10px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .matter-title h2,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .matter-title h2,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .matter-title h2{font-size: 40px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .typeset{font-size: 16px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition{font-size: 14px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-field label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-field label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-field label{font-size: 9px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .posted-date,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .posted-date,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .posted-date{font-size: 32px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-input input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-input input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-input input{font-size: 15px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .post-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .post-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .post-assurance{font-size: 11px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action > span:first-child,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action > span:first-child,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action > span:first-child{font-size: 17px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action > span:last-child,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action > span:last-child,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action > span:last-child{font-size: 19px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand-title,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand-title,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand-title{font-size: 67px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .fragment-one .hand,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand-deadline,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .fragment-one .hand,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand-deadline,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .fragment-one .hand,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand-deadline{font-size: 53px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .note-aside,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .note-aside,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .note-aside{font-size: 42px;}}
+@media (min-width: 601px) and (max-width: 850px){:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-heading,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-heading,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-heading{font-size: 20px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-monogram,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-monogram,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-monogram{font-size: 31px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .matter-location,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .matter-location,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .matter-location{font-size: 12px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-field small,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-field small,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-field small{font-size: 10px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .matter-title h2,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .matter-title h2,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .matter-title h2{font-size: 40px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .typeset{font-size: 16px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition{font-size: 14px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-field label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-field label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-field label{font-size: 9px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .posted-date,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .posted-date,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .posted-date{font-size: 32px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-input input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-input input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-input input{font-size: 15px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .post-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .post-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .post-assurance{font-size: 11px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action > span:first-child,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action > span:first-child,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action > span:first-child{font-size: 17px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action > span:last-child,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action > span:last-child,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action > span:last-child{font-size: 19px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand-title,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand-title,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand-title{font-size: 67px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .fragment-one .hand,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand-deadline,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .fragment-one .hand,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand-deadline,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .fragment-one .hand,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand-deadline{font-size: 53px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .note-aside,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .note-aside,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .note-aside{font-size: 42px;}}
+@media (min-width: 361px) and (max-width: 600px){:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-heading,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-heading,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-heading{font-size: 19px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-monogram,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-monogram,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-monogram,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .posted-date{font-size: 29px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .matter-location,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .post-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .matter-location,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .post-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .matter-location,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .post-assurance{font-size: 10px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-field small,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-field small,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-field small{font-size: 8px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .matter-title h2,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .matter-title h2,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .matter-title h2{font-size: 34px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .typeset{font-size: 14px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-input input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-input input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-input input{font-size: 12px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-field label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-field label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-field label{font-size: 7px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .posted-date,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .posted-date{font-size: 31px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action > span:first-child,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action > span:first-child,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action > span:first-child{font-size: 17px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action > span:last-child,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action > span:last-child,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action > span:last-child{font-size: 18px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand-title,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand-title,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand-title{font-size: 55px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .fragment-one .hand,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .fragment-one .hand,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .fragment-one .hand{font-size: 40px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand-deadline,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand-deadline,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand-deadline{font-size: 43px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .note-aside,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .note-aside,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .note-aside{font-size: 35px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-heading,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-heading,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-heading{font-size: 19px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-monogram,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-monogram,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-monogram,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-input input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .posted-date{font-size: 29px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .matter-location,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .matter-location,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-stage,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .matter-location{font-size: 10px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-field label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-field label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-state,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-field label{font-size: 7px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .matter-title h2,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .posted-date,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .note-aside,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .matter-title h2,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .posted-date,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .note-aside,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .matter-title h2,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .note-aside{font-size: 31px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .post-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .post-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .scope-label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .review-assurance,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .post-assurance{font-size: 8px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .typeset{font-size: 13px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-input input,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-input input,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-input input{font-size: 11px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .deadline-field small,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .deadline-field small,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-field small{font-size: 8px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action > span:first-child,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action > span:first-child,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action > span:first-child{font-size: 17px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .sheet-action > span:last-child,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-action > span:last-child,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-action > span:last-child{font-size: 18px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand-title,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand-title,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand-title{font-size: 51px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .fragment-one .hand,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .fragment-one .hand,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .fragment-one .hand{font-size: 34px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand-deadline,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .hand-deadline,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .hand-deadline{font-size: 39px;}}
+:where(.matter-scroll-journey) .sheet-bottom{justify-content: flex-end;}
+:where(.matter-scroll-journey) .post-assurance{margin-right: auto;}
+:where(.matter-scroll-journey) .stage{perspective: none;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet{scale: none; transform: none; transform-style: flat; width: 572px; margin-left: -286px; left: 50%; top: 90px; height: 480px; transition: top 1.2s var(--ease),height 1.2s var(--ease),box-shadow 1.2s;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet{top: 80px; height: 509px; transform: none;}
+:where(.matter-scroll-journey) #matter-film .matter-title h2{line-height: 1.15;}
+:where(.matter-scroll-journey) #matter-film .matter-location{top: 51px;}
+:where(.matter-scroll-journey) #matter-film .sheet-heading{height: 56px;}
+:where(.matter-scroll-journey) #matter-film .sheet-bottom{height: 66px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .term-edit{transform: none;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film .matter-sheet .deadline-field label,:where(.matter-scroll-journey) #matter-film .matter-sheet .scope-label{font-size: 11px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film .matter-sheet .deadline-field small{font-size: 10px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .amount-input{top: 20px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .deadline-input{top: 21px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .amount-input input{width: 90px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .deadline-input input{max-width: 165px; width: 165px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .typeset{transform: none;}
+@media (max-width: 1100px){:where(.matter-scroll-journey) #matter-film .matter-sheet{width: 503px; margin-left: -252px; height: 471px; top: 95px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet{height: 500px; top: 85px;}}
+@media (max-width: 600px){:where(.matter-scroll-journey) #matter-film .matter-sheet{width: calc(100% - 46px); max-width: 424px; left: 23px; margin-left: 0px; top: 83px; height: 419px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet{top: 78px; height: 446px;}
+:where(.matter-scroll-journey) #matter-film .sheet-heading{height: 45px;}
+:where(.matter-scroll-journey) #matter-film .sheet-bottom{height: 58px;}
+:where(.matter-scroll-journey) #matter-film .matter-location{top: 41px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film .matter-sheet .deadline-field label,:where(.matter-scroll-journey) #matter-film .matter-sheet .scope-label{font-size: 9px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film .matter-sheet .deadline-field small{font-size: 8px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .deadline-input input{width: 133px; max-width: 133px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .amount-input input{width: 75px;}}
+@media (min-width: 469px) and (max-width: 600px){:where(.matter-scroll-journey) #matter-film .matter-sheet{left: 50%; margin-left: -212px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) #matter-film .matter-sheet{width: calc(100% - 32px); left: 16px; max-width: none; margin-left: 0px; height: 415px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet{height: 442px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .deadline-input input{width: 116px; max-width: 116px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .deadline-field small{font-size: 7px;}}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .amount-field small,:where(.matter-scroll-journey) #matter-film .matter-sheet .deadline-field small{top: 66px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet{left: 0px; right: 0px; margin-left: auto; margin-right: auto;}
+:where(.matter-scroll-journey) #matter-film .document-stack{left: 0px; right: 0px; margin-left: auto; margin-right: auto; --fan-spread: 140px;}
+:where(.matter-scroll-journey) #matter-film .title-sheet{transform: translate(-16px, -3px) rotate(-5deg);}
+:where(.matter-scroll-journey) #matter-film .hoa-sheet{transform: translate(16px, -3px) rotate(5deg);}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .title-sheet{transform: translate(calc(var(--fan-spread) * -1),-15px) rotate(-12deg);}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .hoa-sheet{transform: translate(var(--fan-spread),-15px) rotate(12deg);}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .title-sheet{transform: translate(-14px, -5px) rotate(-3deg);}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .hoa-sheet{transform: translate(14px, -5px) rotate(3deg);}
+@media (max-width: 1100px){:where(.matter-scroll-journey) #matter-film .matter-sheet{width: 504px;}
+:where(.matter-scroll-journey) #matter-film .document-stack{--fan-spread: 85px;}}
+@media (max-width: 600px){:where(.matter-scroll-journey) #matter-film .matter-sheet{width: calc(100% - 46px);}
+:where(.matter-scroll-journey) #matter-film .document-stack{--fan-spread: 24px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) #matter-film .matter-sheet{width: calc(100% - 32px);}}
+:where(.matter-scroll-journey) .scope-summary{position: absolute; top: 189px; left: 32px; width: 42%; margin: 0px; font-size: 15px; line-height: 1.55; color: rgb(52, 77, 106); opacity: 0; transition: opacity 0.7s;}
+:where(.matter-scroll-journey) .tasks-label{position: absolute; top: 172px; left: 54%; font-size: 11px; letter-spacing: 0.12em; color: rgb(99, 118, 142); opacity: 0; transition: opacity 0.7s;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .scope-summary,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .scope-summary,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .tasks-label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .tasks-label{opacity: 1;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment{left: 54%; right: 32px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-one,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-one{top: 189px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-two,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-two{top: 221px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-three,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-three{top: 253px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .addition{left: 54%; right: 32px; top: 285px; padding: 6px 8px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .addition{padding-left: 0px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .sheet-state{display: none;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .amount-field,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .amount-field,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .deadline-field,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .deadline-field{top: 349px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .deadline-field,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .deadline-field{left: 54%;}
+@media (max-width: 600px){:where(.matter-scroll-journey) .scope-summary{top: 165px; left: 20px; width: 42%; font-size: 12px; line-height: 1.55;}
+:where(.matter-scroll-journey) .tasks-label{top: 145px; left: 54%; font-size: 9px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment{left: 54%; right: 20px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-one,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-one{top: 165px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-two,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-two{top: 197px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-three,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-three{top: 229px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .addition{top: 265px; left: 54%; right: 20px; padding: 5px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .amount-field,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .amount-field,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .deadline-field,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .deadline-field{top: 325px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet{height: 480px;}
+:where(.matter-scroll-journey) #matter-film .stage{height: 625px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) .scope-summary{font-size: 11px; width: 40%;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .typeset{font-size: 12px; line-height: 1.4;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .addition{font-size: 11px;}}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .amount-input,:where(.matter-scroll-journey) #matter-film[data-stage="1"].edits-visible .amount-input,:where(.matter-scroll-journey) #matter-film .matter-sheet .addition{background: transparent; border-left: 0px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .typeset{font-size: 14px; line-height: 1.3; padding-left: 15px; position: relative; display: block; top: 0px;}
+:where(.matter-scroll-journey) #matter-film .typeset::before,:where(.matter-scroll-journey) #matter-film .addition::before{content: ""; position: absolute; left: 0px; top: 5px; width: 7px; height: 7px; border: 1px solid rgb(139, 156, 176); border-radius: 1px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-one,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-one{top: 189px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-two,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-two{top: 231px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-three,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-three{top: 273px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition{top: 315px; padding: 0px 0px 0px 15px; font-size: 14px; line-height: 1.3;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .amount-field,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .amount-field,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .deadline-field,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .deadline-field{top: 376px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet{height: 540px;}
+@media (max-width: 600px){:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition{font-size: 11px; line-height: 1.35; padding-left: 12px;}
+:where(.matter-scroll-journey) #matter-film .typeset::before,:where(.matter-scroll-journey) #matter-film .addition::before{width: 6px; height: 6px; top: 4px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-one,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-one{top: 165px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-two,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-two{top: 201px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-three,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-three{top: 237px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition{top: 273px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .amount-field,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .amount-field,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .deadline-field,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .deadline-field{top: 334px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet{height: 490px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition{font-size: 10px;}}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .typeset{position: absolute; left: 0px; right: 0px; top: 0px;}
+:where(.matter-scroll-journey) #matter-film .task-toggle{font-family: Sarabun, Arial, sans-serif; text-align: left; color: rgb(52, 77, 106); border: 0px; border-radius: 0px; background: transparent; cursor: pointer; margin: 0px; padding-top: 0px; padding-bottom: 0px; padding-right: 0px; min-height: 30px; box-sizing: border-box;}
+:where(.matter-scroll-journey) #matter-film .task-toggle::before{display: grid; place-items: center; content: ""; width: 10px; height: 10px; top: 4px; font: 10px / 10px Sarabun, Arial, sans-serif; color: rgb(255, 255, 255);}
+:where(.matter-scroll-journey) #matter-film .task-toggle[aria-pressed="true"]::before{content: "✓"; background: rgb(54, 92, 140); border-color: rgb(54, 92, 140);}
+:where(.matter-scroll-journey) #matter-film .task-toggle:hover{color: rgb(54, 92, 140);}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .task-toggle{pointer-events: none;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .task-toggle,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .task-toggle{padding-left: 17px;}
+@media (max-width: 600px){:where(.matter-scroll-journey) #matter-film .task-toggle::before{width: 9px; height: 9px; font-size: 9px; line-height: 9px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .task-toggle,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .task-toggle{padding-left: 15px;}}
+:where(.matter-scroll-journey) #matter-film #matter-amount:focus{outline: none; box-shadow: none;}
+:where(.matter-scroll-journey) #matter-film #matter-amount:focus-visible{outline: none; border-bottom: 2px solid rgb(54, 92, 140);}
+:where(.matter-scroll-journey) #matter-film .task-toggle::before{content: ""; width: 15px; height: 15px; top: 3px; border: 1.5px solid rgb(166, 180, 196); border-radius: 5px; background: rgb(255, 255, 255); box-shadow: rgba(35, 59, 90, 0.03) 0px 1px 2px; transition: background 0.16s, border-color 0.16s, box-shadow 0.16s;}
+:where(.matter-scroll-journey) #matter-film .task-toggle::after{content: ""; position: absolute; left: 4px; top: 7px; width: 8px; height: 4px; border-left: 1.8px solid rgb(255, 255, 255); border-bottom: 1.8px solid rgb(255, 255, 255); transform: rotate(-45deg); opacity: 0; transition: opacity 0.16s; pointer-events: none;}
+:where(.matter-scroll-journey) #matter-film .task-toggle[aria-pressed="true"]::before{content: ""; background: rgb(54, 92, 140); border-color: rgb(54, 92, 140); box-shadow: rgba(35, 59, 90, 0.08) 0px 2px 4px;}
+:where(.matter-scroll-journey) #matter-film .task-toggle[aria-pressed="true"]::after{opacity: 1;}
+:where(.matter-scroll-journey) #matter-film .task-toggle:hover::before{border-color: rgb(100, 134, 177);}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .task-toggle,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .task-toggle{padding-left: 24px;}
+@media (max-width: 600px){:where(.matter-scroll-journey) #matter-film .task-toggle::before{width: 13px; height: 13px; border-radius: 4px; top: 2px;}
+:where(.matter-scroll-journey) #matter-film .task-toggle::after{left: 3px; top: 6px; width: 7px; height: 3.5px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .task-toggle,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .task-toggle{padding-left: 21px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-two,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-two{top: 209px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-three,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-three{top: 249px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition{top: 289px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .amount-field,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .amount-field,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .deadline-field,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .deadline-field{top: 350px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet{height: 510px;}}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .hand,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .hand,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .posted-date{pointer-events: none;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .deadline-input{z-index: 2; pointer-events: auto;}
+:where(.matter-scroll-journey) #matter-film #matter-deadline{cursor: pointer; min-height: 34px;}
+:where(.matter-scroll-journey) #matter-film #matter-deadline::-webkit-calendar-picker-indicator{cursor: pointer; padding: 5px; margin: 0px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-two,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-two{top: 228px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-three,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-three{top: 267px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition{top: 306px;}
+@media (max-width: 600px){:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-two,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-two{top: 198px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-three,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-three{top: 231px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition{top: 264px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-two,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-two{top: 207px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment-three,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-three{top: 238px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition{top: 269px;}}
+:where(.matter-scroll-journey) .build-intake,:where(.matter-scroll-journey) .build-track{display: none;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .build-intake{display: block; position: absolute; top: 110px; left: 32px; right: 32px; z-index: 4; opacity: var(--intake-opacity,1); transform: translateY(var(--intake-y,0px)); pointer-events: none;}
+:where(.matter-scroll-journey) .intake-label{font: 10px Sarabun, Arial, sans-serif; letter-spacing: 0.1em; color: rgb(99, 118, 142);}
+:where(.matter-scroll-journey) .intake-paper{margin: 15px auto 0px; padding: 22px 26px; background: repeating-linear-gradient(transparent 0px, transparent 25px, rgba(143, 175, 209, 0.17) 25px, rgba(143, 175, 209, 0.17) 26px), rgb(255, 253, 233); box-shadow: rgba(35, 59, 90, 0.05) 0px 5px 16px; border-top: 1px dashed rgb(214, 209, 180); font: 400 34px / 0.9 "LPC Notes", cursive; color: rgb(52, 60, 69); width: 90%; box-sizing: border-box;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .build-track{display: block; position: absolute; top: 55px; left: 0px; right: 0px; height: 2px; background: rgb(233, 238, 245); overflow: hidden;}
+:where(.matter-scroll-journey) .build-track span{display: block; height: 100%; background: rgb(100, 149, 237); width: var(--build-progress,0%);}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-title{clip-path: inset(0 var(--hide-title,100%) 0 0); transition: none;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .scope-summary{clip-path: inset(0 0 var(--hide-scope,100%) 0); transition: none;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .tasks-label,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .addition{clip-path: inset(0 var(--hide-tasks,100%) 0 0); transition: none;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .amount-field{clip-path: inset(0 var(--hide-amount,100%) 0 0); transition: none;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .deadline-field{clip-path: inset(0 var(--hide-date,100%) 0 0); transition: none;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .editor-note{opacity: 0; visibility: hidden;}
+@media (max-width: 600px){:where(.matter-scroll-journey) #matter-film[data-stage="1"] .build-intake{left: 20px; right: 20px; top: 100px;}
+:where(.matter-scroll-journey) .intake-paper{font-size: 29px; line-height: 1; padding: 18px 16px; width: 100%;}
+:where(.matter-scroll-journey) .intake-label{font-size: 9px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .build-track{top: 44px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-monogram{font-size: 24px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet .sheet-monogram{font-size: 21px;}
+:where(.matter-scroll-journey) .intake-paper{font-size: 25px;}}
+@media (prefers-reduced-motion: reduce){:where(.matter-scroll-journey) #matter-film[data-stage="1"] .build-intake{transform: none;}}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .fragment,:where(.matter-scroll-journey) #matter-film[data-stage="1"] .addition{clip-path: inset(0 var(--hide-tasks,100%) -55px 0);}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .amount-field{clip-path: inset(0 var(--hide-amount,100%) -110px 0);}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .deadline-field{clip-path: inset(0 var(--hide-date,100%) -110px 0);}
+:where(.matter-scroll-journey) .dashboard-builder[hidden]{display: none !important;}
+:where(.matter-scroll-journey) .dashboard-builder{position: absolute; top: 65px; left: 0px; right: 0px; width: min(880px, 100% - 48px); margin: auto; display: grid; grid-template-columns: 1.05fr 0.95fr; border: 1px solid rgb(224, 229, 235); border-radius: 8px; background: white; box-shadow: rgba(16, 36, 63, 0.08) 0px 12px 36px; overflow: hidden; color: rgb(16, 36, 63); font: 14px / 1.5 Sarabun, Arial, sans-serif; z-index: 5;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .matter-sheet{visibility: hidden; pointer-events: none;}
+:where(.matter-scroll-journey) .builder-source{padding: 28px 30px;}
+:where(.matter-scroll-journey) .builder-eyebrow{display: flex; justify-content: space-between; letter-spacing: 0.1em; font-size: 11px; color: rgb(101, 113, 134);}
+:where(.matter-scroll-journey) .builder-source h2{font: 500 27px / 1.3 Sarabun, sans-serif; letter-spacing: -0.025em; margin: 42px 0px 8px;}
+:where(.matter-scroll-journey) .builder-source p{margin: 0px 0px 24px; color: rgb(101, 113, 134); font-size: 14px;}
+:where(.matter-scroll-journey) .builder-brief{font: 400 16px / 1.8 Sarabun, sans-serif; min-height: 215px; white-space: normal; color: rgb(77, 89, 104);}
+:where(.matter-scroll-journey) .builder-status{display: flex; gap: 8px; align-items: center; color: rgb(101, 113, 134); font-size: 12px; margin-top: 30px;}
+:where(.matter-scroll-journey) .builder-status > span:first-child{width: 6px; height: 6px; background: rgb(100, 149, 237); border-radius: 50%; flex: 0 0 auto;}
+:where(.matter-scroll-journey) .builder-progress{height: 2px; background: rgb(233, 238, 245); margin-top: 12px;}
+:where(.matter-scroll-journey) .builder-progress > span{display: block; background: rgb(100, 149, 237); height: 100%; width: var(--build-progress,0%);}
+:where(.matter-scroll-journey) .builder-draft{padding: 27px 28px 18px; border-left: 1px solid rgb(230, 234, 239); background: rgb(252, 252, 253); min-width: 0px;}
+:where(.matter-scroll-journey) .builder-field{border-bottom: 1px solid rgb(230, 234, 239); padding-bottom: 12px; margin-bottom: 12px; min-width: 0px;}
+:where(.matter-scroll-journey) .builder-field label,:where(.matter-scroll-journey) .builder-label{display: block; text-transform: uppercase; letter-spacing: 0.07em; font-size: 10px; font-weight: 400; color: rgb(101, 113, 134); margin-bottom: 5px;}
+:where(.matter-scroll-journey) .builder-draft input,:where(.matter-scroll-journey) .builder-draft textarea{font: 400 14px / 1.5 Sarabun, sans-serif; color: rgb(77, 89, 104); background: transparent; border: 0px; border-radius: 3px; padding: 0px; width: 100%; min-width: 0px; box-sizing: border-box;}
+:where(.matter-scroll-journey) .builder-draft textarea{height: 84px; resize: none; display: block;}
+:where(.matter-scroll-journey) .builder-draft input:hover,:where(.matter-scroll-journey) .builder-draft textarea:hover{background: rgb(240, 243, 247);}
+:where(.matter-scroll-journey) .builder-draft input:focus-visible,:where(.matter-scroll-journey) .builder-draft textarea:focus-visible{outline: rgb(100, 149, 237) solid 2px; outline-offset: 3px; background: white;}
+:where(.matter-scroll-journey) .builder-title{border: 0px; margin-bottom: 16px; padding: 0px;}
+:where(.matter-scroll-journey) .builder-title label{position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);}
+:where(.matter-scroll-journey) .builder-title input{font-size: 21px; font-weight: 500; color: rgb(16, 36, 63);}
+:where(.matter-scroll-journey) .builder-tasks input{display: block; margin: 5px 0px; font-size: 12px; padding-left: 10px; background-image: radial-gradient(circle, rgb(101, 113, 134) 1px, transparent 1.5px); background-size: 5px 18px; background-position: left top; background-repeat: no-repeat;}
+:where(.matter-scroll-journey) .builder-practical{display: grid; grid-template-columns: 1fr 1fr; gap: 0px 18px;}
+:where(.matter-scroll-journey) .builder-money{display: flex; gap: 3px;}
+:where(.matter-scroll-journey) .builder-money input{max-width: 100px;}
+:where(.matter-scroll-journey) .builder-actions{display: flex; justify-content: space-between; align-items: center; padding-top: 2px;}
+:where(.matter-scroll-journey) .builder-actions button{font: 500 16px Sarabun, sans-serif; cursor: pointer; border: 0px; padding: 8px 15px; border-radius: 5px;}
+:where(.matter-scroll-journey) .builder-preview{background: rgb(16, 36, 63); color: white;}
+:where(.matter-scroll-journey) .builder-preview:disabled{opacity: 0.4; cursor: default;}
+:where(.matter-scroll-journey) .builder-back{background: transparent; color: rgb(101, 113, 134); padding-left: 0px !important;}
+:where(.matter-scroll-journey) .builder-draft [data-build-part]{opacity: var(--part-opacity,0); transition: none;}
+@media (max-width: 760px){:where(.matter-scroll-journey) .dashboard-builder{top: 28px; width: calc(100% - 32px); grid-template-columns: 1fr;}
+:where(.matter-scroll-journey) .builder-source{padding: 16px 20px 12px;}
+:where(.matter-scroll-journey) .builder-source h2{font-size: 21px; margin: 10px 0px 3px;}
+:where(.matter-scroll-journey) .builder-source p{font-size: 11px; margin-bottom: 8px;}
+:where(.matter-scroll-journey) .builder-brief{font-size: 12px; line-height: 1.45; min-height: 0px; max-height: 72px; overflow: auto; border-left: 2px solid rgb(230, 234, 239); padding-left: 10px;}
+:where(.matter-scroll-journey) .builder-status{font-size: 10px; margin-top: 9px;}
+:where(.matter-scroll-journey) .builder-progress{margin-top: 7px;}
+:where(.matter-scroll-journey) .builder-draft{padding: 15px 20px; border-left: 0px; border-top: 1px solid rgb(230, 234, 239);}
+:where(.matter-scroll-journey) .builder-title input{font-size: 19px;}
+:where(.matter-scroll-journey) .builder-field{margin-bottom: 8px; padding-bottom: 8px;}
+:where(.matter-scroll-journey) .builder-title{padding: 0px; margin-bottom: 10px;}
+:where(.matter-scroll-journey) .builder-draft textarea{font-size: 12px; height: 57px; line-height: 1.5;}
+:where(.matter-scroll-journey) .builder-tasks input{font-size: 11px; margin: 3px 0px;}
+:where(.matter-scroll-journey) .builder-field label,:where(.matter-scroll-journey) .builder-label{font-size: 9px; margin-bottom: 3px;}
+:where(.matter-scroll-journey) .builder-practical{gap: 0px 12px; font-size: 12px;}
+:where(.matter-scroll-journey) .builder-practical input{font-size: 12px;}
+:where(.matter-scroll-journey) .builder-actions button{font-size: 16px; padding: 6px 12px;}
+:where(.matter-scroll-journey) #matter-film .stage{height: 690px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) .builder-source,:where(.matter-scroll-journey) .builder-draft{padding-left: 15px; padding-right: 15px;}
+:where(.matter-scroll-journey) .builder-draft textarea{height: 72px;}
+:where(.matter-scroll-journey) .builder-tasks input{font-size: 10px;}}
+:where(.matter-scroll-journey) .builder-brief{white-space: pre-line;}
+:where(.matter-scroll-journey) .builder-brief.is-typing > span::after{content: ""; display: inline-block; height: 1em; width: 1px; background: rgb(100, 149, 237); vertical-align: -0.1em; margin-left: 2px;}
+@media (max-width: 760px){:where(.matter-scroll-journey) .builder-brief{height: 72px; min-height: 72px;}}
+:where(.matter-scroll-journey) .builder-brief{border: 1px solid rgb(213, 221, 231); border-radius: 5px; background: rgb(255, 255, 255); padding: 12px 14px; min-height: 228px;}
+@media (max-width: 760px){:where(.matter-scroll-journey) .builder-brief{border: 1px solid rgb(213, 221, 231); padding: 8px 10px; height: 88px; min-height: 88px; max-height: 88px;}}
+:where(.matter-scroll-journey) .builder-progress{display: none;}
+:where(.matter-scroll-journey) .builder-brief{border: 1.5px solid rgb(169, 183, 201); border-radius: 6px; background: rgb(248, 250, 252); box-shadow: rgba(16, 36, 63, 0.024) 0px 1px 3px inset;}
+@media (max-width: 760px){:where(.matter-scroll-journey) .builder-brief{border: 1.5px solid rgb(169, 183, 201);}}
+:where(.matter-scroll-journey) .dashboard-builder{grid-template-columns: 0.95fr 1.05fr;}
+:where(.matter-scroll-journey) .builder-source h2{margin-top: 25px;}
+:where(.matter-scroll-journey) .builder-source p{margin-bottom: 18px;}
+:where(.matter-scroll-journey) .builder-status{margin-top: 18px;}
+:where(.matter-scroll-journey) .builder-draft textarea{font-size: 15px; height: 78px;}
+:where(.matter-scroll-journey) .builder-tasks input{font-size: 14px; margin: 6px 0px;}
+:where(.matter-scroll-journey) .builder-field label,:where(.matter-scroll-journey) .builder-label{font-size: 11px;}
+:where(.matter-scroll-journey) .builder-title input{font-size: 23px;}
+:where(.matter-scroll-journey) .builder-preview{transition: box-shadow 0.35s, background 0.35s, opacity 0.35s;}
+:where(.matter-scroll-journey) .dashboard-builder.is-ready .builder-preview{background: rgb(35, 59, 90); box-shadow: rgba(35, 59, 90, 0.094) 0px 0px 0px 3px;}
+@media (max-width: 760px){:where(.matter-scroll-journey) .dashboard-builder{grid-template-columns: 1fr; top: 12px;}
+:where(.matter-scroll-journey) .builder-source{padding: 12px 18px;}
+:where(.matter-scroll-journey) .builder-source h2{margin: 6px 0px 3px;}
+:where(.matter-scroll-journey) .builder-source p{margin-bottom: 8px;}
+:where(.matter-scroll-journey) .builder-brief{height: 146px; min-height: 146px; max-height: none; overflow: visible; font-size: 12px; line-height: 18px; padding: 8px 10px;}
+:where(.matter-scroll-journey) .builder-status{margin-top: 8px; font-size: 11px;}
+:where(.matter-scroll-journey) .builder-draft{padding: 14px 18px;}
+:where(.matter-scroll-journey) .builder-draft textarea{font-size: 13px; height: 65px;}
+:where(.matter-scroll-journey) .builder-tasks input{font-size: 12px; margin: 4px 0px;}
+:where(.matter-scroll-journey) .builder-field label,:where(.matter-scroll-journey) .builder-label{font-size: 10px;}
+:where(.matter-scroll-journey) .builder-title input{font-size: 21px;}
+:where(.matter-scroll-journey) #matter-film .stage{height: 780px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) .builder-draft textarea{height: 80px;}
+:where(.matter-scroll-journey) .builder-tasks input{font-size: 11px;}
+:where(.matter-scroll-journey) .builder-source,:where(.matter-scroll-journey) .builder-draft{padding-left: 14px; padding-right: 14px;}}
+@media (prefers-reduced-motion: reduce){:where(.matter-scroll-journey) .builder-preview{transition: none;}}
+:where(.matter-scroll-journey) .builder-draft textarea{height: 68px;}
+:where(.matter-scroll-journey) .builder-tasks input{font-size: 15px;}
+:where(.matter-scroll-journey) .builder-suggestion > span{display: block; font-size: 11px; color: rgb(101, 113, 134); margin: 0px 0px 4px 10px;}
+:where(.matter-scroll-journey) .suggestion-inline{font-size: 9px; letter-spacing: 0px; text-transform: none; white-space: nowrap;}
+@media (max-width: 760px){:where(.matter-scroll-journey) .builder-draft textarea{height: 60px; font-size: 13px;}
+:where(.matter-scroll-journey) .builder-tasks input{font-size: 13px;}
+:where(.matter-scroll-journey) .builder-suggestion > span{font-size: 10px;}
+.matter-scroll-journey .matter-film{top: 0px;}
+/* Keep the mobile draft's Preview action reachable inside the pinned scene. */
+.matter-scroll-journey .matter-film[data-stage="1"]{top: var(--film-top,0px);}
+:where(.matter-scroll-journey) #matter-film .stage{height: 790px;}
+:where(.matter-scroll-journey) .builder-draft{padding-top: 12px; padding-bottom: 12px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) .builder-tasks input{font-size: 12px;}
+:where(.matter-scroll-journey) .builder-draft textarea{height: 78px;}}
+@media (max-width: 760px){:where(.matter-scroll-journey) #matter-film .film-heading{margin-top: 8px;}
+:where(.matter-scroll-journey) #matter-film .film-heading h2{font-size: 32px; line-height: 1.02;}
+:where(.matter-scroll-journey) #matter-film .stage{height: 735px; margin-top: 10px;}
+:where(.matter-scroll-journey) .builder-brief{height: 130px; min-height: 130px; font-size: 12px; line-height: 16px;}
+:where(.matter-scroll-journey) .builder-source{padding-top: 10px; padding-bottom: 8px;}
+:where(.matter-scroll-journey) .builder-source h2{font-size: 19px; margin-top: 4px;}
+:where(.matter-scroll-journey) .builder-source p{margin-bottom: 6px;}
+:where(.matter-scroll-journey) .builder-status{margin-top: 6px;}
+:where(.matter-scroll-journey) .builder-field{margin-bottom: 6px; padding-bottom: 6px;}}
+:where(.matter-scroll-journey) .builder-draft-heading{font: 500 20px / 1.3 Sarabun, sans-serif; color: rgb(16, 36, 63); margin: 0px 0px 20px;}
+:where(.matter-scroll-journey) .builder-source h2{margin-bottom: 18px;}
+@media (max-width: 760px){:where(.matter-scroll-journey) .builder-draft-heading{font-size: 19px; margin-bottom: 12px;}
+:where(.matter-scroll-journey) .builder-source h2{margin-bottom: 10px;}}
+:where(.matter-scroll-journey) .builder-draft-heading{text-decoration: underline 1px; text-underline-offset: 5px;}
+:where(.matter-scroll-journey) .builder-draft-heading{margin-bottom: 7px;}
+:where(.matter-scroll-journey) .builder-edit-hint{margin: 0px 0px 14px; font: 400 12px / 1.4 Sarabun, sans-serif; color: rgb(101, 113, 134);}
+:where(.matter-scroll-journey) .builder-eyebrow{justify-content: flex-end;}
+:where(.matter-scroll-journey) .builder-context{grid-column: 1 / -1;}
+:where(.matter-scroll-journey) .builder-draft-heading,:where(.matter-scroll-journey) .builder-edit-hint{text-align: left;}
+:where(.matter-scroll-journey) .builder-title input{text-align: center;}
+:where(.matter-scroll-journey) .builder-tasks{display: grid; grid-template-columns: repeat(2, minmax(0px, 1fr)); gap: 10px 18px;}
+:where(.matter-scroll-journey) .builder-tasks > .builder-label{grid-column: 1 / -1; margin-bottom: 0px;}
+:where(.matter-scroll-journey) .builder-tasks .builder-suggestion{min-width: 0px;}
+:where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{height: 65px; min-height: 65px; font: 400 14px / 1.45 Sarabun, sans-serif; resize: none; overflow: hidden; margin: 0px; padding: 0px 0px 0px 10px; background-image: radial-gradient(circle, rgb(101, 113, 134) 1px, transparent 1.5px); background-size: 5px 20px; background-position: left top; background-repeat: no-repeat;}
+@media (max-width: 760px){:where(.matter-scroll-journey) .builder-tasks{gap: 8px 12px;}
+:where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{font-size: 12px; height: 70px; min-height: 70px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{font-size: 11px; height: 65px; min-height: 65px;}}
+@media (max-width: 760px){:where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{height: 48px; min-height: 48px;}}
+:where(.matter-scroll-journey) .builder-source h2,:where(.matter-scroll-journey) .builder-draft-heading{font: 500 20px / 1.3 Sarabun, sans-serif; margin: 0px 0px 7px; color: rgb(16, 36, 63);}
+:where(.matter-scroll-journey) .builder-source h2{text-decoration: underline 1px; text-underline-offset: 5px;}
+:where(.matter-scroll-journey) .builder-source > p,:where(.matter-scroll-journey) .builder-edit-hint{font: 400 12px / 1.4 Sarabun, sans-serif; margin: 0px 0px 14px; color: rgb(101, 113, 134);}
+:where(.matter-scroll-journey) .builder-eyebrow{position: absolute; top: 10px; right: 14px;}
+:where(.matter-scroll-journey) .builder-source,:where(.matter-scroll-journey) .builder-draft{padding-top: 28px;}
+:where(.matter-scroll-journey) .builder-tasks{gap: 3px 14px;}
+:where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{height: 43px; min-height: 43px; line-height: 1.35;}
+@media (max-width: 760px){:where(.matter-scroll-journey) .builder-source,:where(.matter-scroll-journey) .builder-draft{padding-top: 14px;}
+:where(.matter-scroll-journey) .builder-source h2,:where(.matter-scroll-journey) .builder-draft-heading{font-size: 19px; margin: 0px 0px 7px;}
+:where(.matter-scroll-journey) .builder-source > p,:where(.matter-scroll-journey) .builder-edit-hint{font-size: 12px; margin: 0px 0px 12px;}
+:where(.matter-scroll-journey) .builder-tasks{gap: 2px 12px;}
+:where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{height: 46px; min-height: 46px; line-height: 1.3;}}
+:where(.matter-scroll-journey) .builder-skip{position: absolute; top: calc(var(--builder-bottom,610px) + 8px); right: max(24px, 50% - 440px); z-index: 6; border: 0px; background: transparent; color: rgb(101, 113, 134); font: 400 11px / 1.4 Sarabun, sans-serif; padding: 4px 2px; cursor: pointer;}
+:where(.matter-scroll-journey) .builder-skip[hidden]{display: none;}
+:where(.matter-scroll-journey) .builder-skip:hover{text-decoration: underline;}
+@media (max-width: 760px){:where(.matter-scroll-journey) .builder-skip{right: 16px;}}
+:where(.matter-scroll-journey) .builder-draft > .builder-context{text-align: center; border: 0px; margin: -8px 0px 14px; padding: 0px; font-size: 12px; color: rgb(101, 113, 134);}
+:where(.matter-scroll-journey) #matter-film .builder-skip{left: 50%; right: auto; transform: translateX(-50%); text-decoration: underline; text-underline-offset: 3px; color: rgb(52, 77, 106); font-size: 12px; padding: 6px 10px;}
+:where(.matter-scroll-journey) .builder-actions .builder-back{font-size: 12px; font-weight: 300; text-decoration: underline 1px; text-underline-offset: 3px;}
+:where(.matter-scroll-journey) .builder-money{gap: 0px;}
+@media (min-width: 761px){:where(.matter-scroll-journey) .builder-draft #builder-scope{height: 54px;}}
+:where(.matter-scroll-journey) .dashboard-builder.is-ready .builder-preview{box-shadow: none;}
+:where(.matter-scroll-journey) .builder-actions .builder-preview:focus-visible{outline: rgb(100, 149, 237) solid 2px; outline-offset: 3px;}
+:where(.matter-scroll-journey) .stage-arrow{position: absolute; top: 46%; z-index: 10; display: grid; place-items: center; width: 32px; height: 44px; padding: 8px; border: 0px; background: transparent; color: rgb(98, 113, 135); cursor: pointer;}
+:where(.matter-scroll-journey) .stage-arrow-prev{left: 8px;}
+:where(.matter-scroll-journey) .stage-arrow-next{right: 8px;}
+:where(.matter-scroll-journey) .stage-arrow svg{width: 16px; height: 24px; fill: none; stroke: currentcolor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round;}
+:where(.matter-scroll-journey) .stage-arrow:hover{color: rgb(35, 59, 90);}
+:where(.matter-scroll-journey) .stage-arrow:disabled{opacity: 0.2; cursor: default;}
+:where(.matter-scroll-journey) .builder-actions{justify-content: flex-end;}
+:where(.matter-scroll-journey) .builder-source h2,:where(.matter-scroll-journey) .builder-draft-heading{font-family: "Cormorant Garamond", Georgia, serif; font-size: 32px; font-weight: 400; letter-spacing: -0.02em; line-height: 1.1;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-monogram{font-size: 26px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .task-toggle::before{width: 11px; height: 11px; border-width: 1px; border-radius: 3px; box-shadow: none; top: 4px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .task-toggle::after{left: 3px; top: 7px; width: 6px; height: 3px; border-width: 1.4px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .task-toggle{padding-left: 19px;}
+@media (max-width: 760px){:where(.matter-scroll-journey) .stage-arrow{width: 16px; padding: 0px; top: 43%;}
+:where(.matter-scroll-journey) .stage-arrow-prev{left: 0px;}
+:where(.matter-scroll-journey) .stage-arrow-next{right: 0px;}
+:where(.matter-scroll-journey) .stage-arrow svg{width: 12px; height: 20px;}
+:where(.matter-scroll-journey) .builder-source h2,:where(.matter-scroll-journey) .builder-draft-heading{font-size: 28px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .sheet-monogram{font-size: 24px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .task-toggle::before{width: 10px; height: 10px; top: 3px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .task-toggle::after{left: 2px; top: 6px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .task-toggle{padding-left: 16px;}}
+:where(.matter-scroll-journey) .builder-status{opacity: 1; transition: opacity 0.8s;}
+:where(.matter-scroll-journey) .builder-status.is-complete{opacity: 0; pointer-events: none;}
+@media (prefers-reduced-motion: reduce){:where(.matter-scroll-journey) .builder-status{transition: none;}}
+:where(.matter-scroll-journey) .dashboard-builder{width: min(960px, 100% - 64px); grid-template-columns: minmax(0px, 0.95fr) 48px minmax(0px, 1.05fr); align-items: start; border: 0px; border-radius: 0px; background: transparent; box-shadow: none; overflow: visible;}
+:where(.matter-scroll-journey) .builder-source,:where(.matter-scroll-journey) .builder-draft{position: relative; border: 1px solid rgb(224, 229, 235); border-radius: 8px; background: rgb(255, 255, 255); box-shadow: rgba(16, 36, 63, 0.08) 0px 12px 36px; padding: 28px;}
+:where(.matter-scroll-journey) .builder-draft{background: rgb(252, 252, 253);}
+:where(.matter-scroll-journey) .builder-source{padding-bottom: 20px;}
+:where(.matter-scroll-journey) .builder-transfer{align-self: center; text-align: center; color: rgb(98, 113, 135); font: 300 28px / 1 Sarabun, sans-serif;}
+:where(.matter-scroll-journey) .builder-eyebrow{display: none;}
+:where(.matter-scroll-journey) #matter-film .builder-skip{top: calc(var(--builder-bottom,610px) + 8px);}
+@media (max-width: 760px){:where(.matter-scroll-journey) .dashboard-builder{width: calc(100% - 36px); grid-template-columns: minmax(0px, 1fr); gap: 0px;}
+:where(.matter-scroll-journey) .builder-source,:where(.matter-scroll-journey) .builder-draft{padding: 14px; border: 1px solid rgb(224, 229, 235);}
+:where(.matter-scroll-journey) .builder-transfer{height: 30px; display: grid; place-items: center; font-size: 23px; transform: rotate(90deg);}
+:where(.matter-scroll-journey) .builder-source{padding-bottom: 9px;}
+:where(.matter-scroll-journey) .builder-status{margin-bottom: 0px;}
+:where(.matter-scroll-journey) #matter-film .stage{height: 795px;}}
+:where(.matter-scroll-journey) .builder-transfer{position: relative; z-index: 8; width: 120px; height: 56px; margin-left: -36px; pointer-events: none; animation: 3.4s ease-in-out 0s infinite normal none running builder-arrow-float;}
+:where(.matter-scroll-journey) .builder-transfer svg{display: block; width: 120px; height: 56px; fill: rgba(117, 147, 182, 0.3); filter: drop-shadow(rgba(35, 59, 90, 0.07) 0px 4px 5px);}
+@keyframes builder-arrow-float { 
+  0%, 100% { transform: translateY(-3px); }
+  50% { transform: translateY(3px); }
+}
+@media (max-width: 760px){:where(.matter-scroll-journey) .builder-transfer{place-self: center; width: 56px; height: 30px; margin: 0px; display: block; animation: 3.4s ease-in-out 0s infinite normal none running builder-arrow-float-mobile;}
+:where(.matter-scroll-journey) .builder-transfer svg{position: absolute; left: -32px; top: -13px; transform: rotate(90deg);}
+@keyframes builder-arrow-float-mobile { 
+  0%, 100% { transform: translateY(-3px); }
+  50% { transform: translateY(3px); }
+}}
+@media (prefers-reduced-motion: reduce){:where(.matter-scroll-journey) .builder-transfer{animation: auto ease 0s 1 normal none running none; transform: none;}}
+:where(.matter-scroll-journey) .builder-transfer{width: 150px; height: 100px; margin-left: -51px; animation: auto ease 0s 1 normal none running none; transform: none;}
+:where(.matter-scroll-journey) .builder-transfer svg{position: static; width: 150px; height: 100px; fill: none; filter: none; overflow: visible;}
+:where(.matter-scroll-journey) .builder-transfer svg path{fill: none; stroke-linecap: round; stroke-linejoin: round;}
+:where(.matter-scroll-journey) .transfer-wash{stroke: rgba(117, 147, 182, 0.17); stroke-width: 9;}
+:where(.matter-scroll-journey) .transfer-ink{stroke: rgb(101, 132, 173); stroke-width: 2; stroke-dasharray: 24, 76; animation: 4s ease-in-out 0s infinite normal none running transfer-ink-travel;}
+:where(.matter-scroll-journey) .transfer-tip{stroke: rgb(101, 132, 173); stroke-width: 2;}
+:where(.matter-scroll-journey) .transfer-spark{stroke: rgb(101, 132, 173); stroke-width: 1.5; opacity: 0.6; transform-origin: 102px 17px; animation: 4s ease-in-out 0s infinite normal none running transfer-spark;}
+@keyframes transfer-ink-travel { 
+  0% { stroke-dashoffset: 24; opacity: 0; }
+  15% { opacity: 1; }
+  75% { stroke-dashoffset: -76; opacity: 1; }
+  100% { stroke-dashoffset: -76; opacity: 0; }
+}
+@keyframes transfer-spark { 
+  0%, 70%, 100% { opacity: 0.25; transform: scale(0.8); }
+  80% { opacity: 0.8; transform: scale(1.1); }
+}
+@media (max-width: 760px){:where(.matter-scroll-journey) .builder-transfer{width: 60px; height: 30px; margin: 0px; animation: auto ease 0s 1 normal none running none; transform: none;}
+:where(.matter-scroll-journey) .builder-transfer svg{position: absolute; left: -15px; top: -15px; width: 90px; height: 60px; transform: rotate(90deg);}}
+@media (prefers-reduced-motion: reduce){:where(.matter-scroll-journey) .transfer-ink{animation: auto ease 0s 1 normal none running none; stroke-dasharray: none;}
+:where(.matter-scroll-journey) .transfer-spark{animation: auto ease 0s 1 normal none running none;}}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .document-stack{opacity: 0.2; filter: blur(3px); pointer-events: none;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .drawing{opacity: 0.15; filter: blur(2px);}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .stage-grid{opacity: 0.08;}
+:where(.matter-scroll-journey) #matter-film .builder-skip[data-mode="replay"]{text-decoration: none; display: grid; place-items: center; min-width: 36px; min-height: 30px;}
+:where(.matter-scroll-journey) #matter-film .builder-skip[hidden]{display: none;}
+@media (min-width: 761px){:where(.matter-scroll-journey) .builder-transfer{top: -24px;}}
+:where(.matter-scroll-journey) .builder-money{border-radius: 3px; align-items: baseline;}
+:where(.matter-scroll-journey) .builder-money:focus-within{outline: rgb(100, 149, 237) solid 2px; outline-offset: 3px; background: rgb(255, 255, 255);}
+:where(.matter-scroll-journey) .builder-draft .builder-money input:focus-visible{outline: none; background: transparent;}
+:where(.matter-scroll-journey) .builder-draft .builder-money input:hover{background: transparent;}
+@media (max-width: 760px) and (max-height: 880px){:where(.matter-scroll-journey) #matter-film .film-heading h2{font-size: 28px;}
+:where(.matter-scroll-journey) .builder-source,:where(.matter-scroll-journey) .builder-draft{padding-top: 10px; padding-bottom: 10px;}
+:where(.matter-scroll-journey) .builder-source h2,:where(.matter-scroll-journey) .builder-draft-heading{font-size: 26px;}
+:where(.matter-scroll-journey) .builder-source > p,:where(.matter-scroll-journey) .builder-edit-hint{margin-bottom: 9px;}
+:where(.matter-scroll-journey) .builder-brief{height: 126px; min-height: 126px; line-height: 15px;}
+:where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{height: 36px; min-height: 36px;}
+:where(.matter-scroll-journey) .builder-draft > #builder-scope{height: 72px;}
+:where(.matter-scroll-journey) .builder-draft .builder-field{margin-bottom: 5px; padding-bottom: 5px;}
+:where(.matter-scroll-journey) .builder-transfer{height: 26px;}}
+:where(.matter-scroll-journey) .builder-money:focus-within{outline: none; background: transparent; box-shadow: rgb(139, 159, 184) 0px 1px 0px; border-radius: 0px;}
+:where(.matter-scroll-journey) .builder-draft #builder-amount{appearance: textfield; outline: none; box-shadow: none;}
+:where(.matter-scroll-journey) .builder-draft #builder-amount::-webkit-inner-spin-button,:where(.matter-scroll-journey) .builder-draft #builder-amount::-webkit-outer-spin-button{appearance: none; margin: 0px;}
+:where(.matter-scroll-journey) .mobile-dotted-trail{display: none;}
+@media (max-width: 760px){:where(.matter-scroll-journey) .mobile-dotted-trail{display: block; position: absolute; inset: 0px; width: 100%; height: 100%; pointer-events: none; color: rgb(117, 147, 182); opacity: 0.52; z-index: 0;}
+:where(.matter-scroll-journey) .mobile-dotted-trail path{stroke: currentcolor; stroke-width: 1.1; stroke-dasharray: 3, 6; stroke-linecap: round; vector-effect: non-scaling-stroke;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .mobile-dotted-trail{opacity: 0.3;}}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet{box-shadow: rgba(35, 59, 90, 0.27) 0px 18px 38px -22px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .sheet-bottom{background: rgb(255, 254, 250); border-top: 1px solid rgb(224, 230, 237);}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .sheet-action{min-width: 0px; min-height: 40px; padding: 9px 16px; gap: 13px; border: 1px solid rgb(35, 59, 90); border-radius: 6px; background: rgb(35, 59, 90); font: 500 16px / 1.2 Sarabun, sans-serif; box-shadow: rgba(35, 59, 90, 0.07) 0px 2px 4px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .sheet-action > span:last-child{font: 400 18px / 1 Sarabun, sans-serif;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .sheet-action:hover{background: rgb(52, 79, 112); border-color: rgb(52, 79, 112);}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .task-toggle{display: flex; align-items: flex-start; gap: 8px; min-height: 0px; height: auto; padding: 0px; text-align: left; line-height: 1.4;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .task-toggle::before{position: relative; left: auto; top: 3px; display: block; flex: 0 0 13px; box-sizing: border-box; width: 13px; height: 13px; border: 1px solid rgb(145, 163, 185); border-radius: 4px; background: rgb(248, 250, 252); box-shadow: none;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .task-toggle::after{left: 3px; top: 7px; width: 6px; height: 3px; border-width: 1.4px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .task-toggle[aria-pressed="true"]::before{background: rgb(54, 92, 140); border-color: rgb(54, 92, 140);}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .task-toggle:hover::before{background: rgb(237, 242, 248); border-color: rgb(83, 123, 168);}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .task-toggle[aria-pressed="true"]:hover::before{background: rgb(54, 92, 140);}
+@media (max-width: 600px){:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .task-toggle{gap: 6px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .task-toggle::before{top: 2px; flex-basis: 11px; width: 11px; height: 11px; border-radius: 3px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .task-toggle::after{left: 2px; top: 5px; width: 5px; height: 3px;}}
+@media (max-width: 760px){:where(.matter-scroll-journey) #matter-film .stage-grid{display: none;}
+:where(.matter-scroll-journey) #matter-film .drawing{display: none;}
+:where(.matter-scroll-journey) .mobile-dotted-trail{opacity: 0.38;}
+:where(.matter-scroll-journey) .mobile-dotted-trail path{stroke-dasharray: 2, 7;}
+:where(.matter-scroll-journey) #matter-film[data-stage="1"] .mobile-dotted-trail{opacity: 0.24;}}
+@media (max-width: 760px){:where(.matter-scroll-journey) #matter-film .mobile-dotted-trail{display: none;}}
+@media (max-width: 760px){:where(.matter-scroll-journey) #matter-film .matter-sheet,:where(.matter-scroll-journey) .dashboard-builder{width: calc(100% - 40px); max-width: 440px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet{left: 0px; right: 0px; margin-inline: auto;}
+:where(.matter-scroll-journey) #matter-film .sheet-heading{padding-inline: 20px;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .sheet-monogram,:where(.matter-scroll-journey) .builder-source h2,:where(.matter-scroll-journey) .builder-draft-heading{font: 400 28px / 1.1 "Cormorant Garamond", Georgia, serif; letter-spacing: -0.02em;}
+:where(.matter-scroll-journey) #matter-film .sheet-action,:where(.matter-scroll-journey) .builder-actions .builder-preview{font: 500 16px / 1.2 Sarabun, sans-serif; min-height: 40px; min-width: 0px; padding: 9px 14px; border-radius: 6px; background: rgb(35, 59, 90); color: rgb(255, 255, 255); gap: 12px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet{top: 28px; height: 465px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand-title{font-size: 58px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .fragment-one .hand{font-size: 43px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .fragment-one{top: 138px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .fragment-two{top: 184px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .fragment-three{top: 229px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .amount-field{top: 278px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .deadline-field{top: 320px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .note-aside{bottom: 75px;}
+:where(.matter-scroll-journey) .dashboard-builder{top: 8px;}
+:where(.matter-scroll-journey) .builder-source,:where(.matter-scroll-journey) .builder-draft{padding: 12px 16px;}
+:where(.matter-scroll-journey) .builder-source h2,:where(.matter-scroll-journey) .builder-draft-heading{margin-bottom: 7px;}
+:where(.matter-scroll-journey) .builder-source > p,:where(.matter-scroll-journey) .builder-edit-hint{font-size: 12px; margin-bottom: 9px;}
+:where(.matter-scroll-journey) .builder-brief{font: 400 13px / 17px Sarabun, sans-serif; height: 137px; min-height: 137px; padding: 8px 10px;}
+:where(.matter-scroll-journey) .builder-status{font-size: 11px; margin-top: 8px;}
+:where(.matter-scroll-journey) .builder-draft .builder-field{margin-bottom: 6px; padding-bottom: 6px;}
+:where(.matter-scroll-journey) .builder-draft .builder-title{padding-bottom: 0px; margin-bottom: 10px;}
+:where(.matter-scroll-journey) .builder-draft .builder-title input{font-size: 23px;}
+:where(.matter-scroll-journey) .builder-draft > .builder-context{margin-bottom: 12px;}
+:where(.matter-scroll-journey) .builder-draft #builder-scope{font-size: 13px; line-height: 1.45; height: 74px;}
+:where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{font-size: 12px; line-height: 1.4; height: 51px; min-height: 51px;}
+:where(.matter-scroll-journey) .builder-draft .builder-practical input{font-size: 13px;}
+:where(.matter-scroll-journey) .builder-transfer{height: 22px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet{top: 28px; height: 570px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-title{top: 77px; left: 20px; right: 20px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .matter-title h2{font-size: 32px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .scope-summary{left: 20px; right: 20px; width: auto; top: 154px; font-size: 14px; line-height: 1.5;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .tasks-label{left: 20px; top: 245px; font-size: 10px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-one,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-two{top: 267px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-three,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition{top: 328px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-one,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-three{left: 20px; right: calc(50% + 8px);}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment-two,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition{left: calc(50% + 8px); right: 20px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .task-toggle{font-size: 12px; line-height: 1.4; gap: 7px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .amount-field,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .deadline-field{top: 411px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .amount-field{left: 20px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .deadline-field{left: calc(50% + 8px);}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-field label,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .deadline-field label{font-size: 10px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .amount-field small{font-size: 10px; top: 63px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand-title{font-size: 51px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .hand,:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet .fragment-one .hand{font-size: 37px;}
+:where(.matter-scroll-journey) .builder-source,:where(.matter-scroll-journey) .builder-draft{padding: 10px 12px;}
+:where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{font-size: 11px; height: 45px; min-height: 45px;}
+:where(.matter-scroll-journey) .builder-draft #builder-scope{font-size: 12px; height: 70px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .task-toggle{font-size: 11px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .scope-summary{font-size: 13px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .matter-title h2{font-size: 29px;}}
+@media (max-width: 760px){:where(.matter-scroll-journey) .builder-brief{height: 128px; min-height: 128px; line-height: 16px;}
+:where(.matter-scroll-journey) .builder-draft #builder-scope{height: 58px;}
+:where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{height: 44px; min-height: 44px;}
+:where(.matter-scroll-journey) .builder-transfer{height: 16px;}
+:where(.matter-scroll-journey) .builder-source > p,:where(.matter-scroll-journey) .builder-edit-hint{margin-bottom: 7px;}}
+@media (max-width: 360px){:where(.matter-scroll-journey) .builder-draft #builder-scope{height: 56px;}
+:where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{height: 42px; min-height: 42px;}}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .typeset,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .tasks-label{transition: none; transform: none; clip-path: none;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .tasks-label{animation: 0.35s ease-out 0s 1 normal both running final-tasks-in;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment .hand{display: none;}
+@keyframes final-tasks-in { 
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce){:where(.matter-scroll-journey) #matter-film[data-stage="2"] .fragment,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet .addition,:where(.matter-scroll-journey) #matter-film[data-stage="2"] .tasks-label{animation: auto ease 0s 1 normal none running none;}}
+:where(.matter-scroll-journey) #matter-film .matter-sheet{overflow: visible;}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .sheet-bottom{top: calc(100% + 14px); bottom: auto; height: auto; min-height: 40px; padding: 0px; border: 0px; background: transparent; justify-content: flex-end;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet{height: 420px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet{height: 475px;}
+:where(.matter-scroll-journey) .builder-draft{padding-bottom: 22px;}
+:where(.matter-scroll-journey) .builder-actions{position: absolute; top: calc(100% + 14px); left: 0px; right: 0px; margin: 0px; padding: 0px; justify-content: flex-end;}
+:where(.matter-scroll-journey) #matter-film .builder-skip{top: calc(var(--builder-bottom,610px) + 65px);}
+@media (max-width: 760px){:where(.matter-scroll-journey) #matter-film[data-stage="0"] .matter-sheet{height: 408px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="0"] .note-aside{bottom: 20px;}
+:where(.matter-scroll-journey) #matter-film[data-stage="2"] .matter-sheet{height: 510px;}
+:where(.matter-scroll-journey) .builder-draft{padding-bottom: 12px;}
+:where(.matter-scroll-journey) .builder-actions{padding: 0px;}
+:where(.matter-scroll-journey) #matter-film .builder-skip{top: calc(var(--builder-bottom,610px) + 60px);}}
+@media (max-width: 760px){:where(.matter-scroll-journey) #matter-film .builder-skip{top: calc(var(--builder-bottom,610px) + 19px);}}
+:where(.matter-scroll-journey) #matter-film .matter-sheet .sheet-bottom,:where(.matter-scroll-journey) .builder-actions{justify-content: center;}
+@media (max-width: 760px){:where(.matter-scroll-journey) #matter-film .builder-skip{left: auto; right: 20px; transform: none; top: calc(var(--builder-bottom,610px) + 19px);}}
+.matter-scroll-journey{background:#eff1f4;isolation:isolate;width:100%;max-width:none;margin:0;--ink:#233b5a;font-family:Sarabun,Arial,sans-serif;color:#233b5a}
+.matter-scroll-journey .film-heading h2{max-width:none;text-transform:none}
+.matter-scroll-journey .matter-film{width:100%;max-width:none;margin:0}
+
+/* Preserve the approved typography against the homepage's global light weights. */
+.lpc-home #matter-film,.lpc-home #matter-film *{font-weight:400!important}
+.lpc-home #matter-film .sheet-action,.lpc-home #matter-film .builder-preview,.lpc-home #matter-film #builder-title{font-weight:500!important}
+/* Keep the persistent navigation clear of the demonstration heading. */
+.lpc-home .matter-scroll-journey .matter-film{padding-top:calc(var(--header-height,72px) + 1px);}
+
+/* Stable stage geometry with a reversible fade-and-slide between scenes. */
+:where(.matter-scroll-journey) .matter-stage-scene{position:absolute;inset:0;}
+
+/* Keep the transfer arrow clear of the draft's editable text. */
+@media (min-width: 761px) {
+  :where(.matter-scroll-journey) .builder-transfer { width: 100px; height: 80px; margin-left: -36px; }
+  :where(.matter-scroll-journey) .builder-transfer svg { width: 100px; height: 80px; }
+}
+
+:where(.matter-scroll-journey) .draft-date-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; min-height: 42px; padding: 9px 12px; border: 1px solid #d6e0ec;
+  border-radius: 9px; background: #f2f6fc; color: #233b5a;
+  font: 400 14px/1.4 Sarabun, sans-serif; cursor: pointer;
+}
+:where(.matter-scroll-journey) .draft-date-trigger:hover { border-color: #6495ed; background: #eaf1fc; }
+.draft-date-trigger svg { width: 20px; height: 20px; flex: none; color: #4775bd; }
+.draft-calendar { width: min(340px, calc(100vw - 32px)); box-sizing: border-box; max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid #dce4ee; border-radius: 18px; background: #fff; color: #233b5a; box-shadow: 0 24px 80px rgb(15 35 60 / .2); font-family: Sarabun, sans-serif; }
+.draft-calendar::backdrop { background: rgb(15 31 51 / .3); backdrop-filter: blur(3px); }
+.draft-calendar header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; }
+.draft-calendar header p { margin: 0 0 7px; font: 500 10px/1.4 Sarabun, sans-serif; letter-spacing: .12em; color: #61758e; }
+.draft-calendar h2 { margin: 0; font: 300 32px/1.1 'Cormorant Garamond', serif; color: #233b5a; }
+.draft-calendar-close { width: 36px; height: 36px; border: 0; border-radius: 50%; background: #f0f4f9; color: #52677f; font: 300 25px/1 Sarabun, sans-serif; cursor: pointer; }
+.draft-calendar-week, .draft-calendar-days { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 4px; text-align: center; }
+.draft-calendar-week { margin-bottom: 8px; font: 400 11px/24px Sarabun, sans-serif; color: #718096; }
+.draft-calendar-days button { aspect-ratio: 1; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #233b5a; font: 400 13px/1 Sarabun, sans-serif; cursor: pointer; }
+.draft-calendar-days button:hover:not(:disabled) { background: #e9f0fc; }
+.draft-calendar-days button[aria-pressed="true"] { background: #385f9e; color: #fff; }
+.draft-calendar-days button:disabled { color: #b6bfcb; cursor: default; }
+.draft-calendar footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid #e8edf4; color: #61758e; font: 400 11px/1.5 Sarabun, sans-serif; }
+.draft-calendar button:focus-visible, .draft-date-trigger:focus-visible { outline: 2px solid #6495ed; outline-offset: 3px; }
+
+/* The final preview action has no pressed movement or click transition. */
+.lpc-home #matter-film[data-stage="2"] .sheet-action,
+.lpc-home #matter-film[data-stage="2"] .sheet-action:active { animation: none !important; transition: none !important; transform: none !important; }
+.lpc-home #matter-film .sheet-action > span:last-child svg { display: block; width: 22px; height: 22px; }
+
+/* Preview checklists belong exclusively to step 03, without exit ghosts. */
+.lpc-home #matter-film:not([data-stage="2"]) .task-toggle,
+.lpc-home #matter-film:not([data-stage="2"]) .tasks-label {
+  visibility: hidden !important;
+  pointer-events: none;
+}
+
+/* One readable deliverable per row, with consistent alignment. */
+.preview-task-list { display: contents; }
+.lpc-home #matter-film[data-stage="2"] .preview-task-list {
+  display: grid; position: absolute; left: 32px; right: 32px; top: 232px; gap: 0;
+}
+.lpc-home #matter-film[data-stage="2"] .preview-task-list .fragment,
+.lpc-home #matter-film[data-stage="2"] .preview-task-list .addition {
+  position: relative; inset: auto; width: auto; margin: 0; height: auto; min-height: 32px;
+  background: none; border: 0; border-bottom: 1px solid #e8edf3; padding: 6px 0;
+}
+.lpc-home #matter-film[data-stage="2"] .preview-task-list .task-toggle {
+  position: relative; inset: auto; width: 100%; margin: 0; padding: 0; color: #354e6b;
+  font: 400 13px/1.4 Sarabun, sans-serif; gap: 10px; align-items: center;
+}
+.lpc-home #matter-film[data-stage="2"] .preview-task-list .addition { padding: 6px 0; }
+.lpc-home #matter-film[data-stage="2"] .preview-task-list .task-toggle::before {
+  content: ''; flex: 0 0 5px; width: 5px; height: 5px; top: auto; border: 0;
+  border-radius: 50%; background: #8fa9c9;
+}
+.lpc-home #matter-film[data-stage="2"] .preview-task-list .task-toggle::after { content: none; }
+.lpc-home #matter-film[data-stage="2"] .tasks-label { top: 210px; }
+.lpc-home #matter-film[data-stage="2"] .amount-field,
+.lpc-home #matter-film[data-stage="2"] .deadline-field { top: 382px; }
+@media (max-width: 760px) {
+  .lpc-home #matter-film[data-stage="2"] .preview-task-list { left: 20px; right: 20px; top: 267px; }
+  .lpc-home #matter-film[data-stage="2"] .tasks-label { top: 245px; }
+  .lpc-home #matter-film[data-stage="2"] .amount-field,
+  .lpc-home #matter-film[data-stage="2"] .deadline-field { top: 411px; }
+  .lpc-home #matter-film[data-stage="2"] .preview-task-list .task-toggle { font-size: 12px; }
+}
+
+.lpc-home #matter-film[data-stage="2"] .matter-sheet .amount-field,
+.lpc-home #matter-film[data-stage="2"] .matter-sheet .deadline-field { top: 382px !important; }
+@media (max-width: 760px) {
+ .lpc-home #matter-film[data-stage="2"] .matter-sheet .amount-field,
+ .lpc-home #matter-film[data-stage="2"] .matter-sheet .deadline-field { top: 411px !important; }
+}
+
+/* Give the preview scope and task list separate rows on larger screens. */
+@media (min-width: 761px) {
+ .lpc-home #matter-film[data-stage="2"] .matter-sheet { height: 510px; }
+ .lpc-home #matter-film[data-stage="2"] .scope-summary { left: 32px; right: 32px; width: auto; max-width: none; }
+ .lpc-home #matter-film[data-stage="2"] .tasks-label { left: 32px; top: 248px; }
+ .lpc-home #matter-film[data-stage="2"] .preview-task-list { top: 270px; }
+ .lpc-home #matter-film[data-stage="2"] .matter-sheet .amount-field,
+ .lpc-home #matter-film[data-stage="2"] .matter-sheet .deadline-field { top: 420px !important; }
+}

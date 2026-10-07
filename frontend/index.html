@@ -13,13 +13,11 @@
   <meta name="twitter:card" content="summary" />
   <meta name="theme-color" content="#FFFFFF" />
 
-  <link rel="preload" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="preload" href="assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="assets/styles/fonts.css?v=20260826-full-sarabun" />
   <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
-  <link rel="stylesheet" href="assets/styles/public-site-chrome.css?v=20261001-periwinkle-footer" />
-  <link rel="stylesheet" href="assets/styles/homepage.css?v=20261002-staged-matter-opening" />
-  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20261001-approved" />
+  <link rel="stylesheet" href="assets/styles/homepage-public-chrome.css?v=20261007-approved-header" />
+  <link rel="stylesheet" href="assets/styles/homepage.css?v=20261007-item11-fallback" />
+  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20261007-faq-spacing-before" />
   <link rel="stylesheet" href="assets/styles/homepage-readable-type.css?v=20260924-original-hero" />
   <link rel="stylesheet" href="assets/styles/homepage-serif-type.css?v=20260929-workflow-wrap" />
   <style>
@@ -39,11 +37,24 @@
       -webkit-backdrop-filter: blur(14px);
       backdrop-filter: blur(14px);
     }
-    .lpc-home--editorial .home-header.is-past-hero { background: rgba(255, 255, 255, .72); }
-    .lpc-home--editorial .home-header,
-    .lpc-home--editorial .home-header.is-scrolled {
-      border-bottom: 0;
-      box-shadow: 0 7px 22px rgba(21, 28, 37, .025);
+    body.lpc-home--editorial .home-header.is-past-hero:not(.is-open) {
+      background: rgba(255, 255, 255, .16);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+      backdrop-filter: blur(18px) saturate(140%);
+      box-shadow: none;
+    }
+    body.lpc-home--editorial .home-header.is-past-hero:not(.is-open):not(.has-ink) {
+      background: rgba(7, 21, 35, .18);
+    }
+    body.lpc-home--editorial .home-header.is-open {
+      background: #fff;
+      --header-foreground: #1a2230 !important;
+    }
+    body.lpc-home--editorial .home-header,
+    body.lpc-home--editorial .home-header.is-scrolled {
+      border: 0;
+      box-shadow: none;
+      transition: background-color 180ms ease, color 180ms ease;
     }
     .lpc-home--editorial .fee-card--hybrid { background: #fff; color: #27394d; }
     .lpc-home--editorial .fee-card--hybrid .fee-card__row > h4 { color: #27394d; }
@@ -52,9 +63,8 @@
     .lpc-home--editorial .fee-card--hybrid .fee-card__row,
     .lpc-home--editorial .fee-card--hybrid > small { border-top-color: #e2e8f0; }
   </style>
-  <link rel="stylesheet" href="assets/styles/homepage-assistant.css?v=20260930-no-glyph-icons" />
-  <link rel="stylesheet" href="assets/styles/homepage-map.css?v=20261002-stable-scroll-hold" />
-  <link rel="stylesheet" href="assets/styles/homepage-mobile-hero.css?v=20261002-short-support" />
+  <link rel="stylesheet" href="assets/styles/homepage-assistant.css?v=20260925-spotlight" />
+  <link rel="stylesheet" href="assets/styles/homepage-map.css?v=20261007-item12-before" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -64,9 +74,15 @@
   <script>
     document.documentElement.classList.add("js");
   </script>
-  <link rel="stylesheet" href="assets/styles/homepage-mobile-reference.css?v=20261001-first-frame" />
-  <link rel="stylesheet" href="assets/styles/homepage-matter-builder.css?v=20261002-stable-scroll-opening" />
-  <script src="assets/scripts/homepage-entrance.js?v=20261001-first-frame" defer></script>
+  <link rel="stylesheet" href="assets/styles/homepage-matter-motion.css?v=20261007-mobile-preview-reachable">
+  <link rel="stylesheet" href="assets/styles/homepage-capacity-story.css?v=20261006-natural-reveal-exit">
+  <link rel="stylesheet" href="assets/styles/homepage-noise-button.css?v=20261006-button-no-pink">
+  <link rel="stylesheet" href="assets/styles/homepage-workflow-content.css?v=20261007-before-wording">
+  <link rel="stylesheet" href="assets/styles/homepage-workflow-before.css?v=20261007-item02">
+  <link rel="stylesheet" href="assets/styles/homepage-mobile-hero.css?v=20261007-item03-browse">
+  <link rel="stylesheet" href="assets/styles/homepage-entrance.css?v=20261007-item04-before">
+  <script src="assets/scripts/homepage-entrance.js?v=20261007-item04-before" defer></script>
+  <link rel="stylesheet" href="assets/styles/homepage-fees-before.css?v=20261007-item08">
 </head>
 <body class="lpc-home lpc-home--hybrid lpc-home--editorial public-site-chrome home-motion-ready">
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -87,7 +103,7 @@
       <div class="home-header__actions">
         <a class="header-signin" href="login.html" id="authAction" data-auth-action data-public-action="text">Sign in</a>
         <button class="header-signout" type="button" id="logoutAction" data-logout-action data-public-action="text" hidden>Sign out</button>
-        <a class="button button--small button--ink" href="signup.html" id="signupAction" data-signup-action data-public-action="primary" data-action-shape="pill" data-action-size="compact">Create an account</a>
+        <a class="button button--small button--ink lpc-noise-signup" href="signup.html" id="signupAction" data-signup-action data-public-action="primary" data-action-shape="pill" data-action-size="compact"><span class="lpc-noise-signup__color" aria-hidden="true"></span><span class="lpc-noise-signup__label">Create an account</span></a>
         <button
           class="mobile-nav-toggle"
           type="button"
@@ -105,21 +121,21 @@
 
     <div class="mobile-nav" id="mobileNav" aria-hidden="true" data-mobile-nav>
       <nav aria-label="Mobile navigation">
-        <a href="#how">How It Works</a>
-        <a href="attorney-faq.html">For Attorneys</a>
-        <a href="paralegal-faq.html">For Paralegals</a>
-        <a href="browse-paralegals.html">Browse Paralegals</a>
+        <a href="#how"><span class="nav-underline-label">How It Works</span></a>
+        <a href="attorney-faq.html"><span class="nav-underline-label">For Attorneys</span></a>
+        <a href="paralegal-faq.html"><span class="nav-underline-label">For Paralegals</span></a>
+        <a href="browse-paralegals.html"><span class="nav-underline-label">Browse Paralegals</span></a>
       </nav>
       <div class="mobile-nav__actions">
         <a href="login.html" data-auth-action data-public-action="text">Sign in</a>
         <button type="button" data-logout-action data-public-action="text" hidden>Sign out</button>
-        <a class="button button--ink" href="signup.html" data-signup-action data-public-action="primary" data-action-shape="pill">Create an account</a>
+        <a class="button button--ink lpc-noise-signup" href="signup.html" data-signup-action data-public-action="primary" data-action-shape="pill"><span class="lpc-noise-signup__color" aria-hidden="true"></span><span class="lpc-noise-signup__label">Create an account</span></a>
       </div>
     </div>
   </header>
 
   <main id="main" tabindex="-1">
-    <section class="editorial-hero" aria-labelledby="hero-title">
+    <section data-header-tone="light" class="editorial-hero" aria-labelledby="hero-title">
       <div class="editorial-hero__inner">
         <div class="editorial-hero__main">
           <div class="editorial-hero__lead">
@@ -156,44 +172,126 @@
 
     </section>
 
-    <section class="matter-builder" aria-labelledby="matter-builder-title">
-      <div class="matter-builder__inner">
-        <div class="matter-builder__opening">
-          <div class="matter-builder__opening-sticky">
-            <h2 id="matter-builder-title"><span class="matter-builder__line matter-builder__line--notes">Your notes.</span><span class="matter-builder__line matter-builder__line--lpc"><em>LPC builds your Matter.</em></span></h2>
-          </div>
+    <section data-header-tone="light" class="hero-capacity type-hook" aria-labelledby="capacity-hook-title">
+      <div class="type-hook__scene">
+        <div class="type-hook__art" aria-hidden="true">
+          <svg class="type-hook__papers type-hook__papers--full" viewBox="0 0 1600 1400" width="1600" height="1400" aria-hidden="true" focusable="false">
+            <defs>
+              <clipPath id="capacity-mountain-full-cutout"><path d="M0 618.5 L14 617.5 L16 615.5 L22 615.5 L23 614.5 L24 615.5 L30 615.5 L31 616.5 L33 616.5 L34 615.5 L41 615.5 L42 614.5 L44 615.5 L47 615.5 L51 613.5 L54 610.5 L55 610.5 L58 606.5 L59 607.5 L61 604.5 L62 604.5 L63 601.5 L64 601.5 L67 596.5 L70 593.5 L71 593.5 L73 590.5 L74 590.5 L75 587.5 L77 585.5 L81 578.5 L85 575.5 L88 569.5 L89 569.5 L90 567.5 L92 566.5 L96 561.5 L97 561.5 L102 556.5 L103 556.5 L104 553.5 L109 549.5 L110 549.5 L111 546.5 L113 546.5 L117 543.5 L122 542.5 L125 539.5 L129 538.5 L130 536.5 L131 537.5 L132 536.5 L134 536.5 L139 532.5 L143 531.5 L145 528.5 L147 528.5 L151 522.5 L152 522.5 L153 519.5 L157 516.5 L165 502.5 L166 502.5 L169 498.5 L171 498.5 L174 494.5 L179 494.5 L182 491.5 L185 490.5 L188 484.5 L190 483.5 L193 479.5 L201 474.5 L205 470.5 L206 470.5 L209 466.5 L211 466.5 L217 460.5 L219 460.5 L220 458.5 L224 454.5 L225 454.5 L230 448.5 L233 447.5 L240 442.5 L243 442.5 L247 438.5 L251 437.5 L254 435.5 L256 435.5 L258 433.5 L260 433.5 L263 430.5 L269 430.5 L275 427.5 L277 425.5 L279 425.5 L286 422.5 L287 423.5 L288 422.5 L289 423.5 L293 419.5 L299 418.5 L302 416.5 L306 417.5 L308 419.5 L312 420.5 L314 422.5 L319 422.5 L324 419.5 L329 418.5 L331 416.5 L334 416.5 L338 414.5 L340 412.5 L342 412.5 L344 410.5 L345 410.5 L346 408.5 L347 409.5 L348 407.5 L353 403.5 L357 401.5 L362 400.5 L364 398.5 L367 398.5 L371 396.5 L377 388.5 L382 387.5 L385 384.5 L386 385.5 L390 382.5 L404 382.5 L405 383.5 L408 383.5 L410 385.5 L412 385.5 L416 387.5 L417 386.5 L419 387.5 L421 391.5 L432 390.5 L433 389.5 L450 389.5 L457 392.5 L462 392.5 L463 390.5 L465 390.5 L469 388.5 L471 386.5 L473 380.5 L478 359.5 L483 346.5 L489 334.5 L490 334.5 L498 327.5 L499 328.5 L501 327.5 L507 321.5 L511 320.5 L513 318.5 L515 318.5 L516 319.5 L518 318.5 L520 316.5 L522 312.5 L524 311.5 L525 276.5 L526 270.5 L528 230.5 L532 215.5 L533 214.5 L534 208.5 L536 207.5 L539 202.5 L542 201.5 L544 198.5 L558 191.5 L563 187.5 L570 184.5 L574 180.5 L575 180.5 L578 176.5 L579 176.5 L584 171.5 L587 170.5 L589 168.5 L593 162.5 L596 160.5 L600 154.5 L604 153.5 L605 152.5 L614 152.5 L619 155.5 L622 155.5 L623 153.5 L625 151.5 L627 151.5 L630 147.5 L634 145.5 L637 145.5 L639 144.5 L640 142.5 L642 142.5 L646 139.5 L650 138.5 L652 136.5 L656 134.5 L659 134.5 L660 133.5 L662 135.5 L663 135.5 L679 151.5 L680 153.5 L682 154.5 L684 157.5 L686 159.5 L687 159.5 L695 167.5 L696 169.5 L698 170.5 L706 178.5 L710 183.5 L711 183.5 L717 191.5 L723 196.5 L741 217.5 L742 217.5 L745 220.5 L767 247.5 L772 252.5 L776 258.5 L798 285.5 L805 292.5 L811 300.5 L832 322.5 L837 325.5 L839 325.5 L845 328.5 L847 328.5 L850 330.5 L852 330.5 L854 332.5 L856 332.5 L860 334.5 L862 336.5 L866 338.5 L871 339.5 L874 341.5 L877 341.5 L878 342.5 L879 341.5 L881 342.5 L885 342.5 L886 341.5 L888 342.5 L891 342.5 L896 345.5 L899 345.5 L902 347.5 L904 346.5 L910 349.5 L915 350.5 L920 353.5 L927 355.5 L941 367.5 L946 369.5 L951 374.5 L952 374.5 L960 382.5 L967 391.5 L970 392.5 L973 395.5 L976 396.5 L980 400.5 L982 400.5 L984 402.5 L985 402.5 L1009 425.5 L1010 425.5 L1012 428.5 L1013 428.5 L1018 432.5 L1023 434.5 L1028 438.5 L1031 439.5 L1032 441.5 L1036 440.5 L1038 442.5 L1040 441.5 L1041 443.5 L1045 443.5 L1049 441.5 L1050 442.5 L1056 439.5 L1057 440.5 L1062 440.5 L1063 441.5 L1066 441.5 L1067 442.5 L1072 442.5 L1073 443.5 L1075 442.5 L1076 443.5 L1079 443.5 L1081 446.5 L1085 443.5 L1090 442.5 L1091 440.5 L1098 440.5 L1101 438.5 L1103 438.5 L1104 436.5 L1106 435.5 L1108 436.5 L1109 435.5 L1112 435.5 L1113 434.5 L1115 435.5 L1121 435.5 L1124 432.5 L1125 432.5 L1127 429.5 L1129 427.5 L1130 427.5 L1133 423.5 L1142 415.5 L1144 414.5 L1151 414.5 L1152 413.5 L1153 413.5 L1154 415.5 L1156 415.5 L1157 416.5 L1158 415.5 L1161 415.5 L1162 416.5 L1165 415.5 L1168 418.5 L1171 418.5 L1175 416.5 L1176 417.5 L1181 417.5 L1185 419.5 L1190 426.5 L1192 426.5 L1193 427.5 L1194 426.5 L1195 427.5 L1197 427.5 L1199 429.5 L1204 429.5 L1211 426.5 L1215 426.5 L1216 424.5 L1218 424.5 L1221 421.5 L1224 420.5 L1229 416.5 L1236 414.5 L1237 411.5 L1239 410.5 L1241 410.5 L1244 408.5 L1246 409.5 L1248 408.5 L1259 417.5 L1262 422.5 L1263 422.5 L1265 426.5 L1267 427.5 L1270 433.5 L1272 434.5 L1273 436.5 L1274 436.5 L1276 438.5 L1278 438.5 L1281 441.5 L1283 441.5 L1285 444.5 L1288 444.5 L1291 447.5 L1295 447.5 L1300 441.5 L1301 440.5 L1302 441.5 L1304 438.5 L1306 436.5 L1307 436.5 L1315 427.5 L1317 426.5 L1322 426.5 L1323 427.5 L1326 426.5 L1328 421.5 L1331 418.5 L1336 415.5 L1342 408.5 L1350 408.5 L1351 409.5 L1354 409.5 L1359 406.5 L1362 406.5 L1365 409.5 L1367 413.5 L1370 416.5 L1372 420.5 L1375 423.5 L1383 436.5 L1385 438.5 L1386 438.5 L1388 440.5 L1389 439.5 L1393 440.5 L1402 449.5 L1403 451.5 L1423 471.5 L1424 471.5 L1448 496.5 L1449 496.5 L1457 504.5 L1458 504.5 L1459 506.5 L1464 508.5 L1466 511.5 L1471 516.5 L1472 516.5 L1477 523.5 L1485 528.5 L1488 532.5 L1489 531.5 L1490 532.5 L1492 532.5 L1493 534.5 L1495 534.5 L1498 537.5 L1502 539.5 L1503 538.5 L1508 544.5 L1510 545.5 L1512 548.5 L1513 548.5 L1518 558.5 L1523 564.5 L1526 564.5 L1530 559.5 L1532 559.5 L1533 558.5 L1535 559.5 L1536 1024 H0Z" /></clipPath>
+              <filter id="capacity-mountain-full-pale" color-interpolation-filters="sRGB">
+                <feColorMatrix type="matrix" values=".2126 .7152 .0722 0 0 .2126 .7152 .0722 0 0 .2126 .7152 .0722 0 0 0 0 0 1 0" />
+                <feComponentTransfer><feFuncR type="linear" slope=".13" intercept=".82" /><feFuncG type="linear" slope=".105" intercept=".855" /><feFuncB type="linear" slope=".08" intercept=".90" /></feComponentTransfer>
+              </filter>
+              <linearGradient id="capacity-mountain-full-fade" x1="0" y1="760" x2="0" y2="1024" gradientUnits="userSpaceOnUse"><stop stop-color="white" /><stop offset="1" stop-color="black" /></linearGradient>
+              <mask id="capacity-mountain-full-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1536" height="1024"><rect width="1536" height="1024" fill="url(#capacity-mountain-full-fade)" /></mask>
+            </defs>
+            <g transform="translate(0 -40) scale(1.041667)" mask="url(#capacity-mountain-full-mask)"><image href="hero-mountain-restored.jpg" width="1536" height="1024" preserveAspectRatio="xMidYMid slice" clip-path="url(#capacity-mountain-full-cutout)" filter="url(#capacity-mountain-full-pale)" /></g>
+          </svg>
+          <span class="type-hook__paper-headline" hidden></span>
+          <div class="type-hook__composite"><svg class="type-hook__papers" viewBox="0 0 1600 1400" width="1600" height="1400" aria-hidden="true" focusable="false">
+            <defs>
+              <clipPath id="capacity-mountain-logo-cutout"><path d="M0 618.5 L14 617.5 L16 615.5 L22 615.5 L23 614.5 L24 615.5 L30 615.5 L31 616.5 L33 616.5 L34 615.5 L41 615.5 L42 614.5 L44 615.5 L47 615.5 L51 613.5 L54 610.5 L55 610.5 L58 606.5 L59 607.5 L61 604.5 L62 604.5 L63 601.5 L64 601.5 L67 596.5 L70 593.5 L71 593.5 L73 590.5 L74 590.5 L75 587.5 L77 585.5 L81 578.5 L85 575.5 L88 569.5 L89 569.5 L90 567.5 L92 566.5 L96 561.5 L97 561.5 L102 556.5 L103 556.5 L104 553.5 L109 549.5 L110 549.5 L111 546.5 L113 546.5 L117 543.5 L122 542.5 L125 539.5 L129 538.5 L130 536.5 L131 537.5 L132 536.5 L134 536.5 L139 532.5 L143 531.5 L145 528.5 L147 528.5 L151 522.5 L152 522.5 L153 519.5 L157 516.5 L165 502.5 L166 502.5 L169 498.5 L171 498.5 L174 494.5 L179 494.5 L182 491.5 L185 490.5 L188 484.5 L190 483.5 L193 479.5 L201 474.5 L205 470.5 L206 470.5 L209 466.5 L211 466.5 L217 460.5 L219 460.5 L220 458.5 L224 454.5 L225 454.5 L230 448.5 L233 447.5 L240 442.5 L243 442.5 L247 438.5 L251 437.5 L254 435.5 L256 435.5 L258 433.5 L260 433.5 L263 430.5 L269 430.5 L275 427.5 L277 425.5 L279 425.5 L286 422.5 L287 423.5 L288 422.5 L289 423.5 L293 419.5 L299 418.5 L302 416.5 L306 417.5 L308 419.5 L312 420.5 L314 422.5 L319 422.5 L324 419.5 L329 418.5 L331 416.5 L334 416.5 L338 414.5 L340 412.5 L342 412.5 L344 410.5 L345 410.5 L346 408.5 L347 409.5 L348 407.5 L353 403.5 L357 401.5 L362 400.5 L364 398.5 L367 398.5 L371 396.5 L377 388.5 L382 387.5 L385 384.5 L386 385.5 L390 382.5 L404 382.5 L405 383.5 L408 383.5 L410 385.5 L412 385.5 L416 387.5 L417 386.5 L419 387.5 L421 391.5 L432 390.5 L433 389.5 L450 389.5 L457 392.5 L462 392.5 L463 390.5 L465 390.5 L469 388.5 L471 386.5 L473 380.5 L478 359.5 L483 346.5 L489 334.5 L490 334.5 L498 327.5 L499 328.5 L501 327.5 L507 321.5 L511 320.5 L513 318.5 L515 318.5 L516 319.5 L518 318.5 L520 316.5 L522 312.5 L524 311.5 L525 276.5 L526 270.5 L528 230.5 L532 215.5 L533 214.5 L534 208.5 L536 207.5 L539 202.5 L542 201.5 L544 198.5 L558 191.5 L563 187.5 L570 184.5 L574 180.5 L575 180.5 L578 176.5 L579 176.5 L584 171.5 L587 170.5 L589 168.5 L593 162.5 L596 160.5 L600 154.5 L604 153.5 L605 152.5 L614 152.5 L619 155.5 L622 155.5 L623 153.5 L625 151.5 L627 151.5 L630 147.5 L634 145.5 L637 145.5 L639 144.5 L640 142.5 L642 142.5 L646 139.5 L650 138.5 L652 136.5 L656 134.5 L659 134.5 L660 133.5 L662 135.5 L663 135.5 L679 151.5 L680 153.5 L682 154.5 L684 157.5 L686 159.5 L687 159.5 L695 167.5 L696 169.5 L698 170.5 L706 178.5 L710 183.5 L711 183.5 L717 191.5 L723 196.5 L741 217.5 L742 217.5 L745 220.5 L767 247.5 L772 252.5 L776 258.5 L798 285.5 L805 292.5 L811 300.5 L832 322.5 L837 325.5 L839 325.5 L845 328.5 L847 328.5 L850 330.5 L852 330.5 L854 332.5 L856 332.5 L860 334.5 L862 336.5 L866 338.5 L871 339.5 L874 341.5 L877 341.5 L878 342.5 L879 341.5 L881 342.5 L885 342.5 L886 341.5 L888 342.5 L891 342.5 L896 345.5 L899 345.5 L902 347.5 L904 346.5 L910 349.5 L915 350.5 L920 353.5 L927 355.5 L941 367.5 L946 369.5 L951 374.5 L952 374.5 L960 382.5 L967 391.5 L970 392.5 L973 395.5 L976 396.5 L980 400.5 L982 400.5 L984 402.5 L985 402.5 L1009 425.5 L1010 425.5 L1012 428.5 L1013 428.5 L1018 432.5 L1023 434.5 L1028 438.5 L1031 439.5 L1032 441.5 L1036 440.5 L1038 442.5 L1040 441.5 L1041 443.5 L1045 443.5 L1049 441.5 L1050 442.5 L1056 439.5 L1057 440.5 L1062 440.5 L1063 441.5 L1066 441.5 L1067 442.5 L1072 442.5 L1073 443.5 L1075 442.5 L1076 443.5 L1079 443.5 L1081 446.5 L1085 443.5 L1090 442.5 L1091 440.5 L1098 440.5 L1101 438.5 L1103 438.5 L1104 436.5 L1106 435.5 L1108 436.5 L1109 435.5 L1112 435.5 L1113 434.5 L1115 435.5 L1121 435.5 L1124 432.5 L1125 432.5 L1127 429.5 L1129 427.5 L1130 427.5 L1133 423.5 L1142 415.5 L1144 414.5 L1151 414.5 L1152 413.5 L1153 413.5 L1154 415.5 L1156 415.5 L1157 416.5 L1158 415.5 L1161 415.5 L1162 416.5 L1165 415.5 L1168 418.5 L1171 418.5 L1175 416.5 L1176 417.5 L1181 417.5 L1185 419.5 L1190 426.5 L1192 426.5 L1193 427.5 L1194 426.5 L1195 427.5 L1197 427.5 L1199 429.5 L1204 429.5 L1211 426.5 L1215 426.5 L1216 424.5 L1218 424.5 L1221 421.5 L1224 420.5 L1229 416.5 L1236 414.5 L1237 411.5 L1239 410.5 L1241 410.5 L1244 408.5 L1246 409.5 L1248 408.5 L1259 417.5 L1262 422.5 L1263 422.5 L1265 426.5 L1267 427.5 L1270 433.5 L1272 434.5 L1273 436.5 L1274 436.5 L1276 438.5 L1278 438.5 L1281 441.5 L1283 441.5 L1285 444.5 L1288 444.5 L1291 447.5 L1295 447.5 L1300 441.5 L1301 440.5 L1302 441.5 L1304 438.5 L1306 436.5 L1307 436.5 L1315 427.5 L1317 426.5 L1322 426.5 L1323 427.5 L1326 426.5 L1328 421.5 L1331 418.5 L1336 415.5 L1342 408.5 L1350 408.5 L1351 409.5 L1354 409.5 L1359 406.5 L1362 406.5 L1365 409.5 L1367 413.5 L1370 416.5 L1372 420.5 L1375 423.5 L1383 436.5 L1385 438.5 L1386 438.5 L1388 440.5 L1389 439.5 L1393 440.5 L1402 449.5 L1403 451.5 L1423 471.5 L1424 471.5 L1448 496.5 L1449 496.5 L1457 504.5 L1458 504.5 L1459 506.5 L1464 508.5 L1466 511.5 L1471 516.5 L1472 516.5 L1477 523.5 L1485 528.5 L1488 532.5 L1489 531.5 L1490 532.5 L1492 532.5 L1493 534.5 L1495 534.5 L1498 537.5 L1502 539.5 L1503 538.5 L1508 544.5 L1510 545.5 L1512 548.5 L1513 548.5 L1518 558.5 L1523 564.5 L1526 564.5 L1530 559.5 L1532 559.5 L1533 558.5 L1535 559.5 L1536 1024 H0Z" /></clipPath>
+              <filter id="capacity-mountain-logo-pale" color-interpolation-filters="sRGB">
+                <feColorMatrix type="matrix" values=".2126 .7152 .0722 0 0 .2126 .7152 .0722 0 0 .2126 .7152 .0722 0 0 0 0 0 1 0" />
+                <feComponentTransfer><feFuncR type="linear" slope=".13" intercept=".82" /><feFuncG type="linear" slope=".105" intercept=".855" /><feFuncB type="linear" slope=".08" intercept=".90" /></feComponentTransfer>
+              </filter>
+              <linearGradient id="capacity-mountain-logo-fade" x1="0" y1="760" x2="0" y2="1024" gradientUnits="userSpaceOnUse"><stop stop-color="white" /><stop offset="1" stop-color="black" /></linearGradient>
+              <mask id="capacity-mountain-logo-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1536" height="1024"><rect width="1536" height="1024" fill="url(#capacity-mountain-logo-fade)" /></mask>
+            </defs>
+            <g transform="translate(0 -40) scale(1.041667)" mask="url(#capacity-mountain-logo-mask)"><image href="hero-mountain-restored.jpg" width="1536" height="1024" preserveAspectRatio="xMidYMid slice" clip-path="url(#capacity-mountain-logo-cutout)" filter="url(#capacity-mountain-logo-pale)" /></g>
+          </svg></div>
+          <svg class="type-hook__outline" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="-12 0 7406 1050"><g><path pathLength="1" d="M171 257V715Q171 744 178.0 758.0Q185 772 204.5 777.5Q224 783 263 783H410Q458 783 480.0 749.5Q502 716 508 661Q508 658 513.5 658.5Q519 659 519 662Q516 687 513.0 721.5Q510 756 510 785Q510 800 495 800H37Q35 800 35.0 794.0Q35 788 37 788Q77 788 96.5 783.0Q116 778 123.0 763.0Q130 748 130 719V256Q130 227 123.0 212.5Q116 198 96.5 192.5Q77 187 37 187Q35 187 35.0 181.0Q35 175 37 175Q61 175 90.0 176.5Q119 178 150 178Q183 178 212.0 176.5Q241 175 264 175Q265 175 265.0 181.0Q265 187 264 187Q224 187 204.5 192.5Q185 198 178.0 213.0Q171 228 171 257Z"/><path pathLength="1" d="M751 812Q693 812 655.0 784.5Q617 757 597.5 713.0Q578 669 578 620Q578 559 606.0 510.5Q634 462 680.5 433.5Q727 405 781 405Q838 405 864.5 437.0Q891 469 891 519Q891 532 888.5 537.5Q886 543 879 543H841Q847 480 820.0 452.5Q793 425 750 425Q691 425 658.5 468.0Q626 511 626 586Q626 641 644.0 686.0Q662 731 697.0 757.0Q732 783 782 783Q818 783 841.0 772.0Q864 761 884 748Q886 746 889.5 750.5Q893 755 891 758Q856 787 821.5 799.5Q787 812 751 812ZM618 544 617 533 846 529V543Z"/><path pathLength="1" d="M1145 812Q1121 812 1100.0 804.5Q1079 797 1067.0 780.0Q1055 763 1055 734V493Q1055 467 1052.0 456.0Q1049 445 1038.0 441.5Q1027 438 1002 438Q1000 438 1000.0 432.5Q1000 427 1002 427Q1038 428 1059.5 407.0Q1081 386 1078 355Q1078 352 1085.5 352.0Q1093 352 1093 355V700Q1093 743 1113.5 764.0Q1134 785 1176 785Q1204 785 1224.5 776.5Q1245 768 1258 759Q1262 757 1264.5 761.5Q1267 766 1263 769Q1226 793 1199.5 802.5Q1173 812 1145 812ZM1234 461Q1195 451 1160.0 449.0Q1125 447 1086 447V427Q1124 427 1160.0 424.0Q1196 421 1236 417Q1240 417 1241.5 423.0Q1243 429 1243 439Q1243 446 1240.5 454.0Q1238 462 1234 461Z"/><path class="type-hook__apostrophe-outline" pathLength="1" d="M1391 163Q1419 163 1434.5 183.5Q1450 204 1450 246Q1450 287 1433.5 323.0Q1417 359 1388 393Q1384 396 1381.0 392.5Q1378 389 1380 386Q1401 354 1406.5 327.5Q1412 301 1412 272Q1412 243 1402.5 225.5Q1393 208 1381 196L1420 189Q1421 206 1411.0 215.0Q1401 224 1387 224Q1372 224 1363.5 216.0Q1355 208 1355 193Q1355 179 1363.0 171.0Q1371 163 1391 163Z"/><path pathLength="1" d="M1600 481Q1600 509 1613.5 528.0Q1627 547 1649.5 559.5Q1672 572 1695 584Q1721 595 1744.0 609.5Q1767 624 1782.0 643.5Q1797 663 1797 694Q1797 726 1781.0 752.5Q1765 779 1733.5 795.0Q1702 811 1658 811Q1635 811 1612.0 804.5Q1589 798 1566 779Q1564 777 1562.0 774.0Q1560 771 1560 767L1558 701Q1558 698 1563.5 697.5Q1569 697 1570 700Q1584 734 1601.0 754.5Q1618 775 1639.0 783.5Q1660 792 1688 792Q1726 792 1745.5 775.0Q1765 758 1762 723Q1761 694 1747.0 676.0Q1733 658 1711.5 646.5Q1690 635 1666 624Q1641 612 1618.5 598.5Q1596 585 1581.5 564.0Q1567 543 1567 511Q1567 474 1587.0 449.5Q1607 425 1637.0 412.5Q1667 400 1699 400Q1716 400 1734.0 404.0Q1752 408 1768 415Q1777 420 1777 426Q1777 440 1776.0 456.5Q1775 473 1775 491Q1775 493 1769.0 493.0Q1763 493 1763 491Q1763 468 1746.0 452.0Q1729 436 1706.0 428.5Q1683 421 1661 421Q1631 421 1615.5 436.0Q1600 451 1600 481Z"/><path pathLength="1" d="M1888 629Q1885 629 1884.0 620.5Q1883 612 1883.5 602.5Q1884 593 1886 593L2147 546Q2150 545 2151.0 554.5Q2152 564 2151.0 572.5Q2150 581 2147 582Z"/><path pathLength="1" d="M2369 715Q2369 745 2378.0 760.5Q2387 776 2415.0 782.0Q2443 788 2500 788Q2503 788 2503.0 794.0Q2503 800 2500 800Q2468 800 2430.5 799.0Q2393 798 2349 798Q2318 798 2288.5 799.0Q2259 800 2235 800Q2233 800 2233.0 794.0Q2233 788 2235 788Q2274 788 2294.0 783.0Q2314 778 2321.0 763.0Q2328 748 2328 719V256Q2328 227 2321.0 212.5Q2314 198 2294.0 192.5Q2274 187 2235 187Q2233 187 2233.0 181.0Q2233 175 2235 175Q2259 175 2288.0 176.5Q2317 178 2348 178Q2374 178 2410.5 175.0Q2447 172 2489 172Q2542 172 2586.5 189.0Q2631 206 2657.0 242.0Q2683 278 2682 336Q2682 389 2661.5 427.0Q2641 465 2608.5 489.5Q2576 514 2537.0 526.0Q2498 538 2461 538Q2447 538 2434.5 537.0Q2422 536 2411 533Q2407 532 2408.5 525.5Q2410 519 2413 520Q2422 522 2431.5 523.0Q2441 524 2449 524Q2496 524 2538.0 506.0Q2580 488 2606.0 450.5Q2632 413 2632 355Q2632 300 2609.0 261.5Q2586 223 2549.0 203.0Q2512 183 2467 183Q2428 183 2406.5 186.5Q2385 190 2377.0 205.0Q2369 220 2369 258Z"/><path pathLength="1" d="M3051 806Q3047 808 3043 808Q3032 808 3024.0 787.5Q3016 767 3016 728V531Q3016 469 2994.5 446.0Q2973 423 2943 423Q2918 423 2901.0 433.5Q2884 444 2874.5 461.0Q2865 478 2860 493Q2859 499 2856.0 512.5Q2853 526 2834 526Q2821 526 2814.0 517.5Q2807 509 2807 500Q2807 485 2824.5 468.0Q2842 451 2868.5 436.5Q2895 422 2923.5 413.0Q2952 404 2977 404Q3018 404 3035.0 430.5Q3052 457 3052 501V692Q3052 729 3060.0 746.0Q3068 763 3090 763Q3110 763 3150 746Q3155 744 3157.0 749.5Q3159 755 3154 757ZM2877 807Q2841 807 2822.0 786.5Q2803 766 2803 740Q2803 726 2809.5 710.5Q2816 695 2836.0 679.0Q2856 663 2896 648L3026 599L3027 612L2897 661Q2873 670 2863.0 680.0Q2853 690 2850.5 700.0Q2848 710 2848 719Q2848 740 2862.0 759.0Q2876 778 2906 778Q2918 778 2931.0 774.0Q2944 770 2962 760L3033 720L3035 731L2959 777Q2933 793 2914.5 800.0Q2896 807 2877 807Z"/><path pathLength="1" d="M3303 529 3299 520Q3336 473 3359.0 448.5Q3382 424 3398.5 414.5Q3415 405 3431 405Q3452 405 3471.5 415.0Q3491 425 3491 440Q3491 447 3484.5 454.0Q3478 461 3466 461Q3455 461 3447.0 455.0Q3439 449 3429.0 443.0Q3419 437 3401 437Q3392 437 3381.0 443.0Q3370 449 3352.0 468.5Q3334 488 3303 529ZM3215 800Q3212 800 3212.0 794.0Q3212 788 3215 788Q3258 788 3270.5 775.5Q3283 763 3283 719V517Q3283 482 3274.5 466.5Q3266 451 3246 451Q3236 451 3221.5 455.0Q3207 459 3188 466Q3184 467 3181.5 462.0Q3179 457 3183 455L3289 406Q3290 405 3293 405Q3300 405 3310.0 425.0Q3320 445 3320 483V719Q3320 749 3327.0 763.5Q3334 778 3356.0 783.0Q3378 788 3423 788Q3425 788 3425.0 794.0Q3425 800 3423 800Q3399 800 3367.5 799.0Q3336 798 3302 798Q3278 798 3255.0 799.0Q3232 800 3215 800Z"/><path pathLength="1" d="M3850 806Q3846 808 3842 808Q3831 808 3823.0 787.5Q3815 767 3815 728V531Q3815 469 3793.5 446.0Q3772 423 3742 423Q3717 423 3700.0 433.5Q3683 444 3673.5 461.0Q3664 478 3659 493Q3658 499 3655.0 512.5Q3652 526 3633 526Q3620 526 3613.0 517.5Q3606 509 3606 500Q3606 485 3623.5 468.0Q3641 451 3667.5 436.5Q3694 422 3722.5 413.0Q3751 404 3776 404Q3817 404 3834.0 430.5Q3851 457 3851 501V692Q3851 729 3859.0 746.0Q3867 763 3889 763Q3909 763 3949 746Q3954 744 3956.0 749.5Q3958 755 3953 757ZM3676 807Q3640 807 3621.0 786.5Q3602 766 3602 740Q3602 726 3608.5 710.5Q3615 695 3635.0 679.0Q3655 663 3695 648L3825 599L3826 612L3696 661Q3672 670 3662.0 680.0Q3652 690 3649.5 700.0Q3647 710 3647 719Q3647 740 3661.0 759.0Q3675 778 3705 778Q3717 778 3730.0 774.0Q3743 770 3761 760L3832 720L3834 731L3758 777Q3732 793 3713.5 800.0Q3695 807 3676 807Z"/><path pathLength="1" d="M4370 164Q4418 164 4450.5 168.0Q4483 172 4511.0 182.5Q4539 193 4572 210Q4577 214 4578.5 216.5Q4580 219 4581 232L4593 341Q4593 343 4587.0 344.5Q4581 346 4581 342Q4560 259 4509.5 218.0Q4459 177 4373 177Q4280 177 4211.5 214.0Q4143 251 4105.5 319.0Q4068 387 4068 479Q4068 543 4092.5 601.5Q4117 660 4160.0 704.5Q4203 749 4257.5 775.0Q4312 801 4374 801Q4463 801 4516.0 758.5Q4569 716 4587 637Q4588 634 4593.5 635.0Q4599 636 4599 638L4593 740Q4592 752 4590.0 755.0Q4588 758 4582 762Q4528 792 4483.0 802.5Q4438 813 4372 813Q4268 813 4187.5 771.5Q4107 730 4061.5 654.5Q4016 579 4016 479Q4016 407 4042.0 349.5Q4068 292 4116.0 250.0Q4164 208 4228.0 186.0Q4292 164 4370 164Z"/><path pathLength="1" d="M4893 813Q4834 813 4791.0 784.0Q4748 755 4725.0 706.5Q4702 658 4702 602Q4702 550 4721.0 512.0Q4740 474 4771.0 449.5Q4802 425 4838.5 413.0Q4875 401 4911 401Q4970 401 5012.5 431.0Q5055 461 5078.0 508.0Q5101 555 5101 607Q5101 671 5072.0 717.0Q5043 763 4996.0 788.0Q4949 813 4893 813ZM4920 796Q4979 796 5016.0 758.5Q5053 721 5053 631Q5053 572 5031.5 524.5Q5010 477 4971.0 448.5Q4932 420 4878 420Q4817 420 4783.0 460.0Q4749 500 4749 575Q4749 632 4770.0 683.0Q4791 734 4829.5 765.0Q4868 796 4920 796Z"/><path pathLength="1" d="M5467 800Q5464 800 5464.0 794.0Q5464 788 5467 788Q5510 788 5522.5 775.5Q5535 763 5535 719V547Q5535 485 5511.0 456.5Q5487 428 5437 428Q5397 428 5356.0 455.0Q5315 482 5284 530L5280 518Q5330 453 5372.5 427.0Q5415 401 5458 401Q5513 401 5542.5 429.5Q5572 458 5572 521V719Q5572 763 5583.5 775.5Q5595 788 5640 788Q5643 788 5643.0 794.0Q5643 800 5640 800Q5623 800 5600.5 799.0Q5578 798 5554 798Q5530 798 5507.0 799.0Q5484 800 5467 800ZM5198 800Q5195 800 5195.0 794.0Q5195 788 5198 788Q5241 788 5253.5 775.5Q5266 763 5266 719V517Q5266 482 5257.5 466.5Q5249 451 5229 451Q5219 451 5204.5 455.0Q5190 459 5171 466Q5167 467 5164.5 462.0Q5162 457 5166 455L5272 406Q5273 405 5276 405Q5283 405 5293.0 425.0Q5303 445 5303 483V719Q5303 763 5314.5 775.5Q5326 788 5371 788Q5374 788 5374.0 794.0Q5374 800 5371 800Q5354 800 5331.5 799.0Q5309 798 5285 798Q5261 798 5238.0 799.0Q5215 800 5198 800Z"/><path pathLength="1" d="M5992 800Q5989 800 5989.0 794.0Q5989 788 5992 788Q6035 788 6047.5 775.5Q6060 763 6060 719V547Q6060 485 6036.0 456.5Q6012 428 5962 428Q5922 428 5881.0 455.0Q5840 482 5809 530L5805 518Q5855 453 5897.5 427.0Q5940 401 5983 401Q6038 401 6067.5 429.5Q6097 458 6097 521V719Q6097 763 6108.5 775.5Q6120 788 6165 788Q6168 788 6168.0 794.0Q6168 800 6165 800Q6148 800 6125.5 799.0Q6103 798 6079 798Q6055 798 6032.0 799.0Q6009 800 5992 800ZM5723 800Q5720 800 5720.0 794.0Q5720 788 5723 788Q5766 788 5778.5 775.5Q5791 763 5791 719V517Q5791 482 5782.5 466.5Q5774 451 5754 451Q5744 451 5729.5 455.0Q5715 459 5696 466Q5692 467 5689.5 462.0Q5687 457 5691 455L5797 406Q5798 405 5801 405Q5808 405 5818.0 425.0Q5828 445 5828 483V719Q5828 763 5839.5 775.5Q5851 788 5896 788Q5899 788 5899.0 794.0Q5899 800 5896 800Q5879 800 5856.5 799.0Q5834 798 5810 798Q5786 798 5763.0 799.0Q5740 800 5723 800Z"/><path pathLength="1" d="M6412 812Q6354 812 6316.0 784.5Q6278 757 6258.5 713.0Q6239 669 6239 620Q6239 559 6267.0 510.5Q6295 462 6341.5 433.5Q6388 405 6442 405Q6499 405 6525.5 437.0Q6552 469 6552 519Q6552 532 6549.5 537.5Q6547 543 6540 543H6502Q6508 480 6481.0 452.5Q6454 425 6411 425Q6352 425 6319.5 468.0Q6287 511 6287 586Q6287 641 6305.0 686.0Q6323 731 6358.0 757.0Q6393 783 6443 783Q6479 783 6502.0 772.0Q6525 761 6545 748Q6547 746 6550.5 750.5Q6554 755 6552 758Q6517 787 6482.5 799.5Q6448 812 6412 812ZM6279 544 6278 533 6507 529V543Z"/><path pathLength="1" d="M6845 812Q6777 812 6735.0 782.5Q6693 753 6673.5 707.5Q6654 662 6654 615Q6654 565 6672.5 526.0Q6691 487 6722.0 460.0Q6753 433 6790.0 419.0Q6827 405 6864 405Q6891 405 6916.5 412.5Q6942 420 6958.5 432.0Q6975 444 6975 458Q6975 469 6969.0 476.5Q6963 484 6952 484Q6940 484 6930.5 476.0Q6921 468 6916 461Q6903 445 6885.0 435.0Q6867 425 6833 425Q6768 425 6735.0 469.5Q6702 514 6702 587Q6702 638 6720.5 683.0Q6739 728 6777.0 756.5Q6815 785 6876 785Q6901 785 6930.0 777.0Q6959 769 6980 748Q6984 746 6987.5 750.0Q6991 754 6987 756Q6954 787 6919.0 799.5Q6884 812 6845 812Z"/><path pathLength="1" d="M7223 812Q7199 812 7178.0 804.5Q7157 797 7145.0 780.0Q7133 763 7133 734V493Q7133 467 7130.0 456.0Q7127 445 7116.0 441.5Q7105 438 7080 438Q7078 438 7078.0 432.5Q7078 427 7080 427Q7116 428 7137.5 407.0Q7159 386 7156 355Q7156 352 7163.5 352.0Q7171 352 7171 355V700Q7171 743 7191.5 764.0Q7212 785 7254 785Q7282 785 7302.5 776.5Q7323 768 7336 759Q7340 757 7342.5 761.5Q7345 766 7341 769Q7304 793 7277.5 802.5Q7251 812 7223 812ZM7312 461Q7273 451 7238.0 449.0Q7203 447 7164 447V427Q7202 427 7238.0 424.0Q7274 421 7314 417Q7318 417 7319.5 423.0Q7321 429 7321 439Q7321 446 7318.5 454.0Q7316 462 7312 461Z"/></g></svg>
+          <img class="type-hook__cloud type-hook__cloud--left" src="assets/images/homepage-capacity/cloud.webp" alt="" width="1800" height="764" loading="lazy" />
+          <img class="type-hook__cloud type-hook__cloud--right" src="assets/images/homepage-capacity/cloud.webp" alt="" width="1800" height="764" loading="lazy" />
+          <img class="type-hook__smoke" src="assets/images/homepage-capacity/smoke.webp" alt="" width="1800" height="581" loading="lazy" />
         </div>
-
-        <div class="matter-builder__details">
-          <div class="matter-builder__heading">
-            <p class="matter-builder__eyebrow">A simpler way to start</p>
-            <p>Tell LPC what needs doing in a few rough notes. It drafts the title, scope, and tasks. You can review and edit everything before posting.</p>
-          </div>
-
-          <div class="matter-builder__example">
-            <div class="matter-builder__panel matter-builder__panel--notes">
-              <span class="matter-builder__label">Your notes</span>
-              <p>1,200 pages of medical records. Need a treatment chronology and gaps in care.</p>
-            </div>
-            <div class="matter-builder__arrow" aria-hidden="true">→</div>
-            <div class="matter-builder__panel matter-builder__panel--draft">
-              <span class="matter-builder__label">LPC’s draft matter</span>
-              <h3>Medical Records Chronology</h3>
-              <p>Review medical records, create a treatment chronology, and identify gaps in care.</p>
-              <span class="matter-builder__tasks-label">Tasks</span>
-              <ul>
-                <li>Organize medical records</li>
-                <li>Build treatment chronology</li>
-                <li>Flag gaps in care</li>
-              </ul>
-            </div>
-          </div>
-          <p class="matter-builder__assurance">You make the final edits and choose when to post.</p>
+        <div class="type-hook__inner">
+          <h2 id="capacity-hook-title">Delegate your overflow work</h2>
+          <p class="type-hook__support">With vetted, experienced paralegals.</p>
+          <p class="type-hook__finish">Matter by matter.</p>
+          <span class="type-hook__brand-static">Let<span class="type-hook__apostrophe">’</span>s-ParaConnect</span>
         </div>
       </div>
     </section>
 
-    <section class="workflow" id="how" aria-labelledby="workflow-title">
+    <div class="matter-scroll-journey" id="matter-story" data-home-matter>
+<section data-header-tone="light" class="matter-film" id="matter-film" data-stage="0" data-pen="mathilde" aria-labelledby="film-title">
+  <header class="film-heading"><h2 id="film-title">Turn your notes into a Matter.<br><em>In seconds.</em></h2></header>
+  <div class="stage" aria-label="Illustrative notes-to-Matter animation">
+    <button type="button" class="stage-arrow stage-arrow-prev" aria-label="Previous step" disabled><svg viewBox="0 0 16 24" aria-hidden="true"><path d="M11 5 4 12l7 7"/></svg></button>
+    <button type="button" class="stage-arrow stage-arrow-next" aria-label="Next step"><svg viewBox="0 0 16 24" aria-hidden="true"><path d="m5 5 7 7-7 7"/></svg></button>
+
+    <div class="stage-grid" aria-hidden="true"></div>
+    <svg class="mobile-dotted-trail" viewBox="0 0 390 790" preserveAspectRatio="none" fill="none" aria-hidden="true"><path d="M-14 36C62 2 206 10 318 58S421 164 372 238C327 304 341 367 391 415M-12 493C40 529 43 594 10 648S7 738 103 766"/></svg>
+    <div class="orbit-caption caption-left" aria-hidden="true"><span class="caption-notes">Describe the work<br><em>you need done.</em></span><span class="caption-review">Your judgment.<br><em>Every detail.</em></span><span class="caption-post">The same intent.<br><em>A new perspective.</em></span></div>
+    <svg class="drawing" viewBox="0 0 1240 560" fill="none" aria-hidden="true"><g class="drawing-architecture" stroke="currentColor" stroke-width="1"><path d="M770 408 996 493 1190 375 967 291Z M800 420V229L929 152 1064 203V388 M929 152V343 M800 229 932 276 1064 203 M932 276V468 M822 237V348L905 379V268Z M953 287V406L988 385V268Z M1006 258V377L1044 354V237Z M814 363 914 401 M844 243V356 M874 255V367 M823 294 904 324 M916 171 920 267 M840 207 960 254 M881 182 1006 229 M831 210 966 137 1095 187 1070 204 M966 137V101L984 92 1004 100V156 M984 92V147"/><path d="m728 425 263 96 228-139M717 444l17-38M1208 397l17-37M706 473l282 105M1004 532l204-122" stroke-dasharray="3 6"/><path d="m775 427 30 10m-18-18-9 25m224 56 29-18m-13-9 6 29"/></g><path class="ink-trail" d="M134 295C48 136 251 45 408 113S649 532 950 436c132-42 150-148 136-217" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 6"/></svg>
+    <div class="document-stack" aria-hidden="true">
+      <div class="source-sheet title-sheet"><span class="source-tab">TITLE</span><div class="source-heading">Commitment for title insurance</div><span class="source-sub">SCHEDULE B · EXCEPTIONS</span><div class="source-lines"></div><span class="source-mark">Review liens &amp; easements</span></div>
+      <div class="source-sheet hoa-sheet"><span class="source-tab">HOA</span><div class="source-heading">Property. People. Obligations.</div><span class="source-sub">ASSOCIATION DOCUMENTS</span><div class="source-lines"></div><span class="source-mark">Summarize the details.</span></div>
+    </div>
+    <div class="matter-sheet">
+      <div class="pad-tear" aria-hidden="true"></div><div class="paper-grain" aria-hidden="true"></div><div class="paper-rule" aria-hidden="true"></div>
+      <header class="sheet-heading"><span class="sheet-monogram" data-step-title>Your notes</span><span class="sheet-stage">01</span></header>
+      <div class="sheet-state"><span class="status-light" aria-hidden="true"></span><span data-status>YOUR STARTING POINT</span></div>
+      <div class="matter-title"><span class="hand-title">Fairfax townhouse</span><h2>Title &amp; HOA review</h2><div class="matter-location">Real estate <span aria-hidden="true">/</span> Fairfax County, Virginia</div></div>
+
+      <p class="scope-summary">Review title and HOA documents for the buyer’s Fairfax townhouse purchase. Summarize findings before closing.</p>
+      <div class="build-intake" aria-hidden="true"><span class="intake-label">LPC IS WORKING FROM YOUR NOTES</span><div class="intake-paper">Fairfax townhouse<br>need title commitment summary<br>+ hoa docs reviewed<br>flag liens, easements<br>~6 hrs / $500<br>Closing June 28<br>Buyer’s side</div></div><div class="build-track" aria-hidden="true"><span></span></div>
+<div class="tasks-label">TASKS</div>
+      <div class="preview-task-list">
+      <div class="fragment fragment-one"><span class="hand">need title commitment summary</span><button type="button" class="typeset task-toggle" aria-pressed="false" tabindex="-1">Deliver a title commitment summary</button></div>
+      <div class="fragment fragment-two"><span class="hand">+ hoa docs reviewed</span><button type="button" class="typeset task-toggle" aria-pressed="false" tabindex="-1">Deliver an HOA obligations summary</button></div>
+      <div class="fragment fragment-three"><span class="hand">flag liens, easements</span><button type="button" class="typeset task-toggle" aria-pressed="false" tabindex="-1">List identified liens and easements</button></div>
+      <button type="button" class="addition task-toggle" aria-pressed="false" tabindex="-1">Submit a one-page findings memo</button>
+      </div>
+      <div class="amount-field"><label for="matter-amount">MATTER AMOUNT</label><span class="hand hand-amount">~6 hrs / $500</span><div class="amount-input"><span aria-hidden="true">$</span><input id="matter-amount" type="number" min="400" max="100000" step="1" value="500" aria-describedby="amount-detail"></div><small id="amount-detail">Estimate · 6 hours</small></div>
+      <div class="deadline-field"><label for="matter-deadline">DELIVER BY</label><span class="hand hand-deadline">Closing June 28</span><div class="deadline-input"><input id="matter-deadline" type="date" value="2026-06-23" min="2026-06-06" max="2026-06-27"></div><time class="posted-date" datetime="2026-06-23">June 23</time></div>
+      <div class="note-aside" aria-hidden="true">Buyer’s side</div>
+      <div class="sheet-bottom"><button type="button" class="sheet-action" data-advance><span>Build my Matter</span><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19 19 5M9 5h10v10" /></svg></span></button></div>
+      <span class="sheet-binding" aria-hidden="true"></span>
+    </div>
+    <section class="dashboard-builder" aria-label="LPC Matter draft editor" hidden>
+      <div class="builder-source">
+        <div class="builder-eyebrow"><span>02</span></div>
+        <h2>Your notes</h2>
+        <p>Start with your notes. We’ll put them in order.</p>
+
+        <div class="builder-brief" aria-label="Your original notes">Fairfax townhouse<br>need title commitment summary<br>+ hoa docs reviewed<br>flag liens, easements<br>~6 hrs / $500<br>Closing June 28<br>Buyer’s side</div>
+        <div class="builder-status"><span aria-hidden="true"></span><span data-builder-status>LPC is building your Matter…</span></div>
+        <div class="builder-progress" aria-hidden="true"><span></span></div>
+      </div>
+      <div class="builder-transfer" aria-hidden="true"><svg viewBox="0 0 150 100"><path class="transfer-wash" d="M12 72C43 75 92 44 80 25C65 3 38 37 69 56C91 69 116 58 138 40"/><path class="transfer-ink" pathLength="100" d="M12 72C43 75 92 44 80 25C65 3 38 37 69 56C91 69 116 58 138 40"/><path class="transfer-tip" d="m122 39 17-1-3 17"/><path class="transfer-spark" d="m102 13 1 8m-5-4 8-1"/></svg></div>
+      <div class="builder-draft">
+        <h2 class="builder-draft-heading">LPC’s draft</h2>
+        <p class="builder-edit-hint">Edit your draft before posting.</p>
+        <div class="builder-field builder-title" data-build-part="title"><label for="builder-title">Matter title</label><input id="builder-title" value="Title &amp; HOA review"></div>
+        <div class="builder-field builder-context" data-build-part="title"><span>Real estate · Virginia</span></div>
+        <div class="builder-field" data-build-part="scope"><textarea aria-label="Description" id="builder-scope" rows="3">Review title and HOA documents for the buyer’s Fairfax townhouse purchase. Summarize findings before closing.</textarea></div>
+        <div class="builder-field builder-tasks" data-build-part="tasks"><span class="builder-label">Tasks</span>
+          <textarea aria-label="Task 1" data-builder-task="0" rows="3">Deliver a title commitment summary</textarea>
+          <textarea aria-label="Task 2" data-builder-task="1" rows="3">Deliver an HOA obligations summary</textarea>
+          <textarea aria-label="Task 3" data-builder-task="2" rows="3">List identified liens and easements</textarea>
+          <div class="builder-suggestion" data-suggestion-task><textarea aria-label="Task 4" data-builder-task="3" rows="3">Submit a one-page findings memo</textarea></div>
+        </div>
+        <div class="builder-practical">
+
+          <div class="builder-field" data-build-part="amount"><label for="builder-amount">Matter amount</label><div class="builder-money">$<input id="builder-amount" type="number" min="400" max="100000" step="1" value="500"></div></div>
+          <div class="builder-field" data-build-part="date"><label for="builder-date">Suggested Due Date</label><input id="builder-date" type="date" min="2026-06-06" max="2026-06-27" value="2026-06-23"></div>
+        </div>
+        <div class="builder-actions"><button class="builder-preview" type="button">Preview</button></div>
+      </div>
+    </section>
+    <button type="button" class="builder-skip" hidden>Skip</button>
+    <div class="editor-note"><span class="editor-note-line" aria-hidden="true"></span><span class="editor-note-heading">A little more specific.</span><span>One-page memo.<br>$500. Due June 23.</span></div>
+    <div class="handoff-label"><span class="handoff-line" aria-hidden="true"></span><strong>Ready when<br>you are.</strong><span>Review the details.<br>Post when you’re ready.</span></div>
+
+  </div>
+
+  <p class="demo-disclosure" role="status" data-feedback></p>
+</section>
+</div>
+
+    <section data-header-tone="light" class="workflow" id="how" aria-labelledby="workflow-title">
       <div class="workflow__constellation" data-matter-field-host aria-hidden="true">
         <canvas class="matter-field matter-field--workflow" data-matter-field="closing" aria-hidden="true"></canvas>
       </div>
@@ -392,7 +490,7 @@
     </section>
 
     <div class="feature-sequence">
-    <section class="assistant-spotlight" id="assistant" aria-labelledby="assistant-title">
+    <section data-header-tone="light" class="assistant-spotlight" id="assistant" aria-labelledby="assistant-title">
       <div class="assistant-spotlight__inner">
         <div class="assistant-spotlight__copy">
           <p class="assistant-spotlight__eyebrow">THE LPC ASSISTANT</p>
@@ -421,10 +519,11 @@
                 <div class="assistant-demo__fact"><span data-demo-fact-label>Next deadline</span><strong data-demo-fact>August 23</strong><span data-demo-detail>Henderson v. Walker</span></div>
               </div>
             </div>
-            <a class="assistant-demo__source" href="login.html">
+            <div class="assistant-demo__source">
               <span class="assistant-demo__file" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6"/></svg></span>
               <span><small>GO TO THE MATTER</small><strong data-demo-matter>Henderson v. Walker</strong></span>
-            </a>
+              <span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M5 19 19 5M8 5h11v11"/></svg></span>
+            </div>
             <div class="assistant-demo__composer" aria-hidden="true"><span>Ask about your matters…</span><span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></span></div>
           </div>
         </div>
@@ -434,7 +533,7 @@
 
     </div>
 
-    <section class="paralegal-map" aria-labelledby="paralegal-map-title">
+    <section data-header-tone="light" class="paralegal-map" aria-labelledby="paralegal-map-title">
       <div class="paralegal-map__inner">
         <div class="paralegal-map__intro">
           <p class="paralegal-map__eyebrow">The network today</p>
@@ -443,15 +542,15 @@
         </div>
         <div class="paralegal-map__stage">
           <div class="paralegal-map__canvas" data-paralegal-map><img class="paralegal-map__outline" src="assets/images/us-map-outline.svg" alt="" aria-hidden="true" decoding="async" /></div>
-          <div class="paralegal-map__status" data-map-status role="status"><a class="paralegal-map__stat" href="browse-paralegals.html" aria-label="Browse paralegals" data-public-action="primary"><strong data-map-total>—</strong><span class="paralegal-map__stat-detail"><span class="paralegal-map__stat-copy"><span data-map-summary>paralegals</span><span data-map-growth>and growing.</span><span class="paralegal-map__stat-cue" aria-hidden="true">Browse</span></span><span class="paralegal-map__stat-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M5 19 19 5M8 5h11v11"/></svg></span></span></a></div>
+          <div class="paralegal-map__status" data-map-status role="status"><a class="paralegal-map__stat" href="browse-paralegals.html" aria-label="Browse paralegals" data-public-action="primary"><strong data-map-total>—</strong><span class="paralegal-map__stat-detail"><span class="paralegal-map__stat-copy"><span data-map-summary>paralegals</span><span data-map-growth>and growing.</span><span class="paralegal-map__stat-cue" aria-hidden="true">Browse</span></span><span class="paralegal-map__stat-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></span></span></a></div>
           <p class="paralegal-map__note">Dots show approved paralegals in each state.</p>
-          <button class="paralegal-map__retry" type="button" data-map-retry hidden>Try again</button>
+          <button class="paralegal-map__retry" type="button" data-public-action="secondary" data-map-retry hidden>Try again</button>
           <noscript><p class="paralegal-map__status">Enable JavaScript to view the network map.</p></noscript>
         </div>
       </div>
     </section>
 
-    <section class="clarity-section" aria-labelledby="clarity-title">
+    <section data-header-tone="light" class="clarity-section" aria-labelledby="clarity-title">
       <div class="clarity-section__intro">
         <p class="eyebrow">Fees and minimums</p>
         <h2 id="clarity-title">Know what to expect from the start.</h2>
@@ -464,7 +563,7 @@
             <span>To get started</span>
             <strong>$0</strong>
             <h4>Post for free.</h4>
-            <p>Post a matter without adding a payment method. When you find the right paralegal, you’ll add one to hire them. Compensation for the paralegal’s work starts at $400 per matter.</p>
+            <p>Post a matter without adding a payment method. When you find the right paralegal, you’ll add one to hire them. Compensation for the paralegal’s work starts at <span class="fee-card__minimum">$400</span> per matter.</p>
           </div>
           <div class="fee-card__row">
             <span>For attorneys</span>
@@ -520,28 +619,32 @@
       </div>
     </section>
 
-    <section class="closing-scene" aria-labelledby="closing-title">
-      <canvas class="matter-field matter-field--closing" data-matter-field="closing" aria-hidden="true"></canvas>
+    <div class="closing-cloud-region">
+    <section data-header-tone="dark" class="closing-scene" aria-labelledby="closing-title">
+      <img class="closing-scene__mountain" src="hero-mountain-restored.jpg" alt="" loading="lazy" decoding="async" />
+      <svg class="closing-scene__ridge" viewBox="0 0 1536 1024" preserveAspectRatio="xMidYMin slice" aria-hidden="true" focusable="false">
+        <defs><clipPath id="closing-ridge-cutout"><path d="M0 618.5 L14 617.5 L16 615.5 L22 615.5 L23 614.5 L24 615.5 L30 615.5 L31 616.5 L33 616.5 L34 615.5 L41 615.5 L42 614.5 L44 615.5 L47 615.5 L51 613.5 L54 610.5 L55 610.5 L58 606.5 L59 607.5 L61 604.5 L62 604.5 L63 601.5 L64 601.5 L67 596.5 L70 593.5 L71 593.5 L73 590.5 L74 590.5 L75 587.5 L77 585.5 L81 578.5 L85 575.5 L88 569.5 L89 569.5 L90 567.5 L92 566.5 L96 561.5 L97 561.5 L102 556.5 L103 556.5 L104 553.5 L109 549.5 L110 549.5 L111 546.5 L113 546.5 L117 543.5 L122 542.5 L125 539.5 L129 538.5 L130 536.5 L131 537.5 L132 536.5 L134 536.5 L139 532.5 L143 531.5 L145 528.5 L147 528.5 L151 522.5 L152 522.5 L153 519.5 L157 516.5 L165 502.5 L166 502.5 L169 498.5 L171 498.5 L174 494.5 L179 494.5 L182 491.5 L185 490.5 L188 484.5 L190 483.5 L193 479.5 L201 474.5 L205 470.5 L206 470.5 L209 466.5 L211 466.5 L217 460.5 L219 460.5 L220 458.5 L224 454.5 L225 454.5 L230 448.5 L233 447.5 L240 442.5 L243 442.5 L247 438.5 L251 437.5 L254 435.5 L256 435.5 L258 433.5 L260 433.5 L263 430.5 L269 430.5 L275 427.5 L277 425.5 L279 425.5 L286 422.5 L287 423.5 L288 422.5 L289 423.5 L293 419.5 L299 418.5 L302 416.5 L306 417.5 L308 419.5 L312 420.5 L314 422.5 L319 422.5 L324 419.5 L329 418.5 L331 416.5 L334 416.5 L338 414.5 L340 412.5 L342 412.5 L344 410.5 L345 410.5 L346 408.5 L347 409.5 L348 407.5 L353 403.5 L357 401.5 L362 400.5 L364 398.5 L367 398.5 L371 396.5 L377 388.5 L382 387.5 L385 384.5 L386 385.5 L390 382.5 L404 382.5 L405 383.5 L408 383.5 L410 385.5 L412 385.5 L416 387.5 L417 386.5 L419 387.5 L421 391.5 L432 390.5 L433 389.5 L450 389.5 L457 392.5 L462 392.5 L463 390.5 L465 390.5 L469 388.5 L471 386.5 L473 380.5 L478 359.5 L483 346.5 L489 334.5 L490 334.5 L498 327.5 L499 328.5 L501 327.5 L507 321.5 L511 320.5 L513 318.5 L515 318.5 L516 319.5 L518 318.5 L520 316.5 L522 312.5 L524 311.5 L525 276.5 L526 270.5 L528 230.5 L532 215.5 L533 214.5 L534 208.5 L536 207.5 L539 202.5 L542 201.5 L544 198.5 L558 191.5 L563 187.5 L570 184.5 L574 180.5 L575 180.5 L578 176.5 L579 176.5 L584 171.5 L587 170.5 L589 168.5 L593 162.5 L596 160.5 L600 154.5 L604 153.5 L605 152.5 L614 152.5 L619 155.5 L622 155.5 L623 153.5 L625 151.5 L627 151.5 L630 147.5 L634 145.5 L637 145.5 L639 144.5 L640 142.5 L642 142.5 L646 139.5 L650 138.5 L652 136.5 L656 134.5 L659 134.5 L660 133.5 L662 135.5 L663 135.5 L679 151.5 L680 153.5 L682 154.5 L684 157.5 L686 159.5 L687 159.5 L695 167.5 L696 169.5 L698 170.5 L706 178.5 L710 183.5 L711 183.5 L717 191.5 L723 196.5 L741 217.5 L742 217.5 L745 220.5 L767 247.5 L772 252.5 L776 258.5 L798 285.5 L805 292.5 L811 300.5 L832 322.5 L837 325.5 L839 325.5 L845 328.5 L847 328.5 L850 330.5 L852 330.5 L854 332.5 L856 332.5 L860 334.5 L862 336.5 L866 338.5 L871 339.5 L874 341.5 L877 341.5 L878 342.5 L879 341.5 L881 342.5 L885 342.5 L886 341.5 L888 342.5 L891 342.5 L896 345.5 L899 345.5 L902 347.5 L904 346.5 L910 349.5 L915 350.5 L920 353.5 L927 355.5 L941 367.5 L946 369.5 L951 374.5 L952 374.5 L960 382.5 L967 391.5 L970 392.5 L973 395.5 L976 396.5 L980 400.5 L982 400.5 L984 402.5 L985 402.5 L1009 425.5 L1010 425.5 L1012 428.5 L1013 428.5 L1018 432.5 L1023 434.5 L1028 438.5 L1031 439.5 L1032 441.5 L1036 440.5 L1038 442.5 L1040 441.5 L1041 443.5 L1045 443.5 L1049 441.5 L1050 442.5 L1056 439.5 L1057 440.5 L1062 440.5 L1063 441.5 L1066 441.5 L1067 442.5 L1072 442.5 L1073 443.5 L1075 442.5 L1076 443.5 L1079 443.5 L1081 446.5 L1085 443.5 L1090 442.5 L1091 440.5 L1098 440.5 L1101 438.5 L1103 438.5 L1104 436.5 L1106 435.5 L1108 436.5 L1109 435.5 L1112 435.5 L1113 434.5 L1115 435.5 L1121 435.5 L1124 432.5 L1125 432.5 L1127 429.5 L1129 427.5 L1130 427.5 L1133 423.5 L1142 415.5 L1144 414.5 L1151 414.5 L1152 413.5 L1153 413.5 L1154 415.5 L1156 415.5 L1157 416.5 L1158 415.5 L1161 415.5 L1162 416.5 L1165 415.5 L1168 418.5 L1171 418.5 L1175 416.5 L1176 417.5 L1181 417.5 L1185 419.5 L1190 426.5 L1192 426.5 L1193 427.5 L1194 426.5 L1195 427.5 L1197 427.5 L1199 429.5 L1204 429.5 L1211 426.5 L1215 426.5 L1216 424.5 L1218 424.5 L1221 421.5 L1224 420.5 L1229 416.5 L1236 414.5 L1237 411.5 L1239 410.5 L1241 410.5 L1244 408.5 L1246 409.5 L1248 408.5 L1259 417.5 L1262 422.5 L1263 422.5 L1265 426.5 L1267 427.5 L1270 433.5 L1272 434.5 L1273 436.5 L1274 436.5 L1276 438.5 L1278 438.5 L1281 441.5 L1283 441.5 L1285 444.5 L1288 444.5 L1291 447.5 L1295 447.5 L1300 441.5 L1301 440.5 L1302 441.5 L1304 438.5 L1306 436.5 L1307 436.5 L1315 427.5 L1317 426.5 L1322 426.5 L1323 427.5 L1326 426.5 L1328 421.5 L1331 418.5 L1336 415.5 L1342 408.5 L1350 408.5 L1351 409.5 L1354 409.5 L1359 406.5 L1362 406.5 L1365 409.5 L1367 413.5 L1370 416.5 L1372 420.5 L1375 423.5 L1383 436.5 L1385 438.5 L1386 438.5 L1388 440.5 L1389 439.5 L1393 440.5 L1402 449.5 L1403 451.5 L1423 471.5 L1424 471.5 L1448 496.5 L1449 496.5 L1457 504.5 L1458 504.5 L1459 506.5 L1464 508.5 L1466 511.5 L1471 516.5 L1472 516.5 L1477 523.5 L1485 528.5 L1488 532.5 L1489 531.5 L1490 532.5 L1492 532.5 L1493 534.5 L1495 534.5 L1498 537.5 L1502 539.5 L1503 538.5 L1508 544.5 L1510 545.5 L1512 548.5 L1513 548.5 L1518 558.5 L1523 564.5 L1526 564.5 L1530 559.5 L1532 559.5 L1533 558.5 L1535 559.5 L1536 1024 H0Z" /></clipPath></defs>
+        <image href="hero-mountain-restored.jpg" width="1536" height="1024" clip-path="url(#closing-ridge-cutout)" />
+        <rect width="1536" height="1024" fill="black" opacity=".3" clip-path="url(#closing-ridge-cutout)" />
+      </svg>
       <div class="closing-scene__content">
-        <h2 id="closing-title">Start with the role that brings you here.</h2>
+        <h2 id="closing-title"><span>Start with the role</span><em>that brings you here.</em></h2>
         <div class="role-actions">
           <a class="role-action" href="signup.html?role=attorney" data-public-action="secondary" data-action-shape="control">
-            <span>For attorneys</span>
-            <strong>Post a matter</strong>
-            <i aria-hidden="true"></i>
+            <strong>For attorneys</strong>
+            <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19 19 5M9 5h10v10" /></svg></i>
           </a>
           <a class="role-action" href="signup.html?role=paralegal" data-public-action="secondary" data-action-shape="control">
-            <span>For paralegals</span>
-            <strong>Apply to join</strong>
-            <i aria-hidden="true"></i>
+            <strong>For paralegals</strong>
+            <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19 19 5M9 5h10v10" /></svg></i>
           </a>
         </div>
-        <p class="closing-access-note">Approval-based access: every paralegal completes LPC’s application and eligibility review before joining.</p>
       </div>
     </section>
+    </div>
   </main>
 
-  <footer class="home-footer">
+  <footer data-header-tone="light" class="home-footer">
     <div class="home-footer__inner">
       <p class="home-footer__statement"><span>Legal work.</span><span>Clearly connected.</span></p>
       <nav class="home-footer__directory" aria-label="Footer navigation">
@@ -574,7 +677,7 @@
           <summary>Legal</summary>
           <div class="home-footer__links">
             <a href="terms.html">Terms</a>
-            <a href="privacy.html">Privacy</a>
+            <a href="privacy.html">Privacy</a><a href="security.html">Security &amp; Confidentiality</a>
             <a href="accessibility.html">Accessibility</a>
           </div>
         </details>
@@ -592,10 +695,16 @@
     </div>
   </footer>
 
-  <script src="assets/scripts/homepage-map.js?v=20261001-immediate-outline" defer></script>
-  <script src="assets/scripts/homepage.js?v=20261002-staged-matter-opening" defer></script>
-  <script src="assets/scripts/homepage-matter-builder.js?v=20261002-stable-scroll-opening" defer></script>
+  <script src="assets/scripts/homepage-closing-parallax.js?v=20261006-continuous-scroll" defer></script>
+  <script src="assets/scripts/homepage-map.js?v=20261007-item12-before" defer></script>
+  <script src="assets/libs/gsap/gsap.min.js?v=3.13.0" defer></script>
+  <script src="assets/libs/gsap/ScrollTrigger.min.js?v=3.13.0" defer></script>
+  <script src="assets/libs/lenis/lenis.min.js?v=1.3.17" defer></script>
+  <script src="assets/scripts/homepage.js?v=20261007-item11-fallback" defer></script>
   <script src="assets/scripts/homepage-assistant.js?v=20260929-review-copy" defer></script>
   <script src="assets/scripts/accessibility-toggle.js" defer></script>
+  <script src="assets/scripts/matter-original.js?v=20261006-step-three-checklist" defer></script>
+  <script src="assets/scripts/homepage-draft-calendar.js?v=20261007-calendar-no-year" defer></script>
+  <script src="assets/scripts/homepage-capacity-motion.js?v=20261006-unmasked-solid-logo" defer></script>
 </body>
 </html>

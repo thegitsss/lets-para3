@@ -1,0 +1,14 @@
+/* Adapted from Aceternity Noise Background: https://ui.aceternity.com/components/noise-background */
+.lpc-home .home-header a.lpc-noise-signup{position:relative;isolation:isolate;overflow:hidden;padding:7px!important;border:0!important;border-radius:999px;background:#e5e5e5!important;color:#171717!important;box-shadow:inset 0 .5px 1px #a3a3a3,0 1px 0 #f5f5f5;transform:none}
+.lpc-noise-signup__color{position:absolute;inset:auto;left:50%;top:50%;width:220%;aspect-ratio:1;z-index:-2;pointer-events:none;background:conic-gradient(#b9cbea 0deg,#b9cbea 100deg,#e6d6ba 220deg,#b9cbea 360deg);transform:translate(-50%,-50%);animation:lpc-noise-orbit 1.8s linear infinite}
+.lpc-home .home-header a.lpc-noise-signup:before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background:url('../images/lpc-button-noise.webp') center/cover;opacity:.2;mix-blend-mode:overlay}
+.lpc-home .home-header a.lpc-noise-signup:after{content:'';position:absolute;left:-20%;right:-20%;top:0;height:4px;background:linear-gradient(90deg,#b9cbea,#b9cbea,#e6d6ba);filter:blur(3px);opacity:.8;z-index:-1;animation:lpc-noise-drift 3s ease-in-out infinite alternate-reverse;pointer-events:none}
+.lpc-noise-signup__label{display:block;position:relative;border-radius:999px;padding:8px 16px;background:linear-gradient(90deg,#f5f5f5,#f5f5f5,#fff);color:#171717;line-height:1.3;box-shadow:inset 0 2px 0 #fafafa,0 .5px 1px #a3a3a3;transition:transform .1s ease}
+.lpc-noise-signup:active .lpc-noise-signup__label{transform:scale(.98)}
+.lpc-home .home-header a.lpc-noise-signup:focus-visible{outline:2px solid #385f9e;outline-offset:4px}
+/* Keep the label still while soft color bands sweep around the border. */
+@keyframes lpc-noise-orbit{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+.lpc-noise-signup__color,.lpc-home .home-header a.lpc-noise-signup:after{animation-play-state:paused}
+.lpc-noise-signup:is(:hover,:focus-visible) .lpc-noise-signup__color,.lpc-home .home-header a.lpc-noise-signup:is(:hover,:focus-visible):after{animation-play-state:running}
+@keyframes lpc-noise-drift{0%{transform:translate(-12%,-5%) rotate(-8deg)}50%{transform:translate(8%,5%) rotate(4deg)}100%{transform:translate(-3%,12%) rotate(12deg)}}
+@media(prefers-reduced-motion:reduce){.lpc-noise-signup__color,.lpc-noise-signup:is(:hover,:focus-visible) .lpc-noise-signup__color,.lpc-home .home-header a.lpc-noise-signup:after{animation:none} .lpc-noise-signup:is(:hover,:focus-visible) .lpc-noise-signup__color{transform:translate(-50%,-50%)}}

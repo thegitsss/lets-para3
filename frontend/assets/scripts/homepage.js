@@ -23,7 +23,14 @@
     const fadeDistance = Math.max(280, Math.min(420, window.innerHeight * 0.4));
     const progress = clamp(window.scrollY / fadeDistance);
     const editorialHero = document.body.classList.contains("lpc-home--editorial");
-    const useInkForeground = editorialHero || progress >= 0.52;
+    // Read the section actually painted behind the header, including pinned scenes.
+    const headerMidpoint = header.getBoundingClientRect().height / 2;
+    const surface = document.elementsFromPoint(window.innerWidth / 2, headerMidpoint)
+      .find(node => !header.contains(node) && node.closest('[data-header-tone]'))
+      ?.closest('[data-header-tone]');
+    const tone = surface?.dataset.headerTone;
+    const useInkForeground = header.classList.contains('is-open') ||
+      (tone ? tone === 'light' : editorialHero || progress >= 0.52);
     header.style.setProperty("--header-surface-alpha", (progress * 0.94).toFixed(3));
     header.style.setProperty("--header-surface-blur", `${(progress * 16).toFixed(2)}px`);
     header.style.setProperty("--header-foreground", useInkForeground ? "rgb(26, 34, 48)" : "rgb(255, 255, 255)");
@@ -34,8 +41,14 @@
   };
 
   syncHeaderSurface();
-  window.addEventListener("scroll", syncHeaderSurface, { passive: true });
-  window.addEventListener("resize", syncHeaderSurface);
+  let headerFrame = 0;
+  const scheduleHeaderSurface = () => {
+    if (headerFrame) return;
+    headerFrame = requestAnimationFrame(() => { headerFrame = 0; syncHeaderSurface(); });
+  };
+  window.addEventListener("scroll", scheduleHeaderSurface, { passive: true });
+  window.addEventListener("resize", scheduleHeaderSurface);
+  document.fonts.ready.then(scheduleHeaderSurface);
 
   const editorialDetails = document.querySelector(".editorial-hero__details");
   let editorialParallaxFrame = 0;
@@ -67,68 +80,42 @@
   });
   syncEditorialParallax();
 
-  const lazyScrollMedia = window.matchMedia("(min-width: 900px) and (pointer: fine) and (prefers-reduced-motion: no-preference)");
-  let lazyScrollFrame = 0;
-  let lazyScrollPosition = window.scrollY;
-  let lazyScrollTarget = window.scrollY;
-
-  const canNestedScrollerMove = (start, delta) => {
-    for (let node = start instanceof Element ? start : null; node && node !== document.body; node = node.parentElement) {
-      const style = getComputedStyle(node);
-      if (!/(auto|scroll)/.test(style.overflowY) || node.scrollHeight <= node.clientHeight + 1) continue;
-      if (delta < 0 && node.scrollTop > 0) return true;
-      if (delta > 0 && node.scrollTop + node.clientHeight < node.scrollHeight - 1) return true;
-    }
-    return false;
-  };
-
-  const stopLazyScroll = () => {
-    if (lazyScrollFrame) window.cancelAnimationFrame(lazyScrollFrame);
-    lazyScrollFrame = 0;
-    lazyScrollPosition = window.scrollY;
-    lazyScrollTarget = window.scrollY;
-    document.documentElement.classList.remove("is-lazy-scrolling");
-  };
-
-  const animateLazyScroll = () => {
-    const distance = lazyScrollTarget - lazyScrollPosition;
-    lazyScrollPosition += distance * 0.09;
-    if (Math.abs(distance) < 0.5) {
-      window.scrollTo(0, lazyScrollTarget);
-      stopLazyScroll();
+  // Match Find’s default Lenis wheel smoothing and unscaled wheel distance.
+  let pageScroll = null;
+  const advancePageScroll = time => pageScroll?.raf(time * 1000);
+  const syncPageScroll = () => {
+    const enabled = window.Lenis && window.gsap && window.ScrollTrigger &&
+      !window.ScrollTrigger.isTouch && !reducedMotion.matches &&
+      !document.body.classList.contains("accessibility-mode");
+    if (!enabled) {
+      window.gsap?.ticker.remove(advancePageScroll);
+      pageScroll?.destroy();
+      pageScroll = null;
       return;
     }
-    window.scrollTo(0, lazyScrollPosition);
-    lazyScrollFrame = window.requestAnimationFrame(animateLazyScroll);
+    if (pageScroll) return;
+    pageScroll = new window.Lenis({
+      autoRaf: false,
+      allowNestedScroll: true,
+      lerp: .1,
+    });
+    pageScroll.on("scroll", window.ScrollTrigger.update);
+    window.gsap.ticker.add(advancePageScroll);
+    window.gsap.ticker.lagSmoothing(0);
   };
-
-  window.addEventListener("wheel", (event) => {
-    if (
-      !lazyScrollMedia.matches ||
-      document.body.classList.contains("accessibility-mode") ||
-      event.ctrlKey ||
-      event.metaKey ||
-      Math.abs(event.deltaX) >= Math.abs(event.deltaY) ||
-      !event.deltaY ||
-      canNestedScrollerMove(event.target, event.deltaY)
-    ) return;
-
-    event.preventDefault();
-    const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? window.innerHeight : 1;
-    if (!lazyScrollFrame) {
-      lazyScrollPosition = window.scrollY;
-      lazyScrollTarget = window.scrollY;
-      document.documentElement.classList.add("is-lazy-scrolling");
-    }
-    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-    const requestedTarget = lazyScrollTarget + (event.deltaY * unit * 0.55);
-    const maxLead = window.innerHeight * 0.75;
-    lazyScrollTarget = clamp(requestedTarget, Math.max(0, lazyScrollPosition - maxLead), Math.min(maxScroll, lazyScrollPosition + maxLead));
-    if (!lazyScrollFrame) lazyScrollFrame = window.requestAnimationFrame(animateLazyScroll);
-  }, { passive: false });
-
-  lazyScrollMedia.addEventListener?.("change", stopLazyScroll);
-  window.addEventListener("pagehide", stopLazyScroll);
+  window.gsap?.registerPlugin(window.ScrollTrigger);
+  reducedMotion.addEventListener("change", syncPageScroll);
+  new MutationObserver(syncPageScroll).observe(document.body, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+  window.addEventListener("pageshow", syncPageScroll);
+  window.addEventListener("pagehide", () => {
+    window.gsap?.ticker.remove(advancePageScroll);
+    pageScroll?.destroy();
+    pageScroll = null;
+  });
+  syncPageScroll();
 
   class MatterField {
     constructor(canvas) {
@@ -211,14 +198,16 @@
       const motionDisabled = reducedMotion.matches || document.body.classList.contains("accessibility-mode");
       if (motionDisabled) {
         this.canvas.style.setProperty("--paths-field-y", "0px");
+        if (this.mode === "closing") this.section.style.setProperty("--closing-content-parallax", "0px");
         return;
       }
       const rect = this.section.getBoundingClientRect();
       const viewportHeight = Math.max(1, window.innerHeight);
       const progress = clamp((viewportHeight - rect.top) / (viewportHeight + rect.height));
       const centered = (progress - 0.5) * 2;
-      const parallaxDistance = this.mode === "paths" ? 320 : 220;
+      const parallaxDistance = this.mode === "paths" ? 320 : 600;
       this.canvas.style.setProperty("--paths-field-y", `${(centered * parallaxDistance).toFixed(1)}px`);
+      if (this.mode === "closing") this.section.style.setProperty("--closing-content-parallax", `${(centered * -100).toFixed(1)}px`);
     }
 
     onPointerMove(event) {
@@ -608,6 +597,7 @@
     mobileToggle.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
     mobileNav.setAttribute("aria-hidden", String(!open));
     mobileNav.toggleAttribute("inert", !open);
+    syncHeaderSurface();
 
     if (!open && document.activeElement && mobileNav.contains(document.activeElement)) {
       mobileToggle.focus();
@@ -685,7 +675,7 @@
   }
 
   const fitMobileWorkflowState = () => {
-    if (!mobileWorkflowStage || !mobileWorkflowStage.offsetParent) return;
+    if (!mobileWorkflowQuery.matches || !mobileWorkflowStage) return;
     const panel = mobileWorkflowStage.querySelector(".workflow-state.is-active");
     const frame = panel?.querySelector(".workflow-mobile-stage__frame");
     if (!panel || !frame) return;
@@ -725,7 +715,7 @@
       window.requestAnimationFrame(fitMobileWorkflowState);
     }
     const activeChapter = chapters.find((chapter) => chapter.dataset.workflowChapter === state);
-    if (activeChapter && mobileWorkflowStageHeading?.offsetParent) {
+    if (activeChapter && mobileWorkflowStageHeading) {
       if (mobileWorkflowStageNumber) mobileWorkflowStageNumber.textContent = String(state).padStart(2, "0");
       if (mobileWorkflowStageTitle) mobileWorkflowStageTitle.innerHTML = activeChapter.querySelector("h3")?.innerHTML || "";
       if (mobileWorkflowStageCopy) mobileWorkflowStageCopy.textContent = activeChapter.querySelector("p")?.textContent || "";
@@ -900,15 +890,7 @@
         [".fee-card__row:nth-of-type(3)", "rise", 0.09, 0.18],
       ],
     },
-    {
-      selector: ".closing-scene",
-      layers: [
-        [".closing-scene__content > .eyebrow", "rise", 0.08, 0.28],
-        [".closing-scene__content > h2", "depth", 0.14, 0.36],
-        [".closing-scene__content > p:not(.eyebrow)", "rise", 0.22, 0.42],
-        [".role-actions", "rise", 0.30, 0.54],
-      ],
-    },
+
   ];
   const cinematicMotionProfiles = {
     rise: { x: 0, y: 72, scale: 0.98, rotate: 0, exitX: 0, exitY: -52 },

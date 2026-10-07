@@ -1,0 +1,140 @@
+/* Restore item 02: deployed workflow presentation only. */
+@media (max-width: 960px) {
+.lpc-home .workflow__story { display: block; width: 100%; min-height: 0; }
+.lpc-home .workflow-mobile-stage, .lpc-home .workflow-mobile-nav { display: none; }
+.lpc-home .workflow-chapters {
+    position: relative; display: flex; gap: 8px; width: 100%; padding: 3px 8px;
+    overflow-x: scroll; overflow-y: hidden; scroll-snap-type: x mandatory;
+    scroll-padding-left: 8px; overscroll-behavior-x: contain; touch-action: auto;
+    scrollbar-width: none;
+  }
+.lpc-home .workflow-chapters::-webkit-scrollbar { display: none; }
+.lpc-home .workflow-chapters .workflow-chapter {
+    position: relative; display: flex; flex-direction: column;
+    flex: 0 0 328px; width: 328px; height: 376px; min-height: 0;
+    padding: 38px 24px 20px; gap: 0;
+    border: 1px solid #e2e5e9; border-radius: 8px;
+    background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+      radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+    opacity: 1; transform: none; transition: none; pointer-events: auto;
+    scroll-snap-align: start;
+  }
+.lpc-home .workflow-chapters .workflow-chapter > * { visibility: visible; }
+.lpc-home .workflow-chapters .workflow-chapter__number { position: absolute; top: 12px; left: 24px; width: auto; height: auto; font: 12px/18px 'Sarabun', sans-serif; color: #62748a; }
+.lpc-home .workflow-chapters .workflow-chapter > div:not(.workflow-mobile-canvas) { display: contents; container-type: normal; }
+.lpc-home .workflow-chapters .workflow-chapter h3 { order: 0; flex: 0 0 auto; margin: 0 0 12px; text-align: center; font-family: 'Sarabun', sans-serif !important; font-size: 21px; font-weight: 300 !important; line-height: 28px; letter-spacing: -.015em; }
+.lpc-home .workflow-chapters .workflow-chapter p { max-width: 260px; margin: 0; font-size: 15px; font-weight: 400; line-height: 24px; color: #647080; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas { order: 1; display: block; flex: 0 0 auto; min-height: 0; width: 100%; margin: 0; padding: 0; opacity: 1; transform: none; }
+.lpc-home .workflow-mobile-canvas .workflow-state {
+    display: block; position: relative; inset: auto; width: 100%; min-height: 0;
+    padding: 14px; border: 1px solid #dce2ea; border-radius: 8px; background: #fff;
+    opacity: 1; transform: none; visibility: visible; pointer-events: none;
+    box-shadow: 0 8px 24px rgba(24,42,67,.05);
+    --workflow-ui-body: 10px; --workflow-ui-small: 9px;
+  }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .product-topbar { display: none; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas :is(.state-heading h4, .completion-state h4) { margin: 0; font: 500 14px/20px 'Sarabun', sans-serif !important; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .state-heading { margin-bottom: 12px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .field { min-height: 0; padding: 8px; gap: 4px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .field--wide { display: none; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-list { gap: 8px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row { grid-template-columns: 30px minmax(0,1fr); gap: 4px 8px; padding: 8px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row .avatar { width: 28px; height: 28px; font-size: 10px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas :is(.applicant-row__skills,.match-score) { display: none; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .workspace-grid { display: block; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .workspace-chat { min-height: 0; padding: 0; border: 0; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .panel-heading { margin-bottom: 10px; padding-bottom: 8px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .message { margin: 0 0 8px; padding: 0; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .message p { max-width: 92%; padding: 8px 10px; font-size: 12px; line-height: 18px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas :is(.workspace-details,.message small) { display: none; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-state { min-height: 0; padding: 0; gap: 8px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-state > p { display: none; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-files { margin: 12px 0; padding: 0; gap: 8px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-files > span { padding: 8px; gap: 6px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-files b { font-size: 11px; line-height: 16px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .payment-summary { padding: 0; margin: 12px 0 0; gap: 8px; background: transparent; border: 0; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .workflow-preview-action { padding: 8px 12px; font-size: 11px; line-height: 16px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-mark { width: 32px; height: 32px; margin: 0 auto 10px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-mark::after { width: 12px; height: 7px; }
+.lpc-home .workflow-chapters:focus-visible { outline: 2px solid #6495ed; outline-offset: -2px; }
+.lpc-home .workflow { padding-bottom: 80px; }
+}
+@media (max-width: 960px) {
+.lpc-home .workflow-chapters .workflow-chapter h3 { color: #1b2534; opacity: 1; }
+.lpc-home .workflow-chapters .workflow-chapter > div:not(.workflow-mobile-canvas) > p { position: absolute; top: 304px; left: 24px; right: 24px; max-width: 250px; margin: 0; line-height: 20px; }
+.lpc-home .workflow-chapters .workflow-chapter__number { z-index: 1; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row { min-height: 0; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row__identity { gap: 2px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row__identity :is(strong,span) { font-size: 12px; line-height: 18px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .message--sent p { color: #fff; }
+}
+.lpc-home .workflow-notes-feature strong { display: block; margin-bottom: 12px; color: #203550; font: 500 22px/1.35 'Sarabun', sans-serif; }
+.lpc-home .workflow-notes-feature p { margin: 0; }
+.lpc-home .workflow-create-preview { max-width: 580px; margin: 36px auto; padding: 28px; border: 1px solid #dce2ea; border-radius: 8px; background: #fff; }
+.lpc-home .workflow-create-preview h4 { margin: 0; color: #1b2534; font: 600 28px/1.25 'Sarabun', sans-serif; font-family: 'Sarabun', sans-serif !important; font-weight: 600 !important; letter-spacing: -.025em; }
+.lpc-home .workflow-create-preview__prompt { margin: 8px 0 24px; color: #647080; font: 400 14px/1.5 'Sarabun', sans-serif; }
+.lpc-home .workflow-create-preview__notes { min-height: 108px; padding: 12px 14px; color: #27394d; font: 400 15px/1.6 'Sarabun', sans-serif; }
+.lpc-home .workflow-create-preview__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 16px; }
+.lpc-home .workflow-create-preview__build { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 5px; background: #203550; color: white; font: 500 13px/20px 'Sarabun', sans-serif; }
+.lpc-home .workflow-create-preview__manual { color: #647080; font: 400 13px/20px 'Sarabun', sans-serif; }
+@media (max-width: 960px) {
+.lpc-home .workflow-notes-feature { max-width: 390px; }
+.lpc-home .workflow-notes-feature strong { font-size: 19px; margin-bottom: 8px; }
+.lpc-home .workflow-notes-feature p { font-size: 16px; line-height: 1.6; }
+.lpc-home .workflow-chapters .workflow-create-preview { margin: 0; padding: 0; border: 0; }
+.lpc-home .workflow-chapters .workflow-create-preview h4 { font-size: 14px; line-height: 20px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .workflow-create-preview__prompt { margin: 4px 0 10px; font-size: 12px; line-height: 18px; }
+.lpc-home .workflow-chapters .workflow-create-preview__notes { min-height: 0; padding: 8px 0; font-size: 12px; line-height: 18px; }
+.lpc-home .workflow-chapters .workflow-create-preview__actions { margin-top: 10px; }
+.lpc-home .workflow-chapters .workflow-create-preview__build { padding: 6px 10px; font-size: 11px; line-height: 16px; }
+.lpc-home .workflow-chapters .workflow-create-preview__manual { display: none; }
+}
+.lpc-home .workflow-create-preview__actions { justify-content: center; }
+.lpc-home .workflow-state .workflow-preview-action { align-self: center; justify-self: center; margin-inline: auto; }
+.lpc-home .workflow-state .message-composer span { display: inline-flex; align-items: center; justify-content: center; }
+@media (max-width: 960px) {
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-list { gap: 6px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row { padding: 4px 6px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row__identity :is(strong,span) { line-height: 16px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .message-composer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 6px 8px; border: 1px solid #dce2ea; border-radius: 6px; font-size: 11px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .message-composer span { padding: 5px; border-radius: 4px; background: #203550; color: #fff; }
+}
+@media (max-width: 960px) {
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-files i { padding: 3px; font-size: 9px; line-height: 14px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-files > span { padding: 6px 8px; }
+}
+.lpc-home .workflow-state .payment-summary > .workflow-payout { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; text-align: center; }
+.lpc-home .workflow-create-preview__actions { flex-direction: column; gap: 8px; }
+.lpc-home .workflow-state .completion-state--released .payment-summary { flex-direction: column; align-items: center; }
+.lpc-home .workflow-canvas.product-shell {
+  background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+    radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+}
+.workflow__constellation {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  pointer-events: none;
+}
+
+.matter-field--workflow {
+  position: sticky;
+  top: 0;
+  display: block;
+  opacity: 0.82;
+}
+
+.workflow__intro,
+.workflow__story {
+  position: relative;
+}
+
+@media (max-width: 600px) {
+  .matter-field--workflow { opacity: 1; }
+}
+
+
+@media (max-width:640px) { .lpc-home .workflow__intro, .lpc-home .workflow__story { background:transparent; } }
+
+.lpc-home .workflow-canvas .applicant-row { grid-template-columns:34px minmax(0,.9fr) minmax(0,1.2fr) minmax(116px,.6fr); }

@@ -1,0 +1,204 @@
+@font-face {
+  font-family: 'Sarabun';
+  font-style: normal;
+  font-weight: 100;
+  font-display: swap;
+  src: url('../fonts/lpc-sarabun-100.ttf') format('truetype');
+}
+
+.lpc-home--editorial .hero-capacity,
+.lpc-home--editorial .matter-scroll-journey {
+  background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+    radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+  background-attachment: fixed;
+}
+.lpc-home--editorial .matter-scroll-journey { position: relative; padding-top: 72px; }
+
+/* The unenhanced document remains complete without JavaScript or motion. */
+.lpc-home .type-hook { position: relative; color: #233b5a; text-align: center; }
+.lpc-home .type-hook__scene {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 100svh;
+  padding: 100px 24px;
+  box-sizing: border-box;
+  overflow: hidden;
+  isolation: isolate;
+}
+.lpc-home .type-hook__inner { position: relative; z-index: 4; width: 100%; max-width: 1200px; margin: auto; }
+.lpc-home .type-hook h2 {
+  font: 400 clamp(40px, 5.3vw, 76px)/1.08 'Cormorant Garamond', Georgia, serif !important;
+  letter-spacing: -.045em;
+  margin: 0;
+  max-width: none;
+  text-wrap: balance;
+}
+.lpc-home .type-hook__support {
+  font: 100 clamp(21px, 2.65vw, 36px)/1.3 Sarabun, sans-serif !important;
+  letter-spacing: -.025em;
+  margin: 22px 0 0;
+  color: #52677f;
+  text-wrap: balance;
+}
+.lpc-home .type-hook__finish {
+  font: 400 italic clamp(38px, 4.5vw, 64px)/1.15 'Cormorant Garamond', Georgia, serif !important;
+  letter-spacing: -.025em;
+  color: #557fbb;
+  margin: 22px 0 0;
+}
+.lpc-home .type-hook__art { display: none; }
+.lpc-home .type-hook__brand-static {
+  display: block;
+  margin-top: 48px;
+  font: 300 clamp(27px, 4vw, 54px)/1.2 'Cormorant Garamond', Georgia, serif;
+}
+
+/* FIND's 500vh desktop / 350vh mobile scene and outline-to-mask sequence. */
+.lpc-home .type-hook.hook-find {
+  height: 500vh;
+  margin-bottom: 0;
+  padding: 0;
+  overflow: visible;
+}
+.lpc-home .hook-find .type-hook__scene { position: sticky; top: 0; height: 100vh; padding-bottom: calc(100px + 12svh); }
+.lpc-home .hook-find .type-hook__art {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  /* Feather the scene itself so cropped clouds never form a section edge. */
+  -webkit-mask-image: linear-gradient(transparent, #000 18%, #000 74%, transparent);
+  mask-image: linear-gradient(transparent, #000 18%, #000 74%, transparent);
+}
+.lpc-home .hook-find .type-hook__brand-static { display: none; }
+.lpc-home .type-hook__papers {
+  position: absolute;
+  top: 60svh;
+  left: 0;
+  width: 100%;
+  height: 87.5vw;
+  max-width: none;
+  transform-origin: bottom center;
+  object-fit: contain;
+  will-change: transform;
+}
+.lpc-home .type-hook__cloud {
+  position: absolute;
+  z-index: 3;
+  width: 78vw;
+  height: auto;
+  will-change: transform;
+}
+.lpc-home .type-hook__cloud--left { top: 25%; left: -23.4vw; }
+.lpc-home .type-hook__cloud--right { top: 20%; right: -23.4vw; width: 65vw; }
+.lpc-home .type-hook__outline {
+  position: absolute;
+  top: 50%;
+  left: 8%;
+  width: 84%;
+  height: auto;
+  transform: translateY(-50%);
+  z-index: 2;
+  opacity: 0;
+  overflow: visible;
+}
+.lpc-home .type-hook__outline path {
+  fill: none;
+  stroke: #233b5a;
+  stroke-width: 7;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.lpc-home .type-hook__composite {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  background: #233b5a;
+  -webkit-mask: url('../images/homepage-capacity/lpc-wordmark.svg') center / 84% auto no-repeat;
+  mask: url('../images/homepage-capacity/lpc-wordmark.svg') center / 84% auto no-repeat;
+}
+.lpc-home .type-hook__composite .type-hook__papers { mix-blend-mode: multiply; }
+.lpc-home .type-hook__smoke {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 43vw;
+  object-fit: cover;
+  object-position: top;
+  z-index: 3;
+  transform: translateY(70%);
+}
+.lpc-home .hook-find::before,
+.lpc-home .hook-find::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  height: 25svh;
+  /* Keep the same viewport-aligned gradient on both sides of each join. */
+  background: inherit;
+  pointer-events: none;
+}
+.lpc-home .hook-find::before {
+  top: 0;
+  -webkit-mask-image: linear-gradient(#000, rgb(0 0 0 / .85) 25%, rgb(0 0 0 / .15) 75%, transparent);
+  mask-image: linear-gradient(#000, rgb(0 0 0 / .85) 25%, rgb(0 0 0 / .15) 75%, transparent);
+}
+.lpc-home .hook-find::after {
+  bottom: 100vh;
+  -webkit-mask-image: linear-gradient(transparent, rgb(0 0 0 / .15) 25%, rgb(0 0 0 / .85) 75%, #000);
+  mask-image: linear-gradient(transparent, rgb(0 0 0 / .15) 25%, rgb(0 0 0 / .85) 75%, #000);
+}
+
+@media (max-width: 767px) {
+  .lpc-home .type-hook__scene { padding: 88px 24px; }
+  .lpc-home .type-hook h2 { font-size: 44px !important; max-width: 14ch; margin: auto; }
+  .lpc-home .type-hook__support { font-size: 21px !important; max-width: 25ch; margin: 20px auto 0; }
+  .lpc-home .type-hook__finish { font-size: 42px !important; margin-top: 24px; }
+  .lpc-home .type-hook.hook-find { height: 350vh; }
+  .lpc-home .hook-find .type-hook__scene { padding-bottom: calc(88px + 12svh); }
+  .lpc-home .type-hook__papers { height: 131.25vw; width: 150%; left: -25%; }
+  .lpc-home .type-hook__cloud--left { top: 40%; left: -130%; width: 175%; }
+  .lpc-home .type-hook__cloud--right { top: 44%; right: -100%; width: 140%; }
+  .lpc-home .type-hook__smoke { height: 60svh; }
+  .lpc-home .type-hook__outline { left: 5%; width: 90%; }
+  .lpc-home .type-hook__outline path { stroke-width: 20; }
+  .lpc-home .type-hook__composite { -webkit-mask-size: 90% auto; mask-size: 90% auto; }
+  .lpc-home--editorial .matter-scroll-journey { padding-top: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lpc-home .type-hook.hook-find { height: auto; margin-bottom: 0; }
+  .lpc-home .hook-find .type-hook__scene { position: relative; padding: 88px 24px; }
+  .lpc-home .hook-find .type-hook__art,
+  .lpc-home .hook-find::before,
+  .lpc-home .hook-find::after { display: none; }
+  .lpc-home .hook-find .type-hook__inner { opacity: 1 !important; transform: none !important; }
+  .lpc-home .hook-find .type-hook__brand-static { display: block; }
+}
+
+/* Keep the brand apostrophe blue in the outline, filled mark, and static fallback. */
+.lpc-home .type-hook__apostrophe { color: #6495ed; }
+.lpc-home .type-hook__outline .type-hook__apostrophe-outline { stroke: #6495ed; }
+.lpc-home .type-hook__composite::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #6495ed;
+  -webkit-mask: url('../images/homepage-capacity/lpc-apostrophe.svg') center / 84% auto no-repeat;
+  mask: url('../images/homepage-capacity/lpc-apostrophe.svg') center / 84% auto no-repeat;
+}
+@media (max-width: 767px) {
+  .lpc-home .type-hook__composite::after { -webkit-mask-size: 90% auto; mask-size: 90% auto; }
+}
+
+/* This overlay contains only the opening Let’s characters; all other cloud overlap stays intact. */
+.lpc-home .type-hook__outline.type-hook__clear-letters { z-index: 4; pointer-events: none; }
+
+/* Keep the finished wordmark outside the artwork fade and above join washes. */
+.lpc-home .hook-find::after { display: none; }
