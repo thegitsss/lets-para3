@@ -39,7 +39,7 @@ jobs:
         run: |
           # The Azure HTTP mirror can stall package-index downloads on runners.
           # Use Ubuntu's official HTTPS archive and retain dependency installation.
-          for apt_source_file in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+          for apt_source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
             if [ -f "$apt_source_file" ]; then
               sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' "$apt_source_file"
             fi
