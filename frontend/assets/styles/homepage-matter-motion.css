@@ -1057,7 +1057,8 @@
 .lpc-home #matter-film,.lpc-home #matter-film *{font-weight:400!important}
 .lpc-home #matter-film .sheet-action,.lpc-home #matter-film .builder-preview,.lpc-home #matter-film #builder-title{font-weight:500!important}
 /* Keep the persistent navigation clear of the demonstration heading. */
-.lpc-home .matter-scroll-journey .matter-film{padding-top:calc(var(--header-height,72px) + 1px);}
+/* Leave room for external actions, replay controls, focus rings and shadows. */
+.lpc-home .matter-scroll-journey .matter-film{padding-top:calc(var(--header-height,72px) + 1px);padding-bottom:32px;}
 
 /* Stable stage geometry with a reversible fade-and-slide between scenes. */
 :where(.matter-scroll-journey) .matter-stage-scene{position:absolute;inset:0;}
