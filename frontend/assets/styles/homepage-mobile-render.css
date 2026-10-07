@@ -2,6 +2,21 @@
    No image, animation, or desktop rule changes. */
 .lpc-home :is(.mobile-capacity-wash, .mobile-section-backdrop) { display: none; }
 @media (max-width: 767px) {
+  .lpc-home .type-hook__paper-layer > svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .lpc-home #matter-film.mobile-stage-commit :is(.matter-sheet, .matter-sheet *, .document-stack, .document-stack *, .drawing, .drawing *) {
+    transition: none !important;
+  }
+  /* Retain the hidden draft's layout so its first entrance does not build an
+     entire form during a touch frame. It remains invisible and inaccessible. */
+  .lpc-home .dashboard-builder[hidden] {
+    display: grid !important;
+    visibility: hidden;
+    pointer-events: none;
+  }
   /* The layout and animation still use the approved small-viewport height.
      Paint the cloud edge into the space exposed when browser chrome retracts,
      instead of showing a rectangular slice of the section background there. */

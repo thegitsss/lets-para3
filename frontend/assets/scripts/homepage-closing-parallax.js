@@ -65,14 +65,18 @@
     const viewportHeight = stableHeight || innerHeight;
     // Read geometry together, before any animation writes. Sizes only need
     // remeasurement when fonts, layout, or viewport dimensions change.
-    const rect = track.getBoundingClientRect();
+    const rect = mobileStyles && geometry && !geometryDirty
+      ? { top: geometry.trackTop - scrollY, bottom: geometry.trackTop + geometry.trackHeight - scrollY }
+      : track.getBoundingClientRect();
     // Intersection callbacks may be delayed or miss a clipped ancestor during
     // fast native scrolling. Use the current scroll geometry for this reveal.
     if (hasRendered && !geometryDirty && !focused &&
       (rect.bottom < -viewportHeight || rect.top > viewportHeight * 2)) return;
-    const sceneTop = scene.getBoundingClientRect().top;
+    const sceneTop = mobileStyles && geometry && !geometryDirty
+      ? rect.top + geometry.sceneOffset : scene.getBoundingClientRect().top;
     if (geometryDirty) {
       geometry = {
+        trackTop: rect.top + scrollY, sceneOffset: sceneTop - rect.top,
         trackHeight: track.offsetHeight, sceneHeight: scene.offsetHeight,
         sceneClientHeight: scene.clientHeight, mountainWidth: mountain.clientWidth,
         mountainHeight: mountain.clientHeight, titleHeight: title.offsetHeight,
@@ -140,7 +144,12 @@
   function schedule() { if (!frame) frame = requestAnimationFrame(render); }
   function invalidate() { geometryDirty = true; schedule(); }
   addEventListener('scroll', schedule, { passive: true });
-  addEventListener('resize', invalidate, { passive: true });
+  let viewportWidth = innerWidth;
+  addEventListener('resize', () => {
+    if (innerWidth <= 640 && innerWidth === viewportWidth) return;
+    viewportWidth = innerWidth;
+    invalidate();
+  }, { passive: true });
   reduced.addEventListener('change', invalidate);
   scene.addEventListener('focusin', schedule);
   scene.addEventListener('focusout', schedule);
@@ -149,6 +158,8 @@
   }
   const sizeObserver = new ResizeObserver(invalidate);
   [track, scene, title, mountain].forEach(node => sizeObserver.observe(node));
+  // Upstream sections can move this scene without changing its own size.
+  new ResizeObserver(() => { if (innerWidth < 768) invalidate(); }).observe(document.body);
   document.fonts.ready.then(invalidate);
   schedule();
 })();

@@ -5,7 +5,9 @@
   gsap.registerPlugin(ScrollTrigger);
   const scene = hook.querySelector('.type-hook__scene');
   const inner = hook.querySelector('.type-hook__inner');
-  const papers = [...hook.querySelectorAll('.type-hook__papers')];
+  const paperArtwork = [...hook.querySelectorAll('.type-hook__papers')];
+  let papers = paperArtwork;
+  const paperLayers = new Map();
   const clouds = [...hook.querySelectorAll('.type-hook__cloud')];
   const outline = hook.querySelector('.type-hook__outline');
   const paths = [...outline.querySelectorAll('path')];
@@ -15,6 +17,7 @@
   let context = null;
   let refreshFrame = 0;
   const mobile = matchMedia('(max-width: 767px)');
+  let renderedMobile = null;
   let viewportWidth = innerWidth;
   const configureRefresh = () => {
     // The scene already uses a stable mobile scroll distance. Browser toolbar
@@ -23,13 +26,41 @@
       ? 'none' : 'visibilitychange,DOMContentLoaded,load,resize' });
   };
   configureRefresh();
-  mobile.addEventListener('change', configureRefresh);
+  mobile.addEventListener('change', () => { configureRefresh(); syncMotion(); });
+
+  function syncPaperLayers() {
+    // An SVG transform redraws the filtered photograph on each animation tick.
+    // On phones, move its HTML surface instead; the SVG contents stay static.
+    papers = paperArtwork.map(svg => {
+      let layer = paperLayers.get(svg);
+      if (mobile.matches) {
+        if (!layer) {
+          layer = document.createElement('div');
+          layer.className = `${svg.getAttribute('class')} type-hook__paper-layer`;
+          svg.before(layer);
+          layer.append(svg);
+          svg.removeAttribute('class');
+          paperLayers.set(svg, layer);
+        }
+        return layer;
+      }
+      if (layer) {
+        svg.setAttribute('class', layer.className.replace(' type-hook__paper-layer', ''));
+        layer.before(svg);
+        layer.remove();
+        paperLayers.delete(svg);
+      }
+      return svg;
+    });
+  }
 
   function syncMotion() {
     const enabled = !reduced.matches && !document.body.classList.contains('accessibility-mode');
-    if (enabled && context) return;
+    if (enabled && context && renderedMobile === mobile.matches) return;
     context?.revert();
     context = null;
+    syncPaperLayers();
+    renderedMobile = mobile.matches;
     hook.classList.toggle('hook-find', enabled);
     if (!enabled) return;
     context = gsap.context(() => {
