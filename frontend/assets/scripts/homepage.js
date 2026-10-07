@@ -561,8 +561,6 @@
     ".clarity-section__intro",
     ".fee-card",
     ".home-faq",
-    ".closing-scene__content",
-    ".role-action",
     ".home-footer__top > *",
   ].join(",")));
 

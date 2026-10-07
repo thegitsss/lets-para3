@@ -27,7 +27,7 @@
   scene.before(track);
   track.append(scene);
   let frame = 0, displayedProgress = null;
-  let geometry = null, geometryDirty = true, nearViewport = true, hasRendered = false;
+  let geometry = null, geometryDirty = true, hasRendered = false;
   const setStyle = (name, value) => {
     value = String(value);
     if (mobileStyles && mobileStyleTargets[name]) {
@@ -59,7 +59,6 @@
       geometryDirty = true;
     }
     const focused = scene.contains(document.activeElement);
-    if (hasRendered && !nearViewport && !geometryDirty && !focused) return;
     const stableHeight = innerWidth <= 640
       ? Math.round(parseFloat(document.documentElement.style.getPropertyValue('--mobile-stable-height')))
       : 0;
@@ -67,6 +66,10 @@
     // Read geometry together, before any animation writes. Sizes only need
     // remeasurement when fonts, layout, or viewport dimensions change.
     const rect = track.getBoundingClientRect();
+    // Intersection callbacks may be delayed or miss a clipped ancestor during
+    // fast native scrolling. Use the current scroll geometry for this reveal.
+    if (hasRendered && !geometryDirty && !focused &&
+      (rect.bottom < -viewportHeight || rect.top > viewportHeight * 2)) return;
     const sceneTop = scene.getBoundingClientRect().top;
     if (geometryDirty) {
       geometry = {
@@ -144,11 +147,6 @@
   for (const node of [document.body, document.documentElement]) {
     new MutationObserver(schedule).observe(node, { attributes: true, attributeFilter: ['class'] });
   }
-  const visibilityObserver = new IntersectionObserver(entries => {
-    nearViewport = entries[0].isIntersecting;
-    if (nearViewport) schedule();
-  }, { rootMargin: `${Math.max(innerHeight, innerWidth)}px 0px` });
-  visibilityObserver.observe(track);
   const sizeObserver = new ResizeObserver(invalidate);
   [track, scene, title, mountain].forEach(node => sizeObserver.observe(node));
   document.fonts.ready.then(invalidate);
