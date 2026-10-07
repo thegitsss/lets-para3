@@ -8,6 +8,8 @@
   let animations = [];
   const originalText = new Map(groups.map(e => [e, e.textContent.trim()]));
   const setMobileHeight = () => {
+    // Height-only toolbar changes must not switch the draft card layout.
+    document.documentElement.classList.toggle('mobile-compact-height', innerHeight <= 880);
     if (innerWidth > 640) { document.documentElement.style.removeProperty('--mobile-stable-height'); return; }
     const probe = document.createElement('div');
     probe.style.cssText = 'position:fixed;height:100svh;width:0;visibility:hidden;pointer-events:none';
