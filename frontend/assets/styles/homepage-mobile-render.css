@@ -81,6 +81,22 @@
       background-attachment: fixed;
     }
     body.lpc-home--editorial::before { display: none; }
+    /* Preserve WebKit's existing multi-layer demo gradient exactly. */
+    .lpc-home--editorial .matter-scroll-journey {
+      isolation: auto;
+      clip-path: none;
+      background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+        radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+      background-attachment: fixed;
+    }
+    .lpc-home--editorial .matter-scroll-journey::before,
+    .lpc-home--editorial .matter-scroll-journey::after { display: none; }
+    .lpc-home--editorial .hook-find + .matter-scroll-journey {
+      background-image: linear-gradient(#fff, rgb(255 255 255 / 0) 45svh),
+        radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+        radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%);
+      background-attachment: scroll, fixed, fixed;
+    }
     .lpc-home--editorial .hero-capacity { isolation: isolate; }
     .lpc-home .mobile-section-backdrop {
       display: block;
