@@ -5,6 +5,17 @@
   const actions = scene.querySelector('.role-actions');
   const title = scene.querySelector('#closing-title');
   const mountain = scene.querySelector('.closing-scene__mountain');
+  const ridge = scene.querySelector('.closing-scene__ridge');
+  // Scope mobile motion values to the layers that consume them. The values and
+  // timing are unchanged; unrelated descendants no longer inherit each update.
+  const mobileStyleTargets = {
+    '--closing-roles-opacity': [actions],
+    '--closing-title-top': [title], '--closing-title-y': [title], '--closing-title-scale': [title],
+    '--closing-actions-top': [actions], '--closing-actions-bottom': [actions], '--closing-actions-y': [actions],
+    '--closing-mountain-y': [mountain, ridge], '--closing-mountain-scale': [mountain, ridge],
+    '--closing-footer-drift': [mountain, ridge],
+  };
+  let mobileStyles = null;
   const track = document.createElement('div');
   track.className = 'closing-parallax-track';
   scene.before(track);
@@ -13,10 +24,21 @@
   let geometry = null, geometryDirty = true, nearViewport = true, hasRendered = false;
   const setStyle = (name, value) => {
     value = String(value);
-    if (scene.style.getPropertyValue(name) !== value) scene.style.setProperty(name, value);
+    const targets = mobileStyles && mobileStyleTargets[name] || [scene];
+    targets.forEach(node => {
+      if (node && node.style.getPropertyValue(name) !== value) node.style.setProperty(name, value);
+    });
   };
   function render() {
     frame = 0;
+    const nextMobileStyles = innerWidth < 768;
+    if (mobileStyles !== nextMobileStyles) {
+      Object.entries(mobileStyleTargets).forEach(([name, nodes]) => {
+        scene.style.removeProperty(name);
+        nodes.forEach(node => node?.style.removeProperty(name));
+      });
+      mobileStyles = nextMobileStyles;
+    }
     const disabled = reduced.matches || document.body.classList.contains('accessibility-mode') || document.documentElement.classList.contains('accessibility-mode');
     if (track.classList.contains('closing-parallax-track--active') === disabled) {
       track.classList.toggle('closing-parallax-track--active', !disabled);

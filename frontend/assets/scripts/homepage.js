@@ -18,19 +18,42 @@
   syncFooterDirectories();
   footerDirectoryMedia.addEventListener?.("change", syncFooterDirectories);
 
+  // Mobile sections are light except the closing scene. Cache their static
+  // document boundaries, and retain painted-surface hit testing at its overflow
+  // into the footer. Desktop keeps its existing surface detection.
+  const mobileHeaderScene = document.querySelector('.closing-scene');
+  let mobileHeaderGeometry = null, mobileHeaderGeometryDirty = true;
   const syncHeaderSurface = () => {
     if (!header) return;
     const fadeDistance = Math.max(280, Math.min(420, window.innerHeight * 0.4));
     const progress = clamp(window.scrollY / fadeDistance);
     const editorialHero = document.body.classList.contains("lpc-home--editorial");
     // Read the section actually painted behind the header, including pinned scenes.
-    const headerBounds = header.getBoundingClientRect();
-    const heroBounds = headerHero?.getBoundingClientRect();
+    const mobile = window.innerWidth < 768 && mobileHeaderScene;
+    if (mobile && mobileHeaderGeometryDirty) {
+      const sceneBounds = mobileHeaderScene.getBoundingClientRect();
+      mobileHeaderGeometry = {
+        headerHeight: header.getBoundingClientRect().height,
+        heroBottom: headerHero ? headerHero.getBoundingClientRect().bottom + scrollY : 0,
+        closingTop: sceneBounds.top + scrollY,
+        closingBottom: sceneBounds.bottom + scrollY,
+        overflowEnd: sceneBounds.bottom + scrollY + mobileHeaderScene.clientHeight,
+      };
+      mobileHeaderGeometryDirty = false;
+    }
+    const headerBounds = mobile ? { height: mobileHeaderGeometry.headerHeight, bottom: mobileHeaderGeometry.headerHeight }
+      : header.getBoundingClientRect();
+    const heroBounds = mobile ? (headerHero ? { bottom: mobileHeaderGeometry.heroBottom - scrollY } : null)
+      : headerHero?.getBoundingClientRect();
     const headerMidpoint = headerBounds.height / 2;
-    const surface = document.elementsFromPoint(window.innerWidth / 2, headerMidpoint)
+    const samplePosition = scrollY + headerMidpoint;
+    let tone;
+    if (mobile && samplePosition < mobileHeaderGeometry.closingTop) tone = 'light';
+    else if (mobile && samplePosition < mobileHeaderGeometry.closingBottom) tone = 'dark';
+    else if (mobile && samplePosition >= mobileHeaderGeometry.overflowEnd) tone = 'light';
+    else tone = document.elementsFromPoint(window.innerWidth / 2, headerMidpoint)
       .find(node => !header.contains(node) && node.closest('[data-header-tone]'))
-      ?.closest('[data-header-tone]');
-    const tone = surface?.dataset.headerTone;
+      ?.closest('[data-header-tone]')?.dataset.headerTone;
     const useInkForeground = header.classList.contains('is-open') ||
       (tone ? tone === 'light' : editorialHero || progress >= 0.52);
     // Finish geometry reads before changing styles, and keep settled values
@@ -57,8 +80,18 @@
     headerFrame = requestAnimationFrame(() => { headerFrame = 0; syncHeaderSurface(); });
   };
   window.addEventListener("scroll", scheduleHeaderSurface, { passive: true });
-  window.addEventListener("resize", scheduleHeaderSurface);
-  document.fonts.ready.then(scheduleHeaderSurface);
+  const invalidateMobileHeaderGeometry = () => {
+    mobileHeaderGeometryDirty = true;
+    scheduleHeaderSurface();
+  };
+  window.addEventListener("resize", invalidateMobileHeaderGeometry);
+  window.addEventListener("load", invalidateMobileHeaderGeometry, { once: true });
+  document.fonts.ready.then(invalidateMobileHeaderGeometry);
+  if (mobileHeaderScene && "ResizeObserver" in window) {
+    const headerGeometryObserver = new ResizeObserver(invalidateMobileHeaderGeometry);
+    [document.body, header, headerHero, mobileHeaderScene].filter(Boolean)
+      .forEach(node => headerGeometryObserver.observe(node));
+  }
 
   const editorialDetails = document.querySelector(".editorial-hero__details");
   let editorialParallaxFrame = 0;

@@ -1,0 +1,71 @@
+/* The existing viewport-aligned gradient is shared on one composited surface.
+   No image, animation, or desktop rule changes. */
+.lpc-home .mobile-capacity-wash { display: none; }
+@media (max-width: 767px) {
+  body.lpc-home--editorial {
+    isolation: isolate;
+    background: #edf0f3;
+    background-attachment: scroll;
+  }
+  body.lpc-home--editorial::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+      radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+    transform: translateZ(0);
+  }
+  .lpc-home--editorial :is(.editorial-hero, .path-scene--attorney, .hero-capacity, .matter-scroll-journey) {
+    background: transparent;
+    background-attachment: scroll;
+  }
+  /* An opaque copy keeps the preceding sticky artwork behind the demo.
+     The rectangular clip bounds the fixed layer to this section. */
+  .lpc-home--editorial .matter-scroll-journey {
+    isolation: isolate;
+    clip-path: inset(0);
+  }
+  .lpc-home--editorial .matter-scroll-journey::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+      radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+    transform: translateZ(0);
+  }
+  .lpc-home--editorial .hook-find + .matter-scroll-journey::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(#fff, rgb(255 255 255 / 0) 45svh);
+  }
+  /* The existing entrance mask moves with the section; its gradient remains
+     viewport-aligned on a separately composited, clipped surface. */
+  .lpc-home .hook-find::before { display: none; }
+  .lpc-home .hook-find .mobile-capacity-wash {
+    display: block;
+    position: absolute;
+    inset: 0 0 auto;
+    height: 25svh;
+    z-index: 2;
+    pointer-events: none;
+    isolation: isolate;
+    clip-path: inset(0);
+    -webkit-mask-image: linear-gradient(#000, rgb(0 0 0 / .85) 25%, rgb(0 0 0 / .15) 75%, transparent);
+    mask-image: linear-gradient(#000, rgb(0 0 0 / .85) 25%, rgb(0 0 0 / .15) 75%, transparent);
+  }
+  .lpc-home .mobile-capacity-wash::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+      radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+    transform: translateZ(0);
+  }
+}
