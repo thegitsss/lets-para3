@@ -1,6 +1,6 @@
 /* The existing viewport-aligned gradient is shared on one composited surface.
    No image, animation, or desktop rule changes. */
-.lpc-home .mobile-capacity-wash { display: none; }
+.lpc-home :is(.mobile-capacity-wash, .mobile-section-backdrop) { display: none; }
 @media (max-width: 767px) {
   body.lpc-home--editorial {
     isolation: isolate;
@@ -67,5 +67,36 @@
     background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
       radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
     transform: translateZ(0);
+  }
+}
+
+/* WebKit's root fixed background is painted differently from section backgrounds.
+   Keep that root appearance and composite the opaque section copies instead. */
+@supports (-webkit-backdrop-filter: blur(1px)) {
+  @media (max-width: 767px) {
+    body.lpc-home--editorial {
+      isolation: auto;
+      background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+        radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+      background-attachment: fixed;
+    }
+    body.lpc-home--editorial::before { display: none; }
+    .lpc-home--editorial .hero-capacity { isolation: isolate; }
+    .lpc-home .mobile-section-backdrop {
+      display: block;
+      position: absolute;
+      inset: 0;
+      z-index: -4;
+      pointer-events: none;
+      clip-path: inset(0);
+    }
+    .lpc-home .mobile-section-backdrop::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+        radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+      transform: translateZ(0);
+    }
   }
 }
