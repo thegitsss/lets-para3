@@ -3,12 +3,14 @@
   overflow: clip;
   padding: clamp(104px, 11vw, 168px) 24px 112px;
   background: radial-gradient(ellipse 70% 40% at 50% 57%, #1b345b 0%, transparent 75%), #091626;
+  /* Preserve the glow's original geometry without adding scroll space. */
+  background-size: 100% calc(100% + var(--home-stable-viewport, 100svh) * .75);
+  background-repeat: no-repeat;
   color: #f5f8ff;
   text-align: center;
   isolation: isolate;
 }
 .paralegal-map__inner { width: min(100%, 1200px); margin: 0 auto; }
-.paralegal-map__inner::after { display: block; height: calc(var(--home-stable-viewport, 100svh) * .75); content: ''; }
 .paralegal-map__intro { max-width: 850px; margin: 0 auto; }
 .paralegal-map__eyebrow {
   margin: 0 0 22px;
@@ -34,8 +36,7 @@
   line-height: 1.6;
 }
 .paralegal-map__stage {
-  position: sticky;
-  top: var(--header-height, 72px);
+  position: relative;
   min-height: calc(var(--home-stable-viewport, 100svh) - var(--header-height, 72px));
   box-sizing: border-box;
   display: flex;
@@ -175,7 +176,7 @@
   .paralegal-map__stat-copy { max-width: 165px; font-size: 1rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .paralegal-map__inner::after { display: none; }
+  .lpc-home .paralegal-map { background-size: auto; }
   .paralegal-map__stage { position: relative; top: auto; min-height: 0; }
   .paralegal-map__stat-cue { transition: none; }
   .paralegal-map__stat:hover .paralegal-map__stat-cue { transition-delay: 0s; }
@@ -185,5 +186,5 @@
   .paralegal-map__canvas.is-live.is-visible .paralegal-map__dot,
   .paralegal-map__canvas.is-live.is-visible .paralegal-map__halo { animation: none; }
 }
-html.accessibility-mode .paralegal-map__inner::after { display: none; }
 html.accessibility-mode .paralegal-map__stage { position: relative; top: auto; min-height: 0; }
+html.accessibility-mode .lpc-home .paralegal-map { background-size: auto; }

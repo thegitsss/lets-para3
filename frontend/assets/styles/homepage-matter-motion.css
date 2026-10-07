@@ -401,8 +401,8 @@
 :where(.matter-scroll-journey) [data-pen="mathilde"] .fragment-one .hand{font-size: 29px;}
 :where(.matter-scroll-journey) [data-pen="mathilde"] .note-aside{font-size: 26px;}}
 :where(.matter-scroll-journey) .sheet-monogram[data-step-title]{letter-spacing: -0.025em; white-space: nowrap;}
-.matter-scroll-journey{height: calc(var(--film-height,900px) + 260svh); position: relative;}
-.matter-scroll-journey .matter-film{position: sticky; top: var(--film-top,0px); padding-top: 1px; padding-bottom: 1px;}
+.matter-scroll-journey{height: calc(var(--film-height,900px) + var(--matter-release-distance,166.4svh)); position: relative;}
+.matter-scroll-journey .matter-film{position: sticky; top: 0px; transform: translateY(var(--film-top,0px)); padding-top: 1px; padding-bottom: 1px;}
 :where(.matter-scroll-journey) .film-heading h2{font-size: clamp(40px, 4.6vw, 66px); line-height: 1.04;}
 :where(.matter-scroll-journey) .film-heading h2 em{font-style: italic; font-synthesis: style;}
 :where(.matter-scroll-journey) .scroll-instruction{display: flex; gap: 9px; align-items: center; white-space: nowrap; font-size: 11px; color: rgb(98, 113, 135);}
@@ -792,9 +792,9 @@
 @media (max-width: 760px){:where(.matter-scroll-journey) .builder-draft textarea{height: 60px; font-size: 13px;}
 :where(.matter-scroll-journey) .builder-tasks input{font-size: 13px;}
 :where(.matter-scroll-journey) .builder-suggestion > span{font-size: 10px;}
-.matter-scroll-journey .matter-film{top: 0px;}
+.matter-scroll-journey .matter-film{transform: none; transition: transform .38s cubic-bezier(.2,.7,.2,1);}
 /* Keep the mobile draft's Preview action reachable inside the pinned scene. */
-.matter-scroll-journey .matter-film[data-stage="1"]{top: var(--film-top,0px);}
+.matter-scroll-journey .matter-film[data-stage="1"]{transform: translateY(var(--film-top,0px));}
 :where(.matter-scroll-journey) #matter-film .stage{height: 790px;}
 :where(.matter-scroll-journey) .builder-draft{padding-top: 12px; padding-bottom: 12px;}}
 @media (max-width: 360px){:where(.matter-scroll-journey) .builder-tasks input{font-size: 12px;}

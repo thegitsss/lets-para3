@@ -4,15 +4,19 @@
   html.lpc-homepage { scroll-behavior: auto; }
   .lpc-home { --home-stable-viewport: var(--mobile-stable-height, 100svh); }
   .lpc-home .editorial-hero { min-height: max(720px, var(--mobile-stable-height, 100svh)); }
-  .lpc-home .type-hook.hook-find { height: calc(var(--mobile-stable-height, 100svh) * 3.5); }
+  .lpc-home .type-hook.hook-find {
+    --capacity-scene-height: var(--mobile-stable-height, 100svh);
+    --capacity-mountain-top: calc(var(--mobile-stable-height, 100svh) * .6);
+    --capacity-scroll-distance: calc(var(--mobile-stable-height, 100svh) * 3.5);
+  }
   .lpc-home .hook-find .type-hook__scene {
     height: var(--mobile-stable-height, 100svh);
     min-height: var(--mobile-stable-height, 100svh);
     padding-bottom: calc(88px + var(--mobile-stable-height, 100svh) * .12);
   }
-  .lpc-home .hook-find .type-hook__papers { top: calc(var(--mobile-stable-height, 100svh) * .6); }
-  .lpc-home .type-hook__smoke { height: calc(var(--mobile-stable-height, 100svh) * .6); }
-  .matter-scroll-journey { height: calc(var(--film-height, 900px) + var(--mobile-stable-height, 100svh) * 2.6); }
+  .lpc-home .hook-find .type-hook__papers { top: var(--capacity-mountain-top); }
+  .lpc-home .type-hook__smoke { height: calc(var(--mobile-stable-height, 100svh) * .5545); }
+  .matter-scroll-journey { height: calc(var(--film-height, 900px) + var(--matter-release-distance, calc(var(--mobile-stable-height, 100svh) * 1.664))); }
   .lpc-home .closing-cloud-region .closing-scene { --closing-scene-height: max(700px, var(--mobile-stable-height, 100svh)); }
   .lpc-home .home-footer { padding-top: max(300px, calc(var(--mobile-stable-height, 100svh) * .38)); }
 }

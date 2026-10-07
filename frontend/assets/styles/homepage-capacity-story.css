@@ -48,16 +48,20 @@
   margin: 22px 0 0;
 }
 .lpc-home .type-hook__art { display: none; }
+.lpc-home .type-hook__outro { display: none; }
 .lpc-home .type-hook__brand-static {
   display: block;
   margin-top: 48px;
   font: 300 clamp(27px, 4vw, 54px)/1.2 'Cormorant Garamond', Georgia, serif;
 }
 
-/* FIND's 500vh desktop / 350vh mobile scene and outline-to-mask sequence. */
+/* Match the full reveal, including the cloud wipe into the following section. */
 .lpc-home .type-hook.hook-find {
-  height: 500vh;
-  margin-bottom: 0;
+  --capacity-scene-height: 100vh;
+  --capacity-mountain-top: 60svh;
+  --capacity-scroll-distance: 500vh;
+  height: var(--capacity-scroll-distance);
+  margin-bottom: calc(-1 * var(--capacity-scene-height));
   padding: 0;
   overflow: visible;
 }
@@ -68,31 +72,43 @@
   inset: 0;
   pointer-events: none;
   z-index: -1;
-  /* Feather the scene itself so cropped clouds never form a section edge. */
+}
+.lpc-home .type-hook__sky {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: .7;
+}
+.lpc-home .hook-find .type-hook__brand-static { display: none; }
+.lpc-home .type-hook__mountain {
+  position: absolute;
+  inset: 0;
+  /* Restore the original mountain fade without fading the new clouds. */
   -webkit-mask-image: linear-gradient(transparent, #000 18%, #000 74%, transparent);
   mask-image: linear-gradient(transparent, #000 18%, #000 74%, transparent);
 }
-.lpc-home .hook-find .type-hook__brand-static { display: none; }
 .lpc-home .type-hook__papers {
   position: absolute;
-  top: 60svh;
+  top: var(--capacity-mountain-top, 60svh);
   left: 0;
   width: 100%;
   height: 87.5vw;
   max-width: none;
   transform-origin: bottom center;
   object-fit: contain;
-  will-change: transform;
+  will-change: transform, opacity;
 }
 .lpc-home .type-hook__cloud {
   position: absolute;
   z-index: 3;
-  width: 78vw;
+  width: 58.54vw;
   height: auto;
   will-change: transform;
 }
-.lpc-home .type-hook__cloud--left { top: 25%; left: -23.4vw; }
-.lpc-home .type-hook__cloud--right { top: 20%; right: -23.4vw; width: 65vw; }
+.lpc-home .type-hook__cloud--left { top: 25%; left: -17.56vw; }
+.lpc-home .type-hook__cloud--right { top: 20%; right: -17.56vw; width: 48.75vw; }
 .lpc-home .type-hook__outline {
   position: absolute;
   top: 50%;
@@ -113,24 +129,60 @@
 }
 .lpc-home .type-hook__composite {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 8%;
+  width: 84%;
+  aspect-ratio: 7406 / 1050;
+  transform: translateY(-50%);
   z-index: 1;
   opacity: 0;
   background: #233b5a;
-  -webkit-mask: url('../images/homepage-capacity/lpc-wordmark.svg') center / 84% auto no-repeat;
-  mask: url('../images/homepage-capacity/lpc-wordmark.svg') center / 84% auto no-repeat;
+  contain: paint;
+  will-change: opacity;
+  -webkit-mask: url('../images/homepage-capacity/lpc-wordmark.svg') center / 100% auto no-repeat;
+  mask: url('../images/homepage-capacity/lpc-wordmark.svg') center / 100% auto no-repeat;
 }
-.lpc-home .type-hook__composite .type-hook__papers { mix-blend-mode: multiply; }
+/* Keep the duplicate image aligned with the full scene while rasterizing only
+   the wordmark bounds instead of another viewport-sized masked surface. */
+.lpc-home .hook-find .type-hook__composite .type-hook__papers {
+  top: calc(50% + var(--capacity-mountain-top) - var(--capacity-scene-height) * .5);
+  left: calc(-100% * 8 / 84);
+  width: calc(100% * 100 / 84);
+  /* The original whitewashed texture stays visible within LPC's ink color. */
+  opacity: .22;
+}
 .lpc-home .type-hook__smoke {
   position: absolute;
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 43vw;
+  height: 32.3vw;
   object-fit: cover;
   object-position: top;
   z-index: 3;
   transform: translateY(70%);
+}
+.lpc-home .hook-find .type-hook__outro {
+  display: block;
+  position: absolute;
+  inset: 0 0 var(--capacity-scene-height);
+  z-index: 2;
+  pointer-events: none;
+}
+.lpc-home .type-hook__outro .type-hook__smoke { transform: none; }
+.lpc-home .type-hook__outro::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 5.21vw;
+  z-index: 4;
+  background: linear-gradient(transparent, #fff);
+}
+.lpc-home--editorial .hook-find + .matter-scroll-journey {
+  background-image: linear-gradient(#fff, rgb(255 255 255 / 0) 45svh),
+    radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+    radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%);
+  background-attachment: scroll, fixed, fixed;
 }
 .lpc-home .hook-find::before,
 .lpc-home .hook-find::after {
@@ -160,22 +212,30 @@
   .lpc-home .type-hook h2 { font-size: 44px !important; max-width: 14ch; margin: auto; }
   .lpc-home .type-hook__support { font-size: 21px !important; max-width: 25ch; margin: 20px auto 0; }
   .lpc-home .type-hook__finish { font-size: 42px !important; margin-top: 24px; }
-  .lpc-home .type-hook.hook-find { height: 350vh; }
+  .lpc-home .type-hook.hook-find { --capacity-scroll-distance: 350vh; }
   .lpc-home .hook-find .type-hook__scene { padding-bottom: calc(88px + 12svh); }
+  .lpc-home .hook-find .type-hook__inner { top: -56px; }
   .lpc-home .type-hook__papers { height: 131.25vw; width: 150%; left: -25%; }
-  .lpc-home .type-hook__cloud--left { top: 40%; left: -130%; width: 175%; }
-  .lpc-home .type-hook__cloud--right { top: 44%; right: -100%; width: 140%; }
-  .lpc-home .type-hook__smoke { height: 60svh; }
+  .lpc-home .type-hook__cloud--left { top: 40%; left: -152.54%; width: 187.2%; }
+  .lpc-home .type-hook__cloud--right { top: 44%; right: -109.87%; width: 148.54%; }
+  .lpc-home .type-hook__smoke { height: 55.45svh; }
+  .lpc-home .type-hook__outro::after { height: 26.67vw; }
   .lpc-home .type-hook__outline { left: 5%; width: 90%; }
   .lpc-home .type-hook__outline path { stroke-width: 20; }
-  .lpc-home .type-hook__composite { -webkit-mask-size: 90% auto; mask-size: 90% auto; }
+  .lpc-home .type-hook__composite { left: 5%; width: 90%; }
+  .lpc-home .hook-find .type-hook__composite .type-hook__papers { left: calc(-100% * 30 / 90); width: calc(100% * 150 / 90); }
   .lpc-home--editorial .matter-scroll-journey { padding-top: 44px; }
+}
+
+@media (max-width: 360px) {
+  .lpc-home .type-hook__finish { font-size: 34px !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .lpc-home .type-hook.hook-find { height: auto; margin-bottom: 0; }
   .lpc-home .hook-find .type-hook__scene { position: relative; padding: 88px 24px; }
   .lpc-home .hook-find .type-hook__art,
+  .lpc-home .hook-find .type-hook__outro,
   .lpc-home .hook-find::before,
   .lpc-home .hook-find::after { display: none; }
   .lpc-home .hook-find .type-hook__inner { opacity: 1 !important; transform: none !important; }
@@ -190,15 +250,9 @@
   position: absolute;
   inset: 0;
   background: #6495ed;
-  -webkit-mask: url('../images/homepage-capacity/lpc-apostrophe.svg') center / 84% auto no-repeat;
-  mask: url('../images/homepage-capacity/lpc-apostrophe.svg') center / 84% auto no-repeat;
-}
-@media (max-width: 767px) {
-  .lpc-home .type-hook__composite::after { -webkit-mask-size: 90% auto; mask-size: 90% auto; }
+  -webkit-mask: url('../images/homepage-capacity/lpc-apostrophe.svg') center / 100% auto no-repeat;
+  mask: url('../images/homepage-capacity/lpc-apostrophe.svg') center / 100% auto no-repeat;
 }
 
-/* This overlay contains only the opening Let’s characters; all other cloud overlap stays intact. */
-.lpc-home .type-hook__outline.type-hook__clear-letters { z-index: 4; pointer-events: none; }
-
-/* Keep the finished wordmark outside the artwork fade and above join washes. */
+/* The cloud bank handles the exit rather than an extra stationary wash. */
 .lpc-home .hook-find::after { display: none; }
