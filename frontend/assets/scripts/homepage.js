@@ -24,20 +24,30 @@
     const progress = clamp(window.scrollY / fadeDistance);
     const editorialHero = document.body.classList.contains("lpc-home--editorial");
     // Read the section actually painted behind the header, including pinned scenes.
-    const headerMidpoint = header.getBoundingClientRect().height / 2;
+    const headerBounds = header.getBoundingClientRect();
+    const heroBounds = headerHero?.getBoundingClientRect();
+    const headerMidpoint = headerBounds.height / 2;
     const surface = document.elementsFromPoint(window.innerWidth / 2, headerMidpoint)
       .find(node => !header.contains(node) && node.closest('[data-header-tone]'))
       ?.closest('[data-header-tone]');
     const tone = surface?.dataset.headerTone;
     const useInkForeground = header.classList.contains('is-open') ||
       (tone ? tone === 'light' : editorialHero || progress >= 0.52);
-    header.style.setProperty("--header-surface-alpha", (progress * 0.94).toFixed(3));
-    header.style.setProperty("--header-surface-blur", `${(progress * 16).toFixed(2)}px`);
-    header.style.setProperty("--header-foreground", useInkForeground ? "rgb(26, 34, 48)" : "rgb(255, 255, 255)");
-    header.classList.toggle("has-ink", useInkForeground);
-    header.classList.toggle("is-scrolled", progress >= 0.98);
-    header.classList.toggle("is-past-hero", !!headerHero &&
-      headerHero.getBoundingClientRect().bottom <= header.getBoundingClientRect().bottom);
+    // Finish geometry reads before changing styles, and keep settled values
+    // untouched while scrolling through later sections.
+    const styles = {
+      "--header-surface-alpha": (progress * 0.94).toFixed(3),
+      "--header-surface-blur": `${(progress * 16).toFixed(2)}px`,
+      "--header-foreground": useInkForeground ? "rgb(26, 34, 48)" : "rgb(255, 255, 255)",
+    };
+    Object.entries(styles).forEach(([name, value]) => {
+      if (header.style.getPropertyValue(name) !== value) header.style.setProperty(name, value);
+    });
+    const classes = { "has-ink": useInkForeground, "is-scrolled": progress >= 0.98,
+      "is-past-hero": !!heroBounds && heroBounds.bottom <= headerBounds.bottom };
+    Object.entries(classes).forEach(([name, enabled]) => {
+      if (header.classList.contains(name) !== enabled) header.classList.toggle(name, enabled);
+    });
   };
 
   syncHeaderSurface();
@@ -52,11 +62,14 @@
 
   const editorialDetails = document.querySelector(".editorial-hero__details");
   let editorialParallaxFrame = 0;
+  let editorialProgress = null;
   const syncEditorialParallax = () => {
     editorialParallaxFrame = 0;
     if (!editorialDetails) return;
     const motionDisabled = window.matchMedia("(max-width: 640px)").matches || reducedMotion.matches || document.body.classList.contains("accessibility-mode");
     const progress = motionDisabled ? 0 : clamp(window.scrollY / Math.max(1, window.innerHeight * 0.52));
+    if (editorialProgress === progress) return;
+    editorialProgress = progress;
     editorialDetails.style.setProperty("--editorial-copy-x", `${(24 * progress).toFixed(1)}px`);
     editorialDetails.style.setProperty("--editorial-copy-y", `${(145 * progress).toFixed(1)}px`);
     editorialDetails.style.setProperty("--editorial-actions-x", `${(-34 * progress).toFixed(1)}px`);

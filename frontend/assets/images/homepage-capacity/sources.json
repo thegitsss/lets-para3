@@ -1,6 +1,6 @@
 {
   "reference": "https://www.findrealestate.com/",
-  "referenceReviewed": "2026-10-06",
+  "referenceReviewed": "2026-10-07",
   "cloud.webp": {
     "source": "https://www.findrealestate.com/_next/static/media/cloud.c8800fa9.png",
     "processing": "Resized to 1800px wide and encoded as WebP."
@@ -17,15 +17,51 @@
     "source": "Original LPC illustration created for this section."
   },
   "motion": {
-    "desktopSectionHeight": "500vh",
-    "mobileSectionHeight": "350vh",
-    "contentFade": [0, 0.2],
-    "outlineDraw": [0.1, 0.4],
-    "outlineFade": [0.28, 0.48],
-    "sceneToWordmark": [0.3, 0.4],
+    "contentFade": [
+      0,
+      0.2
+    ],
+    "outlineDraw": [
+      0.1,
+      0.4
+    ],
+    "outlineFade": [
+      0.28,
+      0.48
+    ],
+    "sceneToWordmark": [
+      0.3,
+      0.4
+    ],
     "foregroundMovement": "y: -40%, scale: 1.3",
     "cloudMovement": "left: -15%, right: 15%",
     "scrubSeconds": 0.1,
-    "note": "Progress is measured from the section top reaching viewport top until section bottom reaches viewport top. LPC uses stable viewport units and a native requestAnimationFrame implementation."
+    "note": "Reference re-reviewed through the complete ending on desktop and mobile. The original whitewashed mountain filter is preserved. Find-style moving side clouds and foreground mist remain unfeathered; a separate document-scrolling cloud bank covers the logo as Matter enters. The hook overlaps the following section by one stable viewport, with no extra static tail.",
+    "desktopScrollDistance": "500vh",
+    "mobileScrollDistance": "350vh",
+    "foregroundTop": "60 percent of the stable viewport, restored from the pre-redesign mountain",
+    "ease": "power1.out",
+    "sceneHeight": "one stable viewport",
+    "sectionHeight": {
+      "desktop": "500vh",
+      "mobile": "350 stable vh"
+    },
+    "nextSectionOverlap": "one stable viewport",
+    "outroCloud": "untransformed smoke layer positioned at the end of the overlap, covering the wordmark with native scroll",
+    "cloudWidths": {
+      "desktop": "58.54vw left, 48.75vw right",
+      "mobile": "187.2vw left, 148.54vw right"
+    },
+    "smokeHeight": {
+      "desktop": "32.3vw",
+      "mobile": "55.45 percent of stable viewport height"
+    },
+    "brandAdaptation": "LPC ink-blue outline and ink-backed pale mountain texture maintain readable letterforms against the original whitewashed mountain; the brand apostrophe remains blue.",
+    "foregroundMovementDuration": 0.52,
+    "foregroundAppearance": "Original whitewashed SVG, original viewport feather at 18/74 percent, and full mountain retained behind the wordmark; restored independently of the new sky, clouds, and logo timeline."
+  },
+  "sky.webp": {
+    "source": "https://www.findrealestate.com/_next/static/media/back.f53e9773.jpg",
+    "processing": "Resized to 1920px wide and encoded as WebP; displayed at 70 percent opacity over LPC pale blue background."
   }
 }

@@ -28,16 +28,39 @@
   revealObserver.observe(canvas);
   const reducedMotionPreference = matchMedia('(prefers-reduced-motion: reduce)');
   let parallaxFrame = 0;
+  let parallaxVisible = true;
+  const layerTransforms = new WeakMap();
   function updateParallax() {
     parallaxFrame = 0;
+    const layers = canvas.querySelectorAll('svg, .paralegal-map__outline');
     if (reducedMotionPreference.matches) {
-      canvas.style.setProperty('--map-parallax-y', '0px');
+      // Let the existing reduced-motion stylesheet control both layers.
+      layers.forEach(layer => {
+        layer.style.removeProperty('transform');
+        layerTransforms.delete(layer);
+      });
       return;
     }
+    if (!parallaxVisible) return;
+    const stableHeight = innerWidth <= 640
+      ? Math.round(parseFloat(document.documentElement.style.getPropertyValue('--mobile-stable-height')))
+      : 0;
+    const viewportHeight = stableHeight || innerHeight;
     const rect = mapSection.getBoundingClientRect();
-    const progress = Math.max(0, Math.min(1, (innerHeight - rect.top) / (innerHeight + rect.height)));
+    // Keep the artwork's existing position and pace after removing the sticky
+    // spacer. This extra distance affects motion only, not document height.
+    const artHeight = rect.height + (document.documentElement.classList.contains('accessibility-mode') ? 0 : viewportHeight * .75);
+    const progress = Math.max(0, Math.min(1, (viewportHeight - rect.top) / (viewportHeight + artHeight)));
     const travel = innerWidth <= 600 ? 65 : 115;
-    canvas.style.setProperty('--map-parallax-y', `${Math.round((.5 - progress) * travel * 2)}px`);
+    const transform = `translate3d(0, ${Math.round((.5 - progress) * travel * 2)}px, 0) scale(${innerWidth <= 600 ? 1.02 : 1.08})`;
+    // An inherited variable on the canvas restyles every SVG pin. Moving the
+    // same two layers directly keeps the existing travel and scale unchanged.
+    layers.forEach(layer => {
+      if (layerTransforms.get(layer) !== transform) {
+        layer.style.transform = transform;
+        layerTransforms.set(layer, transform);
+      }
+    });
   }
   function scheduleParallax() {
     if (!parallaxFrame) parallaxFrame = requestAnimationFrame(updateParallax);
@@ -45,6 +68,11 @@
   addEventListener('scroll', scheduleParallax, { passive: true });
   addEventListener('resize', scheduleParallax);
   reducedMotionPreference.addEventListener('change', scheduleParallax);
+  const parallaxObserver = new IntersectionObserver(entries => {
+    parallaxVisible = entries[0].isIntersecting;
+    if (parallaxVisible) scheduleParallax();
+  }, { rootMargin: '200px 0px' });
+  parallaxObserver.observe(mapSection);
   async function load() {
     if (loading || (lastLoadedAt && Date.now() - lastLoadedAt < 5 * 60 * 1000)) return;
     loading = true;

@@ -9,10 +9,6 @@
   const clouds = [...hook.querySelectorAll('.type-hook__cloud')];
   const outline = hook.querySelector('.type-hook__outline');
   const paths = [...outline.querySelectorAll('path')];
-  const clearLetters = outline.cloneNode(true);
-  clearLetters.classList.add('type-hook__clear-letters');
-  scene.append(clearLetters);
-  const clearPaths = [...clearLetters.querySelectorAll('path')];
   const composite = hook.querySelector('.type-hook__composite');
   const smoke = hook.querySelector('.type-hook__smoke');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -27,32 +23,28 @@
     hook.classList.toggle('hook-find', enabled);
     if (!enabled) return;
     context = gsap.context(() => {
-      gsap.set([...paths, ...clearPaths], { strokeDashoffset: 1 });
-      gsap.set(clearLetters, { opacity: .65 });
-      gsap.set(clearPaths, { strokeOpacity: 0, fillOpacity: 0 });
-      clearPaths.forEach(path => {
-        path.style.fill = path.classList.contains('type-hook__apostrophe-outline') ? '#6495ed' : '#233b5a';
-      });
+      gsap.set(paths, { strokeDashoffset: 1 });
       const timeline = gsap.timeline();
+      // Restore the mountain's pre-redesign rise; both copies stay aligned.
+      // The clouds and logo retain the complete reveal and cloud-cover ending.
       timeline.to(papers, { y: '-40%', scale: 1.3, duration: .52, ease: 'power1.out' }, 0);
-      timeline.to(smoke, { y: '0%', duration: 1, ease: 'none' }, 0);
+      timeline.to(smoke, { y: '0%', duration: 1, ease: 'power1.out' }, 0);
       clouds.forEach((cloud, index) => {
-        timeline.to(cloud, { x: index ? '15%' : '-15%', duration: 1, ease: 'none' }, 0);
+        timeline.to(cloud, { x: index ? '15%' : '-15%', duration: 1, ease: 'power1.out' }, 0);
       });
-      timeline.to(inner, { y: '8%', scale: .98, opacity: 0, duration: .12, ease: 'power1.inOut' }, .14);
-      timeline.to(outline, { opacity: 1, duration: .015, ease: 'none' }, .27);
-      timeline.to(clearPaths, { strokeOpacity: 1, duration: .015, ease: 'none' }, .27);
-      timeline.to([...paths, ...clearPaths], { strokeDashoffset: 0, autoRound: false, duration: .22, ease: 'none' }, .27);
-      timeline.to(composite, { opacity: 1, duration: .1, ease: 'power1.inOut' }, .51);
-      timeline.to(clearPaths, { fillOpacity: 1, duration: .1, ease: 'power1.inOut' }, .51);
-      timeline.to(clearLetters, { opacity: 1, duration: .1, ease: 'power1.inOut' }, .51);
-      timeline.to(outline, { opacity: 0, duration: .1, ease: 'power1.inOut' }, .51);
-      timeline.to(clearPaths, { strokeOpacity: 0, duration: .1, ease: 'power1.inOut' }, .51);
+      timeline.to(inner, { y: '20%', scale: .9, duration: 1, ease: 'power1.out' }, 0);
+      timeline.to(inner, { opacity: 0, duration: .2, ease: 'power1.out' }, 0);
+      timeline.to(outline, { opacity: 1, duration: .01, ease: 'power1.out' }, .1);
+      timeline.to(paths, { strokeDashoffset: 0, autoRound: false, duration: .3, ease: 'power1.out' }, .1);
+      timeline.to(outline, { opacity: 0, duration: .2, ease: 'power1.out' }, .28);
+      timeline.to(composite, { opacity: 1, duration: .1, ease: 'power1.out' }, .3);
       ScrollTrigger.create({
         trigger: hook,
         animation: timeline,
         start: 'top top',
-        end: 'bottom top',
+        // The second cloud bank moves with the document, covering the logo
+        // while the next section enters, as in Find's complete reveal.
+        end: () => `+=${hook.getBoundingClientRect().height}`,
         scrub: .1,
         invalidateOnRefresh: true,
       });
