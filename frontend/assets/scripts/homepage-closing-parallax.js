@@ -5,6 +5,23 @@
   const actions = scene.querySelector('.role-actions');
   const title = scene.querySelector('#closing-title');
   const mountain = scene.querySelector('.closing-scene__mountain');
+  const ridge = scene.querySelector('.closing-scene__ridge');
+  // Apply mobile motion directly to the layers that consume it. The values and
+  // timing are unchanged; unrelated descendants no longer inherit updates.
+  const mobileStyleTargets = {
+    '--closing-roles-opacity': [actions],
+    '--closing-title-top': [title], '--closing-title-y': [title], '--closing-title-scale': [title],
+    '--closing-actions-top': [actions], '--closing-actions-bottom': [actions], '--closing-actions-y': [actions],
+    '--closing-mountain-y': [mountain, ridge], '--closing-mountain-scale': [mountain, ridge],
+    '--closing-footer-drift': [mountain, ridge],
+  };
+  const mobileProperties = {
+    '--closing-roles-opacity': '--closing-roles-opacity',
+    '--closing-title-top': 'top', '--closing-title-y': 'translate', '--closing-title-scale': 'scale',
+    '--closing-actions-top': 'top', '--closing-actions-bottom': 'bottom', '--closing-actions-y': 'translate',
+  };
+  const mobileMountainValues = {};
+  let mobileStyles = null, mobileMountainTransform = null;
   const track = document.createElement('div');
   track.className = 'closing-parallax-track';
   scene.before(track);
@@ -13,10 +30,29 @@
   let geometry = null, geometryDirty = true, nearViewport = true, hasRendered = false;
   const setStyle = (name, value) => {
     value = String(value);
-    if (scene.style.getPropertyValue(name) !== value) scene.style.setProperty(name, value);
+    if (mobileStyles && mobileStyleTargets[name]) {
+      const property = mobileProperties[name];
+      if (!property) { mobileMountainValues[name] = value; return; }
+      const applied = property === 'translate' ? `-50% ${value}` : value;
+      mobileStyleTargets[name].forEach(node => {
+        if (node && node.style.getPropertyValue(property) !== applied) node.style.setProperty(property, applied);
+      });
+    } else if (scene.style.getPropertyValue(name) !== value) scene.style.setProperty(name, value);
   };
   function render() {
     frame = 0;
+    const nextMobileStyles = innerWidth < 768;
+    if (mobileStyles !== nextMobileStyles) {
+      Object.entries(mobileStyleTargets).forEach(([name, nodes]) => {
+        scene.style.removeProperty(name);
+        nodes.forEach(node => {
+          node?.style.removeProperty(name);
+          node?.style.removeProperty(mobileProperties[name] || 'transform');
+        });
+      });
+      mobileStyles = nextMobileStyles;
+      mobileMountainTransform = null;
+    }
     const disabled = reduced.matches || document.body.classList.contains('accessibility-mode') || document.documentElement.classList.contains('accessibility-mode');
     if (track.classList.contains('closing-parallax-track--active') === disabled) {
       track.classList.toggle('closing-parallax-track--active', !disabled);
@@ -88,6 +124,13 @@
     setStyle('--closing-title-y', `${titleRemaining * (mobile ? 290 : 380)}px`);
     setStyle('--closing-title-scale', `${1 - titleRemaining * .1}`);
     setStyle('--closing-actions-y', `${compactRoles ? 0 : remaining * 210}px`);
+    if (mobileStyles) {
+      const transform = `translate3d(0, calc(${mobileMountainValues['--closing-mountain-y']} + ${mobileMountainValues['--closing-footer-drift']}), 0) scale(${mobileMountainValues['--closing-mountain-scale']})`;
+      if (mobileMountainTransform !== transform) {
+        [mountain, ridge].forEach(node => { if (node) node.style.transform = transform; });
+        mobileMountainTransform = transform;
+      }
+    }
     hasRendered = true;
     if (!immediate && displayedProgress !== targetProgress) schedule();
   }
