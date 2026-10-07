@@ -70,3 +70,10 @@
 .faq-page .faq-cta{padding-block:54px}
 }
 @media(prefers-reduced-motion:reduce){.faq-page *{scroll-behavior:auto!important;transition:none!important}}
+
+/* Reserve the existing heading geometry until its light display font is ready. */
+.faq-font-loading .faq-page :is(h1,h2){visibility:hidden}
+/* A failed or stalled font must leave readable headings without a later swap. */
+.faq-font-fallback .faq-page .hero-banner h1,
+.faq-font-fallback .faq-page .faq-group h2,
+.faq-font-fallback .faq-page .faq-cta h2{font-family:serif}
