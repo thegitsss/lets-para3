@@ -73,6 +73,30 @@
     });
   };
 
+  // Yield decorative canvas/pin effects to native phone scrolling. Their
+  // current frame stays visible and the animation resumes when scrolling ends.
+  const nativeScrollRenderQuery = window.matchMedia('(max-width: 767px)');
+  let nativeScrolling = false, nativeScrollIdleTimer = 0;
+  window.addEventListener('scroll', () => {
+    if (!nativeScrollRenderQuery.matches) return;
+    if (!nativeScrolling) {
+      nativeScrolling = true;
+      document.body.classList.add('mobile-is-scrolling');
+    }
+    clearTimeout(nativeScrollIdleTimer);
+    nativeScrollIdleTimer = setTimeout(() => {
+      nativeScrolling = false;
+      document.body.classList.remove('mobile-is-scrolling');
+    }, 180);
+  }, { passive: true });
+  nativeScrollRenderQuery.addEventListener('change', () => {
+    if (!nativeScrollRenderQuery.matches) {
+      clearTimeout(nativeScrollIdleTimer);
+      nativeScrolling = false;
+      document.body.classList.remove('mobile-is-scrolling');
+    }
+  });
+
   syncHeaderSurface();
   let headerFrame = 0;
   const scheduleHeaderSurface = () => {
@@ -279,6 +303,11 @@
     }
 
     syncAnimation() {
+      if (nativeScrollRenderQuery.matches && nativeScrolling) {
+        if (this.frameId) window.cancelAnimationFrame(this.frameId);
+        this.frameId = 0;
+        return;
+      }
       if (!this.shouldAnimate()) {
         if (this.frameId) window.cancelAnimationFrame(this.frameId);
         this.frameId = 0;

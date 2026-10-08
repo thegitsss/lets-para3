@@ -30,9 +30,37 @@
   let parallaxFrame = 0;
   let parallaxVisible = true;
   const layerTransforms = new WeakMap();
+  const mobileMotion = matchMedia('(max-width: 767px)');
+  let motionSurface = null, mapGeometry = null;
+  function motionLayers() {
+    const layers = [...canvas.querySelectorAll('svg, .paralegal-map__outline')];
+    if (mobileMotion.matches) {
+      if (!motionSurface) {
+        motionSurface = document.createElement('div');
+        motionSurface.className = 'paralegal-map__motion-surface';
+        canvas.append(motionSurface);
+      }
+      layers.forEach(layer => {
+        if (layer.parentElement !== motionSurface) {
+          layer.style.removeProperty('transform');
+          layerTransforms.delete(layer);
+          motionSurface.append(layer);
+        }
+      });
+      return [motionSurface];
+    }
+    if (motionSurface) {
+      layers.forEach(layer => canvas.append(layer));
+      layerTransforms.delete(motionSurface);
+      motionSurface.remove();
+      motionSurface = null;
+    }
+    return layers;
+  }
   function updateParallax() {
     parallaxFrame = 0;
-    const layers = canvas.querySelectorAll('svg, .paralegal-map__outline');
+    if (!parallaxVisible && !reducedMotionPreference.matches) return;
+    const layers = motionLayers();
     if (reducedMotionPreference.matches) {
       // Let the existing reduced-motion stylesheet control both layers.
       layers.forEach(layer => {
@@ -46,7 +74,13 @@
       ? Math.round(parseFloat(document.documentElement.style.getPropertyValue('--mobile-stable-height')))
       : 0;
     const viewportHeight = stableHeight || innerHeight;
-    const rect = mapSection.getBoundingClientRect();
+    if (mobileMotion.matches && !mapGeometry) {
+      const bounds = mapSection.getBoundingClientRect();
+      mapGeometry = { top: bounds.top + scrollY, height: bounds.height };
+    }
+    const rect = mobileMotion.matches
+      ? { top: mapGeometry.top - scrollY, height: mapGeometry.height }
+      : mapSection.getBoundingClientRect();
     // Keep the artwork's existing position and pace after removing the sticky
     // spacer. This extra distance affects motion only, not document height.
     const artHeight = rect.height + (document.documentElement.classList.contains('accessibility-mode') ? 0 : viewportHeight * .75);
@@ -66,7 +100,21 @@
     if (!parallaxFrame) parallaxFrame = requestAnimationFrame(updateParallax);
   }
   addEventListener('scroll', scheduleParallax, { passive: true });
-  addEventListener('resize', scheduleParallax);
+  let mapViewportWidth = innerWidth;
+  addEventListener('resize', () => {
+    if (innerWidth <= 640 && innerWidth === mapViewportWidth) return;
+    mapViewportWidth = innerWidth;
+    mapGeometry = null;
+    scheduleParallax();
+  });
+  mobileMotion.addEventListener('change', () => {
+    mapGeometry = null;
+    motionLayers();
+    scheduleParallax();
+  });
+  new ResizeObserver(() => {
+    if (mobileMotion.matches) { mapGeometry = null; scheduleParallax(); }
+  }).observe(document.body);
   reducedMotionPreference.addEventListener('change', scheduleParallax);
   const parallaxObserver = new IntersectionObserver(entries => {
     parallaxVisible = entries[0].isIntersecting;

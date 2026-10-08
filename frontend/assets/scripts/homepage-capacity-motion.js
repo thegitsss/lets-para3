@@ -5,7 +5,10 @@
   gsap.registerPlugin(ScrollTrigger);
   const scene = hook.querySelector('.type-hook__scene');
   const inner = hook.querySelector('.type-hook__inner');
-  const papers = [...hook.querySelectorAll('.type-hook__papers')];
+  const paperArtwork = [...hook.querySelectorAll('.type-hook__papers')];
+  let papers = paperArtwork;
+  const paperLayers = new Map();
+  let rasterFailed = false;
   const clouds = [...hook.querySelectorAll('.type-hook__cloud')];
   const outline = hook.querySelector('.type-hook__outline');
   const paths = [...outline.querySelectorAll('path')];
@@ -15,6 +18,7 @@
   let context = null;
   let refreshFrame = 0;
   const mobile = matchMedia('(max-width: 767px)');
+  let renderedMobile = null;
   let viewportWidth = innerWidth;
   const configureRefresh = () => {
     // The scene already uses a stable mobile scroll distance. Browser toolbar
@@ -23,13 +27,50 @@
       ? 'none' : 'visibilitychange,DOMContentLoaded,load,resize' });
   };
   configureRefresh();
-  mobile.addEventListener('change', configureRefresh);
+  mobile.addEventListener('change', () => { configureRefresh(); syncMotion(); });
+
+  function syncPaperLayers() {
+    // The phone asset is the same photograph, cutout, color filter and fade,
+    // rendered once. Native image transforms avoid filtering SVG photographs
+    // again during scrolling. Keep the original SVGs for desktop and fallback.
+    papers = paperArtwork.map(svg => {
+      let layer = paperLayers.get(svg);
+      if (mobile.matches && !rasterFailed) {
+        if (!layer) {
+          layer = document.createElement('img');
+          layer.className = `${svg.getAttribute('class')} type-hook__paper-layer`;
+          layer.alt = '';
+          layer.setAttribute('aria-hidden', 'true');
+          layer.width = 2000;
+          layer.height = 1750;
+          layer.src = 'assets/images/homepage-capacity/mountain-mobile-composited.webp';
+          layer.addEventListener('error', () => {
+            rasterFailed = true;
+            renderedMobile = null;
+            syncMotion();
+          }, { once: true });
+          svg.replaceWith(layer);
+          paperLayers.set(svg, layer);
+        }
+        return layer;
+      }
+      if (layer) {
+        svg.querySelector('[data-home-mountain]')?.setAttribute('href', mobile.matches
+          ? 'hero-mountain-mobile.jpg' : 'hero-mountain-restored.jpg');
+        layer.replaceWith(svg);
+        paperLayers.delete(svg);
+      }
+      return svg;
+    });
+  }
 
   function syncMotion() {
     const enabled = !reduced.matches && !document.body.classList.contains('accessibility-mode');
-    if (enabled && context) return;
+    if (enabled && context && renderedMobile === mobile.matches) return;
     context?.revert();
     context = null;
+    syncPaperLayers();
+    renderedMobile = mobile.matches;
     hook.classList.toggle('hook-find', enabled);
     if (!enabled) return;
     context = gsap.context(() => {
