@@ -13,6 +13,7 @@
   const deadline = film.querySelector('#matter-deadline');
   const feedback = film.querySelector('[data-feedback]');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const mobileRendering = matchMedia('(max-width: 767px)');
   const status = ['YOUR STARTING POINT', 'YOUR NOTES → YOUR MATTER', ''];
   const actions = ['Build my Matter', 'Preview', 'Post Matter'];
   const previewStart = .64;
@@ -29,7 +30,7 @@
   const brief = film.querySelector('.builder-brief');
   let mobileBriefScrollTop = 0;
   brief.addEventListener('scroll', () => {
-    if (innerWidth <= 767) mobileBriefScrollTop = brief.scrollTop;
+    if (mobileRendering.matches) mobileBriefScrollTop = brief.scrollTop;
   }, { passive: true });
   const originalNotes = brief.innerHTML.replace(/<br\s*\/?>/gi, '\n');
   brief.setAttribute('aria-label', `Your original notes: ${originalNotes}`);
@@ -81,7 +82,7 @@
     // Native flings can cross another threshold before a fade finishes.
     // A phone must follow the latest scroll state instead of replaying an
     // obsolete fade after the user has reversed direction.
-    if (innerWidth <= 767 && changingStage && next !== requestedStage) {
+    if (mobileRendering.matches && changingStage && next !== requestedStage) {
       transitionVersion++;
       sceneAnimation?.cancel();
       sceneAnimation = null;
@@ -90,7 +91,7 @@
       delete film.dataset.transitioning;
     }
     requestedStage = next;
-    const mobileOffscreen = innerWidth <= 767 &&
+    const mobileOffscreen = mobileRendering.matches &&
       (scrollY > mobileFilmEnd || scrollY + measuredViewportHeight < mobileFilmStart);
     if (reduced.matches || mobileOffscreen) {
       transitionVersion++;
@@ -110,7 +111,7 @@
     film.dataset.transitioning = 'true';
     const version = ++transitionVersion;
     try {
-      if (innerWidth <= 767) {
+      if (mobileRendering.matches) {
         // Keep a visible card throughout native scrolling. The desktop's
         // fade-out/fade-in leaves an empty scene and delays the next phone
         // state by 200ms, so phones use just the existing incoming motion.
@@ -216,7 +217,7 @@
       renderBuild(0);
       const tick = now => {
         if (stage !== 1) return;
-        if (innerWidth <= 767 && (scrollY > mobileFilmEnd || scrollY + measuredViewportHeight < mobileFilmStart)) {
+        if (mobileRendering.matches && (scrollY > mobileFilmEnd || scrollY + measuredViewportHeight < mobileFilmStart)) {
           renderBuild(1);
           return;
         }
@@ -242,7 +243,7 @@
     if (count !== typedCount) {
       // Reset scroll before changing text; writing scrollTop afterward forces
       // layout for the newly typed text on every character update.
-      if (innerWidth <= 767) {
+      if (mobileRendering.matches) {
         if (mobileBriefScrollTop) { brief.scrollTop = 0; mobileBriefScrollTop = 0; }
       } else if (brief.scrollTop) brief.scrollTop = 0;
       typedNotes.textContent = originalNotes.slice(0, count);
