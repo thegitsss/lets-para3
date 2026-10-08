@@ -19,6 +19,7 @@
   let previewThreshold = previewStart;
   let stage = 0, frame = 0, scrollStart = 0, scrollDistance = 1;
   let measureFrame = 0;
+  let mobileFilmStart = 0, mobileFilmEnd = Infinity, measuredViewportHeight = innerHeight;
   const disclosure = '';
   const builder = film.querySelector('.dashboard-builder');
   const builderSkip = film.querySelector('.builder-skip');
@@ -72,8 +73,21 @@
   let transitionVersion = 0;
 
   async function transitionTo(next) {
+    // Native flings can cross another threshold before a fade finishes.
+    // A phone must follow the latest scroll state instead of replaying an
+    // obsolete fade after the user has reversed direction.
+    if (innerWidth <= 767 && changingStage && next !== requestedStage) {
+      transitionVersion++;
+      sceneAnimation?.cancel();
+      sceneAnimation = null;
+      changingStage = false;
+      scene.inert = false;
+      delete film.dataset.transitioning;
+    }
     requestedStage = next;
-    if (reduced.matches) {
+    const mobileOffscreen = innerWidth <= 767 &&
+      (scrollY > mobileFilmEnd || scrollY + measuredViewportHeight < mobileFilmStart);
+    if (reduced.matches || mobileOffscreen) {
       transitionVersion++;
       sceneAnimation?.cancel();
       sceneAnimation = null;
@@ -90,6 +104,20 @@
     film.dataset.transitioning = 'true';
     const version = ++transitionVersion;
     try {
+      if (innerWidth <= 767) {
+        // Keep a visible card throughout native scrolling. The desktop's
+        // fade-out/fade-in leaves an empty scene and delays the next phone
+        // state by 200ms, so phones use just the existing incoming motion.
+        const direction = requestedStage > stage ? 1 : -1;
+        setStage(requestedStage);
+        sceneAnimation = scene.animate([
+          { opacity: .65, transform: `translateX(${18 * direction}px)` },
+          { opacity: 1, transform: 'translateX(0)' }
+        ], { duration: 380, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'forwards' });
+        await sceneAnimation.finished;
+        sceneAnimation.cancel();
+        return;
+      }
       while (stage !== requestedStage && version === transitionVersion) {
         const direction = requestedStage > stage ? 1 : -1;
         sceneAnimation = scene.animate([
@@ -142,6 +170,10 @@
     return valid;
   }
   function setStage(next) {
+    // Swap each phone state as one settled surface. Nested layout transitions
+    // must not carry old lettering or geometry into the incoming motion.
+    const mobileCommit = innerWidth <= 767 && stage !== next;
+    if (mobileCommit) film.classList.add('mobile-stage-commit');
     lastValidation = null;
     const previousStage = stage;
     // Keep keyboard focus out of controls that are about to disappear.
@@ -181,12 +213,20 @@
       renderBuild(0);
       const tick = now => {
         if (stage !== 1) return;
+        if (innerWidth <= 767 && (scrollY > mobileFilmEnd || scrollY + measuredViewportHeight < mobileFilmStart)) {
+          renderBuild(1);
+          return;
+        }
         const build = Math.min(1, (now - started) / 8000);
         renderBuild(build);
         if (build < 1) buildFrame = requestAnimationFrame(tick);
       };
       buildFrame = requestAnimationFrame(tick);
     } else renderBuild(1);
+    if (mobileCommit) {
+      void scene.offsetWidth;
+      film.classList.remove('mobile-stage-commit');
+    }
   }
   function updateFromScroll() {
     frame = 0;
@@ -267,6 +307,7 @@
       ? Math.round(parseFloat(document.documentElement.style.getPropertyValue('--mobile-stable-height')))
       : 0;
     const viewportHeight = stableHeight || innerHeight;
+    measuredViewportHeight = viewportHeight;
     const height = film.offsetHeight;
     const oversize = Math.max(0, height - viewportHeight);
     const builderBottom = builder.offsetTop + builder.offsetHeight;
@@ -275,6 +316,8 @@
     setStyle(journey, '--film-height', `${film.getBoundingClientRect().height}px`);
     setStyle(journey, '--film-top', `${-oversize}px`);
     scrollStart = journey.getBoundingClientRect().top + scrollY + oversize;
+    mobileFilmStart = scrollStart - oversize;
+    mobileFilmEnd = mobileFilmStart + journey.offsetHeight;
     // Keep the notes/build thresholds at their original scroll positions.
     // The document ends its sticky travel at Preview instead of holding 03
     // for the unused last 36 percent of the original 260vh scroll range.
@@ -335,7 +378,12 @@
   });
   [amount, deadline].forEach(input => input.addEventListener('input', validate));
   addEventListener('scroll', () => { if (!frame) frame = requestAnimationFrame(updateFromScroll); }, {passive:true});
-  addEventListener('resize', scheduleMeasure, {passive:true});
+  let viewportWidth = innerWidth;
+  addEventListener('resize', () => {
+    if (innerWidth <= 640 && innerWidth === viewportWidth) return;
+    viewportWidth = innerWidth;
+    scheduleMeasure();
+  }, {passive:true});
   reduced.addEventListener('change', () => {
     transitionTo(stage);
     setStage(stage);
