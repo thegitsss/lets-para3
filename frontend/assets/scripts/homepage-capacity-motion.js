@@ -31,24 +31,37 @@
   let sectionHeight = 1;
 
   let lastRenderedValue = null;
+  let lastMobile = null;
+  let lastEntranceOffset = null;
+  let introductionTop = 0;
+  let entranceStart = 0;
+  let viewportHeight = innerHeight;
   function render(value) {
     // An unchanged off-screen scene needs no SVG or inherited style updates.
-    if (innerWidth <= 767 && value === lastRenderedValue) return;
+    const mobile = innerWidth <= 767;
+    const entrance = clamp((scrollY - entranceStart) / Math.max(1, sectionTop - entranceStart));
+    const entranceOffset = mobile ? Math.max(0, introductionTop - 24) * (1 - entrance) : 0;
+    if (mobile && value === lastRenderedValue && mobile === lastMobile && entranceOffset === lastEntranceOffset) return;
+    lastEntranceOffset = entranceOffset;
     lastRenderedValue = value;
+    lastMobile = mobile;
     const travel = tween(value, 0, 1);
     const exit = tween(value, 0, .2);
     const ink = tween(value, .1, .14);
     const fill = tween(value, .24, .06);
-    inner.style.transform = `translate3d(0, ${20 * travel}%, 0) scale(${1 - .1 * travel})`;
+    inner.style.transform = mobile
+      ? `translate3d(0, calc(${20 * travel}% - ${entranceOffset}px), 0) scale(${1 - .1 * travel})`
+      : `translate3d(0, ${20 * travel}%, 0) scale(${1 - .1 * travel})`;
     inner.style.opacity = 1 - exit;
     papers.forEach(paper => {
       paper.style.transform = `translate3d(0, ${-40 * travel}%, 0) scale(${1 + .3 * travel})`;
     });
-    foreground.style.opacity = 1 - fill;
+    // Let the smaller papers dissolve gradually into the mobile cloud sweep.
+    foreground.style.opacity = 1 - tween(value, .24, mobile ? .18 : .06);
     // Clear the paper headline before the logo starts drawing at .1.
     headline.style.opacity = 1 - tween(value, .03, .06);
     clouds.forEach((cloud, index) => {
-      cloud.style.transform = `translate3d(${(index ? 15 : -15) * travel}%, 0, 0)`;
+      cloud.style.transform = `translate3d(${(mobile ? (index ? -40 : 40) : (index ? 15 : -15)) * travel}%, 0, 0)`;
     });
     smoke.style.transform = `translate3d(0, ${70 * (1 - travel)}%, 0)`;
     outline.style.opacity = tween(value, .1, .01) * (1 - tween(value, .24, .06));
@@ -85,9 +98,18 @@
     frame = 0;
     previousTime = 0;
     hook.classList.toggle('hook-find', !reduced.matches);
+    viewportHeight = innerWidth <= 767
+      ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--home-stable-viewport')) || innerHeight
+      : innerHeight;
+    introductionTop = inner.offsetTop;
     const rect = hook.getBoundingClientRect();
     sectionTop = rect.top + scrollY;
     sectionHeight = Math.max(1, rect.height);
+    const heroNote = document.querySelector('.editorial-hero__publishing');
+    const heroContentBottom = heroNote ? heroNote.getBoundingClientRect().bottom + scrollY : sectionTop - viewportHeight;
+    // Keep the content gap steady during entry, then settle at center as the hero leaves.
+    entranceStart = Math.max(sectionTop - viewportHeight,
+      Math.min(heroContentBottom, sectionTop - Math.max(0, introductionTop - 24)));
     progress = reduced.matches ? 0 : clamp((scrollY - sectionTop) / sectionHeight);
     render(progress);
   }

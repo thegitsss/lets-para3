@@ -163,9 +163,9 @@
   .lpc-home .type-hook.hook-find { height: 350svh; }
   .lpc-home .hook-find .type-hook__scene { padding-bottom: calc(88px + 12svh); }
   .lpc-home .type-hook__papers { height: 131.25vw; width: 150%; left: -25%; }
-  .lpc-home .type-hook__cloud--left { top: 40%; left: -130%; width: 175%; }
-  .lpc-home .type-hook__cloud--right { top: 44%; right: -100%; width: 140%; }
-  .lpc-home .type-hook__smoke { height: 60svh; }
+  .lpc-home .type-hook__cloud--left { top: 15%; left: -130%; width: 175%; }
+  .lpc-home .type-hook__cloud--right { top: 20%; right: -100%; width: 140%; }
+  .lpc-home .type-hook__smoke { height: 90svh; }
   .lpc-home .type-hook__outline { left: 5%; width: 90%; }
   .lpc-home .type-hook__outline path { stroke-width: 20; }
   .lpc-home .type-hook__composite { -webkit-mask-size: 90% auto; mask-size: 90% auto; }

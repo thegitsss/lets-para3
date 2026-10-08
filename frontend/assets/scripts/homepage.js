@@ -21,6 +21,24 @@
   // Retain the initial mobile hero geometry while browser toolbars change height.
   // A real width change (including rotation) remeasures the responsive design.
   let heroLayoutWidth = innerWidth;
+  // Share one mobile viewport height across every scroll scene. Safari toolbar
+  // changes must not shorten earlier scenes and move everything after them.
+  const measureMobileViewport = () => {
+    if (!headerHero) return;
+    const root = document.documentElement;
+    if (innerWidth > 767) {
+      root.style.removeProperty('--home-stable-viewport');
+      root.classList.remove('mobile-compact-height');
+      return;
+    }
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;height:100svh;width:0;visibility:hidden;pointer-events:none';
+    document.body.append(probe);
+    const height = probe.getBoundingClientRect().height;
+    root.style.setProperty('--home-stable-viewport', `${height}px`);
+    root.classList.toggle('mobile-compact-height', innerWidth <= 760 && height <= 880);
+    probe.remove();
+  };
   const measureHeroLayout = () => {
     if (!headerHero) return;
     headerHero.style.removeProperty('--hero-layout-min-height');
@@ -30,10 +48,12 @@
       ? parseFloat(computed) : headerHero.getBoundingClientRect().height;
     headerHero.style.setProperty('--hero-layout-min-height', `${resolved}px`);
   };
+  measureMobileViewport();
   measureHeroLayout();
   addEventListener('resize', () => {
     if (innerWidth === heroLayoutWidth) return;
     heroLayoutWidth = innerWidth;
+    measureMobileViewport();
     measureHeroLayout();
   }, { passive: true });
 
