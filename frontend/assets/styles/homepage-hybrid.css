@@ -1533,12 +1533,7 @@ body.lpc-home.lpc-home--hybrid .completion-files > span > i { color: #385f9e; }
 
 
 /* Original photograph, with its ridge in front of the arriving typography. */
-.lpc-home .closing-cloud-region {
-  position: relative;
-  isolation: isolate;
-  /* Keep clipped and backdrop-filtered layers on the same dark backing. */
-  background: #07131f;
-}
+.lpc-home .closing-cloud-region { position: relative; isolation: isolate; background: #fff; }
 .lpc-home .closing-cloud-region .closing-scene {
   --closing-scene-height: max(740px, 100svh);
   position: relative; isolation: isolate; overflow: hidden; display: block;
@@ -1564,10 +1559,7 @@ body.lpc-home.lpc-home--hybrid .completion-files > span > i { color: #385f9e; }
 body.lpc-home .closing-scene #closing-title {
   position: absolute; z-index: 2; top: var(--closing-title-top, 13%); left: 50%;
   width: calc(100% - 64px); max-width: 960px; margin: 0;
-  translate: -50% var(--closing-title-y, 0px);
-  scale: var(--closing-title-scale, 1);
-  transform-origin: 50% 100%;
-  will-change: translate, scale;
+  translate: -50% var(--closing-title-y, 0px); will-change: translate;
   font-family: 'Cormorant Garamond', Georgia, serif !important;
   font-weight: 300 !important; font-synthesis: none; color: #fff;
   font-size: clamp(60px, 6.2vw, 92px); letter-spacing: -.035em; line-height: .99;
@@ -1596,11 +1588,11 @@ body.lpc-home .closing-scene #closing-title {
 .lpc-home .closing-scene .role-action:is(:hover, :focus-visible) i { translate: 6px 0; }
 .lpc-home .closing-scene .role-action:focus-visible { outline: 2px solid #fff; outline-offset: 7px; }
 .closing-parallax-track { background: #07131f; }
-.closing-parallax-track--active { position: relative; height: calc(max(740px, 100svh) + 79.8svh); }
+.closing-parallax-track--active { position: relative; height: calc(max(740px, 100svh) + 220svh); }
 .lpc-home .closing-parallax-track--active .closing-scene { position: sticky; top: 0; }
 @media (max-width: 767px) {
   .lpc-home .closing-cloud-region .closing-scene { --closing-scene-height: max(700px, 100svh); min-height: 700px; }
-  .closing-parallax-track--active { height: calc(max(700px, 100svh) + 62.7svh); }
+  .closing-parallax-track--active { height: calc(max(700px, 100svh) + 190svh); }
   body.lpc-home .closing-scene #closing-title { top: var(--closing-title-top, 15%); width: calc(100% - 36px); font-size: clamp(36px, 10.8vw, 68px); line-height: 1.06; }
   .lpc-home .closing-scene__mountain, .lpc-home .closing-scene__ridge { top: 27%; }
   .lpc-home .closing-scene .role-actions { bottom: var(--closing-actions-bottom, 7%); width: calc(100% - 48px); gap: 10px; grid-template-columns: 1fr; }
@@ -1608,6 +1600,8 @@ body.lpc-home .closing-scene #closing-title {
   .lpc-home .closing-scene .role-action strong { font-size: 30px; margin-top: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .lpc-home .closing-scene .role-action, .lpc-home .closing-scene .role-action i { transition: none; } }
+/* Align the FAQ destination cards with the question columns above. */
+.lpc-home .home-faq__links { column-gap: clamp(34px, 5vw, 72px); }
 
 /* Crop the lower quarter and let the foreground ridge travel over the footer. */
 .lpc-home .closing-cloud-region { z-index: 2; }
@@ -1615,8 +1609,7 @@ body.lpc-home .closing-scene #closing-title {
   height: calc(var(--closing-scene-height) * .75);
   min-height: 0;
   overflow: visible;
-  /* The mountain layers clip themselves; avoid a second rectangular clip
-     across the sticky sky and its backdrop-filtered role buttons. */
+  clip-path: inset(0 0 -55svh);
 }
 .lpc-home .closing-scene__mountain,
 .lpc-home .closing-scene__ridge {
@@ -1628,10 +1621,10 @@ body.lpc-home .closing-scene #closing-title {
 .lpc-home .closing-scene__ridge {
   transform: translate3d(0, calc(var(--closing-mountain-y, 0px) + var(--closing-footer-drift, 0px)), 0) scale(var(--closing-mountain-scale, 1));
 }
-.closing-parallax-track--active { height: calc(max(740px, 100svh) * .75 + 79.8svh); }
+.closing-parallax-track--active { height: calc(max(740px, 100svh) * .75 + 220svh); }
 .lpc-home .home-footer { position: relative; z-index: 1; padding-top: max(300px, 38svh); }
 @media (max-width: 767px) {
-  .closing-parallax-track--active { height: calc(max(700px, 100svh) * .75 + 62.7svh); }
+  .closing-parallax-track--active { height: calc(max(700px, 100svh) * .75 + 190svh); }
   .lpc-home .closing-scene__mountain,
   .lpc-home .closing-scene__ridge { top: calc(var(--closing-scene-height) * .27); }
   .lpc-home .closing-scene__mountain { clip-path: inset(0 0 52%); }
@@ -1648,256 +1641,267 @@ body.lpc-home .closing-scene #closing-title {
   .lpc-home .closing-scene__mountain { mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 28%, transparent 48%); }
 }
 
-/* The roles rise and open outward from the ridge with the heading. */
+/* Reveal both role choices only after the mountain and heading have settled. */
 .lpc-home .closing-parallax-track--active .closing-scene .role-actions {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  translate: -50% var(--closing-actions-y, 0px);
-  transition: none;
+  translate: -50% calc(var(--closing-actions-y, 0px) + 14px);
+  transition: opacity 650ms ease, translate 650ms cubic-bezier(.22,.61,.36,1), visibility 0s linear 650ms;
 }
 .lpc-home .closing-parallax-track--active .closing-scene--actions-ready .role-actions {
-  opacity: var(--closing-roles-opacity, 1);
+  opacity: 1;
   visibility: visible;
   pointer-events: auto;
   translate: -50% var(--closing-actions-y, 0px);
   transition-delay: 0s;
 }
-.lpc-home .closing-scene .role-action:first-child {
-  translate: var(--closing-role-inset, 0px) 0;
-}
-.lpc-home .closing-scene .role-action:last-child {
-  translate: calc(-1 * var(--closing-role-inset, 0px)) 0;
-}
 @media (prefers-reduced-motion: reduce) {
   .lpc-home .closing-scene .role-actions { transition: none; }
 }
 
-/* Keep the wide-screen role links in the sky on either side of the summit. */
-@media (min-width: 1100px) {
-  .lpc-home .closing-scene .role-actions {
-    width: min(880px, calc(100% - 104px));
-    grid-template-columns: minmax(0, 280px) minmax(0, 1fr) minmax(0, 280px);
-    gap: 24px;
+/* Current deployed wording and static mobile presentation; scroll controllers remain unchanged. */
+@media (max-width: 640px) {
+  .lpc-home--editorial .editorial-hero {
+    padding-top: calc(var(--header-height) + 24px);
+    padding-bottom: 28px;
   }
-  .lpc-home .closing-scene .role-action:last-child { grid-column: 3; }
-  .lpc-home .closing-scene .role-action strong { font-size: clamp(28px, 2.4vw, 36px); }
-}
 
-/* When the mountain leaves too little clear sky, give both choices a solid button. */
-@media (max-width: 1099px) {
-  .lpc-home .closing-scene .role-actions {
-    width: min(640px, calc(100% - 48px));
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+  .lpc-home--editorial .editorial-hero__inner {
+    grid-template-rows: 1fr;
   }
-  .lpc-home .closing-scene .role-action {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 68px;
-    padding: 18px 42px;
-    border: 1px solid rgb(255 255 255 / .3);
-    border-radius: 18px;
-    background: var(--lpc-ink);
-    text-align: center;
-  }
-  .lpc-home .closing-scene .role-action strong { font-size: 28px; }
-  .lpc-home .closing-scene .role-action i { right: 16px; width: 20px; }
-  .lpc-home .closing-scene .role-action i::before { width: 20px; }
-  .lpc-home .closing-scene .role-action:is(:hover, :focus-visible) {
-    background: var(--lpc-ink-hover);
-    border-color: rgb(255 255 255 / .65);
-  }
-}
-@media (max-width: 599px) {
-  .lpc-home .closing-scene .role-actions {
-    width: min(360px, calc(100% - 48px));
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-}
 
-.lpc-home .fee-card--hybrid .fee-card__minimum {
-  color: #4775bd;
-  font-weight: 600 !important;
-}
+  .lpc-home--editorial .editorial-hero__main {
+    align-self: center;
+    row-gap: 30px;
+  }
 
-/* Compact role buttons keep their light glass finish on phones and tablets. */
-@media (max-width: 1099px) {
-  .lpc-home .closing-scene .role-action {
-    min-height: 60px;
-    padding: 14px 58px 14px 24px;
-    justify-content: flex-start;
-    border-radius: 14px;
-    text-align: left;
-    background: rgb(241 242 244 / .82);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
-    color: var(--lpc-ink);
-    border-color: rgb(255 255 255 / .34);
+  .lpc-home--editorial .editorial-hero__qualifier {
+    margin-bottom: 16px;
+    font-size: 1.25rem;
   }
-  .lpc-home .closing-scene .role-action strong {
-    display: block;
-    flex: 1;
-    min-width: 0;
-    text-align: left;
-    font-size: 26px;
-  }
-  .lpc-home .closing-scene .role-action i { right: 24px; color: var(--lpc-ink); }
-  .lpc-home .closing-scene .role-action:is(:hover, :focus-visible) {
-    background: rgb(231 233 237 / .88);
-    border-color: rgb(255 255 255 / .7);
-  }
-}
 
-/* Role links point upward and outward. */
-.lpc-home .closing-scene .role-action i {
-  rotate: -45deg;
-}
-.lpc-home .closing-scene .role-action:is(:hover, :focus-visible) i {
-  translate: 4px -4px;
-}
-
-/* Let the mobile closing flow into the footer without sticky stops. */
-@media (max-width: 767px) {
-  .closing-parallax-track--active { height: auto; }
-  .lpc-home .closing-parallax-track--active .closing-scene { position: relative; }
-}
-
-/* Compact mobile choices share a single row. */
-@media (max-width: 767px) {
-  .lpc-home .closing-scene .role-actions {
-    width: min(420px, calc(100% - 24px));
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+  .lpc-home--editorial .editorial-hero h1 {
+    font-size: clamp(3.05rem, 12vw, 3.65rem);
+    line-height: 0.98;
   }
-  .lpc-home .closing-scene .role-action {
-    min-height: 68px;
-    padding: 18px 28px 18px 12px;
-    border-radius: 12px;
-  }
-  .lpc-home .closing-scene .role-action strong {
-    font-size: clamp(18px, 5.2vw, 23px);
-    white-space: nowrap;
-  }
-  .lpc-home .closing-scene .role-action i { right: 11px; width: 14px; }
-  .lpc-home .closing-scene .role-action i::before { width: 14px; }
-  .lpc-home .closing-scene .role-action i::after { width: 7px; height: 7px; }
-}
 
-/* Clear, compact role buttons with one-line labels. */
-.lpc-home .closing-scene .role-actions {
-  width: min(560px, calc(100% - 64px));
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-}
-.lpc-home .closing-scene .role-action:last-child { grid-column: auto; }
-.lpc-home .closing-scene .role-action {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 76px;
-  padding: 19px 50px 19px 24px;
-  border: 1px solid #c4b18f;
-  border-radius: 10px;
-  background: #e5ddce;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  box-shadow: none;
-  color: #19344b;
-  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
-  text-align: left;
-}
-.lpc-home .closing-scene .role-action::before,
-.lpc-home .closing-scene .role-action::after { content: none; }
-.lpc-home .closing-scene .role-action strong {
-  display: block;
-  min-width: 0;
-  flex: 1;
-  font: 400 30px/1.15 'Cormorant Garamond', Georgia, serif;
-  letter-spacing: 0;
-  text-align: left;
-}
-.lpc-home .closing-scene .role-action i { display: block; right: 20px; width: 18px; color: currentColor; }
-.lpc-home .closing-scene .role-action i::before { width: 18px; }
-.lpc-home .closing-scene .role-action i::after { width: 7px; height: 7px; }
-.lpc-home .closing-scene .role-action:is(:hover, :focus-visible) {
-  background: #193650;
-  color: #f0e4ce;
-  border-color: #d5c09a;
-  box-shadow: none;
-}
-.lpc-home .closing-scene .role-action:active { background: #102b42; color: #f0e4ce; }
-.lpc-home .closing-scene .role-action:focus-visible { outline: 2px solid #e5edf5; outline-offset: 4px; }
-@media (max-width: 767px) {
-  .lpc-home .closing-scene .role-actions { width: min(440px, calc(100% - 16px)); gap: 10px; }
-  .lpc-home .closing-scene .role-action { min-height: 72px; padding: 18px 28px 18px 12px; }
-  .lpc-home .closing-scene .role-action strong { font-size: clamp(18px, 6vw, 25px); }
-  .lpc-home .closing-scene .role-action i { right: 10px; width: 12px; }
-  .lpc-home .closing-scene .role-action i::before { width: 12px; }
-  .lpc-home .closing-scene .role-action i::after { width: 6px; height: 6px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .lpc-home .closing-scene .role-action,
-  .lpc-home .closing-scene .role-action i { transition: none; }
-}
-
-@media (min-width: 1100px) {
-  .lpc-home .closing-scene .role-actions {
-    width: min(860px, calc(100% - 104px));
-    grid-template-columns: minmax(0, 280px) minmax(80px, 1fr) minmax(0, 280px);
-    gap: 24px;
+  .lpc-home--editorial .editorial-hero__line--two {
+    max-width: 10.5em;
+    margin-top: 0.12em;
+    font-family: 'Cormorant Garamond', serif !important;
+    font-size: 1.13em;
+    font-style: italic;
+    font-synthesis: style;
+    font-weight: 300 !important;
+    letter-spacing: -0.045em;
+    line-height: 0.9;
   }
-  .lpc-home .closing-scene .role-action:last-child { grid-column: 3; }
+
+  .lpc-home--editorial .editorial-hero__support {
+    max-width: 37ch;
+    padding-left: 0;
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  .lpc-home--editorial .editorial-hero__support-intro {
+    display: none;
+  }
+
+  .lpc-home--editorial .editorial-hero__support::before {
+    display: none;
+  }
+
+  .lpc-home--editorial .editorial-hero__actions {
+    margin-top: 22px;
+  }
+
+  .lpc-home--editorial .editorial-hero__reassurance {
+    display: none;
+  }
+
+  .lpc-home--editorial .editorial-hero__publishing {
+    margin-top: 12px;
+    padding-left: 0;
+    font-size: 0.8rem;
+  }
 }
 
 @media (max-width: 360px) {
-  .lpc-home .closing-scene .role-action strong { font-size: 18px; }
+  .lpc-home--editorial .editorial-hero__line--two {
+    font-size: 1em;
+  }
 }
 
-/* Frosted role choices borrow the mountain's light and texture. */
-.lpc-home .closing-scene .role-action,
-.lpc-home .closing-scene .role-action:last-child {
-  background: linear-gradient(135deg, rgb(240 247 255 / .18), rgb(225 237 248 / .06));
-  border-color: rgb(229 241 255 / .56);
-  border-radius: 16px;
-  color: #f8fbff;
-  -webkit-backdrop-filter: blur(18px) saturate(115%);
-  backdrop-filter: blur(18px) saturate(115%);
-  box-shadow: none;
-  transition: background-color 240ms ease, border-color 240ms ease;
-}
-.lpc-home .closing-scene .role-action:is(:hover, :focus-visible),
-.lpc-home .closing-scene .role-action:last-child:is(:hover, :focus-visible) {
-  background: rgb(233 244 255 / .25);
-  color: #fff;
-  border-color: rgb(255 255 255 / .95);
-}
-.lpc-home .closing-scene .role-action:active,
-.lpc-home .closing-scene .role-action:last-child:active {
-  background: rgb(233 244 255 / .15);
-  color: #fff;
+@media (max-width:640px) {
+  .lpc-home--editorial .editorial-hero__actions { flex-wrap: wrap; }
+  .lpc-home--editorial .editorial-hero__actions .text-action { display:inline-flex; }
 }
 
-/* Match the signup button's pale blue/gold border orbit on hover. */
-@property --role-border-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
-.lpc-home .closing-scene .role-action::before {
-  content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 2px;
-  background: conic-gradient(from var(--role-border-angle), #b9cbea 0deg, #b9cbea 100deg, #e6d6ba 220deg, #b9cbea 360deg);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude;
-  pointer-events: none; opacity: 0;
-  animation: role-border-orbit 1.8s linear infinite paused;
-}
-.lpc-home .closing-scene .role-action:is(:hover, :focus-visible)::before { opacity: 1; animation-play-state: running; }
-@keyframes role-border-orbit { to { --role-border-angle: 360deg; } }
-.lpc-home .closing-scene .role-action i { width: 24px; height: 24px; transform: none; rotate: none; }
-.lpc-home .closing-scene .role-action i::before,
-.lpc-home .closing-scene .role-action i::after { content: none; }
-.lpc-home .closing-scene .role-action i svg { display: block; width: 100%; height: 100%; }
-@media (max-width: 767px) { .lpc-home .closing-scene .role-action i { width: 18px; height: 18px; } }
-@media (prefers-reduced-motion: reduce) { .lpc-home .closing-scene .role-action::before { animation: none; } }
+/* Restore the deployed notes-first preview without changing workflow navigation. */
+.lpc-home .workflow-create-preview { max-width: 580px; margin: 36px auto; padding: 28px; border: 1px solid #dce2ea; border-radius: 8px; background: #fff; }
+.lpc-home .workflow-create-preview h4 { margin: 0; color: #1b2534; font: 600 28px/1.25 'Sarabun', sans-serif; font-family: 'Sarabun', sans-serif !important; font-weight: 600 !important; letter-spacing: -.025em; }
+.lpc-home .workflow-create-preview__prompt { margin: 8px 0 24px; color: #647080; font: 400 14px/1.5 'Sarabun', sans-serif; }
+.lpc-home .workflow-create-preview__notes { min-height: 108px; padding: 12px 14px; color: #27394d; font: 400 15px/1.6 'Sarabun', sans-serif; }
+.lpc-home .workflow-create-preview__actions { display: flex; flex-wrap: wrap; flex-direction: column; align-items: center; justify-content: center; gap: 8px; margin-top: 16px; }
+.lpc-home .workflow-create-preview__build { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 5px; background: #203550; color: white; font: 500 13px/20px 'Sarabun', sans-serif; }
+.lpc-home .workflow-create-preview__manual { color: #647080; font: 400 13px/20px 'Sarabun', sans-serif; }
 
-/* Match the cutout mountain’s 30% black wash on the background image. */
-.lpc-home .closing-scene__mountain { filter: brightness(.7); }
+/* Restore item 02: deployed workflow presentation only. */
+@media (max-width: 960px) {
+.lpc-home .workflow__story { display: block; width: 100%; min-height: 0; }
+.lpc-home .workflow-mobile-stage, .lpc-home .workflow-mobile-nav { display: none; }
+.lpc-home .workflow-chapters {
+    position: relative; display: flex; gap: 8px; width: 100%; padding: 3px 8px;
+    overflow-x: scroll; overflow-y: hidden; scroll-snap-type: x mandatory;
+    scroll-padding-left: 8px; overscroll-behavior-x: contain; touch-action: auto;
+    scrollbar-width: none;
+  }
+.lpc-home .workflow-chapters::-webkit-scrollbar { display: none; }
+.lpc-home .workflow-chapters .workflow-chapter {
+    position: relative; display: flex; flex-direction: column;
+    flex: 0 0 328px; width: 328px; height: 376px; min-height: 0;
+    padding: 38px 24px 20px; gap: 0;
+    border: 1px solid #e2e5e9; border-radius: 8px;
+    background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+      radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+    opacity: 1; transform: none; transition: none; pointer-events: auto;
+    scroll-snap-align: start;
+  }
+.lpc-home .workflow-chapters .workflow-chapter > * { visibility: visible; }
+.lpc-home .workflow-chapters .workflow-chapter__number { position: absolute; top: 12px; left: 24px; width: auto; height: auto; font: 12px/18px 'Sarabun', sans-serif; color: #62748a; }
+.lpc-home .workflow-chapters .workflow-chapter > div:not(.workflow-mobile-canvas) { display: contents; container-type: normal; }
+.lpc-home .workflow-chapters .workflow-chapter h3 { order: 0; flex: 0 0 auto; margin: 0 0 12px; text-align: center; font-family: 'Sarabun', sans-serif !important; font-size: 21px; font-weight: 300 !important; line-height: 28px; letter-spacing: -.015em; }
+.lpc-home .workflow-chapters .workflow-chapter p { max-width: 260px; margin: 0; font-size: 15px; font-weight: 400; line-height: 24px; color: #647080; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas { order: 1; display: block; flex: 0 0 auto; min-height: 0; width: 100%; margin: 0; padding: 0; opacity: 1; transform: none; }
+.lpc-home .workflow-mobile-canvas .workflow-state {
+    display: block; position: relative; inset: auto; width: 100%; min-height: 0;
+    padding: 14px; border: 1px solid #dce2ea; border-radius: 8px; background: #fff;
+    opacity: 1; transform: none; visibility: visible; pointer-events: none;
+    box-shadow: 0 8px 24px rgba(24,42,67,.05);
+    --workflow-ui-body: 10px; --workflow-ui-small: 9px;
+  }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .product-topbar { display: none; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas :is(.state-heading h4, .completion-state h4) { margin: 0; font: 500 14px/20px 'Sarabun', sans-serif !important; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .state-heading { margin-bottom: 12px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .field { min-height: 0; padding: 8px; gap: 4px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .field--wide { display: none; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-list { gap: 8px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row { grid-template-columns: 30px minmax(0,1fr); gap: 4px 8px; padding: 8px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row .avatar { width: 28px; height: 28px; font-size: 10px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas :is(.applicant-row__skills,.match-score) { display: none; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .workspace-grid { display: block; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .workspace-chat { min-height: 0; padding: 0; border: 0; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .panel-heading { margin-bottom: 10px; padding-bottom: 8px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .message { margin: 0 0 8px; padding: 0; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .message p { max-width: 92%; padding: 8px 10px; font-size: 12px; line-height: 18px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas :is(.workspace-details,.message small) { display: none; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-state { min-height: 0; padding: 0; gap: 8px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-state > p { display: none; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-files { margin: 12px 0; padding: 0; gap: 8px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-files > span { padding: 8px; gap: 6px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-files b { font-size: 11px; line-height: 16px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .payment-summary { padding: 0; margin: 12px 0 0; gap: 8px; background: transparent; border: 0; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .workflow-preview-action { padding: 8px 12px; font-size: 11px; line-height: 16px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-mark { width: 32px; height: 32px; margin: 0 auto 10px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-mark::after { width: 12px; height: 7px; }
+.lpc-home .workflow-chapters:focus-visible { outline: 2px solid #6495ed; outline-offset: -2px; }
+.lpc-home .workflow { padding-bottom: 80px; }
+}
+@media (max-width: 960px) {
+.lpc-home .workflow-chapters .workflow-chapter h3 { color: #1b2534; opacity: 1; }
+.lpc-home .workflow-chapters .workflow-chapter > div:not(.workflow-mobile-canvas) > p { position: absolute; top: 304px; left: 24px; right: 24px; max-width: 250px; margin: 0; line-height: 20px; }
+.lpc-home .workflow-chapters .workflow-chapter__number { z-index: 1; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row { min-height: 0; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row__identity { gap: 2px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row__identity :is(strong,span) { font-size: 12px; line-height: 18px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .message--sent p { color: #fff; }
+}
+.lpc-home .workflow-notes-feature strong { display: block; margin-bottom: 12px; color: #203550; font: 500 22px/1.35 'Sarabun', sans-serif; }
+.lpc-home .workflow-notes-feature p { margin: 0; }
+.lpc-home .workflow-create-preview { max-width: 580px; margin: 36px auto; padding: 28px; border: 1px solid #dce2ea; border-radius: 8px; background: #fff; }
+.lpc-home .workflow-create-preview h4 { margin: 0; color: #1b2534; font: 600 28px/1.25 'Sarabun', sans-serif; font-family: 'Sarabun', sans-serif !important; font-weight: 600 !important; letter-spacing: -.025em; }
+.lpc-home .workflow-create-preview__prompt { margin: 8px 0 24px; color: #647080; font: 400 14px/1.5 'Sarabun', sans-serif; }
+.lpc-home .workflow-create-preview__notes { min-height: 108px; padding: 12px 14px; color: #27394d; font: 400 15px/1.6 'Sarabun', sans-serif; }
+.lpc-home .workflow-create-preview__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 16px; }
+.lpc-home .workflow-create-preview__build { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 5px; background: #203550; color: white; font: 500 13px/20px 'Sarabun', sans-serif; }
+.lpc-home .workflow-create-preview__manual { color: #647080; font: 400 13px/20px 'Sarabun', sans-serif; }
+@media (max-width: 960px) {
+.lpc-home .workflow-notes-feature { max-width: 390px; }
+.lpc-home .workflow-notes-feature strong { font-size: 19px; margin-bottom: 8px; }
+.lpc-home .workflow-notes-feature p { font-size: 16px; line-height: 1.6; }
+.lpc-home .workflow-chapters .workflow-create-preview { margin: 0; padding: 0; border: 0; }
+.lpc-home .workflow-chapters .workflow-create-preview h4 { font-size: 14px; line-height: 20px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .workflow-create-preview__prompt { margin: 4px 0 10px; font-size: 12px; line-height: 18px; }
+.lpc-home .workflow-chapters .workflow-create-preview__notes { min-height: 0; padding: 8px 0; font-size: 12px; line-height: 18px; }
+.lpc-home .workflow-chapters .workflow-create-preview__actions { margin-top: 10px; }
+.lpc-home .workflow-chapters .workflow-create-preview__build { padding: 6px 10px; font-size: 11px; line-height: 16px; }
+.lpc-home .workflow-chapters .workflow-create-preview__manual { display: none; }
+}
+.lpc-home .workflow-create-preview__actions { justify-content: center; }
+.lpc-home .workflow-state .workflow-preview-action { align-self: center; justify-self: center; margin-inline: auto; }
+.lpc-home .workflow-state .message-composer span { display: inline-flex; align-items: center; justify-content: center; }
+@media (max-width: 960px) {
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-list { gap: 6px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row { padding: 4px 6px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .applicant-row__identity :is(strong,span) { line-height: 16px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .message-composer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 6px 8px; border: 1px solid #dce2ea; border-radius: 6px; font-size: 11px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .message-composer span { padding: 5px; border-radius: 4px; background: #203550; color: #fff; }
+}
+@media (max-width: 960px) {
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-files i { padding: 3px; font-size: 9px; line-height: 14px; }
+.lpc-home .workflow-chapters .workflow-mobile-canvas .completion-files > span { padding: 6px 8px; }
+}
+.lpc-home .workflow-state .payment-summary > .workflow-payout { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; text-align: center; }
+.lpc-home .workflow-create-preview__actions { flex-direction: column; gap: 8px; }
+.lpc-home .workflow-state .completion-state--released .payment-summary { flex-direction: column; align-items: center; }
+.lpc-home .workflow-canvas.product-shell {
+  background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+    radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+}
+
+.lpc-home .fee-card--hybrid .fee-card__minimum { color:#4775bd; font-weight:600 !important; }
+.lpc-home .fee-card a.stripe-link, .lpc-home .fee-card a.stripe-link:hover, .lpc-home .fee-card a.stripe-link:visited { color:#6495ed; text-decoration:none; }
+@media(max-width:767px){
+ .lpc-home .closing-scene .role-actions{width:min(440px,calc(100% - 16px));grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+ .lpc-home .closing-scene .role-action{display:flex;align-items:center;justify-content:flex-start;min-height:72px;padding:18px 28px 18px 12px;border:1px solid rgb(229 241 255 / .56);border-radius:16px;background:linear-gradient(135deg,rgb(240 247 255 / .18),rgb(225 237 248 / .06));color:#f8fbff;-webkit-backdrop-filter:blur(18px) saturate(115%);backdrop-filter:blur(18px) saturate(115%);box-shadow:none;text-align:left;}
+ .lpc-home .closing-scene .role-action strong{display:block;min-width:0;flex:1;font:400 clamp(18px,6vw,25px)/1.15 'Cormorant Garamond',Georgia,serif;letter-spacing:0;text-align:left;}
+ .lpc-home .closing-scene .role-action i{display:block;right:10px;width:18px;height:18px;color:currentColor;rotate:none;transform:none;}
+ .lpc-home .closing-scene .role-action i::before,.lpc-home .closing-scene .role-action i::after{content:none;}
+ .lpc-home .closing-scene .role-action i svg{display:block;width:100%;height:100%;}
+ .lpc-home .closing-scene .role-action:is(:hover,:focus-visible){background:rgb(233 244 255 / .25);border-color:rgb(255 255 255 / .95);color:#fff;}
+ .lpc-home .closing-scene .role-action:active{background:rgb(233 244 255 / .15);color:#fff;}
+ .lpc-home .closing-scene .role-action:focus-visible{outline:2px solid #e5edf5;outline-offset:4px;}
+}
+@media(max-width:360px){.lpc-home .closing-scene .role-action strong{font-size:18px;}}
+
+/* Deployed constellation and parallax surfaces, scoped to mobile. */
+@media(max-width:767px){
+ .workflow__constellation{position:absolute;inset:0;overflow:clip;pointer-events:none;}
+ .matter-field--workflow{position:sticky;top:0;display:block;opacity:.82;}
+ .workflow__intro,.workflow__story{position:relative;}
+ .lpc-home .paralegal-map{background-size:100% calc(100% + var(--home-stable-viewport,100svh) * .75);background-repeat:no-repeat;}
+ .paralegal-map__stage{min-height:calc(var(--home-stable-viewport,100svh) - var(--header-height,72px));box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;padding:32px 0;}
+ .paralegal-map__canvas{aspect-ratio:975 / 610;}
+ .lpc-home .paralegal-map__motion-surface{position:absolute;inset:0;transform-origin:center;will-change:transform;}
+ .lpc-home .paralegal-map__motion-surface svg{position:absolute;inset:0;width:100%;height:auto;transform:none !important;will-change:auto;}
+ .closing-parallax-track--active{height:auto;}
+ .lpc-home .closing-parallax-track--active .closing-scene{position:relative;clip-path:none;}
+ .lpc-home .closing-scene #closing-title{transform-origin:50% 100%;will-change:translate,scale;}
+ .lpc-home .closing-parallax-track--active .closing-scene .role-actions{transition:none;}
+ .lpc-home .closing-parallax-track--active .closing-scene--actions-ready .role-actions{opacity:var(--closing-roles-opacity,1);}
+}
+@media(max-width:640px){.lpc-home .workflow__intro,.lpc-home .workflow__story{background:transparent;}}
+@media(max-width:600px){.matter-field--workflow{opacity:1;}}
+@media(min-width:768px){.workflow__constellation{display:none;}}
+@media(prefers-reduced-motion:reduce){.lpc-home .paralegal-map{background-size:auto;} .lpc-home .paralegal-map__stage{min-height:0;} .lpc-home .paralegal-map__motion-surface{transform:none !important;will-change:auto;}}
+
+/* Keep mobile hero centering stable while Safari changes toolbar height. */
+@media(max-width:767px){
+ body.lpc-home--editorial .editorial-hero{min-height:var(--hero-layout-min-height,max(700px,100svh));}
+}
+@media(max-width:640px){
+ body.lpc-home--editorial .editorial-hero{min-height:var(--hero-layout-min-height,max(720px,100svh));}
+}

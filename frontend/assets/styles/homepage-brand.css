@@ -1,0 +1,7 @@
+/* Mountain signature follows the header foreground across light and dark scenes. */
+.public-site-chrome .home-brand { display: inline-flex; align-items: center; gap: 10px; }
+.public-site-chrome .home-brand__mountain { width: 40px; height: 20px; flex: none; }
+@media (max-width: 767px) {
+  .public-site-chrome .home-brand { gap: 7px; }
+  .public-site-chrome .home-brand__mountain { width: 30px; height: 17px; }
+}

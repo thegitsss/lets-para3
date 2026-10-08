@@ -18,84 +18,64 @@
   syncFooterDirectories();
   footerDirectoryMedia.addEventListener?.("change", syncFooterDirectories);
 
-  // Mobile sections are light except the closing scene. Cache their static
-  // document boundaries, and retain painted-surface hit testing at its overflow
-  // into the footer. Desktop keeps its existing surface detection.
-  const mobileHeaderScene = document.querySelector('.closing-scene');
-  let mobileHeaderGeometry = null, mobileHeaderGeometryDirty = true;
+  // Retain the initial mobile hero geometry while browser toolbars change height.
+  // A real width change (including rotation) remeasures the responsive design.
+  let heroLayoutWidth = innerWidth;
+  const measureHeroLayout = () => {
+    if (!headerHero) return;
+    headerHero.style.removeProperty('--hero-layout-min-height');
+    if (innerWidth > 767) return;
+    const computed = getComputedStyle(headerHero).minHeight;
+    const resolved = /^[-\d.]+px$/.test(computed)
+      ? parseFloat(computed) : headerHero.getBoundingClientRect().height;
+    headerHero.style.setProperty('--hero-layout-min-height', `${resolved}px`);
+  };
+  measureHeroLayout();
+  addEventListener('resize', () => {
+    if (innerWidth === heroLayoutWidth) return;
+    heroLayoutWidth = innerWidth;
+    measureHeroLayout();
+  }, { passive: true });
+
+  // Safari toolbar height changes must not alter motion progress at a fixed scroll position.
+  let heroViewportWidth = innerWidth;
+  let heroViewportHeight = innerHeight;
+  const heroMotionHeight = () => {
+    if (innerWidth !== heroViewportWidth) {
+      heroViewportWidth = innerWidth;
+      heroViewportHeight = innerHeight;
+    }
+    return innerWidth <= 767 ? heroViewportHeight : innerHeight;
+  };
+  const setMotionStyle = (node, name, value) => {
+    if (node.style.getPropertyValue(name) !== value) node.style.setProperty(name, value);
+  };
   const syncHeaderSurface = () => {
     if (!header) return;
-    const fadeDistance = Math.max(280, Math.min(420, window.innerHeight * 0.4));
+    const fadeDistance = Math.max(280, Math.min(420, heroMotionHeight() * 0.4));
     const progress = clamp(window.scrollY / fadeDistance);
     const editorialHero = document.body.classList.contains("lpc-home--editorial");
     // Read the section actually painted behind the header, including pinned scenes.
-    const mobile = window.innerWidth < 768 && mobileHeaderScene;
-    if (mobile && mobileHeaderGeometryDirty) {
-      const sceneBounds = mobileHeaderScene.getBoundingClientRect();
-      mobileHeaderGeometry = {
-        headerHeight: header.getBoundingClientRect().height,
-        heroBottom: headerHero ? headerHero.getBoundingClientRect().bottom + scrollY : 0,
-        closingTop: sceneBounds.top + scrollY,
-        closingBottom: sceneBounds.bottom + scrollY,
-        overflowEnd: sceneBounds.bottom + scrollY + mobileHeaderScene.clientHeight,
-      };
-      mobileHeaderGeometryDirty = false;
-    }
-    const headerBounds = mobile ? { height: mobileHeaderGeometry.headerHeight, bottom: mobileHeaderGeometry.headerHeight }
-      : header.getBoundingClientRect();
-    const heroBounds = mobile ? (headerHero ? { bottom: mobileHeaderGeometry.heroBottom - scrollY } : null)
-      : headerHero?.getBoundingClientRect();
+    const headerBounds = header.getBoundingClientRect();
+    const pastHero = !!headerHero && headerHero.getBoundingClientRect().bottom <= headerBounds.bottom;
     const headerMidpoint = headerBounds.height / 2;
-    const samplePosition = scrollY + headerMidpoint;
-    let tone;
-    if (mobile && samplePosition < mobileHeaderGeometry.closingTop) tone = 'light';
-    else if (mobile && samplePosition < mobileHeaderGeometry.closingBottom) tone = 'dark';
-    else if (mobile && samplePosition >= mobileHeaderGeometry.overflowEnd) tone = 'light';
-    else tone = document.elementsFromPoint(window.innerWidth / 2, headerMidpoint)
+    const surface = innerWidth <= 767 && !pastHero ? headerHero : document.elementsFromPoint(window.innerWidth / 2, headerMidpoint)
       .find(node => !header.contains(node) && node.closest('[data-header-tone]'))
-      ?.closest('[data-header-tone]')?.dataset.headerTone;
+      ?.closest('[data-header-tone]');
+    const tone = surface?.dataset.headerTone;
     const useInkForeground = header.classList.contains('is-open') ||
       (tone ? tone === 'light' : editorialHero || progress >= 0.52);
-    // Finish geometry reads before changing styles, and keep settled values
-    // untouched while scrolling through later sections.
-    const styles = {
-      "--header-surface-alpha": (progress * 0.94).toFixed(3),
-      "--header-surface-blur": `${(progress * 16).toFixed(2)}px`,
-      "--header-foreground": useInkForeground ? "rgb(26, 34, 48)" : "rgb(255, 255, 255)",
-    };
-    Object.entries(styles).forEach(([name, value]) => {
-      if (header.style.getPropertyValue(name) !== value) header.style.setProperty(name, value);
-    });
-    const classes = { "has-ink": useInkForeground, "is-scrolled": progress >= 0.98,
-      "is-past-hero": !!heroBounds && heroBounds.bottom <= headerBounds.bottom };
-    Object.entries(classes).forEach(([name, enabled]) => {
-      if (header.classList.contains(name) !== enabled) header.classList.toggle(name, enabled);
-    });
+    // These legacy values have no consumers in the current mobile styles.
+    // Preserve desktop behavior while avoiding inherited restyles on phones.
+    if (innerWidth > 767) {
+      setMotionStyle(header, "--header-surface-alpha", (progress * 0.94).toFixed(3));
+      setMotionStyle(header, "--header-surface-blur", `${(progress * 16).toFixed(2)}px`);
+    }
+    setMotionStyle(header, "--header-foreground", useInkForeground ? "rgb(26, 34, 48)" : "rgb(255, 255, 255)");
+    header.classList.toggle("has-ink", useInkForeground);
+    header.classList.toggle("is-scrolled", progress >= 0.98);
+    header.classList.toggle("is-past-hero", pastHero);
   };
-
-  // Yield decorative canvas/pin effects to native phone scrolling. Their
-  // current frame stays visible and the animation resumes when scrolling ends.
-  const nativeScrollRenderQuery = window.matchMedia('(max-width: 767px)');
-  let nativeScrolling = false, nativeScrollIdleTimer = 0;
-  window.addEventListener('scroll', () => {
-    if (!nativeScrollRenderQuery.matches) return;
-    if (!nativeScrolling) {
-      nativeScrolling = true;
-      document.body.classList.add('mobile-is-scrolling');
-    }
-    clearTimeout(nativeScrollIdleTimer);
-    nativeScrollIdleTimer = setTimeout(() => {
-      nativeScrolling = false;
-      document.body.classList.remove('mobile-is-scrolling');
-    }, 180);
-  }, { passive: true });
-  nativeScrollRenderQuery.addEventListener('change', () => {
-    if (!nativeScrollRenderQuery.matches) {
-      clearTimeout(nativeScrollIdleTimer);
-      nativeScrolling = false;
-      document.body.classList.remove('mobile-is-scrolling');
-    }
-  });
 
   syncHeaderSurface();
   let headerFrame = 0;
@@ -104,38 +84,25 @@
     headerFrame = requestAnimationFrame(() => { headerFrame = 0; syncHeaderSurface(); });
   };
   window.addEventListener("scroll", scheduleHeaderSurface, { passive: true });
-  const invalidateMobileHeaderGeometry = () => {
-    mobileHeaderGeometryDirty = true;
-    scheduleHeaderSurface();
-  };
-  window.addEventListener("resize", invalidateMobileHeaderGeometry);
-  window.addEventListener("load", invalidateMobileHeaderGeometry, { once: true });
-  document.fonts.ready.then(invalidateMobileHeaderGeometry);
-  if (mobileHeaderScene && "ResizeObserver" in window) {
-    const headerGeometryObserver = new ResizeObserver(invalidateMobileHeaderGeometry);
-    [document.body, header, headerHero, mobileHeaderScene].filter(Boolean)
-      .forEach(node => headerGeometryObserver.observe(node));
-  }
+  window.addEventListener("resize", scheduleHeaderSurface);
+  document.fonts.ready.then(scheduleHeaderSurface);
 
   const editorialDetails = document.querySelector(".editorial-hero__details");
   let editorialParallaxFrame = 0;
-  let editorialProgress = null;
   const syncEditorialParallax = () => {
     editorialParallaxFrame = 0;
     if (!editorialDetails) return;
-    const motionDisabled = window.matchMedia("(max-width: 640px)").matches || reducedMotion.matches || document.body.classList.contains("accessibility-mode");
-    const progress = motionDisabled ? 0 : clamp(window.scrollY / Math.max(1, window.innerHeight * 0.52));
-    if (editorialProgress === progress) return;
-    editorialProgress = progress;
-    editorialDetails.style.setProperty("--editorial-copy-x", `${(24 * progress).toFixed(1)}px`);
-    editorialDetails.style.setProperty("--editorial-copy-y", `${(145 * progress).toFixed(1)}px`);
-    editorialDetails.style.setProperty("--editorial-actions-x", `${(-34 * progress).toFixed(1)}px`);
-    editorialDetails.style.setProperty("--editorial-actions-y", `${(245 * progress).toFixed(1)}px`);
-    editorialDetails.style.setProperty("--editorial-note-x", `${(44 * progress).toFixed(1)}px`);
-    editorialDetails.style.setProperty("--editorial-note-y", `${(345 * progress).toFixed(1)}px`);
-    editorialDetails.style.setProperty("--editorial-copy-rotate", `${(0.7 * progress).toFixed(2)}deg`);
-    editorialDetails.style.setProperty("--editorial-actions-rotate", `${(-1.3 * progress).toFixed(2)}deg`);
-    editorialDetails.style.setProperty("--editorial-depth-scale", (1 + (progress * 0.075)).toFixed(4));
+    const motionDisabled = reducedMotion.matches || document.body.classList.contains("accessibility-mode");
+    const progress = motionDisabled ? 0 : clamp(window.scrollY / Math.max(1, heroMotionHeight() * 0.52));
+    setMotionStyle(editorialDetails, "--editorial-copy-x", `${(24 * progress).toFixed(1)}px`);
+    setMotionStyle(editorialDetails, "--editorial-copy-y", `${(145 * progress).toFixed(1)}px`);
+    setMotionStyle(editorialDetails, "--editorial-actions-x", `${(-34 * progress).toFixed(1)}px`);
+    setMotionStyle(editorialDetails, "--editorial-actions-y", `${(245 * progress).toFixed(1)}px`);
+    setMotionStyle(editorialDetails, "--editorial-note-x", `${(44 * progress).toFixed(1)}px`);
+    setMotionStyle(editorialDetails, "--editorial-note-y", `${(345 * progress).toFixed(1)}px`);
+    setMotionStyle(editorialDetails, "--editorial-copy-rotate", `${(0.7 * progress).toFixed(2)}deg`);
+    setMotionStyle(editorialDetails, "--editorial-actions-rotate", `${(-1.3 * progress).toFixed(2)}deg`);
+    setMotionStyle(editorialDetails, "--editorial-depth-scale", (1 + (progress * 0.075)).toFixed(4));
   };
   const scheduleEditorialParallax = () => {
     if (editorialParallaxFrame) return;
@@ -150,42 +117,68 @@
   });
   syncEditorialParallax();
 
-  // Match Find’s default Lenis wheel smoothing and unscaled wheel distance.
-  let pageScroll = null;
-  const advancePageScroll = time => pageScroll?.raf(time * 1000);
-  const syncPageScroll = () => {
-    const enabled = window.Lenis && window.gsap && window.ScrollTrigger &&
-      !window.ScrollTrigger.isTouch && !reducedMotion.matches &&
-      !document.body.classList.contains("accessibility-mode");
-    if (!enabled) {
-      window.gsap?.ticker.remove(advancePageScroll);
-      pageScroll?.destroy();
-      pageScroll = null;
+  const lazyScrollMedia = window.matchMedia("(min-width: 900px) and (pointer: fine) and (prefers-reduced-motion: no-preference)");
+  let lazyScrollFrame = 0;
+  let lazyScrollPosition = window.scrollY;
+  let lazyScrollTarget = window.scrollY;
+
+  const canNestedScrollerMove = (start, delta) => {
+    for (let node = start instanceof Element ? start : null; node && node !== document.body; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (!/(auto|scroll)/.test(style.overflowY) || node.scrollHeight <= node.clientHeight + 1) continue;
+      if (delta < 0 && node.scrollTop > 0) return true;
+      if (delta > 0 && node.scrollTop + node.clientHeight < node.scrollHeight - 1) return true;
+    }
+    return false;
+  };
+
+  const stopLazyScroll = () => {
+    if (lazyScrollFrame) window.cancelAnimationFrame(lazyScrollFrame);
+    lazyScrollFrame = 0;
+    lazyScrollPosition = window.scrollY;
+    lazyScrollTarget = window.scrollY;
+    document.documentElement.classList.remove("is-lazy-scrolling");
+  };
+
+  const animateLazyScroll = () => {
+    const distance = lazyScrollTarget - lazyScrollPosition;
+    lazyScrollPosition += distance * 0.09;
+    if (Math.abs(distance) < 0.5) {
+      window.scrollTo(0, lazyScrollTarget);
+      stopLazyScroll();
       return;
     }
-    if (pageScroll) return;
-    pageScroll = new window.Lenis({
-      autoRaf: false,
-      allowNestedScroll: true,
-      lerp: .1,
-    });
-    pageScroll.on("scroll", window.ScrollTrigger.update);
-    window.gsap.ticker.add(advancePageScroll);
-    window.gsap.ticker.lagSmoothing(0);
+    window.scrollTo(0, lazyScrollPosition);
+    lazyScrollFrame = window.requestAnimationFrame(animateLazyScroll);
   };
-  window.gsap?.registerPlugin(window.ScrollTrigger);
-  reducedMotion.addEventListener("change", syncPageScroll);
-  new MutationObserver(syncPageScroll).observe(document.body, {
-    attributes: true,
-    attributeFilter: ["class"],
-  });
-  window.addEventListener("pageshow", syncPageScroll);
-  window.addEventListener("pagehide", () => {
-    window.gsap?.ticker.remove(advancePageScroll);
-    pageScroll?.destroy();
-    pageScroll = null;
-  });
-  syncPageScroll();
+
+  window.addEventListener("wheel", (event) => {
+    if (
+      !lazyScrollMedia.matches ||
+      document.body.classList.contains("accessibility-mode") ||
+      event.ctrlKey ||
+      event.metaKey ||
+      Math.abs(event.deltaX) >= Math.abs(event.deltaY) ||
+      !event.deltaY ||
+      canNestedScrollerMove(event.target, event.deltaY)
+    ) return;
+
+    event.preventDefault();
+    const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? window.innerHeight : 1;
+    if (!lazyScrollFrame) {
+      lazyScrollPosition = window.scrollY;
+      lazyScrollTarget = window.scrollY;
+      document.documentElement.classList.add("is-lazy-scrolling");
+    }
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const requestedTarget = lazyScrollTarget + (event.deltaY * unit * 0.55);
+    const maxLead = window.innerHeight * 0.75;
+    lazyScrollTarget = clamp(requestedTarget, Math.max(0, lazyScrollPosition - maxLead), Math.min(maxScroll, lazyScrollPosition + maxLead));
+    if (!lazyScrollFrame) lazyScrollFrame = window.requestAnimationFrame(animateLazyScroll);
+  }, { passive: false });
+
+  lazyScrollMedia.addEventListener?.("change", stopLazyScroll);
+  window.addEventListener("pagehide", stopLazyScroll);
 
   class MatterField {
     constructor(canvas) {
@@ -303,11 +296,6 @@
     }
 
     syncAnimation() {
-      if (nativeScrollRenderQuery.matches && nativeScrolling) {
-        if (this.frameId) window.cancelAnimationFrame(this.frameId);
-        this.frameId = 0;
-        return;
-      }
       if (!this.shouldAnimate()) {
         if (this.frameId) window.cancelAnimationFrame(this.frameId);
         this.frameId = 0;
@@ -590,6 +578,8 @@
     ".clarity-section__intro",
     ".fee-card",
     ".home-faq",
+    ".closing-scene__content",
+    ".role-action",
     ".home-footer__top > *",
   ].join(",")));
 
@@ -648,23 +638,6 @@
   });
   window.addEventListener("hashchange", () => revealAnchorTargetImmediately());
   if (window.location.hash) window.requestAnimationFrame(() => revealAnchorTargetImmediately());
-  if (window.location.hash === "#how") {
-    // Native fragment positioning can be lost while the scroll scenes measure.
-    // Land on the workflow heading after that initial layout has settled.
-    let interrupted = false;
-    const interrupt = () => { interrupted = true; };
-    const inputEvents = ["wheel", "touchstart", "pointerdown", "keydown"];
-    inputEvents.forEach((name) => window.addEventListener(name, interrupt, { once: true, passive: true }));
-    const pageLoaded = document.readyState === "complete" ? Promise.resolve()
-      : new Promise((resolve) => window.addEventListener("load", resolve, { once: true }));
-    Promise.all([pageLoaded, document.fonts ? document.fonts.ready : Promise.resolve()])
-      .then(() => window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
-        if (!interrupted && window.location.hash === "#how") {
-          document.getElementById("how")?.scrollIntoView({ block: "start", behavior: "instant" });
-        }
-        inputEvents.forEach((name) => window.removeEventListener(name, interrupt));
-      })));
-  }
 
   if (reducedMotion.matches || !("IntersectionObserver" in window)) {
     revealTargets.forEach((element) => element.classList.add("is-revealed"));
@@ -760,10 +733,6 @@
     });
   }
 
-  if (desktopStates.length && mobileWorkflowStage?.querySelectorAll(".workflow-state").length === desktopStates.length) {
-    document.body.classList.add("workflow-enhanced");
-  }
-
   const fitMobileWorkflowState = () => {
     if (!mobileWorkflowQuery.matches || !mobileWorkflowStage) return;
     const panel = mobileWorkflowStage.querySelector(".workflow-state.is-active");
@@ -841,7 +810,7 @@
 
     const centerWorkflowChapter = (chapter, behavior = "smooth") => {
       if (!chapter || !mobileWorkflowQuery.matches) return;
-      const left = chapter.offsetLeft - 8;
+      const left = chapter.offsetLeft - ((workflowChapters.clientWidth - chapter.offsetWidth) / 2);
       workflowChapters.scrollTo({
         left: Math.max(0, left),
         behavior: reducedMotion.matches ? "auto" : behavior,
@@ -851,11 +820,12 @@
     const syncWorkflowSwipe = () => {
       workflowSwipeFrame = 0;
       if (!mobileWorkflowQuery.matches) return;
-      const viewportStart = workflowChapters.scrollLeft + 8;
+      const viewportCenter = workflowChapters.scrollLeft + (workflowChapters.clientWidth / 2);
       const direction = workflowChapters.scrollLeft >= previousWorkflowScrollLeft ? "down" : "up";
       previousWorkflowScrollLeft = workflowChapters.scrollLeft;
       const closestChapter = chapters.reduce((closest, chapter) => {
-        const distance = Math.abs(viewportStart - chapter.offsetLeft);
+        const chapterCenter = chapter.offsetLeft + (chapter.offsetWidth / 2);
+        const distance = Math.abs(viewportCenter - chapterCenter);
         return distance < closest.distance ? { chapter, distance } : closest;
       }, { chapter: chapters[0], distance: Number.POSITIVE_INFINITY }).chapter;
       const state = closestChapter.dataset.workflowChapter || "1";
