@@ -27,6 +27,10 @@
   const builderAmount = film.querySelector('#builder-amount');
   const builderDate = film.querySelector('#builder-date');
   const brief = film.querySelector('.builder-brief');
+  let mobileBriefScrollTop = 0;
+  brief.addEventListener('scroll', () => {
+    if (innerWidth <= 767) mobileBriefScrollTop = brief.scrollTop;
+  }, { passive: true });
   const originalNotes = brief.innerHTML.replace(/<br\s*\/?>/gi, '\n');
   brief.setAttribute('aria-label', `Your original notes: ${originalNotes}`);
   const typedNotes = document.createElement('span');
@@ -71,6 +75,7 @@
   let changingStage = false;
   let sceneAnimation = null;
   let transitionVersion = 0;
+  let mobileArrival = 0;
 
   async function transitionTo(next) {
     // Native flings can cross another threshold before a fade finishes.
@@ -94,6 +99,7 @@
       changingStage = false;
       scene.inert = false;
       delete film.dataset.transitioning;
+      delete scene.dataset.mobileArrival;
       if (stage !== next) setStage(next);
       return;
     }
@@ -110,12 +116,13 @@
         // state by 200ms, so phones use just the existing incoming motion.
         const direction = requestedStage > stage ? 1 : -1;
         setStage(requestedStage);
-        sceneAnimation = scene.animate([
-          { opacity: .65, transform: `translateX(${18 * direction}px)` },
-          { opacity: 1, transform: 'translateX(0)' }
-        ], { duration: 380, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'forwards' });
-        await sceneAnimation.finished;
-        sceneAnimation.cancel();
+        // CSS starts this compositor animation at the normal render boundary.
+        // Alternating names restarts a reversed arrival without forcing style
+        // or layout synchronously after the stage's DOM changes.
+        scene.style.setProperty('--matter-arrival-x', `${18 * direction}px`);
+        scene.dataset.mobileArrival = ++mobileArrival % 2 ? 'a' : 'b';
+        await new Promise(resolve => setTimeout(resolve, 380));
+        if (version === transitionVersion) delete scene.dataset.mobileArrival;
         return;
       }
       while (stage !== requestedStage && version === transitionVersion) {
@@ -235,7 +242,9 @@
     if (count !== typedCount) {
       // Reset scroll before changing text; writing scrollTop afterward forces
       // layout for the newly typed text on every character update.
-      if (brief.scrollTop) brief.scrollTop = 0;
+      if (innerWidth <= 767) {
+        if (mobileBriefScrollTop) { brief.scrollTop = 0; mobileBriefScrollTop = 0; }
+      } else if (brief.scrollTop) brief.scrollTop = 0;
       typedNotes.textContent = originalNotes.slice(0, count);
       typedCount = count;
     }

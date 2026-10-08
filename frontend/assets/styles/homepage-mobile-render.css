@@ -69,6 +69,21 @@
   .lpc-home #matter-film :is(.matter-sheet, .matter-sheet *, .document-stack, .document-stack *, .drawing, .drawing *) {
     transition: none !important;
   }
+  .lpc-home .matter-stage-scene[data-mobile-arrival] {
+    animation-duration: 380ms;
+    animation-timing-function: cubic-bezier(.2, .7, .2, 1);
+    animation-fill-mode: both;
+  }
+  .lpc-home .matter-stage-scene[data-mobile-arrival="a"] { animation-name: matter-phone-arrive-a; }
+  .lpc-home .matter-stage-scene[data-mobile-arrival="b"] { animation-name: matter-phone-arrive-b; }
+  @keyframes matter-phone-arrive-a {
+    from { opacity: .65; transform: translateX(var(--matter-arrival-x)); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes matter-phone-arrive-b {
+    from { opacity: .65; transform: translateX(var(--matter-arrival-x)); }
+    to { opacity: 1; transform: translateX(0); }
+  }
   .lpc-home .dashboard-builder[hidden] {
     display: grid !important;
     visibility: hidden;
