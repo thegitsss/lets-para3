@@ -9,12 +9,10 @@
   const clouds = [...hook.querySelectorAll('.type-hook__cloud')];
   const outline = hook.querySelector('.type-hook__outline');
   const paths = [...outline.querySelectorAll('path')];
-  // Restore a little contrast above the clouds only for the opening Let’s characters.
+  // Keep the complete phone wordmark legible as the clouds cross it. Desktop
+  // retains its existing overlay of the opening Let’s characters.
   const clearLetters = outline.cloneNode(true);
   clearLetters.classList.add('type-hook__clear-letters');
-  [...clearLetters.querySelectorAll('path')].forEach((path, index) => {
-    if (index > 4) path.remove();
-  });
   outline.after(clearLetters);
   const clearPaths = [...clearLetters.querySelectorAll('path')];
   const composite = hook.querySelector('.type-hook__composite');
@@ -31,6 +29,10 @@
   let sectionHeight = 1;
 
   let lastRenderedValue = null;
+  let lastInk = null;
+  let lastOutlineOpacity = null;
+  let lastFill = null;
+  let lastLetterMode = null;
   let lastMobile = null;
   let lastEntranceOffset = null;
   let introductionTop = 0;
@@ -65,15 +67,24 @@
     });
     smoke.style.transform = `translate3d(0, ${70 * (1 - travel)}%, 0)`;
     outline.style.opacity = tween(value, .1, .01) * (1 - tween(value, .24, .06));
-    paths.forEach(path => { path.style.strokeDashoffset = 1 - ink; });
+    if (!mobile || ink !== lastInk) paths.forEach(path => { path.style.strokeDashoffset = 1 - ink; });
     composite.style.opacity = fill;
-    clearLetters.style.opacity = .65;
-    clearPaths.forEach((path) => {
-      path.style.strokeDashoffset = 1 - ink;
-      path.style.strokeOpacity = outline.style.opacity;
-      path.style.fill = path.classList.contains('type-hook__apostrophe-outline') ? '#6495ed' : '#233b5a';
-      path.style.fillOpacity = fill;
-    });
+    clearLetters.style.opacity = mobile ? .75 * (1 - tween(value, .7, .3)) : .65;
+    // Once the phone lettering is filled, scrolling only changes its parent
+    // opacity. Avoid restyling every SVG path throughout the rest of the scene.
+    if (!mobile || ink !== lastInk || outline.style.opacity !== lastOutlineOpacity || fill !== lastFill || mobile !== lastLetterMode) {
+      clearPaths.forEach((path, index) => {
+        path.style.display = !mobile && index > 4 ? 'none' : '';
+        path.style.strokeDashoffset = 1 - ink;
+        path.style.strokeOpacity = outline.style.opacity;
+        path.style.fill = path.classList.contains('type-hook__apostrophe-outline') ? '#6495ed' : '#233b5a';
+        path.style.fillOpacity = fill;
+      });
+    }
+    lastInk = ink;
+    lastOutlineOpacity = outline.style.opacity;
+    lastFill = fill;
+    lastLetterMode = mobile;
   }
 
   function update(time) {

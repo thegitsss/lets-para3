@@ -1,0 +1,108 @@
+/* Blend the reviewed joins inside existing spacing; no extra scroll holds. */
+.lpc-home #lpc-feature-cards {
+  background: linear-gradient(to bottom, #fff calc(100% - 48px), #091626);
+}
+.lpc-home .paralegal-map::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 48px;
+  background: linear-gradient(transparent, #fff);
+  pointer-events: none;
+}
+.lpc-home .closing-cloud-region .home-faq {
+  padding-bottom: 48px;
+  background: linear-gradient(to bottom, #fff calc(100% - 48px), #071c30);
+}
+
+@media (max-width: 767px) {
+  html.lpc-homepage { background: #07131f; }
+  body.lpc-home--editorial { isolation: isolate; background: #edf0f3; padding-bottom: 0; }
+  body.lpc-home--editorial::before {
+    content: '';
+    position: fixed;
+    inset: 0 0 auto;
+    height: 100lvh;
+    z-index: -1;
+    background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+      radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+    pointer-events: none;
+    transform: translateZ(0);
+  }
+  /* Restore the pre-October-8 text placement, retaining every hero animation. */
+  .lpc-home--editorial .editorial-hero__main { align-self: center; top: 0; }
+  .lpc-home--editorial .editorial-hero {
+    padding-top: calc(var(--header-height) + clamp(34px, var(--home-stable-viewport, 100svh) * .05, 58px));
+  }
+  /* Let the logo leave its own scene before the next section can cover it. */
+  .lpc-home .type-hook.hook-find { margin-bottom: 0; }
+  .lpc-home--editorial :is(.hero-capacity, .matter-scroll-journey) {
+    background: transparent;
+    background-attachment: scroll;
+  }
+  .lpc-home .hook-find::before,
+  .lpc-home .hook-find::after,
+  .lpc-home .mobile-capacity-wash,
+  .lpc-home--editorial .matter-scroll-journey::before,
+  .lpc-home--editorial .matter-scroll-journey::after { display: none; }
+  .lpc-home .hook-find .type-hook__scene { overflow-x: clip; overflow-y: visible; }
+  .lpc-home .type-hook__outline { top: 42%; }
+  .lpc-home .type-hook__composite,
+  .lpc-home .type-hook__composite::after {
+    -webkit-mask-position: center calc(50% - var(--home-stable-viewport, 100svh) * .08);
+    mask-position: center calc(50% - var(--home-stable-viewport, 100svh) * .08);
+  }
+  /* The editable draft can scroll only when a short phone cannot contain it. */
+  .lpc-home .dashboard-builder {
+    max-height: calc(var(--home-stable-viewport, 100svh) - var(--header-height, 66px) - 100px);
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-width: thin;
+  }
+  .lpc-home .stage-arrow { width: 40px; display: flex; align-items: center; padding: 0; }
+  .lpc-home .stage-arrow-prev { justify-content: flex-start; padding-left: 6px; }
+  .lpc-home .stage-arrow-next { justify-content: flex-end; padding-right: 6px; }
+  .lpc-home .paralegal-map { padding: 48px 20px; background-size: auto; }
+  .lpc-home .paralegal-map__stage { min-height: 0; padding: 18px 0 0; }
+  .lpc-home .paralegal-map__canvas { width: 100%; margin: 0; aspect-ratio: 975 / 610; }
+  .lpc-home .paralegal-map__status { margin-top: 16px; }
+  .lpc-home .paralegal-map__note { margin-top: 16px; }
+  .lpc-home .paralegal-map__stage::before {
+    top: -20%; left: -15%; width: 130%; height: 120%;
+    background: radial-gradient(ellipse, rgb(72 123 212 / .15), transparent 70%);
+    filter: none; opacity: 1;
+  }
+  .lpc-home .paralegal-map__motion-surface { contain: layout paint; overflow: visible; }
+  .lpc-home .closing-mobile::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0;
+    height: 56px;
+    z-index: 5;
+    background: linear-gradient(transparent, #07131f);
+    pointer-events: none;
+  }
+  .lpc-home .home-footer {
+    margin-bottom: 0;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    background: #07131f;
+    box-shadow: none;
+  }
+  .lpc-home.mobile-is-scrolling :is(.paralegal-map__dot, .paralegal-map__halo),
+  .lpc-home.mobile-is-scrolling #lpc-feature-cards *,
+  .lpc-home.mobile-is-scrolling #lpc-feature-cards *::after { animation-play-state: paused !important; }
+  #lpc-feature-cards .scene { contain: layout paint; }
+  #lpc-feature-cards .tracks { container-type: inline-size; }
+  #lpc-feature-cards .track::after { left: -25%; animation-name: lpc-phone-pulse; }
+  @keyframes lpc-phone-pulse {
+    0%, 8% { transform: translateX(0); opacity: 0; }
+    12%, 32% { opacity: .8; }
+    38%, 100% { transform: translateX(135cqw); opacity: 0; }
+  }
+}
+@media (max-width: 640px) {
+  .lpc-home--editorial .editorial-hero { padding-top: calc(var(--header-height) + 24px); }
+}
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .lpc-home .dashboard-builder { max-height: none; overflow: visible; }
+}
