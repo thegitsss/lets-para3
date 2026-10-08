@@ -131,3 +131,20 @@
     background: linear-gradient(#edf0f3, rgb(237 240 243 / 0));
   }
 }
+@media (max-width: 640px) {
+  /* Only the paint boundary expands when browser chrome retracts. Keep every
+     moving layer anchored to the existing stable scene height. */
+  .lpc-home .hook-find .type-hook__mountain {
+    bottom: auto;
+    height: var(--capacity-scene-height);
+  }
+  .lpc-home .hook-find .type-hook__art > :is(.type-hook__outline, .type-hook__composite) {
+    top: calc(var(--capacity-scene-height) * .5);
+  }
+  .lpc-home .hook-find .type-hook__cloud--left { top: calc(var(--capacity-scene-height) * .4); }
+  .lpc-home .hook-find .type-hook__cloud--right { top: calc(var(--capacity-scene-height) * .44); }
+  .lpc-home .hook-find .type-hook__art > .type-hook__smoke {
+    bottom: auto;
+    top: calc(var(--capacity-scene-height) * .4455);
+  }
+}
