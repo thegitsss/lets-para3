@@ -1,4 +1,5 @@
 import { getSupportMatterContext, clearSupportMatterContext } from "./support-workspace-context.mjs";
+import { isSupportPageAllowed } from "./support-page-boundary.mjs";
 import "../productivity-command-registry.js";
 import { getStoredSession, clearSession } from "../auth.js";
 import { createSupportTransport } from "./support-transport.mjs";
@@ -44,10 +45,9 @@ function getRoleAwareComposerPrompts(role = "") {
   }
   if (normalizedRole === "admin") {
     return [
-      "Ask about the review queue",
-      "Ask about approvals",
-      "Ask about a support ticket",
-      "Ask about an attorney record",
+      "Ask what needs you",
+      "Check background work",
+      "Pause automatic approvals",
     ];
   }
   return [
@@ -78,10 +78,9 @@ function getRoleAwareQuickPrompts(role = "") {
   }
   if (normalizedRole === "admin") {
     return [
-      "Where is the review queue?",
-      "How do I review support tickets?",
-      "How do I update a ticket?",
-      "I need help with the dashboard",
+      "What needs me?",
+      "What is AI doing?",
+      "What can you do?",
     ];
   }
   return [
@@ -96,7 +95,7 @@ function getDrawerSubtitle(role = "") {
   const normalizedRole = String(role || "").trim().toLowerCase();
   if (normalizedRole === "attorney") return "";
   if (normalizedRole === "paralegal") return "";
-  if (normalizedRole === "admin") return "Operations, tickets, incidents, and admin tools.";
+  if (normalizedRole === "admin") return "";
   return "Account and workflow help across LPC.";
 }
 
@@ -110,11 +109,12 @@ function getDrawerTitle(role = "") {
 
 function isInitialAssistantGreeting(message = {}, index = 0) {
   if (index !== 0 || getMessageVariant(message) !== "assistant") return false;
+  if (message.metadata?.kind === 'welcome') return true;
   const text = String(message?.text || "").trim();
   return (
     /^Welcome back,\s+[^.]+\.?$/i.test(text) ||
     /^Hi\s+[^,]+,\s+how can I help you with Let's-ParaConnect\?\s+The more details you provide,\s+the better\.?$/i.test(text) ||
-    /^Hi\s+[—-]\s+I can help with account questions,\s+payouts,\s+case activity,\s+and platform issues\.?$/i.test(text)
+    /^Hi\s+[—-]\s+I can help with account questions,\s+payouts,\s+(?:case|Matter) activity,\s+and platform issues\.?$/i.test(text)
   );
 }
 
@@ -367,8 +367,7 @@ function writeSupportSessionMarker(userId = "") {
 }
 
 function isSupportSessionAllowed() {
-  // An existing member session must not turn the sign-in page into a workspace.
-  if (/\/login(?:\.html)?\/?$/i.test(window.location.pathname)) return false;
+  if (!isSupportPageAllowed(window.location.pathname)) return false;
   const session = getSupportSession();
   const role = String(session?.role || "").toLowerCase();
   const status = String(session?.status || "").toLowerCase();
@@ -384,11 +383,14 @@ function inferViewName(pathname = "", hash = "", caseId = "") {
     return ({ settings: "profile-settings", payments: "billing", help: "help", paralegals: "browse-paralegals", matters: "dashboard-attorney", tasks: "dashboard-attorney" })[routeName] || "dashboard-attorney";
   }
   if (path.includes("paralegal-v2")) {
-    const routeName = currentHash.match(/^#\/(home|browse|work|settings|help|profile|matter)(?:\/|\?|$)/)?.[1] || "home";
+    if (caseId) return "case-detail";
+    const routeName = currentHash.match(/^#\/(home|browse|work|settings|help|profile|matter|conversations|payouts)(?:\/|\?|$)/)?.[1] || "home";
     if (routeName === "matter") return "case-detail";
     if (routeName === "settings") return "profile-settings";
     if (routeName === "work") return "dashboard-paralegal";
     if (routeName === "browse") return "browse-jobs";
+    if (routeName === "conversations") return "messages";
+    if (routeName === "payouts") return "billing";
     return `paralegal-${routeName}`;
   }
   if (path.includes("profile-settings")) return "profile-settings";
@@ -1187,7 +1189,7 @@ function createMessageElement(message = {}) {
 
   item.append(bubble);
 
-  if (!message.loading && message.createdAt) {
+  if (!message.loading && message.createdAt && !isInitialAssistantGreeting(message, state.messages.indexOf(message))) {
     const timestamp = new Date(message.createdAt);
     if (!Number.isNaN(timestamp.getTime())) {
       const meta = document.createElement("time");
@@ -1502,10 +1504,11 @@ function renderThread(viewport = captureThreadViewport()) {
     return;
   }
 
+  const conversationStarted = state.messages.some((message) => message?.sender === "user");
   state.messages
     .filter((message, index) => {
       if (message?.metadata?.kind === "support_escalation") return false;
-      return !isInitialAssistantGreeting(message, index);
+      return !conversationStarted || !isInitialAssistantGreeting(message, index);
     })
     .forEach((message) => {
     state.thread.appendChild(createMessageElement(message));
@@ -1936,6 +1939,9 @@ function syncSupportMutation(next) {
 function applySupportMutationResult(payload, record) {
   supportContentRevision++;
   clearOptimisticSupportMessages();
+  if (payload.assistantReply?.provider === 'admin_action' && payload.assistantReply?.supportFacts?.state === 'completed') {
+    window.dispatchEvent(new CustomEvent('admin:automation-changed'));
+  }
   // Outcome receipts describe the original operation. A different current
   // conversation may already have been started in another tab.
   const currentId = state.conversation?.id;
@@ -2191,6 +2197,10 @@ function createLauncher() {
 
 export function registerSupportLauncher(button) {
   if (!(button instanceof HTMLElement)) return null;
+  if (!isSupportPageAllowed(window.location.pathname)) {
+    button.hidden = true;
+    return null;
+  }
   if (!state.launchers.includes(button)) state.launchers.push(button);
   button.setAttribute("aria-controls", SUPPORT_DRAWER_ID);
   button.setAttribute("aria-expanded", state.open ? "true" : "false");

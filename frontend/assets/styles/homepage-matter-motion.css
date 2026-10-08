@@ -401,8 +401,8 @@
 :where(.matter-scroll-journey) [data-pen="mathilde"] .fragment-one .hand{font-size: 29px;}
 :where(.matter-scroll-journey) [data-pen="mathilde"] .note-aside{font-size: 26px;}}
 :where(.matter-scroll-journey) .sheet-monogram[data-step-title]{letter-spacing: -0.025em; white-space: nowrap;}
-.matter-scroll-journey{height: calc(var(--film-height,900px) + var(--matter-release-distance,166.4svh)); position: relative;}
-.matter-scroll-journey .matter-film{position: sticky; top: 0px; transform: translateY(var(--film-top,0px)); padding-top: 1px; padding-bottom: 1px;}
+.matter-scroll-journey{height: calc(var(--film-height,900px) + 260svh); position: relative;}
+.matter-scroll-journey .matter-film{position: sticky; top: var(--film-top,0px); padding-top: 1px; padding-bottom: 1px;}
 :where(.matter-scroll-journey) .film-heading h2{font-size: clamp(40px, 4.6vw, 66px); line-height: 1.04;}
 :where(.matter-scroll-journey) .film-heading h2 em{font-style: italic; font-synthesis: style;}
 :where(.matter-scroll-journey) .scroll-instruction{display: flex; gap: 9px; align-items: center; white-space: nowrap; font-size: 11px; color: rgb(98, 113, 135);}
@@ -792,9 +792,7 @@
 @media (max-width: 760px){:where(.matter-scroll-journey) .builder-draft textarea{height: 60px; font-size: 13px;}
 :where(.matter-scroll-journey) .builder-tasks input{font-size: 13px;}
 :where(.matter-scroll-journey) .builder-suggestion > span{font-size: 10px;}
-.matter-scroll-journey .matter-film{transform: none; transition: transform .38s cubic-bezier(.2,.7,.2,1);}
-/* Keep the mobile draft's Preview action reachable inside the pinned scene. */
-.matter-scroll-journey .matter-film[data-stage="1"]{transform: translateY(var(--film-top,0px));}
+.matter-scroll-journey .matter-film{top: 0px;}
 :where(.matter-scroll-journey) #matter-film .stage{height: 790px;}
 :where(.matter-scroll-journey) .builder-draft{padding-top: 12px; padding-bottom: 12px;}}
 @media (max-width: 360px){:where(.matter-scroll-journey) .builder-tasks input{font-size: 12px;}
@@ -931,15 +929,15 @@
 :where(.matter-scroll-journey) .builder-money:focus-within{outline: rgb(100, 149, 237) solid 2px; outline-offset: 3px; background: rgb(255, 255, 255);}
 :where(.matter-scroll-journey) .builder-draft .builder-money input:focus-visible{outline: none; background: transparent;}
 :where(.matter-scroll-journey) .builder-draft .builder-money input:hover{background: transparent;}
-@media (max-width: 760px){:where(html.mobile-compact-height) :where(.matter-scroll-journey) #matter-film .film-heading h2{font-size: 28px;}
-:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-source,:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-draft{padding-top: 10px; padding-bottom: 10px;}
-:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-source h2,:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-draft-heading{font-size: 26px;}
-:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-source > p,:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-edit-hint{margin-bottom: 9px;}
-:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-brief{height: 126px; min-height: 126px; line-height: 15px;}
-:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{height: 36px; min-height: 36px;}
-:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-draft > #builder-scope{height: 72px;}
-:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-draft .builder-field{margin-bottom: 5px; padding-bottom: 5px;}
-:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-transfer{height: 26px;}}
+@media (max-width: 760px) and (max-height: 880px){:where(.matter-scroll-journey) #matter-film .film-heading h2{font-size: 28px;}
+:where(.matter-scroll-journey) .builder-source,:where(.matter-scroll-journey) .builder-draft{padding-top: 10px; padding-bottom: 10px;}
+:where(.matter-scroll-journey) .builder-source h2,:where(.matter-scroll-journey) .builder-draft-heading{font-size: 26px;}
+:where(.matter-scroll-journey) .builder-source > p,:where(.matter-scroll-journey) .builder-edit-hint{margin-bottom: 9px;}
+:where(.matter-scroll-journey) .builder-brief{height: 126px; min-height: 126px; line-height: 15px;}
+:where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{height: 36px; min-height: 36px;}
+:where(.matter-scroll-journey) .builder-draft > #builder-scope{height: 72px;}
+:where(.matter-scroll-journey) .builder-draft .builder-field{margin-bottom: 5px; padding-bottom: 5px;}
+:where(.matter-scroll-journey) .builder-transfer{height: 26px;}}
 :where(.matter-scroll-journey) .builder-money:focus-within{outline: none; background: transparent; box-shadow: rgb(139, 159, 184) 0px 1px 0px; border-radius: 0px;}
 :where(.matter-scroll-journey) .builder-draft #builder-amount{appearance: textfield; outline: none; box-shadow: none;}
 :where(.matter-scroll-journey) .builder-draft #builder-amount::-webkit-inner-spin-button,:where(.matter-scroll-journey) .builder-draft #builder-amount::-webkit-outer-spin-button{appearance: none; margin: 0px;}
@@ -1057,10 +1055,7 @@
 .lpc-home #matter-film,.lpc-home #matter-film *{font-weight:400!important}
 .lpc-home #matter-film .sheet-action,.lpc-home #matter-film .builder-preview,.lpc-home #matter-film #builder-title{font-weight:500!important}
 /* Keep the persistent navigation clear of the demonstration heading. */
-/* Leave room for external actions, replay controls, focus rings and shadows. */
-.lpc-home .matter-scroll-journey .matter-film{padding-top:calc(var(--header-height,72px) + 1px);padding-bottom:32px;}
-/* The taller mobile stage already clears its actions; preserve the note-card position. */
-@media (max-width:760px){.lpc-home .matter-scroll-journey .matter-film{padding-bottom:1px;}}
+.lpc-home .matter-scroll-journey .matter-film{padding-top:calc(var(--header-height,72px) + 1px);}
 
 /* Stable stage geometry with a reversible fade-and-slide between scenes. */
 :where(.matter-scroll-journey) .matter-stage-scene{position:absolute;inset:0;}
@@ -1094,18 +1089,10 @@
 .draft-calendar footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid #e8edf4; color: #61758e; font: 400 11px/1.5 Sarabun, sans-serif; }
 .draft-calendar button:focus-visible, .draft-date-trigger:focus-visible { outline: 2px solid #6495ed; outline-offset: 3px; }
 
-/* The final preview action has no pressed movement or click transition. */
-.lpc-home #matter-film[data-stage="2"] .sheet-action,
-.lpc-home #matter-film[data-stage="2"] .sheet-action:active { animation: none !important; transition: none !important; transform: none !important; }
-.lpc-home #matter-film .sheet-action > span:last-child svg { display: block; width: 22px; height: 22px; }
+:where(.matter-scroll-journey) .paper-grain{position: absolute; inset: 0px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23000' opacity='.025' filter='url(%23n)' d='M0 0h180v180H0z'/%3E%3C/svg%3E"); pointer-events: none; z-index: 0;}
 
-/* Preview checklists belong exclusively to step 03, without exit ghosts. */
-.lpc-home #matter-film:not([data-stage="2"]) .task-toggle,
-.lpc-home #matter-film:not([data-stage="2"]) .tasks-label {
-  visibility: hidden !important;
-  pointer-events: none;
-}
-
+/* Restore deployed static demo icons and Preview rows. */
+.lpc-home #matter-film .sheet-action > span:last-child svg{display:block;width:22px;height:22px;}
 /* One readable deliverable per row, with consistent alignment. */
 .preview-task-list { display: contents; }
 .lpc-home #matter-film[data-stage="2"] .preview-task-list {
@@ -1144,12 +1131,3 @@
  .lpc-home #matter-film[data-stage="2"] .matter-sheet .deadline-field { top: 411px !important; }
 }
 
-/* Give the preview scope and task list separate rows on larger screens. */
-@media (min-width: 761px) {
- .lpc-home #matter-film[data-stage="2"] .matter-sheet { height: 510px; }
- .lpc-home #matter-film[data-stage="2"] .scope-summary { left: 32px; right: 32px; width: auto; max-width: none; }
- .lpc-home #matter-film[data-stage="2"] .tasks-label { left: 32px; top: 248px; }
- .lpc-home #matter-film[data-stage="2"] .preview-task-list { top: 270px; }
- .lpc-home #matter-film[data-stage="2"] .matter-sheet .amount-field,
- .lpc-home #matter-film[data-stage="2"] .matter-sheet .deadline-field { top: 420px !important; }
-}

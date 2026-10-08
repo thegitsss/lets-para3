@@ -1,0 +1,41 @@
+/* Approved mobile closing study; desktop remains on the existing scene. */
+.closing-mobile{display:none}
+.closing-mobile .closing__mountain{box-sizing:border-box}
+/* The original closing markup already contains its diagonal SVG arrow. */
+body.lpc-home .closing-scene .role-action i::before,
+body.lpc-home .closing-scene .role-action i::after{content:none;display:none}
+body.lpc-home .closing-scene .role-action i svg{display:block;width:100%;height:100%}
+@media(max-width:767px),(hover:none) and (pointer:coarse){
+body.lpc-home .closing-mobile{position:relative;isolation:isolate;contain:layout style;display:block;height:var(--closing-height,780px);padding:0;overflow:clip;background:#07131f;color:#fff}
+body.lpc-home .closing-mobile .closing__sky{position:absolute;inset:0;background:linear-gradient(180deg,#071c30 0%,#103c60 45%,#07131f 100%);z-index:0}
+body.lpc-home .closing-mobile .closing__mountain{position:absolute;left:-24px;top:0;width:calc(100% + 48px);height:100%;z-index:3;pointer-events:none;will-change:transform}
+body.lpc-home .closing-mobile .closing__fallback{position:absolute;left:50%;top:27%;height:100%;width:150%;max-width:none;object-fit:cover;translate:-43% 0;filter:brightness(.64) saturate(.82);z-index:1;pointer-events:none}
+body.lpc-home .closing-mobile.closing--rendered .closing__fallback{display:none}
+body.lpc-home .closing-mobile #closing-mobile-title{position:absolute;z-index:2;top:var(--title-top,230px);left:18px;right:18px;margin:0;color:#fff;text-align:center;font:300 clamp(36px,10.8vw,68px)/1.06 'Cormorant Garamond',Georgia,serif;font-synthesis:none;letter-spacing:-.035em}
+body.lpc-home .closing-mobile #closing-mobile-title{will-change:transform,opacity}
+body.lpc-home .closing-mobile #closing-mobile-title span,body.lpc-home .closing-mobile #closing-mobile-title em{display:block}
+body.lpc-home .closing-mobile #closing-mobile-title em{font-weight:300}
+body.lpc-home .closing-mobile .closing__actions{position:absolute;z-index:4;top:var(--actions-top,460px);left:8px;right:8px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-width:440px;margin:auto}
+body.lpc-home .closing-mobile .closing__actions a{display:flex;align-items:center;gap:8px;min-height:72px;padding:18px 12px;border:1px solid rgb(229 241 255 / .56);border-radius:16px;background:linear-gradient(135deg,rgb(208 224 240 / .28),rgb(174 197 220 / .19));color:#f8fbff;text-align:left;box-shadow:0 2px 12px rgb(0 0 0 / .08)}
+body.lpc-home .closing-mobile .closing__actions a{opacity:0;filter:blur(7px);will-change:opacity,filter}
+body.lpc-home .closing-mobile .closing__actions strong{flex:1;min-width:0;font:400 clamp(18px,6vw,25px)/1.15 'Cormorant Garamond',Georgia,serif}
+body.lpc-home .closing-mobile .closing__actions svg{flex:0 0 18px;width:18px;height:18px}
+body.lpc-home .closing-mobile .closing__actions a:active{background:rgb(233 244 255 / .3)}
+body.lpc-home .closing-mobile .closing__actions a:focus-visible{outline:2px solid #e5edf5;outline-offset:4px}
+body.lpc-home .closing-mobile .closing__reassurance{grid-column:1/-1;margin:4px 0 0;color:rgb(233 244 255 / .86);font:300 14px/1.5 Sarabun,sans-serif;text-align:center;opacity:0;will-change:opacity;text-shadow:0 1px 3px rgb(0 8 22 / .45)}
+body.lpc-home .closing-cloud-region .closing-scene,
+body.lpc-home .closing-cloud-region .closing-parallax-track{display:none!important}
+body.lpc-home .closing-mobile{min-height:0;margin:0;box-sizing:border-box}
+body.lpc-home .closing-mobile #closing-mobile-title{max-width:none;translate:none;scale:none;text-shadow:none;font-size:clamp(36px,10.8vw,68px);font-weight:300!important;line-height:1.06;font-family:'Cormorant Garamond',Georgia,serif!important}
+body.lpc-home .closing-mobile .closing__actions a{box-sizing:border-box;text-decoration:none;translate:none;transform:none;transition:none}
+body.lpc-home .closing-mobile .closing__actions strong{margin:0;letter-spacing:0;font-weight:400;font-family:'Cormorant Garamond',Georgia,serif}
+body.lpc-home .closing-mobile .closing__actions svg{display:block}
+body.lpc-home .closing-mobile .closing__reassurance{max-width:none;letter-spacing:0}
+body.lpc-home .closing-mobile #closing-mobile-title em{font-weight:300!important}
+body.lpc-home .closing-mobile .closing__actions a{font:300 16px/1.6 Sarabun,sans-serif}
+body.lpc-home .closing-mobile .closing__actions a{font-weight:300!important}
+body.lpc-home .closing-mobile .closing__actions strong{font-weight:400!important}
+body.lpc-home .closing-mobile .closing__reassurance{font-weight:300!important}
+body.lpc-home .home-footer{padding-top:64px}
+}
+@media(prefers-reduced-motion:reduce){.closing-mobile .closing__mountain,.closing-mobile #closing-mobile-title{will-change:auto;transform:none!important}.closing-mobile #closing-mobile-title,.closing-mobile .closing__actions a,.closing-mobile .closing__reassurance{opacity:1!important}.closing-mobile .closing__actions a{filter:none!important;will-change:auto}}

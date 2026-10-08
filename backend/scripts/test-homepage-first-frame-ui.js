@@ -19,12 +19,12 @@ const mappedTotal = Object.values(counts).reduce((sum,count)=>sum+count,0);
           const page = await browser.newPage({viewport:{width:428,height:926},javaScriptEnabled:mode!=='no-script',reducedMotion:mode==='reduced'?'reduce':'no-preference'});
           let mapRequests = 0;
           page.on('request', r=>{if(r.url().includes('/api/public/paralegals/state-counts'))mapRequests++;});
-          if (mode==='late-script') await page.route('**/homepage-entrance.js*',async r=>{await new Promise(resolve=>setTimeout(resolve,2600));await r.continue().catch(()=>{});});
-          if (mode==='failed-script') await page.route('**/homepage-entrance.js*',r=>r.abort());
+          if (mode==='late-script') await page.route('**/homepage.js*',async r=>{await new Promise(resolve=>setTimeout(resolve,2600));await r.continue().catch(()=>{});});
+          if (mode==='failed-script') await page.route('**/homepage.js*',r=>r.abort());
           if (mode==='slow-fonts') await page.route('**/*.woff2',async r=>{await new Promise(resolve=>setTimeout(resolve,2600));await r.continue().catch(()=>{});});
           await page.goto(`http://127.0.0.1:${server.address().port}`,{waitUntil:'commit'});
           const inner=page.locator('.editorial-hero__inner');await inner.waitFor({state:'attached'});
-          if (mode==='reduced') {
+          if (mode==='reduced' || mode==='no-script') {
             await page.waitForTimeout(100);
             assert.equal(await inner.evaluate(e=>getComputedStyle(e).opacity),'1');
             assert.equal(await page.locator('.editorial-hero__line').first().evaluate(e=>getComputedStyle(e).opacity),'1');
@@ -69,23 +69,33 @@ const mappedTotal = Object.values(counts).reduce((sum,count)=>sum+count,0);
         for (const width of [390, 1440]) {
           console.log('[map-first-frame]', name, width);
           const page = await browser.newPage({ viewport: { width, height: 844 } });
+          let releaseCounts;
+          const countsGate = new Promise(resolve => { releaseCounts = resolve; });
           await page.route('**/api/public/paralegals/state-counts', async route => {
-            await new Promise(resolve => setTimeout(resolve, 4000));
+            await countsGate;
             await route.continue().catch(() => {});
           });
           await page.goto(`http://127.0.0.1:${server.address().port}`, { waitUntil: 'domcontentloaded' });
           await page.locator('.paralegal-map').scrollIntoViewIfNeeded();
-          await page.waitForFunction(() => {
-            const outline = document.querySelector('.paralegal-map__outline');
-            return outline?.complete && outline.naturalWidth > 0;
-          });
+          if (width<=767) {
+            await page.waitForFunction(() => {
+              const outline = document.querySelector('.paralegal-map__outline');
+              return outline?.complete && outline.naturalWidth > 0;
+            });
+            assert.equal(await page.locator('.paralegal-map__outline').isVisible(), true);
+          } else {
+            await page.waitForFunction(count => document.querySelectorAll('.paralegal-map__outlines path').length===count, geometry.length);
+            assert.equal(await page.locator('.paralegal-map__outlines').isVisible(), true);
+          }
           assert.equal(await page.locator('.paralegal-map__canvas.is-live').count(), 0,
             'Map outline must be visible before network counts resolve');
-          assert.equal(await page.locator('.paralegal-map__outline').isVisible(), true);
           assert.equal(await page.getByText('Loading the map…').count(), 0);
+          releaseCounts();
           await page.waitForSelector('.paralegal-map__canvas.is-live', { timeout: 30000 });
-          assert.equal(await page.locator('.paralegal-map__outline').count(), 1,
-            'Static map outline must remain while pins reveal');
+          if (width<=767) assert.equal(await page.locator('.paralegal-map__outline').count(), 1,
+            'Mobile map retains the static outline while pins reveal');
+          assert.equal(await page.locator('.paralegal-map__outlines path').count(), geometry.length,
+            'Every state remains represented after live counts resolve');
           assert.equal(await page.locator('.paralegal-map__pin').count(), mappedTotal);
           await page.close();
         }

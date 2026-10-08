@@ -9,7 +9,9 @@ export function setSupportMatterContext({ ownerId, role, matterId, routeMatterId
   const path = String(address?.pathname || ''), hash = String(address?.hash || '');
   if (!owner || !matter || matter !== id(routeMatterId) || !['attorney', 'paralegal'].includes(role) || path !== `/${role}-v2.html` || signal?.aborted) return () => {};
   const expected = role === 'attorney' ? `#/matters/${matter}/` : `#/matter/${matter}`;
-  if (!(role === 'attorney' ? hash.toLowerCase().startsWith(expected) : hash.toLowerCase() === expected || hash.toLowerCase().startsWith(`${expected}?`))) return () => {};
+  const [routePath, query = ''] = hash.toLowerCase().split('?');
+  const conversation = role === 'paralegal' && routePath === '#/conversations' && id(new URLSearchParams(query).get('matter')) === matter && currentTab === 'messages' && allowed.includes('messages');
+  if (!(role === 'attorney' ? hash.toLowerCase().startsWith(expected) : conversation || hash.toLowerCase() === expected || hash.toLowerCase().startsWith(`${expected}?`))) return () => {};
   const entry = { ownerId: owner, role, path, hash, caseId: matter, currentTab: allowed.includes(currentTab) ? currentTab : 'overview', availableMatterTabs: allowed, status: typeof status === 'string' ? status : '', relationship: typeof relationship === 'string' ? relationship : '' };
   current = entry;
   const clear = () => { signal?.removeEventListener('abort', clear); if (current === entry) current = null; };
