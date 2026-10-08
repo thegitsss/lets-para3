@@ -1,0 +1,47 @@
+/* Preserve the current mobile geometry and scroll distances as browser chrome changes. */
+@media (max-width: 767px) {
+  .lpc-home .hook-find::before { z-index: 0; }
+  .lpc-home .type-hook__scene { min-height: var(--home-stable-viewport, 100svh); }
+  .lpc-home .type-hook.hook-find {
+    height: calc(var(--home-stable-viewport, 100svh) * 2.5);
+    margin-bottom: calc(var(--home-stable-viewport, 100svh) * -.5);
+  }
+  .lpc-home .hook-find .type-hook__scene {
+    height: var(--home-stable-viewport, 100svh);
+    padding-bottom: calc(88px + var(--home-stable-viewport, 100svh) * .12);
+  }
+  .lpc-home .type-hook__papers { top: calc(var(--home-stable-viewport, 100svh) * .6); }
+  .lpc-home .type-hook__smoke { height: calc(var(--home-stable-viewport, 100svh) * .9); }
+  .lpc-home .matter-scroll-journey { height: calc(var(--film-height, 900px) + var(--home-stable-viewport, 100svh) * 2); }
+}
+@media (min-width: 641px) and (max-width: 767px) {
+  .lpc-home--editorial .editorial-hero__main { row-gap: clamp(30px, calc(var(--home-stable-viewport, 100svh) * .05), 44px); }
+  .lpc-home--editorial .editorial-hero__qualifier { margin-bottom: clamp(22px, calc(var(--home-stable-viewport, 100svh) * .032), 34px); }
+  .lpc-home--editorial .editorial-hero__reassurance { margin-top: clamp(38px, calc(var(--home-stable-viewport, 100svh) * .05), 52px); }
+}
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .lpc-home .type-hook.hook-find { height: auto; margin-bottom: 0; }
+  .lpc-home .hook-find .type-hook__scene { padding: 88px 24px; }
+}
+
+/* Mobile layout corrections; desktop retains its approved layout and motion. */
+@media (max-width: 767px) {
+  .lpc-home--editorial .editorial-hero__main { position: relative; top: -32px; }
+  body.lpc-home--editorial .home-header,
+  body.lpc-home--editorial .home-header.is-past-hero.has-ink {
+    background: #edf0f3;
+    box-shadow: 0 1px 0 rgb(26 34 48 / .08);
+  }
+  body.lpc-home--editorial .home-header.is-past-hero:not(.is-open):not(.has-ink) {
+    background: #091626;
+  }
+  body.lpc-home--editorial .home-header.is-open { background: #fff; }
+  .lpc-home .home-header :is(.home-brand, .mobile-nav-toggle) { transition: none; }
+  .lpc-home .matter-scroll-journey .builder-draft-heading { padding-right: 94px; }
+  .lpc-home .matter-scroll-journey .builder-actions {
+    top: 10px; left: auto; right: 12px; width: auto; padding: 0; margin: 0;
+  }
+  .lpc-home .matter-scroll-journey .builder-actions .builder-preview {
+    min-height: 44px; padding: 10px 12px; font-size: 14px;
+  }
+}

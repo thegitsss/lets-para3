@@ -227,11 +227,13 @@
   }
   function measure() {
     const height = film.offsetHeight;
-    const oversize = Math.max(0, height - innerHeight);
+    const stableHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--home-stable-viewport'));
+    const viewportHeight = innerWidth <= 767 && Number.isFinite(stableHeight) ? stableHeight : innerHeight;
+    const oversize = Math.max(0, height - viewportHeight);
     journey.style.setProperty('--film-height', `${height}px`);
     journey.style.setProperty('--film-top', `${-oversize}px`);
     scrollStart = journey.getBoundingClientRect().top + scrollY + oversize;
-    scrollDistance = Math.max(1, journey.offsetHeight - Math.max(height, innerHeight));
+    scrollDistance = Math.max(1, journey.offsetHeight - Math.max(height, viewportHeight));
     updateFromScroll();
     film.style.setProperty('--builder-bottom', `${builder.offsetTop + builder.offsetHeight}px`);
   }

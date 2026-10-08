@@ -55,6 +55,7 @@ jobs:
           node scripts/test-public-auth-navigation-ui.js
           LPC_BROWSERS=chromium node scripts/test-homepage-mobile-reference-ui.js
           LPC_BROWSERS=chromium node scripts/test-homepage-first-frame-ui.js
+          LPC_BROWSERS=chromium node scripts/test-homepage-mobile-stability.js
           npm run test:e2e:auth
 
   codeql:

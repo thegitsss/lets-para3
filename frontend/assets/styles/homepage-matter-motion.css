@@ -929,15 +929,25 @@
 :where(.matter-scroll-journey) .builder-money:focus-within{outline: rgb(100, 149, 237) solid 2px; outline-offset: 3px; background: rgb(255, 255, 255);}
 :where(.matter-scroll-journey) .builder-draft .builder-money input:focus-visible{outline: none; background: transparent;}
 :where(.matter-scroll-journey) .builder-draft .builder-money input:hover{background: transparent;}
-@media (max-width: 760px) and (max-height: 880px){:where(.matter-scroll-journey) #matter-film .film-heading h2{font-size: 28px;}
-:where(.matter-scroll-journey) .builder-source,:where(.matter-scroll-journey) .builder-draft{padding-top: 10px; padding-bottom: 10px;}
-:where(.matter-scroll-journey) .builder-source h2,:where(.matter-scroll-journey) .builder-draft-heading{font-size: 26px;}
-:where(.matter-scroll-journey) .builder-source > p,:where(.matter-scroll-journey) .builder-edit-hint{margin-bottom: 9px;}
-:where(.matter-scroll-journey) .builder-brief{height: 126px; min-height: 126px; line-height: 15px;}
-:where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{height: 36px; min-height: 36px;}
-:where(.matter-scroll-journey) .builder-draft > #builder-scope{height: 72px;}
-:where(.matter-scroll-journey) .builder-draft .builder-field{margin-bottom: 5px; padding-bottom: 5px;}
-:where(.matter-scroll-journey) .builder-transfer{height: 26px;}}
+/* Keep the initially chosen compact phone layout through toolbar height changes. */
+@media (max-width: 760px){:where(html.mobile-compact-height) :where(.matter-scroll-journey) #matter-film .film-heading h2{font-size: 28px;}
+:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-source,:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-draft{padding-top: 10px; padding-bottom: 10px;}
+:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-source h2,:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-draft-heading{font-size: 26px;}
+:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-source > p,:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-edit-hint{margin-bottom: 9px;}
+:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-brief{height: 126px; min-height: 126px; line-height: 15px;}
+:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{height: 36px; min-height: 36px;}
+:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-draft > #builder-scope{height: 72px;}
+:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-draft .builder-field{margin-bottom: 5px; padding-bottom: 5px;}
+:where(html.mobile-compact-height) :where(.matter-scroll-journey) .builder-transfer{height: 26px;}}
+@media (max-width: 760px) and (max-height: 880px){:where(html:not(.js)) :where(.matter-scroll-journey) #matter-film .film-heading h2{font-size: 28px;}
+:where(html:not(.js)) :where(.matter-scroll-journey) .builder-source,:where(html:not(.js)) :where(.matter-scroll-journey) .builder-draft{padding-top: 10px; padding-bottom: 10px;}
+:where(html:not(.js)) :where(.matter-scroll-journey) .builder-source h2,:where(html:not(.js)) :where(.matter-scroll-journey) .builder-draft-heading{font-size: 26px;}
+:where(html:not(.js)) :where(.matter-scroll-journey) .builder-source > p,:where(html:not(.js)) :where(.matter-scroll-journey) .builder-edit-hint{margin-bottom: 9px;}
+:where(html:not(.js)) :where(.matter-scroll-journey) .builder-brief{height: 126px; min-height: 126px; line-height: 15px;}
+:where(html:not(.js)) :where(.matter-scroll-journey) .builder-draft .builder-tasks textarea{height: 36px; min-height: 36px;}
+:where(html:not(.js)) :where(.matter-scroll-journey) .builder-draft > #builder-scope{height: 72px;}
+:where(html:not(.js)) :where(.matter-scroll-journey) .builder-draft .builder-field{margin-bottom: 5px; padding-bottom: 5px;}
+:where(html:not(.js)) :where(.matter-scroll-journey) .builder-transfer{height: 26px;}}
 :where(.matter-scroll-journey) .builder-money:focus-within{outline: none; background: transparent; box-shadow: rgb(139, 159, 184) 0px 1px 0px; border-radius: 0px;}
 :where(.matter-scroll-journey) .builder-draft #builder-amount{appearance: textfield; outline: none; box-shadow: none;}
 :where(.matter-scroll-journey) .builder-draft #builder-amount::-webkit-inner-spin-button,:where(.matter-scroll-journey) .builder-draft #builder-amount::-webkit-outer-spin-button{appearance: none; margin: 0px;}
