@@ -418,13 +418,16 @@
   #lpc-feature-cards { padding-bottom: 56px; }
   #lpc-feature-cards .joined { grid-template-columns: 1fr; }
   #lpc-feature-cards article {
+    display: flex;
+    flex-direction: column;
     padding: 20px 24px 28px;
     border-right: 0;
     border-bottom: 1px solid rgba(26, 34, 48, .08);
   }
   #lpc-feature-cards article:last-child { border-bottom: 0; }
-  #lpc-feature-cards .scene { height: 200px; }
-  #lpc-feature-cards h3 { font-size: 30px; }
+  #lpc-feature-cards .scene { order: 2; height: 200px; margin-top: 16px; }
+  #lpc-feature-cards h3 { order: 0; font-size: 30px; margin: 0 0 10px; }
+  #lpc-feature-cards article > p { order: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   #lpc-feature-cards *, #lpc-feature-cards *::after { animation: none !important; }

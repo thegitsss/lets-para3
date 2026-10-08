@@ -77,13 +77,18 @@ const mappedTotal = Object.values(counts).reduce((sum,count)=>sum+count,0);
           });
           await page.goto(`http://127.0.0.1:${server.address().port}`, { waitUntil: 'domcontentloaded' });
           await page.locator('.paralegal-map').scrollIntoViewIfNeeded();
-          await page.waitForFunction(() => {
-            const outline = document.querySelector('.paralegal-map__outline');
-            return outline?.complete && outline.naturalWidth > 0;
-          });
+          if (width<=767) {
+            await page.waitForFunction(() => {
+              const outline = document.querySelector('.paralegal-map__outline');
+              return outline?.complete && outline.naturalWidth > 0;
+            });
+            assert.equal(await page.locator('.paralegal-map__outline').isVisible(), true);
+          } else {
+            await page.waitForFunction(count => document.querySelectorAll('.paralegal-map__outlines path').length===count, geometry.length);
+            assert.equal(await page.locator('.paralegal-map__outlines').isVisible(), true);
+          }
           assert.equal(await page.locator('.paralegal-map__canvas.is-live').count(), 0,
             'Map outline must be visible before network counts resolve');
-          assert.equal(await page.locator('.paralegal-map__outline').isVisible(), true);
           assert.equal(await page.getByText('Loading the map…').count(), 0);
           releaseCounts();
           await page.waitForSelector('.paralegal-map__canvas.is-live', { timeout: 30000 });
