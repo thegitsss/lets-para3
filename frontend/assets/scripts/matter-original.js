@@ -13,12 +13,14 @@
   const deadline = film.querySelector('#matter-deadline');
   const feedback = film.querySelector('[data-feedback]');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const mobileRendering = matchMedia('(max-width: 767px)');
   const status = ['YOUR STARTING POINT', 'YOUR NOTES → YOUR MATTER', ''];
   const actions = ['Build my Matter', 'Preview', 'Post Matter'];
   const previewStart = .64;
   let previewThreshold = previewStart;
   let stage = 0, frame = 0, scrollStart = 0, scrollDistance = 1;
   let measureFrame = 0;
+  let mobileFilmStart = 0, mobileFilmEnd = Infinity, measuredViewportHeight = innerHeight;
   const disclosure = '';
   const builder = film.querySelector('.dashboard-builder');
   const builderSkip = film.querySelector('.builder-skip');
@@ -26,6 +28,10 @@
   const builderAmount = film.querySelector('#builder-amount');
   const builderDate = film.querySelector('#builder-date');
   const brief = film.querySelector('.builder-brief');
+  let mobileBriefScrollTop = 0;
+  brief.addEventListener('scroll', () => {
+    if (mobileRendering.matches) mobileBriefScrollTop = brief.scrollTop;
+  }, { passive: true });
   const originalNotes = brief.innerHTML.replace(/<br\s*\/?>/gi, '\n');
   brief.setAttribute('aria-label', `Your original notes: ${originalNotes}`);
   const typedNotes = document.createElement('span');
@@ -70,16 +76,31 @@
   let changingStage = false;
   let sceneAnimation = null;
   let transitionVersion = 0;
+  let mobileArrival = 0;
 
   async function transitionTo(next) {
-    requestedStage = next;
-    if (reduced.matches) {
+    // Native flings can cross another threshold before a fade finishes.
+    // A phone must follow the latest scroll state instead of replaying an
+    // obsolete fade after the user has reversed direction.
+    if (mobileRendering.matches && changingStage && next !== requestedStage) {
       transitionVersion++;
       sceneAnimation?.cancel();
       sceneAnimation = null;
       changingStage = false;
       scene.inert = false;
       delete film.dataset.transitioning;
+    }
+    requestedStage = next;
+    const mobileOffscreen = mobileRendering.matches &&
+      (scrollY > mobileFilmEnd || scrollY + measuredViewportHeight < mobileFilmStart);
+    if (reduced.matches || mobileOffscreen) {
+      transitionVersion++;
+      sceneAnimation?.cancel();
+      sceneAnimation = null;
+      changingStage = false;
+      scene.inert = false;
+      delete film.dataset.transitioning;
+      delete scene.dataset.mobileArrival;
       if (stage !== next) setStage(next);
       return;
     }
@@ -90,6 +111,21 @@
     film.dataset.transitioning = 'true';
     const version = ++transitionVersion;
     try {
+      if (mobileRendering.matches) {
+        // Keep a visible card throughout native scrolling. The desktop's
+        // fade-out/fade-in leaves an empty scene and delays the next phone
+        // state by 200ms, so phones use just the existing incoming motion.
+        const direction = requestedStage > stage ? 1 : -1;
+        setStage(requestedStage);
+        // CSS starts this compositor animation at the normal render boundary.
+        // Alternating names restarts a reversed arrival without forcing style
+        // or layout synchronously after the stage's DOM changes.
+        scene.style.setProperty('--matter-arrival-x', `${18 * direction}px`);
+        scene.dataset.mobileArrival = ++mobileArrival % 2 ? 'a' : 'b';
+        await new Promise(resolve => setTimeout(resolve, 380));
+        if (version === transitionVersion) delete scene.dataset.mobileArrival;
+        return;
+      }
       while (stage !== requestedStage && version === transitionVersion) {
         const direction = requestedStage > stage ? 1 : -1;
         sceneAnimation = scene.animate([
@@ -181,6 +217,10 @@
       renderBuild(0);
       const tick = now => {
         if (stage !== 1) return;
+        if (mobileRendering.matches && (scrollY > mobileFilmEnd || scrollY + measuredViewportHeight < mobileFilmStart)) {
+          renderBuild(1);
+          return;
+        }
         const build = Math.min(1, (now - started) / 8000);
         renderBuild(build);
         if (build < 1) buildFrame = requestAnimationFrame(tick);
@@ -203,7 +243,9 @@
     if (count !== typedCount) {
       // Reset scroll before changing text; writing scrollTop afterward forces
       // layout for the newly typed text on every character update.
-      if (brief.scrollTop) brief.scrollTop = 0;
+      if (mobileRendering.matches) {
+        if (mobileBriefScrollTop) { brief.scrollTop = 0; mobileBriefScrollTop = 0; }
+      } else if (brief.scrollTop) brief.scrollTop = 0;
       typedNotes.textContent = originalNotes.slice(0, count);
       typedCount = count;
     }
@@ -267,6 +309,7 @@
       ? Math.round(parseFloat(document.documentElement.style.getPropertyValue('--mobile-stable-height')))
       : 0;
     const viewportHeight = stableHeight || innerHeight;
+    measuredViewportHeight = viewportHeight;
     const height = film.offsetHeight;
     const oversize = Math.max(0, height - viewportHeight);
     const builderBottom = builder.offsetTop + builder.offsetHeight;
@@ -275,6 +318,8 @@
     setStyle(journey, '--film-height', `${film.getBoundingClientRect().height}px`);
     setStyle(journey, '--film-top', `${-oversize}px`);
     scrollStart = journey.getBoundingClientRect().top + scrollY + oversize;
+    mobileFilmStart = scrollStart - oversize;
+    mobileFilmEnd = mobileFilmStart + journey.offsetHeight;
     // Keep the notes/build thresholds at their original scroll positions.
     // The document ends its sticky travel at Preview instead of holding 03
     // for the unused last 36 percent of the original 260vh scroll range.
@@ -335,7 +380,12 @@
   });
   [amount, deadline].forEach(input => input.addEventListener('input', validate));
   addEventListener('scroll', () => { if (!frame) frame = requestAnimationFrame(updateFromScroll); }, {passive:true});
-  addEventListener('resize', scheduleMeasure, {passive:true});
+  let viewportWidth = innerWidth;
+  addEventListener('resize', () => {
+    if (innerWidth <= 640 && innerWidth === viewportWidth) return;
+    viewportWidth = innerWidth;
+    scheduleMeasure();
+  }, {passive:true});
   reduced.addEventListener('change', () => {
     transitionTo(stage);
     setStage(stage);
