@@ -78,7 +78,7 @@
   let transitionVersion = 0;
   let mobileArrival = 0;
 
-  async function transitionTo(next) {
+  async function transitionTo(next, scrollPosition = scrollY) {
     // Native flings can cross another threshold before a fade finishes.
     // A phone must follow the latest scroll state instead of replaying an
     // obsolete fade after the user has reversed direction.
@@ -92,7 +92,7 @@
     }
     requestedStage = next;
     const mobileOffscreen = mobileRendering.matches &&
-      (scrollY > mobileFilmEnd || scrollY + measuredViewportHeight < mobileFilmStart);
+      (scrollPosition > mobileFilmEnd || scrollPosition + measuredViewportHeight < mobileFilmStart);
     if (reduced.matches || mobileOffscreen) {
       transitionVersion++;
       sceneAnimation?.cancel();
@@ -230,12 +230,15 @@
   }
   function updateFromScroll() {
     frame = 0;
-    const progress = Math.max(0, Math.min(1, (scrollY - scrollStart) / scrollDistance));
+    syncStage(scrollY);
+  }
+  function syncStage(scrollPosition) {
+    const progress = Math.max(0, Math.min(1, (scrollPosition - scrollStart) / scrollDistance));
 
     if (reduced.matches) return;
     let next = progress < .26 ? 0 : progress < previewThreshold ? 1 : 2;
     if (next === 2 && !validate()) next = 1;
-    transitionTo(next);
+    transitionTo(next, scrollPosition);
   }
   function renderBuild(build) {
     const portion = (start, end) => Math.max(0, Math.min(1, (build - start) / (end - start)));
@@ -313,13 +316,13 @@
     const height = film.offsetHeight;
     const oversize = Math.max(0, height - viewportHeight);
     const builderBottom = builder.offsetTop + builder.offsetHeight;
+    const paintedHeight = film.getBoundingClientRect().height;
+    const scrollPosition = scrollY;
+    const journeyTop = journey.getBoundingClientRect().top + scrollPosition;
     // Use the actual painted height for the sticky boundary. offsetHeight is
     // rounded and can release the scene a fraction of a pixel too early.
-    setStyle(journey, '--film-height', `${film.getBoundingClientRect().height}px`);
-    setStyle(journey, '--film-top', `${-oversize}px`);
-    scrollStart = journey.getBoundingClientRect().top + scrollY + oversize;
-    mobileFilmStart = scrollStart - oversize;
-    mobileFilmEnd = mobileFilmStart + journey.offsetHeight;
+    scrollStart = journeyTop + oversize;
+    mobileFilmStart = journeyTop;
     // Keep the notes/build thresholds at their original scroll positions.
     // The document ends its sticky travel at Preview instead of holding 03
     // for the unused last 36 percent of the original 260vh scroll range.
@@ -331,9 +334,15 @@
     previewThreshold = innerWidth <= 760
       ? Math.max(.45, previewStart - Math.max(oversize, viewportHeight * .5) / scrollDistance)
       : previewStart;
-    setStyle(journey, '--matter-release-distance', `${oversize + scrollDistance * previewStart}px`);
-    updateFromScroll();
+    const releaseDistance = oversize + scrollDistance * previewStart;
+    mobileFilmEnd = journeyTop + paintedHeight + releaseDistance;
+    // Finish geometry reads before changing CSS. Reading the journey after
+    // each write forced several layouts during the same scene-change frame.
+    setStyle(journey, '--film-height', `${paintedHeight}px`);
+    setStyle(journey, '--film-top', `${-oversize}px`);
+    setStyle(journey, '--matter-release-distance', `${releaseDistance}px`);
     setStyle(film, '--builder-bottom', `${builderBottom}px`);
+    syncStage(scrollPosition);
   }
   function scheduleMeasure() {
     if (measureFrame) return;

@@ -256,3 +256,43 @@
 
 /* The cloud bank handles the exit rather than an extra stationary wash. */
 .lpc-home .hook-find::after { display: none; }
+
+/* Keep the phone logo texture in a small cached surface. Its vector mask
+   supplies the sharp wordmark edges while the main mountain keeps moving. */
+.lpc-home .type-hook__paper-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: .22;
+}
+
+/* Let supported phone browsers keep the reveal in step with native scrolling.
+   The ranges and quadratic easing preserve the original scene sequence. */
+.lpc-home .hook-find.hook-native { view-timeline-name: --capacity-reveal; view-timeline-axis: block; view-timeline-inset: 0; }
+.lpc-home .hook-find.hook-native :is(.type-hook__papers,.type-hook__cloud,.type-hook__art > .type-hook__smoke,.type-hook__inner,.type-hook__outline,.type-hook__outline path,.type-hook__composite) {
+  animation-duration: 1s;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(.333333,.666667,.666667,1);
+  animation-timeline: --capacity-reveal;
+  animation-range: entry 100% exit 100%;
+}
+.lpc-home .hook-find.hook-native .type-hook__papers { animation-name: capacity-native-mountain; }
+.lpc-home .hook-find.hook-native .type-hook__cloud--left { animation-name: capacity-native-cloud-left; }
+.lpc-home .hook-find.hook-native .type-hook__cloud--right { animation-name: capacity-native-cloud-right; }
+.lpc-home .hook-find.hook-native .type-hook__art > .type-hook__smoke { animation-name: capacity-native-smoke; }
+.lpc-home .hook-find.hook-native .type-hook__inner {
+  animation-name: capacity-native-content-move, capacity-native-content-fade;
+}
+.lpc-home .hook-find.hook-native .type-hook__outline { animation-name: capacity-native-outline; }
+.lpc-home .hook-find.hook-native .type-hook__outline path { animation-name: capacity-native-draw; }
+.lpc-home .hook-find.hook-native .type-hook__composite { animation-name: capacity-native-fill; }
+@keyframes capacity-native-mountain { 0% { transform: translate3d(0,0,0); } 52%,100% { transform: translate3d(0,-40%,0); } }
+@keyframes capacity-native-cloud-left { from { transform: translate3d(0,0,0); } to { transform: translate3d(-15%,0,0); } }
+@keyframes capacity-native-cloud-right { from { transform: translate3d(0,0,0); } to { transform: translate3d(15%,0,0); } }
+@keyframes capacity-native-smoke { from { transform: translate3d(0,70%,0); } to { transform: translate3d(0,0,0); } }
+@keyframes capacity-native-content-move { from { transform: translate3d(0,0,0) scale(1); } to { transform: translate3d(0,20%,0) scale(.9); } }
+@keyframes capacity-native-content-fade { 0% { opacity: 1; } 20%,100% { opacity: 0; } }
+@keyframes capacity-native-outline { 0%,10% { opacity: 0; } 11%,28% { opacity: 1; } 48%,100% { opacity: 0; } }
+@keyframes capacity-native-draw { 0%,10% { stroke-dashoffset: 1; } 40%,100% { stroke-dashoffset: 0; } }
+@keyframes capacity-native-fill { 0%,30% { opacity: 0; } 40%,100% { opacity: 1; } }
