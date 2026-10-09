@@ -21,7 +21,19 @@ const browsers = require('playwright');
           await page.waitForTimeout(2200);
           assert.equal(await page.locator('.editorial-hero__inner').evaluate(e=>getComputedStyle(e).opacity),'1');
           assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No document overflow');
-          assert.equal(await page.locator('.home-brand__mountain').count(),0);
+          const mountain = page.locator('.home-brand__mountain');
+          assert.equal(await mountain.count(),1,'Header keeps its mountain icon');
+          assert.equal(await mountain.getAttribute('stroke-width'),'.8','Keep the original thin mountain stroke');
+          assert.equal(await mountain.getAttribute('viewBox'),'7 20 50 22','Keep the original mountain proportions');
+          assert.ok(await mountain.isVisible(),'Header mountain is visible at every viewport');
+          await page.locator('#lpc-feature-cards').scrollIntoViewIfNeeded();
+          assert.ok(await mountain.isVisible(),'Header mountain stays visible after scrolling');
+          if (width <= 960) {
+            await page.locator('[data-mobile-nav-toggle]').click();
+            assert.ok(await mountain.isVisible(),'Header mountain stays visible with the menu open');
+            await page.locator('[data-mobile-nav-toggle]').click();
+          }
+          await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
           assert.ok((await page.locator('link[rel="icon"]').first().getAttribute('href')).includes('favicon.ico'));
           const tools = page.locator('#lpc-feature-cards');
           await tools.scrollIntoViewIfNeeded();
