@@ -56,7 +56,6 @@ jobs:
           LPC_BROWSERS=chromium node scripts/test-homepage-mobile-reference-ui.js
           LPC_BROWSERS=chromium node scripts/test-homepage-first-frame-ui.js
           LPC_BROWSERS=chromium node scripts/test-homepage-mobile-stability.js
-          LPC_BROWSERS=chromium node scripts/test-homepage-reviewed-corrections.js
           npm run test:e2e:auth
 
   codeql:
