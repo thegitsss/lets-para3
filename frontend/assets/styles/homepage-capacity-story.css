@@ -212,3 +212,12 @@
 @media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
   .lpc-home .hook-find .type-hook__smoke { will-change: transform; }
 }
+
+/* Match FIND's mobile scroll distance. This specificity also wins over the
+   later 2.5-viewport rule in homepage-mobile-stability.css. Keep the stable
+   viewport supplied by homepage.js so Safari's toolbar cannot resize it. */
+@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
+  body.lpc-home .type-hook.hook-find {
+    height: calc(var(--home-stable-viewport, 100svh) * 3.5);
+  }
+}

@@ -18,7 +18,11 @@
   }
   addEventListener('resize', () => { if (innerWidth === width) return; width = innerWidth; measure(); }, { passive: true });
   if ('ResizeObserver' in window) {
-    const observer = new ResizeObserver(measure);
+    let measureFrame = 0;
+    const observer = new ResizeObserver(() => {
+      if (measureFrame) return;
+      measureFrame = requestAnimationFrame(() => { measureFrame = 0; measure(); });
+    });
     observer.observe(intro);
     observer.observe(document.querySelector('.editorial-hero'));
   }
