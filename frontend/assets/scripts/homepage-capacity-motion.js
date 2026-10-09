@@ -80,6 +80,12 @@
     frame = 0;
     if (reduced.matches) return;
     const target = clamp((scrollY - sectionTop) / sectionHeight);
+    if (innerWidth <= 767) {
+      progress = target;
+      previousTime = 0;
+      render(progress);
+      return;
+    }
     const elapsed = previousTime ? Math.max(0, time - previousTime) : 16;
     previousTime = time;
     progress += (target - progress) * (1 - Math.exp(-elapsed / 100));
@@ -115,7 +121,12 @@
   }
 
   addEventListener('scroll', schedule, { passive: true });
-  addEventListener('resize', measure, { passive: true });
+  let layoutWidth = innerWidth;
+  addEventListener('resize', () => {
+    if (innerWidth <= 767 && innerWidth === layoutWidth) return;
+    layoutWidth = innerWidth;
+    measure();
+  }, { passive: true });
   addEventListener('pageshow', measure);
   reduced.addEventListener('change', measure);
   // Font and upstream layout changes can move the scene after initial paint.

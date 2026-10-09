@@ -1,7 +1,7 @@
 /* Pre-rendered mountain with a transform-only heading reveal behind its ridge. */
 (() => {
   const mobile = matchMedia('(max-width:767px),(hover:none) and (pointer:coarse)');
-  if (!mobile.matches) return;
+  if (innerWidth > 767 || !mobile.matches) return;
   const scene = document.querySelector('.closing-mobile');
   if (!scene) return;
   const canvas = scene.querySelector('canvas');
@@ -65,11 +65,6 @@
         ctx.fillStyle = 'rgba(0,0,0,.36)';
         ctx.fillRect(0, 0, surfaceWidth, height);
       }
-      ctx.globalCompositeOperation = 'destination-in';
-      const fade = ctx.createLinearGradient(0, height * .66, 0, height);
-      fade.addColorStop(0, '#000'); fade.addColorStop(1, 'transparent');
-      ctx.fillStyle = fade; ctx.fillRect(0, 0, surfaceWidth, height);
-      ctx.globalCompositeOperation = 'source-over';
       scene.classList.add('closing--rendered');
       schedule();
     } catch (error) {
@@ -86,7 +81,7 @@
     const top = sceneTop - scrollY;
     if (!disabled && (top > height + 80 || top < -height - 80)) return;
     const progress = Math.max(0, Math.min(1, (height - top) / (height * 1.5)));
-    const y = disabled ? 0 : Math.round((-24 + progress * 48) * 100) / 100;
+    const y = disabled ? 0 : Math.round((-48 + progress * 96) * 100) / 100;
     const reveal = Math.max(0, Math.min(1, (height * .8 - top) / (height * 1.05)));
     const eased = reveal * reveal * (3 - 2 * reveal);
     const titleY = disabled ? 0 : Math.round((1 - eased) * 160 * 100) / 100;
