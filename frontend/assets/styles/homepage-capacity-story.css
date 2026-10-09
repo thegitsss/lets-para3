@@ -199,3 +199,12 @@
 
 /* This overlay contains only the opening Let’s characters; all other cloud overlap stays intact. */
 .lpc-home .type-hook__outline.type-hook__clear-letters { z-index: 4; pointer-events: none; }
+
+/* Keep the moving mobile introduction on one composited text layer. */
+@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
+  .lpc-home .hook-find .type-hook__inner {
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+}
