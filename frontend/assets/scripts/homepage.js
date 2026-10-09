@@ -55,7 +55,7 @@
   let scrollIdleTimer = 0;
   addEventListener('scroll', () => {
     if (innerWidth > 767) return;
-    document.body.classList.add('mobile-is-scrolling');
+    if (!document.body.classList.contains('mobile-is-scrolling')) document.body.classList.add('mobile-is-scrolling');
     clearTimeout(scrollIdleTimer);
     scrollIdleTimer = setTimeout(() => document.body.classList.remove('mobile-is-scrolling'), 160);
   }, { passive: true });
