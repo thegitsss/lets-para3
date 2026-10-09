@@ -43,6 +43,8 @@
         });
       }
       await image.decode();
+      // Cold WebKit loads can decode before the image's first drawable frame.
+      await new Promise(resolve => requestAnimationFrame(resolve));
       if (!path) path = new Path2D(document.querySelector('#closing-ridge-cutout path').getAttribute('d'));
       const dpr = Math.min(devicePixelRatio || 1, 2);
       const surfaceWidth = scene.clientWidth + 48;
