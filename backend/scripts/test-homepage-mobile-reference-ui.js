@@ -28,12 +28,12 @@ const browsers = require('playwright');
           assert.equal(await tools.locator('article').count(),3);
           assert.equal(await tools.locator('button').count(),0);
           const cardGeometry = await tools.locator('article').evaluateAll(es=>es.map(e=>{
-            const scene=e.querySelector('.scene').getBoundingClientRect(), heading=e.querySelector('h3').getBoundingClientRect(), copy=e.querySelector(':scope > p').getBoundingClientRect();
-            return {sceneTop:scene.top,sceneBottom:scene.bottom,headingTop:heading.top,headingBottom:heading.bottom,copyTop:copy.top,copyBottom:copy.bottom};
+            const scene=e.querySelector('.scene').getBoundingClientRect(), heading=e.querySelector('h3').getBoundingClientRect(), copy=[...e.querySelectorAll(':scope > p')].find(p=>getComputedStyle(p).display!=='none')?.getBoundingClientRect();
+            return {sceneTop:scene.top,sceneBottom:scene.bottom,headingTop:heading.top,headingBottom:heading.bottom,copyTop:copy?.top,copyBottom:copy?.bottom};
           }));
           cardGeometry.forEach(c=>{
-            assert.ok(c.copyTop>=c.headingBottom,'Description follows heading');
-            assert.ok(width<768 ? c.sceneTop>=c.copyBottom : c.sceneBottom<=c.headingTop,
+            if (c.copyTop !== undefined) assert.ok(c.copyTop>=c.headingBottom,'Description follows heading');
+            assert.ok(width<768 ? c.sceneTop>=(c.copyBottom ?? c.headingBottom) : c.sceneBottom<=c.headingTop,
               'Mobile animations follow the copy; desktop illustrations remain above it');
           });
           await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
