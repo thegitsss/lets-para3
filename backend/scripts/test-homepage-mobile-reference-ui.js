@@ -28,6 +28,7 @@ const browsers = require('playwright');
           assert.ok(await mountain.isVisible(),'Header mountain is visible at every viewport');
           await page.locator('#lpc-feature-cards').scrollIntoViewIfNeeded();
           assert.ok(await mountain.isVisible(),'Header mountain stays visible after scrolling');
+          if (width <= 767) assert.equal(await page.locator('.type-hook__inner').evaluate(e=>getComputedStyle(e).transform),'none','Mobile heading follows native scrolling without JS counter-motion');
           if (width <= 960) {
             await page.locator('[data-mobile-nav-toggle]').click();
             assert.ok(await mountain.isVisible(),'Header mountain stays visible with the menu open');
