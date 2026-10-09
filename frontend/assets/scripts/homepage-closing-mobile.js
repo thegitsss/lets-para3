@@ -17,7 +17,8 @@
   let prepared = false;
   let lastActionsOpacity = [];
   function measure() {
-    height = Math.max(700, innerHeight);
+    // Font readiness may arrive after the mobile toolbar has collapsed.
+    // Preserve the scene height captured at landing until a true width change.
     scene.style.setProperty('--closing-height', `${height}px`);
     const photoScale = height / 1024;
     const summit = height * .27 + 135 * photoScale;
@@ -42,6 +43,8 @@
         });
       }
       await image.decode();
+      // Cold WebKit loads can decode before the image's first drawable frame.
+      await new Promise(resolve => requestAnimationFrame(resolve));
       if (!path) path = new Path2D(document.querySelector('#closing-ridge-cutout path').getAttribute('d'));
       const dpr = Math.min(devicePixelRatio || 1, 2);
       const surfaceWidth = scene.clientWidth + 48;
@@ -125,7 +128,7 @@
     document.fonts.ready.then(paint);
   }
   measure();
-  document.fonts.ready.then(measure);
+  document.fonts.ready.then(() => { measure(); schedule(); });
   // Decode and flatten the same mountain before it enters view, rather
   // than competing with the initial paper/logo animation for paint time.
   if ('IntersectionObserver' in window) {
@@ -141,7 +144,8 @@
     // Browser chrome may change height while scrolling; only width changes
     // establish a new layout, including device rotation.
     if (innerWidth === width) return;
-    width = innerWidth; measure(); if (prepared) paint(); schedule();
+    width = innerWidth; height = Math.max(700, innerHeight);
+    measure(); if (prepared) paint(); schedule();
   }, { passive: true });
   reduced.addEventListener('change', () => { lastY = lastTitleY = lastOpacity = null; lastActionsOpacity = []; schedule(); });
   for (const node of [document.body, document.documentElement]) {
@@ -151,5 +155,8 @@
     sceneTop = scene.getBoundingClientRect().top + scrollY;
     schedule();
   }).observe(document.body);
+  // A font can become active when this offscreen heading first approaches.
+  // Align it to the same ridge without adopting a toolbar-only height change.
+  new ResizeObserver(() => { measure(); schedule(); }).observe(title);
   schedule();
 })();
