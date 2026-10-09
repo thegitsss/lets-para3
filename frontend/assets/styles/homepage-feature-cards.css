@@ -433,3 +433,15 @@
   #lpc-feature-cards *, #lpc-feature-cards *::after { animation: none !important; }
   #lpc-feature-cards .message { opacity: 1; transform: none; }
 }
+
+#lpc-feature-cards article > .feature-copy-mobile { display: none; }
+@media (max-width: 767px) {
+  #lpc-feature-cards article > .feature-copy-desktop { display: none; }
+  #lpc-feature-cards article > .feature-copy-mobile { display: block; }
+}
+
+@media (max-width: 767px) {
+  #lpc-feature-cards h3,
+  #lpc-feature-cards article > p { text-align: center; }
+  #lpc-feature-cards article > p { width: 100%; margin-inline: auto; }
+}

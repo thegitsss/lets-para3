@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="assets/styles/public-design-system.css?v=20260828-phase8" />
   <link rel="stylesheet" href="assets/styles/public-site-chrome.css?v=20260930-responsive-footer" />
   <link rel="stylesheet" href="assets/styles/homepage.css?v=20260929-workflow-leading" />
-  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20261008-closing-stability" />
+  <link rel="stylesheet" href="assets/styles/homepage-hybrid.css?v=20261008-workflow-constellation" />
   <link rel="stylesheet" href="assets/styles/homepage-readable-type.css?v=20260924-original-hero" />
   <link rel="stylesheet" href="assets/styles/homepage-serif-type.css?v=20260929-workflow-wrap" />
   <style>
@@ -65,7 +65,7 @@
   </style>
   <link rel="stylesheet" href="assets/styles/homepage-assistant.css?v=20260925-spotlight" />
   <link rel="stylesheet" href="assets/styles/homepage-map.css?v=20261008-live-map" />
-  <link rel="stylesheet" href="assets/styles/homepage-feature-cards.css?v=20261008-mobile-audit-fixes" />
+  <link rel="stylesheet" href="assets/styles/homepage-feature-cards.css?v=20261008-mobile-centered-blocks" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -466,13 +466,54 @@
       </div>
     </section>
 
+    <section data-header-tone="dark" class="assistant-spotlight" id="assistant" aria-labelledby="assistant-title">
+      <div class="assistant-spotlight__inner">
+        <div class="assistant-spotlight__copy">
+          <p class="assistant-spotlight__eyebrow">THE LPC ASSISTANT</p>
+          <h2 id="assistant-title">Less searching.<br /><em>More clarity.</em></h2>
+          <p class="assistant-spotlight__description">Ask about your active matters. Get the details—and a way back to the work.</p>
+          <div class="assistant-spotlight__examples" role="group" aria-label="Explore example Assistant answers">
+            <div>
+              <button type="button" data-public-action="secondary" data-assistant-example="deadlines" aria-pressed="true">Deadlines</button>
+              <button type="button" data-public-action="secondary" data-assistant-example="people" aria-pressed="false">Your paralegals</button>
+              <button type="button" data-public-action="secondary" data-assistant-example="review" aria-pressed="false">Work to review</button>
+            </div>
+          </div>
+        </div>
+        <div class="assistant-spotlight__visual">
+          <div class="assistant-demo">
+            <header class="assistant-demo__header">
+              <span class="assistant-demo__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M4 5.5h16v11H9l-5 3v-14Z"/><path d="M8 9h8M8 12.5h6"/></svg></span>
+              <div><strong>LPC Assistant</strong><span>Connected to your matters</span></div>
+              <span class="assistant-demo__online" aria-hidden="true"></span>
+            </header>
+            <div class="assistant-demo__conversation" aria-live="polite" aria-atomic="true">
+              <p class="assistant-demo__question" data-demo-question>What’s my next deadline?</p>
+              <div class="assistant-demo__answer">
+                <span class="assistant-demo__answer-label">LPC ASSISTANT</span>
+                <p data-demo-answer>Your next deadline is August 23 for Henderson v. Walker.</p>
+                <div class="assistant-demo__fact"><span data-demo-fact-label>Next deadline</span><strong data-demo-fact>August 23</strong><span data-demo-detail>Henderson v. Walker</span></div>
+              </div>
+            </div>
+            <div class="assistant-demo__source">
+              <span class="assistant-demo__file" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6"/></svg></span>
+              <span><small>GO TO THE MATTER</small><strong data-demo-matter>Henderson v. Walker</strong></span>
+              <span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M5 19 19 5M8 5h11v11"/></svg></span>
+            </div>
+            <div class="assistant-demo__composer" aria-hidden="true"><span>Ask about your matters…</span><span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></span></div>
+          </div>
+        </div>
+      </div>
+      <p class="assistant-spotlight__disclaimer">Workspace information, not legal advice or decisions.</p>
+    </section>
+
     </div>
 
     <section id="lpc-feature-cards" class="paused" data-header-tone="light" aria-label="Messaging, file security, and Matter workspace">
 <div class="joined">
-<article><div class="scene" aria-hidden="true"><div class="chat"><div class="message"><span class="avatar">A</span><div class="bubble">Can you add the source references?</div></div><div class="message"><span class="avatar para">P</span><div class="bubble">Yes, I’ll update the index.</div></div><div class="message"><span class="avatar">A</span><div class="bubble">Thank you.</div></div><div class="message"><span class="avatar para">P</span><div class="bubble">The revised version is uploaded.</div></div></div></div><h3>Real-time messaging</h3><p>Connect directly with your attorney or paralegal. Ask questions, clarify details, and get updates without switching to email.</p></article>
-<article><div class="scene" aria-hidden="true"><div class="tracks" aria-hidden="true"><div class="track"></div><div class="track"></div><div class="track"></div><div class="track"></div><div class="track"></div></div><div class="transfer" aria-hidden="true"><div class="folder"><div class="paper"></div><div class="paper"></div><div class="paper"></div><div class="folder-face"></div></div><div class="server"><div class="vent">||||||</div><div class="drive"></div><div class="drive"></div></div></div></div><h3>Protected file sharing</h3><p>Matter files are encrypted in transit and at rest, with access restricted to authorized users and temporary download links.</p></article>
-<article><div class="scene" aria-hidden="true"><div class="workspace" aria-hidden="true"><div class="dots"><span></span><span></span><span></span></div><div class="code purple" style="width:60%"></div><div class="code" style="width:75%;margin-left:8px"></div><div class="code blue" style="width:50%;margin-left:8px"></div><div class="code" style="width:80%;margin-left:16px"></div><div class="code green" style="width:45%;margin-left:16px"></div><div class="code" style="width:30%;margin-left:8px"></div><div class="code purple" style="width:20%"></div></div><div class="cursor" aria-hidden="true" title="Illustrative collaboration"><div class="cursor-label"><span class="avatar">A</span>Attorney</div></div><div class="cursor other" aria-hidden="true"><div class="cursor-label"><span class="avatar para">P</span>Paralegal</div></div></div><h3>Your Matter workspace</h3><p>Scope, deadlines, deliverables, and payment details come together in a dedicated workspace—from hiring through final review.</p></article>
+<article><div class="scene" aria-hidden="true"><div class="chat"><div class="message"><span class="avatar">A</span><div class="bubble">Can you add the source references?</div></div><div class="message"><span class="avatar para">P</span><div class="bubble">Yes, I’ll update the index.</div></div><div class="message"><span class="avatar">A</span><div class="bubble">Thank you.</div></div><div class="message"><span class="avatar para">P</span><div class="bubble">The revised version is uploaded.</div></div></div></div><h3>Real-time messaging</h3><p class="feature-copy-desktop">Connect directly with your attorney or paralegal. Ask questions, clarify details, and get updates without switching to email.</p></article>
+<article><div class="scene" aria-hidden="true"><div class="tracks" aria-hidden="true"><div class="track"></div><div class="track"></div><div class="track"></div><div class="track"></div><div class="track"></div></div><div class="transfer" aria-hidden="true"><div class="folder"><div class="paper"></div><div class="paper"></div><div class="paper"></div><div class="folder-face"></div></div><div class="server"><div class="vent">||||||</div><div class="drive"></div><div class="drive"></div></div></div></div><h3>Protected file sharing</h3><p class="feature-copy-desktop">Matter files are encrypted in transit and at rest, with access restricted to authorized users and temporary download links.</p><p class="feature-copy-mobile">Files and messages are encrypted with AES-256.</p></article>
+<article><div class="scene" aria-hidden="true"><div class="workspace" aria-hidden="true"><div class="dots"><span></span><span></span><span></span></div><div class="code purple" style="width:60%"></div><div class="code" style="width:75%;margin-left:8px"></div><div class="code blue" style="width:50%;margin-left:8px"></div><div class="code" style="width:80%;margin-left:16px"></div><div class="code green" style="width:45%;margin-left:16px"></div><div class="code" style="width:30%;margin-left:8px"></div><div class="code purple" style="width:20%"></div></div><div class="cursor" aria-hidden="true" title="Illustrative collaboration"><div class="cursor-label"><span class="avatar">A</span>Attorney</div></div><div class="cursor other" aria-hidden="true"><div class="cursor-label"><span class="avatar para">P</span>Paralegal</div></div></div><h3>Your Matter workspace</h3><p class="feature-copy-desktop">Scope, deadlines, deliverables, and payment details come together in a dedicated workspace—from hiring through final review.</p><p class="feature-copy-mobile">Deadlines, files, and payments in one place.</p></article>
 </div>
     </section>
 

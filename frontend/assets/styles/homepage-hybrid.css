@@ -1877,11 +1877,12 @@ body.lpc-home .closing-scene #closing-title {
 }
 @media(max-width:360px){.lpc-home .closing-scene .role-action strong{font-size:18px;}}
 
-/* Deployed constellation and parallax surfaces, scoped to mobile. */
+/* Workflow constellation on desktop and mobile. */
+.workflow__constellation{position:absolute;inset:0;overflow:clip;pointer-events:none;}
+.matter-field--workflow{position:sticky;top:0;display:block;opacity:.82;}
+.workflow__intro,.workflow__story{position:relative;}
+/* Deployed parallax surfaces, scoped to mobile. */
 @media(max-width:767px){
- .workflow__constellation{position:absolute;inset:0;overflow:clip;pointer-events:none;}
- .matter-field--workflow{position:sticky;top:0;display:block;opacity:.82;}
- .workflow__intro,.workflow__story{position:relative;}
  .lpc-home .paralegal-map{background-size:100% calc(100% + var(--home-stable-viewport,100svh) * .75);background-repeat:no-repeat;}
  .paralegal-map__stage{min-height:calc(var(--home-stable-viewport,100svh) - var(--header-height,72px));box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;padding:32px 0;}
  .paralegal-map__canvas{aspect-ratio:975 / 610;}
@@ -1895,7 +1896,7 @@ body.lpc-home .closing-scene #closing-title {
 }
 @media(max-width:640px){.lpc-home .workflow__intro,.lpc-home .workflow__story{background:transparent;}}
 @media(max-width:600px){.matter-field--workflow{opacity:1;}}
-@media(min-width:768px){.workflow__constellation{display:none;}}
+
 @media(prefers-reduced-motion:reduce){.lpc-home .paralegal-map{background-size:auto;} .lpc-home .paralegal-map__stage{min-height:0;} .lpc-home .paralegal-map__motion-surface{transform:none !important;will-change:auto;}}
 
 /* Keep mobile hero centering stable while Safari changes toolbar height. */
