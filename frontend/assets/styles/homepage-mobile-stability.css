@@ -26,7 +26,6 @@
 
 /* Mobile layout corrections; desktop retains its approved layout and motion. */
 @media (max-width: 767px) {
-  .lpc-home--editorial .editorial-hero__main { position: relative; top: -32px; }
   body.lpc-home--editorial .home-header,
   body.lpc-home--editorial .home-header.is-past-hero.has-ink {
     background: #edf0f3;
@@ -43,5 +42,26 @@
   }
   .lpc-home .matter-scroll-journey .builder-actions .builder-preview {
     min-height: 44px; padding: 10px 12px; font-size: 14px;
+  }
+}
+
+/* Focused phone spacing and reveal corrections. */
+@media (max-width: 767px) {
+  html.lpc-homepage { background: #07131f; }
+  /* Use the existing stable page backing, without fixed section repaints. */
+  .lpc-home--editorial .hero-capacity { background: transparent; background-attachment: scroll; }
+  .lpc-home .hook-find::before { display: none; }
+  .lpc-home .hook-find .mobile-capacity-wash { display: none; }
+  .lpc-home .type-hook__outline { top: 42%; }
+  .lpc-home .type-hook__composite,
+  .lpc-home .type-hook__composite::after {
+    -webkit-mask-position: center calc(50% - var(--home-stable-viewport, 100svh) * .08);
+    mask-position: center calc(50% - var(--home-stable-viewport, 100svh) * .08);
+  }
+  .lpc-home .paralegal-map { padding-top: 56px; padding-bottom: 56px; }
+  .lpc-home .paralegal-map__stage { min-height: 0; padding-block: 28px; }
+  .lpc-home .home-footer {
+    margin-bottom: 0;
+    padding-bottom: max(18px, env(safe-area-inset-bottom));
   }
 }

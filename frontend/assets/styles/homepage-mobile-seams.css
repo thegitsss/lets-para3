@@ -1,0 +1,71 @@
+/* Phone-only painting corrections. Hero, map sizing, controls and motion stay intact. */
+@media (max-width: 767px) {
+  .lpc-home .builder-skip,
+  .lpc-home [data-post-matter-action] { display: none !important; }
+  body.lpc-home .closing-mobile .closing__sky { background: #07131f; }
+  /* Swap panels with the scene motion, without a second paper resize animation. */
+  .lpc-home #matter-film[data-stage] .matter-sheet {
+    top: 8px;
+    transition: none;
+  }
+  .lpc-home #matter-film[data-stage="0"] .matter-sheet * {
+    transition: none;
+  }
+  .lpc-home #matter-film[data-stage="2"] .sheet-bottom {
+    display: none;
+  }
+  html.lpc-homepage { background: #07131f; }
+  body.lpc-home--editorial {
+    isolation: isolate;
+    background: #edf0f3;
+    background-attachment: scroll;
+    padding-bottom: 0;
+  }
+  body.lpc-home--editorial::before {
+    content: '';
+    position: fixed;
+    inset: 0 0 auto;
+    height: 100lvh;
+    z-index: -1;
+    background: radial-gradient(ellipse at 4% 0%, #dce6fb, transparent 46%),
+      radial-gradient(ellipse at 100% 100%, #ccd9e5, transparent 50%), #edf0f3;
+    pointer-events: none;
+    transform: translateZ(0);
+  }
+
+  /* Finish the logo scene before the following section can cover its letters. */
+  .lpc-home .type-hook.hook-find { margin-bottom: 0; }
+  .lpc-home .hook-find .type-hook__scene {
+    overflow-x: clip;
+    overflow-y: visible;
+    clip-path: none;
+  }
+  .lpc-home--editorial .hero-capacity { background: transparent; background-attachment: scroll; }
+  .lpc-home .hook-find::before,
+  .lpc-home .hook-find::after,
+  .lpc-home .mobile-capacity-wash { display: none; }
+  .lpc-home--editorial .matter-scroll-journey {
+    background: transparent;
+    background-attachment: scroll;
+  }
+
+  /* Keep the mobile map joins free of gradient overlays. */
+  .lpc-home #lpc-feature-cards {
+    background: #fff;
+  }
+  .lpc-home .paralegal-map::after {
+    content: none;
+    display: none;
+  }
+
+  /* Keep the mobile footer backing navy without added fade overlays. */
+  .lpc-home .home-footer__bottom {
+    border-top: 0;
+  }
+  .lpc-home .home-footer {
+    background: #07131f;
+    margin-bottom: 0;
+    padding-bottom: max(18px, env(safe-area-inset-bottom));
+    box-shadow: none;
+  }
+}
