@@ -29,7 +29,7 @@
   const clamp = value => Math.max(0, Math.min(1, value));
   const ease = value => 1 - (1 - value) ** 2;
   const tween = (value, start, duration) => ease(clamp((value - start) / duration));
-  const writtenStyles = new WeakMap();
+  let writtenStyles = new WeakMap();
   let mobile = mobileMedia.matches;
   let sectionTop = 0;
   let sectionHeight = 1;
@@ -50,7 +50,8 @@
     if (!previous) { previous = {}; writtenStyles.set(element, previous); }
     if (previous[property] === text) return;
     previous[property] = text;
-    element.style[property] = text;
+    if (property.startsWith('--')) element.style.setProperty(property, text);
+    else element.style[property] = text;
   }
 
   // Every layer uses this single smoothed value, including SVG strokes. There
@@ -66,33 +67,50 @@
     const fillDuration = mobile ? .1 : .06;
     const ink = tween(value, .1, drawDuration);
     const fill = tween(value, fillStart, fillDuration);
+    const foregroundOpacity = 1 - tween(value, fillStart, mobile ? .18 : .06);
+    const headlineOpacity = 1 - tween(value, .03, .06);
     const outlineOpacity = tween(value, .1, mobile ? .04 : .01) *
       (1 - tween(value, fillStart, fillDuration));
 
     writeStyle(inner, 'transform', mobile ? 'none'
       : `translate3d(0, ${20 * travel}%, 0) scale(${1 - .1 * travel})`);
     writeStyle(inner, 'opacity', 1 - exit);
-    papers.forEach(paper => writeStyle(paper, 'transform',
-      `translate3d(0, ${-40 * travel}%, 0) scale(${1 + .3 * travel})`));
-    writeStyle(foreground, 'opacity', 1 - tween(value, fillStart, mobile ? .18 : .06));
-    writeStyle(headline, 'opacity', 1 - tween(value, .03, .06));
+    papers.forEach(paper => {
+      // Invisible mobile layers need no matrix updates. On reverse scrolling,
+      // update the matrix before restoring opacity so the reveal stays exact.
+      const visible = paper === foreground ? foregroundOpacity > 0
+        : paper === headline ? headlineOpacity > 0 : fill > 0;
+      if (!mobile || visible) writeStyle(paper, 'transform',
+        `translate3d(0, ${-40 * travel}%, 0) scale(${1 + .3 * travel})`);
+    });
+    writeStyle(foreground, 'opacity', foregroundOpacity);
+    writeStyle(headline, 'opacity', headlineOpacity);
     clouds.forEach((cloud, index) => writeStyle(cloud, 'transform',
       `translate3d(${(mobile ? (index ? -40 : 40) : (index ? 15 : -15)) * travel}%, 0, 0)`));
     writeStyle(smoke, 'transform', `translate3d(0, ${70 * (1 - travel)}%, 0)`);
     writeStyle(outline, 'opacity', outlineOpacity);
-    paths.forEach(path => writeStyle(path, 'strokeDashoffset', 1 - ink));
+    if (mobile) writeStyle(outline, '--outline-dash', 1 - ink);
+    else paths.forEach(path => writeStyle(path, 'strokeDashoffset', 1 - ink));
     writeStyle(composite, 'opacity', fill);
     writeStyle(clearLetters, 'opacity', .65);
+    if (mobile) {
+      writeStyle(clearLetters, '--outline-dash', 1 - ink);
+      writeStyle(clearLetters, '--outline-stroke-opacity', outlineOpacity);
+      writeStyle(clearLetters, '--outline-fill-opacity', fill);
+    }
     clearPaths.forEach(path => {
-      writeStyle(path, 'strokeDashoffset', 1 - ink);
-      writeStyle(path, 'strokeOpacity', outlineOpacity);
+      if (!mobile) writeStyle(path, 'strokeDashoffset', 1 - ink);
+      if (!mobile) writeStyle(path, 'strokeOpacity', outlineOpacity);
       writeStyle(path, 'fill', path.classList.contains('type-hook__apostrophe-outline') ? '#6495ed' : '#233b5a');
-      writeStyle(path, 'fillOpacity', fill);
+      if (!mobile) writeStyle(path, 'fillOpacity', fill);
     });
   }
 
   function scrollProgress() {
-    return clamp((scrollY - sectionTop) / sectionHeight);
+    // Finish mobile motion before the sticky scene releases. This provides
+    // one stable viewport of animated travel within a two-viewport section.
+    const distance = mobile ? Math.max(1, sectionHeight - viewportHeight) : sectionHeight;
+    return clamp((scrollY - sectionTop) / distance);
   }
 
   function measure(restore = false) {
@@ -103,6 +121,14 @@
     const nextHeight = Math.max(1, rect.height);
     const geometryChanged = !measured || mobile !== nextMobile ||
       Math.abs(sectionTop - nextTop) > .5 || Math.abs(sectionHeight - nextHeight) > .5;
+    if (nextMobile !== mobile) writtenStyles = new WeakMap();
+    if (nextMobile && (!measured || !mobile)) {
+      [...paths, ...clearPaths].forEach(path => {
+        path.style.removeProperty('stroke-dashoffset');
+        path.style.removeProperty('stroke-opacity');
+        path.style.removeProperty('fill-opacity');
+      });
+    }
     mobile = nextMobile;
     sectionTop = nextTop;
     sectionHeight = nextHeight;

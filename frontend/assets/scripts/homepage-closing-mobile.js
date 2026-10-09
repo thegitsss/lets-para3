@@ -6,7 +6,6 @@
   if (!scene) return;
   const canvas = scene.querySelector('canvas');
   const image = scene.querySelector('img');
-  image.loading = 'eager';
   const title = scene.querySelector('h2');
   const actions = scene.querySelector('.closing__actions');
   const buttons = [...actions.querySelectorAll('a')];
@@ -15,6 +14,7 @@
   let width = innerWidth, height = Math.max(700, innerHeight);
   let sceneTop = 0, frame = 0, lastY = null, lastTitleY = null, lastOpacity = null, path = null;
   let painting = false, paintAgain = false;
+  let prepared = false;
   let lastActionsOpacity = [];
   function measure() {
     height = Math.max(700, innerHeight);
@@ -118,14 +118,30 @@
     });
   }
   function schedule() { if (!frame) frame = requestAnimationFrame(render); }
+  function prepare() {
+    if (prepared) return;
+    prepared = true;
+    image.loading = 'eager';
+    document.fonts.ready.then(paint);
+  }
   measure();
-  document.fonts.ready.then(() => { measure(); paint(); });
+  document.fonts.ready.then(measure);
+  // Decode and flatten the same mountain before it enters view, rather
+  // than competing with the initial paper/logo animation for paint time.
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      observer.disconnect();
+      prepare();
+    }, { rootMargin: `${Math.max(1800, Math.ceil(innerHeight * 2))}px 0px` });
+    observer.observe(scene);
+  } else prepare();
   addEventListener('scroll', schedule, { passive: true });
   addEventListener('resize', () => {
     // Browser chrome may change height while scrolling; only width changes
     // establish a new layout, including device rotation.
     if (innerWidth === width) return;
-    width = innerWidth; measure(); paint(); schedule();
+    width = innerWidth; measure(); if (prepared) paint(); schedule();
   }, { passive: true });
   reduced.addEventListener('change', () => { lastY = lastTitleY = lastOpacity = null; lastActionsOpacity = []; schedule(); });
   for (const node of [document.body, document.documentElement]) {
