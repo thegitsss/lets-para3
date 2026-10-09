@@ -72,8 +72,8 @@
       return;
     }
     if (!parallaxVisible) return;
-    const stableHeight = innerWidth <= 640
-      ? Math.round(parseFloat(document.documentElement.style.getPropertyValue('--mobile-stable-height')))
+    const stableHeight = innerWidth <= 767
+      ? Math.round(parseFloat(document.documentElement.style.getPropertyValue('--home-stable-viewport')))
       : 0;
     const viewportHeight = stableHeight || innerHeight;
     if (mobileMotion.matches && !mapGeometry) {
@@ -87,7 +87,7 @@
     // spacer. This extra distance affects motion only, not document height.
     const artHeight = rect.height + (document.documentElement.classList.contains('accessibility-mode') ? 0 : viewportHeight * .75);
     const progress = Math.max(0, Math.min(1, (viewportHeight - rect.top) / (viewportHeight + artHeight)));
-    const travel = innerWidth <= 600 ? 65 : 115;
+    const travel = mobileMotion.matches ? 22 : 115;
     const transform = `translate3d(0, ${Math.round((.5 - progress) * travel * 2)}px, 0) scale(${innerWidth <= 600 ? 1.02 : 1.08})`;
     // An inherited variable on the canvas restyles every SVG pin. Moving the
     // same two layers directly keeps the existing travel and scale unchanged.
@@ -104,7 +104,7 @@
   addEventListener('scroll', scheduleParallax, { passive: true });
   let mapViewportWidth = innerWidth;
   addEventListener('resize', () => {
-    if (innerWidth <= 640 && innerWidth === mapViewportWidth) return;
+    if (innerWidth <= 767 && innerWidth === mapViewportWidth) return;
     mapViewportWidth = innerWidth;
     mapGeometry = null;
     scheduleParallax();

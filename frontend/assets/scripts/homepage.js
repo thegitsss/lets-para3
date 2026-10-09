@@ -50,6 +50,15 @@
   };
   measureMobileViewport();
   measureHeroLayout();
+  // Preserve the decorative frame during a swipe and resume it after scrolling.
+  // Scroll-driven hero, logo, and closing choreography keep running normally.
+  let scrollIdleTimer = 0;
+  addEventListener('scroll', () => {
+    if (innerWidth > 767) return;
+    if (!document.body.classList.contains('mobile-is-scrolling')) document.body.classList.add('mobile-is-scrolling');
+    clearTimeout(scrollIdleTimer);
+    scrollIdleTimer = setTimeout(() => document.body.classList.remove('mobile-is-scrolling'), 160);
+  }, { passive: true });
   addEventListener('resize', () => {
     if (innerWidth === heroLayoutWidth) return;
     heroLayoutWidth = innerWidth;
@@ -70,18 +79,34 @@
   const setMotionStyle = (node, name, value) => {
     if (node.style.getPropertyValue(name) !== value) node.style.setProperty(name, value);
   };
+  let headerGeometry = null;
+  const measureHeaderSurfaces = () => {
+    headerGeometry = {
+      height: header?.offsetHeight || 0,
+      heroBottom: headerHero ? headerHero.getBoundingClientRect().bottom + scrollY : 0,
+      sections: [...document.querySelectorAll('[data-header-tone]')].map(node => {
+        const rect = node.getBoundingClientRect();
+        return { node, top: rect.top + scrollY, bottom: rect.bottom + scrollY };
+      }).filter(section => section.bottom > section.top),
+    };
+  };
+  measureHeaderSurfaces();
   const syncHeaderSurface = () => {
     if (!header) return;
     const fadeDistance = Math.max(280, Math.min(420, heroMotionHeight() * 0.4));
     const progress = clamp(window.scrollY / fadeDistance);
     const editorialHero = document.body.classList.contains("lpc-home--editorial");
     // Read the section actually painted behind the header, including pinned scenes.
-    const headerBounds = header.getBoundingClientRect();
-    const pastHero = !!headerHero && headerHero.getBoundingClientRect().bottom <= headerBounds.bottom;
-    const headerMidpoint = headerBounds.height / 2;
-    const surface = innerWidth <= 767 && !pastHero ? headerHero : document.elementsFromPoint(window.innerWidth / 2, headerMidpoint)
-      .find(node => !header.contains(node) && node.closest('[data-header-tone]'))
-      ?.closest('[data-header-tone]');
+    const mobile = innerWidth <= 767;
+    const headerBounds = mobile ? null : header.getBoundingClientRect();
+    const pastHero = mobile ? scrollY + headerGeometry.height >= headerGeometry.heroBottom
+      : !!headerHero && headerHero.getBoundingClientRect().bottom <= headerBounds.bottom;
+    const headerMidpoint = (mobile ? headerGeometry.height : headerBounds.height) / 2;
+    const surface = mobile
+      ? headerGeometry.sections.findLast(section => section.top <= scrollY + headerMidpoint && section.bottom > scrollY + headerMidpoint)?.node
+      : document.elementsFromPoint(window.innerWidth / 2, headerMidpoint)
+        .find(node => !header.contains(node) && node.closest('[data-header-tone]'))
+        ?.closest('[data-header-tone]');
     const tone = surface?.dataset.headerTone;
     const useInkForeground = header.classList.contains('is-open') ||
       (tone ? tone === 'light' : editorialHero || progress >= 0.52);
@@ -106,6 +131,10 @@
   window.addEventListener("scroll", scheduleHeaderSurface, { passive: true });
   window.addEventListener("resize", scheduleHeaderSurface);
   document.fonts.ready.then(scheduleHeaderSurface);
+  const refreshHeaderSurfaces = () => { measureHeaderSurfaces(); scheduleHeaderSurface(); };
+  addEventListener('resize', refreshHeaderSurfaces, { passive: true });
+  document.fonts.ready.then(refreshHeaderSurfaces);
+  new ResizeObserver(refreshHeaderSurfaces).observe(document.body);
 
   const editorialDetails = document.querySelector(".editorial-hero__details");
   let editorialParallaxFrame = 0;
@@ -303,6 +332,7 @@
       return (
         this.isVisible &&
         !reducedMotion.matches &&
+        !(this.isWorkflowField && innerWidth <= 767 && document.body.classList.contains('mobile-is-scrolling')) &&
         !document.body.classList.contains("accessibility-mode") &&
         document.visibilityState !== "hidden"
       );
@@ -319,7 +349,7 @@
       if (!this.shouldAnimate()) {
         if (this.frameId) window.cancelAnimationFrame(this.frameId);
         this.frameId = 0;
-        this.render(0);
+        if (!(this.isWorkflowField && innerWidth <= 767 && document.body.classList.contains('mobile-is-scrolling'))) this.render(0);
         return;
       }
       if (!this.frameId) this.frameId = window.requestAnimationFrame(this.animate);

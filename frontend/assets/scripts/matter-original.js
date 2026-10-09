@@ -18,7 +18,6 @@
   let stage = 0, frame = 0, scrollStart = 0, scrollDistance = 1;
   const disclosure = '';
   const builder = film.querySelector('.dashboard-builder');
-  const builderSkip = film.querySelector('.builder-skip');
   const builderPreview = film.querySelector('.builder-preview');
   const builderAmount = film.querySelector('#builder-amount');
   const builderDate = film.querySelector('#builder-date');
@@ -115,7 +114,6 @@
     if (next !== 1 && (document.activeElement === amount || document.activeElement === deadline)) advance.focus({preventScroll:true});
     if (next !== 1 && builder.contains(document.activeElement)) advance.focus({preventScroll:true});
     builder.hidden = next !== 1;
-    builderSkip.hidden = next !== 1;
     film.querySelector('.matter-sheet').inert = next === 1;
     stage = next;
     film.dataset.stage = String(stage);
@@ -161,7 +159,7 @@
 
     if (reduced.matches) return;
     let next = progress < .26 ? 0 : progress < .64 ? 1 : 2;
-    if (next === 2 && !validate()) next = 1;
+    if (next === 2 && (innerWidth > 767 || stage !== 2) && !validate()) next = 1;
     transitionTo(next);
   }
   function renderBuild(build) {
@@ -175,14 +173,6 @@
     brief.classList.toggle('is-typing', stage === 1 && count < originalNotes.length);
     draftReady = build >= .62;
     builder.classList.toggle('is-ready', stage === 1 && draftReady);
-    builderSkip.hidden = stage !== 1;
-    const replay = build >= 1;
-    if (builderSkip.dataset.mode !== (replay ? 'replay' : 'skip')) {
-      builderSkip.dataset.mode = replay ? 'replay' : 'skip';
-      builderSkip.setAttribute('aria-label', replay ? 'Replay draft animation' : 'Skip draft animation');
-      builderSkip.title = replay ? 'Replay' : 'Skip';
-      builderSkip.innerHTML = replay ? '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 8a8 8 0 1 1-1 7M5 3v5h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' : 'Skip';
-    }
     builder.querySelector('.builder-status').classList.remove('is-complete');
     builderPreview.disabled = !draftReady || amount.getAttribute('aria-invalid') === 'true' || deadline.getAttribute('aria-invalid') === 'true';
     const intake = 1 - portion(.12, .27);
@@ -229,7 +219,11 @@
     const height = film.offsetHeight;
     const stableHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--home-stable-viewport'));
     const viewportHeight = innerWidth <= 767 && Number.isFinite(stableHeight) ? stableHeight : innerHeight;
-    const oversize = Math.max(0, height - viewportHeight);
+    // Use the actual sticky position. This scene pins at zero even when its
+    // decorative stage is taller than a short phone's viewport.
+    const oversize = innerWidth <= 767
+      ? Math.max(0, -(parseFloat(getComputedStyle(film).top) || 0))
+      : Math.max(0, height - viewportHeight);
     journey.style.setProperty('--film-height', `${height}px`);
     journey.style.setProperty('--film-top', `${-oversize}px`);
     scrollStart = journey.getBoundingClientRect().top + scrollY + oversize;
@@ -243,12 +237,6 @@
     const target = scrollStart + scrollDistance * [0, .43, .83][next];
     scrollTo({top:target, behavior:reduced.matches ? 'instant' : 'smooth'});
   }
-  builderSkip.addEventListener('click', () => {
-    if (builderSkip.dataset.mode === 'replay') { setStage(1); return; }
-    cancelAnimationFrame(buildFrame);
-    renderBuild(1);
-    builderSkip.focus({preventScroll:true});
-  });
   film.querySelector('.stage-arrow-prev').addEventListener('click', () => goTo(Math.max(0, stage - 1)));
   film.querySelector('.stage-arrow-next').addEventListener('click', () => goTo(Math.min(2, stage + 1)));
   builderPreview.addEventListener('click', () => { if (validate()) goTo(2); });
@@ -261,7 +249,7 @@
   advance.addEventListener('click', () => {
     if (stage === 0) goTo(1);
     else if (stage === 1 && validate()) goTo(2);
-    else if (stage === 2) return;
+    else if (stage === 2) location.assign('signup.html?role=attorney');
   });
   film.querySelectorAll('.task-toggle').forEach(button => button.addEventListener('click', () => {
     button.setAttribute('aria-pressed', String(button.getAttribute('aria-pressed') !== 'true'));
