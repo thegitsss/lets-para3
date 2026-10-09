@@ -208,3 +208,7 @@
     -webkit-backface-visibility: hidden;
   }
 }
+
+@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
+  .lpc-home .hook-find .type-hook__smoke { will-change: transform; }
+}
