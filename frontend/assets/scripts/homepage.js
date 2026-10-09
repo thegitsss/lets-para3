@@ -48,14 +48,36 @@
       ? parseFloat(computed) : headerHero.getBoundingClientRect().height;
     headerHero.style.setProperty('--hero-layout-min-height', `${resolved}px`);
   };
+  let heroGeometryLocked = scrollY > 8;
+  let settleTimer = 0;
+  const settleInitialHero = () => {
+    if (innerWidth > 767 || heroGeometryLocked) return;
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      if (heroGeometryLocked) return;
+      // Correct the landing hero without resizing every downstream scene.
+      measureHeroLayout();
+    }, 120);
+  };
   measureMobileViewport();
   measureHeroLayout();
+  // Accept initial toolbar/font settling only before the first scroll. Once
+  // browsing starts, keep the stable scene heights that prevent scroll jumps.
+  addEventListener('scroll', () => {
+    if (scrollY > 8) { heroGeometryLocked = true; clearTimeout(settleTimer); }
+  }, { passive: true });
   addEventListener('resize', () => {
-    if (innerWidth === heroLayoutWidth) return;
+    if (innerWidth === heroLayoutWidth) { settleInitialHero(); return; }
     heroLayoutWidth = innerWidth;
+    clearTimeout(settleTimer);
+    heroGeometryLocked = scrollY > 8;
     measureMobileViewport();
     measureHeroLayout();
   }, { passive: true });
+  visualViewport?.addEventListener('resize', settleInitialHero, { passive: true });
+  addEventListener('load', settleInitialHero);
+  addEventListener('pageshow', settleInitialHero);
+  document.fonts.ready.then(settleInitialHero);
 
   // Safari toolbar height changes must not alter motion progress at a fixed scroll position.
   let heroViewportWidth = innerWidth;
