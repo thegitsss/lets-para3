@@ -14,6 +14,7 @@
   let width = innerWidth, height = Math.max(700, innerHeight);
   let sceneTop = 0, frame = 0, lastY = null, lastTitleY = null, lastOpacity = null, path = null;
   let painting = false, paintAgain = false;
+  let blankPaintRetries = 0;
   let prepared = false;
   let lastActionsOpacity = [];
   function measure() {
@@ -44,7 +45,7 @@
       }
       await image.decode();
       // Cold WebKit loads can decode before the image's first drawable frame.
-      await new Promise(resolve => requestAnimationFrame(resolve));
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       if (!path) path = new Path2D(document.querySelector('#closing-ridge-cutout path').getAttribute('d'));
       const dpr = Math.min(devicePixelRatio || 1, 2);
       const surfaceWidth = scene.clientWidth + 48;
@@ -68,6 +69,13 @@
         ctx.fillStyle = 'rgba(0,0,0,.36)';
         ctx.fillRect(0, 0, surfaceWidth, height);
       }
+      // This point is inside the opaque mountain. Do not hide the fallback
+      // until WebKit has actually copied image pixels into the canvas.
+      if (!ctx.getImageData(Math.floor(canvas.width / 2), canvas.height - 1, 1, 1).data[3]) {
+        if (blankPaintRetries++ < 3) { paintAgain = true; return; }
+        throw new Error('Mountain image pixels are not ready');
+      }
+      blankPaintRetries = 0;
       scene.classList.add('closing--rendered');
       schedule();
     } catch (error) {
