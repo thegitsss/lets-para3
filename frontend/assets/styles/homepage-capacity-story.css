@@ -213,11 +213,21 @@
   .lpc-home .hook-find .type-hook__smoke { will-change: transform; }
 }
 
-/* Match FIND's mobile scroll distance. This specificity also wins over the
-   later 2.5-viewport rule in homepage-mobile-stability.css. Keep the stable
-   viewport supplied by homepage.js so Safari's toolbar cannot resize it. */
+/* Compact mobile reveal: one viewport of motion before sticky release.
+   Override the older distance while retaining stable toolbar geometry. */
 @media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
   body.lpc-home .type-hook.hook-find {
-    height: calc(var(--home-stable-viewport, 100svh) * 3.5);
+    height: calc(var(--home-stable-viewport, 100svh) * 2);
+  }
+}
+
+
+/* Share identical mobile SVG values at the SVG root instead of rewriting
+   every path. Artwork and numeric draw/fill values remain unchanged. */
+@media (max-width: 767px) {
+  .lpc-home .type-hook__outline path { stroke-dashoffset: var(--outline-dash, 1); }
+  .lpc-home .type-hook__clear-letters path {
+    stroke-opacity: var(--outline-stroke-opacity, 0);
+    fill-opacity: var(--outline-fill-opacity, 0);
   }
 }
