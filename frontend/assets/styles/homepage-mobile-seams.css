@@ -1,7 +1,7 @@
 /* Phone-only painting corrections. Hero, map sizing, controls and motion stay intact. */
 @media (max-width: 767px) {
-  .lpc-home .builder-skip,
-  .lpc-home [data-post-matter-action] { display: none !important; }
+  .lpc-home .builder-skip { display: none !important; }
+  body.lpc-home--editorial .editorial-hero { background: transparent; background-attachment: scroll; }
   body.lpc-home .closing-mobile .closing__sky { background: #07131f; }
   /* Swap panels with the scene motion, without a second paper resize animation. */
   .lpc-home #matter-film[data-stage] .matter-sheet {

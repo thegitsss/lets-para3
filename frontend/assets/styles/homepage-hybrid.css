@@ -1906,3 +1906,12 @@ body.lpc-home .closing-scene #closing-title {
 @media(max-width:640px){
  body.lpc-home--editorial .editorial-hero{min-height:var(--hero-layout-min-height,max(720px,100svh));}
 }
+
+/* Keep the header mountain mounted beside the brand at every viewport size. */
+.lpc-home .home-header .home-brand { display: inline-flex; align-items: center; gap: 8px; }
+.lpc-home .home-header .home-brand__name { white-space: nowrap; }
+.lpc-home .home-header .home-brand__mountain { display: block; flex: 0 0 38px; width: 38px; height: 38px; color: inherit; }
+@media (max-width: 640px) {
+  .lpc-home .home-header .home-brand { gap: 6px; }
+  .lpc-home .home-header .home-brand__mountain { flex-basis: 30px; width: 30px; height: 30px; }
+}
