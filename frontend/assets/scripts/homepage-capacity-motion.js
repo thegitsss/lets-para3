@@ -49,8 +49,10 @@
     const exit = tween(value, 0, .2);
     const ink = tween(value, .1, .14);
     const fill = tween(value, .24, .06);
+    // Let mobile text follow the browser's native sticky scrolling.
+    // Scroll-event counter-translations and scaling can lag phone swipes.
     inner.style.transform = mobile
-      ? `translate3d(0, calc(${20 * travel}% - ${entranceOffset}px), 0) scale(${1 - .1 * travel})`
+      ? 'none'
       : `translate3d(0, ${20 * travel}%, 0) scale(${1 - .1 * travel})`;
     inner.style.opacity = 1 - exit;
     papers.forEach(paper => {
