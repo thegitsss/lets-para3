@@ -24,6 +24,9 @@ const mappedTotal = Object.values(counts).reduce((sum,count)=>sum+count,0);
           if (mode==='slow-fonts') await page.route('**/*.woff2',async r=>{await new Promise(resolve=>setTimeout(resolve,2600));await r.continue().catch(()=>{});});
           await page.goto(`http://127.0.0.1:${server.address().port}`,{waitUntil:'commit'});
           const inner=page.locator('.editorial-hero__inner');await inner.waitFor({state:'attached'});
+          // The approved hero waits for its fonts before beginning its entrance.
+          await page.waitForFunction(()=>getComputedStyle(document.querySelector('.editorial-hero__inner')).visibility==='visible',{},{timeout:10000});
+          const visibleGeometry = await inner.evaluate(e=>({top:e.offsetTop,height:e.offsetHeight,titleHeight:e.querySelector('h1').offsetHeight}));
           if (mode==='reduced' || mode==='no-script') {
             await page.waitForTimeout(100);
             assert.equal(await inner.evaluate(e=>getComputedStyle(e).opacity),'1');
@@ -40,19 +43,20 @@ const mappedTotal = Object.values(counts).reduce((sum,count)=>sum+count,0);
               if (entering) break;
               await page.waitForTimeout(25);
             }
-            assert.ok(entering,`${mode}: heading begins gradually before the old blank fallback`);
+            assert.ok(entering,`${mode}: heading begins gradually after font readiness`);
             const state=await page.evaluate(()=>{
               const first=document.querySelector('.hero-motion-line') || document.querySelector('.editorial-hero__line');
               return {inner:getComputedStyle(document.querySelector('.editorial-hero__inner')).opacity,
                 opacity:Number(getComputedStyle(first).opacity),
                 actions:Number(getComputedStyle(document.querySelector('.editorial-hero__actions')).opacity)};
             });
-            assert.equal(state.inner,'1','No whole-hero visibility gate');
+            assert.equal(state.inner,'1','Hero uses its original opacity once fonts are ready');
             assert.ok(state.opacity>0 && state.opacity<1,'Heading enters gradually');
             assert.equal(state.actions,0,'Actions stay staggered behind heading');
           }
           await page.waitForTimeout(2800);
           assert.equal(await inner.evaluate(e=>getComputedStyle(e).opacity),'1');
+          assert.deepEqual(await inner.evaluate(e=>({top:e.offsetTop,height:e.offsetHeight,titleHeight:e.querySelector('h1').offsetHeight})),visibleGeometry,'Visible hero geometry remains stable after fonts load');
           assert.equal(await page.locator('.editorial-hero__actions').evaluate(e=>getComputedStyle(e).opacity),'1');
           // Late scripts must not hide or replay an already revealed hero.
           for(let i=0;i<3;i++) {assert.equal(await page.locator('.editorial-hero__line').first().evaluate(e=>getComputedStyle(e).opacity),'1');await page.waitForTimeout(50);}

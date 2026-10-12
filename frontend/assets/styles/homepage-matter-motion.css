@@ -1141,3 +1141,48 @@
  .lpc-home #matter-film[data-stage="2"] .matter-sheet .deadline-field { top: 411px !important; }
 }
 
+/* The final preview follows content height, including edits made in the draft. */
+.lpc-home #matter-film .matter-preview-content { display: contents; }
+.lpc-home #matter-film[data-stage="2"] .matter-sheet {
+  height: auto;
+  min-height: 475px;
+  padding: 74px 32px 18px;
+}
+.lpc-home #matter-film[data-stage="2"] .matter-preview-content {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+  max-height: 410px;
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+}
+.lpc-home #matter-film[data-stage="2"] .matter-preview-content > :is(.matter-title, .scope-summary, .tasks-label, .preview-task-list, .amount-field, .deadline-field) {
+  position: static;
+  inset: auto;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.lpc-home #matter-film[data-stage="2"] .matter-preview-content > :is(.matter-title, .scope-summary, .tasks-label, .preview-task-list) { grid-column: 1 / -1; }
+.lpc-home #matter-film[data-stage="2"] .matter-title .hand-title,
+.lpc-home #matter-film[data-stage="2"] :is(.hand-amount, .hand-deadline, .deadline-input) { display: none; }
+.lpc-home #matter-film[data-stage="2"] .matter-title h2,
+.lpc-home #matter-film[data-stage="2"] .matter-location,
+.lpc-home #matter-film[data-stage="2"] .amount-input,
+.lpc-home #matter-film[data-stage="2"] .amount-field small,
+.lpc-home #matter-film[data-stage="2"] .posted-date { position: static; inset: auto; }
+.lpc-home #matter-film[data-stage="2"] .matter-location { margin-top: 4px; }
+.lpc-home #matter-film[data-stage="2"] .matter-preview-content > .scope-summary { margin-top: 12px; }
+.lpc-home #matter-film[data-stage="2"] .matter-preview-content > .tasks-label { margin-top: 12px; }
+.lpc-home #matter-film[data-stage="2"] .matter-preview-content > .preview-task-list { margin-top: 2px; }
+.lpc-home #matter-film[data-stage="2"] .matter-preview-content > :is(.amount-field, .deadline-field) { margin-top: 16px; }
+.lpc-home #matter-film[data-stage="2"] :is(.amount-input, .posted-date) { margin-top: 6px; }
+.lpc-home #matter-film[data-stage="2"] .amount-field small { margin-top: 2px; }
+.lpc-home #matter-film[data-stage="2"] .handoff-line { left: -20px; width: 12px; }
+@media (max-width: 760px) {
+  .lpc-home #matter-film[data-stage="2"] .matter-sheet { min-height: 510px; padding: 68px 20px 20px; }
+  .lpc-home #matter-film[data-stage="2"] .matter-preview-content { column-gap: 16px; max-height: 550px; }
+}

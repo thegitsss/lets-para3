@@ -6,20 +6,14 @@
   if (!scene) return;
   const canvas = scene.querySelector('canvas');
   const image = scene.querySelector('img');
+  image.loading = 'eager';
   const title = scene.querySelector('h2');
-  const actions = scene.querySelector('.closing__actions');
-  const buttons = [...actions.querySelectorAll('a')];
-  const reassurance = actions.querySelector('.closing__reassurance');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let width = innerWidth, height = Math.max(700, innerHeight);
   let sceneTop = 0, frame = 0, lastY = null, lastTitleY = null, lastOpacity = null, path = null;
   let painting = false, paintAgain = false;
-  let blankPaintRetries = 0;
-  let prepared = false;
-  let lastActionsOpacity = [];
   function measure() {
-    // Font readiness may arrive after the mobile toolbar has collapsed.
-    // Preserve the scene height captured at landing until a true width change.
+    height = Math.max(700, innerHeight);
     scene.style.setProperty('--closing-height', `${height}px`);
     const photoScale = height / 1024;
     const summit = height * .27 + 135 * photoScale;
@@ -29,7 +23,6 @@
     lastY = null;
     lastTitleY = null;
     lastOpacity = null;
-    lastActionsOpacity = [];
   }
   async function paint() {
     if (painting) { paintAgain = true; return; }
@@ -44,8 +37,6 @@
         });
       }
       await image.decode();
-      // Cold WebKit loads can decode before the image's first drawable frame.
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       if (!path) path = new Path2D(document.querySelector('#closing-ridge-cutout path').getAttribute('d'));
       const dpr = Math.min(devicePixelRatio || 1, 2);
       const surfaceWidth = scene.clientWidth + 48;
@@ -69,13 +60,6 @@
         ctx.fillStyle = 'rgba(0,0,0,.36)';
         ctx.fillRect(0, 0, surfaceWidth, height);
       }
-      // This point is inside the opaque mountain. Do not hide the fallback
-      // until WebKit has actually copied image pixels into the canvas.
-      if (!ctx.getImageData(Math.floor(canvas.width / 2), canvas.height - 1, 1, 1).data[3]) {
-        if (blankPaintRetries++ < 3) { paintAgain = true; return; }
-        throw new Error('Mountain image pixels are not ready');
-      }
-      blankPaintRetries = 0;
       scene.classList.add('closing--rendered');
       schedule();
     } catch (error) {
@@ -98,9 +82,7 @@
     const titleY = disabled ? 0 : Math.round((1 - eased) * 160 * 100) / 100;
     const fade = Math.max(0, Math.min(1, (reveal - .08) / .4));
     const opacity = disabled ? 1 : Math.round(fade * fade * (3 - 2 * fade) * 1000) / 1000;
-    // Reveal the role choices while the heading clears the ridge and the
-    // mountain composition is still comfortably in view.
-    // Tie the fade to scroll progress so reversing never leaves a timed fade running.
+    // Keep the role choices visible while the heading clears the ridge.
     // No layout reads, canvas redraws, text scaling, or inherited variables here.
     if (y !== lastY) {
       canvas.style.transform = `translate3d(0,${y}px,0)`;
@@ -114,57 +96,24 @@
       title.style.opacity = opacity;
       lastOpacity = opacity;
     }
-    buttons.forEach((button, index) => {
-      // Start earlier and give each choice a longer, separate soft reveal.
-      const fade = Math.max(0, Math.min(1, (reveal - .4 - index * .16) / .16));
-      const opacity = disabled ? 1
-        : Math.round(fade * fade * (3 - 2 * fade) * 1000) / 1000;
-      if (opacity === lastActionsOpacity[index]) return;
-      button.style.opacity = opacity;
-      if (index === buttons.length - 1 && reassurance) reassurance.style.opacity = opacity;
-      const blur = disabled ? 0 : Math.round((1 - opacity) * 7 * 100) / 100;
-      button.style.filter = blur === 0 ? 'none' : `blur(${blur}px)`;
-      button.inert = opacity < .1;
-      lastActionsOpacity[index] = opacity;
-    });
   }
   function schedule() { if (!frame) frame = requestAnimationFrame(render); }
-  function prepare() {
-    if (prepared) return;
-    prepared = true;
-    image.loading = 'eager';
-    document.fonts.ready.then(paint);
-  }
   measure();
-  document.fonts.ready.then(() => { measure(); schedule(); });
-  // Decode and flatten the same mountain before it enters view, rather
-  // than competing with the initial paper/logo animation for paint time.
-  if ('IntersectionObserver' in window) {
-    const observer = new IntersectionObserver(entries => {
-      if (!entries.some(entry => entry.isIntersecting)) return;
-      observer.disconnect();
-      prepare();
-    }, { rootMargin: `${Math.max(1800, Math.ceil(innerHeight * 2))}px 0px` });
-    observer.observe(scene);
-  } else prepare();
+  document.fonts.ready.then(() => { measure(); paint(); });
   addEventListener('scroll', schedule, { passive: true });
   addEventListener('resize', () => {
     // Browser chrome may change height while scrolling; only width changes
     // establish a new layout, including device rotation.
     if (innerWidth === width) return;
-    width = innerWidth; height = Math.max(700, innerHeight);
-    measure(); if (prepared) paint(); schedule();
+    width = innerWidth; measure(); paint(); schedule();
   }, { passive: true });
-  reduced.addEventListener('change', () => { lastY = lastTitleY = lastOpacity = null; lastActionsOpacity = []; schedule(); });
+  reduced.addEventListener('change', () => { lastY = lastTitleY = lastOpacity = null; schedule(); });
   for (const node of [document.body, document.documentElement]) {
-    new MutationObserver(() => { lastY = lastTitleY = lastOpacity = null; lastActionsOpacity = []; schedule(); }).observe(node, { attributes: true, attributeFilter: ['class'] });
+    new MutationObserver(() => { lastY = lastTitleY = lastOpacity = null; schedule(); }).observe(node, { attributes: true, attributeFilter: ['class'] });
   }
   new ResizeObserver(() => {
     sceneTop = scene.getBoundingClientRect().top + scrollY;
     schedule();
   }).observe(document.body);
-  // A font can become active when this offscreen heading first approaches.
-  // Align it to the same ridge without adopting a toolbar-only height change.
-  new ResizeObserver(() => { measure(); schedule(); }).observe(title);
   schedule();
 })();

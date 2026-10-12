@@ -3,6 +3,7 @@
 
   const header = document.querySelector("[data-home-header]");
   const headerHero = document.querySelector(".editorial-hero");
+  const firstDarkSurface = document.querySelector('[data-header-tone="dark"]');
   const mobileToggle = document.querySelector("[data-mobile-nav-toggle]");
   const mobileNav = document.querySelector("[data-mobile-nav]");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -48,36 +49,14 @@
       ? parseFloat(computed) : headerHero.getBoundingClientRect().height;
     headerHero.style.setProperty('--hero-layout-min-height', `${resolved}px`);
   };
-  let heroGeometryLocked = scrollY > 8;
-  let settleTimer = 0;
-  const settleInitialHero = () => {
-    if (innerWidth > 767 || heroGeometryLocked) return;
-    clearTimeout(settleTimer);
-    settleTimer = setTimeout(() => {
-      if (heroGeometryLocked) return;
-      // Correct the landing hero without resizing every downstream scene.
-      measureHeroLayout();
-    }, 120);
-  };
   measureMobileViewport();
   measureHeroLayout();
-  // Accept initial toolbar/font settling only before the first scroll. Once
-  // browsing starts, keep the stable scene heights that prevent scroll jumps.
-  addEventListener('scroll', () => {
-    if (scrollY > 8) { heroGeometryLocked = true; clearTimeout(settleTimer); }
-  }, { passive: true });
   addEventListener('resize', () => {
-    if (innerWidth === heroLayoutWidth) { settleInitialHero(); return; }
+    if (innerWidth === heroLayoutWidth) return;
     heroLayoutWidth = innerWidth;
-    clearTimeout(settleTimer);
-    heroGeometryLocked = scrollY > 8;
     measureMobileViewport();
     measureHeroLayout();
   }, { passive: true });
-  visualViewport?.addEventListener('resize', settleInitialHero, { passive: true });
-  addEventListener('load', settleInitialHero);
-  addEventListener('pageshow', settleInitialHero);
-  document.fonts.ready.then(settleInitialHero);
 
   // Safari toolbar height changes must not alter motion progress at a fixed scroll position.
   let heroViewportWidth = innerWidth;
@@ -101,7 +80,11 @@
     const headerBounds = header.getBoundingClientRect();
     const pastHero = !!headerHero && headerHero.getBoundingClientRect().bottom <= headerBounds.bottom;
     const headerMidpoint = headerBounds.height / 2;
-    const surface = innerWidth <= 767 && !pastHero ? headerHero : document.elementsFromPoint(window.innerWidth / 2, headerMidpoint)
+    // Every surface before the first dark section has the same light tone.
+    // Avoid hit-testing the animated SVG/cloud masks on each scroll frame.
+    const beforeDarkSurface = headerHero && firstDarkSurface &&
+      firstDarkSurface.getBoundingClientRect().top > headerMidpoint;
+    const surface = beforeDarkSurface || (innerWidth <= 767 && !pastHero) ? headerHero : document.elementsFromPoint(window.innerWidth / 2, headerMidpoint)
       .find(node => !header.contains(node) && node.closest('[data-header-tone]'))
       ?.closest('[data-header-tone]');
     const tone = surface?.dataset.headerTone;
@@ -160,7 +143,9 @@
   syncEditorialParallax();
 
   const lazyScrollMedia = window.matchMedia("(min-width: 900px) and (pointer: fine) and (prefers-reduced-motion: no-preference)");
+  // A light desktop glide: retain 90% of input, with a brief 45ms easing time.
   let lazyScrollFrame = 0;
+  let lazyScrollLastTime = 0;
   let lazyScrollPosition = window.scrollY;
   let lazyScrollTarget = window.scrollY;
 
@@ -177,14 +162,17 @@
   const stopLazyScroll = () => {
     if (lazyScrollFrame) window.cancelAnimationFrame(lazyScrollFrame);
     lazyScrollFrame = 0;
+    lazyScrollLastTime = 0;
     lazyScrollPosition = window.scrollY;
     lazyScrollTarget = window.scrollY;
     document.documentElement.classList.remove("is-lazy-scrolling");
   };
 
-  const animateLazyScroll = () => {
+  const animateLazyScroll = (time) => {
+    const elapsed = lazyScrollLastTime ? Math.max(0, time - lazyScrollLastTime) : 16;
+    lazyScrollLastTime = time;
     const distance = lazyScrollTarget - lazyScrollPosition;
-    lazyScrollPosition += distance * 0.09;
+    lazyScrollPosition += distance * (1 - Math.exp(-elapsed / 45));
     if (Math.abs(distance) < 0.5) {
       window.scrollTo(0, lazyScrollTarget);
       stopLazyScroll();
@@ -213,9 +201,9 @@
       document.documentElement.classList.add("is-lazy-scrolling");
     }
     const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-    const requestedTarget = lazyScrollTarget + (event.deltaY * unit * 0.55);
-    const maxLead = window.innerHeight * 0.75;
-    lazyScrollTarget = clamp(requestedTarget, Math.max(0, lazyScrollPosition - maxLead), Math.min(maxScroll, lazyScrollPosition + maxLead));
+    const requestedTarget = lazyScrollTarget + (event.deltaY * unit * 0.9);
+    // Keep the full accumulated gesture instead of discarding faster input.
+    lazyScrollTarget = clamp(requestedTarget, 0, maxScroll);
     if (!lazyScrollFrame) lazyScrollFrame = window.requestAnimationFrame(animateLazyScroll);
   }, { passive: false });
 
@@ -760,7 +748,7 @@
     target.appendChild(clone);
   };
 
-  ["1", "2", "3", "4", "5", "6"].forEach(stateForMobile);
+  desktopStates.forEach((panel) => stateForMobile(panel.dataset.state));
 
   if (mobileWorkflowStage && !mobileWorkflowStage.childElementCount) {
     desktopStates.forEach((source) => {

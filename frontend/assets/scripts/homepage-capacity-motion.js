@@ -1,160 +1,106 @@
 (() => {
-  'use strict';
-
   const hook = document.querySelector('.hero-capacity');
-  if (!hook || hook.dataset.capacityMotionController === 'unified-v1') return;
+  if (!hook) return;
   const scene = hook.querySelector('.type-hook__scene');
   const inner = hook.querySelector('.type-hook__inner');
-  const outline = hook.querySelector('.type-hook__outline');
-  const composite = hook.querySelector('.type-hook__composite');
+  const papers = [...hook.querySelectorAll('.type-hook__papers')];
   const foreground = hook.querySelector('.type-hook__papers--full');
   const headline = hook.querySelector('.type-hook__paper-headline');
-  const smoke = hook.querySelector('.type-hook__smoke');
-  if (!scene || !inner || !outline || !composite || !foreground || !headline || !smoke) return;
-  hook.dataset.capacityMotionController = 'unified-v1';
-
-  const papers = [...hook.querySelectorAll('.type-hook__papers')];
   const clouds = [...hook.querySelectorAll('.type-hook__cloud')];
+  const outline = hook.querySelector('.type-hook__outline');
   const paths = [...outline.querySelectorAll('path')];
-  let clearLetters = hook.querySelector('.type-hook__clear-letters');
-  if (!clearLetters) {
-    clearLetters = outline.cloneNode(true);
-    clearLetters.classList.add('type-hook__clear-letters');
-    [...clearLetters.querySelectorAll('path')].slice(5).forEach(path => path.remove());
-    outline.after(clearLetters);
-  }
+  // Restore a little contrast above the clouds only for the opening Let’s characters.
+  const clearLetters = outline.cloneNode(true);
+  clearLetters.classList.add('type-hook__clear-letters');
+  [...clearLetters.querySelectorAll('path')].forEach((path, index) => {
+    if (index > 4) path.remove();
+  });
+  outline.after(clearLetters);
   const clearPaths = [...clearLetters.querySelectorAll('path')];
+  const composite = hook.querySelector('.type-hook__composite');
+  const smoke = hook.querySelector('.type-hook__smoke');
+  // Keep settled SVG strokes and opacity out of subsequent scroll paints.
+  const renderedStyles = new WeakMap();
+  function setStyle(node, property, value) {
+    let values = renderedStyles.get(node);
+    if (!values) renderedStyles.set(node, values = new Map());
+    value = String(value);
+    if (values.get(property) === value) return;
+    values.set(property, value);
+    node.style[property] = value;
+  }
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  const mobileMedia = matchMedia('(max-width: 767px)');
+  // Decode the existing artwork before the scroll reveal needs its first paint.
+  if (!reduced.matches) hook.querySelectorAll('img').forEach(img => {
+    img.decoding = 'async';
+    img.loading = 'eager';
+    // Predecode is best effort; the image's normal load remains authoritative.
+    void Promise.allSettled([img.decode()]);
+  });
   const clamp = value => Math.max(0, Math.min(1, value));
+  // FIND uses GSAP's default power1.out for each tween and a 0.1s scrub.
   const ease = value => 1 - (1 - value) ** 2;
-  const tween = (value, start, duration) => ease(clamp((value - start) / duration));
-  let writtenStyles = new WeakMap();
-  let mobile = mobileMedia.matches;
-  let sectionTop = 0;
-  let sectionHeight = 1;
-  let viewportHeight = innerHeight;
-  let measured = false;
-  let measurePending = false;
-  let restorePending = false;
-  let progress = 0;
+  const tween = (progress, start, duration) => ease(clamp((progress - start) / duration));
   let frame = 0;
   let previousTime = 0;
+  let progress = 0;
+  let sectionTop = 0;
+  let sectionHeight = 1;
+
   let lastRenderedValue = null;
   let lastMobile = null;
-  let layoutWidth = innerWidth;
-
-  function writeStyle(element, property, value) {
-    const text = String(value);
-    let previous = writtenStyles.get(element);
-    if (!previous) { previous = {}; writtenStyles.set(element, previous); }
-    if (previous[property] === text) return;
-    previous[property] = text;
-    if (property.startsWith('--')) element.style.setProperty(property, text);
-    else element.style[property] = text;
-  }
-
-  // Every layer uses this single smoothed value, including SVG strokes. There
-  // are no independent ScrollTimeline clocks or paused animations to seek.
+  let lastEntranceOffset = null;
+  let introductionTop = 0;
+  let entranceStart = 0;
+  let viewportHeight = innerHeight;
   function render(value) {
-    if (value === lastRenderedValue && mobile === lastMobile) return;
+    // An unchanged off-screen scene needs no SVG or inherited style updates.
+    const mobile = innerWidth <= 767;
+    const entrance = clamp((scrollY - entranceStart) / Math.max(1, sectionTop - entranceStart));
+    const entranceOffset = mobile ? Math.max(0, introductionTop - 24) * (1 - entrance) : 0;
+    if (value === lastRenderedValue && mobile === lastMobile && entranceOffset === lastEntranceOffset) return;
+    lastEntranceOffset = entranceOffset;
     lastRenderedValue = value;
     lastMobile = mobile;
     const travel = tween(value, 0, 1);
     const exit = tween(value, 0, .2);
-    const drawDuration = mobile ? .3 : .14;
-    const fillStart = mobile ? .4 : .24;
-    const fillDuration = mobile ? .1 : .06;
-    const ink = tween(value, .1, drawDuration);
-    const fill = tween(value, fillStart, fillDuration);
-    const foregroundOpacity = 1 - tween(value, fillStart, mobile ? .18 : .06);
-    const headlineOpacity = 1 - tween(value, .03, .06);
-    const outlineOpacity = tween(value, .1, mobile ? .04 : .01) *
-      (1 - tween(value, fillStart, fillDuration));
-
-    writeStyle(inner, 'transform', mobile ? 'none'
+    const ink = tween(value, .1, .14);
+    const fill = tween(value, .24, .06);
+    // Let mobile text follow the browser's native sticky scrolling.
+    // Scroll-event counter-translations and scaling can lag phone swipes.
+    setStyle(inner, 'transform', mobile
+      ? 'none'
       : `translate3d(0, ${20 * travel}%, 0) scale(${1 - .1 * travel})`);
-    writeStyle(inner, 'opacity', 1 - exit);
+    setStyle(inner, 'opacity', 1 - exit);
     papers.forEach(paper => {
-      // Invisible mobile layers need no matrix updates. On reverse scrolling,
-      // update the matrix before restoring opacity so the reveal stays exact.
-      const visible = paper === foreground ? foregroundOpacity > 0
-        : paper === headline ? headlineOpacity > 0 : fill > 0;
-      if (!mobile || visible) writeStyle(paper, 'transform',
-        `translate3d(0, ${-40 * travel}%, 0) scale(${1 + .3 * travel})`);
+      setStyle(paper, 'transform', `translate3d(0, ${-40 * travel}%, 0) scale(${1 + .3 * travel})`);
     });
-    writeStyle(foreground, 'opacity', foregroundOpacity);
-    writeStyle(headline, 'opacity', headlineOpacity);
-    clouds.forEach((cloud, index) => writeStyle(cloud, 'transform',
-      `translate3d(${(mobile ? (index ? -40 : 40) : (index ? 15 : -15)) * travel}%, 0, 0)`));
-    writeStyle(smoke, 'transform', `translate3d(0, ${70 * (1 - travel)}%, 0)`);
-    writeStyle(outline, 'opacity', outlineOpacity);
-    if (mobile) writeStyle(outline, '--outline-dash', 1 - ink);
-    else paths.forEach(path => writeStyle(path, 'strokeDashoffset', 1 - ink));
-    writeStyle(composite, 'opacity', fill);
-    writeStyle(clearLetters, 'opacity', .65);
-    if (mobile) {
-      writeStyle(clearLetters, '--outline-dash', 1 - ink);
-      writeStyle(clearLetters, '--outline-stroke-opacity', outlineOpacity);
-      writeStyle(clearLetters, '--outline-fill-opacity', fill);
-    }
-    clearPaths.forEach(path => {
-      if (!mobile) writeStyle(path, 'strokeDashoffset', 1 - ink);
-      if (!mobile) writeStyle(path, 'strokeOpacity', outlineOpacity);
-      writeStyle(path, 'fill', path.classList.contains('type-hook__apostrophe-outline') ? '#6495ed' : '#233b5a');
-      if (!mobile) writeStyle(path, 'fillOpacity', fill);
+    // Let the smaller papers dissolve gradually into the mobile cloud sweep.
+    setStyle(foreground, 'opacity', 1 - tween(value, .24, mobile ? .18 : .06));
+    // Clear the paper headline before the logo starts drawing at .1.
+    setStyle(headline, 'opacity', 1 - tween(value, .03, .06));
+    clouds.forEach((cloud, index) => {
+      setStyle(cloud, 'transform', `translate3d(${(mobile ? (index ? -40 : 40) : (index ? 15 : -15)) * travel}%, 0, 0)`);
     });
-  }
-
-  function scrollProgress() {
-    // Finish mobile motion before the sticky scene releases. This provides
-    // one stable viewport of animated travel within a two-viewport section.
-    const distance = mobile ? Math.max(1, sectionHeight - viewportHeight) : sectionHeight;
-    return clamp((scrollY - sectionTop) / distance);
-  }
-
-  function measure(restore = false) {
-    const nextMobile = mobileMedia.matches;
-    hook.classList.toggle('hook-find', !reduced.matches);
-    const rect = hook.getBoundingClientRect();
-    const nextTop = rect.top + scrollY;
-    const nextHeight = Math.max(1, rect.height);
-    const geometryChanged = !measured || mobile !== nextMobile ||
-      Math.abs(sectionTop - nextTop) > .5 || Math.abs(sectionHeight - nextHeight) > .5;
-    if (nextMobile !== mobile) writtenStyles = new WeakMap();
-    if (nextMobile && (!measured || !mobile)) {
-      [...paths, ...clearPaths].forEach(path => {
-        path.style.removeProperty('stroke-dashoffset');
-        path.style.removeProperty('stroke-opacity');
-        path.style.removeProperty('fill-opacity');
-      });
-    }
-    mobile = nextMobile;
-    sectionTop = nextTop;
-    sectionHeight = nextHeight;
-    viewportHeight = mobile ? scene.clientHeight || innerHeight : innerHeight;
-    measured = true;
-    // ResizeObserver notifications with unchanged geometry must not reset a
-    // running scrub. Toolbar-only mobile resizes do not reach this method.
-    if (geometryChanged || restore || reduced.matches) {
-      progress = reduced.matches ? 0 : scrollProgress();
-      previousTime = 0;
-      lastRenderedValue = null;
-      render(progress);
-    }
+    setStyle(smoke, 'transform', `translate3d(0, ${70 * (1 - travel)}%, 0)`);
+    const outlineOpacity = tween(value, .1, .01) * (1 - tween(value, .24, .06));
+    setStyle(outline, 'opacity', outlineOpacity);
+    paths.forEach(path => { setStyle(path, 'strokeDashoffset', 1 - ink); });
+    setStyle(composite, 'opacity', fill);
+    setStyle(clearLetters, 'opacity', .65);
+    clearPaths.forEach((path) => {
+      setStyle(path, 'strokeDashoffset', 1 - ink);
+      setStyle(path, 'strokeOpacity', outlineOpacity);
+      setStyle(path, 'fill', path.classList.contains('type-hook__apostrophe-outline') ? '#6495ed' : '#233b5a');
+      setStyle(path, 'fillOpacity', fill);
+    });
   }
 
   function update(time) {
     frame = 0;
-    if (document.hidden) { previousTime = 0; return; }
-    if (measurePending) {
-      measurePending = false;
-      measure(restorePending);
-      restorePending = false;
-    }
     if (reduced.matches) return;
-    const target = scrollProgress();
-    if (mobile && (scrollY < sectionTop - viewportHeight || scrollY > sectionTop + sectionHeight)) {
+    const target = clamp((scrollY - sectionTop) / sectionHeight);
+    if (innerWidth <= 767) {
       progress = target;
       previousTime = 0;
       render(progress);
@@ -162,10 +108,7 @@
     }
     const elapsed = previousTime ? Math.max(0, time - previousTime) : 16;
     previousTime = time;
-    // The desktop curve is unchanged. Mobile uses the same 100 ms time
-    // constant, with a cap so a stalled frame cannot advance the whole reveal.
-    const delta = mobile ? Math.min(64, elapsed) : elapsed;
-    progress += (target - progress) * (1 - Math.exp(-delta / 100));
+    progress += (target - progress) * (1 - Math.exp(-elapsed / 100));
     if (Math.abs(target - progress) < .0001) progress = target;
     render(progress);
     if (progress !== target) frame = requestAnimationFrame(update);
@@ -173,39 +116,45 @@
   }
 
   function schedule() {
-    if (!frame && !document.hidden && (!reduced.matches || measurePending)) {
-      frame = requestAnimationFrame(update);
-    }
+    if (!frame && !reduced.matches) frame = requestAnimationFrame(update);
   }
 
-  function scheduleMeasure(restore = false) {
-    measurePending = true;
-    restorePending = restorePending || restore;
-    schedule();
+  function measure() {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    previousTime = 0;
+    hook.classList.toggle('hook-find', !reduced.matches);
+    viewportHeight = innerWidth <= 767
+      ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--home-stable-viewport')) || innerHeight
+      : innerHeight;
+    introductionTop = inner.offsetTop;
+    const rect = hook.getBoundingClientRect();
+    sectionTop = rect.top + scrollY;
+    sectionHeight = Math.max(1, rect.height);
+    const heroNote = document.querySelector('.editorial-hero__publishing');
+    const heroContentBottom = heroNote ? heroNote.getBoundingClientRect().bottom + scrollY : sectionTop - viewportHeight;
+    // Keep the content gap steady during entry, then settle at center as the hero leaves.
+    entranceStart = Math.max(sectionTop - viewportHeight,
+      Math.min(heroContentBottom, sectionTop - Math.max(0, introductionTop - 24)));
+    progress = reduced.matches ? 0 : clamp((scrollY - sectionTop) / sectionHeight);
+    render(progress);
   }
 
   addEventListener('scroll', schedule, { passive: true });
+  let layoutWidth = innerWidth;
   addEventListener('resize', () => {
-    if (mobileMedia.matches && innerWidth === layoutWidth) return;
+    if (innerWidth <= 767 && innerWidth === layoutWidth) return;
     layoutWidth = innerWidth;
-    scheduleMeasure();
+    measure();
   }, { passive: true });
-  addEventListener('pageshow', () => scheduleMeasure(true));
-  reduced.addEventListener('change', () => scheduleMeasure(true));
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      if (frame) cancelAnimationFrame(frame);
-      frame = 0;
-      previousTime = 0;
-    } else scheduleMeasure(true);
-  });
+  addEventListener('pageshow', measure);
+  reduced.addEventListener('change', measure);
+  // Font and upstream layout changes can move the scene after initial paint.
   if ('ResizeObserver' in window) {
-    const observer = new ResizeObserver(() => scheduleMeasure());
-    observer.observe(hook);
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.querySelector('.editorial-hero') || document.body);
     observer.observe(scene);
-    const hero = document.querySelector('.editorial-hero');
-    if (hero) observer.observe(hero);
   }
   measure();
-  document.fonts?.ready.then(() => scheduleMeasure());
+  document.fonts.ready.then(measure);
 })();

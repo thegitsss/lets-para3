@@ -31,6 +31,39 @@
   let typedCount = -1;
   let draftReady = false;
   let buildFrame = 0;
+  const postedDate = film.querySelector('.posted-date');
+  const editorNote = film.querySelector('.editor-note > span:nth-child(3)');
+  const buildIntake = film.querySelector('.build-intake');
+  const buildBars = [...film.querySelectorAll('.build-track span, .builder-progress > span')];
+  const builderStatus = film.querySelector('[data-builder-status]');
+  const statusLabel = film.querySelector('[data-status]');
+  const builderStatusGroup = builder.querySelector('.builder-status');
+  const suggestedTask = builder.querySelector('[data-suggestion-task]');
+  const builderTasks = [...builder.querySelectorAll('[data-builder-task]')];
+  const buildParts = [
+    ['title', .25, .38, '.matter-title h2, .matter-location', '.matter-title'],
+    ['scope', .38, .53, '.scope-summary', '.scope-summary'],
+    ['tasks', .53, .73, '.tasks-label, .typeset, .addition', '.tasks-label, .fragment, .addition'],
+    ['amount', .73, .84, '.amount-field', '.amount-field'],
+    ['date', .84, .95, '.deadline-field', '.deadline-field']
+  ].map(([name, start, end, selector, consumers]) => ({
+    name, start, end,
+    nodes: [...film.querySelectorAll(selector)].map(node => ({node, interactive: node.matches('.typeset, .addition, .amount-field, .deadline-field')})),
+    consumers: [...film.querySelectorAll(consumers)]
+  }));
+  const groupTiming = {title:[.12,.28],scope:[.12,.28],tasks:[.24,.42],practice:[.38,.58],state:[.38,.58],amount:[.38,.58],date:[.38,.58]};
+  const buildGroups = [...builder.querySelectorAll('[data-build-part]')].map(node => ({node, timing: groupTiming[node.dataset.buildPart]}));
+  const setAttribute = (node, name, value) => {
+    value = String(value);
+    if (node.getAttribute(name) !== value) node.setAttribute(name, value);
+  };
+  const setText = (node, value) => { if (node.textContent !== value) node.textContent = value; };
+  const setStyle = (node, name, value) => {
+    value = String(value);
+    if (node.style.getPropertyValue(name) !== value) node.style.setProperty(name, value);
+  };
+  let validationKey = null;
+  let validationResult = false;
   // Keep the arrows fixed while the scene changes beneath them.
   const stageElement = film.querySelector('.stage');
   const scene = document.createElement('div');
@@ -92,24 +125,28 @@
   }
 
   function validate() {
+    const key = `${amount.value}|${deadline.value}|${stage}|${draftReady}`;
+    if (key === validationKey) return validationResult;
+    validationKey = key;
     const validAmount = amount.value !== '' && Number.isFinite(Number(amount.value)) && Number(amount.value) >= 400 && Number(amount.value) <= 100000 && Number.isInteger(Number(amount.value));
     const validDate = deadline.value >= '2026-06-06' && deadline.value <= '2026-06-27';
     const valid = validAmount && validDate;
+    validationResult = valid;
     advance.disabled = stage === 1 && !valid;
     builderPreview.disabled = !valid || !draftReady;
-    amount.setAttribute('aria-invalid', String(!validAmount));
-    deadline.setAttribute('aria-invalid', String(!validDate));
-    if (stage === 1) feedback.textContent = valid ? disclosure : 'Set an amount of $400–$100,000 and a due date from June 6–27 for this example.';
+    setAttribute(amount, 'aria-invalid', !validAmount);
+    setAttribute(deadline, 'aria-invalid', !validDate);
+    if (stage === 1) setText(feedback, valid ? disclosure : 'Set an amount of $400–$100,000 and a due date from June 6–27 for this example.');
     if (validDate) {
       const date = new Date(`${deadline.value}T12:00:00`);
-      const postedDate = film.querySelector('.posted-date');
-      postedDate.textContent = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      postedDate.dateTime = deadline.value;
-      film.querySelector('.editor-note > span:nth-child(3)').textContent = `One-page memo. $${Number(amount.value).toLocaleString('en-US')}. Due ${date.toLocaleDateString('en-US', {month:'long',day:'numeric'})}.`;
+      setText(postedDate, date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+      if (postedDate.dateTime !== deadline.value) postedDate.dateTime = deadline.value;
+      setText(editorNote, `One-page memo. $${Number(amount.value).toLocaleString('en-US')}. Due ${date.toLocaleDateString('en-US', {month:'long',day:'numeric'})}.`);
     }
     return valid;
   }
   function setStage(next) {
+    validationKey = null;
     const previousStage = stage;
     // Keep keyboard focus out of controls that are about to disappear.
     if (next !== 1 && (document.activeElement === amount || document.activeElement === deadline)) advance.focus({preventScroll:true});
@@ -168,14 +205,15 @@
     const portion = (start, end) => Math.max(0, Math.min(1, (build - start) / (end - start)));
     const count = reduced.matches ? originalNotes.length : Math.floor(portion(.02, .65) * originalNotes.length);
     if (count !== typedCount) {
+      // Reset before changing the text, avoiding a forced layout after each letter.
+      if (brief.scrollTop !== 0) brief.scrollTop = 0;
       typedNotes.textContent = originalNotes.slice(0, count);
       typedCount = count;
-      brief.scrollTop = 0;
     }
     brief.classList.toggle('is-typing', stage === 1 && count < originalNotes.length);
     draftReady = build >= .62;
     builder.classList.toggle('is-ready', stage === 1 && draftReady);
-    builderSkip.hidden = stage !== 1;
+    if (builderSkip.hidden !== (stage !== 1)) builderSkip.hidden = stage !== 1;
     const replay = build >= 1;
     if (builderSkip.dataset.mode !== (replay ? 'replay' : 'skip')) {
       builderSkip.dataset.mode = replay ? 'replay' : 'skip';
@@ -183,46 +221,42 @@
       builderSkip.title = replay ? 'Replay' : 'Skip';
       builderSkip.innerHTML = replay ? '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 8a8 8 0 1 1-1 7M5 3v5h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>' : 'Skip';
     }
-    builder.querySelector('.builder-status').classList.remove('is-complete');
-    builderPreview.disabled = !draftReady || amount.getAttribute('aria-invalid') === 'true' || deadline.getAttribute('aria-invalid') === 'true';
+    if (builderStatusGroup.classList.contains('is-complete')) builderStatusGroup.classList.remove('is-complete');
+    const previewDisabled = !draftReady || amount.getAttribute('aria-invalid') === 'true' || deadline.getAttribute('aria-invalid') === 'true';
+    if (builderPreview.disabled !== previewDisabled) builderPreview.disabled = previewDisabled;
     const intake = 1 - portion(.12, .27);
-    film.style.setProperty('--intake-opacity', intake);
-    film.style.setProperty('--intake-y', `${-portion(.12, .27) * 24}px`);
-    film.style.setProperty('--build-progress', `${build * 100}%`);
-    const parts = [
-      ['title', .25, .38, '.matter-title h2, .matter-location'],
-      ['scope', .38, .53, '.scope-summary'],
-      ['tasks', .53, .73, '.tasks-label, .typeset, .addition'],
-      ['amount', .73, .84, '.amount-field'],
-      ['date', .84, .95, '.deadline-field']
-    ];
-    parts.forEach(([name, start, end, selector]) => {
+    // Animate only the elements that consume these values, rather than
+    // invalidating inherited styles across the entire Matter on every frame.
+    setStyle(buildIntake, '--intake-opacity', intake);
+    setStyle(buildIntake, '--intake-y', `${-portion(.12, .27) * 24}px`);
+    buildBars.forEach(node => setStyle(node, '--build-progress', `${build * 100}%`));
+    buildParts.forEach(({name, start, end, nodes, consumers}) => {
       const visible = portion(start, end);
-      film.style.setProperty(`--hide-${name}`, `${(1 - visible) * 100}%`);
-      film.querySelectorAll(selector).forEach(node => {
-        node.setAttribute('aria-hidden', String(stage === 0 || (stage === 1 && visible === 0)));
-        if (node.matches('.typeset, .addition, .amount-field, .deadline-field')) node.inert = stage === 0 || (stage === 1 && visible < 1);
+      consumers.forEach(node => setStyle(node, `--hide-${name}`, `${(1 - visible) * 100}%`));
+      nodes.forEach(({node, interactive}) => {
+        setAttribute(node, 'aria-hidden', stage === 0 || (stage === 1 && visible === 0));
+        const inert = stage === 0 || (stage === 1 && visible < 1);
+        if (interactive && node.inert !== inert) node.inert = inert;
       });
     });
     // Three overlapping groups: heading and scope, tasks, then practical details.
-    const groups = {title:[.12,.28],scope:[.12,.28],tasks:[.24,.42],practice:[.38,.58],state:[.38,.58],amount:[.38,.58],date:[.38,.58]};
-    builder.querySelectorAll('[data-build-part]').forEach(node => {
-      const visible = portion(...groups[node.dataset.buildPart]);
-      node.style.setProperty('--part-opacity', String(visible));
-      node.inert = stage !== 1 || visible < 1;
-      node.setAttribute('aria-hidden', String(visible === 0));
+    buildGroups.forEach(({node, timing}) => {
+      const visible = portion(...timing);
+      setStyle(node, '--part-opacity', visible);
+      const inert = stage !== 1 || visible < 1;
+      if (node.inert !== inert) node.inert = inert;
+      setAttribute(node, 'aria-hidden', visible === 0);
     });
-    builder.querySelectorAll('[data-builder-task]').forEach(node => {
-      node.style.opacity = '1';
-      node.inert = false;
-      node.removeAttribute('aria-hidden');
+    builderTasks.forEach(node => {
+      setStyle(node, 'opacity', '1');
+      if (node.inert) node.inert = false;
+      if (node.hasAttribute('aria-hidden')) node.removeAttribute('aria-hidden');
     });
-    const suggestedTask = builder.querySelector('[data-suggestion-task]');
-    suggestedTask.style.opacity = '1';
-    suggestedTask.removeAttribute('aria-hidden');
-    film.querySelector('[data-builder-status]').textContent = draftReady ? 'Draft built' : 'LPC is building your Matter…';
-    film.querySelector('.build-intake').setAttribute('aria-hidden', String(stage !== 1 || intake === 0));
-    if (stage === 1) film.querySelector('[data-status]').textContent = build < .25 ? 'READING YOUR NOTES' : build < .38 ? 'CREATING THE MATTER TITLE' : build < .53 ? 'WRITING THE SCOPE' : build < .73 ? 'ORGANIZING THE TASKS' : build < .84 ? 'ADDING YOUR AMOUNT' : build < .95 ? 'SUGGESTING A DELIVERY DATE' : 'CONFIRM DRAFT';
+    setStyle(suggestedTask, 'opacity', '1');
+    if (suggestedTask.hasAttribute('aria-hidden')) suggestedTask.removeAttribute('aria-hidden');
+    setText(builderStatus, draftReady ? 'Draft built' : 'LPC is building your Matter…');
+    setAttribute(buildIntake, 'aria-hidden', stage !== 1 || intake === 0);
+    if (stage === 1) setText(statusLabel, build < .25 ? 'READING YOUR NOTES' : build < .38 ? 'CREATING THE MATTER TITLE' : build < .53 ? 'WRITING THE SCOPE' : build < .73 ? 'ORGANIZING THE TASKS' : build < .84 ? 'ADDING YOUR AMOUNT' : build < .95 ? 'SUGGESTING A DELIVERY DATE' : 'CONFIRM DRAFT');
 
   }
   function measure() {
@@ -230,12 +264,12 @@
     const stableHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--home-stable-viewport'));
     const viewportHeight = innerWidth <= 767 && Number.isFinite(stableHeight) ? stableHeight : innerHeight;
     const oversize = Math.max(0, height - viewportHeight);
-    journey.style.setProperty('--film-height', `${height}px`);
-    journey.style.setProperty('--film-top', `${-oversize}px`);
+    setStyle(journey, '--film-height', `${height}px`);
+    setStyle(journey, '--film-top', `${-oversize}px`);
     scrollStart = journey.getBoundingClientRect().top + scrollY + oversize;
     scrollDistance = Math.max(1, journey.offsetHeight - Math.max(height, viewportHeight));
     updateFromScroll();
-    film.style.setProperty('--builder-bottom', `${builder.offsetTop + builder.offsetHeight}px`);
+    setStyle(film, '--builder-bottom', `${builder.offsetTop + builder.offsetHeight}px`);
   }
   function goTo(next) {
     if (next === 2 && !validate()) next = 1;
@@ -261,7 +295,7 @@
   advance.addEventListener('click', () => {
     if (stage === 0) goTo(1);
     else if (stage === 1 && validate()) goTo(2);
-    else if (stage === 2) return;
+    else if (stage === 2) location.assign('signup.html?role=attorney');
   });
   film.querySelectorAll('.task-toggle').forEach(button => button.addEventListener('click', () => {
     button.setAttribute('aria-pressed', String(button.getAttribute('aria-pressed') !== 'true'));
@@ -273,7 +307,12 @@
   });
   [amount, deadline].forEach(input => input.addEventListener('input', validate));
   addEventListener('scroll', () => { if (!frame) frame = requestAnimationFrame(updateFromScroll); }, {passive:true});
-  addEventListener('resize', measure, {passive:true});
+  let layoutWidth = innerWidth;
+  addEventListener('resize', () => {
+    if (innerWidth <= 767 && innerWidth === layoutWidth) return;
+    layoutWidth = innerWidth;
+    measure();
+  }, {passive:true});
   reduced.addEventListener('change', () => {
     transitionTo(stage);
     setStage(stage);
@@ -282,7 +321,7 @@
     requestAnimationFrame(measure);
   });
   new ResizeObserver(measure).observe(film);
-  new ResizeObserver(() => { if (!builder.hidden) film.style.setProperty('--builder-bottom', `${builder.offsetTop + builder.offsetHeight}px`); }).observe(builder);
+  new ResizeObserver(() => { if (!builder.hidden) setStyle(film, '--builder-bottom', `${builder.offsetTop + builder.offsetHeight}px`); }).observe(builder);
   setStage(0); measure();
   document.fonts.ready.then(measure);
 })();

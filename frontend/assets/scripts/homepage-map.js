@@ -23,21 +23,6 @@
   let lastLoadedAt = 0;
   let loading = false;
   const mapSection = canvas.closest('.paralegal-map');
-  // Fetch current counts early, but keep offscreen SVG construction away
-  // from the hero/logo reveal. Prepare the same map two viewports ahead.
-  const mapApproach = new Promise(resolve => {
-    if (!('IntersectionObserver' in window)) { resolve(); return; }
-    const observer = new IntersectionObserver(entries => {
-      if (!entries.some(entry => entry.isIntersecting)) return;
-      observer.disconnect();
-      resolve();
-    }, { rootMargin: `${Math.max(1500, Math.ceil(innerHeight * 2))}px 0px` });
-    observer.observe(mapSection);
-  });
-  const nextMapBuildSlot = () => new Promise(resolve => {
-    if ('requestIdleCallback' in window) requestIdleCallback(resolve, { timeout: 200 });
-    else setTimeout(resolve, 16);
-  });
   const revealObserver = new IntersectionObserver(entries => {
     canvas.classList.toggle('is-visible', entries[0].isIntersecting);
     if (entries[0].isIntersecting && lastLoadedAt && Date.now() - lastLoadedAt >= 5 * 60 * 1000) load();
@@ -160,8 +145,7 @@
       counts = data.states;
       const mappedTotal = states.reduce((sum, state) => sum + counts[state.code], 0);
       if (!Number.isSafeInteger(data.approvedTotal) || data.approvedTotal < mappedTotal) throw new Error('Invalid network total');
-      await mapApproach;
-      await render();
+      render();
       canvas.classList.add('is-live');
       lastLoadedAt = Date.now();
       setStatus(data.approvedTotal.toLocaleString(), data.approvedTotal
@@ -180,7 +164,7 @@
       canvas.removeAttribute('aria-busy');
     }
   }
-  async function render() {
+  function render() {
       pinIndex = 0;
       canvas.setAttribute('aria-busy', 'true');
       const previousSvg = canvas.querySelector('svg');
@@ -192,9 +176,6 @@
       canvas.append(svg);
       scheduleParallax();
       for (const state of states) {
-        // Each state's geometry is unchanged. Yield between states instead
-        // of forcing all SVG geometry reads into one blocking startup task.
-        await nextMapBuildSlot();
         const outline = svgNode('path', { d: state.path, 'data-state': state.code });
         outlines.append(outline);
         const count = counts[state.code] || 0;
