@@ -77,12 +77,16 @@ body.auth-entry {
   .auth-entry .left-panel { padding-inline: 24px; }
   .auth-entry :is(.login-aside-copy, .signup-aside-copy) { padding: 26px 22px 18px; }
 }
-/* Smaller two-column windows keep the message, without miniature feature cards. */
+/* Fit the existing feature preview into smaller two-column windows. */
 @media (min-width: 769px) and (max-width: 1100px), (min-width: 769px) and (max-height: 700px) {
   .auth-entry :is(.login-aside-copy, .signup-aside-copy) {
     justify-content: center; align-items: center; text-align: center;
   }
-  .auth-entry .lpc-entry-preview, .auth-entry .auth-story__footer { display: none; }
+  .auth-entry .lpc-entry-preview {
+    display: block; height: auto; aspect-ratio: 1;
+    max-height: min(440px, calc(100dvh - 240px));
+  }
+  .auth-entry .auth-story__footer { display: none; }
   .auth-entry .auth-story__text { margin-inline: auto; }
 }
 @media (max-width: 768px) {

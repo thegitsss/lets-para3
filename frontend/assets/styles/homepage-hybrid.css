@@ -1915,3 +1915,100 @@ body.lpc-home .closing-scene #closing-title {
   .lpc-home .home-header .home-brand { gap: 6px; }
   .lpc-home .home-header .home-brand__mountain { flex-basis: 30px; width: 30px; height: 30px; }
 }
+
+/* Lift the desktop workflow above its distant constellation field. */
+@media (min-width: 961px) {
+  body.lpc-home--hybrid .workflow-chapters[data-workflow-state="2"] { --workflow-progress: 33.333333%; }
+  body.lpc-home--hybrid .workflow-chapters[data-workflow-state="3"] { --workflow-progress: 66.666667%; }
+  body.lpc-home--hybrid .workflow-chapters[data-workflow-state="4"] { --workflow-progress: 100%; }
+  body.lpc-home--hybrid .workflow { isolation: isolate; }
+  body.lpc-home--hybrid .workflow__constellation { z-index: 0; }
+  body.lpc-home--hybrid .matter-field--workflow { opacity: 0.42; }
+  body.lpc-home--hybrid :is(.workflow__intro, .workflow__story) { z-index: 2; }
+  body.lpc-home--hybrid .workflow-chapters { position: relative; z-index: 3; }
+  body.lpc-home--hybrid .workflow-canvas-wrap { z-index: 4; }
+  body.lpc-home--hybrid .workflow-chapter > div:not(.workflow-mobile-canvas) {
+    position: relative;
+    isolation: isolate;
+  }
+  body.lpc-home--hybrid .workflow-chapter > div:not(.workflow-mobile-canvas)::before {
+    position: absolute;
+    z-index: -1;
+    inset: -64px -44px;
+    background: radial-gradient(ellipse, rgb(255 255 255 / 0.98) 28%, rgb(255 255 255 / 0.88) 48%, transparent 74%);
+    content: "";
+    pointer-events: none;
+  }
+  body.lpc-home--hybrid .workflow-canvas {
+    box-shadow:
+      0 54px 100px -22px rgb(35 53 78 / 0.24),
+      0 22px 48px -18px rgb(35 53 78 / 0.16),
+      0 0 0 1px rgb(255 255 255 / 0.8);
+  }
+}
+
+/* Document review lives beside the work; completed tasks lead into closeout. */
+body.lpc-home--hybrid .matter-rail--workflow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+body.lpc-home--hybrid .workflow-review .compact-file { grid-template-columns: minmax(0, 1fr) auto; }
+body.lpc-home--hybrid .workflow-file-review { padding: 4px 8px; border-radius: 5px; background: #edf3fd; color: #355e9f; font: 400 12px/1.4 Sarabun, sans-serif; }
+body.lpc-home--hybrid .workflow-completed-tasks { display: grid; gap: 10px; max-width: 340px; margin: 24px auto; padding: 0; list-style: none; text-align: left; }
+body.lpc-home--hybrid .workflow-completed-tasks li { display: flex; align-items: center; gap: 10px; color: #526277; font: 400 16px/1.5 Sarabun, sans-serif; }
+body.lpc-home--hybrid .workflow-completed-tasks i { display: grid; place-items: center; flex: 0 0 20px; height: 20px; border-radius: 50%; background: #667265; color: #fff; }
+body.lpc-home--hybrid .workflow-completed-tasks i::before { width: 5px; height: 9px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; content: ""; transform: translateY(-1px) rotate(45deg); }
+body.lpc-home--hybrid .completion-state > .workflow-close-status { margin: 18px auto 12px; color: #52664f; }
+@media (max-width: 960px) {
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas [data-state="3"] .panel-heading { margin-bottom: 4px; padding-bottom: 4px; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas [data-state="3"] .message { margin-bottom: 3px; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas [data-state="3"] .message p { max-width: 100%; padding: 4px 8px; font-size: 11px; line-height: 15px; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas [data-state="3"] .message-composer { display: none; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas [data-state="3"] .workspace-details { display: flex; gap: 4px; margin-top: 6px; padding: 0; border: 0; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas [data-state="3"] .detail-block { display: none; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas [data-state="3"] :is(.workflow-files, .workflow-review) { display: flex; gap: 3px; padding-bottom: 3px; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas [data-state="3"] .interface-label { margin: 0; font-size: 9px; line-height: 12px; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas [data-state="3"] .compact-file { font-size: 10px; line-height: 13px; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas .workflow-file-review { padding: 2px 6px; font-size: 10px; line-height: 13px; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas .workflow-completed-tasks { gap: 5px; margin: 10px auto; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas .workflow-completed-tasks li { gap: 7px; font-size: 11px; line-height: 16px; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas .workflow-completed-tasks i { flex-basis: 14px; height: 14px; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas .completion-state > .workflow-close-status { display: block; margin: 6px auto; font-size: 11px; line-height: 16px; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas [data-state="4"] .payment-summary { margin-top: 6px; gap: 6px; }
+  body.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas [data-state="4"] .workflow-payout { flex-direction: row; justify-content: center; gap: 6px; }
+}
+
+/* Give each role a clear next action beneath the shared closing invitation. */
+body.lpc-home.lpc-home--hybrid :is(.closing-scene .role-action, .closing-mobile .closing__actions a) { display: grid; grid-template-columns: minmax(0, 1fr) 18px; grid-template-rows: auto auto; align-content: start; align-items: start; column-gap: 8px; row-gap: 4px; }
+body.lpc-home.lpc-home--hybrid :is(.closing-scene .role-action, .closing-mobile .closing__actions a) small { grid-column: 1; font: 300 12px/1.4 Sarabun, sans-serif; color: #e5edf5; }
+body.lpc-home.lpc-home--hybrid :is(.closing-scene .role-action, .closing-mobile .closing__actions a) strong { grid-column: 1; font-size: 25px; line-height: 1.15; }
+body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions svg { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+body.lpc-home.lpc-home--hybrid .closing-scene .role-action i { position: static; grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+@media (max-width: 767px) {
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a { padding: 12px; }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions strong { font-size: 20px; }
+}
+
+/* Share applicant tracks so submission labels cannot shift the skill bubbles. */
+@media (min-width: 961px) {
+  body.lpc-home--hybrid .workflow-canvas .applicant-list {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) max-content;
+    column-gap: 15px;
+  }
+  body.lpc-home--hybrid .workflow-canvas .applicant-row {
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+  }
+}
+/* Keep the review filename intact instead of breaking its extension. */
+body.lpc-home.lpc-home--hybrid .workflow-review .compact-file b {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+}
+@media (min-width: 961px) {
+  body.lpc-home.lpc-home--hybrid .workflow-canvas .workflow-review .compact-file b {
+    font-size: 14px;
+    line-height: 1.35;
+    letter-spacing: 0;
+  }
+}

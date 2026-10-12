@@ -18,11 +18,7 @@
   }
   addEventListener('resize', () => { if (innerWidth === width) return; width = innerWidth; measure(); }, { passive: true });
   if ('ResizeObserver' in window) {
-    let measureFrame = 0;
-    const observer = new ResizeObserver(() => {
-      if (measureFrame) return;
-      measureFrame = requestAnimationFrame(() => { measureFrame = 0; measure(); });
-    });
+    const observer = new ResizeObserver(measure);
     observer.observe(intro);
     observer.observe(document.querySelector('.editorial-hero'));
   }
@@ -31,7 +27,7 @@
     measure();
     const entrances = document.querySelector('.editorial-hero').getAnimations({ subtree: true })
       .filter(animation => Number.isFinite(animation.effect.getTiming().iterations));
-    Promise.all(entrances.map(animation => animation.finished.catch(() => {}))).then(measure);
-  });
+    return Promise.allSettled(entrances.map(animation => animation.finished)).then(measure);
+  }).catch(error => console.warn('Homepage spacing measurement unavailable.', error));
   measure();
 })();

@@ -34,6 +34,11 @@
   max-width: none;
   text-wrap: balance;
 }
+.lpc-home .type-hook h2 .type-hook__overflow-f {
+  font-weight: inherit !important;
+  font-variant-ligatures: none;
+  margin-right: .12em;
+}
 .lpc-home .type-hook__support {
   font: 100 clamp(21px, 2.65vw, 36px)/1.3 Sarabun, sans-serif !important;
   letter-spacing: -.025em;
@@ -62,6 +67,12 @@
   overflow: visible;
 }
 .lpc-home .hook-find .type-hook__scene { position: sticky; top: 0; height: 100svh; padding-bottom: calc(100px + 12svh); }
+
+/* Shorten the desktop cloud hold while preserving the restored mobile sequence. */
+@media (min-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .lpc-home .type-hook.hook-find { height: 250svh; }
+}
+
 .lpc-home .hook-find .type-hook__art {
   display: block;
   position: absolute;
@@ -71,6 +82,8 @@
   /* Feather the scene itself so cropped clouds never form a section edge. */
   -webkit-mask-image: linear-gradient(transparent, #000 18%, #000 74%, transparent);
   mask-image: linear-gradient(transparent, #000 18%, #000 74%, transparent);
+  /* The existing mask already clips this artwork to the scene bounds. */
+  contain: paint;
 }
 .lpc-home .hook-find .type-hook__brand-static { display: none; }
 .lpc-home .type-hook__papers {
@@ -206,28 +219,5 @@
     will-change: transform, opacity;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
-  }
-}
-
-@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
-  .lpc-home .hook-find .type-hook__smoke { will-change: transform; }
-}
-
-/* Compact mobile reveal: one viewport of motion before sticky release.
-   Override the older distance while retaining stable toolbar geometry. */
-@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
-  body.lpc-home .type-hook.hook-find {
-    height: calc(var(--home-stable-viewport, 100svh) * 2);
-  }
-}
-
-
-/* Share identical mobile SVG values at the SVG root instead of rewriting
-   every path. Artwork and numeric draw/fill values remain unchanged. */
-@media (max-width: 767px) {
-  .lpc-home .type-hook__outline path { stroke-dashoffset: var(--outline-dash, 1); }
-  .lpc-home .type-hook__clear-letters path {
-    stroke-opacity: var(--outline-stroke-opacity, 0);
-    fill-opacity: var(--outline-fill-opacity, 0);
   }
 }
