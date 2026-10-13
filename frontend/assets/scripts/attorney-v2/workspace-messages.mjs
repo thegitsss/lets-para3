@@ -348,6 +348,7 @@ export function createWorkspaceMessages(caseId, { api, signal, ownerId, route, p
         } else if (!target) {list.scrollTop=list.scrollHeight;newMessages.hidden=true;}
         requestAnimationFrame(resizeInput);
       } else if (!quiet && !older && !target) list.scrollTop = list.scrollHeight;
+      if (quiet && messages.length && feedback.textContent === "No messages have been recorded for this Matter.") feedback.textContent = "";
       if (!quiet) feedback.textContent = recovered ? "Message sent." : page.targetMissing ? "The linked message is no longer available in this conversation." : messages.length ? "" : "No messages have been recorded for this Matter.";
       if (target && !older && !quiet && messages.some(message => message.id === target)) requestAnimationFrame(() => { if (!signal.aborted) { const item = list.querySelector(`[data-message-id="${target}"]`); item?.scrollIntoView({ block: "center" }); item?.focus({ preventScroll: true }); } });
       if (state.edit) {
