@@ -409,6 +409,7 @@ async function buildArchiveZipFile(caseDoc, { contents, signal, validate = async
     const documents = []; let totalBytes = 0;
     for (const document of source.documents) {
       active();
+      await assertObjectMalwareSafe({ s3, bucket: BUCKET, key: document.key, signal: combinedSignal });
       const head = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: document.key }), { abortSignal: combinedSignal });
       if (!Number.isSafeInteger(head.ContentLength) || head.ContentLength < 0 || typeof head.ETag !== "string" || !head.ETag) throw Object.assign(new Error("Document metadata could not be verified."), { publicCode: "EXPORT_SOURCE_CHANGED", status: 409 });
       totalBytes += head.ContentLength;

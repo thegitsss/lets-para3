@@ -11,6 +11,8 @@ const runtimeLogger = createRuntimeLogger("routes:uploads");
 // backend/routes/uploads.js
 const express = require("express");
 const router = express.Router();
+const { createMatterDocumentLink, verifyMatterDocumentLink } = require("../utils/matterDocumentLink");
+const { pipeline } = require("node:stream/promises");
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const multer = require("multer");
@@ -583,19 +585,33 @@ router.get("/view", async (req, res) => {
     const key = normalizeKeyPath(req.query.key);
     if (!key) return res.status(400).json({ msg: "Missing key" });
 
+    let documentTicket;
+    try { documentTicket = verifyMatterDocumentLink(req, key); }
+    catch (error) { return res.status(error.statusCode).json({ msg: error.message, code: error.code }); }
+
     if (extractPersonalOwnerId(key)) await personalDocumentGuard.checkCurrentRead(req, key);
     const allowed = await ensureKeyAccess(req, key, req.query.caseId);
     if (!allowed) return res.status(403).json({ msg: "Forbidden" });
 
     try {
-      await ensureObjectExists(key);
       await enforceUploadedObjectSecurity(key, req.query.caseId);
+      await ensureObjectExists(key);
     } catch (err) {
-      if (err?.code === "NoSuchKey") return res.status(404).json({ msg: "File not found" });
+      if (err?.code === "NoSuchKey" || err?.code === "FILE_METADATA_MISSING") return res.status(404).json({ msg: "File not found" });
       if (err?.statusCode) return res.status(err.statusCode).json({ msg: err.message, code: err.code });
       throw err;
     }
 
+    if (extractCaseIdFromKey(key)) {
+      const object = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+      res.set("Cache-Control", "private, no-store");
+      res.set("Content-Type", object.ContentType || "application/octet-stream");
+      if (documentTicket?.attachment) res.attachment(key.split("/").pop());
+      await auditAdministrativeRead(req, key);
+      if (typeof object.Body?.pipe === "function") await pipeline(object.Body, res);
+      else res.send(Buffer.from(await object.Body.transformToByteArray()));
+      return;
+    }
     const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: key, ResponseCacheControl: "private, no-store" });
     const url = await getSignedUrl(s3, getCmd, { expiresIn: 60 });
     if (extractPersonalOwnerId(key)) {
@@ -606,6 +622,7 @@ router.get("/view", async (req, res) => {
     await auditAdministrativeRead(req, key);
     res.redirect(url);
   } catch (e) {
+    if (res.headersSent) return res.destroy();
     if (accountWriteGuard.respond(e, res)) return;
     runtimeLogger.error("[uploads] view error", e);
     res.status(500).json({ msg: "view error" });
@@ -631,10 +648,10 @@ router.get("/signed-get", async (req, res) => {
     if (!allowed) return res.status(403).json({ msg: "Forbidden" });
 
     try {
-      await ensureObjectExists(normalizedKey);
       await enforceUploadedObjectSecurity(normalizedKey, caseId);
+      await ensureObjectExists(normalizedKey);
     } catch (err) {
-      if (err?.code === "NoSuchKey") return res.status(404).json({ msg: "File not found" });
+      if (err?.code === "NoSuchKey" || err?.code === "FILE_METADATA_MISSING") return res.status(404).json({ msg: "File not found" });
       if (err?.statusCode) return res.status(err.statusCode).json({ msg: err.message, code: err.code });
       throw err;
     }
@@ -644,7 +661,9 @@ router.get("/signed-get", async (req, res) => {
     const maximumTtl = wantsPreview ? 300 : 60;
     const ttl = Number.isFinite(ttlRaw) ? Math.min(Math.max(ttlRaw, 60), maximumTtl) : maximumTtl;
     const get = new GetObjectCommand({ Bucket: BUCKET, Key: normalizedKey, ResponseCacheControl: "private, no-store" });
-    const url = await getSignedUrl(s3, get, { expiresIn: ttl });
+    const url = extractCaseIdFromKey(normalizedKey)
+      ? createMatterDocumentLink(req, normalizedKey, { expiresIn: ttl })
+      : await getSignedUrl(s3, get, { expiresIn: ttl });
     if (extractPersonalOwnerId(normalizedKey)) {
       await personalDocumentGuard.checkCurrentRead(req, normalizedKey);
       if (!await ensureKeyAccess(req, normalizedKey, req.query.caseId)) return res.status(403).json({ msg: "Forbidden" });
@@ -669,10 +688,10 @@ router.get("/download", csrfProtection, async (req, res) => {
     if (!allowed) return res.status(403).json({ msg: "Forbidden" });
 
     try {
-      await ensureObjectExists(key);
       await enforceUploadedObjectSecurity(key, req.query.caseId);
+      await ensureObjectExists(key);
     } catch (err) {
-      if (err?.code === "NoSuchKey") return res.status(404).json({ msg: "File not found" });
+      if (err?.code === "NoSuchKey" || err?.code === "FILE_METADATA_MISSING") return res.status(404).json({ msg: "File not found" });
       if (err?.statusCode) return res.status(err.statusCode).json({ msg: err.message, code: err.code });
       throw err;
     }
@@ -680,7 +699,9 @@ router.get("/download", csrfProtection, async (req, res) => {
     const expiresIn = 60; // seconds
     const attachmentName = { resumeURL: "Resume.pdf", certificateURL: "Certificate.pdf", writingSampleURL: "Writing sample.pdf" }[req.query.documentField];
     const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: key, ResponseCacheControl: "private, no-store", ...(extractPersonalOwnerId(key) && req.query.download === "true" && attachmentName ? { ResponseContentDisposition: `attachment; filename="${attachmentName}"` } : {}) });
-    const url = await getSignedUrl(s3, getCmd, { expiresIn });
+    const url = extractCaseIdFromKey(key)
+      ? createMatterDocumentLink(req, key, { expiresIn, attachment: true })
+      : await getSignedUrl(s3, getCmd, { expiresIn });
     if (extractPersonalOwnerId(key)) {
       await personalDocumentGuard.checkCurrentRead(req, key);
       if (!await ensureKeyAccess(req, key, req.query.caseId)) return res.status(403).json({ msg: "Forbidden" });

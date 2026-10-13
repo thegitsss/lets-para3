@@ -381,7 +381,9 @@ function renderFiles(state) {
         }),
       ]),
       node("div", { className: "v2-matter-file-state", "data-v2-submission-status": submission.status }, [
-        security.ready || security.status === "pending" ? fileProgress(security.status) : node("span", { className: `is-${security.status}`, text: security.label }),
+        security.ready ? fileProgress(security.status, security.label)
+          : security.status === "pending" ? node("span", {}, [fileProgress(security.status, security.label), node("span", { text: security.label })])
+          : node("span", { className: `is-${security.status}`, text: security.label }),
         security.status === "pending" && (state.securityAttempts.get(id) || 0) >= SECURITY_RECHECK_DELAYS_MS.length ? node("small", { text: "This is taking longer than usual. You can keep working and check again shortly." }) : null,
         submission.label && !revisionRequest ? node("span", { className: `v2-matter-submission-state is-${submission.status}`, text: submission.label }) : null,
         submission.submitted && submission.detail && !revisionRequest ? node("small", { text: submission.detail }) : null,

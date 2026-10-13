@@ -132,6 +132,8 @@ async function bodyToBuffer(body) {
 async function validateStoredMatterFile({ s3, bucket, key, mimeType, filename = "", head } = {}) {
   if (!s3 || !bucket || !key) throw new Error("Stored file validation requires S3, bucket, and key.");
   const required = malwareScanRequired();
+  // HEAD is also denied by S3 quarantine until the current version is clean.
+  if (required && !head) await assertObjectMalwareSafe({ s3, bucket, key, required });
   const identity = required ? (head || await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: String(key) }))) : head;
   const versionId = identity?.VersionId && identity.VersionId !== "null" ? identity.VersionId : undefined;
   const etag = identity?.ETag;
@@ -166,7 +168,14 @@ async function getObjectMalwareScan({ s3, bucket, key, versionId, signal, requir
   if (!required) return classifyMalwareScanResult("", { required: false });
   if (!s3 || !bucket || !key) throw new Error("Malware scan verification requires S3, bucket, and key.");
   const command = new GetObjectTaggingCommand({ Bucket: bucket, Key: String(key), ...(versionId ? { VersionId: versionId } : {}) });
-  const response = signal ? await s3.send(command, { abortSignal: signal }) : await s3.send(command);
+  let response;
+  try {
+    response = signal ? await s3.send(command, { abortSignal: signal }) : await s3.send(command);
+  } catch (error) {
+    if (signal?.aborted || error?.name === "AbortError") throw error;
+    if (error?.$metadata?.httpStatusCode === 404 || ["NoSuchKey", "NotFound"].includes(error?.name || error?.code)) throw Object.assign(error, { code: "NoSuchKey", statusCode: 404 });
+    throw unsafeFileError({ status: "error", result: "FAILED", safe: false });
+  }
   const tag = (response?.TagSet || []).find((entry) => entry?.Key === GUARDDUTY_TAG_KEY);
   if (!tag && await matchesLegacyUpload({ s3, bucket, key: String(key), versionId, signal })) {
     return { status: "not_required", result: "LEGACY_UNVERIFIED", safe: true };

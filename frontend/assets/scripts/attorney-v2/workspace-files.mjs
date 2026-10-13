@@ -37,7 +37,7 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
   section.append(node("div",{className:"av2-section-heading"},[node("h2", { text: "Files" }),node("div", { className: "av2-actions" }, [refresh, cancel])]), notice, feedback, browser); inventory.append(more);
   const upload = createWorkspaceFileUploads(caseId, { api, signal, ownerId, state: state.upload, route, onSaved: () => void load({ quiet: true }) }); browser.before(upload);
   const removal = createWorkspaceFileRemoval(caseId, { api, signal, ownerId, state: state.removal, onRemoved: async fileId => { if (signal.aborted) return; if (selected?.id === fileId) { selected = null; rememberSelection(null); } await load(); earlier.invalidate(); }, onDenied: denied, onClose: () => { const heading = section.querySelector("h2"); heading.tabIndex = -1; heading.focus(); } }); section.append(removal);
-  const earlier = createWorkspaceEarlierFiles(caseId, { api, signal, ownerId, route, onDenied: denied }); section.append(node("details", {className:"av2-secondary-disclosure"}, [node("summary", {text:"Earlier documents and retained versions"}), earlier]));
+  const earlier = createWorkspaceEarlierFiles(caseId, { api, signal, ownerId, route, onDenied: denied }); section.append(node("details", {className:"av2-secondary-disclosure", ...(route.query.has("earlierFileId") ? {open:""} : {})}, [node("summary", {text:"Earlier documents and retained versions"}), earlier]));
   const options = { signal, ownerId };
   const controls = () => {
     const blocked = busy || reading && !quietReading;
@@ -96,7 +96,16 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
     if (previewType(file) && (previewType(file) !== "pdf" || navigator.pdfViewerEnabled !== false)) transferActions.prepend(button("Preview file", () => void transfer(file, true)));
     else if (previewType(file) === "pdf") detail.append(node("p", { text: "This browser does not display PDF previews. Download the document to review it." }));
     transferActions.querySelectorAll("button").forEach(action => {action.dataset.fileTransferControl=""; action.disabled = !["clean","not_required"].includes(file.securityStatus);});
-    if (!["clean","not_required"].includes(file.securityStatus)) detail.append(node("p",{className:"av2-notice",text:"Preview and download are unavailable until this document has a clear security check."}));
+    if (!["clean","not_required"].includes(file.securityStatus)) {
+      const message = file.securityStatus === "blocked"
+        ? "This file did not pass the security check. Preview and download are blocked. Remove it or replace it with a safe file."
+        : file.securityStatus === "error"
+          ? "The security check could not complete. This file stays unavailable. Check its status again later."
+          : "Security check in progress. Preview and download remain unavailable until the file passes.";
+      const check = button("Check security status", () => void recheckSecurity(file));
+      check.disabled = busy;
+      detail.append(node("p", { className: "av2-notice", text: message }), check);
+    }
     const secondary = [];
     if (value?.canUpload && !state.pending) secondary.push(button("Replace document", () => openReplacement(file)));
     if (value?.canUpload && !state.pending) secondary.push(button("Remove document", event => removal.open(file, event.currentTarget)));
@@ -142,6 +151,20 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
       if ([401, 403, 404].includes(error.status) || error.kind === "authentication") denied(error);
       else { feedback.textContent = reviewError(error); renderDetail(); }
     } finally { busy = false; if (!signal.aborted) { controls(); detail.querySelector("h3")?.setAttribute("tabindex", "-1"); detail.querySelector("h3")?.focus({ preventScroll: true }); } }
+  }
+  async function recheckSecurity(file) {
+    if (busy || signal.aborted) return;
+    busy = true; feedback.textContent = "Checking document security…"; controls();
+    try {
+      await api.readWorkspaceFileSecurity(caseId, file.id, { signal });
+      if (signal.aborted) return;
+      busy = false; await load();
+      if (!signal.aborted) feedback.textContent = "Security status checked. Files remain unavailable until their security check clears.";
+    } catch (error) {
+      if (signal.aborted) return;
+      if ([401,403,404].includes(error.status) || error.kind === "authentication") denied(error);
+      else feedback.textContent = "The security status could not be verified. The file stays unavailable. Try again later.";
+    } finally { busy = false; if (!signal.aborted) controls(); }
   }
   async function load({ append = false, quiet = false } = {}) {
     // Rebuilding the list between a native press and click loses that selection.

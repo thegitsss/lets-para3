@@ -49,14 +49,28 @@ module.exports = async function globalMongoTeardown() {
     }
 
     const mongoInstance = mongoServer.instanceInfo?.instance;
-    // Let the replica owner perform its one graceful shutdown and watchdog
-    // cleanup. Sending a separate shutdown first races that same owner.
+    // Request an explicit one-second quiesce period. The memory-server SIGINT
+    // watchdog otherwise kills this single primary before its default quiesce
+    // period finishes. Wait for the real
+    // clean process exit before asking the owner to remove its files/watchdog.
     const processExitPromise = observeProcessExit(mongoInstance?.mongodProcess)
       .then((exit) => ({ exit }), (error) => ({ error }));
-    await client.close().catch((err) => cleanupErrors.push(err));
     const processOwner = global.__LPC_JEST_MONGO_REPLICA_SET__ || mongoServer;
-    await processOwner.stop({ doCleanup: true, force: true }).catch((err) => cleanupErrors.push(err));
+    if (new URL(mongoServer.getUri()).hostname !== "127.0.0.1") throw new Error("Jest shutdown requires its isolated loopback Mongo process.");
+    try {
+      await client.db("admin").command({ shutdown: 1, force: true, timeoutSecs: 1 });
+    } catch (err) {
+      // Shutdown closes its own client socket. A successful process exit below
+      // is still mandatory; other driver/server failures remain failures.
+      if (err.name !== "MongoNetworkError" && err.code !== 11600) cleanupErrors.push(err);
+    }
+    await client.close().catch((err) => cleanupErrors.push(err));
     const outcome = await processExitPromise;
+    // memory-server retains this reference when stop() finds an already dead
+    // child. Clear it only after proving a normal exit, never to hide a kill.
+    if (outcome.exit?.code === 0 && !outcome.exit.signal) mongoInstance.mongodProcess = undefined;
+    await mongoInstance?.stop().catch((err) => cleanupErrors.push(err));
+    await processOwner.stop({ doCleanup: true, force: true }).catch((err) => cleanupErrors.push(err));
     if (outcome.error) cleanupErrors.push(outcome.error);
     else if (outcome.exit.code !== 0 || outcome.exit.signal) {
       cleanupErrors.push(new Error(`The shared Jest mongod process exited abnormally (${JSON.stringify(outcome.exit)}).`));

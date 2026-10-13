@@ -4139,7 +4139,7 @@ router.get(
           code,
         });
       }
-      const url = await signDownload(plainFile.storageKey);
+      const url = require("../utils/matterDocumentLink").createMatterDocumentLink(req, plainFile.storageKey);
       res.json({ url, filename: plainFile.originalName || null });
     } catch (e) {
       logger.error("[cases] signed-get error:", e);

@@ -59,7 +59,9 @@ async function read(req) {
   if (!rows.length) fail(404,"EVIDENCE_NOT_FOUND","That document is not part of this Matter's reviewed assignment.");
   const file=decryptCaseFilePayload(rows[0]),key=safeKey(file.storageKey,caseId),bucket=String(process.env.S3_BUCKET||"").trim();
   if(!bucket)fail(503,"EVIDENCE_STORAGE_UNAVAILABLE","Evidence storage is unavailable.");
-  const s3=createS3Client(),head=await s3.send(new HeadObjectCommand({Bucket:bucket,Key:key}));
+  const s3=createS3Client();
+  await assertObjectMalwareSafe({s3,bucket,key});
+  const head=await s3.send(new HeadObjectCommand({Bucket:bucket,Key:key}));
   const versionId=head.VersionId&&head.VersionId!=="null"?head.VersionId:undefined;
   const recheckFile = async () => {
     const latest = await CaseFile.collection.findOne(query,{projection});

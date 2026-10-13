@@ -274,6 +274,10 @@ export function createApiClient({ fetchImpl = window.fetch.bind(window), onAuthe
       const value = await request(`/api/cases/${caseId}/files/${fileId}/history/${index}/download?${new URLSearchParams({expectedOwnerId: options.ownerId, revision})}`, {signal: options.signal, binary: true});
       await verifyDownloadOwner(options); return value;
     },
+    readWorkspaceFileSecurity: (caseId, fileId, options = {}) => {
+      if (!validDraftId(caseId) || !validDraftId(fileId)) throw new TypeError("Invalid Matter document.");
+      return request(`/api/uploads/case/${caseId}/${fileId}/security-status`, { signal: options.signal });
+    },
     readWorkspaceFiles: (caseId, options) => {
       if (!validDraftId(caseId)) throw new TypeError("Invalid Matter files.");
       const query = new URLSearchParams({ expectedOwnerId: options.ownerId });

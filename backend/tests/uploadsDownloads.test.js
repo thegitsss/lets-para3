@@ -432,24 +432,32 @@ describe("File uploads + downloads", () => {
 
     const authorized = await request(app).get(path).set("Cookie", authCookieFor(assigned));
     expect(authorized.status).toBe(200);
-    expect(authorized.body.url).toBe("https://signed-url.test/object");
-    expect(mockGetSignedUrl.mock.calls.at(-1)[2].expiresIn).toBe(60);
+    expect(authorized.body.url).toMatch(/^\/api\/uploads\/view\?/);
+    const ticketFor = response => jwt.verify(new URL(response.body.url,"https://lpc.test").searchParams.get("ticket"),process.env.JWT_SECRET,{audience:"lpc-matter-document-link"});
+    expect(ticketFor(authorized).exp-ticketFor(authorized).iat).toBe(60);
+    expect(ticketFor(authorized).sub).toBe(String(assigned._id));
+    await request(app).get(authorized.body.url).set("Cookie",authCookieFor(assigned)).expect(200);
+    await request(app).get(authorized.body.url).set("Cookie",authCookieFor(attorney)).expect(403);
+    const expired=jwt.sign({key:ticketFor(authorized).key,sid:""},process.env.JWT_SECRET,{subject:String(assigned._id),audience:"lpc-matter-document-link",expiresIn:-1});
+    await request(app).get(authorized.body.url.replace(new URL(authorized.body.url,"https://lpc.test").searchParams.get("ticket"),expired)).set("Cookie",authCookieFor(assigned)).expect(403);
+    expect(mockGetSignedUrl).not.toHaveBeenCalled();
     await request(app).get(path + "&ttl=900").set("Cookie", authCookieFor(assigned)).expect(200);
-    expect(mockGetSignedUrl.mock.calls.at(-1)[2].expiresIn).toBe(60);
-    await request(app).get(path + "&preview=true&ttl=900").set("Cookie", authCookieFor(assigned)).expect(200);
-    expect(mockGetSignedUrl.mock.calls.at(-1)[2].expiresIn).toBe(300);
+    expect(mockGetSignedUrl).not.toHaveBeenCalled();
+    const previewLink=await request(app).get(path + "&preview=true&ttl=900").set("Cookie", authCookieFor(assigned)).expect(200);
+    expect(ticketFor(previewLink).exp-ticketFor(previewLink).iat).toBe(300);
     const administrator = await User.create({ ...acceptedPolicyFixture(), firstName: "Admin", lastName: "Reviewer", email: "admin.file-boundary@example.test", password: "Password123!", role: "admin", status: "approved" });
     await request(app).get(path).set("Cookie", authCookieFor(administrator)).expect(403);
     const archiveKey = `cases/${caseDoc._id}/archive-v2.zip`;
     await request(app).get(`/api/uploads/view?key=${encodeURIComponent(archiveKey)}`).set("Cookie", authCookieFor(administrator)).expect(403);
 
     expect(authorized.headers["cache-control"]).toBe("private, no-store");
-    expect(mockGetSignedUrl.mock.calls.at(-1)[1].input.ResponseCacheControl).toBe("private, no-store");
+    expect(mockGetSignedUrl).not.toHaveBeenCalled();
 
     for (const route of ["view", "download"]) {
       const response = await request(app).get(`/api/uploads/${route}?caseId=${caseDoc._id}&key=${encodeURIComponent(key)}`).set("Cookie", authCookieFor(assigned));
-      expect(response.status).toBe(route === "view" ? 302 : 200);
-      expect(mockGetSignedUrl.mock.calls.at(-1)[1].input.ResponseCacheControl).toBe("private, no-store");
+      expect(response.status).toBe(200);
+      expect(response.headers["cache-control"]).toBe("private, no-store");
+      expect(mockGetSignedUrl).not.toHaveBeenCalled();
     }
 
     const anonymous = await request(app).get(path);
@@ -468,7 +476,7 @@ describe("File uploads + downloads", () => {
     [[], 423, "FILE_SCAN_PENDING"],
     [[{ Key: "GuardDutyMalwareScanStatus", Value: "THREATS_FOUND" }], 422, "FILE_SECURITY_BLOCKED"],
     [[{ Key: "GuardDutyMalwareScanStatus", Value: "FAILED" }], 503, "FILE_SCAN_ERROR"],
-  ])("Matter file access fails closed for scan result %#", async (tagSet, status, code) => {
+  ].flatMap(row => ["signed-get", "view", "download"].map(route => [...row, route])))("Matter file access fails closed for scan result %#", async (tagSet, status, code, route) => {
     const previousRequired = process.env.S3_MALWARE_SCAN_REQUIRED;
     process.env.S3_MALWARE_SCAN_REQUIRED = "true";
     try {
@@ -516,11 +524,12 @@ describe("File uploads + downloads", () => {
       });
       mockSend.mockImplementation((command) => {
         if (command?.constructor?.name === "GetObjectTaggingCommand") return { TagSet: tagSet };
+        if (command?.constructor?.name === "HeadObjectCommand") throw Object.assign(new Error("Quarantine denies HEAD"), { name: "AccessDenied" });
         return {};
       });
 
       const response = await request(app)
-        .get(`/api/uploads/signed-get?caseId=${caseDoc._id}&key=${encodeURIComponent(key)}`)
+        .get(`/api/uploads/${route}?caseId=${caseDoc._id}&key=${encodeURIComponent(key)}`)
         .set("Cookie", authCookieFor(paralegal));
       expect(response.status).toBe(status);
       expect(response.body.code).toBe(code);
@@ -586,7 +595,7 @@ describe("File uploads + downloads", () => {
       .set("Cookie", authCookieFor(paralegal));
 
     expect(res.status).toBe(200);
-    expect(res.body.url).toBe("https://signed-url.test/object");
+    expect(res.body.url).toMatch(/^\/api\/uploads\/view\?/);
   });
 
   test("Requested pre-engagement paralegal cannot access another known Matter key", async () => {
