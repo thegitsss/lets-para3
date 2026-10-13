@@ -181,6 +181,7 @@ body.lpc-home .home-footer{padding-top:64px}
 
 @media (max-width: 767px) {
   body.lpc-home .closing-mobile #closing-mobile-title {
+    z-index: 4;
     white-space: nowrap;
     font-size: clamp(28px, 8.6vw, 60px);
     min-height: calc(clamp(36px, 10.8vw, 68px) * 2.12);
@@ -199,4 +200,25 @@ body.lpc-home .home-footer{padding-top:64px}
     color: #dce5ee;
     text-shadow: none;
   }
+}
+
+@media (max-width: 767px) {
+  body.lpc-home .mobile-nav a.lpc-noise-signup {
+    border-radius: 999px;
+    clip-path: inset(0 round 999px);
+  }
+  body.lpc-home .mobile-nav a.lpc-noise-signup::before { border-radius: inherit; }
+}
+@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
+  body.lpc-home .closing-mobile .closing__actions {
+    animation: lpc-mobile-choices-float 4s ease-in-out infinite;
+    animation-play-state: paused;
+  }
+  body.lpc-home .closing-mobile.closing--in-view .closing__actions { animation-play-state: running; }
+  body.lpc-home:is(.accessibility-mode) .closing-mobile .closing__actions,
+  html.accessibility-mode body.lpc-home .closing-mobile .closing__actions { animation: none; }
+}
+@keyframes lpc-mobile-choices-float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -4px; }
 }
