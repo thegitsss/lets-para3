@@ -198,7 +198,7 @@ body.lpc-home .home-footer{padding-top:64px}
     right: 8px;
     margin: 0;
     color: #dce5ee;
-    font-size: clamp(18px, 5.2vw, 22px);
+    font-size: 16px;
     text-shadow: none;
   }
 }
