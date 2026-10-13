@@ -8,6 +8,7 @@
   const image = scene.querySelector('img');
   image.loading = 'eager';
   const title = scene.querySelector('h2');
+  const reassurance = scene.querySelector('.closing__reassurance');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let width = innerWidth, height = Math.max(700, innerHeight);
   let sceneTop = 0, frame = 0, lastY = null, lastTitleY = null, lastOpacity = null, path = null;
@@ -17,8 +18,9 @@
     scene.style.setProperty('--closing-height', `${height}px`);
     const photoScale = height / 1024;
     const summit = height * .27 + 135 * photoScale;
-    scene.style.setProperty('--title-top', `${Math.max(90, summit - title.offsetHeight - 18)}px`);
-    scene.style.setProperty('--actions-top', `${Math.max(summit + 100, height * .56)}px`);
+    scene.style.setProperty('--title-top', `${Math.max(90, summit - title.offsetHeight - 18) - 55}px`);
+    scene.style.setProperty('--reassurance-top', `${Math.max(90, summit - title.offsetHeight - 18) + title.firstElementChild.offsetHeight + 12 - 55}px`);
+    scene.style.setProperty('--actions-top', `${Math.max(summit + 100, height * .56) - 55}px`);
     sceneTop = scene.getBoundingClientRect().top + scrollY;
     lastY = null;
     lastTitleY = null;
@@ -90,6 +92,7 @@
     }
     if (titleY !== lastTitleY) {
       title.style.transform = `translate3d(0,${titleY}px,0)`;
+      reassurance.style.transform = `translate3d(0,${titleY}px,0)`;
       lastTitleY = titleY;
     }
     if (opacity !== lastOpacity) {
