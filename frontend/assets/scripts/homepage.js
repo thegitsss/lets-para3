@@ -287,7 +287,14 @@
     syncParallax() {
       this.parallaxFrameId = 0;
       if (!["paths", "closing"].includes(this.mode)) return;
-      if (this.isWorkflowField) return;
+      if (this.isWorkflowField) {
+        if (innerWidth > 767) return;
+        const disabled = reducedMotion.matches || document.body.classList.contains("accessibility-mode");
+        const viewport = parseFloat(document.documentElement.style.getPropertyValue('--home-stable-viewport')) || innerHeight;
+        const progress = clamp((viewport - (this.parallaxTop - scrollY)) / (viewport + this.parallaxHeight));
+        this.canvas.style.setProperty('--workflow-field-y', disabled ? '0px' : `${((progress - .5) * 96).toFixed(1)}px`);
+        return;
+      }
       const motionDisabled = reducedMotion.matches || document.body.classList.contains("accessibility-mode");
       if (motionDisabled) {
         this.canvas.style.setProperty("--paths-field-y", "0px");
@@ -337,6 +344,11 @@
 
     resize() {
       const rect = this.section.getBoundingClientRect();
+      if (this.isWorkflowField && innerWidth <= 767) {
+        this.parallaxTop = rect.top + scrollY;
+        this.parallaxHeight = rect.height;
+        this.scheduleParallax();
+      }
       const width = Math.max(1, Math.round(rect.width));
       const height = this.isWorkflowField
         ? Math.min(900, Math.max(1, window.innerHeight))
