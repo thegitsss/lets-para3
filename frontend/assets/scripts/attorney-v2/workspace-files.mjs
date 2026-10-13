@@ -65,7 +65,7 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
     reset(); if ([401, 403, 404].includes(error.status) || error.kind === "authentication") { upload.clear(); removal.clear(); earlier.clear(); state.drafts = {}; state.pending = null; state.replacements = {}; privateState.fileReviews.delete(caseId); feedback.textContent = "Files are no longer available to this account."; }
     else feedback.textContent = error.status === 413 ? "This Matter exceeds the document inventory review limit. Contact LPC support for the remaining records." : "Files couldn’t load. Try again."; section.dataset.state = [401, 403, 404].includes(error.status) || error.kind === "authentication" ? "restricted" : "error";
   }
-  function render() {
+  function render({ preserveDetail = false } = {}) {
     if (!value) return;
     notice.textContent = value.access === "available" ? "" : downloadAccess(value);
     list.replaceChildren(...files.map(file => {
@@ -77,7 +77,7 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
     detail.hidden = !selected; browser.classList.toggle("has-selection",Boolean(selected));
     for (const row of list.children) if (stale.has(row.dataset.downloadFile)) row.querySelector("button").disabled = true;
     if (value.access === "available" && !files.length) list.append(node("li", { text: state.filters.q || state.filters.status !== "all" ? "No documents match these filters. Clear filters to see the other documents." : "No documents have been shared on this Matter. Upload a file when sharing is available." }));
-    if (selected) renderDetail(); controls();
+    if (selected && !preserveDetail) renderDetail(); controls();
   }
   function choose(file) {
     if (busy || reading || stale.has(file.id)) return;
@@ -189,12 +189,14 @@ export function createWorkspaceFiles(caseId, { api, signal, ownerId, route, priv
           loaded = [...loaded, ...page.files]; next = page;
         }
       }
+      const previousAccess = value?.access, previousCanUpload = value?.canUpload;
       stale.clear(); files = append ? [...files, ...loaded] : loaded; state.loadedCount=files.length; value = next;
+      const preserveDetail = quiet && previousAccess === next.access && previousCanUpload === next.canUpload && selected && next.selectedFile && detail.childElementCount > 0 && JSON.stringify(selected) === JSON.stringify(next.selectedFile);
       selected = target ? next.selectedFile : null;
       if (state.pending) { feedback.textContent = selected ? `Current saved review: ${fileStatus(selected)}. Check the document before making another decision.` : "The previously reviewed document is no longer available."; state.pending = null; }
       else if (next.selection === "unavailable") feedback.textContent = "The linked document is no longer available on this Matter.";
       else if (!quiet) feedback.textContent = "";
-      render(); section.dataset.state = "ready";
+      render({ preserveDetail }); section.dataset.state = "ready";
       if (initialSelection && selected && route.query.get("fileId")) requestAnimationFrame(() => {
         if (!signal.aborted && selected?.id === target) { detail.tabIndex = -1; detail.focus({ preventScroll: true }); }
       });
