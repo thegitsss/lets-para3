@@ -12,7 +12,6 @@ const runtimeLogger = createRuntimeLogger("routes:uploads");
 const express = require("express");
 const router = express.Router();
 const { createMatterDocumentLink, verifyMatterDocumentLink } = require("../utils/matterDocumentLink");
-const { pipeline } = require("node:stream/promises");
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const multer = require("multer");
@@ -143,7 +142,15 @@ async function ensureObjectExists(key) {
 }
 
 async function refreshCaseFileSecurity(record, key, { persist = true, enforce = true } = {}) {
-  const scan = await getObjectMalwareScan({ s3, bucket: BUCKET, key });
+  let scan;
+  try {
+    scan = await getObjectMalwareScan({ s3, bucket: BUCKET, key });
+  } catch (error) {
+    // A provider outage is an unavailable scan state, never permission to read.
+    // Persist it so status checks and both interfaces can offer recovery.
+    if (error?.scan?.status !== "error") throw error;
+    scan = error.scan;
+  }
   if (persist && record?._id) await matterFileWrites.persistScan(record, key, scan);
   if (enforce && !scan.safe) {
     const error = new Error(
@@ -303,6 +310,44 @@ async function nextCaseFileVersion(caseId, filename) {
 function extractCaseIdFromKey(key) {
   const match = normalizeKeyPath(key).match(/cases\/([a-f0-9]{24})\//i);
   return match ? match[1] : null;
+}
+
+// Hold bounded Matter documents until storage has finished responding. A
+// participant/session checked before that wait may no longer be authorized.
+async function readMatterDocumentBody(body) {
+  const chunks = [];
+  let size = 0;
+  const append = chunk => {
+    const bytes = Buffer.from(chunk);
+    size += bytes.length;
+    if (size > MAX_CASE_FILE_BYTES) {
+      throw Object.assign(new Error("This document exceeds the Matter file size limit."), { statusCode: 413, code: "FILE_TOO_LARGE" });
+    }
+    chunks.push(bytes);
+  };
+  try {
+    if (typeof body?.[Symbol.asyncIterator] === "function") {
+      for await (const chunk of body) append(chunk);
+    } else if (typeof body?.transformToByteArray === "function") {
+      append(await body.transformToByteArray());
+    } else {
+      throw new Error("Document storage returned no readable body.");
+    }
+    return Buffer.concat(chunks, size);
+  } finally {
+    body?.destroy?.();
+  }
+}
+
+async function revalidateMatterDocumentRead(req, key) {
+  const current = { headers: { authorization: `Bearer ${req.auth?.token || ""}` }, cookies: {}, query: req.query };
+  let authenticated = false;
+  const deny = { status() { return this; }, json() {} };
+  await verifyToken(current, deny, error => { if (error) throw error; authenticated = true; });
+  if (!authenticated || !current.user?.approved || current.user.role !== req.user.role
+    || current.user.id !== req.user.id || current.authSessionId !== req.authSessionId) return false;
+  verifyMatterDocumentLink(current, key);
+  return ensureKeyAccess(current, key, req.query.caseId || req.params?.caseId);
 }
 
 function extractPersonalOwnerId(key) {
@@ -577,7 +622,8 @@ router.post(
 
 /**
  * GET /api/uploads/view?key=<s3key>
- * Redirects to a short-lived signed URL after auth checks.
+ * Delivers Matter documents after current access checks; personal documents
+ * retain their short-lived storage redirect.
  */
 router.get("/view", async (req, res) => {
   try {
@@ -605,11 +651,13 @@ router.get("/view", async (req, res) => {
     if (extractCaseIdFromKey(key)) {
       const object = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
       res.set("Cache-Control", "private, no-store");
+      const bytes = await readMatterDocumentBody(object.Body);
+      await enforceUploadedObjectSecurity(key, req.query.caseId);
+      if (!await revalidateMatterDocumentRead(req, key)) return res.status(403).json({ msg: "Forbidden" });
       res.set("Content-Type", object.ContentType || "application/octet-stream");
       if (documentTicket?.attachment) res.attachment(key.split("/").pop());
       await auditAdministrativeRead(req, key);
-      if (typeof object.Body?.pipe === "function") await pipeline(object.Body, res);
-      else res.send(Buffer.from(await object.Body.transformToByteArray()));
+      res.send(bytes);
       return;
     }
     const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: key, ResponseCacheControl: "private, no-store" });
@@ -623,6 +671,7 @@ router.get("/view", async (req, res) => {
     res.redirect(url);
   } catch (e) {
     if (res.headersSent) return res.destroy();
+    if (e?.statusCode) return res.status(e.statusCode).json({ msg: e.message, code: e.code });
     if (accountWriteGuard.respond(e, res)) return;
     runtimeLogger.error("[uploads] view error", e);
     res.status(500).json({ msg: "view error" });
@@ -1486,6 +1535,16 @@ router.get(
     }
     const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(plainRecord.storageKey) });
     const data = await s3.send(getCmd);
+    res.set("Cache-Control", "private, no-store");
+    let bytes;
+    try {
+      bytes = await readMatterDocumentBody(data.Body);
+      await enforceUploadedObjectSecurity(plainRecord.storageKey, req.params.caseId);
+      if (!await revalidateMatterDocumentRead(req, plainRecord.storageKey)) return res.status(403).json({ msg: "Forbidden" });
+    } catch (error) {
+      if (error?.statusCode) return res.status(error.statusCode).json({ msg: error.message, code: error.code });
+      throw error;
+    }
     const filename = plainRecord.originalName || `case-file-${record._id}`;
     const mimeType = String(plainRecord.mimeType || "application/octet-stream").toLowerCase();
     const previewableMimeTypes = new Set([
@@ -1499,28 +1558,20 @@ router.get(
     const previewInline = String(req.query.preview || "").toLowerCase() === "true"
       && previewableMimeTypes.has(mimeType);
     res.setHeader("Content-Type", mimeType);
-    if (plainRecord.size) {
-      res.setHeader("Content-Length", String(plainRecord.size));
-    }
+    res.setHeader("Content-Length", String(bytes.length));
     res.setHeader(
       "Content-Disposition",
       `${previewInline ? "inline" : "attachment"}; filename="${encodeURIComponent(filename)}"`
     );
-    data.Body.on("error", (err) => {
-      runtimeLogger.error("[uploads] download stream error", err);
-      res.destroy(err);
-    });
-    data.Body.pipe(res);
-    data.Body.on("end", () => {
-      logAction(req, "file_downloaded", {
-        targetType: "case",
-        targetId: caseDoc._id,
-        meta: { fileId: record._id, filename },
-      }).catch(logPromiseFailure(runtimeLogger, "[uploads] file download audit persistence failed", {
-        caseId: caseDoc._id,
-        fileId: record._id,
-      }));
-    });
+    res.send(bytes);
+    logAction(req, "file_downloaded", {
+      targetType: "case",
+      targetId: caseDoc._id,
+      meta: { fileId: record._id, filename },
+    }).catch(logPromiseFailure(runtimeLogger, "[uploads] file download audit persistence failed", {
+      caseId: caseDoc._id,
+      fileId: record._id,
+    }));
   })
 );
 

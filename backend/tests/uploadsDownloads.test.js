@@ -473,6 +473,7 @@ describe("File uploads + downloads", () => {
   });
 
   test.each([
+    [null, 503, "FILE_SCAN_ERROR"],
     [[], 423, "FILE_SCAN_PENDING"],
     [[{ Key: "GuardDutyMalwareScanStatus", Value: "THREATS_FOUND" }], 422, "FILE_SECURITY_BLOCKED"],
     [[{ Key: "GuardDutyMalwareScanStatus", Value: "FAILED" }], 503, "FILE_SCAN_ERROR"],
@@ -523,7 +524,10 @@ describe("File uploads + downloads", () => {
         securityScanResult: "PENDING",
       });
       mockSend.mockImplementation((command) => {
-        if (command?.constructor?.name === "GetObjectTaggingCommand") return { TagSet: tagSet };
+        if (command?.constructor?.name === "GetObjectTaggingCommand") {
+          if (tagSet === null) throw Object.assign(new Error("Scan provider unavailable"), { name: "AccessDenied", $metadata: { httpStatusCode: 403 } });
+          return { TagSet: tagSet };
+        }
         if (command?.constructor?.name === "HeadObjectCommand") throw Object.assign(new Error("Quarantine denies HEAD"), { name: "AccessDenied" });
         return {};
       });
@@ -536,6 +540,20 @@ describe("File uploads + downloads", () => {
       const refreshed = await CaseFile.findById(record._id).lean();
       expect(refreshed.securityStatus).toBe(status === 423 ? "pending" : status === 422 ? "blocked" : "error");
       expect(mockGetSignedUrl).not.toHaveBeenCalled();
+      if (tagSet === null) {
+        const unavailable = await request(app)
+          .get(`/api/uploads/case/${caseDoc._id}/${record._id}/security-status`)
+          .set("Cookie", authCookieFor(paralegal));
+        expect(unavailable.status).toBe(200);
+        expect(unavailable.body).toMatchObject({ securityStatus: "error", ready: false });
+        expect(mockSend.mock.calls.some(([command]) => command.constructor.name === "GetObjectCommand")).toBe(false);
+        mockSend.mockImplementation(() => ({ TagSet: [{ Key: "GuardDutyMalwareScanStatus", Value: "NO_THREATS_FOUND" }] }));
+        const recovered = await request(app)
+          .get(`/api/uploads/case/${caseDoc._id}/${record._id}/security-status`)
+          .set("Cookie", authCookieFor(paralegal));
+        expect(recovered.status).toBe(200);
+        expect(recovered.body).toMatchObject({ securityStatus: "clean", ready: true });
+      }
     } finally {
       if (previousRequired == null) delete process.env.S3_MALWARE_SCAN_REQUIRED;
       else process.env.S3_MALWARE_SCAN_REQUIRED = previousRequired;
@@ -1293,5 +1311,57 @@ describe("File uploads + downloads", () => {
 
     const record = await CaseFile.findOne(buildCaseFileKeyQuery({ caseId: caseDoc._id, storageKey: key })).lean();
     expect(record).toBeTruthy();
+  });
+});
+
+
+describe("Matter document delivery rechecks authority after storage waits", () => {
+  const variants = [
+    ["get", "matter", 403], ["buffer", "matter", 403], ["stream", "matter", 403],
+    ["get", "disabled", 403], ["get", "session", 403], ["get", "metadata", 404],
+    ["stream", "unchanged", 200], ["stream", "oversize", 413],
+  ].flatMap(row => ["link", "record"].map(route => [route, ...row]));
+  test.each(variants)("%s delivery held at %s rejects %s authority loss", async (route, hold, change, expected) => {
+    const attorney = await User.create({ ...acceptedPolicyFixture(), firstName: "Delivery", lastName: "Attorney", email: "delivery-owner@example.test", password: "Password123!", role: "attorney", status: "approved", state: "CA" });
+    const para = await User.create({ ...acceptedPolicyFixture(), firstName: "Delivery", lastName: "Paralegal", email: "delivery-viewer@example.test", password: "Password123!", role: "paralegal", status: "approved", state: "CA" });
+    const { createAuthSession, revokeSession } = require("../services/authSessionService");
+    const { sessionId } = await createAuthSession(para, {});
+    const cookie = `token=${jwt.sign({ id: String(para._id), role: para.role, av: 0, sid: sessionId }, process.env.JWT_SECRET, { expiresIn: "2h" })}`;
+    const matter = await Case.create({ title: "Held document delivery", details: "Synthetic access boundary", status: "in progress", attorney: attorney._id, attorneyId: attorney._id, paralegal: para._id, paralegalId: para._id, escrowIntentId: "pi_delivery", escrowStatus: "funded", totalAmount: 100000, currency: "usd" });
+    const key = `cases/${matter._id}/documents/held.pdf`;
+    const file = await CaseFile.create({ caseId: matter._id, userId: attorney._id, originalName: "held.pdf", storageKey: key, mimeType: "application/pdf", size: 25, securityStatus: "not_required", securityScanResult: "NOT_REQUIRED" });
+    const link = await request(app).get(`/api/uploads/signed-get?key=${encodeURIComponent(key)}`).set("Cookie", cookie).expect(200);
+    const path = route === "link" ? link.body.url : `/api/uploads/case/${matter._id}/${file._id}/download?preview=true`;
+    let entered, release;
+    const ready = new Promise(resolve => { entered = resolve; });
+    const held = new Promise(resolve => { release = resolve; });
+    const stream = new PassThrough();
+    const privateBytes = Buffer.from("PRIVATE_PENDING_DOCUMENT");
+    const original = mockSend.getMockImplementation();
+    mockSend.mockImplementation(command => {
+      if (command.constructor.name !== "GetObjectCommand" || command.input.Key !== key) return original(command);
+      if (hold === "get") { entered(); return held; }
+      if (hold === "buffer") return { Body: { transformToByteArray: async () => { entered(); return held; } } };
+      entered(); return { Body: stream };
+    });
+    const pending = request(app).get(path).set("Cookie", cookie).then(response => response);
+    await ready;
+    try {
+      if (change === "matter") await Case.updateOne({ _id: matter._id }, { $set: { paralegalAccessRevokedAt: new Date() } });
+      if (change === "disabled") await User.updateOne({ _id: para._id }, { $set: { disabled: true } });
+      if (change === "session") await revokeSession(sessionId, para._id);
+      if (change === "metadata") await CaseFile.deleteOne({ _id: file._id });
+    } finally {
+      if (hold === "get") release({ ContentType: "application/pdf", Body: { transformToByteArray: async () => privateBytes } });
+      else if (hold === "buffer") release(privateBytes);
+      else stream.end(change === "oversize" ? Buffer.alloc(20 * 1024 * 1024 + 1) : privateBytes);
+    }
+    const response = await pending;
+    expect(response.status).toBe(expected);
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+    const delivered = Buffer.isBuffer(response.body) ? response.body.toString() : response.text || JSON.stringify(response.body);
+    if (expected === 200) expect(delivered).toBe(privateBytes.toString());
+    else expect(delivered).not.toContain(privateBytes.toString());
+    if (hold === "stream") expect(stream.destroyed).toBe(true);
   });
 });
