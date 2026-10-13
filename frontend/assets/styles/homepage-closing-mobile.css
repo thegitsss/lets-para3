@@ -137,3 +137,66 @@ body.lpc-home .home-footer{padding-top:64px}
   body.lpc-home :is(.closing-scene__canvas, .closing-footer__canvas) { filter: brightness(.55); }
   body.lpc-home .home-footer summary { color: #c4d8fb; }
 }
+
+/* Mobile role choices follow the supplied open, divided-row reference. */
+@media (max-width: 767px) {
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions { column-gap: 0; }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a {
+    grid-template-columns: minmax(0, 1fr) 12px;
+    column-gap: 4px;
+    padding-inline: clamp(4px, 2vw, 8px);
+    align-content: center;
+    border: 0;
+    border-top: 1px solid rgb(196 216 235 / .45);
+    border-bottom: 1px solid rgb(196 216 235 / .45);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a:first-child {
+    border-right: 1px solid rgb(196 216 235 / .45);
+  }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a:is(:active, :focus-visible) {
+    background: transparent;
+  }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a small {
+    font-size: 12px;
+    color: #c2cfdb;
+  }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a strong {
+    font-size: clamp(14px, calc(7vw - 10px), 20px);
+    white-space: nowrap;
+  }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a svg {
+    display: block;
+    width: 12px;
+    height: 12px;
+    grid-column: 2;
+    grid-row: 2;
+    align-self: center;
+    color: #c2cfdb;
+    transform: rotate(45deg);
+  }
+}
+
+@media (max-width: 767px) {
+  body.lpc-home .closing-mobile #closing-mobile-title {
+    white-space: nowrap;
+    font-size: clamp(28px, 8.6vw, 60px);
+    min-height: calc(clamp(36px, 10.8vw, 68px) * 2.12);
+  }
+  body.lpc-home .closing-mobile .closing__mountain { height: var(--closing-height, 780px); filter: brightness(.4); translate: 0 -120px; }
+  body.lpc-home .closing-mobile .closing__fallback { height: var(--closing-height, 780px); filter: brightness(.256) saturate(.82); translate: -43% -120px; }
+  body.lpc-home .closing-mobile { height: calc(var(--closing-height, 780px) - 120px); }
+  body.lpc-home .home-footer { padding-top: 0; }
+  body.lpc-home .closing-mobile > .closing__reassurance {
+    position: absolute;
+    z-index: 4;
+    top: var(--reassurance-top, 280px);
+    left: 8px;
+    right: 8px;
+    margin: 0;
+    color: #dce5ee;
+    text-shadow: none;
+  }
+}
