@@ -1,0 +1,268 @@
+(function(){
+  const FALLBACK_AVATAR = "/assets/avatar-placeholder.svg";
+  let hydrated = false;
+  let stylesInjected = false;
+  let pendingStylesInjected = false;
+
+  function targetEls(){
+    return {
+      name: document.getElementById("clusterName") || document.getElementById("headerName"),
+      role: document.getElementById("clusterRole") || document.getElementById("headerRole"),
+      avatar: document.getElementById("clusterAvatar") || document.getElementById("headerAvatar") || document.querySelector(".nav-profile-photo"),
+      badge: document.getElementById("notificationBadge") || document.querySelector("[data-notification-badge]"),
+    };
+  }
+
+  function hasTargets(){
+    const { name, role, avatar, badge } = targetEls();
+    return !!(name || role || avatar || badge);
+  }
+
+  function ensurePendingBannerStyles(){
+    if (pendingStylesInjected) return;
+    pendingStylesInjected = true;
+    const style = document.createElement("style");
+    style.textContent = `
+      .pending-approval-banner{
+        display:flex;
+        align-items:center;
+        gap:12px;
+        padding:12px 16px;
+        margin:0 0 1.25rem;
+        border-radius:12px;
+        background:#fff6e5;
+        border:1px solid #e6cf9a;
+        color:#5b4212;
+        font-size:0.95rem;
+        font-weight:200;
+        box-shadow:0 10px 24px rgba(0,0,0,0.05);
+      }
+      .pending-approval-banner strong{
+        font-family:'Sarabun',sans-serif;
+        font-weight:300;
+        font-size:1.05rem;
+      }
+      .pending-approval-banner.hidden{
+        display:none;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function injectFloatingStyles(){
+    if (stylesInjected) return;
+    stylesInjected = true;
+    const style = document.createElement("style");
+    style.textContent = `
+      #paralegalFloatingCluster{
+        position:fixed;
+        top:16px;
+        right:16px;
+        display:flex;
+        align-items:center;
+        gap:12px;
+        z-index:1200;
+      }
+      #paralegalFloatingCluster .user-profile{
+        display:flex;
+        align-items:center;
+        gap:12px;
+        padding:8px 12px;
+        border-radius:999px;
+        background:rgba(255,255,255,0.6);
+        border:none;
+        backdrop-filter:blur(14px);
+        -webkit-backdrop-filter:blur(14px);
+        transition:border-color .2s ease, box-shadow .2s ease;
+      }
+      #paralegalFloatingCluster .user-profile strong{display:block;font-family:'Sarabun',sans-serif;font-weight:300;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      #paralegalFloatingCluster .user-profile span{display:block;font-size:0.85rem;color:#6b6b6b;font-weight:200;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      #paralegalFloatingCluster img{
+        width:44px;
+        height:44px;
+        border-radius:50%;
+        border:2px solid #fff;
+        object-fit:cover;
+        box-shadow:none;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function mountFloatingCluster(){
+    injectFloatingStyles();
+    if (document.getElementById("paralegalFloatingCluster")) return;
+    const wrap = document.createElement("div");
+    wrap.id = "paralegalFloatingCluster";
+    wrap.setAttribute("data-notification-center","true");
+    wrap.style.position = "fixed";
+    wrap.style.top = "16px";
+    wrap.style.right = "16px";
+    wrap.innerHTML = `
+      <div class="notification-wrapper">
+        <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 01-3.46 0"></path>
+          </svg>
+          <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
+        </button>
+        <div id="notificationPanel" class="notifications-panel notif-panel hidden" role="region" aria-live="polite" data-notification-panel>
+          <div class="notif-header" aria-label="Notifications"></div>
+          <div id="notifList" class="notif-scroll" data-notification-list></div>
+          <div class="notif-empty" data-notification-empty>Loading…</div>
+          <button id="markAllReadBtn" class="notif-markall" type="button" data-notification-mark>Mark All Read</button>
+        </div>
+      </div>
+      <div class="user-profile">
+        <img id="clusterAvatar" class="nav-profile-photo" src="${FALLBACK_AVATAR}" alt="Paralegal avatar" />
+        <div>
+          <strong id="clusterName">Paralegal</strong>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(wrap);
+    window.scanNotificationCenters?.();
+  }
+
+  function formatName(user={}){
+    const combined = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+    return combined || user.name || "Paralegal";
+  }
+
+  function formatRole(user={}){
+    if (user.role) return String(user.role).charAt(0).toUpperCase() + String(user.role).slice(1);
+    return "Paralegal";
+  }
+
+  function isPendingPhoto(user = {}){
+    return (
+      String(user.profilePhotoStatus || "").toLowerCase() === "pending_review" ||
+      Boolean(user.pendingProfileImage)
+    );
+  }
+
+  function applyGlobalAvatars(user = {}) {
+    const avatar = user.pendingProfileImage || user.profileImage || user.avatarURL || "";
+    if (!avatar) return;
+    const targets = document.querySelectorAll("#user-avatar, #headerAvatar, #avatarPreview");
+    targets.forEach((el) => {
+      if (el) el.src = avatar;
+    });
+  }
+
+  function findPendingBannerHost(){
+    return (
+      document.querySelector("main#main") ||
+      document.querySelector("main") ||
+      document.querySelector(".main") ||
+      document.querySelector("[role='main']") ||
+      document.body
+    );
+  }
+
+  function ensurePendingBanner(){
+    let banner = document.getElementById("pendingApprovalBanner");
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.id = "pendingApprovalBanner";
+      banner.className = "pending-approval-banner hidden";
+      banner.setAttribute("role", "status");
+      banner.setAttribute("aria-live", "polite");
+      banner.innerHTML = `
+        <strong>Pending Approval</strong>
+        <span>Your profile photo is under review and visible only to you.</span>
+      `;
+    }
+    if (!banner.parentElement) {
+      const host = findPendingBannerHost();
+      if (host) {
+        const header = Array.from(host.children || []).find((el) => el.tagName === "HEADER");
+        if (header) {
+          header.insertAdjacentElement("afterend", banner);
+        } else {
+          host.insertAdjacentElement("afterbegin", banner);
+        }
+      }
+    }
+    return banner;
+  }
+
+  function renderPendingBanner(user = {}){
+    const isParalegal = String(user.role || "").toLowerCase() === "paralegal";
+    const pending = isParalegal && isPendingPhoto(user);
+    const banner = document.getElementById("pendingApprovalBanner");
+    if (!pending) {
+      if (banner) banner.classList.add("hidden");
+      return;
+    }
+    ensurePendingBannerStyles();
+    ensurePendingBanner().classList.remove("hidden");
+  }
+
+  function renderUserFields(user = {}){
+    const els = targetEls();
+    if (!hasTargets()) return;
+    if (els.name) els.name.textContent = formatName(user);
+    if (els.role) {
+      const roleText = formatRole(user);
+      const pending = isPendingPhoto(user);
+      const displayText = pending
+        ? roleText
+          ? `${roleText} · PENDING`
+          : "PENDING"
+        : roleText;
+      els.role.textContent = displayText;
+      els.role.style.display = displayText ? "" : "none";
+    }
+    const avatar = user.pendingProfileImage || user.profileImage || user.avatarURL || FALLBACK_AVATAR;
+    if (els.avatar && avatar) {
+      els.avatar.src = avatar;
+      els.avatar.alt = `${formatName(user)} avatar`;
+    }
+    if (els.badge) {
+      const count = typeof user.unreadNotifications === "number" ? user.unreadNotifications : 0;
+      const label = count > 9 ? "9+" : String(count || 0);
+      els.badge.textContent = label;
+      els.badge.classList.toggle("show", count > 0);
+    }
+    applyGlobalAvatars(user);
+    renderPendingBanner(user);
+  }
+
+  function hydrate(user={}){
+    renderUserFields(user);
+    hydrated = true;
+    window.__paralegalClusterHydrated = true;
+  }
+
+  function applyStoredUser(){
+    try{
+      const stored = localStorage.getItem("lpc_user");
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === "object") renderUserFields(parsed);
+    }catch(_){}
+  }
+
+  async function loadCluster(){
+    if (hydrated || window.__paralegalClusterHydrated) return;
+    if (!hasTargets()) {
+      mountFloatingCluster();
+    }
+    if (!hasTargets()) return;
+    try{
+      const res = await fetch("/api/users/me", { credentials:"include" });
+      const user = res.ok ? await res.json() : {};
+      hydrate(user || {});
+    }catch(err){
+      hydrate({});
+    }
+  }
+
+  window.hydrateParalegalCluster = hydrate;
+  document.addEventListener("DOMContentLoaded", () => {
+    applyStoredUser();
+    loadCluster();
+  });
+})();

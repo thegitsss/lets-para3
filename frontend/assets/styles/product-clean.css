@@ -1,0 +1,1254 @@
+/* LPC product UI — intentionally plain, compact, and structural. */
+body.lpc-product-clean {
+  --bg: #fff;
+  --panel: #fcfcfc;
+  --sidebar-bg: rgba(245, 245, 245, 0.9);
+  --sidebar-text: #1a1a1a;
+  --ink: #1a1a1a;
+  --muted: #8a8a8a;
+  --line: rgba(0, 0, 0, 0.08);
+  --accent: #b6a47a;
+  --radius: 14px;
+  --app-surface: #fff;
+  --app-surface-contrast: #fff;
+  --app-card-muted: #fcfcfc;
+  --app-border: rgba(0, 0, 0, 0.08);
+  --app-border-soft: rgba(0, 0, 0, 0.06);
+  --app-text: #1a1a1a;
+  --app-muted: #8a8a8a;
+  --lpc-surface-page: #fff;
+  --lpc-surface-panel: #fcfcfc;
+  --lpc-surface-raised: #fff;
+  --lpc-surface-subtle: rgba(0, 0, 0, 0.025);
+  --lpc-border-subtle: rgba(0, 0, 0, 0.08);
+  --lpc-text-primary: #1a1a1a;
+  --lpc-text-secondary: #8a8a8a;
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: var(--clean-surface, #fff) !important;
+  display: flex;
+  min-height: 100vh;
+}
+
+body.lpc-product-clean *,
+body.lpc-product-clean *::before,
+body.lpc-product-clean *::after {
+  text-shadow: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.lpc-product-clean,
+  body.lpc-product-clean *,
+  body.lpc-product-clean *::before,
+  body.lpc-product-clean *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body.lpc-product-clean :where(h1, h2, h3, h4, h5, h6) {
+  color: var(--clean-ink, #1a1a1a) !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav, .authenticated-browse-sidebar) {
+  width: 240px;
+  min-width: 240px;
+  height: 100vh;
+  display: flex;
+  flex: 0 0 248px;
+  flex-direction: column;
+  box-sizing: border-box;
+  position: sticky;
+  top: 0;
+  padding: 24px 16px;
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: var(--clean-surface, rgba(245, 245, 245, 0.9)) !important;
+  background-image: none !important;
+  border-right: 1px solid var(--clean-border, rgba(0, 0, 0, 0.08)) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  overflow-x: hidden;
+  overflow-y: auto;
+  transform: none;
+}
+
+/* Sidebar geometry must not depend on an individual page's reset stylesheet. */
+body.lpc-product-clean :where(.sidebar, #sidebarNav, .authenticated-browse-sidebar),
+body.lpc-product-clean :where(.sidebar, #sidebarNav, .authenticated-browse-sidebar) * {
+  box-sizing: border-box;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav, .authenticated-browse-sidebar)::before {
+  content: none !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .logo {
+  margin: 0 0 36px;
+  color: var(--clean-ink, #1a1a1a) !important;
+  font-size: 1.6rem !important;
+  line-height: 1.25;
+  text-align: center !important;
+  letter-spacing: 0.5px !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .logo.sidebar-profile-host {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 20px;
+  overflow: visible;
+  text-align: center !important;
+}
+
+/* Reserve the final navigation geometry in the initial document. The shared
+   sidebar script replaces this blank icon slot with the real SVG without
+   moving the label. */
+body.lpc-product-clean :where(.sidebar, #sidebarNav, .authenticated-browse-sidebar) nav
+  > :is(a, button):not(.lpc-sidebar-nav-link) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav, .authenticated-browse-sidebar) nav
+  > :is(a, button):not(.lpc-sidebar-nav-link)::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster {
+  position: relative !important;
+  width: auto !important;
+  max-width: calc(100% - 8px) !important;
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  margin: 0 auto !important;
+  padding: 5px 8px 5px 5px !important;
+  border-radius: 7px !important;
+  overflow: visible !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster:hover,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster:focus-visible {
+  background: transparent !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster > :where(.user-chip, .user-profile, .profile-menu) {
+  min-width: 0;
+  width: auto !important;
+  flex: 0 1 auto;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster .profile-menu {
+  position: static !important;
+  width: auto !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster .profile-dropdown {
+  position: absolute !important;
+  top: calc(100% + 8px) !important;
+  right: auto !important;
+  left: 0 !important;
+  width: 200px !important;
+  min-width: 200px !important;
+  max-width: min(220px, calc(100vw - 32px)) !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 2px !important;
+  padding: 5px !important;
+  overflow: hidden !important;
+  z-index: 10000 !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster .profile-dropdown:not(.show) {
+  display: none !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster .profile-dropdown.show {
+  display: flex !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster .profile-dropdown :where(a, button) {
+  width: 100% !important;
+  min-height: 34px !important;
+  display: flex !important;
+  align-items: center !important;
+  margin: 0 !important;
+  padding: 7px 9px !important;
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 5px !important;
+  font-size: 0.82rem !important;
+  line-height: 1.25 !important;
+  text-align: left !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster .profile-dropdown :where(a, button):hover {
+  background: var(--clean-hover, rgba(0, 0, 0, 0.04)) !important;
+}
+
+/* Sidebar account menu: one consistent identity surface across member pages. */
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 0 !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-sidebar-profile-trigger {
+  box-sizing: border-box;
+  width: 100% !important;
+  min-height: 52px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  padding: 8px 10px !important;
+  color: var(--lpc-text-primary) !important;
+  background: var(--lpc-surface-subtle) !important;
+  border: 1px solid transparent !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  text-align: left !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster > .lpc-sidebar-profile-trigger {
+  display: flex !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-sidebar-profile-trigger:hover,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-sidebar-profile-trigger:focus-visible,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-sidebar-profile-trigger[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--lpc-text-primary) 5%, var(--lpc-surface-raised)) !important;
+  border-color: var(--lpc-border-subtle) !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-sidebar-profile-trigger-avatar {
+  width: 36px !important;
+  height: 36px !important;
+  flex: 0 0 36px !important;
+  border: 1px solid var(--lpc-border-subtle) !important;
+  border-radius: 8px !important;
+  background: var(--lpc-surface-subtle) !important;
+  object-fit: cover !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-sidebar-profile-trigger-details {
+  min-width: 0;
+  display: block !important;
+  flex: 1 1 auto;
+  text-align: left !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster .lpc-sidebar-profile-trigger-details {
+  display: block !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-sidebar-profile-trigger-details strong {
+  max-width: none !important;
+  color: var(--lpc-text-primary) !important;
+  font-size: 0.92rem !important;
+  font-weight: 500 !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-profile-trigger-caret {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 150ms ease;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-sidebar-profile-trigger[aria-expanded="true"] .lpc-profile-trigger-caret {
+  transform: rotate(180deg);
+}
+
+body.lpc-product-clean .lpc-sidebar-account-menu {
+  position: fixed !important;
+  inset: auto !important;
+  top: var(--lpc-account-menu-top, 76px) !important;
+  left: var(--lpc-account-menu-left, 16px) !important;
+  box-sizing: border-box !important;
+  width: min(270px, calc(100vw - 24px)) !important;
+  min-width: 0 !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: calc(100vh - 96px) !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  color: var(--lpc-text-primary) !important;
+  background: var(--lpc-surface-raised) !important;
+  border: 1px solid color-mix(in srgb, var(--lpc-text-primary) 15%, transparent) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 18px 42px rgba(17, 24, 39, 0.16) !important;
+  z-index: 4000 !important;
+}
+
+body.lpc-product-clean .lpc-sidebar-account-menu:not(.show) {
+  display: none !important;
+}
+
+body.lpc-product-clean .lpc-sidebar-account-menu.show {
+  display: flex !important;
+}
+
+body.lpc-product-clean .lpc-account-menu-identity {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 18px 18px 14px;
+  text-align: center;
+}
+
+body.lpc-product-clean .lpc-account-menu-avatar {
+  width: 42px !important;
+  height: 42px !important;
+  border: 1px solid var(--lpc-border-subtle) !important;
+  border-radius: 9px !important;
+  background: var(--lpc-surface-subtle) !important;
+  box-shadow: none !important;
+  object-fit: cover !important;
+}
+
+body.lpc-product-clean .lpc-account-menu-product {
+  display: block;
+  color: var(--lpc-text-primary) !important;
+  font-family: "Sarabun", sans-serif !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+body.lpc-product-clean .lpc-account-menu-section {
+  display: grid;
+  gap: 2px;
+  padding: 4px 12px 6px;
+}
+
+body.lpc-product-clean .lpc-account-menu-secondary {
+  padding-top: 6px;
+  padding-bottom: 8px;
+}
+
+body.lpc-product-clean .lpc-account-menu-divider {
+  height: 1px;
+  flex: 0 0 1px;
+  background: color-mix(in srgb, var(--lpc-text-primary) 14%, transparent);
+}
+
+body.lpc-product-clean .lpc-sidebar-account-menu .lpc-account-menu-item {
+  box-sizing: border-box;
+  width: 100% !important;
+  min-height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 11px !important;
+  margin: 0 !important;
+  padding: 7px 9px !important;
+  color: var(--lpc-text-primary) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  box-shadow: none !important;
+  font-size: 14.5px !important;
+  font-weight: 300 !important;
+  line-height: 1.25 !important;
+  text-align: left !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+}
+
+body.lpc-product-clean .lpc-sidebar-account-menu :where(a, button).lpc-account-menu-item:hover,
+body.lpc-product-clean .lpc-sidebar-account-menu :where(a, button).lpc-account-menu-item:focus-visible {
+  background: color-mix(in srgb, var(--lpc-text-primary) 5%, transparent) !important;
+  outline: none !important;
+}
+
+body.lpc-product-clean .lpc-account-menu-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  fill: none;
+  stroke: color-mix(in srgb, var(--lpc-text-primary) 74%, var(--lpc-surface-raised));
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+body.lpc-product-clean .lpc-account-menu-label {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: inherit !important;
+  font-size: inherit !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.lpc-product-clean .lpc-account-menu-trailing-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  margin-left: auto;
+  fill: none;
+  stroke: color-mix(in srgb, var(--lpc-text-primary) 74%, var(--lpc-surface-raised));
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+body.lpc-product-clean .lpc-account-menu-user {
+  cursor: pointer;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) nav {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) nav :where(a, button),
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-link,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) #logoutBtn {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 !important;
+  padding: 10px 14px !important;
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  font-size: 0.92rem !important;
+  line-height: 1.25;
+  text-align: left;
+  text-decoration: none;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) nav :where(a, button):hover,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) nav :where(a, button):focus-visible,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) #logoutBtn:hover,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) #logoutBtn:focus-visible {
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: var(--clean-hover, rgba(0, 0, 0, 0.04)) !important;
+  outline: none !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) nav :where(a, button).active,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) nav a[aria-current='page'] {
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: var(--clean-hover, rgba(0, 0, 0, 0.04)) !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-nav-icon {
+  width: 19px !important;
+  height: 19px !important;
+  flex: 0 0 19px !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  opacity: 0.92;
+  stroke-width: 1.5 !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-sidebar-section-label {
+  margin: 20px 12px 7px;
+  color: var(--clean-muted, #707070);
+  font-size: 0.76rem !important;
+  line-height: 1.2;
+}
+
+body.lpc-product-clean .sidebar-bottom,
+body.lpc-product-clean .sidebar > #logoutBtn {
+  margin-top: auto !important;
+}
+
+body.lpc-product-clean .sidebar-bottom {
+  width: 100%;
+  display: flex !important;
+  flex: 0 0 auto !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+}
+
+body.lpc-product-clean :where(.content, .main, .case-main, .page-shell) {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+body.lpc-product-clean .page-shell {
+  max-width: none;
+  margin: 0;
+  box-shadow: none !important;
+}
+
+body.lpc-product-clean.authenticated-browse .authenticated-browse-sidebar {
+  position: sticky !important;
+  inset: auto !important;
+  top: 0 !important;
+  z-index: 300;
+}
+
+body.lpc-product-clean.authenticated-browse .browse-page-shell {
+  width: auto !important;
+  min-width: 0;
+  flex: 1 1 auto;
+  margin-left: 0 !important;
+}
+
+body.lpc-product-clean.lpc-auth-resource-page {
+  flex-direction: row !important;
+  overflow: hidden;
+}
+
+body.lpc-product-clean.lpc-auth-resource-page .browse-page-shell {
+  width: auto;
+  min-width: 0;
+  height: 100vh;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+body.lpc-product-clean.lpc-auth-resource-page .site-header {
+  display: none !important;
+}
+
+body.lpc-product-clean .lpc-mobile-menu-icon {
+  width: 18px;
+  height: 12px;
+  display: block;
+  border-top: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  position: relative;
+}
+
+body.lpc-product-clean .lpc-mobile-menu-icon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  border-top: 1.5px solid currentColor;
+  transform: translateY(-50%);
+}
+
+body.lpc-product-clean .sidebar-footer {
+  margin-top: 0 !important;
+  color: var(--clean-muted, #707070) !important;
+  font-size: 0.68rem !important;
+  line-height: 1.3 !important;
+  text-align: center !important;
+}
+
+body.lpc-product-clean .sidebar-bottom #logoutBtn {
+  flex: 0 0 auto !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  padding: 7px 10px !important;
+  color: var(--clean-muted, #8a8a8a) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  font-size: 0.82rem !important;
+  text-align: center !important;
+}
+
+body.lpc-product-clean .sidebar-bottom #logoutBtn:hover,
+body.lpc-product-clean .sidebar-bottom #logoutBtn:focus-visible {
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: transparent !important;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+body.lpc-product-clean :where(.main, .case-main) {
+  color: var(--clean-ink, #1a1a1a);
+  background: var(--clean-surface, #fff) !important;
+  background-image: none !important;
+}
+
+body.lpc-product-clean :where(.topbar, .case-topbar) {
+  background: var(--clean-surface, #fff) !important;
+  background-image: none !important;
+  border-color: var(--clean-border, rgba(0, 0, 0, 0.06)) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.lpc-product-clean :where(.user-chip, .user-profile) {
+  min-height: 42px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  padding: 3px 7px 3px 3px !important;
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.lpc-product-clean :where(.user-chip, .user-profile) img {
+  width: 36px !important;
+  height: 36px !important;
+  flex: 0 0 36px !important;
+  border: 1px solid var(--clean-border, rgba(0, 0, 0, 0.08)) !important;
+  border-radius: 50% !important;
+  box-shadow: none !important;
+  object-fit: cover !important;
+}
+
+body.lpc-product-clean :where(.user-chip, .user-profile) strong {
+  display: block !important;
+  max-width: 170px;
+  overflow: hidden;
+  color: var(--clean-ink, #1a1a1a) !important;
+  font-size: 0.84rem !important;
+  line-height: 1.25;
+  letter-spacing: 0 !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster :where(.user-chip, .user-profile) > div:not(.profile-dropdown) {
+  text-align: center !important;
+}
+
+body.lpc-product-clean :where(.user-chip, .user-profile) span:not(.notification-badge) {
+  color: var(--clean-muted, #8a8a8a) !important;
+  font-size: 0.72rem !important;
+}
+
+body.lpc-product-clean :where(.profile-dropdown, [data-profile-menu]) {
+  min-width: 200px !important;
+  padding: 5px !important;
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: var(--clean-surface, #fff) !important;
+  border: 1px solid var(--clean-border, rgba(0, 0, 0, 0.08)) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 12px 28px rgba(17, 24, 39, 0.12) !important;
+}
+
+body.lpc-product-clean :where(.profile-dropdown, [data-profile-menu]) :where(a, button) {
+  min-height: 34px;
+  margin: 0 !important;
+  padding: 7px 9px !important;
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 5px !important;
+  font-size: 0.82rem !important;
+  text-align: left !important;
+}
+
+body.lpc-product-clean :where(.profile-dropdown, [data-profile-menu]) :where(a, button):hover {
+  background: var(--clean-hover, rgba(0, 0, 0, 0.04)) !important;
+}
+
+body.lpc-product-clean :where(
+  .card,
+  .panel,
+  .summary,
+  .tips,
+  form,
+  .case-workspace,
+  .case-overview-panel,
+  .metric-card,
+  .stats-card,
+  .overview-card,
+  .matter-card,
+  .applicant-card,
+  .case-card,
+  .settings-card,
+  .modal-card,
+  .payment-modal-content
+) {
+  background: var(--clean-panel, #fcfcfc) !important;
+  background-image: none !important;
+  border-color: var(--clean-border, rgba(0, 0, 0, 0.08)) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.lpc-product-clean :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]),
+  select,
+  textarea
+) {
+  min-height: 38px;
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: var(--clean-surface, #fff) !important;
+  background-image: none !important;
+  border: 1px solid var(--clean-border, rgba(0, 0, 0, 0.12)) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  font-size: 0.88rem !important;
+}
+
+/* Assistant composer owns the field border; its textarea must remain visually bare. */
+body.lpc-product-clean .support-composer {
+  padding: 12px 14px 13px !important;
+  background: var(--clean-surface, #fff) !important;
+  border-top: 1px solid var(--clean-border, rgba(0, 0, 0, 0.08)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.lpc-product-clean .support-composer-shell {
+  position: relative !important;
+  min-height: 50px !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  padding: 9px 46px 9px 12px !important;
+  overflow: hidden !important;
+  background: var(--clean-surface, #fff) !important;
+  border: 1px solid var(--clean-border, rgba(0, 0, 0, 0.12)) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+body.lpc-product-clean .support-composer-shell:focus-within {
+  border-color: #b6a47a !important;
+  box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.14) !important;
+}
+
+body.lpc-product-clean .support-composer textarea {
+  min-height: 30px !important;
+  max-height: 120px !important;
+  padding: 5px 0 !important;
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+  resize: none !important;
+  font-size: 0.88rem !important;
+  line-height: 1.45 !important;
+}
+
+body.lpc-product-clean .support-composer-prompt {
+  left: 12px !important;
+  right: 48px !important;
+  top: 14px !important;
+  color: var(--clean-muted, #676f78) !important;
+  font-size: 0.88rem !important;
+  line-height: 1.45 !important;
+}
+
+body.lpc-product-clean .support-send {
+  right: 8px !important;
+  bottom: 8px !important;
+  width: 34px !important;
+  height: 34px !important;
+  color: #fff !important;
+  background: #1a1a1a !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+body.lpc-product-clean .support-send:disabled {
+  color: #9ca3af !important;
+  background: #f0f1f3 !important;
+}
+
+body.lpc-product-clean .support-composer-hint {
+  margin: 7px 2px 0 !important;
+  color: var(--clean-muted, #676f78) !important;
+  font-size: 0.75rem !important;
+}
+
+body.lpc-product-clean :where(input, select, textarea):focus {
+  border-color: #b6a47a !important;
+  box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.14) !important;
+  outline: none !important;
+}
+
+body.lpc-product-clean :where(
+  .btn,
+  .primary-btn,
+  .secondary-btn,
+  .ghost-btn,
+  .add-btn,
+  .case-action-btn,
+  .pill-btn,
+  .type-btn
+) {
+  min-height: 36px;
+  padding: 7px 11px !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  font-size: 0.84rem !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  transform: none !important;
+}
+
+body.lpc-product-clean :where(.btn, .secondary-btn, .ghost-btn, .case-action-btn, .pill-btn, .type-btn) {
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: var(--clean-surface, #fff) !important;
+  border: 1px solid var(--clean-border, rgba(0, 0, 0, 0.12)) !important;
+}
+
+body.lpc-product-clean :where(.btn.primary, .primary-btn, .add-btn) {
+  color: #1a1a1a !important;
+  background: #b6a47a !important;
+  border: 1px solid #b6a47a !important;
+}
+
+body.lpc-product-clean :where(.btn, .primary-btn, .secondary-btn, .ghost-btn, .add-btn, .case-action-btn, .pill-btn, .type-btn):hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+body.lpc-product-clean :where([class*='glass'], [class*='gradient']) {
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.lpc-product-clean :where(.matter-tabs, .tabs, [role='tablist']) {
+  border-color: var(--clean-border, rgba(0, 0, 0, 0.08)) !important;
+}
+
+body.lpc-product-clean :where(.matter-tabs button, [role='tab']) {
+  color: var(--clean-muted, #676f78) !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+body.lpc-product-clean :where(.matter-tabs button, [role='tab'])[aria-selected='true'] {
+  color: var(--clean-ink, #1a1a1a) !important;
+}
+
+body.lpc-product-clean :where(hr) {
+  border: 0;
+  border-top: 1px solid var(--clean-border, rgba(0, 0, 0, 0.06));
+}
+
+body.lpc-product-clean :where(.modal, [role='dialog']) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.lpc-product-clean :where(.modal-card, [role='dialog'] > div) {
+  box-shadow: 0 18px 44px rgba(17, 24, 39, 0.16) !important;
+}
+
+@media (max-width: 900px) {
+  body.lpc-product-clean .case-rail-header select {
+    min-height: 44px;
+  }
+
+  body.lpc-product-clean :where(.sidebar, #sidebarNav) {
+    width: min(280px, 86vw);
+    min-width: 0;
+    flex-basis: auto;
+    position: fixed;
+    z-index: 2000;
+    padding: 76px 18px 20px;
+    transform: translateX(-110%);
+  }
+
+  body.lpc-product-clean.nav-open :where(.sidebar, #sidebarNav) {
+    transform: translateX(0);
+  }
+
+  body.lpc-product-clean.authenticated-browse .authenticated-browse-sidebar {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+  }
+
+  body.lpc-product-clean.lpc-auth-resource-page {
+    overflow: auto;
+  }
+
+  body.lpc-product-clean :where(.user-chip, .user-profile) > div:not(.profile-dropdown) {
+    display: none !important;
+  }
+
+  body.lpc-product-clean :where(.sidebar, #sidebarNav) .sidebar-profile-cluster > :where(.user-chip, .user-profile, .profile-menu) {
+    display: block !important;
+  }
+}
+
+/* Approved LPC light visual contract. Cormorant's bundled 300 face is the
+   sole exception to the 250 ceiling; all product UI text uses real Sarabun 200. */
+body.lpc-product-clean,
+body.lpc-product-clean :where(*) {
+  font-family: "Sarabun", sans-serif !important;
+  font-weight: 200 !important;
+}
+
+body.lpc-product-clean :where(h1, h2, h3, h4, h5, h6, .logo, .lpc-brand-name),
+body.lpc-product-clean :where(h1, h2, h3, h4, h5, h6) :where(*),
+body.lpc-product-clean .view-home header h1,
+body.lpc-product-clean .view-home header h1 :where(*) {
+  font-family: "Cormorant Garamond", serif !important;
+  font-weight: 300 !important;
+}
+
+/* Authenticated attorney/paralegal workspaces use Stripe-style display type
+   for hierarchy and emphasis. Public-facing typography remains unchanged. */
+body.lpc-product-clean:is(
+  .lpc-role-dashboard,
+  .lpc-auth-resource-page,
+  .authenticated-browse,
+  .attorney-classic,
+  .paralegal-flat
+) {
+  --lpc-dashboard-heading-font: "Söhne", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: var(--lpc-dashboard-heading-font);
+}
+
+body.lpc-product-clean:is(
+  .lpc-role-dashboard,
+  .lpc-auth-resource-page,
+  .authenticated-browse,
+  .attorney-classic,
+  .paralegal-flat
+) :where(h1, h2, h3, h4, h5, h6, .logo, .lpc-brand-name),
+body.lpc-product-clean:is(
+  .lpc-role-dashboard,
+  .lpc-auth-resource-page,
+  .authenticated-browse,
+  .attorney-classic,
+  .paralegal-flat
+) :where(h1, h2, h3, h4, h5, h6) :where(*),
+body.lpc-product-clean:is(
+  .lpc-role-dashboard,
+  .lpc-auth-resource-page,
+  .authenticated-browse,
+  .attorney-classic,
+  .paralegal-flat
+) .view-home header h1,
+body.lpc-product-clean:is(
+  .lpc-role-dashboard,
+  .lpc-auth-resource-page,
+  .authenticated-browse,
+  .attorney-classic,
+  .paralegal-flat
+) .view-home header h1 :where(*) {
+  font-family: var(--lpc-dashboard-heading-font) !important;
+  font-weight: 400 !important;
+  font-feature-settings: "ss01" 1;
+  letter-spacing: 0;
+}
+
+body.lpc-product-clean:is(
+  .lpc-role-dashboard,
+  .lpc-auth-resource-page,
+  .authenticated-browse,
+  .attorney-classic,
+  .paralegal-flat
+) :where(strong, b) {
+  font-family: var(--lpc-dashboard-heading-font) !important;
+  font-weight: 500 !important;
+  font-feature-settings: "ss01" 1;
+}
+
+body.lpc-product-clean {
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: var(--clean-surface, #ffffff) !important;
+}
+
+body.lpc-product-clean :where(main, .main, .main-content, .content, .dashboard-main, .dashboard-content) {
+  background-color: var(--clean-page, #ffffff) !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) {
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: var(--clean-surface, rgba(245, 245, 245, 0.9)) !important;
+  border-right-color: var(--clean-border, rgba(0, 0, 0, 0.08)) !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) nav :where(a, button):hover,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) nav :where(a, button):focus-visible,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) nav :where(a, button).active,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) nav a[aria-current="page"] {
+  color: var(--clean-ink, #1a1a1a) !important;
+  background: var(--clean-hover, rgba(0, 0, 0, 0.04)) !important;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls :where(.notification-icon, .support-launcher),
+body.lpc-product-clean .lpc-universal-header-controls :where(.notification-icon, .support-launcher):hover,
+body.lpc-product-clean .lpc-universal-header-controls :where(.notification-icon, .support-launcher):focus-visible {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Keep sidebar identity and selection lightweight: structure and typography
+   carry the state without gray tiles or floating-card treatment. */
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-sidebar-profile-trigger,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-sidebar-profile-trigger:hover,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-sidebar-profile-trigger:focus-visible,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) .lpc-sidebar-profile-trigger[aria-expanded="true"] {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.lpc-product-clean :where(.sidebar, #sidebarNav) nav :where(a, button).active,
+body.lpc-product-clean :where(.sidebar, #sidebarNav) nav a[aria-current="page"] {
+  color: var(--clean-link, #4772bc) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+}
+
+body.lpc-product-clean .lpc-universal-header-controls :where(.notification-icon, .support-launcher):hover,
+body.lpc-product-clean .lpc-universal-header-controls :where(.notification-icon, .support-launcher):focus-visible {
+  opacity: 0.78;
+  transform: translateY(-1px);
+}
+
+body.lpc-product-clean .sidebar-footer {
+  font-family: "Sarabun", sans-serif !important;
+  font-weight: 200 !important;
+}
+
+@media (max-width: 1024px) {
+  body.lpc-product-clean.lpc-auth-shell-v2 :where(.sidebar, #sidebarNav, .authenticated-browse-sidebar) {
+    width: min(280px, 86vw) !important;
+    min-width: 0 !important;
+    height: 100vh !important;
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    z-index: 2000 !important;
+    padding: 76px 18px 20px !important;
+    transform: translateX(-110%) !important;
+    transition: transform 180ms ease !important;
+    box-shadow: none !important;
+  }
+
+  body.lpc-product-clean.lpc-auth-shell-v2.nav-open :where(.sidebar, #sidebarNav, .authenticated-browse-sidebar) {
+    transform: translateX(0) !important;
+  }
+
+  body.lpc-product-clean.lpc-auth-shell-v2 .sidebar-toggle {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: fixed !important;
+    top: 12px !important;
+    left: 12px !important;
+    z-index: 2300 !important;
+  }
+
+  body.lpc-product-clean.lpc-auth-shell-v2 .sidebar-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 1900 !important;
+  }
+
+  body.lpc-product-clean.lpc-auth-shell-v2.nav-open .sidebar-backdrop {
+    display: block !important;
+  }
+
+  body.lpc-product-clean:is(
+    .lpc-role-dashboard,
+    .lpc-auth-resource-page,
+    .authenticated-browse,
+    .attorney-classic,
+    .paralegal-flat
+  ) :where(.sidebar, #sidebarNav, .authenticated-browse-sidebar) {
+    padding: 76px 18px 20px !important;
+  }
+}
+
+@media (max-width: 1024px) and (prefers-reduced-motion: reduce) {
+  body.lpc-product-clean.lpc-auth-shell-v2 :where(.sidebar, #sidebarNav, .authenticated-browse-sidebar) {
+    transition: none !important;
+  }
+}
+
+/* Authenticated Stripe-style layout shell. This intentionally stops at
+   signed-in surfaces so public LPC typography and branding remain unchanged. */
+body.lpc-product-clean:is(
+  .lpc-role-dashboard,
+  .lpc-auth-resource-page,
+  .authenticated-browse,
+  .attorney-classic,
+  .paralegal-flat
+) {
+  --ink: #1a1f36;
+  --muted: #667085;
+  --line: #e3e8ee;
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #1a1f36;
+  --panel: #ffffff;
+  --radius: 8px;
+  --app-text: #1a1f36;
+  --app-muted: #667085;
+  --app-border: #e3e8ee;
+  --app-border-soft: #eef1f4;
+  --lpc-text-primary: #1a1f36;
+  --lpc-text-secondary: #667085;
+  --lpc-border-subtle: #e3e8ee;
+  --lpc-surface-panel: #ffffff;
+  --lpc-surface-subtle: #f6f8fa;
+  color: var(--clean-ink, #1a1f36) !important;
+}
+
+body.lpc-product-clean:is(
+  .lpc-role-dashboard,
+  .lpc-auth-resource-page,
+  .authenticated-browse,
+  .attorney-classic,
+  .paralegal-flat
+) :where(.sidebar, #sidebarNav, .authenticated-browse-sidebar) {
+  width: 230px;
+  min-width: 230px;
+  flex-basis: 230px;
+  padding: 16px 14px 18px;
+  background: var(--clean-surface, #ffffff) !important;
+  border-right-color: var(--clean-border, #e3e8ee) !important;
+}
+
+body.lpc-product-clean:is(
+  .lpc-role-dashboard,
+  .lpc-auth-resource-page,
+  .authenticated-browse,
+  .attorney-classic,
+  .paralegal-flat
+) :where(.sidebar, #sidebarNav, .authenticated-browse-sidebar) nav {
+  gap: 2px !important;
+}
+
+body.lpc-product-clean:is(
+  .lpc-role-dashboard,
+  .lpc-auth-resource-page,
+  .authenticated-browse,
+  .attorney-classic,
+  .paralegal-flat
+) :where(.sidebar, #sidebarNav, .authenticated-browse-sidebar) nav :where(a, button) {
+  min-height: 36px;
+  padding: 8px 10px !important;
+  border-radius: 6px !important;
+  font-size: 0.875rem !important;
+}
+
+body.lpc-product-clean:is(
+  .lpc-role-dashboard,
+  .lpc-auth-resource-page,
+  .authenticated-browse,
+  .attorney-classic,
+  .paralegal-flat
+) :where(.sidebar, #sidebarNav) .lpc-sidebar-profile-trigger {
+  min-height: 46px !important;
+  padding: 6px 8px !important;
+  border-radius: 8px !important;
+}
+
+body.lpc-product-clean:is(
+  .lpc-role-dashboard,
+  .lpc-auth-resource-page,
+  .authenticated-browse,
+  .attorney-classic,
+  .paralegal-flat
+) :where(
+  .panel,
+  .home-panel,
+  .info-box,
+  .case-card,
+  .note-modal-card,
+  .modal-card,
+  .onboarding-attention-card,
+  .status-rail-shell,
+  [data-notification-panel]
+) {
+  border-radius: 8px !important;
+  border-color: var(--clean-border, #e3e8ee) !important;
+  box-shadow: none !important;
+}
+
+/* One neutral palette for the reachable authenticated documents. Fallbacks in
+   the rules above preserve their existing light treatment; saved dark mode
+   must also reach styles that previously hard-coded light surfaces. */
+body.lpc-product-clean.theme-dark:is(.lpc-role-dashboard, .lpc-auth-resource-page, .authenticated-browse, .attorney-classic, .paralegal-flat, .lpc-auth-shell-v2) {
+  color-scheme: dark;
+  --clean-page: #0f172a;
+  --clean-surface: #111b2b;
+  --clean-panel: #151f30;
+  --clean-ink: #eef3f9;
+  --clean-muted: #aebbd0;
+  --clean-border: #35435a;
+  --clean-hover: #1b2b42;
+  --clean-link: #9bbcf2;
+  --clean-success: #9dddac;
+  --clean-danger: #ffb6ad;
+  --bg: var(--clean-page);
+  --panel: var(--clean-surface);
+  --sidebar-bg: var(--clean-surface);
+  --sidebar-text: var(--clean-ink);
+  --ink: var(--clean-ink);
+  --muted: var(--clean-muted);
+  --line: var(--clean-border);
+  --app-surface: var(--clean-surface);
+  --app-surface-contrast: var(--clean-surface);
+  --app-card-muted: var(--clean-panel);
+  --app-border: var(--clean-border);
+  --app-border-soft: var(--clean-border);
+  --app-text: var(--clean-ink);
+  --app-muted: var(--clean-muted);
+  --lpc-surface-canvas: var(--clean-page);
+  --lpc-surface-page: var(--clean-page);
+  --lpc-surface-panel: var(--clean-surface);
+  --lpc-surface-raised: var(--clean-surface);
+  --lpc-surface-subtle: var(--clean-hover);
+  --lpc-border-subtle: var(--clean-border);
+  --lpc-text-primary: var(--clean-ink);
+  --lpc-text-secondary: var(--clean-muted);
+  --lpc-accent-soft: var(--clean-hover);
+  background: var(--clean-page) !important;
+}
+
+body.lpc-product-clean #securitySection .password-field-label {
+  display: block;
+  color: var(--ink);
+  font-size: .875rem;
+  line-height: 1.4;
+}
+
+body.lpc-product-clean #securitySection .security-card > .password-field-label {
+  margin-bottom: -8px;
+}
+
+body.lpc-product-clean #securitySection .password-grid .password-field-label {
+  margin-bottom: 8px;
+}

@@ -1,0 +1,5846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/global-search.css?v=20260831-3" />
+  <link rel="stylesheet" href="assets/styles/context-panel.css?v=20260812-paralegal-heading" />
+  <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
+  <link rel="preload" as="font" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Account Settings – Let’s-ParaConnect</title>
+
+  <script>
+    (function () {
+      const root = document.documentElement;
+      root.classList.add("js");
+      try {
+        const raw = localStorage.getItem("lpc_user");
+        if (!raw) return;
+        const user = JSON.parse(raw);
+        const role = String(user?.role || "").toLowerCase();
+        if (role === "attorney" || role === "paralegal") root.classList.add(`role-${role}`);
+        const storedTheme = String(user?.preferences?.theme || "").toLowerCase();
+        const theme = storedTheme === "dark" || /dark$/i.test(storedTheme) ? "dark" : "light";
+        root.classList.add(`theme-${theme}`);
+        if (theme === "dark") {
+          root.style.backgroundColor = "#0f172a";
+          root.style.color = "#f4f6fb";
+          root.style.setProperty("--bg", "#0f172a");
+        }
+      } catch (_) {}
+    })();
+  </script>
+  <script src="assets/scripts/utils/session.js?v=20260902-1"></script>
+  <script src="assets/scripts/auth.js" type="module"></script>
+  <style>
+    html.role-paralegal [data-attorney-only],
+    html.role-attorney [data-paralegal-only],
+    html:not(.role-paralegal):not(.role-attorney) [data-paralegal-only],
+    html:not(.role-paralegal):not(.role-attorney) [data-attorney-only] {
+      display: none !important;
+    }
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      clip-path: inset(50%);
+      border: 0;
+      white-space: nowrap;
+    }
+
+    .gold{color:#b4975a;}
+    :root {
+      --bg: #ffffff;
+      --sidebar-bg: #f5f5f5e6;
+      --panel: #fcfcfc;
+      --accent: #b6a47a;
+      --accent-dark: #9c8a63;
+      --ink: #1a1a1a;
+      --muted: #6b6b6b;
+      --line: rgba(0, 0, 0, 0.08);
+      --sidebar-text: #1a1a1a;
+      --danger: #c0392b;
+      --danger-dark: #962d22;
+      --radius: 14px;
+      --font-serif: 'Sarabun', sans-serif;
+      --font-sans: 'Sarabun', sans-serif;
+    }
+
+    html.theme-dark,
+    html.theme-dark body,
+    body.theme-dark {
+      --bg: #0f172a;
+      --sidebar-bg: #1c2333;
+      --panel: #151b29;
+      --ink: #f4f6fb;
+      --muted: #9aa7c4;
+      --line: rgba(255, 255, 255, 0.08);
+      --sidebar-text: #f8fbff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-weight: 200;
+      line-height: 1.15;
+      font-synthesis: none;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+    }
+
+    .sidebar {
+      width: 240px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--line);
+      padding: 32px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      font-family: var(--font-sans);
+      font-weight: 200;
+      color: var(--sidebar-text);
+    }
+
+    .sidebar-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      position: relative;
+      z-index: 2100;
+    }
+
+    .sidebar-toggle-icon {
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
+
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 1900;
+    }
+
+    .sidebar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: transparent;
+      pointer-events: none;
+      transition: background 0.3s ease;
+    }
+
+    .logo {
+      font-family: var(--font-serif);
+      font-size: 1.5rem;
+      text-align: center;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+    }
+
+    .settings-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .settings-nav button {
+      border: none;
+      background: transparent;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      text-align: left;
+      font-size: 0.95rem;
+      color: var(--sidebar-text);
+      transition: background 0.2s ease, color 0.2s ease;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: inherit;
+    }
+
+    .settings-nav button.active,
+    .settings-nav button:hover {
+      background: rgba(0, 0, 0, 0.05);
+      color: var(--ink);
+    }
+
+    .settings-section {
+      display: none;
+    }
+
+    .settings-section.active {
+      display: block;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .settings-item {
+      width: 100%;
+      padding: 14px 20px;
+      text-align: left;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 1.05rem;
+    }
+
+    .settings-item.active {
+      background: rgba(0, 0, 0, 0.06);
+      border-radius: 12px;
+    }
+
+    .content {
+      flex: 1;
+      padding: 28px 40px 40px;
+      overflow-y: auto;
+      background: var(--bg);
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      margin-bottom: 18px;
+      padding: 0 28px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 0;
+      align-items: center;
+      gap: 1.5rem;
+      position: relative;
+      z-index: 3;
+      pointer-events: auto;
+      min-height: 0;
+      flex: 0 0 auto;
+    }
+    .topbar .lpc-shared-header {
+      margin-bottom: 0;
+      align-items: center;
+    }
+    .header-skeleton {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    html.has-user-cache .header-skeleton {
+      display: none;
+    }
+    .skeleton-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(90deg, #e9edf3 0%, #f5f7fb 50%, #e9edf3 100%);
+      background-size: 200% 100%;
+      animation: skeletonShimmer 1.4s ease infinite;
+    }
+    .skeleton-line {
+      height: 12px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #e9edf3 0%, #f5f7fb 50%, #e9edf3 100%);
+      background-size: 200% 100%;
+      animation: skeletonShimmer 1.4s ease infinite;
+    }
+    .skeleton-line.short { width: 40%; }
+    .skeleton-line.medium { width: 60%; }
+    .skeleton-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 120px;
+    }
+    @keyframes skeletonShimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    @keyframes onboardingPulse {
+      0% { box-shadow: 0 0 0 0 rgba(182, 164, 122, 0.35); }
+      70% { box-shadow: 0 0 0 12px rgba(182, 164, 122, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(182, 164, 122, 0); }
+    }
+    .onboarding-pulse {
+      position: relative;
+      box-shadow: 0 0 0 0 rgba(182, 164, 122, 0.35);
+      animation: onboardingPulse 1.6s ease-out 2;
+    }
+
+    .unified-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0;
+      position: relative;
+      flex: 1 1 auto;
+    }
+
+
+    .unified-header .title-block {
+      max-width: 520px;
+    }
+
+    .unified-header h1 {
+      font-family: var(--font-serif);
+      font-size: 2.4rem;
+      margin-bottom: 8px;
+      font-weight: 300;
+    }
+
+    .unified-header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .lpc-shared-header .user-chip strong {
+      font-weight: 300 !important;
+    }
+
+    .topbar .lpc-shared-header {
+      margin-bottom: 0;
+      align-items: center;
+    }
+
+    .settings-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 28px;
+      margin-bottom: 28px;
+      display: none;
+      color: var(--ink);
+    }
+
+    .settings-panel.active {
+      display: block;
+    }
+
+    .scroll-indicator {
+      position: fixed;
+      right: 28px;
+      bottom: 28px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.82);
+      color: var(--muted);
+      font-size: 0.82rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      z-index: 1200;
+    }
+
+    .scroll-indicator.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .scroll-indicator svg {
+      width: 14px;
+      height: 14px;
+      animation: scrollCueDrift 1.35s ease-in-out 3;
+    }
+
+    @keyframes scrollCueDrift {
+      0%, 100% { transform: translateY(0); opacity: 0.78; }
+      50% { transform: translateY(4px); opacity: 1; }
+    }
+
+    body.theme-dark .scroll-indicator,
+    html.theme-dark .scroll-indicator {
+      background: rgba(15, 23, 42, 0.78);
+    }
+
+    body.theme-dark .sidebar-link,
+    body.theme-dark .settings-nav button {
+      color: #f8fbff;
+    }
+
+    body.theme-dark .settings-nav button.active,
+    body.theme-dark .settings-nav button:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #f8fbff;
+    }
+
+    body.theme-dark .settings-panel,
+    body.theme-dark .role-settings .settings-section {
+      background: rgba(20, 25, 38, 0.9);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    body.theme-dark input,
+    body.theme-dark textarea,
+    body.theme-dark select {
+      background: rgba(10, 14, 24, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #f8fbff;
+    }
+
+    body.theme-dark #attorneySettings .form-field input,
+    body.theme-dark #attorneySettings .form-field textarea,
+    body.theme-dark #paralegalSettings input,
+    body.theme-dark #paralegalSettings textarea,
+    body.theme-dark #paralegalSettings select {
+      background: rgba(10, 14, 24, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f8fbff;
+      font-weight: 300;
+    }
+
+    body.theme-dark input::placeholder,
+    body.theme-dark textarea::placeholder,
+    body.theme-dark select option {
+      color: rgba(248, 251, 255, 0.65);
+    }
+
+    body.theme-dark .dropdown-panel {
+      background: var(--panel);
+      border-color: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.45);
+    }
+
+    body.theme-dark .dropdown-summary .chip {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--ink);
+    }
+
+    body.theme-dark .chip-remove:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    body.theme-dark .dropdown-option.selected {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    body.theme-dark .dropdown-toggle,
+    body.theme-dark .dropdown-search {
+      background: var(--panel);
+      color: var(--ink);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    body.theme-dark .dropdown-option:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    body.theme-dark .dropdown-option input[type="checkbox"],
+    body.theme-dark input[type="checkbox"] {
+      background: rgba(10, 14, 24, 0.85);
+      border-color: rgba(255, 255, 255, 0.28);
+    }
+
+    body.theme-dark #securitySection .two-factor-codes {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    body.theme-dark #securitySection .two-factor-codes code {
+      background: rgba(10, 14, 24, 0.85);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: var(--ink);
+    }
+
+    body.theme-dark .slider {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    body.theme-dark .slider:before {
+      background: #f4f6fb;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    }
+
+    body.theme-dark .profile-tour-tooltip {
+      background: var(--panel);
+      color: var(--ink);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 18px 38px rgba(0, 0, 0, 0.45);
+    }
+
+    body.theme-dark .profile-tour-tooltip.arrow-left::after {
+      border-color: transparent var(--panel) transparent transparent;
+    }
+
+    body.theme-dark .profile-tour-tooltip.arrow-right::after {
+      border-color: transparent transparent transparent var(--panel);
+    }
+
+    body.theme-dark .profile-tour-tooltip.arrow-top::after {
+      border-color: transparent transparent var(--panel) transparent;
+    }
+
+    body.theme-dark .profile-tour-tooltip.arrow-bottom::after {
+      border-color: var(--panel) transparent transparent transparent;
+    }
+
+    body.theme-dark .profile-tour-title {
+      color: var(--ink);
+    }
+
+    body.theme-dark .profile-tour-btn {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--ink);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    body.theme-dark .profile-tour-close {
+      color: rgba(248, 251, 255, 0.7);
+    }
+
+    body.theme-dark .modal-card {
+      background: var(--panel);
+      border-color: rgba(255, 255, 255, 0.08);
+      color: var(--ink);
+      box-shadow: 0 20px 46px rgba(0, 0, 0, 0.45);
+    }
+
+    body.theme-dark .modal-card p {
+      color: var(--muted);
+    }
+
+    body.theme-dark #securitySection .session-device-icon,
+    body.theme-dark #securitySection .security-icon,
+    body.theme-dark .photo-crop-stage {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: var(--muted);
+    }
+
+    .settings-panel h2 {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      margin-bottom: 6px;
+      font-weight: 300;
+    }
+
+    .settings-panel p {
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    #attorneySettings .settings-section {
+      display: block;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 28px;
+      margin-bottom: 28px;
+    }
+
+    #attorneySettings .section-title {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 300;
+      margin-bottom: 6px;
+    }
+
+    #attorneySettings .section-subtitle {
+      color: var(--muted);
+      margin-bottom: 24px;
+      font-size: 0.95rem;
+    }
+
+    #attorneySettings .avatar-block {
+      margin-bottom: 24px;
+    }
+
+    #attorneySettings .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    #attorneySettings .form-field {
+      flex: 1;
+      min-width: 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    #attorneySettings .form-field input,
+    #attorneySettings .form-field textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: #fff;
+    }
+
+    #attorneySettings textarea {
+      min-height: 140px;
+      resize: vertical;
+    }
+
+    #attorneySettings .actions-row {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    #attorneySettings .save-btn {
+      border-radius: 999px;
+      padding: 12px 26px;
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      font-family: var(--font-sans);
+      font-weight: 200;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    #attorneySettings .save-btn:hover:not(:disabled) {
+      background: var(--accent-dark);
+      transform: translateY(-1px);
+    }
+
+    #securitySection {
+      margin-top: 24px;
+      margin-bottom: 28px;
+    }
+
+    #securitySection .settings-block:first-child {
+      margin-top: 0;
+    }
+
+    #securitySection .security-column .settings-block:first-child {
+      margin-top: 0;
+    }
+
+    #securitySection .settings-block {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 26px 22px;
+    }
+
+    #securitySection .settings-block h3 {
+      margin-bottom: 0;
+    }
+
+    #securitySection label,
+    #securitySection p {
+      margin: 0;
+      line-height: 1.6;
+    }
+
+    #securitySection .btn {
+      align-self: flex-start;
+      margin-top: 4px;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-weight: 300;
+      padding: 8px 18px;
+    }
+
+    #securitySection input[type="password"] {
+      max-width: 100%;
+    }
+
+    #securitySection .security-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      gap: 24px;
+    }
+
+    #securitySection .security-column {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    #securitySection .security-column + .security-column {
+      border-left: 1px solid var(--line);
+      padding-left: 24px;
+    }
+
+    #securitySection .security-column .settings-block {
+      margin-top: 0;
+    }
+
+    #securitySection .security-card-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #securitySection .security-card-title h3 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    #securitySection .security-icon {
+      width: 32px;
+      height: 32px;
+      flex: 0 0 32px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    #securitySection .security-icon svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+    }
+
+    #securitySection .password-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    #securitySection .field-group {
+      position: relative;
+      max-width: 100%;
+    }
+
+    #securitySection .field-group input {
+      width: 100%;
+      padding-right: 42px;
+    }
+
+    #securitySection .toggle-visibility {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    #securitySection .toggle-visibility svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+    }
+
+    #securitySection .session-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #securitySection .two-factor-security-actions {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    #securitySection .two-factor-security-actions input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    #securitySection .backup-codes-output {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      line-height: 1.75;
+    }
+
+    #securitySection .session-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    #securitySection .session-row:first-child {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    #securitySection .session-device {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #securitySection .session-device-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 500;
+      color: var(--muted);
+      background: #fff;
+      font-size: 0.85rem;
+    }
+
+    #securitySection .session-meta {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    #securitySection .session-status {
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    #securitySection .session-action {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    #securitySection .session-action:disabled {
+      cursor: not-allowed;
+      opacity: 0.4;
+    }
+
+    #securitySection .session-action svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+    }
+
+    #securitySection .two-factor-hero {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, rgba(182, 164, 122, 0.08), rgba(0, 0, 0, 0));
+    }
+
+    #securitySection .two-factor-hero svg {
+      width: 130px;
+      height: 90px;
+      color: var(--muted);
+    }
+
+    #securitySection .two-factor-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    #securitySection .two-factor-option:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    #securitySection .two-factor-details {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    #securitySection .two-factor-details h4 {
+      margin: 0 0 4px;
+      font-size: 0.95rem;
+    }
+
+    #securitySection .two-factor-badge {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-left: 6px;
+    }
+
+    #securitySection .two-factor-details p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    #securitySection .two-factor-status {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    #securitySection .two-factor-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #securitySection .two-factor-codes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      padding: 14px;
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.02);
+      font-size: 0.9rem;
+    }
+
+    #securitySection .two-factor-codes code {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      text-align: center;
+      font-family: "SF Mono", "Menlo", "Consolas", monospace;
+      font-size: 0.85rem;
+      letter-spacing: 0.08em;
+    }
+
+    #securitySection .authenticator-setup,
+    #securitySection .passkey-panel {
+      margin-top: 14px;
+      padding: 16px;
+      border: 1px solid var(--border, #d9e2ec);
+      border-radius: 12px;
+      background: var(--surface-subtle, #f8fafc);
+    }
+
+    #securitySection .authenticator-setup img {
+      display: block;
+      width: 220px;
+      max-width: 100%;
+      height: auto;
+      margin: 12px auto;
+      border: 8px solid #fff;
+      border-radius: 8px;
+    }
+
+    #securitySection .security-inline-fields {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    #securitySection .manual-secret {
+      overflow-wrap: anywhere;
+      user-select: all;
+    }
+
+    #securitySection .passkey-list {
+      display: grid;
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    #securitySection .passkey-list-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid var(--border, #d9e2ec);
+      border-radius: 10px;
+      background: var(--surface, #fff);
+    }
+
+    #securitySection .security-extras {
+      margin-top: 24px;
+      display: grid;
+      gap: 20px;
+    }
+
+    body.paralegal-flat #securitySection {
+      max-width: none;
+      width: 100%;
+      margin: 0 0 28px;
+      height: auto;
+      overflow: visible;
+      padding-right: 0;
+      padding-bottom: 12px;
+    }
+
+    body.paralegal-flat #securitySection .settings-block {
+      margin-top: 40px;
+      padding: 0 0 32px;
+      border-radius: 0;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--line);
+      box-shadow: none;
+    }
+
+    body.paralegal-flat #securitySection .settings-block:first-child {
+      margin-top: 0;
+    }
+
+    body.paralegal-flat #securitySection .settings-block:last-child {
+      border-bottom: none;
+      padding-bottom: 12px;
+    }
+
+    body.paralegal-flat #securitySection .blocked-users-card {
+      margin-top: 0;
+    }
+
+    @media (max-width: 960px) {
+      #securitySection .security-grid {
+        grid-template-columns: 1fr;
+      }
+
+      #securitySection .password-grid {
+        grid-template-columns: 1fr;
+      }
+
+      #securitySection .security-column + .security-column {
+        border-left: none;
+        padding-left: 0;
+      }
+
+      #securitySection .session-row {
+        grid-template-columns: 1fr;
+        text-align: left;
+      }
+
+      #securitySection .session-status {
+        text-align: left;
+      }
+    }
+
+    .settings-block {
+      margin-top: 22px;
+      padding: 18px 22px;
+      border-radius: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+    }
+
+    .settings-block h3 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      margin-bottom: 12px;
+      font-size: 1.3rem;
+    }
+
+    .small-btn {
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .small-btn.danger-lite {
+      color: #8d3f3f;
+      border-color: rgba(141, 63, 63, 0.2);
+      background: rgba(141, 63, 63, 0.05);
+    }
+
+    .blocked-users-copy {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+
+    .settings-title-with-help {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .settings-help-tooltip {
+      position: relative;
+      display: inline-flex;
+    }
+
+    .settings-help-tooltip summary {
+      list-style: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.6);
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-serif);
+      font-size: 0.95rem;
+      font-weight: 300;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .settings-help-tooltip summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .settings-help-tooltip-panel {
+      position: absolute;
+      top: calc(100% + 10px);
+      left: 0;
+      right: auto;
+      transform: none;
+      width: min(340px, calc(100vw - 48px));
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.55;
+      box-shadow: 0 18px 36px rgba(10, 15, 25, 0.12);
+      z-index: 20;
+    }
+
+    .settings-help-tooltip-panel::after {
+      content: "";
+      position: absolute;
+      left: 10px;
+      top: -7px;
+      width: 12px;
+      height: 12px;
+      transform: rotate(45deg);
+      background: var(--panel);
+      border-left: 1px solid var(--line);
+      border-top: 1px solid var(--line);
+    }
+
+    .settings-help-tooltip:not([open]) .settings-help-tooltip-panel {
+      display: none;
+    }
+
+    body.paralegal-flat #securitySection.settings-section.active {
+      overflow: visible;
+      height: auto;
+    }
+
+    html.theme-dark .settings-help-tooltip summary,
+    body.theme-dark .settings-help-tooltip summary {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: var(--muted);
+    }
+
+    html.theme-dark .settings-help-tooltip-panel,
+    body.theme-dark .settings-help-tooltip-panel {
+      background: #151b29;
+      border-color: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 22px 40px rgba(4, 6, 12, 0.5);
+    }
+
+    html.theme-dark .settings-help-tooltip-panel::after,
+    body.theme-dark .settings-help-tooltip-panel::after {
+      background: #151b29;
+      border-left-color: rgba(255, 255, 255, 0.12);
+      border-top-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .blocked-user-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.45);
+    }
+
+    .blocked-user-name {
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      font-weight: 300;
+      letter-spacing: 0.01em;
+      color: var(--ink);
+      min-width: 0;
+    }
+
+    #securitySection .blocked-users-card {
+      padding: 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .blocked-users-disclosure {
+      flex: 1;
+      border: none;
+      background: transparent;
+      overflow: visible;
+    }
+
+    .blocked-users-disclosure summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 4px 0;
+      font-family: var(--font-sans);
+      font-size: 0.92rem;
+      font-weight: 300;
+      color: var(--ink);
+      user-select: none;
+    }
+
+    .blocked-users-disclosure summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .blocked-users-summary-leading {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .blocked-users-summary-inline-help {
+      padding: 0;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.55);
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-serif);
+      font-size: 0.8rem;
+      font-weight: 300;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .blocked-users-summary-inline-help:hover,
+    .blocked-users-summary-inline-help:focus-visible,
+    .blocked-users-summary-inline-help[aria-expanded="true"] {
+      border-color: var(--accent);
+      color: var(--ink);
+      outline: none;
+    }
+
+    .blocked-users-help-panel {
+      position: absolute;
+      top: calc(100% + 10px);
+      left: 0;
+      width: min(340px, calc(100vw - 48px));
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--muted);
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      font-weight: 300;
+      line-height: 1.55;
+      text-align: left;
+      white-space: normal;
+      box-shadow: 0 18px 36px rgba(10, 15, 25, 0.12);
+      z-index: 30;
+      cursor: default;
+      user-select: text;
+    }
+
+    .blocked-users-help-panel::after {
+      content: "";
+      position: absolute;
+      left: 23px;
+      top: -7px;
+      width: 12px;
+      height: 12px;
+      transform: rotate(45deg);
+      background: var(--panel);
+      border-left: 1px solid var(--line);
+      border-top: 1px solid var(--line);
+    }
+
+    html.theme-dark .blocked-users-help-panel,
+    body.theme-dark .blocked-users-help-panel {
+      background: #151b29;
+      border-color: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 22px 40px rgba(4, 6, 12, 0.5);
+    }
+
+    html.theme-dark .blocked-users-help-panel::after,
+    body.theme-dark .blocked-users-help-panel::after {
+      background: #151b29;
+      border-left-color: rgba(255, 255, 255, 0.12);
+      border-top-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .blocked-users-summary-meta {
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 200;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .blocked-users-summary-caret {
+      color: var(--muted);
+      font-size: 0.72rem;
+      transition: transform 0.2s ease;
+    }
+
+    .blocked-users-disclosure[open] .blocked-users-summary-caret {
+      transform: rotate(180deg);
+    }
+
+    .blocked-users-panel {
+      padding: 8px 0 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.avatar-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.attorney-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 280px) 1fr;
+  gap: 24px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+    .photo-row {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+.avatar-frame {
+  width: 108px;
+  height: 108px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(182, 164, 122, 0.25), rgba(0, 0, 0, 0.05));
+      border: 1px dashed var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+  font-size: 1.6rem;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+    .avatar-frame--large {
+      width: 220px;
+      height: 220px;
+      border-radius: 32px;
+      font-size: 2.2rem;
+}
+
+.avatar-frame.has-photo {
+  border-style: solid;
+  border-color: transparent;
+}
+
+    .avatar-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center center !important;
+      display: block;
+      opacity: 0;
+      transform: scale(1.02);
+      transition: opacity 0.25s ease, transform 0.35s ease;
+    }
+
+    .avatar-frame.has-photo img,
+    .avatar-frame img.is-loaded {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .avatar-frame span {
+      position: absolute;
+    }
+
+    .required-missing::after {
+      content: " *";
+      color: var(--danger);
+      font-weight: 600;
+    }
+
+    .avatar-frame.required-missing::after {
+      content: "*";
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      color: var(--danger);
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .avatar-actions button {
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 200;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+.avatar-actions button:hover {
+  background: var(--accent-dark);
+  transform: translateY(-1px);
+}
+
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+label {
+  font-size: 0.9rem;
+  font-weight: 200;
+  display: flex;
+  flex-direction: column;
+      gap: 8px;
+    }
+
+    .field-block {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field-block.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .language-editor {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #paralegalSettings .language-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .education-editor {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .education-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .education-row .education-school {
+      flex: 2 1 240px;
+      min-width: 200px;
+    }
+
+    .education-row .education-month {
+      flex: 1 1 140px;
+      min-width: 120px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      padding: 10px 36px 10px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background:
+        linear-gradient(135deg, rgba(182, 164, 122, 0.18), rgba(0, 0, 0, 0)) padding-box,
+        linear-gradient(135deg, rgba(182, 164, 122, 0.35), rgba(0, 0, 0, 0.05)) border-box;
+      color: var(--ink);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath fill='%23a08655' d='M7 9L0 0h14z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      background-size: 12px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .education-row .education-month:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.25);
+    }
+
+    .education-row .education-year {
+      flex: 1 1 120px;
+      min-width: 110px;
+    }
+
+    .education-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 15, 25, 0.6);
+      display: none;
+      z-index: 13000;
+    }
+
+    .education-modal-overlay.is-active {
+      display: block;
+    }
+
+    .education-modal {
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      width: min(720px, 92vw);
+      max-height: 86vh;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 30px 60px rgba(15, 23, 42, 0.3);
+      display: none;
+      z-index: 13001;
+      overflow: hidden;
+    }
+
+    .education-modal.is-active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .education-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .education-modal-header h3 {
+      font-family: var(--font-serif);
+      font-size: 1.4rem;
+      margin: 0;
+      color: var(--navy);
+      font-weight: 500;
+    }
+
+    .education-modal-close {
+      border: none;
+      background: transparent;
+      color: #8a94a6;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+
+    .education-modal-body {
+      padding: 18px 22px 8px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .education-entry {
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #fbfbfd;
+    }
+
+    .education-entry-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .education-entry-title {
+      font-weight: 500;
+      color: var(--navy);
+      margin: 0;
+    }
+
+    .education-entry-remove {
+      border: none;
+      background: transparent;
+      color: #d14343;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .education-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 16px;
+    }
+
+    .education-form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .education-form-row label {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .education-form-row input,
+    .education-form-row select,
+    .education-form-row textarea {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: #ffffff;
+    }
+
+    .education-form-row textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    .education-form-row.education-form-row-inline {
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .education-form-row.education-form-row-inline label {
+      order: 2;
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    .education-form-row.education-form-row-inline input {
+      width: 16.6667%;
+      min-width: 72px;
+      max-width: 96px;
+      flex: 0 0 auto;
+    }
+
+    .education-date-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .education-form-span {
+      grid-column: 1 / -1;
+    }
+
+    .education-modal-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 22px 20px;
+      border-top: 1px solid var(--line);
+    }
+
+    .education-modal-actions .btn {
+      min-width: 120px;
+    }
+
+    body.theme-dark .education-modal {
+      background: #151b29;
+      color: var(--ink);
+      box-shadow: 0 26px 60px rgba(4, 6, 12, 0.7);
+    }
+
+    body.theme-dark .education-modal-overlay {
+      background: rgba(5, 8, 14, 0.72);
+    }
+
+    body.theme-dark .education-modal-header {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    body.theme-dark .education-modal-header h3 {
+      color: var(--ink);
+    }
+
+    body.theme-dark .education-modal-close {
+      color: var(--muted);
+    }
+
+    body.theme-dark .education-entry {
+      background: rgba(12, 16, 24, 0.9);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    body.theme-dark .education-entry-title {
+      color: var(--ink);
+    }
+
+    body.theme-dark .education-modal-actions {
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    #paralegalSettings .language-row .language-name,
+    #paralegalSettings .language-row .language-level {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .language-row .language-level {
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      padding: 10px 36px 10px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background:
+        linear-gradient(135deg, rgba(182, 164, 122, 0.18), rgba(0, 0, 0, 0)) padding-box,
+        linear-gradient(135deg, rgba(182, 164, 122, 0.35), rgba(0, 0, 0, 0.05)) border-box;
+      color: var(--ink);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath fill='%23a08655' d='M7 9L0 0h14z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      background-size: 12px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .language-row .language-level:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.25);
+    }
+
+    .language-row .language-level option {
+      color: #132033;
+      background: #ffffff;
+    }
+
+    #paralegalSettings .language-row .remove-language {
+      justify-self: end;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      border-radius: 999px;
+      transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+    }
+
+    #paralegalSettings .language-row .remove-language:hover {
+      color: var(--danger);
+      border-color: rgba(192, 57, 43, 0.45);
+      background: rgba(192, 57, 43, 0.08);
+    }
+
+    #paralegalSettings #addLanguageBtn {
+      align-self: center;
+      color: var(--muted);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 8px 18px;
+      margin-left: auto;
+      margin-right: auto;
+      margin-top: 12px;
+    }
+
+    #paralegalSettings #addLanguageBtn:hover {
+      color: var(--ink);
+      border-color: rgba(182, 164, 122, 0.55);
+      background: rgba(182, 164, 122, 0.08);
+    }
+
+    .education-row .remove-education {
+      border: none;
+      background: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 6px 10px;
+    }
+
+    input[type="text"],
+    input[type="email"],
+input[type="tel"],
+input[type="url"],
+input[type="password"],
+input[type="number"],
+    textarea {
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: #fff;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .dropdown-multiselect {
+      position: relative;
+      max-width: 480px;
+    }
+
+    .dropdown-multiselect.narrow {
+      max-width: 420px;
+    }
+
+    .dropdown-toggle {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: #fff;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .dropdown-summary {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .dropdown-summary .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 10px;
+      background: #eef2f8;
+      color: var(--ink);
+      font-size: 0.9rem;
+    }
+
+    .chip-remove {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+      line-height: 1;
+      padding: 2px;
+      border-radius: 4px;
+    }
+
+    .chip-remove:hover {
+      background: rgba(0, 0, 0, 0.05);
+      color: var(--accent);
+    }
+
+    .dropdown-summary .placeholder {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .dropdown-caret {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .dropdown-panel {
+      display: none;
+      position: absolute;
+      z-index: 10;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      margin-top: 6px;
+      width: 100%;
+      max-height: 240px;
+      overflow-y: auto;
+      padding: 0 0 8px;
+    }
+
+    .dropdown-panel.open {
+      display: block;
+    }
+
+    .dropdown-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .dropdown-option--select-all {
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 4px;
+      padding-bottom: 10px;
+    }
+
+    .dropdown-option:hover {
+      background: #f6f8fb;
+    }
+
+    .dropdown-option input[type="checkbox"] {
+      width: 14px !important;
+      height: 14px !important;
+      min-width: 14px;
+      margin: 0;
+      border: 1px solid #cfd6e3;
+      border-radius: 6px;
+      appearance: none;
+      background: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: pointer;
+      flex-shrink: 0;
+      box-sizing: border-box;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .dropdown-option input[type="checkbox"]:checked {
+      border-color: #0a84ff;
+      background-color: #0a84ff;
+      background-image: url("data:image/svg+xml,%3Csvg width='12' height='9' viewBox='0 0 12 9' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='white' d='M4.6 8.6L0.5 4.5l1.2-1.2L4.6 6.2 10.4 0.5l1.1 1.1z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 12px 9px;
+    }
+
+    .dropdown-option.selected {
+      background: #f5f7fb;
+    }
+
+    .dropdown-search {
+      padding: 10px 12px 8px;
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 1;
+    }
+
+    .dropdown-search input {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+    }
+
+    input[type="checkbox"] {
+      width: auto;
+      height: auto;
+      appearance: none;
+      -webkit-appearance: none;
+      background: #fff;
+      border: 1px solid #cfd6e3;
+      border-radius: 4px;
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+      position: relative;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    input[type="checkbox"]:checked {
+      background: #0a84ff;
+      border-color: #0a84ff;
+      background-image: url("data:image/svg+xml,%3Csvg width='12' height='9' viewBox='0 0 12 9' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='white' d='M4.6 8.6L0.5 4.5l1.2-1.2L4.6 6.2 10.4 0.5l1.1 1.1z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 8px 6px;
+    }
+
+    input[type="checkbox"]:focus {
+      outline: none;
+      box-shadow: none !important;
+    }
+
+    .pref-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 14px 0;
+      font-size: 1.1rem;
+      gap: 16px;
+    }
+
+    .pref-row.is-readonly,
+    .toggle-row.is-readonly {
+      opacity: 0.65;
+    }
+
+    .pref-row.is-readonly span,
+    .toggle-row.is-readonly .pref-title,
+    .toggle-row.is-readonly .pref-desc {
+      color: var(--muted);
+    }
+
+    .pref-row > label {
+      font: inherit;
+      color: inherit;
+    }
+
+    .pref-row select {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.35rem 0.75rem;
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      background: var(--panel);
+      color: var(--ink);
+    }
+
+    .theme-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+      margin: 8px 0 20px;
+    }
+
+    .theme-preview {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: var(--panel);
+      text-align: left;
+      cursor: pointer;
+      font-family: var(--font-sans);
+      color: var(--ink);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .theme-preview span {
+      font-size: 0.95rem;
+    }
+
+    .theme-preview-icon {
+      width: 120px;
+      height: 78px;
+      display: block;
+      border-radius: 10px;
+    }
+
+    .theme-preview[aria-checked="true"] {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.2);
+    }
+
+    .theme-preview:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.35);
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 26px;
+    }
+
+    .switch input {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      display: block;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: #707b8a;
+      transition: 0.2s;
+      border-radius: 999px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      transition: 0.2s;
+      border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    input:checked + .slider {
+      background: var(--accent);
+    }
+
+    .switch input:checked + .slider:before {
+      background: #17243a;
+      transform: translateX(22px);
+    }
+
+    .switch input:focus-visible + .slider {
+      outline: 2px solid var(--ink);
+      outline-offset: 3px;
+    }
+
+    .switch input:disabled {
+      cursor: not-allowed;
+    }
+
+    .switch input:disabled + .slider {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.2);
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+	    #yearsExperienceInput {
+	      max-width: 220px;
+	      text-align: center;
+	      font-weight: 400;
+	      letter-spacing: 0.02em;
+	    }
+	
+	    .years-experience-sep {
+	      display: none;
+	    }
+
+    #yearsExperienceInput::-webkit-inner-spin-button,
+    #yearsExperienceInput::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    #yearsExperienceInput[type="number"] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+
+    .file-input-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .upload-card {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 20px;
+      background: var(--panel);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 220px;
+      height: 100%;
+      justify-content: space-between;
+    }
+
+    #settingsCertificate,
+    #settingsResume,
+    #settingsWritingSample {
+      height: 100%;
+    }
+
+    .upload-card h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 300;
+    }
+
+    .upload-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .file-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border: none;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 22px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-family: var(--font-sans);
+      font-weight: 400;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .upload-card .file-trigger {
+      padding: 8px 16px;
+      font-size: 0.85rem;
+    }
+
+    .file-trigger:hover {
+      background: var(--accent-dark);
+      transform: translateY(-1px);
+    }
+
+    .file-name {
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    .file-input-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      clip-path: inset(50%);
+      border: 0;
+      white-space: nowrap;
+    }
+
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      align-items: stretch;
+    }
+
+    body.paralegal-flat {
+      --paralegal-max-width: 1350px;
+      --paralegal-radius: 8px;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    body.paralegal-flat .content {
+      padding-top: 24px;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    body.paralegal-flat #settingsContent {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    body.paralegal-flat .settings-section.active {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    body.paralegal-flat .topbar .header-skeleton {
+      display: none;
+    }
+
+    body.paralegal-flat .page-header {
+      margin-bottom: 8px;
+      flex: 0 0 auto;
+    }
+
+    body.paralegal-flat #accountSettingsTitle {
+      display: block;
+      margin: 0;
+      font-size: clamp(1.8rem, 3vw, 2.35rem);
+      line-height: 1.05;
+    }
+
+    #paralegalSettings {
+      max-width: var(--paralegal-max-width);
+      margin: 0 auto;
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      height: 100%;
+      align-items: stretch;
+    }
+
+    body.paralegal-flat #profileSection {
+      background: transparent;
+      border: none;
+      padding: 0;
+      margin-bottom: 0;
+      box-shadow: none;
+      animation: none;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    #paralegalSettings label {
+      font-weight: 400;
+      font-size: 0.95rem;
+    }
+
+    #paralegalSettings .paralegal-profile-form {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      height: 100%;
+    }
+
+    #paralegalSettings .profile-layout {
+      display: grid;
+      grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.6fr);
+      gap: 24px;
+      align-items: start;
+      flex: 1;
+      min-height: 0;
+      height: 100%;
+    }
+
+    #paralegalSettings .profile-sidebar,
+    #paralegalSettings .profile-main {
+      display: flex;
+      flex-direction: column;
+      gap: 38px;
+      min-height: 0;
+    }
+
+    #paralegalSettings .profile-sidebar {
+      padding-right: 24px;
+      border-right: 1px solid var(--line);
+      position: sticky;
+      top: 24px;
+      align-self: stretch;
+      height: 100%;
+      max-height: 100%;
+      padding-bottom: 12px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+    }
+
+    #paralegalSettings .profile-main {
+      padding-left: 24px;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 8px;
+      padding-bottom: 12px;
+      height: 100%;
+      max-height: 100%;
+      overscroll-behavior: contain;
+      align-self: stretch;
+    }
+
+    #paralegalSettings .profile-section-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+      align-items: start;
+    }
+
+    #paralegalSettings .profile-photo-block {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+      align-items: center;
+    }
+
+    #paralegalSettings .avatar-actions {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      margin-top: -12px;
+    }
+
+    #paralegalSettings .avatar-remove-btn {
+      padding: 6px 14px;
+      font-size: 0.85rem;
+    }
+
+    #paralegalSettings .avatar-edit-btn {
+      padding: 6px 14px;
+      font-size: 0.85rem;
+    }
+
+    #paralegalSettings .photo-guidelines {
+      max-width: 260px;
+      margin: 0 0 14px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    #paralegalSettings .photo-review-status {
+      font-size: 0.85rem;
+      padding: 6px 12px;
+      margin-top: 10px;
+      margin-bottom: 6px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.6);
+      color: #8a6b2e;
+      text-align: center;
+    }
+
+    #paralegalSettings .photo-review-status.is-rejected {
+      color: #9a3412;
+      border-color: rgba(234, 88, 12, 0.35);
+      background: rgba(255, 237, 213, 0.7);
+    }
+
+    #paralegalSettings .hero-photo-shell {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #paralegalSettings .hero-photo {
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: var(--panel);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+    }
+
+    #paralegalSettings .hero-photo .avatar-frame {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      font-size: 2.2rem;
+    }
+
+    #paralegalSettings .hero-photo .avatar-frame span {
+      position: static;
+    }
+
+    #paralegalSettings .profile-meta-stack {
+      width: 100%;
+    }
+
+    #paralegalSettings .profile-meta-columns {
+      display: grid;
+      grid-template-columns: minmax(120px, auto) minmax(0, 1fr);
+      gap: 12px 18px;
+      align-items: center;
+      width: min(100%, 520px);
+    }
+
+    #paralegalSettings .profile-meta-columns .hero-meta-pill {
+      justify-self: start;
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    #paralegalSettings .profile-meta-columns input {
+      width: 100%;
+    }
+
+    #paralegalSettings .profile-docs-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #paralegalSettings .experience-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 8px;
+    }
+
+    #paralegalSettings .experience-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr) 28px;
+      gap: 12px;
+      align-items: end;
+    }
+
+    #paralegalSettings .experience-row label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    #paralegalSettings .experience-row input {
+      font-size: 0.95rem;
+    }
+
+    #paralegalSettings .experience-remove-btn {
+      width: 28px;
+      height: 28px;
+      justify-self: center;
+      align-self: center;
+      border-radius: 0;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--font-serif);
+      font-size: 1.4rem;
+      font-weight: 600;
+      line-height: 1;
+      cursor: pointer;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75), 0 -1px 1px rgba(15, 23, 42, 0.2);
+      transition: color 0.2s ease, text-shadow 0.2s ease;
+    }
+
+    #paralegalSettings .experience-remove-btn:hover:not(:disabled) {
+      color: var(--accent);
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85), 0 -1px 1px rgba(15, 23, 42, 0.3);
+    }
+
+    #paralegalSettings #addExperienceRow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 2px;
+      width: 28px;
+      height: 28px;
+      margin-left: auto;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      color: #2b2b2b;
+      font-family: var(--font-serif);
+      font-size: 1.5rem;
+      font-weight: 600;
+      line-height: 1;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75), 0 -1px 1px rgba(15, 23, 42, 0.2);
+      box-shadow: none;
+      transition: color 0.2s ease, text-shadow 0.2s ease;
+    }
+
+    #paralegalSettings #addExperienceRow:hover {
+      color: var(--accent);
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85), 0 -1px 1px rgba(15, 23, 42, 0.3);
+    }
+
+    #paralegalSettings .experience-remove-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    #paralegalSettings .profile-header {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    #paralegalSettings .profile-identity {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #paralegalSettings .profile-role-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    #paralegalSettings .profile-name-input {
+      font-family: var(--font-serif);
+      font-size: 3rem;
+      font-weight: 300;
+      letter-spacing: 0.6px;
+      width: 100%;
+      text-align: center;
+    }
+
+    #paralegalSettings .bio-input {
+      max-width: 520px;
+    }
+
+    #paralegalSettings .hero-meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+      border-radius: 0;
+      background: transparent;
+      border: none;
+      font-size: 0.9rem;
+      color: var(--muted);
+      text-align: left;
+    }
+
+    #paralegalSettings .card-header-label {
+      font-size: 0.8rem;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    #paralegalSettings .section-header {
+      position: relative;
+      text-align: center;
+      margin-bottom: 16px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    #paralegalSettings .section-header .card-header-label {
+      margin: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    #paralegalSettings .chip-section .card-header-label {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    #paralegalSettings .section-edit-toggle {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      border: none;
+      background: transparent;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 8px;
+      cursor: pointer;
+      color: var(--muted);
+      border-radius: 8px;
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    #paralegalSettings .section-edit-toggle:hover,
+    #paralegalSettings .section-edit-toggle:focus-visible,
+    #paralegalSettings .section-edit-toggle[aria-pressed="true"] {
+      background: rgba(23, 20, 25, 0.06);
+      color: var(--ink);
+    }
+
+    #paralegalSettings .section-edit-toggle svg {
+      display: block;
+      width: 14px;
+      height: 14px;
+    }
+
+    #paralegalSettings #documentsSection .section-header {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    #paralegalSettings #documentsSection .documents-toggle {
+      position: static;
+      right: auto;
+      top: auto;
+      transform: none;
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      background: transparent;
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-size: 0.8rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+
+    #paralegalSettings #documentsSection .documents-toggle:hover {
+      background: rgba(0, 0, 0, 0.04);
+      color: var(--ink);
+    }
+
+    #paralegalSettings #documentsSection .documents-toggle svg {
+      width: 12px;
+      height: 12px;
+      transition: transform 0.2s ease;
+    }
+
+    #paralegalSettings #documentsSection.is-editing .documents-toggle {
+      background: rgba(182, 164, 122, 0.12);
+      border-color: rgba(182, 164, 122, 0.45);
+      color: var(--ink);
+    }
+
+    #paralegalSettings #documentsSection.is-editing .documents-toggle svg {
+      transform: rotate(180deg);
+    }
+
+    #paralegalSettings [data-edit-section] {
+      --section-base-height: 180px;
+      min-height: var(--section-base-height);
+    }
+
+    #paralegalSettings [data-edit-section]:not(.is-editing) {
+      overflow: hidden;
+    }
+
+    #paralegalSettings [data-edit-section].is-editing {
+      overflow: hidden;
+    }
+
+    #paralegalSettings [data-edit-section] .section-display {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #paralegalSettings [data-edit-section] .section-edit {
+      display: none;
+      pointer-events: none;
+    }
+
+    #paralegalSettings .section-editable:not(.is-editing):not(#documentsSection) .section-display,
+    #paralegalSettings .section-editable:not(.is-editing):not(#documentsSection) .best-for-body {
+      cursor: pointer;
+    }
+
+    #paralegalSettings [data-edit-section].is-editing .section-edit {
+      display: block;
+      pointer-events: auto;
+      max-height: var(--section-edit-max-height, var(--section-base-height));
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    #paralegalSettings #skillsCard.is-editing {
+      overflow: visible;
+    }
+
+    #paralegalSettings #skillsCard.is-editing .section-edit {
+      max-height: none;
+      overflow: visible;
+    }
+
+    #paralegalSettings #practiceAreasCard.is-editing {
+      overflow: visible;
+    }
+
+    #paralegalSettings #practiceAreasCard.is-editing .section-edit {
+      max-height: none;
+      overflow: visible;
+    }
+
+    #paralegalSettings #stateExperienceCard.is-editing {
+      overflow: visible;
+    }
+
+    #paralegalSettings #stateExperienceCard.is-editing .section-edit {
+      max-height: none;
+      overflow: visible;
+    }
+
+    #paralegalSettings [data-edit-section].is-editing .section-display {
+      display: none;
+    }
+
+    #paralegalSettings #bestForSection.is-editing .section-display {
+      display: block;
+    }
+
+    #paralegalSettings [data-edit-section].is-editing [data-section-edit="languages"] {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #paralegalSettings #languagesEditor {
+      width: 100%;
+    }
+
+    #paralegalSettings .section-display-text {
+      margin: 0;
+      white-space: pre-line;
+    }
+
+    #paralegalSettings .section-display-text.is-placeholder {
+      color: var(--muted);
+    }
+
+    #paralegalSettings #languagesDisplay {
+      line-height: 1.8;
+    }
+
+    #paralegalSettings #skillsDisplay,
+    #paralegalSettings #experienceDisplay {
+      line-height: 1.8;
+    }
+
+    #paralegalSettings #skillsInput {
+      font: inherit;
+      line-height: 1.8;
+      padding: 0;
+      margin: 0;
+    }
+
+    #paralegalSettings .best-for-list {
+      margin: 0;
+      padding-left: 18px;
+      white-space: normal;
+    }
+
+    #paralegalSettings .best-for-list li {
+      margin: 0;
+      min-height: 1.2em;
+    }
+
+    #paralegalSettings .best-for-list li + li {
+      margin-top: 10px;
+    }
+
+    #paralegalSettings #bestForSection .best-for-list li::marker {
+      font-size: 0.75em;
+    }
+
+    #paralegalSettings #bestForSection .best-for-body {
+      position: relative;
+      max-height: calc(4 * 1.2em + 3 * 10px + 1rem);
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+
+    #paralegalSettings #bestForSection.is-editing .best-for-body {
+      max-height: calc(4 * 1.2em + 3 * 10px + 1rem);
+    }
+
+    #paralegalSettings #bestForSection.is-editing .best-for-list {
+      cursor: text;
+    }
+
+    #paralegalSettings #bestForSection .best-for-list li[contenteditable="true"]:focus {
+      outline: none;
+    }
+
+    #paralegalSettings #bestForSection.is-editing .best-for-list {
+      color: var(--muted);
+    }
+
+    #paralegalSettings #bestForSection.is-editing .best-for-list.is-typing {
+      color: var(--ink);
+    }
+
+    #paralegalSettings #documentsSection:not(.is-editing) .paralegal-doc-actions {
+      display: none;
+    }
+
+    #paralegalSettings #documentsSection .profile-docs-stack {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(-6px);
+      transition:
+        max-height 420ms cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 380ms ease,
+        transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
+        visibility 0s linear 420ms;
+    }
+
+    #paralegalSettings #documentsSection.is-editing .profile-docs-stack {
+      max-height: var(--documents-stack-height, 1200px);
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateY(0);
+      transition:
+        max-height 460ms cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 440ms ease 70ms,
+        transform 460ms cubic-bezier(0.22, 1, 0.36, 1),
+        visibility 0s linear 0s;
+    }
+
+    #paralegalSettings #documentsSection .paralegal-doc-row {
+      opacity: 0;
+      transform: translateY(10px);
+      transition:
+        opacity 320ms ease,
+        transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    #paralegalSettings #documentsSection.is-editing .paralegal-doc-row {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    #paralegalSettings #documentsSection.is-editing .paralegal-doc-row:nth-child(1) {
+      transition-delay: 90ms;
+    }
+
+    #paralegalSettings #documentsSection.is-editing .paralegal-doc-row:nth-child(2) {
+      transition-delay: 150ms;
+    }
+
+    #paralegalSettings #documentsSection.is-editing .paralegal-doc-row:nth-child(3) {
+      transition-delay: 210ms;
+    }
+
+    #paralegalSettings #documentsSection.is-editing {
+      min-height: auto;
+      height: auto;
+      overflow: visible;
+    }
+
+    #paralegalSettings #documentsSection.is-editing .section-edit {
+      max-height: none;
+      overflow: visible;
+    }
+
+    #paralegalSettings [data-edit-section] textarea {
+      resize: none;
+      width: 100%;
+      overflow-y: hidden;
+    }
+
+    #paralegalSettings .chip-section {
+      margin-top: 10px;
+    }
+
+    #paralegalSettings #skillsSection {
+      margin-top: 0;
+      margin-bottom: 18px;
+    }
+
+    #paralegalSettings #skillsSection .chip-cloud {
+      margin-top: 0;
+      min-height: 0;
+    }
+
+    #paralegalSettings #skillsChips:empty {
+      display: none;
+    }
+
+    #paralegalSettings .skills-editor {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #paralegalSettings .skill-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 10px;
+      background: #eef2f8;
+      color: var(--ink);
+      font-size: 0.9rem;
+    }
+
+    body.theme-dark #paralegalSettings .skill-chip,
+    html.theme-dark #paralegalSettings .skill-chip {
+      background: rgba(148, 163, 184, 0.18);
+      color: var(--ink);
+    }
+
+    #paralegalSettings #skillsCard .section-edit {
+      padding-top: 0;
+    }
+
+    #paralegalSettings #skillsCard .chip-section + .chip-section {
+      margin-top: 22px;
+    }
+
+    #paralegalSettings #skillsCard .dropdown-multiselect {
+      margin-top: 10px;
+    }
+
+    #paralegalSettings #skillsCard .dropdown-toggle {
+      min-height: 56px;
+    }
+
+    #paralegalSettings .chip-cloud,
+    #paralegalSettings .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    #paralegalSettings .doc-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0;
+      border-radius: 0;
+      border: none;
+      background: transparent;
+      text-decoration: none;
+      color: var(--accent);
+      font-size: 0.9rem;
+    }
+
+    #paralegalSettings .paralegal-doc-row {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 100%;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--paralegal-radius);
+      background: var(--panel);
+    }
+
+    #paralegalSettings .paralegal-doc-meta h3 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 400;
+    }
+
+    #paralegalSettings .paralegal-doc-meta p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    #paralegalSettings .paralegal-doc-meta .doc-status:empty {
+      display: none;
+    }
+
+    #paralegalSettings .paralegal-doc-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-start;
+      margin-top: auto;
+    }
+
+    #paralegalSettings .paralegal-doc-actions .file-input-row {
+      flex-wrap: nowrap;
+      width: 100%;
+    }
+
+    #paralegalSettings .paralegal-doc-actions .file-trigger {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink);
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      font-weight: 300;
+      border-radius: var(--paralegal-radius);
+      letter-spacing: 0.02em;
+      text-transform: none;
+      white-space: nowrap;
+    }
+
+    #paralegalSettings .paralegal-doc-actions .file-trigger:hover {
+      background: rgba(0, 0, 0, 0.04);
+      transform: none;
+    }
+
+    body.theme-dark #paralegalSettings .paralegal-doc-actions .file-trigger:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    html.theme-dark #paralegalSettings .paralegal-doc-row,
+    body.theme-dark #paralegalSettings .paralegal-doc-row {
+      background: var(--panel);
+      border-color: var(--line);
+    }
+
+    #paralegalSettings .full-name-hidden {
+      display: none;
+    }
+
+    #paralegalSettings .full-name-input {
+      width: 100%;
+    }
+
+    #paralegalSettings .full-name-input input {
+      width: 100%;
+    }
+
+    #paralegalSettings #firstNameInput,
+    #paralegalSettings #lastNameInput {
+      text-align: center;
+    }
+
+    #paralegalSettings #yearsExperienceInput {
+      max-width: 120px;
+      text-align: left;
+    }
+
+    #paralegalSettings .btn-row {
+      justify-content: flex-end;
+    }
+
+    #paralegalSettings .paralegal-actions {
+      align-items: center;
+      gap: 18px;
+      margin-top: 24px;
+      flex: 0 0 auto;
+    }
+
+    #paralegalSettings .profile-standards-tooltip {
+      position: relative;
+      margin-right: auto;
+    }
+
+    #paralegalSettings .profile-standards-tooltip summary {
+      list-style: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 400;
+      user-select: none;
+    }
+
+    #paralegalSettings .profile-standards-tooltip summary::-webkit-details-marker {
+      display: none;
+    }
+
+    #paralegalSettings .profile-standards-tooltip summary::before {
+      content: "i";
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-serif);
+      font-size: 0.9rem;
+      line-height: 1;
+      color: var(--accent);
+      background: var(--panel);
+      flex-shrink: 0;
+    }
+
+    #paralegalSettings .profile-standards-tooltip[open] summary {
+      color: var(--ink);
+    }
+
+    #paralegalSettings .profile-standards-tooltip-panel {
+      position: absolute;
+      left: 0;
+      bottom: calc(100% + 12px);
+      width: min(360px, calc(100vw - 64px));
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: var(--paralegal-radius);
+      padding: 14px 18px;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+      z-index: 15;
+    }
+
+    #paralegalSettings .profile-standards-title {
+      font-size: 0.7rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    #paralegalSettings .profile-standards-tooltip-panel p {
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--ink);
+      line-height: 1.5;
+      text-align: justify;
+      text-justify: inter-word;
+      hyphens: auto;
+      font-family: "Cormorant Garamond", "Times New Roman", serif;
+    }
+
+    #paralegalSettings .profile-standards-tooltip-panel::after {
+      content: "";
+      position: absolute;
+      left: 22px;
+      top: 100%;
+      border-width: 8px;
+      border-style: solid;
+      border-color: #ffffff transparent transparent transparent;
+      filter: drop-shadow(0 1px 0 rgba(15, 23, 42, 0.08));
+    }
+
+    #paralegalSettings .profile-standards-tooltip-panel .fyi-amount {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    html.theme-dark #paralegalSettings .profile-standards-tooltip-panel,
+    body.theme-dark #paralegalSettings .profile-standards-tooltip-panel {
+      background: var(--panel);
+      border-color: var(--line);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    html.theme-dark #paralegalSettings .profile-standards-tooltip-panel p,
+    body.theme-dark #paralegalSettings .profile-standards-tooltip-panel p {
+      color: #d1d9e6;
+      font-weight: 300;
+    }
+
+    html.theme-dark #paralegalSettings .profile-standards-tooltip-panel::after,
+    body.theme-dark #paralegalSettings .profile-standards-tooltip-panel::after {
+      border-top-color: var(--panel);
+    }
+
+    @media (max-width: 960px) {
+      #paralegalSettings .paralegal-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      #paralegalSettings .profile-standards-tooltip {
+        margin-right: 0;
+      }
+
+      #paralegalSettings .profile-standards-tooltip summary {
+        justify-content: center;
+      }
+
+      #paralegalSettings .profile-standards-tooltip-panel {
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(360px, calc(100vw - 40px));
+      }
+
+      #paralegalSettings .profile-standards-tooltip-panel::after {
+        left: 50%;
+        transform: translateX(-50%);
+      }
+    }
+
+    #paralegalSettings input[type="text"],
+    #paralegalSettings input[type="email"],
+    #paralegalSettings input[type="tel"],
+    #paralegalSettings input[type="url"],
+    #paralegalSettings input[type="password"],
+    #paralegalSettings input[type="number"],
+    #paralegalSettings textarea,
+    #paralegalSettings select,
+    #paralegalSettings .dropdown-toggle,
+    #paralegalSettings .language-row .language-level,
+    #paralegalSettings .education-row .education-month,
+    #paralegalSettings .file-trigger,
+    #paralegalSettings .btn,
+    #paralegalSettings .upload-card,
+    #paralegalSettings .avatar-frame {
+      border-radius: var(--paralegal-radius);
+    }
+
+    #paralegalSettings input[type="text"],
+    #paralegalSettings input[type="email"],
+    #paralegalSettings input[type="tel"],
+    #paralegalSettings input[type="url"],
+    #paralegalSettings input[type="password"],
+    #paralegalSettings input[type="number"],
+    #paralegalSettings textarea,
+    #paralegalSettings select {
+      font-weight: 300;
+      width: 100%;
+    }
+
+    #paralegalSettings input[type="text"],
+    #paralegalSettings input[type="email"],
+    #paralegalSettings input[type="tel"],
+    #paralegalSettings input[type="url"],
+    #paralegalSettings input[type="password"],
+    #paralegalSettings input[type="number"],
+    #paralegalSettings textarea,
+    #paralegalSettings select {
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      padding: 0;
+    }
+
+    #paralegalSettings input:focus,
+    #paralegalSettings textarea:focus,
+    #paralegalSettings select:focus {
+      border: none;
+      box-shadow: none;
+      outline: none;
+    }
+
+    body.theme-dark #paralegalSettings input[type="text"],
+    body.theme-dark #paralegalSettings input[type="email"],
+    body.theme-dark #paralegalSettings input[type="tel"],
+    body.theme-dark #paralegalSettings input[type="url"],
+    body.theme-dark #paralegalSettings input[type="password"],
+    body.theme-dark #paralegalSettings input[type="number"],
+    body.theme-dark #paralegalSettings textarea,
+    body.theme-dark #paralegalSettings select,
+    html.theme-dark #paralegalSettings input[type="text"],
+    html.theme-dark #paralegalSettings input[type="email"],
+    html.theme-dark #paralegalSettings input[type="tel"],
+    html.theme-dark #paralegalSettings input[type="url"],
+    html.theme-dark #paralegalSettings input[type="password"],
+    html.theme-dark #paralegalSettings input[type="number"],
+    html.theme-dark #paralegalSettings textarea,
+    html.theme-dark #paralegalSettings select {
+      background-color: transparent;
+      border: none;
+      box-shadow: none;
+      color: var(--ink);
+    }
+
+    body.theme-dark #skillsInput,
+    body.theme-dark #practiceAreasInput,
+    body.theme-dark #stateExperienceInput,
+    html.theme-dark #skillsInput,
+    html.theme-dark #practiceAreasInput,
+    html.theme-dark #stateExperienceInput {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      color: var(--ink);
+    }
+
+    body.theme-dark #paralegalSettings .language-row .language-level,
+    html.theme-dark #paralegalSettings .language-row .language-level {
+      background:
+        linear-gradient(135deg, rgba(182, 164, 122, 0.18), rgba(0, 0, 0, 0)) padding-box,
+        linear-gradient(135deg, rgba(182, 164, 122, 0.38), rgba(255, 255, 255, 0.08)) border-box;
+      background-color: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(201, 173, 118, 0.35);
+      color: #f8fafc;
+      box-shadow: 0 10px 24px rgba(3, 7, 18, 0.22);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath fill='%23f3e3b2' d='M7 9L0 0h14z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      background-size: 12px;
+    }
+
+    body.theme-dark #paralegalSettings .language-row .language-level:focus,
+    html.theme-dark #paralegalSettings .language-row .language-level:focus {
+      border: 1px solid rgba(243, 227, 178, 0.55);
+      box-shadow: 0 0 0 3px rgba(182, 164, 122, 0.22);
+    }
+
+    body.theme-dark #paralegalSettings .language-row .language-level option,
+    html.theme-dark #paralegalSettings .language-row .language-level option {
+      background: #111827;
+      color: #f8fafc;
+    }
+
+    #paralegalSettings #stateExperienceInput {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 0.6rem 0.75rem;
+      line-height: 1.4;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      color: var(--ink);
+    }
+
+    #paralegalSettings .state-experience-editor {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #paralegalSettings .state-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 10px;
+      background: #eef2f8;
+      color: var(--ink);
+      font-size: 0.9rem;
+    }
+
+    body.theme-dark #paralegalSettings .state-chip,
+    html.theme-dark #paralegalSettings .state-chip {
+      background: rgba(148, 163, 184, 0.18);
+      color: var(--ink);
+    }
+
+    #paralegalSettings input:disabled,
+    #paralegalSettings textarea:disabled,
+    #paralegalSettings select:disabled {
+      background-image: none;
+    }
+
+    .profile-tour-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 12000;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 240ms ease, visibility 0s linear 240ms;
+      --spot-x: 0px;
+      --spot-y: 0px;
+      --spot-w: 0px;
+      --spot-h: 0px;
+    }
+
+    .profile-tour-overlay.is-active {
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 240ms ease;
+    }
+
+    .profile-tour-overlay::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 15, 25, 0.6);
+      transition: background 240ms ease;
+    }
+
+    .profile-tour-overlay.spotlight::before {
+      background: transparent;
+    }
+
+    .profile-tour-overlay.spotlight::after {
+      content: "";
+      position: absolute;
+      left: var(--spot-x);
+      top: var(--spot-y);
+      width: var(--spot-w);
+      height: var(--spot-h);
+      border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(10, 15, 25, 0.6);
+      transition: left 280ms ease, top 280ms ease, width 280ms ease, height 280ms ease, box-shadow 280ms ease;
+    }
+
+    .profile-tour-tooltip {
+      position: fixed;
+      max-width: 280px;
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 16px 18px 14px;
+      box-shadow: 0 18px 38px rgba(15, 23, 42, 0.25);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(6px) scale(0.98);
+      transition: opacity 200ms ease, transform 200ms ease, visibility 0s linear 200ms;
+      z-index: 12001;
+    }
+
+    .profile-tour-tooltip.is-active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+      transition: opacity 200ms ease, transform 200ms ease;
+    }
+
+    .profile-tour-tooltip::after {
+      content: "";
+      position: absolute;
+      top: var(--arrow-top, 18px);
+      border-width: 8px;
+      border-style: solid;
+    }
+
+    .profile-tour-tooltip.arrow-left::after {
+      left: -8px;
+      border-color: transparent #ffffff transparent transparent;
+    }
+
+    .profile-tour-tooltip.arrow-right::after {
+      right: -8px;
+      border-color: transparent transparent transparent #ffffff;
+    }
+
+    .profile-tour-tooltip.arrow-top::after {
+      top: -8px;
+      left: var(--arrow-left, 24px);
+      border-color: transparent transparent #ffffff transparent;
+    }
+
+    .profile-tour-tooltip.arrow-bottom::after {
+      top: auto;
+      bottom: -8px;
+      left: var(--arrow-left, 24px);
+      border-color: #ffffff transparent transparent transparent;
+    }
+
+    .profile-tour-title {
+      font-size: 1.02rem;
+      font-weight: 500;
+      color: var(--navy);
+      margin: 0 0 6px;
+    }
+
+    .profile-tour-text {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+
+    .profile-tour-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .profile-tour-btn {
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--navy);
+      padding: 8px 16px;
+      border-radius: 999px;
+      min-height: 44px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .profile-tour-btn.primary {
+      background: var(--accent);
+      color: #171419;
+      border-color: transparent;
+    }
+
+    .profile-tour-close {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      border: none;
+      background: transparent;
+      color: #8a94a6;
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+      width: 44px;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .profile-tour-close:hover {
+      color: #4b5563;
+    }
+
+    @media (max-width: 960px) {
+      body.paralegal-flat {
+        height: auto;
+        overflow: visible;
+      }
+
+      body.paralegal-flat .content {
+        height: auto;
+        overflow-y: auto;
+      }
+
+      body.paralegal-flat #settingsContent {
+        height: auto;
+      }
+
+      body.paralegal-flat .settings-section.active {
+        overflow: visible;
+        height: auto;
+      }
+
+      body.paralegal-flat #profileSection {
+        overflow: visible;
+        height: auto;
+      }
+
+      #paralegalSettings {
+        height: auto;
+      }
+
+      #paralegalSettings .paralegal-profile-form {
+        height: auto;
+      }
+
+      #paralegalSettings .profile-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      #paralegalSettings .profile-photo-block,
+      #paralegalSettings .profile-header {
+        align-items: center;
+        text-align: center;
+      }
+
+      #paralegalSettings .profile-meta-stack {
+        align-items: center;
+      }
+
+      #paralegalSettings .profile-meta-columns {
+        grid-template-columns: 1fr;
+      }
+
+      #paralegalSettings .profile-section-row {
+        grid-template-columns: 1fr;
+        gap: 18px;
+      }
+
+      #paralegalSettings .profile-meta-columns .hero-meta-pill {
+        margin-bottom: -4px;
+      }
+
+      #paralegalSettings .profile-header-main {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      #paralegalSettings .profile-sidebar {
+        padding-right: 0;
+        border-right: none;
+        position: static;
+        top: auto;
+        height: auto;
+        max-height: none;
+        padding-bottom: 0;
+        overflow: visible;
+      }
+
+      #paralegalSettings .profile-main {
+        padding-left: 0;
+        padding-right: 0;
+        overflow: visible;
+        height: auto;
+        max-height: none;
+      }
+
+      #paralegalSettings .profile-role-row {
+        justify-content: center;
+      }
+
+      #paralegalSettings #documentsSection.is-editing .profile-docs-stack {
+        grid-template-columns: 1fr;
+      }
+
+      #paralegalSettings .paralegal-doc-row {
+        min-height: auto;
+      }
+
+      #paralegalSettings .experience-row {
+        grid-template-columns: 1fr;
+      }
+
+      #paralegalSettings .experience-remove-btn {
+        width: 40px;
+      }
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border-radius: 999px;
+      padding: 12px 22px;
+      font-weight: 200;
+      cursor: pointer;
+      transition: transform 0.2s ease, background 0.2s ease;
+      border: none;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-dark);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink);
+      font-weight: 200;
+    }
+
+    .btn-light {
+      font-weight: 200;
+    }
+
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 0;
+      border-bottom: 1px solid var(--line);
+      gap: 12px;
+    }
+
+    .toggle-row:last-child {
+      border-bottom: none;
+    }
+
+    .toggle-row h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .toggle-row p {
+      margin: 4px 0 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .danger-panel {
+      border: 1px solid rgba(192, 57, 43, 0.4);
+      background: rgba(192, 57, 43, 0.05);
+    }
+
+    .danger-panel p {
+      color: var(--muted);
+    }
+
+    .danger-btn {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .danger-btn:hover:not(:disabled) {
+      background: var(--danger-dark);
+    }
+
+    .deactivate-actions {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    #securitySection [data-deactivate-account] {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: none;
+      background: var(--danger);
+      color: #fff;
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 300;
+      line-height: 1;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    #securitySection [data-deactivate-account]:hover:not(:disabled) {
+      background: var(--danger-dark);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--ink);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 14px 32px rgba(15, 23, 42, 0.28);
+      padding: 12px 24px;
+      border-radius: 999px;
+      opacity: 0;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: none;
+      z-index: 40;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast[data-toast-type="ok"] {
+      background: #166534;
+      color: #f8fffb;
+    }
+
+    .toast[data-toast-type="err"] {
+      background: #b42318;
+      color: #fff7f6;
+    }
+
+    .toast[data-toast-type="info"] {
+      background: #1f2937;
+      color: #f9fafb;
+    }
+
+    html.theme-dark .toast,
+    body.theme-dark .toast {
+      border-color: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
+    }
+
+    html.theme-dark .toast[data-toast-type="ok"],
+    body.theme-dark .toast[data-toast-type="ok"] {
+      background: #14532d;
+      color: #f7fee7;
+    }
+
+    html.theme-dark .toast[data-toast-type="info"],
+    body.theme-dark .toast[data-toast-type="info"] {
+      background: #111827;
+      color: #f9fafb;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 50;
+    }
+
+    .modal.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 32px;
+      max-width: 420px;
+      width: 92%;
+      text-align: center;
+      border: 1px solid var(--line);
+    }
+
+    .modal-card h3 {
+      font-size: 1.4rem;
+      margin-bottom: 12px;
+    }
+
+    .modal-card p {
+      margin-bottom: 24px;
+      color: var(--muted);
+    }
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: transparent;
+      border: none;
+      font-size: 1.4rem;
+      color: var(--muted);
+      cursor: pointer;
+      line-height: 1;
+    }
+    .modal-card {
+      position: relative;
+    }
+    .attorney-onboarding-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      z-index: 60;
+      background: rgba(10, 15, 25, 0.6);
+    }
+    .attorney-onboarding-overlay.is-active {
+      display: block;
+    }
+    .attorney-onboarding-modal {
+      width: min(420px, 92vw);
+      background: #ffffff;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+      text-align: center;
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+      z-index: 61;
+    }
+    .attorney-onboarding-modal.is-active {
+      display: block;
+    }
+    .attorney-onboarding-hero {
+      height: 150px;
+      background-image: url("hero-mountain.jpg");
+      background-size: cover;
+      background-position: center;
+    }
+    .attorney-onboarding-content {
+      padding: 22px 26px 28px;
+    }
+    .attorney-onboarding-title {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      color: #1a2230;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+    .attorney-onboarding-text {
+      color: #4b5563;
+      font-size: 0.98rem;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .attorney-onboarding-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+    .attorney-onboarding-btn {
+      border: 1px solid rgba(26, 34, 48, 0.18);
+      background: #f8fafc;
+      color: #1a2230;
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-weight: 300;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .attorney-onboarding-btn.primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: transparent;
+      box-shadow: 0 12px 24px rgba(182, 164, 122, 0.35);
+    }
+    .attorney-onboarding-btn:hover {
+      transform: translateY(-1px);
+    }
+    .attorney-onboarding-close {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      border: none;
+      background: transparent;
+      color: #8a94a6;
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+
+    .photo-crop-card {
+      max-width: 720px;
+      width: min(92vw, 720px);
+      text-align: left;
+      padding: 24px;
+    }
+
+    .photo-crop-title {
+      font-size: 1.25rem;
+      margin-bottom: 6px;
+    }
+
+    .photo-crop-card .photo-crop-subtitle {
+      color: #5f6877;
+      margin-bottom: 16px;
+    }
+
+    .photo-crop-stage {
+      height: min(60vh, 420px);
+      background: #f4f4f5;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      position: relative;
+    }
+
+    .photo-crop-stage img {
+      display: block;
+      max-width: 100%;
+    }
+
+    .photo-crop-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.88);
+      color: var(--ink);
+      font-size: 0.95rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 2;
+    }
+
+    .photo-crop-spinner {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid var(--line);
+      border-top-color: var(--accent);
+      animation: cropper-spin 0.9s linear infinite;
+    }
+
+    .photo-crop-card.is-loading .photo-crop-loading {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    @keyframes cropper-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .photo-crop-stage cropper-canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .photo-crop-stage:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .photo-crop-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .photo-crop-card .photo-crop-controls label {
+      font-size: 0.9rem;
+      color: #5f6877;
+      min-width: 52px;
+    }
+
+    body.theme-dark .photo-crop-card .photo-crop-subtitle,
+    body.theme-dark .photo-crop-card .photo-crop-controls label {
+      color: #cbd5e1;
+    }
+
+    .photo-crop-controls input[type="range"] {
+      flex: 1;
+    }
+
+    .photo-crop-controls input[type="range"][disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .photo-crop-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    body.attorney-classic {
+      --attorney-ink: #0f172a;
+      --attorney-muted: #5c6575;
+      --attorney-line: #dfe3ea;
+      --attorney-accent: #0b4bb3;
+      --attorney-subtle: #f5f7fb;
+    }
+
+    body.theme-dark.attorney-classic,
+    html.theme-dark body.attorney-classic {
+      --attorney-ink: #f4f6fb;
+      --attorney-muted: #9aa7c4;
+      --attorney-line: rgba(255, 255, 255, 0.12);
+      --attorney-accent: #7aa2ff;
+      --attorney-subtle: rgba(15, 23, 42, 0.7);
+    }
+
+    body.attorney-classic .content {
+      background: linear-gradient(180deg, #f7f8fb 0%, #eef2f7 100%);
+      position: relative;
+    }
+
+    body.theme-dark.attorney-classic .content,
+    html.theme-dark body.attorney-classic .content {
+      background: linear-gradient(180deg, rgba(14, 19, 30, 0.98) 0%, rgba(10, 14, 24, 1) 100%);
+    }
+
+    body.attorney-classic #settingsContent {
+      max-width: 1220px;
+      margin: 0 auto;
+    }
+
+    body.attorney-classic #profileSection {
+      color: var(--attorney-ink);
+      font-family: var(--font-sans);
+    }
+
+    body.attorney-classic #profileSection.settings-panel {
+      background: transparent;
+      border: none;
+      padding: 0;
+      box-shadow: none;
+    }
+
+    body.attorney-classic .page-header {
+      margin: 0 auto 28px;
+      max-width: 1220px;
+      padding: 0;
+    }
+
+    body.attorney-classic .unified-header h1 {
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 2.8rem;
+      color: var(--attorney-ink);
+    }
+
+    body.attorney-classic .unified-header p {
+      color: var(--attorney-muted);
+      font-size: 1rem;
+    }
+
+    body.attorney-classic #attorneySettings .settings-section {
+      background: transparent;
+      border: none;
+      padding: 0;
+      margin: 0 0 32px;
+    }
+
+    body.attorney-classic #attorneySettings .attorney-settings-inner {
+      display: grid;
+      gap: 24px;
+    }
+
+    body.attorney-classic #attorneySettings .attorney-grid {
+      grid-template-columns: minmax(0, 1.1fr) 460px;
+      gap: 40px;
+      grid-template-areas: "form photo";
+    }
+
+    body.attorney-classic #attorneySettings .form-stack {
+      grid-area: form;
+    }
+
+    body.attorney-classic #attorneySettings .avatar-block {
+      grid-area: photo;
+    }
+
+    body.attorney-classic #attorneySettings .photo-row {
+      margin-bottom: 18px;
+    }
+
+    body.attorney-classic #attorneySettings label {
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.72rem;
+      color: var(--attorney-muted);
+    }
+
+    body.attorney-classic #attorneySettings .form-field {
+      gap: 10px;
+    }
+
+    body.attorney-classic #attorneySettings .form-row {
+      gap: 22px;
+    }
+
+    body.attorney-classic #attorneySettings .form-field input,
+    body.attorney-classic #attorneySettings .form-field textarea,
+    body.attorney-classic #attorneySettings .dropdown-toggle,
+    body.attorney-classic #attorneySettings .dropdown-search input {
+      border-radius: 6px;
+      border: 1px solid var(--attorney-line);
+      background: var(--attorney-subtle);
+      color: var(--attorney-ink);
+      font-size: 0.98rem;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+
+    body.theme-dark.attorney-classic #attorneySettings .form-field input,
+    body.theme-dark.attorney-classic #attorneySettings .form-field textarea,
+    body.theme-dark.attorney-classic #attorneySettings .dropdown-toggle,
+    body.theme-dark.attorney-classic #attorneySettings .dropdown-search input,
+    html.theme-dark body.attorney-classic #attorneySettings .form-field input,
+    html.theme-dark body.attorney-classic #attorneySettings .form-field textarea,
+    html.theme-dark body.attorney-classic #attorneySettings .dropdown-toggle,
+    html.theme-dark body.attorney-classic #attorneySettings .dropdown-search input {
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    body.attorney-classic #attorneySettings .form-field input::placeholder,
+    body.attorney-classic #attorneySettings .form-field textarea::placeholder {
+      color: rgba(92, 101, 117, 0.7);
+    }
+
+    body.theme-dark.attorney-classic #attorneySettings .form-field input::placeholder,
+    body.theme-dark.attorney-classic #attorneySettings .form-field textarea::placeholder,
+    html.theme-dark body.attorney-classic #attorneySettings .form-field input::placeholder,
+    html.theme-dark body.attorney-classic #attorneySettings .form-field textarea::placeholder {
+      color: rgba(248, 251, 255, 0.6);
+    }
+
+    body.attorney-classic #attorneySettings .form-field input:focus,
+    body.attorney-classic #attorneySettings .form-field textarea:focus,
+    body.attorney-classic #attorneySettings .dropdown-toggle:focus,
+    body.attorney-classic #attorneySettings .dropdown-search input:focus {
+      border-color: var(--attorney-accent);
+      box-shadow: 0 0 0 2px rgba(11, 75, 179, 0.15);
+      outline: none;
+    }
+
+    body.attorney-classic #attorneySettings .avatar-frame,
+    body.attorney-classic #attorneySettings .avatar-frame--large {
+      border-radius: 6px;
+      border: 1px solid var(--attorney-line);
+      background: linear-gradient(135deg, #e7edf5, #cfd8e7);
+      color: #3f4e66;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    body.theme-dark.attorney-classic #attorneySettings .avatar-frame,
+    body.theme-dark.attorney-classic #attorneySettings .avatar-frame--large,
+    html.theme-dark body.attorney-classic #attorneySettings .avatar-frame,
+    html.theme-dark body.attorney-classic #attorneySettings .avatar-frame--large {
+      background: linear-gradient(135deg, rgba(40, 52, 74, 0.9), rgba(20, 30, 48, 0.95));
+      color: #cbd5f5;
+    }
+
+    body.attorney-classic #attorneySettings .avatar-frame--large {
+      width: 100%;
+      height: 430px;
+      font-size: 2.6rem;
+    }
+
+    body.attorney-classic #attorneySettings .avatar-frame--large:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 28px rgba(15, 23, 42, 0.18);
+    }
+
+    body.theme-dark.attorney-classic #attorneySettings .avatar-frame--large:hover,
+    html.theme-dark body.attorney-classic #attorneySettings .avatar-frame--large:hover {
+      box-shadow: 0 18px 28px rgba(0, 0, 0, 0.45);
+    }
+
+    body.attorney-classic #attorneySettings .avatar-frame span {
+      font-weight: 700;
+      letter-spacing: 0.12em;
+    }
+
+    body.attorney-classic #attorneySettings .dropdown-panel {
+      border-radius: 6px;
+      border: 1px solid var(--attorney-line);
+      box-shadow: 0 16px 28px rgba(15, 23, 42, 0.12);
+    }
+
+    body.attorney-classic #attorneySettings .dropdown-summary .chip {
+      background: #eef2f8;
+      color: var(--attorney-accent);
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    body.theme-dark.attorney-classic #attorneySettings .dropdown-summary .chip,
+    html.theme-dark body.attorney-classic #attorneySettings .dropdown-summary .chip {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--attorney-accent);
+    }
+
+    body.attorney-classic #attorneySettings .chip-remove {
+      color: rgba(92, 101, 117, 0.7);
+    }
+
+    body.attorney-classic #attorneySettings .dropdown-option.selected {
+      background: #f0f4ff;
+    }
+
+    body.theme-dark.attorney-classic #attorneySettings .dropdown-option.selected,
+    html.theme-dark body.attorney-classic #attorneySettings .dropdown-option.selected {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    body.attorney-classic #attorneySettings .dropdown-option input[type="checkbox"]:checked {
+      border-color: var(--attorney-accent);
+      background-color: var(--attorney-accent);
+    }
+
+    body.attorney-classic #attorneySettings .muted {
+      color: var(--attorney-muted);
+    }
+
+    body.attorney-classic #attorneySettings .attorney-settings-inner > .form-field {
+      border: 1px solid var(--attorney-line);
+      border-radius: 6px;
+      padding: 18px 20px;
+      background: #f9fbff;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    body.theme-dark.attorney-classic #attorneySettings .attorney-settings-inner > .form-field,
+    html.theme-dark body.attorney-classic #attorneySettings .attorney-settings-inner > .form-field {
+      background: var(--panel);
+      box-shadow: 0 12px 26px rgba(0, 0, 0, 0.45);
+    }
+
+    body.attorney-classic #attorneySettings:not(.hidden) ~ .settings-section {
+      background: #fff;
+      border: 1px solid var(--attorney-line);
+      border-radius: 6px;
+      padding: 20px 22px;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    body.theme-dark.attorney-classic #attorneySettings:not(.hidden) ~ .settings-section,
+    html.theme-dark body.attorney-classic #attorneySettings:not(.hidden) ~ .settings-section {
+      background: var(--panel);
+      box-shadow: 0 12px 26px rgba(0, 0, 0, 0.45);
+    }
+
+    body.attorney-classic #attorneySettings:not(.hidden) ~ .settings-section .section-title {
+      font-family: var(--font-sans);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 1.05rem;
+      color: var(--attorney-muted);
+      margin-bottom: 8px;
+    }
+
+    body.attorney-classic #attorneySettings:not(.hidden) ~ .settings-section .section-subtitle {
+      color: var(--attorney-muted);
+      font-size: 0.95rem;
+      margin-bottom: 16px;
+    }
+
+    body.attorney-classic #attorneySettings:not(.hidden) ~ .settings-section .toggle-row {
+      border-bottom: 1px solid var(--attorney-line);
+      padding: 16px 0;
+    }
+
+    body.attorney-classic #attorneySettings:not(.hidden) ~ .settings-section .pref-title {
+      font-weight: 700;
+      color: var(--attorney-ink);
+    }
+
+    body.attorney-classic #attorneySettings:not(.hidden) ~ .settings-section .pref-desc {
+      color: var(--attorney-muted);
+    }
+
+    body.attorney-classic #attorneySettings:not(.hidden) ~ .actions-row {
+      justify-content: flex-start;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    body.attorney-classic #attorneySettings:not(.hidden) ~ .actions-row .btn {
+      border-radius: 4px;
+      font-weight: 700;
+      padding: 10px 16px;
+    }
+
+    body.attorney-classic #saveAttorneyProfile {
+      background: var(--attorney-accent);
+      color: #fff;
+      border-color: var(--attorney-accent);
+    }
+
+    body.attorney-classic #saveAttorneyProfile:hover {
+      background: #093d91;
+      border-color: #093d91;
+    }
+
+    body.attorney-classic #attorneyPreviewProfileBtn {
+      background: #fff;
+      color: var(--attorney-accent);
+      border: 1px solid var(--attorney-line);
+    }
+
+    body.theme-dark.attorney-classic #attorneyPreviewProfileBtn,
+    html.theme-dark body.attorney-classic #attorneyPreviewProfileBtn {
+      background: var(--panel);
+      color: var(--attorney-accent);
+    }
+
+
+    @media (max-width: 900px) {
+  .attorney-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.attorney-classic #attorneySettings .attorney-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "form"
+      "photo";
+  }
+
+  body.attorney-classic #attorneySettings .avatar-frame--large {
+    height: 340px;
+  }
+}
+
+@media (max-width: 960px) {
+  html,
+  body {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    flex-direction: row;
+  }
+  body.paralegal-flat .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 260px;
+    height: 100vh;
+    border-right: none;
+    border-bottom: none;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 24px;
+    padding: 24px 18px 24px;
+    padding-top: 72px;
+    transform: translateX(-110%);
+    transition: transform 0.25s ease;
+    z-index: 2000;
+    box-shadow: 18px 0 40px rgba(0, 0, 0, 0.18);
+  }
+
+  body.paralegal-flat.nav-open .sidebar {
+    transform: translateX(0);
+  }
+
+  body.paralegal-flat.nav-open .sidebar-backdrop {
+    display: block;
+  }
+
+  body.paralegal-flat .sidebar-toggle {
+    display: inline-flex;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+  }
+
+  body.paralegal-flat .settings-nav {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  body.paralegal-flat .settings-nav button {
+    flex: initial;
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+  }
+
+  body.paralegal-flat .settings-item {
+    padding: 10px 14px;
+    font-size: 0.95rem;
+  }
+
+  body.attorney-classic .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 260px;
+    height: 100vh;
+    border-right: none;
+    border-bottom: none;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 24px;
+    padding: 24px 18px;
+    padding-top: 72px;
+    transform: translateX(-110%);
+    transition: transform 0.25s ease;
+    z-index: 2000;
+    box-shadow: 18px 0 40px rgba(0, 0, 0, 0.18);
+  }
+
+  body.attorney-classic.nav-open .sidebar {
+    transform: translateX(0);
+  }
+
+  body.attorney-classic.nav-open .sidebar-backdrop {
+    display: block;
+  }
+
+  body.attorney-classic .sidebar-toggle {
+    display: inline-flex;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+  }
+
+  body.attorney-classic .settings-nav {
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+
+  body.attorney-classic .settings-nav button {
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+    flex: initial;
+  }
+
+  body.attorney-classic .settings-item {
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+  }
+
+  body.attorney-classic #dashboardReturnLink {
+    width: 100%;
+    text-align: left;
+  }
+
+  body.paralegal-flat #dashboardReturnLink {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 12px 16px;
+    border: none;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--sidebar-text);
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: inherit;
+    letter-spacing: normal;
+    text-align: left;
+    text-transform: none;
+  }
+
+  body.paralegal-flat #dashboardReturnLink:hover,
+  body.paralegal-flat #dashboardReturnLink:focus-visible {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--ink);
+    transform: none;
+  }
+
+  body.attorney-classic .topbar {
+    margin-bottom: 1.25rem;
+    min-height: 56px;
+    justify-content: flex-end;
+    gap: 12px;
+    order: -1;
+  }
+
+  body.attorney-classic .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+      .sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 16px 12px;
+      }
+      .settings-nav {
+        flex-direction: row;
+        flex-wrap: wrap;
+        flex: 1;
+        gap: 8px;
+      }
+      .settings-nav button {
+        flex: 1 1 120px;
+        text-align: center;
+        padding: 8px 10px;
+        font-size: 0.95rem;
+      }
+      .settings-item {
+        padding: 8px 10px;
+        font-size: 0.95rem;
+      }
+      .content {
+        padding: 28px 20px 60px;
+        overflow-y: visible;
+      }
+
+      body.theme-dark.paralegal-flat .topbar .lpc-shared-header .user-chip,
+      html.theme-dark body.paralegal-flat .topbar .lpc-shared-header .user-chip {
+        background: #111827 !important;
+        background-image: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
+      .scroll-indicator {
+        right: 18px;
+        bottom: 18px;
+        padding: 9px 12px;
+        font-size: 0.76rem;
+      }
+
+      .unified-header {
+        flex-direction: column;
+        gap: 20px;
+      }
+      #accountSettingsTitle {
+        text-align: center;
+      }
+    }
+
+    body * {
+      box-shadow: none !important;
+    }
+  </style>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260831-21" />
+  <link rel="stylesheet" href="assets/styles/lpc-product-components.css?v=20260901-1" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260902-5" />
+  <script defer src="assets/scripts/universal-header.js?v=20260831-3"></script>
+  <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
+  <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
+  <link rel="stylesheet" href="assets/styles/profile-settings-paralegal-final.css?v=20260902-5" />
+<link rel="stylesheet" href="assets/styles/admin-security.css">
+</head>
+<body class="dashboard-no-shadows lpc-product-clean lpc-auth-resource-page lpc-static-universal-header lpc-auth-shell-v2 lpc-settings-shell sidebar-layout-ready settings-layout-ready">
+  <script>
+    if (document.documentElement.classList.contains('role-paralegal')) {
+      document.body.classList.add('paralegal-flat');
+    }
+  </script>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
+    <span class="lpc-mobile-menu-icon" aria-hidden="true"></span>
+  </button>
+  <aside class="sidebar" id="sidebarNav">
+    <div class="logo sidebar-profile-host">
+      <div class="sidebar-profile-cluster" data-lpc-sidebar-profile>
+        <button class="user-chip lpc-sidebar-profile-trigger" type="button" data-lpc-sidebar-profile-trigger aria-label="Open profile menu" aria-haspopup="true" aria-expanded="false">
+          <img class="globalProfileImage lpc-sidebar-profile-trigger-avatar" src="assets/avatar-placeholder.svg" alt="" />
+          <span class="lpc-sidebar-profile-trigger-details"><strong class="globalProfileName">Member</strong></span>
+          <svg class="lpc-profile-trigger-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"></path></svg>
+        </button>
+      </div>
+    </div>
+    <script src="assets/scripts/sidebar-first-paint.js?v=20260902-2"></script>
+    <nav class="paralegal-account-nav" aria-label="Main navigation" data-paralegal-only>
+      <a href="dashboard-paralegal.html#home" class="lpc-sidebar-nav-link"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"></path><path d="M5 9v11h14V9"></path><path d="M9 20v-6h6v6"></path></svg><span class="lpc-sidebar-nav-label">Home</span></a>
+      <a href="browse-jobs.html" class="lpc-sidebar-nav-link"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path><path d="M8 11h6"></path><path d="M11 8v6"></path></svg><span class="lpc-sidebar-nav-label">Browse Matters</span></a>
+      <a href="dashboard-paralegal.html#cases" class="lpc-sidebar-nav-link"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M3 12h18"></path></svg><span class="lpc-sidebar-nav-label">My Matters &amp; Applications</span></a>
+      <div class="lpc-sidebar-section-label">Account</div>
+      <a href="profile-settings.html" class="active lpc-sidebar-nav-link lpc-sidebar-nav-link--secondary" aria-current="page"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg><span class="lpc-sidebar-nav-label">Profile Settings</span></a>
+      <a href="paralegalhelp.html" class="lpc-sidebar-nav-link lpc-sidebar-nav-link--secondary"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9a2.7 2.7 0 1 1 4.6 1.9c-1.1.9-2.1 1.3-2.1 3.1"></path><path d="M12 18h.01"></path></svg><span class="lpc-sidebar-nav-label">Help</span></a>
+    </nav>
+    <nav class="settings-nav" aria-label="Settings navigation" data-attorney-only>
+      <button id="navSettings" class="settings-item" type="button" data-target="settingsDirectorySection" data-sidebar-icon="settings" data-attorney-only>Settings</button>
+      <button id="navProfile" class="settings-item active" type="button" data-target="profileSection" data-sidebar-icon="profile">Profile</button>
+      <button id="navSecurity" class="settings-item" type="button" data-target="securitySection" data-sidebar-icon="security">Security</button>
+      <button id="navPreferences" class="settings-item" type="button" data-target="preferencesSection" data-sidebar-icon="preferences">Preferences</button>
+      <button id="navHelp" class="settings-item" type="button" data-sidebar-icon="help">Help</button>
+    </nav>
+    <a class="btn btn-outline btn-light" id="dashboardReturnLink" href="dashboard-attorney.html" style="margin-top:auto;" data-attorney-only>Return to Dashboard</a>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+
+  <div class="lpc-auth-page-shell">
+  <div class="lpc-universal-header-shell lpc-universal-header-shell--created" role="group" aria-label="Workspace tools" data-lpc-universal-header="true">
+    <div class="lpc-universal-header-controls" data-notification-center="true" aria-label="Search, notifications, and Assistant">
+      <div class="lpc-global-search-host" data-productivity-trigger-host></div>
+      <div class="notification-wrapper"><button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span class="notification-badge" data-notification-badge>0</span></button><div class="notifications-panel notif-panel hidden" role="region" aria-label="Notifications" aria-live="polite" data-notification-panel><div class="notif-header" aria-label="Notifications"></div><div class="notif-scroll" data-notification-list></div><div class="notif-empty" data-notification-empty>Loading…</div><button type="button" class="notif-markall" data-notification-mark>Mark All Read</button></div></div>
+    </div>
+  </div>
+  <main id="main" tabindex="-1" class="content">
+    <div class="page-header">
+      <section class="unified-header" aria-label="Account settings header">
+        <div class="title-block">
+          <h1 id="accountSettingsTitle">Account Settings</h1>
+          <p id="accountSettingsSubtitle">Manage your profile, security, and preferences.</p>
+        </div>
+      </section>
+      <div class="topbar" data-attorney-header>
+        <div class="header-skeleton" aria-hidden="true">
+          <div class="skeleton-circle"></div>
+          <div class="skeleton-stack">
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line medium"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="settingsContent" aria-busy="true">
+      <nav class="account-settings-tabs" aria-label="Account Settings categories" data-paralegal-only>
+        <button type="button" class="active" data-settings-section="profileSection">Profile</button>
+        <button type="button" data-settings-section="securitySection">Security</button>
+        <button type="button" data-settings-section="preferencesSection">Preferences</button>
+      </nav>
+      <section class="settings-section settings-directory" id="settingsDirectorySection" data-attorney-only aria-labelledby="settingsDirectoryHeading">
+        <h2 class="sr-only" id="settingsDirectoryHeading">Attorney settings directory</h2>
+        <div class="settings-directory-search">
+          <label for="settingsDirectorySearch">Search settings</label>
+          <div class="settings-directory-search-field">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <circle cx="8.5" cy="8.5" r="5.25"></circle>
+              <path d="m12.5 12.5 4 4"></path>
+            </svg>
+            <input id="settingsDirectorySearch" type="search" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="settings-directory-groups">
+          <section class="settings-directory-group" data-settings-group="Personal settings">
+            <h3>Personal settings</h3>
+            <div class="settings-directory-grid">
+              <a class="settings-destination" href="#profile:personal" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><circle cx="10" cy="6.25" r="3.25"></circle><path d="M4.25 17c.35-3.3 2.3-5.1 5.75-5.1s5.4 1.8 5.75 5.1"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Personal details</strong><span>Name, email address, and profile photo.</span></span>
+              </a>
+              <a class="settings-destination" href="#securitySection" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><rect x="4.25" y="8.5" width="11.5" height="8" rx="2"></rect><path d="M6.75 8.5V6.25a3.25 3.25 0 0 1 6.5 0V8.5"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Sign-in &amp; security</strong><span>Password, two-step verification, passkeys, and active sessions.</span></span>
+              </a>
+              <a class="settings-destination" href="#profile:notifications" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M15.25 8a5.25 5.25 0 1 0-10.5 0c0 5-2.25 6.25-2.25 6.25h15S15.25 13 15.25 8"></path><path d="M11.75 16.25a2 2 0 0 1-3.5 0"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Communication preferences</strong><span>Choose which matter, message, and account email notifications you receive.</span></span>
+              </a>
+              <a class="settings-destination" href="#preferencesSection" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M3 5.25h14M3 10h14M3 14.75h14"></path><circle cx="7" cy="5.25" r="1.75"></circle><circle cx="13" cy="10" r="1.75"></circle><circle cx="8.5" cy="14.75" r="1.75"></circle></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Display preferences</strong><span>Adjust appearance, text size, primary state, and dashboard guidance.</span></span>
+              </a>
+            </div>
+          </section>
+
+          <section class="settings-directory-group" data-settings-group="Attorney profile">
+            <h3>Attorney profile</h3>
+            <div class="settings-directory-grid">
+              <a class="settings-destination" href="#profile:public" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"></circle><path d="M3.5 10h13M10 3c2 2 3 4.3 3 7s-1 5-3 7c-2-2-3-4.3-3-7s1-5 3-7"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Public profile</strong><span>Manage how you appear to paralegals on LPC.</span></span>
+              </a>
+              <a class="settings-destination" href="#profile:firm" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M3.5 17V6.5L10 3l6.5 3.5V17M7 17v-4h6v4M6.5 8.5h.01M10 8.5h.01M13.5 8.5h.01"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Firm &amp; practice</strong><span>Firm details, website, practice areas, and professional background.</span></span>
+              </a>
+            </div>
+          </section>
+
+          <section class="settings-directory-group" data-settings-group="Payments">
+            <h3>Payments</h3>
+            <div class="settings-directory-grid">
+              <a class="settings-destination" href="dashboard-attorney.html?from=settings&amp;settingsTarget=payment-method#funds" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><rect x="2.75" y="5" width="14.5" height="10" rx="2"></rect><path d="M2.75 8.25h14.5M5.5 12h3"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Payment methods</strong><span>Manage the payment methods used to fund matters.</span></span>
+              </a>
+              <a class="settings-destination" href="dashboard-attorney.html?from=settings&amp;settingsTarget=billing-history#funds" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M5 2.75h8l2.25 2.25v12.25H5zM13 2.75V5h2.25M7.5 9h5M7.5 12h5M7.5 15h3"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Billing history</strong><span>View completed Matter payments and available receipts.</span></span>
+              </a>
+              <a class="settings-destination" href="attorney-faq.html#q8" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"></circle><path d="M12.75 7.25c0-1.3-1.1-2.25-2.65-2.25-1.4 0-2.45.7-2.85 1.8M10 13.75v.1M10 11.5c0-1.7 2.75-1.55 2.75-4.25"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Platform fees</strong><span>Review LPC’s current attorney platform fee and Matter billing disclosures.</span></span>
+              </a>
+            </div>
+          </section>
+
+          <section class="settings-directory-group" data-settings-group="Account">
+            <h3>Account</h3>
+            <div class="settings-directory-grid">
+              <a class="settings-destination" href="#security:closure" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M4 5.5h12M7 5.5V3.75h6V5.5M6 5.5l.75 11h6.5l.75-11M8.5 8.25v5.5M11.5 8.25v5.5"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Account closure</strong><span>Deactivate your account and review how historical records are retained.</span></span>
+              </a>
+              <a class="settings-destination" href="terms.html" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M4.25 2.75h8l3.5 3.5v11H4.25zM12.25 2.75v3.5h3.5M7 10h6M7 13h6"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Legal &amp; agreements</strong><span>Review the Terms of Service and policies associated with your account.</span></span>
+              </a>
+              <a class="settings-destination" href="privacy.html" data-settings-destination>
+                <span class="settings-destination-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path d="M10 2.5 16 5v4.5c0 3.8-2.4 6.6-6 8-3.6-1.4-6-4.2-6-8V5z"></path><path d="M7.5 10 9 11.5l3.5-3.5"></path></svg>
+                </span>
+                <span class="settings-destination-copy"><strong>Privacy policy</strong><span>Review how LPC handles personal information, retention, and privacy requests.</span></span>
+              </a>
+            </div>
+          </section>
+        </div>
+        <p class="settings-directory-empty" id="settingsDirectoryEmpty" role="status" hidden>No settings found.</p>
+      </section>
+
+      <section class="settings-panel settings-section active" id="profileSection">
+
+        <div id="attorneySettings" class="role-settings hidden" data-attorney-settings>
+          <a class="settings-back-link" href="profile-settings.html" data-attorney-only>Back to settings</a>
+          <div class="attorney-settings-stack">
+            <section class="attorney-settings-panel" id="attorneyPersonalSection" aria-labelledby="attorneyPersonalHeading">
+              <span id="profile:personal" hidden></span>
+              <div class="attorney-panel-header">
+                <h2 id="attorneyPersonalHeading">Personal information</h2>
+                <p>Manage the information attached to your LPC account.</p>
+              </div>
+
+              <div class="attorney-photo-setting">
+                <div class="attorney-photo-label">Profile photo</div>
+                <div class="attorney-photo-value">
+                  <div class="avatar-frame" id="attorneyAvatarFrame" role="button" tabindex="0" aria-label="Edit current profile photo">
+                    <img id="attorneyAvatarPreview" alt="Current profile photo" hidden />
+                    <span id="attorneyAvatarInitials">A</span>
+                  </div>
+                  <div class="attorney-photo-copy">
+                    <p>JPEG or PNG. 5 MB maximum.</p>
+                    <div class="avatar-actions">
+                      <button type="button" class="btn btn-outline avatar-edit-btn" id="editAttorneyAvatarBtn">Change photo</button>
+                      <button type="button" class="avatar-remove-btn hidden" id="removeAttorneyAvatarBtn">Remove</button>
+                    </div>
+                  </div>
+                </div>
+                <input type="file" id="attorneyAvatarInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden />
+              </div>
+
+              <div class="attorney-form-grid attorney-form-grid--names">
+                <div class="form-field">
+                  <label for="attorneyFirstName">First name</label>
+                  <input id="attorneyFirstName" type="text" autocomplete="given-name" required aria-describedby="attorneyFirstNameError" />
+                  <p class="field-error" id="attorneyFirstNameError" role="alert" hidden></p>
+                </div>
+                <div class="form-field">
+                  <label for="attorneyLastName">Last name</label>
+                  <input id="attorneyLastName" type="text" autocomplete="family-name" required aria-describedby="attorneyLastNameError" />
+                  <p class="field-error" id="attorneyLastNameError" role="alert" hidden></p>
+                </div>
+              </div>
+              <div class="form-field">
+                <label for="attorneyEmail">Email</label>
+                <input id="attorneyEmail" type="email" autocomplete="email" disabled />
+                <p class="field-help">Contact support if you need to change the email for this account.</p>
+              </div>
+            </section>
+
+            <section class="attorney-settings-panel" id="attorneyProfessionalSection" aria-labelledby="attorneyProfessionalHeading">
+              <span id="profile:public" hidden></span>
+              <div class="attorney-panel-header">
+                <h2 id="attorneyProfessionalHeading">Professional profile</h2>
+                <p>This information appears on your public attorney profile.</p>
+              </div>
+
+              <div class="attorney-form-grid">
+                <div class="form-field">
+                  <label for="attorneyLinkedIn">LinkedIn</label>
+                  <input id="attorneyLinkedIn" type="url" inputmode="url" placeholder="https://www.linkedin.com/in/username" aria-describedby="attorneyLinkedInError" />
+                  <p class="field-error" id="attorneyLinkedInError" role="alert" hidden></p>
+                </div>
+                <div class="form-field">
+                  <label for="attorneyFirmName">Firm name</label>
+                  <span id="profile:firm" hidden></span>
+                  <input id="attorneyFirmName" type="text" autocomplete="organization" />
+                </div>
+                <div class="form-field">
+                  <label for="attorneyFirmWebsite">Firm website</label>
+                  <input id="attorneyFirmWebsite" type="url" inputmode="url" placeholder="https://yourfirm.com" aria-describedby="attorneyFirmWebsiteError" />
+                  <p class="field-error" id="attorneyFirmWebsiteError" role="alert" hidden></p>
+                </div>
+                <div class="form-field">
+                  <label id="attorneyPracticeLabel">Field of Law / Practices</label>
+                  <div class="dropdown-multiselect narrow">
+                    <button type="button" id="attorneyPracticeDropdownToggle" class="dropdown-toggle" aria-labelledby="attorneyPracticeLabel attorneyPracticeSummary" aria-haspopup="listbox" aria-expanded="false">
+                      <span id="attorneyPracticeSummary" class="dropdown-summary">Select fields</span>
+                      <span class="dropdown-caret" aria-hidden="true">▾</span>
+                    </button>
+                    <div id="attorneyPracticeDropdown" class="dropdown-panel" role="listbox" aria-multiselectable="true"></div>
+                  </div>
+                  <p class="field-help">Select all that apply.</p>
+                </div>
+              </div>
+
+              <div class="form-field attorney-form-field--wide">
+                <label for="attorneyPracticeDescription">Practice description</label>
+                <textarea id="attorneyPracticeDescription" rows="5" maxlength="4000" placeholder="Briefly describe your practice, areas of focus, or how you collaborate with paralegals."></textarea>
+                <div id="attorneyPracticeCount" class="field-count">0 / 4000 characters</div>
+              </div>
+
+              <div class="form-field attorney-form-field--wide">
+                <label for="attorneyPublications">Publications &amp; presentations</label>
+                <textarea id="attorneyPublications" rows="4" aria-describedby="attorneyPublicationsHelp"></textarea>
+                <p class="field-help" id="attorneyPublicationsHelp">Enter one publication or presentation per line.</p>
+              </div>
+            </section>
+
+            <section class="attorney-settings-panel" id="attorneyNotificationsSection" aria-labelledby="attorneyNotificationsHeading">
+              <span id="profile:notifications" hidden></span>
+              <div class="attorney-panel-header">
+                <h2 id="attorneyNotificationsHeading">Notifications</h2>
+                <p>Control email updates about your account and Matters.</p>
+              </div>
+              <div id="attorneyNotificationToggles">
+                <div class="toggle-row">
+                  <div>
+                    <div class="pref-title">Email notifications</div>
+                    <div class="pref-desc">Receive essential account updates in your inbox.</div>
+                  </div>
+                  <label class="switch">
+                    <span class="sr-only">Email notifications</span>
+                    <input type="checkbox" id="attorneyEmailNotifications" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div class="toggle-row">
+                  <div>
+                    <div class="pref-title">New message alerts</div>
+                    <div class="pref-desc">Email me whenever a hired paralegal replies.</div>
+                  </div>
+                  <label class="switch">
+                    <span class="sr-only">New message alerts</span>
+                    <input type="checkbox" id="attorneyMessageAlerts" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div class="toggle-row">
+                  <div>
+                    <div class="pref-title">Matter updates</div>
+                    <div class="pref-desc">Email me when a paralegal accepts an invite or a Matter changes.</div>
+                  </div>
+                  <label class="switch">
+                    <span class="sr-only">Matter updates</span>
+                    <input type="checkbox" id="attorneyCaseUpdates" />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+            </section>
+
+            <div class="attorney-actions" data-attorney-only>
+              <p id="attorneySaveStatus" class="attorney-save-status" role="status" aria-live="polite" hidden></p>
+              <div class="attorney-action-buttons">
+                <button id="attorneyPreviewProfileBtn" class="btn btn-outline" type="button">View profile</button>
+                <button id="saveAttorneyProfile" class="btn btn-primary" type="button" disabled>Save changes</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      <div id="paralegalSettings" class="role-settings hidden">
+        <form id="profileForm" class="paralegal-profile-form">
+          <section class="profile-layout">
+            <aside class="profile-sidebar">
+              <div class="profile-photo-block">
+                <div class="hero-photo-shell">
+                  <div class="hero-photo">
+                    <div class="avatar-frame" id="avatarFrame" role="button" tabindex="0" aria-label="Upload profile photo" aria-expanded="false">
+                      <img id="avatarPreview" data-avatar alt="Profile photo" />
+                      <span id="avatarInitials">P</span>
+                    </div>
+                  </div>
+                  <div class="avatar-actions hidden" id="avatarPhotoActions" role="menu" aria-label="Profile photo actions">
+                    <button type="button" class="avatar-edit-btn hidden" id="editAvatarBtn" role="menuitem">Edit photo</button>
+                    <button type="button" class="avatar-remove-btn hidden" id="removeAvatarBtn" role="menuitem">Remove photo</button>
+                  </div>
+                </div>
+                <div id="photoReviewStatus" class="photo-review-status hidden" role="status" aria-live="polite"></div>
+                <input type="file" id="avatarInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden />
+                <p class="photo-guidelines">
+                  Professional headshot required. Neutral background and business attire recommended.
+                  Replacing your photo temporarily hides your profile from attorney discovery until the new photo is approved.
+                </p>
+                <div class="profile-meta-stack">
+                  <div class="profile-meta-columns">
+                    <label class="hero-meta-pill" for="emailInput">Email</label>
+                    <input type="email" id="emailInput" name="email" autocomplete="email" required />
+                    <label class="hero-meta-pill" for="linkedInInput">LinkedIn</label>
+                    <input type="url" id="linkedInInput" name="linkedInURL" placeholder="https://www.linkedin.com/in/username" />
+                    <label class="hero-meta-pill" for="yearsExperienceInput">Years of Experience</label>
+                    <input type="number" id="yearsExperienceInput" min="0" max="99" placeholder="e.g., 5" />
+                  </div>
+                </div>
+              </div>
+
+            </aside>
+
+            <section class="profile-main">
+              <div class="profile-readiness" id="profileReadiness" role="status" aria-live="polite">
+                <div class="profile-readiness-copy">
+                  <span class="profile-readiness-kicker">Profile readiness</span>
+                  <strong id="profileReadinessTitle">Your profile is ready</strong>
+                  <span id="profileReadinessDetail" hidden></span>
+                </div>
+                <button class="profile-readiness-action" id="profileReadinessAction" type="button" aria-label="Review missing profile information" hidden>Review</button>
+              </div>
+              <section class="profile-header" aria-label="Paralegal profile">
+                <div class="profile-header-main">
+                  <div class="profile-identity">
+                    <div class="full-name-input" data-field-label="Full name">
+                      <input type="text" id="fullNameInput" name="fullName" autocomplete="name" required aria-label="Full name" class="profile-name-input" />
+                    </div>
+                    <div class="full-name-hidden">
+                      <input type="text" id="firstNameInput" name="firstName" autocomplete="given-name" required />
+                      <input type="text" id="lastNameInput" name="lastName" autocomplete="family-name" required />
+                    </div>
+                    <div class="profile-section section-editable" id="bioSection" data-edit-section="bio">
+                      <div class="section-header">
+                        <span class="card-header-label">Bio</span>
+                        <button class="section-edit-toggle" type="button" data-edit-toggle="bio" aria-label="Edit bio" aria-pressed="false">Edit</button>
+                      </div>
+                      <div class="section-display" data-section-display="bio">
+                        <p id="bioDisplay" class="section-display-text"></p>
+                      </div>
+                      <div class="section-edit" data-section-edit="bio">
+                        <textarea id="bioInput" name="bio" class="bio-input" aria-label="Bio"></textarea>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <div class="profile-section-row">
+                <article class="profile-section section-editable" id="practiceAreasCard" data-edit-section="practiceAreas">
+                  <div class="section-header">
+                    <span class="card-header-label" id="paralegalPracticeLabel">Practice Areas</span>
+                    <button class="section-edit-toggle" type="button" data-edit-toggle="practiceAreas" aria-label="Edit practice areas" aria-pressed="false">Edit</button>
+                  </div>
+                  <div class="section-display" data-section-display="practiceAreas">
+                    <p id="practiceAreasDisplay" class="section-display-text"></p>
+                  </div>
+                  <div class="section-edit" data-section-edit="practiceAreas">
+                    <div class="chip-section" id="practiceSection">
+                      <div class="dropdown-multiselect narrow">
+                        <button type="button" id="paralegalPracticeDropdownToggle" class="dropdown-toggle" aria-labelledby="paralegalPracticeLabel paralegalPracticeSummary">
+                          <span id="paralegalPracticeSummary" class="dropdown-summary">Select fields</span>
+                          <span class="dropdown-caret" aria-hidden="true">▾</span>
+                        </button>
+                        <div id="paralegalPracticeDropdown" class="dropdown-panel" role="listbox" aria-multiselectable="true"></div>
+                      </div>
+                      <div class="muted" style="font-size:0.85rem;margin-top:6px;">Select all that apply.</div>
+                      <input type="hidden" id="practiceAreasInput" />
+                    </div>
+                  </div>
+                </article>
+
+                <article class="profile-section section-editable" id="stateExperienceCard" data-edit-section="stateExperience">
+                  <div class="section-header">
+                    <span class="card-header-label">State Experience</span>
+                    <button class="section-edit-toggle" type="button" data-edit-toggle="stateExperience" aria-label="Edit state experience" aria-pressed="false">Edit</button>
+                  </div>
+                  <div class="section-display" data-section-display="stateExperience">
+                    <p id="stateExperienceDisplay" class="section-display-text"></p>
+                  </div>
+                  <div class="section-edit" data-section-edit="stateExperience">
+                    <div class="state-experience-editor">
+                      <div id="stateExperienceChips" class="chip-cloud" aria-live="polite"></div>
+                      <input
+                        type="text"
+                        id="stateExperienceInput"
+                        placeholder="e.g., VA"
+                        aria-label="State abbreviation"
+                        autocomplete="off"
+                        aria-describedby="stateExperienceHelp"
+                      />
+                      <p class="muted" id="stateExperienceHelp">Add states using the two-letter abbreviation, then press Enter.</p>
+                    </div>
+                  </div>
+                </article>
+              </div>
+
+              <div class="profile-section-row profile-section-row--highlights">
+                <article class="profile-section section-editable" id="skillsCard" data-edit-section="skills">
+                  <div class="section-header">
+                    <span class="card-header-label">Skills</span>
+                    <button class="section-edit-toggle" type="button" data-edit-toggle="skills" aria-label="Edit skills" aria-pressed="false">Edit</button>
+                  </div>
+                  <div class="section-display" data-section-display="skills">
+                    <p id="skillsDisplay" class="section-display-text"></p>
+                  </div>
+                  <div class="section-edit" data-section-edit="skills">
+                    <div class="chip-section skills-editor" id="skillsSection">
+                      <div id="skillsChips" class="chip-cloud" aria-live="polite"></div>
+                      <input type="text" id="skillsInput" placeholder="Type a skill and press Enter" />
+                    </div>
+                  </div>
+                </article>
+
+                <article class="profile-section section-editable" id="bestForSection" data-edit-section="bestFor">
+                  <div class="section-header">
+                    <span class="card-header-label">Best For</span>
+                    <button class="section-edit-toggle" type="button" data-edit-toggle="bestFor" aria-label="Edit best-for entries" aria-pressed="false">Edit</button>
+                  </div>
+                  <div class="best-for-body" role="region" aria-label="Best For entries" tabindex="0">
+                    <div class="section-display" data-section-display="bestFor">
+                      <ul id="bestForDisplay" class="section-display-text best-for-list" aria-label="Best For list"></ul>
+                    </div>
+                  </div>
+                </article>
+              </div>
+
+              <article class="profile-section section-editable" id="experienceCard" data-edit-section="experience">
+                <div class="section-header">
+                  <span class="card-header-label">Experience</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="experience" aria-label="Edit experience" aria-pressed="false">Edit</button>
+                </div>
+                <div class="section-display" data-section-display="experience">
+                  <p id="experienceDisplay" class="section-display-text"></p>
+                </div>
+                <div class="section-edit" data-section-edit="experience">
+                  <div class="experience-rows" id="experienceRows"></div>
+                  <button type="button" class="btn btn-outline" id="addExperienceRow" aria-label="Add law firm" title="Add law firm">+</button>
+                </div>
+              </article>
+
+              <article class="profile-section section-editable" id="educationCard" data-edit-section="education">
+                <div class="section-header">
+                  <span class="card-header-label">Education</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="education" aria-label="Edit education" aria-pressed="false">Edit</button>
+                </div>
+                <div class="section-display" data-section-display="education">
+                  <p id="educationDisplay" class="section-display-text"></p>
+                </div>
+                <div class="section-edit" data-section-edit="education">
+                  <div id="educationEditor" class="education-editor"></div>
+                  <button type="button" class="btn btn-outline" id="addEducationBtn">Add education</button>
+                </div>
+              </article>
+
+              <article class="profile-section section-editable" id="languagesRow" data-edit-section="languages">
+                <div class="section-header">
+                  <span class="card-header-label">Languages</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="languages" aria-label="Edit languages" aria-pressed="false">Edit</button>
+                </div>
+                <div class="section-display" data-section-display="languages">
+                  <p id="languagesDisplay" class="section-display-text"></p>
+                </div>
+                <div class="section-edit" data-section-edit="languages">
+                  <div id="languagesEditor" class="language-editor"></div>
+                  <button type="button" class="btn btn-outline" id="addLanguageBtn">Add language</button>
+                </div>
+              </article>
+
+              <article class="profile-section section-editable" id="documentsSection" data-edit-section="documents">
+                <div class="section-header">
+                  <button class="section-edit-toggle documents-toggle" type="button" data-edit-toggle="documents" aria-label="Toggle documents uploads" aria-expanded="false" aria-pressed="false">
+                    <span>Documents</span>
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M5 7l5 6 5-6H5z" fill="currentColor"></path>
+                    </svg>
+                  </button>
+                </div>
+                <div class="profile-docs-stack">
+                  <div class="field-block" data-paralegal-only id="settingsResume"></div>
+                  <div class="field-block" data-paralegal-only id="settingsCertificate"></div>
+                  <div class="field-block" data-paralegal-only id="settingsWritingSample"></div>
+                </div>
+              </article>
+
+            </section>
+          </section>
+
+          <div class="btn-row paralegal-actions">
+            <p id="profileSaveStatus" class="profile-save-status" role="status" aria-live="polite">All changes saved.</p>
+            <details class="profile-standards-tooltip">
+              <summary>Professional Standards</summary>
+              <div class="profile-standards-tooltip-panel" role="note" aria-label="Professional standards">
+                <p>Matters posted on Let’s-ParaConnect have a minimum posted amount of <span class="fyi-amount">$400</span>. The minimum is a posting requirement, not a guarantee of scope, quality, or fit. Attorneys are solely responsible for evaluating the Matter scope and selecting any paralegal they choose to engage.</p>
+              </div>
+            </details>
+            <button class="btn btn-primary" type="button" id="profileSaveBtn">Save changes</button>
+            <button class="btn btn-outline" type="button" id="previewProfileBtn">
+    View Profile
+  </button>
+          </div>
+        </form>
+        <div class="hidden" aria-hidden="true">
+          <section class="settings-panel" id="settingsSkills" data-paralegal-only></section>
+          <section class="settings-panel" id="settingsEducation" data-paralegal-only></section>
+          <section class="settings-panel" id="settingsAwards" data-paralegal-only></section>
+        </div>
+      </div>
+    </section>
+
+    <section id="securitySection" class="settings-section">
+      <div class="attorney-section-page-header focused-settings-header">
+        <a class="settings-back-link" href="profile-settings.html" data-attorney-only>Back to settings</a>
+        <h2>Security</h2>
+        <p>Manage sign-in methods, devices, and account access.</p>
+      </div>
+      <div class="security-grid">
+        <div class="security-column">
+          <div class="settings-block" data-paralegal-only>
+            <div class="settings-title-with-help">
+              <h3>Payout Setup</h3>
+              <details class="settings-help-tooltip">
+                <summary aria-label="Payout timing information">i</summary>
+                <div class="settings-help-tooltip-panel" role="note">
+                  Your payout follows Stripe’s processing schedule and your bank’s deposit timing. Check Stripe for the latest status and expected arrival date.
+                </div>
+              </details>
+            </div>
+            <p class="muted" id="stripeRequirementCopy"><strong>Stripe onboarding is required before you can receive payouts on Let’s-ParaConnect.</strong></p>
+            <button id="connectStripeBtn" class="btn btn-primary" type="button">Connect Stripe Account →</button>
+            <p id="stripeStatus" class="muted hidden"></p>
+          </div>
+
+          <div class="settings-block security-card">
+            <div class="security-card-title">
+              <span class="security-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="4.25" y="8.5" width="11.5" height="8" rx="2"></rect>
+                  <path d="M6.75 8.5V6.25a3.25 3.25 0 0 1 6.5 0V8.5"></path>
+                  <circle cx="10" cy="12.15" r="0.85" fill="currentColor" stroke="none"></circle>
+                  <path d="M10 13v1.25"></path>
+                </svg>
+              </span>
+              <h3>Change password</h3>
+            </div>
+            <label for="currentPassword" class="password-field-label">Current password</label>
+            <div class="field-group">
+              <input type="password" id="currentPassword" autocomplete="current-password">
+              <button type="button" class="toggle-visibility" data-toggle-password="currentPassword" aria-label="Show current password">
+                <svg viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M12 5c5.5 0 9.6 3.9 11 7-1.4 3.1-5.5 7-11 7S2.4 15.1 1 12c1.4-3.1 5.5-7 11-7zm0 2c-4.3 0-7.7 2.8-9 5 1.3 2.2 4.7 5 9 5s7.7-2.8 9-5c-1.3-2.2-4.7-5-9-5zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z"/>
+                </svg>
+              </button>
+            </div>
+            <div class="password-grid">
+              <div>
+                <label for="newPassword" class="password-field-label">New password</label>
+                <div class="field-group">
+                  <input type="password" id="newPassword" autocomplete="new-password">
+                  <button type="button" class="toggle-visibility" data-toggle-password="newPassword" aria-label="Show new password">
+                    <svg viewBox="0 0 24 24">
+                      <path fill="currentColor" d="M12 5c5.5 0 9.6 3.9 11 7-1.4 3.1-5.5 7-11 7S2.4 15.1 1 12c1.4-3.1 5.5-7 11-7zm0 2c-4.3 0-7.7 2.8-9 5 1.3 2.2 4.7 5 9 5s7.7-2.8 9-5c-1.3-2.2-4.7-5-9-5zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label for="confirmPassword" class="password-field-label">Confirm password</label>
+                <div class="field-group">
+                  <input type="password" id="confirmPassword" autocomplete="new-password">
+                  <button type="button" class="toggle-visibility" data-toggle-password="confirmPassword" aria-label="Show confirm password">
+                    <svg viewBox="0 0 24 24">
+                      <path fill="currentColor" d="M12 5c5.5 0 9.6 3.9 11 7-1.4 3.1-5.5 7-11 7S2.4 15.1 1 12c1.4-3.1 5.5-7 11-7zm0 2c-4.3 0-7.7 2.8-9 5 1.3 2.2 4.7 5 9 5s7.7-2.8 9-5c-1.3-2.2-4.7-5-9-5zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button id="savePasswordBtn" class="btn btn-primary" type="button">Save password</button>
+          </div>
+
+          <div class="settings-block security-card blocked-users-card">
+            <div class="blocked-users-layout">
+              <details class="blocked-users-disclosure">
+                <summary>
+                  <span class="blocked-users-summary-leading">
+                    <span>Blocked</span>
+                  </span>
+                  <span class="blocked-users-summary-meta">
+                    <span id="blockedUsersSummaryCount">Loading…</span>
+                    <span class="blocked-users-summary-caret" aria-hidden="true">▾</span>
+                  </span>
+                </summary>
+                <div class="blocked-users-panel">
+                  <div id="blockedUsersList">Loading…</div>
+                </div>
+              </details>
+              <button
+                type="button"
+                class="blocked-users-summary-inline-help"
+                aria-label="Blocked users help"
+                aria-expanded="false"
+                aria-controls="blockedUsersHelpPanel"
+              >?</button>
+              <span id="blockedUsersHelpPanel" class="blocked-users-help-panel hidden" role="tooltip">
+                Manage active blocks here. Removing a block only restores future interaction. It does not reopen old matters, messages, or prior workflows.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="security-column">
+          <div class="settings-block security-card security-verification-card">
+            <div class="security-card-title">
+              <span class="security-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20"><path fill="currentColor" d="M10 1.5l6.5 2.6v5.2c0 4-2.7 7.6-6.5 8.7-3.8-1.1-6.5-4.7-6.5-8.7V4.1L10 1.5zm0 2.1L5.1 5.1v4.2c0 3 2 5.7 4.9 6.6 2.9-.9 4.9-3.6 4.9-6.6V5.1L10 3.6z"/></svg>
+              </span>
+              <h3>Confirm security changes</h3>
+            </div>
+            <label for="twoFactorCurrentPassword">Current password</label>
+            <input type="password" id="twoFactorCurrentPassword" autocomplete="current-password" maxlength="128">
+            <p class="muted">Used only to confirm changes to two-step verification, backup codes, and passkeys.</p>
+          </div>
+          <div class="settings-block security-card" id="twoFactorSection">
+            <div class="security-card-title">
+              <span class="security-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20">
+                  <path fill="currentColor" d="M10 1.5l6.5 2.6v5.2c0 4-2.7 7.6-6.5 8.7-3.8-1.1-6.5-4.7-6.5-8.7V4.1L10 1.5zm0 2.1L5.1 5.1v4.2c0 3 2 5.7 4.9 6.6 2.9-.9 4.9-3.6 4.9-6.6V5.1L10 3.6z"/>
+                </svg>
+              </span>
+              <h3>Set up two-step verification</h3>
+            </div>
+            <div class="two-factor-hero" aria-hidden="true">
+              <svg viewBox="0 0 180 120">
+                <rect x="10" y="28" width="160" height="64" rx="12" fill="currentColor" opacity="0.08"></rect>
+                <rect x="26" y="40" width="90" height="10" rx="5" fill="currentColor" opacity="0.18"></rect>
+                <rect x="26" y="58" width="70" height="10" rx="5" fill="currentColor" opacity="0.18"></rect>
+                <path d="M90 24l40 16v32c0 24-16 46-40 54-24-8-40-30-40-54V40l40-16z" fill="currentColor" opacity="0.2"></path>
+                <rect x="78" y="60" width="24" height="24" rx="6" fill="#fff"></rect>
+                <path d="M90 58c6 0 10 5 10 10v6H80v-6c0-5 4-10 10-10z" fill="#fff"></path>
+              </svg>
+            </div>
+            <div class="two-factor-option">
+              <div class="two-factor-details">
+                <span class="security-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20">
+                    <path fill="currentColor" d="M10 1.5l6.5 2.6v5.2c0 4-2.7 7.6-6.5 8.7-3.8-1.1-6.5-4.7-6.5-8.7V4.1L10 1.5zm0 2.1L5.1 5.1v4.2c0 3 2 5.7 4.9 6.6 2.9-.9 4.9-3.6 4.9-6.6V5.1L10 3.6z"/>
+                  </svg>
+                </span>
+                <div>
+                  <h4>Authenticator app</h4>
+                  <p>Use a time-based code from your authenticator app. Recommended when a passkey is unavailable.</p>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" class="two-factor-toggle" data-two-factor-method="authenticator" aria-label="Enable authenticator app">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="two-factor-option">
+              <div class="two-factor-details">
+                <span class="security-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20"><path fill="currentColor" d="M2.5 4h15v12h-15V4zm1.8 2v.4l5.7 4.1 5.7-4.1V6H4.3zm11.4 8V8.8L10 12.9 4.3 8.8V14h11.4z"/></svg>
+                </span>
+                <div>
+                  <h4>Email verification</h4>
+                  <p>Send a one-time code to your verified email when you sign in.</p>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" class="two-factor-toggle" data-two-factor-method="email" aria-label="Enable email verification">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="two-factor-security-actions">
+              <strong>Backup codes</strong>
+              <button type="button" class="btn btn-outline" id="generateBackupCodesBtn">Generate new backup codes</button>
+              <p class="muted">Generating new codes invalidates any previous set.</p>
+              <div id="backupCodesOutput" class="backup-codes-output" hidden aria-live="polite"></div>
+            </div>
+            <div id="authenticatorSetupPanel" class="authenticator-setup" hidden>
+              <h4>Connect your authenticator app</h4>
+              <p class="muted">Scan this QR code, or enter the key manually. Then enter the current six-digit code to confirm setup.</p>
+              <img id="authenticatorQrCode" alt="Authenticator setup QR code">
+              <p>Manual key: <code id="authenticatorManualSecret" class="manual-secret"></code></p>
+              <div class="security-inline-fields">
+                <label for="authenticatorConfirmCode">Six-digit code</label>
+                <input id="authenticatorConfirmCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="123456">
+                <button type="button" class="btn btn-primary" id="authenticatorConfirmBtn">Confirm authenticator</button>
+                <button type="button" class="btn btn-outline" id="authenticatorCancelBtn">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <div class="settings-block security-card" id="passkeysSection">
+            <div class="security-card-title">
+              <span class="security-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20"><path fill="currentColor" d="M7.5 11a4.5 4.5 0 1 1 4.2-2.9H18v3h-2v2h-3v2h-3.2A4.5 4.5 0 0 1 7.5 11zm0-2A2.5 2.5 0 1 0 7.5 4a2.5 2.5 0 0 0 0 5z"/></svg>
+              </span>
+              <h3>Passkeys</h3>
+            </div>
+            <p class="muted">Sign in with your device screen lock, fingerprint, face, or security key. Passkeys are phishing-resistant.</p>
+            <div id="passkeyUnsupported" class="notice" hidden>This browser or device does not support passkeys.</div>
+            <div id="passkeyList" class="passkey-list" aria-live="polite"><p class="muted">Loading passkeys…</p></div>
+            <div class="passkey-panel security-inline-fields">
+              <label for="passkeyName">Passkey name</label>
+              <input id="passkeyName" maxlength="80" autocomplete="off" placeholder="For example: Work MacBook">
+              <button type="button" class="btn btn-primary" id="addPasskeyBtn">Add a passkey</button>
+              <p class="muted">Confirm your current password in the security verification card before adding or removing a passkey.</p>
+            </div>
+          </div>
+          <div class="settings-block security-card" id="activeSessionsSection">
+            <div class="security-card-title">
+              <span class="security-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20"><path fill="currentColor" d="M3 3h14v10H3V3zm2 2v6h10V5H5zm2 10h6v2H7v-2z"/></svg>
+              </span>
+              <h3>Active sessions</h3>
+            </div>
+            <p class="muted">Review devices currently signed in to your account.</p>
+            <div id="sessionHistoryList" class="session-list" aria-live="polite"><p class="muted">Loading active sessions…</p></div>
+            <button type="button" class="btn btn-outline" id="revokeOtherSessionsBtn">Sign out other devices</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="security-extras">
+        <div class="settings-block">
+          <div class="settings-title-with-help">
+            <span id="security:closure" hidden></span>
+            <h3 id="accountClosureHeading">Deactivate account</h3>
+            <details class="settings-help-tooltip">
+              <summary aria-label="Deactivate account help">?</summary>
+              <div class="settings-help-tooltip-panel" role="note">
+                Deactivate your account and remove it from active platform participation. Historical Matter, dispute, payment, audit, and financial records will be preserved. This is not full erasure. Accounts cannot be deactivated while you are involved in an active Matter or while payout, dispute, or other financial obligations remain unresolved.
+              </div>
+            </details>
+          </div>
+          <div class="deactivate-actions">
+            <button class="btn danger-btn" type="button" data-deactivate-account>Deactivate</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-panel settings-section" id="preferencesSection">
+      <div class="focused-settings-header">
+        <a class="settings-back-link" href="profile-settings.html" data-attorney-only>Back to settings</a>
+        <h2>Preferences</h2>
+        <p>Choose how LPC communicates with you and how your workspace appears.</p>
+        <p id="preferencesSaveStatus" class="preferences-save-status" role="status" aria-live="polite">Changes save automatically.</p>
+      </div>
+      <div class="preferences-layout">
+      <section class="preference-group" aria-labelledby="communicationPreferencesHeading" data-paralegal-only>
+        <header class="preference-group-header">
+          <h3 id="communicationPreferencesHeading">Notifications</h3>
+          <p>Choose which account and Matter updates reach your inbox.</p>
+        </header>
+        <div class="preference-group-rows">
+      <div class="pref-row">
+        <span id="emailNotificationsLabel">Email notifications</span>
+        <label class="switch">
+          <input type="checkbox" id="emailNotificationsToggle" aria-labelledby="emailNotificationsLabel">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="pref-row" data-paralegal-only>
+        <span id="paralegalMessageAlertsLabel">New message alerts</span>
+        <label class="switch">
+          <input type="checkbox" id="paralegalMessageAlerts" aria-labelledby="paralegalMessageAlertsLabel">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="pref-row" data-paralegal-only>
+        <span id="paralegalCaseUpdatesLabel">Matter updates</span>
+        <label class="switch">
+          <input type="checkbox" id="paralegalCaseUpdates" aria-labelledby="paralegalCaseUpdatesLabel">
+          <span class="slider"></span>
+        </label>
+      </div>
+        </div>
+      </section>
+      <section class="preference-group" aria-labelledby="visibilityPreferencesHeading" data-paralegal-only>
+        <header class="preference-group-header">
+          <h3 id="visibilityPreferencesHeading">Profile visibility</h3>
+          <p>Control whether attorneys can discover your professional profile.</p>
+        </header>
+        <div class="preference-group-rows">
+      <div class="pref-row" data-paralegal-only>
+        <div class="pref-row-copy">
+          <span id="profileVisibilityLabel">Hide profile</span>
+          <p class="muted" id="profileVisibilityHelp">Controls whether attorneys can discover your profile. A profile photo must be approved before your profile can be visible.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="paralegalHideProfile" aria-labelledby="profileVisibilityLabel" aria-describedby="profileVisibilityHelp">
+          <span class="slider"></span>
+        </label>
+      </div>
+        </div>
+      </section>
+      <section class="preference-group preference-group--workspace" aria-labelledby="workspacePreferencesHeading">
+        <header class="preference-group-header">
+          <h3 id="workspacePreferencesHeading">Workspace</h3>
+          <p>Adjust the reading experience and your primary jurisdiction.</p>
+        </header>
+        <div class="preference-group-rows">
+      <div class="pref-row">
+        <label for="fontSizePreference">Font size</label>
+        <select id="fontSizePreference">
+          <option value="xs">Extra Small</option>
+          <option value="sm">Small</option>
+          <option value="md" selected>Medium</option>
+          <option value="lg">Large</option>
+          <option value="xl">Extra Large</option>
+        </select>
+      </div>
+      <input type="hidden" id="themePreference" value="light" />
+      <div class="pref-row pref-row--appearance">
+        <span>Appearance</span>
+        <div class="theme-preview-grid" role="radiogroup" aria-label="Appearance">
+          <button type="button" class="theme-preview" data-theme-preview="light" role="radio" aria-checked="false">
+            <svg class="theme-preview-icon" viewBox="0 0 120 78" aria-hidden="true">
+              <rect x="1" y="1" width="118" height="76" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+              <rect x="8" y="10" width="30" height="58" rx="6" fill="#f3f4f6"/>
+              <rect x="46" y="16" width="60" height="8" rx="4" fill="#d9a441"/>
+              <rect x="46" y="30" width="52" height="6" rx="3" fill="#e5e7eb"/>
+              <rect x="46" y="42" width="46" height="6" rx="3" fill="#e5e7eb"/>
+              <rect x="46" y="54" width="38" height="6" rx="3" fill="#e5e7eb"/>
+            </svg>
+            <span>Light</span>
+          </button>
+          <button type="button" class="theme-preview" data-theme-preview="dark" role="radio" aria-checked="false">
+            <svg class="theme-preview-icon" viewBox="0 0 120 78" aria-hidden="true">
+              <rect x="1" y="1" width="118" height="76" rx="10" fill="#1c2333" stroke="#d1d5db"/>
+              <rect x="8" y="10" width="30" height="58" rx="6" fill="#111827"/>
+              <rect x="46" y="16" width="60" height="8" rx="4" fill="#d9a441"/>
+              <rect x="46" y="30" width="52" height="6" rx="3" fill="#e5e7eb"/>
+              <rect x="46" y="42" width="46" height="6" rx="3" fill="#e5e7eb"/>
+              <rect x="46" y="54" width="38" height="6" rx="3" fill="#e5e7eb"/>
+            </svg>
+            <span>Dark</span>
+          </button>
+        </div>
+      </div>
+      <div class="pref-row pref-row--state">
+        <div class="pref-row-copy">
+          <label for="statePreference">Primary state</label>
+          <p class="muted" id="statePreferenceHelp">Used on your profile and to help you browse Matters by jurisdiction.</p>
+        </div>
+        <select id="statePreference" aria-describedby="statePreferenceHelp">
+          <option value="">Select state</option>
+          <option value="AL">Alabama</option>
+          <option value="AK">Alaska</option>
+          <option value="AZ">Arizona</option>
+          <option value="AR">Arkansas</option>
+          <option value="CA">California</option>
+          <option value="CO">Colorado</option>
+          <option value="CT">Connecticut</option>
+          <option value="DE">Delaware</option>
+          <option value="DC">District of Columbia</option>
+          <option value="FL">Florida</option>
+          <option value="GA">Georgia</option>
+          <option value="HI">Hawaii</option>
+          <option value="ID">Idaho</option>
+          <option value="IL">Illinois</option>
+          <option value="IN">Indiana</option>
+          <option value="IA">Iowa</option>
+          <option value="KS">Kansas</option>
+          <option value="KY">Kentucky</option>
+          <option value="LA">Louisiana</option>
+          <option value="ME">Maine</option>
+          <option value="MD">Maryland</option>
+          <option value="MA">Massachusetts</option>
+          <option value="MI">Michigan</option>
+          <option value="MN">Minnesota</option>
+          <option value="MS">Mississippi</option>
+          <option value="MO">Missouri</option>
+          <option value="MT">Montana</option>
+          <option value="NE">Nebraska</option>
+          <option value="NV">Nevada</option>
+          <option value="NH">New Hampshire</option>
+          <option value="NJ">New Jersey</option>
+          <option value="NM">New Mexico</option>
+          <option value="NY">New York</option>
+          <option value="NC">North Carolina</option>
+          <option value="ND">North Dakota</option>
+          <option value="OH">Ohio</option>
+          <option value="OK">Oklahoma</option>
+          <option value="OR">Oregon</option>
+          <option value="PA">Pennsylvania</option>
+          <option value="RI">Rhode Island</option>
+          <option value="SC">South Carolina</option>
+          <option value="SD">South Dakota</option>
+          <option value="TN">Tennessee</option>
+          <option value="TX">Texas</option>
+          <option value="UT">Utah</option>
+          <option value="VT">Vermont</option>
+          <option value="VA">Virginia</option>
+          <option value="WA">Washington</option>
+          <option value="WV">West Virginia</option>
+          <option value="WI">Wisconsin</option>
+          <option value="WY">Wyoming</option>
+        </select>
+      </div>
+        </div>
+      </section>
+      <section class="preference-group" aria-labelledby="guidancePreferencesHeading">
+        <header class="preference-group-header">
+          <h3 id="guidancePreferencesHeading">Guidance</h3>
+          <p>Replay the product tour whenever you need a refresher.</p>
+        </header>
+        <div class="preference-group-rows">
+      <div class="pref-row" data-attorney-only>
+        <span>Replay attorney tour</span>
+        <button type="button" class="btn btn-outline" id="replayAttorneyTourBtn">Replay</button>
+      </div>
+      <div class="pref-row" data-paralegal-only>
+        <span>Replay paralegal tour</span>
+        <button type="button" class="btn btn-outline" id="replayParalegalTourBtn">Replay</button>
+      </div>
+        </div>
+      </section>
+      </div>
+    </section>
+
+    <div id="paralegalScrollIndicator" class="scroll-indicator" aria-hidden="true">
+      <span>Scroll</span>
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <path fill="currentColor" d="M10 15.2 4.8 10l1.4-1.4 3.8 3.8 3.8-3.8 1.4 1.4z"/>
+      </svg>
+    </div>
+
+    </div>
+  </main>
+  </div>
+
+  <div id="toastBanner" class="toast" role="status" aria-live="assertive"></div>
+
+  <div class="modal" id="photoCropModal" role="dialog" aria-modal="true" aria-labelledby="photoCropTitle" aria-hidden="true" inert>
+    <div class="modal-card photo-crop-card">
+      <header class="photo-crop-header">
+        <div class="photo-crop-header-row">
+          <h2 class="photo-crop-title" id="photoCropTitle">Edit profile photo</h2>
+          <button type="button" class="modal-close photo-crop-close" id="photoCropClose" aria-label="Close photo editor">×</button>
+        </div>
+        <p class="photo-crop-subtitle" id="photoCropInstructions">Drag to reposition and use the slider to zoom.</p>
+      </header>
+      <div class="photo-crop-stage" id="photoCropStage" role="group" tabindex="0" aria-label="Profile photo crop area" aria-describedby="photoCropInstructions">
+        <img id="photoCropImage" alt="Photo being cropped" />
+        <div class="photo-crop-loading" id="photoCropLoading" aria-live="polite" aria-hidden="true">
+          <span class="photo-crop-spinner" aria-hidden="true"></span>
+          <span id="photoCropLoadingText">Loading photo…</span>
+        </div>
+        <div class="photo-crop-error" id="photoCropError" role="alert" hidden>
+          <strong>We couldn’t load this photo.</strong>
+          <p id="photoCropErrorText">Try again or choose another JPEG or PNG.</p>
+          <div class="photo-crop-error-actions">
+            <button type="button" class="btn btn-outline" id="photoCropTryAgain">Try again</button>
+            <button type="button" class="btn btn-outline" id="photoCropChooseAnother">Choose another photo</button>
+          </div>
+        </div>
+      </div>
+      <div class="photo-crop-footer">
+        <div class="photo-crop-controls">
+          <label class="sr-only" for="photoCropZoom">Zoom</label>
+          <div class="photo-crop-range">
+            <span aria-hidden="true">−</span>
+            <input type="range" id="photoCropZoom" min="1" max="3" step="0.01" value="1" />
+            <span aria-hidden="true">+</span>
+          </div>
+        </div>
+      </div>
+      <div class="photo-crop-actions">
+        <button type="button" class="btn btn-outline" id="photoCropCancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="photoCropSave">Save photo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="attorney-onboarding-overlay" id="attorneyOnboardingOverlay" aria-hidden="true"></div>
+  <div class="attorney-onboarding-modal" id="attorneyOnboardingModal" role="dialog" aria-modal="true" aria-labelledby="attorneyOnboardingTitle" aria-hidden="true" inert>
+    <button type="button" class="attorney-onboarding-close" data-onboarding-close aria-label="Close">×</button>
+    <div class="attorney-onboarding-hero" role="presentation"></div>
+    <div class="attorney-onboarding-content">
+      <div class="attorney-onboarding-title" id="attorneyOnboardingTitle">Let’s Get Started</div>
+      <p class="attorney-onboarding-text" id="attorneyOnboardingText">Step 1 of 3: Complete your profile, then click Save changes.</p>
+      <div class="attorney-onboarding-actions">
+        <button type="button" class="attorney-onboarding-btn" data-onboarding-skip>Skip onboarding</button>
+        <button type="button" class="attorney-onboarding-btn primary" data-onboarding-continue>Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="education-modal-overlay" id="educationModalOverlay" aria-hidden="true"></div>
+  <div class="education-modal" id="educationModal" role="dialog" aria-modal="true" aria-labelledby="educationModalTitle" aria-hidden="true" inert>
+    <div class="education-modal-header">
+      <h3 id="educationModalTitle">Edit education</h3>
+      <button type="button" class="education-modal-close" id="educationModalClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="education-modal-body">
+      <div id="educationModalList"></div>
+      <button type="button" class="btn btn-outline" id="educationModalAdd">Add another education</button>
+    </div>
+    <div class="education-modal-actions">
+      <button type="button" class="btn btn-outline" id="educationModalCancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="educationModalSave">Save</button>
+    </div>
+  </div>
+
+  <div class="profile-tour-overlay" id="profileTourOverlay" aria-hidden="true"></div>
+  <div class="profile-tour-tooltip" id="profileTourTooltip" role="dialog" aria-live="polite" aria-labelledby="profileTourTitle" aria-describedby="profileTourText" aria-hidden="true" inert>
+    <button type="button" class="profile-tour-close" id="profileTourCloseBtn" aria-label="Close tour">&times;</button>
+    <div class="profile-tour-title" id="profileTourTitle"></div>
+    <p class="profile-tour-text" id="profileTourText"></p>
+    <div class="profile-tour-actions">
+      <button type="button" class="profile-tour-btn" id="profileTourBackBtn">Back</button>
+      <button type="button" class="profile-tour-btn primary" id="profileTourNextBtn">Next</button>
+    </div>
+  </div>
+
+  <script src="assets/scripts/utils/toast.js?v=20260208"></script>
+  <script>
+    window.__ATTORNEY_PAGE__ = "profile-settings";
+    window.__TAB_ROLE__ = "attorney,paralegal";
+  </script>
+  <script src="assets/libs/cropper/cropper.main.js?v=2.1.1"></script>
+  <script src="/assets/vendor/simplewebauthn-13.3.0.js"></script>
+  <script type="module" src="assets/scripts/profile-settings-role-loader.js?v=20260901-1"></script>
+  <script type="module" src="assets/scripts/profile-settings.js?v=20260902-3"></script>
+  <script src="assets/scripts/context-panel.js?v=20260812-paralegal-heading"></script>
+  <script src="assets/scripts/productivity-command-registry.js"></script>
+  <script src="assets/scripts/global-search.js?v=20260831-2"></script>
+</body>
+</html>

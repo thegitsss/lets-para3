@@ -1,0 +1,3859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="assets/scripts/utils/workspace-entry-guard.js"></script>
+  <!-- Opt in before the first rendering opportunity, including streamed loads. -->
+  <style>@view-transition { navigation: auto; }</style>
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
+  <link rel="stylesheet" href="assets/styles/global-search.css?v=20260831-3" />
+  <link rel="stylesheet" href="assets/styles/context-panel.css?v=20260812-paralegal-heading" />
+  <link rel="stylesheet" href="assets/styles/dashboard-system.css?v=20260820-4" />
+  <link rel="stylesheet" href="assets/styles/lpc-dialog-refresh.css?v=20260831-1" />
+  <link rel="preload" as="font" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
+  <script>
+    (function () {
+      const root = document.documentElement;
+      root.classList.add("js");
+      try {
+        const raw = localStorage.getItem("lpc_user");
+        if (!raw) return;
+        const user = JSON.parse(raw);
+        const storedTheme = String(user?.preferences?.theme || "").toLowerCase();
+        const theme = storedTheme === "dark" || /dark$/i.test(storedTheme) ? "dark" : "light";
+        root.classList.add(`theme-${theme}`);
+        if (theme === "dark") {
+          root.style.backgroundColor = "#0f172a";
+          root.style.color = "#f4f6fb";
+          root.style.setProperty("--bg", "#0f172a");
+        }
+      } catch (_) {}
+    })();
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Paralegal Dashboard – Let’s-ParaConnect</title>
+<script defer src="assets/scripts/utils/session.js?v=20260902-1"></script>
+<script defer src="assets/scripts/utils/business-date.js"></script>
+  <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
+    .gold{color:#b4975a;}
+    :root {
+      --bg: #ffffff;
+      --sidebar-bg: #ffffff;
+      --accent: #b6a47a;
+      --navy: #102c50;
+      --ink: #1a1a1a;
+      --muted: #8a8a8a;
+      --line: rgba(0, 0, 0, 0.08);
+      --panel: #fcfcfc;
+      --sidebar-text: #1a1a1a;
+      --radius: 14px;
+      --font-serif: 'Sarabun', sans-serif;
+      --font-sans: 'Sarabun', sans-serif;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-weight: 200;
+      font-synthesis: none;
+      background: var(--bg);
+      color: var(--ink);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .tour-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 12000;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 240ms ease, visibility 0s linear 240ms;
+      --spot-x: 0px;
+      --spot-y: 0px;
+      --spot-w: 0px;
+      --spot-h: 0px;
+    }
+
+    .tour-overlay.is-active {
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 240ms ease;
+    }
+
+    .tour-overlay::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 15, 25, 0.6);
+      transition: background 240ms ease;
+    }
+
+    .tour-overlay.spotlight::before {
+      background: transparent;
+    }
+
+    .tour-overlay.spotlight::after {
+      content: "";
+      position: absolute;
+      left: var(--spot-x);
+      top: var(--spot-y);
+      width: var(--spot-w);
+      height: var(--spot-h);
+      border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(10, 15, 25, 0.6);
+      transition: left 280ms ease, top 280ms ease, width 280ms ease, height 280ms ease, box-shadow 280ms ease;
+    }
+
+    .tour-modal {
+      width: min(420px, 92vw);
+      background: #ffffff;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+      text-align: center;
+      position: relative;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      z-index: 12001;
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) scale(0.98);
+      transition: opacity 240ms ease, transform 240ms ease, visibility 0s linear 240ms;
+    }
+
+    .tour-modal.is-active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1);
+      transition: opacity 240ms ease, transform 240ms ease;
+    }
+
+    .tour-hero {
+      height: 150px;
+      background-image: url("hero-mountain.jpg");
+      background-size: cover;
+      background-position: center;
+    }
+
+    .tour-content {
+      padding: 22px 26px 28px;
+    }
+
+    .tour-title {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      color: var(--navy);
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .tour-text {
+      color: var(--muted);
+      font-size: 0.98rem;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .tour-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .tour-btn {
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--navy);
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-weight: 300;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .tour-btn.primary {
+      background: var(--accent);
+      color: #202124;
+      border-color: transparent;
+      box-shadow: 0 12px 24px rgba(182, 164, 122, 0.35);
+    }
+
+    .tour-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .tour-btn.ghost {
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .tour-tooltip {
+      position: fixed;
+      max-width: 240px;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 16px 35px rgba(15, 23, 42, 0.25);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(6px) scale(0.98);
+      transition: opacity 200ms ease, transform 200ms ease, visibility 0s linear 200ms;
+      z-index: 12001;
+    }
+
+    .tour-tooltip.is-active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+      transition: opacity 200ms ease, transform 200ms ease;
+    }
+
+    .tour-tooltip::after {
+      content: "";
+      position: absolute;
+      left: -8px;
+      top: var(--arrow-top, 18px);
+      border-width: 8px;
+      border-style: solid;
+      border-color: transparent #ffffff transparent transparent;
+    }
+
+    .tour-tooltip p {
+      margin: 0 0 10px;
+      color: var(--navy);
+      font-weight: 400;
+    }
+
+    .tour-step-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .tour-highlight {
+      position: relative;
+      z-index: 12002;
+      color: #f8fafc;
+      text-shadow: 0 6px 18px rgba(15, 23, 42, 0.6);
+    }
+
+    .sidebar nav a.tour-highlight {
+      color: #f8fafc !important;
+    }
+
+    html:not(.theme-dark) .tour-highlight {
+      color: #1a2230;
+      text-shadow: none;
+    }
+
+    html:not(.theme-dark) .sidebar nav a.tour-highlight {
+      color: #1a2230 !important;
+      background: rgba(255, 255, 255, 0.92);
+    }
+
+    .tour-close {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      border: none;
+      background: transparent;
+      color: #8a94a6;
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .tour-close:hover {
+      color: #4b5563;
+    }
+
+    .sidebar {
+      width: 240px;
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      padding: 24px 16px;
+      color: var(--sidebar-text);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+
+    .logo {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      margin-bottom: 36px;
+      text-align: center;
+    }
+
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    nav a {
+      text-decoration: none;
+      color: var(--ink);
+      font-weight: 200;
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      transition: background 0.3s ease;
+    }
+
+    nav a.active,
+    nav a:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .sidebar-link {
+      display: block;
+      width: 100%;
+      border: none;
+      background: none;
+      color: var(--sidebar-text);
+      font-size: 0.95rem;
+      font-family: var(--font-sans);
+      font-weight: 300;
+      text-align: left;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .sidebar-link:hover,
+    .sidebar-link:focus {
+      background: rgba(0, 0, 0, 0.04);
+      outline: none;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .sidebar-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      position: relative;
+      z-index: 2100;
+    }
+
+    .sidebar-toggle-icon {
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
+
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 1900;
+    }
+
+    @media (max-width: 1024px) {
+      body {
+        flex-direction: row;
+      }
+
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 260px;
+        height: 100vh;
+        border-right: none;
+        border-bottom: none;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        gap: 24px;
+        padding: 24px 18px;
+        padding-top: 72px;
+        transform: translateX(-110%);
+        transition: transform 0.25s ease;
+        z-index: 2000;
+        box-shadow: 18px 0 40px rgba(0, 0, 0, 0.18);
+      }
+
+      body.nav-open .sidebar {
+        transform: translateX(0);
+      }
+
+      body.nav-open .sidebar-backdrop {
+        display: block;
+      }
+
+      .sidebar-toggle {
+        display: inline-flex;
+        position: fixed;
+        top: 14px;
+        left: 14px;
+      }
+
+      .topbar {
+        justify-content: flex-end;
+        gap: 12px;
+      }
+
+      .logo {
+        font-size: 1.4rem;
+        text-align: left;
+        margin-bottom: 4px;
+      }
+
+      nav {
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      nav a {
+        width: 100%;
+        text-align: left;
+        padding: 10px 14px;
+        font-size: 0.95rem;
+      }
+
+      .sidebar-link {
+        padding: 10px 14px;
+        font-size: 0.95rem;
+        text-align: left;
+      }
+
+      .main {
+        padding: 28px 20px 60px;
+      }
+    }
+
+    .main {
+      flex: 1;
+      padding: 40px;
+      overflow-y: auto;
+    }
+    html.js .main {
+      opacity: 1;
+      transition: none;
+    }
+    html.js body.is-ready .main {
+      opacity: 1;
+    }
+
+    .dashboard-view {
+      display: none;
+    }
+
+    .dashboard-view.is-active {
+      display: block;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 2rem;
+      gap: 1.5rem;
+      min-height: 72px;
+      position: relative;
+      z-index: 3;
+      pointer-events: auto;
+    }
+    .topbar .lpc-shared-header {
+      margin-bottom: 0;
+    }
+    #paralegalFloatingCluster {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      z-index: 1200;
+      margin-left: auto;
+    }
+
+    #paralegalFloatingCluster .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.6);
+      border: none;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+
+    #paralegalFloatingCluster .user-profile strong {
+      display: block;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      letter-spacing: 0.02em;
+      color: #1a1a1a;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #paralegalFloatingCluster .user-profile span {
+      display: block;
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      color: #6b6b6b;
+      font-weight: 200;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #paralegalFloatingCluster img {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #fff;
+      box-shadow: none;
+    }
+
+    body.theme-dark #paralegalFloatingCluster .user-profile {
+      background: rgba(15,23,42,0.4);
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    body.theme-dark #paralegalFloatingCluster .user-profile strong {
+      color: #fff;
+    }
+
+    body.theme-dark #paralegalFloatingCluster .user-profile span {
+      color: rgba(255,255,255,0.8);
+    }
+
+    #paralegalFloatingCluster .profile-dropdown {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 10px);
+      min-width: 200px;
+      display: none;
+      flex-direction: column;
+      padding: 6px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 18px 30px rgba(0, 0, 0, 0.12);
+      z-index: 9999;
+    }
+
+    #paralegalFloatingCluster .profile-dropdown.show {
+      display: flex;
+    }
+
+    #paralegalFloatingCluster .profile-dropdown a,
+    #paralegalFloatingCluster .profile-dropdown button {
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: inherit;
+      text-decoration: none;
+      text-align: left;
+      padding: 0.85rem 1.1rem;
+      margin: 0;
+      border-radius: 12px;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    #paralegalFloatingCluster .profile-dropdown a:hover,
+    #paralegalFloatingCluster .profile-dropdown button:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    #paralegalFloatingCluster .profile-dropdown button[data-logout] {
+      color: #b35f5f;
+      background: rgba(179, 95, 95, 0.08);
+    }
+
+    #paralegalFloatingCluster .profile-dropdown button[data-logout]:hover {
+      background: rgba(179, 95, 95, 0.14);
+    }
+    .profile-header-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: relative;
+      z-index: 4;
+      pointer-events: auto;
+    }
+
+
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.6);
+      border: none;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: border-color .2s ease, box-shadow .2s ease;
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .user-chip img {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      object-fit: cover;
+      box-shadow: none;
+    }
+
+    .user-chip strong {
+      display: block;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      letter-spacing: 0.02em;
+      color: #1a1a1a;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .user-chip span {
+      font-size: 0.85rem;
+      color: #6b6b6b;
+      display: block;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pending-approval-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      margin: 0 0 1.5rem;
+      border-radius: 12px;
+      background: #fff6e5;
+      border: 1px solid #e6cf9a;
+      color: #5b4212;
+      font-size: 0.95rem;
+      font-weight: 200;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.05);
+    }
+
+    .pending-approval-banner strong {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 1.05rem;
+    }
+
+    .pending-approval-banner.hidden {
+      display: none;
+    }
+
+    header h1 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 2.2rem;
+      margin-bottom: 0.25rem;
+    }
+
+    header p {
+      font-weight: 200;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    .sidebar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: transparent;
+      pointer-events: none;
+      transition: background 0.3s ease;
+    }
+
+    html.theme-dark,
+    html.theme-dark body,
+    body.theme-dark {
+      --bg: #0f172a;
+      --sidebar-bg: #1c2333;
+      --panel: #151b29;
+      --ink: #f4f6fb;
+      --muted: #9aa7c4;
+      --line: rgba(255, 255, 255, 0.08);
+      --sidebar-text: #f8fbff;
+    }
+
+    body.theme-dark nav a.active,
+    body.theme-dark nav a:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    body.theme-dark .sidebar-link:hover,
+    body.theme-dark .sidebar-link:focus {
+      color: #fff;
+    }
+
+    body.theme-dark .case-card,
+    body.theme-dark .dashboard-card,
+    body.theme-dark .panel,
+    body.theme-dark table {
+      background: rgba(18, 23, 36, 0.92);
+      border-color: rgba(255, 255, 255, 0.08);
+      color: var(--ink);
+    }
+
+    body.theme-dark .case-subinfo,
+    body.theme-dark .info-line,
+    body.theme-dark .muted {
+      color: var(--muted);
+    }
+
+    .section-title {
+      font-family: var(--font-serif);
+      font-size: 1.25rem;
+      font-weight: 300;
+      margin-bottom: 1rem;
+    }
+
+    .info-line {
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+      font-weight: 200;
+    }
+
+    .side-by-side-panels {
+      display: flex;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+.side-by-side-panels > section {
+      flex: 1;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 1.25rem;
+      font-weight: 200;
+    }
+
+    .case-panels > section {
+      border: none;
+      padding: 0;
+      background: transparent;
+    }
+
+    .case-panels .case-card,
+    .case-panels .dashboard-card {
+      height: 100%;
+    }
+
+    .card-link {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 0.92rem;
+      color: var(--accent);
+      font-weight: 200;
+      text-decoration: none;
+      text-underline-offset: 3px;
+      transition: color 0.2s ease, text-decoration-color 0.2s ease;
+    }
+
+    .card-link:hover {
+      color: var(--accent-dark, #9c8a63);
+      text-decoration: underline;
+    }
+
+    @media (max-width: 820px) {
+      html,
+      body {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+      }
+
+      .main,
+      .dashboard-view {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+      }
+
+      .topbar,
+      .page-header,
+      .side-by-side-panels {
+        flex-wrap: wrap;
+      }
+
+      .topbar > *,
+      .page-header > *,
+      .side-by-side-panels > * {
+        min-width: 0;
+      }
+
+      .user-chip {
+        max-width: 100%;
+      }
+
+      .case-panels {
+        gap: 1rem;
+      }
+
+      .case-panels .case-card,
+      .case-panels .dashboard-card {
+        min-height: 220px;
+      }
+
+      .case-panels .case-card.empty-state {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .case-panels .case-actions {
+        margin-top: auto;
+      }
+
+      .case-panels .case-card.empty-state .case-actions {
+        display: none;
+      }
+
+      img,
+      svg,
+      video,
+      iframe,
+      table {
+        max-width: 100%;
+        height: auto;
+      }
+
+      .case-card,
+      .dashboard-card,
+      .panel,
+      .case-subinfo,
+      .case-meta,
+      .card-link,
+      .invite-dialog,
+      .invite-lead,
+      .invite-meta,
+      .body-text {
+        min-width: 0;
+        overflow-wrap: break-word;
+        word-break: normal;
+        hyphens: auto;
+      }
+    }
+
+    .case-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .cases-apps-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      gap: 0;
+      align-items: start;
+    }
+
+    .cases-column,
+    .apps-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-width: 0;
+    }
+
+    .cases-column {
+      padding-right: 2rem;
+    }
+
+    .cases-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .completed-cases-section {
+      margin-top: 0.25rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--line);
+    }
+
+    .file-card.is-highlighted {
+      border-color: #b6a47a;
+      box-shadow: 0 18px 38px rgba(182, 164, 122, 0.22);
+      background: #fffdf7;
+      position: relative;
+    }
+    .file-card.is-highlighted::after {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border: 1px solid rgba(182, 164, 122, 0.5);
+      border-radius: 14px;
+      pointer-events: none;
+    }
+
+    .completed-cases-section .section-title {
+      margin-bottom: 0.35rem;
+    }
+
+    .apps-column {
+      padding-left: 2rem;
+      border-left: 1px solid var(--line);
+    }
+
+    .apps-column .applied-header {
+      margin-top: 0;
+    }
+
+    .apps-column .applied-controls {
+      margin-top: 0;
+    }
+
+    .applied-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .applied-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-left: auto;
+    }
+
+    .applied-header h2 {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 300;
+    }
+
+    .applied-filter-btn {
+      border: none;
+      background: transparent;
+      color: var(--ink);
+      border-radius: 999px;
+      width: 2.25rem;
+      height: 2.25rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-family: var(--font-sans);
+      font-weight: 200;
+      transition: color 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+      opacity: 0.72;
+    }
+
+    .applied-filter-btn:hover,
+    .applied-filter-btn[aria-expanded="true"] {
+      color: var(--accent);
+      background: rgba(182, 164, 122, 0.06);
+      opacity: 1;
+    }
+
+    .applied-filter-btn svg {
+      width: 1.15rem;
+      height: 1.15rem;
+      display: block;
+    }
+
+    .applied-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .applied-page-btn {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 0.35rem 1rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+    }
+
+    .applied-page-btn:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .applied-page-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .applied-page-info {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .applied-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin: 0;
+    }
+
+    .applied-controls-panel {
+      margin: 1rem 0 1.5rem;
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+    }
+
+    .applied-controls-panel[hidden] {
+      display: none;
+    }
+
+    .applied-controls input,
+    .applied-controls select {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      font-family: var(--font-sans);
+      font-weight: 200;
+      font-size: 0.9rem;
+      line-height: 1.35;
+      background: var(--panel);
+      color: var(--ink);
+    }
+
+    .applied-controls input {
+      min-width: 220px;
+      flex: 1;
+    }
+
+    .applied-count {
+      font-size: 0.85rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .availability-hidden {
+      display: none;
+    }
+
+    @media (max-width: 820px) {
+      .cases-apps-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .cases-column {
+        padding-right: 0;
+      }
+
+      .apps-column {
+        margin-top: 1.5rem;
+        padding-left: 0;
+        border-left: none;
+      }
+
+      .applied-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .applied-toolbar {
+        width: 100%;
+        justify-content: space-between;
+        margin-left: 0;
+      }
+
+      .applied-controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .applied-pagination {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .applied-count {
+        margin-left: 0;
+      }
+    }
+
+    .case-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      background: var(--panel);
+    }
+
+    .case-card.applied-card.is-highlighted {
+      border-color: rgba(182, 164, 122, 0.7);
+      background: rgba(182, 164, 122, 0.08);
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.18), var(--shadow-md);
+    }
+
+    body.theme-dark .case-card.applied-card.is-highlighted,
+    html.theme-dark .case-card.applied-card.is-highlighted {
+      border-color: rgba(182, 164, 122, 0.6);
+      background: rgba(182, 164, 122, 0.12);
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.22), var(--shadow-md);
+    }
+
+    .dashboard-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      background: var(--panel);
+    }
+
+    .case-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .case-header h2 {
+      font-family: var(--font-serif);
+      font-size: 1.5rem;
+      font-weight: 300;
+    }
+
+    .case-subinfo {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-top: 0.25rem;
+    }
+
+    .case-content {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+      display: none;
+      font-size: 0.95rem;
+    }
+
+    .open .case-content {
+      display: block;
+    }
+
+    .case-actions {
+      margin-top: 1rem;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .case-card .case-actions button,
+    .case-card .case-actions a {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-family: var(--font-sans);
+      font-weight: 200;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .case-card .case-actions button:hover,
+    .case-card .case-actions a:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+      background: rgba(182, 164, 122, 0.1);
+    }
+
+    body.theme-dark .case-card .case-actions button,
+    body.theme-dark .case-card .case-actions a,
+    html.theme-dark .case-card .case-actions button,
+    html.theme-dark .case-card .case-actions a {
+      border-color: rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      color: #f4f6fb;
+    }
+
+    body.theme-dark .case-card .case-actions [data-action="primary"],
+    html.theme-dark .case-card .case-actions [data-action="primary"] {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #ffffff;
+    }
+
+    body.theme-dark .case-card .case-actions [data-action="secondary"],
+    html.theme-dark .case-card .case-actions [data-action="secondary"] {
+      background: rgba(255, 255, 255, 0.02);
+      color: #f4f6fb;
+    }
+
+    .case-title {
+      font-size: 1.15rem;
+      font-weight: 300;
+      margin-bottom: 0.35rem;
+    }
+
+    .case-meta {
+      color: var(--muted);
+      font-size: 0.95rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 30px;
+      transform: translate(-50%, 20px);
+      background: rgba(17, 17, 17, 0.92);
+      color: #fff;
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 3000;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    /* Invite detail modal (mirrors job popup styling) */
+    .invite-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.38);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 4000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      padding: 18px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .invite-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .invite-dialog {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 28px 30px 24px;
+      width: min(760px, 95vw);
+      box-shadow: 0 20px 46px rgba(15, 23, 42, 0.16);
+      display: grid;
+      gap: 14px;
+      position: relative;
+    }
+
+    .invite-dialog .invite-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+    }
+
+    .invite-dialog .invite-title {
+      font-family: var(--font-serif);
+      font-size: 1.8rem;
+      font-weight: 300;
+      margin: 0;
+      line-height: 1.15;
+      color: var(--ink);
+    }
+
+    .invite-dialog .invite-subtitle {
+      font-family: var(--font-serif);
+      font-size: 1.2rem;
+      font-weight: 300;
+      color: var(--ink);
+      margin: -2px 0 0;
+    }
+
+    .invite-dialog .invite-lead {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.45;
+    }
+
+    .invite-dialog .close-btn {
+      border: none;
+      background: none;
+      font-size: 1.35rem;
+      line-height: 1;
+      cursor: pointer;
+      color: var(--muted);
+      border-radius: 10px;
+      padding: 4px 6px;
+    }
+
+    .invite-dialog .invite-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .invite-dialog .pill {
+      padding: 6px 11px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(248, 246, 241, 0.75);
+      color: var(--ink);
+      font-size: 0.88rem;
+      font-family: var(--font-sans);
+      font-weight: 300;
+    }
+
+    .invite-dialog .body-text {
+      font-size: 0.98rem;
+      color: var(--ink);
+      line-height: 1.6;
+      margin: 0;
+      padding-top: 2px;
+    }
+
+    .invite-dialog .body-text p {
+      margin: 0;
+    }
+
+    .invite-dialog .invite-task-block {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .invite-dialog .invite-task-label {
+      font-family: var(--font-serif);
+      font-size: 1rem;
+      font-weight: 300;
+      margin-bottom: 8px;
+      color: var(--ink);
+    }
+
+    .invite-dialog .invite-task-list {
+      margin: 0;
+      padding-left: 1.1rem;
+      display: grid;
+      gap: 6px;
+      max-height: 11.5rem;
+      overflow-y: auto;
+      padding-right: 6px;
+    }
+
+    .invite-dialog .invited-by {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-top: 1px solid var(--line);
+      padding-top: 14px;
+      margin-top: 2px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .invite-dialog .invited-by img {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid var(--line);
+    }
+
+    .invite-dialog .invited-by .muted {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .invite-dialog .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .invite-dialog .actions.is-accepted {
+      justify-content: space-between;
+    }
+
+    .invite-dialog .actions button {
+      padding: 0.6rem 1.1rem;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      border-radius: 6px;
+      font-family: var(--font-serif);
+      font-size: 0.92rem;
+      font-weight: 300;
+      hyphens: none;
+      transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .invite-dialog .actions button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: #fff;
+    }
+
+    .invite-dialog .actions .primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .invite-dialog .actions .primary:hover {
+      background: #a0854d;
+      color: #fff;
+      border-color: #a0854d;
+    }
+
+    .invite-dialog .actions button:disabled {
+      cursor: default;
+      opacity: 0.75;
+    }
+
+    /* Invite detail modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 4000;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .case-modal {
+      background: #fff;
+      width: min(540px, 95vw);
+      border-radius: 16px;
+      padding: 20px 22px;
+      box-shadow: 0 26px 70px rgba(0,0,0,0.16);
+      position: relative;
+      display: grid;
+      gap: 10px;
+    }
+
+    .case-modal h3 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 1.4rem;
+      font-weight: 400;
+    }
+
+    .case-modal .meta {
+      font-size: 0.95rem;
+      color: var(--muted);
+      display: grid;
+      gap: 4px;
+    }
+
+    .case-modal .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .case-modal .actions button {
+      padding: 0.5rem 1.1rem;
+      border: 1px solid var(--navy);
+      background: transparent;
+      color: var(--navy);
+      cursor: pointer;
+      border-radius: 8px;
+      font-family: var(--font-sans);
+    }
+
+    .case-modal .actions .primary {
+      background: var(--navy);
+      color: #fff;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      border: none;
+      background: transparent;
+      font-size: 1.2rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+
+    #latestMessage a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    #latestMessage a:hover {
+      color: var(--accent-dark, #9c8a63);
+      text-decoration: underline;
+    }
+
+    #updateAvailabilityLink {
+      color: var(--accent);
+      border: 0;
+      padding: 0;
+      background: transparent;
+      font: inherit;
+      text-decoration: none;
+      font-weight: 200;
+      cursor: pointer;
+    }
+
+    #updateAvailabilityLink:hover {
+      color: var(--accent-dark, #9c8a63);
+      text-decoration: underline;
+    }
+
+    /* Availability modal overlay must match Invite Modal */
+    #availabilityModal.modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 24px;
+    }
+
+    #availabilityModal.show {
+      display: flex;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    /* Availability Modal (same styling philosophy as Invite Modal) */
+    .availability-modal {
+      width: min(420px, 90%);
+      background: var(--panel);
+      border-radius: 20px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      box-shadow: 0 40px 80px rgba(0, 0, 0, 0.18);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .availability-modal h3 {
+      font-size: 1.4rem;
+      font-weight: 300;
+      margin-bottom: 4px;
+    }
+
+    .field-label {
+      font-size: 0.95rem;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-label input,
+    .field-label select {
+      padding: 8px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      font-family: inherit;
+      font-size: 0.95rem;
+    }
+
+    .modal-actions {
+      margin-top: 8px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+
+    .modal-actions button {
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      padding: 0.55rem 1.4rem;
+      font-size: 0.95rem;
+      font-family: inherit;
+      cursor: pointer;
+      background: var(--panel);
+      color: var(--ink);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease, color 0.2s ease;
+    }
+
+    .modal-actions button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+      background: var(--panel);
+    }
+
+    .modal-actions .confirm {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+    }
+
+    .modal-actions .confirm:hover {
+      background: #c2b082;
+      box-shadow: 0 10px 24px rgba(182, 164, 122, 0.35);
+    }
+
+    .modal-actions .cancel {
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .modal-actions .cancel:hover {
+      background: rgba(0, 0, 0, 0.04);
+      color: var(--ink);
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 0.75rem;
+    }
+
+    .page-header h1 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 2rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .page-header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .cases-page-header {
+      margin-bottom: 0;
+    }
+
+    .cases-page-header #browseJobsBtn {
+      margin-top: 2rem;
+    }
+
+    .cases-hairline {
+      width: 100%;
+      height: 1px;
+      background: var(--line);
+      margin: 0 0 1.25rem;
+    }
+
+
+    .filters {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filters label {
+      font-size: 0.8rem;
+      font-family: var(--font-sans);
+      font-weight: 300;
+      color: var(--muted);
+    }
+
+    .filters select {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 0.5rem 0.9rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-family: var(--font-sans);
+      font-weight: 300;
+      color: var(--ink);
+      transition: border-color 0.2s ease;
+    }
+
+    .filters select:hover {
+      border-color: var(--accent);
+    }
+
+    .case-files {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .file-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .file-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .file-name {
+      font-family: var(--font-serif);
+      font-size: 1.05rem;
+      word-break: break-word;
+    }
+
+    .file-status {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: capitalize;
+    }
+
+    .case-files-empty {
+      padding: 16px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .file-meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      flex-wrap: wrap;
+    }
+
+    .file-actions {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .card-more-actions {
+      position: relative;
+    }
+
+    .card-more-actions summary {
+      list-style: none;
+      cursor: pointer;
+      border: none;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--ink);
+      width: 2.25rem;
+      height: 2.25rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-sans);
+      font-size: 0.82rem;
+      font-weight: 200;
+      letter-spacing: 0;
+      padding: 0;
+      opacity: 0.42;
+      transition: color 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+      user-select: none;
+    }
+
+    .card-more-actions summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .card-more-actions[open] summary {
+      color: var(--accent);
+      background: rgba(182, 164, 122, 0.04);
+      opacity: 0.88;
+    }
+
+    .card-more-actions summary:hover {
+      color: var(--accent);
+      background: rgba(182, 164, 122, 0.04);
+      opacity: 0.88;
+    }
+
+    .card-more-actions-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 2px);
+      width: max-content;
+      min-width: 0;
+      padding: 0.2rem;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+      display: grid;
+      gap: 0;
+      z-index: 20;
+    }
+
+    .card-more-actions-menu button,
+    .card-more-actions-menu span {
+      display: block;
+      width: 100%;
+      border: none;
+      background: transparent;
+      text-align: left;
+      white-space: nowrap;
+      padding: 0.46rem 0.62rem;
+      border-radius: 10px;
+      font-family: var(--font-sans);
+      font-size: 0.82rem;
+      font-weight: 200;
+      color: var(--muted);
+    }
+
+    .card-more-actions-menu button {
+      cursor: pointer;
+    }
+
+    .card-more-actions-menu button:hover {
+      background: rgba(166, 142, 95, 0.08);
+      color: var(--accent);
+    }
+
+    .card-more-actions-menu span[aria-disabled="true"] {
+      color: var(--muted);
+    }
+
+    .completed-pagination {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 0.85rem;
+      flex-wrap: wrap;
+    }
+
+    .completed-page-btn {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 0.4rem 0.9rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-family: var(--font-serif);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease;
+    }
+
+    #browseJobsBtn {
+      padding: 0.6rem 1.4rem;
+      font-size: 0.95rem;
+      border-color: var(--accent);
+    }
+
+    .completed-page-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .completed-page-info {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .btn-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .btn-link:hover {
+      text-decoration: underline;
+    }
+
+    .btn-link[aria-disabled="true"] {
+      color: var(--muted);
+      cursor: default;
+      text-decoration: none;
+    }
+
+    .btn-link.dispute-note {
+      background: transparent;
+      border: none;
+      padding: 0;
+      color: var(--accent);
+      font-weight: 600;
+      text-decoration: none;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .btn-link.dispute-note:hover {
+      text-decoration: underline;
+    }
+
+    .tour-form {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .tour-form label {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .tour-form textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 0.85rem 1rem;
+      border-radius: 14px;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      background: #fff;
+      font-family: inherit;
+      font-size: 0.95rem;
+      resize: vertical;
+    }
+
+    #disputeFormModal .tour-actions {
+      margin-top: 1rem;
+    }
+
+    .note-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .note-modal.hidden {
+      display: none;
+    }
+
+    .note-modal-card {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 1.5rem;
+      width: min(92vw, 720px);
+      max-height: 85vh;
+      overflow: auto;
+      box-shadow: 0 30px 80px rgba(15, 23, 42, 0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .case-preview-header {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      min-height: 2rem;
+    }
+
+    .case-preview-header h3 {
+      margin: 0;
+      padding: 0.35rem 0 0.45rem;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 1.55rem;
+      text-align: center;
+    }
+
+    .case-preview-close {
+      position: absolute;
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+      border: none;
+      background: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+    }
+
+    .application-detail {
+      display: grid;
+      gap: 0.75rem;
+      font-size: 0.95rem;
+    }
+
+    .application-detail .detail-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+    }
+
+    .application-detail .detail-label {
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      min-width: 140px;
+    }
+
+    .application-detail .detail-value {
+      color: var(--ink);
+    }
+
+    .application-cover {
+      border-top: 1px solid var(--line);
+      padding-top: 0.75rem;
+      line-height: 1.5;
+    }
+
+    .application-preengagement {
+      border-top: 1px solid var(--line);
+      padding-top: 1rem;
+      display: grid;
+      gap: 1rem;
+    }
+
+    .application-preengagement h4 {
+      margin: 0;
+      padding: 0.3rem 0 0.5rem;
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-size: 1.48rem;
+      text-align: center;
+      letter-spacing: 0.01em;
+    }
+
+    .application-preengagement-card-list {
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .application-preengagement-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-start;
+    }
+
+    .application-preengagement-card {
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.72);
+      overflow: hidden;
+    }
+
+    .application-preengagement-card.is-complete {
+      border-color: rgba(182, 164, 122, 0.24);
+      background: rgba(248, 246, 240, 0.72);
+    }
+
+    .application-preengagement-card-toggle {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 1rem 1rem 0.95rem;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .application-preengagement-card-main {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    .application-preengagement-card-copy {
+      min-width: 0;
+      display: grid;
+      gap: 0.05rem;
+    }
+
+    .application-preengagement-item-title {
+      font-family: var(--font-serif);
+      font-size: 1.08rem;
+      line-height: 1.32;
+      color: var(--ink);
+      font-weight: 400;
+      letter-spacing: 0.01em;
+    }
+
+    .application-preengagement-card-status {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-weight: 400;
+      letter-spacing: 0.01em;
+    }
+
+    .application-preengagement-card-status.is-complete {
+      color: var(--accent-strong);
+    }
+
+    .application-preengagement-card-check {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1rem;
+      height: 1rem;
+      font-size: 0.82rem;
+      line-height: 1;
+    }
+
+    .application-preengagement-card-body {
+      display: grid;
+      gap: 0.8rem;
+      padding: 0 1rem 1rem;
+    }
+
+    .application-preengagement-doc {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 0.1rem 0;
+      border: 0;
+      background: transparent;
+    }
+
+    .application-preengagement-doc-upload {
+      align-items: flex-start;
+      padding: 0;
+    }
+
+    .application-preengagement-doc strong {
+      display: block;
+      font-weight: 500;
+      font-size: 0.98rem;
+      line-height: 1.35;
+    }
+
+    .application-preengagement-doc-copy {
+      display: grid;
+      gap: 0.18rem;
+    }
+
+    .application-preengagement-doc-sub {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .application-preengagement-optional {
+      display: grid;
+      gap: 0.45rem;
+      padding: 0.15rem 0 0;
+      background: transparent;
+      border: 0;
+      opacity: 0.82;
+    }
+
+    .application-preengagement-action-btn {
+      min-height: 34px;
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      background: rgba(255,255,255,0.72);
+      color: var(--ink);
+      box-shadow: none;
+    }
+
+    .application-preengagement-action-btn:hover {
+      background: rgba(248, 246, 240, 0.78);
+      border-color: rgba(15, 23, 42, 0.2);
+      box-shadow: none;
+      transform: none;
+    }
+
+    .application-preengagement-upload-trigger {
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .application-preengagement-check,
+    .application-preengagement-choice {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      line-height: 1.45;
+      font-size: 0.95rem;
+    }
+
+    .application-preengagement-choices {
+      display: grid;
+      gap: 0.6rem;
+      border: 0;
+      padding: 0;
+      margin: 0;
+    }
+
+    .application-preengagement-response {
+      display: grid;
+      gap: 0.65rem;
+      padding-top: 0.1rem;
+    }
+
+    .application-preengagement-choice {
+      padding: 0;
+      border-radius: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    .application-preengagement-instructions {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: rgba(15, 23, 42, 0.78);
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+
+    .application-preengagement textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 0.85rem 1rem;
+      border-radius: 14px;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      background: #fff;
+      font-family: inherit;
+      font-size: 0.95rem;
+      resize: vertical;
+    }
+
+    .application-preengagement textarea.is-invalid {
+      border-color: rgba(185, 28, 28, 0.4);
+    }
+
+    .application-preengagement-help {
+      font-size: 0.84rem;
+      color: #991b1b;
+      margin: 0;
+    }
+
+    .application-preengagement-summary {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+
+    .application-preengagement-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      padding-top: 0.9rem;
+      border-top: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .application-preengagement-submit-btn {
+      min-width: 210px;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      padding: 0.55rem 1.3rem;
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      background: rgba(255,255,255,0.78);
+      color: var(--muted);
+      opacity: 0.78;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease, color 0.2s ease;
+    }
+
+    .application-preengagement-submit-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+      background: rgba(255,255,255,0.94);
+      opacity: 1;
+    }
+
+    .application-preengagement-submit-btn:disabled,
+    .application-preengagement-submit-btn[disabled] {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .application-preengagement-status {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.4;
+    }
+
+    .case-subinfo.preengagement-flag {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .note-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 0.2rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .note-modal-actions button {
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      padding: 0.55rem 1.3rem;
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      background: var(--panel);
+      color: var(--ink);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease, color 0.2s ease;
+    }
+
+    .note-modal-actions button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+      background: var(--panel);
+    }
+
+    .note-modal-actions .revoke-btn {
+      margin-right: auto;
+      border-color: rgba(15, 23, 42, 0.12);
+      color: var(--muted);
+      background: rgba(255,255,255,0.78);
+      opacity: 0.78;
+    }
+
+    .note-modal-actions .revoke-btn:hover {
+      background: rgba(255,255,255,0.94);
+      opacity: 1;
+    }
+
+    /* Premium polish */
+    :root {
+      --shadow-sm: 0 10px 24px rgba(15, 23, 42, 0.08);
+      --shadow-md: 0 18px 45px rgba(15, 23, 42, 0.12);
+      --shadow-lg: 0 28px 70px rgba(15, 23, 42, 0.16);
+      --focus-ring: 0 0 0 3px rgba(182, 164, 122, 0.25);
+      --accent-strong: #a48957;
+      --main-bg: #ffffff;
+    }
+
+    body {
+      line-height: 1.6;
+    }
+
+    .main {
+      background: var(--main-bg);
+    }
+
+    body.theme-dark {
+      --main-bg: rgba(12, 16, 27, 1);
+    }
+
+    body:not(.theme-dark) .case-card,
+    body:not(.theme-dark) .dashboard-card,
+    body:not(.theme-dark) .panel,
+    body:not(.theme-dark) .side-by-side-panels > section {
+      border-color: rgba(15, 23, 42, 0.08);
+      box-shadow: var(--shadow-sm);
+    }
+
+    body.theme-dark .case-card,
+    body.theme-dark .dashboard-card,
+    body.theme-dark .panel,
+    body.theme-dark .side-by-side-panels > section {
+      box-shadow: var(--shadow-sm);
+    }
+
+    .case-card,
+    .dashboard-card {
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+
+    .case-card:hover,
+    .dashboard-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    body:not(.theme-dark) .user-chip {
+      box-shadow: none;
+    }
+
+    body.theme-dark .user-chip {
+      background: rgba(15,23,42,0.4);
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    body.theme-dark .user-chip strong {
+      color: #fff;
+    }
+
+    body.theme-dark .user-chip span {
+      color: rgba(255,255,255,0.8);
+    }
+
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
+  </style>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260831-21" />
+  <link rel="stylesheet" href="assets/styles/lpc-product-components.css?v=20260901-1" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260902-5" />
+  <script defer src="assets/scripts/universal-header.js?v=20260831-3"></script>
+  <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
+  <link rel="stylesheet" href="assets/styles/paralegal-private-office.css?v=20260902-5" />
+  <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
+  <style>
+    @media (max-width: 900px) {
+      body.lpc-product-clean.lpc-role-dashboard #sidebarNav {
+        padding: 76px 18px 20px;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="assets/styles/paralegal-financials.css" />
+  <style>
+    #inviteOverlay {
+      --invite-surface: #fff;
+      --ink: #17233b;
+      --muted: #65728a;
+      --line: #dce3ea;
+      --invite-action: #17233b;
+      --invite-action-text: #fff;
+    }
+    html.theme-dark #inviteOverlay, body.theme-dark #inviteOverlay {
+      --invite-surface: #111c2a;
+      --ink: #e8edf7;
+      --muted: #bac5d5;
+      --line: #435268;
+      --invite-action: #e8edf7;
+      --invite-action-text: #111c2a;
+    }
+    body.lpc-role-dashboard #inviteOverlay .invite-dialog {
+      background: var(--invite-surface) !important;
+      color: var(--ink) !important;
+      border-color: var(--line) !important;
+      max-height: calc(100dvh - 32px);
+      overflow: auto;
+    }
+    #inviteOverlay #inviteCaseTitle { color: var(--ink) !important; }
+    #inviteOverlay .invite-subtitle,
+    #inviteOverlay .body-text, #inviteOverlay .invited-by { color: var(--ink); }
+    #inviteOverlay .pill { background: var(--invite-surface); color: var(--ink); }
+    #inviteOverlay .actions button { min-height: 44px; background: var(--invite-surface); color: var(--ink); }
+    #inviteOverlay .actions .primary, #inviteOverlay .actions .primary:hover {
+      background: var(--invite-action);
+      border-color: var(--invite-action);
+      color: var(--invite-action-text);
+    }
+    #inviteOverlay button:focus-visible { outline-color: var(--ink) !important; }
+    #inviteOverlay .close-btn { min-width: 44px; min-height: 44px; color: var(--muted); }
+    @media (max-width: 480px) {
+      #inviteOverlay .actions button { flex: 1 1 10rem; min-width: 0; max-width: 100%; }
+    }
+    [data-invitation-load-state] button { min-height: 44px; padding: 8px 12px; }
+  </style>
+</head>
+<body class="dashboard-no-shadows lpc-role-dashboard lpc-product-clean lpc-static-universal-header lpc-auth-shell-v2">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
+    <span class="lpc-mobile-menu-icon" aria-hidden="true"></span>
+  </button>
+  <aside class="sidebar" id="sidebarNav">
+    <div class="logo sidebar-profile-host">
+      <div class="sidebar-profile-cluster" data-lpc-sidebar-profile>
+        <button class="user-chip lpc-sidebar-profile-trigger" type="button" data-lpc-sidebar-profile-trigger aria-label="Open profile menu" aria-haspopup="true" aria-expanded="false">
+          <img class="globalProfileImage lpc-sidebar-profile-trigger-avatar" src="assets/avatar-placeholder.svg" alt="" />
+          <span class="lpc-sidebar-profile-trigger-details"><strong class="globalProfileName">Member</strong></span>
+          <svg class="lpc-profile-trigger-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"></path></svg>
+        </button>
+      </div>
+    </div>
+    <script src="assets/scripts/sidebar-first-paint.js?v=20260902-2"></script>
+    <nav>
+      <a href="#home" class="active lpc-sidebar-nav-link" data-view-link="home"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"></path><path d="M5 9v11h14V9"></path><path d="M9 20v-6h6v6"></path></svg><span class="lpc-sidebar-nav-label">Home</span></a>
+      <a href="browse-jobs.html" class="lpc-sidebar-nav-link"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path><path d="M8 11h6"></path><path d="M11 8v6"></path></svg><span class="lpc-sidebar-nav-label">Browse Matters</span></a>
+      <a href="#cases" class="lpc-sidebar-nav-link" data-view-link="cases"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M3 12h18"></path></svg><span class="lpc-sidebar-nav-label">My Matters &amp; Applications</span></a>
+      <div class="lpc-sidebar-section-label">Account</div>
+      <a href="profile-settings.html" id="profileSettingsLink" class="lpc-sidebar-nav-link lpc-sidebar-nav-link--secondary"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg><span class="lpc-sidebar-nav-label">Profile Settings</span></a>
+      <a href="paralegalhelp.html" class="lpc-sidebar-nav-link lpc-sidebar-nav-link--secondary"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9a2.7 2.7 0 1 1 4.6 1.9c-1.1.9-2.1 1.3-2.1 3.1"></path><path d="M12 18h.01"></path></svg><span class="lpc-sidebar-nav-label">Help</span></a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sidebar-footer">© Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect 2026</div>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+  <div class="lpc-auth-page-shell">
+  <div class="lpc-universal-header-shell lpc-universal-header-shell--created" role="group" aria-label="Workspace tools" data-lpc-universal-header="true">
+    <div class="lpc-universal-header-controls" data-notification-center="true" aria-label="Search, notifications, and Assistant">
+      <div class="lpc-global-search-host" data-productivity-trigger-host></div>
+      <div class="notification-wrapper">
+        <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          <span class="notification-badge" data-notification-badge>0</span>
+        </button>
+        <div class="notifications-panel notif-panel hidden" role="region" aria-label="Notifications" aria-live="polite" data-notification-panel><div class="notif-header" aria-label="Notifications"></div><div class="notif-scroll" data-notification-list></div><div class="notif-empty" data-notification-empty>Loading…</div><button type="button" class="notif-markall" data-notification-mark>Mark All Read</button></div>
+      </div>
+    </div>
+  </div>
+  <main id="main" tabindex="-1" class="main">
+    <div class="topbar" data-attorney-header>
+      <div class="lpc-global-search-host" data-productivity-trigger-host></div>
+      <div id="paralegalFloatingCluster" data-notification-center="true">
+        <div class="notification-wrapper">
+          <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 01-3.46 0"></path>
+            </svg>
+            <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
+          </button>
+          <div id="notificationPanel" class="notifications-panel notif-panel hidden" role="region" aria-live="polite" data-notification-panel>
+            <div class="notif-header" aria-label="Notifications"></div>
+            <div id="notifList" class="notif-scroll" data-notification-list></div>
+            <div class="notif-empty" data-notification-empty>Loading…</div>
+            <button id="markAllReadBtn" class="notif-markall" type="button" data-notification-mark>Mark All Read</button>
+          </div>
+        </div>
+        <div class="user-profile" id="clusterProfileTrigger" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-controls="clusterProfileDropdown" aria-label="Open profile menu">
+          <img
+            id="clusterAvatar"
+            class="nav-profile-photo"
+            src="assets/avatar-placeholder.svg"
+            alt="Paralegal avatar"
+          />
+          <div>
+            <strong id="clusterName">Paralegal</strong>
+          </div>
+          <div class="profile-dropdown" id="clusterProfileDropdown" aria-hidden="true">
+            <a href="profile-settings.html">Account Settings</a>
+            <button type="button" data-logout>Log Out</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="photoPendingBanner" class="pending-approval-banner hidden" role="status" aria-live="polite">
+      <strong>Pending Approval</strong>
+      <span>Your profile photo is under review and visible only to you.</span>
+    </div>
+
+    <div id="paralegalHomeView" class="dashboard-view paralegal-home-feed private-office is-active is-hydrating">
+      <header class="private-office-header">
+        <div class="private-office-header__title">
+          <h1 class="private-office-label">On your desk</h1>
+        </div>
+        <div class="private-office-header__actions">
+          <button class="home-availability-button" type="button" data-action="availability" aria-label="Update availability" aria-haspopup="dialog" aria-controls="availabilityModal" disabled>
+            <span class="home-availability-dot" aria-hidden="true"></span>
+            <span class="home-availability-copy">
+              <small>Availability</small>
+              <span id="availabilityStatus">Checking…</span>
+            </span>
+            <svg class="home-availability-chevron" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m4 6 4 4 4-4"></path>
+            </svg>
+          </button>
+          <a class="home-primary-action" href="browse-jobs.html">Browse Matters</a>
+        </div>
+      </header>
+
+      <div class="private-office-worktable">
+        <section class="private-office-desk" id="homeWorkSection" aria-labelledby="homeWorkTitle" aria-busy="true">
+          <header class="private-office-desk__header">
+            <div>
+              <h2 class="sr-only" id="homeWorkTitle">Active Matter work surface</h2>
+            </div>
+            <div class="private-office-desk__switcher" id="deskMatterSwitcher" hidden>
+              <button type="button" data-desk-previous aria-label="Previous active Matter">&#8592;</button>
+              <span id="deskMatterPosition" aria-live="polite"></span>
+              <button type="button" data-desk-next aria-label="Next active Matter">&#8594;</button>
+            </div>
+          </header>
+          <div class="private-office-desk__body" id="assignmentList" aria-live="polite">
+            <div class="private-office-desk__loading">Preparing your desk…</div>
+          </div>
+        </section>
+
+        <aside class="private-office-side" aria-label="Schedule and office activity">
+          <section class="private-office-calendar" aria-labelledby="privateOfficeCalendarTitle">
+            <header>
+              <span class="private-office-label">Next seven days</span>
+              <h2 id="privateOfficeCalendarTitle">Calendar</h2>
+            </header>
+            <div id="deadlineList" aria-live="polite">
+              <p class="private-office-secondary-state">Checking your deadlines…</p>
+            </div>
+          </section>
+
+          <section class="private-office-inbox" id="paralegalPriorityQueue" aria-labelledby="paralegalPriorityTitle">
+            <header>
+              <div>
+                <h2 id="paralegalPriorityTitle">Office inbox</h2>
+              </div>
+              <span data-paralegal-priority-count aria-live="polite">Loading…</span>
+            </header>
+            <div class="private-office-inbox__list" data-paralegal-priority-list aria-live="polite">
+              <div class="office-inbox-item"><strong>Checking your workspace…</strong></div>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <div class="availability-hidden" aria-hidden="true">
+        <span id="availabilityNext"></span>
+        <span id="availabilityNextRow"></span>
+        <button type="button" id="updateAvailabilityLink">Update availability</button>
+      </div>
+
+      <section class="private-office-opportunities" id="recommendedMattersSection" aria-labelledby="recommendedMattersTitle">
+        <header>
+          <div>
+            <h2 id="recommendedMattersTitle">Matters to explore</h2>
+          </div>
+          <a href="browse-jobs.html">Browse Matters</a>
+        </header>
+        <div class="private-office-folios" id="recommendedMattersList" aria-live="polite">
+          <p class="private-office-secondary-state">Reviewing open Matters…</p>
+        </div>
+      </section>
+
+      <section class="private-office-application" id="homeApplicationsSection" aria-labelledby="homeApplicationsTitle">
+        <header>
+          <div>
+            <h2 id="homeApplicationsTitle">Applications</h2>
+          </div>
+        </header>
+        <div id="homeApplicationPipeline" aria-label="Application progress" aria-live="polite">
+          <p class="private-office-secondary-state">Checking application progress…</p>
+        </div>
+        <div class="private-office-application__links">
+          <div id="homeApplicationsList" aria-live="polite"></div>
+          <a href="dashboard-paralegal.html#cases">All applications</a>
+        </div>
+      </section>
+
+      <section class="private-office-compensation" aria-labelledby="privateOfficeCompensationTitle">
+        <h2 id="privateOfficeCompensationTitle">Payouts</h2>
+        <div id="paralegalFinancialSummary"><p role="status">Loading payouts…</p></div>
+        <a href="profile-settings.html?section=payments">Payment settings</a>
+      </section>
+
+      <section id="homeProfileNote" hidden aria-hidden="true">
+        <span id="homeProfileStripTitle">Professional profile</span>
+        <span id="homeProfileStates">Add your states</span>
+        <span id="homeProfilePractices">Add practice areas</span>
+        <span id="homeProfileExperience">Add experience</span>
+      </section>
+
+      <section id="homeReturningOverview" hidden aria-hidden="true">
+        <span data-field="homeActiveMatters">0</span>
+        <span data-field="homeNextDeadline">—</span>
+        <span data-field="homeUnreadMessages">0</span>
+      </section>
+
+    </div>
+
+    <div id="paralegalCasesView" class="dashboard-view" hidden>
+      <header class="page-header cases-page-header">
+        <div>
+          <h1>My Matters &amp; Applications</h1>
+          <p>Track your applications and manage active matters.</p>
+        </div>
+        <button type="button" class="completed-page-btn" id="browseJobsBtn">Browse Matters</button>
+      </header>
+      <div class="cases-hairline" aria-hidden="true"></div>
+
+      <div class="cases-apps-grid">
+        <section class="cases-column" aria-label="Matters">
+          <div class="cases-section">
+            <div class="section-title">Active Matters</div>
+            <div class="completed-pagination" id="activeCasesPagination" aria-label="Active Matters pagination">
+              <button type="button" class="completed-page-btn" id="activePrevBtn" disabled>Back</button>
+              <span class="completed-page-info" id="activePageInfo"></span>
+              <button type="button" class="completed-page-btn" id="activeNextBtn" disabled>Next</button>
+            </div>
+            <div class="case-files" id="filesContainer" aria-live="polite">
+              <p class="case-files-empty">Loading matters…</p>
+            </div>
+          </div>
+          <div class="cases-section completed-cases-section">
+            <div class="section-title">Past Matters</div>
+            <div class="completed-pagination" id="completedCasesPagination" aria-label="Past Matters pagination">
+              <button type="button" class="completed-page-btn" id="completedPrevBtn" disabled>Back</button>
+              <span class="completed-page-info" id="completedPageInfo"></span>
+              <button type="button" class="completed-page-btn" id="completedNextBtn" disabled>Next</button>
+            </div>
+            <div class="case-files" id="completedCasesContainer" aria-live="polite">
+              <p class="case-files-empty">Loading history…</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="apps-column" aria-label="Applications">
+          <div class="applied-header">
+            <div>
+              <h2>My Applications</h2>
+              <div class="case-subinfo">Search and filter your recent applications.</div>
+            </div>
+            <div class="applied-toolbar">
+              <span class="applied-count" id="appliedCount"></span>
+              <button
+                type="button"
+                class="applied-filter-btn"
+                id="appliedFilterToggle"
+                aria-expanded="false"
+                aria-controls="appliedControlsPanel"
+                aria-label="Show application filters"
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 7h14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                  <circle cx="9" cy="7" r="1.4" fill="currentColor"/>
+                  <path d="M5 12h14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                  <circle cx="15" cy="12" r="1.4" fill="currentColor"/>
+                  <path d="M5 17h14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                  <circle cx="11" cy="17" r="1.4" fill="currentColor"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="lpc-saved-view-bar" aria-label="Application saved views">
+            <div class="lpc-saved-view-field">
+              <label for="paralegalApplicationSavedView">View</label>
+              <select id="paralegalApplicationSavedView" data-application-saved-view></select>
+            </div>
+            <button type="button" class="lpc-saved-view-button is-primary" data-application-save-view>Save current view</button>
+            <button type="button" class="lpc-saved-view-button" data-application-delete-view hidden>Delete</button>
+            <span class="lpc-saved-view-status" data-application-saved-view-status aria-live="polite"></span>
+          </div>
+          <div class="applied-controls-panel" id="appliedControlsPanel" hidden>
+            <div class="applied-controls">
+              <input type="search" id="appliedSearch" placeholder="Search by Matter title or practice area" />
+              <select id="appliedStatusFilter" aria-label="Application status">
+                <option value="all">All statuses</option>
+              </select>
+              <select id="appliedPracticeFilter">
+                <option value="all">All practice areas</option>
+              </select>
+              <select id="appliedDateFilter">
+                <option value="3">Last 3 days</option>
+                <option value="7">Last week</option>
+                <option value="30">Last month</option>
+                <option value="all">All time</option>
+              </select>
+              <select id="appliedSort" aria-label="Sort applications">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="matter">Matter A–Z</option>
+              </select>
+            </div>
+          </div>
+
+          <section class="case-list" id="appliedJobsList">
+            <div class="case-card empty-state">
+              <div class="case-header">
+                <div>
+                  <h2>No applications yet</h2>
+                  <div class="case-subinfo">Matters you apply to will appear here.</div>
+                </div>
+              </div>
+            </div>
+          </section>
+          <nav class="applied-pagination" aria-label="Applications pagination">
+            <button type="button" class="applied-page-btn" id="appliedPrevBtn" disabled>Previous</button>
+            <span class="applied-page-info" id="appliedPageInfo"></span>
+            <button type="button" class="applied-page-btn" id="appliedNextBtn" disabled>Next</button>
+          </nav>
+        </section>
+      </div>
+    </div>
+    <div class="tour-overlay" id="paralegalTourOverlay" aria-hidden="true"></div>
+    <div class="tour-modal" id="paralegalTourModal" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-describedby="tourText" aria-hidden="true" inert>
+      <button type="button" class="tour-close" id="tourCloseBtn" aria-label="Close tour">×</button>
+      <div class="tour-hero" role="presentation"></div>
+      <div class="tour-content">
+        <div class="tour-title" id="tourTitle">Welcome to <span class="lpc-brand-name">Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect</span></div>
+        <p class="tour-text" id="tourText">
+          You’re about to take a short tour of your new dashboard. We’ll start by setting up your profile.
+        </p>
+        <div class="tour-actions">
+          <button type="button" class="tour-btn primary" id="startTourBtn">Let’s start</button>
+        </div>
+      </div>
+    </div>
+    <div class="tour-overlay" id="withdrawalSuccessOverlay" aria-hidden="true"></div>
+    <div class="tour-modal" id="withdrawalSuccessModal" role="dialog" aria-modal="true" aria-labelledby="withdrawalSuccessTitle" aria-describedby="withdrawalSuccessText" aria-hidden="true" inert>
+      <button type="button" class="tour-close" id="withdrawalSuccessCloseBtn" aria-label="Close withdrawal notice">×</button>
+      <div class="tour-hero" role="presentation"></div>
+      <div class="tour-content">
+        <div class="tour-title" id="withdrawalSuccessTitle">Withdraw Successful</div>
+        <p class="tour-text" id="withdrawalSuccessText">Your withdrawal has been recorded.</p>
+        <div class="tour-actions">
+          <button type="button" class="tour-btn primary" id="withdrawalSuccessOkBtn">Close</button>
+        </div>
+      </div>
+    </div>
+    <div class="tour-overlay" id="caseCompletedOverlay" aria-hidden="true"></div>
+    <div class="tour-modal" id="caseCompletedModal" role="dialog" aria-modal="true" aria-labelledby="caseCompletedTitle" aria-describedby="caseCompletedText" aria-hidden="true" inert>
+      <button type="button" class="tour-close" id="caseCompletedCloseBtn" aria-label="Close Matter completed notice">×</button>
+      <div class="tour-hero" role="presentation"></div>
+      <div class="tour-content">
+        <div class="tour-title" id="caseCompletedTitle">Matter complete</div>
+        <p class="tour-text" id="caseCompletedText" hidden></p>
+        <div class="tour-actions">
+          <button type="button" class="tour-btn primary" id="caseCompletedOkBtn">Close</button>
+        </div>
+      </div>
+    </div>
+    <div class="tour-overlay" id="disputeFormOverlay" aria-hidden="true"></div>
+    <div class="tour-modal" id="disputeFormModal" role="dialog" aria-modal="true" aria-labelledby="disputeFormTitle" aria-describedby="disputeFormText" aria-hidden="true" inert>
+      <button type="button" class="tour-close" id="disputeFormCloseBtn" aria-label="Close review form">×</button>
+      <div class="tour-hero" role="presentation"></div>
+      <div class="tour-content">
+        <div class="tour-title" id="disputeFormTitle">Request Review</div>
+        <p class="tour-text" id="disputeFormText">Please share the details of your review.</p>
+        <div class="tour-form">
+          <textarea id="disputeFormMessage" name="disputeFormMessage" placeholder="Add a note (required)" aria-label="Review note"></textarea>
+        </div>
+        <div class="tour-actions">
+          <button type="button" class="tour-btn ghost" id="disputeFormCancelBtn">Cancel</button>
+          <button type="button" class="tour-btn primary" id="disputeFormSubmitBtn">Submit review</button>
+        </div>
+      </div>
+    </div>
+    <div class="tour-tooltip" id="profileTourTooltip" role="dialog" aria-live="polite" aria-labelledby="profileTourTooltipText" aria-hidden="true" inert>
+      <button type="button" class="tour-close" id="tourTooltipCloseBtn" aria-label="Close tour">×</button>
+      <p id="profileTourTooltipText">Set up your profile here.</p>
+      <div class="tour-step-actions">
+        <button type="button" class="tour-btn ghost" id="tourBackBtn">Back</button>
+        <button type="button" class="tour-btn primary" id="tourNextBtn">Next</button>
+      </div>
+    </div>
+  </main>
+  </div>
+  <!-- AVAILABILITY MODAL -->
+  <div class="modal-overlay" id="availabilityModal" aria-hidden="true" inert>
+    <div class="availability-modal" role="dialog" aria-modal="true" aria-labelledby="availabilityModalTitle" tabindex="-1">
+      <h3 id="availabilityModalTitle">Update availability</h3>
+
+      <label class="field-label">
+        Status
+        <select id="availabilityStatusInput">
+          <option value="available">Available now</option>
+          <option value="unavailable">Not available</option>
+        </select>
+      </label>
+
+      <label class="field-label" id="availabilityDateRow">
+        Available again (optional)
+        <input type="date" id="availabilityDateInput" />
+      </label>
+
+      <p id="availabilityError" class="muted" role="alert" hidden></p>
+
+      <div class="modal-actions">
+        <button type="button" id="saveAvailabilityBtn" class="confirm">Save</button>
+        <button type="button" id="cancelAvailabilityBtn" class="cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <div id="applicationDetailModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="applicationDetailTitle" aria-hidden="true" inert>
+    <div class="note-modal-card">
+      <header class="case-preview-header">
+        <h3 id="applicationDetailTitle">Application Details</h3>
+        <button type="button" class="case-preview-close" aria-label="Close application details" data-application-close>&times;</button>
+      </header>
+      <div class="application-detail" data-application-detail>
+        <p class="muted">Loading application...</p>
+      </div>
+      <div class="note-modal-actions">
+        <button type="button" class="btn secondary revoke-btn" data-application-revoke>Withdraw application</button>
+      </div>
+    </div>
+  </div>
+  <div id="revokeConfirmModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="revokeConfirmTitle" aria-hidden="true" inert>
+    <div class="note-modal-card" style="width:min(92vw, 460px);">
+      <header class="case-preview-header">
+        <h3 id="revokeConfirmTitle">Withdraw this application?</h3>
+        <button type="button" class="case-preview-close" aria-label="Close confirmation" data-revoke-confirm-close>&times;</button>
+      </header>
+      <div class="application-detail">
+        <p class="muted" style="margin:0;line-height:1.6;">Your application will no longer be considered for this Matter.</p>
+      </div>
+      <div class="note-modal-actions">
+        <button type="button" class="btn secondary" data-revoke-confirm-cancel>Cancel</button>
+        <button type="button" class="btn secondary revoke-btn" data-revoke-confirm-submit>Withdraw application</button>
+      </div>
+    </div>
+  </div>
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="assets/scripts/utils/notifications.js"></script>
+  <script src="assets/scripts/paralegal-cluster.js"></script>
+  <script src="assets/scripts/utils/toast.js?v=20260208"></script>
+  <script>
+    (function markReady() {
+      const apply = () => document.body.classList.add("is-ready");
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", apply, { once: true });
+      } else {
+        apply();
+      }
+    })();
+  </script>
+  <script>
+    (function preloadStoredProfile() {
+      document.addEventListener('DOMContentLoaded', () => {
+        try {
+          const raw = localStorage.getItem('lpc_user');
+          if (!raw) return;
+          const user = JSON.parse(raw);
+          if (!user || typeof user !== 'object') return;
+          const placeholderAvatar = "/assets/avatar-placeholder.svg";
+          const avatar = user.pendingProfileImage || user.profileImage || user.avatarURL || placeholderAvatar;
+          document.querySelectorAll('[data-avatar]').forEach((el) => {
+            el.src = avatar;
+          });
+        } catch (_) {}
+      });
+    })();
+  </script>
+  <script type="module" src="assets/scripts/paralegal-dashboard.js?v=20260902-4"></script>
+  <script type="module">
+    import { secureFetch, fetchCSRF, getStoredSession } from "./assets/scripts/auth.js";
+    import { historyWorkLabel, loadParalegalHistory, renderHistoryPayout } from "./assets/scripts/utils/paralegal-history.mjs";
+    const historyApi = {
+      async get(path, options) { const response = await secureFetch(path, { ...options, cache: "no-store", headers: { Accept: "application/json" } }); const value = await response.json().catch(() => null); if (!response.ok) throw Object.assign(new Error(value?.error || "History unavailable."), { status: response.status }); return value; },
+      async blob(path, options) { const response = await secureFetch(path, { ...options, cache: "no-store" }); if (!response.ok) throw Object.assign(new Error("Receipt unavailable."), { status: response.status }); return response.blob(); },
+    };
+    import { activateDialogFocus, deactivateDialogFocus } from "./assets/scripts/utils/dialog-focus.js";
+    import { confirmAction, showAlert } from "./assets/scripts/utils/dialogs.js";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const homeView = document.getElementById("paralegalHomeView");
+      const casesView = document.getElementById("paralegalCasesView");
+      const viewLinks = document.querySelectorAll("[data-view-link]");
+      const basePath = window.location.pathname + window.location.search;
+      const views = { home: homeView, cases: casesView };
+      let casesReady = false;
+      let activeKey = "home";
+      const viewScrollPositions = { home: 0, cases: 0 };
+
+      const filesContainer = document.getElementById("filesContainer");
+      const activePagination = document.getElementById("activeCasesPagination");
+      const activePrevBtn = document.getElementById("activePrevBtn");
+      const activeNextBtn = document.getElementById("activeNextBtn");
+      const activePageInfo = document.getElementById("activePageInfo");
+      const completedCasesContainer = document.getElementById("completedCasesContainer");
+      const completedPagination = document.getElementById("completedCasesPagination");
+      const completedPrevBtn = document.getElementById("completedPrevBtn");
+      const completedNextBtn = document.getElementById("completedNextBtn");
+      const completedPageInfo = document.getElementById("completedPageInfo");
+      let activeCasesCache = [];
+      let completedCasesCache = [];
+      let historyGeneration = 0, receiptGeneration = 0, historyOwnerId = "", historyPresentation = "", historyController = new AbortController(), receiptController = new AbortController();
+      const currentHistoryOwner = () => { const { user, role, status } = getStoredSession(); return role === "paralegal" && status === "approved" ? String(user?.id || user?._id || "") : ""; };
+      const resetReceipts = () => { receiptGeneration++; receiptController.abort(); receiptController = new AbortController(); };
+      const clearHistory = () => {
+        historyGeneration++; historyController.abort(); resetReceipts(); completedCasesCache = []; historyPresentation = "";
+        if (completedCasesContainer) completedCasesContainer.innerHTML = '<p role="status">History needs to be refreshed.</p>';
+        updateCompletedPagination(0);
+      };
+      window.addEventListener("storage", event => { if (event.key === "lpc_user" || event.key === null) clearHistory(); });
+      window.addEventListener("lpc:user-updated", () => { if (historyOwnerId !== currentHistoryOwner()) clearHistory(); });
+      let activePageIndex = 0;
+      let completedPageIndex = 0;
+      let completedMinHeight = 0;
+      let casesRefreshPromise = null;
+      const ACTIVE_PAGE_SIZE = 3;
+      const COMPLETED_PAGE_SIZE = 3;
+      const highlightCaseId = new URLSearchParams(window.location.search).get("highlightCase") || "";
+      let highlightPending = highlightCaseId;
+
+      function escapeHTML(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+
+
+      function formatDate(value) {
+        if (!value) return "";
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return "";
+        return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+      }
+
+      function formatStatus(value) {
+        const raw = String(value || "").trim();
+        if (!raw) return "";
+        const cleaned = raw.replace(/_/g, " ");
+        return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+      }
+
+      function notifyCase(message, type = "info") {
+        const helper = window.toastUtils;
+        if (helper?.show) {
+          helper.show(message, { targetId: "toastBanner", type });
+        } else {
+          void showAlert(message, { title: type === "error" ? "Action unavailable" : "Notice" });
+        }
+      }
+
+      function getBlockConfirmMessage() {
+        return "Block future interaction with this attorney? This prevents future applications, invitations, hiring, and direct messaging between the two of you on Let's ParaConnect. This user will not be notified. Existing Matter and payment history will remain available.";
+      }
+
+      function buildBlockAction(item) {
+        const blockStatus = item?.blockStatus || null;
+        const caseId = item?.caseId || item?.id || item?._id || "";
+        if (!blockStatus || !caseId) return "";
+        if (blockStatus.blocked) {
+          return `
+            <details class="card-more-actions">
+              <summary aria-label="More actions">...</summary>
+              <div class="card-more-actions-menu">
+                <span aria-disabled="true">Blocked - manage in Settings</span>
+              </div>
+            </details>
+          `;
+        }
+        if (!blockStatus.canBlock) return "";
+        return `
+          <details class="card-more-actions">
+            <summary aria-label="More actions">...</summary>
+            <div class="card-more-actions-menu">
+              <button type="button" data-block-future-interaction data-case-id="${escapeHTML(caseId)}">Block attorney</button>
+            </div>
+          </details>
+        `;
+      }
+
+      function updateActivePagination(totalCount) {
+        if (!activePagination) return;
+        const totalPages = Math.max(1, Math.ceil(totalCount / ACTIVE_PAGE_SIZE));
+        const safeIndex = Math.min(activePageIndex, totalPages - 1);
+        activePageIndex = safeIndex;
+        const start = totalCount === 0 ? 0 : safeIndex * ACTIVE_PAGE_SIZE + 1;
+        const end = Math.min(totalCount, (safeIndex + 1) * ACTIVE_PAGE_SIZE);
+        if (activePageInfo) {
+          activePageInfo.textContent = totalCount ? `${start}-${end} of ${totalCount}` : "0 of 0";
+        }
+        if (activePrevBtn) activePrevBtn.disabled = safeIndex <= 0;
+        if (activeNextBtn) activeNextBtn.disabled = safeIndex >= totalPages - 1;
+        activePagination.style.display = totalCount > ACTIVE_PAGE_SIZE ? "flex" : "none";
+      }
+
+      function applyActiveCases(items = [], { preservePage = false } = {}) {
+        activeCasesCache = Array.isArray(items) ? items : [];
+        if (highlightPending) {
+          const matchIndex = activeCasesCache.findIndex((item) => {
+            const caseId = item.caseId || item.id || item._id || "";
+            return caseId && String(caseId) === String(highlightPending);
+          });
+          activePageIndex = matchIndex >= 0 ? Math.floor(matchIndex / ACTIVE_PAGE_SIZE) : 0;
+        } else if (!preservePage) {
+          activePageIndex = 0;
+        }
+        renderActiveCases(activeCasesCache);
+      }
+
+      function renderActiveCases(items = activeCasesCache) {
+        if (!filesContainer) return;
+        if (!items.length) {
+          filesContainer.innerHTML = `<p class="case-files-empty">No active matters yet. New assignments will appear here.</p>`;
+          updateActivePagination(0);
+          return;
+        }
+        const totalCount = items.length;
+        const start = activePageIndex * ACTIVE_PAGE_SIZE;
+        const pageItems = items.slice(start, start + ACTIVE_PAGE_SIZE);
+        filesContainer.innerHTML = pageItems
+          .map((item) => {
+            const caseId = item.caseId || item.id || item._id || "";
+            const title = item.jobTitle || item.title || "Matter";
+            const attorney = item.attorneyName || "Attorney";
+            const status = formatStatus(item.status);
+            const deadline = item.deadline
+              ? window.LPCBusinessDate?.format(item.deadlineDate || item.deadline) || item.deadline
+              : "";
+            const meta = [
+              `Attorney: ${attorney}`,
+              status ? `Status: ${status}` : "",
+              deadline ? `Deadline: ${deadline}` : "",
+            ]
+              .filter(Boolean)
+              .map((line) => `<span>${escapeHTML(line)}</span>`)
+              .join("");
+            const viewAction = caseId
+              ? `<a href="case-detail.html?caseId=${encodeURIComponent(caseId)}" class="btn-link">Details</a>`
+              : `<span class="btn-link" aria-disabled="true">Matter unavailable</span>`;
+            const highlightClass = highlightPending && caseId && String(caseId) === String(highlightPending)
+              ? " is-highlighted"
+              : "";
+            return `
+              <article class="file-card${highlightClass}" data-case-id="${escapeHTML(caseId)}">
+                <div class="file-line">
+                  <span class="file-name">${escapeHTML(title)}</span>
+                </div>
+                <div class="file-meta">${meta}</div>
+                <div class="file-actions">
+                  ${viewAction}
+                </div>
+              </article>
+            `;
+          })
+          .join("");
+        updateActivePagination(totalCount);
+        if (highlightPending && filesContainer) {
+          requestAnimationFrame(() => {
+            const target = filesContainer.querySelector(`[data-case-id="${CSS.escape(highlightPending)}"]`);
+            if (target) {
+              target.scrollIntoView({ behavior: "smooth", block: "center" });
+              finalizeHighlight();
+            }
+          });
+        }
+      }
+
+      function updateCompletedPagination(totalCount) {
+        if (!completedPagination) return;
+        const totalPages = Math.max(1, Math.ceil(totalCount / COMPLETED_PAGE_SIZE));
+        const safeIndex = Math.min(completedPageIndex, totalPages - 1);
+        completedPageIndex = safeIndex;
+        const start = totalCount === 0 ? 0 : safeIndex * COMPLETED_PAGE_SIZE + 1;
+        const end = Math.min(totalCount, (safeIndex + 1) * COMPLETED_PAGE_SIZE);
+        if (completedPageInfo) {
+          completedPageInfo.textContent = totalCount
+            ? `${start}–${end} of ${totalCount}`
+            : "0 of 0";
+        }
+        if (completedPrevBtn) completedPrevBtn.disabled = safeIndex <= 0;
+        if (completedNextBtn) completedNextBtn.disabled = safeIndex >= totalPages - 1;
+        completedPagination.style.display = totalCount > COMPLETED_PAGE_SIZE ? "flex" : "none";
+      }
+
+      function renderCompletedCases(items = completedCasesCache) {
+        if (!completedCasesContainer) return;
+        resetReceipts();
+        if (!historyOwnerId || historyOwnerId !== currentHistoryOwner()) { clearHistory(); return; }
+        if (!items.length) {
+          completedCasesContainer.innerHTML = `<p class="case-files-empty">No past matters yet.</p>`;
+          updateCompletedPagination(0);
+          if (completedMinHeight) {
+            completedCasesContainer.style.minHeight = `${completedMinHeight}px`;
+          }
+          return;
+        }
+        const totalCount = items.length;
+        const start = completedPageIndex * COMPLETED_PAGE_SIZE;
+        const pageItems = items.slice(start, start + COMPLETED_PAGE_SIZE);
+        completedCasesContainer.innerHTML = pageItems
+          .map((item) => {
+            const caseId = item.caseId || item.id || item._id || "";
+            const title = item.title || "Matter";
+            const attorney = item.attorneyName || "Attorney";
+            const completed = formatDate(item.completedAt);
+            const isWithdrawn = !!item.isWithdrawn;
+            const completedLabel = `${historyWorkLabel(item.workState, item.reviewKind)}${completed ? ` · ${completed}` : ""}`;
+            const meta = [
+              `Attorney: ${attorney}`,
+              completedLabel,
+            ]
+              .filter(Boolean)
+              .map((line) => `<span>${escapeHTML(line)}</span>`)
+              .join("");
+            const disputeAction = isWithdrawn && item.canDispute && caseId
+              ? `<button type="button" class="btn-link dispute-note" data-dispute-withdrawn data-case-id="${escapeHTML(
+                  caseId
+                )}">Request LPC review</button>`
+              : "";
+            const blockAction = buildBlockAction(item);
+            const highlightClass = highlightPending && caseId && String(caseId) === String(highlightPending)
+              ? " is-highlighted"
+              : "";
+            return `
+              <article class="file-card${highlightClass}" data-case-id="${escapeHTML(caseId)}">
+                <div class="file-line">
+                  <span class="file-name">${escapeHTML(title)}</span>
+                  ${blockAction}
+                </div>
+                <div class="file-meta">${meta}</div>
+                <div data-history-payout></div>
+                <div class="file-actions">
+                  ${disputeAction}
+                </div>
+              </article>
+          `;
+          })
+          .join("");
+        const generation = receiptGeneration, ownerId = historyOwnerId;
+        for (const [index, container] of [...completedCasesContainer.querySelectorAll("[data-history-payout]")].entries()) {
+          container.replaceChildren(renderHistoryPayout(pageItems[index], { api: historyApi, ownerId, signal: receiptController.signal, isCurrent: () => activeKey === "cases" && ownerId === currentHistoryOwner() && generation === receiptGeneration, onRefresh: () => loadCompletedCases({ preservePage: true }) }));
+        }
+        updateCompletedPagination(totalCount);
+        requestAnimationFrame(() => {
+          const nextHeight = completedCasesContainer.offsetHeight;
+          if (nextHeight > completedMinHeight) {
+            completedMinHeight = nextHeight;
+          }
+          if (completedMinHeight) {
+            completedCasesContainer.style.minHeight = `${completedMinHeight}px`;
+          }
+        });
+        if (highlightPending && completedCasesContainer) {
+          requestAnimationFrame(() => {
+            const target = completedCasesContainer.querySelector(`[data-case-id="${CSS.escape(highlightPending)}"]`);
+            if (target) {
+              target.scrollIntoView({ behavior: "smooth", block: "center" });
+              finalizeHighlight();
+            }
+          });
+        }
+      }
+
+      function finalizeHighlight() {
+        if (!highlightPending) return;
+        const url = new URL(window.location.href);
+        url.searchParams.delete("highlightCase");
+        history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+        highlightPending = "";
+      }
+
+      async function loadActiveCases({ items = null, preservePage = false, showLoading = true } = {}) {
+        if (!filesContainer) return;
+        if (Array.isArray(items)) {
+          applyActiveCases(items, { preservePage });
+          return;
+        }
+        if (showLoading) filesContainer.innerHTML = `<p class="case-files-empty">Loading matters…</p>`;
+        window.dispatchEvent(new CustomEvent("lpc:paralegal-dashboard-request-refresh", {
+          detail: { reason: "active-matters" },
+        }));
+      }
+
+      function renderActiveCasesUnavailable() {
+        if (!filesContainer) return;
+        filesContainer.innerHTML = `
+          <div class="case-files-empty">
+            <p>Active Matters could not be loaded.</p>
+            <button type="button" class="completed-page-btn" data-retry-active-matters>Retry</button>
+          </div>`;
+        filesContainer.querySelector("[data-retry-active-matters]")?.addEventListener("click", () => {
+          void loadActiveCases({ preservePage: true });
+        });
+        updateActivePagination(0);
+      }
+
+      async function loadCompletedCases({ preservePage = false, showLoading = true } = {}) {
+        if (!completedCasesContainer) return;
+        const previousPageIndex = completedPageIndex, generation = ++historyGeneration;
+        historyController.abort(); historyController = new AbortController();
+        if (showLoading) {
+          resetReceipts(); completedCasesCache = []; historyPresentation = "";
+          completedCasesContainer.innerHTML = `<p class="case-files-empty" role="status">Loading history…</p>`;
+          updateCompletedPagination(0);
+        }
+        try {
+          const viewer = await window.requireRole?.("paralegal");
+          const ownerId = String(viewer?.id || viewer?._id || "");
+          if (generation !== historyGeneration || !ownerId || ownerId !== currentHistoryOwner()) return;
+          historyOwnerId = ownerId;
+          const payload = await loadParalegalHistory(historyApi, ownerId, { signal: historyController.signal, isCurrent: () => generation === historyGeneration && ownerId === currentHistoryOwner() });
+          if (generation !== historyGeneration || ownerId !== currentHistoryOwner()) return;
+          const presentation = JSON.stringify(payload.items);
+          // An unchanged background read must not remove a focused control,
+          // collapse an earlier receipt, or cancel its verified PDF request.
+          if (!showLoading && preservePage && presentation === historyPresentation) return;
+          resetReceipts(); historyPresentation = presentation;
+          completedCasesCache = payload.items;
+          completedCasesCache.sort((a, b) => {
+            const aDate = new Date(a?.completedAt || a?.updatedAt || 0).getTime();
+            const bDate = new Date(b?.completedAt || b?.updatedAt || 0).getTime();
+            return bDate - aDate;
+          });
+          if (highlightPending) {
+            const matchIndex = completedCasesCache.findIndex((item) => {
+              const caseId = item.caseId || item.id || item._id || "";
+              return caseId && String(caseId) === String(highlightPending);
+            });
+            completedPageIndex =
+              matchIndex >= 0 ? Math.floor(matchIndex / COMPLETED_PAGE_SIZE) : 0;
+          } else if (preservePage) {
+            completedPageIndex = previousPageIndex;
+          } else {
+            completedPageIndex = 0;
+          }
+          renderCompletedCases(completedCasesCache);
+        } catch (err) {
+          if (generation !== historyGeneration) return;
+          resetReceipts(); completedCasesCache = []; historyPresentation = "";
+          console.warn("Unable to load past Matters", err);
+          completedCasesContainer.innerHTML = `
+            <div class="case-files-empty">
+              <p>Past Matters could not be loaded.</p>
+              <button type="button" class="completed-page-btn" data-retry-completed-matters>Retry</button>
+            </div>`;
+          completedCasesContainer.querySelector("[data-retry-completed-matters]")?.addEventListener("click", () => {
+            void loadCompletedCases({ preservePage: true });
+          });
+          updateCompletedPagination(0);
+        }
+      }
+
+      async function refreshCasesView({ preserveCompletedPage = true, preserveActivePage = true, activeCases = null, showLoading = true } = {}) {
+        if (casesRefreshPromise) return casesRefreshPromise;
+        casesRefreshPromise = Promise.all([
+          loadActiveCases({ items: activeCases, preservePage: preserveActivePage, showLoading }),
+          loadCompletedCases({ preservePage: preserveCompletedPage, showLoading }),
+        ]).finally(() => {
+          casesRefreshPromise = null;
+        });
+        return casesRefreshPromise;
+      }
+
+      function setActiveView(target = "home") {
+        const key = target === "cases" ? "cases" : "home";
+        const completedMattersRequested = key === "cases" && window.location.hash.includes("completed");
+        const main = document.getElementById("main");
+        if (key !== activeKey && main) viewScrollPositions[activeKey] = main.scrollTop;
+        Object.entries(views).forEach(([name, node]) => {
+          if (!node) return;
+          const isActive = name === key;
+          node.classList.toggle("is-active", isActive);
+          if (isActive) {
+            node.removeAttribute("hidden");
+          } else {
+            node.setAttribute("hidden", "hidden");
+          }
+        });
+        viewLinks.forEach((link) => {
+          const isActive = (link.dataset.viewLink || "home") === key;
+          link.classList.toggle("active", isActive);
+          link.setAttribute("aria-current", isActive ? "page" : "false");
+        });
+        if (key !== "cases" && key !== activeKey) resetReceipts();
+        if (key === "cases" && (!casesReady || key !== activeKey)) {
+          const preservePage = casesReady;
+          casesReady = true;
+          refreshCasesView({ preserveCompletedPage: preservePage, preserveActivePage: preservePage }).catch((error) =>
+            console.warn("Cases view refresh failed", error)
+          );
+        }
+        if (completedMattersRequested) {
+          requestAnimationFrame(() => {
+            document.querySelector(".completed-cases-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        }
+        if (key === "cases") {
+          history.replaceState(null, "", `${basePath}${completedMattersRequested ? "#cases-completed" : "#cases"}`);
+        } else {
+          history.replaceState(null, "", basePath);
+        }
+        if (key !== activeKey) {
+          activeKey = key;
+          if (main) requestAnimationFrame(() => { main.scrollTop = viewScrollPositions[key] || 0; });
+        }
+      }
+
+      viewLinks.forEach((link) => {
+        link.addEventListener("click", (event) => {
+          const target = link.dataset.viewLink;
+          if (target === "home" || target === "cases") {
+            event.preventDefault();
+            setActiveView(target);
+          }
+        });
+      });
+
+      const resolveViewFromHash = () => (window.location.hash.startsWith("#cases") ? "cases" : "home");
+
+      window.addEventListener("hashchange", () => {
+        setActiveView(resolveViewFromHash());
+      });
+
+      window.addEventListener("lpc:paralegal-dashboard-refresh", (event) => {
+        if (!casesReady) return;
+        const detail = event?.detail || {};
+        const activeCases = Array.isArray(detail.activeCases) ? detail.activeCases : null;
+        if (detail.dashboardAvailable === false) {
+          renderActiveCasesUnavailable();
+        } else if (activeCases) {
+          void loadActiveCases({ items: activeCases, preservePage: true, showLoading: false });
+        }
+        if (detail.reason !== "initial") {
+          loadCompletedCases({ preservePage: true, showLoading: false }).catch((error) =>
+            console.warn("Past Matters refresh failed", error)
+          );
+        }
+      });
+
+      setActiveView(resolveViewFromHash());
+      if (!casesReady) {
+        casesReady = true;
+        loadCompletedCases({ preservePage: false, showLoading: true }).catch((error) =>
+          console.warn("Past Matters preload failed", error)
+        );
+      }
+
+      let withdrawalToastShown = false;
+      (function showWithdrawalToast() {
+        try {
+          const stored = sessionStorage.getItem("lpc-withdrawal-toast");
+          if (!stored) return;
+          sessionStorage.removeItem("lpc-withdrawal-toast");
+          const payload = JSON.parse(stored || "{}");
+          const message = payload?.message || "Withdrawal recorded.";
+          const overlay = document.getElementById("withdrawalSuccessOverlay");
+          const modal = document.getElementById("withdrawalSuccessModal");
+          const textNode = document.getElementById("withdrawalSuccessText");
+          if (textNode) textNode.textContent = message;
+          if (overlay && modal) {
+            overlay.classList.add("is-active");
+            overlay.setAttribute("aria-hidden", "false");
+            modal.classList.add("is-active");
+            modal.setAttribute("aria-hidden", "false");
+            modal.removeAttribute("inert");
+            withdrawalToastShown = true;
+            const close = () => {
+              overlay.classList.remove("is-active");
+              overlay.setAttribute("aria-hidden", "true");
+              modal.classList.remove("is-active");
+              modal.setAttribute("aria-hidden", "true");
+              modal.setAttribute("inert", "");
+              deactivateDialogFocus(modal);
+            };
+            const closeBtn = document.getElementById("withdrawalSuccessCloseBtn");
+            const okBtn = document.getElementById("withdrawalSuccessOkBtn");
+            closeBtn?.addEventListener("click", close, { once: true });
+            okBtn?.addEventListener("click", close, { once: true });
+            activateDialogFocus(modal, { initialFocus: okBtn || closeBtn, onEscape: close });
+          }
+        } catch (err) {
+          sessionStorage.removeItem("lpc-withdrawal-toast");
+        }
+      })();
+
+      (function showCaseCompletedToast() {
+        try {
+          if (withdrawalToastShown) return;
+          const stored = sessionStorage.getItem("lpc-case-completed-toast");
+          if (!stored) return;
+          sessionStorage.removeItem("lpc-case-completed-toast");
+          const payload = JSON.parse(stored || "{}");
+          const title = "Matter complete";
+          const message = typeof payload?.caseTitle === "string" ? payload.caseTitle.trim() : "";
+          const overlay = document.getElementById("caseCompletedOverlay");
+          const modal = document.getElementById("caseCompletedModal");
+          const titleNode = document.getElementById("caseCompletedTitle");
+          const textNode = document.getElementById("caseCompletedText");
+          if (titleNode) titleNode.textContent = title;
+          if (textNode) { textNode.textContent = message; textNode.hidden = !message; }
+          if (!message) modal?.removeAttribute("aria-describedby");
+          if (overlay && modal) {
+            overlay.classList.add("is-active");
+            overlay.setAttribute("aria-hidden", "false");
+            modal.classList.add("is-active");
+            modal.setAttribute("aria-hidden", "false");
+            modal.removeAttribute("inert");
+            const close = () => {
+              overlay.classList.remove("is-active");
+              overlay.setAttribute("aria-hidden", "true");
+              modal.classList.remove("is-active");
+              modal.setAttribute("aria-hidden", "true");
+              modal.setAttribute("inert", "");
+              deactivateDialogFocus(modal);
+            };
+            const closeBtn = document.getElementById("caseCompletedCloseBtn");
+            const okBtn = document.getElementById("caseCompletedOkBtn");
+            closeBtn?.addEventListener("click", close, { once: true });
+            okBtn?.addEventListener("click", close, { once: true });
+            activateDialogFocus(modal, { initialFocus: okBtn || closeBtn, onEscape: close });
+          }
+        } catch (err) {
+          sessionStorage.removeItem("lpc-case-completed-toast");
+        }
+      })();
+
+      if (activePrevBtn) {
+        activePrevBtn.addEventListener("click", () => {
+          if (activePageIndex <= 0) return;
+          activePageIndex -= 1;
+          renderActiveCases(activeCasesCache);
+        });
+      }
+      if (activeNextBtn) {
+        activeNextBtn.addEventListener("click", () => {
+          const totalPages = Math.max(1, Math.ceil(activeCasesCache.length / ACTIVE_PAGE_SIZE));
+          if (activePageIndex >= totalPages - 1) return;
+          activePageIndex += 1;
+          renderActiveCases(activeCasesCache);
+        });
+      }
+
+      if (completedPrevBtn) {
+        completedPrevBtn.addEventListener("click", () => {
+          if (completedPageIndex <= 0) return;
+          completedPageIndex -= 1;
+          renderCompletedCases(completedCasesCache);
+        });
+      }
+      if (completedNextBtn) {
+        completedNextBtn.addEventListener("click", () => {
+          const totalPages = Math.max(1, Math.ceil(completedCasesCache.length / COMPLETED_PAGE_SIZE));
+          if (completedPageIndex >= totalPages - 1) return;
+          completedPageIndex += 1;
+          renderCompletedCases(completedCasesCache);
+        });
+      }
+
+      if (completedCasesContainer) {
+        completedCasesContainer.addEventListener("click", async (event) => {
+          const btn = event.target.closest("[data-dispute-withdrawn]");
+          if (btn) {
+            const caseId = btn.dataset.caseId || "";
+            if (!caseId) return;
+            openDisputeModal(caseId);
+            return;
+          }
+          const blockBtn = event.target.closest("[data-block-future-interaction]");
+          if (blockBtn) {
+            const caseId = blockBtn.dataset.caseId || "";
+            if (!caseId) return;
+            const confirmed = await confirmAction(getBlockConfirmMessage(), {
+              title: "Block this attorney?",
+              confirmLabel: "Block attorney",
+              tone: "danger",
+            });
+            if (!confirmed) return;
+            blockBtn.disabled = true;
+            try {
+              await fetchCSRF().catch(() => "");
+              const res = await secureFetch("/api/blocks", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ caseId }),
+              });
+              const payload = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                throw new Error(payload?.error || "Unable to block future interaction.");
+              }
+              notifyCase("Attorney blocked from future interaction.", "success");
+              await refreshCasesView({ preserveCompletedPage: true });
+            } catch (error) {
+              blockBtn.disabled = false;
+              notifyCase(error?.message || "Unable to block future interaction.", "error");
+            }
+            return;
+          }
+        });
+      }
+
+      document.addEventListener("click", (event) => {
+        document.querySelectorAll(".card-more-actions[open]").forEach((menu) => {
+          if (menu.contains(event.target)) return;
+          menu.removeAttribute("open");
+        });
+      });
+
+      let pendingDisputeCaseId = "";
+      const disputeOverlay = document.getElementById("disputeFormOverlay");
+      const disputeModal = document.getElementById("disputeFormModal");
+      const disputeMessageInput = document.getElementById("disputeFormMessage");
+      const disputeSubmitBtn = document.getElementById("disputeFormSubmitBtn");
+      const disputeCancelBtn = document.getElementById("disputeFormCancelBtn");
+      const disputeCloseBtn = document.getElementById("disputeFormCloseBtn");
+
+      function openDisputeModal(caseId) {
+        if (!disputeOverlay || !disputeModal) return;
+        pendingDisputeCaseId = caseId;
+        if (disputeMessageInput) disputeMessageInput.value = "";
+        disputeOverlay.classList.add("is-active");
+        disputeOverlay.setAttribute("aria-hidden", "false");
+        disputeModal.classList.add("is-active");
+        disputeModal.setAttribute("aria-hidden", "false");
+        disputeModal.removeAttribute("inert");
+        activateDialogFocus(disputeModal, {
+          initialFocus: disputeMessageInput,
+          onEscape: closeDisputeModal,
+        });
+      }
+
+      function closeDisputeModal() {
+        if (!disputeOverlay || !disputeModal) return;
+        disputeOverlay.classList.remove("is-active");
+        disputeOverlay.setAttribute("aria-hidden", "true");
+        disputeModal.classList.remove("is-active");
+        disputeModal.setAttribute("aria-hidden", "true");
+        disputeModal.setAttribute("inert", "");
+        deactivateDialogFocus(disputeModal);
+        pendingDisputeCaseId = "";
+      }
+
+      async function submitDispute() {
+        const caseId = pendingDisputeCaseId;
+        if (!caseId) return;
+        const note = String(disputeMessageInput?.value || "").trim();
+        if (!note) {
+          notifyCase("Details are required.", "error");
+          disputeMessageInput?.focus();
+          return;
+        }
+        disputeSubmitBtn?.setAttribute("disabled", "true");
+        disputeCancelBtn?.setAttribute("disabled", "true");
+        disputeCloseBtn?.setAttribute("disabled", "true");
+        try {
+          await fetchCSRF().catch(() => "");
+          const res = await secureFetch(`/api/disputes/${encodeURIComponent(caseId)}`, {
+            method: "POST",
+            body: { message: note },
+          });
+          if (!res.ok) {
+            throw new Error("Unable to submit request.");
+          }
+          notifyCase("Request submitted.", "success");
+          closeDisputeModal();
+          await loadCompletedCases();
+        } catch (err) {
+          notifyCase("Unable to submit request.", "error");
+        } finally {
+          disputeSubmitBtn?.removeAttribute("disabled");
+          disputeCancelBtn?.removeAttribute("disabled");
+          disputeCloseBtn?.removeAttribute("disabled");
+        }
+      }
+
+      disputeOverlay?.addEventListener("click", (event) => {
+        if (event.target === disputeOverlay) closeDisputeModal();
+      });
+      disputeCancelBtn?.addEventListener("click", closeDisputeModal);
+      disputeCloseBtn?.addEventListener("click", closeDisputeModal);
+      disputeSubmitBtn?.addEventListener("click", submitDispute);
+      disputeMessageInput?.addEventListener("keydown", (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+          submitDispute();
+        }
+      });
+      const browseJobsBtn = document.getElementById("browseJobsBtn");
+      if (browseJobsBtn) {
+        browseJobsBtn.addEventListener("click", () => {
+          window.location.href = "browse-jobs.html";
+        });
+      }
+    });
+  </script>
+  <div class="invite-overlay" id="inviteOverlay" aria-hidden="true" inert>
+    <div class="invite-dialog" role="dialog" aria-modal="true" aria-labelledby="inviteCaseTitle" aria-describedby="inviteJobTitle" tabindex="-1">
+      <div class="invite-header">
+        <h3 class="invite-title" id="inviteCaseTitle">Invitation</h3>
+        <button type="button" class="close-btn" id="inviteCloseBtn" aria-label="Close invite">&times;</button>
+      </div>
+      <div class="invite-subtitle" id="inviteJobTitle">Matter title</div>
+      <p class="invite-lead" id="inviteLead"></p>
+      <div class="invite-meta" id="inviteMeta"></div>
+      <div class="body-text" id="inviteDetails"></div>
+      <a class="invited-by" id="inviteAttorneyLink">
+        <img id="inviteAttorneyAvatar" alt="Attorney avatar" />
+        <div>
+          <div id="inviteAttorneyName"></div>
+          <div id="inviteAttorneyFirm" class="muted"></div>
+        </div>
+      </a>
+      <div class="actions">
+        <button type="button" id="inviteDeclineBtn">Decline</button>
+        <button type="button" class="primary" id="inviteAcceptBtn">Accept Invitation</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const sidebarToggle = document.getElementById('sidebarToggle');
+      const sidebarNav = document.getElementById('sidebarNav');
+      const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+      const focusFirstSidebarControl = () => {
+        const candidates = sidebarNav?.querySelectorAll(
+          'a[href], button:not([disabled]), [role="button"][tabindex]'
+        ) || [];
+        const target = Array.from(candidates).find((element) => {
+          if (element.closest('[aria-hidden="true"]')) return false;
+          return element.getClientRects().length > 0;
+        });
+        target?.focus({ preventScroll: true });
+      };
+      const syncSidebar = () => {
+        const isMobile = window.innerWidth <= 1024;
+        const isOpen = isMobile
+          ? document.body.classList.contains('nav-open')
+          : !document.body.classList.contains('nav-collapsed');
+        if (sidebarToggle) {
+          sidebarToggle.setAttribute('aria-expanded', String(isOpen));
+          sidebarToggle.setAttribute('aria-label', isOpen ? 'Close menu' : 'Open menu');
+        }
+        if (sidebarNav) {
+          sidebarNav.toggleAttribute('inert', !isOpen);
+          sidebarNav.setAttribute('aria-hidden', String(!isOpen));
+        }
+        if (sidebarBackdrop) sidebarBackdrop.setAttribute('aria-hidden', String(!isMobile || !isOpen));
+      };
+      const closeSidebar = ({ restoreFocus = false } = {}) => {
+        document.body.classList.remove('nav-open');
+        syncSidebar();
+        if (restoreFocus) sidebarToggle?.focus({ preventScroll: true });
+      };
+      const openSidebar = () => {
+        document.body.classList.add('nav-open');
+        syncSidebar();
+        focusFirstSidebarControl();
+      };
+      if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', () => {
+          if (document.body.classList.contains('nav-open')) closeSidebar({ restoreFocus: true });
+          else openSidebar();
+        });
+      }
+      if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener('click', () => closeSidebar({ restoreFocus: true }));
+      }
+      if (sidebarNav) {
+        sidebarNav.addEventListener('click', (event) => {
+          if (event.target.closest('a') || event.target.closest('button')) {
+            closeSidebar();
+          }
+        });
+      }
+      window.addEventListener('resize', () => {
+        if (window.innerWidth > 1024) document.body.classList.remove('nav-open');
+        else document.body.classList.remove('nav-collapsed');
+        syncSidebar();
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && document.body.classList.contains('nav-open')) {
+          closeSidebar({ restoreFocus: true });
+        }
+      });
+      new MutationObserver(syncSidebar).observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class'],
+      });
+      syncSidebar();
+    });
+  </script>
+  <script src="assets/scripts/context-panel.js?v=20260812-paralegal-heading"></script>
+  <script src="assets/scripts/productivity-command-registry.js"></script>
+  <script src="assets/scripts/global-search.js?v=20260831-2"></script>
+  <script type="module" src="assets/scripts/utils/workspace-entry.mjs"></script>
+</body>
+</html>

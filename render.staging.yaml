@@ -1,0 +1,4 @@
+# Paid staging Blueprint withdrawn: owner rejected additional charges.
+# Existing service reuse is tracked in outputs/shared-matter-20261012/staging-reuse-plan.json.
+# Do not create or replace services by applying this file.
+services: []

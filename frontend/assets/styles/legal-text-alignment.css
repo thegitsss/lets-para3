@@ -1,0 +1,24 @@
+/* Justify policy prose, including the Terms/Privacy inline section blocks. */
+:is(.terms-page, .privacy-page, .security-page) .legal-document section.card,
+:is(.terms-page, .privacy-page, .security-page) .legal-document :is(p, li),
+:is(.terms-page, .privacy-page, .security-page) .legal-document section.card li,
+:is(.accessibility-content, .security-content) :is(p, li) {
+  text-align: justify;
+  text-align-last: start;
+  hyphens: auto;
+}
+
+/* Dates, navigation, headings, and contact details retain natural spacing. */
+:is(.terms-page, .privacy-page, .security-page) .legal-document :is(h2, h3, .legal-effective-date),
+:is(.terms-page, .privacy-page, .security-page) .legal-document .document-toc li,
+:is(.terms-page, .privacy-page, .security-page) .legal-document address,
+:is(.accessibility-content, .security-content) :is(h2, h3, address) {
+  text-align: left;
+  hyphens: manual;
+}
+
+/* The accessible reading mode avoids expanded word spacing. */
+body.accessibility-mode :is(.legal-document, .accessibility-content, .security-content) :is(section.card, p, li) {
+  text-align: left;
+  hyphens: manual;
+}

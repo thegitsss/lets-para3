@@ -1,0 +1,250 @@
+/* Homepage-only Sarabun overrides: preserve existing responsive sizes, add 2pt. */
+.public-site-chrome .home-header { font-size: calc(16px + 2pt); }
+.public-site-chrome .home-nav a, .public-site-chrome .header-signout { font-size: calc(13.44px + 2pt); }
+.public-site-chrome .header-signin { font-size: calc(15.04px + 2pt); }
+.public-site-chrome .home-header .button { font-size: calc(14.4px + 2pt); }
+.public-site-chrome .home-footer { font-size: calc(16px + 2pt); }
+.public-site-chrome .home-footer__statement { font-size: calc(clamp(2.4rem, 3.5vw, 3.9rem) + 2pt); }
+.public-site-chrome .home-footer summary { font-size: calc(11.2px + 2pt); }
+.public-site-chrome .home-footer__bottom > p { font-size: calc(10.56px + 2pt); }
+.public-site-chrome .home-footer .accessibility-toggle { font-size: calc(12px + 2pt); }
+@media (max-width: 1100px) {
+  .public-site-chrome .mobile-nav nav a { font-size: calc(1rem + 2pt); }
+}
+@media (max-width: 1100px) {
+  .public-site-chrome .mobile-nav__actions > a:not(.button), .public-site-chrome .mobile-nav__actions > button { font-size: calc(0.84rem + 2pt); }
+}
+@media (max-width: 1100px) {
+  .public-site-chrome .mobile-nav__actions > .button { font-size: calc(0.95rem + 2pt); }
+}
+@media (max-width: 900px) {
+  .public-site-chrome .home-footer__statement { font-size: calc(clamp(2.5rem, 12vw, 3.5rem) + 2pt); }
+}
+.eyebrow, .interface-label { font-size: calc(0.72rem + 2pt); }
+.button { font-size: calc(0.82rem + 2pt); }
+.button--small { font-size: calc(0.74rem + 2pt); }
+.text-action { font-size: calc(0.82rem + 2pt); }
+.interface-label { font-size: calc(0.58rem + 2pt); }
+.status-chip { font-size: calc(0.6rem + 2pt); }
+.avatar { font-size: calc(0.56rem + 2pt); }
+.applicant-row__skills span { font-size: calc(0.5rem + 2pt); }
+.matter-rail > div { font-size: calc(0.56rem + 2pt); }
+.matter-rail i { font-size: calc(0.5rem + 2pt); }
+.workflow__intro-support { font-size: calc(clamp(1rem, 1.4vw, 1.18rem) + 2pt); }
+.workflow-chapter__number { font-size: calc(0.72rem + 2pt); }
+.workflow-chapter p { font-size: calc(clamp(0.84rem, 1vw, 0.94rem) + 2pt); }
+.field span { font-size: calc(0.58rem + 2pt); }
+.field strong { font-size: calc(0.72rem + 2pt); }
+.applicant-row__identity strong, .match-score strong { font-size: calc(0.68rem + 2pt); }
+.applicant-row__identity span { font-size: calc(0.54rem + 2pt); }
+.panel-heading strong { font-size: calc(0.72rem + 2pt); }
+.message p { font-size: calc(0.62rem + 2pt); }
+.message small { font-size: calc(0.46rem + 2pt); }
+.message-composer { font-size: calc(0.58rem + 2pt); }
+.detail-block strong { font-size: calc(0.7rem + 2pt); }
+.detail-block > span, .detail-block label { font-size: calc(0.56rem + 2pt); }
+.detail-block i { font-size: calc(0.45rem + 2pt); }
+.completion-state > p:not(.interface-label) { font-size: calc(0.68rem + 2pt); }
+.completion-files i { font-size: calc(0.45rem + 2pt); }
+.completion-files b { font-size: calc(0.56rem + 2pt); }
+.payment-summary small { font-size: calc(0.5rem + 2pt); }
+.payment-summary strong { font-size: calc(0.78rem + 2pt); }
+.assistant-showcase__intro > p:last-of-type { font-size: calc(clamp(1rem, 1.35vw, 1.18rem) + 2pt); }
+.assistant-workspace__topbar { font-size: calc(0.66rem + 2pt); }
+.assistant-workspace__nav { font-size: calc(0.7rem + 2pt); }
+.assistant-workspace__matter small { font-size: calc(0.68rem + 2pt); }
+.assistant-workspace__matter strong { font-size: calc(0.76rem + 2pt); }
+.assistant-preview__header strong { font-size: calc(0.82rem + 2pt); }
+.assistant-message { font-size: calc(0.82rem + 2pt); }
+.assistant-message__mark { font-size: calc(0.48rem + 2pt); }
+.assistant-message--assistant a { font-size: calc(0.72rem + 2pt); }
+.assistant-preview__suggestions span { font-size: calc(0.6rem + 2pt); }
+.assistant-preview__composer { font-size: calc(0.68rem + 2pt); }
+.audience-connection b { font-size: calc(0.56rem + 2pt); }
+.path-scene__copy > p:not(.eyebrow) { font-size: calc(clamp(0.95rem, 1.2vw, 1.08rem) + 2pt); }
+.audience-interface__topbar { font-size: calc(0.62rem + 2pt); }
+ .audience-matter small, .audience-attention small, .available-project small, .active-assignment small { font-size: calc(0.52rem + 2pt); }
+ .available-project h4, .active-assignment h4 { font-size: calc(0.76rem + 2pt); }
+.audience-matter__meta strong, .available-project__terms strong { font-size: calc(0.58rem + 2pt); }
+.audience-attention strong, .audience-attention b { font-size: calc(0.57rem + 2pt); }
+.trust-band article > span { font-size: calc(0.68rem + 2pt); }
+.trust-band p { font-size: calc(0.84rem + 2pt); }
+.fee-card__row > span { font-size: calc(0.7rem + 2pt); }
+.fee-card__row > p { font-size: calc(0.78rem + 2pt); }
+.fee-card > small { font-size: calc(0.9rem + 2pt); }
+.home-faq details p { font-size: calc(0.84rem + 2pt); }
+.home-faq__link-copy small { font-size: calc(0.7rem + 2pt); }
+.home-faq__links > a > i { font-size: calc(1.1rem + 2pt); }
+.closing-scene__content > p:not(.eyebrow) { font-size: calc(clamp(1rem, 1.4vw, 1.18rem) + 2pt); }
+.role-action span { font-size: calc(0.68rem + 2pt); }
+.assistant-showcase__intro > p:last-of-type, .path-scene__copy > p:not(.eyebrow), .path-scene--paralegal .path-scene__copy > p:not(.eyebrow) { font-size: calc(clamp(1.04rem, 1.35vw, 1.22rem) + 2pt); }
+.matter-identity > span { font-size: calc(0.56rem + 2pt); }
+.matter-identity > strong { font-size: calc(1.35rem + 2pt); }
+.matter-identity > small { font-size: calc(0.62rem + 2pt); }
+.matter-identity--compact > strong { font-size: calc(0.72rem + 2pt); }
+.matter-identity--compact > span, .matter-identity--compact > small { font-size: calc(0.5rem + 2pt); }
+.assistant-showcase__disclaimer { font-size: calc(0.72rem + 2pt); }
+@media (max-width: 640px) {
+  .closing-scene__content > p:not(.eyebrow) { font-size: calc(0.92rem + 2pt); }
+}
+.workflow__intro-support { font-size: calc(clamp(1rem, 1.3vw, 1.16rem) + 2pt); }
+.workflow-chapter p { font-size: calc(clamp(0.84rem, 1vw, 0.94rem) + 2pt); }
+@media (min-width: 1100px) {
+  .lpc-home .assistant-workspace__topbar .matter-identity--compact > span, .lpc-home .assistant-workspace__topbar .matter-identity--compact > small { font-size: calc(0.7rem + 2pt); }
+}
+@media (min-width: 1100px) {
+  .lpc-home .assistant-workspace__topbar .matter-identity--compact > strong { font-size: calc(0.94rem + 2pt); }
+}
+@media (min-width: 1100px) {
+  .lpc-home .assistant-preview__header strong { font-size: calc(0.98rem + 2pt); }
+}
+@media (min-width: 1100px) {
+  .lpc-home .assistant-message { font-size: calc(0.92rem + 2pt); }
+}
+@media (min-width: 1100px) {
+  .lpc-home .assistant-message--assistant a { font-size: calc(0.8rem + 2pt); }
+}
+@media (min-width: 1100px) {
+  .lpc-home .assistant-showcase__disclaimer { font-size: calc(0.78rem + 2pt); }
+}
+.lpc-home .assistant-matter-list strong { font-size: calc(1.02rem + 2pt); }
+.lpc-home .assistant-matter-list small { font-size: calc(0.82rem + 2pt); }
+.lpc-home .assistant-matter-list > article > span { font-size: calc(0.78rem + 2pt); }
+@media (min-width: 961px) {
+  .lpc-home .workflow-chapter__number { font-size: calc(0.68rem + 2pt); }
+}
+@media (min-width: 961px) {
+  .lpc-home .workflow-chapter p { font-size: calc(clamp(0.98rem, 1.2vw, 1.08rem) + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .workflow__intro-support { font-size: calc(0.95rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .workflow-chapter p { font-size: calc(0.88rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .assistant-showcase__intro > p:last-of-type { font-size: calc(1rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .path-scene__copy > p:not(.eyebrow), .lpc-home .path-scene--paralegal .path-scene__copy > p:not(.eyebrow) { font-size: calc(0.98rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .assistant-message { font-size: calc(0.95rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .assistant-showcase__disclaimer { font-size: calc(0.76rem + 2pt); }
+}
+@media (min-width: 1100px) {
+  .lpc-home .assistant-showcase .assistant-workspace__nav { font-size: calc(0.82rem + 2pt); }
+}
+@media (min-width: 1100px) {
+  .lpc-home .assistant-showcase__disclaimer { font-size: calc(1.08rem + 2pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .workflow__intro-support { font-size: calc(clamp(1.12rem, 1.45vw, 1.3rem) + 2pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .path-scene__copy > p:not(.eyebrow), .lpc-home .path-scene--paralegal .path-scene__copy > p:not(.eyebrow), .lpc-home .assistant-showcase__intro > p:last-of-type { font-size: calc(clamp(1.16rem, 1.5vw, 1.36rem) + 2pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .trust-band p { font-size: calc(0.96rem + 2pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .trust-band article > span { font-size: calc(0.78rem + 2pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .home-faq details p { font-size: calc(0.96rem + 2pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .closing-scene__content > p:not(.eyebrow) { font-size: calc(clamp(1.12rem, 1.55vw, 1.32rem) + 2pt); }
+}
+@media (min-width: 641px) {
+  .lpc-home .role-action span { font-size: calc(0.78rem + 2pt); }
+}
+@media (min-width: 961px) {
+  .lpc-home .workflow-chapter__number { font-size: calc(0.78rem + 2pt); }
+}
+@media (min-width: 961px) {
+  .lpc-home .workflow-chapter p { font-size: calc(clamp(1.1rem, 1.35vw, 1.22rem) + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .workflow__intro-support, .lpc-home .workflow-chapter p, .lpc-home .path-scene__copy > p:not(.eyebrow), .lpc-home .path-scene--paralegal .path-scene__copy > p:not(.eyebrow), .lpc-home .assistant-showcase__intro > p:last-of-type, .lpc-home .trust-band p, .lpc-home .home-faq details p, .lpc-home .closing-scene__content > p:not(.eyebrow) { font-size: calc(1.06rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .role-action span { font-size: calc(0.86rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .workflow-mobile-stage__number { font-size: calc(0.76rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home .workflow-mobile-stage__heading p { font-size: calc(0.94rem + 2pt); }
+}
+.lpc-home--hybrid :is(.workflow-canvas, .workflow-mobile-canvas, .audience-interface, .assistant-stage) small, .lpc-home--hybrid :is(.workflow-canvas, .workflow-mobile-canvas, .audience-interface, .assistant-stage) :is(.interface-label, .field > span, .sort-control, .applicant-row__identity > span, .match-score > span, .message-composer, .detail-block > span, .detail-block > label, .compact-file, .matter-identity--compact > span) { font-size: calc(max(0.78rem, 12px) + 2pt); }
+.lpc-home--hybrid .path-scene--paralegal .audience-interface__topbar { font-size: calc(0.8rem + 2pt); }
+.lpc-home--hybrid .path-scene--paralegal .audience-interface :is(.interface-label, small) { font-size: calc(0.82rem + 2pt); }
+.lpc-home--hybrid .path-scene--paralegal .audience-interface :is(.available-project h4, .active-assignment h4) { font-size: calc(1.05rem + 2pt); }
+.lpc-home--hybrid .path-scene--paralegal .audience-interface :is(.available-project__terms strong, .audience-payment strong) { font-size: calc(0.95rem + 2pt); }
+.lpc-home--hybrid .path-scene--paralegal .audience-interface :is(.status-chip, .assignment-tasks label) { font-size: calc(0.76rem + 2pt); }
+.lpc-home--hybrid .audience-interface :is(.audience-matter__meta, .audience-payment, .available-project__terms) strong { font-size: calc(max(0.82rem, 13px) + 2pt); }
+.lpc-home--hybrid :is(.audience-interface__topbar, .assistant-workspace__topbar) { font-size: calc(max(0.8rem, 12.5px) + 2pt); }
+.lpc-home--hybrid :is(.workflow-canvas, .workflow-mobile-canvas, .audience-interface, .assistant-stage) :is(.status-chip, .completion-files b, .payment-summary button, .audience-attention strong, .audience-attention b, .assignment-tasks label, .assistant-workspace__activity b, .assistant-preview__online, .assistant-preview__suggestions span, .assistant-preview__composer) { font-size: calc(max(0.78rem, 12px) + 2pt); }
+.lpc-home--hybrid .workflow-example-label { font-size: calc(0.78rem + 2pt); }
+.lpc-home--hybrid .workflow-preview-context .matter-identity strong { font-size: calc(0.96rem + 2pt); }
+.lpc-home--hybrid .workflow-preview-context .matter-identity small { font-size: calc(0.8rem + 2pt); }
+.lpc-home--hybrid .payment-summary > .workflow-preview-action { font-size: calc(0.86rem + 2pt); }
+.lpc-home--hybrid :is(.workflow-canvas, .workflow-mobile-canvas, .workflow-mobile-stage__canvas) .completion-files i { font-size: calc(0.75rem + 2pt); }
+.lpc-home--hybrid .audience-payment--dark > p { font-size: calc(0.82rem + 2pt); }
+.lpc-home--hybrid :is(.workflow-canvas, .workflow-mobile-canvas, .workflow-mobile-stage__canvas) :is(.interface-label, .sort-control, .field > span, .applicant-row__identity > span, .match-score > span, .applicant-row__skills span, .message small, .message-composer, .detail-block > span, .detail-block > label, .completion-files small, .payment-summary small, .status-chip, .matter-identity--compact > span, .matter-identity--compact > small) { font-size: calc(var(--workflow-ui-small) + 2pt); }
+.lpc-home--hybrid :is(.workflow-canvas, .workflow-mobile-canvas, .workflow-mobile-stage__canvas) :is(.field strong, .applicant-row__identity strong, .match-score strong, .panel-heading strong, .message p, .detail-block strong, .compact-file b, .completion-files b, .payment-summary strong, .payment-summary button, .matter-identity--compact > strong) { font-size: calc(var(--workflow-ui-body) + 2pt); }
+.lpc-home--hybrid :is(.workflow-canvas, .workflow-mobile-canvas, .workflow-mobile-stage__canvas) .completion-state > p:not(.interface-label) { font-size: calc(var(--workflow-ui-body) + 2pt); }
+.lpc-home--hybrid .workflow-canvas .matter-rail > div { font-size: calc(0.76rem + 2pt); }
+ .lpc-home--hybrid .fee-card--hybrid .fee-card__row > span { font-size: calc(0.8rem + 2pt); }
+.lpc-home--hybrid .fee-card--hybrid .fee-card__row > p { font-size: calc(0.95rem + 2pt); }
+.lpc-home--hybrid .fee-card--hybrid > small { font-size: calc(0.82rem + 2pt); }
+.editorial-hero__support { font-size: calc(clamp(1rem, 1.25vw, 1.16rem) + 2pt); }
+.editorial-hero__publishing { font-size: calc(0.82rem + 2pt); }
+.editorial-hero__reassurance p { font-size: calc(clamp(0.64rem, 0.72vw, 0.72rem) + 2pt); }
+@media (max-width: 640px) {
+  .editorial-hero__support { font-size: calc(0.94rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .editorial-hero__publishing { font-size: calc(0.78rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .editorial-hero__reassurance p { font-size: calc(0.6rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home--hybrid .workflow-mobile-stage__canvas :is(.interface-label, .sort-control, .field > span, .applicant-row__identity > span, .match-score > span, .applicant-row__skills span, .message small, .message-composer, .detail-block > span, .detail-block > label, .completion-files small, .payment-summary small, .status-chip) { font-size: calc(var(--workflow-ui-small) + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home--hybrid .workflow-mobile-stage__canvas :is(.field strong, .applicant-row__identity strong, .match-score strong, .panel-heading strong, .message p, .detail-block strong, .compact-file b, .completion-files b, .payment-summary strong, .payment-summary button, .completion-state > p:not(.interface-label)) { font-size: calc(var(--workflow-ui-body) + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home--hybrid .assistant-workspace__topbar .matter-identity--compact > span, .lpc-home--hybrid .assistant-workspace__topbar .matter-identity--compact > small { font-size: calc(0.78rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home--hybrid .assistant-workspace__topbar .matter-identity--compact > strong { font-size: calc(0.98rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home--hybrid .assistant-preview__header strong { font-size: calc(0.98rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home--hybrid .assistant-message { font-size: calc(0.96rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home--hybrid .assistant-message--assistant a { font-size: calc(0.82rem + 2pt); }
+}
+@media (max-width: 640px) {
+  .lpc-home--hybrid .assistant-showcase__disclaimer { font-size: calc(0.92rem + 2pt); }
+}
+@media (max-height: 700px) {
+  body.lpc-home.lpc-home--hybrid .assistant-showcase .assistant-showcase__disclaimer { font-size: calc(0.76rem + 2pt); }
+}
+/* Text sharing base rules with serif elements is scoped separately. */
+.lpc-home .skip-link { font-size: calc(16px + 2pt); }
+.lpc-home .applicant-row .avatar { font-size: calc(.86rem + 2pt); }
+.public-site-chrome .home-footer__links a { font-size: calc(12.16px + 2pt); }
+@media (min-width: 641px) {
+  .lpc-home .workflow-mobile-stage__number,
+  .lpc-home .workflow-mobile-stage__heading p { font-size: calc(16px + 2pt); }
+}

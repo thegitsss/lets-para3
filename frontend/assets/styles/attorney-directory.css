@@ -1,0 +1,40 @@
+/* One directory composition for Browse and Saved. */
+body.av2 .av2-directory { max-width:1000px; }
+body.av2 .av2-directory > .av2-view-header { margin:0 0 18px; padding:0; }
+body.av2 .av2-directory > .av2-view-header h1 { margin:0; font:500 1.375rem/1.3 "Sarabun",sans-serif; }
+body.av2 .av2-directory .av2-directory-tabs { display:flex; flex-wrap:wrap; gap:24px; width:100%; padding:0; border:0; border-bottom:1px solid var(--av2-line); border-radius:0; background:transparent; }
+body.av2 .av2-directory .av2-directory-tabs a { flex:0 1 auto; padding:8px 0 12px; min-height:40px; border:0; border-bottom:2px solid transparent; border-radius:0; margin-bottom:-1px; background:transparent; font-size:.8125rem; font-weight:400; color:var(--av2-muted); box-shadow:none; }
+body.av2 .av2-directory .av2-directory-tabs a[aria-current=page] { border-bottom-color:var(--av2-accent); color:var(--av2-accent); font-weight:500; }
+body.av2 .av2-directory > .av2-card { margin-top:20px; }
+body.av2 .av2-directory .av2-candidate-grid,body.av2 .av2-directory .lpc-saved-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 32px; margin:0; }
+body.av2 .av2-directory .lpc-saved-paralegals { margin:18px 0 0; color:var(--av2-ink); }
+body.av2 .av2-directory .lpc-saved-paralegals > [role=status] { margin:0 0 8px; color:var(--av2-muted); font-size:.75rem; }
+body.av2 .av2-directory .av2-candidate-card,body.av2 .av2-directory .lpc-saved-card { border:0; border-bottom:1px solid var(--av2-line); border-radius:0; padding:18px 0; background:transparent; box-shadow:none; }
+body.av2 .av2-directory .av2-candidate-card { padding-left:56px; position:relative; }
+body.av2 .av2-directory .av2-candidate-identity { gap:0; }
+body.av2 .av2-directory .av2-candidate-identity img { position:absolute; left:0; top:20px; width:38px; height:38px; }
+body.av2 .av2-directory .av2-candidate-card h2,body.av2 .av2-directory .lpc-saved-card h2 { margin:0 0 3px; font-size:.9375rem; line-height:1.5; font-weight:500; }
+body.av2 .av2-directory .av2-candidate-card h2 a,body.av2 .av2-directory .lpc-saved-card h2 a { font:inherit; color:var(--av2-ink); text-decoration:none; }
+body.av2 .av2-directory h2 a:hover { color:var(--av2-accent); text-decoration:underline; text-underline-offset:3px; }
+body.av2 .av2-directory .av2-candidate-card p,body.av2 .av2-directory .lpc-saved-card p { font-size:.8125rem; line-height:1.5; color:var(--av2-muted); margin:3px 0; }
+body.av2 .av2-directory .lpc-saved-card { display:grid; grid-template-columns:38px minmax(0,1fr) 40px; gap:0 18px; align-items:center; }
+body.av2 .av2-directory .lpc-saved-avatar { display:grid; place-items:center; width:38px; height:38px; border-radius:50%; background:var(--av2-soft); color:var(--av2-accent); font-size:.8125rem; }
+body.av2 .av2-directory .lpc-saved-info { min-width:0; }
+body.av2 .av2-directory .lpc-saved-remove-icon { display:grid; place-items:center; width:40px; height:40px; padding:8px; border:0; background:transparent; color:var(--av2-accent); border-radius:6px; }
+body.av2 .av2-directory .lpc-saved-remove-icon svg { width:22px; height:22px; flex:none; fill:currentColor; stroke:currentColor; }
+body.av2 .av2-directory .lpc-saved-remove-icon:hover { background:var(--av2-soft); }
+body.av2 .av2-directory .lpc-saved-card > [role=status] { grid-column:2 / -1; }
+body.av2 .av2-directory .lpc-saved-card > [role=status]:empty { display:none; }
+@media(max-width:480px) {
+ body.av2 .av2-directory .lpc-saved-card { gap:0 12px; }
+ body.av2 .av2-directory .av2-candidate-card { padding-left:50px; }
+ body.av2 .av2-directory .av2-directory-tabs { gap:20px; }
+}
+body.av2 .av2-directory .av2-filter-disclosure > summary { white-space:nowrap; }
+body.av2 .av2-directory .av2-filter-disclosure { flex-shrink:0; }
+body.av2 .av2-directory > form.av2-card { padding:0; }
+
+body.av2 .av2-directory .lpc-saved-avatar img { display:block; width:38px; height:38px; object-fit:cover; border-radius:50%; }
+@media(max-width:760px) {
+ body.av2 .av2-directory .av2-candidate-grid,body.av2 .av2-directory .lpc-saved-grid { grid-template-columns:minmax(0,1fr); }
+}

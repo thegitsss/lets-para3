@@ -1,0 +1,75 @@
+.commission-value { white-space: pre-line; overflow-wrap: normal; }
+.admin-directors .metric .commission-value { font-size: clamp(1rem, 2vw, 1.45rem); }
+.admin-directors .metric, .admin-directors .oversight-card { min-width: 0; overflow-wrap: anywhere; }
+.admin-directors .oversight-card dd { min-width: 0; margin-left: 0; overflow-wrap: normal; }
+.admin-directors .metric-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); }
+.admin-directors .oversight-card dl { grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr)); }
+@media (max-width: 640px) {
+  .admin-directors .metric:has(.commission-value) { grid-column: 1 / -1; }
+  .admin-directors td { grid-template-columns: minmax(0, 1fr); gap: 0.2rem; }
+}
+.completed-card .metric-value[data-state="needs_review"],
+.completed-card .metric-value[data-state="unavailable"] { font-size: 1.35rem; line-height: 1.3; }
+.director-retry { margin-top: 0.75rem; border: 1px solid var(--line, #dce0e5); border-radius: 12px; background: var(--surface, #fff); color: inherit; padding: 0.65rem 0.9rem; font: inherit; cursor: pointer; }
+.director-retry:focus-visible { outline: 2px solid #3665b3; outline-offset: 3px; }
+.arc-gauge[hidden], .dot-grid[hidden], .mini-bars[hidden], .tiny-line[hidden], .performance-chart[hidden], .director-retry[hidden] { display: none !important; }
+#auditBody { overflow-x: auto; }
+#auditBody td { white-space: normal; }
+
+.admin-directors .audit-dialog { background: var(--card); color: var(--ink); border-color: var(--line); }
+.admin-directors #auditBody { min-width: 0; overflow-wrap: normal; }
+.admin-directors #auditBody > p { overflow-wrap: anywhere; }
+.admin-directors .text-btn { min-height: 44px; min-width: 44px; color: var(--ink); }
+.admin-directors .text-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.admin-directors .text-btn:disabled { opacity: 0.5; cursor: not-allowed; text-decoration: none; }
+.admin-directors .skip-link { top: 0.5rem; transform: translateY(calc(-100% - 1rem)); }
+.admin-directors .skip-link:focus { transform: none; }
+.admin-directors .btn { min-height: 44px; }
+
+.admin-directors .audit-dialog { container-type: inline-size; }
+.admin-directors .audit-head { flex-wrap: wrap; }
+.admin-directors .audit-head > * { max-width: 100%; }
+@container (max-width: 50rem) {
+  #auditBody table, #auditBody tbody, #auditBody tr { display: block; min-width: 0; width: 100%; }
+  #auditBody thead { display: none; }
+  #auditBody td { font-size: 0.875rem; display: grid; width: 100%; grid-template-columns: minmax(0, 1fr); gap: 0.2rem; border: 0; padding: 0.5rem 0; }
+  #auditBody td::before { content: attr(data-label); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.66rem; }
+  #auditBody tr { border-bottom: 1px solid var(--line); padding: 0.5rem 0; }
+}
+
+.admin-directors dialog.audit-panel { margin: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; border: 0; color: var(--ink); }
+.admin-directors dialog.audit-panel:not([open]) { display: none; }
+.admin-directors dialog.audit-panel::backdrop { background: transparent; }
+
+.payment-dialog { width: min(100%, 42rem); }
+.payment-context, .payment-entries { overflow-wrap: anywhere; }
+.payment-dialog fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.payment-fields { display: grid; gap: 1rem; min-width: 0; }
+.payment-fields label { display: grid; gap: 0.4rem; min-width: 0; font-size: 0.9rem; }
+.payment-fields input, .payment-fields select, .payment-fields textarea { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: 0.65rem; font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+.payment-fields [hidden] { display: none; }
+.payment-fields textarea { resize: vertical; }
+.payment-actions { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+.payment-actions [hidden] { display: none; }
+.payment-history { margin-top: 1.5rem; border-top: 1px solid var(--line, #dce0e5); padding-top: 1rem; }
+.payment-balances { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); gap: 0.75rem; }
+.payment-balances dd { margin: 0.3rem 0 0; white-space: normal; }
+.payment-balances dt { color: var(--muted, #657182); font-size: 0.875rem; }
+.payment-entries { list-style: none; padding: 0; }
+.payment-entries li { border-top: 1px solid var(--line, #dce0e5); padding: 0.75rem 0; display: flex; justify-content: space-between; align-items: start; gap: 0.6rem; flex-wrap: wrap; }
+.payment-entries span { display: block; margin-top: 0.25rem; }
+.payment-entries button { font: inherit; }
+.admin-directors .payment-dialog .btn { font: inherit; font-size: 0.875rem; }
+.admin-directors .payment-dialog .btn.secondary { color: var(--ink); background: var(--card); border-color: var(--line); }
+.admin-directors .payment-dialog .payment-history { margin-top: 1rem; padding-top: 0; border-top: 0; }
+
+.director-payment-open, .director-payment-reader button { font: inherit; min-height: 44px; padding: 0.5rem 0.75rem; border: 1px solid var(--director-line); border-radius: 8px; background: var(--director-panel); color: var(--director-ink); cursor: pointer; }
+.director-payment-open { white-space: nowrap; text-decoration: underline; text-underline-offset: 0.2em; }
+.director-payment-reader { box-sizing: border-box; width: min(42rem, calc(100vw - 2rem)); max-width: calc(100vw - 2rem); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.25rem; background: var(--director-panel); color: var(--director-ink); border: 1px solid var(--director-line); border-radius: 12px; font: inherit; line-height: 1.5; }
+.director-payment-reader:not([open]) { display: none; }
+.director-payment-reader::backdrop { background: rgba(15, 25, 30, 0.4); }
+.director-payment-reader-head { display: flex; justify-content: space-between; align-items: start; gap: 1rem; flex-wrap: wrap; }
+.director-payment-reader h2 { margin: 0; font: inherit; font-size: 1.4rem; }
+.director-payment-reader .payment-history { border: 0; padding: 0; margin-top: 1rem; }
+.director-payment-reader dd { font-size: 1rem; }
+.director-payment-reader button:focus-visible, .director-payment-open:focus-visible { outline: 2px solid var(--director-blue); outline-offset: 3px; }

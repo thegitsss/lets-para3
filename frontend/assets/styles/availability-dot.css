@@ -1,0 +1,12 @@
+.lpc-availability-dot { position:relative; display:inline-flex; width:24px; height:24px; margin-left:6px; vertical-align:middle; align-items:center; justify-content:center; flex:none; border-radius:50%; }
+.lpc-availability-dot::before { content:''; width:8px; height:8px; border-radius:50%; background:#24834b; }
+.lpc-availability-dot.is-unavailable::before { background:#c44242; }
+.lpc-availability-tooltip { display:none; position:absolute; top:100%; right:0; z-index:20; padding:5px 9px; border-radius:5px; background:#182033; color:#fff; font:400 12px/1.4 "Sarabun",sans-serif; white-space:nowrap; }
+.lpc-availability-dot:hover .lpc-availability-tooltip,.lpc-availability-dot:focus .lpc-availability-tooltip { display:block; }
+.lpc-availability-dot:focus-visible { outline:2px solid #6495ed; outline-offset:2px; }
+.lpc-availability-dot.is-available::before { background:#24a15a; box-shadow:0 0 5px #24a15a40; }
+.lpc-availability-dot.is-available::after { content:''; position:absolute; width:8px; height:8px; border-radius:50%; background:#24a15a; pointer-events:none; animation:lpc-availability-pulse 2.8s ease-out infinite; }
+@keyframes lpc-availability-pulse { 0% { transform:scale(1); opacity:.35; } 70%,100% { transform:scale(2.5); opacity:0; } }
+@media(prefers-reduced-motion:reduce) { .lpc-availability-dot.is-available::after { animation:none; transform:scale(1.8); opacity:.12; } }
+.lpc-availability-dot:hover:not(:focus) .lpc-availability-tooltip { animation:lpc-availability-caption .22s ease-out .4s both; }
+@keyframes lpc-availability-caption { from { opacity:0; visibility:hidden; } to { opacity:1; visibility:visible; } }

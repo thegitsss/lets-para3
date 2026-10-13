@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1400" viewBox="0 0 1600 1400" fill="none">
+  <defs>
+    <linearGradient id="paper" x1="280" y1="0" x2="1200" y2="1400" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset=".55" stop-color="#eef3f9"/><stop offset="1" stop-color="#c2d1e3"/></linearGradient>
+    <linearGradient id="folder" x1="200" y1="850" x2="1300" y2="1400" gradientUnits="userSpaceOnUse"><stop stop-color="#466eaa"/><stop offset="1" stop-color="#132d50"/></linearGradient>
+    <filter id="shadow" x="-40%" y="-30%" width="180%" height="180%"><feDropShadow dx="0" dy="26" stdDeviation="24" flood-color="#244260" flood-opacity=".2"/></filter>
+    <pattern id="lines" width="390" height="28" patternUnits="userSpaceOnUse"><path d="M0 14H390" stroke="#8fa4bc" stroke-opacity=".4" stroke-width="2"/></pattern>
+  </defs>
+  <g filter="url(#shadow)" transform="rotate(-13 800 850)">
+    <rect x="200" y="255" width="660" height="1010" rx="5" fill="url(#paper)"/>
+    <path d="M260 335H415M260 357H357" stroke="#587496" stroke-width="5"/>
+    <path d="M260 442H770M260 462H690" stroke="#354f73" stroke-width="9"/>
+    <rect x="260" y="520" width="530" height="300" fill="url(#lines)"/>
+    <rect x="260" y="875" width="530" height="230" fill="url(#lines)"/>
+  </g>
+  <g filter="url(#shadow)" transform="rotate(11 800 850)">
+    <rect x="742" y="205" width="640" height="1020" rx="5" fill="url(#paper)"/>
+    <path d="M802 290H1000M802 314H928" stroke="#587496" stroke-width="5"/>
+    <path d="M802 405H1320M802 430H1180" stroke="#354f73" stroke-width="9"/>
+    <rect x="802" y="490" width="514" height="420" fill="url(#lines)"/>
+    <path d="m847 991 15 16 30-38m-45 80 15 16 30-38" stroke="#5f83b7" stroke-width="4"/>
+    <path d="M920 996H1280M920 1054H1250" stroke="#8fa4bc" stroke-width="3"/>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="430" y="100" width="740" height="1100" rx="5" fill="url(#paper)"/>
+    <path d="M490 177H666M490 201H616" stroke="#7b91a9" stroke-width="4"/>
+    <path d="M490 424H1105" stroke="#9eb3cb" stroke-width="2"/>
+    <text x="491" y="495" fill="#587496" font-family="Arial,sans-serif" font-size="16" letter-spacing="3">SCOPE OF WORK</text>
+    <rect x="490" y="525" width="615" height="190" fill="url(#lines)"/>
+    <text x="491" y="783" fill="#587496" font-family="Arial,sans-serif" font-size="16" letter-spacing="3">DELIVERABLES</text>
+    <g stroke="#6b8bb7" stroke-width="3"><rect x="492" y="826" width="18" height="18" rx="2"/><rect x="492" y="880" width="18" height="18" rx="2"/><rect x="492" y="934" width="18" height="18" rx="2"/></g>
+    <path d="M535 836H1080M535 890H1020M535 944H1060" stroke="#9aafc7" stroke-width="3"/>
+    <path d="M490 1045H1105" stroke="#9eb3cb" stroke-width="2"/>
+    <text x="491" y="1100" fill="#233b5a" font-family="Georgia,serif" font-size="29">Let’s-ParaConnect</text>
+  </g>
+  <g filter="url(#shadow)"><path d="M150 1130Q150 1110 170 1110H530L590 1150H1430Q1450 1150 1450 1170V1400H150Z" fill="url(#folder)"/><path d="M170 1165H550" stroke="#b8cde7" stroke-opacity=".6" stroke-width="2"/></g>
+</svg>

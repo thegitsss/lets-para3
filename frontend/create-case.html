@@ -1,0 +1,2915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    (function applyEarlyTheme() {
+      try {
+        const raw = localStorage.getItem("lpc_user");
+        if (!raw) return;
+        const stored = JSON.parse(raw);
+        const storedTheme = String(stored?.preferences?.theme || "").toLowerCase();
+        const theme = storedTheme === "dark" || /dark$/i.test(storedTheme) ? "dark" : "light";
+        document.documentElement.classList.add(`theme-${theme}`);
+      } catch (_) {}
+    })();
+  </script>
+
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
+  <link rel="stylesheet" href="assets/styles/dashboard-system.css?v=20260820-4" />
+  <link rel="preload" as="image" href="hero-mountain.jpg" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Matter – Let’s-ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+  <link rel="stylesheet" href="assets/styles/global-search.css?v=20260831-3" />
+  <script src="assets/scripts/utils/session.js?v=20260902-1"></script>
+  <script src="assets/scripts/utils/business-date.js"></script>
+  <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
+    .gold{color:#b4975a;}
+    :root {
+      --bg:#ffffff;
+      --sidebar-bg:#ffffff;
+      --accent:#b6a47a;
+      --ink:#1a1a1a;
+      --muted:#8a8a8a;
+      --line:rgba(0,0,0,0.08);
+      --panel:#fcfcfc;
+      --sidebar-text:#1a1a1a;
+      --radius:14px;
+      --font-serif:'Sarabun',sans-serif;
+      --font-sans:'Sarabun',sans-serif;
+    }
+    body.theme-dark{
+      --bg:#0f172a;
+      --sidebar-bg:#1c2333;
+      --panel:#151b29;
+      --ink:#f5f6fb;
+      --muted:#9aa7c4;
+      --line:rgba(255,255,255,0.08);
+      --sidebar-text:#f8fbff;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{
+      font-family:var(--font-sans);
+      background:var(--bg);
+      color:var(--ink);
+      display:flex;
+      height:100vh;
+      overflow:hidden;
+      font-weight:200;
+    }
+    strong{
+      font-family:var(--font-serif);
+      font-weight:400;
+    }
+
+    /* Sidebar */
+    .sidebar{
+      width:240px;
+      background:var(--sidebar-bg);
+      display:flex;
+      flex-direction:column;
+      border-right:1px solid var(--line);
+      padding:24px 16px;
+      color:var(--sidebar-text);
+      position:relative;
+    }
+    .sidebar::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:transparent;
+      pointer-events:none;
+      transition:background .3s ease;
+    }
+    .logo{
+      font-family:var(--font-serif);
+      font-size:1.6rem;
+      font-weight:300;
+      text-align:center;
+      margin-bottom:36px;
+    }
+    nav{display:flex;flex-direction:column;gap:14px;}
+    nav a{
+      text-decoration:none;
+      color:var(--sidebar-text);
+      font-size:0.95rem;
+      padding:10px 14px;
+      border-radius:var(--radius);
+      transition:background .3s;
+    }
+    nav a.active,nav a:hover{background:rgba(0,0,0,0.04);}
+    body.theme-dark nav a.active,
+    body.theme-dark nav a:hover{background:rgba(255,255,255,0.12);}
+    .sidebar-link{
+      margin-top:1.5rem;
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:0.6rem 1rem;
+      background:transparent;
+      font-size:0.9rem;
+      font-family:var(--font-serif);
+      font-weight:300;
+      color:var(--sidebar-text);
+      cursor:pointer;
+      transition:background .2s,color .2s;
+    }
+    .sidebar-link:hover,
+    .sidebar-link:focus{
+      background:rgba(0,0,0,0.05);
+      color:var(--accent);
+      outline:none;
+    }
+    body.theme-dark .sidebar-link:hover,
+    body.theme-dark .sidebar-link:focus{
+      color:#fff;
+    }
+    .sidebar-bottom{
+      margin-top:auto;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .sidebar-footer{
+      font-size:0.7rem;
+      color:var(--muted);
+      text-align:center;
+    }
+    .sidebar-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 56px;
+      border-radius: 0 16px 16px 0;
+      border: 1px solid rgba(26, 26, 26, 0.08);
+      border-left: none;
+      background: linear-gradient(90deg, rgba(182, 164, 122, 0.08) 0%, rgba(255, 255, 255, 0.92) 34%, rgba(255, 255, 255, 0.96) 100%);
+      backdrop-filter: blur(10px);
+      padding: 0;
+      cursor: pointer;
+      position: relative;
+      z-index: 2100;
+      flex: 0 0 auto;
+      box-shadow: none;
+      transition: transform 0.18s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+    .sidebar-toggle::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 1px;
+      background: rgba(182, 164, 122, 0.24);
+    }
+    .sidebar-toggle:hover,
+    .sidebar-toggle:focus-visible {
+      background: linear-gradient(90deg, rgba(182, 164, 122, 0.12) 0%, rgba(255, 255, 255, 0.96) 34%, rgba(255, 255, 255, 0.98) 100%);
+      border-color: rgba(182, 164, 122, 0.4);
+      outline: none;
+    }
+    .sidebar-toggle[aria-expanded="true"] {
+      background: linear-gradient(90deg, rgba(182, 164, 122, 0.16) 0%, rgba(255, 255, 255, 0.92) 34%, rgba(255, 255, 255, 0.96) 100%);
+      border-color: rgba(182, 164, 122, 0.45);
+    }
+    .sidebar-toggle-glyph {
+      position: relative;
+      width: 14px;
+      height: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .sidebar-toggle-bar {
+      position: absolute;
+      left: 0;
+      width: 14px;
+      height: 1px;
+      border-radius: 999px;
+      background: rgba(26, 26, 26, 0.56);
+      transform-origin: center;
+      transition:
+        transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.28s ease,
+        width 0.28s ease,
+        background 0.2s ease;
+    }
+    .sidebar-toggle-bar--top {
+      transform: translateY(-4px);
+    }
+    .sidebar-toggle-bar--middle {
+      width: 10px;
+    }
+    .sidebar-toggle-bar--bottom {
+      transform: translateY(4px);
+    }
+    .sidebar-toggle:hover .sidebar-toggle-glyph,
+    .sidebar-toggle:focus-visible .sidebar-toggle-glyph {
+      transform: scale(1.03);
+    }
+    .sidebar-toggle:hover .sidebar-toggle-bar--top,
+    .sidebar-toggle:hover .sidebar-toggle-bar--bottom,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--top,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--bottom {
+      width: 12px;
+      background: rgba(26, 26, 26, 0.72);
+    }
+    .sidebar-toggle:hover .sidebar-toggle-bar--middle,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--middle {
+      width: 14px;
+      background: rgba(26, 26, 26, 0.7);
+    }
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-glyph {
+      transform: rotate(180deg) scale(1.01);
+    }
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar {
+      width: 14px;
+      background: rgba(26, 26, 26, 0.7);
+    }
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--top {
+      transform: rotate(45deg);
+    }
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--middle {
+      opacity: 0;
+      transform: scaleX(0.35);
+    }
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--bottom {
+      transform: rotate(-45deg);
+    }
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 1900;
+    }
+    /* uniform style for step bubbles across all create-case pages */
+.steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 700px;
+  margin: 0 auto 2.5rem;
+  position: relative;
+}
+
+.steps::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--line);
+}
+
+.step {
+  text-align: center;
+  flex: 1;
+  position: relative;
+}
+
+.circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+.step.active .circle {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.step span {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+    /* Main */
+    .main{flex:1;padding:40px;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;}
+    .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.2rem;gap:1.5rem;position:relative;min-height:56px;}
+    #createCaseTopbar{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+    .topbar-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex:1;}
+    .user-profile{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:none;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color 0.2s ease,box-shadow .2s ease;cursor:pointer;position:relative;}
+    .user-profile img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:none;object-fit:cover;}
+    .user-profile strong{display:block;font-family:var(--font-serif);font-weight:500;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .user-profile span{font-size:0.85rem;color:#6b6b6b;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .profile-dropdown{position:absolute;right:0;top:calc(100% + 10px);background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:16px;box-shadow:0 18px 30px rgba(0,0,0,0.12);display:none;flex-direction:column;min-width:200px;z-index:45;pointer-events:auto;overflow:visible;color:var(--ink,#1a1a1a);}
+    .profile-dropdown.show{display:flex;pointer-events:auto;overflow:visible;}
+    .profile-dropdown button,
+    .profile-dropdown a{background:none;border:none;padding:.85rem 1.1rem;text-align:left;font-size:.92rem;cursor:pointer;color:inherit;text-decoration:none;display:block;font-weight:200;border-radius:12px;margin:4px 6px;width:calc(100% - 12px);}
+    .profile-dropdown button:hover,
+    .profile-dropdown a:hover{background:rgba(0,0,0,0.04);}
+    .profile-dropdown .logout-btn{color:#8f7240;background:rgba(182,164,122,0.14);border:1px solid rgba(182,164,122,0.35);}
+    .profile-dropdown .logout-btn:hover{background:rgba(182,164,122,0.22);color:#6f552b;}
+    body.theme-dark .user-profile{background:rgba(15,23,42,0.4);border-color:transparent;box-shadow:none;}
+    body.theme-dark .user-profile strong{color:#fff;}
+    body.theme-dark .user-profile span{color:rgba(255,255,255,0.8);}
+    body.theme-dark .profile-dropdown button:hover,
+    body.theme-dark .profile-dropdown a:hover{background:rgba(255,255,255,0.06);}
+
+    header h1{
+      font-family:var(--font-sans);
+      font-weight:400;
+      font-size:2rem;
+      margin:0 0 0.75rem;
+    }
+    header p{font-weight:200;color:var(--muted);margin-bottom:2rem;}
+
+    /* Wizard steps */
+    .steps{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      max-width:700px;
+      margin:0 auto 2.5rem;
+      position:relative;
+    }
+    .step{
+      text-align:center;
+      flex:1;
+      position:relative;
+    }
+    .circle{
+      position:relative;
+      z-index:1;
+      width:28px;
+      height:28px;
+      border-radius:50%;
+      background:#fff;
+      border:2px solid var(--line);
+      margin:0 auto 8px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:0.8rem;
+    }
+    .active .circle{
+      background:var(--accent);
+      border-color:var(--accent);
+      color:#fff;
+    }
+    .step span{font-size:0.85rem;color:var(--muted);}
+
+    /* Form */
+    .input-error{
+      border-color:#c0392b !important;
+      background:rgba(192,57,43,0.05);
+    }
+    button.input-error{
+      border-color:#c0392b !important;
+      box-shadow:0 0 0 1px rgba(192,57,43,0.2);
+    }
+    .field-error{
+      color:#b91c1c;
+      font-size:0.8rem;
+      margin-top:6px;
+    }
+
+    form{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:2rem;
+      max-width:800px;
+      margin:0 auto;
+      box-shadow:0 2px 6px rgba(0,0,0,0.03);
+    }
+    .field{margin-bottom:1.25rem;}
+    .field label{
+      display:block;
+      margin-bottom:6px;
+      font-size:0.9rem;
+      color:var(--ink);
+    }
+    .field-requirement{
+      margin-left:6px;
+      color:var(--muted);
+      font-size:0.76rem;
+      font-weight:400;
+    }
+    button{
+      font-family:var(--font-serif);
+      font-weight:300;
+    }
+    input,select,textarea{
+      width:100%;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:6px;
+      font-family:inherit;
+      font-weight:200;
+      font-size:0.9rem;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    textarea{resize:vertical;}
+    input:focus,select:focus,textarea:focus{
+      border-color:var(--accent);
+      box-shadow:0 0 0 3px rgba(182,164,122,0.15);
+      outline:none;
+    }
+    body.theme-dark input,
+    body.theme-dark select,
+    body.theme-dark textarea{
+      background:rgba(15,23,42,0.55);
+      color:var(--ink);
+      border-color:var(--line);
+    }
+    body.theme-dark input::placeholder,
+    body.theme-dark textarea::placeholder{
+      color:var(--muted);
+    }
+    .task-input-row{
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    .task-input-row input{flex:1;}
+    .task-list{
+      list-style:none;
+      padding-left:0;
+      margin:10px 0 0;
+      display:grid;
+      gap:8px;
+      max-height:250px;
+      overflow-y:auto;
+      padding-right:6px;
+    }
+    .task-list li{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:8px 10px;
+      border:1px solid var(--line);
+      border-radius:6px;
+      background:#fff;
+      font-size:0.9rem;
+    }
+    body.theme-dark .task-list li{
+      background:rgba(15,23,42,0.6);
+      color:var(--ink);
+      border-color:var(--line);
+    }
+    .task-list .task-empty{
+      border:none;
+      background:transparent;
+      color:var(--muted);
+      padding:0;
+      justify-content:flex-start;
+    }
+    .task-remove{
+      border:none;
+      background:transparent;
+      color:var(--muted);
+      cursor:pointer;
+      font-size:0.85rem;
+    }
+    .task-remove:hover{color:var(--accent);}
+    .task-helper{
+      font-size:0.85rem;
+      color:var(--muted);
+      margin-top:6px;
+    }
+
+    .btn{
+      border:none;
+      border-radius:6px;
+      padding:0.6rem 1.1rem;
+      font-size:0.9rem;
+      font-family:var(--font-serif);
+      font-weight:300;
+      cursor:pointer;
+      transition:background-color .2s, border-color .2s, color .2s, box-shadow .2s, transform .2s;
+    }
+    .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
+    .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
+    .btn.primary{background:var(--accent);color:#fff;}
+    .btn.primary:hover{background:#a0854d;}
+    body.theme-dark .btn.secondary{
+      background:transparent;
+      border-color:var(--line);
+      color:var(--ink);
+    }
+    body.theme-dark .btn.secondary:hover{
+      border-color:var(--accent);
+      color:var(--accent);
+    }
+.comp-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.lock-note{font-size:0.9rem;margin-top:6px;color:var(--muted);}
+
+.dollar-sign {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+#comp {
+  padding-left: 24px;
+  width: 135px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem 0.5rem 1.4rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+body.theme-dark #comp{
+  background:rgba(15,23,42,0.55);
+  color:var(--ink);
+  border-color:var(--line);
+}
+
+#comp:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(182,164,122,0.15);
+  outline: none;
+}
+
+#comp:disabled {
+  background: #f4f1e8;
+  color: #7a6f5a;
+  border-color: #e0d7c4;
+  cursor: not-allowed;
+}
+
+.comp-wrapper.is-locked .dollar-sign {
+  color: #b1a58a;
+}
+
+.comp-type {
+  display: flex;
+  gap: 6px;
+}
+
+.type-btn {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+body.theme-dark .type-btn{
+  background:rgba(15,23,42,0.55);
+  color:var(--ink);
+  border-color:var(--line);
+}
+
+.type-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.type-btn:hover:not(.active) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.select-field .select-wrapper {
+  position: relative;
+}
+.select-field select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.65rem 2.6rem 0.65rem 0.85rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: #fff;
+  appearance: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+body.theme-dark .select-field select{
+  background:rgba(15,23,42,0.55);
+  color:var(--ink);
+  border-color:var(--line);
+}
+.select-field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(182,164,122,0.18);
+  outline: none;
+}
+.select-field .select-arrow {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.select-field .select-wrapper {
+  position: relative;
+}
+.select-field select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.65rem 2.8rem 0.65rem 0.9rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: #fff;
+  appearance: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+body.theme-dark .select-field select{
+  background:rgba(15,23,42,0.55);
+  color:var(--ink);
+  border-color:var(--line);
+}
+.select-field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(182,164,122,0.18);
+  outline: none;
+}
+.select-field .select-arrow {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.steps a {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.steps a:hover .circle {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.steps a:hover span {
+  color: var(--accent);
+}
+
+    .step-panel[hidden] {
+      display: none !important;
+    }
+
+    .step-panel form{
+      max-width:1000px;
+      margin:0 auto;
+      width:100%;
+    }
+
+    .form-wrapper{
+      max-width:1000px;
+      margin:0 auto;
+      display:flex;
+      flex-direction:column;
+      gap:1.5rem;
+      position: relative;
+    }
+
+    #create-step-description .form-wrapper form{
+      width:100%;
+    }
+
+    #create-step-description .form-wrapper > .tips{
+      width:100%;
+    }
+
+    #caseDescription {
+      min-height: 220px;
+    }
+
+    .tips{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:1.5rem;
+      background:var(--panel);
+      font-size:0.9rem;
+      color:var(--muted);
+    }
+    .tips-help{
+      position: absolute;
+      top: 4px;
+      right: 0;
+      z-index: 5;
+    }
+    .tips-help summary{
+      list-style:none;
+      width:28px;
+      height:28px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid var(--line);
+      border-radius:50%;
+      font-family:var(--font-serif);
+      font-size:0.9rem;
+      color:var(--muted);
+      cursor:pointer;
+      background:#fff;
+      transition:border-color .2s ease,color .2s ease,transform .2s ease;
+    }
+    .tips-help summary::-webkit-details-marker{
+      display:none;
+    }
+    .tips-help summary:hover{
+      border-color:var(--accent);
+      color:var(--accent);
+      transform:translateY(-1px);
+    }
+    .tips-help[open] summary{
+      border-color:var(--accent);
+      color:var(--accent);
+    }
+    .tips-help .tips{
+      position: absolute;
+      right: 0;
+      top: 36px;
+      margin-top:0;
+      width: min(280px, 82vw);
+      padding: 0.9rem 1rem;
+      box-shadow:0 12px 30px rgba(0,0,0,0.08);
+    }
+    .tips h3{
+      font-family:var(--font-serif);
+      font-size:1rem;
+      font-weight:300;
+      margin-bottom:0.45rem;
+      color:var(--ink);
+    }
+    .tips ul{
+      margin:0 0 0.2rem 1rem;
+      padding:0;
+      display:flex;
+      flex-direction:column;
+      gap:0.25rem;
+    }
+
+    .summary-layout{
+      display:grid;
+      grid-template-columns: 1fr 30%;
+      gap:18px;
+      align-items:start;
+    }
+    .summary-content{
+      min-width:0;
+    }
+    .summary-wide{
+      grid-column:1 / -1;
+    }
+    .compliance-note{
+      max-width:100%;
+      margin:0;
+      padding:0 0 0 1rem;
+      background:transparent;
+      border-left:1px solid var(--line);
+    }
+
+    .compliance-note h3{
+      margin:0 0 0.35rem;
+      font-family:var(--font-serif);
+      font-size:0.95rem;
+      font-weight:300;
+      color:var(--ink);
+    }
+
+    .compliance-note p{
+      margin:0;
+      font-size:0.8rem;
+      line-height:1.35;
+      color:#5f5542;
+    }
+
+    .fee-info{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:18px;
+      height:18px;
+      margin-left:6px;
+      border-radius:50%;
+      border:1px solid rgba(26,34,48,0.25);
+      color:rgba(26,34,48,0.7);
+      font-size:0.75rem;
+      font-family:var(--font-serif);
+      font-weight:400;
+      position:relative;
+      cursor:default;
+      transition:border-color 0.2s ease,color 0.2s ease,transform 0.2s ease;
+    }
+    .fee-info::after{
+      content:attr(data-tooltip);
+      position:absolute;
+      left:50%;
+      bottom:calc(100% + 10px);
+      transform:translateX(-50%) translateY(4px);
+      width:min(300px, 80vw);
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(26,34,48,0.12);
+      background:#ffffff;
+      color:#1a2230;
+      font-size:0.78rem;
+      font-weight:300;
+      line-height:1.4;
+      font-family:var(--font-sans);
+      box-shadow:0 16px 32px rgba(15,23,42,0.18);
+      opacity:0;
+      pointer-events:none;
+      z-index:5;
+      transition:opacity 0.2s ease,transform 0.2s ease;
+    }
+    .fee-info:hover,
+    .fee-info:focus-visible{
+      border-color:rgba(182,164,122,0.8);
+      color:#1a2230;
+      transform:translateY(-1px);
+    }
+    .fee-info:hover::after,
+    .fee-info:focus-visible::after{
+      opacity:1;
+      transform:translateX(-50%) translateY(0);
+    }
+
+    .compliance-ack{
+      display:flex;
+      gap:0.65rem;
+      align-items:flex-start;
+      font-size:0.92rem;
+      color:var(--ink);
+    }
+
+    .compliance-ack input{
+      margin-top:2px;
+    }
+
+    .case-title-preview{
+      display:flex;
+      flex-direction:column;
+      gap:0.2rem;
+      margin-bottom:0.6rem;
+      text-align:center;
+      align-items:center;
+    }
+    .case-title-preview .label{
+      text-transform:uppercase;
+      letter-spacing:0.18em;
+      font-size:0.7rem;
+      color:var(--muted);
+      font-weight:300;
+      font-family:var(--font-sans);
+    }
+    .case-title-preview .value{
+      font-family:var(--font-serif);
+      font-size:1.6rem;
+      font-weight:300;
+      line-height:1.15;
+      color:var(--ink);
+    }
+
+    .char-count{
+      text-align:right;
+      font-size:0.8rem;
+      color:var(--muted);
+      margin-top:6px;
+    }
+
+    .summary{
+      max-width:1000px;
+      margin:0 auto;
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:2.1rem 2.6rem;
+      box-shadow:0 2px 6px rgba(0,0,0,0.03);
+      display:flex;
+      flex-direction:column;
+      gap:0.6rem;
+      line-height:1.45;
+    }
+    .summary h2{
+      font-family:'Sarabun',sans-serif;
+      font-weight:400;
+      font-size:1.5rem;
+      line-height:1.2;
+      margin-bottom:0.65rem;
+    }
+    .summary p{margin:0;color:var(--ink);}
+    .summary small{color:var(--muted);}
+    .summary hr{margin:0.75rem 0;}
+    .review-task-list{
+      max-height:220px;
+      overflow-y:auto;
+      padding-right:6px;
+    }
+    .preview-tasks{
+      max-height:220px;
+      overflow-y:auto;
+      padding-right:6px;
+    }
+    .review-task-list .task-list,
+    .preview-tasks .task-list{
+      max-height:none;
+      overflow:visible;
+      padding-right:0;
+    }
+
+    .auto-note{margin-top:0.6rem;font-size:0.9rem;color:var(--muted);}
+
+    #create-step-review header{
+      margin-bottom:1.1rem;
+    }
+    #create-step-review header h1{
+      margin:0 0 0.35rem;
+      line-height:1.15;
+    }
+    #create-step-review header p{
+      margin:0;
+      line-height:1.3;
+    }
+    .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:2rem;}
+    .step-panel .actions{
+      max-width:1000px;
+      margin:2rem auto 0;
+      width:100%;
+      padding:0 2rem;
+      justify-content:flex-end;
+    }
+    .btn{border:none;border-radius:6px;padding:0.6rem 1.1rem;font-size:0.9rem;font-family:var(--font-serif);font-weight:300;cursor:pointer;transition:background-color .2s,border-color .2s,color .2s,box-shadow .2s,transform .2s;}
+    .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
+    .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
+    .btn.primary{background:var(--accent);color:#fff;}
+    .btn.primary:hover{background:#a0854d;}
+
+    .modal{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.35);
+      backdrop-filter:blur(6px);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:80;
+    }
+    .modal.active{display:flex;}
+    .modal-content{
+      background:#fff;
+      width:min(700px,90vw);
+      border-radius:18px;
+      padding:2.5rem 2.75rem;
+      box-shadow:0 15px 50px rgba(0,0,0,0.15);
+      border:1px solid #e9e6df;
+      font-family:'Sarabun',sans-serif;
+      color:var(--ink);
+      line-height:1.6;
+    }
+    body.theme-dark .modal-content{
+      background:var(--panel);
+      border-color:rgba(255,255,255,0.08);
+      box-shadow:0 18px 50px rgba(0,0,0,0.35);
+      color:var(--ink);
+    }
+    .modal-content h3{
+      font-family:'Sarabun',sans-serif;
+      font-weight:400;
+      font-size:1.9rem;
+      color:#1a1a1a;
+      margin-bottom:2rem;
+      text-align:center;
+      letter-spacing:0.3px;
+    }
+    body.theme-dark .modal-content h3{
+      color:#f8fbff;
+    }
+    .modal-content hr{
+      border:none;
+      border-top:1px solid #e0ded8;
+      margin:1.5rem 0;
+    }
+    body.theme-dark .modal-content hr{
+      border-top-color:rgba(255,255,255,0.12);
+    }
+    .modal-content p{
+      margin:0.35rem 0;
+      color:#2a2a2a;
+      font-size:0.95rem;
+      display:flex;
+      align-items:baseline;
+      gap:6px;
+    }
+    body.theme-dark .modal-content p{
+      color:#e6ecf8;
+    }
+    .modal-content strong{
+      font-family:'Sarabun',sans-serif;
+      font-weight:400;
+      font-size:1rem;
+      color:#111;
+      min-width:130px;
+      display:inline-block;
+    }
+    body.theme-dark .modal-content strong{
+      color:#f8fbff;
+    }
+    .close-btn{
+      display:block;
+      margin:2rem auto 0;
+      background:#faf9f6;
+      border:1px solid #d8d3c9;
+      padding:0.55rem 1.2rem;
+      border-radius:8px;
+      font-size:0.9rem;
+      cursor:pointer;
+      color:#333;
+      transition:background-color 0.2s ease,border-color 0.2s ease,color 0.2s ease,box-shadow 0.2s ease,transform 0.2s ease;
+      font-family:'Sarabun',sans-serif;
+    }
+    body.theme-dark .close-btn{
+      background:rgba(255,255,255,0.08);
+      border-color:rgba(255,255,255,0.2);
+      color:#f8fbff;
+    }
+    .close-btn:hover{
+      background:var(--accent);
+      border-color:var(--accent);
+      color:#fff;
+    }
+    body.modal-open{overflow:hidden;}
+    .toast.inline-toast{
+      position:fixed;
+      bottom:-120px;
+      right:32px;
+      max-width:320px;
+      background:rgba(182,164,122,0.95);
+      color:#fff;
+      padding:0.85rem 1.1rem;
+      border-radius:10px;
+      font-size:0.9rem;
+      box-shadow:0 4px 18px rgba(0,0,0,0.18);
+      gap:0.65rem;
+      display:flex;
+      align-items:center;
+      transition:bottom .35s ease;
+      z-index:85;
+    }
+    .toast.inline-toast.show{bottom:34px;}
+    .toast.inline-toast.error{background:#c0392b;}
+    .toast.inline-toast a{color:#fff;text-decoration:underline;margin-left:10px;}
+
+    @media (max-width: 1024px) {
+      body {
+        flex-direction: column;
+        height: auto;
+        overflow: auto;
+      }
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 260px;
+        height: 100vh;
+        border-right: none;
+        border-bottom: none;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        gap: 24px;
+        padding: 24px 18px;
+        padding-top: 72px;
+        transform: translateX(-110%);
+        transition: transform 0.25s ease;
+        z-index: 2000;
+        box-shadow: 18px 0 40px rgba(0, 0, 0, 0.18);
+      }
+      body.nav-open .sidebar {
+        transform: translateX(0);
+      }
+      body.nav-open .sidebar-backdrop {
+        display: block;
+      }
+      .sidebar-toggle {
+        display: inline-flex;
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        border-left: 1px solid rgba(26, 26, 26, 0.08);
+        background: rgba(255, 255, 255, 0.82);
+      }
+      .sidebar-toggle::before {
+        display: none;
+      }
+      .sidebar-toggle-glyph {
+        width: 18px;
+        height: 12px;
+      }
+      .sidebar-toggle-bar {
+        width: 18px;
+      }
+      .sidebar-toggle-bar--top {
+        transform: translateY(-5px);
+      }
+      .sidebar-toggle-bar--middle {
+        width: 12px;
+      }
+      .sidebar-toggle-bar--bottom {
+        transform: translateY(5px);
+      }
+      .sidebar-toggle:hover .sidebar-toggle-bar--top,
+      .sidebar-toggle:hover .sidebar-toggle-bar--bottom,
+      .sidebar-toggle:focus-visible .sidebar-toggle-bar--top,
+      .sidebar-toggle:focus-visible .sidebar-toggle-bar--bottom {
+        width: 16px;
+      }
+      .sidebar-toggle:hover .sidebar-toggle-bar--middle,
+      .sidebar-toggle:focus-visible .sidebar-toggle-bar--middle {
+        width: 18px;
+      }
+      .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--top,
+      .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--bottom {
+        width: 18px;
+      }
+      .topbar {
+        margin-bottom: 1.25rem;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .logo {
+        margin-bottom: 4px;
+        text-align: left;
+        font-size: 1.4rem;
+      }
+      nav {
+        flex-direction: column;
+        gap: 12px;
+      }
+      nav a {
+        width: 100%;
+        text-align: left;
+        padding: 10px 14px;
+        font-size: 0.95rem;
+      }
+      .sidebar-bottom {
+        margin-top: auto;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .sidebar-link {
+        width: 100%;
+        text-align: left;
+        padding: 10px 14px;
+        font-size: 0.95rem;
+      }
+      .sidebar-footer {
+        text-align: left;
+      }
+      .main {
+        padding: 28px 20px 60px;
+        overflow: visible;
+      }
+      .user-profile {
+        padding: 6px 10px;
+      }
+      .user-profile img {
+        width: 38px;
+        height: 38px;
+      }
+      header h1 {
+        font-size: 1.7rem;
+      }
+      header p {
+        margin-bottom: 1.5rem;
+      }
+      .steps {
+        max-width: 100%;
+        margin: 0 0 1.5rem;
+      }
+      .steps::before {
+        left: 8px;
+        right: 8px;
+      }
+      .circle {
+        width: 24px;
+        height: 24px;
+        font-size: 0.75rem;
+      }
+      .step span {
+        font-size: 0.75rem;
+      }
+      form {
+        padding: 1.5rem;
+        width: 100%;
+      }
+      .step-panel .actions,
+      .actions {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0;
+      }
+      .actions .btn {
+        width: 100%;
+      }
+      .summary {
+        padding: 1.6rem 1.4rem;
+      }
+      .tips {
+        padding: 1.1rem;
+      }
+      .task-input-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .task-input-row button {
+        width: 100%;
+      }
+      .comp-wrapper {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      #comp {
+        width: 100%;
+      }
+      .comp-type {
+        flex-wrap: wrap;
+      }
+      .modal-content {
+        padding: 1.8rem 1.6rem;
+      }
+      .modal-content h3 {
+        font-size: 1.6rem;
+      }
+      .modal-content strong {
+        min-width: 110px;
+      }
+      .toast.inline-toast {
+        right: 16px;
+        left: 16px;
+        max-width: none;
+      }
+      .summary-layout {
+        grid-template-columns: 1fr;
+      }
+      .summary-content {
+        order: 1;
+      }
+      .summary-wide {
+        order: 2;
+      }
+      .compliance-note {
+        max-width: none;
+        width: 100%;
+        order: 3;
+        border-left: none;
+        padding-left: 0;
+        border-top: 1px solid var(--line);
+        padding-top: 0.8rem;
+        margin-top: 0.6rem;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .main {
+        padding: 20px 14px 48px;
+      }
+      .steps {
+        gap: 0.4rem;
+      }
+      .steps::before {
+        top: 12px;
+      }
+      .step span {
+        font-size: 0.7rem;
+      }
+    }
+
+
+    .current-posting-editor { max-width: 960px; margin: 2rem auto; }
+    .current-posting-editor [hidden] { display: none !important; }
+    .current-posting-editor .av2-card { border: 1px solid var(--border, #d9e0e8); padding: 1.25rem; margin: 1rem 0; border-radius: 10px; }
+    .current-posting-editor .av2-draft-fields { display: grid; gap: .65rem; }
+    .current-posting-editor input, .current-posting-editor textarea, .current-posting-editor select { width: 100%; min-width: 0; padding: .75rem; font: inherit; color: inherit; background: var(--card-bg, #fff); border: 1px solid var(--border, #b8c0cc); border-radius: 6px; }
+    .current-posting-editor .av2-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+    .current-posting-editor button { padding: .65rem 1rem; margin: .5rem .5rem .5rem 0; font: inherit; cursor: pointer; }
+    .current-posting-editor button:disabled { cursor: default; opacity: .6; }
+    .current-posting-editor pre, .current-posting-editor .av2-draft-review p { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+    .draft-save-recovery select { padding: .7rem; max-width: 100%; margin: .5rem; font: inherit; }
+    .draft-save-recovery { margin: 1.5rem 0; padding: 1rem; border: 1px solid var(--border, #d9e0e8); border-radius: 10px; }
+    .draft-save-recovery .av2-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+    .draft-save-recovery pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+    .draft-save-recovery [hidden] { display: none !important; }
+  </style>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260831-21" />
+  <link rel="stylesheet" href="assets/styles/matter-publication.css" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260831-3" />
+  <script defer src="assets/scripts/universal-header.js?v=20260831-3"></script>
+  <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
+  <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
+</head>
+  <body class="dashboard-no-shadows lpc-role-dashboard lpc-product-clean lpc-static-universal-header">
+  <script>
+    (function applyStoredTheme() {
+      try {
+        const raw = localStorage.getItem("lpc_user");
+        if (!raw) return;
+        const stored = JSON.parse(raw);
+        const storedTheme = String(stored?.preferences?.theme || "").toLowerCase();
+        const theme = storedTheme === "dark" || /dark$/i.test(storedTheme) ? "dark" : "light";
+        document.body.classList.add(`theme-${theme}`);
+        const fontKey = String(stored?.preferences?.fontSize || "").toLowerCase();
+        const sizeMap = { xs: "15px", sm: "16px", md: "17px", lg: "20px", xl: "22px" };
+        if (sizeMap[fontKey]) {
+          document.documentElement.style.fontSize = sizeMap[fontKey];
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  </script>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebarNav">
+    <div class="logo">Dashboard</div>
+    <nav>
+      <a href="dashboard-attorney.html"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"></path><path d="M5 9v11h14V9"></path><path d="M9 20v-6h6v6"></path></svg><span>Home</span></a>
+      <a href="dashboard-attorney.html#cases"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M3 12h18"></path></svg><span>Matters</span></a>
+      <a href="dashboard-attorney.html#tasks"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="m8 12 2.5 2.5L16 9"></path></svg><span>Tasks</span></a>
+      <a href="browse-paralegals.html"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><span>Paralegals</span></a>
+      <a href="dashboard-attorney.html#funds"><svg class="sidebar-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M2 10h20"></path><path d="M6 15h2"></path></svg><span>Payments</span></a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sidebar-footer">© Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect 2026</div>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+
+  <!-- Main -->
+  <div class="lpc-auth-page-shell">
+  <div class="lpc-universal-header-shell lpc-universal-header-shell--created" role="group" aria-label="Workspace tools" data-lpc-universal-header="true"></div>
+  <main id="main" tabindex="-1" class="main">
+    <div class="topbar" id="createCaseTopbar">
+      <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Show menu" aria-controls="sidebarNav" aria-expanded="false">
+        <span class="lpc-mobile-menu-icon" aria-hidden="true"></span>
+      </button>
+      <div class="topbar-actions" data-notification-center>
+      <div class="lpc-global-search-host" data-productivity-trigger-host></div>
+      <div class="notification-wrapper">
+        <button class="notification-icon" id="createCaseNotifBtn" type="button" aria-label="View notifications" data-notification-toggle>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 01-3.46 0" />
+          </svg>
+          <span class="notification-badge" id="createCaseNotifBadge" data-notification-badge>0</span>
+        </button>
+        <div class="notifications-panel hidden" role="region" aria-live="polite" data-notification-panel>
+          <div class="notif-header">
+            <span class="notif-header-title" aria-label="Notifications"></span>
+            <button type="button" class="notif-markall" data-notification-mark>Mark All Read</button>
+          </div>
+          <div class="notif-scroll" data-notification-list></div>
+          <div class="notif-empty" data-notification-empty>Loading...</div>
+        </div>
+      </div>
+      <div class="user-profile" id="createCaseUserChip" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-controls="createCaseProfileMenu" aria-label="Open profile menu">
+        <img id="createCaseAvatar" src="assets/avatar-placeholder.svg" alt="Attorney avatar" />
+        <div>
+          <strong id="createCaseName">Attorney</strong>
+        </div>
+        <div class="profile-dropdown" id="createCaseProfileMenu" aria-hidden="true">
+          <a href="profile-settings.html" data-account-settings>Account Settings</a>
+          <button type="button" class="logout-btn" data-logout>Log Out</button>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <header id="draftEditorHeader" class="lpc-draft-editor-header" hidden>
+      <h1>Create a New Matter</h1>
+      <p>Drafts stay private. Publishing doesn’t charge you.</p>
+    </header>
+    <section class="step-panel" data-step="details" id="create-step-details">
+      <header>
+        <h1>Create a New Matter</h1>
+      </header>
+
+      <div class="steps">
+        <a href="#details" class="step active" data-step-link="details">
+          <div class="circle">1</div><span>Matter details</span>
+        </a>
+        <a href="#description" class="step" data-step-link="description">
+          <div class="circle">2</div><span>Description</span>
+        </a>
+        <a href="#review" class="step" data-step-link="review">
+          <div class="circle">3</div><span>Review &amp; Post</span>
+        </a>
+      </div>
+
+      <form>
+        <p class="field-instructions">Fields are required unless marked optional.</p>
+        <div class="field">
+          <label for="caseTitleInput">Matter Title</label>
+          <input id="caseTitleInput" maxlength="300" type="text" placeholder="e.g., Draft asset purchase agreement" autocomplete="off" required />
+        </div>
+      <div class="field">
+        <label for="specialty">Field of Law</label>
+        <select id="specialty" required>
+              <option value="">Select…</option>
+    <option>Administrative Law</option>
+    <option>Admiralty & Maritime Law</option>
+    <option>Antitrust Law</option>
+    <option>Appellate Law</option>
+    <option>Banking Law</option>
+    <option>Bankruptcy Law</option>
+    <option>Business / Corporate Law</option>
+    <option>Civil Rights Law</option>
+    <option>Class Action Law</option>
+    <option>Commercial Law</option>
+    <option>Communications Law</option>
+    <option>Construction Law</option>
+    <option>Consumer Protection Law</option>
+    <option>Contract Law</option>
+    <option>Criminal Defense Law</option>
+    <option>Education Law</option>
+    <option>Elder Law</option>
+    <option>Election Law</option>
+    <option>Employment & Labor Law</option>
+    <option>Energy Law</option>
+    <option>Entertainment Law</option>
+    <option>Environmental Law</option>
+    <option>Estate Planning & Probate</option>
+    <option>Family Law</option>
+    <option>Franchise Law</option>
+    <option>Government Contracts Law</option>
+    <option>Health Care Law</option>
+    <option>Immigration Law</option>
+    <option>Insurance Law</option>
+    <option>Intellectual Property (IP) Law</option>
+    <option>International Law</option>
+    <option>Land Use & Zoning Law</option>
+    <option>Litigation</option>
+    <option>Media Law</option>
+    <option>Medical Malpractice</option>
+    <option>Military Law</option>
+    <option>Municipal Law</option>
+    <option>Personal Injury Law</option>
+    <option>Product Liability Law</option>
+    <option>Real Estate Law</option>
+    <option>Securities Law</option>
+    <option>Social Security / Disability Law</option>
+    <option>Sports Law</option>
+    <option>Tax Law</option>
+    <option>Technology Law</option>
+    <option>Telecommunications Law</option>
+    <option>Torts</option>
+    <option>Transportation Law</option>
+    <option>Trusts &amp; Estates</option>
+    <option>Estate Planning</option>
+    <option>White Collar Crime</option>
+    <option>Workers’ Compensation</option>
+  </select>
+</div>
+
+      <div class="field">
+  <label for="state">Location (State)</label>
+  <select id="state" required>
+    <option value="">Select…</option>
+    <option>Alabama</option>
+    <option>Alaska</option>
+    <option>Arizona</option>
+    <option>Arkansas</option>
+    <option>California</option>
+    <option>Colorado</option>
+    <option>Connecticut</option>
+    <option>Delaware</option>
+    <option>District of Columbia</option>
+    <option>Florida</option>
+    <option>Georgia</option>
+    <option>Hawaii</option>
+    <option>Idaho</option>
+    <option>Illinois</option>
+    <option>Indiana</option>
+    <option>Iowa</option>
+    <option>Kansas</option>
+    <option>Kentucky</option>
+    <option>Louisiana</option>
+    <option>Maine</option>
+    <option>Maryland</option>
+    <option>Massachusetts</option>
+    <option>Michigan</option>
+    <option>Minnesota</option>
+    <option>Mississippi</option>
+    <option>Missouri</option>
+    <option>Montana</option>
+    <option>Nebraska</option>
+    <option>Nevada</option>
+    <option>New Hampshire</option>
+    <option>New Jersey</option>
+    <option>New Mexico</option>
+    <option>New York</option>
+    <option>North Carolina</option>
+    <option>North Dakota</option>
+    <option>Ohio</option>
+    <option>Oklahoma</option>
+    <option>Oregon</option>
+    <option>Pennsylvania</option>
+    <option>Rhode Island</option>
+    <option>South Carolina</option>
+    <option>South Dakota</option>
+    <option>Tennessee</option>
+    <option>Texas</option>
+    <option>Utah</option>
+    <option>Vermont</option>
+    <option>Virginia</option>
+    <option>Washington</option>
+    <option>West Virginia</option>
+    <option>Wisconsin</option>
+    <option>Wyoming</option>
+  </select>
+</div>
+
+  <div class="field">
+  <label for="comp">Compensation<span class="fee-info" tabindex="0" data-tooltip="Your card will not be charged until you select and hire a paralegal. Payment is processed through Stripe and released after you approve completed work or a platform review or dispute is resolved.">?</span></label>
+  <div class="comp-wrapper">
+    <span class="dollar-sign">$</span>
+    <input id="comp" type="text" inputmode="numeric" placeholder="3,500+" autocomplete="off" required />
+  </div>
+</div>
+
+      <div class="field select-field">
+        <label for="experience">Minimum Experience (Optional)</label>
+        <div class="select-wrapper">
+          <select id="experience">
+            <option value="">No minimum</option>
+            <option value="1+ years">At least 1 year</option>
+            <option value="3+ years">At least 3 years</option>
+            <option value="5+ years">At least 5 years</option>
+            <option value="7+ years">At least 7 years</option>
+            <option value="10+ years">At least 10 years</option>
+            <option value="12+ years">At least 12 years</option>
+          </select>
+          <span class="select-arrow">▾</span>
+        </div>
+      </div>
+
+      </form>
+
+      <div class="actions">
+        <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html#cases">Cancel</button>
+        <button type="button" class="btn primary" data-step-switch="description" id="detailsNextBtn">Next Step</button>
+      </div>
+    </section>
+
+    <section class="step-panel" data-step="description" id="create-step-description" hidden>
+      <header>
+        <h1>Create a New Matter</h1>
+      </header>
+
+      <div class="steps">
+        <a href="#details" class="step" data-step-link="details">
+          <div class="circle">1</div><span>Matter details</span>
+        </a>
+        <a href="#description" class="step active" data-step-link="description">
+          <div class="circle">2</div><span>Description</span>
+        </a>
+        <a href="#review" class="step" data-step-link="review">
+          <div class="circle">3</div><span>Review &amp; Post</span>
+        </a>
+      </div>
+
+      <div class="form-wrapper">
+        <form>
+          <div class="case-title-preview" id="caseTitlePreview">
+            <span class="label">Matter Title</span>
+            <span class="value" id="caseTitlePreviewText">Untitled Matter</span>
+          </div>
+          <div class="field">
+            <label for="caseDescription">Matter Description</label>
+            <textarea id="caseDescription" placeholder="Describe your matter, goals, and expectations for the paralegal..." maxlength="4000" required></textarea>
+            <div class="char-count" id="descriptionCharCount">0 / 4000</div>
+          </div>
+          <div class="field" id="caseTasksField">
+            <label for="caseTaskInput">Tasks</label>
+            <div class="task-input-row">
+              <input id="caseTaskInput" type="text" placeholder="e.g., Draft initial motion" aria-describedby="caseTaskHelper" />
+              <button type="button" class="btn secondary" id="addCaseTaskBtn">Add</button>
+            </div>
+            <p class="task-helper" id="caseTaskHelper">Add at least one deliverable or requirement.</p>
+            <ul class="task-list" id="caseTaskList"></ul>
+          </div>
+          <div class="field">
+            <label for="caseDeadline">Deadline <span class="field-requirement">Optional</span></label>
+            <input id="caseDeadline" type="date" placeholder="YYYY-MM-DD" />
+          </div>
+        </form>
+
+        <div class="actions">
+          <button type="button" class="btn secondary" data-step-switch="details">Back</button>
+          <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html#cases:draft" data-save-draft="true">Save and Exit</button>
+          <button type="button" class="btn primary" data-step-switch="review">Next Step</button>
+        </div>
+      </div>
+    </section>
+    <section class="step-panel" data-step="review" id="create-step-review" hidden>
+      <header>
+        <h1>Review &amp; Post Your Matter</h1>
+      </header>
+
+      <div class="steps">
+        <a href="#details" class="step" data-step-link="details">
+          <div class="circle">1</div><span>Matter details</span>
+        </a>
+        <a href="#description" class="step" data-step-link="description">
+          <div class="circle">2</div><span>Description</span>
+        </a>
+        <a href="#review" class="step active" data-step-link="review">
+          <div class="circle">3</div><span>Review &amp; Post</span>
+        </a>
+      </div>
+
+      <section class="summary" id="reviewSummary">
+        <div class="summary-layout">
+          <div class="summary-content">
+            <p>Gathering your matter details…</p>
+          </div>
+          <aside class="compliance-note" aria-label="Professional guidelines">
+            <h3>Professional Guidelines</h3>
+            <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed through Stripe and are released only upon attorney approval within the workspace or resolution of a platform review or dispute.</p>
+          </aside>
+          <div class="summary-wide"></div>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button type="button" class="btn secondary" data-step-switch="description">Back</button>
+        <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html#cases:draft" data-save-draft="true">Save &amp; Exit</button>
+        <button type="button" class="btn secondary" id="previewBtn">Preview Listing</button>
+        <button type="button" class="btn primary" id="postBtn">Post Matter</button>
+      </div>
+    </section>
+  </main>
+  </div>
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <div class="modal" id="previewModal" aria-hidden="true" inert>
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="previewTitle" tabindex="-1">
+      <h3 id="previewTitle"></h3>
+      <p><strong>Field of Law:</strong> <span id="previewField">—</span></p>
+      <p><strong>Location:</strong> <span id="previewState">—</span></p>
+      <p><strong>Compensation:</strong> <span id="previewComp">—</span></p>
+      <p><strong>Platform fee (22%):</strong> <span id="previewPlatformFee">—</span></p>
+      <details class="preview-fee-details">
+        <summary>About the platform fee</summary>
+        <p>The platform fee supports tools that enable attorneys and paralegals to collaborate, including the Matter workspace, messaging, document sharing, workflow tools, Stripe payment processing, account review, and platform administration. The platform fee is not a fee for legal services.</p>
+      </details>
+      <p><strong>Estimated total due at hire:</strong> <span id="previewTotalDue">—</span></p>
+      <p><strong>Experience:</strong> <span id="previewExperience">—</span></p>
+      <p id="previewDeadlineRow" hidden><strong>Deadline:</strong> <span id="previewDeadline">—</span></p>
+      <hr>
+      <p id="previewDescription"></p>
+      <div class="preview-tasks" id="previewTasks"></div>
+      <button type="button" class="close-btn" id="closePreview">Close Preview</button>
+    </div>
+  </div>
+  <div class="toast inline-toast" id="toast"></div>
+  <script src="assets/scripts/utils/toast.js?v=20260208"></script>
+  <script>
+    (function initCreateCaseAuthHeader() {
+      function userDisplayName(user) {
+        const first = String(user?.firstName || "").trim();
+        const last = String(user?.lastName || "").trim();
+        const full = [first, last].filter(Boolean).join(" ").trim();
+        const fallbackName = String(user?.name || user?.email || "Attorney").trim();
+        return full || fallbackName || "Attorney";
+      }
+
+      function userAvatar(user) {
+        return (
+          user?.profileImage ||
+          user?.avatarURL ||
+          user?.pendingProfileImage ||
+          "assets/avatar-placeholder.svg"
+        );
+      }
+
+      function applyUser(user) {
+        const nameEl = document.getElementById("createCaseName");
+        const avatarEl = document.getElementById("createCaseAvatar");
+        if (nameEl) nameEl.textContent = userDisplayName(user);
+        if (avatarEl) avatarEl.src = userAvatar(user);
+      }
+
+      async function hydrateUser() {
+        const session = await window.requireRole?.("attorney");
+        const user = session || window.getStoredUser?.();
+        if (!user) {
+          window.location.href = "login.html";
+          return;
+        }
+        applyUser(user);
+        try {
+          const res = await fetch("/api/users/me", {
+            credentials: "include",
+            headers: { Accept: "application/json" },
+          });
+          if (res.ok) {
+            const profile = await res.json().catch(() => null);
+            if (profile && typeof profile === "object") {
+              applyUser(profile);
+            }
+          }
+        } catch {
+          // Keep the verified session identity when the optional profile refresh fails.
+          applyUser(user);
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+
+        const userChip = document.getElementById("createCaseUserChip");
+        const profileMenu = document.getElementById("createCaseProfileMenu");
+        if (userChip && profileMenu) {
+          const setProfileMenuOpen = (open) => {
+            profileMenu.classList.toggle("show", open);
+            profileMenu.setAttribute("aria-hidden", open ? "false" : "true");
+            userChip.setAttribute("aria-expanded", open ? "true" : "false");
+          };
+          setProfileMenuOpen(false);
+          userChip.addEventListener("click", (event) => {
+            if (profileMenu.contains(event.target)) return;
+            setProfileMenuOpen(!profileMenu.classList.contains("show"));
+          });
+          userChip.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setProfileMenuOpen(!profileMenu.classList.contains("show"));
+            } else if (event.key === "Escape") {
+              setProfileMenuOpen(false);
+            }
+          });
+          document.addEventListener("click", (event) => {
+            if (!profileMenu.classList.contains("show")) return;
+            if (userChip.contains(event.target)) return;
+            setProfileMenuOpen(false);
+          });
+          document.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape") return;
+            if (!profileMenu.classList.contains("show")) return;
+            setProfileMenuOpen(false);
+          });
+        }
+
+        const cached = window.getStoredUser?.();
+        if (cached) applyUser(cached);
+        void hydrateUser();
+      });
+    })();
+  </script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const sidebarToggle = document.getElementById("sidebarToggle");
+      const sidebarNav = document.getElementById("sidebarNav");
+      const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+      const syncSidebarToggle = () => {
+        if (!sidebarToggle) return;
+        const isOpen = document.body.classList.contains("nav-open");
+        sidebarToggle.setAttribute("aria-expanded", String(isOpen));
+        sidebarToggle.setAttribute("aria-label", isOpen ? "Hide menu" : "Show menu");
+      };
+      const closeSidebar = () => {
+        document.body.classList.remove("nav-open");
+        syncSidebarToggle();
+      };
+      const openSidebar = () => {
+        document.body.classList.add("nav-open");
+        syncSidebarToggle();
+      };
+      if (sidebarToggle) {
+        sidebarToggle.addEventListener("click", () => {
+          if (document.body.classList.contains("nav-open")) closeSidebar();
+          else openSidebar();
+        });
+      }
+      if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener("click", closeSidebar);
+      }
+      if (sidebarNav) {
+        sidebarNav.addEventListener("click", (event) => {
+          if (event.target.closest("a") || event.target.closest("button")) {
+            closeSidebar();
+          }
+        });
+      }
+      window.addEventListener("resize", () => {
+        if (window.innerWidth > 1024) closeSidebar();
+      });
+      syncSidebarToggle();
+    });
+  </script>
+
+  <script>
+  (function () {
+    const params = new URLSearchParams(window.location.search);
+    const editingCaseId = params.get("caseId");
+    const retainedCaseDraftId = params.get("caseDraftId");
+    const draftIdParam = params.get("draftId");
+    const isEditing = Boolean(editingCaseId || retainedCaseDraftId);
+    let currentDraftId = !isEditing ? draftIdParam : "";
+    let draftSession = null;
+    let draftState = null;
+    let draftRecovery = null;
+    let publication = null;
+    let draftContract = null;
+    let draftReturnTo = "";
+    let draftOwnerId = "";
+    let draftPosting = false;
+    const draftController = new AbortController();
+    const draftCache = {
+      title: "",
+      practiceArea: "",
+      state: "",
+      compAmount: "",
+      experience: "",
+      deadline: "",
+      description: "",
+      tasks: [],
+    };
+
+    const stepPanels = new Map();
+    document.querySelectorAll(".step-panel").forEach((panel) => {
+      const key = panel.dataset.step;
+      if (key) stepPanels.set(key, panel);
+    });
+    let currentStep = null;
+
+    const fields = {
+      title: document.getElementById("caseTitleInput"),
+      specialty: document.getElementById("specialty"),
+      state: document.getElementById("state"),
+      comp: document.getElementById("comp"),
+      experience: document.getElementById("experience"),
+      deadline: document.getElementById("caseDeadline"),
+    };
+    const taskInput = document.getElementById("caseTaskInput");
+    const taskAddBtn = document.getElementById("addCaseTaskBtn");
+    const taskList = document.getElementById("caseTaskList");
+    const titlePreview = document.getElementById("caseTitlePreviewText");
+    const descriptionInput = document.getElementById("caseDescription");
+    const descriptionCount = document.getElementById("descriptionCharCount");
+    const toastHelper = window.toastUtils;
+    const reviewSummary = document.getElementById("reviewSummary");
+    const previewBtn = document.getElementById("previewBtn");
+    const postBtn = document.getElementById("postBtn");
+    const previewModal = document.getElementById("previewModal");
+    const closePreviewBtn = document.getElementById("closePreview");
+    let previewReturnFocus = null;
+    const previewFields = {
+      title: document.getElementById("previewTitle"),
+      field: document.getElementById("previewField"),
+      state: document.getElementById("previewState"),
+      comp: document.getElementById("previewComp"),
+      platformFee: document.getElementById("previewPlatformFee"),
+      totalDue: document.getElementById("previewTotalDue"),
+      experience: document.getElementById("previewExperience"),
+      deadline: document.getElementById("previewDeadline"),
+      deadlineRow: document.getElementById("previewDeadlineRow"),
+      description: document.getElementById("previewDescription"),
+      tasks: document.getElementById("previewTasks"),
+    };
+    const PLATFORM_FEE_PCT = 22;
+    const PLATFORM_FEE_NOTE =
+      "The platform fee supports tools that enable attorneys and paralegals to collaborate, including the Matter workspace, messaging, document sharing, workflow tools, Stripe payment processing, account review, and platform administration. The platform fee is not a fee for legal services.";
+    let latestCaseData = null;
+    let authModulePromise = null;
+    const tasksState = {
+      items: [],
+      locked: false,
+    };
+
+    const validators = [
+      {
+        field: fields.title,
+        check: (value) => value.trim().length >= 3,
+        message: "Add a descriptive matter title.",
+      },
+      {
+        field: fields.specialty,
+        check: (value) => Boolean(value.trim()),
+        message: "Select the primary practice area.",
+      },
+      {
+        field: fields.state,
+        check: (value) => Boolean(value.trim()),
+        message: "Select the state or jurisdiction.",
+      },
+      {
+        field: fields.comp,
+        check: (value) => parseCompAmount(value) >= 400,
+        message: "Enter a compensation amount of at least $400.",
+      },
+    ];
+
+    function normalizeCompInputValue(value) {
+      return String(value || "").replace(/[^0-9.]/g, "");
+    }
+
+    function formatCompInputValue(value) {
+      const normalized = normalizeCompInputValue(value);
+      if (!normalized) return "";
+      const [wholeRaw, decimalRaw = ""] = normalized.split(".");
+      const whole = wholeRaw.replace(/^0+(?=\d)/, "") || "0";
+      const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      return decimalRaw ? `${withCommas}.${decimalRaw.slice(0, 2)}` : withCommas;
+    }
+
+    function getCompFieldRawValue() {
+      return normalizeCompInputValue(fields.comp?.value || "");
+    }
+
+    function setCompFieldValue(value) {
+      if (!fields.comp) return;
+      fields.comp.value = formatCompInputValue(value);
+    }
+
+    const stepForms = document.querySelectorAll(".step-panel form");
+    stepForms.forEach((form) => {
+      form.setAttribute("novalidate", "novalidate");
+      form.addEventListener("submit", (event) => event.preventDefault());
+    });
+
+    function focusFirstInvalidField() {
+      const firstInvalid = validators.find(({ field, check }) => field && !check(field.value || ""));
+      if (!firstInvalid?.field) return;
+      try {
+        firstInvalid.field.focus({ preventScroll: true });
+        firstInvalid.field.scrollIntoView({ block: "center" });
+      } catch {}
+    }
+
+    function updateTitlePreview(value = "") {
+      if (!titlePreview) return;
+      const safe = value.trim();
+      titlePreview.textContent = safe || "Untitled Matter";
+    }
+
+    function updateDescriptionCount() {
+      if (!descriptionInput || !descriptionCount) return;
+      descriptionCount.textContent = `${descriptionInput.value.length} / 4000`;
+    }
+
+
+    function normalizeTaskTitle(value) {
+      return String(value || "")
+        .replace(/[\u0000-\u001F\u007F]/g, "")
+        .trim()
+        .slice(0, 200);
+    }
+
+    function readStoredTasks() {
+      if (!Array.isArray(draftCache.tasks)) return [];
+      return draftCache.tasks
+        .map((entry) => {
+          const title = normalizeTaskTitle(typeof entry === "string" ? entry : entry?.title);
+          return title ? { title } : null;
+        })
+        .filter(Boolean);
+    }
+
+    function persistTasks() {
+      draftCache.tasks = tasksState.items.map((task) => ({ title: task.title }));
+      queueDraftSave();
+    }
+
+    function getNormalizedTasks() {
+      const source = tasksState.items.length ? tasksState.items : readStoredTasks();
+      return source
+        .map((task) => normalizeTaskTitle(typeof task === "string" ? task : task?.title))
+        .filter(Boolean)
+        .map((title) => ({ title }));
+    }
+
+    function validateTasks() {
+      if (!taskInput) return true;
+      clearFieldError(taskInput);
+      const tasks = getNormalizedTasks();
+      if (!tasks.length) {
+        showFieldError(taskInput, "Add at least one task.");
+        return false;
+      }
+      if (tasks.length > 25) {
+        showFieldError(taskInput, "Use 25 tasks or fewer before publishing.");
+        taskInput.focus();
+        return false;
+      }
+      return true;
+    }
+
+    function renderTasks() {
+      if (!taskList) return;
+      taskList.innerHTML = "";
+      if (!tasksState.items.length) {
+        const empty = document.createElement("li");
+        empty.className = "task-empty";
+        empty.textContent = "";
+        taskList.appendChild(empty);
+        return;
+      }
+      tasksState.items.forEach((task, idx) => {
+        const row = document.createElement("li");
+        const label = document.createElement("span");
+        label.textContent = task.title;
+        row.appendChild(label);
+        if (!tasksState.locked) {
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "task-remove";
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", () => {
+            tasksState.items.splice(idx, 1);
+            persistTasks();
+            renderTasks();
+          });
+          row.appendChild(removeBtn);
+        }
+        taskList.appendChild(row);
+      });
+      if (tasksState.items.length) {
+        clearFieldError(taskInput);
+      }
+    }
+
+    
+
+    const DRAFT_FIELD_MAP = {
+      caseTitle: "title",
+      caseSpecialty: "practiceArea",
+      caseState: "state",
+      caseComp: "compAmount",
+      caseCompAmount: "compAmount",
+      caseExperience: "experience",
+      caseDeadline: "deadline",
+      caseDescription: "description",
+    };
+
+    function setDraftField(key, value) {
+      const mapped = DRAFT_FIELD_MAP[key] || key;
+      draftCache[mapped] = String(value || "");
+    }
+
+    function getDraftField(key) {
+      const mapped = DRAFT_FIELD_MAP[key] || key;
+      return String(draftCache[mapped] || "");
+    }
+
+    function hydrateDeadline() {
+      if (!fields.deadline) return;
+      const stored = getStoredValue("caseDeadline", "case_deadline");
+      if (stored) fields.deadline.value = stored;
+    }
+
+    function showStep(step, { updateHash = true } = {}) {
+      if (!stepPanels.has(step)) return;
+      stepPanels.forEach((panel, key) => {
+        if (!panel) return;
+        panel.hidden = key !== step;
+      });
+      currentStep = step;
+      if (updateHash) {
+        history.replaceState(null, "", `#${step}`);
+      }
+    }
+
+    function attemptStepChange(targetStep) {
+      try {
+        if (!targetStep || targetStep === currentStep) return;
+        if (targetStep === "description" && currentStep !== "description") {
+          if (!validateDetails()) return;
+          persistDraft();
+        }
+        if (targetStep === "review") {
+          if (!ensureReviewReady()) return;
+          persistDraft();
+          hydrateReviewSummary();
+        }
+        showStep(targetStep);
+      } catch (err) {
+        console.warn("Step change failed", err);
+        showStep("details", { updateHash: false });
+        showToastBanner("Finish the required fields before moving to the next step.", "error");
+      }
+    }
+
+    document.querySelectorAll("[data-step-link]").forEach((link) => {
+      link.addEventListener("click", (event) => {
+        const target = link.dataset.stepLink;
+        if (!target) return;
+        event.preventDefault();
+        attemptStepChange(target);
+      });
+    });
+    document.querySelectorAll("[data-step-switch]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.stepSwitch;
+        if (!target) return;
+        attemptStepChange(target);
+      });
+    });
+
+    const initialHash = (window.location.hash || "").replace("#", "");
+    const pendingInitialStep = initialHash && stepPanels.has(initialHash) ? initialHash : "details";
+    let initialStepApplied = false;
+
+    function applyInitialStep() {
+      if (initialStepApplied) return;
+      initialStepApplied = true;
+      if (currentDraftId) {
+        showStep(pendingInitialStep, { updateHash: false });
+        if (pendingInitialStep === "review") {
+          hydrateReviewSummary();
+        }
+        return;
+      }
+      if (pendingInitialStep === "description") {
+        showStep("details", { updateHash: false });
+        attemptStepChange("description");
+      } else if (pendingInitialStep === "review") {
+        showStep("details", { updateHash: false });
+        attemptStepChange("description");
+        attemptStepChange("review");
+      } else {
+        showStep(pendingInitialStep, { updateHash: false });
+      }
+    }
+
+    window.addEventListener("hashchange", () => {
+      const hashed = (window.location.hash || "").replace("#", "");
+      if (!hashed || hashed === currentStep) return;
+      if (!stepPanels.has(hashed)) return;
+      if (hashed === "description" || hashed === "review") {
+        attemptStepChange(hashed);
+      } else {
+        showStep(hashed, { updateHash: false });
+      }
+    });
+
+    Object.entries(fields).forEach(([key, field]) => {
+      if (!field) return;
+      const eventName = field.tagName === "SELECT" ? "change" : "input";
+      field.addEventListener(eventName, () => clearFieldError(field));
+      const storageKeyCamel = `case${key.charAt(0).toUpperCase() + key.slice(1)}`;
+      const storedValue = isEditing ? "" : getStoredValue(storageKeyCamel, `case_${key}`);
+      if (storedValue && field.value !== storedValue) {
+        if (key === "comp") {
+          setCompFieldValue(storedValue);
+        } else {
+          field.value = storedValue;
+        }
+      }
+      if (key === "title") {
+        updateTitlePreview(field.value || storedValue || "");
+      }
+      field.addEventListener(eventName, () => {
+        const value = key === "comp" ? getCompFieldRawValue() : field.value || "";
+        setDraftField(storageKeyCamel, value);
+        queueDraftSave();
+        if (key === "title") {
+          updateTitlePreview(value);
+        }
+      });
+    });
+
+    if (fields.comp) {
+      fields.comp.addEventListener("input", () => {
+        const raw = getCompFieldRawValue();
+        const formatted = formatCompInputValue(raw);
+        if (fields.comp.value !== formatted) {
+          fields.comp.value = formatted;
+        }
+      });
+    }
+
+    if (descriptionInput) {
+      const storedDescription = isEditing
+        ? ""
+        : getStoredValue("caseDescription", "case_description");
+      if (storedDescription) {
+        descriptionInput.value = storedDescription.slice(0, 4000);
+      }
+      updateDescriptionCount();
+      hydrateDeadline();
+      descriptionInput.addEventListener("input", () => {
+        if (!isEditing && descriptionInput.value.length > 4000) {
+          descriptionInput.value = descriptionInput.value.slice(0, 4000);
+        }
+        setDraftField("caseDescription", descriptionInput.value);
+        queueDraftSave();
+        updateDescriptionCount();
+      });
+    }
+
+    tasksState.items = isEditing ? [] : readStoredTasks();
+    renderTasks();
+    if (taskAddBtn && taskInput) {
+      taskAddBtn.addEventListener("click", () => {
+        if (tasksState.locked) return;
+        const title = normalizeTaskTitle(taskInput.value);
+        if (!title) return;
+        tasksState.items.push({ title });
+        taskInput.value = "";
+        persistTasks();
+        renderTasks();
+      });
+      taskInput.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        taskAddBtn.click();
+      });
+    }
+    function hydrateDraftValues(values) {
+      Object.assign(draftCache, values);
+      if (fields.title && fields.title.value !== values.title) fields.title.value = values.title;
+      for (const [key, control] of [["practiceArea", fields.specialty], ["state", fields.state], ["experience", fields.experience]]) {
+        if (control && control.value !== values[key]) {
+          if (values[key]) setSelectValue(control, values[key]); else control.value = "";
+        }
+      }
+      if (getCompFieldRawValue() !== values.compAmount) setCompFieldValue(values.compAmount);
+      if (fields.deadline) {
+        fields.deadline.maxLength = 50;
+        fields.deadline.type = values.deadline && !draftContract.validDraftDate(values.deadline) ? "text" : "date";
+        if (fields.deadline.value !== values.deadline) fields.deadline.value = values.deadline;
+      }
+      if (descriptionInput && descriptionInput.value !== values.description) descriptionInput.value = values.description;
+      tasksState.items = structuredClone(values.tasks);
+      renderTasks(); updateDescriptionCount(); updateTitlePreview(values.title);
+      latestCaseData = null;
+      if (currentStep === "review") hydrateReviewSummary();
+    }
+    function protectDraft() {
+      draftController.abort();
+      clearDraft();
+      document.querySelectorAll(".step-panel input, .step-panel textarea").forEach((control) => { control.value = ""; });
+      tasksState.items = []; renderTasks();
+      draftRecovery?.root.replaceChildren();
+      publication?.root.replaceChildren();
+      draftState = null;
+      window.location.replace("/login.html");
+    }
+    async function draftRequest(path, { method = "GET", body, signal = draftController.signal } = {}) {
+      const response = await authorizedFetch(path, { method, body, signal, noRedirect: true, suppressToast: true, cache: "no-store", headers: { Accept: "application/json" } });
+      const { data } = await readResponsePayload(response);
+      if (!response.ok) {
+        if (response.status === 401 || data.code === "DRAFT_ACCOUNT_CHANGED") protectDraft();
+        const error = new Error(data.error || "Draft request failed."); error.status = response.status; error.code = data.code; throw error;
+      }
+      return data;
+    }
+    async function verifyDraftOwner() {
+      const { user } = await draftRequest("/api/auth/me");
+      const id = String(user?.id || user?._id || "");
+      if (!id || user.role !== "attorney" || user.status !== "approved" || user.disabled || user.deleted || (draftOwnerId && id !== draftOwnerId)) {
+        protectDraft(); throw new Error("Draft account changed.");
+      }
+      draftOwnerId = id;
+    }
+    async function initDraftLoad() {
+      if (isEditing) return;
+      document.body.classList.add("lpc-current-draft");
+      document.getElementById("draftEditorHeader").hidden = false;
+      const editable = [...document.querySelectorAll(".step-panel input, .step-panel select, .step-panel textarea, .step-panel button")];
+      editable.forEach((control) => { control.disabled = true; });
+      try {
+        const [{ createDraftSession, newDraftState }, { createDraftRecovery }, contract, { createPublication }, { safeCurrentMatterReturn }] = await Promise.all([
+          import("./assets/scripts/matter-draft-session.mjs"), import("./assets/scripts/matter-draft-recovery.mjs"), import("./assets/scripts/matter-draft-contract.mjs"), import("./assets/scripts/matter-publication.mjs"), import("./assets/scripts/attorney-v2/matter-return.mjs")
+        ]);
+        draftReturnTo = safeCurrentMatterReturn(params.get("returnTo")) || "";
+        let requestId = params.get("request") || crypto.randomUUID();
+        draftContract = contract;
+        draftState = newDraftState({ id: currentDraftId || "", requestId });
+        if (!currentDraftId) { const url = new URL(location.href); url.searchParams.set("request", requestId); history.replaceState(null, "", url); }
+        const api = {
+          publishMatter: async (review, options) => { await verifyDraftOwner(); return draftRequest("/api/cases/posting/publications", { ...options, method: "POST", body: { ...review, expectedOwnerId: draftOwnerId } }); },
+          cleanupMatterPublication: async (requestId, options) => { await verifyDraftOwner(); return draftRequest(`/api/cases/posting/publications/${requestId}/cleanup`, { ...options, method: "POST", body: { expectedOwnerId: draftOwnerId } }); },
+          get: async (path, options) => { await verifyDraftOwner(); return draftRequest(path, options); },
+          createMatterDraft: async (values, clientRequestId, options) => { await verifyDraftOwner(); return draftRequest("/api/case-drafts", { ...options, method: "POST", body: { ...values, clientRequestId, expectedOwnerId: draftOwnerId } }); },
+          saveMatterDraft: async (id, values, revision, options) => { await verifyDraftOwner(); return draftRequest(`/api/case-drafts/${id}`, { ...options, method: "PUT", body: { ...values, revision, expectedOwnerId: draftOwnerId } }); },
+          deleteMatterDraft: async (id, revision, options) => { await verifyDraftOwner(); return draftRequest(`/api/case-drafts/${id}`, { ...options, method: "DELETE", body: { revision, expectedOwnerId: draftOwnerId } }); },
+        };
+        draftSession = createDraftSession(draftState, { api, ownerId: "", signal: draftController.signal,
+          onIdentity: () => { currentDraftId = draftState.id; if (currentDraftId) syncDraftIdInUrl(currentDraftId); },
+          onChange: (state) => {
+            if (draftController.signal.aborted) return;
+            draftRecovery.render(state);
+            editable.forEach((control) => { control.disabled = !state.loaded || state.missing || state.deleted || draftPosting || Boolean(publication?.locked); });
+            if (postBtn) postBtn.disabled = !state.loaded || state.uncertain || state.busy || state.missing || state.deleted || state.values.tasks.length > 25 || draftPosting || Boolean(publication?.locked);
+            if (state.loaded && !state.deleted) hydrateDraftValues(state.values);
+          }
+        });
+        draftRecovery = createDraftRecovery(draftSession, { buttonClass: "btn secondary", className: "draft-save-recovery" });
+        document.querySelector(".step-panel").before(draftRecovery.root);
+        publication = createPublication({ state: draftState, session: draftSession, api, ownerId: draftOwnerId, signal: draftController.signal, buttonClass: "btn secondary", returnHref: draftReturnTo || "/dashboard-attorney.html#cases", reviewControl: postBtn,
+          onChange: () => {
+            if (draftController.signal.aborted || !publication) return;
+            draftPosting = publication.locked;
+            editable.forEach((control) => { control.disabled = draftPosting || !draftState.loaded || draftState.missing || draftState.deleted; });
+            if (postBtn) postBtn.disabled = draftPosting || !draftState.loaded || draftState.busy || draftState.uncertain || draftState.values.tasks.length > 25;
+            draftRecovery.render(draftState);
+            draftRecovery.root.querySelectorAll("button").forEach((control) => { if (draftPosting) control.disabled = true; });
+            if (publication.result) {
+              document.getElementById("draftEditorHeader").hidden = true;
+              document.querySelectorAll(".step-panel").forEach((panel) => { panel.hidden = true; });
+              draftRecovery.root.hidden = true;
+            }
+          }
+        });
+        draftRecovery.root.before(publication.root);
+        draftRecovery.render(draftState);
+        if ((draftIdParam !== null && !contract.validDraftId(draftIdParam)) || !contract.validRequestId(requestId)) {
+          draftState.error = "This draft link is invalid. Return to Matters and open the draft again.";
+          draftState.uncertain = true; draftRecovery.render(draftState); return;
+        }
+        await publication.check();
+        if (!publication.result) await draftSession.check();
+        window.addEventListener("focus", () => { void verifyDraftOwner().catch(() => {
+          if (!draftController.signal.aborted && draftState) {
+            draftState.uncertain = true;
+            draftState.error = "Your session couldn’t be confirmed. Check the saved draft before continuing.";
+            draftRecovery.render(draftState);
+          }
+        }); }, { signal: draftController.signal });
+        window.addEventListener("beforeunload", (event) => {
+          if (draftState && (["busy", "uncertain"].includes(draftState.publication?.phase) || draftState.dirty || (["save", "delete"].includes(draftState.action) && (draftState.uncertain || draftState.busy)))) { event.preventDefault(); event.returnValue = ""; }
+        }, { signal: draftController.signal });
+        window.addEventListener("pagehide", () => {
+          draftController.abort(); clearDraft(); draftState = null; tasksState.items = [];
+          document.querySelectorAll(".step-panel").forEach((panel) => panel.replaceChildren());
+          draftRecovery.root.replaceChildren(); publication?.root.replaceChildren();
+        }, { once: true });
+        window.addEventListener("pageshow", (event) => { if (event.persisted) location.reload(); });
+      } catch (error) {
+        if (!draftController.signal.aborted) {
+          const recovery = document.createElement("section"); recovery.className = "draft-save-recovery"; recovery.setAttribute("role", "alert");
+          recovery.textContent = "The draft editor couldn’t load. Reload this page to try again. ";
+          const reload = document.createElement("button"); reload.type = "button"; reload.className = "btn secondary"; reload.textContent = "Reload draft editor";
+          reload.addEventListener("click", () => location.reload()); recovery.append(reload);
+          document.querySelector(".step-panel").before(recovery);
+        }
+      }
+      if (!publication?.result) applyInitialStep();
+    }
+
+    void initDraftLoad();
+
+    function validateDetails() {
+      let hasErrors = false;
+      validators.forEach(({ field, check, message }) => {
+        clearFieldError(field);
+        if (!field) return;
+        if (!check(field.value || "")) {
+          showFieldError(field, message);
+          hasErrors = true;
+        }
+      });
+      if (hasErrors) {
+        focusFirstInvalidField();
+        return false;
+      }
+      return true;
+    }
+
+    function persistDraft() {
+      if (isEditing) return;
+      setDraftField("caseTitle", fields.title?.value?.trim() || "");
+      setDraftField("caseSpecialty", fields.specialty?.value || "");
+      setDraftField("caseState", fields.state?.value || "");
+      setDraftField("caseComp", getCompFieldRawValue());
+      setDraftField("caseCompAmount", getCompFieldRawValue());
+      setDraftField("caseExperience", fields.experience?.value || "");
+      setDraftField("caseDeadline", fields.deadline?.value || "");
+      setDraftField("caseDescription", descriptionInput?.value || "");
+      draftCache.tasks = tasksState.items.map((task) => ({ title: task.title }));
+      queueDraftSave({ immediate: true });
+    }
+
+    function showFieldError(field, message) {
+      if (!field) return;
+      clearFieldError(field);
+      field.classList.add("input-error");
+      field.setAttribute("aria-invalid", "true");
+      const error = document.createElement("div");
+      error.className = "field-error";
+      error.id = `${field.id || "field"}-error`;
+      error.setAttribute("role", "alert");
+      error.textContent = message;
+      const describedBy = new Set(String(field.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean));
+      describedBy.add(error.id);
+      field.setAttribute("aria-describedby", Array.from(describedBy).join(" "));
+      const wrapper = field.closest(".field") || field.closest("[data-field-wrapper]");
+      if (wrapper) wrapper.appendChild(error);
+      else field.insertAdjacentElement("afterend", error);
+    }
+
+    function clearFieldError(field) {
+      if (!field) return;
+      field.classList.remove("input-error");
+      field.removeAttribute("aria-invalid");
+      const errorId = `${field.id || "field"}-error`;
+      const describedBy = String(field.getAttribute("aria-describedby") || "")
+        .split(/\s+/)
+        .filter((id) => id && id !== errorId);
+      if (describedBy.length) field.setAttribute("aria-describedby", describedBy.join(" "));
+      else field.removeAttribute("aria-describedby");
+      const wrapper = field.closest(".field") || field.closest("[data-field-wrapper]");
+      if (wrapper) {
+        const existing = wrapper.querySelector(".field-error");
+        if (existing) existing.remove();
+        return;
+      }
+      const next = field.nextElementSibling;
+      if (next?.classList.contains("field-error")) {
+        next.remove();
+      }
+    }
+
+    function getStoredValue(primaryKey, legacyKey) {
+      const value = getDraftField(primaryKey) || getDraftField(legacyKey);
+      if (primaryKey === "caseDescription" || legacyKey === "case_description") {
+        return value.slice(0, 4000);
+      }
+      return value;
+    }
+
+    function formatComp(amount) {
+      if (!amount) return "—";
+      const numeric = Number(normalizeCompInputValue(amount));
+      if (!Number.isFinite(numeric)) return `$${amount}`;
+      return numeric.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatMoney(value) {
+      if (value == null || Number.isNaN(Number(value))) return "—";
+      const numeric = Number(value);
+      return numeric.toLocaleString("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    function parseCompAmount(value) {
+      const numeric = Number(normalizeCompInputValue(value));
+      if (!Number.isFinite(numeric) || numeric <= 0) return null;
+      return numeric;
+    }
+
+    function computePlatformFee(amount) {
+      const cents = Math.round(amount * 100);
+      const feeCents = Math.round((cents * PLATFORM_FEE_PCT) / 100);
+      const totalCents = cents + feeCents;
+      return { fee: feeCents / 100, total: totalCents / 100 };
+    }
+
+    function escapeHTML(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function collectCaseData() {
+      const title = (fields.title?.value || "").trim() || getStoredValue("caseTitle", "case_title");
+      const field = fields.specialty?.value || getStoredValue("caseSpecialty", "case_specialty");
+      const state = fields.state?.value || getStoredValue("caseState", "case_state");
+      const compRaw = getCompFieldRawValue() || getStoredValue("caseCompAmount", "case_comp_amount");
+      const experience = fields.experience?.value || getStoredValue("caseExperience", "case_experience");
+      const deadline = fields.deadline?.value || getStoredValue("caseDeadline", "case_deadline");
+      let description = (descriptionInput?.value || "").trim() || getStoredValue("caseDescription", "case_description").trim();
+      if (description.length > 4000) {
+        description = description.slice(0, 4000);
+      }
+      const tasks = tasksState.items.length ? tasksState.items : readStoredTasks();
+      return {
+        title: title || "",
+        field: field || "",
+        state: state || "",
+        compAmount: compRaw || "",
+        comp: formatComp(compRaw),
+        experience: experience || "",
+        deadline: deadline || "",
+        description: description || "",
+        tasks,
+      };
+    }
+
+    
+
+    function hasDescription() {
+      if ((descriptionInput?.value || "").trim()) return true;
+      return Boolean(getStoredValue("caseDescription", "case_description").trim());
+    }
+
+    function ensureReviewReady() {
+      if (!validateDetails()) return false;
+      if (!validateTasks()) return false;
+      clearFieldError(descriptionInput);
+      if (!hasDescription()) {
+        showFieldError(descriptionInput, "Describe the Matter, its goals, and the expected deliverables.");
+        descriptionInput?.focus();
+        return false;
+      }
+      if (fields.deadline && fields.deadline.value) {
+        const parsed = window.LPCBusinessDate?.normalize(fields.deadline.value);
+        if (!parsed) {
+          showFieldError(fields.deadline, "Enter a valid deadline date.");
+          fields.deadline.focus();
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function hydrateReviewSummary() {
+      if (!reviewSummary) return;
+      const data = collectCaseData();
+      latestCaseData = data;
+      const deadlineText = data.deadline
+        ? window.LPCBusinessDate?.format(data.deadline) || data.deadline
+        : "No deadline set";
+      const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      const tasksMarkup = tasks.length
+        ? `<ul class="task-list">${tasks
+            .map((task) => `<li>${escapeHTML(task.title)}</li>`)
+            .join("")}</ul>`
+        : `<p><strong>Tasks:</strong> Not provided</p>`;
+      const safeTitle = escapeHTML(data.title || "(Untitled Matter)");
+      const safeField = escapeHTML(data.field || "Practice area pending");
+      const safeState = escapeHTML(data.state || "Location pending");
+      const safeComp = escapeHTML(data.comp || "—");
+      const safeExperience = escapeHTML(data.experience || "Not specified");
+      const safeDeadline = escapeHTML(deadlineText);
+      const compAmount = parseCompAmount(data.compAmount);
+      const feeEstimate = compAmount ? computePlatformFee(compAmount) : null;
+      const feeInfoHtml = feeEstimate
+        ? `<span class="fee-info" tabindex="0" data-tooltip="${escapeHTML(PLATFORM_FEE_NOTE)}">?</span>`
+        : "";
+      const feeLine = feeEstimate
+        ? `<p><strong>Platform fee (${PLATFORM_FEE_PCT}%):</strong> ${formatMoney(
+            feeEstimate.fee
+          )} ${feeInfoHtml}</p>`
+        : "";
+      const totalLine = feeEstimate
+        ? `<p><strong>Estimated total due at hire:</strong> ${formatMoney(feeEstimate.total)}</p>`
+        : "";
+      const rawDescription = data.description || "No description provided yet.";
+      const safeDescription = escapeHTML(rawDescription);
+      const displayDescription = safeDescription.replace(/\n/g, "<br>");
+      const guidelinesHtml = `
+        <aside class="compliance-note" aria-label="Professional guidelines">
+          <h3>Professional Guidelines</h3>
+          <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed through Stripe and are released only upon attorney approval within the workspace or resolution of a platform review or dispute.</p>
+        </aside>
+      `;
+      reviewSummary.innerHTML = `
+        <div class="summary-layout">
+          <div class="summary-content">
+            <h2>${safeTitle}</h2>
+            <p><small>${safeField} • ${safeState}</small></p>
+            <p><strong>Compensation:</strong> ${safeComp}</p>
+            ${feeLine}
+            ${totalLine}
+            <p><strong>Experience:</strong> ${safeExperience}</p>
+            <p><strong>Deadline:</strong> ${safeDeadline}</p>
+          </div>
+          ${guidelinesHtml}
+          <div class="summary-wide">
+            <hr>
+            <p>${displayDescription}</p>
+            <div style="margin-top:16px;">
+              <div class="description-label" style="margin-bottom:6px;font-family:var(--font-serif);">Required Tasks</div>
+              <div class="review-task-list">${tasksMarkup}</div>
+            </div>
+            ${tasks.length > 25 ? '<p role="alert">Use 25 tasks or fewer before publishing.</p>' : ""}
+          </div>
+        </div>
+      `;
+    }
+
+    function openPreviewModal() {
+      if (!previewModal) return;
+      const data = latestCaseData || collectCaseData();
+      if (!data.title || !data.description) {
+        showToastBanner("Add a matter title and description before previewing.", "error");
+        return;
+      }
+      const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      const tasksMarkup = tasks.length
+        ? `<div class="description-label" style="margin-bottom:6px;font-family:var(--font-serif);">Required Tasks</div>
+           <ul class="task-list">${tasks
+             .map((task) => `<li>${escapeHTML(task.title)}</li>`)
+             .join("")}</ul>${tasks.length > 25 ? '<p role="alert">Use 25 tasks or fewer before publishing.</p>' : ""}`
+        : `<p><strong>Tasks:</strong> Not provided</p>`;
+      previewFields.title && (previewFields.title.textContent = data.title);
+      previewFields.field && (previewFields.field.textContent = data.field || "—");
+      previewFields.state && (previewFields.state.textContent = data.state || "—");
+      previewFields.comp && (previewFields.comp.textContent = data.comp || "—");
+      const previewCompAmount = parseCompAmount(data.compAmount);
+      const previewFeeEstimate = previewCompAmount ? computePlatformFee(previewCompAmount) : null;
+      if (previewFields.platformFee) {
+        previewFields.platformFee.textContent = previewFeeEstimate
+          ? formatMoney(previewFeeEstimate.fee)
+          : "—";
+      }
+      if (previewFields.totalDue) {
+        previewFields.totalDue.textContent = previewFeeEstimate
+          ? formatMoney(previewFeeEstimate.total)
+          : "—";
+      }
+      previewFields.experience && (previewFields.experience.textContent = data.experience || "—");
+      previewFields.description && (previewFields.description.textContent = data.description || "No description provided yet.");
+      previewFields.tasks && (previewFields.tasks.innerHTML = tasksMarkup);
+      if (previewFields.deadline && previewFields.deadlineRow) {
+        if (data.deadline) {
+          const deadlineText = window.LPCBusinessDate?.format(data.deadline) || data.deadline;
+          previewFields.deadline.textContent = deadlineText;
+          previewFields.deadlineRow.hidden = false;
+        } else {
+          previewFields.deadline.textContent = "—";
+          previewFields.deadlineRow.hidden = true;
+        }
+      }
+      previewReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : previewBtn;
+      previewModal.classList.add("active");
+      previewModal.setAttribute("aria-hidden", "false");
+      previewModal.removeAttribute("inert");
+      document.body.classList.add("modal-open");
+      const previewDialog = previewModal.querySelector('[role="dialog"]');
+      previewDialog?.focus({ preventScroll: true });
+      if (previewDialog) previewDialog.scrollTop = 0;
+    }
+
+    function closePreviewModal() {
+      if (!previewModal) return;
+      previewModal.classList.remove("active");
+      previewModal.setAttribute("aria-hidden", "true");
+      previewModal.setAttribute("inert", "");
+      document.body.classList.remove("modal-open");
+      previewReturnFocus?.focus();
+    }
+
+    function clearDraft() {
+      draftCache.title = "";
+      draftCache.practiceArea = "";
+      draftCache.state = "";
+      draftCache.compAmount = "";
+      draftCache.experience = "";
+      draftCache.deadline = "";
+      draftCache.description = "";
+      draftCache.tasks = [];
+    }
+
+    
+
+    async function readResponsePayload(res) {
+      const text = await res.text().catch(() => "");
+      if (!text) return { data: {}, text: "" };
+      try {
+        return { data: JSON.parse(text), text };
+      } catch {
+        return { data: {}, text };
+      }
+    }
+
+    async function authorizedFetch(url, options = {}) {
+      authModulePromise ||= import("./assets/scripts/auth.js");
+      const { secureFetch } = await authModulePromise;
+      return secureFetch(url, options);
+    }
+
+    function syncDraftIdInUrl(draftId) {
+      if (isEditing) return;
+      try {
+        const url = new URL(window.location.href);
+        if (draftId) {
+          url.searchParams.set("draftId", draftId);
+          url.searchParams.delete("request");
+        } else {
+          url.searchParams.delete("draftId");
+        }
+        window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      } catch {}
+    }
+
+    
+
+    
+
+    
+
+    function buildDraftPayload() {
+      return {
+        title: fields.title?.value || "", practiceArea: fields.specialty?.value || "", state: fields.state?.value || "",
+        compAmount: getCompFieldRawValue() || "", experience: fields.experience?.value || "", deadline: fields.deadline?.value || "",
+        description: descriptionInput?.value || "", tasks: structuredClone(tasksState.items),
+      };
+    }
+    async function flushDraftSave() {
+      if (isEditing) return true;
+      if (!draftSession || draftPosting) return false;
+      draftSession.edit(buildDraftPayload());
+      return draftSession.save();
+    }
+    function queueDraftSave({ immediate = false } = {}) {
+      if (isEditing || !draftSession || draftPosting) return;
+      draftSession.edit(buildDraftPayload());
+      if (immediate) void draftSession.save();
+    }
+    
+    window.saveDraftAndExit = async function (targetHref) {
+      if (await flushDraftSave() && targetHref) window.location.href = draftReturnTo || targetHref;
+    };
+
+    async function handlePost() {
+      if (isEditing || !publication || publication.locked) return;
+      if (!ensureReviewReady()) { showToastBanner("Finish the required fields before posting.", "error"); return; }
+      if (await flushDraftSave()) await publication.prepare();
+    }
+
+    function showToastBanner(message, type = "info") {
+      if (toastHelper?.show) {
+        toastHelper.show(message, { targetId: "toastBanner", type });
+      }
+    }
+
+    previewBtn?.addEventListener("click", openPreviewModal);
+    closePreviewBtn?.addEventListener("click", closePreviewModal);
+    previewModal?.addEventListener("click", (event) => {
+      if (event.target === previewModal) closePreviewModal();
+    });
+    previewModal?.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closePreviewModal();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(
+        previewModal.querySelectorAll('button:not([disabled]), summary, a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
+      ).filter((element) => !element.hidden && getComputedStyle(element).display !== "none");
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+    postBtn?.addEventListener("click", handlePost);
+
+    
+
+    function titleCaseWords(value = "") {
+      return String(value)
+        .toLowerCase()
+        .split(/\s+/)
+        .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : ""))
+        .join(" ")
+        .trim();
+    }
+
+    function setSelectValue(select, value) {
+      if (!select || !value) return;
+      const raw = value.toString().trim();
+      const target = raw.toLowerCase();
+      const match = Array.from(select.options).find(
+        (opt) => opt.value.toLowerCase() === target || opt.textContent.toLowerCase() === target
+      );
+      if (match) {
+        select.value = match.value;
+        return;
+      }
+      const option = document.createElement("option");
+      option.value = raw;
+      option.textContent = /[a-z]/i.test(raw) ? titleCaseWords(raw) : raw;
+      select.appendChild(option);
+      select.value = option.value;
+    }
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    async function initPostingEditor() {
+      const panels = [...document.querySelectorAll(".step-panel")];
+      panels.forEach((panel) => { panel.hidden = true; });
+      const container = document.createElement("div"); container.className = "current-posting-editor";
+      document.getElementById("main").append(container);
+      container.textContent = retainedCaseDraftId ? "Loading saved draft…" : "Loading saved posting…";
+      try {
+        const [editorModule, { createApiClient }, { createPrivateState }, { classifySession }, { safeCurrentMatterReturn }, { previousWorkspaceDestination }] = await Promise.all([
+          retainedCaseDraftId ? import("./assets/scripts/attorney-v2/draft-editor.mjs") : import("./assets/scripts/attorney-v2/posting-editor.mjs"), import("./assets/scripts/attorney-v2/api-client.mjs"), import("./assets/scripts/attorney-v2/private-state.mjs"), import("./assets/scripts/attorney-v2/session-boundary.mjs"), import("./assets/scripts/attorney-v2/matter-return.mjs"), import("./assets/scripts/utils/workspace-destinations.mjs")
+        ]);
+        const privateState = createPrivateState();
+        const protect = () => { privateState.clear(); draftController.abort(); container.replaceChildren(); window.location.replace("/login.html"); };
+        const api = createApiClient({ onAuthenticationLost: protect });
+        const session = classifySession(await api.get("/api/auth/me", { signal: draftController.signal }));
+        if (session.state !== "ready") { protect(); return; }
+        if (retainedCaseDraftId && (editingCaseId || draftIdParam)) { container.textContent = "This draft link is invalid. Open the draft from Matters to continue."; return; }
+        const options = { api, privateState, signal: draftController.signal, returnHref: "/dashboard-attorney.html#cases" };
+        if (retainedCaseDraftId) {
+          const target = new URL(safeCurrentMatterReturn(params.get("returnTo")) || "/dashboard-attorney.html#cases:draft", location.origin);
+          if (params.get("workspace") === "legacy") target.searchParams.set("workspace", "legacy");
+          const returnHref = `${target.pathname}${target.search}${target.hash}`;
+          params.set("step", params.get("step") || location.hash.slice(1) || "description");
+          options.navigation = {
+            returnHref, returnLabel: target.hash === "#cases:draft" ? "drafts" : "Matters",
+            sync(query, step) { const url = new URL(location.href); url.search = query.toString(); url.hash = step; history.replaceState(history.state, "", `${url.pathname}${url.search}${url.hash}`); },
+            go(href) { location.assign(href); },
+            href(value) { return previousWorkspaceDestination("attorney", `/attorney-v2.html${value}`, { origin: location.origin, ownerId: session.identity.id }) || returnHref; },
+          };
+        }
+        const editor = retainedCaseDraftId ? editorModule.createDraftEditor({ query: params }, session.identity, options) : editorModule.createPostingEditor({ query: params }, session.identity, options);
+        container.replaceChildren(editor);
+        window.addEventListener("beforeunload", (event) => { if (privateState.hasUnsaved()) { event.preventDefault(); event.returnValue = ""; } }, { signal: draftController.signal });
+        window.addEventListener("pagehide", () => { privateState.clear(); api.clear(); draftController.abort(); container.replaceChildren(); }, { once: true });
+        window.addEventListener("pageshow", (event) => { if (event.persisted) location.reload(); });
+        window.addEventListener("focus", async () => {
+          try { const current = classifySession(await api.get("/api/auth/me", { signal: draftController.signal })); if (current.state !== "ready" || current.identity.id !== session.identity.id) protect(); }
+          catch { if (!draftController.signal.aborted) protect(); }
+        }, { signal: draftController.signal });
+        await editor.readiness;
+      } catch { if (!draftController.signal.aborted) container.textContent = retainedCaseDraftId ? "The draft couldn’t load. Reload this page to try again." : "The posting editor couldn’t load. Reload this page to try again."; }
+    }
+    if (isEditing) {
+      clearDraft(); document.title = retainedCaseDraftId ? "Continue Matter draft – Let’s-ParaConnect" : "Edit Matter – Let’s-ParaConnect";
+      void initPostingEditor();
+    }
+
+  })();
+  </script>
+  <script src="assets/scripts/create-case-nav.js"></script>
+  <script src="assets/scripts/productivity-command-registry.js"></script>
+  <script src="assets/scripts/global-search.js?v=20260831-2"></script>
+  <script type="module" src="assets/scripts/utils/support-drawer.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+/* Approved mobile section spacing; desktop remains unchanged. */
+@media (max-width: 767px) {
+  .lpc-home .hook-find .type-hook__inner { top: var(--capacity-preview-intro-offset, 0px); }
+  .lpc-home .workflow { padding-top: 72px; padding-bottom: 96px; }
+  .lpc-home .workflow__intro { margin-bottom: 48px; }
+  .lpc-home .assistant-spotlight { padding-top: 88px; padding-bottom: 48px; }
+  .lpc-home .assistant-spotlight__inner { gap: 44px; }
+  #lpc-feature-cards { padding-top: 56px; padding-bottom: 72px; }
+  #lpc-feature-cards article { padding-top: 40px; padding-bottom: 48px; }
+  #lpc-feature-cards .scene { margin-top: 24px; height: 196px; }
+  .lpc-home .paralegal-map { padding-top: 88px; padding-bottom: 88px; }
+  .lpc-home .paralegal-map__stage { padding-block: 40px; }
+  .lpc-home .clarity-section { padding-top: 88px; padding-bottom: 96px; }
+}
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .lpc-home .type-hook.hook-find { height: auto; }
+}

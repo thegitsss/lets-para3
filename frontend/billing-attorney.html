@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Opening Payments – Let’s‑ParaConnect</title>
+  <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f8f6f1;
+      color: #1a1a1a;
+      margin: 0;
+    }
+    .redirect-card {
+      text-align: center;
+      max-width: 420px;
+      padding: 2rem;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.9);
+      box-shadow: 0 25px 60px rgba(10, 16, 34, 0.08);
+    }
+    .redirect-card h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      margin-bottom: 0.5rem;
+    }
+    .redirect-card a {
+      color: #887244;
+      font-weight: 600;
+      text-decoration: none;
+    }
+  </style>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      if (!window.location.pathname.endsWith('billing-attorney.html')) return;
+      const source = new URL(window.location.href);
+      const rawStatus = String(source.searchParams.get('payment') || source.searchParams.get('checkout') || '')
+        .trim()
+        .toLowerCase();
+      const paymentStatus = rawStatus === 'success'
+        ? 'success'
+        : ['cancel', 'cancelled'].includes(rawStatus)
+          ? 'cancel'
+          : '';
+      const caseId = String(source.searchParams.get('caseId') || '').trim();
+      const target = new URL('dashboard-attorney.html', source);
+      if (paymentStatus) target.searchParams.set('payment', paymentStatus);
+      if (/^[a-f0-9]{24}$/i.test(caseId)) target.searchParams.set('caseId', caseId);
+      target.hash = 'funds';
+      window.location.replace(target.toString());
+    });
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <main class="redirect-card" id="main" tabindex="-1" aria-live="polite">
+    <h1>Opening Payments</h1>
+    <p>Your payment status and Matter context will continue with you.</p>
+    <p><a href="dashboard-attorney.html#funds">Continue to Payments</a></p>
+  </main>
+</body>
+</html>

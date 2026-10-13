@@ -1,0 +1,7527 @@
+import { initAdminSecurityViews } from "./admin/security-views.js";
+import { secureFetch, persistSession, getStoredSession, clearSession } from "./auth.js";
+import { startStripeOnboarding } from "./utils/stripe-connect.js";
+import { activateDialogFocus, deactivateDialogFocus } from "./utils/dialog-focus.js";
+import { confirmAction, showAlert } from "./utils/dialogs.js";
+import { normalizeHttpNavigationUrl } from "./utils/navigation-url.js";
+
+const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
+const ATTORNEY_ONBOARDING_MODAL_SEEN_KEY = "lpc_attorney_onboarding_modal_seen";
+
+const DEFAULT_AVATAR_DATA = "/assets/avatar-placeholder.svg";
+const initialSettingsTasks = [];
+const PROFILE_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+let preferenceMutationQueue = Promise.resolve();
+
+function initSettingsSidebarToggle() {
+  const sidebarToggle = document.getElementById("sidebarToggle");
+  const sidebarNav = document.getElementById("sidebarNav");
+  const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+  if (!sidebarToggle || !sidebarNav || !sidebarBackdrop || sidebarToggle.dataset.lpcSidebarBound === "true") return;
+  sidebarToggle.dataset.lpcSidebarBound = "true";
+
+  const setOpen = (open, { restoreFocus = false } = {}) => {
+    document.body.classList.toggle("nav-open", Boolean(open));
+    sidebarToggle.setAttribute("aria-expanded", String(Boolean(open)));
+    sidebarToggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    if (!open && restoreFocus) sidebarToggle.focus({ preventScroll: true });
+  };
+
+  sidebarToggle.addEventListener("click", () => {
+    setOpen(!document.body.classList.contains("nav-open"));
+  });
+  sidebarBackdrop.addEventListener("click", () => setOpen(false));
+  sidebarNav.addEventListener("click", (event) => {
+    if (event.target.closest("a") || event.target.closest("button")) setOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || event.key !== "Escape" || !document.body.classList.contains("nav-open")) return;
+    if (document.querySelector(".profile-dropdown.show, [data-profile-menu].show")) return;
+    setOpen(false, { restoreFocus: true });
+  });
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 1024 && document.body.classList.contains("nav-open")) setOpen(false);
+  });
+}
+
+initSettingsSidebarToggle();
+
+function setPreferencesSaveStatus(message, state = "idle") {
+  const status = document.getElementById("preferencesSaveStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.state = state;
+}
+
+function queuePreferenceMutation(operation) {
+  const scheduled = preferenceMutationQueue.then(operation);
+  preferenceMutationQueue = scheduled.catch(() => undefined);
+  return scheduled;
+}
+
+function trackInitialSettingsTask(task) {
+  const trackedTask = Promise.resolve(task);
+  initialSettingsTasks.push(trackedTask);
+  return trackedTask;
+}
+
+function escapeHTML(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function redirectAfterDeactivation(message = "This account has been deactivated.") {
+  try {
+    sessionStorage.setItem("disabledAccountMsg", message);
+  } catch {}
+  clearSession();
+  try {
+    window.location.replace("/login.html?deactivated=1");
+  } catch {
+    window.location.href = "/login.html?deactivated=1";
+  }
+}
+
+function getAttorneyOnboardingStep() {
+  try {
+    return sessionStorage.getItem(ATTORNEY_ONBOARDING_STEP_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setAttorneyOnboardingStep(step) {
+  try {
+    if (!step) {
+      sessionStorage.removeItem(ATTORNEY_ONBOARDING_STEP_KEY);
+      return;
+    }
+    sessionStorage.setItem(ATTORNEY_ONBOARDING_STEP_KEY, step);
+  } catch {}
+}
+
+function clearAttorneyOnboardingStep() {
+  try {
+    sessionStorage.removeItem(ATTORNEY_ONBOARDING_STEP_KEY);
+  } catch {}
+}
+
+function getAttorneyOnboardingModalSeen(step = "profile") {
+  try {
+    return sessionStorage.getItem(`${ATTORNEY_ONBOARDING_MODAL_SEEN_KEY}_${step}`) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setAttorneyOnboardingModalSeen(step = "profile") {
+  try {
+    sessionStorage.setItem(`${ATTORNEY_ONBOARDING_MODAL_SEEN_KEY}_${step}`, "1");
+  } catch {}
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const blockedUsersHelpButton = document.querySelector(".blocked-users-summary-inline-help");
+  const blockedUsersHelpPanel = document.getElementById("blockedUsersHelpPanel");
+  const setBlockedUsersHelpOpen = (open) => {
+    if (!blockedUsersHelpButton || !blockedUsersHelpPanel) return;
+    blockedUsersHelpButton.setAttribute("aria-expanded", open ? "true" : "false");
+    blockedUsersHelpPanel.classList.toggle("hidden", !open);
+  };
+
+  blockedUsersHelpButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setBlockedUsersHelpOpen(blockedUsersHelpButton.getAttribute("aria-expanded") !== "true");
+  });
+  blockedUsersHelpPanel?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+
+  const closeSettingsHelpTooltips = (exceptTooltip = null) => {
+    document.querySelectorAll(".settings-help-tooltip[open]").forEach((tooltip) => {
+      if (exceptTooltip && tooltip === exceptTooltip) return;
+      tooltip.removeAttribute("open");
+    });
+  };
+
+  document.addEventListener("click", (event) => {
+    if (
+      blockedUsersHelpButton &&
+      blockedUsersHelpPanel &&
+      event.target instanceof Element &&
+      !blockedUsersHelpButton.contains(event.target) &&
+      !blockedUsersHelpPanel.contains(event.target)
+    ) {
+      setBlockedUsersHelpOpen(false);
+    }
+    const tooltip = event.target instanceof Element
+      ? event.target.closest(".settings-help-tooltip")
+      : null;
+    if (tooltip) return;
+    closeSettingsHelpTooltips();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || blockedUsersHelpButton?.getAttribute("aria-expanded") !== "true") return;
+    setBlockedUsersHelpOpen(false);
+    blockedUsersHelpButton.focus();
+  });
+
+  document.querySelectorAll(".settings-help-tooltip summary").forEach((summary) => {
+    summary.addEventListener("click", () => {
+      const tooltip = summary.closest(".settings-help-tooltip");
+      if (!tooltip) return;
+      window.requestAnimationFrame(() => {
+        if (tooltip.hasAttribute("open")) {
+          closeSettingsHelpTooltips(tooltip);
+        }
+      });
+    });
+  });
+
+  let suppressProfileToast = false;
+  let showOnboardingModal = false;
+  let requestedOnboardingStep = "";
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const onboardingStep = params.get("onboardingStep");
+    const shouldPrompt = params.get("profilePrompt") === "1";
+    const onboardingStatus = params.get("onboarding");
+    if (onboardingStep) {
+      setAttorneyOnboardingStep(onboardingStep);
+      requestedOnboardingStep = onboardingStep;
+      params.delete("onboardingStep");
+    } else if (shouldPrompt) {
+      setAttorneyOnboardingStep("profile");
+      requestedOnboardingStep = "profile";
+      suppressProfileToast = true;
+      showOnboardingModal = true;
+    }
+    if (onboardingStatus === "success" && getAttorneyOnboardingStep() === "security" && isAttorneyRole()) {
+      setAttorneyOnboardingStep("case");
+      window.location.href = "dashboard-attorney.html#cases";
+      return;
+    }
+    if (onboardingStep || shouldPrompt) {
+      params.delete("profilePrompt");
+      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash}`;
+      window.history.replaceState(null, "", next);
+    }
+  } catch (_) {
+    /* noop */
+  }
+  const navItems = {
+    navSettings: "settingsDirectorySection",
+    navProfile: "profileSection",
+    navSecurity: "securitySection",
+    navPreferences: "preferencesSection",
+    navDelete: "deleteSection"
+  };
+  const sectionToNav = Object.entries(navItems).reduce((acc, [navId, sectionId]) => {
+    acc[sectionId] = navId;
+    return acc;
+  }, {});
+  const topLevelSections = Object.values(navItems)
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+  const hashRouteMap = {
+    "#settings": { sectionId: "settingsDirectorySection" },
+    "#securitysection": { sectionId: "securitySection" },
+    "#security": { sectionId: "securitySection" },
+    "#security:closure": { sectionId: "securitySection", targetId: "accountClosureHeading" },
+    "#profilesection": { sectionId: "profileSection" },
+    "#profile": { sectionId: "profileSection" },
+    "#profile:personal": { sectionId: "profileSection", targetId: "attorneyPersonalHeading" },
+    "#profile:public": { sectionId: "profileSection", targetId: "attorneyProfessionalHeading" },
+    "#profile:firm": { sectionId: "profileSection", targetId: "attorneyFirmName" },
+    "#profile:notifications": { sectionId: "profileSection", targetId: "attorneyNotificationsHeading" },
+    "#preferencessection": { sectionId: "preferencesSection" },
+    "#preferences": { sectionId: "preferencesSection" },
+    "#deletesection": { sectionId: "deleteSection" },
+    "#delete": { sectionId: "deleteSection" },
+  };
+  const syncActiveNav = (sectionId) => {
+    const activeNavId = sectionToNav[sectionId] || (isAttorneyRole() ? "navSettings" : "navProfile");
+    document.querySelectorAll(".settings-item").forEach((el) => {
+      el.classList.toggle("active", el.id === activeNavId);
+    });
+    document.querySelectorAll("[data-settings-section]").forEach((el) => {
+      const active = el.dataset.settingsSection === sectionId;
+      el.classList.toggle("active", active);
+      if (active) el.setAttribute("aria-current", "page");
+      else el.removeAttribute("aria-current");
+    });
+  };
+  const syncSettingsHeader = (sectionId) => {
+    const isDirectory = sectionId === "settingsDirectorySection";
+    const title = document.getElementById("accountSettingsTitle");
+    const subtitle = document.getElementById("accountSettingsSubtitle");
+    if (title) title.textContent = isDirectory ? "Settings" : "Account Settings";
+    if (subtitle) {
+      subtitle.textContent = isDirectory
+        ? "Manage your attorney account and preferences."
+        : "Manage your profile, security, and preferences.";
+    }
+    document.body.classList.toggle("settings-directory-active", isDirectory);
+  };
+  if ("scrollRestoration" in window.history) {
+    window.history.scrollRestoration = "manual";
+  }
+  let pendingSettingsScrollFrame = 0;
+  const focusSettingsTarget = (targetId = "") => {
+    const main = document.getElementById("main");
+    const resetSettingsScroll = () => {
+      main?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      if (document.scrollingElement) {
+        document.scrollingElement.scrollTop = 0;
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    };
+    if (pendingSettingsScrollFrame) window.cancelAnimationFrame(pendingSettingsScrollFrame);
+    pendingSettingsScrollFrame = window.requestAnimationFrame(() => {
+      pendingSettingsScrollFrame = 0;
+      if (!targetId) {
+        resetSettingsScroll();
+        return;
+      }
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      target.scrollIntoView({ block: "start" });
+      if (!target.matches("input, select, textarea, button, a[href], [tabindex]")) {
+        target.setAttribute("tabindex", "-1");
+      }
+      target.focus({ preventScroll: true });
+    });
+  };
+  const setActiveSection = (sectionId, { targetId = "" } = {}) => {
+    if (String(currentUser?.role || "").toLowerCase() === "admin") {
+      sectionId = "securitySection";
+      if (targetId === "security:closure") targetId = "";
+    }
+    const section = document.getElementById(sectionId);
+    const sectionChanged = !section?.classList.contains("active") || section?.hidden;
+    topLevelSections.forEach((sec) => {
+      sec.classList.remove("active");
+      sec.classList.add("hidden");
+      sec.setAttribute("aria-hidden", "true");
+      sec.hidden = true;
+      sec.style.setProperty("display", "none", "important");
+    });
+    if (section) {
+      section.classList.remove("hidden");
+      section.classList.add("active");
+      section.hidden = false;
+      section.removeAttribute("aria-hidden");
+      section.style.removeProperty("display");
+      section.style.display = "block";
+    }
+    syncActiveNav(sectionId);
+    syncSettingsHeader(sectionId);
+    if (String(currentUser?.role || "").toLowerCase() === "admin") {
+      const heading = document.getElementById('accountSettingsTitle');
+      if (heading) heading.textContent = 'Admin security';
+      const subtitle = document.getElementById('accountSettingsSubtitle');
+      if (subtitle) subtitle.textContent = 'Manage your sign-in and devices.';
+    }
+    if (sectionChanged || targetId) focusSettingsTarget(targetId);
+    scheduleProfileScrollIndicatorUpdate();
+  };
+
+  const applySectionFromHash = (hashValue = window.location.hash) => {
+    const normalizedHash = String(hashValue || "").trim().toLowerCase();
+    const route = hashRouteMap[normalizedHash] || (
+      !normalizedHash
+        ? { sectionId: isAttorneyRole() ? "settingsDirectorySection" : "profileSection" }
+        : null
+    );
+    if (!route) return false;
+    if (route.sectionId === "settingsDirectorySection" && !isAttorneyRole()) {
+      setActiveSection("profileSection");
+      return true;
+    }
+    setActiveSection(route.sectionId, { targetId: route.targetId || "" });
+    return true;
+  };
+
+  Object.keys(navItems).forEach(navId => {
+    const btn = document.getElementById(navId);
+    const sectionId = navItems[navId];
+
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+      const nextHash = sectionId === "settingsDirectorySection"
+        ? ""
+        : sectionId === "profileSection"
+        ? "#profile"
+        : sectionId === "securitySection"
+        ? "#security"
+        : sectionId === "preferencesSection"
+        ? "#preferences"
+        : `#${sectionId}`;
+      const nextUrl = `${window.location.pathname}${window.location.search}${nextHash}`;
+      const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (currentUrl !== nextUrl) {
+        window.history.pushState(null, "", nextUrl);
+      }
+      setActiveSection(sectionId);
+    });
+  });
+
+  document.querySelectorAll("[data-settings-section]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const sectionId = btn.dataset.settingsSection;
+      if (!sectionId || !sectionToNav[sectionId]) return;
+      const nextHash = sectionId === "profileSection"
+        ? "#profile"
+        : sectionId === "securitySection"
+        ? "#security"
+        : "#preferences";
+      window.history.pushState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
+      setActiveSection(sectionId);
+    });
+  });
+
+  const helpBtn = document.getElementById("navHelp");
+  if (helpBtn) {
+    helpBtn.addEventListener("click", () => {
+      const session = getStoredSession();
+      const role = String(session?.role || session?.user?.role || "").toLowerCase();
+      window.location.href = role === "paralegal" ? "paralegalhelp.html" : "help.html";
+    });
+  }
+
+  const filterSettingsDirectory = () => {
+    const search = document.getElementById("settingsDirectorySearch");
+    const empty = document.getElementById("settingsDirectoryEmpty");
+    const groups = Array.from(document.querySelectorAll("[data-settings-group]"));
+    if (!search || !groups.length) return;
+    const applyFilter = () => {
+      const query = String(search.value || "").trim().toLocaleLowerCase();
+      let visibleCount = 0;
+      groups.forEach((group) => {
+        const groupName = String(group.dataset.settingsGroup || "").toLocaleLowerCase();
+        let groupVisibleCount = 0;
+        group.querySelectorAll("[data-settings-destination]").forEach((destination) => {
+          const searchableText = `${groupName} ${destination.textContent || ""}`.toLocaleLowerCase();
+          const matches = !query || searchableText.includes(query);
+          destination.hidden = !matches;
+          if (matches) {
+            visibleCount += 1;
+            groupVisibleCount += 1;
+          }
+        });
+        group.hidden = groupVisibleCount === 0;
+      });
+      if (empty) empty.hidden = visibleCount !== 0;
+    };
+    search.addEventListener("input", applyFilter);
+    applyFilter();
+  };
+
+  filterSettingsDirectory();
+  applySectionFromHash();
+  const syncRoute = () => applySectionFromHash();
+  window.__syncProfileSettingsRoute = syncRoute;
+  window.addEventListener("hashchange", syncRoute);
+  window.addEventListener("popstate", syncRoute);
+  bindProfileScrollIndicator();
+  const stepToRun = String(requestedOnboardingStep || "").toLowerCase();
+  if (stepToRun) {
+    runAttorneyOnboardingStep(stepToRun, { silent: suppressProfileToast && stepToRun === "profile" });
+  }
+  if (showOnboardingModal || (stepToRun === "profile" && !getAttorneyOnboardingModalSeen("profile"))) {
+    bindAttorneyOnboardingModal();
+    showAttorneyOnboardingModal(
+      "Step 1 of 3: Complete your profile, then click Save changes.",
+      "profile",
+      "Let’s Get Started"
+    );
+  }
+
+  const dashboardLink = document.getElementById("dashboardReturnLink");
+  if (dashboardLink) {
+    const session = getStoredSession();
+    const role = String(session?.role || session?.user?.role || "").toLowerCase();
+    if (role === "admin") {
+      dashboardLink.href = "admin-dashboard.html";
+    } else if (role === "paralegal") {
+      dashboardLink.href = "dashboard-paralegal.html";
+    } else {
+      dashboardLink.href = "dashboard-attorney.html";
+    }
+  }
+
+  const passwordBtn = document.getElementById("savePasswordBtn");
+  if (passwordBtn) {
+    passwordBtn.addEventListener("click", async () => {
+      const currentPass = document.getElementById("currentPassword")?.value || "";
+      const newPass = document.getElementById("newPassword")?.value || "";
+      const confirm = document.getElementById("confirmPassword")?.value || "";
+
+      if (!currentPass) {
+        showToast("Enter your current password.", "err");
+        return;
+      }
+      if (newPass !== confirm) {
+        showToast("Passwords do not match.", "err");
+        return;
+      }
+      if (String(newPass).length < 8) {
+        showToast("Password must be at least 8 characters.", "err");
+        return;
+      }
+
+      const res = await secureFetch("/api/account/update-password", {
+        method: "POST",
+        body: { currentPassword: currentPass, newPassword: newPass }
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data?.error || "Unable to update password.", "err");
+        return;
+      }
+      showToast("Password updated. Sign in again to protect your account.", "ok");
+      const currentInput = document.getElementById("currentPassword");
+      const newInput = document.getElementById("newPassword");
+      const confirmInput = document.getElementById("confirmPassword");
+      if (currentInput) currentInput.value = "";
+      if (newInput) newInput.value = "";
+      if (confirmInput) confirmInput.value = "";
+      try {
+        window.clearStoredSession?.();
+        localStorage.removeItem("lpc_user");
+      } catch {}
+      window.location.href = "login.html";
+    });
+  }
+
+  document.querySelectorAll("[data-toggle-password]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const inputId = btn.getAttribute("data-toggle-password");
+      if (!inputId) return;
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      const reveal = input.type === "password";
+      input.type = reveal ? "text" : "password";
+      const label = input.labels?.[0]?.textContent.trim() || "Password";
+      btn.setAttribute("aria-label", `${reveal ? "Hide" : "Show"} ${label.toLowerCase()}`);
+    });
+  });
+
+  const themeSelect = document.getElementById("themePreference");
+  const themePreviewButtons = document.querySelectorAll("[data-theme-preview]");
+  const emailToggle = document.getElementById("emailNotificationsToggle");
+  const replayTourBtn = document.getElementById("replayAttorneyTourBtn");
+  const replayParalegalTourBtn = document.getElementById("replayParalegalTourBtn");
+  const fontSizeSelect = document.getElementById("fontSizePreference");
+  const hideProfileToggle = document.getElementById("paralegalHideProfile");
+  statePreferenceSelect = document.getElementById("statePreference");
+  const selectableThemes = new Set(["light", "dark"]);
+  const normalizeSelectableTheme = (value) => {
+    const normalized = String(value || "").toLowerCase();
+    return selectableThemes.has(normalized) ? normalized : "light";
+  };
+  const queueAccountPreferenceWrite = (payload, { successMessage = "Saved", recover = true } = {}) => {
+    setPreferencesSaveStatus("Saving…", "saving");
+    return queuePreferenceMutation(async () => {
+      try {
+        const response = await secureFetch("/api/account/preferences", {
+          method: "POST",
+          suppressToast: true,
+          body: payload,
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data?.error || "Unable to save preference.");
+        setPreferencesSaveStatus(successMessage, "saved");
+        return data;
+      } catch (err) {
+        console.error("Failed to persist account preference", err);
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
+        if (recover) await loadPreferences({ preserveStatus: true });
+        return null;
+      }
+    });
+  };
+
+  const updateThemePreview = (value) => {
+    if (!themePreviewButtons.length) return;
+    themePreviewButtons.forEach((btn) => {
+      const isActive = btn.dataset.themePreview === value;
+      btn.setAttribute("aria-checked", isActive ? "true" : "false");
+      btn.tabIndex = isActive ? 0 : -1;
+      btn.classList.toggle("is-active", isActive);
+    });
+  };
+
+  if (replayTourBtn) {
+    replayTourBtn.addEventListener("click", () => {
+      try {
+        sessionStorage.setItem("lpc_attorney_replay_tour", "1");
+      } catch (_) {}
+      window.location.href = "dashboard-attorney.html?replayTour=1#home";
+    });
+  }
+
+  if (replayParalegalTourBtn) {
+    replayParalegalTourBtn.addEventListener("click", () => {
+      try {
+        sessionStorage.setItem("lpc_paralegal_replay_tour", "1");
+      } catch (_) {}
+      window.location.href = "dashboard-paralegal.html?replayTour=1";
+    });
+  }
+
+  function persistThemePreference(themeValue, fontSizeValue) {
+    return queueAccountPreferenceWrite({
+      theme: normalizeSelectableTheme(themeValue || themeSelect?.value),
+      fontSize: fontSizeValue || fontSizeSelect?.value,
+    }, { successMessage: "Appearance saved" });
+  }
+
+  const applyThemeSelection = (value) => {
+    if (!value) return;
+    const normalizedValue = normalizeSelectableTheme(value);
+    if (themeSelect) {
+      themeSelect.value = normalizedValue;
+    }
+    updateThemePreview(normalizedValue);
+    if (typeof window.applyThemePreference === "function") {
+      window.applyThemePreference(normalizedValue);
+    }
+    if (currentUser) {
+      currentUser.preferences = {
+        ...(currentUser.preferences || {}),
+        theme: normalizedValue
+      };
+    }
+    persistThemePreference(normalizedValue, fontSizeSelect?.value);
+  };
+
+  const fontSizeMap = {
+    xs: "15px",
+    sm: "16px",
+    md: "17px",
+    lg: "20px",
+    xl: "22px"
+  };
+
+  const applyFontSizeSelection = (value, options = {}) => {
+    if (!value) return;
+    if (fontSizeSelect) {
+      fontSizeSelect.value = value;
+    }
+    if (typeof window.applyFontSizePreference === "function") {
+      window.applyFontSizePreference(value);
+    } else {
+      const size = fontSizeMap[value] || fontSizeMap.md;
+      document.documentElement.style.fontSize = size;
+    }
+    if (currentUser) {
+      currentUser.preferences = {
+        ...(currentUser.preferences || {}),
+        fontSize: value
+      };
+    }
+    if (!options.skipPersist) {
+      persistThemePreference(themeSelect?.value, value);
+    }
+  };
+
+  if (themeSelect) {
+    themeSelect.addEventListener("change", () => {
+      applyThemeSelection(themeSelect.value);
+    });
+  }
+
+  if (fontSizeSelect) {
+    fontSizeSelect.addEventListener("change", () => {
+      applyFontSizeSelection(fontSizeSelect.value);
+    });
+  }
+
+  themePreviewButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const value = btn.dataset.themePreview;
+      applyThemeSelection(value);
+    });
+    btn.addEventListener("keydown", (event) => {
+      const buttons = Array.from(themePreviewButtons).filter((item) => !item.disabled);
+      const currentIndex = buttons.indexOf(btn);
+      if (currentIndex < 0) return;
+      let nextIndex = currentIndex;
+      if (["ArrowRight", "ArrowDown"].includes(event.key)) nextIndex = (currentIndex + 1) % buttons.length;
+      else if (["ArrowLeft", "ArrowUp"].includes(event.key)) nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+      else if (event.key === "Home") nextIndex = 0;
+      else if (event.key === "End") nextIndex = buttons.length - 1;
+      else return;
+      event.preventDefault();
+      buttons[nextIndex].focus();
+      buttons[nextIndex].click();
+    });
+  });
+
+  if (themeSelect) {
+    updateThemePreview(themeSelect.value);
+  }
+
+  const fullNameInput = document.getElementById("fullNameInput");
+  if (fullNameInput) {
+    fullNameInput.addEventListener("input", () => {
+      syncNamePartsFromFullName();
+    });
+  }
+  const yearsExperienceInput = document.getElementById("yearsExperienceInput");
+  if (yearsExperienceInput) {
+    yearsExperienceInput.addEventListener("input", () => {
+      const digitsOnly = String(yearsExperienceInput.value || "").replace(/\D+/g, "").slice(0, 2);
+      if (yearsExperienceInput.value !== digitsOnly) {
+        yearsExperienceInput.value = digitsOnly;
+      }
+      updateRoleLineFromExperience();
+    });
+  }
+  const bestForList = document.getElementById("bestForDisplay");
+  if (bestForList) {
+    bestForList.addEventListener("keydown", handleBestForListKeydown);
+    bestForList.addEventListener("input", handleBestForListInput);
+  }
+
+  async function loadPreferences({ preserveStatus = false } = {}) {
+    try {
+      const res = await fetch("/api/account/preferences", {
+        suppressToast: true,
+        credentials: "include"
+      });
+      if (!res.ok) throw new Error("Unable to load preferences.");
+      const prefs = await res.json();
+      if (emailToggle) emailToggle.checked = !!prefs.email;
+      if (themeSelect) {
+        const resolvedTheme = normalizeSelectableTheme(prefs.theme);
+        if (resolvedTheme) {
+          themeSelect.value = resolvedTheme;
+          updateThemePreview(resolvedTheme);
+          if (typeof window.applyThemePreference === "function") {
+            window.applyThemePreference(resolvedTheme);
+          }
+          if (currentUser) {
+            currentUser.preferences = {
+              ...(currentUser.preferences || {}),
+              theme: resolvedTheme
+            };
+          }
+        }
+      } else if (prefs.theme) {
+        applyThemeSelection(prefs.theme);
+      }
+      if (fontSizeSelect) {
+        const resolvedSize = prefs.fontSize || fontSizeSelect.value || "md";
+        applyFontSizeSelection(resolvedSize, { skipPersist: true });
+      }
+      if (hideProfileToggle) hideProfileToggle.checked = !!prefs.hideProfile;
+      const stateValue = prefs.state || currentUser?.location || currentUser?.state || "";
+      if (statePreferenceSelect) {
+        setStatePreferenceValue(stateValue);
+      }
+      if (!preserveStatus) setPreferencesSaveStatus("Changes save automatically.", "idle");
+    } catch (err) {
+      console.error("Failed to load preferences", err);
+      setPreferencesSaveStatus("Preferences could not be loaded. Try refreshing this page.", "error");
+    }
+  }
+  trackInitialSettingsTask(loadPreferences());
+
+  if (statePreferenceSelect) {
+    statePreferenceSelect.addEventListener("change", async () => {
+      const state = statePreferenceSelect.value;
+      const data = await queueAccountPreferenceWrite({ state }, { successMessage: "Primary state saved" });
+      if (!data) return;
+      if (currentUser) {
+        currentUser.location = state || "";
+        currentUser.state = state || "";
+        persistSession({ user: mergeSessionPreferences(currentUser) });
+      }
+      hydrateStatePreference(currentUser || { state });
+    });
+  }
+
+  const deactivateButtons = document.querySelectorAll("[data-deactivate-account]");
+  if (deactivateButtons.length) {
+    deactivateButtons.forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const confirmed = await confirmAction(
+          "Sign-in and active platform participation will be disabled. Historical Matter, dispute, payment, audit, and financial records are preserved; this is not full erasure. Deactivation is blocked while active work or financial obligations remain.",
+          { title: "Deactivate your account?", confirmLabel: "Deactivate account", tone: "danger" }
+        );
+        if (!confirmed) return;
+        btn.disabled = true;
+        try {
+          const res = await secureFetch("/api/account/deactivate", {
+            method: "DELETE",
+          });
+          const data = await res.json().catch(() => ({}));
+
+          if (res.ok) {
+            redirectAfterDeactivation("Your account has been deactivated.");
+            return;
+          }
+
+          const alreadyDeactivated =
+            (Array.isArray(data?.blockers) && data.blockers.some((item) => item?.code === "already_deactivated")) ||
+            /account has been (disabled|deactivated)/i.test(String(data?.error || data?.msg || ""));
+          if (alreadyDeactivated) {
+            redirectAfterDeactivation(
+              data?.blockers?.[0]?.message || data?.error || data?.msg || "This account has been deactivated."
+            );
+            return;
+          }
+
+          const blockerCopy = Array.isArray(data?.blockers) && data.blockers.length
+            ? data.blockers.map((item) => item.message).join("\n")
+            : "";
+          showToast(blockerCopy || data?.error || "Unable to deactivate account.", "err");
+        } catch (err) {
+          if (/session expired|account has been (disabled|deactivated)/i.test(String(err?.message || ""))) {
+            redirectAfterDeactivation(err?.message || "This account has been deactivated.");
+            return;
+          }
+          showToast(err?.message || "Unable to deactivate account.", "err");
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  // --- TWO-STEP VERIFICATION ---
+  const twoFactorToggles = Array.from(document.querySelectorAll(".two-factor-toggle"));
+  const twoFactorPasswordInput = document.getElementById("twoFactorCurrentPassword");
+  const generateBackupCodesBtn = document.getElementById("generateBackupCodesBtn");
+  const backupCodesOutput = document.getElementById("backupCodesOutput");
+  const authenticatorSetupPanel = document.getElementById("authenticatorSetupPanel");
+  const authenticatorQrCode = document.getElementById("authenticatorQrCode");
+  const authenticatorManualSecret = document.getElementById("authenticatorManualSecret");
+  const authenticatorConfirmCode = document.getElementById("authenticatorConfirmCode");
+  const authenticatorConfirmBtn = document.getElementById("authenticatorConfirmBtn");
+  const authenticatorCancelBtn = document.getElementById("authenticatorCancelBtn");
+  let authenticatorChallengeId = "";
+  let twoFactorUpdating = false;
+
+  const setTwoFactorUI = ({ enabled = false, method = "email" } = {}) => {
+    const availableMethods = new Set(
+      twoFactorToggles.filter((toggle) => !toggle.disabled).map((toggle) => toggle.dataset.twoFactorMethod)
+    );
+    const normalizedMethod = availableMethods.has(method) ? method : "email";
+    const activeMethod = enabled ? normalizedMethod : "";
+    twoFactorToggles.forEach((toggle) => {
+      toggle.checked = enabled && toggle.dataset.twoFactorMethod === activeMethod;
+    });
+  };
+
+  async function loadTwoFactorStatus() {
+    if (!twoFactorToggles.length) return;
+    try {
+      const res = await secureFetch("/api/account/2fa");
+      if (!res.ok) throw new Error("Unable to load 2FA status");
+      const data = await res.json();
+      if (data?.disabled) {
+        twoFactorToggles.forEach((toggle) => {
+          toggle.checked = false;
+          toggle.disabled = true;
+          toggle.setAttribute("aria-disabled", "true");
+        });
+        return;
+      }
+      setTwoFactorUI({
+        enabled: !!data?.enabled,
+        method: data?.method || "email",
+      });
+    } catch (err) {
+      console.warn("[profile-settings] two-step verification status failed", err);
+      twoFactorToggles.forEach((toggle) => {
+        toggle.checked = false;
+        toggle.disabled = true;
+        toggle.setAttribute("aria-disabled", "true");
+      });
+      showToast("Two-step verification status could not be loaded. Try again before changing it.", "err");
+    }
+  }
+
+  const updateTwoFactor = async (enabled, method) => {
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) throw new Error("Enter your current password to change two-step verification.");
+    const res = await secureFetch("/api/account/2fa-toggle", {
+      method: "POST",
+      body: { enabled, method, currentPassword },
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      throw new Error(payload?.error || "Unable to update 2-step verification.");
+    }
+  };
+
+  const closeAuthenticatorSetup = () => {
+    authenticatorChallengeId = "";
+    if (authenticatorSetupPanel) authenticatorSetupPanel.hidden = true;
+    if (authenticatorQrCode) authenticatorQrCode.removeAttribute("src");
+    if (authenticatorManualSecret) authenticatorManualSecret.textContent = "";
+    if (authenticatorConfirmCode) authenticatorConfirmCode.value = "";
+  };
+
+  const beginAuthenticatorSetup = async () => {
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) throw new Error("Enter your current password to set up an authenticator app.");
+    const res = await secureFetch("/api/account/2fa/authenticator/setup", {
+      method: "POST",
+      body: { currentPassword },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || "Unable to start authenticator setup.");
+    authenticatorChallengeId = data.challengeId || "";
+    if (authenticatorQrCode) authenticatorQrCode.src = data.qrDataUrl || "";
+    if (authenticatorManualSecret) authenticatorManualSecret.textContent = data.manualSecret || "";
+    if (authenticatorSetupPanel) authenticatorSetupPanel.hidden = false;
+    authenticatorSetupPanel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    authenticatorConfirmCode?.focus();
+  };
+
+  if (twoFactorToggles.length) {
+    twoFactorToggles.forEach((toggle) => {
+      toggle.addEventListener("change", async () => {
+        if (twoFactorUpdating) return;
+        const method = toggle.dataset.twoFactorMethod || "email";
+        const enabled = toggle.checked;
+        if (method === "authenticator" && enabled) {
+          twoFactorUpdating = true;
+          try {
+            await beginAuthenticatorSetup();
+            toggle.checked = false;
+          } catch (err) {
+            showToast(err?.message || "Unable to start authenticator setup.", "err");
+            await loadTwoFactorStatus();
+          } finally {
+            twoFactorUpdating = false;
+          }
+          return;
+        }
+        if (enabled) {
+          twoFactorToggles.forEach((other) => {
+            if (other !== toggle) other.checked = false;
+          });
+        }
+        const anyEnabled = twoFactorToggles.some((item) => item.checked);
+        const activeToggle = twoFactorToggles.find((item) => item.checked);
+        const activeMethod = activeToggle?.dataset.twoFactorMethod || method;
+        const finalEnabled = enabled ? true : anyEnabled;
+
+        twoFactorUpdating = true;
+        try {
+          await updateTwoFactor(finalEnabled, activeMethod);
+          if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
+          await loadTwoFactorStatus();
+        } catch (err) {
+          showToast(err?.message || "Unable to update 2-step verification.", "err");
+          await loadTwoFactorStatus();
+        } finally {
+          twoFactorUpdating = false;
+        }
+      });
+    });
+  }
+
+  trackInitialSettingsTask(loadTwoFactorStatus());
+
+  authenticatorCancelBtn?.addEventListener("click", () => {
+    closeAuthenticatorSetup();
+    loadTwoFactorStatus();
+  });
+
+  authenticatorConfirmBtn?.addEventListener("click", async () => {
+    const code = String(authenticatorConfirmCode?.value || "").trim();
+    if (!authenticatorChallengeId || !/^\d{6}$/.test(code)) {
+      showToast("Enter the current six-digit code from your authenticator app.", "err");
+      authenticatorConfirmCode?.focus();
+      return;
+    }
+    authenticatorConfirmBtn.disabled = true;
+    try {
+      const res = await secureFetch("/api/account/2fa/authenticator/confirm", {
+        method: "POST",
+        body: { challengeId: authenticatorChallengeId, code },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to confirm authenticator setup.");
+      if (backupCodesOutput) {
+        backupCodesOutput.textContent = [
+          "Authenticator enabled. Save these one-time backup codes now:",
+          "",
+          ...(Array.isArray(data?.backupCodes) ? data.backupCodes : []),
+        ].join("\n");
+        backupCodesOutput.hidden = false;
+      }
+      if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
+      closeAuthenticatorSetup();
+      await loadTwoFactorStatus();
+    } catch (err) {
+      showToast(err?.message || "Unable to confirm authenticator setup.", "err");
+    } finally {
+      authenticatorConfirmBtn.disabled = false;
+    }
+  });
+
+  generateBackupCodesBtn?.addEventListener("click", async () => {
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) {
+      showToast("Enter your current password to generate backup codes.", "err");
+      twoFactorPasswordInput?.focus();
+      return;
+    }
+    if (!(await confirmAction("Any previous backup codes will stop working immediately.", {
+      title: "Generate new backup codes?",
+      confirmLabel: "Generate codes",
+      tone: "danger",
+    }))) return;
+    generateBackupCodesBtn.disabled = true;
+    try {
+      const res = await secureFetch("/api/account/2fa-backup-codes", {
+        method: "POST",
+        body: { currentPassword },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to generate backup codes.");
+      if (backupCodesOutput) {
+        backupCodesOutput.textContent = [
+          "Save these codes now. Each code can be used once:",
+          "",
+          ...(Array.isArray(data?.codes) ? data.codes : []),
+        ].join("\n");
+        backupCodesOutput.hidden = false;
+      }
+      if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
+    } catch (err) {
+      showToast(err?.message || "Unable to generate backup codes.", "err");
+    } finally {
+      generateBackupCodesBtn.disabled = false;
+    }
+  });
+
+  // --- PASSKEYS ---
+  const passkeyList = document.getElementById("passkeyList");
+  const passkeyNameInput = document.getElementById("passkeyName");
+  const addPasskeyBtn = document.getElementById("addPasskeyBtn");
+  const passkeyUnsupported = document.getElementById("passkeyUnsupported");
+  const webAuthnBrowser = window.SimpleWebAuthnBrowser;
+  const passkeysSupported = Boolean(webAuthnBrowser?.browserSupportsWebAuthn?.());
+
+  if (!passkeysSupported) {
+    if (passkeyUnsupported) passkeyUnsupported.hidden = false;
+    if (addPasskeyBtn) addPasskeyBtn.disabled = true;
+  }
+
+  const loadPasskeys = async () => {
+    if (!passkeyList) return;
+    try {
+      const res = await secureFetch("/api/account/passkeys");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to load passkeys.");
+      const passkeys = Array.isArray(data?.passkeys) ? data.passkeys : [];
+      if (!passkeys.length) {
+        passkeyList.innerHTML = '<p class="muted">No passkeys added.</p>';
+        return;
+      }
+      passkeyList.innerHTML = passkeys.map((item) => {
+        const lastUsed = item.lastUsedAt ? `Last used ${new Date(item.lastUsedAt).toLocaleDateString()}` : "Not used yet";
+        return `<div class="passkey-list-item">
+          <div><strong>${escapeHTML(item.name || "Passkey")}</strong><br><span class="muted">${escapeHTML(lastUsed)}</span></div>
+          <button type="button" class="btn btn-outline" data-remove-passkey="${escapeHTML(item.id)}">Remove</button>
+        </div>`;
+      }).join("");
+    } catch (err) {
+      passkeyList.innerHTML = `<p class="muted">${escapeHTML(err?.message || "Unable to load passkeys.")}</p>`;
+    }
+  };
+
+  addPasskeyBtn?.addEventListener("click", async () => {
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) {
+      showToast("Enter your current password to add a passkey.", "err");
+      twoFactorPasswordInput?.focus();
+      return;
+    }
+    addPasskeyBtn.disabled = true;
+    try {
+      const optionsRes = await secureFetch("/api/account/passkeys/registration-options", {
+        method: "POST",
+        body: { currentPassword },
+      });
+      const optionsData = await optionsRes.json().catch(() => ({}));
+      if (!optionsRes.ok) throw new Error(optionsData?.error || "Unable to start passkey setup.");
+      const response = await webAuthnBrowser.startRegistration({ optionsJSON: optionsData.options });
+      const registerRes = await secureFetch("/api/account/passkeys/register", {
+        method: "POST",
+        body: {
+          challengeId: optionsData.challengeId,
+          response,
+          name: String(passkeyNameInput?.value || "").trim() || "Passkey",
+        },
+      });
+      const registerData = await registerRes.json().catch(() => ({}));
+      if (!registerRes.ok) throw new Error(registerData?.error || "Unable to add passkey.");
+      if (passkeyNameInput) passkeyNameInput.value = "";
+      if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
+      await loadPasskeys();
+    } catch (err) {
+      if (err?.name !== "NotAllowedError") showToast(err?.message || "Passkey setup was cancelled or failed.", "err");
+    } finally {
+      addPasskeyBtn.disabled = !passkeysSupported;
+    }
+  });
+
+  passkeyList?.addEventListener("click", async (event) => {
+    const button = event.target instanceof Element ? event.target.closest("[data-remove-passkey]") : null;
+    if (!button) return;
+    const currentPassword = twoFactorPasswordInput?.value || "";
+    if (!currentPassword) {
+      showToast("Enter your current password to remove a passkey.", "err");
+      twoFactorPasswordInput?.focus();
+      return;
+    }
+    if (!(await confirmAction("This passkey will no longer sign in to your account.", {
+      title: "Remove this passkey?",
+      confirmLabel: "Remove passkey",
+      tone: "danger",
+    }))) return;
+    button.disabled = true;
+    try {
+      const res = await secureFetch(`/api/account/passkeys/${encodeURIComponent(button.dataset.removePasskey || "")}`, {
+        method: "DELETE",
+        body: { currentPassword },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to remove passkey.");
+      if (twoFactorPasswordInput) twoFactorPasswordInput.value = "";
+      await loadPasskeys();
+    } catch (err) {
+      showToast(err?.message || "Unable to remove passkey.", "err");
+      button.disabled = false;
+    }
+  });
+
+  trackInitialSettingsTask(loadPasskeys());
+
+  // --- SESSION HISTORY ---
+  const sessionHistoryList = document.getElementById("sessionHistoryList");
+
+  const guessDeviceLabel = (ua = "") => {
+    const lower = ua.toLowerCase();
+    let browser = "Browser";
+    if (lower.includes("edg")) browser = "Edge";
+    else if (lower.includes("chrome")) browser = "Chrome";
+    else if (lower.includes("safari") && !lower.includes("chrome")) browser = "Safari";
+    else if (lower.includes("firefox")) browser = "Firefox";
+
+    let os = "Device";
+    if (lower.includes("mac os")) os = "macOS";
+    else if (lower.includes("windows")) os = "Windows";
+    else if (lower.includes("iphone") || lower.includes("ipad")) os = "iOS";
+    else if (lower.includes("android")) os = "Android";
+    else if (lower.includes("linux")) os = "Linux";
+
+    return `${browser} on ${os}`;
+  };
+
+  const formatRelativeTime = (dateValue) => {
+    const date = dateValue ? new Date(dateValue) : null;
+    if (!date || Number.isNaN(date.getTime())) return "Unknown time";
+    const diffMs = Date.now() - date.getTime();
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 2) return "Just now";
+    if (minutes < 60) return `${minutes} min ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hr${hours === 1 ? "" : "s"} ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+    return date.toLocaleDateString();
+  };
+
+  const renderSessionHistory = (sessions = []) => {
+    if (!sessionHistoryList) return;
+    if (!sessions.length) {
+      sessionHistoryList.innerHTML = "<p class=\"muted\">No recent sessions.</p>";
+      return;
+    }
+    sessionHistoryList.innerHTML = sessions
+      .map((item) => {
+        const isActive = item.current === true;
+        const deviceLabel = guessDeviceLabel(item.ua);
+        const locationLabel = escapeHTML(item.ip ? `IP ${item.ip}` : "Location unavailable");
+        const statusLabel = isActive ? "Current session" : `Active ${formatRelativeTime(item.lastSeenAt || item.createdAt)}`;
+        return `
+          <div class="session-row">
+            <div class="session-device">
+              <div class="session-device-icon">${deviceLabel[0] || "D"}</div>
+              <div>
+                <div>${deviceLabel}</div>
+                <div class="session-meta">${locationLabel}</div>
+              </div>
+            </div>
+            <div class="session-status">${statusLabel}</div>
+            <button class="session-action" type="button" data-session-action="logout" data-session-id="${escapeHTML(item.id || "")}" aria-label="Sign out ${isActive ? "of this session" : deviceLabel}">
+              <svg viewBox="0 0 20 20">
+                <path fill="currentColor" d="M6.5 3.5h7a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-7v-1.6h6.4v-7.8H6.5V3.5zm3.4 2.8 3.1 3.1-3.1 3.1-1.1-1.1 1.2-1.2H2.5V8.6h7.1L8.4 7.4l1.1-1.1z"/>
+              </svg>
+            </button>
+          </div>
+        `;
+      })
+      .join("");
+
+    sessionHistoryList.querySelectorAll("[data-session-action=\"logout\"]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const confirmed = await confirmAction("The selected session will lose access and must sign in again.", {
+          title: "Sign out this device?",
+          confirmLabel: "Sign out device",
+          tone: "danger",
+        });
+        if (!confirmed) return;
+        try {
+          const res = await secureFetch(`/api/account/sessions/${encodeURIComponent(btn.dataset.sessionId || "")}`, { method: "DELETE" });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data?.error || "Unable to sign out that device.");
+          if (data?.currentSessionRevoked) {
+            try {
+              window.clearStoredSession?.();
+              localStorage.removeItem("lpc_user");
+            } catch {}
+            window.location.href = "login.html";
+            return;
+          }
+          await loadSessionHistory();
+        } catch (err) {
+          showToast(err?.message || "Unable to sign out that device.", "err");
+        }
+      });
+    });
+  };
+
+  async function loadSessionHistory() {
+    if (!sessionHistoryList) return;
+    try {
+      const res = await secureFetch("/api/account/sessions");
+      if (!res.ok) throw new Error("Unable to load sessions");
+      const data = await res.json().catch(() => ({}));
+      renderSessionHistory(Array.isArray(data?.sessions) ? data.sessions : []);
+    } catch (err) {
+      sessionHistoryList.innerHTML = "<p class=\"muted\">Unable to load sessions.</p>";
+    }
+  }
+
+  trackInitialSettingsTask(loadSessionHistory());
+
+  document.getElementById("revokeOtherSessionsBtn")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    if (!(await confirmAction("Every session except this one will lose access and must sign in again.", {
+      title: "Sign out all other devices?",
+      confirmLabel: "Sign out devices",
+      tone: "danger",
+    }))) return;
+    button.disabled = true;
+    try {
+      const res = await secureFetch("/api/account/sessions/revoke-others", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to sign out other devices.");
+      await loadSessionHistory();
+    } catch (err) {
+      showToast(err?.message || "Unable to sign out other devices.", "err");
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  // --- BLOCKED USERS ---
+  async function requestUnblock(userId, name = "this user") {
+    const confirmed = await confirmAction(
+      "Future interaction restrictions will be removed for new activity only. Old Matters, messages, and workflows remain closed. This user will not be notified.",
+      { title: `Unblock ${name}?`, confirmLabel: "Unblock user" }
+    );
+    if (!confirmed) return false;
+    await secureFetch(`/api/blocks/${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    });
+    return true;
+  }
+
+  async function loadBlockedUsers() {
+    const container = document.getElementById("blockedUsersList");
+    const summaryCount = document.getElementById("blockedUsersSummaryCount");
+    if (!container) return;
+
+    try {
+      const res = await fetch("/api/blocks", { credentials: "include" });
+      const data = await res.json();
+
+      if (!Array.isArray(data) || !data.length) {
+        if (summaryCount) summaryCount.textContent = "No blocked users";
+        container.innerHTML = "<p class='muted'>No blocked users.</p>";
+        return;
+      }
+
+      if (summaryCount) {
+        const count = data.length;
+        summaryCount.textContent = `${count} blocked user${count === 1 ? "" : "s"}`;
+      }
+
+      container.innerHTML = data
+        .map((u) => {
+          const userId = u.blockedId || u._id || "";
+          const safeName = escapeHTML(u.name || "User");
+          return `
+            <div class="blocked-user-row">
+              <div class="blocked-user-name">${safeName}</div>
+              <button class="small-btn danger-lite unblock-btn" type="button" data-id="${escapeHTML(userId)}" data-name="${encodeURIComponent(
+                u.name || "User"
+              )}">Unblock</button>
+            </div>
+          `;
+        })
+        .join("");
+
+      container.querySelectorAll(".unblock-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          try {
+            const didUnblock = await requestUnblock(
+              btn.dataset.id,
+              btn.dataset.name ? decodeURIComponent(btn.dataset.name) : "this user"
+            );
+            if (!didUnblock) return;
+            loadBlockedUsers();
+          } catch (error) {
+            console.error("Failed to unblock user", error);
+            container.insertAdjacentHTML(
+              "afterbegin",
+              "<p class='muted'>Unable to unblock this user right now.</p>"
+            );
+          }
+        });
+      });
+    } catch (err) {
+      console.error("Failed to load blocked users", err);
+      if (summaryCount) summaryCount.textContent = "Unavailable";
+      container.innerHTML = "<p class='muted'>Unable to load blocked users.</p>";
+    }
+  }
+  trackInitialSettingsTask(loadBlockedUsers());
+
+  // --- STRIPE CONNECT ---
+  const connectStripeBtn = document.getElementById("connectStripeBtn");
+  const stripeStatus = document.getElementById("stripeStatus");
+  const stripeRequirementCopy = document.getElementById("stripeRequirementCopy");
+  const cachedUser = getCachedUser();
+  const cachedRole = String(cachedUser?.role || "").toLowerCase();
+  const isParalegal = cachedRole === "paralegal";
+  const setStripeStatus = (message = "") => {
+    if (!stripeStatus) return;
+    stripeStatus.textContent = message;
+    stripeStatus.classList.toggle("hidden", !message);
+  };
+
+  const updateStripeStatus = (data = {}) => {
+    const readiness = data.readiness && typeof data.readiness === "object" ? data.readiness : null;
+    const connected = readiness?.ready === true;
+    const statusUnavailable = readiness?.evidenceState && readiness.evidenceState !== "verified";
+    const bankName = String(data.bank_name || "").trim();
+    const bankLast4 = String(data.bank_last4 || "").trim();
+    if (stripeStatus) {
+      if (connected) {
+        const bankBits = [];
+        if (bankName) bankBits.push(bankName);
+        if (bankLast4) bankBits.push(`**** ${bankLast4}`);
+        setStripeStatus(bankBits.length
+          ? `Stripe connected for payouts (${bankBits.join(" ")})`
+          : "Stripe connected for payouts.");
+      } else if (statusUnavailable) {
+        setStripeStatus("Stripe status unavailable.");
+      } else {
+        setStripeStatus();
+      }
+    }
+    if (stripeRequirementCopy) {
+      if (connected) {
+        stripeRequirementCopy.textContent = "Your payout account is connected and ready to receive eligible payouts.";
+      } else if (statusUnavailable) {
+        stripeRequirementCopy.textContent = "LPC could not confirm your current payout readiness. Review Stripe before relying on this status.";
+      } else if (readiness?.accountPresent) {
+        stripeRequirementCopy.textContent = "Finish the remaining Stripe requirements before receiving payouts.";
+      } else {
+        stripeRequirementCopy.textContent = "Connect Stripe before applying to Matters or receiving payment.";
+      }
+    }
+    if (connectStripeBtn) {
+      connectStripeBtn.textContent = connected || readiness?.accountPresent
+        ? "Update Stripe Details"
+        : "Connect Stripe Account →";
+      connectStripeBtn.disabled = !isParalegal;
+      connectStripeBtn.setAttribute("aria-disabled", !isParalegal ? "true" : "false");
+      connectStripeBtn.removeAttribute("title");
+    }
+  };
+
+  async function refreshStripeStatus() {
+    if (!isParalegal) return;
+    if (!connectStripeBtn && !stripeStatus) return;
+    setStripeStatus("Checking Stripe status…");
+    try {
+      const res = await secureFetch("/api/payments/connect/status");
+      if (!res.ok) throw new Error("Unable to fetch Stripe status");
+      const data = await res.json();
+      updateStripeStatus(data);
+    } catch (err) {
+      setStripeStatus("Stripe status unavailable.");
+      if (stripeRequirementCopy) {
+        stripeRequirementCopy.textContent = "LPC could not confirm your current payout readiness. Review Stripe before relying on this status.";
+      }
+      if (connectStripeBtn) {
+        connectStripeBtn.disabled = !isParalegal;
+        connectStripeBtn.setAttribute("aria-disabled", !isParalegal ? "true" : "false");
+        connectStripeBtn.removeAttribute("title");
+      }
+    }
+  }
+
+  if (connectStripeBtn) {
+    connectStripeBtn.addEventListener("click", async () => {
+      if (!isParalegal) return;
+      if (connectStripeBtn.disabled) return;
+      connectStripeBtn.disabled = true;
+      connectStripeBtn.textContent = "Connecting…";
+      try {
+        await startStripeOnboarding();
+      } catch (err) {
+        console.error("Failed to start Stripe connect flow", err);
+        showToast(err?.message || "Unable to connect Stripe right now.", "err");
+        refreshStripeStatus();
+      }
+    });
+    refreshStripeStatus();
+    if (!isParalegal) {
+      connectStripeBtn.disabled = true;
+      connectStripeBtn.setAttribute("aria-disabled", "true");
+    }
+  } else if (!isParalegal && stripeStatus) {
+    setStripeStatus();
+  }
+});
+
+const PROFILE_SETTINGS_DRAFT_KEY = "lpc_profile_settings_draft_v1";
+
+const paralegalSettingsSection = document.getElementById("paralegalSettings");
+const attorneySettingsSection = document.getElementById("attorneySettings");
+
+function resolveSessionUser() {
+  if (typeof window.getStoredUser === "function") {
+    try {
+      return window.getStoredUser();
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function ensureUserStatus(user = {}) {
+  if (!user) return user;
+  if (user.status) return user;
+  const snapshot = resolveSessionUser();
+  if (snapshot?.status) {
+    user.status = snapshot.status;
+  }
+  return user;
+}
+
+function resolveAccountStatus(user = {}) {
+  if (user?.status) return String(user.status).toLowerCase();
+  const snapshot = resolveSessionUser();
+  if (snapshot?.status) return String(snapshot.status).toLowerCase();
+  return "";
+}
+
+function hasSettingsAccess(user = {}) {
+  const role = String(user.role || "").toLowerCase();
+  if (role === "admin") return true;
+  return resolveAccountStatus(user) === "approved";
+}
+
+function showPendingSettingsNotice() {
+  const title = document.getElementById("accountSettingsTitle");
+  if (title) title.textContent = "Account pending approval";
+  const subtitle = document.getElementById("accountSettingsSubtitle");
+  if (subtitle) {
+    subtitle.textContent = "Once an administrator approves your account, you can edit your LPC profile.";
+  }
+  const content = document.getElementById("settingsContent");
+  if (content) {
+    content.innerHTML = `
+      <section class="settings-panel active">
+        <h2>Awaiting approval</h2>
+        <p>Your application is under review. You’ll receive an email when the review is complete.</p>
+        <p class="muted">Need help? Contact support and reference your signup email.</p>
+      </section>
+    `;
+  }
+}
+
+paralegalSettingsSection?.classList.add("hidden");
+attorneySettingsSection?.classList.add("hidden");
+
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    try {
+      localStorage.removeItem("lpc_edit_profile_prefill");
+    } catch {}
+    await window.checkSession();
+    await loadSettings();
+    await Promise.allSettled(initialSettingsTasks);
+  } finally {
+    document.getElementById("settingsContent")?.removeAttribute("aria-busy");
+  }
+});
+
+let settingsState = {
+  profileImage: "",
+  profileImageOriginal: "",
+  pendingProfileImage: "",
+  pendingProfileImageOriginal: "",
+  profilePhotoStatus: "",
+  stagedProfilePhotoFile: null,
+  stagedProfilePhotoIsEdit: false,
+  stagedProfilePhotoUrl: "",
+  stagedProfilePhotoOriginalFile: null,
+  stagedProfilePhotoOriginalUrl: "",
+  resumeFile: null,
+  pendingResumeKey: "",
+  pendingCertificateKey: "",
+  pendingWritingSampleKey: "",
+  removeResume: false,
+  removeCertificate: false,
+  removeWritingSample: false,
+  bio: "",
+  education: [],
+  awards: [],
+  highlightedSkills: [],
+  stateExperience: [],
+  linkedInURL: "",
+  notificationPrefs: { email: true, emailMessages: true, emailCase: true, sms: false },
+  digestFrequency: "off",
+  practiceDescription: ""
+};
+
+let currentUser = null;
+let statePreferenceSelect = null;
+let attorneyPrefsBound = false;
+let attorneySaveBound = false;
+let paralegalPrefsBound = false;
+let paralegalEditBound = false;
+let paralegalVisibilityBound = false;
+let paralegalRequiredBound = false;
+let activeParalegalSection = null;
+let profileDraftPersistenceBound = false;
+let applyingProfileDraft = false;
+let profileDraftWriteTimer = null;
+let profileScrollIndicatorBound = false;
+let attorneySavedSnapshot = "";
+let attorneySaveStateBound = false;
+let attorneySaveInFlight = false;
+
+function updateProfileScrollIndicator() {
+  const indicator = document.getElementById("paralegalScrollIndicator");
+  const content = document.getElementById("main");
+  const profileSection = document.getElementById("profileSection");
+  const isParalegal = String(currentUser?.role || "").toLowerCase() === "paralegal";
+  const profileVisible = Boolean(profileSection?.classList.contains("active"));
+  const paralegalVisible = !paralegalSettingsSection?.classList.contains("hidden");
+  const scrollRemaining = content ? content.scrollHeight - content.scrollTop - content.clientHeight : 0;
+  const shouldShow = Boolean(
+    indicator &&
+      content &&
+      isParalegal &&
+      profileVisible &&
+      paralegalVisible &&
+      scrollRemaining > 80
+  );
+  if (!indicator) return;
+  indicator.classList.toggle("is-visible", shouldShow);
+  indicator.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+}
+
+function scheduleProfileScrollIndicatorUpdate() {
+  requestAnimationFrame(() => updateProfileScrollIndicator());
+}
+
+function bindProfileScrollIndicator() {
+  if (profileScrollIndicatorBound) return;
+  const content = document.getElementById("main");
+  if (!content) return;
+  content.addEventListener("scroll", scheduleProfileScrollIndicatorUpdate, { passive: true });
+  window.addEventListener("resize", scheduleProfileScrollIndicatorUpdate);
+  document.addEventListener("click", () => {
+    setTimeout(() => scheduleProfileScrollIndicatorUpdate(), 0);
+  });
+  profileScrollIndicatorBound = true;
+}
+
+const FIELD_OF_LAW_OPTIONS = [
+  "Administrative Law",
+  "Admiralty & Maritime Law",
+  "Antitrust Law",
+  "Appellate Law",
+  "Banking Law",
+  "Bankruptcy Law",
+  "Business / Corporate Law",
+  "Civil Rights Law",
+  "Class Action Law",
+  "Commercial Law",
+  "Communications Law",
+  "Construction Law",
+  "Consumer Protection Law",
+  "Contract Law",
+  "Criminal Defense Law",
+  "Education Law",
+  "Elder Law",
+  "Election Law",
+  "Employment & Labor Law",
+  "Energy Law",
+  "Entertainment Law",
+  "Environmental Law",
+  "Estate Planning & Probate",
+  "Family Law",
+  "Franchise Law",
+  "Government Contracts Law",
+  "Health Care Law",
+  "Immigration Law",
+  "Insurance Law",
+  "Intellectual Property (IP) Law",
+  "International Law",
+  "Land Use & Zoning Law",
+  "Litigation",
+  "Media Law",
+  "Medical Malpractice",
+  "Military Law",
+  "Municipal Law",
+  "Personal Injury Law",
+  "Product Liability Law",
+  "Real Estate Law",
+  "Securities Law",
+  "Social Security / Disability Law",
+  "Sports Law",
+  "Tax Law",
+  "Technology Law",
+  "Telecommunications Law",
+  "Torts",
+  "Transportation Law",
+  "Trusts & Estates",
+  "Estate Planning",
+  "White Collar Crime",
+  "Workers’ Compensation"
+];
+
+const STATE_CODE_TO_NAME = {
+  AL: "Alabama",
+  AK: "Alaska",
+  AZ: "Arizona",
+  AR: "Arkansas",
+  CA: "California",
+  CO: "Colorado",
+  CT: "Connecticut",
+  DE: "Delaware",
+  DC: "Washington, D.C.",
+  FL: "Florida",
+  GA: "Georgia",
+  HI: "Hawaii",
+  ID: "Idaho",
+  IL: "Illinois",
+  IN: "Indiana",
+  IA: "Iowa",
+  KS: "Kansas",
+  KY: "Kentucky",
+  LA: "Louisiana",
+  ME: "Maine",
+  MD: "Maryland",
+  MA: "Massachusetts",
+  MI: "Michigan",
+  MN: "Minnesota",
+  MS: "Mississippi",
+  MO: "Missouri",
+  MT: "Montana",
+  NE: "Nebraska",
+  NV: "Nevada",
+  NH: "New Hampshire",
+  NJ: "New Jersey",
+  NM: "New Mexico",
+  NY: "New York",
+  NC: "North Carolina",
+  ND: "North Dakota",
+  OH: "Ohio",
+  OK: "Oklahoma",
+  OR: "Oregon",
+  PA: "Pennsylvania",
+  RI: "Rhode Island",
+  SC: "South Carolina",
+  SD: "South Dakota",
+  TN: "Tennessee",
+  TX: "Texas",
+  UT: "Utah",
+  VT: "Vermont",
+  VA: "Virginia",
+  WA: "Washington",
+  WV: "West Virginia",
+  WI: "Wisconsin",
+  WY: "Wyoming",
+};
+const STATE_NAME_TO_CODE = Object.entries(STATE_CODE_TO_NAME).reduce((acc, [code, name]) => {
+  acc[String(name || "").toLowerCase().replace(/[^a-z]/g, "")] = code;
+  return acc;
+}, {});
+
+const LANGUAGE_PROFICIENCY_OPTIONS = [
+  { value: "Native", label: "Native" },
+  { value: "Fluent", label: "Fluent" },
+  { value: "Professional", label: "Professional" },
+  { value: "Conversational", label: "Conversational" },
+  { value: "Basic", label: "Basic" }
+];
+
+const EDUCATION_MONTH_OPTIONS = [
+  { value: "", label: "Month (optional)" },
+  { value: "Jan", label: "January" },
+  { value: "Feb", label: "February" },
+  { value: "Mar", label: "March" },
+  { value: "Apr", label: "April" },
+  { value: "May", label: "May" },
+  { value: "Jun", label: "June" },
+  { value: "Jul", label: "July" },
+  { value: "Aug", label: "August" },
+  { value: "Sep", label: "September" },
+  { value: "Oct", label: "October" },
+  { value: "Nov", label: "November" },
+  { value: "Dec", label: "December" }
+];
+
+function normalizeStateValue(raw = "") {
+  return String(raw || "")
+    .trim()
+    .toUpperCase();
+}
+
+function setStatePreferenceValue(rawValue = "") {
+  if (!statePreferenceSelect) return;
+  const normalized = normalizeStateValue(rawValue);
+  const hasOption = Array.from(statePreferenceSelect.options || []).some(
+    (opt) => opt.value === normalized
+  );
+  statePreferenceSelect.value = normalized && hasOption ? normalized : "";
+}
+
+function hydrateStatePreference(user = {}) {
+  const candidate = user.state || user.location || "";
+  setStatePreferenceValue(candidate);
+}
+
+const languagesEditor = document.getElementById("languagesEditor");
+const addLanguageBtn = document.getElementById("addLanguageBtn");
+const educationEditor = document.getElementById("educationEditor");
+const addEducationBtn = document.getElementById("addEducationBtn");
+const educationModalOverlay = document.getElementById("educationModalOverlay");
+const educationModal = document.getElementById("educationModal");
+const educationModalList = document.getElementById("educationModalList");
+const educationModalAdd = document.getElementById("educationModalAdd");
+const educationModalSave = document.getElementById("educationModalSave");
+const educationModalCancel = document.getElementById("educationModalCancel");
+const educationModalClose = document.getElementById("educationModalClose");
+let educationModalBound = false;
+
+if (addLanguageBtn && languagesEditor) {
+  addLanguageBtn.addEventListener("click", () => addLanguageRow());
+}
+if (addEducationBtn && educationEditor) {
+  addEducationBtn.addEventListener("click", () => addEducationRow(normalizeEducationEntry()));
+}
+
+function buildInitials(name = "", fallback = "A") {
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return fallback;
+  const letters = trimmed
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("")
+    .slice(0, 2);
+  return letters || fallback;
+}
+
+function getAttorneyInitials(user = {}) {
+  const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.name || "";
+  return buildInitials(fullName, "A");
+}
+
+function getParalegalInitials(user = {}) {
+  const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.name || "";
+  return buildInitials(fullName, "P");
+}
+
+function getProfileSettingsDraftStorageKey(user = currentUser || getCachedUser() || {}) {
+  const role = String(user?.role || "").trim().toLowerCase();
+  const identifier =
+    String(user?._id || user?.id || user?.email || "").trim().toLowerCase();
+  if (!role || !identifier) return "";
+  return `${PROFILE_SETTINGS_DRAFT_KEY}:${role}:${identifier}`;
+}
+
+function getProfileSettingsServerFingerprint(user = currentUser || getCachedUser() || {}) {
+  const role = String(user?.role || "").trim().toLowerCase();
+  const profile = role === "attorney"
+    ? {
+        firstName: user?.firstName || "",
+        lastName: user?.lastName || "",
+        linkedInURL: user?.linkedInURL || "",
+        lawFirm: user?.lawFirm || "",
+        firmWebsite: user?.firmWebsite || "",
+        practiceDescription: user?.practiceDescription || user?.bio || "",
+        publications: user?.publications || [],
+        practiceAreas: user?.practiceAreas || [],
+      }
+    : {
+        firstName: user?.firstName || "",
+        lastName: user?.lastName || "",
+        email: user?.email || "",
+        bio: user?.bio || "",
+        linkedInURL: user?.linkedInURL || "",
+        yearsExperience: user?.yearsExperience || "",
+        practiceAreas: user?.practiceAreas || [],
+        highlightedSkills: user?.highlightedSkills || user?.skills || [],
+        stateExperience: user?.stateExperience || [],
+        bestFor: user?.bestFor || [],
+        experience: user?.experience || [],
+        education: user?.education || [],
+        languages: user?.languages || [],
+      };
+  return JSON.stringify(profile);
+}
+
+function readProfileSettingsDraft(user = currentUser || getCachedUser() || {}) {
+  const key = getProfileSettingsDraftStorageKey(user);
+  if (!key) return null;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    const savedAt = Number(parsed.savedAt || 0);
+    const age = Date.now() - savedAt;
+    const currentServerFingerprint = getProfileSettingsServerFingerprint(user);
+    const draftServerFingerprint = String(parsed.serverFingerprint || "");
+    if (
+      !Number.isFinite(savedAt) ||
+      savedAt <= 0 ||
+      age < 0 ||
+      age > PROFILE_DRAFT_MAX_AGE_MS ||
+      draftServerFingerprint !== currentServerFingerprint
+    ) {
+      clearProfileSettingsDraft(user);
+      return null;
+    }
+    return parsed;
+  } catch {
+    clearProfileSettingsDraft(user);
+    return null;
+  }
+}
+
+function clearProfileSettingsDraft(user = currentUser || getCachedUser() || {}) {
+  const key = getProfileSettingsDraftStorageKey(user);
+  if (!key) return;
+  try {
+    sessionStorage.removeItem(key);
+  } catch {}
+}
+
+function collectAttorneyProfileDraft() {
+  return {
+    role: "attorney",
+    firstName: document.getElementById("attorneyFirstName")?.value.trim() || "",
+    lastName: document.getElementById("attorneyLastName")?.value.trim() || "",
+    linkedInURL: document.getElementById("attorneyLinkedIn")?.value.trim() || "",
+    lawFirm: document.getElementById("attorneyFirmName")?.value.trim() || "",
+    firmWebsite: document.getElementById("attorneyFirmWebsite")?.value.trim() || "",
+    practiceDescription: document.getElementById("attorneyPracticeDescription")?.value || "",
+    publications: (document.getElementById("attorneyPublications")?.value || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean),
+    practiceAreas: collectAttorneyPracticeAreas(),
+  };
+}
+
+function collectParalegalProfileDraft() {
+  syncNamePartsFromFullName();
+  return {
+    role: "paralegal",
+    firstName: document.getElementById("firstNameInput")?.value.trim() || "",
+    lastName: document.getElementById("lastNameInput")?.value.trim() || "",
+    email: document.getElementById("emailInput")?.value.trim() || "",
+    bio: document.getElementById("bioInput")?.value || "",
+    linkedInURL: document.getElementById("linkedInInput")?.value.trim() || "",
+    yearsExperience: document.getElementById("yearsExperienceInput")?.value || "",
+    practiceAreas: collectParalegalPracticeAreas(),
+    skills: readSkillsInput(),
+    stateExperience: readStateExperienceInput(),
+    bestFor: collectBestForEntries(),
+    experience: buildExperienceEntriesForSave(collectExperienceRows()),
+    education: collectEducationFromEditor(),
+    languages: collectLanguagesFromEditor(),
+  };
+}
+
+function collectProfileSettingsDraft() {
+  const role = String(currentUser?.role || "").trim().toLowerCase();
+  if (role === "attorney") return collectAttorneyProfileDraft();
+  if (role === "paralegal") return collectParalegalProfileDraft();
+  return null;
+}
+
+function persistProfileSettingsDraft() {
+  if (applyingProfileDraft) return;
+  const key = getProfileSettingsDraftStorageKey();
+  if (!key) return;
+  const draft = collectProfileSettingsDraft();
+  if (!draft) return;
+  try {
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        ...draft,
+        savedAt: Date.now(),
+        serverFingerprint: getProfileSettingsServerFingerprint(),
+      })
+    );
+  } catch {}
+}
+
+function scheduleProfileSettingsDraftPersist(delay = 120) {
+  if (applyingProfileDraft) return;
+  if (profileDraftWriteTimer) {
+    clearTimeout(profileDraftWriteTimer);
+  }
+  profileDraftWriteTimer = setTimeout(() => {
+    profileDraftWriteTimer = null;
+    persistProfileSettingsDraft();
+  }, delay);
+}
+
+function applyProfileSettingsDraft(draft = null, user = currentUser || {}) {
+  if (!draft || typeof draft !== "object") return;
+  const role = String(user?.role || draft.role || "").trim().toLowerCase();
+  if (!role || (draft.role && String(draft.role).trim().toLowerCase() !== role)) return;
+
+  applyingProfileDraft = true;
+  try {
+    if (role === "attorney") {
+      const firstInput = document.getElementById("attorneyFirstName");
+      if (firstInput) firstInput.value = draft.firstName || "";
+      const lastInput = document.getElementById("attorneyLastName");
+      if (lastInput) lastInput.value = draft.lastName || "";
+      const linkedInInput = document.getElementById("attorneyLinkedIn");
+      if (linkedInInput) linkedInInput.value = draft.linkedInURL || "";
+      const firmNameInput = document.getElementById("attorneyFirmName");
+      if (firmNameInput) firmNameInput.value = draft.lawFirm || "";
+      const firmWebsiteInput = document.getElementById("attorneyFirmWebsite");
+      if (firmWebsiteInput) firmWebsiteInput.value = draft.firmWebsite || "";
+      const practiceInput = document.getElementById("attorneyPracticeDescription");
+      if (practiceInput) practiceInput.value = draft.practiceDescription || "";
+      const publicationsInput = document.getElementById("attorneyPublications");
+      if (publicationsInput) {
+        publicationsInput.value = Array.isArray(draft.publications) ? draft.publications.join("\n") : "";
+      }
+      renderAttorneyPracticeAreas(Array.isArray(draft.practiceAreas) ? draft.practiceAreas : []);
+      settingsState.practiceDescription = draft.practiceDescription || "";
+      updateAttorneyPracticeCount();
+      syncCluster({
+        ...(user || {}),
+        firstName: draft.firstName || user.firstName || "",
+        lastName: draft.lastName || user.lastName || "",
+      });
+      return;
+    }
+
+    setFullNameInputs({
+      ...(user || {}),
+      firstName: draft.firstName || user.firstName || "",
+      lastName: draft.lastName || user.lastName || "",
+    });
+    const emailInput = document.getElementById("emailInput");
+    if (emailInput) emailInput.value = draft.email || "";
+    const bioInput = document.getElementById("bioInput");
+    if (bioInput) bioInput.value = draft.bio || "";
+    const linkedInInput = document.getElementById("linkedInInput");
+    if (linkedInInput) linkedInInput.value = draft.linkedInURL || "";
+    const yearsExperienceInput = document.getElementById("yearsExperienceInput");
+    if (yearsExperienceInput) yearsExperienceInput.value = draft.yearsExperience || "";
+    renderParalegalPracticeAreas(Array.isArray(draft.practiceAreas) ? draft.practiceAreas : []);
+    applySkillsInput(Array.isArray(draft.skills) ? draft.skills : []);
+    bindSkillsInput();
+    applyStateExperienceInput(Array.isArray(draft.stateExperience) ? draft.stateExperience : []);
+    bindStateExperienceInput();
+    renderBestForList(Array.isArray(draft.bestFor) ? draft.bestFor : [], { editable: false });
+    renderExperienceRows(Array.isArray(draft.experience) ? draft.experience : []);
+    bindExperienceAddButton();
+    renderEducationEditor(Array.isArray(draft.education) ? draft.education : []);
+    renderLanguageEditor(Array.isArray(draft.languages) ? draft.languages : []);
+    settingsState.bio = draft.bio || "";
+    settingsState.linkedInURL = draft.linkedInURL || "";
+    settingsState.highlightedSkills = Array.isArray(draft.skills) ? draft.skills : [];
+    settingsState.stateExperience = Array.isArray(draft.stateExperience) ? draft.stateExperience : [];
+    settingsState.education = Array.isArray(draft.education) ? draft.education : [];
+    refreshParalegalSectionDisplays();
+    updateRoleLineFromExperience();
+    updateRequiredFieldMarkers();
+    syncCluster({
+      ...(user || {}),
+      firstName: draft.firstName || user.firstName || "",
+      lastName: draft.lastName || user.lastName || "",
+    });
+  } finally {
+    applyingProfileDraft = false;
+  }
+}
+
+function bindProfileDraftPersistence() {
+  if (profileDraftPersistenceBound) return;
+  const shouldTrack = (target) => {
+    if (!(target instanceof HTMLElement)) return false;
+    return Boolean(target.closest("#profileForm, #attorneySettings"));
+  };
+  const scheduleFromEvent = (event) => {
+    if (!currentUser || applyingProfileDraft || !shouldTrack(event.target)) return;
+    scheduleProfileSettingsDraftPersist();
+  };
+
+  document.addEventListener("input", scheduleFromEvent, true);
+  document.addEventListener("change", scheduleFromEvent, true);
+  profileDraftPersistenceBound = true;
+}
+
+function seedSettingsState(user = {}) {
+  settingsState.bio = user.bio || "";
+  settingsState.education = user.education || [];
+  settingsState.awards = user.awards || [];
+  settingsState.highlightedSkills = user.highlightedSkills || user.skills || [];
+  settingsState.stateExperience = user.stateExperience || [];
+  settingsState.linkedInURL = user.linkedInURL || "";
+  settingsState.profileImage = user.profileImage || user.avatarURL || "";
+  settingsState.profileImageOriginal = user.profileImageOriginal || "";
+  settingsState.pendingProfileImage = user.pendingProfileImage || "";
+  settingsState.pendingProfileImageOriginal = user.pendingProfileImageOriginal || "";
+  settingsState.profilePhotoStatus = resolveProfilePhotoStatus(user);
+  settingsState.notificationPrefs = {
+    email: true,
+    emailMessages: true,
+    emailCase: true,
+    sms: false,
+    ...(user.notificationPrefs || {})
+  };
+  settingsState.practiceDescription = user.practiceDescription || user.bio || "";
+  const freq = typeof user.digestFrequency === "string" ? user.digestFrequency : "off";
+  settingsState.digestFrequency = ["off", "daily", "weekly"].includes(freq) ? freq : "off";
+}
+
+function resolveProfilePhotoStatus(user = {}) {
+  const role = String(user.role || currentUser?.role || "").trim().toLowerCase();
+  const hasApproved = Boolean(user.profileImage || user.avatarURL || settingsState.profileImage);
+  if (role === "attorney") {
+    return hasApproved ? "approved" : "unsubmitted";
+  }
+  if (user.pendingProfileImage || settingsState.pendingProfileImage || settingsState.stagedProfilePhotoUrl) {
+    return "pending_review";
+  }
+  const raw = String(user.profilePhotoStatus || settingsState.profilePhotoStatus || "").trim();
+  if (raw) return raw;
+  return hasApproved ? "approved" : "unsubmitted";
+}
+
+function resolvePendingProfileImage(user = {}) {
+  return user.pendingProfileImage || settingsState.pendingProfileImage || "";
+}
+
+function preserveProfileSettingsScrollPosition() {
+  const content = document.getElementById("main");
+  if (!content) return () => {};
+  const previousTop = content.scrollTop;
+  return () => {
+    requestAnimationFrame(() => {
+      content.scrollTop = previousTop;
+      scheduleProfileScrollIndicatorUpdate?.();
+    });
+  };
+}
+
+function bindDocumentFileChooser(triggerId, input, onAfterChoose = null) {
+  const trigger = document.getElementById(triggerId);
+  if (!trigger || !input) return;
+  trigger.addEventListener("click", () => {
+    const restoreScroll = preserveProfileSettingsScrollPosition();
+    input.click();
+    setTimeout(() => {
+      restoreScroll();
+      if (typeof onAfterChoose === "function") onAfterChoose();
+    }, 0);
+  });
+  input.addEventListener("change", () => {
+    const restoreScroll = preserveProfileSettingsScrollPosition();
+    setTimeout(() => {
+      restoreScroll();
+      if (typeof onAfterChoose === "function") onAfterChoose();
+    }, 0);
+  });
+}
+
+function openProfileDocument(url) {
+  const targetUrl = normalizeHttpNavigationUrl(url);
+  if (!targetUrl) return;
+  try {
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
+  } catch {
+    window.location.href = targetUrl;
+  }
+}
+
+async function uploadParalegalPdfDocument({
+  input,
+  endpoint,
+  invalidMessage,
+  sizeMessage,
+  failureMessage,
+  successMessage,
+  onSuccess,
+  onFinally,
+}) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  if (!isPdfFile(file)) {
+    showToast(invalidMessage, "err");
+    input.value = "";
+    onFinally?.();
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    showToast(sizeMessage, "err");
+    input.value = "";
+    onFinally?.();
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  try {
+    const res = await secureFetch(endpoint, {
+      method: "POST",
+      body: fd
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload.msg || failureMessage);
+    }
+    onSuccess?.(payload, file);
+    showToast(successMessage, "ok");
+  } catch (err) {
+    console.error(`Upload failed for ${endpoint}`, err);
+    showToast(err?.message || failureMessage, "err");
+  } finally {
+    input.value = "";
+    onFinally?.();
+  }
+}
+
+function resolvePendingProfileImageOriginal(user = {}) {
+  return user.pendingProfileImageOriginal || settingsState.pendingProfileImageOriginal || "";
+}
+
+function resolveProfileImageOriginal(user = {}) {
+  return user.profileImageOriginal || settingsState.profileImageOriginal || "";
+}
+
+function getOriginalPhotoSource(user = {}, { allowPending = false } = {}) {
+  if (settingsState.stagedProfilePhotoOriginalFile) {
+    return { type: "file", value: settingsState.stagedProfilePhotoOriginalFile };
+  }
+  if (settingsState.stagedProfilePhotoOriginalUrl) {
+    return { type: "url", value: settingsState.stagedProfilePhotoOriginalUrl };
+  }
+  const pendingOriginal = resolvePendingProfileImageOriginal(user);
+  if (allowPending && pendingOriginal) {
+    return { type: "url", value: pendingOriginal };
+  }
+  const approvedOriginal = resolveProfileImageOriginal(user);
+  if (approvedOriginal) {
+    return { type: "url", value: approvedOriginal };
+  }
+  return null;
+}
+
+function getDisplayProfileImage(user = {}, { allowPending = false } = {}) {
+  const approved = user.profileImage || user.avatarURL || settingsState.profileImage || "";
+  const role = String(user.role || currentUser?.role || "").trim().toLowerCase();
+  const hasPending = Boolean(resolvePendingProfileImage(user) || settingsState.stagedProfilePhotoUrl);
+  if (allowPending && (role === "paralegal" || hasPending)) {
+    if (settingsState.stagedProfilePhotoUrl) {
+      return settingsState.stagedProfilePhotoUrl;
+    }
+    const pending = resolvePendingProfileImage(user);
+    if (pending) return pending;
+  }
+  return approved;
+}
+
+function updatePhotoReviewStatus(user = {}) {
+  const statusEl = document.getElementById("photoReviewStatus");
+  if (!statusEl) return;
+  const role = String(currentUser?.role || user?.role || "").trim().toLowerCase();
+  if (role === "attorney") {
+    statusEl.classList.remove("is-rejected");
+    statusEl.textContent = "";
+    statusEl.classList.add("hidden");
+    return;
+  }
+  if (settingsState.stagedProfilePhotoFile) {
+    statusEl.classList.remove("is-rejected");
+    statusEl.textContent = "";
+    statusEl.classList.add("hidden");
+    return;
+  }
+  const status = resolveProfilePhotoStatus(user);
+  statusEl.classList.remove("is-rejected");
+  let message = "";
+  if (status === "pending_review") {
+    message = "Your profile is hidden from attorney discovery until your photo is approved.";
+  } else if (status === "rejected") {
+    message = "Your photo needs a quick update. Please upload a new one that meets our guidelines.";
+    statusEl.classList.add("is-rejected");
+  }
+  statusEl.textContent = message;
+  statusEl.classList.toggle("hidden", !message);
+}
+
+function isParalegalPhotoApproved(user = {}) {
+  const status = String(user.profilePhotoStatus || "").trim();
+  const hasPending = Boolean(user.pendingProfileImage || settingsState.pendingProfileImage);
+  return status === "approved" && !hasPending;
+}
+
+function getParalegalRequiredFieldStatus() {
+  const bioInput = document.getElementById("bioInput");
+  const bioValue = bioInput?.value ?? settingsState.bio;
+  const bioOk = Boolean(String(bioValue || "").trim());
+
+  const skills = readSkillsInput();
+  const practiceAreas = collectParalegalPracticeAreas();
+  const skillsOk = skills.length > 0;
+  const practiceAreasOk = practiceAreas.length > 0;
+
+  const resumeKeyInput = document.getElementById("resumeKeyInput");
+  const resumeValue =
+    resumeKeyInput?.value || settingsState.pendingResumeKey || currentUser?.resumeURL || "";
+  const resumeOk = !settingsState.removeResume && Boolean(String(resumeValue || "").trim());
+
+  const pendingPhoto = settingsState.pendingProfileImage || currentUser?.pendingProfileImage || "";
+  const approvedPhoto = settingsState.profileImage || currentUser?.profileImage || currentUser?.avatarURL || "";
+  const photoOk = Boolean(settingsState.stagedProfilePhotoFile || pendingPhoto || approvedPhoto);
+
+  return {
+    bioOk,
+    skillsOk,
+    practiceAreasOk,
+    resumeOk,
+    photoOk,
+  };
+}
+
+function updateRequiredFieldMarkers() {
+  if (!currentUser || String(currentUser.role || "").toLowerCase() !== "paralegal") {
+    return { ok: true };
+  }
+  const status = getParalegalRequiredFieldStatus();
+  const bioLabel = document.querySelector("#bioSection .card-header-label");
+  if (bioLabel) bioLabel.classList.toggle("required-missing", !status.bioOk);
+  const skillsLabel = document.querySelector("#skillsCard .card-header-label");
+  if (skillsLabel) skillsLabel.classList.toggle("required-missing", !status.skillsOk);
+  const practiceAreasLabel = document.querySelector("#practiceAreasCard .card-header-label");
+  if (practiceAreasLabel) practiceAreasLabel.classList.toggle("required-missing", !status.practiceAreasOk);
+  const stateLabel = document.querySelector("#stateExperienceCard .card-header-label");
+  if (stateLabel) stateLabel.classList.remove("required-missing");
+  const resumeHeader = document.querySelector("#settingsResume h3");
+  if (resumeHeader) resumeHeader.classList.toggle("required-missing", !status.resumeOk);
+  const avatarFrame = document.getElementById("avatarFrame");
+  if (avatarFrame) avatarFrame.classList.toggle("required-missing", !status.photoOk);
+
+  const missing = [];
+  if (!status.bioOk) missing.push("Bio");
+  if (!status.skillsOk) missing.push("Skills");
+  if (!status.practiceAreasOk) missing.push("Practice Areas");
+  if (!status.resumeOk) missing.push("Resume");
+  if (!status.photoOk) missing.push("Profile photo");
+
+  const readiness = document.getElementById("profileReadiness");
+  const readinessTitle = document.getElementById("profileReadinessTitle");
+  const readinessDetail = document.getElementById("profileReadinessDetail");
+  const readinessAction = document.getElementById("profileReadinessAction");
+  const isReady = missing.length === 0;
+  if (readiness) readiness.dataset.state = isReady ? "ready" : "incomplete";
+  if (readinessTitle) {
+    readinessTitle.textContent = isReady
+      ? "Your profile is ready"
+      : `${missing.length} required ${missing.length === 1 ? "item" : "items"} to finish`;
+  }
+  if (readinessDetail) {
+    readinessDetail.hidden = isReady;
+    readinessDetail.textContent = isReady
+      ? ""
+      : `Add ${missing.join(", ")} before making your profile visible.`;
+  }
+  if (readinessAction) {
+    readinessAction.hidden = isReady;
+    readinessAction.dataset.target = !status.photoOk
+      ? "avatarFrame"
+      : !status.bioOk
+      ? "bioSection"
+      : !status.skillsOk
+      ? "skillsCard"
+      : !status.practiceAreasOk
+      ? "practiceAreasCard"
+      : "settingsResume";
+  }
+
+  return {
+    ...status,
+    ok: status.bioOk && status.skillsOk && status.practiceAreasOk && status.resumeOk && status.photoOk,
+    missing,
+  };
+}
+
+const profileReadinessAction = document.getElementById("profileReadinessAction");
+if (profileReadinessAction) {
+  profileReadinessAction.addEventListener("click", () => {
+    const target = document.getElementById(profileReadinessAction.dataset.target || "");
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    const editToggle = target.querySelector?.("[data-edit-toggle]");
+    (editToggle || target).focus({ preventScroll: true });
+  });
+}
+
+function bindParalegalRequiredFieldWatchers() {
+  if (paralegalRequiredBound) return;
+  paralegalRequiredBound = true;
+  const bioInput = document.getElementById("bioInput");
+  if (bioInput) bioInput.addEventListener("input", updateRequiredFieldMarkers);
+  bindSkillsInput();
+  const stateInput = document.getElementById("stateExperienceInput");
+  if (stateInput) stateInput.addEventListener("input", updateRequiredFieldMarkers);
+}
+
+function bootstrapProfileSettings(user) {
+  enforceUnifiedRoleStyling(user);
+  currentUser = user;
+  const role = (user.role || "").toLowerCase();
+  if (role === "attorney") {
+    initAttorneySettings(user);
+    return;
+  }
+  initParalegalSettings(user);
+}
+
+function initAttorneySettings(user = {}) {
+  seedSettingsState(user);
+  showAttorneySettings();
+  hydrateAttorneyProfileForm(user);
+  initializeAttorneySaveState();
+  bindAttorneyPracticeEditor();
+  bindAttorneySaveButton();
+  bindAttorneyPublicationsToggle();
+  bindAttorneyNotificationToggles();
+  syncCluster(user);
+}
+
+function initParalegalSettings(user = {}) {
+  showParalegalSettings();
+  hydrateProfileForm(user);
+  seedSettingsState(user);
+  updatePhotoReviewStatus(user);
+  initParalegalSectionEditing();
+  bindEducationModal();
+  hydrateParalegalNotificationPrefs(user);
+  bindParalegalNotificationToggles();
+  hydrateParalegalVisibilityPref(user);
+  bindParalegalVisibilityToggle();
+  bindParalegalRequiredFieldWatchers();
+  updateRequiredFieldMarkers();
+  renderLanguageEditor(user.languages || []);
+  [
+    ["certificate", loadCertificate],
+    ["resume", loadResume],
+    ["writing sample", loadWritingSample],
+    ["bio", loadBio],
+    ["education", loadEducation],
+    ["awards", loadAwards],
+    ["skills", loadSkills],
+    ["LinkedIn", loadLinkedIn],
+    ["notifications", loadNotifications],
+  ].forEach(([section, hydrate]) => {
+    try {
+      hydrate(user);
+    } catch (error) {
+      console.error(`[profile] ${section} hydration failed`, error);
+    }
+  });
+  syncCluster(user);
+  setTimeout(() => initParalegalProfileTour(user), 300);
+}
+
+let profileTourInitialized = false;
+
+function getStoredUserSnapshot() {
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+let onboardingState = null;
+let onboardingPromise = null;
+
+function normalizeOnboarding(raw = {}) {
+  return {
+    paralegalTourCompleted: Boolean(raw?.paralegalTourCompleted),
+    paralegalProfileTourCompleted: Boolean(raw?.paralegalProfileTourCompleted),
+    attorneyProfileCompleted: Boolean(raw?.attorneyProfileCompleted),
+  };
+}
+
+function getCachedOnboarding(user) {
+  if (user?.onboarding && typeof user.onboarding === "object") {
+    onboardingState = normalizeOnboarding(user.onboarding);
+    return onboardingState;
+  }
+  return onboardingState || normalizeOnboarding({});
+}
+
+async function loadOnboardingState(user) {
+  if (user?.onboarding && typeof user.onboarding === "object") {
+    onboardingState = normalizeOnboarding(user.onboarding);
+    return onboardingState;
+  }
+  if (onboardingState) return onboardingState;
+  if (onboardingPromise) return onboardingPromise;
+  onboardingPromise = (async () => {
+    try {
+      const res = await secureFetch("/api/users/me/onboarding", {
+        headers: { Accept: "application/json" },
+        suppressToast: true,
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || "Unable to load onboarding state.");
+      onboardingState = normalizeOnboarding(payload.onboarding || {});
+      return onboardingState;
+    } catch (err) {
+      console.warn("Unable to load onboarding state", err);
+      onboardingState = normalizeOnboarding({});
+      return onboardingState;
+    } finally {
+      onboardingPromise = null;
+    }
+  })();
+  return onboardingPromise;
+}
+
+async function updateOnboardingState(updates = {}, { markFirstLoginComplete = false } = {}) {
+  try {
+    const res = await secureFetch("/api/users/me/onboarding", {
+      method: "PATCH",
+      headers: { Accept: "application/json" },
+      body: updates,
+      suppressToast: true,
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload?.error || "Unable to update onboarding state.");
+    onboardingState = normalizeOnboarding(payload.onboarding || {});
+    if (typeof window.updateSessionUser === "function") {
+      const nextUser = { onboarding: onboardingState };
+      if (markFirstLoginComplete) nextUser.isFirstLogin = false;
+      window.updateSessionUser(nextUser);
+    }
+    return onboardingState;
+  } catch (err) {
+    console.warn("Unable to update onboarding state", err);
+    return getCachedOnboarding({});
+  }
+}
+
+
+function markProfileTourCompleted() {
+  void updateOnboardingState({ paralegalProfileTourCompleted: true }, { markFirstLoginComplete: true });
+}
+
+async function initParalegalProfileTour(user = {}) {
+  if (profileTourInitialized) return;
+  profileTourInitialized = true;
+  if (String(user?.role || "").toLowerCase() !== "paralegal") return;
+
+  const overlay = document.getElementById("profileTourOverlay");
+  const tooltip = document.getElementById("profileTourTooltip");
+  const titleEl = document.getElementById("profileTourTitle");
+  const textEl = document.getElementById("profileTourText");
+  const closeBtn = document.getElementById("profileTourCloseBtn");
+  const backBtn = document.getElementById("profileTourBackBtn");
+  const nextBtn = document.getElementById("profileTourNextBtn");
+  const saveChangesBtn = document.getElementById("profileSaveBtn");
+  const previewProfileBtn = document.getElementById("previewProfileBtn");
+  const sidebarToggle = document.getElementById("sidebarToggle");
+  const sidebarNav = document.getElementById("sidebarNav");
+  let sidebarOpenedByTour = false;
+  const saveChangesInitiallyDisabled = Boolean(saveChangesBtn?.disabled);
+  const previewProfileInitiallyDisabled = Boolean(previewProfileBtn?.disabled);
+  if (!overlay || !tooltip || !titleEl || !textEl || !closeBtn || !backBtn || !nextBtn) return;
+
+  const stored = getStoredUserSnapshot();
+  const effectiveUser = user || stored || {};
+  const role = String(effectiveUser?.role || "").toLowerCase();
+  const status = String(effectiveUser?.status || "").toLowerCase();
+  const storedFlag = stored?.isFirstLogin;
+  const userFlag = effectiveUser?.isFirstLogin;
+  const isFirstLogin = typeof storedFlag === "boolean" ? storedFlag : Boolean(userFlag);
+  const onboarding = await loadOnboardingState(effectiveUser);
+
+  const params = new URLSearchParams(window.location.search);
+  const forceTour = params.get("tour") === "1";
+  const shouldShow =
+    forceTour ||
+    (role === "paralegal" &&
+      (!status || status === "approved") &&
+      isFirstLogin &&
+      !onboarding?.paralegalProfileTourCompleted);
+  if (!shouldShow) return;
+  if (!forceTour) {
+    markProfileTourCompleted();
+  }
+
+  const steps = [
+    {
+      id: "bioSection",
+      sectionId: "profileSection",
+      title: "Bio",
+      text: "Share a short overview of your background, specialties, and the types of matters you support.",
+      autoScroll: "smooth",
+    },
+    {
+      id: "profileSaveBtn",
+      sectionId: "profileSection",
+      title: "Save changes",
+      text: "Save your updates so your profile stays current.",
+      autoScroll: "smooth",
+    },
+    {
+      id: "previewProfileBtn",
+      sectionId: "profileSection",
+      title: "View profile",
+      text: "Preview the profile attorneys will see when your profile is available on the platform.",
+      autoScroll: "smooth",
+    },
+    {
+      id: "connectStripeBtn",
+      sectionId: "securitySection",
+      title: "Payouts Setup",
+      text: "Set up payouts here. Connect Stripe so you can receive payments.",
+      autoScroll: "smooth",
+    },
+    {
+      selector: ".theme-preview-grid",
+      sectionId: "preferencesSection",
+      title: "Preferences Tab / Theme Changes",
+      text: "In Preferences, you can change your theme here to personalize how your dashboard looks.",
+      autoScroll: "smooth",
+    },
+    {
+      id: "dashboardReturnLink",
+      title: "RETURN TO DASHBOARD",
+      text: "Use this button anytime to go back to your dashboard.",
+    },
+  ];
+
+  let activeIndex = 0;
+  let activeRenderToken = 0;
+  let activeTourTarget = null;
+  let pendingSyncFrame = null;
+  const sectionNavMap = {
+    profileSection: "navProfile",
+    securitySection: "navSecurity",
+    preferencesSection: "navPreferences",
+  };
+
+  const activateSection = (sectionId) => {
+    if (!sectionId) return;
+    const navId = sectionNavMap[sectionId];
+    if (!navId) return;
+    const navBtn = document.getElementById(navId);
+    if (navBtn && !navBtn.classList.contains("active")) {
+      navBtn.click();
+    }
+  };
+
+  const setSidebarOpen = (open) => {
+    document.body.classList.toggle("nav-open", Boolean(open));
+    if (sidebarToggle) {
+      sidebarToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+  };
+
+  const isMobileSidebarMode = () => window.matchMedia("(max-width: 960px)").matches;
+
+  const ensureSidebarVisibleForTarget = (target) => {
+    if (!target || !sidebarNav) {
+      if (sidebarOpenedByTour) {
+        setSidebarOpen(false);
+        sidebarOpenedByTour = false;
+      }
+      return;
+    }
+
+    const isSidebarTarget = sidebarNav.contains(target);
+    if (isMobileSidebarMode() && isSidebarTarget) {
+      const alreadyOpen = document.body.classList.contains("nav-open");
+      if (!alreadyOpen) sidebarOpenedByTour = true;
+      setSidebarOpen(true);
+      return;
+    }
+
+    if (sidebarOpenedByTour) {
+      setSidebarOpen(false);
+      sidebarOpenedByTour = false;
+    }
+  };
+
+  const setTourSaveButtonLock = (locked) => {
+    if (!saveChangesBtn) return;
+    if (locked) {
+      saveChangesBtn.disabled = true;
+      saveChangesBtn.setAttribute("aria-disabled", "true");
+      saveChangesBtn.dataset.tourLocked = "true";
+      return;
+    }
+    if (saveChangesBtn.dataset.tourLocked !== "true") return;
+    delete saveChangesBtn.dataset.tourLocked;
+    saveChangesBtn.disabled = saveChangesInitiallyDisabled;
+    if (saveChangesInitiallyDisabled) {
+      saveChangesBtn.setAttribute("aria-disabled", "true");
+    } else {
+      saveChangesBtn.removeAttribute("aria-disabled");
+    }
+  };
+
+  const setTourPreviewButtonLock = (locked) => {
+    if (!previewProfileBtn) return;
+    if (locked) {
+      previewProfileBtn.disabled = true;
+      previewProfileBtn.setAttribute("aria-disabled", "true");
+      previewProfileBtn.dataset.tourLocked = "true";
+      return;
+    }
+    if (previewProfileBtn.dataset.tourLocked !== "true") return;
+    delete previewProfileBtn.dataset.tourLocked;
+    previewProfileBtn.disabled = previewProfileInitiallyDisabled;
+    if (previewProfileInitiallyDisabled) {
+      previewProfileBtn.setAttribute("aria-disabled", "true");
+    } else {
+      previewProfileBtn.removeAttribute("aria-disabled");
+    }
+  };
+
+  const clearTour = () => {
+    const returnTarget = activeTourTarget;
+    activeRenderToken += 1;
+    activeTourTarget = null;
+    ensureSidebarVisibleForTarget(null);
+    if (pendingSyncFrame) {
+      cancelAnimationFrame(pendingSyncFrame);
+      pendingSyncFrame = null;
+    }
+    setTourSaveButtonLock(false);
+    setTourPreviewButtonLock(false);
+    overlay.classList.remove("is-active", "spotlight");
+    overlay.setAttribute("aria-hidden", "true");
+    tooltip.classList.remove("is-active", "arrow-left", "arrow-right", "arrow-top", "arrow-bottom");
+    tooltip.setAttribute("aria-hidden", "true");
+    tooltip.setAttribute("inert", "");
+    deactivateDialogFocus(tooltip, { restoreFocus: false });
+    if (returnTarget instanceof HTMLElement) returnTarget.focus();
+    if (forceTour) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  };
+
+  const positionTooltip = (target) => {
+    const rect = target.getBoundingClientRect();
+    const tipRect = tooltip.getBoundingClientRect();
+    const viewportPadding = 12;
+    const gap = 14;
+    const arrowClassNames = ["arrow-left", "arrow-right", "arrow-top", "arrow-bottom"];
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const isCompactViewport = window.matchMedia("(max-width: 900px)").matches;
+    const targetCenterX = rect.left + rect.width / 2;
+    const targetCenterY = rect.top + rect.height / 2;
+    const overlapArea = (a, b) => {
+      const width = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+      const height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      return width * height;
+    };
+    const getOverflow = (box) =>
+      Math.max(0, viewportPadding - box.left) +
+      Math.max(0, box.right - (window.innerWidth - viewportPadding)) +
+      Math.max(0, viewportPadding - box.top) +
+      Math.max(0, box.bottom - (window.innerHeight - viewportPadding));
+
+    if (isCompactViewport) {
+      const left = clamp(
+        targetCenterX - tipRect.width / 2,
+        viewportPadding,
+        Math.max(viewportPadding, window.innerWidth - tipRect.width - viewportPadding)
+      );
+      const topCandidates = [
+        {
+          top: Math.max(viewportPadding, rect.top - tipRect.height - gap),
+          arrowClass: "arrow-bottom",
+        },
+        {
+          top: Math.min(window.innerHeight - tipRect.height - viewportPadding, rect.bottom + gap),
+          arrowClass: "arrow-top",
+        },
+      ];
+
+      const ranked = topCandidates
+        .map((candidate, index) => {
+          const box = {
+            left,
+            top: candidate.top,
+            right: left + tipRect.width,
+            bottom: candidate.top + tipRect.height,
+          };
+          const overflow = getOverflow(box);
+          const overlap = overlapArea(box, rect);
+          const score = overlap * 100000 + overflow * 100 + index;
+          return { ...candidate, left, score };
+        })
+        .sort((a, b) => a.score - b.score);
+
+      const best = ranked[0];
+      tooltip.style.left = `${best.left}px`;
+      tooltip.style.top = `${best.top}px`;
+      tooltip.classList.remove(...arrowClassNames);
+      tooltip.classList.add(best.arrowClass);
+      const arrowLeft = clamp(targetCenterX - best.left - 8, 16, tipRect.width - 20);
+      tooltip.style.setProperty("--arrow-left", `${arrowLeft}px`);
+      return;
+    }
+
+    const buildCandidate = (placement) => {
+      if (placement === "right") {
+        const left = rect.right + gap;
+        const top = clamp(
+          targetCenterY - tipRect.height / 2,
+          viewportPadding,
+          Math.max(viewportPadding, window.innerHeight - tipRect.height - viewportPadding)
+        );
+        return {
+          left,
+          top,
+          arrowClass: "arrow-left",
+          arrowTop: clamp(targetCenterY - top - 8, 16, tipRect.height - 20),
+        };
+      }
+      if (placement === "left") {
+        const left = rect.left - tipRect.width - gap;
+        const top = clamp(
+          targetCenterY - tipRect.height / 2,
+          viewportPadding,
+          Math.max(viewportPadding, window.innerHeight - tipRect.height - viewportPadding)
+        );
+        return {
+          left,
+          top,
+          arrowClass: "arrow-right",
+          arrowTop: clamp(targetCenterY - top - 8, 16, tipRect.height - 20),
+        };
+      }
+      if (placement === "top") {
+        const left = clamp(
+          targetCenterX - tipRect.width / 2,
+          viewportPadding,
+          Math.max(viewportPadding, window.innerWidth - tipRect.width - viewportPadding)
+        );
+        const top = rect.top - tipRect.height - gap;
+        return {
+          left,
+          top,
+          arrowClass: "arrow-bottom",
+          arrowLeft: clamp(targetCenterX - left - 8, 16, tipRect.width - 20),
+        };
+      }
+      const left = clamp(
+        targetCenterX - tipRect.width / 2,
+        viewportPadding,
+        Math.max(viewportPadding, window.innerWidth - tipRect.width - viewportPadding)
+      );
+      const top = rect.bottom + gap;
+      return {
+        left,
+        top,
+        arrowClass: "arrow-top",
+        arrowLeft: clamp(targetCenterX - left - 8, 16, tipRect.width - 20),
+      };
+    };
+
+    const preferredPlacements = window.matchMedia("(max-width: 900px)").matches
+      ? ["top", "bottom", "right", "left"]
+      : ["right", "left", "top", "bottom"];
+
+    const ranked = preferredPlacements
+      .map((placement, index) => {
+        const candidate = buildCandidate(placement);
+        const box = {
+          left: candidate.left,
+          top: candidate.top,
+          right: candidate.left + tipRect.width,
+          bottom: candidate.top + tipRect.height,
+        };
+        const overflow = getOverflow(box);
+        const overlap = overlapArea(box, rect);
+        const score = overflow * 100000 + overlap * 100 + index;
+        return { ...candidate, score };
+      })
+      .sort((a, b) => a.score - b.score);
+
+    const best = ranked[0];
+    tooltip.style.left = `${best.left}px`;
+    tooltip.style.top = `${best.top}px`;
+    tooltip.classList.remove(...arrowClassNames);
+    tooltip.classList.add(best.arrowClass);
+    if (typeof best.arrowTop === "number") {
+      tooltip.style.setProperty("--arrow-top", `${best.arrowTop}px`);
+    }
+    if (typeof best.arrowLeft === "number") {
+      tooltip.style.setProperty("--arrow-left", `${best.arrowLeft}px`);
+    }
+  };
+
+  const positionSpotlight = (target) => {
+    const rect = target.getBoundingClientRect();
+    const padding = 10;
+    overlay.style.setProperty("--spot-x", `${rect.left - padding}px`);
+    overlay.style.setProperty("--spot-y", `${rect.top - padding}px`);
+    overlay.style.setProperty("--spot-w", `${rect.width + padding * 2}px`);
+    overlay.style.setProperty("--spot-h", `${rect.height + padding * 2}px`);
+  };
+
+  const syncActiveStepPosition = () => {
+    if (!activeTourTarget) return;
+    if (!overlay.classList.contains("is-active") || !tooltip.classList.contains("is-active")) return;
+    if (!document.body.contains(activeTourTarget)) return;
+    positionSpotlight(activeTourTarget);
+    positionTooltip(activeTourTarget);
+  };
+
+  const scheduleActiveStepSync = () => {
+    if (pendingSyncFrame) return;
+    pendingSyncFrame = requestAnimationFrame(() => {
+      pendingSyncFrame = null;
+      syncActiveStepPosition();
+    });
+  };
+
+  const trackStepTargetPosition = (target, renderToken, durationMs = 750) => {
+    const start = performance.now();
+    const tick = () => {
+      if (renderToken !== activeRenderToken) return;
+      positionSpotlight(target);
+      positionTooltip(target);
+      if (performance.now() - start < durationMs) {
+        requestAnimationFrame(tick);
+      }
+    };
+    requestAnimationFrame(tick);
+  };
+
+  const showStep = (index, { allowAutoScroll = true } = {}) => {
+    const renderToken = ++activeRenderToken;
+    const step = steps[index];
+    if (!step) {
+      clearTour();
+      return;
+    }
+    activateSection(step.sectionId);
+    const target = step.id ? document.getElementById(step.id) : document.querySelector(step.selector);
+    if (!target) {
+      showStep(index + 1);
+      return;
+    }
+    ensureSidebarVisibleForTarget(target);
+    activeTourTarget = target;
+    activeIndex = index;
+    titleEl.textContent = step.title;
+    textEl.textContent = step.text;
+    backBtn.style.visibility = index === 0 ? "hidden" : "visible";
+    backBtn.disabled = index === 0;
+    nextBtn.textContent = index === steps.length - 1 ? "Finish" : "Next";
+    overlay.classList.add("is-active", "spotlight");
+    overlay.setAttribute("aria-hidden", "false");
+    tooltip.classList.add("is-active");
+    tooltip.setAttribute("aria-hidden", "false");
+    tooltip.removeAttribute("inert");
+    activateDialogFocus(tooltip, {
+      initialFocus: nextBtn,
+      onEscape: clearTour,
+    });
+    const shouldAutoScroll = allowAutoScroll && step.autoScroll === "smooth";
+    if (shouldAutoScroll) {
+      target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      trackStepTargetPosition(target, renderToken);
+      return;
+    }
+    trackStepTargetPosition(target, renderToken, 450);
+  };
+
+  closeBtn.addEventListener("click", clearTour);
+  backBtn.addEventListener("click", () => showStep(activeIndex - 1));
+  nextBtn.addEventListener("click", () => {
+    if (activeIndex >= steps.length - 1) {
+      clearTour();
+    } else {
+      showStep(activeIndex + 1);
+    }
+  });
+
+  const handleViewportMutation = () => {
+    scheduleActiveStepSync();
+  };
+  document.addEventListener("scroll", handleViewportMutation, true);
+  window.addEventListener("resize", () => showStep(activeIndex, { allowAutoScroll: false }));
+
+  setTourSaveButtonLock(true);
+  setTourPreviewButtonLock(true);
+  showStep(0);
+}
+
+function showParalegalSettings() {
+  paralegalSettingsSection?.classList.remove("hidden");
+  attorneySettingsSection?.classList.add("hidden");
+  scheduleProfileScrollIndicatorUpdate();
+}
+
+function showAttorneySettings() {
+  attorneySettingsSection?.classList.remove("hidden");
+  paralegalSettingsSection?.classList.add("hidden");
+  scheduleProfileScrollIndicatorUpdate();
+}
+
+function setFullNameInputs(user = {}) {
+  const firstName = user.firstName || "";
+  const lastName = user.lastName || "";
+  const firstNameInput = document.getElementById("firstNameInput");
+  const lastNameInput = document.getElementById("lastNameInput");
+  const fullNameInput = document.getElementById("fullNameInput");
+  if (firstNameInput) firstNameInput.value = firstName;
+  if (lastNameInput) lastNameInput.value = lastName;
+  if (fullNameInput) {
+    const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+    fullNameInput.value = fullName;
+  }
+}
+
+function syncNamePartsFromFullName() {
+  const fullNameInput = document.getElementById("fullNameInput");
+  if (!fullNameInput) return;
+  const value = fullNameInput.value.trim();
+  let firstName = "";
+  let lastName = "";
+  if (value) {
+    const parts = value.split(/\s+/);
+    firstName = parts.shift() || "";
+    lastName = parts.join(" ");
+  }
+  const firstNameInput = document.getElementById("firstNameInput");
+  const lastNameInput = document.getElementById("lastNameInput");
+  if (firstNameInput) firstNameInput.value = firstName;
+  if (lastNameInput) lastNameInput.value = lastName;
+}
+
+function updateRoleLineFromExperience() {
+  const roleLine = document.getElementById("roleLine");
+  if (!roleLine) return;
+  const yearsInput = document.getElementById("yearsExperienceInput");
+  const raw = yearsInput ? Number(yearsInput.value) : null;
+  if (raw && !Number.isNaN(raw)) {
+    const label = raw === 1 ? "year" : "years";
+    roleLine.textContent = `${raw} ${label} experience`;
+    return;
+  }
+  roleLine.textContent = "Experience details pending";
+}
+
+const BEST_FOR_SUGGESTIONS = [
+  "Ongoing litigation support",
+  "Family law matters",
+  "Document drafting and research",
+  "Matter management support"
+];
+
+const EXPERIENCE_TITLE = "Paralegal";
+
+function normalizeExperienceEntry(entry = {}) {
+  const rawFirm = String(entry.description || entry.firm || entry.title || "").trim();
+  const firm = rawFirm.replace(/^(paralegal|legal assistant)\s+at\s+/i, "").trim();
+  const dates = String(entry.years || entry.dates || "").trim();
+  return { firm, dates };
+}
+
+function createExperienceRow(entry = {}) {
+  const { firm, dates } = normalizeExperienceEntry(entry);
+  const row = document.createElement("div");
+  row.className = "experience-row";
+
+  const firmLabel = document.createElement("label");
+  const firmText = document.createElement("span");
+  firmText.textContent = "Law firm";
+  const firmInput = document.createElement("input");
+  firmInput.type = "text";
+  firmInput.className = "experience-firm-input";
+  firmInput.placeholder = "Smith & Co.";
+  firmInput.value = firm;
+  firmLabel.appendChild(firmText);
+  firmLabel.appendChild(firmInput);
+
+  const datesLabel = document.createElement("label");
+  const datesText = document.createElement("span");
+  datesText.textContent = "Dates";
+  const datesInput = document.createElement("input");
+  datesInput.type = "text";
+  datesInput.className = "experience-dates-input";
+  datesInput.placeholder = "2020–2024";
+  datesInput.value = dates;
+  datesLabel.appendChild(datesText);
+  datesLabel.appendChild(datesInput);
+
+  row.appendChild(firmLabel);
+  row.appendChild(datesLabel);
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "experience-remove-btn";
+  removeBtn.textContent = "–";
+  removeBtn.setAttribute("aria-label", "Remove experience");
+  removeBtn.addEventListener("click", () => {
+    const container = row.parentElement;
+    row.remove();
+    if (container && !container.querySelector(".experience-row")) {
+      container.appendChild(createExperienceRow());
+    }
+    updateExperienceRemoveButtons(container);
+    markParalegalProfileChanged();
+  });
+  row.appendChild(removeBtn);
+  return row;
+}
+
+function renderExperienceRows(entries = []) {
+  const container = document.getElementById("experienceRows");
+  if (!container) return;
+  container.innerHTML = "";
+  const list = Array.isArray(entries) && entries.length ? entries : [{}];
+  list.forEach((entry) => {
+    container.appendChild(createExperienceRow(entry));
+  });
+  updateExperienceRemoveButtons(container);
+}
+
+function bindExperienceAddButton() {
+  const container = document.getElementById("experienceRows");
+  const addBtn = document.getElementById("addExperienceRow");
+  if (!container || !addBtn) return;
+  if (addBtn.dataset.bound === "true") return;
+  addBtn.addEventListener("click", () => {
+    container.appendChild(createExperienceRow());
+    updateExperienceRemoveButtons(container);
+  });
+  addBtn.dataset.bound = "true";
+}
+
+function updateExperienceRemoveButtons(container) {
+  if (!container) return;
+  const rows = [...container.querySelectorAll(".experience-row")];
+  const canRemove = rows.length > 1;
+  rows.forEach((row) => {
+    const btn = row.querySelector(".experience-remove-btn");
+    if (!btn) return;
+    btn.disabled = !canRemove;
+  });
+}
+
+function collectExperienceRows() {
+  const container = document.getElementById("experienceRows");
+  if (!container) return [];
+  const rows = [...container.querySelectorAll(".experience-row")];
+  return rows
+    .map((row) => {
+      const firm = row.querySelector(".experience-firm-input")?.value.trim() || "";
+      const dates = row.querySelector(".experience-dates-input")?.value.trim() || "";
+      if (!firm && !dates) return null;
+      return { firm, dates };
+    })
+    .filter(Boolean);
+}
+
+function formatExperienceDisplayLine(entry = {}) {
+  const firm = String(entry.firm || "").trim();
+  const dates = String(entry.dates || "").trim();
+  if (!firm && !dates) return "";
+  const base = firm ? `${EXPERIENCE_TITLE} · ${firm}` : EXPERIENCE_TITLE;
+  return dates ? `${base} (${dates})` : base;
+}
+
+function buildExperienceEntriesForSave(entries = []) {
+  return entries
+    .map((entry) => ({
+      title: EXPERIENCE_TITLE,
+      description: entry.firm || "",
+      years: entry.dates || ""
+    }))
+    .filter((entry) => entry.description || entry.years);
+}
+
+function setSectionDisplayText(element, value, fallback) {
+  if (!element) return;
+  const text = String(value || "").trim();
+  if (text) {
+    element.textContent = text;
+    element.classList.remove("is-placeholder");
+  } else {
+    element.textContent = fallback;
+    element.classList.add("is-placeholder");
+  }
+}
+
+
+function parseCommaList(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseSkillsList(value) {
+  const entries = Array.isArray(value)
+    ? value
+    : String(value || "").split(/[,\n;]+/);
+  const seen = new Set();
+  return entries
+    .map((item) => String(item || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .filter((item) => {
+      const key = item.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+
+const MAX_PROFILE_SKILLS = 5;
+const MAX_PROFILE_BEST_FOR = 5;
+
+function renderSkillsChips(values = []) {
+  const container = document.getElementById("skillsChips");
+  if (!container) return;
+  const skills = parseSkillsList(values).slice(0, MAX_PROFILE_SKILLS);
+  container.innerHTML = "";
+  skills.forEach((skill) => {
+    const chip = document.createElement("span");
+    chip.className = "skill-chip";
+    chip.dataset.skillValue = skill;
+    chip.textContent = skill;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "chip-remove";
+    remove.setAttribute("aria-label", `Remove ${skill}`);
+    remove.textContent = "×";
+    remove.addEventListener("click", () => {
+      const updated = readSkillsInput().filter((value) => value.toLowerCase() !== skill.toLowerCase());
+      applySkillsInput(updated);
+      refreshParalegalSectionDisplays();
+      updateRequiredFieldMarkers();
+      markParalegalProfileChanged();
+    });
+    chip.appendChild(remove);
+    container.appendChild(chip);
+  });
+}
+
+function readSkillsInput() {
+  const container = document.getElementById("skillsChips");
+  const input = document.getElementById("skillsInput");
+  const chipValues = container
+    ? Array.from(container.querySelectorAll("[data-skill-value]"))
+        .map((el) => String(el.dataset.skillValue || "").trim())
+        .filter(Boolean)
+    : [];
+  const pendingValues = input ? parseSkillsList(input.value) : [];
+  return parseSkillsList([...chipValues, ...pendingValues]).slice(0, MAX_PROFILE_SKILLS);
+}
+
+function applySkillsInput(values = []) {
+  renderSkillsChips(values);
+  const input = document.getElementById("skillsInput");
+  if (input) input.value = "";
+}
+
+function bindSkillsInput() {
+  const input = document.getElementById("skillsInput");
+  if (!input || input.dataset.bound === "true") return;
+  input.dataset.bound = "true";
+
+  const commitSkills = () => {
+    const container = document.getElementById("skillsChips");
+    const chipValues = container
+      ? Array.from(container.querySelectorAll("[data-skill-value]"))
+          .map((el) => String(el.dataset.skillValue || "").trim())
+          .filter(Boolean)
+      : [];
+    const pendingValues = parseSkillsList(input.value);
+    const combined = parseSkillsList([...chipValues, ...pendingValues]);
+    const exceeded = combined.length > MAX_PROFILE_SKILLS;
+    const nextSkills = combined.slice(0, MAX_PROFILE_SKILLS);
+    applySkillsInput(nextSkills);
+    refreshParalegalSectionDisplays();
+    updateRequiredFieldMarkers();
+    if (exceeded) {
+      showToast(`You can list up to ${MAX_PROFILE_SKILLS} skills.`, "info");
+    }
+  };
+
+  input.addEventListener("input", () => {
+    refreshParalegalSectionDisplays();
+    updateRequiredFieldMarkers();
+  });
+  input.addEventListener("keydown", (event) => {
+    if (!["Enter", ",", ";"].includes(event.key)) return;
+    event.preventDefault();
+    commitSkills();
+  });
+  input.addEventListener("blur", () => {
+    if (!String(input.value || "").trim()) return;
+    commitSkills();
+  });
+}
+
+function normalizeStateName(value = "") {
+  return String(value || "").toLowerCase().replace(/[^a-z]/g, "");
+}
+
+function normalizeStateCode(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const upper = raw.toUpperCase().replace(/[^A-Z]/g, "");
+  if (STATE_CODE_TO_NAME[upper]) return upper;
+  const normalized = normalizeStateName(raw);
+  if (normalized === "districtofcolumbia" || normalized === "washingtondc") {
+    return "DC";
+  }
+  return STATE_NAME_TO_CODE[normalized] || "";
+}
+
+function getDefaultStateExperienceValues(user = {}) {
+  const explicit = Array.isArray(user.stateExperience) ? user.stateExperience : [];
+  const normalizedExplicit = explicit.map((entry) => normalizeStateCode(entry)).filter(Boolean);
+  if (normalizedExplicit.length) return normalizedExplicit;
+
+  const directState = normalizeStateCode(user.state || "");
+  if (directState) return [directState];
+
+  const locationParts = String(user.location || "")
+    .split(/,|\||-/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  for (let index = locationParts.length - 1; index >= 0; index -= 1) {
+    const code = normalizeStateCode(locationParts[index]);
+    if (code) return [code];
+  }
+
+  return [];
+}
+
+function renderStateExperienceChips(values = []) {
+  const container = document.getElementById("stateExperienceChips");
+  if (!container) return;
+  const codes = Array.isArray(values)
+    ? values.map((value) => normalizeStateCode(value)).filter(Boolean)
+    : [];
+  const unique = Array.from(new Set(codes));
+  container.innerHTML = "";
+  unique.forEach((code) => {
+    const chip = document.createElement("span");
+    chip.className = "state-chip";
+    chip.dataset.stateCode = code;
+    chip.textContent = STATE_CODE_TO_NAME[code] || code;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "chip-remove";
+    remove.setAttribute("aria-label", `Remove ${chip.textContent}`);
+    remove.textContent = "×";
+    remove.addEventListener("click", () => {
+      const updated = readStateExperienceInput().filter((value) => value !== code);
+      renderStateExperienceChips(updated);
+      refreshParalegalSectionDisplays();
+      markParalegalProfileChanged();
+    });
+    chip.appendChild(remove);
+    container.appendChild(chip);
+  });
+}
+
+function readStateExperienceInput() {
+  const container = document.getElementById("stateExperienceChips");
+  if (container) {
+    return Array.from(container.querySelectorAll("[data-state-code]"))
+      .map((el) => String(el.dataset.stateCode || "").trim())
+      .filter(Boolean);
+  }
+  const input = document.getElementById("stateExperienceInput");
+  if (!input) return [];
+  return parseCommaList(input.value)
+    .map((value) => normalizeStateCode(value))
+    .filter(Boolean);
+}
+
+function readStateExperienceLabels() {
+  return readStateExperienceInput().map((code) => STATE_CODE_TO_NAME[code] || code);
+}
+
+function applyStateExperienceInput(values = []) {
+  const entries = Array.isArray(values)
+    ? values
+    : String(values || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+  const normalized = entries.map((entry) => normalizeStateCode(entry)).filter(Boolean);
+  renderStateExperienceChips(normalized);
+  const input = document.getElementById("stateExperienceInput");
+  if (input) input.value = "";
+}
+
+function bindStateExperienceInput() {
+  const input = document.getElementById("stateExperienceInput");
+  if (!input || input.dataset.bound === "true") return;
+  input.dataset.bound = "true";
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const rawValue = input.value.trim();
+    if (!rawValue) return;
+    const entries = rawValue
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const existing = new Set(readStateExperienceInput());
+    let invalid = 0;
+    entries.forEach((entry) => {
+      const code = normalizeStateCode(entry);
+      if (!code) {
+        invalid += 1;
+        return;
+      }
+      existing.add(code);
+    });
+    renderStateExperienceChips(Array.from(existing));
+    input.value = "";
+    refreshParalegalSectionDisplays();
+    if (invalid) {
+      showToast("Use a valid two-letter state abbreviation (e.g., VA).", "err");
+    }
+  });
+}
+
+function sanitizeBestForEntry(value) {
+  return String(value || "").replace(/^\s*[•*-]\s*/, "").trim();
+}
+
+function collectBestForEntries() {
+  const list = document.getElementById("bestForDisplay");
+  if (!list) return [];
+  if (list.dataset.mode === "placeholder") return [];
+  return Array.from(list.querySelectorAll("li"))
+    .map((item) => sanitizeBestForEntry(item.textContent))
+    .filter(Boolean)
+    .slice(0, MAX_PROFILE_BEST_FOR);
+}
+
+function createBestForListItem(text = "") {
+  const li = document.createElement("li");
+  li.textContent = text;
+  li.contentEditable = "true";
+  li.spellcheck = false;
+  li.tabIndex = 0;
+  return li;
+}
+
+function renderBestForList(entries = [], { editable = false } = {}) {
+  const list = document.getElementById("bestForDisplay");
+  if (!list) return;
+  const safeEntries = (Array.isArray(entries) ? entries : [])
+    .map((entry) => sanitizeBestForEntry(entry))
+    .filter(Boolean)
+    .slice(0, MAX_PROFILE_BEST_FOR);
+  const hasEntries = safeEntries.length > 0;
+  list.innerHTML = "";
+
+  if (editable) {
+    const editItems = hasEntries ? safeEntries : [""];
+    editItems.forEach((item) => list.appendChild(createBestForListItem(item)));
+    list.dataset.mode = "edit";
+    list.classList.remove("is-placeholder");
+    return;
+  }
+
+  const items = hasEntries ? safeEntries : BEST_FOR_SUGGESTIONS;
+  items.forEach((item) => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    list.appendChild(li);
+  });
+  list.dataset.mode = hasEntries ? "data" : "placeholder";
+  list.classList.toggle("is-placeholder", !hasEntries);
+}
+
+function focusBestForItem(item, toEnd = false) {
+  if (!item) return;
+  item.focus();
+  const range = document.createRange();
+  range.selectNodeContents(item);
+  range.collapse(!toEnd);
+  const selection = window.getSelection();
+  if (!selection) return;
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function handleBestForListKeydown(event) {
+  const section = document.getElementById("bestForSection");
+  if (!section?.classList.contains("is-editing")) return;
+  const target = event.target;
+  const element = target && target.nodeType === 3 ? target.parentElement : target;
+  if (!element || typeof element.closest !== "function") return;
+  const item = element.closest("li");
+  if (!item) return;
+
+  if (event.key === "Enter") {
+    const currentEntries = collectBestForEntries();
+    if (currentEntries.length >= MAX_PROFILE_BEST_FOR && sanitizeBestForEntry(item.textContent)) {
+      event.preventDefault();
+      showToast(`You can list up to ${MAX_PROFILE_BEST_FOR} Best For items.`, "info");
+      return;
+    }
+    event.preventDefault();
+    const nextItem = createBestForListItem("");
+    item.insertAdjacentElement("afterend", nextItem);
+    focusBestForItem(nextItem);
+    return;
+  }
+
+  if (event.key === "Backspace") {
+    const text = sanitizeBestForEntry(item.textContent);
+    if (!text) {
+      const items = item.parentElement?.querySelectorAll("li") || [];
+      if (items.length > 1) {
+        event.preventDefault();
+        const focusTarget = item.previousElementSibling || item.nextElementSibling;
+        item.remove();
+        focusBestForItem(focusTarget, true);
+        return;
+      }
+      event.preventDefault();
+      item.textContent = "";
+      focusBestForItem(item);
+    }
+  }
+
+  if (event.key === "Delete") {
+    const text = sanitizeBestForEntry(item.textContent);
+    if (!text) {
+      const items = item.parentElement?.querySelectorAll("li") || [];
+      if (items.length > 1) {
+        event.preventDefault();
+        const focusTarget = item.nextElementSibling || item.previousElementSibling;
+        item.remove();
+        focusBestForItem(focusTarget, false);
+        return;
+      }
+    }
+  }
+}
+
+function handleBestForListInput() {
+  const list = document.getElementById("bestForDisplay");
+  if (!list || list.dataset.mode !== "edit") return;
+  const items = Array.from(list.querySelectorAll("li"));
+  if (items.length > MAX_PROFILE_BEST_FOR) {
+    items.slice(MAX_PROFILE_BEST_FOR).forEach((item) => item.remove());
+    showToast(`You can list up to ${MAX_PROFILE_BEST_FOR} Best For items.`, "info");
+  }
+  const activeItem = document.activeElement?.closest?.("#bestForDisplay li") || null;
+  Array.from(list.querySelectorAll("li")).forEach((item) => {
+    const normalized = sanitizeBestForEntry(item.textContent);
+    if (item.textContent !== normalized) {
+      item.textContent = normalized;
+      if (item === activeItem) {
+        focusBestForItem(item, true);
+      }
+    }
+  });
+  const refreshedItems = list.querySelectorAll("li");
+  if (!refreshedItems.length) {
+    list.appendChild(createBestForListItem(""));
+  }
+  const hasText = collectBestForEntries().length > 0;
+  list.classList.toggle("is-typing", hasText);
+}
+
+function updateBestForEditingState() {
+  const section = document.getElementById("bestForSection");
+  if (!section) return;
+  if (section.classList.contains("is-editing")) {
+    const entries = collectBestForEntries();
+    renderBestForList(entries, { editable: true });
+    const list = document.getElementById("bestForDisplay");
+    if (list) list.classList.toggle("is-typing", entries.length > 0);
+    const items = document.getElementById("bestForDisplay")?.querySelectorAll("li");
+    const lastItem = items && items.length ? items[items.length - 1] : null;
+    focusBestForItem(lastItem, true);
+  } else {
+    renderBestForList(collectBestForEntries(), { editable: false });
+  }
+}
+
+function formatEducationEntry(entry = {}) {
+  const pieces = [];
+  const titleBits = [entry.degree, entry.fieldOfStudy].filter(Boolean);
+  if (titleBits.length) pieces.push(titleBits.join(", "));
+  if (entry.school) pieces.push(entry.school);
+  const startParts = [entry.startMonth, entry.startYear].filter(Boolean).join(" ");
+  const endParts = [entry.endMonth, entry.endYear].filter(Boolean).join(" ");
+  let range = "";
+  if (startParts && endParts) {
+    range = `${startParts} - ${endParts}`;
+  } else if (startParts) {
+    range = startParts;
+  } else if (endParts) {
+    range = endParts;
+  }
+  if (range) pieces.push(range);
+  return pieces.filter(Boolean).join(" - ");
+}
+
+function refreshParalegalSectionDisplays() {
+  const root = document.getElementById("paralegalSettings");
+  if (!root) return;
+
+  const bioDisplay = document.getElementById("bioDisplay");
+  const bioInput = document.getElementById("bioInput");
+  setSectionDisplayText(bioDisplay, bioInput?.value || "", "No bio provided.");
+
+  const experienceDisplay = document.getElementById("experienceDisplay");
+  const experienceRows = collectExperienceRows();
+  const experienceLines = experienceRows
+    .map((entry) => formatExperienceDisplayLine(entry))
+    .filter(Boolean);
+  setSectionDisplayText(
+    experienceDisplay,
+    experienceLines.join("\n"),
+    "No experience added yet."
+  );
+
+  const skillsDisplay = document.getElementById("skillsDisplay");
+  const skills = readSkillsInput();
+  if (skillsDisplay) {
+    setSectionDisplayText(
+      skillsDisplay,
+      skills.join(", "),
+      "No skills listed."
+    );
+  }
+
+  const practiceAreasDisplay = document.getElementById("practiceAreasDisplay");
+  const practiceAreas = collectParalegalPracticeAreas();
+  if (practiceAreasDisplay) {
+    setSectionDisplayText(
+      practiceAreasDisplay,
+      practiceAreas.join(", "),
+      "No practice areas listed."
+    );
+  }
+
+  const stateExperienceDisplay = document.getElementById("stateExperienceDisplay");
+  if (stateExperienceDisplay) {
+    const states = readStateExperienceLabels();
+    setSectionDisplayText(
+      stateExperienceDisplay,
+      states.join(", "),
+      "No state experience listed."
+    );
+  }
+
+  const educationDisplay = document.getElementById("educationDisplay");
+  if (educationDisplay) {
+    const entries = collectEducationFromEditor();
+    const lines = entries.map((entry) => formatEducationEntry(entry)).filter(Boolean);
+    setSectionDisplayText(
+      educationDisplay,
+      lines.join("\n"),
+      "No education entries yet."
+    );
+  }
+
+  const languagesDisplay = document.getElementById("languagesDisplay");
+  if (languagesDisplay) {
+    const entries = collectLanguagesFromEditor();
+    const lines = entries
+      .map((entry) => {
+        const name = entry?.name ? entry.name.trim() : "";
+        if (!name) return "";
+        const proficiency = entry?.proficiency ? entry.proficiency.trim() : "";
+        return proficiency ? `${name} (${proficiency})` : name;
+      })
+      .filter(Boolean);
+    setSectionDisplayText(
+      languagesDisplay,
+      lines.join("\n"),
+      "No languages listed."
+    );
+  }
+
+  updateRequiredFieldMarkers();
+  requestAnimationFrame(() => {
+    lockParalegalSectionHeights();
+  });
+}
+
+function autoSizeParalegalTextarea(textarea) {
+  if (!textarea) return;
+  const section = textarea.closest("[data-edit-section]");
+  const baseRaw = section ? parseFloat(getComputedStyle(section).getPropertyValue("--section-base-height")) : 0;
+  const baseHeight = baseRaw > 0 ? baseRaw : 260;
+  const expandedHeight = baseHeight * 2;
+  const shouldExpand = textarea.scrollHeight > baseHeight;
+  if (section) {
+    section.style.setProperty(
+      "--section-edit-max-height",
+      `${Math.round(shouldExpand ? expandedHeight : baseHeight)}px`
+    );
+  }
+  textarea.style.height = "auto";
+  const nextHeight = Math.min(textarea.scrollHeight, expandedHeight);
+  textarea.style.height = `${nextHeight}px`;
+  textarea.style.overflowY = textarea.scrollHeight > expandedHeight ? "auto" : "hidden";
+}
+
+function bindParalegalTextareaAutoSize() {
+  const root = document.getElementById("paralegalSettings");
+  if (!root) return;
+  root.querySelectorAll("[data-edit-section] textarea").forEach((textarea) => {
+    if (!textarea.dataset.autoSizeBound) {
+      textarea.dataset.autoSizeBound = "true";
+      textarea.addEventListener("input", () => autoSizeParalegalTextarea(textarea));
+    }
+    if (!textarea.closest("[data-edit-section]")?.classList.contains("is-editing")) {
+      textarea.style.height = "";
+      textarea.style.overflowY = "hidden";
+    }
+  });
+}
+
+function lockParalegalSectionHeights() {
+  const root = document.getElementById("paralegalSettings");
+  if (!root) return;
+  const sections = root.querySelectorAll("[data-edit-section]");
+  sections.forEach((section) => {
+    if (section.classList.contains("is-editing")) return;
+    const measured = Math.ceil(section.getBoundingClientRect().height);
+    if (measured > 0) {
+      const base = Math.max(120, measured);
+      section.style.setProperty("--section-base-height", `${base}px`);
+      section.style.setProperty("--section-edit-max-height", `${base}px`);
+    }
+  });
+  bindParalegalTextareaAutoSize();
+}
+
+function setActiveParalegalSection(sectionKey) {
+  const root = document.getElementById("paralegalSettings");
+  if (!root) return;
+  const sections = root.querySelectorAll("[data-edit-section]");
+  sections.forEach((section) => {
+    const isActive = section.dataset.editSection === sectionKey;
+    section.classList.toggle("is-editing", isActive);
+    if (isActive) {
+      if (section.dataset.editSection === "documents") {
+        const docsStack = section.querySelector(".profile-docs-stack");
+        const docsHeight = Math.max(0, Math.ceil(docsStack?.scrollHeight || 0));
+        const expandedHeight = Math.max(
+          120,
+          Math.ceil(section.querySelector(".section-header")?.getBoundingClientRect().height || 0) +
+            docsHeight +
+            24
+        );
+        section.style.setProperty("--documents-stack-height", `${docsHeight}px`);
+        section.style.setProperty("--section-base-height", `${expandedHeight}px`);
+        section.style.setProperty("--section-edit-max-height", `${expandedHeight}px`);
+      } else {
+        const baseRaw = parseFloat(getComputedStyle(section).getPropertyValue("--section-base-height"));
+        const base = Number.isFinite(baseRaw) && baseRaw > 0 ? baseRaw : Math.max(120, Math.ceil(section.getBoundingClientRect().height));
+        section.style.setProperty("--section-edit-max-height", `${Math.round(base)}px`);
+      }
+    } else if (section.dataset.editSection === "documents") {
+      section.style.setProperty("--documents-stack-height", "0px");
+    }
+    const toggle = section.querySelector(".section-edit-toggle");
+    if (toggle) {
+      toggle.setAttribute("aria-pressed", isActive ? "true" : "false");
+      if (section.dataset.editSection === "documents") {
+        toggle.setAttribute("aria-expanded", isActive ? "true" : "false");
+      }
+    }
+  });
+  updateBestForEditingState();
+  activeParalegalSection = sectionKey || null;
+  refreshParalegalSectionDisplays();
+  requestAnimationFrame(() => {
+    lockParalegalSectionHeights();
+  });
+}
+
+function initParalegalSectionEditing() {
+  const root = document.getElementById("paralegalSettings");
+  if (!root) return;
+  const toggles = root.querySelectorAll(".section-edit-toggle");
+  if (!toggles.length) return;
+
+  const openSection = (targetKey, { allowToggleClose = true } = {}) => {
+    if (!targetKey) return;
+    if (targetKey === "education") {
+      setActiveParalegalSection(null);
+      openEducationModal();
+      return;
+    }
+    if (allowToggleClose) {
+      const nextKey = activeParalegalSection === targetKey ? null : targetKey;
+      setActiveParalegalSection(nextKey);
+      return;
+    }
+    setActiveParalegalSection(targetKey);
+  };
+
+  if (!paralegalEditBound) {
+    toggles.forEach((toggle) => {
+      toggle.addEventListener("click", () => {
+        const targetKey = toggle.dataset.editToggle;
+        openSection(targetKey, { allowToggleClose: true });
+      });
+    });
+
+    root.addEventListener("click", (event) => {
+      const section = event.target.closest("[data-edit-section]");
+      if (!section || !root.contains(section)) return;
+      const targetKey = section.dataset.editSection;
+      if (!targetKey || targetKey === "documents") return;
+      if (event.target.closest(".section-edit-toggle")) return;
+      if (event.target.closest(".section-edit")) return;
+      if (event.target.closest("button, a, input, select, textarea, label, [contenteditable='true']")) return;
+      openSection(targetKey, { allowToggleClose: false });
+    });
+
+    paralegalEditBound = true;
+  }
+
+  if (!activeParalegalSection) {
+    setActiveParalegalSection(null);
+  } else {
+    setActiveParalegalSection(activeParalegalSection);
+  }
+
+  if (!root.dataset.sectionResizeBound) {
+    window.addEventListener("resize", () => {
+      requestAnimationFrame(() => {
+        lockParalegalSectionHeights();
+      });
+    });
+    root.dataset.sectionResizeBound = "true";
+  }
+}
+
+function isPdfFile(file) {
+  if (!file) return false;
+  const mime = String(file.type || "").toLowerCase();
+  const name = String(file.name || "").toLowerCase();
+  return mime === "application/pdf" || name.endsWith(".pdf");
+}
+
+function hydrateAttorneyProfileForm(user = {}) {
+  const first = document.getElementById("attorneyFirstName");
+  if (first) first.value = user.firstName || "";
+  const last = document.getElementById("attorneyLastName");
+  if (last) last.value = user.lastName || "";
+  const emailInput = document.getElementById("attorneyEmail");
+  if (emailInput) emailInput.value = user.email || "";
+  const linkedInInput = document.getElementById("attorneyLinkedIn");
+  if (linkedInInput) linkedInInput.value = user.linkedInURL || "";
+  const firmNameInput = document.getElementById("attorneyFirmName");
+  if (firmNameInput) firmNameInput.value = user.lawFirm || user.firmName || "";
+  const firmWebsiteInput = document.getElementById("attorneyFirmWebsite");
+  if (firmWebsiteInput) firmWebsiteInput.value = user.firmWebsite || "";
+  const practiceInput = document.getElementById("attorneyPracticeDescription");
+  const practiceValue = user.practiceDescription || user.bio || "";
+  if (practiceInput) practiceInput.value = practiceValue;
+  settingsState.practiceDescription = practiceValue;
+  renderAttorneyPracticeAreas(user.practiceAreas || []);
+  const publicationsInput = document.getElementById("attorneyPublications");
+  if (publicationsInput) publicationsInput.value = Array.isArray(user.publications) ? user.publications.join("\n") : "";
+  updateAttorneyPracticeCount();
+  hydrateAttorneyNotificationPrefs(user);
+  updateAttorneyAvatarPreview(user);
+}
+
+function getAttorneyFormSnapshot() {
+  return JSON.stringify({
+    firstName: document.getElementById("attorneyFirstName")?.value || "",
+    lastName: document.getElementById("attorneyLastName")?.value || "",
+    linkedInURL: document.getElementById("attorneyLinkedIn")?.value || "",
+    lawFirm: document.getElementById("attorneyFirmName")?.value || "",
+    firmWebsite: document.getElementById("attorneyFirmWebsite")?.value || "",
+    practiceAreas: collectAttorneyPracticeAreas(),
+    practiceDescription: document.getElementById("attorneyPracticeDescription")?.value || "",
+    publications: document.getElementById("attorneyPublications")?.value || "",
+  });
+}
+
+function setAttorneySaveStatus(message = "", state = "") {
+  const status = document.getElementById("attorneySaveStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.hidden = !message;
+  if (state) status.dataset.state = state;
+  else delete status.dataset.state;
+}
+
+function updateAttorneySaveState() {
+  const saveBtn = document.getElementById("saveAttorneyProfile");
+  if (!saveBtn || !attorneySavedSnapshot) return;
+  const dirty = getAttorneyFormSnapshot() !== attorneySavedSnapshot;
+  saveBtn.disabled = attorneySaveInFlight || !dirty;
+  saveBtn.closest(".attorney-actions")?.classList.toggle("has-unsaved-changes", dirty);
+  if (dirty && document.getElementById("attorneySaveStatus")?.dataset.state === "success") {
+    setAttorneySaveStatus("Unsaved changes", "pending");
+  }
+}
+
+function markAttorneyProfileSaved() {
+  attorneySavedSnapshot = getAttorneyFormSnapshot();
+  updateAttorneySaveState();
+}
+
+function initializeAttorneySaveState() {
+  const root = document.getElementById("attorneySettings");
+  if (!root) return;
+  attorneySavedSnapshot = getAttorneyFormSnapshot();
+  if (!attorneySaveStateBound) {
+    const handleChange = (event) => {
+      if (event.target.closest("#attorneyNotificationToggles") || event.target.id === "attorneyAvatarInput") return;
+      setTimeout(updateAttorneySaveState, 0);
+    };
+    root.addEventListener("input", handleChange);
+    root.addEventListener("change", handleChange);
+    root.addEventListener("click", (event) => {
+      if (event.target.closest("#attorneyPracticeDropdown")) handleChange(event);
+    });
+    attorneySaveStateBound = true;
+  }
+  updateAttorneySaveState();
+}
+
+function clearAttorneyFieldErrors() {
+  document.querySelectorAll("#attorneySettings .field-error").forEach((error) => {
+    error.textContent = "";
+    error.hidden = true;
+  });
+  document.querySelectorAll("#attorneySettings [aria-invalid='true']").forEach((field) => {
+    field.removeAttribute("aria-invalid");
+  });
+}
+
+function setAttorneyFieldError(inputId, errorId, message) {
+  const input = document.getElementById(inputId);
+  const error = document.getElementById(errorId);
+  input?.setAttribute("aria-invalid", "true");
+  if (error) {
+    error.textContent = message;
+    error.hidden = false;
+  }
+  input?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+  input?.focus?.({ preventScroll: true });
+}
+
+function validateAttorneyProfile() {
+  clearAttorneyFieldErrors();
+  const first = document.getElementById("attorneyFirstName")?.value.trim() || "";
+  if (!first) {
+    setAttorneyFieldError("attorneyFirstName", "attorneyFirstNameError", "Enter your first name.");
+    return false;
+  }
+  const last = document.getElementById("attorneyLastName")?.value.trim() || "";
+  if (!last) {
+    setAttorneyFieldError("attorneyLastName", "attorneyLastNameError", "Enter your last name.");
+    return false;
+  }
+  const linkedInInput = document.getElementById("attorneyLinkedIn");
+  try {
+    normalizeHttpUrlInput(linkedInInput?.value, { fieldLabel: "LinkedIn URL", requiredHost: "linkedin.com" });
+  } catch (error) {
+    setAttorneyFieldError("attorneyLinkedIn", "attorneyLinkedInError", error.message);
+    return false;
+  }
+  const firmWebsiteInput = document.getElementById("attorneyFirmWebsite");
+  try {
+    normalizeHttpUrlInput(firmWebsiteInput?.value, { fieldLabel: "firm website" });
+  } catch (error) {
+    setAttorneyFieldError("attorneyFirmWebsite", "attorneyFirmWebsiteError", error.message);
+    return false;
+  }
+  return true;
+}
+
+function syncPracticeAreasInput(inputId, values = []) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.value = (Array.isArray(values) ? values : [values]).filter(Boolean).join(", ");
+}
+
+function loadAvatarPreview({ preview, frame, initials, url, fallbackText = "", onLoad, onError } = {}) {
+  if (!preview) {
+    if (initials && fallbackText) initials.textContent = fallbackText;
+    return;
+  }
+  const resolvedUrl = url || DEFAULT_AVATAR_DATA;
+
+  preview.hidden = false;
+  preview.classList.remove("is-loaded");
+  frame?.classList.remove("has-photo");
+
+  const markLoaded = () => {
+    preview.classList.add("is-loaded");
+    frame?.classList.add("has-photo");
+    if (initials) initials.style.display = "none";
+    onLoad?.();
+  };
+
+  const handleError = () => {
+    preview.hidden = true;
+    preview.classList.remove("is-loaded");
+    frame?.classList.remove("has-photo");
+    if (initials) {
+      initials.style.display = "flex";
+      if (fallbackText) initials.textContent = fallbackText;
+    }
+    onError?.();
+  };
+
+  preview.addEventListener("load", markLoaded, { once: true });
+  preview.addEventListener("error", handleError, { once: true });
+  preview.src = resolvedUrl;
+  if (preview.complete && preview.naturalWidth > 0) {
+    markLoaded();
+  }
+}
+
+function updateAttorneyAvatarPreview(user = {}) {
+  const preview = document.getElementById("attorneyAvatarPreview");
+  const initials = document.getElementById("attorneyAvatarInitials");
+  const frame = document.getElementById("attorneyAvatarFrame");
+  const avatarUrl = getDisplayProfileImage(user, { allowPending: true });
+  loadAvatarPreview({
+    preview,
+    frame,
+    initials,
+    url: avatarUrl,
+    fallbackText: getAttorneyInitials(user),
+  });
+}
+
+function bindAttorneySaveButton() {
+  if (attorneySaveBound) return;
+  const saveBtn = document.getElementById("saveAttorneyProfile");
+  if (!saveBtn) return;
+  saveBtn.addEventListener("click", handleAttorneyProfileSave);
+  attorneySaveBound = true;
+}
+
+function bindAttorneyPracticeEditor() {
+  const practiceInput = document.getElementById("attorneyPracticeDescription");
+  if (!practiceInput) return;
+  practiceInput.addEventListener("input", () => {
+    settingsState.practiceDescription = practiceInput.value;
+    updateAttorneyPracticeCount();
+  });
+  updateAttorneyPracticeCount();
+}
+
+function bindAttorneyPublicationsToggle() {
+  const toggle = document.getElementById("attorneyPublicationsToggle");
+  const panel = document.getElementById("attorneyPublicationsPanel");
+  if (!toggle || !panel) return;
+
+  const setExpanded = (isExpanded) => {
+    toggle.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+    panel.hidden = !isExpanded;
+  };
+
+  setExpanded(toggle.getAttribute("aria-expanded") === "true");
+
+  if (toggle.dataset.bound === "true") return;
+  toggle.addEventListener("click", () => {
+    const isExpanded = toggle.getAttribute("aria-expanded") === "true";
+    setExpanded(!isExpanded);
+  });
+  toggle.dataset.bound = "true";
+}
+
+function renderPracticeAreasDropdown({
+  panelId,
+  toggleId,
+  summaryId,
+  inputId = "",
+  selected = [],
+  onChange = null,
+} = {}) {
+  const panel = document.getElementById(panelId);
+  const toggle = document.getElementById(toggleId);
+  const summary = document.getElementById(summaryId);
+  if (!panel || !toggle || !summary) return;
+  panel.innerHTML = "";
+
+  const searchWrap = document.createElement("div");
+  searchWrap.className = "dropdown-search";
+  const searchInput = document.createElement("input");
+  searchInput.type = "search";
+  searchInput.placeholder = "Search…";
+  searchWrap.appendChild(searchInput);
+  panel.appendChild(searchWrap);
+
+  const selectedSet = new Set(
+    (Array.isArray(selected) ? selected : [selected])
+      .filter(Boolean)
+      .map((v) => String(v).trim())
+  );
+
+  const optionNodes = [];
+  const syncAllOptionClasses = () => {
+    optionNodes.forEach((opt) => {
+      const cb = opt.querySelector("input[type=\"checkbox\"]");
+      if (cb) opt.classList.toggle("selected", cb.checked);
+    });
+  };
+
+  const buildOption = (label, isSelectAll = false) => {
+    const option = document.createElement("div");
+    option.className = `dropdown-option${isSelectAll ? " dropdown-option--select-all" : ""}`;
+    option.role = "option";
+    option.tabIndex = 0;
+    option.dataset.label = label.toLowerCase();
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = label;
+    checkbox.checked = isSelectAll ? selectedSet.size === FIELD_OF_LAW_OPTIONS.length : selectedSet.has(label);
+
+    const text = document.createElement("span");
+    text.textContent = label;
+
+    option.appendChild(checkbox);
+    option.appendChild(text);
+    panel.appendChild(option);
+    if (!isSelectAll) optionNodes.push(option);
+
+    const findAllCheckboxes = () =>
+      optionNodes.map((opt) => opt.querySelector("input[type=\"checkbox\"]")).filter(Boolean);
+
+    const setAll = (checked) => {
+      findAllCheckboxes().forEach((cb) => {
+        cb.checked = checked;
+        const opt = cb.closest(".dropdown-option");
+        if (opt) opt.classList.toggle("selected", checked);
+      });
+      updatePracticeDropdownLabel();
+    };
+
+    const toggleCheckbox = () => {
+      checkbox.checked = !checkbox.checked;
+      if (isSelectAll) {
+        setAll(checkbox.checked);
+      } else {
+        syncSelectedClass();
+        updatePracticeDropdownLabel();
+        syncAllOptionClasses();
+      }
+    };
+
+    const syncSelectedClass = () => {
+      if (!isSelectAll) {
+        option.classList.toggle("selected", checkbox.checked);
+      }
+    };
+
+    checkbox.addEventListener("change", () => {
+      if (isSelectAll) {
+        setAll(checkbox.checked);
+      } else {
+        syncSelectedClass();
+        updatePracticeDropdownLabel();
+        syncAllOptionClasses();
+      }
+    });
+
+    option.addEventListener("click", (e) => {
+      if (e.target === checkbox) return;
+      toggleCheckbox();
+    });
+    option.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleCheckbox();
+      }
+    });
+    syncSelectedClass();
+    syncAllOptionClasses();
+    return option;
+  };
+
+  buildOption("Select all", true);
+
+  FIELD_OF_LAW_OPTIONS.forEach((label) => {
+    buildOption(label, false);
+  });
+
+  const updatePracticeDropdownLabel = () => {
+    const selectedValues = collectPracticeAreasFromPanel(panelId);
+    syncPracticeAreasInput(inputId, selectedValues);
+    summary.innerHTML = "";
+    if (!selectedValues.length) {
+      const span = document.createElement("span");
+      span.className = "placeholder";
+      span.textContent = "Select fields";
+      summary.appendChild(span);
+      if (typeof onChange === "function") onChange([]);
+      return;
+    }
+    const chips = selectedValues.slice(0, 3);
+    chips.forEach((value) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = value;
+      summary.appendChild(chip);
+    });
+    if (selectedValues.length > chips.length) {
+      const more = document.createElement("span");
+      more.className = "chip";
+      more.textContent = `+${selectedValues.length - chips.length} more`;
+      summary.appendChild(more);
+    }
+    if (typeof onChange === "function") onChange(selectedValues);
+  };
+
+  const filterOptions = () => {
+    const q = (searchInput.value || "").toLowerCase().trim();
+    optionNodes.forEach((opt) => {
+      const match = !q || opt.dataset.label.includes(q);
+      opt.style.display = match ? "flex" : "none";
+    });
+  };
+
+  searchInput.addEventListener("input", filterOptions);
+  filterOptions();
+  updatePracticeDropdownLabel();
+
+  if (!toggle.dataset.bound) {
+    toggle.addEventListener("click", () => {
+      panel.classList.toggle("open");
+      toggle.setAttribute("aria-expanded", panel.classList.contains("open") ? "true" : "false");
+    });
+    document.addEventListener("click", (e) => {
+      if (!panel.contains(e.target) && !toggle.contains(e.target)) {
+        panel.classList.remove("open");
+        toggle.setAttribute("aria-expanded", "false");
+      }
+    });
+    toggle.dataset.bound = "true";
+  }
+}
+
+function collectPracticeAreasFromPanel(panelId) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return [];
+  return Array.from(panel.querySelectorAll(".dropdown-option input[type=\"checkbox\"]"))
+    .filter((input) => input.value !== "Select all" && input.checked)
+    .map((input) => input.value)
+    .filter(Boolean);
+}
+
+function renderAttorneyPracticeAreas(selected = []) {
+  renderPracticeAreasDropdown({
+    panelId: "attorneyPracticeDropdown",
+    toggleId: "attorneyPracticeDropdownToggle",
+    summaryId: "attorneyPracticeSummary",
+    selected,
+  });
+}
+
+function collectAttorneyPracticeAreas() {
+  return collectPracticeAreasFromPanel("attorneyPracticeDropdown");
+}
+
+function renderParalegalPracticeAreas(selected = []) {
+  renderPracticeAreasDropdown({
+    panelId: "paralegalPracticeDropdown",
+    toggleId: "paralegalPracticeDropdownToggle",
+    summaryId: "paralegalPracticeSummary",
+    inputId: "practiceAreasInput",
+    selected,
+    onChange: () => {
+      refreshParalegalSectionDisplays();
+      updateRequiredFieldMarkers();
+    },
+  });
+}
+
+function collectParalegalPracticeAreas() {
+  return collectPracticeAreasFromPanel("paralegalPracticeDropdown");
+}
+
+function bindAttorneyNotificationToggles() {
+  if (attorneyPrefsBound) return;
+  const emailInput = document.getElementById("attorneyEmailNotifications");
+  const childToggles = [
+    { id: "attorneyMessageAlerts", key: "emailMessages" },
+    { id: "attorneyCaseUpdates", key: "emailCase" },
+  ];
+
+  const syncChildren = () => {
+    const masterEnabled = emailInput ? emailInput.checked : settingsState.notificationPrefs.email !== false;
+    childToggles.forEach(({ id, key }) => {
+      const input = document.getElementById(id);
+      if (!input) return;
+      input.disabled = !masterEnabled;
+      input.checked = masterEnabled ? settingsState.notificationPrefs[key] !== false : false;
+      const row = input.closest(".toggle-row");
+      row?.classList.toggle("is-readonly", !masterEnabled);
+      if (row) row.setAttribute("aria-disabled", masterEnabled ? "false" : "true");
+    });
+  };
+
+  if (emailInput) {
+    emailInput.addEventListener("change", async () => {
+      const checked = emailInput.checked;
+      try {
+        await saveNotificationPreferenceWithStatus("email", checked);
+        settingsState.notificationPrefs.email = checked;
+        syncChildren();
+        showToast("Notification preference updated", "ok");
+      } catch (err) {
+        console.error("Unable to update notification preference", err);
+        emailInput.checked = !checked;
+        settingsState.notificationPrefs.email = emailInput.checked;
+        syncChildren();
+        showToast("Unable to update preference right now.", "err");
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
+      }
+    });
+  }
+
+  childToggles.forEach(({ id, key }) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener("change", async () => {
+      const checked = input.checked;
+      try {
+        await saveNotificationPreferenceWithStatus(key, checked);
+        settingsState.notificationPrefs[key] = checked;
+        syncChildren();
+        showToast("Notification preference updated", "ok");
+      } catch (err) {
+        console.error("Unable to update notification preference", err);
+        input.checked = !checked;
+        syncChildren();
+        showToast("Unable to update preference right now.", "err");
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
+      }
+    });
+  });
+
+  syncChildren();
+  attorneyPrefsBound = true;
+}
+
+function bindParalegalNotificationToggles() {
+  if (paralegalPrefsBound) return;
+  const emailInput = document.getElementById("emailNotificationsToggle");
+  const childToggles = [
+    { id: "paralegalMessageAlerts", key: "emailMessages" },
+    { id: "paralegalCaseUpdates", key: "emailCase" },
+  ];
+
+  const syncChildren = () => {
+    const masterEnabled = emailInput ? emailInput.checked : settingsState.notificationPrefs.email !== false;
+    childToggles.forEach(({ id, key }) => {
+      const input = document.getElementById(id);
+      if (!input) return;
+      input.disabled = !masterEnabled;
+      input.checked = masterEnabled ? settingsState.notificationPrefs[key] !== false : false;
+      const row = input.closest(".pref-row");
+      row?.classList.toggle("is-readonly", !masterEnabled);
+      if (row) row.setAttribute("aria-disabled", masterEnabled ? "false" : "true");
+    });
+  };
+
+  if (emailInput) {
+    emailInput.addEventListener("change", async () => {
+      const checked = emailInput.checked;
+      try {
+        await saveNotificationPreferenceWithStatus("email", checked);
+        settingsState.notificationPrefs.email = checked;
+        syncChildren();
+      } catch (err) {
+        console.error("Unable to update notification preference", err);
+        emailInput.checked = !checked;
+        settingsState.notificationPrefs.email = emailInput.checked;
+        syncChildren();
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
+      }
+    });
+  }
+
+  childToggles.forEach(({ id, key }) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener("change", async () => {
+      const checked = input.checked;
+      try {
+        await saveNotificationPreferenceWithStatus(key, checked);
+        settingsState.notificationPrefs[key] = checked;
+        syncChildren();
+      } catch (err) {
+        console.error("Unable to update notification preference", err);
+        input.checked = !checked;
+        syncChildren();
+        setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
+      }
+    });
+  });
+
+  syncChildren();
+  paralegalPrefsBound = true;
+}
+
+function bindParalegalVisibilityToggle() {
+  if (paralegalVisibilityBound) return;
+  const input = document.getElementById("paralegalHideProfile");
+  if (!input) return;
+  input.addEventListener("change", async () => {
+    const checked = input.checked;
+    setPreferencesSaveStatus("Saving…", "saving");
+    try {
+      const prefs = await queuePreferenceMutation(() => saveProfileVisibility(checked));
+      if (currentUser) {
+        currentUser.preferences = {
+          ...(currentUser.preferences || {}),
+          hideProfile: prefs?.hideProfile ?? checked
+        };
+        persistSession({ user: currentUser });
+        window.updateSessionUser?.(currentUser);
+      }
+      setPreferencesSaveStatus("Profile visibility saved", "saved");
+    } catch (err) {
+      console.error("Unable to update profile visibility", err);
+      input.checked = !checked;
+      setPreferencesSaveStatus("Could not save. Your previous setting has been restored.", "error");
+    }
+  });
+  paralegalVisibilityBound = true;
+}
+
+function updateParalegalVisibilityLock(user = {}) {
+  const toggle = document.getElementById("paralegalHideProfile");
+  const help = document.getElementById("profileVisibilityHelp");
+  if (!toggle) return;
+  const approved = isParalegalPhotoApproved(user);
+  if (!approved) {
+    toggle.checked = true;
+  }
+  toggle.disabled = !approved;
+  if (help) {
+    help.textContent = approved
+      ? "Controls whether attorneys can discover your profile."
+      : "Your profile remains hidden until your profile photo is approved.";
+  }
+}
+
+function hydrateAttorneyNotificationPrefs(user = {}) {
+  const prefs = user.notificationPrefs || {};
+  const emailToggle = document.getElementById("attorneyEmailNotifications");
+  if (emailToggle) emailToggle.checked = prefs.email !== false;
+  const messageToggle = document.getElementById("attorneyMessageAlerts");
+  if (messageToggle) messageToggle.checked = prefs.emailMessages !== false;
+  const caseToggle = document.getElementById("attorneyCaseUpdates");
+  if (caseToggle) caseToggle.checked = prefs.emailCase !== false;
+  settingsState.notificationPrefs = {
+    ...settingsState.notificationPrefs,
+    email: prefs.email !== false,
+    emailMessages: prefs.emailMessages !== false,
+    emailCase: prefs.emailCase !== false
+  };
+  const messageRow = messageToggle?.closest(".toggle-row");
+  const caseRow = caseToggle?.closest(".toggle-row");
+  const masterEnabled = prefs.email !== false;
+  if (messageToggle) {
+    messageToggle.disabled = !masterEnabled;
+    messageToggle.checked = masterEnabled ? prefs.emailMessages !== false : false;
+  }
+  if (caseToggle) {
+    caseToggle.disabled = !masterEnabled;
+    caseToggle.checked = masterEnabled ? prefs.emailCase !== false : false;
+  }
+  messageRow?.classList.toggle("is-readonly", !masterEnabled);
+  caseRow?.classList.toggle("is-readonly", !masterEnabled);
+}
+
+function hydrateParalegalNotificationPrefs(user = {}) {
+  const prefs = user.notificationPrefs || {};
+  const emailToggle = document.getElementById("emailNotificationsToggle");
+  if (emailToggle) emailToggle.checked = prefs.email !== false;
+  const messageToggle = document.getElementById("paralegalMessageAlerts");
+  const caseToggle = document.getElementById("paralegalCaseUpdates");
+  settingsState.notificationPrefs = {
+    ...settingsState.notificationPrefs,
+    email: prefs.email !== false,
+    emailMessages: prefs.emailMessages !== false,
+    emailCase: prefs.emailCase !== false
+  };
+  const masterEnabled = prefs.email !== false;
+  const messageRow = messageToggle?.closest(".pref-row");
+  const caseRow = caseToggle?.closest(".pref-row");
+  if (messageToggle) {
+    messageToggle.disabled = !masterEnabled;
+    messageToggle.checked = masterEnabled ? prefs.emailMessages !== false : false;
+  }
+  if (caseToggle) {
+    caseToggle.disabled = !masterEnabled;
+    caseToggle.checked = masterEnabled ? prefs.emailCase !== false : false;
+  }
+  messageRow?.classList.toggle("is-readonly", !masterEnabled);
+  caseRow?.classList.toggle("is-readonly", !masterEnabled);
+}
+
+function hydrateParalegalVisibilityPref(user = {}) {
+  const toggle = document.getElementById("paralegalHideProfile");
+  if (!toggle) return;
+  const hidden = user?.preferences && typeof user.preferences === "object"
+    ? user.preferences.hideProfile
+    : false;
+  toggle.checked = !!hidden;
+  updateParalegalVisibilityLock(user);
+}
+
+function normalizeHttpUrlInput(value, { fieldLabel = "URL", requiredHost = "" } = {}) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const withProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+  let parsed;
+  try {
+    parsed = new URL(withProtocol);
+  } catch {
+    throw new Error(`Enter a valid ${fieldLabel}.`);
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error(`Enter a valid ${fieldLabel}.`);
+  }
+  if (requiredHost) {
+    const host = parsed.hostname.toLowerCase();
+    if (!host || (host !== requiredHost && !host.endsWith(`.${requiredHost}`))) {
+      throw new Error(`Enter a valid ${fieldLabel}.`);
+    }
+  }
+  return parsed.toString();
+}
+
+function collectAttorneyPayload() {
+  const first = document.getElementById("attorneyFirstName")?.value.trim() || "";
+  const last = document.getElementById("attorneyLastName")?.value.trim() || "";
+  const email = document.getElementById("attorneyEmail")?.value.trim() || "";
+  const linkedInInput = document.getElementById("attorneyLinkedIn");
+  const linkedIn = normalizeHttpUrlInput(linkedInInput?.value, {
+    fieldLabel: "LinkedIn URL",
+    requiredHost: "linkedin.com",
+  });
+  const lawFirm = document.getElementById("attorneyFirmName")?.value.trim() || "";
+  const firmWebsiteInput = document.getElementById("attorneyFirmWebsite");
+  const firmWebsite = normalizeHttpUrlInput(firmWebsiteInput?.value, {
+    fieldLabel: "firm website",
+  });
+  const practiceDescription = document.getElementById("attorneyPracticeDescription")?.value.trim() || "";
+  const emailToggle = document.getElementById("attorneyEmailNotifications");
+  const practiceAreas = collectAttorneyPracticeAreas();
+  const publicationsRaw = document.getElementById("attorneyPublications")?.value || "";
+  const publications = publicationsRaw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const payload = {
+    firstName: first,
+    lastName: last,
+    email,
+    linkedInURL: linkedIn || null,
+    lawFirm,
+    practiceAreas,
+    publications,
+    practiceDescription,
+    bio: practiceDescription,
+    notificationPrefs: {
+      email: emailToggle ? emailToggle.checked : settingsState.notificationPrefs.email !== false
+    }
+  };
+  if (linkedInInput) linkedInInput.value = linkedIn;
+  if (firmWebsiteInput) firmWebsiteInput.value = firmWebsite;
+  settingsState.practiceDescription = practiceDescription;
+  if (firmWebsite) {
+    payload.firmWebsite = firmWebsite;
+  }
+  return payload;
+}
+
+function updateAttorneyPracticeCount() {
+  const practiceInput = document.getElementById("attorneyPracticeDescription");
+  const counter = document.getElementById("attorneyPracticeCount");
+  if (!practiceInput || !counter) return;
+  const length = practiceInput.value?.length || 0;
+  counter.textContent = `${length} / 4000 characters`;
+}
+async function handleAttorneyProfileSave() {
+  if (attorneySaveInFlight) return;
+  const saveBtn =
+    document.getElementById("saveAttorneyProfile") || document.getElementById("attorneyProfileSaveBtn");
+  const originalLabel = saveBtn?.textContent || "";
+  if (!validateAttorneyProfile()) {
+    setAttorneySaveStatus("Review the highlighted field.", "error");
+    return;
+  }
+  attorneySaveInFlight = true;
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving…";
+  }
+  setAttorneySaveStatus("Saving changes…", "pending");
+  try {
+    const preservedPhoto =
+      currentUser?.profileImage ||
+      currentUser?.avatarURL ||
+      settingsState.profileImage ||
+      "";
+    const payload = collectAttorneyPayload();
+    const res = await secureFetch("/api/users/me", {
+      method: "PATCH",
+      body: payload
+    });
+    const updatedUser = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(updatedUser?.error || "Unable to save profile");
+    }
+    if (preservedPhoto && !updatedUser.profileImage && !updatedUser.avatarURL) {
+      updatedUser.profileImage = preservedPhoto;
+      updatedUser.avatarURL = preservedPhoto;
+    }
+    const baseUser = currentUser || getCachedUser() || {};
+    currentUser = mergeSessionPreferences({ ...baseUser, ...updatedUser });
+    persistSession({ user: currentUser });
+    window.updateSessionUser?.(currentUser);
+    clearProfileSettingsDraft(currentUser);
+    settingsState.profileImage =
+      updatedUser.profileImage || updatedUser.avatarURL || settingsState.profileImage || preservedPhoto;
+    settingsState.profileImageOriginal = updatedUser.profileImageOriginal || settingsState.profileImageOriginal;
+    settingsState.pendingProfileImage = updatedUser.pendingProfileImage || settingsState.pendingProfileImage;
+    settingsState.pendingProfileImageOriginal =
+      updatedUser.pendingProfileImageOriginal || settingsState.pendingProfileImageOriginal;
+    settingsState.profilePhotoStatus = resolveProfilePhotoStatus(updatedUser);
+    settingsState.practiceDescription = updatedUser.practiceDescription || updatedUser.bio || "";
+    renderAttorneyPracticeAreas(updatedUser.practiceAreas || []);
+    settingsState.notificationPrefs = {
+      ...settingsState.notificationPrefs,
+      email: updatedUser.notificationPrefs?.email !== false,
+      emailMessages: updatedUser.notificationPrefs?.emailMessages !== false,
+      emailCase: updatedUser.notificationPrefs?.emailCase !== false
+    };
+    hydrateAttorneyProfileForm(updatedUser);
+    updatePhotoReviewStatus(updatedUser);
+    markAttorneyProfileSaved();
+    setAttorneySaveStatus("Changes saved.", "success");
+    showToast("Profile updated!", "ok");
+    if (getAttorneyOnboardingStep() === "profile" && isAttorneyRole()) {
+      clearAttorneyOnboardingStep();
+    }
+  } catch (err) {
+    console.error("Failed to save attorney profile", err);
+    setAttorneySaveStatus(err?.message || "Unable to save changes.", "error");
+    showToast(err?.message || "Unable to save profile right now.", "err");
+  } finally {
+    attorneySaveInFlight = false;
+    if (saveBtn) {
+      saveBtn.textContent = originalLabel || "Save changes";
+    }
+    updateAttorneySaveState();
+  }
+}
+
+async function saveNotificationPref(key, value) {
+  const res = await secureFetch("/api/users/me/notification-prefs", {
+    method: "PATCH",
+    suppressToast: true,
+    body: { [key]: !!value }
+  });
+  if (!res.ok) {
+    const errPayload = await res.json().catch(() => ({}));
+    throw new Error(errPayload?.error || "Preference update failed");
+  }
+}
+
+async function saveNotificationPreferenceWithStatus(key, value) {
+  setPreferencesSaveStatus("Saving…", "saving");
+  await queuePreferenceMutation(() => saveNotificationPref(key, value));
+  setPreferencesSaveStatus("Notification preferences saved", "saved");
+}
+
+async function saveProfileVisibility(value) {
+  const res = await secureFetch("/api/account/preferences", {
+    method: "POST",
+    suppressToast: true,
+    body: { hideProfile: !!value }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || "Preference update failed");
+  }
+  return data?.preferences || {};
+}
+
+function normalizeLanguageEntry(entry) {
+  if (!entry) return { name: "", proficiency: "" };
+  if (typeof entry === "string") return { name: entry, proficiency: "" };
+  return {
+    name: entry.name || entry.language || "",
+    proficiency: entry.proficiency || entry.level || ""
+  };
+}
+
+function normalizeEducationEntry(entry) {
+  if (!entry) {
+    return {
+      school: "",
+      startMonth: "",
+      startYear: "",
+      endMonth: "",
+      endYear: "",
+      degree: "",
+      fieldOfStudy: "",
+      grade: "",
+      activities: ""
+    };
+  }
+  if (typeof entry === "string") {
+    return {
+      school: entry,
+      startMonth: "",
+      startYear: "",
+      endMonth: "",
+      endYear: "",
+      degree: "",
+      fieldOfStudy: "",
+      grade: "",
+      activities: ""
+    };
+  }
+  return {
+    school: entry.school || entry.institution || "",
+    startMonth: entry.startMonth || entry.beginMonth || "",
+    startYear: entry.startYear || entry.beginYear || "",
+    endMonth: entry.endMonth || entry.finishMonth || "",
+    endYear: entry.endYear || entry.finishYear || "",
+    degree: entry.degree || "",
+    fieldOfStudy: entry.fieldOfStudy || entry.field || "",
+    grade: entry.grade || "",
+    activities: entry.activities || entry.activitiesAndSocieties || ""
+  };
+}
+
+function addLanguageRow(entry = {}) {
+  if (!languagesEditor) return;
+  const row = document.createElement("div");
+  row.className = "language-row";
+
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.placeholder = "Language (e.g., Spanish)";
+  nameInput.className = "language-name";
+  nameInput.value = entry.name || entry.language || "";
+  row.appendChild(nameInput);
+
+  const select = document.createElement("select");
+  select.className = "language-level";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select proficiency";
+  select.appendChild(placeholder);
+  LANGUAGE_PROFICIENCY_OPTIONS.forEach((opt) => {
+    const option = document.createElement("option");
+    option.value = opt.value;
+    option.textContent = opt.label;
+    select.appendChild(option);
+  });
+  select.value = entry.proficiency || entry.level || "";
+  row.appendChild(select);
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "remove-language";
+  removeBtn.textContent = "Remove";
+  removeBtn.addEventListener("click", () => {
+    row.remove();
+    markParalegalProfileChanged();
+  });
+  row.appendChild(removeBtn);
+
+  languagesEditor.appendChild(row);
+}
+
+function createEducationMonthSelect(value, placeholderLabel) {
+  const select = document.createElement("select");
+  select.className = "education-month";
+  EDUCATION_MONTH_OPTIONS.forEach((opt) => {
+    const option = document.createElement("option");
+    option.value = opt.value;
+    if (!opt.value && placeholderLabel) {
+      option.textContent = placeholderLabel;
+    } else {
+      option.textContent = opt.label || placeholderLabel || "";
+    }
+    select.appendChild(option);
+  });
+  select.value = value || "";
+  return select;
+}
+
+function addEducationRow(entry = {}) {
+  if (!educationEditor) return;
+  const row = document.createElement("div");
+  row.className = "education-row";
+  row.dataset.degree = entry.degree || "";
+  row.dataset.fieldOfStudy = entry.fieldOfStudy || "";
+  row.dataset.grade = entry.grade || "";
+  row.dataset.activities = entry.activities || "";
+
+  const schoolInput = document.createElement("input");
+  schoolInput.type = "text";
+  schoolInput.placeholder = "School";
+  schoolInput.className = "education-school";
+  schoolInput.value = entry.school || "";
+  row.appendChild(schoolInput);
+
+  const startMonthSelect = createEducationMonthSelect(entry.startMonth, "Begin month (optional)");
+  startMonthSelect.classList.add("education-start-month");
+  row.appendChild(startMonthSelect);
+
+  const startYearInput = document.createElement("input");
+  startYearInput.type = "number";
+  startYearInput.placeholder = "Begin year";
+  startYearInput.className = "education-year education-start-year";
+  startYearInput.value = entry.startYear || "";
+  row.appendChild(startYearInput);
+
+  const endMonthSelect = createEducationMonthSelect(entry.endMonth, "End month (optional)");
+  endMonthSelect.classList.add("education-end-month");
+  row.appendChild(endMonthSelect);
+
+  const endYearInput = document.createElement("input");
+  endYearInput.type = "number";
+  endYearInput.placeholder = "End year";
+  endYearInput.className = "education-year education-end-year";
+  endYearInput.value = entry.endYear || "";
+  row.appendChild(endYearInput);
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "remove-education";
+  removeBtn.textContent = "Remove";
+  removeBtn.addEventListener("click", () => {
+    row.remove();
+    markParalegalProfileChanged();
+  });
+  row.appendChild(removeBtn);
+
+  educationEditor.appendChild(row);
+}
+
+function renderLanguageEditor(languages = []) {
+  if (!languagesEditor) return;
+  languagesEditor.innerHTML = "";
+  const entries =
+    Array.isArray(languages) && languages.length
+      ? languages.map((entry) => normalizeLanguageEntry(entry))
+      : [normalizeLanguageEntry()];
+  entries.forEach((entry) => addLanguageRow(entry));
+}
+
+function renderEducationEditor(education = []) {
+  if (!educationEditor) return;
+  educationEditor.innerHTML = "";
+  const entries =
+    Array.isArray(education) && education.length
+      ? education.map((entry) => normalizeEducationEntry(entry))
+      : [normalizeEducationEntry()];
+  entries.forEach((entry) => addEducationRow(entry));
+  settingsState.education = entries;
+}
+
+function collectLanguagesFromEditor() {
+  if (!languagesEditor) return [];
+  return Array.from(languagesEditor.querySelectorAll(".language-row"))
+    .map((row) => {
+      const name = row.querySelector(".language-name")?.value.trim();
+      const proficiency = row.querySelector(".language-level")?.value || "";
+      if (!name) return null;
+      return { name, proficiency };
+    })
+    .filter(Boolean);
+}
+
+function collectEducationFromEditor() {
+  if (!educationEditor) return settingsState.education || [];
+  return Array.from(educationEditor.querySelectorAll(".education-row"))
+    .map((row) => {
+      const school = row.querySelector(".education-school")?.value.trim() || "";
+      const startMonth = row.querySelector(".education-start-month")?.value || "";
+      const startYear = row.querySelector(".education-start-year")?.value || "";
+      const endMonth = row.querySelector(".education-end-month")?.value || "";
+      const endYear = row.querySelector(".education-end-year")?.value || "";
+      const degree = row.dataset.degree || "";
+      const fieldOfStudy = row.dataset.fieldOfStudy || "";
+      const grade = row.dataset.grade || "";
+      const activities = row.dataset.activities || "";
+      if (!school && !startYear && !endYear && !startMonth && !endMonth && !degree && !fieldOfStudy && !grade && !activities) {
+        return null;
+      }
+      const entry = {
+        school,
+        startMonth,
+        startYear,
+        endMonth,
+        endYear
+      };
+      if (degree) entry.degree = degree;
+      if (fieldOfStudy) entry.fieldOfStudy = fieldOfStudy;
+      if (grade) entry.grade = grade;
+      if (activities) entry.activities = activities;
+      return entry;
+    })
+    .filter(Boolean);
+}
+
+function buildEducationModalField({ label, field, placeholder, value, type = "text", span = false, isTextarea = false, rowClass = "" }) {
+  const row = document.createElement("div");
+  row.className = "education-form-row";
+  if (span) row.classList.add("education-form-span");
+  if (rowClass) row.classList.add(...String(rowClass).split(/\s+/).filter(Boolean));
+
+  const labelEl = document.createElement("label");
+  labelEl.textContent = label;
+
+  const input = isTextarea ? document.createElement("textarea") : document.createElement("input");
+  if (!isTextarea) input.type = type;
+  input.placeholder = placeholder || "";
+  input.value = value || "";
+  input.setAttribute("data-field", field);
+
+  row.appendChild(labelEl);
+  row.appendChild(input);
+  return row;
+}
+
+function buildEducationDateRow({ label, monthField, yearField, monthValue, yearValue }) {
+  const row = document.createElement("div");
+  row.className = "education-form-row";
+
+  const labelEl = document.createElement("label");
+  labelEl.textContent = label;
+
+  const grid = document.createElement("div");
+  grid.className = "education-date-grid";
+  const monthSelect = createEducationMonthSelect(monthValue, "Month");
+  monthSelect.setAttribute("data-field", monthField);
+  const yearInput = document.createElement("input");
+  yearInput.type = "number";
+  yearInput.placeholder = "Year";
+  yearInput.value = yearValue || "";
+  yearInput.min = "1900";
+  yearInput.max = "2100";
+  yearInput.setAttribute("data-field", yearField);
+  grid.appendChild(monthSelect);
+  grid.appendChild(yearInput);
+
+  row.appendChild(labelEl);
+  row.appendChild(grid);
+  return row;
+}
+
+function buildEducationModalEntry(entry = {}) {
+  const normalized = normalizeEducationEntry(entry);
+  const card = document.createElement("div");
+  card.className = "education-entry";
+
+  const header = document.createElement("div");
+  header.className = "education-entry-header";
+
+  const title = document.createElement("h4");
+  title.className = "education-entry-title";
+  title.textContent = "Education";
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "education-entry-remove";
+  removeBtn.textContent = "Remove";
+  removeBtn.setAttribute("aria-label", "Remove education");
+  removeBtn.addEventListener("click", () => {
+    card.remove();
+    updateEducationEntryTitles();
+  });
+
+  header.appendChild(title);
+  header.appendChild(removeBtn);
+  card.appendChild(header);
+
+  const grid = document.createElement("div");
+  grid.className = "education-form-grid";
+  grid.appendChild(
+    buildEducationModalField({
+      label: "School *",
+      field: "school",
+      placeholder: "Ex: Boston University",
+      value: normalized.school,
+      span: true
+    })
+  );
+  grid.appendChild(
+    buildEducationModalField({
+      label: "Degree",
+      field: "degree",
+      placeholder: "Ex: Bachelor's",
+      value: normalized.degree
+    })
+  );
+  grid.appendChild(
+    buildEducationModalField({
+      label: "Field of study",
+      field: "fieldOfStudy",
+      placeholder: "Ex: Business",
+      value: normalized.fieldOfStudy
+    })
+  );
+  grid.appendChild(
+    buildEducationDateRow({
+      label: "Start date",
+      monthField: "startMonth",
+      yearField: "startYear",
+      monthValue: normalized.startMonth,
+      yearValue: normalized.startYear
+    })
+  );
+  grid.appendChild(
+    buildEducationDateRow({
+      label: "End date (or expected)",
+      monthField: "endMonth",
+      yearField: "endYear",
+      monthValue: normalized.endMonth,
+      yearValue: normalized.endYear
+    })
+  );
+  grid.appendChild(
+    buildEducationModalField({
+      label: "GPA",
+      field: "grade",
+      placeholder: "Ex: 3.8",
+      value: normalized.grade,
+      rowClass: "education-form-row-inline"
+    })
+  );
+  grid.appendChild(
+    buildEducationModalField({
+      label: "Activities and societies",
+      field: "activities",
+      placeholder: "Ex: Alpha Phi Omega, Marching Band, Volleyball",
+      value: normalized.activities,
+      span: true,
+      isTextarea: true
+    })
+  );
+
+  card.appendChild(grid);
+  return card;
+}
+
+function updateEducationEntryTitles() {
+  if (!educationModalList) return;
+  const entries = educationModalList.querySelectorAll(".education-entry");
+  entries.forEach((entry, index) => {
+    const title = entry.querySelector(".education-entry-title");
+    if (title) title.textContent = `Education ${index + 1}`;
+  });
+}
+
+function renderEducationModalEntries(education = []) {
+  if (!educationModalList) return;
+  educationModalList.innerHTML = "";
+  const entries =
+    Array.isArray(education) && education.length
+      ? education.map((entry) => normalizeEducationEntry(entry))
+      : [normalizeEducationEntry()];
+  entries.forEach((entry) => educationModalList.appendChild(buildEducationModalEntry(entry)));
+  updateEducationEntryTitles();
+}
+
+function collectEducationFromModal() {
+  if (!educationModalList) return settingsState.education || [];
+  const entries = [];
+  educationModalList.querySelectorAll(".education-entry").forEach((entryEl) => {
+    const data = {};
+    entryEl.querySelectorAll("[data-field]").forEach((fieldEl) => {
+      const field = fieldEl.getAttribute("data-field");
+      if (!field) return;
+      const value = typeof fieldEl.value === "string" ? fieldEl.value.trim() : "";
+      data[field] = value;
+    });
+    const hasContent = Object.values(data).some((value) => String(value || "").trim().length > 0);
+    if (hasContent) entries.push(normalizeEducationEntry(data));
+  });
+  return entries;
+}
+
+function openEducationModal() {
+  if (!educationModalOverlay || !educationModal) return;
+  bindEducationModal();
+  const current = collectEducationFromEditor();
+  const entries = current.length ? current : settingsState.education || [];
+  renderEducationModalEntries(entries);
+  educationModalOverlay.classList.add("is-active");
+  educationModalOverlay.setAttribute("aria-hidden", "false");
+  educationModal.classList.add("is-active");
+  educationModal.setAttribute("aria-hidden", "false");
+  educationModal.removeAttribute("inert");
+  const firstInput = educationModalList?.querySelector("[data-field='school']");
+  activateDialogFocus(educationModal, {
+    initialFocus: firstInput || educationModalClose,
+    onEscape: closeEducationModal,
+  });
+}
+
+function closeEducationModal() {
+  if (!educationModalOverlay || !educationModal) return;
+  educationModalOverlay.classList.remove("is-active");
+  educationModalOverlay.setAttribute("aria-hidden", "true");
+  educationModal.classList.remove("is-active");
+  educationModal.setAttribute("aria-hidden", "true");
+  educationModal.setAttribute("inert", "");
+  deactivateDialogFocus(educationModal);
+}
+
+function bindEducationModal() {
+  if (educationModalBound) return;
+  if (!educationModalOverlay || !educationModal) return;
+  educationModalBound = true;
+
+  educationModalOverlay.addEventListener("click", (evt) => {
+    if (evt.target === educationModalOverlay) {
+      closeEducationModal();
+    }
+  });
+  educationModalClose?.addEventListener("click", closeEducationModal);
+  educationModalCancel?.addEventListener("click", closeEducationModal);
+  educationModalAdd?.addEventListener("click", () => {
+    if (!educationModalList) return;
+    educationModalList.appendChild(buildEducationModalEntry(normalizeEducationEntry()));
+    updateEducationEntryTitles();
+  });
+  educationModalSave?.addEventListener("click", () => {
+    const entries = collectEducationFromModal();
+    settingsState.education = entries;
+    renderEducationEditor(entries);
+    refreshParalegalSectionDisplays();
+    markParalegalProfileChanged();
+    closeEducationModal();
+  });
+}
+
+function getCachedUser() {
+  if (typeof window.getStoredUser === "function") {
+    const stored = window.getStoredUser();
+    if (stored) return stored;
+  }
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function mergeSessionPreferences(user = {}) {
+  if (!user || typeof user !== "object") return user;
+  const prefs = user.preferences && typeof user.preferences === "object" ? user.preferences : {};
+  const sessionTheme = typeof window.getThemePreference === "function" ? window.getThemePreference() : null;
+  const sessionFontSize = typeof window.getFontSizePreference === "function" ? window.getFontSizePreference() : null;
+  const theme = prefs.theme || sessionTheme;
+  const fontSize = prefs.fontSize || sessionFontSize;
+  if (!theme && !fontSize) return user;
+  return {
+    ...user,
+    preferences: {
+      ...prefs,
+      ...(theme ? { theme } : {}),
+      ...(fontSize ? { fontSize } : {})
+    }
+  };
+}
+
+function showToast(message, type = "info") {
+  if (!message) return;
+  if (window.toastUtils?.show) {
+    window.toastUtils.show(message, { type });
+  } else {
+    const banner = document.getElementById("toastBanner");
+    if (banner) {
+      banner.textContent = message;
+      banner.dataset.toastType = type;
+      banner.classList.add("show");
+      setTimeout(() => banner.classList.remove("show"), 2500);
+    } else {
+      void showAlert(message, { title: type === "err" ? "Action unavailable" : "Notice" });
+    }
+  }
+}
+
+function isAttorneyRole() {
+  const cachedUser = getCachedUser();
+  const session = getStoredSession?.();
+  const role = String(cachedUser?.role || session?.role || session?.user?.role || "").toLowerCase();
+  return role === "attorney";
+}
+
+function clearOnboardingHighlights() {
+  document.querySelectorAll(".onboarding-pulse").forEach((el) => el.classList.remove("onboarding-pulse"));
+}
+
+let attorneyOnboardingModalBound = false;
+let attorneyOnboardingScrollY = 0;
+let attorneyOnboardingBodyOverflow = "";
+
+function bindAttorneyOnboardingModal() {
+  if (attorneyOnboardingModalBound) return;
+  const modal = document.getElementById("attorneyOnboardingModal");
+  if (!modal) return;
+  attorneyOnboardingModalBound = true;
+  const overlay = document.getElementById("attorneyOnboardingOverlay");
+  const closeBtn = modal.querySelector("[data-onboarding-close]");
+  const continueBtn = modal.querySelector("[data-onboarding-continue]");
+  const skipBtn = modal.querySelector("[data-onboarding-skip]");
+
+  const handleClose = () => {
+    hideAttorneyOnboardingModal();
+  };
+
+  closeBtn?.addEventListener("click", handleClose);
+  continueBtn?.addEventListener("click", () => {
+    const step = modal.dataset.onboardingStep || "profile";
+    hideAttorneyOnboardingModal();
+    runAttorneyOnboardingStep(step, { silent: true });
+    if (step === "profile") {
+      const saveBtn = document.getElementById("saveAttorneyProfile") || document.getElementById("attorneyProfileSaveBtn");
+      saveBtn?.focus?.();
+    } else if (step === "payment") {
+      window.location.href = "dashboard-attorney.html#funds";
+    }
+  });
+  skipBtn?.addEventListener("click", () => {
+    hideAttorneyOnboardingModal();
+    clearOnboardingHighlights();
+    clearAttorneyOnboardingStep();
+  });
+  overlay?.addEventListener("click", (event) => {
+    event.preventDefault();
+    handleClose();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && modal.classList.contains("is-active")) {
+      handleClose();
+    }
+  });
+}
+
+function showAttorneyOnboardingModal(message, step = "profile", title) {
+  const modal = document.getElementById("attorneyOnboardingModal");
+  const overlay = document.getElementById("attorneyOnboardingOverlay");
+  if (!modal || !overlay) return;
+  const text = document.getElementById("attorneyOnboardingText");
+  const titleEl = document.getElementById("attorneyOnboardingTitle");
+  if (text && message) text.textContent = message;
+  if (titleEl && title) titleEl.textContent = title;
+  modal.dataset.onboardingStep = step;
+  attorneyOnboardingScrollY = window.scrollY || 0;
+  attorneyOnboardingBodyOverflow = document.body.style.overflow || "";
+  document.body.style.overflow = "hidden";
+  overlay.classList.add("is-active");
+  overlay.setAttribute("aria-hidden", "false");
+  modal.classList.add("is-active");
+  modal.setAttribute("aria-hidden", "false");
+  modal.removeAttribute("inert");
+  activateDialogFocus(modal, {
+    initialFocus: modal.querySelector("[data-onboarding-continue]"),
+    onEscape: hideAttorneyOnboardingModal,
+  });
+  setAttorneyOnboardingModalSeen(step);
+}
+
+function hideAttorneyOnboardingModal() {
+  const modal = document.getElementById("attorneyOnboardingModal");
+  const overlay = document.getElementById("attorneyOnboardingOverlay");
+  if (!modal || !overlay) return;
+  overlay.classList.remove("is-active");
+  overlay.setAttribute("aria-hidden", "true");
+  modal.classList.remove("is-active");
+  modal.setAttribute("aria-hidden", "true");
+  modal.setAttribute("inert", "");
+  deactivateDialogFocus(modal);
+  document.body.style.overflow = attorneyOnboardingBodyOverflow;
+  window.scrollTo({ top: attorneyOnboardingScrollY, left: 0, behavior: "instant" });
+}
+
+
+function runAttorneyOnboardingStep(step, options = {}) {
+  const silent = Boolean(options.silent);
+  if (!step || !isAttorneyRole()) return;
+  clearOnboardingHighlights();
+
+  if (step === "profile") {
+    const saveBtn = document.getElementById("saveAttorneyProfile") || document.getElementById("attorneyProfileSaveBtn");
+    if (saveBtn) saveBtn.classList.add("onboarding-pulse");
+    return;
+  }
+
+  if (step === "payment") {
+    if (!silent && !getAttorneyOnboardingModalSeen("payment")) {
+      bindAttorneyOnboardingModal();
+      showAttorneyOnboardingModal(
+        "Step 2 of 3: Add a payment method so you can fund matters when you're ready.",
+        "payment",
+        "Add Payment Method"
+      );
+      return;
+    }
+    window.location.href = "dashboard-attorney.html#funds";
+    return;
+  }
+
+  if (step === "case") {
+    window.location.href = "dashboard-attorney.html#cases";
+  }
+}
+
+function showForceVisible() {
+  document.querySelectorAll("[data-force-visible]").forEach((el) => {
+    el.style.display = "block";
+    el.hidden = false;
+  });
+}
+
+function applyUnifiedRoleStyling(user = {}) {
+  showForceVisible();
+  const role = (user.role || "").trim().toLowerCase();
+  const isParalegal = role === "paralegal";
+  const title = document.querySelector(".unified-header h1");
+  const sidebarLogo = document.querySelector(".sidebar .logo");
+
+  if (title) {
+    title.textContent = role === "admin" ? "Admin security" : "Account Settings";
+  }
+  if (sidebarLogo && !sidebarLogo.classList.contains("sidebar-profile-host")) {
+    const defaultText = sidebarLogo.dataset.defaultText || sidebarLogo.textContent;
+    if (!sidebarLogo.dataset.defaultText) sidebarLogo.dataset.defaultText = defaultText;
+    sidebarLogo.textContent = isParalegal ? "Account Settings" : defaultText;
+  }
+  document.body.classList.toggle("admin-security", role === "admin");
+  if (role === "admin") {
+    if (!document.getElementById('adminSecurityBack')) {
+      const heading = document.getElementById('accountSettingsTitle');
+      const back = document.createElement('a');
+      back.id = 'adminSecurityBack'; back.href = 'admin-dashboard.html#overview'; back.textContent = '← Back to admin';
+      heading?.before(back);
+    }
+    document.querySelectorAll('[data-deactivate-account]').forEach(button => {
+      button.disabled = true;
+      button.closest('.settings-block')?.remove();
+    });
+    const back = document.getElementById('dashboardReturnLink');
+    if (back) { back.removeAttribute('data-attorney-only'); back.href='admin-dashboard.html#overview'; back.textContent='Back to admin'; back.hidden=false; back.style.display='block'; }
+    document.getElementById('navProfile')?.setAttribute('hidden', '');
+    document.getElementById('navPreferences')?.setAttribute('hidden', '');
+    if (location.hash !== '#security') location.hash = 'security';
+    initAdminSecurityViews();
+  }
+  document.body.classList.toggle("paralegal-flat", isParalegal);
+  document.body.classList.toggle("attorney-classic", role === "attorney");
+  document.documentElement.classList.toggle("role-paralegal", isParalegal);
+  document.documentElement.classList.toggle("role-attorney", role === "attorney");
+
+  document.querySelectorAll("[data-paralegal-only]").forEach((el) => {
+    if (el.dataset.forceVisible !== undefined) {
+      el.style.display = "";
+      el.hidden = false;
+      return;
+    }
+    el.style.display = isParalegal ? "" : "none";
+  });
+
+  document.querySelectorAll("[data-attorney-only]").forEach((el) => {
+    el.style.display = role === "attorney" ? "" : "none";
+  });
+
+  if (role === "attorney") {
+    showAttorneySettings();
+  } else {
+    showParalegalSettings();
+  }
+  window.__syncProfileSettingsRoute?.();
+}
+
+function enforceUnifiedRoleStyling(user = {}) {
+  applyUnifiedRoleStyling(user);
+  requestAnimationFrame(() => applyUnifiedRoleStyling(user));
+}
+
+function applyAvatar(user) {
+  const rawUrl = getDisplayProfileImage(user, { allowPending: true });
+  const isSignedAssetUrl =
+    typeof rawUrl === "string" &&
+    /(X-Amz-(Algorithm|Credential|Date|Expires|SignedHeaders|Signature)=|AWSAccessKeyId=|Signature=)/i.test(rawUrl);
+  const resolvedUrl = rawUrl || DEFAULT_AVATAR_DATA;
+  const cacheBusted = rawUrl
+    ? rawUrl.startsWith("blob:") || rawUrl.startsWith("data:") || isSignedAssetUrl
+      ? rawUrl
+      : `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}t=${Date.now()}`
+    : resolvedUrl;
+
+  const header = document.getElementById("headerAvatar");
+  if (header) header.src = cacheBusted;
+
+  const preview = document.getElementById("avatarPreview");
+  const attorneyPreview = document.getElementById("attorneyAvatarPreview");
+  const paralegalInitials = document.getElementById("avatarInitials");
+  const attorneyInitials = document.getElementById("attorneyAvatarInitials");
+  const paralegalFallbackText = getParalegalInitials(user);
+  const attorneyFallbackText = getAttorneyInitials(user);
+  if (paralegalInitials) paralegalInitials.textContent = paralegalFallbackText;
+  if (attorneyInitials) attorneyInitials.textContent = attorneyFallbackText;
+  loadAvatarPreview({
+    preview,
+    frame: document.getElementById("avatarFrame"),
+    initials: paralegalInitials,
+    url: cacheBusted,
+    fallbackText: paralegalFallbackText,
+    onLoad: () => {
+      const editButton = document.getElementById("editAvatarBtn");
+      if (editButton) editButton.textContent = "Edit photo";
+      syncParalegalAvatarFrameAction(true);
+    },
+    onError: () => {
+      const editButton = document.getElementById("editAvatarBtn");
+      if (editButton) editButton.textContent = "Replace photo";
+      syncParalegalAvatarFrameAction(false);
+    },
+  });
+  loadAvatarPreview({
+    preview: attorneyPreview,
+    frame: document.getElementById("attorneyAvatarFrame"),
+    initials: attorneyInitials,
+    url: cacheBusted,
+    fallbackText: attorneyFallbackText,
+  });
+
+  const cluster = document.getElementById("clusterAvatar");
+  if (cluster) cluster.src = cacheBusted;
+
+  document.querySelectorAll(".nav-profile-photo, .globalProfileImage").forEach((el) => {
+    el.src = cacheBusted;
+  });
+
+  updateAvatarRemoveButton(user);
+}
+
+function renderFallback(sectionId, title) {
+  const section = document.getElementById(sectionId);
+  if (section) section.innerHTML = `<h3>${title}</h3><p>Unable to load.</p>`;
+}
+
+function syncCluster(user = {}) {
+  const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.name || "Paralegal";
+  const roleLabel = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "Paralegal";
+  const avatar = getDisplayProfileImage(user, { allowPending: true }) || DEFAULT_AVATAR_DATA;
+  const avatarEl = document.getElementById("clusterAvatar");
+  if (avatarEl) avatarEl.src = avatar;
+  document.querySelectorAll(".nav-profile-photo").forEach((el) => {
+    el.src = avatar;
+  });
+  const nameEl = document.getElementById("clusterName");
+  if (nameEl) nameEl.textContent = fullName;
+  const roleEl = document.getElementById("clusterRole");
+  if (roleEl) roleEl.textContent = roleLabel;
+  window.hydrateParalegalCluster?.(user);
+}
+
+function ensureAttorneySettingsStyles() {
+  const styles = [
+    ["assets/styles/profile-settings-attorney-account.css?v=20260820-14", "lpcAttorneyAccountStyles"],
+    ["assets/styles/profile-settings-focused.css?v=20260902-2", "lpcAttorneyFocusedStyles"],
+  ];
+  return Promise.all(styles.map(([href, id]) => new Promise((resolve) => {
+    const existing = document.getElementById(id);
+    if (existing?.sheet) {
+      resolve(existing);
+      return;
+    }
+    const link = existing || document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = href;
+    const finish = () => resolve(link);
+    link.addEventListener("load", finish, { once: true });
+    link.addEventListener("error", finish, { once: true });
+    if (!existing) document.head.appendChild(link);
+  })));
+}
+
+async function loadSettings() {
+  showForceVisible();
+  let user = {};
+  try {
+    const res = await secureFetch("/api/users/me");
+    user = await res.json();
+    if ((!user?.role || !user.role.trim()) && typeof window.refreshSession === "function") {
+      try {
+        const session = await window.refreshSession();
+        const sessionUser = session?.user || session;
+        if (sessionUser?.role) {
+          user.role = sessionUser.role;
+        }
+      } catch (error) {
+        console.warn("[profile-settings] session role refresh failed", error);
+      }
+    }
+    ensureUserStatus(user);
+    currentUser = mergeSessionPreferences(user);
+    window.currentUser = currentUser;
+    persistSession({ user: currentUser });
+    window.updateSessionUser?.(currentUser);
+    hydrateStatePreference(user);
+    bindProfileDraftPersistence();
+
+    if (String(currentUser?.role || "").toLowerCase() === "attorney") {
+      await ensureAttorneySettingsStyles().catch(() => null);
+    }
+
+    if (!hasSettingsAccess(user)) {
+      showPendingSettingsNotice();
+      scheduleProfileScrollIndicatorUpdate();
+      return;
+    }
+    const titleEl = document.getElementById("accountSettingsTitle");
+    const subtitleEl = document.getElementById("accountSettingsSubtitle");
+
+    if (titleEl) titleEl.textContent = "Account Settings";
+    if (currentUser?.role === "attorney") {
+      if (subtitleEl) subtitleEl.textContent = "Manage your profile, security, and preferences.";
+    }
+    enforceUnifiedRoleStyling(user);
+    applyAvatar(user);
+    bootstrapProfileSettings(user);
+
+    const role = (currentUser?.role || "").toLowerCase();
+
+    if (role === "attorney") {
+      const draft = readProfileSettingsDraft(user);
+      if (draft) applyProfileSettingsDraft(draft, user);
+      else syncCluster(user);
+      updateAttorneySaveState();
+      scheduleProfileScrollIndicatorUpdate();
+      return;
+    }
+  } catch (err) {
+    renderFallback("settingsCertificate", "Certificate");
+    renderFallback("settingsResume", "Résumé");
+    renderFallback("settingsWritingSample", "Writing Sample");
+    renderFallback("settingsBio", "Bio");
+    renderFallback("settingsEducation", "Education");
+    renderFallback("settingsAwards", "Awards");
+    renderFallback("settingsSkills", "Skills");
+    renderFallback("settingsLinkedIn", "LinkedIn");
+    renderFallback("settingsNotifications", "Notifications");
+    return;
+  }
+
+  const draft = readProfileSettingsDraft(user);
+  if (draft) {
+    applyProfileSettingsDraft(draft, user);
+    setParalegalProfileDirty(true);
+  } else {
+    syncCluster(user);
+    setParalegalProfileDirty(false);
+  }
+  scheduleProfileScrollIndicatorUpdate();
+
+}
+
+function hydrateProfileForm(user = {}) {
+  setFullNameInputs(user);
+  const emailInput = document.getElementById("emailInput");
+  if (emailInput) emailInput.value = user.email || "";
+  const phoneInput = document.getElementById("phoneInput");
+  if (phoneInput) phoneInput.value = user.phoneNumber || "";
+  const lawFirmInput = document.getElementById("lawFirmInput");
+  if (lawFirmInput) lawFirmInput.value = user.lawFirm || "";
+  const bioInput = document.getElementById("bioInput");
+  if (bioInput) bioInput.value = user.bio || "";
+  const role = (user.role || "").toLowerCase();
+  if (role === "paralegal") {
+    const linkedInInput = document.getElementById("linkedInInput");
+    if (linkedInInput) linkedInInput.value = user.linkedInURL || "";
+    const yearsExperienceInput = document.getElementById("yearsExperienceInput");
+    if (yearsExperienceInput) yearsExperienceInput.value = user.yearsExperience ?? "";
+    renderParalegalPracticeAreas(user.practiceAreas || []);
+    const skillsSource =
+      Array.isArray(user.highlightedSkills) && user.highlightedSkills.length
+        ? user.highlightedSkills
+        : Array.isArray(user.skills)
+        ? user.skills
+        : [];
+    applySkillsInput(skillsSource);
+    bindSkillsInput();
+    applyStateExperienceInput(getDefaultStateExperienceValues(user));
+    bindStateExperienceInput();
+    renderBestForList(Array.isArray(user.bestFor) ? user.bestFor : [], { editable: false });
+    renderExperienceRows(Array.isArray(user.experience) ? user.experience : []);
+    bindExperienceAddButton();
+    renderEducationEditor(user.education || []);
+    renderLanguageEditor(user.languages || []);
+    updateRoleLineFromExperience();
+    refreshParalegalSectionDisplays();
+  }
+}
+
+
+// ================= RESUME =================
+
+function loadCertificate(user) {
+  const section = document.getElementById("settingsCertificate");
+  if (!section) return;
+  settingsState.removeCertificate = false;
+  const hasCertificate = Boolean(user.certificateURL || settingsState.pendingCertificateKey);
+  section.innerHTML = `
+    <div class="paralegal-doc-row">
+      <div class="paralegal-doc-meta">
+        <h3>Upload Certificate (PDF)</h3>
+        <p>Share certifications or licenses for attorneys to review.</p>
+        <p class="doc-status" id="certificateStatus"></p>
+      </div>
+      <div class="paralegal-doc-actions">
+        <div class="file-input-row">
+          <button type="button" id="certificateChooseBtn" class="file-trigger">${hasCertificate ? "Certificate on file" : "Choose File"}</button>
+          <button id="removeCertificateBtn" class="file-trigger remove-action-btn" type="button" ${hasCertificate ? "" : "hidden"}>Remove</button>
+          <span id="certificateFileName" class="file-name"></span>
+        </div>
+        <input id="certificateInput" type="file" accept="application/pdf" class="file-input-hidden">
+      </div>
+    </div>
+  `;
+
+  const certInput = document.getElementById("certificateInput");
+  const certFileName = document.getElementById("certificateFileName");
+  bindDocumentFileChooser("certificateChooseBtn", certInput);
+  if (certInput) {
+    certInput.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0] || null;
+      if (!file) return;
+      if (certFileName) certFileName.textContent = file.name;
+      const status = document.getElementById("certificateStatus");
+      if (status) status.textContent = "Uploading…";
+      await uploadParalegalPdfDocument({
+        input: certInput,
+        endpoint: "/api/uploads/paralegal-certificate",
+        invalidMessage: "Certificate must be a PDF.",
+        sizeMessage: "Certificate must be 10 MB or smaller.",
+        failureMessage: "Certificate upload failed.",
+        successMessage: "Certificate uploaded. Click Save changes to publish the update.",
+        onSuccess: (payload) => {
+          const certHidden = document.getElementById("certificateKeyInput") || (() => {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.id = "certificateKeyInput";
+            input.name = "certificateKey";
+            section.appendChild(input);
+            return input;
+          })();
+          const latestKey = payload.url || payload.key || "";
+          certHidden.value = latestKey;
+          settingsState.pendingCertificateKey = latestKey;
+          settingsState.removeCertificate = false;
+          if (certFileName) certFileName.textContent = file?.name || "";
+          if (status) status.textContent = "";
+          const chooseBtn = document.getElementById("certificateChooseBtn");
+          if (chooseBtn) chooseBtn.textContent = "Certificate on file";
+          const removeBtn = document.getElementById("removeCertificateBtn");
+          if (removeBtn) removeBtn.hidden = false;
+          markParalegalProfileChanged();
+        },
+        onFinally: () => {
+          if (status && status.textContent === "Uploading…") {
+            status.textContent = "";
+          }
+          if (certFileName && certFileName.textContent === file?.name) {
+            certFileName.textContent = "";
+          }
+        },
+      });
+    });
+  }
+
+  document.getElementById("removeCertificateBtn")?.addEventListener("click", async () => {
+    const confirmed = await confirmAction("The certificate will be removed after you save your changes.", {
+      title: "Remove certificate?",
+      confirmLabel: "Remove certificate",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    settingsState.pendingCertificateKey = "";
+    settingsState.removeCertificate = true;
+    const certHidden = document.getElementById("certificateKeyInput");
+    if (certHidden) certHidden.value = "";
+    if (certInput) certInput.value = "";
+    if (certFileName) certFileName.textContent = "";
+    const status = document.getElementById("certificateStatus");
+    if (status) status.textContent = "Removed. Click Save to publish the update.";
+    const chooseBtn = document.getElementById("certificateChooseBtn");
+    if (chooseBtn) chooseBtn.textContent = "Choose File";
+    const removeBtn = document.getElementById("removeCertificateBtn");
+    if (removeBtn) removeBtn.hidden = true;
+    markParalegalProfileChanged();
+  });
+}
+
+function loadResume(user) {
+  const section = document.getElementById("settingsResume");
+  if (!section) return;
+  settingsState.removeResume = false;
+  const getResumeUrl = () => String(settingsState.pendingResumeKey || user.resumeURL || "").trim();
+  const hasResume = Boolean(getResumeUrl());
+  section.innerHTML = `
+    <div class="paralegal-doc-row">
+      <div class="paralegal-doc-meta">
+        <h3>Résumé (PDF)</h3>
+        <p>Upload a polished résumé so attorneys can review your experience.</p>
+        <p class="doc-status" id="resumeStatus"></p>
+      </div>
+      <div class="paralegal-doc-actions">
+        <div class="file-input-row">
+          <button type="button" id="resumeChooseBtn" class="file-trigger">${hasResume ? "View Resume" : "Choose File"}</button>
+          <button id="removeResumeBtn" class="file-trigger remove-action-btn" type="button" ${hasResume ? "" : "hidden"}>Remove</button>
+          <span id="resumeFileName" class="file-name"></span>
+        </div>
+        <input id="resumeInput" type="file" accept="application/pdf" class="file-input-hidden">
+      </div>
+    </div>
+  `;
+
+  const resumeInput = document.getElementById("resumeInput");
+  const resumeFileName = document.getElementById("resumeFileName");
+  const resumeChooseBtn = document.getElementById("resumeChooseBtn");
+  resumeChooseBtn?.addEventListener("click", () => {
+    const currentResumeUrl = getResumeUrl();
+    if (currentResumeUrl) {
+      openProfileDocument(currentResumeUrl);
+      return;
+    }
+    if (!resumeInput) return;
+    const restoreScroll = preserveProfileSettingsScrollPosition();
+    resumeInput.click();
+    setTimeout(() => restoreScroll(), 0);
+  });
+  if (resumeInput) {
+    resumeInput.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0] || null;
+      if (!file) return;
+      if (resumeFileName) resumeFileName.textContent = file.name;
+      const status = document.getElementById("resumeStatus");
+      if (status) status.textContent = "Uploading…";
+      await uploadParalegalPdfDocument({
+        input: resumeInput,
+        endpoint: "/api/uploads/paralegal-resume",
+        invalidMessage: "Résumé must be a PDF.",
+        sizeMessage: "Résumé must be 10 MB or smaller.",
+        failureMessage: "Resume upload failed.",
+        successMessage: "Résumé uploaded. Click Save changes to publish the update.",
+        onSuccess: (payload) => {
+          const resumeHidden = document.getElementById("resumeKeyInput") || (() => {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.id = "resumeKeyInput";
+            input.name = "resumeKey";
+            section.appendChild(input);
+            return input;
+          })();
+          const latestKey = payload.url || payload.key || "";
+          resumeHidden.value = latestKey;
+          settingsState.pendingResumeKey = latestKey;
+          settingsState.removeResume = false;
+          if (resumeFileName) resumeFileName.textContent = file?.name || "";
+          if (status) status.textContent = "";
+          const chooseBtn = document.getElementById("resumeChooseBtn");
+          if (chooseBtn) chooseBtn.textContent = "View Resume";
+          const removeBtn = document.getElementById("removeResumeBtn");
+          if (removeBtn) removeBtn.hidden = false;
+          updateRequiredFieldMarkers();
+          markParalegalProfileChanged();
+        },
+        onFinally: () => {
+          if (status && status.textContent === "Uploading…") {
+            status.textContent = "";
+          }
+          if (resumeFileName && resumeFileName.textContent === file?.name) {
+            resumeFileName.textContent = "";
+          }
+        },
+      });
+    });
+  }
+
+  document.getElementById("removeResumeBtn")?.addEventListener("click", async () => {
+    const confirmed = await confirmAction("The résumé will be removed after you save your changes.", {
+      title: "Remove résumé?",
+      confirmLabel: "Remove résumé",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    settingsState.pendingResumeKey = "";
+    settingsState.removeResume = true;
+    const resumeHidden = document.getElementById("resumeKeyInput");
+    if (resumeHidden) resumeHidden.value = "";
+    if (resumeInput) resumeInput.value = "";
+    if (resumeFileName) resumeFileName.textContent = "";
+    const status = document.getElementById("resumeStatus");
+    if (status) status.textContent = "Removed. Click Save to publish the update.";
+    const chooseBtn = document.getElementById("resumeChooseBtn");
+    if (chooseBtn) chooseBtn.textContent = "Choose File";
+    const removeBtn = document.getElementById("removeResumeBtn");
+    if (removeBtn) removeBtn.hidden = true;
+    updateRequiredFieldMarkers();
+    markParalegalProfileChanged();
+  });
+
+  updateRequiredFieldMarkers();
+}
+
+function loadWritingSample(user) {
+  const section = document.getElementById("settingsWritingSample");
+  if (!section) return;
+  settingsState.removeWritingSample = false;
+  const hasSample = Boolean(user.writingSampleURL || settingsState.pendingWritingSampleKey);
+  section.innerHTML = `
+    <div class="paralegal-doc-row">
+      <div class="paralegal-doc-meta">
+        <h3>Upload Writing Sample (PDF)</h3>
+        <p>Attach a representative writing sample for attorneys to review.</p>
+        <p class="doc-status" id="writingSampleStatus"></p>
+      </div>
+      <div class="paralegal-doc-actions">
+        <div class="file-input-row">
+          <button type="button" id="writingSampleChooseBtn" class="file-trigger">${hasSample ? "Writing sample on file" : "Choose File"}</button>
+          <button id="removeWritingSampleBtn" class="file-trigger remove-action-btn" type="button" ${hasSample ? "" : "hidden"}>Remove</button>
+          <span id="writingSampleFileName" class="file-name"></span>
+        </div>
+        <input id="writingSampleInput" type="file" accept="application/pdf" class="file-input-hidden">
+      </div>
+    </div>
+  `;
+
+  const sampleInput = document.getElementById("writingSampleInput");
+  const sampleFileName = document.getElementById("writingSampleFileName");
+  bindDocumentFileChooser("writingSampleChooseBtn", sampleInput);
+  if (sampleInput) {
+    sampleInput.addEventListener("change", async (event) => {
+      const file = event.target.files?.[0] || null;
+      if (!file) return;
+      if (sampleFileName) sampleFileName.textContent = file.name;
+      const status = document.getElementById("writingSampleStatus");
+      if (status) status.textContent = "Uploading…";
+      await uploadParalegalPdfDocument({
+        input: sampleInput,
+        endpoint: "/api/uploads/paralegal-writing-sample",
+        invalidMessage: "Writing sample must be a PDF.",
+        sizeMessage: "Writing sample must be 10 MB or smaller.",
+        failureMessage: "Writing sample upload failed.",
+        successMessage: "Writing sample uploaded. Click Save changes to publish the update.",
+        onSuccess: (payload) => {
+          const hidden = document.getElementById("writingSampleKeyInput") || (() => {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.id = "writingSampleKeyInput";
+            input.name = "writingSampleKey";
+            section.appendChild(input);
+            return input;
+          })();
+          const latestKey = payload.url || payload.key || "";
+          hidden.value = latestKey;
+          settingsState.pendingWritingSampleKey = latestKey;
+          settingsState.removeWritingSample = false;
+          if (sampleFileName) sampleFileName.textContent = file?.name || "";
+          if (status) status.textContent = "";
+          const chooseBtn = document.getElementById("writingSampleChooseBtn");
+          if (chooseBtn) chooseBtn.textContent = "Writing sample on file";
+          const removeBtn = document.getElementById("removeWritingSampleBtn");
+          if (removeBtn) removeBtn.hidden = false;
+          markParalegalProfileChanged();
+        },
+        onFinally: () => {
+          if (status && status.textContent === "Uploading…") {
+            status.textContent = "";
+          }
+          if (sampleFileName && sampleFileName.textContent === file?.name) {
+            sampleFileName.textContent = "";
+          }
+        },
+      });
+    });
+  }
+
+  document.getElementById("removeWritingSampleBtn")?.addEventListener("click", async () => {
+    const confirmed = await confirmAction("The writing sample will be removed after you save your changes.", {
+      title: "Remove writing sample?",
+      confirmLabel: "Remove sample",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    settingsState.pendingWritingSampleKey = "";
+    settingsState.removeWritingSample = true;
+    const sampleHidden = document.getElementById("writingSampleKeyInput");
+    if (sampleHidden) sampleHidden.value = "";
+    if (sampleInput) sampleInput.value = "";
+    if (sampleFileName) sampleFileName.textContent = "";
+    const status = document.getElementById("writingSampleStatus");
+    if (status) status.textContent = "Removed. Click Save to publish the update.";
+    const chooseBtn = document.getElementById("writingSampleChooseBtn");
+    if (chooseBtn) chooseBtn.textContent = "Choose File";
+    const removeBtn = document.getElementById("removeWritingSampleBtn");
+    if (removeBtn) removeBtn.hidden = true;
+    markParalegalProfileChanged();
+  });
+}
+
+
+
+// ================= BIO =================
+
+function loadBio(user) {
+  const section = document.getElementById("settingsBio");
+  if (!section) return;
+  section.innerHTML = `
+    <h3>Bio</h3>
+    <textarea id="bioInput" style="width:100%;">${escapeHTML(user.bio || "")}</textarea>
+  `;
+  const bioInput = document.getElementById("bioInput");
+  if (bioInput) {
+    bioInput.addEventListener("input", (evt) => {
+      settingsState.bio = evt.target.value;
+    });
+  }
+}
+
+
+// ================= EDUCATION =================
+
+function loadEducation(user) {
+  const section = document.getElementById("settingsEducation");
+  if (!section) return;
+  const items = user.education || [];
+
+  section.innerHTML = `
+    <h3>Education</h3>
+    <div id="eduList"></div>
+    <button id="addEduBtn" type="button">Add Education Entry</button>
+  `;
+
+  const list = document.getElementById("eduList");
+  if (!list) return;
+
+  function renderEdu() {
+    list.innerHTML = "";
+    settingsState.education.forEach((ed, idx) => {
+      list.innerHTML += `
+        <div class="edu-entry">
+          <input placeholder="Degree" value="${escapeHTML(ed.degree || "")}" data-idx="${idx}" data-field="degree">
+          <input placeholder="Institution" value="${escapeHTML(ed.institution || "")}" data-idx="${idx}" data-field="institution">
+          <input placeholder="Year" value="${escapeHTML(ed.year || "")}" data-idx="${idx}" data-field="year">
+          <input placeholder="Certification" value="${escapeHTML(ed.certification || "")}" data-idx="${idx}" data-field="certification">
+        </div>
+      `;
+    });
+
+    list.querySelectorAll("input").forEach(input => {
+      input.addEventListener("input", (evt) => {
+        const idx = evt.target.dataset.idx;
+        const field = evt.target.dataset.field;
+        settingsState.education[idx][field] = evt.target.value;
+      });
+    });
+  }
+
+  settingsState.education = items;
+  renderEdu();
+
+  const addBtn = document.getElementById("addEduBtn");
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      settingsState.education.push({ degree:"", institution:"", year:"", certification:"" });
+      renderEdu();
+    });
+  }
+}
+
+
+// ================= AWARDS =================
+
+function loadAwards(user) {
+  const section = document.getElementById("settingsAwards");
+  if (!section) return;
+  const items = user.awards || [];
+
+  section.innerHTML = `
+    <h3>Awards</h3>
+    <div id="awardList"></div>
+    <button id="addAwardBtn" type="button">Add Award</button>
+  `;
+
+  const list = document.getElementById("awardList");
+  if (!list) return;
+
+  function renderAwards() {
+    list.innerHTML = "";
+    settingsState.awards.forEach((a, idx) => {
+      list.innerHTML += `
+        <div class="award-entry">
+          <input placeholder="Award title" value="${escapeHTML(a)}" data-idx="${idx}">
+        </div>
+      `;
+    });
+
+    list.querySelectorAll("input").forEach(input => {
+      input.addEventListener("input", (evt) => {
+        const idx = evt.target.dataset.idx;
+        settingsState.awards[idx] = evt.target.value;
+      });
+    });
+  }
+
+  settingsState.awards = items;
+  renderAwards();
+
+  const addBtn = document.getElementById("addAwardBtn");
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      settingsState.awards.push("");
+      renderAwards();
+    });
+  }
+}
+
+
+// ================= SKILLS =================
+
+function loadSkills(user) {
+  const section = document.getElementById("settingsSkills");
+  if (!section) return;
+  const items = user.highlightedSkills || user.skills || [];
+
+  section.innerHTML = `
+    <h3>Highlighted Skills (Top 3–5)</h3>
+    <div id="skillsList"></div>
+    <button id="addSkillBtn" type="button">Add Skill</button>
+  `;
+
+  const list = document.getElementById("skillsList");
+  if (!list) return;
+
+  function renderSkills() {
+    list.innerHTML = "";
+    settingsState.highlightedSkills.forEach((s, idx) => {
+      list.innerHTML += `
+        <div class="skill-entry">
+          <input placeholder="Skill" value="${escapeHTML(s)}" data-idx="${idx}">
+        </div>
+      `;
+    });
+
+    list.querySelectorAll("input").forEach(input => {
+      input.addEventListener("input", (evt) => {
+        const idx = evt.target.dataset.idx;
+        settingsState.highlightedSkills[idx] = evt.target.value;
+      });
+    });
+  }
+
+  settingsState.highlightedSkills = items;
+  renderSkills();
+
+  const addBtn = document.getElementById("addSkillBtn");
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      if (settingsState.highlightedSkills.length < 5) {
+        settingsState.highlightedSkills.push("");
+        renderSkills();
+      }
+    });
+  }
+}
+
+
+// ================= LINKEDIN =================
+
+function loadLinkedIn(user) {
+  const section = document.getElementById("settingsLinkedIn");
+  if (!section) return;
+  section.innerHTML = `
+    <h3>LinkedIn Profile</h3>
+    <input id="linkedInURLInput" type="url" style="width:100%;" value="${escapeHTML(user.linkedInURL || "")}">
+  `;
+  const linkedInInput = document.getElementById("linkedInURLInput");
+  if (linkedInInput) {
+    linkedInInput.addEventListener("input", (evt) => {
+      settingsState.linkedInURL = evt.target.value;
+    });
+  }
+}
+
+
+// ================= NOTIFICATION PREFS =================
+
+function loadNotifications(user) {
+  const section = document.getElementById("settingsNotifications");
+  if (!section) return;
+  const prefs = {
+    email: true,
+    sms: false,
+    ...(user.notificationPrefs || {})
+  };
+
+  section.innerHTML = `
+    <h3>Notification Preferences</h3>
+    <label class="pref-row">
+      <input type="checkbox" id="prefEmailNotify"> Email notifications
+    </label><br>
+    <label class="pref-row">
+      <input type="checkbox" id="prefSmsNotify"> SMS notifications
+      <small style="margin-left: 0.5rem; opacity: 0.75;">Requires a verified phone number.</small>
+    </label>
+    <div class="pref-row" style="flex-wrap: wrap; gap: 10px;">
+      <div style="flex: 1; min-width: 220px;">
+        <strong>Digest emails</strong>
+        <p style="margin:4px 0 0; font-size: 0.9rem; color: var(--muted);">Receive a summary of messages, invites, and updates.</p>
+      </div>
+      <select id="digestFrequencySelect" style="padding:6px 10px;border-radius:12px;border:1px solid var(--line);font-size:0.95rem;min-width:160px;">
+        <option value="off">Off</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+      </select>
+    </div>
+  `;
+
+  const emailToggle = document.getElementById("prefEmailNotify");
+  const smsToggle = document.getElementById("prefSmsNotify");
+  const digestSelect = document.getElementById("digestFrequencySelect");
+
+  if (emailToggle) {
+    emailToggle.checked = prefs.email !== false;
+    emailToggle.addEventListener("change", (e) => {
+      settingsState.notificationPrefs.email = e.target.checked;
+    });
+  }
+  if (smsToggle) {
+    smsToggle.checked = !!prefs.sms;
+    smsToggle.addEventListener("change", (e) => {
+      settingsState.notificationPrefs.sms = e.target.checked;
+    });
+  }
+  if (digestSelect) {
+    digestSelect.value = settingsState.digestFrequency;
+    digestSelect.addEventListener("change", (e) => {
+      const value = e.target.value;
+      settingsState.digestFrequency = ["off", "daily", "weekly"].includes(value) ? value : "off";
+    });
+  }
+
+  settingsState.notificationPrefs = { ...prefs };
+}
+
+
+// ================= SAVE SETTINGS =================
+
+async function saveSettings() {
+  syncNamePartsFromFullName();
+  const isParalegal = String(currentUser?.role || "").toLowerCase() === "paralegal";
+  const stagedPhoto = !!settingsState.stagedProfilePhotoFile;
+  let uploadedPhotoPendingReview = false;
+  const firstNameInput = document.getElementById("firstNameInput");
+  const lastNameInput = document.getElementById("lastNameInput");
+  const emailInput = document.getElementById("emailInput");
+  const phoneInput = document.getElementById("phoneInput");
+  const lawFirmInput = document.getElementById("lawFirmInput");
+  const bioInput = document.getElementById("bioInput");
+  const linkedInInput = document.getElementById("linkedInInput");
+  const yearsExperienceInput = document.getElementById("yearsExperienceInput");
+  const resumeKeyInput = document.getElementById("resumeKeyInput");
+  const certificateKeyInput = document.getElementById("certificateKeyInput");
+  const writingSampleKeyInput = document.getElementById("writingSampleKeyInput");
+  let normalizedLinkedInURL = "";
+  try {
+    normalizedLinkedInURL = normalizeHttpUrlInput(linkedInInput?.value, {
+      fieldLabel: "LinkedIn URL",
+      requiredHost: "linkedin.com",
+    });
+    if (linkedInInput) linkedInInput.value = normalizedLinkedInURL;
+  } catch (error) {
+    showToast(error?.message || "Enter a valid LinkedIn URL.", "err");
+    linkedInInput?.focus();
+    return false;
+  }
+  if (settingsState.stagedProfilePhotoFile) {
+    try {
+      const payload = await uploadProfilePhotoFile(
+        settingsState.stagedProfilePhotoFile,
+        settingsState.stagedProfilePhotoOriginalFile,
+        settingsState.stagedProfilePhotoIsEdit
+      );
+      uploadedPhotoPendingReview = String(payload?.status || "").toLowerCase() === "pending_review";
+      applyProfilePhotoUploadResult(payload, { suppressToast: true });
+    } catch (err) {
+      console.error("Unable to upload profile photo", err);
+      showToast("Unable to upload photo. Please try again.", "err");
+      return false;
+    }
+  }
+  const body = {
+    firstName: firstNameInput ? firstNameInput.value.trim() : "",
+    lastName: lastNameInput ? lastNameInput.value.trim() : "",
+    email: emailInput?.value || "",
+    bio: bioInput?.value ?? settingsState.bio,
+    education: settingsState.education,
+    awards: settingsState.awards,
+    highlightedSkills: settingsState.highlightedSkills,
+    linkedInURL: normalizedLinkedInURL || null,
+    notificationPrefs: settingsState.notificationPrefs,
+    digestFrequency: settingsState.digestFrequency
+  };
+  if (phoneInput) {
+    body.phoneNumber = phoneInput.value || "";
+  }
+  if (lawFirmInput) {
+    body.lawFirm = lawFirmInput.value || "";
+  }
+
+  body.linkedInURL = normalizedLinkedInURL || null;
+  body.yearsExperience = yearsExperienceInput ? Number(yearsExperienceInput.value) || null : null;
+  body.practiceAreas = collectParalegalPracticeAreas();
+  body.highlightedSkills = readSkillsInput();
+  body.stateExperience = readStateExperienceInput();
+  body.bestFor = collectBestForEntries();
+  body.skills = body.highlightedSkills;
+  body.experience = buildExperienceEntriesForSave(collectExperienceRows());
+  body.education = collectEducationFromEditor();
+  const resumeKeyValue = resumeKeyInput?.value || settingsState.pendingResumeKey || "";
+  if (settingsState.removeResume) {
+    body.resumeURL = "";
+  } else if (resumeKeyValue) {
+    body.resumeURL = resumeKeyValue;
+  }
+  const certificateKeyValue = certificateKeyInput?.value || settingsState.pendingCertificateKey || "";
+  if (settingsState.removeCertificate) {
+    body.certificateURL = "";
+  } else if (certificateKeyValue) {
+    body.certificateURL = certificateKeyValue;
+  }
+  const writingSampleInput = document.getElementById("writingSampleKeyInput");
+  const writingSampleValue = writingSampleInput?.value || settingsState.pendingWritingSampleKey || "";
+  if (settingsState.removeWritingSample) {
+    body.writingSampleURL = "";
+  } else if (writingSampleValue) {
+    body.writingSampleURL = writingSampleValue;
+  }
+
+  if (languagesEditor) {
+    body.languages = collectLanguagesFromEditor();
+  }
+
+  const res = await secureFetch("/api/users/me", {
+    method: "PATCH",
+    body
+  });
+
+  if (!res.ok) {
+    showToast("Could not save settings.", "err");
+    return false;
+  }
+
+  const updatedUser = await secureFetch("/api/users/me").then((r) => r.json());
+  const approvedPhotoFallback =
+    currentUser?.profileImage ||
+    currentUser?.avatarURL ||
+    settingsState.profileImage ||
+    "";
+  const approvedOriginalFallback =
+    settingsState.profileImageOriginal || currentUser?.profileImageOriginal || "";
+  const pendingFallback = settingsState.pendingProfileImage || currentUser?.pendingProfileImage || "";
+  const pendingOriginalFallback =
+    settingsState.pendingProfileImageOriginal || currentUser?.pendingProfileImageOriginal || "";
+  if (approvedPhotoFallback && !updatedUser?.profileImage && !updatedUser?.avatarURL) {
+    updatedUser.profileImage = approvedPhotoFallback;
+    updatedUser.avatarURL = approvedPhotoFallback;
+    updatedUser.profilePhotoStatus = updatedUser.profilePhotoStatus || "approved";
+  }
+  if (approvedOriginalFallback && !updatedUser?.profileImageOriginal) {
+    updatedUser.profileImageOriginal = approvedOriginalFallback;
+  }
+  if (pendingFallback && !updatedUser?.pendingProfileImage) {
+    updatedUser.pendingProfileImage = pendingFallback;
+    updatedUser.profilePhotoStatus = updatedUser.profilePhotoStatus || "pending_review";
+  }
+  if (pendingOriginalFallback && !updatedUser?.pendingProfileImageOriginal) {
+    updatedUser.pendingProfileImageOriginal = pendingOriginalFallback;
+  }
+  const mergedUser = mergeSessionPreferences({
+    ...(currentUser || {}),
+    ...updatedUser,
+    role: updatedUser.role || currentUser?.role || ""
+  });
+  currentUser = mergedUser;
+  settingsState.bio = updatedUser.bio || "";
+  settingsState.education = updatedUser.education || [];
+  settingsState.awards = updatedUser.awards || [];
+  settingsState.highlightedSkills = updatedUser.highlightedSkills || updatedUser.skills || [];
+  settingsState.stateExperience = updatedUser.stateExperience || [];
+  settingsState.linkedInURL = updatedUser.linkedInURL || "";
+  settingsState.notificationPrefs = {
+    email: true,
+    sms: false,
+    ...(updatedUser.notificationPrefs || {})
+  };
+  const newFreq = typeof updatedUser.digestFrequency === "string" ? updatedUser.digestFrequency : "off";
+  settingsState.digestFrequency = ["off", "daily", "weekly"].includes(newFreq) ? newFreq : "off";
+  settingsState.profileImage = updatedUser.profileImage || settingsState.profileImage;
+  settingsState.profileImageOriginal = updatedUser.profileImageOriginal || settingsState.profileImageOriginal;
+  settingsState.pendingProfileImage = updatedUser.pendingProfileImage || settingsState.pendingProfileImage;
+  settingsState.pendingProfileImageOriginal =
+    updatedUser.pendingProfileImageOriginal || settingsState.pendingProfileImageOriginal;
+  settingsState.profilePhotoStatus = resolveProfilePhotoStatus(updatedUser);
+  settingsState.pendingResumeKey = "";
+  settingsState.pendingCertificateKey = "";
+  settingsState.pendingWritingSampleKey = "";
+  settingsState.removeResume = false;
+  settingsState.removeCertificate = false;
+  settingsState.removeWritingSample = false;
+  if (resumeKeyInput) resumeKeyInput.value = "";
+  if (certificateKeyInput) certificateKeyInput.value = "";
+  if (writingSampleKeyInput) writingSampleKeyInput.value = "";
+  if (writingSampleInput) writingSampleInput.value = "";
+
+  persistSession({ user: mergedUser });
+  window.updateSessionUser?.(mergedUser);
+  clearProfileSettingsDraft(mergedUser);
+
+  applyAvatar?.(mergedUser);
+  bootstrapProfileSettings(mergedUser);
+  const requiredStatus = isParalegal ? updateRequiredFieldMarkers() : { ok: true, missing: [] };
+  try {
+    window.dispatchEvent(new CustomEvent("lpc:user-updated", { detail: mergedUser }));
+  } catch (_) {}
+  if (isParalegal && !requiredStatus.ok) {
+    const remainingMissing = Array.isArray(requiredStatus.missing)
+      ? requiredStatus.missing.filter((field) => !(uploadedPhotoPendingReview && field === "Profile photo"))
+      : [];
+    if (uploadedPhotoPendingReview && remainingMissing.length === 0) {
+      showToast("Settings saved and profile photo submitted for review.", "ok");
+      return true;
+    }
+    const missingList = remainingMissing.length
+      ? remainingMissing.join(", ")
+      : "your remaining profile fields";
+    const savedMessage = uploadedPhotoPendingReview
+      ? "Settings saved and profile photo submitted for review."
+      : "Settings saved.";
+    showToast(`${savedMessage} Complete ${missingList} to finish your profile for attorney review.`, "info");
+    return true;
+  }
+
+  showToast(
+    stagedPhoto
+      ? uploadedPhotoPendingReview
+        ? "Settings saved and profile photo submitted for review."
+        : "Settings saved and profile photo updated."
+      : "Settings saved!",
+    "ok"
+  );
+  return true;
+}
+
+// -----------------------------
+// PROFILE PHOTO UPLOAD FLOW
+// -----------------------------
+
+const avatarUploadConfigs = [
+  { frameId: "avatarFrame", inputId: "avatarInput", previewId: "avatarPreview", initialsId: "avatarInitials" },
+  {
+    frameId: "attorneyAvatarFrame",
+    inputId: "attorneyAvatarInput",
+    previewId: "attorneyAvatarPreview",
+    initialsId: "attorneyAvatarInitials"
+  }
+];
+const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+const PROFILE_PHOTO_ALLOWED_MIMES = new Set(["image/jpeg", "image/jpg", "image/png"]);
+const PROFILE_PHOTO_ALLOWED_EXT = /\.(jpe?g|png)$/i;
+const PROFILE_PHOTO_CROPPER_TEMPLATE =
+  '<cropper-canvas>' +
+  '<cropper-image scalable translatable initial-center-size="contain"></cropper-image>' +
+  '<cropper-selection initial-coverage="1" initial-aspect-ratio="1" aspect-ratio="1" precise>' +
+  '<cropper-handle action="move" theme-color="rgba(255, 255, 255, 0.28)"></cropper-handle>' +
+  '</cropper-selection>' +
+  '</cropper-canvas>';
+
+let activeCropper = null;
+let activeCropperImage = null;
+let activeCropperSelection = null;
+let cropperModal = null;
+let cropperImage = null;
+let cropperZoom = null;
+let cropperSaveBtn = null;
+let cropperLoading = null;
+let cropperLoadingText = null;
+let cropperModalCard = null;
+let cropperConfig = null;
+let cropperFile = null;
+let cropperOriginalFile = null;
+let cropperOriginalUrl = "";
+let cropperObjectUrl = null;
+let cropperBaseScale = 1;
+let cropperTransformHandler = null;
+let cropperReady = false;
+let cropperLoadRetries = 0;
+let cropperLoadTimer = null;
+let cropperFetchController = null;
+let cropperError = null;
+let cropperErrorText = null;
+let cropperAvatarPreview = null;
+let cropperPreviewTimer = null;
+let cropperRetryAction = null;
+let cropperSaveInFlight = false;
+let cropperReturnFocus = null;
+let cropperOpenVersion = 0;
+
+function clearCropperLoadTimer() {
+  if (cropperLoadTimer) clearTimeout(cropperLoadTimer);
+  cropperLoadTimer = null;
+}
+
+function hideCropperError() {
+  if (cropperError) cropperError.hidden = true;
+  cropperRetryAction = null;
+}
+
+function showCropperError(message, retryAction = null, { preserveCropper = false } = {}) {
+  clearCropperLoadTimer();
+  setCropperLoading(false);
+  if (!preserveCropper) cropperReady = false;
+  if (cropperZoom) cropperZoom.disabled = !preserveCropper;
+  if (cropperSaveBtn) cropperSaveBtn.disabled = true;
+  if (cropperErrorText && message) cropperErrorText.textContent = message;
+  if (cropperError) cropperError.hidden = false;
+  cropperRetryAction = typeof retryAction === "function" ? retryAction : null;
+}
+
+function beginCropperLoadDeadline(retryAction) {
+  clearCropperLoadTimer();
+  cropperLoadTimer = setTimeout(() => {
+    destroyActiveCropperInstance();
+    showCropperError("The photo took too long to load. Try again or choose another photo.", retryAction);
+  }, 12000);
+}
+
+function scheduleCropperAvatarPreview() {
+  if (!activeCropperSelection || !cropperAvatarPreview) return;
+  if (cropperPreviewTimer) clearTimeout(cropperPreviewTimer);
+  const selection = activeCropperSelection;
+  cropperPreviewTimer = setTimeout(async () => {
+    cropperPreviewTimer = null;
+    if (selection !== activeCropperSelection) return;
+    try {
+      const canvas = await selection.$toCanvas({ width: 72, height: 72 });
+      if (selection === activeCropperSelection && cropperAvatarPreview) {
+        cropperAvatarPreview.src = canvas.toDataURL("image/jpeg", 0.86);
+      }
+    } catch (error) {
+      console.debug("[profile-settings] crop preview unavailable", error);
+    }
+  }, 80);
+}
+
+function getCropperConstructor() {
+  const cropperGlobal = globalThis.Cropper;
+  if (typeof cropperGlobal === "function") return cropperGlobal;
+  return typeof cropperGlobal?.default === "function" ? cropperGlobal.default : null;
+}
+
+function getCropperMatrixScale(matrix = []) {
+  const a = Number(matrix[0]);
+  const b = Number(matrix[1]);
+  return Number.isFinite(a) && Number.isFinite(b) ? Math.hypot(a, b) : 1;
+}
+
+function syncCropperZoomFromMatrix(matrix) {
+  if (!cropperZoom || !cropperBaseScale) return;
+  const currentScale = getCropperMatrixScale(matrix || activeCropperImage?.$getTransform?.());
+  const relative = currentScale / cropperBaseScale - 1;
+  cropperZoom.min = "0";
+  cropperZoom.max = "0.5";
+  cropperZoom.step = "0.01";
+  cropperZoom.value = String(Math.min(0.5, Math.max(0, relative)));
+}
+
+function setCropperZoom(targetZoom) {
+  if (!activeCropperImage || !cropperBaseScale) return;
+  const target = Math.min(0.5, Math.max(0, Number(targetZoom) || 0));
+  const currentScale = getCropperMatrixScale(activeCropperImage.$getTransform());
+  const currentZoom = Math.max(0, currentScale / cropperBaseScale - 1);
+  const factor = (1 + target) / (1 + currentZoom);
+  const delta = factor >= 1 ? factor - 1 : 1 - 1 / factor;
+  activeCropperImage.$zoom(delta);
+  syncCropperZoomFromMatrix();
+}
+
+function proposedCropperImageCoversSelection(matrix) {
+  if (!activeCropperImage || !activeCropperSelection || !Array.isArray(matrix)) return false;
+  const proposedMatrix = matrix.slice(0, 6).map(Number);
+  const currentTransform = activeCropperImage.$getTransform?.();
+  const currentMatrix = Array.isArray(currentTransform) ? currentTransform.slice(0, 6).map(Number) : [];
+  const width = activeCropperImage.offsetWidth;
+  const height = activeCropperImage.offsetHeight;
+  if (
+    proposedMatrix.length !== 6 ||
+    currentMatrix?.length !== 6 ||
+    !proposedMatrix.every(Number.isFinite) ||
+    !currentMatrix.every(Number.isFinite) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return false;
+  }
+
+  const transformOrigin = getComputedStyle(activeCropperImage).transformOrigin.split(" ");
+  const parsedOriginX = Number.parseFloat(transformOrigin[0]);
+  const parsedOriginY = Number.parseFloat(transformOrigin[1]);
+  const originX = Number.isFinite(parsedOriginX) ? parsedOriginX : width / 2;
+  const originY = Number.isFinite(parsedOriginY) ? parsedOriginY : height / 2;
+  const getTransformedBounds = ([a, b, c, d, e, f]) => {
+    const corners = [
+      [0, 0],
+      [width, 0],
+      [width, height],
+      [0, height],
+    ].map(([x, y]) => ({
+      x: originX + a * (x - originX) + c * (y - originY) + e,
+      y: originY + b * (x - originX) + d * (y - originY) + f,
+    }));
+    return {
+      top: Math.min(...corners.map((corner) => corner.y)),
+      right: Math.max(...corners.map((corner) => corner.x)),
+      bottom: Math.max(...corners.map((corner) => corner.y)),
+      left: Math.min(...corners.map((corner) => corner.x)),
+    };
+  };
+
+  const currentBounds = getTransformedBounds(currentMatrix);
+  const proposedBounds = getTransformedBounds(proposedMatrix);
+  const currentRect = activeCropperImage.getBoundingClientRect();
+  const layoutLeft = currentRect.left - currentBounds.left;
+  const layoutTop = currentRect.top - currentBounds.top;
+  const imageRect = {
+    top: layoutTop + proposedBounds.top,
+    right: layoutLeft + proposedBounds.right,
+    bottom: layoutTop + proposedBounds.bottom,
+    left: layoutLeft + proposedBounds.left,
+  };
+  const selectionRect = activeCropperSelection.getBoundingClientRect();
+  const tolerance = 0.75;
+  return (
+    imageRect.top <= selectionRect.top + tolerance &&
+    imageRect.right >= selectionRect.right - tolerance &&
+    imageRect.bottom >= selectionRect.bottom - tolerance &&
+    imageRect.left <= selectionRect.left + tolerance
+  );
+}
+
+function bindCropperTransformBoundary() {
+  if (!activeCropperImage) return;
+  cropperTransformHandler = (event) => {
+    const matrix = event.detail?.matrix;
+    if (!Array.isArray(matrix)) return;
+    const relativeZoom = getCropperMatrixScale(matrix) / cropperBaseScale - 1;
+    if (relativeZoom < -0.001 || relativeZoom > 0.501 || !proposedCropperImageCoversSelection(matrix)) {
+      event.preventDefault();
+      syncCropperZoomFromMatrix();
+      return;
+    }
+    syncCropperZoomFromMatrix(matrix);
+    scheduleCropperAvatarPreview();
+  };
+  activeCropperImage.addEventListener("transform", cropperTransformHandler);
+}
+
+async function initializePhotoCropper() {
+  const CropperConstructor = getCropperConstructor();
+  if (!CropperConstructor) throw new Error("Cropper.js 2.x is unavailable.");
+  const cropperInstance = new CropperConstructor(cropperImage, {
+    container: cropperImage.parentElement,
+    template: PROFILE_PHOTO_CROPPER_TEMPLATE,
+  });
+  const cropperImageElement = cropperInstance.getCropperImage?.();
+  const cropperSelectionElement = cropperInstance.getCropperSelection?.();
+  if (!cropperImageElement || !cropperSelectionElement || typeof cropperSelectionElement.$toCanvas !== "function") {
+    cropperInstance.destroy();
+    throw new Error("Cropper.js 2.x did not create the required image and selection elements.");
+  }
+  activeCropper = cropperInstance;
+  activeCropperImage = cropperImageElement;
+  activeCropperSelection = cropperSelectionElement;
+  await cropperImageElement.$ready();
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  if (activeCropper !== cropperInstance) return;
+  cropperImageElement.$center("contain");
+  const imageRect = cropperImageElement.getBoundingClientRect();
+  const selectionRect = cropperSelectionElement.getBoundingClientRect();
+  const fitScale = Math.max(
+    selectionRect.width / Math.max(imageRect.width, 1),
+    selectionRect.height / Math.max(imageRect.height, 1)
+  );
+  if (fitScale > 1) cropperImageElement.$scale(fitScale);
+  cropperImageElement.$center();
+  cropperBaseScale = getCropperMatrixScale(cropperImageElement.$getTransform());
+  bindCropperTransformBoundary();
+  syncCropperZoomFromMatrix();
+  if (cropperZoom) cropperZoom.disabled = false;
+  cropperReady = true;
+  if (cropperSaveBtn) cropperSaveBtn.disabled = false;
+  clearCropperLoadTimer();
+  setCropperLoading(false);
+  scheduleCropperAvatarPreview();
+}
+
+async function canDecodeImageFile(file) {
+  if (!file) return false;
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file);
+      if (bitmap && typeof bitmap.close === "function") bitmap.close();
+      return true;
+    } catch (error) {
+      console.debug("[profile-settings] createImageBitmap decode unavailable; using Image fallback", error);
+      // Fall through to Image-based decode check.
+    }
+  }
+  return await new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(true);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(false);
+    };
+    img.src = objectUrl;
+  });
+}
+
+function closeParalegalAvatarActions({ restoreFocus = false } = {}) {
+  const menu = document.getElementById("avatarPhotoActions");
+  const frame = document.getElementById("avatarFrame");
+  if (!menu || !frame) return;
+  const wasOpen = !menu.classList.contains("hidden");
+  menu.classList.add("hidden");
+  frame.setAttribute("aria-expanded", "false");
+  if (restoreFocus && wasOpen) frame.focus();
+}
+
+function toggleParalegalAvatarActions() {
+  const menu = document.getElementById("avatarPhotoActions");
+  const frame = document.getElementById("avatarFrame");
+  if (!menu || !frame) return;
+  const willOpen = menu.classList.contains("hidden");
+  menu.classList.toggle("hidden", !willOpen);
+  frame.setAttribute("aria-expanded", willOpen ? "true" : "false");
+  if (willOpen) {
+    menu.querySelector('[role="menuitem"]:not(:disabled)')?.focus();
+  }
+}
+
+function syncParalegalAvatarFrameAction(hasVisiblePhoto) {
+  const frame = document.getElementById("avatarFrame");
+  if (!frame) return;
+  frame.setAttribute("aria-label", hasVisiblePhoto ? "Open profile photo actions" : "Upload profile photo");
+  if (hasVisiblePhoto) {
+    frame.setAttribute("aria-haspopup", "menu");
+    frame.setAttribute("aria-controls", "avatarPhotoActions");
+    return;
+  }
+  frame.removeAttribute("aria-haspopup");
+  frame.removeAttribute("aria-controls");
+  closeParalegalAvatarActions();
+}
+
+function initAvatarUploaders() {
+  bindAvatarRemoval();
+  bindAvatarEditing();
+  initPhotoCropperModal();
+  avatarUploadConfigs.forEach((config) => {
+    const frame = document.getElementById(config.frameId);
+    const input = document.getElementById(config.inputId);
+    if (!frame || !input) return;
+
+    const activateFrame = () => {
+      cropperReturnFocus = frame;
+      const isAttorneyFrame = config.frameId === "attorneyAvatarFrame";
+      const existingPhoto = getDisplayProfileImage(currentUser || {}, { allowPending: true });
+      if (
+        !isAttorneyFrame &&
+        frame.classList.contains("has-photo") &&
+        existingPhoto &&
+        existingPhoto !== DEFAULT_AVATAR_DATA
+      ) {
+        toggleParalegalAvatarActions();
+        return;
+      }
+      if (isAttorneyFrame && existingPhoto && existingPhoto !== DEFAULT_AVATAR_DATA) {
+        openExistingPhotoEditor(config);
+        return;
+      }
+      closeParalegalAvatarActions();
+      input.click();
+    };
+    frame.style.cursor = "pointer";
+    frame.addEventListener("click", activateFrame);
+    frame.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter" || evt.key === " ") {
+        evt.preventDefault();
+        activateFrame();
+      }
+    });
+
+    input.addEventListener("change", () => handleAvatarUpload(config));
+  });
+
+  if (document.body.dataset.paralegalAvatarActionsBound !== "true") {
+    document.body.dataset.paralegalAvatarActionsBound = "true";
+    document.addEventListener("click", (event) => {
+      const menu = document.getElementById("avatarPhotoActions");
+      const frame = document.getElementById("avatarFrame");
+      if (!menu || menu.classList.contains("hidden")) return;
+      if (menu.contains(event.target) || frame?.contains(event.target)) return;
+      closeParalegalAvatarActions();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      const menu = document.getElementById("avatarPhotoActions");
+      if (!menu || menu.classList.contains("hidden")) return;
+      event.preventDefault();
+      closeParalegalAvatarActions({ restoreFocus: true });
+    });
+  }
+}
+
+function updateAvatarRemoveButton(user = currentUser || {}) {
+  const removeBtn = document.getElementById("removeAvatarBtn");
+  const attorneyRemoveBtn = document.getElementById("removeAttorneyAvatarBtn");
+  const editBtn = document.getElementById("editAvatarBtn");
+  const attorneyEditBtn = document.getElementById("editAttorneyAvatarBtn");
+  const rawUrl = user.profileImage || user.avatarURL || settingsState.profileImage || "";
+  const pendingUrl = resolvePendingProfileImage(user);
+  const stagedUrl = settingsState.stagedProfilePhotoUrl || "";
+  const hasPhoto = Boolean(rawUrl || pendingUrl || stagedUrl);
+  const avatarFrame = document.getElementById("avatarFrame");
+  syncParalegalAvatarFrameAction(Boolean(hasPhoto && avatarFrame?.classList.contains("has-photo")));
+  if (removeBtn) {
+    removeBtn.classList.toggle("hidden", !hasPhoto);
+    removeBtn.disabled = !hasPhoto;
+  }
+  if (attorneyRemoveBtn) {
+    attorneyRemoveBtn.classList.toggle("hidden", !hasPhoto);
+    attorneyRemoveBtn.disabled = !hasPhoto;
+  }
+  if (editBtn) {
+    editBtn.classList.toggle("hidden", !hasPhoto);
+    editBtn.disabled = !hasPhoto;
+  }
+  if (attorneyEditBtn) {
+    attorneyEditBtn.classList.remove("hidden");
+    attorneyEditBtn.disabled = false;
+  }
+}
+
+function clearStagedProfilePhoto() {
+  if (settingsState.stagedProfilePhotoUrl?.startsWith("blob:")) {
+    URL.revokeObjectURL(settingsState.stagedProfilePhotoUrl);
+  }
+  settingsState.stagedProfilePhotoUrl = "";
+  settingsState.stagedProfilePhotoFile = null;
+  settingsState.stagedProfilePhotoIsEdit = false;
+  if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:")) {
+    URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
+  }
+  settingsState.stagedProfilePhotoOriginalUrl = "";
+  settingsState.stagedProfilePhotoOriginalFile = null;
+}
+
+function applyProfilePhotoUploadResult(payload = {}, { suppressToast = false } = {}) {
+  const status = String(payload?.status || payload?.profilePhotoStatus || "").trim();
+  const pendingUrl = payload?.pendingProfileImage || (status === "pending_review" ? payload?.url : "");
+  const approvedUrl = payload?.profileImage || payload?.avatarURL || (status !== "pending_review" ? payload?.url : "");
+  const pendingOriginal = payload?.pendingProfileImageOriginal || "";
+  const approvedOriginal = payload?.profileImageOriginal || "";
+
+  if (status === "pending_review") {
+    const updatedUser = mergeSessionPreferences({
+      ...(currentUser || {}),
+      pendingProfileImage: pendingUrl,
+      pendingProfileImageOriginal: pendingOriginal,
+      profilePhotoStatus: "pending_review",
+    });
+    currentUser = updatedUser;
+    settingsState.pendingProfileImage = pendingUrl || settingsState.pendingProfileImage;
+    settingsState.pendingProfileImageOriginal = pendingOriginal || settingsState.pendingProfileImageOriginal;
+    settingsState.profilePhotoStatus = "pending_review";
+    persistSession({ user: updatedUser });
+    window.updateSessionUser?.(updatedUser);
+    applyAvatar(updatedUser);
+    updateAvatarRemoveButton(updatedUser);
+    updatePhotoReviewStatus(updatedUser);
+    if (!suppressToast) {
+      showToast("Photo submitted for review.", "ok");
+    }
+  } else if (approvedUrl) {
+    const updatedUser = mergeSessionPreferences({
+      ...(currentUser || {}),
+      profileImage: approvedUrl,
+      avatarURL: approvedUrl,
+      profileImageOriginal: approvedOriginal || (currentUser?.profileImageOriginal || ""),
+      pendingProfileImage: "",
+      pendingProfileImageOriginal: "",
+      profilePhotoStatus: "approved",
+    });
+    currentUser = updatedUser;
+    settingsState.profileImage = approvedUrl;
+    settingsState.profileImageOriginal =
+      approvedOriginal || currentUser?.profileImageOriginal || settingsState.profileImageOriginal;
+    settingsState.pendingProfileImage = "";
+    settingsState.pendingProfileImageOriginal = "";
+    settingsState.profilePhotoStatus = "approved";
+    persistSession({ user: updatedUser });
+    window.updateSessionUser?.(updatedUser);
+    applyAvatar(updatedUser);
+    updateAvatarRemoveButton(updatedUser);
+    updatePhotoReviewStatus(updatedUser);
+    if (!suppressToast) {
+      showToast("Profile photo updated!", "ok");
+    }
+  }
+
+  updateParalegalVisibilityLock(currentUser || {});
+  updateRequiredFieldMarkers();
+  clearStagedProfilePhoto();
+}
+
+function bindAvatarRemoval() {
+  const bindRemoveButton = (button) => {
+    if (!button || button.dataset.bound === "true") return;
+    button.dataset.bound = "true";
+    button.addEventListener("click", async () => {
+      if (button.id === "removeAvatarBtn") closeParalegalAvatarActions();
+      const confirmed = await confirmAction(
+        "This removes the photo from your account, public profile, and navigation avatar.",
+        {
+          title: "Remove profile photo?",
+          confirmLabel: "Remove photo",
+          tone: "danger",
+        }
+      );
+      if (!confirmed) return;
+      if (settingsState.stagedProfilePhotoFile) {
+        clearStagedProfilePhoto();
+        applyAvatar(currentUser || {});
+        updateAvatarRemoveButton(currentUser || {});
+        updatePhotoReviewStatus(currentUser || {});
+        updateRequiredFieldMarkers();
+        return;
+      }
+      if (!currentUser) return;
+      const originalLabel = button.textContent;
+      button.disabled = true;
+      button.textContent = "Removing…";
+      try {
+        const res = await secureFetch("/api/users/me", {
+          method: "PATCH",
+          body: { profileImage: "", avatarURL: "" }
+        });
+        const updatedUser = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(updatedUser?.error || "Unable to remove photo");
+        }
+        const mergedUser = mergeSessionPreferences(updatedUser);
+        currentUser = mergedUser;
+        settingsState.profileImage = updatedUser.profileImage || "";
+        settingsState.profileImageOriginal = updatedUser.profileImageOriginal || "";
+        settingsState.pendingProfileImage = updatedUser.pendingProfileImage || "";
+        settingsState.pendingProfileImageOriginal = updatedUser.pendingProfileImageOriginal || "";
+        settingsState.profilePhotoStatus = resolveProfilePhotoStatus(updatedUser);
+        persistSession({ user: mergedUser });
+        window.updateSessionUser?.(mergedUser);
+        applyAvatar(mergedUser);
+        updateAvatarRemoveButton(mergedUser);
+        updatePhotoReviewStatus(mergedUser);
+        updateRequiredFieldMarkers();
+        showToast("Profile photo removed.", "ok");
+      } catch (err) {
+        console.error("Unable to remove profile photo", err);
+        showToast(err.message || "Unable to remove photo.", "err");
+      } finally {
+        button.textContent = originalLabel;
+        updateAvatarRemoveButton(currentUser);
+      }
+    });
+  };
+
+  bindRemoveButton(document.getElementById("removeAvatarBtn"));
+  bindRemoveButton(document.getElementById("removeAttorneyAvatarBtn"));
+}
+
+function bindAvatarEditing() {
+  const editBtn = document.getElementById("editAvatarBtn");
+  const attorneyEditBtn = document.getElementById("editAttorneyAvatarBtn");
+  const paralegalConfig = avatarUploadConfigs.find((config) => config.frameId === "avatarFrame");
+  const attorneyConfig = avatarUploadConfigs.find((config) => config.frameId === "attorneyAvatarFrame");
+
+  if (editBtn && editBtn.dataset.bound !== "true") {
+    editBtn.dataset.bound = "true";
+    editBtn.addEventListener("click", () => {
+      closeParalegalAvatarActions();
+      cropperReturnFocus = document.getElementById("avatarFrame");
+      if (paralegalConfig) openExistingPhotoEditor(paralegalConfig);
+    });
+  }
+  if (attorneyEditBtn && attorneyEditBtn.dataset.bound !== "true") {
+    attorneyEditBtn.dataset.bound = "true";
+    attorneyEditBtn.addEventListener("click", () => {
+      cropperReturnFocus = attorneyEditBtn;
+      document.getElementById(attorneyConfig?.inputId || "attorneyAvatarInput")?.click();
+    });
+  }
+}
+
+async function handleAvatarUpload(config) {
+  const input = document.getElementById(config.inputId);
+  if (!input) return;
+
+  const file = input.files?.[0];
+  if (!file) return;
+  const mime = String(file.type || "").toLowerCase();
+  const filename = String(file.name || "");
+  const mimeAllowed = PROFILE_PHOTO_ALLOWED_MIMES.has(mime);
+  const hasMime = Boolean(mime);
+  const extAllowed = PROFILE_PHOTO_ALLOWED_EXT.test(filename);
+  // Allow extension fallback only when browser does not provide a MIME type.
+  if (!mimeAllowed && !(extAllowed && !hasMime)) {
+    showToast("Upload a JPEG or PNG profile photo.", "err");
+    input.value = "";
+    return;
+  }
+  if (Number(file.size || 0) > PROFILE_PHOTO_MAX_BYTES) {
+    showToast("Profile photo must be 5 MB or smaller.", "err");
+    input.value = "";
+    return;
+  }
+  const decodable = await canDecodeImageFile(file);
+  if (!decodable) {
+    showToast("This image can't be read on this device. Please upload a JPG or PNG.", "err");
+    input.value = "";
+    return;
+  }
+
+  if (getCropperConstructor() && cropperModal && cropperImage) {
+    openPhotoCropper(file, config);
+  } else if (config.frameId === "attorneyAvatarFrame" && cropperModal) {
+    cropperConfig = config;
+    cropperFile = file;
+    revealPhotoCropper();
+    showCropperError("The photo editor is unavailable. Refresh the page or choose another photo.");
+  } else {
+    stagePhotoDirect(file, config);
+  }
+  input.value = "";
+}
+
+function updateAvatarPreview(preview, frame, initials, src) {
+  if (preview) {
+    preview.src = src;
+    preview.hidden = false;
+    preview.style.objectPosition = "center center";
+  }
+  if (frame) frame.classList.add("has-photo");
+  if (initials) initials.style.display = "none";
+}
+
+function initPhotoCropperModal() {
+  cropperModal = document.getElementById("photoCropModal");
+  cropperImage = document.getElementById("photoCropImage");
+  cropperZoom = document.getElementById("photoCropZoom");
+  const cancelBtn = document.getElementById("photoCropCancel");
+  const saveBtn = document.getElementById("photoCropSave");
+  cropperSaveBtn = saveBtn;
+  cropperModalCard = cropperModal?.querySelector(".photo-crop-card");
+  cropperLoading = document.getElementById("photoCropLoading");
+  cropperLoadingText = document.getElementById("photoCropLoadingText");
+  cropperError = document.getElementById("photoCropError");
+  cropperErrorText = document.getElementById("photoCropErrorText");
+  cropperAvatarPreview = document.getElementById("photoCropAvatarPreview");
+  const closeBtn = document.getElementById("photoCropClose");
+  const retryBtn = document.getElementById("photoCropTryAgain");
+  const chooseAnotherBtn = document.getElementById("photoCropChooseAnother");
+  if (!cropperModal || !cropperImage || !saveBtn) return;
+  saveBtn.disabled = true;
+
+  cancelBtn?.addEventListener("click", closePhotoCropper);
+  closeBtn?.addEventListener("click", closePhotoCropper);
+  retryBtn?.addEventListener("click", () => {
+    const retry = cropperRetryAction;
+    hideCropperError();
+    if (retry) retry();
+  });
+  chooseAnotherBtn?.addEventListener("click", () => {
+    const inputId = cropperConfig?.inputId;
+    closePhotoCropper();
+    if (inputId) setTimeout(() => document.getElementById(inputId)?.click(), 0);
+  });
+  cropperModalCard?.addEventListener("mousedown", (event) => event.stopPropagation());
+  cropperModal.addEventListener("mousedown", (event) => {
+    if (event.target === cropperModal) closePhotoCropper();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && cropperModal.classList.contains("show")) {
+      closePhotoCropper();
+    }
+  });
+  if (cropperZoom) {
+    cropperZoom.disabled = true;
+    cropperZoom.addEventListener("input", () => {
+      setCropperZoom(cropperZoom.value);
+    });
+  }
+  const cropStage = document.getElementById("photoCropStage");
+  cropStage?.addEventListener("keydown", (event) => {
+    if (!cropperReady || !activeCropperImage) return;
+    const step = event.shiftKey ? 20 : 5;
+    const movement = {
+      ArrowLeft: [-step, 0],
+      ArrowRight: [step, 0],
+      ArrowUp: [0, -step],
+      ArrowDown: [0, step],
+    }[event.key];
+    if (!movement) return;
+    event.preventDefault();
+    activeCropperImage.$move(...movement);
+  });
+  saveBtn.addEventListener("click", () => {
+    if (cropperSaveInFlight) return;
+    if (!cropperReady || !activeCropper) {
+      showToast("Image is still loading. Please wait a moment and try again.", "err");
+      return;
+    }
+    void applyCroppedPhoto();
+  });
+}
+
+function setCropperLoading(isLoading, text = "") {
+  if (cropperModalCard) {
+    cropperModalCard.classList.toggle("is-loading", Boolean(isLoading));
+  }
+  if (cropperLoadingText && text) {
+    cropperLoadingText.textContent = text;
+  }
+  if (cropperLoading) {
+    cropperLoading.setAttribute("aria-hidden", isLoading ? "false" : "true");
+  }
+}
+
+function openPhotoCropper(file, config) {
+  if (!cropperModal || !cropperImage) return;
+  cropperOpenVersion += 1;
+  hideCropperError();
+  cropperConfig = config;
+  cropperFile = file;
+  cropperOriginalFile = file;
+  cropperOriginalUrl = "";
+  cropperLoadRetries = 0;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = typeof reader.result === "string" ? reader.result : "";
+    if (dataUrl) {
+      loadCropperImage(dataUrl, false);
+      return;
+    }
+    loadCropperImage(URL.createObjectURL(file), true);
+  };
+  reader.onerror = () => {
+    loadCropperImage(URL.createObjectURL(file), true);
+  };
+  reader.readAsDataURL(file);
+}
+
+function openPhotoCropperFromUrl(url, config, isObjectUrl = false, options = {}) {
+  if (!cropperModal || !cropperImage) return;
+  hideCropperError();
+  cropperConfig = config;
+  cropperFile = null;
+  cropperOriginalFile = null;
+  cropperOriginalUrl = options.originalUrl || (!isObjectUrl ? url : "");
+  cropperLoadRetries = 0;
+  loadCropperImage(url, isObjectUrl);
+}
+
+async function fetchProfilePhotoBlob(url, { authenticated = false } = {}) {
+  cropperFetchController?.abort();
+  const controller = new AbortController();
+  cropperFetchController = controller;
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const request = authenticated
+      ? secureFetch(url, { signal: controller.signal, noRedirect: true })
+      : fetch(url, { credentials: "include", signal: controller.signal });
+    const response = await request;
+    if (!response.ok) throw new Error("Unable to load profile photo.");
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType && !contentType.startsWith("image/")) {
+      throw new Error("Profile photo unavailable.");
+    }
+    return await response.blob();
+  } finally {
+    clearTimeout(timeout);
+    if (cropperFetchController === controller) cropperFetchController = null;
+  }
+}
+
+async function openExistingPhotoEditor(config) {
+  const openVersion = ++cropperOpenVersion;
+  const source = getOriginalPhotoSource(currentUser || {}, { allowPending: true });
+  const fallbackUrl = getDisplayProfileImage(currentUser || {}, { allowPending: true });
+  const primaryUrl =
+    source && source.value && source.value !== DEFAULT_AVATAR_DATA ? source.value : fallbackUrl || "";
+
+  if (!primaryUrl || primaryUrl === DEFAULT_AVATAR_DATA) {
+    showToast("Upload the original profile photo to enable editing.", "err");
+    return;
+  }
+  if (source?.type === "file") {
+    openPhotoCropper(source.value, config);
+    return;
+  }
+
+  if (cropperModal) {
+    cropperConfig = config;
+    hideCropperError();
+    revealPhotoCropper();
+    setCropperLoading(true, "Loading photo…");
+  }
+
+  const openFromBlob = (blob, originalUrl) => {
+    if (openVersion !== cropperOpenVersion || !cropperModal?.classList.contains("show")) return false;
+    const objectUrl = URL.createObjectURL(blob);
+    openPhotoCropperFromUrl(objectUrl, config, true, { originalUrl });
+    return true;
+  };
+
+  const tryDirect = async (targetUrl, allowFallback) => {
+    if (openVersion !== cropperOpenVersion || !cropperModal?.classList.contains("show")) return false;
+    if (targetUrl.startsWith("data:")) {
+      openPhotoCropperFromUrl(targetUrl, config, false, { originalUrl: targetUrl });
+      return true;
+    }
+    if (targetUrl.startsWith("blob:")) {
+      openPhotoCropperFromUrl(targetUrl, config, true, { originalUrl: targetUrl });
+      return true;
+    }
+    try {
+      const blob = await fetchProfilePhotoBlob(targetUrl);
+      return openFromBlob(blob, targetUrl);
+    } catch (error) {
+      if (allowFallback && fallbackUrl && fallbackUrl !== targetUrl) {
+        return tryDirect(fallbackUrl, false);
+      }
+      return false;
+    }
+  };
+
+  if (primaryUrl.startsWith("data:") || primaryUrl.startsWith("blob:")) {
+    openPhotoCropperFromUrl(primaryUrl, config, primaryUrl.startsWith("blob:"), { originalUrl: primaryUrl });
+    return;
+  }
+
+  const originalUrl = source?.value || fallbackUrl || "";
+  const allowFallback = Boolean(source?.value && fallbackUrl && fallbackUrl !== primaryUrl);
+  const sourceParam = encodeURIComponent(primaryUrl);
+  try {
+    const blob = await fetchProfilePhotoBlob(
+      `/api/uploads/profile-photo/original?source=${sourceParam}`,
+      { authenticated: true }
+    );
+    openFromBlob(blob, originalUrl || primaryUrl);
+  } catch (error) {
+    const loaded = await tryDirect(primaryUrl, allowFallback);
+    if (!loaded && openVersion === cropperOpenVersion && cropperModal?.classList.contains("show")) {
+      showCropperError(
+        "The saved photo could not be loaded. Try again or choose another JPEG or PNG.",
+        () => void openExistingPhotoEditor(config)
+      );
+    }
+  }
+}
+
+function loadCropperImage(url, isObjectUrl) {
+  if (!cropperModal || !cropperImage) return;
+  hideCropperError();
+  cropperReady = false;
+  if (cropperSaveBtn) cropperSaveBtn.disabled = true;
+  if (cropperZoom) {
+    cropperZoom.disabled = true;
+  }
+  if (cropperObjectUrl) {
+    URL.revokeObjectURL(cropperObjectUrl);
+    cropperObjectUrl = null;
+  }
+  if (isObjectUrl) cropperObjectUrl = url;
+  revealPhotoCropper();
+  setCropperLoading(true, "Loading photo…");
+  destroyActiveCropperInstance();
+  const retryConfig = cropperConfig;
+  const retryFile = cropperFile;
+  const retry = () => {
+    if (retryFile && retryConfig) {
+      openPhotoCropper(retryFile, retryConfig);
+    } else if (retryConfig) {
+      void openExistingPhotoEditor(retryConfig);
+    }
+  };
+  beginCropperLoadDeadline(retry);
+  cropperImage.onerror = () => {
+    const fallbackFile = cropperFile;
+    if (fallbackFile && cropperLoadRetries === 0) {
+      cropperLoadRetries += 1;
+      loadCropperImage(URL.createObjectURL(fallbackFile), true);
+      return;
+    }
+    if (cropperZoom) cropperZoom.disabled = true;
+    if (cropperSaveBtn) cropperSaveBtn.disabled = true;
+    showCropperError("This photo could not be opened. Try again or choose another JPEG or PNG.", retry);
+  };
+  cropperImage.onload = () => {
+    try {
+      void initializePhotoCropper().catch((error) => {
+        console.error("Unable to initialize cropper", error);
+        showCropperError("The photo editor could not start. Try again or choose another photo.", retry);
+      });
+    } catch (err) {
+      console.error("Unable to initialize cropper", err);
+      showCropperError("The photo editor could not start. Try again or choose another photo.", retry);
+    }
+  };
+  cropperImage.src = url;
+}
+
+function revealPhotoCropper() {
+  if (!cropperModal) return;
+  const wasHidden = cropperModal.getAttribute("aria-hidden") !== "false";
+  cropperModal.classList.add("show");
+  cropperModal.setAttribute("aria-hidden", "false");
+  cropperModal.removeAttribute("inert");
+  if (wasHidden) {
+    activateDialogFocus(cropperModal, {
+      initialFocus: document.getElementById("photoCropCancel"),
+      returnFocus: cropperReturnFocus,
+      onEscape: closePhotoCropper,
+    });
+  }
+}
+
+function closePhotoCropper() {
+  if (!cropperModal) return;
+  cropperOpenVersion += 1;
+  cropperFetchController?.abort();
+  cropperFetchController = null;
+  cropperModal.classList.remove("show");
+  cropperModal.setAttribute("aria-hidden", "true");
+  cropperModal.setAttribute("inert", "");
+  deactivateDialogFocus(cropperModal);
+  cropperReturnFocus = null;
+  setCropperLoading(false);
+  destroyPhotoCropper();
+}
+
+function destroyPhotoCropper() {
+  clearCropperLoadTimer();
+  if (cropperPreviewTimer) clearTimeout(cropperPreviewTimer);
+  cropperPreviewTimer = null;
+  hideCropperError();
+  destroyActiveCropperInstance();
+  if (cropperImage) {
+    cropperImage.onerror = null;
+    cropperImage.onload = null;
+    cropperImage.src = "";
+  }
+  if (cropperZoom) {
+    cropperZoom.value = "0";
+    cropperZoom.disabled = true;
+  }
+  if (cropperSaveBtn) {
+    cropperSaveBtn.disabled = true;
+    cropperSaveBtn.textContent = "Save photo";
+  }
+  if (cropperAvatarPreview) cropperAvatarPreview.removeAttribute("src");
+  cropperBaseScale = 1;
+  cropperReady = false;
+  cropperLoadRetries = 0;
+  if (cropperObjectUrl) {
+    URL.revokeObjectURL(cropperObjectUrl);
+    cropperObjectUrl = null;
+  }
+  cropperConfig = null;
+  cropperFile = null;
+  cropperOriginalFile = null;
+  cropperOriginalUrl = "";
+}
+
+function destroyActiveCropperInstance() {
+  if (activeCropperImage && cropperTransformHandler) {
+    activeCropperImage.removeEventListener("transform", cropperTransformHandler);
+  }
+  cropperTransformHandler = null;
+  if (activeCropper) {
+    activeCropper.destroy();
+    activeCropper = null;
+  }
+  activeCropperImage = null;
+  activeCropperSelection = null;
+}
+
+async function applyCroppedPhoto() {
+  if (!activeCropperSelection || !cropperConfig) return;
+  const activeConfig = cropperConfig;
+  const preview = document.getElementById(activeConfig.previewId);
+  const initials = document.getElementById(activeConfig.initialsId);
+  const frame = document.getElementById(activeConfig.frameId);
+  const isAttorneyPhoto = activeConfig.frameId === "attorneyAvatarFrame";
+  const originalFile = cropperOriginalFile;
+  const originalUrl = cropperOriginalUrl;
+  const sourceFile = cropperFile;
+  if (cropperSaveBtn) cropperSaveBtn.disabled = true;
+  let canvas = null;
+  try {
+    canvas = await activeCropperSelection.$toCanvas({
+      width: 600,
+      height: 600,
+      beforeDraw(context) {
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+      },
+    });
+  } catch (error) {
+    console.error("Unable to render cropped photo", error);
+  }
+  if (!canvas) {
+    if (cropperSaveBtn) cropperSaveBtn.disabled = false;
+    showToast("Unable to process this image. Please choose another JPG or PNG file.", "err");
+    return;
+  }
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+  if (!blob) {
+    if (cropperSaveBtn) cropperSaveBtn.disabled = false;
+    showToast("Unable to process this image. Please choose a JPG or PNG file.", "err");
+    return;
+  }
+  const name = sourceFile?.name ? sourceFile.name.replace(/\.[^.]+$/, ".jpg") : "profile-photo.jpg";
+  const file = new File([blob], name, { type: "image/jpeg" });
+  const previewUrl = canvas.toDataURL("image/jpeg", 0.92);
+  const editedExistingPhoto = !sourceFile && Boolean(originalUrl);
+
+  if (isAttorneyPhoto) {
+    cropperSaveInFlight = true;
+    if (cropperSaveBtn) cropperSaveBtn.textContent = "Saving…";
+    hideCropperError();
+    setCropperLoading(true, "Saving photo…");
+    try {
+      const payload = await uploadProfilePhotoFile(file, originalFile, editedExistingPhoto);
+      applyProfilePhotoUploadResult(payload, { suppressToast: true });
+      setAttorneySaveStatus("Profile photo saved.", "success");
+      showToast("Profile photo updated!", "ok");
+      closePhotoCropper();
+    } catch (error) {
+      console.error("Unable to upload profile photo", error);
+      showCropperError(
+        error?.message || "The photo could not be saved. Check your connection and try again.",
+        () => void applyCroppedPhoto(),
+        { preserveCropper: true }
+      );
+    } finally {
+      cropperSaveInFlight = false;
+      if (cropperSaveBtn) {
+        cropperSaveBtn.textContent = "Save photo";
+        cropperSaveBtn.disabled = !cropperReady;
+      }
+      if (cropperModal?.classList.contains("show") && cropperError?.hidden) setCropperLoading(false);
+    }
+    return;
+  }
+
+  updateAvatarPreview(preview, frame, initials, previewUrl);
+  settingsState.stagedProfilePhotoFile = file;
+  settingsState.stagedProfilePhotoIsEdit = editedExistingPhoto;
+  settingsState.stagedProfilePhotoUrl = previewUrl;
+  if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:") && settingsState.stagedProfilePhotoOriginalUrl !== cropperOriginalUrl) {
+    URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
+  }
+  if (originalFile) {
+    settingsState.stagedProfilePhotoOriginalFile = originalFile;
+    settingsState.stagedProfilePhotoOriginalUrl = "";
+  } else if (originalUrl) {
+    settingsState.stagedProfilePhotoOriginalFile = null;
+    settingsState.stagedProfilePhotoOriginalUrl = originalUrl;
+  } else {
+    settingsState.stagedProfilePhotoOriginalFile = null;
+    settingsState.stagedProfilePhotoOriginalUrl = "";
+  }
+  applyAvatar(currentUser || {});
+  updateAvatarRemoveButton(currentUser || {});
+  updatePhotoReviewStatus(currentUser || {});
+  updateRequiredFieldMarkers();
+  markParalegalProfileChanged();
+  closePhotoCropper();
+}
+
+function stagePhotoDirect(file, config) {
+  const preview = document.getElementById(config.previewId);
+  const initials = document.getElementById(config.initialsId);
+  const frame = document.getElementById(config.frameId);
+  if (!preview || !frame) return;
+
+  if (settingsState.stagedProfilePhotoUrl?.startsWith("blob:")) {
+    URL.revokeObjectURL(settingsState.stagedProfilePhotoUrl);
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = typeof reader.result === "string" ? reader.result : "";
+    const previewUrl = dataUrl || URL.createObjectURL(file);
+    updateAvatarPreview(preview, frame, initials, previewUrl);
+    settingsState.stagedProfilePhotoFile = file;
+    settingsState.stagedProfilePhotoIsEdit = false;
+    settingsState.stagedProfilePhotoUrl = previewUrl;
+    if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
+    }
+    settingsState.stagedProfilePhotoOriginalFile = file;
+    settingsState.stagedProfilePhotoOriginalUrl = "";
+    applyAvatar(currentUser || {});
+    updateAvatarRemoveButton(currentUser || {});
+    updatePhotoReviewStatus(currentUser || {});
+    updateRequiredFieldMarkers();
+    markParalegalProfileChanged();
+  };
+  reader.onerror = () => {
+    const fallbackUrl = URL.createObjectURL(file);
+    updateAvatarPreview(preview, frame, initials, fallbackUrl);
+    settingsState.stagedProfilePhotoFile = file;
+    settingsState.stagedProfilePhotoIsEdit = false;
+    settingsState.stagedProfilePhotoUrl = fallbackUrl;
+    if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
+    }
+    settingsState.stagedProfilePhotoOriginalFile = file;
+    settingsState.stagedProfilePhotoOriginalUrl = "";
+    applyAvatar(currentUser || {});
+    updateAvatarRemoveButton(currentUser || {});
+    updatePhotoReviewStatus(currentUser || {});
+    updateRequiredFieldMarkers();
+    markParalegalProfileChanged();
+  };
+  reader.readAsDataURL(file);
+}
+
+async function uploadProfilePhotoFile(file, originalFile, editedExisting = false) {
+  const formData = new FormData();
+  formData.append("file", file, file.name || "avatar.png");
+  if (originalFile) {
+    formData.append("original", originalFile, originalFile.name || "profile-original.png");
+  }
+  if (editedExisting) {
+    formData.append("editExisting", "1");
+  }
+
+  const res = await secureFetch("/api/uploads/profile-photo", {
+    method: "POST",
+    body: formData,
+  });
+
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload?.error || "Upload failed");
+  }
+  return payload;
+}
+
+document.addEventListener("DOMContentLoaded", initAvatarUploaders);
+
+async function saveProfile() {
+  const saveBtn = document.getElementById("profileSaveBtn");
+  const originalLabel = saveBtn?.textContent || "Save changes";
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving…";
+  }
+  try {
+    const saved = await saveSettings();
+    if (saved) setParalegalProfileDirty(false);
+  } catch (err) {
+    console.error("Profile save failed", err);
+    showToast(err?.message || "Unable to save settings right now.", "err");
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = !paralegalProfileDirty;
+      saveBtn.textContent = originalLabel;
+    }
+  }
+}
+
+const profileSaveBtn = document.getElementById("profileSaveBtn");
+const profileSaveStatus = document.getElementById("profileSaveStatus");
+let paralegalProfileDirty = false;
+
+function setParalegalProfileDirty(dirty) {
+  paralegalProfileDirty = Boolean(dirty);
+  if (profileSaveBtn) profileSaveBtn.disabled = !paralegalProfileDirty;
+  if (profileSaveStatus) {
+    profileSaveStatus.textContent = paralegalProfileDirty ? "Unsaved changes" : "All changes saved.";
+    profileSaveStatus.dataset.state = paralegalProfileDirty ? "dirty" : "saved";
+  }
+}
+
+function markParalegalProfileChanged() {
+  setParalegalProfileDirty(true);
+  scheduleProfileSettingsDraftPersist();
+}
+
+if (profileSaveBtn) {
+  profileSaveBtn.addEventListener("click", saveProfile);
+}
+
+const profileForm = document.getElementById("profileForm");
+if (profileForm) {
+  profileForm.addEventListener("submit", (e) => e.preventDefault());
+  profileForm.addEventListener("input", () => markParalegalProfileChanged());
+  profileForm.addEventListener("change", (event) => {
+    if (event.target instanceof HTMLInputElement && event.target.type === "file") return;
+    markParalegalProfileChanged();
+  });
+  setParalegalProfileDirty(false);
+}
+
+window.addEventListener("beforeunload", (event) => {
+  if (!paralegalProfileDirty) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
+
+async function handleProfilePreviewNavigation() {
+  const cached = currentUser || getCachedUser() || {};
+
+  const role = (cached.role || "").toLowerCase();
+  const id = cached._id || cached.id;
+
+  if (!id) {
+    showToast("Your profile could not be opened because the account identifier is missing.", "err");
+    return;
+  }
+
+  // Favor the attorney view when the attorney settings panel is visible or when the role is missing.
+  const isAttorneyPanelVisible = !document.getElementById("attorneySettings")?.classList.contains("hidden");
+  if (role === "attorney" || (!role && isAttorneyPanelVisible)) {
+    window.location.href = `profile-attorney.html?id=${id}`;
+  } else {
+    window.location.href = `profile-paralegal.html?paralegalId=${id}`;
+  }
+}
+
+[document.getElementById("previewProfileBtn"), document.getElementById("attorneyPreviewProfileBtn")]
+  .filter(Boolean)
+  .forEach((btn) => btn.addEventListener("click", handleProfilePreviewNavigation));

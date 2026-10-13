@@ -1,0 +1,1950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <style>@view-transition { navigation: auto; }</style>
+
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paralegal Profile – Let’s-ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+  <script src="assets/scripts/utils/session.js?v=20260902-1"></script>
+  <link rel="stylesheet" href="assets/styles/global-search.css?v=20260831-3" />
+
+  <style>
+    .skip-link {
+      position: fixed;
+      left: 12px;
+      top: -48px;
+      z-index: 10000;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: #1a2230;
+      color: #ffffff;
+      text-decoration: none;
+    }
+    .skip-link:focus { top: 12px; }
+    :root {
+      --bg: #f5f5f5;
+      --panel: #fcfcfc;
+      --line: rgba(0, 0, 0, 0.08);
+      --ink: #1a1a1a;
+      --muted: #6b6b6b;
+      --accent: #b6a47a;
+      --accent-soft: rgba(182, 164, 122, 0.12);
+      --success: #00a86b;
+      --radius-lg: 32px;
+      --radius-md: 22px;
+      --font-serif: 'Cormorant Garamond', serif;
+      --font-sans: 'Sarabun', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-weight: 200;
+      background: transparent;
+      color: var(--ink);
+      min-height: 100vh;
+      line-height: 1.7;
+      letter-spacing: 0.25px;
+    }
+    .input-error{
+      border-color:#c0392b !important;
+      background:rgba(192,57,43,0.04);
+      box-shadow:0 0 0 1px rgba(192,57,43,0.15);
+    }
+    .field-error{
+      color:#b91c1c;
+      font-size:0.82rem;
+      margin-top:6px;
+    }
+
+    .page-shell {
+      max-width: 1120px;
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 28px 36px 52px;
+      position: relative;
+      z-index: 20;
+      background: #fff;
+      box-shadow: 0 40px 90px rgba(15, 23, 42, 0.25);
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      gap: 16px;
+      position: relative;
+      z-index: 200;
+      pointer-events: auto;
+    }
+
+    .sidebar-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      z-index: 2100;
+    }
+
+    .sidebar-toggle-icon {
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
+
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 1900;
+    }
+
+    .mobile-sidebar {
+      display: none;
+      width: 260px;
+      background: #f5f5f5e6;
+      color: var(--ink);
+      border-right: 1px solid var(--line);
+      padding: 24px 16px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      transform: translateX(-110%);
+      transition: transform 0.25s ease;
+      z-index: 2000;
+      box-shadow: 18px 0 40px rgba(0, 0, 0, 0.18);
+      flex-direction: column;
+    }
+
+    .mobile-sidebar .logo {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      margin-bottom: 28px;
+      text-align: center;
+    }
+
+    .mobile-sidebar nav {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .mobile-sidebar nav a {
+      text-decoration: none;
+      color: var(--ink);
+      font-weight: 200;
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      border-radius: 14px;
+      transition: background 0.3s ease;
+    }
+
+    .mobile-sidebar nav a.active,
+    .mobile-sidebar nav a:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .mobile-sidebar .sidebar-link {
+      margin-top: 1.5rem;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 0.6rem 1rem;
+      background: transparent;
+      color: var(--ink);
+      font-size: 0.9rem;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .mobile-sidebar .sidebar-link:hover,
+    .mobile-sidebar .sidebar-link:focus {
+      background: rgba(0, 0, 0, 0.05);
+      color: var(--accent);
+      outline: none;
+    }
+
+    .mobile-sidebar .sidebar-footer {
+      margin-top: auto;
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .profile-header-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: relative;
+      z-index: 201;
+      pointer-events: auto;
+      overflow: visible;
+    }
+
+    .notification-wrapper {
+      position: relative;
+    }
+
+    .notification-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #fff;
+      cursor: pointer;
+      transition: transform 0.2s ease, background-color 0.2s ease;
+      position: relative;
+    }
+
+    .notification-icon:hover {
+      background: rgba(182, 164, 122, 0.08);
+      transform: translateY(-1px);
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #e63946;
+      color: #fff;
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      display: none;
+    }
+
+    .notification-badge.show {
+      display: flex;
+    }
+
+    #notificationToggle[data-count]:after,
+    [data-notification-toggle][data-count]:after {
+      content: attr(data-count);
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: var(--accent);
+      color: #fff;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 999px;
+    }
+
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.6);
+      border: none;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .user-chip img {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      object-fit: cover;
+      box-shadow: none;
+    }
+
+    .user-chip strong {
+      display: block;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      letter-spacing: 0.02em;
+      color: #1a1a1a;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .user-chip span {
+      font-size: 0.85rem;
+      color: #6b6b6b;
+      display: block;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    body.theme-dark .user-chip {
+      background: rgba(15,23,42,0.4);
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    body.theme-dark .user-chip strong {
+      color: #fff;
+    }
+
+    body.theme-dark .user-chip span {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    body.viewer-attorney .profile-header-controls .user-chip {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.6);
+      border: none;
+      box-shadow: none;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    body.viewer-attorney .profile-header-controls .user-chip img {
+      border: 2px solid #fff;
+      box-shadow: none;
+    }
+
+    body.viewer-attorney .profile-header-controls .user-chip strong {
+      font-family: var(--font-serif);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: #1a1a1a;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    body.viewer-attorney .profile-header-controls .user-chip span {
+      color: #6b6b6b;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .profile-menu {
+      position: relative;
+      z-index: 10010;
+      isolation: isolate;
+    }
+    .profile-dropdown {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 10px);
+      background: #ffffff;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 12px;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
+      padding: 0.4rem;
+      min-width: 180px;
+      display: none;
+      flex-direction: column;
+      gap: 0.25rem;
+      z-index: 6000;
+      pointer-events: auto;
+    }
+    .profile-dropdown.show {
+      display: flex;
+    }
+    .profile-dropdown button,
+    .profile-dropdown a {
+      border: none;
+      background: transparent;
+      text-align: left;
+      padding: 0.6rem 0.8rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      color: var(--ink);
+      transition: background 0.2s ease;
+      text-decoration: none;
+      display: block;
+    }
+    .profile-dropdown button:hover,
+    .profile-dropdown a:hover {
+      background: rgba(182, 164, 122, 0.14);
+    }
+
+    body.viewer-attorney .profile-dropdown {
+      position: fixed;
+      top: 116px;
+      right: 24px;
+      background: var(--panel, #fff);
+      border: 1px solid var(--line, rgba(0, 0, 0, 0.08));
+      border-radius: 16px;
+      box-shadow: 0 18px 30px rgba(0, 0, 0, 0.12);
+      min-width: 200px;
+      z-index: 20000;
+      pointer-events: auto;
+      overflow: hidden;
+      color: var(--ink, #1a1a1a);
+    }
+
+    body.viewer-attorney .profile-dropdown button,
+    body.viewer-attorney .profile-dropdown a {
+      background: none;
+      border: none;
+      padding: 0.85rem 1.1rem;
+      text-align: left;
+      font-size: 0.92rem;
+      cursor: pointer;
+      color: inherit;
+      text-decoration: none;
+      display: block;
+      font-weight: 200;
+      border-radius: 12px;
+      margin: 4px 6px;
+      width: calc(100% - 12px);
+    }
+
+    body.viewer-attorney .profile-dropdown button:hover,
+    body.viewer-attorney .profile-dropdown a:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    body.viewer-attorney .profile-dropdown .logout-btn {
+      color: #b91c1c;
+      background: rgba(185, 28, 28, 0.08);
+      border: 1px solid rgba(185, 28, 28, 0.2);
+    }
+
+    body.viewer-attorney .profile-dropdown .logout-btn:hover {
+      background: rgba(185, 28, 28, 0.15);
+      color: #991b1b;
+    }
+
+    .notif-panel {
+      position: absolute;
+      right: 0;
+      top: 48px;
+      width: 340px;
+      background: #ffffff;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 12px;
+      padding: 0;
+      z-index: 6000;
+      display: none;
+      flex-direction: column;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
+    }
+    .notification-dropdown {
+      z-index: 6000;
+    }
+
+    .notif-panel.show {
+      display: flex;
+    }
+
+    .notif-panel.hidden {
+      display: none;
+    }
+
+    .notif-header {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 1.3rem;
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      background: #fafafa;
+    }
+
+    #notifList {
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .notif-item {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .notif-item:last-child {
+      border-bottom: none;
+    }
+
+    .notif-item:hover {
+      background: #f6f6f6;
+    }
+
+    .notif-item.unread {
+      background: #ffffff;
+      border-left: 3px solid var(--accent);
+    }
+
+    .notif-item.read {
+      opacity: 0.75;
+    }
+
+    .notif-meta {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .notif-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.6;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+
+    .notif-item:not(.unread) .notif-dot {
+      opacity: 0;
+    }
+
+    .notif-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      width: 100%;
+    }
+
+    .notif-title {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 400;
+      font-size: 0.98rem;
+      margin: 0;
+      color: #1a1a1a;
+      line-height: 1.35;
+    }
+
+    .notif-time {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.82rem;
+      color: #777;
+    }
+
+    .notif-empty {
+      padding: 18px;
+      text-align: center;
+      font-size: 0.9rem;
+      color: #8a8a8a;
+    }
+
+    .notif-markall {
+      border: none;
+      border-top: 1px solid rgba(0, 0, 0, 0.08);
+      background: #fafafa;
+      padding: 12px;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.9rem;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .notif-markall:hover {
+      background: #f0f0f0;
+    }
+
+    /* HERO CARD (matches UX layout) */
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      background: transparent;
+      color: #1b1f2a;
+      text-decoration: none;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 14px;
+      font-weight: 300;
+      box-shadow: none;
+      transition: none;
+    }
+
+    .back-link:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .back-link svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .hero-photo-shell {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+    }
+
+    .hero-photo {
+      position: relative;
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: var(--panel);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+      border: none;
+    }
+
+    .hero-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .profile-avatar-fallback {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: var(--ink);
+      background: #f3f4f6;
+      font-family: var(--font-serif);
+      font-size: 3.25rem;
+      font-weight: 600;
+    }
+
+    #profileName {
+      font-family: var(--font-serif);
+      font-size: 3rem;
+      font-weight: 300;
+      letter-spacing: 0.6px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    #roleLine {
+      font-size: 1.05rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    #bioCopy {
+      font-size: 1rem;
+      color: var(--ink);
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: justify;
+      text-justify: inter-word;
+      margin-top: 10px;
+    }
+
+    .hero-meta-row {
+      display: flex;
+      gap: 20px;
+      margin-top: 4px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .hero-meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+      border-radius: 0;
+      background: transparent;
+      border: none;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.08);
+      justify-content: center;
+      text-align: center;
+      width: 100%;
+    }
+
+    .hero-meta-link,
+    .meta-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .meta-icon {
+      display: inline-flex;
+      width: 18px;
+      height: 18px;
+      color: currentColor;
+    }
+
+    .hero-meta-pill a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 400;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.08);
+    }
+
+    .hero-meta-pill a:hover {
+      text-decoration: underline;
+    }
+
+    #locationMeta,
+    #locationMeta .hero-meta-link,
+    #locationMeta .meta-line,
+    #locationMeta .meta-text {
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-family: var(--font-sans);
+      font-weight: 300;
+      text-decoration: none;
+    }
+
+    #locationMeta a:hover {
+      text-decoration: none;
+    }
+
+    #credentialMeta {
+      justify-content: center;
+      text-align: center;
+      width: 100%;
+    }
+
+    #joinedMeta {
+      display: none;
+    }
+
+    .joined-meta-corner {
+      display: flex;
+      width: 100%;
+      justify-content: center;
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .joined-meta-corner .hero-meta-pill {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      width: auto;
+      min-height: 0;
+      padding: 0;
+      justify-content: center;
+      text-align: center;
+      color: #8e94a0;
+      font-family: var(--font-serif);
+      font-size: 9pt;
+      font-weight: 400;
+      letter-spacing: 0.01em;
+    }
+
+    .profile-layout {
+      display: grid;
+      grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.6fr);
+      gap: 16px;
+      align-items: start;
+      text-align: center;
+      justify-items: center;
+    }
+
+    .profile-sidebar,
+    .profile-main {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      align-items: center;
+    }
+
+    .profile-sidebar {
+      padding-right: 18px;
+      border-right: 1px solid var(--line);
+    }
+
+    .profile-main {
+      padding-left: 18px;
+    }
+
+    .profile-photo-block {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .photo-review-note {
+      font-size: 0.85rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.6);
+      color: #8a6b2e;
+      text-align: center;
+    }
+
+    .photo-review-note.is-rejected {
+      color: #9a3412;
+      border-color: rgba(234, 88, 12, 0.35);
+      background: rgba(255, 237, 213, 0.7);
+    }
+
+    .profile-meta-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: center;
+      text-align: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .profile-meta-columns {
+      display: grid;
+      grid-template-columns: repeat(2, max-content);
+      gap: 6px 16px;
+      justify-items: center;
+      text-align: center;
+      justify-content: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .meta-column {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+      text-align: center;
+      width: max-content;
+      max-width: 100%;
+    }
+
+    .meta-column.has-meta-icon .profile-docs-stack {
+      padding-left: 0;
+    }
+
+    .profile-docs-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .profile-section,
+    .education-section,
+    .experience-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 100%;
+    }
+
+    .profile-header {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      align-items: center;
+      text-align: center;
+      align-self: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .profile-header-main {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      text-align: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .profile-identity {
+      text-align: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .profile-header-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      align-items: center;
+    }
+
+    .profile-header-actions .hero-cta-row {
+      justify-content: center;
+    }
+
+    .profile-completion {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 0 18px;
+      text-align: center;
+    }
+
+    #completeProfileBtn {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 18px;
+      background: var(--accent);
+      color: #fff;
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 0.2s ease, filter 0.2s ease;
+    }
+
+    #completeProfileBtn:hover:not(:disabled) {
+      filter: brightness(0.96);
+      transform: translateY(-1px);
+    }
+
+    #completeProfileBtn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .profile-role-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .profile-sidebar .hero-photo-shell {
+      justify-content: center;
+    }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 0.88rem;
+      color: var(--success);
+      background: rgba(0, 168, 107, 0.06);
+      border-radius: 999px;
+      margin-top: 8px;
+    }
+
+    .hero-cta-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .hero-cta-row button {
+      border-radius: 999px;
+      padding: 8px 22px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .hero-cta-row button:hover:not(:disabled) {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      transform: none;
+    }
+
+    .hero-cta-row button:disabled {
+      opacity: 0.4;
+      cursor: default;
+      transform: none;
+    }
+
+    .hero-cta-row .cta-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 22px;
+      border: 2px solid rgba(255, 255, 255, 0.45);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.12);
+      color: rgba(17, 19, 23, 0.94);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 300;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      -webkit-backdrop-filter: saturate(160%) blur(2px);
+      backdrop-filter: saturate(160%) blur(2px);
+    }
+
+    .hero-cta-row .cta-primary:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.6);
+      transform: none;
+    }
+
+    .hero-cta-row .cta-primary:focus-visible {
+      outline: 2px solid rgba(182, 164, 122, 0.44);
+      outline-offset: 2px;
+    }
+
+    .hero-cta-row #inviteToCaseBtn {
+      border-color: rgba(200, 221, 251, 0.9);
+      background: rgba(255, 255, 255, 0.5);
+      color: #27496f;
+      box-shadow: 0 10px 24px rgba(63, 95, 143, 0.08);
+      -webkit-backdrop-filter: saturate(160%) blur(8px);
+      backdrop-filter: saturate(160%) blur(8px);
+    }
+
+    .hero-cta-row #inviteToCaseBtn:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.58);
+      border-color: #c8ddfb;
+      color: #1f3f62;
+    }
+
+    .hero-cta-row #inviteToCaseBtn:focus-visible {
+      outline: 2px solid rgba(200, 221, 251, 0.9);
+    }
+
+    .hero-doc-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* MAIN GRID (compact fold) */
+
+    .card-header-label {
+      font-size: 0.8rem;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--line);
+      text-align: center;
+    }
+
+    .card-title {
+      font-family: var(--font-serif);
+      font-size: 1.2rem;
+      font-weight: 300;
+      margin-bottom: 2px;
+      text-align: center;
+    }
+
+    .chip-cloud,
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      justify-content: center;
+    }
+
+    #languagesList {
+      gap: 0;
+      justify-content: center;
+    }
+
+    #languagesList .chip {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    #languagesList .chip:not(:last-child)::after {
+      content: "·";
+      margin: 0 10px;
+      color: var(--muted);
+    }
+
+    #practiceList {
+      gap: 0;
+      justify-content: center;
+    }
+
+    #practiceList .chip {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    #practiceList .chip:not(:last-child)::after {
+      content: "·";
+      margin: 0 10px;
+      color: var(--muted);
+    }
+
+    .chip-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .chip-section:first-of-type {
+      margin-top: 6px;
+    }
+
+    .chip-section .card-header-label {
+      display: block;
+      width: 100%;
+      text-align: center;
+    }
+
+    .chip {
+      padding: 0;
+      border-radius: 0;
+      background: transparent;
+      border: none;
+      font-size: 0.92rem;
+      transition: none;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.08);
+    }
+
+    .chip:hover,
+    .timeline-item:hover {
+      transform: none;
+      box-shadow: none;
+      background: transparent;
+    }
+
+    .timeline-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 10px 0 6px;
+      align-items: flex-start;
+    }
+
+    .timeline-item {
+      display: block;
+      padding: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      text-align: left;
+    }
+
+    .experience-line {
+      font-size: 1rem;
+      color: var(--ink);
+      font-weight: 300;
+      letter-spacing: 0.01em;
+    }
+
+    .best-for-list {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      list-style: disc;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      text-align: left;
+    }
+
+    .best-for-list li {
+      margin: 0;
+      text-align: justify;
+      text-justify: inter-word;
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+
+    .best-for-list li::marker {
+      color: var(--accent);
+      font-size: 0.45em;
+    }
+
+    .profile-duo {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 28px;
+      width: 100%;
+      max-width: 720px;
+      margin: 6px auto 0;
+    }
+
+    .profile-duo.is-single {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .edu-inline {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 8px;
+      align-items: center;
+    }
+
+    .edu-entry {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .edu-title {
+      font-size: 0.98rem;
+      font-weight: 400;
+      color: var(--ink);
+      letter-spacing: 0.01em;
+    }
+
+    .edu-sub {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .edu-meta {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .inline-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .credentials-row {
+      border-top: 1px dashed var(--line);
+      padding-top: 10px;
+    }
+
+    .doc-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .doc-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0;
+      border-radius: 0;
+      border: none;
+      background: transparent;
+      text-decoration: none;
+      color: var(--accent);
+      font-size: 0.9rem;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.08);
+      justify-content: center;
+      width: 100%;
+    }
+
+    #certificateLink,
+    #resumeLink {
+      justify-content: center;
+      text-align: center;
+      width: 100%;
+    }
+
+    .languages-empty {
+      margin: 0;
+    }
+
+    /* Toast, modal, error */
+
+    .error-card {
+      padding: 1.25rem;
+      border-radius: 18px;
+      border: 1px solid rgba(192, 57, 43, 0.2);
+      background: rgba(192, 57, 43, 0.05);
+      color: #962d22;
+      margin-bottom: 20px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 24px;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .invite-modal {
+      width: min(360px, 90%);
+      max-height: 82vh;
+      background: rgba(249, 244, 236, 0.9);
+      border-radius: 30px;
+      padding: 30px 22px;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      box-shadow:
+        0 22px 55px rgba(0, 0, 0, 0.14),
+        0 38px 120px rgba(0, 0, 0, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(24px) saturate(130%);
+      -webkit-backdrop-filter: blur(24px) saturate(130%);
+    }
+
+    .invite-modal::before {
+      content: "";
+      position: absolute;
+      inset: -40% auto auto -20%;
+      width: 220px;
+      height: 220px;
+      background: rgba(255, 255, 255, 0.32);
+      transform: rotate(8deg);
+      pointer-events: none;
+      filter: blur(2px);
+    }
+
+    .invite-modal::after {
+      content: "";
+      position: absolute;
+      inset: auto -25% -35% auto;
+      width: 260px;
+      height: 260px;
+      background: rgba(255, 247, 230, 0.36);
+      transform: rotate(-6deg);
+      pointer-events: none;
+      filter: blur(4px);
+    }
+
+    .invite-modal h3 {
+      font-family: "Cormorant Garamond", "Times New Roman", serif;
+      font-size: 1.8rem;
+      font-weight: 400;
+      margin: 0 0 10px 0;
+      color: #1b1f2a;
+      letter-spacing: 0.02em;
+      text-align: center;
+    }
+
+    .invite-modal .modal-subtitle {
+      margin: 0;
+      color: #62687a;
+      font-size: 0.95rem;
+    }
+
+    .invite-modal label {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-weight: 500;
+      color: #2f3645;
+    }
+
+    .invite-modal select {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      padding: 12px 14px;
+      font-size: 1rem;
+      background: #fff;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .modal-actions button {
+      border-radius: 999px;
+      padding: 0.65rem 1.4rem;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      background: #fff;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    }
+
+    .modal-actions button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    .modal-actions .confirm {
+      background: #1f2937;
+      color: #fff;
+      border-color: #1f2937;
+    }
+
+    .modal-actions .confirm:disabled {
+      background: #d5d7dc;
+      border-color: #d5d7dc;
+      color: #8c9099;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 30px;
+      transform: translate(-50%, 20px);
+      background: rgba(17, 17, 17, 0.9);
+      color: #fff;
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 200;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    @media (max-width: 960px) {
+      html,
+      body {
+        width: 100%;
+        overflow-x: hidden;
+      }
+
+      .page-shell {
+        padding: 28px 20px 70px;
+        padding-top: 88px;
+        box-shadow: none;
+      }
+
+      .mobile-sidebar {
+        display: flex;
+      }
+
+      body.nav-open .mobile-sidebar {
+        transform: translateX(0);
+      }
+
+      body.nav-open .sidebar-backdrop {
+        display: block;
+      }
+
+      .sidebar-toggle {
+        display: inline-flex;
+      }
+
+      .profile-layout {
+        grid-template-columns: 1fr;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .profile-duo {
+        grid-template-columns: 1fr;
+        gap: 18px;
+      }
+
+      .profile-photo-block,
+      .profile-header {
+        align-items: center;
+        text-align: center;
+      }
+
+      .profile-meta-stack {
+        align-items: center;
+      }
+
+      .profile-meta-columns {
+        grid-template-columns: max-content;
+        justify-content: center;
+      }
+
+      .profile-header-main {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .profile-header-actions {
+        align-items: center;
+      }
+
+      .profile-header-actions .hero-cta-row {
+        justify-content: center;
+      }
+
+      .profile-sidebar {
+        padding-right: 0;
+        border-right: none;
+      }
+
+      .profile-main {
+        padding-left: 0;
+      }
+
+      .profile-role-row {
+        justify-content: center;
+      }
+
+      .profile-sidebar,
+      .profile-main,
+      .profile-photo-block {
+        display: contents;
+      }
+
+      .hero-photo-shell {
+        order: 1;
+        margin-bottom: 18px;
+      }
+
+      .profile-header {
+        order: 2;
+      }
+
+      .profile-meta-stack {
+        order: 3;
+        margin-top: 14px;
+      }
+
+      .profile-section {
+        order: 4;
+        margin-top: 22px;
+      }
+
+      body.viewer-attorney .joined-meta-corner {
+        justify-content: center;
+        padding-left: 0;
+        margin-top: 12px;
+      }
+
+      img,
+      svg,
+      video,
+      iframe,
+      table {
+        max-width: 100%;
+        height: auto;
+      }
+
+      .profile-header,
+      .profile-meta-stack,
+      .profile-meta-columns,
+      .profile-role-row,
+      .profile-bio,
+      .profile-section,
+      .hero-meta-pill,
+      .doc-chip,
+      .profile-copy,
+      .experience-card,
+      .education-grid,
+      .skills-list,
+      .focus-areas,
+      .languages-list {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+
+      body.viewer-attorney .profile-dropdown {
+        top: 96px;
+        right: 16px;
+        left: auto;
+        min-width: min(240px, calc(100vw - 32px));
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="assets/styles/product-clean.css?v=20260831-21" />
+  <link rel="stylesheet" href="assets/styles/lpc-product-components.css?v=20260901-1" />
+  <script defer src="assets/scripts/sidebar-profile.js?v=20260820-11"></script>
+  <link rel="stylesheet" href="assets/styles/universal-header.css?v=20260831-3" />
+  <script defer src="assets/scripts/universal-header.js?v=20260831-3"></script>
+  <link rel="stylesheet" href="assets/styles/sidebar-grip.css?v=20260812-9" />
+  <script defer src="assets/scripts/sidebar-grip.js?v=20260812-8"></script>
+  <link rel="stylesheet" href="assets/styles/profile-paralegal.css?v=20260814-1" />
+  <link rel="stylesheet" href="assets/styles/matter-invitations.css" />
+  <link rel="stylesheet" href="assets/styles/profile-engagement.css" />
+</head>
+<body class="dashboard-no-shadows lpc-product-clean lpc-static-universal-header lpc-auth-shell-v2">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
+    <span class="lpc-mobile-menu-icon" aria-hidden="true"></span>
+  </button>
+  <aside class="mobile-sidebar" id="sidebarNav">
+    <div class="logo sidebar-profile-host">
+      <div class="sidebar-profile-cluster" data-lpc-sidebar-profile>
+        <button class="user-chip lpc-sidebar-profile-trigger" type="button" data-lpc-sidebar-profile-trigger aria-label="Open profile menu" aria-haspopup="true" aria-expanded="false">
+          <img class="globalProfileImage lpc-sidebar-profile-trigger-avatar" src="assets/avatar-placeholder.svg" alt="" />
+          <span class="lpc-sidebar-profile-trigger-details"><strong class="globalProfileName">Member</strong></span>
+          <svg class="lpc-profile-trigger-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"></path></svg>
+        </button>
+      </div>
+    </div>
+    <nav>
+      <a href="dashboard-paralegal.html" data-profile-mobile-nav="home">Home</a>
+      <a href="browse-jobs.html" data-profile-mobile-nav="browse">Browse Matters</a>
+      <a href="dashboard-paralegal.html#cases" data-profile-mobile-nav="matters">My Matters &amp; Applications</a>
+      <a href="profile-settings.html" data-profile-mobile-nav="settings">Profile Settings</a>
+      <a href="paralegalhelp.html" data-profile-mobile-nav="help">Help</a>
+    </nav>
+    <div class="sidebar-footer">© Let<span class="lpc-brand-apostrophe">’</span>s-ParaConnect 2026</div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+  <div class="lpc-auth-page-shell">
+  <div class="lpc-universal-header-shell lpc-universal-header-shell--created" role="group" aria-label="Workspace tools" data-lpc-universal-header="true">
+    <div class="lpc-universal-header-controls" data-notification-center="true" aria-label="Search, notifications, and Assistant">
+      <div class="lpc-global-search-host" data-productivity-trigger-host></div>
+      <div class="notification-wrapper"><button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span class="notification-badge" data-notification-badge>0</span></button><div class="notifications-panel notif-panel hidden" role="region" aria-label="Notifications" aria-live="polite" data-notification-panel><div class="notif-header" aria-label="Notifications"></div><div class="notif-scroll" data-notification-list></div><div class="notif-empty" data-notification-empty>Loading…</div><button type="button" class="notif-markall" data-notification-mark>Mark All Read</button></div></div>
+    </div>
+  </div>
+  <main class="page-shell" id="main" tabindex="-1">
+    <div class="topbar">
+      <a id="backBtn" class="back-link" href="browse-paralegals.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 6l-6 6 6 6"></path>
+        </svg>
+        <span>Back</span>
+      </a>
+      <div class="profile-header-controls" data-notification-center>
+        <div class="notification-wrapper">
+          <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle id="notificationToggle">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 01-3.46 0"></path>
+            </svg>
+            <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
+          </button>
+          <div id="notificationPanel" class="notif-panel hidden" data-notification-panel>
+            <div class="notif-header">Notifications</div>
+            <div class="notif-body" id="notifList" data-notification-list></div>
+            <div class="notif-empty" data-notification-empty>No new notifications.</div>
+          </div>
+          </div>
+        <div class="profile-menu">
+          <a class="user-chip" id="userChip" href="/dashboard-paralegal.html" aria-label="Open profile menu">
+            <img id="clusterAvatar" class="nav-profile-photo" src="assets/avatar-placeholder.svg" alt="Profile" />
+            <div>
+              <strong id="clusterName">Profile</strong>
+            </div>
+          </a>
+          <div class="profile-dropdown" id="profileDropdown">
+            <a href="/profile-settings.html" data-settings>Account Settings</a>
+            <a href="/login.html" class="logout-btn" data-logout>Log out</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="profileError" class="error-card hidden"></div>
+
+    <section class="profile-layout">
+      <aside class="profile-sidebar">
+        <div class="profile-photo-block">
+          <div class="hero-photo-shell">
+            <div class="hero-photo" data-avatar-wrapper>
+              <img id="user-avatar" data-profile-avatar src="" alt="Profile photo" />
+              <span class="profile-avatar-fallback" data-avatar-fallback aria-hidden="true"></span>
+            </div>
+          </div>
+          <div id="photoReviewStatus" class="photo-review-note hidden" role="status" aria-live="polite"></div>
+          <div class="profile-meta-stack">
+            <div class="profile-meta-columns">
+              <div class="meta-column">
+                <span id="locationMeta" class="hero-meta-pill">Location</span>
+                <span id="joinedMeta" class="hero-meta-pill">Joined date unavailable</span>
+              </div>
+              <div class="meta-column">
+                <div class="profile-docs-stack">
+                  <a target="_blank" rel="noopener" id="certificateLink" class="doc-chip hidden">Certificate</a>
+                  <a target="_blank" rel="noopener" id="resumeLink" class="doc-chip hidden">Résumé</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <article class="profile-section" id="educationCard">
+          <div class="education-section" id="educationSection">
+            <div class="card-header-label">Education</div>
+            <div id="educationList" class="edu-inline">
+              <!-- folded education inline -->
+            </div>
+          </div>
+        </article>
+
+        <article class="profile-section" id="skillsCard">
+          <div class="chip-section" id="skillsSection">
+            <span class="card-header-label">Skills</span>
+            <div id="skillsList" class="chip-cloud"></div>
+          </div>
+        </article>
+
+        <article class="profile-section hidden" id="stateExperienceRow">
+          <div class="card-header-label">State Experience</div>
+          <div class="chip-row" id="stateExperienceList"></div>
+        </article>
+
+        <article class="profile-section" id="languagesRow">
+          <div class="card-header-label">Languages</div>
+          <div class="chip-row" id="languagesList"></div>
+        </article>
+
+        <article class="profile-section hidden" id="documentsSection">
+          <div class="card-header-label">Documents</div>
+          <div class="doc-buttons">
+            <a target="_blank" rel="noopener" id="writingSampleLink" class="doc-chip hidden">Writing Sample</a>
+          </div>
+        </article>
+        <div class="joined-meta-corner" aria-hidden="true">
+          <span id="joinedMetaCorner" class="hero-meta-pill">Joined date unavailable</span>
+        </div>
+      </aside>
+
+      <section class="profile-main">
+        <section class="profile-header" aria-label="Paralegal profile">
+          <div class="profile-header-main">
+            <div class="profile-identity">
+              <h1 id="profileName"></h1>
+              <div class="profile-role-row">
+                <span id="roleLine"></span>
+                <span class="status-chip" id="statusChip"></span>
+              </div>
+              <p id="bioCopy" class="hidden">Hello, pleased to meet you.</p>
+            </div>
+            <div class="profile-header-actions">
+              <div class="hero-cta-row">
+                <button type="button" class="cta-secondary hidden" id="messageBtn">Message</button>
+                <button type="button" class="cta-primary hidden" id="inviteToCaseBtn">Invite to Matter</button>
+                <button type="button" class="cta-ghost hidden" id="editProfileBtn">Edit Profile</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="profileCompletionPrompt" class="profile-completion hidden" role="status">
+            <div>
+              <strong>Complete your profile</strong>
+              <span id="profileCompletionDetails" class="muted">Add missing details to improve your profile visibility.</span>
+            </div>
+            <button type="button" id="completeProfileBtn">Complete profile</button>
+          </div>
+        </section>
+
+        <div class="profile-duo" id="bestForFocusRow">
+          <article class="profile-section hidden" id="bestForCard">
+            <div class="card-header-label">Best For</div>
+            <ul id="bestForList" class="best-for-list"></ul>
+          </article>
+          <article class="profile-section" id="practiceSection">
+            <div class="card-header-label">Practice Areas</div>
+            <div id="practiceList" class="chip-cloud"></div>
+          </article>
+        </div>
+
+        <article class="profile-section" id="experienceCard">
+          <div class="experience-section" id="experienceSection">
+            <div class="card-header-label">Experience</div>
+            <div id="experienceList" class="timeline-list">
+              <!-- condensed experience timeline -->
+            </div>
+          </div>
+        </article>
+      </section>
+    </section>
+
+    <article class="profile-section hidden" id="funFactsCard">
+      <div class="card-header-label">Fun facts</div>
+      <div class="card-title">Fun Facts &amp; Extras</div>
+      <p id="funFactsCopy"></p>
+    </article>
+  </main>
+  </div>
+
+  <!-- Modal + toast + scripts stay intact -->
+  <div class="modal-overlay" id="inviteModal" role="dialog" aria-modal="true" aria-labelledby="inviteModalTitle" aria-describedby="inviteModalDescription" aria-hidden="true" inert>
+    <div class="invite-modal">
+      <h3 id="inviteModalTitle">Invite to Matter</h3>
+      <p class="modal-subtitle" id="inviteModalDescription">Choose the matter for your invitation to this paralegal.</p>
+      <label>
+        <span style="display:block;font-size:0.9rem;color:var(--muted);margin-bottom:6px;">Select a matter</span>
+        <select id="inviteCaseSelect"></select>
+      </label>
+      <div class="modal-actions">
+        <button type="button" id="sendInviteBtn" class="confirm" disabled>Send Invite</button>
+        <button type="button" id="closeInviteBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script>
+    window.__SKIP_NOTIFICATIONS__ = true;
+  </script>
+  <script type="module" src="assets/scripts/utils/notifications.js"></script>
+  <script type="module" src="assets/scripts/profile-paralegal.js"></script>
+  <script src="assets/scripts/productivity-command-registry.js"></script>
+  <script src="assets/scripts/global-search.js?v=20260831-2"></script>
+  <script>
+    (function bindNotificationToggle() {
+      const bind = () => {
+        const toggle = document.getElementById("notificationToggle");
+        const panel = document.getElementById("notificationPanel");
+        if (!toggle || !panel || toggle.dataset.boundToggle === "true") return;
+        toggle.dataset.boundToggle = "true";
+        const closePanel = () => {
+          panel.classList.remove("show");
+          panel.classList.add("hidden");
+          panel.style.display = "none";
+        };
+        toggle.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const willShow = !panel.classList.contains("show");
+          panel.classList.toggle("show", willShow);
+          panel.classList.toggle("hidden", !willShow);
+          panel.style.display = willShow ? "flex" : "none";
+        });
+        document.addEventListener("click", (event) => {
+          if (toggle.contains(event.target) || panel.contains(event.target)) return;
+          closePanel();
+        });
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") closePanel();
+        });
+      };
+      if (document.readyState === "complete" || document.readyState === "interactive") {
+        bind();
+      } else {
+        window.addEventListener("DOMContentLoaded", bind, { once: true });
+      }
+    })();
+  </script>
+  <script>
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarNav = document.getElementById('sidebarNav');
+    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    const closeSidebar = () => {
+      document.body.classList.remove('nav-open');
+      if (sidebarToggle) {
+        sidebarToggle.setAttribute('aria-expanded', 'false');
+        sidebarToggle.setAttribute('aria-label', 'Open menu');
+      }
+    };
+    const openSidebar = () => {
+      document.body.classList.add('nav-open');
+      if (sidebarToggle) {
+        sidebarToggle.setAttribute('aria-expanded', 'true');
+        sidebarToggle.setAttribute('aria-label', 'Close menu');
+      }
+    };
+    if (sidebarToggle) {
+      sidebarToggle.addEventListener('click', () => {
+        if (document.body.classList.contains('nav-open')) closeSidebar();
+        else openSidebar();
+      });
+    }
+    if (sidebarBackdrop) {
+      sidebarBackdrop.addEventListener('click', closeSidebar);
+    }
+    if (sidebarNav) {
+      sidebarNav.addEventListener('click', (event) => {
+        if (event.target && event.target.tagName === 'A') closeSidebar();
+      });
+    }
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && document.body.classList.contains('nav-open')) {
+        closeSidebar();
+        sidebarToggle?.focus({ preventScroll: true });
+      }
+    });
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 1024) closeSidebar();
+    });
+  </script>
+</body>
+</html>

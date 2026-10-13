@@ -1,0 +1,10 @@
+.av2-closure-effects { max-width: 46rem; line-height: 1.7; }
+.av2-closure-effects p { margin: 0 0 1rem; }
+.av2-closure-blockers { padding: 1.25rem 0; border-top: 1px solid var(--av2-line); }
+.av2-closure-blockers h2 { font-size: 1rem; margin: 0 0 .75rem; }
+.av2-closure-blockers ul { padding-left: 1.25rem; line-height: 1.7; }
+.av2-closure-blockers li + li { margin-top: .5rem; }
+.av2-closure-danger { color: #a12c28; border-color: #c0807b; }
+.theme-dark .av2-closure-danger { color: #ffb7b1; border-color: #b97873; }
+.av2-closure-dialog p { line-height: 1.65; }
+.av2-closure-dialog h2, .av2-closure-dialog p, .av2-closure-blockers { overflow-wrap: anywhere; }

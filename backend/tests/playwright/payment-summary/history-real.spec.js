@@ -1,0 +1,36 @@
+const { test, expect } = require('playwright/test'), path = require('node:path'), fs = require('node:fs/promises'), startServer = require('./real-server.cjs');
+let server, cleanup;
+test.beforeEach(async ({ context }) => {
+  server = await startServer({ frontendRoot: path.join(process.env.LPC_HELP_SOURCE_ROOT || path.resolve(__dirname,'../../../..'),'frontend'), onStartupCleanup: close => {cleanup=close;} });
+  await context.route('**/*',route=>new URL(route.request().url()).origin===server.origin?route.continue():route.abort('blockedbyclient'));
+});
+test.afterEach(async ({page})=>{await page.close();await(server?.close||cleanup)?.();server=null;cleanup=null;});
+test('actual original and new payment histories share retained events and CSV bytes; stale records and changed owners cannot be exported',async({page,context},testInfo)=>{
+  const pageErrors = [], assetFailures = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  page.on('response', response => { const url = new URL(response.url()); if (url.origin === server.origin && url.pathname.startsWith('/assets/') && response.status() >= 400) assetFailures.push({ path: url.pathname, status: response.status() }); });
+  const owner=await server.createUser();await server.seed(owner.id);await context.addCookies([owner.cookie]);
+  const before=await server.evidence(owner.id),posts=[];page.on('request',r=>{if(r.method()!=='GET'&&r.url().includes('/api/'))posts.push(r.url());});
+  await page.goto(`${server.origin}/dashboard-attorney.html#funds`);
+  const history=page.locator('[data-financial-history]');await expect(history).toHaveAttribute('data-state','ready');await expect(history).toContainText('6 of 6 records shown');
+  const originalRows=await history.locator('[data-financial-record]').allTextContents();
+  const shared=await page.request.get(`${server.origin}/api/payments/attorney-financial-history?expectedOwnerId=${owner.id}`),legacy=await page.request.get(`${server.origin}/api/payments/history?expectedOwnerId=${owner.id}`);
+  expect(shared.status()).toBe(200);expect(legacy.status()).toBe(200);const value=await shared.json();expect(await legacy.json()).toEqual(value);
+  const download=async()=>{const pending=page.waitForEvent('download');await history.getByRole('button',{name:'Download CSV',exact:true}).click();return fs.readFile(await(await pending).path(),'utf8');};
+  const legacyCsv=await download();expect(legacyCsv.trim().split(/\r?\n/)).toHaveLength(7);expect(legacyCsv).toContain('EUR');expect(legacyCsv).toContain('USD');
+  const compatibilityCsv=await page.request.get(`${server.origin}/api/payments/export/csv?expectedOwnerId=${owner.id}&revision=${value.revision}`);expect(compatibilityCsv.status()).toBe(200);expect((await compatibilityCsv.body()).toString('utf8').replace(/^\uFEFF/, '')).toBe(legacyCsv.replace(/^\uFEFF/,''));
+  await page.goto(`${server.origin}/attorney-v2.html#/payments`);await expect(history).toHaveAttribute('data-state','ready');expect(await history.locator('[data-financial-record]').allTextContents()).toEqual(originalRows);expect(await download()).toBe(legacyCsv);
+  await expect(history.getByRole('status')).toHaveText('Check your downloads for the CSV.');
+  await expect(page.locator('[data-payment-records] details')).not.toHaveAttribute('open', '');
+  await require('./history-layout')(page, testInfo);
+  expect(await server.evidence(owner.id)).toEqual(before);expect(server.providerCalls).toEqual([]);expect(posts).toEqual([]);
+  await history.getByLabel('Record type',{exact:true}).selectOption('funding');await history.getByLabel('Matter title',{exact:true}).fill('USD');await history.getByRole('button',{name:'Apply filters',exact:true}).click();await expect(history).toContainText('1 of 1 records shown');expect((await download()).trim().split(/\r?\n/)).toHaveLength(2);
+  await server.removeFunding(owner.id);const changed=await server.evidence(owner.id),downloads=[];page.on('download',d=>downloads.push(d));
+  await history.getByRole('button',{name:'Download CSV',exact:true}).click();await expect(history).toHaveAttribute('data-state','error');expect(downloads).toEqual([]);await expect(history.locator('[data-financial-record]')).toHaveCount(0);
+  await history.getByRole('button',{name:'Refresh financial history',exact:true}).click();await expect(history).toHaveAttribute('data-state','ready');await expect(history).toContainText('No verified funding amount');
+  const replacement=await server.createUser();await context.addCookies([replacement.cookie]);
+  const refused=await page.request.get(`${server.origin}/api/payments/history?expectedOwnerId=${owner.id}`);expect(refused.status()).toBe(403);
+  await history.getByRole('button',{name:'Download CSV',exact:true}).click();await expect(page).toHaveURL(/\/login.html/);expect(downloads).toEqual([]);expect(await server.evidence(owner.id)).toEqual(changed);expect(server.providerCalls).toEqual([]);expect(posts).toEqual([]);
+  await fs.writeFile(testInfo.outputPath('actual-history-agreement.json'),JSON.stringify({recordCount:6,fullCsvRows:7,filteredCsvRows:2,sameFinancialRecords:true,sameCsvBytes:true,staleDownloadRefused:true,changedOwnerStatus:refused.status(),financialPosts:posts,providerCalls:server.providerCalls,pageErrors,assetFailures},null,2));
+  expect(pageErrors).toEqual([]); expect(assetFailures).toEqual([]);
+});

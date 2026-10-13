@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /public/
+
+Sitemap: https://www.lets-paraconnect.com/sitemap.xml

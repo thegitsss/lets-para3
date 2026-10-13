@@ -1,0 +1,553 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:public");
+// backend/routes/public.js
+const express = require("express");
+const router = express.Router();
+const rateLimit = require("express-rate-limit");
+const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
+
+const User = require("../models/User");
+const verifyToken = require("../utils/verifyToken");
+const { recordContactSubmission } = require("../services/support/adminInboxService");
+const sendEmail = require("../utils/email");
+const { logAction } = require("../utils/audit");
+const {
+  BLOCKED_MESSAGE,
+  findActiveBlockBetween,
+  getBlockedUserIds,
+} = require("../utils/blocks");
+const { applyPublicParalegalFilter } = require("../utils/paralegalProfile");
+const { buildPublicProfilePhotoUrl } = require("../services/profilePhotoDelivery");
+const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
+const { looksLikeSupportSubmission } = require("../services/lpcEvents/supportRoutingService");
+const { csrfProtection } = require("../utils/csrf");
+const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+// ----------------------------------------
+// Rate limits
+// - /contact: per-IP 10 min window, 20 requests
+// - (add other public routes similarly if needed)
+// ----------------------------------------
+router.use(
+  "/contact",
+  rateLimit({
+    windowMs: 10 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { msg: "Too many requests. Please try again later." },
+  })
+);
+
+// ----------------------------------------
+// GET /public/unsubscribe?token=...
+// ----------------------------------------
+router.get(
+  "/unsubscribe",
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many unsubscribe requests. Please try again later." },
+  }),
+  asyncHandler(async (req, res) => {
+    const redirect = (status, reason) => {
+      return res.redirect(303, `/login.html?unsubscribe=${encodeURIComponent(status)}${reason ? `&reason=${encodeURIComponent(reason)}` : ""}`);
+    };
+    const token = String(req.query?.token || "").trim();
+    if (!token) {
+      return redirect("error", "missing");
+    }
+    let payload = null;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET || "");
+    } catch {
+      return redirect("error", "invalid");
+    }
+    if (!payload || payload.purpose !== "unsubscribe" || !payload.uid || !isObjId(payload.uid)) {
+      return redirect("error", "invalid");
+    }
+
+    const user = await User.findById(payload.uid);
+    if (!user) return redirect("error", "not_found");
+
+    if (!user.notificationPrefs) user.notificationPrefs = {};
+    user.notificationPrefs.email = false;
+    if (!user.emailPref) user.emailPref = {};
+    user.emailPref.product = false;
+    user.emailPref.marketing = false;
+    await user.save();
+
+    return redirect("success");
+  })
+);
+
+// ----------------------------------------
+// Helpers
+// ----------------------------------------
+function isEmail(v = "") {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).toLowerCase());
+}
+function escapeHTML(s) {
+  return String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+}
+function sanitizeSubject(s = "") {
+  // prevent header injection (\r or \n). Keep short.
+  return String(s).replace(/[\r\n]/g, " ").trim().slice(0, 140);
+}
+
+const isObjId = (id) => mongoose.Types.ObjectId.isValid(id);
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+const escapeRegex = (str = "") => String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const US_STATE_NAME_TO_CODE = {
+  alabama: "AL",
+  alaska: "AK",
+  arizona: "AZ",
+  arkansas: "AR",
+  california: "CA",
+  colorado: "CO",
+  connecticut: "CT",
+  delaware: "DE",
+  "district of columbia": "DC",
+  florida: "FL",
+  georgia: "GA",
+  hawaii: "HI",
+  idaho: "ID",
+  illinois: "IL",
+  indiana: "IN",
+  iowa: "IA",
+  kansas: "KS",
+  kentucky: "KY",
+  louisiana: "LA",
+  maine: "ME",
+  maryland: "MD",
+  massachusetts: "MA",
+  michigan: "MI",
+  minnesota: "MN",
+  mississippi: "MS",
+  missouri: "MO",
+  montana: "MT",
+  nebraska: "NE",
+  nevada: "NV",
+  "new hampshire": "NH",
+  "new jersey": "NJ",
+  "new mexico": "NM",
+  "new york": "NY",
+  "north carolina": "NC",
+  "north dakota": "ND",
+  ohio: "OH",
+  oklahoma: "OK",
+  oregon: "OR",
+  pennsylvania: "PA",
+  "rhode island": "RI",
+  "south carolina": "SC",
+  "south dakota": "SD",
+  tennessee: "TN",
+  texas: "TX",
+  utah: "UT",
+  vermont: "VT",
+  virginia: "VA",
+  washington: "WA",
+  "west virginia": "WV",
+  wisconsin: "WI",
+  wyoming: "WY",
+};
+const US_STATE_CODE_TO_NAME = Object.fromEntries(
+  Object.entries(US_STATE_NAME_TO_CODE).map(([name, code]) => [code, name])
+);
+
+const PUBLIC_PAR_FIELDS =
+  "_id firstName lastName avatarURL profileImage location state stateExperience specialties practiceAreas bestFor yearsExperience linkedInURL education bio about availability availabilityDetails approvedAt createdAt updatedAt";
+
+function getStateSearchTerms(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return [];
+  const normalizedName = raw.toLowerCase().replace(/\s+/g, " ");
+  const upperCode = raw.toUpperCase();
+  const terms = new Set([raw]);
+  if (US_STATE_NAME_TO_CODE[normalizedName]) terms.add(US_STATE_NAME_TO_CODE[normalizedName]);
+  if (US_STATE_CODE_TO_NAME[upperCode]) terms.add(US_STATE_CODE_TO_NAME[upperCode]);
+  return [...terms];
+}
+
+function buildLocationFilter(value = "") {
+  const terms = String(value || "")
+    .split(/[|,]/)
+    .flatMap((token) => getStateSearchTerms(token))
+    .filter(Boolean);
+  if (!terms.length) return null;
+  const uniqueTerms = [...new Set(terms)];
+  const patterns = uniqueTerms.map((term) => new RegExp(escapeRegex(term), "i"));
+  return {
+    $or: [
+      { location: { $in: patterns } },
+      { state: { $in: patterns } },
+      { stateExperience: { $in: patterns } },
+      { jurisdictions: { $in: patterns } },
+    ],
+  };
+}
+
+function buildAvailableParalegalFilter() {
+  return [require("../utils/availability").buildEffectiveAvailableClause()];
+}
+
+function serializeParalegal(userDoc) {
+  if (!userDoc) return null;
+  const src = userDoc.toObject ? userDoc.toObject() : userDoc;
+  const photoUrl = buildPublicProfilePhotoUrl(src);
+  return {
+    _id: String(src._id),
+    id: String(src._id),
+    firstName: src.firstName || "",
+    lastName: src.lastName || "",
+    name: `${src.firstName || ""} ${src.lastName || ""}`.trim(),
+    avatarURL: photoUrl,
+    profileImage: photoUrl,
+    photoUrl,
+    location: src.location || src.state || "",
+    specialties: Array.isArray(src.specialties) ? src.specialties : [],
+    practiceAreas: Array.isArray(src.practiceAreas) ? src.practiceAreas : [],
+    bestFor: Array.isArray(src.bestFor) ? src.bestFor : [],
+    yearsExperience: typeof src.yearsExperience === "number" ? src.yearsExperience : null,
+    linkedInURL: src.linkedInURL || "",
+    education: Array.isArray(src.education) ? src.education : [],
+    bio: src.bio || "",
+    about: src.about || "",
+    ...require("../utils/availability").effectiveAvailability(src),
+    approvedAt: src.approvedAt || null,
+    createdAt: src.createdAt || null,
+  };
+}
+// ----------------------------------------
+// POST /api/public/contact
+// Body:
+//   { name, email, role?, subject, message, hp? }
+//   - hp is a honeypot field (should be empty)
+// ----------------------------------------
+router.post(
+  "/contact",
+  csrfProtection,
+  async (req, res) => {
+    try {
+      const {
+        name = "",
+        email = "",
+        role = "",
+        subject = "",
+        message = "",
+        hp = "", // honeypot (bots often fill every field)
+      } = req.body || {};
+
+      // Honeypot & basic requireds
+      if (hp) return res.status(400).json({ msg: "Bad request" });
+      if (!name || !email || !subject || !message) {
+        return res.status(400).json({ msg: "Missing required fields" });
+      }
+      const msgStr = String(message);
+      if (msgStr.length > 2000) {
+        return res.status(400).json({ msg: "Message too long (max 2000 chars)" });
+      }
+
+      if ([name, email, subject, message, role].some(value => typeof value !== "string") ||
+          !name.trim() || !subject.trim() || !message.trim() || name.length > 240 || subject.length > 280 || email.length > 320) {
+        return res.status(400).json({ msg: "Please check your contact details and message." });
+      }
+      if (!isEmail(email.trim())) return res.status(400).json({ msg: "Invalid email" });
+      // Persist every inquiry before acknowledging it, independent of email or AI routing.
+      const contactTicket = await recordContactSubmission({ name: name.trim(), email: email.trim(), role, subject: subject.trim(), message: message.trim() });
+
+      // reCAPTCHA disabled in localhost/dev mode
+
+      const safeSubject = `[Contact] ${sanitizeSubject(subject)}`;
+      const html = `
+        <div style="font-family:Georgia,serif;font-size:16px;color:#5c4e3a">
+          <h2 style="color:#27394d;margin:0 0 6px">New Contact Submission</h2>
+          <p><strong>Name:</strong> ${escapeHTML(name)}</p>
+          <p><strong>Email:</strong> ${escapeHTML(email)}</p>
+          ${role ? `<p><strong>Role:</strong> ${escapeHTML(role)}</p>` : ""}
+          <p><strong>Subject:</strong> ${escapeHTML(subject)}</p>
+          <p style="white-space:pre-wrap;border-top:1px solid #eee;margin-top:8px;padding-top:8px">${escapeHTML(
+            message
+          )}</p>
+          <hr style="border:none;border-top:1px solid #eee;margin:12px 0" />
+          <p style="color:#888;font-size:12px">
+            IP: ${escapeHTML(req.ip || "")}<br/>
+            UA: ${escapeHTML(req.headers["user-agent"] || "")}
+          </p>
+        </div>
+      `;
+      const text =
+        `New Contact Submission\n\n` +
+        `Name: ${name}\n` +
+        `Email: ${email}\n` +
+        (role ? `Role: ${role}\n` : ``) +
+        `Subject: ${subject}\n\n` +
+        `${message}\n\n` +
+        `----\nIP: ${req.ip || ""}\nUA: ${req.headers["user-agent"] || ""}\n`;
+
+      const to =
+        process.env.CONTACT_INBOX ||
+        process.env.SMTP_FROM_EMAIL ||
+        process.env.SMTP_USER ||
+        "help@lets-paraconnect.com";
+      if (!to) {
+        // Don't fail user submissions if email isn't configured—just acknowledge.
+        runtimeLogger.warn("[contact] No CONTACT_INBOX/SMTP configured; skipping email send.");
+      } else {
+        // sendEmail(to, subject, html, { text, replyTo })
+        try {
+          await sendEmail(to, safeSubject, html, { text, replyTo: email, headers: { "Auto-Submitted": "auto-generated" } });
+        } catch (e) {
+          // non-fatal for UX; we still proceed
+          runtimeLogger.error("[contact] sendEmail failed:", e?.message || e);
+        }
+      }
+
+      // Best-effort audit log with metadata
+      try {
+        await logAction(req, "public.contact.submit", {
+          targetType: "other",
+          meta: {
+            role: role || null,
+            email,
+            ua: req.headers["user-agent"] || null,
+            ip: req.ip || null,
+          },
+        });
+      } catch (e) {
+        runtimeLogger.warn("[contact] audit logging failed", {
+          error: e?.message || String(e),
+        });
+      }
+
+      await publishEventSafe({
+        eventType: "public.contact.submitted",
+        eventFamily: "public_signal",
+        actor: {
+          actorType: "user",
+          role: "visitor",
+          email,
+          label: name,
+        },
+        subject: {
+          entityType: "public_contact",
+          entityId: email.toLowerCase(),
+        },
+        source: {
+          surface: "public",
+          route: "/api/public/contact",
+          service: "public",
+          producer: "route",
+        },
+        facts: {
+          summary: `Public contact submission received from ${email}.`,
+          after: {
+            name,
+            email,
+            role,
+            subject,
+          },
+        },
+        signals: {
+          confidence: "high",
+          priority: "normal",
+          publicFacing: true,
+        },
+      });
+
+      if (looksLikeSupportSubmission({ subject, message })) {
+        await publishEventSafe({
+          eventType: "support.submission.created",
+          related: { supportTicketId: contactTicket._id },
+          eventFamily: "support",
+          actor: {
+            actorType: "user",
+            role: "visitor",
+            email,
+            label: name,
+          },
+          subject: {
+            entityType: "support_submission",
+            entityId: `${email.toLowerCase()}:${sanitizeSubject(subject).toLowerCase()}`,
+          },
+          source: {
+            surface: "public",
+            route: "/api/public/contact",
+            service: "support",
+            producer: "route",
+          },
+          facts: {
+            summary: `Support-style public submission received from ${email}.`,
+            after: {
+              name,
+              email,
+              role: role || "visitor",
+              subject,
+              message,
+              sourceLabel: "Public contact form",
+            },
+          },
+          signals: {
+            confidence: "medium",
+            priority: "normal",
+            publicFacing: true,
+          },
+        });
+      }
+
+      return res.json({ ok: true, reference: `SUP-${String(contactTicket._id).slice(-6).toUpperCase()}` });
+    } catch (e) {
+      runtimeLogger.error("contact error", e);
+      return res.status(500).json({ msg: "Server error" });
+    }
+  }
+);
+
+// ----------------------------------------
+// Public paralegal directory
+// ----------------------------------------
+router.get(
+  "/paralegals",
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many directory requests. Please slow down." },
+  }),
+  verifyToken.optional,
+  asyncHandler(async (req, res) => {
+    const page = clamp(parseInt(req.query.page, 10) || 1, 1, 10_000);
+    const limit = clamp(parseInt(req.query.limit, 10) || 12, 1, 50);
+    const search =
+      typeof req.query.q === "string" && req.query.q.trim()
+        ? req.query.q.trim()
+        : typeof req.query.search === "string"
+        ? req.query.search.trim()
+        : "";
+    const location = typeof req.query.location === "string" ? req.query.location.trim() : "";
+    const practiceRaw = typeof req.query.practice === "string" ? req.query.practice.trim() : "";
+    const minYears = parseInt(req.query.minYears, 10);
+    const sortKey = typeof req.query.sort === "string" ? req.query.sort.trim().toLowerCase() : "recent";
+
+    const filter = {
+      role: "paralegal",
+      status: "approved",
+      disabled: { $ne: true },
+      deleted: { $ne: true },
+    };
+    filter["preferences.hideProfile"] = { $ne: true };
+    filter.$and = [...buildAvailableParalegalFilter()];
+    applyPublicParalegalFilter(filter);
+    if (String(req.user?.role || "").toLowerCase() === "attorney") {
+      const blockedIds = await getBlockedUserIds(req.user.id);
+      if (blockedIds.length) {
+        filter._id = { $nin: blockedIds };
+      }
+    }
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), "i");
+      filter.$or = [
+        { firstName: rx },
+        { lastName: rx },
+        { bio: rx },
+        { about: rx },
+        { specialties: rx },
+        { practiceAreas: rx },
+        { location: rx },
+        { state: rx },
+      ];
+    }
+    if (location) {
+      const locationFilter = buildLocationFilter(location);
+      if (locationFilter) {
+        filter.$and = [...(filter.$and || []), locationFilter];
+      }
+    }
+    if (practiceRaw) {
+      const tokens = practiceRaw
+        .split(/[|,]/)
+        .map((token) => token.trim())
+        .filter(Boolean)
+        .map((token) => new RegExp(escapeRegex(token), "i"));
+      if (tokens.length) {
+        filter.practiceAreas = { $in: tokens };
+      }
+    }
+    if (Number.isFinite(minYears) && minYears > 0) {
+      filter.yearsExperience = { $gte: minYears };
+    }
+
+    const sort =
+      sortKey === "alpha"
+        ? { firstName: 1, lastName: 1 }
+        : sortKey === "experience"
+        ? { yearsExperience: -1 }
+        : { createdAt: -1 };
+
+    const [docs, total] = await Promise.all([
+      User.find(filter)
+        .sort(sort)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .select(PUBLIC_PAR_FIELDS)
+        .lean(),
+      User.countDocuments(filter),
+    ]);
+
+    res.json({
+      items: docs.map(serializeParalegal),
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+      hasMore: page * limit < total,
+    });
+  })
+);
+
+router.get(
+  "/paralegals/:id",
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 90,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many profile requests. Please slow down." },
+  }),
+  verifyToken.optional,
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    if (!isObjId(id)) return res.status(400).json({ error: "Invalid paralegal id" });
+    const filter = {
+      _id: id,
+      role: "paralegal",
+      status: "approved",
+      disabled: { $ne: true },
+      deleted: { $ne: true },
+      "preferences.hideProfile": { $ne: true },
+    };
+    applyPublicParalegalFilter(filter);
+    const doc = await User.findOne(filter)
+      .select(PUBLIC_PAR_FIELDS)
+      .lean();
+    if (!doc) {
+      return res.status(404).json({ error: "Paralegal not found" });
+    }
+    if (String(req.user?.role || "").toLowerCase() === "attorney") {
+      const block = await findActiveBlockBetween(req.user.id, doc._id);
+      if (block) {
+        return res.status(403).json({
+          error: BLOCKED_MESSAGE,
+          blockedByProfileOwner: String(block.blockerId) === String(doc._id),
+        });
+      }
+    }
+    res.json(serializeParalegal(doc));
+  })
+);
+
+module.exports = router;

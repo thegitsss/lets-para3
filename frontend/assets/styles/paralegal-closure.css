@@ -1,0 +1,26 @@
+.pv2-closure { min-width: 0; padding-top: 28px; border-top: 1px solid var(--v2-line); color: var(--v2-ink); }
+.pv2-closure *, .pv2-closure-dialog * { box-sizing: border-box; }
+.pv2-closure-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+.pv2-closure-header h2 { margin: 0; font-size: 1.125rem; font-weight: 600; }
+.pv2-closure :is(h2,h3), .pv2-closure-dialog h2 { color: var(--v2-ink); font-family: var(--v2-font-sans); }
+.pv2-closure button, .pv2-closure-dialog button { font: inherit; cursor: pointer; max-width: 100%; overflow-wrap: anywhere; }
+.pv2-closure button:disabled, .pv2-closure-dialog button:disabled { cursor: not-allowed; opacity: .65; }
+.pv2-closure :is(a,button):focus-visible, .pv2-closure-dialog button:focus-visible, .pv2-closure h2:focus { outline: 2px solid var(--v2-ink); outline-offset: 3px; }
+.pv2-closure-effects { max-width: 46rem; line-height: 1.7; }
+.pv2-closure-effects p { margin: 0 0 1rem; }
+.pv2-closure-blockers { padding: 1rem 0; }
+.pv2-closure-blockers h2 { font-size: 1rem; margin: 0 0 .75rem; }
+.pv2-closure-blockers ul { padding-left: 1.25rem; line-height: 1.7; }
+.pv2-closure-blockers li + li { margin-top: .5rem; }
+.pv2-closure .pv2-actions { justify-content: flex-start; }
+.pv2-closure a { color: var(--v2-blue); text-underline-offset: 3px; }
+.pv2-closure-danger { color: #a12c28; border-color: #c0807b; }
+.theme-dark .pv2-closure-danger { color: #ffb7b1; border-color: #b97873; }
+.pv2-closure-dialog { box-sizing: border-box; width: min(540px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; border: 1px solid var(--v2-line); border-radius: 12px; color: var(--v2-ink); background: var(--v2-white); }
+.pv2-closure-dialog::backdrop { background: #101b2b88; }
+.pv2-closure-dialog h2 { margin: 0 0 12px; font-size: 1.35rem; }
+.pv2-closure-dialog p { line-height: 1.65; }
+.pv2-closure-dialog .pv2-actions { margin-top: 20px; }
+.pv2-closure-dialog :is(h2,p), .pv2-closure-blockers { overflow-wrap: anywhere; }
+body[data-v2-closure="pending"] > :not(script) { visibility: hidden !important; pointer-events: none !important; }
+@media(max-width:480px) { .pv2-closure-dialog { padding: 18px; } .pv2-closure .pv2-actions { flex-direction: column; align-items: stretch; } }

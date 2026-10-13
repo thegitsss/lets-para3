@@ -1,0 +1,130 @@
+const PARALEGAL_PRODUCTION_DEFECTS = Object.freeze([
+  Object.freeze({
+    id: "PPD001_raw_verified_information",
+    capabilityId: "P07_browse_apply",
+    prompt: "how do i apply to a matter",
+    requiredEvidence: ["workflow"],
+    requiredTools: ["get_paralegal_workflow_readiness"],
+    requiredClaims: ["browse_apply"],
+    forbiddenClaims: ["raw_evidence", "generic_verified_information"],
+    riskLabels: ["workflow_policy", "privacy_authorization"],
+    observedFrom: "shared_support_drawer",
+  }),
+  Object.freeze({
+    id: "PPD002_payout_timing_unavailable",
+    capabilityId: "P15_payout_timing",
+    prompt: "when does the paralegal get paid",
+    requiredEvidence: ["workflow"],
+    requiredTools: ["get_paralegal_workflow_readiness"],
+    requiredClaims: ["payout_timing", "release_bank_distinction"],
+    forbiddenClaims: ["false_unavailability", "bank_receipt_confirmed"],
+    riskLabels: ["financial", "workflow_policy"],
+    observedFrom: "shared_support_drawer",
+  }),
+  Object.freeze({
+    id: "PPD003_bank_receipt_overclaim",
+    capabilityId: "P15_payout_timing",
+    prompt: "has it hit my bank",
+    history: [{ role: "user", content: "did my Smith payout get released yet" }],
+    conversationState: {
+      activeEntity: {
+        type: "matter",
+        id: "matter-smith",
+        name: "Smith",
+        source: "verified_fixture",
+      },
+      lastCapabilityIds: ["P15_payout_timing"],
+    },
+    requiredEvidence: ["workflow", "payout_history"],
+    requiredTools: ["get_paralegal_workflow_readiness", "get_paralegal_payout_history"],
+    requiredClaims: ["release_bank_distinction"],
+    forbiddenClaims: ["bank_receipt_confirmed"],
+    riskLabels: ["financial", "workflow_policy"],
+    observedFrom: "shared_support_drawer",
+  }),
+  Object.freeze({
+    id: "PPD004_followup_context_loss",
+    capabilityId: "P10_assignment_start",
+    prompt: "and then what?",
+    history: [{ role: "user", content: "I accepted the Smith invitation" }],
+    conversationState: {
+      activeEntity: {
+        type: "matter",
+        id: "matter-smith",
+        name: "Smith",
+        source: "verified_fixture",
+      },
+      lastCapabilityIds: ["P10_assignment_start"],
+    },
+    requiredEvidence: ["invitations", "workflow"],
+    requiredTools: ["get_paralegal_invitation_activity", "get_paralegal_workflow_readiness"],
+    requiredClaims: ["assignment_start"],
+    forbiddenClaims: ["generic_fallback", "context_lost"],
+    riskLabels: ["workflow_policy", "ownership"],
+    observedFrom: "shared_support_drawer",
+  }),
+  Object.freeze({
+    id: "PPD005_duplicate_contact_controls",
+    capabilityId: "P30_navigation",
+    prompt: "i need to speak with a representative",
+    requiredEvidence: ["navigation"],
+    requiredTools: ["find_paralegal_navigation_destination"],
+    requiredClaims: ["human_contact"],
+    forbiddenClaims: ["handoff_completed", "duplicate_inline_button_link"],
+    riskLabels: ["response_ui"],
+    observedFrom: "shared_support_drawer",
+  }),
+  Object.freeze({
+    id: "PPD006_phantom_manual_review",
+    capabilityId: "P02_matter_details",
+    prompt: "is the Smith matter still active",
+    requiredEvidence: ["workspace"],
+    requiredTools: ["get_paralegal_case_workspace"],
+    requiredClaims: ["matter_details"],
+    forbiddenClaims: ["manual_review_sent", "team_escalation_claim"],
+    riskLabels: ["privacy_authorization", "response_ui"],
+    observedFrom: "shared_support_drawer",
+  }),
+  Object.freeze({
+    id: "PPD007_repeated_tool_call",
+    capabilityId: "P17_matter_financials",
+    prompt: "and how much was that for?",
+    history: [{ role: "user", content: "What was the payout on the Smith matter?" }],
+    conversationState: {
+      activeEntity: {
+        type: "matter",
+        id: "matter-smith",
+        name: "Smith",
+        source: "verified_fixture",
+      },
+      lastCapabilityIds: ["P17_matter_financials"],
+      lastRequestedDimensions: ["amount"],
+    },
+    requiredEvidence: ["matter_financials"],
+    requiredTools: ["get_paralegal_case_financials"],
+    requiredClaims: ["matter_financials"],
+    forbiddenClaims: ["repeated_tool_call"],
+    riskLabels: ["financial", "ownership"],
+    observedFrom: "shared_support_drawer",
+  }),
+]);
+
+function getParalegalProductionDefects() {
+  return PARALEGAL_PRODUCTION_DEFECTS.map((defect) => ({
+    ...defect,
+    history: Array.isArray(defect.history) ? defect.history.map((item) => ({ ...item })) : [],
+    conversationState: defect.conversationState
+      ? JSON.parse(JSON.stringify(defect.conversationState))
+      : {},
+    requiredEvidence: [...(defect.requiredEvidence || [])],
+    requiredTools: [...(defect.requiredTools || [])],
+    requiredClaims: [...(defect.requiredClaims || [])],
+    forbiddenClaims: [...(defect.forbiddenClaims || [])],
+    riskLabels: [...(defect.riskLabels || [])],
+  }));
+}
+
+module.exports = {
+  PARALEGAL_PRODUCTION_DEFECTS,
+  getParalegalProductionDefects,
+};
