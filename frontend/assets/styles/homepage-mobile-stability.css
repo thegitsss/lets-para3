@@ -3,7 +3,7 @@
   .lpc-home .hook-find::before { z-index: 0; }
   .lpc-home .type-hook__scene { min-height: var(--home-stable-viewport, 100svh); }
   .lpc-home .type-hook.hook-find {
-    height: calc(var(--home-stable-viewport, 100svh) * 2.5);
+    height: calc(var(--home-stable-viewport, 100svh) * 2);
     margin-bottom: calc(var(--home-stable-viewport, 100svh) * -.5);
   }
   .lpc-home .hook-find .type-hook__scene {
