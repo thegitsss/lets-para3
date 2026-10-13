@@ -3,7 +3,7 @@
   .lpc-home .hook-find::before { z-index: 0; }
   .lpc-home .type-hook__scene { min-height: var(--home-stable-viewport, 100svh); }
   .lpc-home .type-hook.hook-find {
-    height: calc(var(--home-stable-viewport, 100svh) * 2.5);
+    height: calc(var(--home-stable-viewport, 100svh) * 2);
     margin-bottom: calc(var(--home-stable-viewport, 100svh) * -.5);
   }
   .lpc-home .hook-find .type-hook__scene {
@@ -13,6 +13,17 @@
   .lpc-home .type-hook__papers { top: calc(var(--home-stable-viewport, 100svh) * .6); }
   .lpc-home .type-hook__smoke { height: calc(var(--home-stable-viewport, 100svh) * .9); }
   .lpc-home .matter-scroll-journey { height: calc(var(--film-height, 900px) + var(--home-stable-viewport, 100svh) * 2); }
+}
+
+/* Restore the workflow's phone parallax without changing its cards or spacing. */
+@media (max-width: 767px) {
+  body.lpc-home .matter-field--workflow {
+    transform: translate3d(0, var(--workflow-field-y, 0px), 0);
+    will-change: transform;
+  }
+}
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  body.lpc-home .matter-field--workflow { transform: none; will-change: auto; }
 }
 @media (min-width: 641px) and (max-width: 767px) {
   .lpc-home--editorial .editorial-hero__main { row-gap: clamp(30px, calc(var(--home-stable-viewport, 100svh) * .05), 44px); }
