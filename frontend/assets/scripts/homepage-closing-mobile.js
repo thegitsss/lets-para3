@@ -76,14 +76,14 @@
     frame = 0;
     const disabled = reduced.matches || document.body.classList.contains('accessibility-mode') || document.documentElement.classList.contains('accessibility-mode');
     const top = sceneTop - scrollY;
+    scene.classList.toggle('closing--in-view', top < height && top > -(height - 120));
     if (!disabled && (top > height + 80 || top < -height - 80)) return;
     const progress = Math.max(0, Math.min(1, (height - top) / (height * 1.5)));
     const y = disabled ? 0 : Math.round((-48 + progress * 96) * 100) / 100;
-    const reveal = Math.max(0, Math.min(1, (height * .8 - top) / (height * 1.05)));
+    const reveal = Math.max(0, Math.min(1, (height - top) / (height * .5)));
     const eased = reveal * reveal * (3 - 2 * reveal);
     const titleY = disabled ? 0 : Math.round((1 - eased) * 160 * 100) / 100;
-    const fade = Math.max(0, Math.min(1, (reveal - .08) / .4));
-    const opacity = disabled ? 1 : Math.round(fade * fade * (3 - 2 * fade) * 1000) / 1000;
+    const opacity = disabled ? 1 : Math.round(eased * 1000) / 1000;
     // Keep the role choices visible while the heading clears the ridge.
     // No layout reads, canvas redraws, text scaling, or inherited variables here.
     if (y !== lastY) {
