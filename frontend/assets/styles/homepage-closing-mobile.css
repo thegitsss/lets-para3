@@ -228,3 +228,25 @@ body.lpc-home .home-footer{padding-top:64px}
 @media (max-width: 767px) {
   body.lpc-home .closing-footer__canvas { display: none !important; }
 }
+
+/* Full-width mobile closing actions, attorneys first. */
+@media (max-width: 767px) {
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions { grid-template-columns: minmax(0, 1fr); gap: 0; max-width: none; }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a { min-height: 88px; padding: 14px 12px; grid-template-columns: minmax(0, 1fr) 18px; }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a:first-child { border-right: 0; border-bottom: 0; }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a small { font-size: 14px; }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a strong { font-size: clamp(25px, 7vw, 32px); line-height: 1.15; white-space: normal; }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a svg { width: 18px; height: 18px; }
+}
+
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  body.lpc-home .closing-mobile :is(.closing__actions, .closing__reassurance) { transform: none !important; }
+}
+
+/* Stronger mobile closing action typography and directional arrows. */
+@media (max-width: 767px) {
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a { min-height: 100px; padding: 16px 14px; grid-template-columns: minmax(0, 1fr) 32px; column-gap: 12px; border-color: rgb(233 244 255 / .75); }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a small { font-size: 12px; font-weight: 400; letter-spacing: .12em; text-transform: uppercase; color: #fff; }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a strong { font-size: clamp(28px, 8.4vw, 38px); font-weight: 500 !important; line-height: 1.08; color: #fff; }
+  body.lpc-home.lpc-home--hybrid .closing-mobile .closing__actions a svg { width: 32px; height: 32px; color: #fff; stroke-width: 1.8; transform: none; }
+}
