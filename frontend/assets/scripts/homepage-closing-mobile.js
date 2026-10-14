@@ -6,10 +6,41 @@
   if (!scene) return;
   const canvas = scene.querySelector('canvas');
   const image = scene.querySelector('img');
-  image.loading = 'eager';
+  let imageRequested = false;
+  let sourcePrepared = false;
+  function prepareSource() {
+    if (sourcePrepared) return;
+    sourcePrepared = true;
+    image.decoding = 'async';
+    image.fetchPriority = 'low';
+    image.loading = 'eager';
+  }
+  function requestImage() {
+    if (imageRequested) return;
+    imageRequested = true;
+    prepareSource();
+    image.fetchPriority = 'auto';
+    void paint();
+  }
   const title = scene.querySelector('h2');
   const reassurance = scene.querySelector('.closing__reassurance');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  // Fetch the small phone image after the unchanged hero entrance, while keeping
+  // canvas decoding/painting near the closing section rather than at startup.
+  function queueSource() {
+    const outro = document.querySelector('.editorial-hero__reassurance');
+    if (reduced.matches) { prepareSource(); return; }
+    outro?.addEventListener('animationend', prepareSource, { once: true });
+    setTimeout(prepareSource, 2200);
+  }
+  if (document.documentElement.classList.contains('hero-fonts-pending')) {
+    const ready = new MutationObserver(() => {
+      if (document.documentElement.classList.contains('hero-fonts-pending')) return;
+      ready.disconnect();
+      queueSource();
+    });
+    ready.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  } else queueSource();
   let width = innerWidth, height = Math.max(700, innerHeight);
   let sceneTop = 0, frame = 0, lastY = null, lastTitleY = null, lastOpacity = null, path = null;
   let painting = false, paintAgain = false;
@@ -27,6 +58,7 @@
     lastOpacity = null;
   }
   async function paint() {
+    if (!imageRequested) return;
     if (painting) { paintAgain = true; return; }
     painting = true;
     try {
@@ -102,7 +134,15 @@
   }
   function schedule() { if (!frame) frame = requestAnimationFrame(render); }
   measure();
-  document.fonts.ready.then(() => { measure(); paint(); });
+  document.fonts.ready.then(() => { measure(); if (imageRequested) paint(); });
+  if ('IntersectionObserver' in window) {
+    const loader = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      loader.disconnect();
+      requestImage();
+    }, { rootMargin: '1500px 0px' });
+    loader.observe(scene);
+  } else requestImage();
   addEventListener('scroll', schedule, { passive: true });
   addEventListener('resize', () => {
     // Browser chrome may change height while scrolling; only width changes

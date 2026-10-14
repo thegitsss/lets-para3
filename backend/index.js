@@ -3,6 +3,7 @@ require("dotenv").config();
 
 // 1) Core + Libs
 const express = require("express");
+const { mountMobileHomepageImages } = require("./utils/mobileHomepageImages");
 const path = require("path");
 const { createWebNotFoundHandler } = require("./utils/webNotFound");
 const mongoose = require("mongoose");
@@ -273,6 +274,7 @@ app.use("/api", (_req, res) => {
   res.status(404).json({ error: "Not found" });
 });
 
+mountMobileHomepageImages(app, FRONTEND_DIR);
 app.use(express.static(PUBLIC_DIR));
 app.use(express.static(FRONTEND_DIR));
 app.use(
