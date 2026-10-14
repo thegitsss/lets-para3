@@ -143,7 +143,7 @@
   }
   function schedule() { if (!frame) frame = requestAnimationFrame(render); }
   measure();
-  document.fonts.ready.then(() => { measure(); if (imageRequested) paint(); });
+  document.fonts.ready.then(() => { measure(); schedule(); if (imageRequested) paint(); });
   if ('IntersectionObserver' in window) {
     const loader = new IntersectionObserver(entries => {
       if (!entries.some(entry => entry.isIntersecting)) return;
@@ -152,6 +152,23 @@
     }, { rootMargin: '1500px 0px' });
     loader.observe(scene);
   } else requestImage();
+  // iOS can suspend a queued frame when opening/restoring a tab. Re-arm the
+  // section independently of image decoding when the page becomes active.
+  function resumeMotion() {
+    if (document.visibilityState === 'hidden') return;
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    // Preserve the approved height when browser toolbars change on activation.
+    if (innerWidth !== width) { width = innerWidth; measure(); }
+    else {
+      sceneTop = scene.getBoundingClientRect().top + scrollY;
+      lastY = lastTitleY = lastActionsY = lastOpacity = null;
+    }
+    schedule();
+  }
+  addEventListener('pageshow', resumeMotion);
+  document.addEventListener('visibilitychange', resumeMotion);
+  addEventListener('load', resumeMotion, { once: true });
   addEventListener('scroll', schedule, { passive: true });
   addEventListener('resize', () => {
     // Browser chrome may change height while scrolling; only width changes
