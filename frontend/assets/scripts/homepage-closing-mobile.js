@@ -158,7 +158,12 @@
     if (document.visibilityState === 'hidden') return;
     if (frame) cancelAnimationFrame(frame);
     frame = 0;
-    measure();
+    // Preserve the approved height when browser toolbars change on activation.
+    if (innerWidth !== width) { width = innerWidth; measure(); }
+    else {
+      sceneTop = scene.getBoundingClientRect().top + scrollY;
+      lastY = lastTitleY = lastActionsY = lastOpacity = null;
+    }
     schedule();
   }
   addEventListener('pageshow', resumeMotion);
