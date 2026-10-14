@@ -82,7 +82,17 @@
   body.lpc-home .matter-scroll-journey .builder-actions { display: none; }
 }
 
-/* Keep the complete Assistant answer cards equal in height on mobile. */
+/* All three mobile Assistant answers use the same card height. */
 @media (max-width: 767px) {
-  body.lpc-home .assistant-demo { min-height: var(--assistant-mobile-card-height, 0px); }
+  body.lpc-home .assistant-demo { height: 610px; }
+}
+@media (max-width: 414px) {
+  body.lpc-home .assistant-demo { height: 630px; }
+}
+@media (max-width: 360px) {
+  body.lpc-home .assistant-demo { height: 660px; }
+}
+
+@media (min-width: 721px) and (max-width: 767px) {
+  body.lpc-home .assistant-demo { height: 650px; }
 }
