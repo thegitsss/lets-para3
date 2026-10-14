@@ -1,7 +1,12 @@
 /* Pre-rendered mountain with a transform-only heading reveal behind its ridge. */
 (() => {
-  const mobile = matchMedia('(max-width:767px),(hover:none) and (pointer:coarse)');
-  if (innerWidth > 767 || !mobile.matches) return;
+  const mobile = matchMedia('(max-width:767px)');
+  let initialized = false;
+  let resume = () => {};
+  function initialize() {
+  if (!mobile.matches) return;
+  if (initialized) { resume(); return; }
+  initialized = true;
   const scene = document.querySelector('.closing-mobile');
   if (!scene) return;
   const canvas = scene.querySelector('canvas');
@@ -108,6 +113,7 @@
   }
   function render() {
     frame = 0;
+    if (!mobile.matches) return;
     const disabled = reduced.matches || document.body.classList.contains('accessibility-mode') || document.documentElement.classList.contains('accessibility-mode');
     const top = sceneTop - scrollY;
     scene.classList.toggle('closing--in-view', top < height && top > -(height - 120));
@@ -155,7 +161,7 @@
   // iOS can suspend a queued frame when opening/restoring a tab. Re-arm the
   // section independently of image decoding when the page becomes active.
   function resumeMotion() {
-    if (document.visibilityState === 'hidden') return;
+    if (!mobile.matches || document.visibilityState === 'hidden') return;
     if (frame) cancelAnimationFrame(frame);
     frame = 0;
     // Preserve the approved height when browser toolbars change on activation.
@@ -166,6 +172,7 @@
     }
     schedule();
   }
+  resume = resumeMotion;
   addEventListener('pageshow', resumeMotion);
   document.addEventListener('visibilitychange', resumeMotion);
   addEventListener('load', resumeMotion, { once: true });
@@ -173,7 +180,7 @@
   addEventListener('resize', () => {
     // Browser chrome may change height while scrolling; only width changes
     // establish a new layout, including device rotation.
-    if (innerWidth === width) return;
+    if (!mobile.matches || innerWidth === width) return;
     width = innerWidth; measure(); paint(); schedule();
   }, { passive: true });
   reduced.addEventListener('change', () => { lastY = lastTitleY = lastActionsY = lastOpacity = null; schedule(); });
@@ -185,4 +192,8 @@
     schedule();
   }).observe(document.body);
   schedule();
+  }
+  mobile.addEventListener('change', initialize);
+  addEventListener('pageshow', () => { if (!initialized) initialize(); });
+  initialize();
 })();
