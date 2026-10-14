@@ -82,7 +82,7 @@
   body.lpc-home .matter-scroll-journey .builder-actions { display: none; }
 }
 
-/* Keep all three mobile Assistant example controls the same height. */
+/* Keep the complete Assistant answer cards equal in height on mobile. */
 @media (max-width: 767px) {
-  body.lpc-home .assistant-spotlight__examples button { box-sizing: border-box; height: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding-block: 0; white-space: nowrap; }
+  body.lpc-home .assistant-demo { min-height: var(--assistant-mobile-card-height, 0px); }
 }
