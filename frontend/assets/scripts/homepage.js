@@ -604,7 +604,14 @@
   }
 
   document.querySelectorAll("[data-matter-field]").forEach((canvas) => {
-    new MatterField(canvas);
+    if (innerWidth <= 767 && "IntersectionObserver" in window) {
+      const prepareField = new IntersectionObserver(entries => {
+        if (!entries.some(entry => entry.isIntersecting)) return;
+        prepareField.disconnect();
+        new MatterField(canvas);
+      }, { rootMargin: "300px 0px" });
+      prepareField.observe(canvas.closest("[data-matter-field-host]") || canvas);
+    } else new MatterField(canvas);
   });
 
   const revealTargets = Array.from(document.querySelectorAll([

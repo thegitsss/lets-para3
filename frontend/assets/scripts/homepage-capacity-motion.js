@@ -30,13 +30,28 @@
     node.style[property] = value;
   }
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  // Decode the existing artwork before the scroll reveal needs its first paint.
-  if (!reduced.matches) hook.querySelectorAll('img').forEach(img => {
-    img.decoding = 'async';
-    img.loading = 'eager';
-    // Predecode is best effort; the image's normal load remains authoritative.
-    void Promise.allSettled([img.decode()]);
-  });
+  // Phones prepare the unchanged artwork near its scene, away from the hero fade.
+  if (!reduced.matches && innerWidth <= 767 && 'IntersectionObserver' in window) {
+    const prepareArtwork = () => hook.querySelectorAll('img').forEach(img => {
+      img.decoding = 'async';
+      img.loading = 'eager';
+      void Promise.allSettled([img.decode()]);
+    });
+    const artworkObserver = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      artworkObserver.disconnect();
+      prepareArtwork();
+    }, { rootMargin: '128px 0px' });
+    artworkObserver.observe(clouds[1] || scene);
+  } else {
+    // Decode the existing artwork before the scroll reveal needs its first paint.
+    if (!reduced.matches) hook.querySelectorAll('img').forEach(img => {
+      img.decoding = 'async';
+      img.loading = 'eager';
+      // Predecode is best effort; the image's normal load remains authoritative.
+      void Promise.allSettled([img.decode()]);
+    });
+  }
   const clamp = value => Math.max(0, Math.min(1, value));
   // FIND uses GSAP's default power1.out for each tween and a 0.1s scrub.
   const ease = value => 1 - (1 - value) ** 2;

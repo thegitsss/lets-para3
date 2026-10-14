@@ -95,7 +95,9 @@
           fonts.set(font, `${fonts.get(font) || ""} ${text}`);
         });
         Promise.allSettled(Array.from(fonts, ([font, text]) => document.fonts.load(font, text))).then(() => {
-          requestAnimationFrame(() => document.documentElement.classList.remove("hero-fonts-pending"));
+          if (innerWidth <= 767) {
+            requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove("hero-fonts-pending")));
+          } else requestAnimationFrame(() => document.documentElement.classList.remove("hero-fonts-pending"));
         });
       }, { once: true });
     }
@@ -589,7 +591,7 @@
       </div>
     </section>
 
-    <section class="closing closing-mobile" data-header-tone="dark" aria-labelledby="closing-mobile-title"><div class="closing__sky" aria-hidden="true"></div><canvas class="closing__mountain" aria-hidden="true"></canvas><img class="closing__fallback" src="/hero-mountain-restored.jpg" alt="" decoding="async" loading="lazy"><h2 id="closing-mobile-title"><span>Let’s get to work.</span></h2><p class="closing__reassurance">Create an account—it’s free.</p><div class="closing__actions"><a href="/signup.html?role=attorney"><small>For attorneys</small><strong>Post your first matter</strong><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19 19 5M9 5h10v10"/></svg></a><a href="/signup.html?role=paralegal"><small>For paralegals</small><strong>Apply to join</strong><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19 19 5M9 5h10v10"/></svg></a></div></section>
+    <section class="closing closing-mobile" data-header-tone="dark" aria-labelledby="closing-mobile-title"><div class="closing__sky" aria-hidden="true"></div><canvas class="closing__mountain" aria-hidden="true"></canvas><img class="closing__fallback" src="/assets/images/homepage-capacity/mountain-mobile-1920-fb4e1e2d7eff.jpg" alt="" decoding="async" loading="lazy"><h2 id="closing-mobile-title"><span>Let’s get to work.</span></h2><p class="closing__reassurance">Create an account—it’s free.</p><div class="closing__actions"><a href="/signup.html?role=attorney"><small>For attorneys</small><strong>Post your first matter</strong><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19 19 5M9 5h10v10"/></svg></a><a href="/signup.html?role=paralegal"><small>For paralegals</small><strong>Apply to join</strong><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19 19 5M9 5h10v10"/></svg></a></div></section>
 
     <section data-header-tone="dark" class="closing-scene closing-scene--mountain" aria-labelledby="closing-title">
       <img class="closing-scene__mountain" src="hero-mountain-restored.jpg" alt="" loading="lazy" decoding="async" />
@@ -667,15 +669,15 @@
   </footer>
 
   <script src="assets/scripts/homepage-closing-parallax.js?v=20261012-homepage-polish" defer></script>
-  <script src="assets/scripts/homepage-closing-mobile.js?v=20261013-menu-reveal-float" defer></script>
+  <script src="assets/scripts/homepage-closing-mobile.js?v=20261014-mobile-load" defer></script>
   <script src="assets/scripts/homepage-map.js?v=20261008-live-map" defer></script>
   <script src="assets/scripts/homepage-feature-cards.js?v=20261008-approved-cards" defer></script>
-  <script src="assets/scripts/homepage.js?v=20261013-workflow-parallax" defer></script>
+  <script src="assets/scripts/homepage.js?v=20261014-mobile-load" defer></script>
   <script src="assets/scripts/homepage-assistant.js?v=20260929-review-copy" defer></script>
   <script src="assets/scripts/accessibility-toggle.js" defer></script>
   <script src="assets/scripts/matter-original.js?v=20261012-homepage-polish" defer></script>
   <script src="assets/scripts/homepage-draft-calendar.js?v=20261008-static-restoration" defer></script>
-  <script src="assets/scripts/homepage-capacity-motion.js?v=20261012-scroll-rendering" defer></script>
+  <script src="assets/scripts/homepage-capacity-motion.js?v=20261014-mobile-load" defer></script>
 <script src="assets/scripts/homepage-mobile-spacing.js?v=20261008-approved-final" defer></script>
 </body>
 </html>
