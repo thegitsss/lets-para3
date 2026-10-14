@@ -24,6 +24,7 @@
   }
   const title = scene.querySelector('h2');
   const reassurance = scene.querySelector('.closing__reassurance');
+  const actions = scene.querySelector('.closing__actions');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   // Fetch the small phone image after the unchanged hero entrance, while keeping
   // canvas decoding/painting near the closing section rather than at startup.
@@ -42,7 +43,7 @@
     ready.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
   } else queueSource();
   let width = innerWidth, height = Math.max(700, innerHeight);
-  let sceneTop = 0, frame = 0, lastY = null, lastTitleY = null, lastOpacity = null, path = null;
+  let sceneTop = 0, frame = 0, lastY = null, lastTitleY = null, lastActionsY = null, lastOpacity = null, path = null;
   let painting = false, paintAgain = false;
   function measure() {
     height = Math.max(700, innerHeight);
@@ -55,6 +56,7 @@
     sceneTop = scene.getBoundingClientRect().top + scrollY;
     lastY = null;
     lastTitleY = null;
+    lastActionsY = null;
     lastOpacity = null;
   }
   async function paint() {
@@ -114,9 +116,12 @@
     const y = disabled ? 0 : Math.round((-48 + progress * 96) * 100) / 100;
     const reveal = Math.max(0, Math.min(1, (height - top) / (height * .5)));
     const eased = reveal * reveal * (3 - 2 * reveal);
-    const titleY = disabled ? 0 : Math.round((1 - eased) * 160 * 100) / 100;
+    // Anchor at mid-viewport, with continuous reversible drift after entry.
+    const drift = top - height * .5;
+    const titleY = disabled ? 0 : Math.round(((1 - eased) * 160 + drift * .18) * 100) / 100;
+    const actionsY = disabled ? 0 : Math.round(drift * .13 * 100) / 100;
     const opacity = disabled ? 1 : Math.round(eased * 1000) / 1000;
-    // Keep the role choices visible while the heading clears the ridge.
+    // Keep the role choices visible while text and buttons drift with scrolling.
     // No layout reads, canvas redraws, text scaling, or inherited variables here.
     if (y !== lastY) {
       canvas.style.transform = `translate3d(0,${y}px,0)`;
@@ -126,6 +131,10 @@
       title.style.transform = `translate3d(0,${titleY}px,0)`;
       reassurance.style.transform = `translate3d(0,${titleY}px,0)`;
       lastTitleY = titleY;
+    }
+    if (actionsY !== lastActionsY) {
+      actions.style.transform = `translate3d(0,${actionsY}px,0)`;
+      lastActionsY = actionsY;
     }
     if (opacity !== lastOpacity) {
       title.style.opacity = opacity;
@@ -150,9 +159,9 @@
     if (innerWidth === width) return;
     width = innerWidth; measure(); paint(); schedule();
   }, { passive: true });
-  reduced.addEventListener('change', () => { lastY = lastTitleY = lastOpacity = null; schedule(); });
+  reduced.addEventListener('change', () => { lastY = lastTitleY = lastActionsY = lastOpacity = null; schedule(); });
   for (const node of [document.body, document.documentElement]) {
-    new MutationObserver(() => { lastY = lastTitleY = lastOpacity = null; schedule(); }).observe(node, { attributes: true, attributeFilter: ['class'] });
+    new MutationObserver(() => { lastY = lastTitleY = lastActionsY = lastOpacity = null; schedule(); }).observe(node, { attributes: true, attributeFilter: ['class'] });
   }
   new ResizeObserver(() => {
     sceneTop = scene.getBoundingClientRect().top + scrollY;
