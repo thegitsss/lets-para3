@@ -76,3 +76,13 @@
     padding-bottom: max(18px, env(safe-area-inset-bottom));
   }
 }
+
+/* Remove section 02's Preview control from the mobile presentation. */
+@media (max-width: 767px) {
+  body.lpc-home .matter-scroll-journey .builder-actions { display: none; }
+}
+
+/* Keep all three mobile Assistant example controls the same height. */
+@media (max-width: 767px) {
+  body.lpc-home .assistant-spotlight__examples button { box-sizing: border-box; height: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding-block: 0; white-space: nowrap; }
+}
