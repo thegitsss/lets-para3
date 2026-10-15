@@ -615,6 +615,21 @@ function validateSourceReturnCalls(jobs) {
   return new Set(Object.keys(calls));
 }
 
+
+// Exercise the actual selected-native inline guard against the actual tracked
+// plan before dispatch. This is CI source validation, never a product callback.
+function validateNativeEvidenceBudget(plan) {
+  const nativePath = path.join(repositoryRoot, ".github/workflows/native-acceptance-return.yml");
+  const native = parseWorkflow(fs.readFileSync(nativePath, "utf8"), nativePath);
+  const command = findStep(native.jobs.selection, "Require reviewed source, selection and finite evidence allocation")?.run || "";
+  const begin = command.indexOf("function verifyEvidenceBudget(plan,executionScope){");
+  const end = command.indexOf("\nverifyEvidenceBudget(p,", begin);
+  if (begin < 0 || end <= begin) fail("Actual native evidence budget verifier is missing.");
+  const source = command.slice(begin, end);
+  const check = new Function("assert", "plan", source + ";verifyEvidenceBudget(plan,'recovery-return');");
+  check(require("node:assert/strict"), plan);
+}
+
 function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSync(path.join(repositoryRoot, "backend/package.json"), "utf8")), catalog = browserCatalog()) {
   const triggers = workflow.on || {};
   if (!Object.prototype.hasOwnProperty.call(triggers, "pull_request")) fail("pull_request validation is required.");
@@ -668,6 +683,8 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
   focusedFiles(manifest, "test:auth");focusedFiles(manifest, "test:payments");
   const criticalBrowserCommands = validateCriticalBrowserScripts(manifest);
   validateRuntimeBeforeInstall(jobs["deployment-blueprint"], "deployment-blueprint");
+
+  validateNativeEvidenceBudget(JSON.parse(fs.readFileSync(path.join(repositoryRoot, "backend/tests/playwright/acceptance/native-continuation-plan.json"), "utf8")));
 
   const dependencyReview = jobs["dependency-review"];
   if (dependencyReview.if !== "github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'recovery-return')") {
@@ -741,6 +758,7 @@ if (require.main === module) {
 module.exports = {
   parseWorkflow,
   validateWorkflowContract,
+  validateNativeEvidenceBudget,
   validateCriticalBrowserScripts,
   validateGroupedBrowserJobs,
   validateReviewedBrowserFixtureAmendments,

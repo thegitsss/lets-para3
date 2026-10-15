@@ -493,3 +493,25 @@ describe("exact recovery-return dependency review", () => {
   });
 
 });
+
+
+describe("actual current selected-native evidence budget", () => {
+  const { validateNativeEvidenceBudget } = require("../scripts/check-ci-workflow");
+  const currentPlan = () => JSON.parse(fs.readFileSync(path.resolve(__dirname, "playwright/acceptance/native-continuation-plan.json"), "utf8"));
+  test("the actual tracked inline verifier accepts the actual current plan and all eight complete evidence allocations", () => {
+    expect(() => validateNativeEvidenceBudget(currentPlan())).not.toThrow();
+  });
+  test.each(["stale-prior", "unknown-prior", "missing-summary", "summary-name", "summary-bytes", "summary-retention", "native-sum", "fixed-extra", "unknown-scope-budget"])("the actual inline verifier rejects %s allocation drift before any native callback", kind => {
+    const p = currentPlan(), e = p.cloudEvidence;
+    if (kind === "stale-prior") e.priorRetainedBytes = 1397187555;
+    if (kind === "unknown-prior") e.priorRetainedBytes++;
+    if (kind === "missing-summary") delete e.optionalDependencyReviewSummary;
+    if (kind === "summary-name") e.optionalDependencyReviewSummary.name += "-unknown";
+    if (kind === "summary-bytes") e.optionalDependencyReviewSummary.maximumBytes++;
+    if (kind === "summary-retention") e.optionalDependencyReviewSummary.retentionDays = 2;
+    if (kind === "native-sum") e.scopes[1].maxBytes++;
+    if (kind === "fixed-extra") e.recoveryArtifacts[0].maxBytes++;
+    if (kind === "unknown-scope-budget") e.scopes[0].maxBytes = 1;
+    expect(() => validateNativeEvidenceBudget(p)).toThrow();
+  });
+});
