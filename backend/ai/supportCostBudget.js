@@ -13,6 +13,17 @@ const CEILING_BILLING = Object.freeze({
   modelEvidenceSha256: "d6ed1b67c963843adff531428a9c435acecb2ee475048b785377f5bff32437ed",
   pricingEvidenceSha256: "ffcc6656986cdb633e99398e1df49a258ef0cb850769197bba735812bf58e311",
 });
+// Optional settlement only: full pre-send long-context reservation stays unchanged.
+const SHORT_CONTEXT_SETTLEMENT = Object.freeze({
+  schemaVersion: 1, confirmed: true, inputThresholdTokens: 272000,
+  inputNanoUsdPerToken: 2500, outputNanoUsdPerToken: 12000,
+  modelEvidenceSha256: CEILING_BILLING.modelEvidenceSha256,
+  pricingEvidenceSha256: CEILING_BILLING.pricingEvidenceSha256,
+});
+function validateShortContextSettlement(policy) {
+  need(policy && Object.keys(policy).length === Object.keys(SHORT_CONTEXT_SETTLEMENT).length && Object.entries(SHORT_CONTEXT_SETTLEMENT).every(([key, value]) => policy[key] === value), "short-context settlement evidence/rates differ");
+  return true;
+}
 // Exact source-coded manager control; optional synthetic acceptance authority only.
 // Original request bytes are never rewritten. Error text cannot carry user data.
 const TRUSTED_INTERNAL_CONTROL = Object.freeze({
@@ -71,6 +82,7 @@ function validateAuthority(authority, env = process.env, now = Date.now()) {
     need(profiles.every(profile => ["curated", "hosted"].includes(profile?.mode) && /^[a-f0-9]{64}$/.test(profile.entrySha256 || "") && Array.isArray(profile.features) && profile.features.length && profile.features.every(feature => authority.allowedFeatures.includes(feature))), "execution allowlist invalid");
     need(new Set(profiles.map(profile => profile.entrySha256)).size === profiles.length && profiles.some(profile => profile.mode === "hosted") && profiles.some(profile => profile.mode === "curated"), "ambiguous/incomplete execution allowlist");
   }
+  if (authority.shortContextSettlement !== undefined) { need(authority.billingMode === "full_model_ceiling", "short-context settlement requires full ceiling reservation"); validateShortContextSettlement(authority.shortContextSettlement); }
   if (authority.internalValidationControls !== undefined) validateInternalControlPolicy(authority);
   return authority;
 }
@@ -175,8 +187,9 @@ function usageCost(usage, input, outputCeiling) {
   if (!integer(cached) || !integer(written) || cached + written > usage.input_tokens) return null;
   return (usage.input_tokens - cached - written) * 2000 + cached * 200 + written * 2500 + usage.output_tokens * PRICES.output;
 }
-function ceilingUsageUpperBound(result, outputCeiling) {
+function ceilingUsageUpperBound(result, outputCeiling, shortContextSettlement) {
   need(result?.model === MODEL && result.service_tier === "default", "provider model/tier differs");
+  if (shortContextSettlement !== undefined) validateShortContextSettlement(shortContextSettlement);
   const usage = result.usage;
   if (usage?.input_tokens === undefined || usage?.output_tokens === undefined) return null;
   need(integer(usage.input_tokens, 0, CEILING_BILLING.inputCeilingTokens) && integer(usage.output_tokens, 0, outputCeiling), "provider usage exceeds full-model/output ceiling");
@@ -185,9 +198,11 @@ function ceilingUsageUpperBound(result, outputCeiling) {
   need(details === undefined || (details !== null && typeof details === "object" && !Array.isArray(details)), "provider cache detail invalid");
   const cached = details?.cached_tokens, written = details?.cache_write_tokens;
   need((cached === undefined || integer(cached, 0, usage.input_tokens)) && (written === undefined || integer(written, 0, usage.input_tokens)) && (cached ?? 0) + (written ?? 0) <= usage.input_tokens, "provider cache usage differs");
-  // Deliberately charge every input token at the highest long-context cache-write rate.
-  // This is an accounting upper bound, not a claim about the provider's actual invoice.
-  return usage.input_tokens * CEILING_BILLING.inputNanoUsdPerToken + usage.output_tokens * CEILING_BILLING.outputNanoUsdPerToken;
+  // All input uses the highest documented category for the authenticated context tier.
+  // Unknown usage retains the full reserve. This remains an upper bound, never an invoice.
+  const rates = shortContextSettlement && usage.input_tokens <= shortContextSettlement.inputThresholdTokens
+    ? shortContextSettlement : CEILING_BILLING;
+  return usage.input_tokens * rates.inputNanoUsdPerToken + usage.output_tokens * rates.outputNanoUsdPerToken;
 }
 function createGuardedFetch({ authority, env, journal, journalLease, transport = globalThis.fetch, now = Date.now }) {
   validateAuthority(authority, env, now());
@@ -228,9 +243,9 @@ function createGuardedFetch({ authority, env, journal, journalLease, transport =
       try {
         const result = await response.clone().json();
         let upperBound;
-        try { upperBound = ceilingUsageUpperBound(result, request.body.max_output_tokens); }
+        try { upperBound = ceilingUsageUpperBound(result, request.body.max_output_tokens, authority.shortContextSettlement); }
         catch (error) { halted = true; await journal.halt?.(); throw error; }
-        await journal.observe(reservation, { outcome: "response", status: response.status, providerRequestId: response.headers.get("x-request-id"), sdkRetry: retry, usage: result.usage, billingMode: "full_model_ceiling", costBasis: "conservative_upper_bound", conservativeUpperBoundNanoUsd: upperBound, actualBillingKnown: false }, upperBound);
+        await journal.observe(reservation, { outcome: "response", status: response.status, providerRequestId: response.headers.get("x-request-id"), sdkRetry: retry, usage: result.usage, billingMode: "full_model_ceiling", costBasis: "conservative_upper_bound", conservativeUpperBoundNanoUsd: upperBound, actualBillingKnown: false, ...(authority.shortContextSettlement ? { settlementPolicySha256: digest(authority.shortContextSettlement), authenticatedResponseModel: result.model, authenticatedResponseServiceTier: result.service_tier, pricingContextTier: result.usage?.input_tokens === undefined ? "unknown" : result.usage.input_tokens <= authority.shortContextSettlement.inputThresholdTokens ? "short" : "long" } : {}) }, upperBound);
       } catch (error) { deny("ceiling usage/journal reconciliation failed; full reservation retained"); }
       return response;
     }
@@ -286,4 +301,4 @@ function fromEnvironment(apiKey) {
   environmentAuthority = authority;
   return environmentFetch;
 }
-module.exports = { MODEL, FEATURES, COLLECTION, TRUSTED_INTERNAL_CONTROL, validateInternalControlPolicy, CEILING_BILLING, sha, digest, validateAuthority, resolveExecution, initialDocument, mongoJournal, metadataJournalLease, envelope, usageCost, ceilingUsageUpperBound, createGuardedFetch, fromEnvironment };
+module.exports = { MODEL, FEATURES, COLLECTION, TRUSTED_INTERNAL_CONTROL, validateInternalControlPolicy, CEILING_BILLING, SHORT_CONTEXT_SETTLEMENT, validateShortContextSettlement, sha, digest, validateAuthority, resolveExecution, initialDocument, mongoJournal, metadataJournalLease, envelope, usageCost, ceilingUsageUpperBound, createGuardedFetch, fromEnvironment };

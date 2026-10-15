@@ -205,3 +205,32 @@ test("current Payments navigation accepts both actual retained replies only with
     assert(e.evaluateCommonReply({ ...response, reply: "Open another page." }, scenario).errors.includes("required_answer_fact_missing"));
   }
 });
+
+test("short-tier settlement: exact272000 uses short maximum;272001 stays full long rates", () => {
+  const policy = { ...guard.SHORT_CONTEXT_SETTLEMENT };
+  assert.equal(guard.ceilingUsageUpperBound(result({usage:{input_tokens:272000,output_tokens:1800,total_tokens:273800}}),1800,policy),272000*2500+1800*12000);
+  assert.equal(guard.ceilingUsageUpperBound(result({usage:{input_tokens:272001,output_tokens:1800,total_tokens:273801}}),1800,policy),272001*5000+1800*18000);
+  assert.equal(guard.ceilingUsageUpperBound(result({usage:{input_tokens:272000,output_tokens:1800}}),1800),272000*5000+1800*18000);
+});
+test("short-tier settlement: policy evidence/rates/threshold and exact ceiling mode are mandatory", () => {
+  const a=authority({shortContextSettlement:{...guard.SHORT_CONTEXT_SETTLEMENT}});guard.validateAuthority(a,env);
+  for(const key of Object.keys(guard.SHORT_CONTEXT_SETTLEMENT))assert.throws(()=>guard.validateAuthority(authority({shortContextSettlement:{...guard.SHORT_CONTEXT_SETTLEMENT,[key]:"changed"}}),env));
+  assert.throws(()=>guard.validateAuthority(authority({billingMode:"exact_counter",counterBilling:{confirmed:true,flatNanoUsdPerAttempt:0,evidenceSha256:"3".repeat(64)},shortContextSettlement:{...guard.SHORT_CONTEXT_SETTLEMENT}}),env));
+});
+test("short-tier settlement: every physical attempt still reserves full4.6424 first then exact conservative short bound", async () => {
+  const journal=memoryJournal(),a=authority({shortContextSettlement:{...guard.SHORT_CONTEXT_SETTLEMENT}});let calls=0;
+  await call(create(journal,async(url,init)=>{calls++;assert.equal(url,"https://api.openai.com/v1/responses");assert.equal(journal.remaining,CAP-RESERVE);assert.equal(journal.records[0].reservedNanoUsd,RESERVE);return response();},a));
+  assert.equal(calls,1);assert.equal(journal.records[0].actualNanoUsd,3700000);assert.equal(journal.remaining,CAP-3700000);assert.equal(journal.records[0].details.pricingContextTier,"short");assert.equal(journal.records[0].details.authenticatedResponseModel,guard.MODEL);assert.equal(journal.records[0].details.authenticatedResponseServiceTier,"default");assert.equal(journal.records[0].details.actualBillingKnown,false);assert.equal(journal.records[0].details.settlementPolicySha256,guard.digest(a.shortContextSettlement));
+});
+test("short-tier settlement: missing cache breakdown never assumes cheaper uncached/read rates", () => {
+  for(const input_tokens_details of [undefined,{}, {cached_tokens:999}, {cache_write_tokens:1000}])assert.equal(guard.ceilingUsageUpperBound(result({usage:{input_tokens:1000,output_tokens:100,input_tokens_details}}),1800,guard.SHORT_CONTEXT_SETTLEMENT),3700000);
+});
+test("short-tier settlement: unknown usage/transport holds full reserve and wrong tier/model/usage halts", async () => {
+  const a=authority({shortContextSettlement:{...guard.SHORT_CONTEXT_SETTLEMENT}});
+  const journal=memoryJournal();await call(create(journal,async()=>response({usage:undefined}),a));assert.equal(journal.remaining,CAP-RESERVE);assert.equal(journal.records[0].state,"unknown_hold_retained");
+  for(const change of [{model:"other"},{service_tier:"priority"},{usage:{input_tokens:272000,output_tokens:1801}},{usage:{input_tokens:272000,output_tokens:1,total_tokens:2}}]){const j=memoryJournal();await assert.rejects(call(create(j,async()=>response(change),a)),/reconciliation/);assert.equal(j.remaining,CAP-RESERVE);assert(j.halted);}
+});
+test("short-tier settlement: settled plus remaining and all full reservations stay inside original10 under concurrent requests", async () => {
+  const journal=memoryJournal(),a=authority({shortContextSettlement:{...guard.SHORT_CONTEXT_SETTLEMENT}});let release;const barrier=new Promise(r=>{release=r;});let sent=0;
+  const f=create(journal,async()=>{sent++;await barrier;return response();},a);const calls=Array.from({length:3},()=>call(f)), settled=Promise.allSettled(calls);await new Promise(r=>setImmediate(r));assert.equal(sent,2);assert.equal(journal.remaining,CAP-2*RESERVE);release();const outcomes=await settled;assert.equal(outcomes.filter(x=>x.status==='fulfilled').length,2);assert.equal(journal.records.length,2);assert.equal(journal.remaining,CAP-2*3700000);assert.equal(journal.remaining+journal.records.reduce((n,r)=>n+r.actualNanoUsd,0),CAP);
+});
