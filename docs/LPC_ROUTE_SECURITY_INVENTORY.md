@@ -6,8 +6,8 @@ Scope: every `router.post`, `router.put`, `router.patch`, and `router.delete` de
 
 ## Summary
 
-- Total mutating routes inventoried: 247
-- Verified CSRF/protected: 240
+- Total mutating routes inventoried: 248
+- Verified CSRF/protected: 241
 - Open security review items: 0
 - CSRF-exempt or exemption-review items: 7
 
@@ -24,7 +24,7 @@ No open mutating routes detected by the static inventory.
 | POST | /api/admin/ai-control-room/dev/e2e/bootstrap-paralegal | controlRoomE2eHarness.js:88 | Exempt: dev E2E harness route gated by harness enablement and shared secret; not mounted as a normal production browser surface. | exempt | controlRoomE2eHarness.js:88 |
 | POST | /api/admin/ai-control-room/dev/e2e/bootstrap-director | controlRoomE2eHarness.js:136 | Exempt: dev E2E harness route gated by harness enablement and shared secret; not mounted as a normal production browser surface. | exempt | controlRoomE2eHarness.js:136 |
 | POST | /api/admin/ai-control-room/dev/e2e/seed | controlRoomE2eHarness.js:160 | Exempt: dev E2E harness route gated by harness enablement and shared secret; not mounted as a normal production browser surface. | exempt | controlRoomE2eHarness.js:160 |
-| POST | /api/webhooks/stripe/ | paymentsWebhook.js:122 | Exempt: Stripe webhook requires raw body/signature verification, not browser CSRF. | exempt | paymentsWebhook.js:122 |
+| POST | /api/webhooks/stripe/ | paymentsWebhook.js:125 | Exempt: Stripe webhook requires raw body/signature verification, not browser CSRF. | exempt | paymentsWebhook.js:125 |
 | POST | /api/performance/vitals | performance.js:15 | Exempt: anonymous same-origin metrics intake stores only allowlisted, bounded values and has a dedicated rate limit. | exempt | performance.js:15 |
 
 ## Full Inventory
@@ -118,8 +118,9 @@ No open mutating routes detected by the static inventory.
 | POST | /api/admin/workspace/communications/pre-engagement/:id/retry | adminWorkspace.js:124 | yes | 'admin'; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | not detected | admin-only | verified | adminWorkspace.js:124 |
 | POST | /api/admin/workspace/communications/reviews/:id/retry | adminWorkspace.js:128 | yes | 'admin'; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | not detected | admin-only | verified | adminWorkspace.js:128 |
 | PUT | /api/admin/workspace/drafts/:kind/:recordId | adminWorkspace.js:136 | yes | 'admin'; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | not detected | admin-only | verified | adminWorkspace.js:136 |
-| POST | /api/admin/workspace/accounts/:id/information-request | adminWorkspace.js:165 | yes | 'admin'; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | not detected | admin-only | verified | adminWorkspace.js:165 |
-| POST | /api/admin/workspace/accounts/:id/note | adminWorkspace.js:178 | yes | 'admin'; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | yes/in-route | admin-only | verified | adminWorkspace.js:178 |
+| POST | /api/admin/workspace/finance/payment-alerts/:receiptId/resolve | adminWorkspace.js:148 | yes | 'admin'; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | not detected | admin-only | verified | adminWorkspace.js:148 |
+| POST | /api/admin/workspace/accounts/:id/information-request | adminWorkspace.js:174 | yes | 'admin'; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | not detected | admin-only | verified | adminWorkspace.js:174 |
+| POST | /api/admin/workspace/accounts/:id/note | adminWorkspace.js:187 | yes | 'admin'; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | yes/in-route | admin-only | verified | adminWorkspace.js:187 |
 | POST | /api/admin/ai/control-room/autonomy-preferences/:agentRole/:actionType/enable | aiAdmin.js:3230 | yes | "admin"; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | not detected | admin-only | verified | aiAdmin.js:3230 |
 | POST | /api/admin/ai/control-room/autonomy-preferences/:agentRole/:actionType/manual | aiAdmin.js:3243 | yes | "admin"; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | not detected | admin-only | verified | aiAdmin.js:3243 |
 | POST | /api/applications/earlier/:caseId/revoke | applications.js:382 | yes | "paralegal"; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | true | not detected | authenticated | verified | applications.js:382 |
@@ -250,7 +251,7 @@ No open mutating routes detected by the static inventory.
 | POST | /api/payments/reconcile/:caseId | payments.js:807 | yes | "attorney"; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | not detected | authenticated | verified | payments.js:807 |
 | POST | /api/payments/dispute/settle/:caseId | payments.js:814 | yes | "attorney"; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | yes/in-route | admin-only | verified | payments.js:814 |
 | POST | /api/payments/portal/attorney | payments.js:1627 | yes | "attorney"; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | not detected | admin-only | verified | payments.js:1627 |
-| POST | /api/webhooks/stripe/ | paymentsWebhook.js:122 | no/public | none/implicit; approved=no/public-or-special | Exempt: Stripe webhook requires raw body/signature verification, not browser CSRF. | Webhook endpoint; no browser rate-limit expected. | yes/in-route | webhook/system-only | exempt | paymentsWebhook.js:122 |
+| POST | /api/webhooks/stripe/ | paymentsWebhook.js:125 | no/public | none/implicit; approved=no/public-or-special | Exempt: Stripe webhook requires raw body/signature verification, not browser CSRF. | Webhook endpoint; no browser rate-limit expected. | yes/in-route | webhook/system-only | exempt | paymentsWebhook.js:125 |
 | POST | /api/performance/vitals | performance.js:15 | no/public | none/implicit; approved=no/public-or-special | Exempt: anonymous same-origin metrics intake stores only allowlisted, bounded values and has a dedicated rate limit. | true | not detected | public/telemetry | exempt | performance.js:15 |
 | POST | /api/public and /public/contact | public.js:231 | yes | none/implicit; approved=no/public-or-special | Protected by csrfProtection/protectMutations/mutatingGuards. | Route-level public limits plus app-level /api limit. | yes/in-route | authenticated | verified | public.js:231 |
 | POST | /api/support/conversation/:id/messages | support.js:110 | yes | "admin", "attorney", "paralegal"; approved=yes | Protected by csrfProtection/protectMutations/mutatingGuards. | App-level /api limit where mounted. | not detected | admin-only | verified | support.js:110 |

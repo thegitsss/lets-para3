@@ -521,6 +521,15 @@
       "applicability": "New process-only same-key turn used only by the two above services."
     },
     {
+      "path": "docs/LPC_ROUTE_SECURITY_INVENTORY.md",
+      "beforeSha256": "38a5153d9051fe7555a7ebb7a7ae15b00940cffa70fce88ad2acd3ccd30e599d",
+      "afterSha256": "2bb6fea1dcc3543dfc5d986330d6356514822ed9475cb31a3c22948c2c89f90b",
+      "kind": "documentation-only",
+      "affectedSuites": [],
+      "reviewedEvidenceSha256": "398aa7fb2780f016acf94b5dd864b16a24e27b36ce24badd4ddcbd03751f1c6b",
+      "applicability": "Unchanged generator refreshes the one new managed-Admin CSRF-protected payment-alert resolve route and exact evidence line numbers;248 routes,241 verified,7 exemptions,0 open. No route/policy/handler changed."
+    },
+    {
       "path": "docs/security/SECRET_SCAN_DISPOSITIONS_20261014.json",
       "beforeSha256": "12f7023b67ef9c03ab0f0412b8670a0ed57eef9612297fa8685ee95d7087aa8b",
       "afterSha256": "b3377ca492a04cb375a44c1af47d449176bdbc7bfa432faafce91480142c8908",
