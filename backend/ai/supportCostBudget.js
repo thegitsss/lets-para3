@@ -13,6 +13,22 @@ const CEILING_BILLING = Object.freeze({
   modelEvidenceSha256: "d6ed1b67c963843adff531428a9c435acecb2ee475048b785377f5bff32437ed",
   pricingEvidenceSha256: "ffcc6656986cdb633e99398e1df49a258ef0cb850769197bba735812bf58e311",
 });
+// Exact source-coded manager control; optional synthetic acceptance authority only.
+// Original request bytes are never rewritten. Error text cannot carry user data.
+const TRUSTED_INTERNAL_CONTROL = Object.freeze({
+  schemaVersion: 1,
+  instruction: "Correct the answer using existing tool evidence. Call another tool only if evidence is insufficient. Do not mention this validation step.",
+  maxControlsPerRequest: 2,
+  maxErrorCodes: 128,
+  sourcePins: Object.freeze({"supportManagerAgent.js": "10b12c3d818390b893ba4e53482b48a6d1f3d52a0f5c02ede3e08097361a0717", "attorneyResponseValidator.js": "2f13f82abb4b995fd5a78c00640aa89e0cc5f0dfade5981cc0fc67b88eea8db0", "attorneyConversationPolicy.js": "261af6fa2905c34901fb82bbedc2395aef221795afbddced6d951178c6053e1a", "attorneyEvidenceContract.js": "c9c1ed793e146703ed10b67cfc0dd4288bbe1253046c6b8ea78d3bd179c2bd43"}),
+  errorCodes: Object.freeze(["account_payment_state_not_distinguished", "attorney_charge_not_labeled", "attorney_fee_not_labeled", "case_clarification_too_long", "claimed_data_unavailable_despite_available_evidence", "direct_answer_not_first", "direct_factual_answer_without_successful_tool_evidence", "duplicate_suggestions", "forbidden_action_or_legal_claim", "forbidden_support_meta_claim", "irrelevant_suggestion", "limitation_has_multiple_next_steps", "live_status_without_live_evidence", "matter_amount_not_labeled", "missing_answer_part:application", "missing_answer_part:archive", "missing_answer_part:attorney_fee", "missing_answer_part:charge", "missing_answer_part:deadline", "missing_answer_part:file", "missing_answer_part:invitation", "missing_answer_part:matter_amount", "missing_answer_part:message", "missing_answer_part:paralegal_fee", "missing_answer_part:payment_method", "missing_answer_part:payout", "missing_answer_part:profile", "missing_answer_part:receipt", "missing_answer_part:requirement", "missing_answer_part:status", "missing_answer_part:task", "missing_capability_answer_fact:deposit_release_transition", "missing_capability_answer_fact:deposit_release_trigger", "missing_capability_answer_fact:deposit_timing_source", "missing_capability_answer_fact:deposit_timing_state", "missing_capability_answer_fact:hiring_confirmation", "missing_capability_answer_fact:hiring_selection", "missing_capability_answer_fact:hiring_start", "missing_capability_answer_fact:post_hire_files", "missing_capability_answer_fact:post_hire_messages", "missing_capability_answer_fact:post_hire_status", "missing_capability_answer_fact:post_hire_tasks", "missing_capability_answer_fact:post_hire_workspace", "missing_capability_answer_fact:release_transition", "missing_capability_answer_fact:release_trigger", "missing_net_paralegal_payout", "missing_requested_task_identity", "missing_required_evidence:account", "missing_required_evidence:applications", "missing_required_evidence:attention", "missing_required_evidence:billing_method", "missing_required_evidence:billing_summary", "missing_required_evidence:case_details", "missing_required_evidence:case_overview", "missing_required_evidence:deactivation", "missing_required_evidence:knowledge", "missing_required_evidence:matter_financials", "missing_required_evidence:matter_readiness", "missing_required_evidence:messages", "missing_required_evidence:messaging_state", "missing_required_evidence:navigation", "missing_required_evidence:next_deadline", "missing_required_evidence:pending_paralegal", "missing_required_evidence:receipt_history", "missing_required_evidence:workflow_readiness", "missing_required_evidence:workspace", "missing_total_attorney_charge", "numeric_claim_absent_from_evidence", "paralegal_fee_not_labeled", "paralegal_payout_not_labeled", "planner_wrong_source", "platform_requirement_not_distinguished", "policy_presented_as_live_state", "raw_evidence_fields_exposed", "repeated_tool_after_sufficient_evidence", "simple_fact_too_long", "structured_output_invalid", "suggestion_repeats_answer", "too_many_suggestions_for_simple_answer", "unauthorized_evidence_used_as_fact", "unavailable_evidence_reported_as_absent", "unavailable_evidence_requires_truthful_limitation", "unrelated_billing_or_posting_content", "unrelated_tool_evidence", "unsupported_date_claim", "unsupported_fee_charge_or_payout_claim", "unsupported_invoice_record_claim", "unsupported_name_or_title_claim", "unsupported_receipt_readiness_claim", "unsupported_relative_date_claim", "unsupported_status_or_lifecycle_claim", "untrusted_instruction_content_echoed", "unverified_evidence_presented_as_verified", "validator_internal_error", "workflow_answer_conflicts_with_authoritative_policy", "workflow_prerequisite_without_authoritative_evidence"]),
+});
+function validateInternalControlPolicy(authority, readFile = fs.readFileSync) {
+  const policy = authority.internalValidationControls;
+  need(policy && Object.keys(policy).length === 3 && policy.confirmed === true && policy.schemaVersion === 1 && policy.manifestSha256 === digest(TRUSTED_INTERNAL_CONTROL), "trusted internal control authority differs");
+  for (const [file, expected] of Object.entries(TRUSTED_INTERNAL_CONTROL.sourcePins)) need(sha(readFile(require("node:path").join(__dirname, file))) === expected, "trusted internal control source differs");
+  return true;
+}
 const FEATURES = Object.freeze({
   lpc_support_manager: ["attorney", 1800],
   lpc_paralegal_support_manager_routing: ["paralegal", 700],
@@ -55,6 +71,7 @@ function validateAuthority(authority, env = process.env, now = Date.now()) {
     need(profiles.every(profile => ["curated", "hosted"].includes(profile?.mode) && /^[a-f0-9]{64}$/.test(profile.entrySha256 || "") && Array.isArray(profile.features) && profile.features.length && profile.features.every(feature => authority.allowedFeatures.includes(feature))), "execution allowlist invalid");
     need(new Set(profiles.map(profile => profile.entrySha256)).size === profiles.length && profiles.some(profile => profile.mode === "hosted") && profiles.some(profile => profile.mode === "curated"), "ambiguous/incomplete execution allowlist");
   }
+  if (authority.internalValidationControls !== undefined) validateInternalControlPolicy(authority);
   return authority;
 }
 function resolveExecution(authority, entryFile = process.argv[1]) {
@@ -120,6 +137,7 @@ function envelope(raw, authority, env, execution = authority) {
   need(!body.tools || body.tools.every((tool) => tool.type === "function"), "billable built-in tools forbidden");
   need(Array.isArray(body.input), "explicit complete input required");
   const prompts = [];
+  let priorApprovedPrompt = false, internalControls = 0;
   for (const item of body.input) {
     need([undefined, "message", "function_call", "function_call_output", "reasoning"].includes(item?.type), "remote/media/stateful input forbidden");
     if (item?.type === "function_call_output") need(typeof item.output === "string" || (Array.isArray(item.output) && item.output.every((part) => part?.type === "input_text" && typeof part.text === "string")), "only text function tool output permitted");
@@ -127,11 +145,20 @@ function envelope(raw, authority, env, execution = authority) {
     const userTexts = item?.role !== "user" ? [] : typeof item.content === "string" ? [item.content] : (item.content || []).map(part => part.text);
     for (const text of userTexts) {
       let value;
-      try { value = JSON.parse(text); } catch { prompts.push(text); continue; }
+      try { value = JSON.parse(text); } catch { prompts.push(text); priorApprovedPrompt ||= authority.allowedPromptSha256.includes(sha(text)); continue; }
+      if (value?.internalValidationFailure === true) {
+        validateInternalControlPolicy(authority);
+        need(feature === "lpc_support_manager" && definition[0] === "attorney" && body.metadata.role === "attorney" && priorApprovedPrompt, "internal control requires prior approved attorney prompt");
+        need(Object.keys(value).sort().join("|") === "errors|instruction|internalValidationFailure" && value.instruction === TRUSTED_INTERNAL_CONTROL.instruction, "internal control shape/instruction differs");
+        need(Array.isArray(value.errors) && value.errors.length > 0 && value.errors.length <= TRUSTED_INTERNAL_CONTROL.maxErrorCodes && value.errors.every(error => typeof error === "string" && TRUSTED_INTERNAL_CONTROL.errorCodes.includes(error)), "internal control error code differs");
+        need(++internalControls <= TRUSTED_INTERNAL_CONTROL.maxControlsPerRequest, "internal control bound exceeded");
+        continue;
+      }
       if (value?.userRole !== undefined) need(value.userRole === definition[0], "input role differs");
       if (typeof value?.latestUserMessage === "string") prompts.push(value.latestUserMessage);
       else if (typeof value?.generationInstructions?.userMessage === "string") prompts.push(value.generationInstructions.userMessage);
       else prompts.push(text);
+      priorApprovedPrompt ||= authority.allowedPromptSha256.includes(sha(prompts.at(-1)));
     }
   }
   need(prompts.length > 0 && prompts.every((prompt) => authority.allowedPromptSha256.includes(sha(prompt))), "unapproved synthetic prompt/history");
@@ -259,4 +286,4 @@ function fromEnvironment(apiKey) {
   environmentAuthority = authority;
   return environmentFetch;
 }
-module.exports = { MODEL, FEATURES, COLLECTION, CEILING_BILLING, sha, digest, validateAuthority, resolveExecution, initialDocument, mongoJournal, metadataJournalLease, envelope, usageCost, ceilingUsageUpperBound, createGuardedFetch, fromEnvironment };
+module.exports = { MODEL, FEATURES, COLLECTION, TRUSTED_INTERNAL_CONTROL, validateInternalControlPolicy, CEILING_BILLING, sha, digest, validateAuthority, resolveExecution, initialDocument, mongoJournal, metadataJournalLease, envelope, usageCost, ceilingUsageUpperBound, createGuardedFetch, fromEnvironment };

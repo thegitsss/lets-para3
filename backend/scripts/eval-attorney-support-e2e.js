@@ -4,6 +4,24 @@ const assert = require("node:assert/strict");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 process.env.OPENAI_SUPPORT_MANAGER_ENABLED = "true";
 
+// This evaluation owns only synthetic billing identities. Like the Paralegal
+// evaluator, it never sends its fake customer/card identifiers to Stripe.
+function createSyntheticStripeFixture() {
+  return {
+    customers: { retrieve: async (id) => {
+      assert.equal(id, "cus_p6_saved", "Only the owned synthetic customer may be read");
+      return { id, invoice_settings: { default_payment_method: "pm_package7_saved" } };
+    } },
+    paymentMethods: { retrieve: async (id) => {
+      assert.equal(id, "pm_package7_saved", "Only the exact synthetic card may be read");
+      return { id, type: "card", card: { brand: "visa", last4: "4242", exp_month: 12, exp_year: 2099 } };
+    } },
+  };
+}
+const stripeModulePath = require.resolve("../utils/stripe");
+require.cache[stripeModulePath] = { id: stripeModulePath, filename: stripeModulePath,
+  loaded: true, exports: createSyntheticStripeFixture() };
+
 const mongoose = require("mongoose");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 
@@ -26,6 +44,27 @@ function numberFlag(name, fallback, { min = 1, max = 10 } = {}) {
   const argument = process.argv.find((value) => value.startsWith(prefix));
   const parsed = Number(argument ? argument.slice(prefix.length) : fallback);
   return Math.max(min, Math.min(max, Number.isFinite(parsed) ? Math.floor(parsed) : fallback));
+}
+
+// Optional exact original-slot continuation. The default still executes every
+// original scenario twice; no filter silently changes the default corpus.
+function selectScenarioSlots(scenarioIds, repetitions, selection = "") {
+  assert(Array.isArray(scenarioIds) && new Set(scenarioIds).size === scenarioIds.length);
+  const all = Array.from({ length: repetitions }, (_, i) => scenarioIds.map(id => ({ scenarioId: id, repetition: i + 1 }))).flat();
+  if (!selection) return all;
+  const requested = selection.split(",");
+  assert(requested.length > 0 && requested.length <= all.length && new Set(requested).size === requested.length, "Exact unique original slots required");
+  for (const slot of requested) assert(all.some(row => slot === row.scenarioId + "@" + row.repetition), "Unknown scenario/repetition slot");
+  const chosen = new Set(requested);
+  return all.filter(row => chosen.has(row.scenarioId + "@" + row.repetition));
+}
+function scenarioSelection(argv = process.argv) {
+  const flags = argv.filter(value => value.startsWith("--scenario="));
+  assert(flags.length <= 1, "One exact scenario selector allowed");
+  if (!flags.length) return "";
+  const value = flags[0].slice("--scenario=".length);
+  assert(value, "Empty scenario selection forbidden");
+  return value;
 }
 
 function countSentences(value = "") {
@@ -596,10 +635,10 @@ async function main() {
       },
       {
         id: "authorized_navigation",
-        name: "billing navigation is exact and uncluttered",
+        name: "Payments navigation is exact and uncluttered",
         messageText: "Where is Payments?",
         expectedTools: ["find_navigation_destination"],
-        answerPattern: /billing/i,
+        answerPattern: /payments/i,
         expectedNavigationHref: "dashboard-attorney.html#funds",
         dimensions: ["navigation", "concision", "ui_relevance"],
         criticalGates: ["privacy_sensitive_fields"],
@@ -613,10 +652,15 @@ async function main() {
         user: { email: user.email, role: user.role },
       });
     }
+    const scenarioIds = [...scenarios.map(entry => entry.id), "multiturn_pronoun_refresh", "multiturn_explicit_correction"];
+    const selectedSlots = selectScenarioSlots(scenarioIds, repetitions, scenarioSelection());
+    const selectedScenarioIds = [...new Set(selectedSlots.map(row => row.scenarioId))];
     const preflight = {
       passed: true,
       dataClassification: "synthetic_only",
-      scenarioCount: scenarios.length + 2,
+      scenarioCount: selectedScenarioIds.length,
+      fullCorpusScenarioCount: scenarioIds.length,
+      selectedOriginalSlots: selectedSlots,
       repetitions,
       store: false,
       database: "MongoMemoryServer",
@@ -636,10 +680,10 @@ async function main() {
     const results = [];
     for (let repetition = 1; repetition <= repetitions; repetition += 1) {
       for (const scenario of scenarios) {
-        results.push(await runSingleScenario({ scenario, user, pageContext, repetition }));
+        if (selectedSlots.some(row => row.scenarioId === scenario.id && row.repetition === repetition)) results.push(await runSingleScenario({ scenario, user, pageContext, repetition }));
       }
-      results.push(await runReferenceScenario({ fixture, user, pageContext, repetition }));
-      results.push(await runCorrectionScenario({ fixture, user, pageContext, repetition }));
+      if (selectedSlots.some(row => row.scenarioId === "multiturn_pronoun_refresh" && row.repetition === repetition)) results.push(await runReferenceScenario({ fixture, user, pageContext, repetition }));
+      if (selectedSlots.some(row => row.scenarioId === "multiturn_explicit_correction" && row.repetition === repetition)) results.push(await runCorrectionScenario({ fixture, user, pageContext, repetition }));
     }
 
     const passed = results.filter((result) => result.passed).length;
@@ -676,7 +720,9 @@ async function main() {
       completedAt: new Date().toISOString(),
       preflight,
       repetitions,
-      selectedScenarioCount: scenarios.length + 2,
+      selectedScenarioCount: selectedScenarioIds.length,
+      selectedOriginalSlots: selectedSlots,
+      fullCorpusScenarioCount: scenarioIds.length,
       runCount: results.length,
       managerIterationCount: results.reduce((total, result) => total + result.managerIterations, 0),
       validationRetryCount: results.reduce((total, result) => total + result.validationRetries, 0),
@@ -703,7 +749,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
+if (require.main === module) main().catch((error) => {
   console.error(error?.message || error);
   process.exitCode = 1;
 });
+module.exports = { accuratePostingPaymentAnswer, createSyntheticStripeFixture,
+  selectScenarioSlots, scenarioSelection, evaluateCommonReply };

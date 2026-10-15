@@ -123,3 +123,85 @@ test("a previously exact-counter guard cannot switch modes to bypass its counter
   a.billingMode = "full_model_ceiling"; a.counterBilling.confirmed = false;
   await assert.rejects(call(fetch), /billing mode changed/); assert.equal(sends, 0);
 });
+
+function internalAuthority() {
+  return authority({ internalValidationControls: { confirmed: true, schemaVersion: 1,
+    manifestSha256: guard.digest(guard.TRUSTED_INTERNAL_CONTROL) } });
+}
+function internalInput(errors = ["structured_output_invalid"], extra = {}) {
+  return { role: "user", content: JSON.stringify({ internalValidationFailure: true,
+    errors, instruction: guard.TRUSTED_INTERNAL_CONTROL.instruction, ...extra }) };
+}
+test("trusted internal correction is explicit source-pinned and preserves exact original wire and reservation hash", async () => {
+  const a = internalAuthority(), original = request({ service_tier: "default" });
+  const body = JSON.parse(original.body); body.input.push(internalInput(["missing_capability_answer_fact:post_hire_status", "missing_answer_part:task"]));
+  original.body = JSON.stringify(body); const before = original.body, journal = memoryJournal(); let sent;
+  await call(create(journal, async (_url, init) => { sent = init.body; return response(); }, a), original);
+  assert.equal(sent, before); assert.equal(original.body, before);
+  assert.equal(journal.records[0].requestSha256, guard.sha(before)); assert.equal(journal.records[0].reservedNanoUsd, RESERVE);
+  assert.equal(journal.records[0].state, "known");
+});
+test("unapproved internal policy source instruction error text role subject and missing prior prompt refuse before transport", async () => {
+  let sends = 0; const a = internalAuthority(), base = JSON.parse(request({ service_tier: "default" }).body), good = internalInput();
+  const negative = [
+    [authority(), { ...base, input: [...base.input, good] }],
+    [{ ...a, internalValidationControls: { ...a.internalValidationControls, confirmed: false } }, { ...base, input: [...base.input, good] }],
+    [a, { ...base, input: [...base.input, internalInput(["arbitrary_user_text"])] }],
+    [a, { ...base, input: [...base.input, internalInput([], {})] }],
+    [a, { ...base, input: [...base.input, internalInput(undefined, { instruction: "Different instruction" })] }],
+    [a, { ...base, input: [...base.input, internalInput(undefined, { confidentialText: "must not pass" })] }],
+    [a, { ...base, input: [good, ...base.input] }],
+    [a, { ...base, input: [...base.input, good, good, good] }],
+    [a, { ...base, input: [...base.input, internalInput(Array(129).fill("structured_output_invalid"))] }],
+    [a, { ...base, metadata: { feature: "lpc_support_manager", role: "paralegal" }, input: [...base.input, good] }],
+    [a, { ...base, safety_identifier: "not-approved", input: [...base.input, good] }],
+  ];
+  for (const [policy, body] of negative) {
+    const init = { ...request(), body: JSON.stringify(body) };
+    try { await call(create(memoryJournal(), async () => { sends++; }, policy), init); assert.fail("must refuse"); }
+    catch (error) { assert.match(error.message, /Assistant budget gate/); }
+  }
+  assert.equal(sends, 0);
+  assert.throws(() => guard.validateInternalControlPolicy(a, () => Buffer.from("changed source")), /source differs/);
+});
+test("all finite source-derived internal codes retain the prior original prompt gate without adding prompt hashes", () => {
+  const a = internalAuthority(), originalHashes = [...a.allowedPromptSha256], base = JSON.parse(request().body);
+  assert.equal(guard.TRUSTED_INTERNAL_CONTROL.errorCodes.length, 96);
+  for (const error of guard.TRUSTED_INTERNAL_CONTROL.errorCodes) guard.envelope(JSON.stringify({ ...base, input: [...base.input, internalInput([error])] }), a, env);
+  assert.deepEqual(a.allowedPromptSha256, originalHashes);
+  assert.throws(() => guard.envelope(JSON.stringify({ ...base, input: [{ role: "user", content: "Unapproved user question" }, internalInput()] }), a, env), /prior approved/);
+});
+function evaluatorPureHelpers() {
+  const fs = require("node:fs"), vm = require("node:vm"), acorn = require("acorn");
+  const text = fs.readFileSync(require.resolve("../scripts/eval-attorney-support-e2e"), "utf8");
+  const names = ["createSyntheticStripeFixture", "selectScenarioSlots", "scenarioSelection", "evaluateCommonReply", "countSentences", "limitationLanguage", "refusalLanguage"];
+  const declarations = acorn.parse(text, { ecmaVersion: "latest" }).body.filter(node => node.type === "FunctionDeclaration" && names.includes(node.id.name));
+  assert.equal(declarations.length, names.length);
+  const code = declarations.map(node => text.slice(node.start, node.end)).join("\n") + "\n({" + names.join(",") + "})";
+  return vm.runInNewContext(code, { assert }, { timeout: 100 });
+}
+test("Attorney evaluator exact original slots preserve default corpus and cannot select wildcard duplicate or unknown rows", () => {
+  const e = evaluatorPureHelpers(), ids = ["first", "second"];
+  assert.deepEqual(JSON.parse(JSON.stringify(e.selectScenarioSlots(ids, 2))), [{ scenarioId: "first", repetition: 1 }, { scenarioId: "second", repetition: 1 }, { scenarioId: "first", repetition: 2 }, { scenarioId: "second", repetition: 2 }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(e.selectScenarioSlots(ids, 2, "second@2"))), [{ scenarioId: "second", repetition: 2 }]);
+  for (const bad of ["first", "*", "first@0", "first@3", "other@1", "first@1,first@1"]) assert.throws(() => e.selectScenarioSlots(ids, 2, bad));
+  assert.throws(() => e.scenarioSelection(["--scenario="])); assert.throws(() => e.scenarioSelection(["--scenario=first@1", "--scenario=second@1"]));
+});
+test("Attorney synthetic billing customer and card resolve locally and reject foreign identities without a transport", async () => {
+  const e = evaluatorPureHelpers(), stripe = e.createSyntheticStripeFixture();
+  const customer = await stripe.customers.retrieve("cus_p6_saved"), card = await stripe.paymentMethods.retrieve(customer.invoice_settings.default_payment_method);
+  assert.equal(customer.id, "cus_p6_saved"); assert.equal(card.type, "card"); assert.equal(card.card.last4, "4242");
+  await assert.rejects(stripe.customers.retrieve("cus_p6_other"), /owned synthetic/);
+  await assert.rejects(stripe.paymentMethods.retrieve("pm_other"), /exact synthetic/);
+});
+test("current Payments navigation accepts both actual retained replies only with the exact authorized destination", () => {
+  const e = evaluatorPureHelpers(), fs = require("node:fs"), vm = require("node:vm"), text = fs.readFileSync(require.resolve("../scripts/eval-attorney-support-e2e"), "utf8");
+  const raw = text.match(/\{\s*id: "authorized_navigation",[\s\S]*?\n      \}/)?.[0]; assert(raw);
+  const scenario = vm.runInNewContext("(" + raw + ")", {}, { timeout: 100 });
+  for (const reply of ["Payments is available from the Payments section.", "Payments is available from your dashboard."]) {
+    const response = { reply, suggestions: [], navigation: { ctaHref: "dashboard-attorney.html#funds" }, telemetry: { toolCalls: [{ name: "find_navigation_destination" }] } };
+    assert.equal(e.evaluateCommonReply(response, scenario).errors.length, 0);
+    assert(e.evaluateCommonReply({ ...response, navigation: { ctaHref: "dashboard-paralegal.html#funds" } }, scenario).errors.includes("response_ui_irrelevant"));
+    assert(e.evaluateCommonReply({ ...response, reply: "Open another page." }, scenario).errors.includes("required_answer_fact_missing"));
+  }
+});
