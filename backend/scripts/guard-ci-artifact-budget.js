@@ -18,6 +18,7 @@ function catalog(run, attempt, groups = JSON.parse(fs.readFileSync(path.join(ROO
   add("runtime-checks", "", "jest-plan", "backend/test-results/jest/plan.json", 16*MIB);
   add("backend-coverage", "", "jest-complete-union", "backend/test-results/jest/required-coverage.json", 16*MIB);
   add("browser-collection", "", "browser-collection", "backend/test-results/critical-group-verification/verified-union.json", 16*MIB);
+  add("secrets", "", "secret-scan-evidence", "results.sarif", 16*MIB);
   for (let shard=1; shard<=8; shard++) rows.push({job:"backend-tests", key:String(shard), name:`jest-shard-${suffix}-${shard}`, path:`backend/test-results/jest/shards/shard-${shard}`, maxBytes:128*MIB});
   // Public C240 includes complete failed traces (~293MB raw); reserve headroom
   // for all294 identities. Financial actual-record stages receive extra weight.
@@ -34,7 +35,7 @@ function catalog(run, attempt, groups = JSON.parse(fs.readFileSync(path.join(ROO
   const available=LIMIT-rows.reduce((n,r)=>n+r.maxBytes,0)-raw.length*16*MIB;
   const totalWeight=raw.reduce((n,r)=>n+r.weight,0);
   for(const r of raw) { const {weight,...row}=r; rows.push({...row,maxBytes:16*MIB+Math.floor(available*weight/totalWeight)}); }
-  if(rows.length!==83 || new Set(rows.map(r=>r.name)).size!==83 || rows.reduce((n,r)=>n+r.maxBytes,0)>LIMIT) fail("Invalid finite allocation.");
+  if(rows.length!==84 || new Set(rows.map(r=>r.name)).size!==84 || rows.reduce((n,r)=>n+r.maxBytes,0)>LIMIT) fail("Invalid finite allocation.");
   return rows;
 }
 function inventory(root,input) {

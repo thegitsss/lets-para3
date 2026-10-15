@@ -189,7 +189,7 @@ function validateArtifactBudgets(workflow) {
       }
     }
   }
-  if(JSON.stringify(actual.sort())!==JSON.stringify(expected.map(r=>r.name).sort())) fail("Finite83 artifact inventory must be complete and unique.");
+  if(JSON.stringify(actual.sort())!==JSON.stringify(expected.map(r=>r.name).sort())) fail("Finite84 artifact inventory must be complete and unique.");
 }
 
 function requireCommands(job, commands, label) {
@@ -369,6 +369,8 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
   if (!String(secretStep?.uses || "").startsWith("gitleaks/gitleaks-action@")) {
     fail("The Secret scan job must run gitleaks.");
   }
+  if(secretStep.env?.GITLEAKS_ENABLE_UPLOAD_ARTIFACT!=="false" || secretStep.env?.GITLEAKS_ENABLE_COMMENTS!=="false" || secretStep["continue-on-error"] || secretJob["continue-on-error"]) fail("Secret scan must preserve failures and replace only its implicit upload/comments with bounded SARIF evidence.");
+  if(secretJob.steps.find(s=>s.name==="Use pinned Node runtime")?.with?.["node-version-file"]!==".node-version" || secretJob.steps.find(s=>s.name==="Verify pinned Node and npm runtimes")?.run!=="node scripts/verify-runtime.js") fail("Secret SARIF budget guard must use the pinned runtime.");
 
   validateArtifactBudgets(workflow);
   return {

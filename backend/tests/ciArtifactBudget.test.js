@@ -5,8 +5,8 @@ const workflow=()=>parseWorkflow(fs.readFileSync(path.resolve(__dirname,"../../.
 let root;
 beforeEach(()=>{root=fs.mkdtempSync(path.join(os.tmpdir(),"lpc-artifact-budget-"));});
 afterEach(()=>fs.rmSync(root,{recursive:true,force:true}));
-test("all83 expanded artifacts have disjoint finite allocations within10GiB, bound to exact attempt",()=>{
- const rows=catalog("12345","2");expect(rows).toHaveLength(83);expect(new Set(rows.map(x=>x.name)).size).toBe(83);expect(rows.reduce((n,r)=>n+r.maxBytes,0)).toBeLessThanOrEqual(LIMIT);
+test("all84 expanded artifacts have disjoint finite allocations within10GiB, bound to exact attempt",()=>{
+ const rows=catalog("12345","2");expect(rows).toHaveLength(84);expect(new Set(rows.map(x=>x.name)).size).toBe(84);expect(rows.reduce((n,r)=>n+r.maxBytes,0)).toBeLessThanOrEqual(LIMIT);
  expect(rows.filter(x=>x.path==="backend/test-results")).toHaveLength(35);
  expect(rows.filter(x=>x.path==="backend/test-results/junit")).toHaveLength(35);
  expect(()=>catalog("0","2")).toThrow(/positive/);
@@ -45,4 +45,16 @@ test.each(["failure-only","seven-days","optional-files","narrowed-path","missing
 test("an inert or failure-swallowing budget command cannot open an upload gate",()=>{
  const w=workflow(),j=w.jobs["browser-role-journeys"],s=j.steps.find(x=>x.name==="Upload complete raw browser evidence"),g=j.steps[j.steps.indexOf(s)-1];g.run+="; true";
  expect(()=>validateWorkflowContract(w)).toThrow(/exact always/);
+});
+test("secret scan preserves exact redacted SARIF bytes through the same finite upload guard",()=>{
+ const selected=catalog("12345","1").find(x=>x.job==="secrets"),sarif=JSON.stringify({version:"2.1.0",runs:[{results:[{message:{text:"redacted synthetic finding"}}]}]});fs.writeFileSync(path.join(root,"results.sarif"),sarif);
+ const proof=guard({root,job:"secrets",name:selected.name,input:selected.path,run:"12345",attempt:"1"});expect(proof.files).toHaveLength(1);expect(proof.rawBytes).toBe(Buffer.byteLength(sarif));expect(fs.readFileSync(path.join(root,"results.sarif"),"utf8")).toBe(sarif);
+});
+test.each(["implicit-upload","comments","failure-swallowed","missing-sarif"])("secret scan rejects %s without weakening its substantive gate",kind=>{
+ const w=workflow(),j=w.jobs.secrets,s=j.steps.find(x=>x.name==="Scan repository history");
+ if(kind==="implicit-upload")s.env.GITLEAKS_ENABLE_UPLOAD_ARTIFACT="true";
+ if(kind==="comments")delete s.env.GITLEAKS_ENABLE_COMMENTS;
+ if(kind==="failure-swallowed")s["continue-on-error"]=true;
+ if(kind==="missing-sarif")j.steps.pop();
+ expect(()=>validateWorkflowContract(w)).toThrow();
 });
