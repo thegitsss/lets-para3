@@ -1,4 +1,5 @@
 const path = require("path");
+const assert = require("node:assert/strict");
 
 require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 process.env.OPENAI_SUPPORT_MANAGER_ENABLED = "true";
@@ -46,6 +47,39 @@ function refusalLanguage(value = "") {
 
 function rate(passed, total) {
   return total ? passed / total : 0;
+}
+
+function accuratePostingPaymentAnswer(value = "") {
+  const text = String(value).replace(/[’]/g, "'").toLowerCase();
+  if (/^\s*yes\b/.test(text)) return false;
+  const saysNoPrerequisite = /^\s*no\b/.test(text) || /\b(?:can|may)\s+post\b[^.!?]*\bwithout\b/.test(text) || /\b(?:do not|don't|does not|doesn't)\s+need\b/.test(text) || /\b(?:card|payment method)\b[^.!?]*\b(?:is not|isn't|not)\s+(?:required|needed|necessary|mandatory)\b/.test(text);
+  if (!saysNoPrerequisite) return false;
+  for (const clause of text.split(/[.!?;]|\bbut\b|\bwhile\b|,(?=\s*(?:you|a |the |saved |payment |card))/)) {
+    if (!/\b(?:before|to)\s+(?:you\s+(?:can\s+)?)?(?:post|posting)\b/.test(clause) || !/\b(?:card|payment method)\b/.test(clause)) continue;
+    if (/\b(?:cannot|can't|may not)\s+post\b[^.!?]*\bwithout\b/.test(clause)) return false;
+    if (/\b(?:need|needs|needed|required|requires|necessary|mandatory|must)\b/.test(clause) && !/\b(?:do not|don't|does not|doesn't)\s+need\b|\b(?:is not|isn't|not)\s+(?:required|needed|necessary|mandatory)\b|\bno\s+(?:saved\s+)?(?:card|payment method)\s+(?:is\s+)?(?:required|needed|necessary|mandatory)\b|\bwithout\b/.test(clause)) return false;
+  }
+  return true;
+}
+
+async function pinInaccessibleMatterFixture(fixture, collection = Case.collection) {
+  const fixed = new mongoose.Types.ObjectId("67000000000000000000f017");
+  const originalId = fixture.caseIds.inaccessible;
+  assert(!Object.values(fixture.caseIds).some(id => String(id) === String(fixed)), "Fixed synthetic ID must not collide with another fixture");
+  assert.equal(await collection.countDocuments({ _id: fixed }), 0, "Fixed synthetic ID must be absent");
+  const original = await collection.findOne({ _id: originalId });
+  assert(original && String(original.attorneyId) === String(fixture.ids.otherAttorney));
+  assert.notEqual(String(original.attorneyId), String(fixture.ids.owner));
+  const replacement = { ...original, _id: fixed };
+  await collection.insertOne(replacement);
+  const deleted = await collection.deleteOne({ _id: originalId, attorneyId: original.attorneyId });
+  assert.equal(deleted.deletedCount, 1);
+  assert.deepEqual(await collection.findOne({ _id: fixed }), replacement);
+  assert.equal(await collection.countDocuments({ _id: originalId }), 0);
+  assert.equal(await collection.countDocuments({ _id: { $in: [originalId, fixed] } }), 1);
+  fixture.caseIds.inaccessible = fixed;
+  fixture.cases.inaccessible = { ...fixture.cases.inaccessible, _id: fixed };
+  return { fixedId: String(fixed), previouslyAbsent: true, oneForeignRecordRetained: true, originalRemoved: true, nonIdRecordFieldsPreserved: true, ownerIsolationPreserved: true };
 }
 
 function evaluateCommonReply(reply, scenario) {
@@ -153,8 +187,8 @@ function syntheticWorkflowExecutor(fixture) {
         },
       },
       stages: {
-        post_matter: { label: "Post a matter", paymentMethodRequired: true, ready: true, blocker: "" },
-        receive_applications: { label: "Receive applications", paymentMethodRequired: true, ready: true, blocker: "" },
+        post_matter: { label: "Post a matter", paymentMethodRequired: false, ready: true, blocker: "" },
+        receive_applications: { label: "Receive applications", paymentMethodRequired: false, ready: true, blocker: "" },
         invite_paralegal: { label: "Invite a paralegal", paralegalApprovalRequired: true },
         pre_engagement: { label: "Request pre-engagement items", scopeTaskRequired: true },
         hire_and_fund: {
@@ -361,6 +395,7 @@ async function main() {
   try {
     await mongoose.connect(memoryServer.getUri("package7-attorney-live-eval"));
     const fixture = await seedAttorneySupportFixtures();
+    const immutablePromptFixture = await pinInaccessibleMatterFixture(fixture);
     const user = { ...fixture.users.owner, id: fixture.ids.owner };
     const pageContext = { pathname: "/dashboard-attorney.html", viewName: "dashboard-attorney" };
     const financialConversationId = new mongoose.Types.ObjectId();
@@ -451,8 +486,8 @@ async function main() {
         name: "posting prerequisite matches executable payment policy",
         messageText: "Do I need a saved payment method before I can post a matter?",
         expectedTools: ["get_attorney_workflow_readiness"],
-        answerPattern: /\b(?:yes|required|need)\b[\s\S]*\b(?:before|post)\b/i,
-        forbiddenPatterns: [/not required/i, /don(?:'|’)t need/i],
+        answerPattern: { test: accuratePostingPaymentAnswer },
+        forbiddenPatterns: [/^\s*yes\b/i],
         toolExecutor: syntheticWorkflowExecutor(fixture),
         sentenceLimit: 3,
         dimensions: ["workflow_policy", "payment_method"],
@@ -586,6 +621,7 @@ async function main() {
       store: false,
       database: "MongoMemoryServer",
       externalProcessorCalls: false,
+      immutablePromptFixture,
     };
     if (process.argv.includes("--dry-run")) {
       console.log(JSON.stringify({

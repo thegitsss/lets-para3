@@ -163,7 +163,8 @@ test("cache read and write are alternative input categories; missing details ret
   assert.equal(guard.usageCost({ input_tokens: 1000, output_tokens: 100, input_tokens_details: { cached_tokens: 900, cache_write_tokens: 400 } }, 1000, 1800), null);
 });
 test("metadata URI hash host and database are bound before any independent client is created", async () => {
-  const uri = "mongodb+srv://synthetic:local-fixture@metadata.example.invalid/lpc_staging_shared_20261012", a = authority({ journalUriSha256: guard.sha(uri) }), e = { ...env, LPC_ASSISTANT_BUDGET_MONGO_URI: uri, STAGING_MONGO_HOST: "metadata.example.invalid" }; let created = 0;
+  const metadataTarget = new URL("mongodb+srv://metadata.example.invalid/lpc_staging_shared_20261012"); metadataTarget.username = "synthetic"; metadataTarget.password = "local-fixture";
+  const uri = metadataTarget.toString(), a = authority({ journalUriSha256: guard.sha(uri) }), e = { ...env, LPC_ASSISTANT_BUDGET_MONGO_URI: uri, STAGING_MONGO_HOST: "metadata.example.invalid" }; let created = 0;
   const createClient = () => { created += 1; throw Error("must_not_connect"); };
   for (const change of [{ LPC_ASSISTANT_BUDGET_MONGO_URI: undefined }, { LPC_ASSISTANT_BUDGET_MONGO_URI: uri + "changed" }, { STAGING_MONGO_HOST: "different.invalid" }]) assert.throws(() => guard.metadataJournalLease(a, { ...e, ...change }, { createClient }));
   const wrongDatabase = uri.replace("lpc_staging_shared_20261012", "wrong_database"); assert.throws(() => guard.metadataJournalLease({ ...a, journalUriSha256: guard.sha(wrongDatabase) }, { ...e, LPC_ASSISTANT_BUDGET_MONGO_URI: wrongDatabase }, { createClient }));
@@ -171,7 +172,8 @@ test("metadata URI hash host and database are bound before any independent clien
   await assert.rejects(lease(async () => null), /target changed/); assert.equal(created, 0);
 });
 test("independent metadata leases close partially connected clients and every throwing callback without shared handles", async () => {
-  const uri = "mongodb+srv://synthetic:local-fixture@metadata.example.invalid/lpc_staging_shared_20261012", a = authority({ journalUriSha256: guard.sha(uri) }), e = { ...env, LPC_ASSISTANT_BUDGET_MONGO_URI: uri, STAGING_MONGO_HOST: "metadata.example.invalid" };
+  const metadataTarget = new URL("mongodb+srv://metadata.example.invalid/lpc_staging_shared_20261012"); metadataTarget.username = "synthetic"; metadataTarget.password = "local-fixture";
+  const uri = metadataTarget.toString(), a = authority({ journalUriSha256: guard.sha(uri) }), e = { ...env, LPC_ASSISTANT_BUDGET_MONGO_URI: uri, STAGING_MONGO_HOST: "metadata.example.invalid" };
   const clients = [];
   const lease = guard.metadataJournalLease(a, e, { createClient: (actual, options) => {
     assert.equal(actual, uri); assert.equal(options.maxPoolSize, 1);

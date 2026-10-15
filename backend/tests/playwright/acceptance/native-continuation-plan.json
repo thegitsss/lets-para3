@@ -11,10 +11,10 @@
   "expectedOther": 306,
   "expectedOverall": 6251,
   "sourceManifest": {
-    "proofClass": "Complete final tracked sourcePins; external approved plan hash resolves self-pin. Source preparation manifest is not a deployment receipt.",
-    "finalNSourceImpactReview": {
-      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/FINAL_N_SOURCE_IMPACT_AND_ACCEPTANCE_REVIEW.json",
-      "sha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a"
+    "proofClass": "Complete final tracked sourcePins; external approved hash resolves plan self-pin. No deployment receipt.",
+    "finalOSourceImpactReview": {
+      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/FINAL_O_SOURCE_IMPACT_AND_ACCEPTANCE_REVIEW.json",
+      "sha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad"
     }
   },
   "priorIndex": {
@@ -30,7 +30,7 @@
     ".github/dependabot.yml": "74c5d13fa7d248f58bdb7885d54f7581ea2a71d448f1b744908f110a5a98d325",
     ".github/workflows/backend-acceptance-return.yml": "d2819180a34ca816cca132dcf3ffb66fc88690f05cf492c97dcf24715aedd884",
     ".github/workflows/backend-single-file-return.yml": "5dcc15b3807296d30e54c6123339e9e80d6f3d2e75981d1eea751551e44ca7ef",
-    ".github/workflows/native-acceptance-return.yml": "eaf6b6249d9dc17589eebf3aaf9307c77ccac0d6cbe686664a1365817d4721bf",
+    ".github/workflows/native-acceptance-return.yml": "321ebf3a51a3dd356cecfe20b727d8aa966a6e8d2275d5ca4890a278ccae37f4",
     ".github/workflows/public-release.yml": "888567a645fd62681a70d4f17dbd8fe22501b07f8a800b18b6d68f3c35f8cd9d",
     ".github/workflows/quality.yml": "5d595a833b4a009cf76a3d9cae333d0df61dfafd410e17f06537f77046084923",
     ".gitignore": "6a2ba6a35f6f75eb15cfe4d8dd95c66eef57addcc94fd00825b1a3d22217f78f",
@@ -310,7 +310,7 @@
     "backend/scripts/e2e-withdrawal-flow.js": "d77d5e8b650990f3e5069e15b90747cf7ebe0a816b1b82035133c3f93c38a71e",
     "backend/scripts/e2e-workspace-fixture.js": "e35ecd1f681870a4fb57e49ff84191004cf835d307f8da974add22119ec845dd",
     "backend/scripts/eval-attorney-support-coverage.js": "8d61294b1fda7c298cb22ac710930dbaa5f3500a4e0923867fc5e64c52f8990d",
-    "backend/scripts/eval-attorney-support-e2e.js": "e4f76337b65f050641d71dfbf7418ef30031133ab74e7c46286b2de997521b81",
+    "backend/scripts/eval-attorney-support-e2e.js": "ab7ce3d5466e93dd3d60a2c4bec07891d049aad474cf3a649281ac04aad5c879",
     "backend/scripts/eval-attorney-support-manager.js": "a8efa84add0ca0773744e1656c7393d79838f4b3cfbb6b888f3f8c14500927ad",
     "backend/scripts/eval-paralegal-support-coverage.js": "86cd2290a14d96a6ccbff76edb8e0ba655c48017a798eaaa41039edd0a434127",
     "backend/scripts/eval-paralegal-support-e2e.js": "3deb1d021316eb46ef564e7e6503d63eeaa17be69c816578cd6dbd21ec2da66f",
@@ -388,7 +388,7 @@
     "backend/scripts/verify-critical-browser-groups.js": "6015deaa9deb7a6f0b6d8fdde328e3290626483b019140cbe8609940262b68ef",
     "backend/scripts/verify-production-surface.js": "59a98e67bfdbae1fd1b505d5a2b8654a40f9f45f9526ef16a4217bb4cf75dcf2",
     "backend/scripts/verify-runtime.js": "bdf42bca89111953a6964b3992c2de2e2f696f173517ac37db745e06629fe038",
-    "backend/scripts/verify-single-file-jest-return.cjs": "8781809874dd683d7ad4647d4e433610d42cb3c87cf90b28fa763b3dba20163a",
+    "backend/scripts/verify-single-file-jest-return.cjs": "89550fca212b696f35568d7b374831befbfb488c4a57f15f74553fdca58e9c6e",
     "backend/scripts/verify-source-bound-backend-return.js": "9339327e593eef71d51e10d9b20ea52f550fa890e0111c6026b7498d943f7787",
     "backend/scripts/verify-staging-storage-controls.py": "001c366da8451277794ed71566c348ca2fea22c6e7a2c7d2d87a276987c4d274",
     "backend/services/accountApplicationProjections.js": "1f26295a9e0a9d74fb46b0cb1b54c7928ccf9891b92f33d3a17654f6af7f0081",
@@ -1665,9 +1665,9 @@
     "backend/tests/supportConversationHandoffBoundary.test.js": "eed13eb3b8b1b8c8c20299a741722846a73aef4b2bc088646af838aba803791c",
     "backend/tests/supportConversationMutationBoundary.test.js": "037917d433847357443caf76e264a1a0c025dc5299d22d8d1c0010222265233c",
     "backend/tests/supportConversationReadRace.test.js": "11fade666545b57517731e7edaffef5eda4b69afdddf5e08d16271e4a0ee5cca",
-    "backend/tests/supportCostBudget.test.js": "a3dae80349f7f9b9826135f82e63ccfca2f4b2c0abf32c754eac5b4314e3ceab",
+    "backend/tests/supportCostBudget.test.js": "aa56a9557aefe74148f435f4dc45fcceac517965e71e60bdbf587b1cde0dfe2b",
     "backend/tests/supportCostBudgetCeiling.test.js": "f66164969b1a8f6f70dcbb5222635d2e97db996d5bbe97616a48a94a7bcb8d1e",
-    "backend/tests/supportCostBudgetReplica.test.js": "7162f0468050ad87772d93b41d0686b294f021d9e93181604aea7c28f0403450",
+    "backend/tests/supportCostBudgetReplica.test.js": "6e830b20dcd0f1a7d3c24110fbedc0311b1d9dfed25bb01c80eda0720484201c",
     "backend/tests/supportDrawerResponsiveBoundary.test.js": "8dc00bd4766006a71cd6dd32d3296764870cb4f9a673ea647a1e31e2264575ac",
     "backend/tests/supportEvidenceFreshness.test.js": "301ec4062726bf3d8076f7bfc2371283b3cfe3933751024d4c264c8e91321dcf",
     "backend/tests/supportManagerAgent.test.js": "a4cb5b2be8339d512cf794410ac76b6eaf8cda12f87ce1a54ff7b23a9f31d6ce",
@@ -2357,7 +2357,7 @@
     "frontend/assets/styles/matter-creation.css": "dd67fd294fbb8954c0bd1126830ef9da8a567377961eaa03611ddb1d114589aa",
     "frontend/assets/styles/matter-invitations.css": "354085463d4757305dcd70cadbd03288889b7f44eecd6bbec1224cecf2acc1e5",
     "frontend/assets/styles/matter-notes.css": "79378b738c8d5327d021d21e72730735230caba7b3963e30553cfa8ced82470a",
-    "frontend/assets/styles/matter-publication.css": "4ca25d74a3ff876eeb255e54de0c66e6b5daa4c9beb3602fbce66fd09732e101",
+    "frontend/assets/styles/matter-publication.css": "872591dd87fa47395f65f3600cd941c7014cec367e31d03aef3317d270082637",
     "frontend/assets/styles/matter-work-queue.css": "08688013de5de4148bd142cf430a7ad883d73e492e1ba1f22e73b7fb16a86048",
     "frontend/assets/styles/matter-workspace-navigation.css": "95186ab5b76e98d2bbe3ce8b735e0799a9a22b4365ada67c24163627678ea3f5",
     "frontend/assets/styles/notification-center.css": "423487e132360edf975e60f851aa31b9f2e65406dd6ffb122a51eae7faf94a30",
@@ -2370,7 +2370,7 @@
     "frontend/assets/styles/paralegal-private-office.css": "2a4135e3684fdfd16ba9af9860585325e6afe0c06a281a51b1837dcf3ba6711a",
     "frontend/assets/styles/paralegal-security.css": "14b8bd75b29b3b6cfe7452b61460358d41db81c21cb631b4fc108c7f1a35c022",
     "frontend/assets/styles/paralegal-v2-browse.css": "0ef7c8ae62e919299008d36c0faa99dbbc888db2ebe306cd67d35b638a7bc7e4",
-    "frontend/assets/styles/paralegal-v2-global.css": "dbd0b6c8eca42dea6ea58d04c12f50a3ec364b13a98a0969481e226fe0dbf81b",
+    "frontend/assets/styles/paralegal-v2-global.css": "1691497ac6660412d42fd5bc8853db775f8c45edb63a33c5a827781b8c11f6e6",
     "frontend/assets/styles/paralegal-v2-home.css": "a07088729602ee9cb75398895def1cbdc0216ca4cf05415af04d8a00949b45b8",
     "frontend/assets/styles/paralegal-v2-matter.css": "caac930b9ff55c1441ab8d78d50b0d8f78bafb70a7a63bdd4d8de4bdf1ab975c",
     "frontend/assets/styles/paralegal-v2-overview.css": "c9023db7c87320e5f63356a30bee90a0458ac0d7cf6419ea95b941150c2d6a88",
@@ -2458,7 +2458,7 @@
     "backend/tests/playwright/acceptance/native-continuation.config.cjs": "a54bf492fd717229d43e3fd83964cc19f7328d44ea9dad2fd213ef83bd840132"
   },
   "packageLockSha256": "a5100240a796274e7fa20f690afa8ad796982f96923772318e3ae63358ff05d5",
-  "buildManifestSha256": "264810c6769f65081cdf0b66b2f89b85d535475a55ee5600d02c2c8630ad728f",
+  "buildManifestSha256": "bcbad8a5d35c13de7ad3eaf8ca75ec9d4459263b90747d699f9273792e60a56c",
   "runtime": {
     "node": "v24.18.0",
     "playwright": "1.62.1",
@@ -2705,13 +2705,7 @@
         "workers": 1,
         "webServer": null
       },
-      "selected": [
-        "[\"backend/tests/playwright/attorney-v2/message-attachments.spec.js\",71,1,\"native audio plays without automatic playback and unchanged polling preserves the player\",\"firefox\"]",
-        "[\"backend/tests/playwright/attorney-v2/message-attachments.spec.js\",86,1,\"denied attachment access clears the loaded conversation and stops its player\",\"firefox\"]",
-        "[\"backend/tests/playwright/attorney-v2/read-views.spec.js\",250,1,\"populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text\",\"chromium\"]",
-        "[\"backend/tests/playwright/attorney-v2/read-views.spec.js\",250,1,\"populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text\",\"firefox\"]",
-        "[\"backend/tests/playwright/attorney-v2/read-views.spec.js\",250,1,\"populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text\",\"webkit\"]"
-      ],
+      "selected": [],
       "originalDarwinEffectiveConfigSha256": "fa1bb721f683e6a147d11ebbe27757bd6932dfed994279891af7576ab3b339e2",
       "originalDarwinEffectiveConfig": {
         "configFile": "<ROOT>/backend/tests/playwright/acceptance/native-continuation.config.cjs",
@@ -2916,11 +2910,7 @@
         "workers": 1,
         "webServer": null
       },
-      "selected": [
-        "[\"backend/tests/playwright/attorney-v2/retained-conversation.spec.js\",42,1,\"retained audio plays only on request, survives refresh and stops when retention expires\",\"firefox\"]",
-        "[\"backend/tests/playwright/attorney-v2/retained-conversation.spec.js\",42,1,\"retained audio plays only on request, survives refresh and stops when retention expires\",\"chromium\"]",
-        "[\"backend/tests/playwright/attorney-v2/retained-conversation.spec.js\",42,1,\"retained audio plays only on request, survives refresh and stops when retention expires\",\"webkit\"]"
-      ],
+      "selected": [],
       "originalDarwinEffectiveConfigSha256": "98eebf7dc05f87c43a6e19d2165a3dc05a2d2fafcc7635d2f3638646071f6544"
     },
     {
@@ -3133,7 +3123,7 @@
       "expected": 330,
       "reportPath": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/current-changed-scope-collection/attorney-v2-declared-1/catalog.json",
       "reportSha256": "14fc9f76db420a4100d3b3ced84b7121e3a813c75e2c040459dae33ad8ba568e",
-      "effectiveConfigSha256": "fc48c0c8146ef49a6462179a318b130a338abb5b20a4bf6cbb9b4151eba8d233",
+      "effectiveConfigSha256": "4b28d10e82c0226a2a979e25d989cdac753a6315e02b8d30600c2f0e6fcd6524",
       "effectiveConfig": {
         "configFile": "<ROOT>/backend/tests/playwright/acceptance/native-continuation.config.cjs",
         "rootDir": "<ROOT>/backend/tests/playwright",
@@ -3258,6 +3248,7 @@
             "LPC_ADMIN_LEGACY_PORT": "0",
             "LPC_USE_BUILT_FRONTEND": "true",
             "LPC_SECURITY_FRONTEND_ROOT": "<ROOT>/.lpc-build/frontend",
+            "XDG_RUNTIME_DIR": "<OWNED-LINUX-CI-AUDIO-RUNTIME>",
             "PLAYWRIGHT_BASE_URL": "http://127.0.0.1:61004",
             "PLAYWRIGHT_MONGO_REPLICA_SET": "true",
             "PLAYWRIGHT_INITIALIZE_ATTORNEY_MODELS": "true",
@@ -3265,8 +3256,7 @@
             "PORT": "61004",
             "APP_BASE_URL": "http://127.0.0.1:61004",
             "CLIENT_BASE_URL": "http://127.0.0.1:61004",
-            "FRONTEND_BASE_URL": "http://127.0.0.1:61004",
-            "XDG_RUNTIME_DIR": "<OWNED-LINUX-CI-AUDIO-RUNTIME>"
+            "FRONTEND_BASE_URL": "http://127.0.0.1:61004"
           },
           "gracefulShutdown": {
             "signal": "SIGTERM",
@@ -4033,7 +4023,7 @@
       "expected": 330,
       "reportPath": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/current-changed-scope-collection/attorney-v2-declared-5/catalog.json",
       "reportSha256": "ae407a964d3406b65ce2590da3c062742eafe69599fffe5387db1dd8c66d6b84",
-      "effectiveConfigSha256": "22956641de03d5ce626b827ee436a8cdfc0171ca9f933ce9adf1d2a3e28db475",
+      "effectiveConfigSha256": "b350e17389dc42e7fd458717c65b935d17068a42983ff1e7b8c95e9f28e7aeaa",
       "effectiveConfig": {
         "configFile": "<ROOT>/backend/tests/playwright/acceptance/native-continuation.config.cjs",
         "rootDir": "<ROOT>/backend/tests/playwright",
@@ -4161,6 +4151,7 @@
             "LPC_ADMIN_LEGACY_PORT": "0",
             "LPC_USE_BUILT_FRONTEND": "true",
             "LPC_SECURITY_FRONTEND_ROOT": "<ROOT>/.lpc-build/frontend",
+            "XDG_RUNTIME_DIR": "<OWNED-LINUX-CI-AUDIO-RUNTIME>",
             "PLAYWRIGHT_BASE_URL": "http://127.0.0.1:61008",
             "PLAYWRIGHT_MONGO_REPLICA_SET": "true",
             "PLAYWRIGHT_INITIALIZE_ATTORNEY_MODELS": "true",
@@ -4168,8 +4159,7 @@
             "PORT": "61008",
             "APP_BASE_URL": "http://127.0.0.1:61008",
             "CLIENT_BASE_URL": "http://127.0.0.1:61008",
-            "FRONTEND_BASE_URL": "http://127.0.0.1:61008",
-            "XDG_RUNTIME_DIR": "<OWNED-LINUX-CI-AUDIO-RUNTIME>"
+            "FRONTEND_BASE_URL": "http://127.0.0.1:61008"
           },
           "gracefulShutdown": {
             "signal": "SIGTERM",
@@ -4921,7 +4911,6 @@
         }
       },
       "selected": [
-        "[\"backend/tests/playwright/paralegal-support/v2-browse.spec.js\",359,1,\"office polish: count sits beside filters and details retain scope in both themes\",\"webkit\"]",
         "[\"backend/tests/playwright/paralegal-support/v2-global-tools.spec.js\",763,1,\"office polish: Help discloses answers with keyboard control and retains the open answer\",\"webkit\"]",
         "[\"backend/tests/playwright/paralegal-support/v2-help.spec.js\",332,1,\"Help and report states remain readable and operable in supported layouts\",\"webkit\"]"
       ],
@@ -6871,11 +6860,7 @@
         "workers": 1,
         "webServer": null
       },
-      "selected": [
-        "[\"backend/tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js\",10,1,\"passive receipt refresh preserves a native download press and retains current-owner revision and retry boundaries\",\"chromium\"]",
-        "[\"backend/tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js\",10,1,\"passive receipt refresh preserves a native download press and retains current-owner revision and retry boundaries\",\"firefox\"]",
-        "[\"backend/tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js\",10,1,\"passive receipt refresh preserves a native download press and retains current-owner revision and retry boundaries\",\"webkit\"]"
-      ],
+      "selected": [],
       "originalDarwinEffectiveConfigSha256": "32a92e5aef70826f781588ad1690384e2710c46a39779024233df1ffa7b2175a",
       "originalDarwinEffectiveConfig": {
         "configFile": "<ROOT>/backend/tests/playwright/acceptance/native-continuation.config.cjs",
@@ -7076,11 +7061,7 @@
         "workers": 1,
         "webServer": null
       },
-      "selected": [
-        "[\"backend/tests/playwright/shared-matter/email-message-links.spec.js\",83,1,\"an older protected email link acknowledges its target boundary while newer messages stay unread for both roles\",\"chromium\"]",
-        "[\"backend/tests/playwright/shared-matter/email-message-links.spec.js\",83,1,\"an older protected email link acknowledges its target boundary while newer messages stay unread for both roles\",\"firefox\"]",
-        "[\"backend/tests/playwright/shared-matter/email-message-links.spec.js\",83,1,\"an older protected email link acknowledges its target boundary while newer messages stay unread for both roles\",\"webkit\"]"
-      ],
+      "selected": [],
       "originalDarwinEffectiveConfigSha256": "5b4fe61f1dd5feb73c9c763c6a53624e19b1e4f61d296dcebcb3d87bc33680f1",
       "originalDarwinEffectiveConfig": {
         "configFile": "<ROOT>/backend/tests/playwright/acceptance/native-continuation.config.cjs",
@@ -8192,8 +8173,22 @@
       "engine": "firefox",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 1,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 4860,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:07:12.092Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-actual-shared-2",
       "configSha256": "fa1bb721f683e6a147d11ebbe27757bd6932dfed994279891af7576ab3b339e2",
       "id": "[\"backend/tests/playwright/attorney-v2/message-attachments.spec.js\",71,1,\"native audio plays without automatic playback and unchanged polling preserves the player\",\"firefox\"]",
@@ -8210,17 +8205,24 @@
       "currentSpecSha256": "3a7a55dff817c66fd82d420123cce9a03ad1e098452c98a552dc5a9a426addb3",
       "priorCallbackSha256": "c722ae432e682cdd6b6530d87b686a2b6a5597c784fdc76a93ff98e878e03e4c",
       "priorSpecSha256": "3a7a55dff817c66fd82d420123cce9a03ad1e098452c98a552dc5a9a426addb3",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-junit-failure-or-skipped-no-pass-credit",
       "proofClass": "junit-business-fragment-only",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/message-attachments.spec.js\",71,1,\"native audio plays without automatic playback and unchanged polling preserves the player\",\"firefox\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/message-attachments.spec.js\",\"native audio plays without automatic playback and unchanged polling preserves the player\",\"firefox\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "junit-business-fragment-only"
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "2d3ede65fa3dc6740e18c05f42ab7f90f0043c1ce8c2765d404a5a47a2957ade"
       }
     },
     {
@@ -8235,8 +8237,22 @@
       "engine": "firefox",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 1,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 2669,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:07:23.416Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-actual-shared-2",
       "configSha256": "fa1bb721f683e6a147d11ebbe27757bd6932dfed994279891af7576ab3b339e2",
       "id": "[\"backend/tests/playwright/attorney-v2/message-attachments.spec.js\",86,1,\"denied attachment access clears the loaded conversation and stops its player\",\"firefox\"]",
@@ -8253,17 +8269,24 @@
       "currentSpecSha256": "3a7a55dff817c66fd82d420123cce9a03ad1e098452c98a552dc5a9a426addb3",
       "priorCallbackSha256": "e6ef33e012d97a0bebb257bf024cc8914705261c00bf020c487b9b133ecf4d1b",
       "priorSpecSha256": "3a7a55dff817c66fd82d420123cce9a03ad1e098452c98a552dc5a9a426addb3",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-junit-failure-or-skipped-no-pass-credit",
       "proofClass": "junit-business-fragment-only",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/message-attachments.spec.js\",86,1,\"denied attachment access clears the loaded conversation and stops its player\",\"firefox\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/message-attachments.spec.js\",\"denied attachment access clears the loaded conversation and stops its player\",\"firefox\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "junit-business-fragment-only"
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "2d3ede65fa3dc6740e18c05f42ab7f90f0043c1ce8c2765d404a5a47a2957ade"
       }
     },
     {
@@ -8628,8 +8651,22 @@
       "engine": "chromium",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 0,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 2587,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:07:03.605Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-actual-shared-2",
       "configSha256": "fa1bb721f683e6a147d11ebbe27757bd6932dfed994279891af7576ab3b339e2",
       "id": "[\"backend/tests/playwright/attorney-v2/read-views.spec.js\",250,1,\"populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text\",\"chromium\"]",
@@ -8646,24 +8683,24 @@
       "currentSpecSha256": "7e33b3cdba5b01e1806819863344c3d15977dcf449df32377522c3ebd912a1c8",
       "priorCallbackSha256": "7050996a4e875f14b85590fb3886e345d3280d9aab9677a2446e8ff3d423eaf7",
       "priorSpecSha256": "b91ba234fd1452afb68e14597f77f0cecf4afb5d15e6a658fe4e3d5f7264c494",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-junit-failure-or-skipped-no-pass-credit",
       "proofClass": "junit-business-fragment-only",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/read-views.spec.js\",250,1,\"populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text\",\"chromium\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/read-views.spec.js\",\"populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text\",\"chromium\"]",
-        "disposition": "execute",
-        "reason": "New unread-badge inline-size CSS affects all three engine layout checks; final compiled candidate acceptance required.",
-        "evidence": [
-          {
-            "proofClass": "explicit-M-individual-partial-original-fixture-class",
-            "ref": "M-original-class317-minus-audio2",
-            "currentTitle": "populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text",
-            "rawReportSha256": "8406abeb2585f39f4b3ebf83779b4712558743cdbef4934072953acb6f9bccb3"
-          }
-        ],
-        "originalProofClass": "junit-business-fragment-only"
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "2d3ede65fa3dc6740e18c05f42ab7f90f0043c1ce8c2765d404a5a47a2957ade"
       }
     },
     {
@@ -9028,8 +9065,22 @@
       "engine": "firefox",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 2,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 3278,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:07:26.831Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-actual-shared-2",
       "configSha256": "fa1bb721f683e6a147d11ebbe27757bd6932dfed994279891af7576ab3b339e2",
       "id": "[\"backend/tests/playwright/attorney-v2/read-views.spec.js\",250,1,\"populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text\",\"firefox\"]",
@@ -9046,24 +9097,24 @@
       "currentSpecSha256": "7e33b3cdba5b01e1806819863344c3d15977dcf449df32377522c3ebd912a1c8",
       "priorCallbackSha256": "7050996a4e875f14b85590fb3886e345d3280d9aab9677a2446e8ff3d423eaf7",
       "priorSpecSha256": "b91ba234fd1452afb68e14597f77f0cecf4afb5d15e6a658fe4e3d5f7264c494",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-junit-failure-or-skipped-no-pass-credit",
       "proofClass": "junit-business-fragment-only",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/read-views.spec.js\",250,1,\"populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text\",\"firefox\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/read-views.spec.js\",\"populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text\",\"firefox\"]",
-        "disposition": "execute",
-        "reason": "New unread-badge inline-size CSS affects all three engine layout checks; final compiled candidate acceptance required.",
-        "evidence": [
-          {
-            "proofClass": "explicit-M-individual-partial-original-fixture-class",
-            "ref": "M-original-class317-minus-audio2",
-            "currentTitle": "populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text",
-            "rawReportSha256": "8406abeb2585f39f4b3ebf83779b4712558743cdbef4934072953acb6f9bccb3"
-          }
-        ],
-        "originalProofClass": "junit-business-fragment-only"
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "2d3ede65fa3dc6740e18c05f42ab7f90f0043c1ce8c2765d404a5a47a2957ade"
       }
     },
     {
@@ -9428,8 +9479,22 @@
       "engine": "webkit",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 3,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 3826,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:07:37.737Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-actual-shared-2",
       "configSha256": "fa1bb721f683e6a147d11ebbe27757bd6932dfed994279891af7576ab3b339e2",
       "id": "[\"backend/tests/playwright/attorney-v2/read-views.spec.js\",250,1,\"populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text\",\"webkit\"]",
@@ -9446,24 +9511,24 @@
       "currentSpecSha256": "7e33b3cdba5b01e1806819863344c3d15977dcf449df32377522c3ebd912a1c8",
       "priorCallbackSha256": "7050996a4e875f14b85590fb3886e345d3280d9aab9677a2446e8ff3d423eaf7",
       "priorSpecSha256": "b91ba234fd1452afb68e14597f77f0cecf4afb5d15e6a658fe4e3d5f7264c494",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-junit-failure-or-skipped-no-pass-credit",
       "proofClass": "junit-business-fragment-only",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/read-views.spec.js\",250,1,\"populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text\",\"webkit\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/read-views.spec.js\",\"populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text\",\"webkit\"]",
-        "disposition": "execute",
-        "reason": "New unread-badge inline-size CSS affects all three engine layout checks; final compiled candidate acceptance required.",
-        "evidence": [
-          {
-            "proofClass": "source-attributed-local-read-views-original-class-root-diagnostic-applicability-disposition-separate",
-            "ref": "attorney-read-views-layout-fix/FINAL_8_READ_VIEWS_BROWSER_HANDOFF.json",
-            "currentTitle": "populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text",
-            "rawReportSha256": "6be224bdff9dda4ab82e106191f75b7fc77e513632b179f2d2bba255c3490455"
-          }
-        ],
-        "originalProofClass": "junit-business-fragment-only"
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "junit-business-fragment-only",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "2d3ede65fa3dc6740e18c05f42ab7f90f0043c1ce8c2765d404a5a47a2957ade"
       }
     },
     {
@@ -10308,8 +10373,22 @@
       "engine": "firefox",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 1,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 5502,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:06:52.234Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-actual-shared-3",
       "configSha256": "98eebf7dc05f87c43a6e19d2165a3dc05a2d2fafcc7635d2f3638646071f6544",
       "id": "[\"backend/tests/playwright/attorney-v2/retained-conversation.spec.js\",42,1,\"retained audio plays only on request, survives refresh and stops when retention expires\",\"firefox\"]",
@@ -10326,17 +10405,24 @@
       "currentSpecSha256": "7caeef1069c4d2c5cdca89b3f578a13f35f1a81b586b86972cfe230ca4416791",
       "priorCallbackSha256": "1d385a107d1bac8ecebb9795193d6265457d96e9d3ca5af9cb5e261b623b26f7",
       "priorSpecSha256": "7caeef1069c4d2c5cdca89b3f578a13f35f1a81b586b86972cfe230ca4416791",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-native-failed-skipped-retried-or-unexecuted",
       "proofClass": "original-native-report-callback",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/retained-conversation.spec.js\",42,1,\"retained audio plays only on request, survives refresh and stops when retention expires\",\"firefox\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/retained-conversation.spec.js\",\"retained audio plays only on request, survives refresh and stops when retention expires\",\"firefox\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "original-native-report-callback"
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "original-native-report-callback",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "53889a9df871b9ca522e16e65356b3b0e39e8f33efea89e56f3600a9f94e9502"
       }
     },
     {
@@ -16010,8 +16096,22 @@
       "engine": "webkit",
       "expectedStatus": "passed",
       "timeout": 90000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 0,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 14609,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:06:19.581Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "paralegal-support-declared-2",
       "configSha256": "58a1c3353b98d969c80ab573afafd613a38ab6c43941b8cc5e14896cd1835570",
       "id": "[\"backend/tests/playwright/paralegal-support/v2-browse.spec.js\",359,1,\"office polish: count sits beside filters and details retain scope in both themes\",\"webkit\"]",
@@ -16028,17 +16128,24 @@
       "currentSpecSha256": "5b673f39d85f4c8a60be5404272581568429d01341b91e13ad00e9cb9dcd6573",
       "priorCallbackSha256": "2e663da857404300d0c96929fa65366f582dfe423dcf664ad26307ccc9a7e637",
       "priorSpecSha256": "5b673f39d85f4c8a60be5404272581568429d01341b91e13ad00e9cb9dcd6573",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "prior-native-failed-skipped-retried-or-unexecuted",
       "proofClass": "original-native-report-callback",
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/paralegal-support/v2-browse.spec.js\",359,1,\"office polish: count sits beside filters and details retain scope in both themes\",\"webkit\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/paralegal-support/v2-browse.spec.js\",\"office polish: count sits beside filters and details retain scope in both themes\",\"webkit\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "original-native-report-callback"
+        "proofClass": "EXPLICIT_N_ORIGINAL_INDIVIDUAL_PARTIAL_CLASS_NOT_WHOLE_SCOPE",
+        "originalFixtureClass": "original-native-report-callback",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": false,
+        "originalGroupExitCode": 1,
+        "sourceArchiveSha256": "a81e0927bfddbdf970e69687de22822b5400b1a2f18277f66df62c4abdb34933"
       }
     },
     {
@@ -32467,8 +32574,22 @@
       "engine": "chromium",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 0,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 5110,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:06:38.765Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-actual-shared-3",
       "configSha256": "98eebf7dc05f87c43a6e19d2165a3dc05a2d2fafcc7635d2f3638646071f6544",
       "id": "[\"backend/tests/playwright/attorney-v2/retained-conversation.spec.js\",42,1,\"retained audio plays only on request, survives refresh and stops when retention expires\",\"chromium\"]",
@@ -32485,7 +32606,7 @@
       "currentSpecSha256": "7caeef1069c4d2c5cdca89b3f578a13f35f1a81b586b86972cfe230ca4416791",
       "priorCallbackSha256": "1d385a107d1bac8ecebb9795193d6265457d96e9d3ca5af9cb5e261b623b26f7",
       "priorSpecSha256": "7caeef1069c4d2c5cdca89b3f578a13f35f1a81b586b86972cfe230ca4416791",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "Prior audio engine affected by actual Firefox Linux media-sink correction; original callback rerun with all3 engines",
       "priorNative": {
         "source": "backend/tests/playwright/attorney-v2/retained-conversation.spec.js",
@@ -32529,11 +32650,18 @@
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/retained-conversation.spec.js\",42,1,\"retained audio plays only on request, survives refresh and stops when retention expires\",\"chromium\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/retained-conversation.spec.js\",\"retained audio plays only on request, survives refresh and stops when retention expires\",\"chromium\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "original-native-report-callback"
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "original-native-report-callback",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "53889a9df871b9ca522e16e65356b3b0e39e8f33efea89e56f3600a9f94e9502"
       }
     },
     {
@@ -32548,8 +32676,22 @@
       "engine": "webkit",
       "expectedStatus": "passed",
       "timeout": 45000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 2,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 5033,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:07:06.978Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "attorney-v2-actual-shared-3",
       "configSha256": "98eebf7dc05f87c43a6e19d2165a3dc05a2d2fafcc7635d2f3638646071f6544",
       "id": "[\"backend/tests/playwright/attorney-v2/retained-conversation.spec.js\",42,1,\"retained audio plays only on request, survives refresh and stops when retention expires\",\"webkit\"]",
@@ -32566,7 +32708,7 @@
       "currentSpecSha256": "7caeef1069c4d2c5cdca89b3f578a13f35f1a81b586b86972cfe230ca4416791",
       "priorCallbackSha256": "1d385a107d1bac8ecebb9795193d6265457d96e9d3ca5af9cb5e261b623b26f7",
       "priorSpecSha256": "7caeef1069c4d2c5cdca89b3f578a13f35f1a81b586b86972cfe230ca4416791",
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "reason": "Prior audio engine affected by actual Firefox Linux media-sink correction; original callback rerun with all3 engines",
       "priorNative": {
         "source": "backend/tests/playwright/attorney-v2/retained-conversation.spec.js",
@@ -32610,11 +32752,18 @@
       "currentContextLifetimeAndCleanup": "unverified-no-promotion-from-prior-report",
       "originalIdentity": "[\"backend/tests/playwright/attorney-v2/retained-conversation.spec.js\",42,1,\"retained audio plays only on request, survives refresh and stops when retention expires\",\"webkit\"]",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/attorney-v2/retained-conversation.spec.js\",\"retained audio plays only on request, survives refresh and stops when retention expires\",\"webkit\"]",
-        "disposition": "execute",
-        "reason": "Original actual current-qualified outcome remains missing.",
-        "evidence": [],
-        "originalProofClass": "original-native-report-callback"
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "original-native-report-callback",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "53889a9df871b9ca522e16e65356b3b0e39e8f33efea89e56f3600a9f94e9502"
       }
     },
     {
@@ -32629,8 +32778,28 @@
       "engine": "chromium",
       "expectedStatus": "passed",
       "timeout": 150000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 0,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 5362,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:06:54.418Z",
+          "annotations": [],
+          "attachments": [
+            {
+              "name": "financial-strict-evidence.json",
+              "contentType": "application/json",
+              "path": "/home/runner/work/lets-para3/lets-para3/backend/test-results/jest/shards/native-financial-lifecycle/test-output/financial-lifecycle-receip-4ecb4-vision-and-retry-boundaries-chromium/attachments/financial-strict-evidence-json-d95576da31d8d8e1939dc0e4abed1ff2ed45075d.json"
+            }
+          ]
+        }
+      ],
       "scope": "financial-lifecycle",
       "id": "[\"backend/tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js\",10,1,\"passive receipt refresh preserves a native download press and retains current-owner revision and retry boundaries\",\"chromium\"]",
       "callbackSha256": "f64055a6015485a74cdf8a46d84d5d9b0260934177d3e37a4d31db2089771d85",
@@ -32644,12 +32813,20 @@
         "sourceSha256": "143c9ad7da57100ca6ecc0ba92eb429ed950ff3227f1f41f78587af5cffcbf8e",
         "rule": "Exact source-owned budgets; no adapter/CLI retry/deadline override."
       },
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js\",\"passive receipt refresh preserves a native download press and retains current-owner revision and retry boundaries\",\"chromium\"]",
-        "reason": "New permanent reviewed boundary regression; exact final source must execute on all original engines.",
-        "disposition": "execute",
-        "newPermanentRegression": true
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "current-boundary-regression-original-reviewed-fixture-contract",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "dd56c1694b6cca8aca922d370cb8330aeaa6d7c9213db218587655b1ed05dfae"
       },
       "proofClass": "current-boundary-regression-original-reviewed-fixture-contract",
       "currentContextLifetimeAndCleanup": "current-execution-required-no-unexecuted-proof"
@@ -32666,8 +32843,28 @@
       "engine": "firefox",
       "expectedStatus": "passed",
       "timeout": 150000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 1,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 6550,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:07:04.022Z",
+          "annotations": [],
+          "attachments": [
+            {
+              "name": "financial-strict-evidence.json",
+              "contentType": "application/json",
+              "path": "/home/runner/work/lets-para3/lets-para3/backend/test-results/jest/shards/native-financial-lifecycle/test-output/financial-lifecycle-receip-4ecb4-vision-and-retry-boundaries-firefox/attachments/financial-strict-evidence-json-b6318cacba2e1b11086959a58dd8fc97c9858913.json"
+            }
+          ]
+        }
+      ],
       "scope": "financial-lifecycle",
       "id": "[\"backend/tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js\",10,1,\"passive receipt refresh preserves a native download press and retains current-owner revision and retry boundaries\",\"firefox\"]",
       "callbackSha256": "f64055a6015485a74cdf8a46d84d5d9b0260934177d3e37a4d31db2089771d85",
@@ -32681,12 +32878,20 @@
         "sourceSha256": "143c9ad7da57100ca6ecc0ba92eb429ed950ff3227f1f41f78587af5cffcbf8e",
         "rule": "Exact source-owned budgets; no adapter/CLI retry/deadline override."
       },
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js\",\"passive receipt refresh preserves a native download press and retains current-owner revision and retry boundaries\",\"firefox\"]",
-        "reason": "New permanent reviewed boundary regression; exact final source must execute on all original engines.",
-        "disposition": "execute",
-        "newPermanentRegression": true
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "current-boundary-regression-original-reviewed-fixture-contract",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "dd56c1694b6cca8aca922d370cb8330aeaa6d7c9213db218587655b1ed05dfae"
       },
       "proofClass": "current-boundary-regression-original-reviewed-fixture-contract",
       "currentContextLifetimeAndCleanup": "current-execution-required-no-unexecuted-proof"
@@ -32703,8 +32908,28 @@
       "engine": "webkit",
       "expectedStatus": "passed",
       "timeout": 150000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 2,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 15173,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:07:17.114Z",
+          "annotations": [],
+          "attachments": [
+            {
+              "name": "financial-strict-evidence.json",
+              "contentType": "application/json",
+              "path": "/home/runner/work/lets-para3/lets-para3/backend/test-results/jest/shards/native-financial-lifecycle/test-output/financial-lifecycle-receip-4ecb4-vision-and-retry-boundaries-webkit/attachments/financial-strict-evidence-json-4e493f5f7c565341eb3c7a1db74e26d14a87b19e.json"
+            }
+          ]
+        }
+      ],
       "scope": "financial-lifecycle",
       "id": "[\"backend/tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js\",10,1,\"passive receipt refresh preserves a native download press and retains current-owner revision and retry boundaries\",\"webkit\"]",
       "callbackSha256": "f64055a6015485a74cdf8a46d84d5d9b0260934177d3e37a4d31db2089771d85",
@@ -32718,12 +32943,20 @@
         "sourceSha256": "143c9ad7da57100ca6ecc0ba92eb429ed950ff3227f1f41f78587af5cffcbf8e",
         "rule": "Exact source-owned budgets; no adapter/CLI retry/deadline override."
       },
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js\",\"passive receipt refresh preserves a native download press and retains current-owner revision and retry boundaries\",\"webkit\"]",
-        "reason": "New permanent reviewed boundary regression; exact final source must execute on all original engines.",
-        "disposition": "execute",
-        "newPermanentRegression": true
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "current-boundary-regression-original-reviewed-fixture-contract",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "dd56c1694b6cca8aca922d370cb8330aeaa6d7c9213db218587655b1ed05dfae"
       },
       "proofClass": "current-boundary-regression-original-reviewed-fixture-contract",
       "currentContextLifetimeAndCleanup": "current-execution-required-no-unexecuted-proof"
@@ -32740,8 +32973,22 @@
       "engine": "chromium",
       "expectedStatus": "passed",
       "timeout": 150000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 0,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 2954,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:06:48.579Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "shared-matter",
       "id": "[\"backend/tests/playwright/shared-matter/email-message-links.spec.js\",83,1,\"an older protected email link acknowledges its target boundary while newer messages stay unread for both roles\",\"chromium\"]",
       "callbackSha256": "cdcc2df98a7c2d73c21028fd6939ceb2c69afbc35a13a32bb1294185f3b2d4ef",
@@ -32755,12 +33002,20 @@
         "sourceSha256": "6e576ba362d36af7fa365619a7148aef8d25952ffb914484f6fe9b85cd6c0ac6",
         "rule": "Exact source-owned budgets; no adapter/CLI retry/deadline override."
       },
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/shared-matter/email-message-links.spec.js\",\"an older protected email link acknowledges its target boundary while newer messages stay unread for both roles\",\"chromium\"]",
-        "reason": "New permanent reviewed boundary regression; exact final source must execute on all original engines.",
-        "disposition": "execute",
-        "newPermanentRegression": true
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "current-boundary-regression-original-reviewed-fixture-contract",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "3c066ee8ab43e6cccb6dd5c61fb52281bf9e600d4e1db4027892c569d580be24"
       },
       "proofClass": "current-boundary-regression-original-reviewed-fixture-contract",
       "currentContextLifetimeAndCleanup": "current-execution-required-no-unexecuted-proof"
@@ -32777,8 +33032,22 @@
       "engine": "firefox",
       "expectedStatus": "passed",
       "timeout": 150000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 1,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 4064,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:06:57.006Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "shared-matter",
       "id": "[\"backend/tests/playwright/shared-matter/email-message-links.spec.js\",83,1,\"an older protected email link acknowledges its target boundary while newer messages stay unread for both roles\",\"firefox\"]",
       "callbackSha256": "cdcc2df98a7c2d73c21028fd6939ceb2c69afbc35a13a32bb1294185f3b2d4ef",
@@ -32792,12 +33061,20 @@
         "sourceSha256": "6e576ba362d36af7fa365619a7148aef8d25952ffb914484f6fe9b85cd6c0ac6",
         "rule": "Exact source-owned budgets; no adapter/CLI retry/deadline override."
       },
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/shared-matter/email-message-links.spec.js\",\"an older protected email link acknowledges its target boundary while newer messages stay unread for both roles\",\"firefox\"]",
-        "reason": "New permanent reviewed boundary regression; exact final source must execute on all original engines.",
-        "disposition": "execute",
-        "newPermanentRegression": true
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "current-boundary-regression-original-reviewed-fixture-contract",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "3c066ee8ab43e6cccb6dd5c61fb52281bf9e600d4e1db4027892c569d580be24"
       },
       "proofClass": "current-boundary-regression-original-reviewed-fixture-contract",
       "currentContextLifetimeAndCleanup": "current-execution-required-no-unexecuted-proof"
@@ -32814,8 +33091,22 @@
       "engine": "webkit",
       "expectedStatus": "passed",
       "timeout": 150000,
-      "status": "skipped",
-      "results": [],
+      "status": "expected",
+      "results": [
+        {
+          "workerIndex": 2,
+          "parallelIndex": 0,
+          "status": "passed",
+          "duration": 6126,
+          "errors": [],
+          "stdout": [],
+          "stderr": [],
+          "retry": 0,
+          "startTime": "2026-10-15T15:07:06.927Z",
+          "annotations": [],
+          "attachments": []
+        }
+      ],
       "scope": "shared-matter",
       "id": "[\"backend/tests/playwright/shared-matter/email-message-links.spec.js\",83,1,\"an older protected email link acknowledges its target boundary while newer messages stay unread for both roles\",\"webkit\"]",
       "callbackSha256": "cdcc2df98a7c2d73c21028fd6939ceb2c69afbc35a13a32bb1294185f3b2d4ef",
@@ -32829,12 +33120,20 @@
         "sourceSha256": "6e576ba362d36af7fa365619a7148aef8d25952ffb914484f6fe9b85cd6c0ac6",
         "rule": "Exact source-owned budgets; no adapter/CLI retry/deadline override."
       },
-      "disposition": "execute",
+      "disposition": "qualified-current-explicit-original-class",
       "currentEvidence": {
-        "semantic": "[\"backend/tests/playwright/shared-matter/email-message-links.spec.js\",\"an older protected email link acknowledges its target boundary while newer messages stay unread for both roles\",\"webkit\"]",
-        "reason": "New permanent reviewed boundary regression; exact final source must execute on all original engines.",
-        "disposition": "execute",
-        "newPermanentRegression": true
+        "proofClass": "ACTUAL_N_WHOLE_SCOPE_ORIGINAL_CALLBACK_CLASS_WITH_NORMAL_SOURCE_CUSTODY",
+        "originalFixtureClass": "current-boundary-regression-original-reviewed-fixture-contract",
+        "sourceCommit": "d9ca1643ede17a8abacf28959e056d1667176daa",
+        "runId": 38757134644,
+        "attempt": 1,
+        "sourceOutcomeReadback": {
+          "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+          "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+        },
+        "originalWholeGroupQualified": true,
+        "originalGroupExitCode": 0,
+        "sourceArchiveSha256": "3c066ee8ab43e6cccb6dd5c61fb52281bf9e600d4e1db4027892c569d580be24"
       },
       "proofClass": "current-boundary-regression-original-reviewed-fixture-contract",
       "currentContextLifetimeAndCleanup": "current-execution-required-no-unexecuted-proof"
@@ -32871,7 +33170,7 @@
   "executionSelected": 33,
   "cloudEvidence": {
     "maximumNewBytes": 8589934592,
-    "priorRetainedBytes": 1256689267,
+    "priorRetainedBytes": 1354649122,
     "cumulativeMaximumBytes": 9846623859,
     "approvedCumulativeBytes": 10737418240,
     "retentionDays": 1,
@@ -32883,39 +33182,19 @@
         "maxBytes": 536870912
       },
       {
-        "scope": "attorney-v2-actual-shared-2",
-        "selected": 5,
-        "maxBytes": 1239416832
-      },
-      {
-        "scope": "attorney-v2-actual-shared-3",
-        "selected": 3,
-        "maxBytes": 958398464
-      },
-      {
         "scope": "attorney-v2-declared-1",
         "selected": 9,
-        "maxBytes": 1801453568
+        "maxBytes": 3758096384
       },
       {
         "scope": "attorney-v2-declared-5",
         "selected": 4,
-        "maxBytes": 1098907648
+        "maxBytes": 2147483648
       },
       {
         "scope": "paralegal-support-declared-2",
-        "selected": 3,
-        "maxBytes": 958398464
-      },
-      {
-        "scope": "financial-lifecycle",
-        "selected": 3,
-        "maxBytes": 958398464
-      },
-      {
-        "scope": "shared-matter",
-        "selected": 3,
-        "maxBytes": 958398464
+        "selected": 2,
+        "maxBytes": 2067791872
       }
     ],
     "priorArchives": [
@@ -32948,6 +33227,12 @@
         "sha256": "491a7e07c3737a5ef29688cbbfc4bbdba63a89a7a5c1ef1e4069a1e5a6472d23",
         "artifacts": 27,
         "bytes": 477808941
+      },
+      {
+        "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/live-n-run-38757134644-attempt-1/archive/verified-artifact-manifest.json",
+        "sha256": "315f49142b1030b97b6d2a6b2ddc705f47e9ef5d48aa2e1830fdce959308c3e8",
+        "artifacts": 11,
+        "bytes": 97959855
       }
     ],
     "coverage": "All8 complete current success/failure native artifacts, actual final17 and4 source/security artifacts share8GiB; previous129 archives reserve1256689267B. Prior raw stays local; no historicalZIP upload or538 rerun.",
@@ -33079,8 +33364,8 @@
       {
         "path": ".github/workflows/native-acceptance-return.yml",
         "beforeSha256": null,
-        "afterSha256": "eaf6b6249d9dc17589eebf3aaf9307c77ccac0d6cbe686664a1365817d4721bf",
-        "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+        "afterSha256": "321ebf3a51a3dd356cecfe20b727d8aa966a6e8d2275d5ca4890a278ccae37f4",
+        "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
         "kind": "ci-control",
         "affectedSuites": []
       },
@@ -33171,6 +33456,14 @@
         "beforeSha256": "38e3fe13e8932aaee9926d71c012d19e1ea4b1ec546ad7cdec8fa05a5367433a",
         "afterSha256": "e1b88ba0fcf2d5ca1f24c9505b090dc5c27bf4ac5d7563559d4b7b6f1cd27215",
         "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+        "kind": "ci-control",
+        "affectedSuites": []
+      },
+      {
+        "path": "backend/scripts/eval-attorney-support-e2e.js",
+        "beforeSha256": "e4f76337b65f050641d71dfbf7418ef30031133ab74e7c46286b2de997521b81",
+        "afterSha256": "ab7ce3d5466e93dd3d60a2c4bec07891d049aad474cf3a649281ac04aad5c879",
+        "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
         "kind": "ci-control",
         "affectedSuites": []
       },
@@ -33279,8 +33572,8 @@
       {
         "path": "backend/scripts/verify-single-file-jest-return.cjs",
         "beforeSha256": null,
-        "afterSha256": "8781809874dd683d7ad4647d4e433610d42cb3c87cf90b28fa763b3dba20163a",
-        "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+        "afterSha256": "89550fca212b696f35568d7b374831befbfb488c4a57f15f74553fdca58e9c6e",
+        "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
         "kind": "ci-control",
         "affectedSuites": []
       },
@@ -33389,10 +33682,9 @@
         "path": "backend/tests/playwright/acceptance/native-continuation-plan.json",
         "beforeSha256": null,
         "afterSha256": "@approved-plan",
+        "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
         "kind": "test-fixture",
-        "affectedSuites": [],
-        "reviewedEvidenceSha256": "6848b5f6aa2e412c104a6334e24e75898c079013c23aac9fea067df58ad6a2ec",
-        "reviewedEvidencePath": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/K_SHARED_PLAN_PUBLICATION.json"
+        "affectedSuites": []
       },
       {
         "path": "backend/tests/playwright/acceptance/native-continuation.config.cjs",
@@ -33696,8 +33988,8 @@
       {
         "path": "backend/tests/supportCostBudget.test.js",
         "beforeSha256": null,
-        "afterSha256": "a3dae80349f7f9b9826135f82e63ccfca2f4b2c0abf32c754eac5b4314e3ceab",
-        "reviewedEvidenceSha256": "494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd",
+        "afterSha256": "aa56a9557aefe74148f435f4dc45fcceac517965e71e60bdbf587b1cde0dfe2b",
+        "reviewedEvidenceSha256": "40f1a643d40982c582b6d15c7f0ce3c921a8c437497be73bb8908910274d610d",
         "kind": "test-fixture",
         "affectedSuites": [
           "tests/supportCostBudget.test.js"
@@ -33716,8 +34008,8 @@
       {
         "path": "backend/tests/supportCostBudgetReplica.test.js",
         "beforeSha256": null,
-        "afterSha256": "7162f0468050ad87772d93b41d0686b294f021d9e93181604aea7c28f0403450",
-        "reviewedEvidenceSha256": "494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd",
+        "afterSha256": "6e830b20dcd0f1a7d3c24110fbedc0311b1d9dfed25bb01c80eda0720484201c",
+        "reviewedEvidenceSha256": "40f1a643d40982c582b6d15c7f0ce3c921a8c437497be73bb8908910274d610d",
         "kind": "test-fixture",
         "affectedSuites": [
           "tests/supportCostBudgetReplica.test.js"
@@ -33866,12 +34158,35 @@
         "browserAcceptanceRequired": true
       },
       {
+        "path": "frontend/assets/styles/matter-publication.css",
+        "beforeSha256": "4ca25d74a3ff876eeb255e54de0c66e6b5daa4c9beb3602fbce66fd09732e101",
+        "afterSha256": "872591dd87fa47395f65f3600cd941c7014cec367e31d03aef3317d270082637",
+        "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
+        "kind": "browser-only-product",
+        "affectedSuites": [],
+        "backendRuntimeImpact": "none-reviewed",
+        "browserAcceptanceRequired": true
+      },
+      {
         "path": "frontend/assets/styles/paralegal-conversations.css",
         "beforeSha256": "1db803a1ca9f8a64895b7e700fed9bf98629ebb87d0453b2f3e5b31f7a1e157c",
         "afterSha256": "95b5a6e101acbf3fff4c087b988fb9315630afcf2c89ff41269734d937fc3f6a",
         "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
         "kind": "browser-only-product",
         "affectedSuites": [],
+        "backendRuntimeImpact": "none-reviewed",
+        "browserAcceptanceRequired": true
+      },
+      {
+        "path": "frontend/assets/styles/paralegal-v2-global.css",
+        "beforeSha256": "dbd0b6c8eca42dea6ea58d04c12f50a3ec364b13a98a0969481e226fe0dbf81b",
+        "afterSha256": "1691497ac6660412d42fd5bc8853db775f8c45edb63a33c5a827781b8c11f6e6",
+        "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
+        "kind": "browser-only-product",
+        "affectedSuites": [
+          "tests/paralegalV2FoundationContract.test.js",
+          "tests/paralegalV2Phase6Contract.test.js"
+        ],
         "backendRuntimeImpact": "none-reviewed",
         "browserAcceptanceRequired": true
       },
@@ -34001,8 +34316,8 @@
         {
           "path": ".github/workflows/native-acceptance-return.yml",
           "beforeSha256": null,
-          "afterSha256": "eaf6b6249d9dc17589eebf3aaf9307c77ccac0d6cbe686664a1365817d4721bf",
-          "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+          "afterSha256": "321ebf3a51a3dd356cecfe20b727d8aa966a6e8d2275d5ca4890a278ccae37f4",
+          "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
           "kind": "ci-control",
           "affectedSuites": []
         },
@@ -34093,6 +34408,14 @@
           "beforeSha256": "38e3fe13e8932aaee9926d71c012d19e1ea4b1ec546ad7cdec8fa05a5367433a",
           "afterSha256": "e1b88ba0fcf2d5ca1f24c9505b090dc5c27bf4ac5d7563559d4b7b6f1cd27215",
           "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+          "kind": "ci-control",
+          "affectedSuites": []
+        },
+        {
+          "path": "backend/scripts/eval-attorney-support-e2e.js",
+          "beforeSha256": "e4f76337b65f050641d71dfbf7418ef30031133ab74e7c46286b2de997521b81",
+          "afterSha256": "ab7ce3d5466e93dd3d60a2c4bec07891d049aad474cf3a649281ac04aad5c879",
+          "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
           "kind": "ci-control",
           "affectedSuites": []
         },
@@ -34201,8 +34524,8 @@
         {
           "path": "backend/scripts/verify-single-file-jest-return.cjs",
           "beforeSha256": null,
-          "afterSha256": "8781809874dd683d7ad4647d4e433610d42cb3c87cf90b28fa763b3dba20163a",
-          "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+          "afterSha256": "89550fca212b696f35568d7b374831befbfb488c4a57f15f74553fdca58e9c6e",
+          "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
           "kind": "ci-control",
           "affectedSuites": []
         },
@@ -34311,10 +34634,9 @@
           "path": "backend/tests/playwright/acceptance/native-continuation-plan.json",
           "beforeSha256": null,
           "afterSha256": "@approved-plan",
+          "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
           "kind": "test-fixture",
-          "affectedSuites": [],
-          "reviewedEvidenceSha256": "6848b5f6aa2e412c104a6334e24e75898c079013c23aac9fea067df58ad6a2ec",
-          "reviewedEvidencePath": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/K_SHARED_PLAN_PUBLICATION.json"
+          "affectedSuites": []
         },
         {
           "path": "backend/tests/playwright/acceptance/native-continuation.config.cjs",
@@ -34618,8 +34940,8 @@
         {
           "path": "backend/tests/supportCostBudget.test.js",
           "beforeSha256": null,
-          "afterSha256": "a3dae80349f7f9b9826135f82e63ccfca2f4b2c0abf32c754eac5b4314e3ceab",
-          "reviewedEvidenceSha256": "494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd",
+          "afterSha256": "aa56a9557aefe74148f435f4dc45fcceac517965e71e60bdbf587b1cde0dfe2b",
+          "reviewedEvidenceSha256": "40f1a643d40982c582b6d15c7f0ce3c921a8c437497be73bb8908910274d610d",
           "kind": "test-fixture",
           "affectedSuites": [
             "tests/supportCostBudget.test.js"
@@ -34638,8 +34960,8 @@
         {
           "path": "backend/tests/supportCostBudgetReplica.test.js",
           "beforeSha256": null,
-          "afterSha256": "7162f0468050ad87772d93b41d0686b294f021d9e93181604aea7c28f0403450",
-          "reviewedEvidenceSha256": "494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd",
+          "afterSha256": "6e830b20dcd0f1a7d3c24110fbedc0311b1d9dfed25bb01c80eda0720484201c",
+          "reviewedEvidenceSha256": "40f1a643d40982c582b6d15c7f0ce3c921a8c437497be73bb8908910274d610d",
           "kind": "test-fixture",
           "affectedSuites": [
             "tests/supportCostBudgetReplica.test.js"
@@ -34788,12 +35110,35 @@
           "browserAcceptanceRequired": true
         },
         {
+          "path": "frontend/assets/styles/matter-publication.css",
+          "beforeSha256": "4ca25d74a3ff876eeb255e54de0c66e6b5daa4c9beb3602fbce66fd09732e101",
+          "afterSha256": "872591dd87fa47395f65f3600cd941c7014cec367e31d03aef3317d270082637",
+          "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
+          "kind": "browser-only-product",
+          "affectedSuites": [],
+          "backendRuntimeImpact": "none-reviewed",
+          "browserAcceptanceRequired": true
+        },
+        {
           "path": "frontend/assets/styles/paralegal-conversations.css",
           "beforeSha256": "1db803a1ca9f8a64895b7e700fed9bf98629ebb87d0453b2f3e5b31f7a1e157c",
           "afterSha256": "95b5a6e101acbf3fff4c087b988fb9315630afcf2c89ff41269734d937fc3f6a",
           "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
           "kind": "browser-only-product",
           "affectedSuites": [],
+          "backendRuntimeImpact": "none-reviewed",
+          "browserAcceptanceRequired": true
+        },
+        {
+          "path": "frontend/assets/styles/paralegal-v2-global.css",
+          "beforeSha256": "dbd0b6c8eca42dea6ea58d04c12f50a3ec364b13a98a0969481e226fe0dbf81b",
+          "afterSha256": "1691497ac6660412d42fd5bc8853db775f8c45edb63a33c5a827781b8c11f6e6",
+          "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
+          "kind": "browser-only-product",
+          "affectedSuites": [
+            "tests/paralegalV2FoundationContract.test.js",
+            "tests/paralegalV2Phase6Contract.test.js"
+          ],
           "backendRuntimeImpact": "none-reviewed",
           "browserAcceptanceRequired": true
         },
@@ -37254,6 +37599,10 @@
         "sourceSha256": "366e9f28c9f40efcdd014aea332e70b129a5794efb3168a5b71acb3b674f43c4"
       },
       "localRawUnionRequiredBeforeBackendComponentClosure": true
+    },
+    "postNExactFileReplacementEvidence": {
+      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/O_FOUR_EXACT_FILE_FIVE_CALLBACK_SOURCE_REPLACEMENT_CLASSES.json",
+      "sha256": "7d4b0a3fc1519a346144fdbcea2059da290d4fb91f436d75620d26127418140c"
     }
   },
   "partialNativeReuse": {
@@ -37467,15 +37816,28 @@
   ],
   "currentSourceApplicability": {
     "originalCohort": 494,
-    "availableOriginalClasses": 470,
-    "withoutQualifiedOutcome": 24,
-    "selectedAffectedOriginals": 27,
-    "newRegressions": 6,
-    "selectedCurrent": 33,
+    "availableOriginalClasses": 476,
+    "withoutQualifiedOutcome": 18,
+    "selectedAffectedOriginals": 18,
+    "newRegressions": 0,
+    "selectedCurrent": 18,
     "finalLocalBackendFiles": 20,
     "finalLocalBackendCallbacks": 311,
     "priorJestClass": 538,
     "currentDiscoveryIncludingNewReviewedFiles": 542,
-    "wholeProductCurrentPassClaim": false
+    "wholeProductCurrentPassClaim": false,
+    "priorNNewRegressionsPreserved": 6
+  },
+  "continuationAfterActualN": {
+    "actualNReadback": {
+      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_N_TERMINAL_14_WHOLE_PLUS_ONE_ORIGINAL_PARTIAL_FIVE_FAIL_THIRTEEN_UNEXECUTED.json",
+      "sha256": "3f0c44cfd14bdd40aa0abe2738f28088ef5e56f62ef2a51ed114f3442963f8c3"
+    },
+    "actualNWholeQualifiedCallbacks": 14,
+    "actualNIndividualOriginalPartialClasses": 1,
+    "selectedOUnqualifiedOrFailedCallbacks": 18,
+    "repeatedUnchangedPassingNativeCallbacks": 0,
+    "priorNativeUniverseRemains500": true,
+    "notAWholeCurrentCatalogueCertification": true
   }
 }

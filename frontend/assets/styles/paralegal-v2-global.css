@@ -681,7 +681,7 @@
   line-height: 1.65;
 }
 
-.v2-help-answer > summary {display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:44px;padding:10px 0;cursor:pointer;list-style:none;font-size:.875rem;line-height:1.5;}
+.v2-help-answer > summary {color:var(--v2-ink);display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:44px;padding:10px 0;cursor:pointer;list-style:none;font-size:.875rem;line-height:1.5;}
 .v2-help-answer > summary::-webkit-details-marker {display:none;}
 .v2-help-answer > summary::after {content:'+';flex:none;color:var(--v2-muted);}
 .v2-help-answer[open] > summary::after {content:'−';}

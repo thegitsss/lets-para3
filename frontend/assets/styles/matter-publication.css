@@ -146,3 +146,23 @@ body.lpc-product-clean.lpc-current-draft.theme-dark .lpc-draft-editor-header h1 
 .lpc-current-draft #previewModal :is(button, .btn) { min-height: 44px; white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
 body.lpc-product-clean.lpc-current-draft.theme-dark #previewModal :is(.modal-content, h3, p, strong, .description-label, .task-list li) { color: var(--ink) !important; }
 body.lpc-product-clean.lpc-current-draft.theme-dark #previewModal :is(.modal-content, .task-list li) { background: var(--panel) !important; border-color: var(--line) !important; }
+
+/* Draft review is a document surface, not the dashboard summary-card grid. */
+.lpc-current-draft #reviewSummary { display: flex; flex-direction: column; overflow-wrap: anywhere; }
+.lpc-current-draft #caseTitlePreview .value { max-width: 100%; overflow-wrap: anywhere; }
+
+/* Anchor fee help to its full text line so hidden or opened help cannot widen the review. */
+.lpc-current-draft #reviewSummary .summary-content > p { position: relative; }
+.lpc-current-draft #reviewSummary .fee-info { position: static; transform: none; }
+.lpc-current-draft #reviewSummary .fee-info::after {
+  display: none;
+  left: 0;
+  width: min(300px, 100%);
+  max-width: 100%;
+  box-sizing: border-box;
+  transform: translateY(4px);
+}
+.lpc-current-draft #reviewSummary .fee-info:is(:hover, :focus-visible)::after {
+  display: block;
+  transform: translateY(0);
+}

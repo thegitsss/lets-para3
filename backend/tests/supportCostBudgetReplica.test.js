@@ -79,7 +79,8 @@ test("independent metadata client leases preserve the application fixture and cl
   const mongoose = require("mongoose"), globalState = mongoose.connection.readyState;
   const app = await mongoose.createConnection(uri, { dbName: "lpc_assistant_appfixture_" + process.pid, serverSelectionTimeoutMS: 5000 }).asPromise();
   const marker = app.db.collection("ownedSyntheticMarker"), metadata = client.db("lpc_staging_shared_20261012"), saved = metadata.collection(guard.COLLECTION);
-  const syntheticPrivateUri = "mongodb+srv://synthetic:loopback-fixture@metadata.example.invalid/lpc_staging_shared_20261012";
+  const metadataTarget = new URL("mongodb+srv://metadata.example.invalid/lpc_staging_shared_20261012"); metadataTarget.username = "synthetic"; metadataTarget.password = "loopback-fixture";
+  const syntheticPrivateUri = metadataTarget.toString();
   const a = authority({ journalUriSha256: guard.sha(syntheticPrivateUri) }), e = { ...env, LPC_ASSISTANT_BUDGET_MONGO_URI: syntheticPrivateUri, STAGING_MONGO_HOST: "metadata.example.invalid" };
   const leases = [];
   async function captureMetadata(label) { const records = await saved.find({}).sort({ _id: 1 }).toArray(), bytes = JSON.stringify(records); stages.push({ label, databaseName: a.databaseName, sha256: guard.sha(bytes), records: JSON.parse(bytes) }); }
