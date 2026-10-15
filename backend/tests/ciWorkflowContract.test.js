@@ -328,3 +328,88 @@ describe("bounded source-bound acceptance return", () => {
     }
   });
 });
+
+
+describe("explicit single-file recovery return with complete named gates", () => {
+  const evaluate = (expression, event, scope) => Function("github", "inputs", `return (${expression.replace("always()", "true")})`)({event_name:event}, {execution_scope:scope});
+  test.each([
+    ["pull_request", "recovery-return"], ["push", "recovery-return"],
+    ["workflow_dispatch", "full"], ["workflow_dispatch", undefined],
+    ["workflow_dispatch", "unknown"], ["workflow_dispatch", "backend-source"],
+    ["workflow_dispatch", "source-return"], ["workflow_dispatch", "recovery-return"],
+  ])("binds the exact source security and execution jobs for %s/%s", (event, scope) => {
+    const w=currentWorkflow();validateWorkflowContract(w);
+    const manual=event==="workflow_dispatch", recovery=manual&&scope==="recovery-return", source=manual&&scope==="source-return";
+    for(const name of ["deployment-blueprint","runtime-checks","codeql","secrets"])expect(evaluate(w.jobs[name].if,event,scope)).toBe(!source);
+    for(const name of ["backend-tests","backend-coverage"])expect(evaluate(w.jobs[name].if,event,scope)).toBe(!source&&!recovery);
+    for(const name of ["browser-collection","browser-checks","browser-role-journeys"])expect(evaluate(w.jobs[name].if,event,scope)).toBe(!manual||!["backend-source","source-return","recovery-return"].includes(scope));
+    expect(evaluate(w.jobs.validate.if,event,scope)).toBe(!source);
+    expect(evaluate(w.jobs["browser-contracts"].if,event,scope)).toBe(!manual||!["backend-source","source-return"].includes(scope));
+    expect(evaluate(w.jobs["source-bound-recovery-return"].if,event,scope)).toBe(recovery);
+    expect(evaluate(w.jobs["source-bound-backend-return"].if,event,scope)).toBe(source);
+    expect(evaluate(w.jobs["selected-native-return"].if,event,scope)).toBe(source||recovery);
+  });
+  const outcomes = [
+    ["validate",false,{CHECKS_RESULT:"success",SHARDS_RESULT:"success",COVERAGE_RESULT:"success",RECOVERY_RESULT:"skipped"}],
+    ["validate",true,{CHECKS_RESULT:"success",SHARDS_RESULT:"skipped",COVERAGE_RESULT:"skipped",RECOVERY_RESULT:"success"}],
+    ["browser-contracts",false,{COLLECTION_RESULT:"success",CHECKS_RESULT:"success",ROLES_RESULT:"success",SELECTED_RESULT:"skipped"}],
+    ["browser-contracts",true,{COLLECTION_RESULT:"skipped",CHECKS_RESULT:"skipped",ROLES_RESULT:"skipped",SELECTED_RESULT:"success"}],
+  ];
+  test.each(outcomes)("named %s gate accepts only its exact complete result class (recovery=%s)",(name,recovery,values)=>{
+    const cp=require("child_process"),job=currentWorkflow().jobs[name],script=job.steps[0].run;
+    const run=env=>cp.spawnSync("/bin/bash",["-e","-c",script],{env:{...process.env,...env,RECOVERY_SCOPE:String(recovery)},encoding:"utf8"}).status;
+    expect(run(values)).toBe(0);
+    for(const key of Object.keys(values))for(const value of ["failure","cancelled","unknown",""]){expect(run({...values,[key]:value})).not.toBe(0);}
+    for(const key of Object.keys(values))expect(run({...values,[key]:values[key]==="success"?"skipped":"success"})).not.toBe(0);
+  });
+  test("recovery workflow cannot use ambient authority mutable code or an unbound plan",()=>{
+    for(const mutate of [j=>j.secrets="inherit",j=>j.permissions.actions="write",j=>j.with.bridge_sha256="f".repeat(64),j=>j.if="github.event_name == 'workflow_dispatch'",j=>j.uses="owner/repo/workflow.yml@main",j=>j["continue-on-error"]=true]){
+      const w=currentWorkflow();mutate(w.jobs["source-bound-recovery-return"]);expect(()=>validateWorkflowContract(w)).toThrow(/Source-bound return calls/);
+    }
+  });
+  test("both original named aggregates reject proof dependency env script or result suppression drift",()=>{
+    for(const name of ["validate","browser-contracts"])for(const mutate of [j=>j.needs=j.needs.slice(0,-1),j=>j.steps[0].env.RECOVERY_SCOPE="false",j=>j.steps[0].run+="\ntrue",j=>j.steps[0]["continue-on-error"]=true]){
+      const w=currentWorkflow();mutate(w.jobs[name]);expect(()=>validateWorkflowContract(w)).toThrow();
+    }
+  });
+});
+
+describe("recovery artifacts share the approved native pool before upload", () => {
+  const { verifyRecoveryArtifactAllocation } = require("../scripts/check-ci-workflow");
+  function fixture(prefix, maximum) {
+    const env = { GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_EVENT_PATH: "/owned/event.json", GITHUB_REPOSITORY: "thegitsss/lets-para3", GITHUB_SHA: "a".repeat(40), GITHUB_RUN_ID: "123", GITHUB_RUN_ATTEMPT: "1" };
+    const job = prefix === "candidate-identity" ? "runtime-checks" : "secrets";
+    const plan = { candidateCommit: "@checked-out-head", sourcePins: { "backend/tests/playwright/acceptance/native-continuation-plan.json": "@approved-plan" }, cloudEvidence: { recoveryArtifacts: [{ prefix, job, key: "", maxBytes: maximum }, ...[1, 2, 3, 4].map(n => ({ prefix: "other-" + n }))] } };
+    const record = { schemaVersion: 1, repository: env.GITHUB_REPOSITORY, headSha: env.GITHUB_SHA, runId: env.GITHUB_RUN_ID, attempt: env.GITHUB_RUN_ATTEMPT, artifact: { job, key: "", name: prefix + "-123-1" }, completeEvidence: true, retentionDays: 1, compressionLevel: 9, upperBoundBytes: maximum };
+    const event = { inputs: { execution_scope: "recovery-return", continuation_plan_sha256: "" } };
+    function run() {
+      const bytes = Buffer.from(JSON.stringify(plan));
+      event.inputs.continuation_plan_sha256 = require("node:crypto").createHash("sha256").update(bytes).digest("hex");
+      const values = { [env.GITHUB_EVENT_PATH]: Buffer.from(JSON.stringify(event)), "tests/playwright/acceptance/native-continuation-plan.json": bytes, "/owned/record.json": Buffer.from(JSON.stringify(record)) };
+      return verifyRecoveryArtifactAllocation(prefix, "/owned/record.json", { env, read: p => { if (!Object.hasOwn(values, p)) throw Error("Unreviewed path"); return values[p]; } });
+    }
+    return { env, plan, record, event, run };
+  }
+  test("both exact recovery limits accept complete evidence and ordinary events retain their allocation", () => {
+    for (const [prefix, maximum] of [["candidate-identity", 4 * 1024 ** 2], ["secret-scan-evidence", 8 * 1024 ** 2]]) {
+      const f = fixture(prefix, maximum);
+      expect(f.run()).toEqual({ profile: "recovery-return", maximum, upperBoundBytes: maximum });
+      f.record.upperBoundBytes = 1; expect(f.run().upperBoundBytes).toBe(1);
+      f.env.GITHUB_EVENT_NAME = "pull_request"; expect(f.run()).toEqual({ profile: "ordinary-allocation" });
+      f.env.GITHUB_EVENT_NAME = "workflow_dispatch"; f.event.inputs.execution_scope = "full"; expect(f.run()).toEqual({ profile: "ordinary-allocation" });
+    }
+  });
+  test("over-budget stale incomplete or unbound proof and a removed preupload guard fail closed", () => {
+    for (const [prefix, maximum] of [["candidate-identity", 4 * 1024 ** 2], ["secret-scan-evidence", 8 * 1024 ** 2]]) {
+      for (const mutate of [f => f.record.upperBoundBytes++, f => f.record.upperBoundBytes = 0, f => f.record.upperBoundBytes = 1.5, f => f.record.headSha = "b".repeat(40), f => f.record.runId = "124", f => f.record.attempt = "2", f => f.record.repository = "another/repo", f => f.record.completeEvidence = false, f => f.record.artifact.job = "wrong", f => f.record.artifact.name += "-extra", f => f.plan.cloudEvidence.recoveryArtifacts[0].maxBytes++, f => f.plan.cloudEvidence.recoveryArtifacts.pop(), f => f.plan.sourcePins["backend/tests/playwright/acceptance/native-continuation-plan.json"] = "f".repeat(64)]) {
+        const f = fixture(prefix, maximum); mutate(f); expect(f.run).toThrow();
+      }
+    }
+    for (const name of ["runtime-checks", "secrets"]) {
+      const w = currentWorkflow(), guard = w.jobs[name].steps.find(s => String(s.run || "").includes("verifyRecoveryArtifactAllocation(prefix"));
+      expect(guard).toBeTruthy(); guard.run = guard.run.split("\n")[0]; expect(() => validateWorkflowContract(w)).toThrow(/finite budget guard/);
+    }
+    const f = fixture("candidate-identity", 4 * 1024 ** 2);
+    expect(() => verifyRecoveryArtifactAllocation("candidate-identity", "/owned/record.json", { env: f.env, read: p => p === f.env.GITHUB_EVENT_PATH ? Buffer.from(JSON.stringify({ inputs: { execution_scope: "recovery-return", continuation_plan_sha256: "f".repeat(64) } })) : Buffer.from("{}") })).toThrow();
+  });
+});

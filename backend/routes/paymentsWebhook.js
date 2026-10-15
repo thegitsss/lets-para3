@@ -147,7 +147,13 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
   }
   const { deduped, retryLater } = claim;
   if (deduped) {
-    return res.json({ received: true, deduped: true });
+    let recovery;
+    try { recovery = await refundEvents.observeRecovery({ event, stripe, ip: req.ip, ua: req.headers["user-agent"] }); }
+    catch (error) {
+      logger.warn("Signed refund recovery observation unavailable.", errorMetadata(error));
+      recovery = { recoveryObserved: false, reason: "Current signed refund evidence could not be verified. Keep this alert open for payment review." };
+    }
+    return res.json({ received: true, deduped: true, ...(recovery || {}) });
   }
   if (retryLater) {
     return res.status(503).json({ received: false, handled: false, retryable: true });

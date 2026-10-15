@@ -42,10 +42,10 @@ The implementation owner is responsible for finding and correcting inconsistenci
 - [x] New signup separately records Terms agreement and Privacy acknowledgement with version, timestamp, and source.
 - [x] AI-assisted support identifies OpenAI at point of use, prohibits confidential/privileged matter content, and is accurately described in the Privacy Policy.
 - [ ] Samantha approves the exact Terms and Privacy files after the specific policy/business decisions and factual checks are resolved. Record her actual approval reference plus the hashes printed by `npm run check:legal` in the production secret store. Do not invent a counsel approval; the existing `LEGAL_COUNSEL_APPROVAL_ID` is a legacy configuration key.
-- [ ] Counsel reviews the restored Privacy Policy section “Processing in the United States”; its candidate digest supersedes any earlier unapproved Privacy digest.
+- [ ] Samantha reviews the restored Privacy Policy section “Processing in the United States” after the actual hosting, processing and vendor facts are verified. Its candidate digest supersedes any earlier unapproved Privacy digest; record unresolved policy uncertainty explicitly.
 - [ ] Run `npm run certify:legal`; it must confirm the recorded owner policy approval and exact document versions/digests.
 - [ ] After deployment, run `npm run verify:production` from the same clean candidate checkout and retain `test-results/release/production-surface.json`; the live Terms and Privacy bytes must match the owner-approved candidate hashes.
-- [ ] Counsel confirms jurisdiction-specific privacy, marketplace, professional-responsibility, independent-contractor, fee, dispute, waiver, and notice language. Code review is not legal approval.
+- [ ] Samantha resolves the specific jurisdiction, privacy, marketplace, professional-responsibility, independent-contractor, fee, dispute, waiver and notice policy/business decisions after the substantive factual checks. Record any unresolved legal uncertainty; technical verification does not establish a legal opinion or require appointing counsel.
 
 ## 3. Authentication, authorization, and account security
 
@@ -128,7 +128,7 @@ Local verification update, October 12, 2026: production and billing remain uncha
 - [ ] Samantha reviews substantive engineering/security reviews, test, data integrity, deployment, observability and rollback evidence. Record the technical executor; no independent technical reviewer or second-person signature is required.
 - [ ] Operations owner signs backup/restore, alerts, incident response, and on-call readiness.
 - [ ] Finance owner signs live Stripe reconciliation and payout/refund evidence.
-- [ ] Counsel signs the exact legal documents and launch-relevant legal/privacy decisions.
+- [ ] Samantha approves the exact legal documents and launch-relevant policy/privacy decisions, with document versions, hashes and her actual approval reference recorded.
 - [ ] Samantha retains final release approval: review every stop-ship condition in `docs/RELEASE_GATES.md`, record residual non-blocking risks with owner/date, and make the exact-candidate go/no-go decision. Completing this checklist does not authorize deployment without her explicit approval.
 
 Launch remains **no-go** until every required item above is supported by evidence for the exact candidate. Local implementation and tests are necessary, but they are not production attestation.

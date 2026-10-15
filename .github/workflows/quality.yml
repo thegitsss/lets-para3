@@ -11,9 +11,9 @@ on:
         type: choice
         required: true
         default: full
-        options: [full, backend-source, source-return]
+        options: [full, backend-source, source-return, recovery-return]
       continuation_plan_sha256:
-        description: Optional reviewed backend continuation plan SHA-256 (backend-source manual dispatch only)
+        description: Reviewed source-bound continuation plan SHA-256 (explicit manual return scopes only)
         type: string
         required: false
         default: ""
@@ -125,8 +125,41 @@ jobs:
       - name: Bound complete evidence before upload 2
         id: evidence_limit_2
         if: always()
-        run: >-
+        run: |
           node scripts/guard-ci-artifact-budget.js --job "runtime-checks" --key "" --artifact "candidate-identity-${{ github.run_id }}-${{ github.run_attempt }}" --path "backend/test-results/release/candidate.json" --record "${{ runner.temp }}/lpc-artifact-runtime-checks--2.json"
+          node - <<'JS'
+          function verifyRecoveryArtifactAllocation(prefix, recordPath, options = {}) {
+            const assert = require("node:assert/strict"), crypto = require("node:crypto");
+            const env = options.env || process.env, read = options.read || require("node:fs").readFileSync;
+            if (env.GITHUB_EVENT_NAME !== "workflow_dispatch") return { profile: "ordinary-allocation" };
+            const event = JSON.parse(read(env.GITHUB_EVENT_PATH));
+            if (event.inputs?.execution_scope !== "recovery-return") return { profile: "ordinary-allocation" };
+            const fixed = { "candidate-identity": ["runtime-checks", 4 * 1024 ** 2], "secret-scan-evidence": ["secrets", 8 * 1024 ** 2] };
+            assert(Object.hasOwn(fixed, prefix));
+            const approved = event.inputs.continuation_plan_sha256;
+            assert(/^[a-f0-9]{64}$/.test(approved || ""));
+            const bytes = read("tests/playwright/acceptance/native-continuation-plan.json");
+            assert.equal(crypto.createHash("sha256").update(bytes).digest("hex"), approved);
+            const plan = JSON.parse(bytes), rows = plan.cloudEvidence?.recoveryArtifacts;
+            assert.equal(plan.candidateCommit, "@checked-out-head");
+            assert.equal(plan.sourcePins?.["backend/tests/playwright/acceptance/native-continuation-plan.json"], "@approved-plan");
+            assert(Array.isArray(rows) && rows.length === 5);
+            const matches = rows.filter(row => row.prefix === prefix);
+            assert.equal(matches.length, 1);
+            const [job, maximum] = fixed[prefix], row = matches[0];
+            assert.equal(row.job, job); assert.equal(row.key, ""); assert.equal(row.maxBytes, maximum);
+            const record = JSON.parse(read(recordPath));
+            assert.equal(record.schemaVersion, 1); assert.equal(record.repository, "thegitsss/lets-para3");
+            assert.equal(record.repository, env.GITHUB_REPOSITORY); assert.equal(record.headSha, env.GITHUB_SHA);
+            assert.equal(record.runId, env.GITHUB_RUN_ID); assert.equal(record.attempt, env.GITHUB_RUN_ATTEMPT);
+            assert.equal(record.artifact?.job, job); assert.equal(record.artifact?.key, "");
+            assert.equal(record.artifact?.name, prefix + "-" + env.GITHUB_RUN_ID + "-" + env.GITHUB_RUN_ATTEMPT);
+            assert.equal(record.completeEvidence, true); assert.equal(record.retentionDays, 1); assert.equal(record.compressionLevel, 9);
+            assert(Number.isSafeInteger(record.upperBoundBytes) && record.upperBoundBytes > 0 && record.upperBoundBytes <= maximum);
+            return { profile: "recovery-return", maximum, upperBoundBytes: record.upperBoundBytes };
+          }
+          verifyRecoveryArtifactAllocation("candidate-identity", require("node:path").join(process.env.RUNNER_TEMP, "lpc-artifact-runtime-checks--2.json"));
+          JS
 
       - name: Upload candidate identity evidence
         if: ${{ always() && steps.evidence_limit_2.outcome == 'success' }}
@@ -157,7 +190,7 @@ jobs:
           compression-level: 9
           include-hidden-files: true
   backend-tests:
-    if: github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'source-return'
+    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'source-return' && inputs.execution_scope != 'recovery-return')
     name: Backend original suite shard ${{ matrix.shard }}
     needs: runtime-checks
     runs-on: ubuntu-24.04
@@ -234,7 +267,7 @@ jobs:
     needs:
       - runtime-checks
       - backend-tests
-    if: always() && (github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'source-return')
+    if: always() && (github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'source-return' && inputs.execution_scope != 'recovery-return'))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -313,6 +346,7 @@ jobs:
       - runtime-checks
       - backend-tests
       - backend-coverage
+      - source-bound-recovery-return
     if: always() && (github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'source-return')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -323,13 +357,22 @@ jobs:
           CHECKS_RESULT: ${{ needs.runtime-checks.result }}
           SHARDS_RESULT: ${{ needs.backend-tests.result }}
           COVERAGE_RESULT: ${{ needs.backend-coverage.result }}
+          RECOVERY_RESULT: ${{ needs.source-bound-recovery-return.result }}
+          RECOVERY_SCOPE: ${{ github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'recovery-return' }}
         run: |-
           test "$CHECKS_RESULT" = success
-          test "$SHARDS_RESULT" = success
-          test "$COVERAGE_RESULT" = success
+          if [ "$RECOVERY_SCOPE" = true ]; then
+            test "$RECOVERY_RESULT" = success
+            test "$SHARDS_RESULT" = skipped
+            test "$COVERAGE_RESULT" = skipped
+          else
+            test "$SHARDS_RESULT" = success
+            test "$COVERAGE_RESULT" = success
+            test "$RECOVERY_RESULT" = skipped
+          fi
 
   browser-collection:
-    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return')
+    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return' && inputs.execution_scope != 'recovery-return')
     name: Browser fixture collection
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -396,7 +439,7 @@ jobs:
           include-hidden-files: true
 
   browser-checks:
-    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return')
+    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return' && inputs.execution_scope != 'recovery-return')
     name: Browser checks (${{ matrix.scope }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -492,7 +535,7 @@ jobs:
           include-hidden-files: true
 
   browser-role-journeys:
-    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return')
+    if: github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return' && inputs.execution_scope != 'recovery-return')
     name: Role journeys (${{ matrix.group }})
     needs: browser-collection
     runs-on: ubuntu-24.04
@@ -615,7 +658,7 @@ jobs:
 
   browser-contracts:
     name: Browser contracts
-    needs: [browser-collection, browser-checks, browser-role-journeys]
+    needs: [browser-collection, browser-checks, browser-role-journeys, selected-native-return]
     if: always() && (github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return'))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -626,10 +669,20 @@ jobs:
           COLLECTION_RESULT: ${{ needs.browser-collection.result }}
           CHECKS_RESULT: ${{ needs.browser-checks.result }}
           ROLES_RESULT: ${{ needs.browser-role-journeys.result }}
+          SELECTED_RESULT: ${{ needs.selected-native-return.result }}
+          RECOVERY_SCOPE: ${{ github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'recovery-return' }}
         run: |
-          test "$COLLECTION_RESULT" = success
-          test "$CHECKS_RESULT" = success
-          test "$ROLES_RESULT" = success
+          if [ "$RECOVERY_SCOPE" = true ]; then
+            test "$SELECTED_RESULT" = success
+            test "$COLLECTION_RESULT" = skipped
+            test "$CHECKS_RESULT" = skipped
+            test "$ROLES_RESULT" = skipped
+          else
+            test "$COLLECTION_RESULT" = success
+            test "$CHECKS_RESULT" = success
+            test "$ROLES_RESULT" = success
+            test "$SELECTED_RESULT" = skipped
+          fi
 
   dependency-review:
     name: Dependency review
@@ -700,8 +753,41 @@ jobs:
       - name: Bound complete evidence before upload 1
         id: evidence_limit_1
         if: always()
-        run: >-
+        run: |
           node scripts/guard-ci-artifact-budget.js --job "secrets" --key "" --artifact "secret-scan-evidence-${{ github.run_id }}-${{ github.run_attempt }}" --path "results.sarif" --record "${{ runner.temp }}/lpc-artifact-secrets--1.json"
+          node - <<'JS'
+          function verifyRecoveryArtifactAllocation(prefix, recordPath, options = {}) {
+            const assert = require("node:assert/strict"), crypto = require("node:crypto");
+            const env = options.env || process.env, read = options.read || require("node:fs").readFileSync;
+            if (env.GITHUB_EVENT_NAME !== "workflow_dispatch") return { profile: "ordinary-allocation" };
+            const event = JSON.parse(read(env.GITHUB_EVENT_PATH));
+            if (event.inputs?.execution_scope !== "recovery-return") return { profile: "ordinary-allocation" };
+            const fixed = { "candidate-identity": ["runtime-checks", 4 * 1024 ** 2], "secret-scan-evidence": ["secrets", 8 * 1024 ** 2] };
+            assert(Object.hasOwn(fixed, prefix));
+            const approved = event.inputs.continuation_plan_sha256;
+            assert(/^[a-f0-9]{64}$/.test(approved || ""));
+            const bytes = read("tests/playwright/acceptance/native-continuation-plan.json");
+            assert.equal(crypto.createHash("sha256").update(bytes).digest("hex"), approved);
+            const plan = JSON.parse(bytes), rows = plan.cloudEvidence?.recoveryArtifacts;
+            assert.equal(plan.candidateCommit, "@checked-out-head");
+            assert.equal(plan.sourcePins?.["backend/tests/playwright/acceptance/native-continuation-plan.json"], "@approved-plan");
+            assert(Array.isArray(rows) && rows.length === 5);
+            const matches = rows.filter(row => row.prefix === prefix);
+            assert.equal(matches.length, 1);
+            const [job, maximum] = fixed[prefix], row = matches[0];
+            assert.equal(row.job, job); assert.equal(row.key, ""); assert.equal(row.maxBytes, maximum);
+            const record = JSON.parse(read(recordPath));
+            assert.equal(record.schemaVersion, 1); assert.equal(record.repository, "thegitsss/lets-para3");
+            assert.equal(record.repository, env.GITHUB_REPOSITORY); assert.equal(record.headSha, env.GITHUB_SHA);
+            assert.equal(record.runId, env.GITHUB_RUN_ID); assert.equal(record.attempt, env.GITHUB_RUN_ATTEMPT);
+            assert.equal(record.artifact?.job, job); assert.equal(record.artifact?.key, "");
+            assert.equal(record.artifact?.name, prefix + "-" + env.GITHUB_RUN_ID + "-" + env.GITHUB_RUN_ATTEMPT);
+            assert.equal(record.completeEvidence, true); assert.equal(record.retentionDays, 1); assert.equal(record.compressionLevel, 9);
+            assert(Number.isSafeInteger(record.upperBoundBytes) && record.upperBoundBytes > 0 && record.upperBoundBytes <= maximum);
+            return { profile: "recovery-return", maximum, upperBoundBytes: record.upperBoundBytes };
+          }
+          verifyRecoveryArtifactAllocation("secret-scan-evidence", require("node:path").join(process.env.RUNNER_TEMP, "lpc-artifact-secrets--1.json"));
+          JS
       - name: Upload complete redacted secret scan evidence
         if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -723,10 +809,19 @@ jobs:
       bridge_sha256: ${{ inputs.continuation_plan_sha256 }}
 
   selected-native-return:
-    if: github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'source-return'
+    if: github.event_name == 'workflow_dispatch' && (inputs.execution_scope == 'source-return' || inputs.execution_scope == 'recovery-return')
     permissions:
       contents: read
       actions: read
     uses: ./.github/workflows/native-acceptance-return.yml
+    with:
+      bridge_sha256: ${{ inputs.continuation_plan_sha256 }}
+
+  source-bound-recovery-return:
+    if: github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'recovery-return'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/backend-single-file-return.yml
     with:
       bridge_sha256: ${{ inputs.continuation_plan_sha256 }}

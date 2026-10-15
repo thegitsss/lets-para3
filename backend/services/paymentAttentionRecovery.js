@@ -45,10 +45,19 @@ async function list(req) {
   await actor(req);
   return { ownerId: owner.ownerId, revision: fingerprint([owner, rows]), items: rows.map(safeReceipt) };
 }
+function reviewedProof(proof) {
+  if (!proof) return proof;
+  // Stripe can refresh this presentation URL between otherwise identical
+  // reads. It is not accounting evidence. Do not mutate either source object
+  // or omit any other provider, saved-record, audit, or authority field.
+  const charge = value => value && typeof value === 'object' && value.object === 'charge'
+    ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'receipt_url')) : value;
+  return { ...proof, charge: charge(proof.charge), intent: proof.intent ? { ...proof.intent, latest_charge: charge(proof.intent.latest_charge) } : proof.intent };
+}
 async function inspect(req, stripe) {
   const owner = await actor(req), row = await receipt(req);
   const view = { ownerId: owner.ownerId, receipt: safeReceipt(row), caseId: null, caseTitle: null, canResolve: false, reason: '', evidence: null };
-  let proof = null, audit = null, event = null;
+  let proof = null, audit = null, event = null, observation = null;
   if (!row.attentionRequired) view.reason = 'This alert has already been resolved.';
   else if (row.status !== 'processed') view.reason = 'Processing is not complete. This alert cannot be resolved while delivery is pending or failed.';
   else if (row.attentionCategory !== 'processing' || !types.has(row.type)) view.reason = 'This alert needs its substantive payment review. It cannot be cleared as a recovered processing failure.';
@@ -58,7 +67,10 @@ async function inspect(req, stripe) {
     if (event.id !== row.eventId || event.type !== row.type || event.account || mode === 'unknown' || row.stripeMode !== mode || currentStripeMode() !== mode) fail(409, 'PROVIDER_MISMATCH', 'The current provider account or event does not match this alert.');
     proof = await refunds.reviewAttention({ event, stripe });
     audit = await Audit.collection.findOne({ _id: new mongoose.Types.ObjectId(fingerprint(['stripe_refund_event', event.id]).slice(0, 24)) });
-    const recorded = audit && audit.action === event.type && audit.actorRole === 'system' && audit.meta?.kind === 'refund_observation' && audit.meta.eventId === event.id && audit.meta.externalRef === event.data.object.id && audit.meta.eventHash === fingerprint([event.id, event.type, event.created, event.livemode, event.account, event.request, event.data.object]) && !audit.meta.associationProblem && proof.projected && audit.meta.outcome === proof.projected.paymentStatus && audit.meta.confirmedRefundAmount === proof.projected.confirmedTotal && audit.meta.refundCount === proof.refunds.length && audit.meta.currency === proof.intent.currency && id(audit.case) === id(proof.view.raw._id);
+    const originalMatches = refunds.originalAuditAgrees(audit, event, proof);
+    const fullHashMatches = originalMatches && audit.meta.eventHash === fingerprint([event.id, event.type, event.created, event.livemode, event.account, event.request, event.data.object]);
+    if (originalMatches && !fullHashMatches) observation = await Audit.collection.findOne({ _id: refunds.recoveryObservationId(event.id) });
+    const recorded = originalMatches && (fullHashMatches || refunds.recoveryObservationMatches(observation, audit, row, event, proof));
     if (!proof.ready || !recorded) view.reason = 'Current refund, accounting, and original event evidence do not all agree. Keep this alert open for payment review.';
     else {
       view.canResolve = true; view.reason = 'The provider refund is settled and the saved accounting agrees. Only the recovered processing alert will be resolved.';
@@ -69,9 +81,10 @@ async function inspect(req, stripe) {
   }
   if (fingerprint(row) !== fingerprint(await receipt(req))) changed();
   if (audit && fingerprint(audit) !== fingerprint(await Audit.collection.findOne({ _id: audit._id }))) changed();
+  if (observation && fingerprint(observation) !== fingerprint(await Audit.collection.findOne({ _id: observation._id }))) changed();
   await actor(req);
-  const revision = fingerprint([owner, row, event, proof, audit]);
-  return { value: { ...view, revision }, row, proof, audit };
+  const revision = fingerprint([owner, row, event, reviewedProof(proof), audit, observation]);
+  return { value: { ...view, revision }, row, proof, audit, observation };
 }
 async function review(req, stripe) { return (await inspect(req, stripe)).value; }
 const resolutionId = (owner, requestId) => new mongoose.Types.ObjectId(fingerprint(['payment_attention_resolution', owner, requestId]).slice(0, 24));
@@ -92,11 +105,12 @@ async function resolve(req, stripe) {
   const inspected = await inspect(req, stripe);
   if (inspected.value.revision !== body.revision) changed();
   if (!inspected.value.canResolve) fail(409, 'REVIEW_REQUIRED', inspected.value.reason);
-  const { row, proof, audit } = inspected;
+  const { row, proof, audit, observation } = inspected;
   const result = await write(req, async session => {
     if (await Audit.collection.findOne({ _id: auditId }, { session })) changed();
     await verifySources(proof, session);
     if (fingerprint(audit) !== fingerprint(await Audit.collection.findOne({ _id: audit._id }, { session }))) changed();
+    if (observation && fingerprint(observation) !== fingerprint(await Audit.collection.findOne({ _id: observation._id }, { session }))) changed();
     const raw = proof.view.raw;
     // This version-only write serializes this review with a competing Matter
     // financial write. No amount, status, scope, payout, or refund is changed.

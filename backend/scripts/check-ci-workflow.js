@@ -5,11 +5,18 @@ const { parseDocument } = require("yaml");
 const repositoryRoot = path.resolve(__dirname, "../..");
 const defaultWorkflowPath = path.join(repositoryRoot, ".github/workflows/quality.yml");
 const SOURCE_RETURN_GUARD = "github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'source-return'";
+const RECOVERY_RETURN_GUARD = "github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'recovery-return'";
+const NATIVE_RETURN_GUARD = "github.event_name == 'workflow_dispatch' && (inputs.execution_scope == 'source-return' || inputs.execution_scope == 'recovery-return')";
+const BACKEND_EXEC_GUARD = "github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'source-return' && inputs.execution_scope != 'recovery-return')";
+const BACKEND_UNION_GUARD = "always() && (" + BACKEND_EXEC_GUARD + ")";
+const BROWSER_EXEC_GUARD = "github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return' && inputs.execution_scope != 'recovery-return')";
 const DEFAULT_SCOPE_GUARD = "github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'source-return'";
 const DEFAULT_GATE_GUARD = "always() && (" + DEFAULT_SCOPE_GUARD + ")";
 const BROWSER_SCOPE_GUARD = "github.event_name != 'workflow_dispatch' || (inputs.execution_scope != 'backend-source' && inputs.execution_scope != 'source-return')";
 const BROWSER_GATE_GUARD = "always() && (" + BROWSER_SCOPE_GUARD + ")";
 const CONTINUATION_PLAN_BINDING = "${{ github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'backend-source' && inputs.continuation_plan_sha256 || '' }}";
+const RUNTIME_AGGREGATE_SCRIPT = "test \"$CHECKS_RESULT\" = success\nif [ \"$RECOVERY_SCOPE\" = true ]; then\n  test \"$RECOVERY_RESULT\" = success\n  test \"$SHARDS_RESULT\" = skipped\n  test \"$COVERAGE_RESULT\" = skipped\nelse\n  test \"$SHARDS_RESULT\" = success\n  test \"$COVERAGE_RESULT\" = success\n  test \"$RECOVERY_RESULT\" = skipped\nfi";
+const BROWSER_AGGREGATE_SCRIPT = "if [ \"$RECOVERY_SCOPE\" = true ]; then\n  test \"$SELECTED_RESULT\" = success\n  test \"$COLLECTION_RESULT\" = skipped\n  test \"$CHECKS_RESULT\" = skipped\n  test \"$ROLES_RESULT\" = skipped\nelse\n  test \"$COLLECTION_RESULT\" = success\n  test \"$CHECKS_RESULT\" = success\n  test \"$ROLES_RESULT\" = success\n  test \"$SELECTED_RESULT\" = skipped\nfi";
 const REQUIRED_JOBS = Object.freeze([
   "deployment-blueprint",
   "validate",
@@ -173,6 +180,45 @@ function validateLaunchEvidenceArtifact(job, { stepName, pathFragment }) {
   if (step.with?.["compression-level"] !== 9) fail(`${stepName} must losslessly compress complete evidence at level9.`);
 }
 
+function verifyRecoveryArtifactAllocation(prefix, recordPath, options = {}) {
+  const assert = require("node:assert/strict"), crypto = require("node:crypto");
+  const env = options.env || process.env, read = options.read || require("node:fs").readFileSync;
+  if (env.GITHUB_EVENT_NAME !== "workflow_dispatch") return { profile: "ordinary-allocation" };
+  const event = JSON.parse(read(env.GITHUB_EVENT_PATH));
+  if (event.inputs?.execution_scope !== "recovery-return") return { profile: "ordinary-allocation" };
+  const fixed = { "candidate-identity": ["runtime-checks", 4 * 1024 ** 2], "secret-scan-evidence": ["secrets", 8 * 1024 ** 2] };
+  assert(Object.hasOwn(fixed, prefix));
+  const approved = event.inputs.continuation_plan_sha256;
+  assert(/^[a-f0-9]{64}$/.test(approved || ""));
+  const bytes = read("tests/playwright/acceptance/native-continuation-plan.json");
+  assert.equal(crypto.createHash("sha256").update(bytes).digest("hex"), approved);
+  const plan = JSON.parse(bytes), rows = plan.cloudEvidence?.recoveryArtifacts;
+  assert.equal(plan.candidateCommit, "@checked-out-head");
+  assert.equal(plan.sourcePins?.["backend/tests/playwright/acceptance/native-continuation-plan.json"], "@approved-plan");
+  assert(Array.isArray(rows) && rows.length === 5);
+  const matches = rows.filter(row => row.prefix === prefix);
+  assert.equal(matches.length, 1);
+  const [job, maximum] = fixed[prefix], row = matches[0];
+  assert.equal(row.job, job); assert.equal(row.key, ""); assert.equal(row.maxBytes, maximum);
+  const record = JSON.parse(read(recordPath));
+  assert.equal(record.schemaVersion, 1); assert.equal(record.repository, "thegitsss/lets-para3");
+  assert.equal(record.repository, env.GITHUB_REPOSITORY); assert.equal(record.headSha, env.GITHUB_SHA);
+  assert.equal(record.runId, env.GITHUB_RUN_ID); assert.equal(record.attempt, env.GITHUB_RUN_ATTEMPT);
+  assert.equal(record.artifact?.job, job); assert.equal(record.artifact?.key, "");
+  assert.equal(record.artifact?.name, prefix + "-" + env.GITHUB_RUN_ID + "-" + env.GITHUB_RUN_ATTEMPT);
+  assert.equal(record.completeEvidence, true); assert.equal(record.retentionDays, 1); assert.equal(record.compressionLevel, 9);
+  assert(Number.isSafeInteger(record.upperBoundBytes) && record.upperBoundBytes > 0 && record.upperBoundBytes <= maximum);
+  return { profile: "recovery-return", maximum, upperBoundBytes: record.upperBoundBytes };
+}
+
+function recoveryArtifactGuardCommand(prefix, recordName) {
+  const source = fs.readFileSync(__filename, "utf8");
+  const begin = source.indexOf("\nfunction verifyRecoveryArtifactAllocation("), end = source.indexOf("\nfunction recoveryArtifactGuardCommand(", begin + 1);
+  if (begin < 0 || end <= begin) fail("Exact recovery allocation guard source is missing.");
+  const body = source.slice(begin + 1, end).trimEnd();
+  return "node - <<'JS'\n" + body + "\nverifyRecoveryArtifactAllocation(" + JSON.stringify(prefix) + ", require(\"node:path\").join(process.env.RUNNER_TEMP, " + JSON.stringify(recordName) + "));\nJS\n";
+}
+
 function validateArtifactBudgets(workflow) {
   const { catalog } = require("./guard-ci-artifact-budget");
   const expected=catalog("1","1"),actual=[];
@@ -188,7 +234,9 @@ function validateArtifactBudgets(workflow) {
         if(!row) fail("Unbudgeted artifact or narrowed complete evidence path.");
         const guard=job.steps[index-1];
         const ordinal=/^evidence_limit_(\d+)$/.exec(guard?.id||"")?.[1];
-        const guardCommand=`node scripts/guard-ci-artifact-budget.js --job "${jobName}" --key "${key}" --artifact "${name}" --path "${input}" --record "\${{ runner.temp }}/lpc-artifact-${jobName}-${key}-${ordinal}.json"`;
+        let guardCommand=`node scripts/guard-ci-artifact-budget.js --job "${jobName}" --key "${key}" --artifact "${name}" --path "${input}" --record "\${{ runner.temp }}/lpc-artifact-${jobName}-${key}-${ordinal}.json"`;
+        const recoveryPrefix = jobName === "secrets" ? "secret-scan-evidence" : jobName === "runtime-checks" && ordinal === "2" ? "candidate-identity" : null;
+        if (recoveryPrefix) guardCommand += "\n" + recoveryArtifactGuardCommand(recoveryPrefix, `lpc-artifact-${jobName}-${key}-${ordinal}.json`);
         if(!ordinal || guard.if!=="always()" || expand(guard.run||"")!==guardCommand || step.if!==`\${{ always() && steps.${guard.id}.outcome == 'success' }}`) fail("Artifact upload requires its immediately preceding exact always() finite budget guard.");
         if(step.with?.["retention-days"]!==1||step.with?.["compression-level"]!==9||step.with?.["if-no-files-found"]!=="error"||step.with?.["include-hidden-files"]!==true||step.with?.archive===false||step.with?.overwrite===true) fail("Complete artifact evidence requires one day, compression9, mandatory files, unchanged ZIP and no overwrite.");
         actual.push(row.name);
@@ -257,7 +305,7 @@ function validateGroupedBrowserJobs(jobs, catalog) {
   validateLaunchEvidenceArtifact(collection, { stepName: "Upload browser collection evidence", pathFragment: "backend/test-results/critical-group-verification/verified-union.json" });
   for (const [name, job] of [["browser-collection", collection], ["browser-checks", checks], ["browser-role-journeys", roles]]) {
     validateCompiledBrowserFixtures(job); validateRuntimeBeforeInstall(job, name);
-    if (job.if !== BROWSER_SCOPE_GUARD || job["continue-on-error"]) fail(`${name} cannot conditionally bypass complete acceptance except the exact explicit backend-only dispatch.`);
+    if (job.if !== BROWSER_EXEC_GUARD || job["continue-on-error"]) fail(`${name} cannot conditionally bypass complete acceptance except the exact explicit backend-only dispatch.`);
     for (const step of job.steps || []) if (step["continue-on-error"]) fail(`${name} cannot suppress a failed step.`);
   }
   for (const job of [checks, roles]) {
@@ -270,12 +318,12 @@ function validateGroupedBrowserJobs(jobs, catalog) {
   if (roles.needs !== "browser-collection" || Object.keys(roles.strategy.matrix || {}).join() !== "group" ||
       JSON.stringify([...(roles.strategy.matrix.group || [])].sort()) !== JSON.stringify([...EXPECTED_GROUP_NAMES].sort()) ||
       findStep(roles, "Run complete fixture-compatible role group")?.run !== 'npm run test:playwright:critical:group -- --group "${{ matrix.group }}"') fail("Every approved role fixture group must execute exactly once after collection verification.");
-  const dependencies = ["browser-collection", "browser-checks", "browser-role-journeys"];
+  const dependencies = ["browser-collection", "browser-checks", "browser-role-journeys", "selected-native-return"];
   if (gate.if !== BROWSER_GATE_GUARD || JSON.stringify([...(gate.needs || [])].sort()) !== JSON.stringify([...dependencies].sort()) || gate["continue-on-error"]) fail("Fixed Browser contracts gate must always require all browser jobs and reject failures, cancellations and skips outside the exact backend-only dispatch.");
   const final = findStep(gate, "Require every original browser scope and role group");
   if (gate.steps?.length !== 1 || final?.["continue-on-error"] ||
-      JSON.stringify(final?.env) !== JSON.stringify({ COLLECTION_RESULT: "${{ needs.browser-collection.result }}", CHECKS_RESULT: "${{ needs.browser-checks.result }}", ROLES_RESULT: "${{ needs.browser-role-journeys.result }}" }) ||
-      final?.run?.trim() !== 'test "$COLLECTION_RESULT" = success\ntest "$CHECKS_RESULT" = success\ntest "$ROLES_RESULT" = success') fail("Browser aggregate must fail closed unless every complete dependency succeeds.");
+      JSON.stringify(final?.env) !== JSON.stringify({ COLLECTION_RESULT: "${{ needs.browser-collection.result }}", CHECKS_RESULT: "${{ needs.browser-checks.result }}", ROLES_RESULT: "${{ needs.browser-role-journeys.result }}", SELECTED_RESULT: "${{ needs.selected-native-return.result }}", RECOVERY_SCOPE: "${{ github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'recovery-return' }}" }) ||
+      final?.run?.trim() !== BROWSER_AGGREGATE_SCRIPT) fail("Browser aggregate must fail closed unless every complete dependency succeeds.");
   if (final["working-directory"] !== "${{ runner.temp }}") fail("Checkout-free Browser aggregate requires the existing runner temporary directory.");
   return catalog.groups.length;
 }
@@ -302,7 +350,7 @@ function validateGroupedBackendJobs(jobs) {
   const checks = jobs["runtime-checks"], shards = jobs["backend-tests"], union = jobs["backend-coverage"], gate = jobs.validate;
   if (!checks || !shards || !union) fail("Runtime checks, disjoint complete backend shards and raw coverage union are required.");
   for (const [name, job] of [["runtime-checks", checks], ["backend-tests", shards], ["backend-coverage", union]]) {
-    if (job["continue-on-error"] || job.if !== (name === "backend-coverage" ? DEFAULT_GATE_GUARD : DEFAULT_SCOPE_GUARD) || job.steps?.some(step => step["continue-on-error"])) fail(`${name} cannot suppress or skip complete backend acceptance outside the exact source-bound return.`);
+    if (job["continue-on-error"] || job.if !== (name === "runtime-checks" ? DEFAULT_SCOPE_GUARD : name === "backend-coverage" ? BACKEND_UNION_GUARD : BACKEND_EXEC_GUARD) || job.steps?.some(step => step["continue-on-error"])) fail(`${name} cannot suppress or skip complete backend acceptance outside the exact source-bound return.`);
     validateRuntimeBeforeInstall(job, name);validateCandidateBeforeInstall(job);
   }
   requireCommands(checks, ["npm ci", ...REQUIRED_VALIDATE_COMMANDS, "node scripts/verify-ci-jest-shards.js --prepare"], "runtime-checks");
@@ -320,22 +368,23 @@ function validateGroupedBackendJobs(jobs) {
   const download = findStep(union, "Download all original Jest shard evidence");
   if (download?.with?.pattern !== "jest-shard-${{ github.run_id }}-${{ github.run_attempt }}-*" || download.with.path !== "backend/test-results/jest/shard-artifacts" || download.with["merge-multiple"] !== false || download.with["digest-mismatch"] !== "error") fail("Every separate raw shard artifact must be downloaded without overwrites or digest waivers.");
   validateLaunchEvidenceArtifact(union, { stepName: "Upload complete backend union evidence", pathFragment: "backend/test-results/jest/required-coverage.json" });
-  const dependencies = ["backend-coverage", "backend-tests", "runtime-checks"];
+  const dependencies = ["backend-coverage", "backend-tests", "runtime-checks", "source-bound-recovery-return"];
   if (gate.if !== DEFAULT_GATE_GUARD || JSON.stringify([...(gate.needs || [])].sort()) !== JSON.stringify(dependencies) || gate["continue-on-error"]) fail("Fixed Runtime gate must always require every source, shard and raw coverage dependency outside the exact source-bound return.");
   const final = findStep(gate, "Require source checks and the exact complete backend union");
-  if (gate.steps?.length !== 1 || final?.["continue-on-error"] || JSON.stringify(final?.env) !== JSON.stringify({CHECKS_RESULT:"${{ needs.runtime-checks.result }}",SHARDS_RESULT:"${{ needs.backend-tests.result }}",COVERAGE_RESULT:"${{ needs.backend-coverage.result }}"}) || final.run?.trim() !== 'test "$CHECKS_RESULT" = success\ntest "$SHARDS_RESULT" = success\ntest "$COVERAGE_RESULT" = success') fail("Runtime aggregate must fail closed for failed, cancelled or skipped backend evidence.");
+  if (gate.steps?.length !== 1 || final?.["continue-on-error"] || JSON.stringify(final?.env) !== JSON.stringify({CHECKS_RESULT:"${{ needs.runtime-checks.result }}",SHARDS_RESULT:"${{ needs.backend-tests.result }}",COVERAGE_RESULT:"${{ needs.backend-coverage.result }}",RECOVERY_RESULT:"${{ needs.source-bound-recovery-return.result }}",RECOVERY_SCOPE:"${{ github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'recovery-return' }}"}) || final.run?.trim() !== RUNTIME_AGGREGATE_SCRIPT) fail("Runtime aggregate must fail closed for failed, cancelled or skipped backend evidence.");
   if (final["working-directory"] !== "${{ runner.temp }}") fail("Checkout-free Runtime aggregate requires the existing runner temporary directory.");
   return 8;
 }
 
 function validateSourceReturnCalls(jobs) {
   const calls = {
-    "source-bound-backend-return": "./.github/workflows/backend-acceptance-return.yml",
-    "selected-native-return": "./.github/workflows/native-acceptance-return.yml",
+    "source-bound-backend-return": ["./.github/workflows/backend-acceptance-return.yml", SOURCE_RETURN_GUARD],
+    "selected-native-return": ["./.github/workflows/native-acceptance-return.yml", NATIVE_RETURN_GUARD],
+    "source-bound-recovery-return": ["./.github/workflows/backend-single-file-return.yml", RECOVERY_RETURN_GUARD],
   };
-  for (const [name, file] of Object.entries(calls)) {
+  for (const [name, [file, guard]] of Object.entries(calls)) {
     const job = jobs[name];
-    if (!job || job.uses !== file || job.if !== SOURCE_RETURN_GUARD ||
+    if (!job || job.uses !== file || job.if !== guard ||
         JSON.stringify(job.with) !== JSON.stringify({ bridge_sha256: "${{ inputs.continuation_plan_sha256 }}" }) ||
         JSON.stringify(Object.keys(job.permissions || {}).sort()) !== JSON.stringify(["actions", "contents"]) ||
         job.permissions.contents !== "read" || job.permissions.actions !== "read" ||
@@ -362,10 +411,10 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
       typeof continuationInput.description !== "string" || !continuationInput.description ||
       Object.keys(continuationInput).some(key => !["type", "required", "default", "description"].includes(key)) ||
       !input || input.type !== "choice" || input.required !== true || input.default !== "full" ||
-      JSON.stringify(input.options) !== JSON.stringify(["full", "backend-source", "source-return"]) ||
+      JSON.stringify(input.options) !== JSON.stringify(["full", "backend-source", "source-return", "recovery-return"]) ||
       typeof input.description !== "string" || !input.description ||
       Object.keys(input).some(key => !["type", "required", "default", "options", "description"].includes(key))) {
-    fail("Only explicit manual backend-source or source-return dispatch may select source-bound evidence; full is required by default.");
+    fail("Only explicit manual backend-source, source-return or recovery-return dispatch may select source-bound evidence; full is required by default.");
   }
 
   if (Object.prototype.hasOwnProperty.call(triggers, "pull_request_target")) {
@@ -473,4 +522,6 @@ module.exports = {
   validateGroupedBrowserJobs,
   validateGroupedBackendJobs,
   validateArtifactBudgets,
+  verifyRecoveryArtifactAllocation,
+  recoveryArtifactGuardCommand,
 };

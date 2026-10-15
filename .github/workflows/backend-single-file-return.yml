@@ -1,0 +1,86 @@
+name: Exact final signed-recovery file return
+on:
+  workflow_call:
+    inputs:
+      bridge_sha256:
+        description: Externally reviewed complete shared source plan SHA-256
+        type: string
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  final-file:
+    name: Final signed-recovery17 with retained J backend evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      AWS_EC2_METADATA_DISABLED: "true"
+    steps:
+      - name: Check out exact dispatched source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify pinned Node and npm runtimes
+        run: node backend/scripts/verify-runtime.js
+      - name: Install unchanged locked dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Verify additive single-file guards without a database
+        run: node --test backend/scripts/single-file-jest-return-controls.test.cjs
+      - name: Build exact current frontend
+        working-directory: backend
+        run: npm run build:frontend
+      - name: Create disposable synthetic account encryption keys
+        run: |
+          node - <<'JS'
+          const fs=require('fs'),crypto=require('crypto'),assert=require('assert/strict');assert(process.env.GITHUB_ENV);fs.appendFileSync(process.env.GITHUB_ENV,'JWT_SECRET='+crypto.randomBytes(48).toString('hex')+'\nDATA_ENCRYPTION_KEY='+crypto.randomBytes(32).toString('hex')+'\n');
+          JS
+      - name: Execute exact final17 once and verify actual J538 provenance
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LPC_BACKEND_RETURN_BRIDGE_SHA256: ${{ inputs.bridge_sha256 }}
+        run: node backend/scripts/verify-single-file-jest-return.cjs
+      - name: Bound complete success or failure evidence without truncation
+        id: bound
+        if: always()
+        env:
+          APPROVED_PLAN_SHA256: ${{ inputs.bridge_sha256 }}
+        run: |
+          node - <<'JS'
+          const fs=require('fs'),path=require('path'),crypto=require('crypto'),assert=require('assert/strict'),budget=require('./backend/scripts/guard-ci-artifact-budget');const bytes=fs.readFileSync('backend/tests/playwright/acceptance/native-continuation-plan.json');assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),process.env.APPROVED_PLAN_SHA256);const plan=JSON.parse(bytes),limit=plan.backendReturn.singleFileRecovery.cloudEvidence.maximumNewBytes;assert(Number.isSafeInteger(limit)&&limit>0&&limit<=64*1024**2);assert(plan.cloudEvidence.priorRetainedBytes+plan.cloudEvidence.maximumNewBytes+limit<=10*1024**3);const input='backend/test-results/jest/shards/single-file-final-recovery',files=budget.inventory(path.resolve('.'),input),maximum=budget.bound(files);assert(maximum<=limit,'Complete raw evidence exceeds reviewed allocation; preserve, never truncate');console.log(JSON.stringify({input,files:files.length,maximumBytes:maximum,approvedBytes:limit,completeEvidence:true}));
+          JS
+      - name: Upload complete final-file raw report and cleanup evidence
+        if: ${{ always() && steps.bound.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: jest-single-final-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/jest/shards/single-file-final-recovery
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+      - name: Require actual final-file execution and qualified source-bound union
+        if: always()
+        working-directory: ${{ runner.temp }}
+        env:
+          CHECKS_RESULT: ${{ steps.verify.outputs.checks_result }}
+          SHARDS_RESULT: ${{ steps.verify.outputs.shards_result }}
+          COVERAGE_RESULT: ${{ steps.verify.outputs.coverage_result }}
+          ARTIFACT_RESULT: ${{ steps.bound.outcome }}
+        run: |-
+          test "$CHECKS_RESULT" = success
+          test "$SHARDS_RESULT" = success
+          test "$COVERAGE_RESULT" = success
+          test "$ARTIFACT_RESULT" = success
