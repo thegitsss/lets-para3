@@ -1,0 +1,81 @@
+# Exactly reviewed historical nonsecret findings, 2026-10-14.
+# Evidence: docs/security/SECRET_SCAN_DISPOSITIONS_20261014.json
+# Default rules, other findings, later commits and scan failure behavior remain active.
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+79ec0537b16d5a8ab00103797a78e5063f1604a7:backend/tests/financialLifecycleModuleLease.test.js:generic-api-key:7
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+79ec0537b16d5a8ab00103797a78e5063f1604a7:backend/scripts/run-critical-browser-group.js:generic-api-key:26
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+79ec0537b16d5a8ab00103797a78e5063f1604a7:.github/workflows/quality.yml:generic-api-key:158
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+fe3f5794d0b6838b61055df1ff1e13cbe09a075e:.github/workflows/quality.yml:generic-api-key:151
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+79ec0537b16d5a8ab00103797a78e5063f1604a7:.github/workflows/quality.yml:generic-api-key:332
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+fe3f5794d0b6838b61055df1ff1e13cbe09a075e:.github/workflows/quality.yml:generic-api-key:225
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:.github/workflows/quality.yml:generic-api-key:63
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:.github/workflows/quality.yml:generic-api-key:154
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/playwright.admin-financials.config.js:generic-api-key:16
+# Password for newly created local loopback stub users only; declaration and usages inspected, no existing-account credential.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/scripts/e2e-validation.js:generic-api-key:8
+# Password for users newly seeded in disposable Mongo/loopback browser rehearsal, not an existing-account credential.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/scripts/e2e-withdrawal-flow.js:generic-api-key:13
+# Explicit synthetic PaymentIntent client-secret in mocked provider response.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/scripts/e2e-job-escrow.js:generic-api-key:29
+# KMS resource UUID used by describe-key and get-key-rotation-status, not authentication material.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/scripts/verify-staging-storage-controls.py:generic-api-key:12
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/helpers/financialLifecycleGlobalSetup.js:generic-api-key:6
+# Named deterministic JWT fixture for isolated CSRF tests.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/csrf.test.js:generic-api-key:67
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/helpers/paralegalFinancialBrowserServer.js:generic-api-key:7
+# Intentional nonfunctional secret-shaped logger input whose assertion requires redaction.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/logger.test.js:generic-api-key:5
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/helpers/financialLifecycleBrowserServer.js:generic-api-key:12
+# Nonfunctional secret-shaped alert test input with mocked email whose assertion requires redaction.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/opsAlerting.test.js:stripe-access-token:21
+# Explicit synthetic PaymentIntent client-secret in mocked test response.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/jobEscrow.test.js:generic-api-key:513
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/playwright/assistant-completion/real-server.cjs:generic-api-key:10
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/playwright/attorney-help/backend-server.cjs:generic-api-key:9
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/playwright/attorney-v2/playwright.config.js:generic-api-key:38
+# Explicit synthetic manualSecret in intercepted browser TOTP fixture, not an enrolled user seed.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/playwright/attorney-v2/security.spec.js:generic-api-key:24
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/playwright/payment-summary/real-server.cjs:generic-api-key:7
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/playwright/report-status/real-server.js:generic-api-key:12
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/playwright/workspace-search/real-server.js:generic-api-key:11
+# Explicit nonfunctional Stripe test placeholder used by safety/version guards.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/stripeSafety.test.js:stripe-access-token:11
+# Explicit nonfunctional Stripe test placeholder used by safety/version guards.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/stripeSafety.test.js:stripe-access-token:25
+# Explicit nonfunctional Stripe placeholder used by safety/version guards.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/stripeSafety.test.js:stripe-access-token:34
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/productionOrigin.test.js:generic-api-key:36
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:backend/tests/workerProductionConfig.test.js:generic-api-key:11
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:docs/audits/completion-2026-09-09/help/backend-browser-server.cjs:generic-api-key:6
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:docs/audits/completion-2026-09-09/security/backend-browser-server.cjs:generic-api-key:10
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:docs/audits/completion-2026-09-09/closure/backend-browser-server.cjs:generic-api-key:10
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:docs/audits/completion-2026-09-09/closure/paralegal/backend-browser-server.cjs:generic-api-key:10
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:docs/audits/completion-2026-09-09/blocks/backend-browser-server.cjs:generic-api-key:14
+# Deterministic hexadecimal data-encryption fixture in isolated local/CI test configuration; not an operational data key.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:docs/audits/completion-2026-09-09/accounts/backend-browser-server.cjs:generic-api-key:12
+# Public sessionStorage key name for opaque draft resume metadata, not a credential or object capability.
+51bbcb92e3dbd48e3ce395acbe1bb06b62f21f41:frontend/assets/scripts/attorney-v2/matter-creation.mjs:generic-api-key:4

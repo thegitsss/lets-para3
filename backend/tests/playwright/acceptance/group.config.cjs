@@ -22,6 +22,7 @@ if(group.adapter==='actual-shared'){
  globalSetup=require.resolve('../../helpers/financialLifecycleGlobalSetup');
  globalTeardown=require.resolve('../../helpers/globalMongoTeardown');
  webServer=undefined;
+ if(group.name==='paralegal-support-actual-shared-1')use.storageState={cookies:[],origins:[]};
 }else if(webServer&&!['admin-financials','paralegal-financial-records'].includes(group.name)){
  const port=Number(process.env.LPC_BROWSER_HTTP_PORT||group.httpPort);
  if(!Number.isSafeInteger(port)||port<1024||port>65535||port===5054)throw Error('An independent loopback group port is required.');
@@ -34,6 +35,9 @@ if(group.adapter==='actual-shared'){
   env:{...webServer.env,PORT:String(port),PLAYWRIGHT_BASE_URL:origin,
    APP_BASE_URL:origin,CLIENT_BASE_URL:origin,FRONTEND_BASE_URL:origin,
    PLAYWRIGHT_MONGO_PORT:retainedMongoPort,EMAIL_DISABLE:'true'}};
+}
+if(webServer&&typeof webServer.command==='string'&&webServer.command.replace(/\\/g,'/').includes('/control-room/webServer.js')){
+ webServer={...webServer,gracefulShutdown:{signal:'SIGTERM',timeout:30000}};
 }
 module.exports={...original,
  testDir:path.join(backend,'tests/playwright'),

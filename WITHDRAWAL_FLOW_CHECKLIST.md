@@ -24,7 +24,7 @@ Use separate sessions for Attorney, Paralegal, Admin.
 - [ ] Attorney auto‑prompt appears (Paralegal Withdrawal popup)
 - [ ] Attorney selects Enter Partial Payout, enters valid amount
 - [ ] Modal shows finality disclaimer + Terms/Help links
-- [ ] Modal shows “Recommended: no more than 70%” hint (no hard cap)
+- [ ] The attorney decision enforces the displayed maximum: the lesser of the verified remaining balance and 70% of the original Matter amount; an amount above that maximum is rejected.
 - [ ] Payout finalized + receipts generated
 - [ ] Case relists automatically with remaining balance/tasks
 - [ ] Case is visible + hireable on `browse-jobs.html`

@@ -4,6 +4,8 @@ const { parseDocument } = require("yaml");
 
 const repositoryRoot = path.resolve(__dirname, "../..");
 const defaultWorkflowPath = path.join(repositoryRoot, ".github/workflows/quality.yml");
+const BROWSER_SCOPE_GUARD = "github.event_name != 'workflow_dispatch' || inputs.execution_scope != 'backend-source'";
+const BROWSER_GATE_GUARD = "always() && (" + BROWSER_SCOPE_GUARD + ")";
 const REQUIRED_JOBS = Object.freeze([
   "deployment-blueprint",
   "validate",
@@ -251,7 +253,7 @@ function validateGroupedBrowserJobs(jobs, catalog) {
   validateLaunchEvidenceArtifact(collection, { stepName: "Upload browser collection evidence", pathFragment: "backend/test-results/critical-group-verification/verified-union.json" });
   for (const [name, job] of [["browser-collection", collection], ["browser-checks", checks], ["browser-role-journeys", roles]]) {
     validateCompiledBrowserFixtures(job); validateRuntimeBeforeInstall(job, name);
-    if (job.if || job["continue-on-error"]) fail(`${name} cannot conditionally bypass complete acceptance.`);
+    if (job.if !== BROWSER_SCOPE_GUARD || job["continue-on-error"]) fail(`${name} cannot conditionally bypass complete acceptance except the exact explicit backend-only dispatch.`);
     for (const step of job.steps || []) if (step["continue-on-error"]) fail(`${name} cannot suppress a failed step.`);
   }
   for (const job of [checks, roles]) {
@@ -265,7 +267,7 @@ function validateGroupedBrowserJobs(jobs, catalog) {
       JSON.stringify([...(roles.strategy.matrix.group || [])].sort()) !== JSON.stringify([...EXPECTED_GROUP_NAMES].sort()) ||
       findStep(roles, "Run complete fixture-compatible role group")?.run !== 'npm run test:playwright:critical:group -- --group "${{ matrix.group }}"') fail("Every approved role fixture group must execute exactly once after collection verification.");
   const dependencies = ["browser-collection", "browser-checks", "browser-role-journeys"];
-  if (gate.if !== "always()" || JSON.stringify([...(gate.needs || [])].sort()) !== JSON.stringify([...dependencies].sort()) || gate["continue-on-error"]) fail("Fixed Browser contracts gate must always require all browser jobs and reject failures, cancellations and skips.");
+  if (gate.if !== BROWSER_GATE_GUARD || JSON.stringify([...(gate.needs || [])].sort()) !== JSON.stringify([...dependencies].sort()) || gate["continue-on-error"]) fail("Fixed Browser contracts gate must always require all browser jobs and reject failures, cancellations and skips outside the exact backend-only dispatch.");
   const final = findStep(gate, "Require every original browser scope and role group");
   if (gate.steps?.length !== 1 || final?.["continue-on-error"] ||
       JSON.stringify(final?.env) !== JSON.stringify({ COLLECTION_RESULT: "${{ needs.browser-collection.result }}", CHECKS_RESULT: "${{ needs.browser-checks.result }}", ROLES_RESULT: "${{ needs.browser-role-journeys.result }}" }) ||
@@ -306,6 +308,16 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
   const triggers = workflow.on || {};
   if (!Object.prototype.hasOwnProperty.call(triggers, "pull_request")) fail("pull_request validation is required.");
   if (!Object.prototype.hasOwnProperty.call(triggers, "push")) fail("main push validation is required.");
+  const dispatch = triggers.workflow_dispatch;
+  const input = dispatch?.inputs?.execution_scope;
+  if (!dispatch || Object.keys(dispatch).join() !== "inputs" || Object.keys(dispatch.inputs || {}).join() !== "execution_scope" ||
+      !input || input.type !== "choice" || input.required !== true || input.default !== "full" ||
+      JSON.stringify(input.options) !== JSON.stringify(["full", "backend-source"]) ||
+      typeof input.description !== "string" || !input.description ||
+      Object.keys(input).some(key => !["type", "required", "default", "options", "description"].includes(key))) {
+    fail("Only explicit manual backend-source dispatch may omit browser execution; full is required by default.");
+  }
+
   if (Object.prototype.hasOwnProperty.call(triggers, "pull_request_target")) {
     fail("pull_request_target is forbidden for the quality workflow.");
   }

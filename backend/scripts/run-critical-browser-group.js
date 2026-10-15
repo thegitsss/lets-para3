@@ -1,4 +1,5 @@
 'use strict';
+(()=>{
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),{spawn}=require('node:child_process');
 const backend=path.resolve(__dirname,'..');
 const manifest=require('../tests/playwright/acceptance/groups.json');
@@ -49,3 +50,4 @@ async function run(group){
  }finally{for(const lock of locks)fs.unlinkSync(lock);}
 }
 (async()=>{for(const group of selected){const result=await run(group);if(result.code!==0||result.signal){process.exitCode=result.code||1;break;}}})().catch(error=>{console.error(error.message);process.exitCode=1;});
+})();

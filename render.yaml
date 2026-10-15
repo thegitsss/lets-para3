@@ -5,7 +5,7 @@ services:
     runtime: node
     repo: https://github.com/thegitsss/lets-para3
     branch: main
-    buildCommand: cd backend && node scripts/verify-runtime.js && PUPPETEER_SKIP_DOWNLOAD=true MONGOMS_DISABLE_POSTINSTALL=true npm ci --include=dev && npm run build:frontend
+    buildCommand: cd backend && node scripts/verify-runtime.js && PUPPETEER_SKIP_DOWNLOAD=true MONGOMS_DISABLE_POSTINSTALL=true npm ci --include=dev && npm run build:frontend && PUPPETEER_SKIP_DOWNLOAD=false ./node_modules/.bin/puppeteer browsers install chrome
     preDeployCommand: cd backend && npm run migrate:production:apply && npm run admin:communications:indexes
     startCommand: cd backend && npm start
     autoDeployTrigger: checksPass

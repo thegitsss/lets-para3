@@ -13,10 +13,11 @@ const {
 } = require("../services/platformFeePolicy");
 
 const RENDER_SCHEMA_URL = "https://render.com/schema/render.yaml.json";
-// Reviewed 2026-10-05: web/worker/cron schemas, Node runtime, secret envVars,
-// checksPass trigger, health/shutdown and strict property boundaries. LPC keeps
-// its separate exact-value contract; upstream schema changes cannot weaken it.
-const RENDER_SCHEMA_SHA256 = "a0d4e8a3eb119a1b63657741757e3c25c091b3ce463c4be8c90e8026678d8163";
+// Reviewed 2026-10-15 against the retained 2026-10-05 schema: only the unused
+// buildSourceGit Docker context field and its conditional changed (baseDir to
+// dockerContext). Web/worker/cron, runtime, envVars and property boundaries are
+// unchanged. The separate exact-value LPC production contract remains strict.
+const RENDER_SCHEMA_SHA256 = "8a3fb8da6b4f55fe686fbefa790e011d3dd7895f013f355953c572a21ab6494a";
 const CANONICAL_ORIGIN = "https://www.lets-paraconnect.com";
 
 function fail(message) {
@@ -141,7 +142,7 @@ function validateDeploymentContract(blueprint) {
   validateServiceBase(service, {
     type: "web",
     name: "lets-para3",
-    buildCommand: "cd backend && node scripts/verify-runtime.js && PUPPETEER_SKIP_DOWNLOAD=true MONGOMS_DISABLE_POSTINSTALL=true npm ci --include=dev && npm run build:frontend",
+    buildCommand: "cd backend && node scripts/verify-runtime.js && PUPPETEER_SKIP_DOWNLOAD=true MONGOMS_DISABLE_POSTINSTALL=true npm ci --include=dev && npm run build:frontend && PUPPETEER_SKIP_DOWNLOAD=false ./node_modules/.bin/puppeteer browsers install chrome",
     preDeployCommand: "cd backend && npm run migrate:production:apply && npm run admin:communications:indexes",
     startCommand: "cd backend && npm start",
     healthCheckPath: "/api/health",

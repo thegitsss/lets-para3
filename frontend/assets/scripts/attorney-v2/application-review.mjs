@@ -6,7 +6,6 @@ import {createContextualBlock} from './contextual-block.mjs';
 import {createHiring} from './hiring.mjs';
 import {createHiringReturn} from './pending-hire.mjs';
 import {createPreEngagement} from './pre-engagement.mjs';
-import {withMatterReturn} from './matter-return.mjs';
 import {timeLabel} from './workspace-model.mjs';
 import {invitationStatus} from './invitation-model.mjs';
 

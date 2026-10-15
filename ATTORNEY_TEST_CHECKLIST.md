@@ -54,17 +54,17 @@ Use this for a manual pass through the attorney experience on Let’s-ParaConnec
 - [ ] Preview/public profile links work if shown.
 - [ ] Notification/settings toggles save correctly if tested.
 
-## 6. Billing / Payment Method
-- [ ] Open the Billing view.
-- [ ] Billing page loads without broken sections.
-- [ ] Add payment method flow opens correctly. (Use test card: 4242 4242 4242 4242 cvc: any 3  digits. date: any future date)
+## 6. Payments / Payment Method
+- [ ] Open the Payments view.
+- [ ] Payments page loads without broken sections.
+- [ ] Add payment method flow opens correctly. Use only the approved Stripe TEST-mode payment fixture for this environment.
 - [ ] Payment form loads correctly.
 - [ ] Saving a payment method succeeds, or any failure is explained clearly.
 - [ ] Saved payment method summary appears after setup.
 - [ ] Stripe billing portal button works.
-- [ ] Billing page remains usable after refresh.
+- [ ] Payments page remains usable after refresh.
 
-## 7. Create a Case
+## 7. Post a Matter
 - [ ] Create a new case.
 - [ ] Multi-step case flow is understandable.
 - [ ] Required fields are enforced clearly.
@@ -101,8 +101,8 @@ attn: do not interact with any paralegals on browse-paralegals.html! Clicking an
 - [ ] Case status updates appropriately after hire.
 - [ ] Other applicants are handled correctly after a hire.
 
-## 11. Case Workspace
-- [ ] Open the case workspace in `case-detail.html` (only available after a paralegal has been hired.)
+## 11. Matter Workspace
+- [ ] Open the Matter workspace in `case-detail.html` (only available after a paralegal has been hired.)
 - [ ] Case title, status, task list, and participant info load correctly.
 - [ ] Messaging works in the workspace.
 - [ ] Message sending feels immediate and readable.

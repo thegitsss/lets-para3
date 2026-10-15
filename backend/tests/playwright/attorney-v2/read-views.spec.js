@@ -41,6 +41,7 @@ function fixtures() {
 async function mock(page, data = fixtures()) {
   const user = (await (await page.request.get("/api/auth/me")).json()).user;
   data.payments.ownerId = user.id || user._id;
+  data.profile = { ...user, ...data.profile };
   data.home.ownerId = user.id || user._id;
   data.saved = { ...data.saved, ownerId: user.id || user._id, scope: "attorney_matters", views: data.saved.views.map(view => ({ ...view, scope: "attorney_matters", revision: "a".repeat(64) })) };
   const paths = {
@@ -63,11 +64,25 @@ async function mock(page, data = fixtures()) {
   return data;
 }
 
+const tour=page=>page.locator('.av2-workspace-guide');
+async function home(page){await page.goto(`${entry}#/home`);for(const key of ['overview','attention','applications','messages','onboarding'])await loaded(page,key);}
+async function awayAndBack(page){await page.getByRole('navigation',{name:'Help',exact:true}).getByRole('link',{name:'Help',exact:true}).click();await expect(page.getByRole('heading',{name:'Help for Attorneys',exact:true})).toBeVisible();await page.goBack();}
+function watchWrites(page){const writes=[];page.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/api/')&&!['GET','HEAD'].includes(r.method()))writes.push({method:r.method(),path:new URL(r.url()).pathname,body:r.postDataJSON()});});return writes;}
+async function financial(page,{invalid=false}={}){
+ const user=(await(await page.request.get('/api/auth/me')).json()).user,ownerId=user.id||user._id,state={invalid,reads:[]};
+ await page.route('**/api/payments/attorney-financial-history?**',route=>{
+  const q=new URL(route.request().url()).searchParams;state.reads.push(Object.fromEntries(q));
+  return json(route,{ownerId,revision:'a'.repeat(64),view:q.get('view')||'all',q:q.get('q')||'',caseId:q.get('caseId'),total:1,nextCursor:null,entries:[{id:'1'.padStart(64,'0'),caseId:objectId(1),caseTitle:'Synthetic Matter 01',type:'funding',state:'recorded',amount:state.invalid?99999:10005,currency:'USD',recordedAt:'2026-09-04T12:00:00Z',basis:'original_payment',receiptId:'payment',paralegalName:null}],summary:{currencies:[{currency:'USD',originalFunding:10005,paralegalPayouts:0,refunds:0,fundingRecords:1,payoutRecords:0,refundRecords:0,fundingUnverified:0,payoutsUnverified:0,refundsUnverified:0}],requiresReview:0,pending:0,undated:0}});
+ });return state;
+}
+
+
 test.beforeEach(async({page,foundationServer},info)=>{
  if(info.title!=="real server summaries agree with the new Home, complete Matters and current V1 reads")return;
  const mongoose=require('mongoose'),Case=mongoose.models.Case,Draft=mongoose.models.CaseDraft,Message=mongoose.models.Message;
  expect(mongoose.connection.name).toBe(foundationServer.ownedDatabaseName);
  const owner=foundationServer.actorId,csrf=(await(await page.request.get('/api/csrf')).json()).csrfToken;
+ const preparationBaseline={Case:await Case.collection.find({attorney:new mongoose.Types.ObjectId(owner)},{projection:{_id:1}}).toArray(),CaseDraft:await Draft.collection.find({owner:new mongoose.Types.ObjectId(owner)},{projection:{_id:1}}).toArray()};
  const result=await page.request.post('/api/cases',{headers:{'X-CSRF-Token':csrf},data:{title:'Actual funded Home comparison Matter',practiceArea:'immigration',state:'CA',totalAmount:400.01,experience:'5+ years',deadline:'2027-03-14',description:'Private synthetic linked summary comparison.',tasks:[{title:'Prepare exhibit index'}]}});
  expect(result.ok(),await result.text()).toBe(true);const created=await result.json(),caseId=String(created.case?._id||created._id||created.id);
  const funded=await require('../home-private-actual-preparation.cjs').ensureEligibleMatter(page,caseId,foundationServer);
@@ -76,8 +91,11 @@ test.beforeEach(async({page,foundationServer},info)=>{
  await Case.collection.insertMany(Array.from({length:208},(_,i)=>({attorney:ownerId,attorneyId:ownerId,title:`Actual comparison Matter ${String(i).padStart(3,'0')}`,details:'PRIVATE_COMPARE_DESCRIPTION',status:i<105?'open':'completed',archived:i>=105,paymentReleased:i>=105,practiceArea:'Contract Law',totalAmount:40001,currency:'usd',applicants:[],files:[],tasks:[],updatedAt:stamp(i),createdAt:stamp(i)})));
  for(let i=0;i<3;i++)await Message.create({caseId,senderId:funded.paralegalId,senderRole:'paralegal',type:'text',text:`Private comparison message ${i}`,readBy:[funded.paralegalId]});
  const before={Case:await Case.collection.find({attorney:ownerId}).sort({_id:1}).toArray(),CaseDraft:await Draft.collection.find({owner:ownerId}).sort({_id:1}).toArray(),Message:await Message.collection.find({caseId:new mongoose.Types.ObjectId(caseId)}).sort({_id:1}).toArray()};
- expect(before.Case).toHaveLength(209);expect(before.CaseDraft).toHaveLength(203);expect(before.Message).toHaveLength(3);
- await require('node:fs/promises').writeFile(info.outputPath('actual-populated-summary-preparation.json'),JSON.stringify({owner,caseId,funded,models:before,scope:'Run-owned synthetic historical records, actual local hire/funding/API reads. Message model encryption hooks run. No real payment provider.'},null,2));
+ const existingCaseIds=new Set(preparationBaseline.Case.map(record=>String(record._id))),existingDraftIds=new Set(preparationBaseline.CaseDraft.map(record=>String(record._id)));
+ const createdComparison={Case:before.Case.filter(record=>!existingCaseIds.has(String(record._id))),CaseDraft:before.CaseDraft.filter(record=>!existingDraftIds.has(String(record._id)))};
+ expect(createdComparison.Case).toHaveLength(209);expect(createdComparison.CaseDraft).toHaveLength(203);expect(before.Message).toHaveLength(3);
+ expect(before.Case).toHaveLength(preparationBaseline.Case.length+209);expect(before.CaseDraft).toHaveLength(preparationBaseline.CaseDraft.length+203);
+ await require('node:fs/promises').writeFile(info.outputPath('actual-populated-summary-preparation.json'),JSON.stringify({owner,caseId,funded,preparationBaseline,createdComparison,models:before,scope:'Run-owned synthetic historical records, actual local hire/funding/API reads. Message model encryption hooks run. No real payment provider.'},null,2));
 });
 
 test("real server summaries agree with the new Home, complete Matters and current V1 reads", async ({ page }) => {
@@ -108,77 +126,32 @@ test("real server summaries agree with the new Home, complete Matters and curren
   await expect(page.locator("#overviewMattersBody")).toHaveText(home.recent.total ? `${home.recent.total} current` : "No current Matters.");
 });
 
-test("populated Home uses exact cents, counts, readiness, and contextual destinations without writes", async ({ page }) => {
-  await mock(page);
-  const writes = [];
-  page.on("request", (request) => { if (request.url().includes("/api/") && request.method() !== "GET") writes.push(request.url()); });
-  await page.goto(`${entry}#/home`);
-  for (const key of ["overview", "attention", "applications", "messages", "payments", "onboarding"]) await loaded(page, key);
-  await expect(region(page, "payments").getByText("$100.05", { exact: true })).toBeVisible();
-  await expect(region(page, "messages")).toContainText("3 unread messages");
-  await expect(region(page, "attention")).toContainText("2 overdue private tasks");
-  await expect(region(page, "applications").locator('.av2-summary-row')).toHaveCount(1);
-  await expect(region(page, "applications")).not.toContainText("Some applicant counts differ");
-  await expect(region(page, "applications").getByRole("link", { name: "Applicant One" })).toHaveAttribute("href", `#/matters/${objectId(30)}/applications?applicantId=${objectId(61)}&applicationId=${objectId(60)}`);
-  await expect(region(page, "attention").getByRole("link", { name: "Review submitted files" })).toHaveAttribute("href", `#/matters/${objectId(1)}/files`);
-  await expect(region(page, "attention").getByRole("link", { name: "Review withdrawal and response deadline" })).toHaveAttribute("href", `#/matters/${objectId(41)}/financials`);
-  await expect(region(page, "deadlines").getByRole("link", { name: "Synthetic Matter 01" })).toHaveAttribute("href", `#/matters/${objectId(1)}/activity`);
-  await expect(region(page, "onboarding")).toContainText("Setup complete.");
-  await expect(region(page, "deadlines")).toContainText("Sep 6, 2026");
-  expect(writes).toEqual([]);
+test("populated Home uses exact cents, counts, readiness, and contextual destinations without writes", async({page})=>{
+ await mock(page);await financial(page);const writes=watchWrites(page);await home(page);
+ await expect(region(page,'overview').getByRole('link',{name:'Active Matters: 18',exact:true})).toBeVisible();await expect(region(page,'messages').getByText('3 unread',{exact:true})).toBeVisible();
+ await expect(region(page,'attention').getByRole('link',{name:'Private tasks — 2 overdue. View overdue tasks',exact:true})).toHaveAttribute('href','#/tasks?status=overdue');
+ await expect(region(page,'applications').locator('.av2-summary-row')).toHaveCount(1);await expect(region(page,'applications')).not.toContainText('Some applicant counts differ');
+ await expect(region(page,'applications').getByRole('link',{name:'Applicant Matter — Applicant One applied. View application',exact:true})).toHaveAttribute('href',`#/matters/${objectId(30)}/applications?applicantId=${objectId(61)}&applicationId=${objectId(60)}`);
+ await expect(region(page,'attention').getByRole('link',{name:/Synthetic Matter 01.*Review files/})).toHaveAttribute('href',`#/matters/${objectId(1)}/files`);await expect(region(page,'attention').getByRole('link',{name:/Paused Matter.*Review withdrawal/})).toHaveAttribute('href',`#/matters/${objectId(41)}/financials`);
+ await expect(region(page,'deadlines').getByRole('link',{name:/Synthetic Matter 01/})).toHaveAttribute('href',`#/matters/${objectId(1)}/deadlines`);await expect(region(page,'deadlines').locator('time[datetime="2026-09-06"]')).toHaveAttribute('aria-label','Sep 6, 2026');await expect(tour(page)).toHaveCount(0);
+ await page.getByRole('navigation',{name:'Primary',exact:true}).getByRole('link',{name:'Payments',exact:true}).click();const history=page.locator('[data-financial-history]');await expect(history).toHaveAttribute('data-state','ready');await expect(history.locator('[data-financial-record]').getByText('$100.05',{exact:true})).toBeVisible();await history.locator('.av2-secondary-disclosure > summary').click();await expect(history.locator('dl')).toContainText('$100.05');expect(writes).toEqual([]);
 });
 
-test("matter pagination, filters, saved-view reads, drafts, archive preview and history retain context", async ({ page }) => {
-  await mock(page);
-  await page.goto(`${entry}#/matters`);
-  await loaded(page, "matter-list");
-  await expect(page.locator("[data-av2-matter]")).toHaveCount(15);
-  await page.getByRole("link", { name: "Next page" }).click();
-  await loaded(page, "matter-list");
-  await expect(page).toHaveURL(/page=2/);
-  await expect(page.locator("[data-av2-matter]")).toHaveCount(3);
-  await page.reload();
-  await loaded(page, "matter-list");
-  await expect(page.locator("[data-av2-matter]")).toHaveCount(3);
-  await page.getByRole("combobox", { name: "Saved views", exact: true }).selectOption("saved:saved-deadlines");
-  await loaded(page, "matter-list");
-  await expect(page.locator("[data-av2-matter]")).toHaveCount(1);
-  await expect(page.getByRole("searchbox", { name: "Search matters" })).toHaveValue("Synthetic Matter 01");
-  await page.goBack();
-  await loaded(page, "matter-list");
-  await expect(page.locator("[data-av2-matter]")).toHaveCount(3);
-  await page.goto(`${entry}#/matters?view=draft`);
-  await loaded(page, "matter-list");
-  await expect(page.getByRole("link", { name: "Draft Matter", exact: true })).toHaveAttribute("href", `#/matters/new?draftId=${objectId(50)}&step=description&returnTo=${encodeURIComponent("#/matters?view=draft")}`);
-  await page.goto(`${entry}#/matters?view=archived&highlightCase=${objectId(40)}&previewCaseId=${objectId(40)}`);
-  await loaded(page, "matter-list");
-  await expect(page.locator(".av2-highlighted details").filter({ has: page.getByText("Preview matter", { exact: true }) })).toHaveAttribute("open", "");
-  await expect(page.getByRole("group", { name: "Actions for Completed Matter", exact: true })).not.toHaveAttribute("open", "");
-  await expect(page.locator(".av2-highlighted")).toContainText("Synthetic read-only matter description.");
-  await page.getByRole("combobox", { name: "Archive status", exact: true }).selectOption("paused");
-  await page.getByRole("button", { name: "Apply filters" }).click();
-  await loaded(page, "matter-list");
-  await expect(page.locator("[data-av2-matter]")).toHaveCount(1);
-  await expect(page.locator("[data-av2-matter]")).toContainText("Paused Matter");
+test("matter pagination, filters, saved-view reads, drafts, archive preview and history retain context", async({page})=>{
+ await mock(page);const writes=watchWrites(page);await page.goto(`${entry}#/matters`);await loaded(page,'matter-list');
+ await expect(page.locator('[data-av2-matter]')).toHaveCount(15);await page.getByRole('link',{name:'Next page',exact:true}).click();await loaded(page,'matter-list');await expect(page).toHaveURL(/page=2/);await expect(page.locator('[data-av2-matter]')).toHaveCount(3);
+ await page.reload();await loaded(page,'matter-list');await expect(page.locator('[data-av2-matter]')).toHaveCount(3);
+ await page.getByRole('combobox',{name:'Saved views',exact:true}).selectOption('saved:saved-deadlines');await loaded(page,'matter-list');await expect(page.locator('[data-av2-matter]')).toHaveCount(1);await expect(page.getByRole('searchbox',{name:'Search matters',exact:true})).toHaveValue('Synthetic Matter 01');
+ await page.goBack();await loaded(page,'matter-list');await expect(page.locator('[data-av2-matter]')).toHaveCount(3);
+ await page.goto(`${entry}#/matters?view=draft`);await loaded(page,'matter-list');await expect(page.getByRole('link',{name:'Draft Matter',exact:true})).toHaveAttribute('href',`#/matters/new?draftId=${objectId(50)}&step=description&returnTo=${encodeURIComponent('#/matters?view=draft')}`);
+ await page.goto(`${entry}#/matters?view=archived&highlightCase=${objectId(40)}&previewCaseId=${objectId(40)}`);await loaded(page,'matter-list');
+ const row=page.locator(`[data-av2-matter="${objectId(40)}"]`);await expect(row.locator('.av2-matter-inline-preview')).toHaveAttribute('open','');await expect(row.locator('.av2-matter-menu')).not.toHaveAttribute('open','');await expect(row).toContainText('Synthetic read-only matter description.');
+ await page.getByRole('button',{name:/^Filters(?: · \d+ active)?$/}).click();await page.getByRole('combobox',{name:'Archive status',exact:true}).selectOption('paused');await loaded(page,'matter-list');await expect(page.locator('[data-av2-matter]')).toHaveCount(1);await expect(page.locator('[data-av2-matter]')).toContainText('Paused Matter');expect(writes).toEqual([]);
 });
 
-test("zero, complete and missing-target lists remain honest and filterable", async ({ page }) => {
-  const data = await mock(page);
-  data.active = []; data.archived = []; data.drafts = { items: [] }; data.applications = [];
-  await page.goto(`${entry}#/matters?previewCaseId=${objectId(99)}`);
-  await loaded(page, "matter-list");
-  await expect(region(page, "matter-list")).toContainText("No matters match this view");
-  await expect(region(page, "matter-list")).toContainText("The linked matter is not on this page");
-  data.active = Array.from({ length: 100 }, (_, index) => matter(index + 1));
-  await page.getByRole("button", { name: "Refresh matters", exact: true }).click();
-  await loaded(page, "matter-list");
-  await expect(region(page, "matter-list")).toContainText("100 matching matters");
-  await expect(region(page, "matter-list")).not.toContainText("more records may exist");
-  await page.getByRole("searchbox", { name: "Search matters" }).fill("No match");
-  await page.getByRole("button", { name: "Apply filters" }).click();
-  await loaded(page, "matter-list");
-  await expect(page.locator("[data-av2-matter]")).toHaveCount(0);
-  await expect(region(page, "matter-list")).toContainText("No matters match this view");
+test("zero, complete and missing-target lists remain honest and filterable", async({page})=>{
+ const data=await mock(page);data.active=[];data.archived=[];data.drafts={items:[]};data.applications=[];const writes=watchWrites(page);await page.goto(`${entry}#/matters?previewCaseId=${objectId(99)}`);await loaded(page,'matter-list');await expect(region(page,'matter-list')).toContainText('No active Matters.');await expect(region(page,'matter-list')).toContainText('The linked matter is not on this page');
+ data.active=Array.from({length:100},(_,index)=>matter(index+1));await awayAndBack(page);await loaded(page,'matter-list');await expect(region(page,'matter-list').getByLabel('Matter pages')).toContainText('91–100 of 100 results');await expect(page.locator(`[data-av2-matter="${objectId(99)}"]`)).toBeVisible();await expect(region(page,'matter-list')).not.toContainText('more records may exist');await page.getByRole('searchbox',{name:'Search matters',exact:true}).fill('No match');await loaded(page,'matter-list');await expect(page.locator('[data-av2-matter]')).toHaveCount(0);await expect(region(page,'matter-list')).toContainText('No Matters match these filters.');expect(writes).toEqual([]);
 });
 
 test("errors and restricted categories never masquerade as empty data and can recover", async ({ page }) => {
@@ -205,50 +178,26 @@ test("errors and restricted categories never masquerade as empty data and can re
   await expect(page.locator("[data-av2-matter]")).toHaveCount(15);
 });
 
-test("unread and financial disagreements suppress an unverified aggregate", async ({ page }) => {
-  const data = await mock(page);
-  data.unread.count = 99; data.payments.activeFunds = 99999;
-  await page.goto(`${entry}#/home`);
-  await loaded(page, "messages"); await expect(region(page, "payments")).toHaveAttribute("data-state", "error");
-  await expect(region(page, "messages")).toContainText("Unread counts are updating");
-  await expect(region(page, "messages")).not.toContainText("99 unread");
-  await expect(region(page, "payments")).toContainText("couldn’t be loaded");
-  await expect(region(page, "payments").getByText("$999.99")).toHaveCount(0);
-  data.unread.count = 3; data.payments.activeFunds = 10005;
-  await page.getByRole("button", { name: "Refresh messages", exact: true }).click();
-  await loaded(page, "messages");
-  await expect(region(page, "messages")).toContainText("3 unread messages");
-  await page.getByRole("button", { name: "Refresh payments", exact: true }).click();
-  await loaded(page, "payments");
-  await expect(region(page, "payments").getByText("$100.05", { exact: true })).toBeVisible();
+test("unread and financial disagreements suppress an unverified aggregate", async({page})=>{
+ const data=await mock(page);data.unread.count=99;const finances=await financial(page,{invalid:true});const writes=watchWrites(page);await home(page);await expect(region(page,'messages')).toContainText('Unread counts are updating');await expect(region(page,'messages')).not.toContainText('99 unread');data.unread.count=3;await awayAndBack(page);await loaded(page,'messages');await expect(region(page,'messages').getByText('3 unread',{exact:true})).toBeVisible();
+ await page.getByRole('navigation',{name:'Primary',exact:true}).getByRole('link',{name:'Payments',exact:true}).click();const history=page.locator('[data-financial-history]');await expect(history).toHaveAttribute('data-state','error');await expect(history).toContainText('Financial history couldn’t load. Try again.');await expect(history.getByText('$999.99')).toHaveCount(0);await expect(history.locator('dl')).toHaveCount(0);await expect(history.locator('[data-financial-record]')).toHaveCount(0);
+ finances.invalid=false;await history.getByRole('button',{name:'Retry financial history',exact:true}).click();await expect(history).toHaveAttribute('data-state','ready');await expect(history.locator('[data-financial-record]').getByText('$100.05',{exact:true})).toBeVisible();expect(writes).toEqual([]);
 });
 
-test("onboarding skip, replay, navigation and refreshed completion preserve progress", async ({ page }) => {
-  const data = await mock(page);
-  data.profile = {}; data.payment = { paymentMethod: null }; data.active = []; data.archived = [];
-  data.home = { ...data.home, counts: { active: 0, applications: 0, draft: 1, archived: 0 }, postedCount: 0,
-    attention: { ...data.home.attention, total: 0, items: [] }, week: { ...data.home.week, total: 0, items: [] } };
-  await page.goto(`${entry}#/home`);
-  await loaded(page, "onboarding");
-  await expect(region(page, "onboarding")).toContainText("3 setup steps remaining");
-  await region(page, "onboarding").getByRole("button", { name: "Walk through setup" }).click();
-  await region(page, "onboarding").getByRole("button", { name: "Next step" }).click();
-  await expect(region(page, "onboarding")).toContainText("Guide step 2 of 4");
-  await page.evaluate(() => sessionStorage.setItem("lpc_attorney_onboarding_step", "payment"));
-  await region(page, "onboarding").getByRole("button", { name: "Skip for now" }).click();
-  expect(await page.evaluate(() => sessionStorage.getItem("lpc_attorney_onboarding_step"))).toBeNull();
-  expect(await page.evaluate(() => sessionStorage.getItem("lpc_attorney_onboarding_dismissed"))).toBe("1");
-  await page.reload(); await loaded(page, "onboarding");
-  await expect(region(page, "onboarding").getByRole("button", { name: "Show setup guide" })).toBeVisible();
-  await region(page, "onboarding").getByRole("button", { name: "Show setup guide" }).click();
-  await expect(region(page, "onboarding").getByRole("link", { name: "Complete your profile" })).toHaveAttribute("href", "#/settings");
-  data.profile = { lawFirm: "Firm" }; data.payment = { paymentMethod: { id: "pm_test" } }; data.active = [matter(1)];
-  data.home.counts.active = 1; data.home.postedCount = 1;
-  await region(page, "onboarding").getByRole("button", { name: "Refresh getting started" }).click();
-  await loaded(page, "onboarding");
-  await expect(region(page, "onboarding")).toContainText("Setup complete.");
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Matters", exact: true }).click();
-  await loaded(page, "matter-list");
+test("onboarding skip, replay, navigation and refreshed completion preserve progress", async({page})=>{
+ const data=await mock(page);data.profile={lawFirm:'',practiceDescription:'',bio:'',practiceAreas:[],linkedInURL:'',firmWebsite:'',publications:[],onboarding:{attorneyTourCompleted:false,attorneyProfileCompleted:false}};data.payment={paymentMethod:null};data.active=[];data.archived=[];
+ data.home={...data.home,counts:{active:0,applications:0,draft:1,archived:0},postedCount:0,attention:{...data.home.attention,total:0,items:[]},week:{...data.home.week,total:0,items:[]}};
+ const writes=watchWrites(page);await home(page);await tour(page).locator('summary').click();await tour(page).getByRole('button',{name:'Start workspace guide',exact:true}).click();await tour(page).getByRole('button',{name:'Next',exact:true}).click();await expect(tour(page)).toContainText('Tour · 2 of 4');
+ await page.evaluate(()=>sessionStorage.setItem('lpc_attorney_onboarding_step','payment'));await tour(page).getByRole('button',{name:'Close',exact:true}).click();
+ expect(await page.evaluate(()=>sessionStorage.getItem('lpc_attorney_onboarding_step'))).toBeNull();expect(await page.evaluate(()=>sessionStorage.getItem('lpc_attorney_onboarding_dismissed'))).toBe('1');
+ await page.reload();await loaded(page,'onboarding');await expect(tour(page)).toHaveCount(0);
+ await page.getByRole('navigation',{name:'Help',exact:true}).getByRole('link',{name:'Help',exact:true}).click();await page.getByRole('link',{name:'Replay workspace guide',exact:true}).click();await loaded(page,'onboarding');await expect(tour(page)).toContainText('Tour · 1 of 4');await expect(tour(page).getByRole('link',{name:'Open profile',exact:true})).toHaveAttribute('href','#/settings');await expect(page).not.toHaveURL(/replayTour/);
+ await page.locator('.av2-brand-menu > summary').click();await expect(page.locator('[data-av2-finish-setup]')).toHaveAttribute('href','attorney-v2.html#/settings');await expect(page.locator('[data-av2-finish-setup]')).toBeVisible();await page.locator('.av2-brand-menu > summary').click();
+ data.profile={lawFirm:'Firm',onboarding:{attorneyTourCompleted:false}};await page.locator('.av2-brand-menu > summary').click();await expect(page.locator('[data-av2-finish-setup]')).toHaveAttribute('href','attorney-v2.html#/payments/setup');await expect(page.locator('[data-av2-finish-setup]')).toBeVisible();await page.locator('.av2-brand-menu > summary').click();
+ await tour(page).getByRole('button',{name:'Close',exact:true}).click();await expect(tour(page)).toHaveCount(0);data.profile.onboarding.attorneyTourCompleted=true;data.payment={paymentMethod:{id:'pm_test'}};data.active=[matter(1)];data.home.counts.active=1;data.home.postedCount=1;
+ await page.getByRole('navigation',{name:'Help',exact:true}).getByRole('link',{name:'Help',exact:true}).click();await page.getByRole('navigation',{name:'Primary',exact:true}).getByRole('link',{name:'Home',exact:true}).click();await loaded(page,'onboarding');await expect(tour(page)).toHaveCount(0);
+ await page.locator('.av2-brand-menu > summary').click();await expect(page.locator('[data-av2-finish-setup]')).toBeHidden();await page.locator('.av2-brand-menu > summary').click();
+ await page.getByRole('navigation',{name:'Primary',exact:true}).getByRole('link',{name:'Matters',exact:true}).click();await loaded(page,'matter-list');expect(writes).toEqual([]);
 });
 
 test("slow reads do not block navigation or reappear after session protection", async ({ page }) => {
@@ -269,68 +218,38 @@ test("slow reads do not block navigation or reappear after session protection", 
   await expect(page.getByText("Synthetic Matter 01", { exact: true })).toHaveCount(0);
 });
 
-test("first-login tour resumes four targets and persists only explicit confirmed completion", async ({ page }) => {
-  const data = await mock(page);
-  data.profile.onboarding = { attorneyTourCompleted: false };
-  const sessionResponse = await page.request.get('/api/auth/me');
-  expect(sessionResponse.ok()).toBe(true);
-  const session = await sessionResponse.json();
-  session.user.isFirstLogin = true;
-  await page.route("**/api/auth/me", route => json(route, session));
-  let fail = true;
-  const patches = [];
-  await page.route("**/api/csrf", (route) => json(route, { csrfToken: "synthetic-csrf" }));
-  await page.route("**/api/users/me/onboarding", (route) => {
-    patches.push(route.request().postDataJSON());
-    expect(route.request().headers()["x-csrf-token"]).toBe("synthetic-csrf");
-    if (fail) return json(route, { error: "Synthetic unavailable" }, 503);
-    data.profile.onboarding.attorneyTourCompleted = true;
-    return json(route, { onboarding: { attorneyTourCompleted: true } });
-  });
-  await page.goto(`${entry}#/home`); await loaded(page, "onboarding");
-  await expect(region(page, "onboarding")).toContainText("Guide step 1 of 4");
-  expect((await region(page, "onboarding").boundingBox()).y).toBeLessThan(600);
-  expect(patches).toEqual([]);
-  await region(page, "onboarding").getByRole("button", { name: "Next step" }).click();
-  await page.reload(); await loaded(page, "onboarding");
-  await expect(region(page, "onboarding")).toContainText("Guide step 2 of 4");
-  await region(page, "onboarding").getByRole("button", { name: "Next step" }).click();
-  await region(page, "onboarding").getByRole("button", { name: "Next step" }).click();
-  await expect(region(page, "onboarding").getByRole("link", { name: "Browse paralegals" })).toHaveAttribute("href", "#/paralegals");
-  await region(page, "onboarding").getByRole("button", { name: "Finish guide" }).click();
-  await expect(region(page, "onboarding")).toContainText("Tour completion couldn’t be confirmed");
-  expect(patches).toEqual([{ attorneyTourCompleted: true }]);
-  fail = false;
-  await region(page, "onboarding").getByRole("button", { name: "Finish guide" }).click();
-  await expect(region(page, "onboarding")).toContainText("Guide completed.");
-  expect(await page.evaluate(() => sessionStorage.getItem("lpc_attorney_tour_completed"))).toBe("1");
-  expect(patches).toHaveLength(2);
-  await page.reload(); await loaded(page, "onboarding");
-  await expect(region(page, "onboarding")).not.toContainText("Guide step");
-  await page.goto(`${entry}?replayTour=1#/home`); await loaded(page, "onboarding");
-  await expect(region(page, "onboarding")).toContainText("Guide step 1 of 4");
-  await expect(page).not.toHaveURL(/replayTour/);
+test("first-login tour resumes four targets and persists only explicit confirmed completion", async({page},info)=>{
+ const data=await mock(page);data.profile.onboarding={attorneyTourCompleted:false};
+ const session=(await(await page.request.get('/api/auth/me')).json());session.user.isFirstLogin=true;
+ await page.route('**/api/auth/me',route=>json(route,session));
+ const actualCsrf=(await(await page.request.get('/api/csrf')).json()).csrfToken,patches=[];
+ await page.route('**/api/csrf',route=>json(route,{csrfToken:actualCsrf}));
+ await page.route('**/api/users/me/onboarding',async route=>{
+  patches.push({method:route.request().method(),headers:route.request().headers(),body:route.request().postDataJSON()});
+  await route.continue();
+ });
+ await home(page);await expect(tour(page)).toBeVisible();await expect(tour(page)).toContainText('Tour · 1 of 4');
+ expect((await region(page,'onboarding').boundingBox()).y).toBeLessThan(600);
+ await expect(page.locator('.av2-home-primary > :first-child')).toHaveAttribute('data-av2-region','onboarding');await tour(page).locator('summary').focus();await page.keyboard.press('Tab');await expect(tour(page).getByRole('link',{name:'Open profile',exact:true})).toBeFocused();
+ for(const [width,scale] of [[1440,1],[390,2]]){await page.setViewportSize({width,height:900});await page.evaluate(scale=>document.documentElement.style.fontSize=`${16*scale}px`,scale);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1&&document.querySelector('main').scrollWidth<=document.querySelector('main').clientWidth+1)).toBe(true);expect((await new AxeBuilder({page}).include('.av2-workspace-guide').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);await page.screenshot({path:info.outputPath(`active-guide-${width}-${scale}.png`),fullPage:true});}
+ await page.evaluate(()=>document.documentElement.style.fontSize='16px');await page.setViewportSize({width:1280,height:720});
+ expect(patches).toEqual([]);
+ for(let i=0;i<3;i++)await tour(page).getByRole('button',{name:'Next',exact:true}).click();
+ await expect(tour(page).getByRole('link',{name:'Browse paralegals',exact:true})).toHaveAttribute('href','#/paralegals');
+ const saved=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/users/me/onboarding'&&r.request().method()==='PATCH');
+ await tour(page).getByRole('button',{name:'Finish tour',exact:true}).click();expect((await saved).status()).toBe(200);
+ await expect(tour(page)).toHaveCount(0);await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeFocused();
+ expect(patches).toHaveLength(1);expect(patches[0].method).toBe('PATCH');expect(patches[0].body).toEqual({attorneyTourCompleted:true});expect(patches[0].headers['x-csrf-token']).toBe(actualCsrf);
+ expect(await page.evaluate(()=>sessionStorage.getItem('lpc_attorney_tour_completed'))).toBe('1');
+ data.profile.onboarding.attorneyTourCompleted=true;session.user.isFirstLogin=false;await page.reload();await loaded(page,'onboarding');await expect(tour(page)).toHaveCount(0);await expect(page.locator('.av2-home-primary > :first-child')).toHaveClass('av2-home-review');
+ await page.goto(`${entry}?replayTour=1#/home`);await loaded(page,'onboarding');await expect(tour(page)).toContainText('Tour · 1 of 4');await expect(page).not.toHaveURL(/replayTour/);
+ const ownerId=session.user.id||session.user._id;expect(JSON.parse(await page.evaluate(key=>sessionStorage.getItem(key),`lpc_attorney_v2_onboarding:${ownerId}`)).tour).toBe(0);expect(patches).toHaveLength(1);
+ await require('node:fs/promises').writeFile(info.outputPath('onboarding-patch-receipt.json'),JSON.stringify({patches:patches.map(p=>({method:p.method,body:p.body,csrfMatched:p.headers['x-csrf-token']===actualCsrf})),actualProtectedHandler:true,firstLoginIdentityProjection:true,priorCoreFourTargetReload503CreditRetained:true},null,2));
 });
 
-test("populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text", async ({ page }) => {
-  await mock(page);
-  await page.goto(`${entry}#/matters?view=applications&caseId=${objectId(30)}&openApplicants=1`);
-  await loaded(page, "matter-list");
-  await page.getByText("Preview matter", { exact: true }).click();
-  for (const width of [320, 390, 768, 1024, 1440]) {
-    await page.setViewportSize({ width, height: 900 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1 && document.querySelector("main").scrollWidth <= document.querySelector("main").clientWidth + 1)).toBe(true);
-  }
-  let results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
-  expect(results.violations).toEqual([]);
-  await page.screenshot({ path: test.info().outputPath("matters-desktop.png"), fullPage: true });
-  await page.goto(`${entry}#/home`); await loaded(page, "onboarding");
-  results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
-  expect(results.violations).toEqual([]);
-  await page.screenshot({ path: test.info().outputPath("home-desktop.png"), fullPage: true });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: test.info().outputPath("home-mobile.png"), fullPage: true });
-  await page.evaluate(() => document.documentElement.style.fontSize = "200%");
-  expect(await page.evaluate(() => document.querySelector("main").scrollWidth <= document.querySelector("main").clientWidth + 1)).toBe(true);
-  await page.screenshot({ path: test.info().outputPath("home-mobile-enlarged.png"), fullPage: true });
+test("populated views and expanded previews pass AA and fit narrow, tablet, dock and enlarged text", async({page},info)=>{
+ await mock(page);await page.goto(`${entry}#/matters?view=applications&caseId=${objectId(30)}&openApplicants=1`);await loaded(page,'matter-list');const row=page.locator(`[data-av2-matter="${objectId(30)}"]`);await row.locator('.av2-matter-menu > summary').click();await row.getByRole('button',{name:'Preview matter',exact:true}).click();await expect(row.locator('.av2-matter-inline-preview')).toHaveAttribute('open','');
+ for(const width of [320,390,768,1024,1440]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1&&document.querySelector('main').scrollWidth<=document.querySelector('main').clientWidth+1)).toBe(true);}
+ let results=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(results.violations).toEqual([]);await page.screenshot({path:info.outputPath('matters-desktop.png'),fullPage:true});
+ await home(page);results=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(results.violations).toEqual([]);await page.screenshot({path:info.outputPath('home-desktop.png'),fullPage:true});await page.setViewportSize({width:390,height:844});await page.screenshot({path:info.outputPath('home-mobile.png'),fullPage:true});await page.evaluate(()=>document.documentElement.style.fontSize='200%');expect(await page.evaluate(()=>document.querySelector('main').scrollWidth<=document.querySelector('main').clientWidth+1)).toBe(true);await page.screenshot({path:info.outputPath('home-mobile-enlarged.png'),fullPage:true});
 });

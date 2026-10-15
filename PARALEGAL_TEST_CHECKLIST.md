@@ -9,7 +9,7 @@ Use this for a manual pass through the paralegal experience on Let’s-ParaConne
 
 ## Before You Start
 - [ ] Use a fresh browser session or Incognito window.
-- [ ] If payouts or payments are involved, use only approved test details. (use 5555 5555 5555 4444 cvc: any 3 digits. date: any future date.)
+- [ ] If payouts or payments are involved, use only approved test details. Use the approved Stripe TEST-mode fixture for this environment.
 - [ ] Keep notes on anything confusing, broken, slow, or misleading.
 - [ ] If something fails, write down the exact page, action, and error message.
 
@@ -71,7 +71,7 @@ Use this for a manual pass through the paralegal experience on Let’s-ParaConne
 - [ ] Any profile or approval banners are understandable.
 - [ ] Refreshing the dashboard preserves the correct state.
 
-## 8. Browse Open Jobs
+## 8. Browse Open Matters
 - [ ] `browse-jobs.html` loads available jobs correctly.
 - [ ] Job cards are clear and easy to scan.
 - [ ] Opening a job modal/detail works.
@@ -79,30 +79,30 @@ Use this for a manual pass through the paralegal experience on Let’s-ParaConne
 - [ ] If Stripe is required, the gating message is clear before applying.
 - [ ] If no jobs are available, the empty state feels intentional.
 
-## 9. Apply to a Job
+## 9. Apply to a Matter
 - [ ] Apply action is available only when expected.
 - [ ] Cover letter prompt/form is understandable.
 - [ ] Application validation is clear.
 - [ ] Successful application shows confirmation.
 - [ ] Duplicate/confusing application state does not occur.
-- [ ] Applied job appears in `paralegal-applications.html`.
+- [ ] Applied job appears in `dashboard-paralegal.html#cases`.
 
 ## 10. My Applications
-- [ ] `paralegal-applications.html` loads correctly.
+- [ ] `dashboard-paralegal.html#cases` loads correctly.
 - [ ] Submitted applications list is accurate.
 - [ ] Status labels are understandable.
 - [ ] Opening an application detail view/modal works.
 - [ ] Application detail shows the correct job info and cover message.
 - [ ] Deep links with a specific application still open correctly if tested.
 
-## 11. Assigned Cases (after applying to a case and getting hired)
-- [ ] `paralegal-assigned.html` loads correctly.
+## 11. Assigned Matters (after applying to a case and getting hired)
+- [ ] `dashboard-paralegal.html#cases` loads correctly.
 - [ ] Assigned matters list shows the right attorney/case info.
 - [ ] Workspace access becomes available only when attorney funding/status allow it. 
 - [ ] Opening an eligible hired/assigned case goes to `case-detail.html`.
 
-## 12. Case Workspace
-- [ ] Open the case workspace in `case-detail.html`.
+## 12. Matter Workspace
+- [ ] Open the Matter workspace in `case-detail.html`.
 - [ ] Case title, status, tasks, and attorney info load correctly.
 - [ ] Messaging works in the workspace.
 - [ ] Message sending feels immediate and readable.

@@ -876,7 +876,6 @@ const manualMailboxImport = createDirectorManualImport({
   },
 });
 async function importToday() { return manualMailboxImport.sync(); }
-async function checkReplies(options) { return manualMailboxImport.replies(options); }
 
 document.getElementById("importTodayBtn")?.addEventListener("click", importToday);
 openZohoBtn?.addEventListener("click", openZohoMail);

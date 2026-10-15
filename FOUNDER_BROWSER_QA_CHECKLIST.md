@@ -125,7 +125,7 @@ Use this pass in a real browser on the current app build. The goal is to catch r
 
 - Admin workspace loaders partially succeeding and leaving stale detail panels behind.
 - Signed-in versus signed-out header state drifting on public FAQ/help pages.
-- War Room copy implying canonical truth where the backend is still using heuristics or compatibility-only lifecycle signals.
+- AI Control Room copy implying canonical truth where the backend is still using heuristics or compatibility-only lifecycle signals.
 - Marketing publish readiness showing stale connection or packet state after refreshes.
 - Incident detail and timeline panels not clearing when the selected incident changes or a fetch fails.
 

@@ -180,3 +180,39 @@ describe("complete disjoint backend gate graph", () => {
   const inflated=currentWorkflow();inflated.jobs["backend-tests"]["timeout-minutes"]=60;expect(()=>validateWorkflowContract(inflated)).toThrow(/Original 45-minute/);
  });
 });
+
+
+describe("explicit source/backend evidence dispatch", () => {
+  const scopes = ["browser-collection", "browser-checks", "browser-role-journeys", "browser-contracts"];
+  test.each([
+    ["pull_request", undefined, true], ["push", undefined, true],
+    ["workflow_dispatch", "full", true], ["workflow_dispatch", undefined, true],
+    ["workflow_dispatch", "unknown", true], ["workflow_dispatch", "backend-source", false],
+  ])("browser execution is preserved for %s/%s", (eventName, scope, expected) => {
+    const workflow = currentWorkflow();
+    validateWorkflowContract(workflow);
+    for (const name of scopes) {
+      const expression = workflow.jobs[name].if.replace("always()", "true");
+      const enabled = Function("github", "inputs", `return (${expression})`)({event_name:eventName}, {execution_scope:scope});
+      expect(enabled).toBe(expected);
+    }
+  });
+  test("rejects omission, broader skip expressions, default narrowing and extra inputs", () => {
+    for (const name of scopes) {
+      const missing = currentWorkflow(); delete missing.jobs[name].if;
+      expect(() => validateWorkflowContract(missing)).toThrow();
+      const broad = currentWorkflow(); broad.jobs[name].if = "github.event_name != 'workflow_dispatch'";
+      expect(() => validateWorkflowContract(broad)).toThrow();
+    }
+    for (const mutate of [
+      w => { w.on.workflow_dispatch.inputs.execution_scope.default = "backend-source"; },
+      w => { w.on.workflow_dispatch.inputs.execution_scope.required = false; },
+      w => { w.on.workflow_dispatch.inputs.execution_scope.options.push("skip"); },
+      w => { w.on.workflow_dispatch.inputs.skip = {type:"boolean", default:true}; },
+      w => { delete w.on.workflow_dispatch; },
+    ]) {
+      const workflow = currentWorkflow(); mutate(workflow);
+      expect(() => validateWorkflowContract(workflow)).toThrow(/Only explicit manual/);
+    }
+  });
+});

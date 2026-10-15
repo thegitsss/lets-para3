@@ -24,6 +24,7 @@ async function main() {
   const mongoInstance = {
     ip: "127.0.0.1",
     launchTimeout: 60000,
+    args: ["--setParameter", "shutdownTimeoutMillisForSignaledShutdown=1000"],
   };
   if (process.env.PLAYWRIGHT_MONGO_PORT) {
     mongoInstance.port = Number(process.env.PLAYWRIGHT_MONGO_PORT);
@@ -54,31 +55,38 @@ async function main() {
     process.env.CONTROL_ROOM_E2E_ADMIN_EMAIL ||
     "control-room.e2e.admin@lets-paraconnect.dev";
 
-  let shuttingDown = false;
-  const shutdown = async () => {
-    if (shuttingDown) return;
-    shuttingDown = true;
-    try {
-      await mongo.stop();
-    } catch (_) {
-      // Best effort cleanup for the Playwright-local Mongo server.
-    }
+  const mongoose = require("mongoose");
+  let shutdownPromise;
+  const shutdown = () => {
+    if (shutdownPromise) return shutdownPromise;
+    shutdownPromise = (async () => {
+      // index.js owns HTTP draining and then disconnects its application client.
+      // Keep the owned replica alive until that drain has actually completed.
+      if (mongoose.connection.readyState !== 0) {
+        await new Promise(resolve => mongoose.connection.once("disconnected", resolve));
+      }
+      await mongo.stop({ doCleanup: true, force: true });
+    })();
+    return shutdownPromise;
   };
 
-  process.on("SIGINT", async () => {
-    await shutdown();
-    process.exit(0);
-  });
-  process.on("SIGTERM", async () => {
-    await shutdown();
-    process.exit(0);
-  });
-  process.on("exit", () => {
-    void shutdown();
-  });
+  try {
+    await prepareDatabaseModels(process.env.MONGO_URI);
+    require("../../../index.js");
+  } catch (error) {
+    await mongoose.disconnect();
+    await mongo.stop({ doCleanup: true, force: true });
+    throw error;
+  }
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    process.once(signal, () => {
+      shutdown().catch(error => {
+        console.error("[control-room-playwright] Owned replica cleanup failed.", error);
+        process.exitCode = 1;
+      });
+    });
+  }
 
-  await prepareDatabaseModels(process.env.MONGO_URI);
-  require("../../../index.js");
 }
 
 main().catch((error) => {

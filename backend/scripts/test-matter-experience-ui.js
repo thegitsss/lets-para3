@@ -17,8 +17,13 @@ function stripScripts(source) {
 
 const htmlSource = stripScripts(fs.readFileSync(htmlPath, "utf8"));
 const scriptSource = prepareMatterModule(fs.readFileSync(scriptPath, "utf8"));
-const baselineHtmlSource = stripScripts(execFileSync("git", ["show", "HEAD:frontend/case-detail.html"], { cwd: repositoryRoot, encoding: "utf8" }));
-const baselineScriptSource = prepareMatterModule(execFileSync("git", ["show", "HEAD:frontend/assets/scripts/case-detail.js"], { cwd: repositoryRoot, encoding: "utf8" }));
+// Compare against the actual pre-redesign UI, not HEAD after the candidate is committed.
+const baselineCommit = "501cee87480df00ce5a1afe1d0488a4fed34d5d5";
+const evidenceRoot = path.resolve(process.env.LPC_UI_EVIDENCE_DIR || path.join(repositoryRoot, "backend/test-results/matter-experience-ui"));
+fs.mkdirSync(evidenceRoot, { recursive: true });
+const evidencePath = (name) => path.join(evidenceRoot, name);
+const baselineHtmlSource = stripScripts(execFileSync("git", ["show", `${baselineCommit}:frontend/case-detail.html`], { cwd: repositoryRoot, encoding: "utf8" }));
+const baselineScriptSource = prepareMatterModule(execFileSync("git", ["show", `${baselineCommit}:frontend/assets/scripts/case-detail.js`], { cwd: repositoryRoot, encoding: "utf8" }));
 
 function experience(role) {
   const attorney = role === "attorney";
@@ -204,7 +209,7 @@ async function runRoleJourney(browser, role) {
     await page.locator(".sidebar nav:not([hidden])").getAttribute("aria-label"),
     role === "attorney" ? "Attorney navigation" : "Paralegal navigation"
   );
-  await page.screenshot({ path: `/tmp/lpc-prompt2-${role}-matter-current.png`, fullPage: true });
+  await page.screenshot({ path: evidencePath(`lpc-prompt2-${role}-matter-current.png`), fullPage: true });
 
   const visibleTabs = await page.locator('[data-matter-tab]:not([hidden])').allTextContents();
   assert.deepEqual(visibleTabs, role === "attorney"
@@ -302,7 +307,7 @@ async function runRoleJourney(browser, role) {
   for (const tabId of tabIds) {
     await page.click(`[data-matter-tab="${tabId}"]`);
     await page.waitForSelector(`[data-matter-panel="${tabId}"]:not([hidden])`);
-    await page.screenshot({ path: `/tmp/lpc-prompt5-${role}-matter-${tabId}.png`, fullPage: true });
+    await page.screenshot({ path: evidencePath(`lpc-prompt5-${role}-matter-${tabId}.png`), fullPage: true });
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -341,7 +346,7 @@ async function runRoleJourney(browser, role) {
   });
   assert.ok(taskControlSize.width >= 18 && taskControlSize.width <= 24, JSON.stringify(taskControlSize));
   assert.ok(taskControlSize.height >= 18 && taskControlSize.height <= 24, JSON.stringify(taskControlSize));
-  await page.screenshot({ path: `/tmp/lpc-prompt2-${role}-matter-mobile.png`, fullPage: true });
+  await page.screenshot({ path: evidencePath(`lpc-prompt2-${role}-matter-mobile.png`), fullPage: true });
   await page.close();
 
   const baselinePage = await browser.newPage({ viewport: { width: 1280, height: 820 } });
@@ -358,6 +363,7 @@ async function runRoleJourney(browser, role) {
       { timeout: 10_000 }
     );
   } catch (error) {
+    await baselinePage.screenshot({ path: evidencePath(`lpc-baseline-failure-${role}.png`), fullPage: true });
     const baselineState = await baselinePage.evaluate(() => ({
       selectedMatter: document.querySelector("#case-select")?.selectedOptions?.[0]?.textContent || "",
       listStatus: document.querySelector("#caseListStatus")?.textContent || "",
@@ -367,7 +373,7 @@ async function runRoleJourney(browser, role) {
       `${error.message}; baseline page errors: ${baselineErrors.join(" | ") || "none"}; detail requests: ${baselineCounters.detail}; state: ${JSON.stringify(baselineState)}`
     );
   }
-  await baselinePage.screenshot({ path: `/tmp/lpc-prompt2-${role}-matter-baseline.png`, fullPage: true });
+  await baselinePage.screenshot({ path: evidencePath(`lpc-prompt2-${role}-matter-baseline.png`), fullPage: true });
   await baselinePage.close();
 }
 
