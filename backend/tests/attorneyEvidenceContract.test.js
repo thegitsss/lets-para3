@@ -11,6 +11,19 @@ jest.mock("../ai/supportAgentTools", () => ({
 }));
 
 const { auditManagerReply, buildValidationSafeFallback } = require("../ai/supportManagerAgent");
+const { bindAccountOverviewToActor } = require("../ai/aggregateOverviewGrounding");
+const OVERVIEW_OWNER = "507f1f77bcf86cd799439011";
+
+function overviewTrace() {
+  const result = { ok: true, available: true, role: "attorney", totalCount: 9, activeCount: 5, completedCount: 4, byStatus: {}, requestedScope: "completed", recentCases: [], matchingCaseCount: 4, returnedCaseCount: 0, truncated: false };
+  const observedAt = new Date().toISOString();
+  return bindAccountOverviewToActor({ name: "get_my_case_overview", result: {
+    ...result, evidenceState: "verified", evidence: {
+      ...normalizeAttorneyToolEvidence({ toolName: "get_my_case_overview", result, retrievedAt: observedAt }),
+      state: "verified", source: "get_my_case_overview", observedAt,
+    },
+  } }, { id: OVERVIEW_OWNER, role: "attorney" });
+}
 
 function workflowResult(overrides = {}) {
   return {
@@ -200,7 +213,8 @@ describe("attorney normalized evidence contract", () => {
   test("keeps a verified core answer and removes an irrelevant suggestion", () => {
     const audit = auditManagerReply(reply({ suggestions: ["Open billing"] }), {
       messageText: "How many cases have I completed?",
-      toolOutputs: [{ name: "get_my_case_overview", result: { ok: true, available: true, completedCount: 4 } }],
+      accountOwnerId: OVERVIEW_OWNER,
+      toolOutputs: [overviewTrace()],
     });
     expect(audit.valid).toBe(true);
     expect(audit.data.reply).toBe("You have 4 completed cases.");
@@ -217,7 +231,8 @@ describe("attorney normalized evidence contract", () => {
       },
     }), {
       messageText: "How many cases have I completed?",
-      toolOutputs: [{ name: "get_my_case_overview", result: { ok: true, available: true, completedCount: 4 } }],
+      accountOwnerId: OVERVIEW_OWNER,
+      toolOutputs: [overviewTrace()],
     });
     expect(audit.valid).toBe(true);
     expect(audit.data.navigation).toBeNull();
@@ -229,7 +244,8 @@ describe("attorney normalized evidence contract", () => {
       reply: "You have 4 completed cases. Your current matter is disputed.",
     }), {
       messageText: "How many cases have I completed?",
-      toolOutputs: [{ name: "get_my_case_overview", result: { ok: true, available: true, completedCount: 4 } }],
+      accountOwnerId: OVERVIEW_OWNER,
+      toolOutputs: [overviewTrace()],
     });
     expect(audit.valid).toBe(true);
     expect(audit.data.reply).toBe("You have 4 completed cases.");

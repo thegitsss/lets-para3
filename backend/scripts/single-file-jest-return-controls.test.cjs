@@ -74,8 +74,8 @@ function assistantSourceFixture(){
  }
  x.discovered=[...x.names,K.SUITE,...K.ADDED_BACKEND_TESTS].sort();return x;
 }
-test('reviewed Assistant and admission additions require exactly five current file obligations and explicit default-off consumers',()=>{
- const x=assistantSourceFixture(),r=source(x);assert.deepEqual(r.affectedBackendRuntimeSuites,[...K.ADDED_BACKEND_TESTS].sort());assert.deepEqual(K.ADDED_BACKEND_TESTS,['tests/supportCostBudget.test.js','tests/supportCostBudgetReplica.test.js','tests/supportCostBudgetCeiling.test.js','tests/authAdmissionUploadRecovery.test.js','tests/attorneyRefundConcurrency.test.js']);assert.equal(x.discovered.length,544);assert.throws(()=>api.combine({},x.current,x.discovered,{},r),/Affected backend corrections/);
+test('reviewed Assistant, admission and aggregate additions require exactly six current file obligations and explicit default-off consumers',()=>{
+ const x=assistantSourceFixture(),r=source(x);assert.deepEqual(r.affectedBackendRuntimeSuites,[...K.ADDED_BACKEND_TESTS].sort());assert.deepEqual(K.ADDED_BACKEND_TESTS,['tests/supportCostBudget.test.js','tests/supportCostBudgetReplica.test.js','tests/supportCostBudgetCeiling.test.js','tests/authAdmissionUploadRecovery.test.js','tests/attorneyRefundConcurrency.test.js','tests/attorneyAggregateOverviewGrounding.test.js']);assert.equal(x.discovered.length,545);assert.throws(()=>api.combine({},x.current,x.discovered,{},r),/Affected backend corrections/);
 });
 for(const kind of ['source-pin','unreviewed-new-file','missing-new-file','default-off-bridge','default-off-consumers','new-test-not-executed'])test('optional Assistant source bridge rejects '+kind,()=>{
  const x=assistantSourceFixture(),config=x.spec.sourceChanges.find(e=>e.path==='backend/ai/config.js');
@@ -122,3 +122,33 @@ test('unchanged dependency sources preserve the default strict path without an e
 function refundConflictFixture(){const x=assistantSourceFixture(),p='backend/services/attorneyRefundEvents.js',d=K.BACKEND_RUNTIME_CHANGES[p];for(const file of d.affectedSuites){if(file=== 'tests/attorneyRefundConcurrency.test.js'||x.names.includes(file))continue;const replacement=x.names.find(n=>n.startsWith('tests/pureFixture'));x.names.splice(x.names.indexOf(replacement),1,file);for(const source of[x.prior,x.current]){delete source.files['backend/'+replacement];source.files['backend/'+file]='1'.repeat(64);}}x.current.files[p]=d.pins[1];Object.assign(x.spec.sourceChanges.find(e=>e.path===p),{afterSha256:d.pins[1],affectedSuites:d.affectedSuites,reviewedEvidenceSha256:d.reviewedEvidenceSha256});x.discovered=[...x.names,K.SUITE,...K.ADDED_BACKEND_TESTS].sort();return x;}
 test('refund correction names all six exact affected obligations outside final17',()=>{const x=refundConflictFixture(),r=source(x);for(const file of K.BACKEND_RUNTIME_CHANGES['backend/services/attorneyRefundEvents.js'].affectedSuites)assert(r.affectedBackendRuntimeSuites.includes(file));});
 for(const kind of ['missing-consumer','changed-proof','changed-product','missing-controls'])test('refund source correction rejects '+kind,()=>{const x=refundConflictFixture(),e=x.spec.sourceChanges.find(r=>r.path==='backend/services/attorneyRefundEvents.js');if(kind==='missing-consumer')e.affectedSuites=e.affectedSuites.filter(s=>s!=='tests/phase2Lifecycle.test.js');if(kind==='changed-proof')e.reviewedEvidenceSha256='f'.repeat(64);if(kind==='changed-product'){x.current.files[e.path]='f'.repeat(64);e.afterSha256=x.current.files[e.path];}if(kind==='missing-controls')delete x.current.files['backend/tests/attorneyRefundConcurrency.test.js'];assert.throws(()=>source(x));});
+
+// Finite six-path aggregate correction. Pure source guards, never business proof.
+const aggregatePaths=['backend/ai/aggregateOverviewGrounding.js','backend/ai/attorneyResponseValidator.js','backend/ai/supportManagerAgent.js','backend/tests/attorneyAggregateOverviewGrounding.test.js','backend/tests/attorneyEvidenceContract.test.js','backend/tests/supportManagerAgent.test.js'];
+function aggregateSourceFixture(){
+ const x=fixture(),newFile='tests/attorneyAggregateOverviewGrounding.test.js';
+ for(const p of aggregatePaths){const d=K.BACKEND_RUNTIME_CHANGES[p];
+  for(const file of d.affectedSuites){if(file===newFile||x.names.includes(file))continue;const old=x.names.find(n=>n.startsWith('tests/pureFixture'));assert(old);x.names.splice(x.names.indexOf(old),1,file);for(const source of[x.prior,x.current]){delete source.files['backend/'+old];source.files['backend/'+file]='1'.repeat(64);}}
+  if(d.pins[0]===null)delete x.prior.files[p];else x.prior.files[p]=d.pins[0];x.current.files[p]=d.pins[1];
+  x.spec.sourceChanges.push({path:p,beforeSha256:d.pins[0],afterSha256:d.pins[1],kind:p.startsWith('backend/tests/')?'test-fixture':'product-change',affectedSuites:[...d.affectedSuites],reviewedEvidenceSha256:d.reviewedEvidenceSha256});
+ }
+ x.discovered=[...x.names,K.SUITE,newFile].sort();return x;
+}
+test('aggregate correction binds exact six paths and all five affected suite obligations outside final17',()=>{
+ const x=aggregateSourceFixture(),r=source(x);assert.deepEqual(r.affectedBackendRuntimeSuites,['tests/attorneyAggregateOverviewGrounding.test.js','tests/attorneyEvidenceContract.test.js','tests/attorneyResponseValidator.test.js','tests/attorneySupportDatabaseIntegration.test.js','tests/supportManagerAgent.test.js']);
+ const e=execution(),q=verify(e),receipt=api.standaloneResult(e.current,e.discovered,q,r);assert.deepEqual(receipt.requiredLocalAffectedBackendSuites,r.affectedBackendRuntimeSuites);assert.equal(receipt.priorUnionVerifiedInThisJob,false);assert.throws(()=>api.combine({},e.current,e.discovered,q,r),/Affected backend corrections/);
+});
+for(const kind of ['runtime-pin','test-pin','proof','missing-database-consumer','missing-validator-consumer','ci-disguise','missing-new-suite','unknown-new-suite','missing-helper','partial-old-manager'])test('aggregate source guard rejects '+kind,()=>{
+ const x=aggregateSourceFixture(),e=x.spec.sourceChanges.find(v=>v.path==='backend/ai/attorneyResponseValidator.js');
+ if(kind==='runtime-pin'){x.current.files[e.path]='f'.repeat(64);e.afterSha256='f'.repeat(64);}
+ if(kind==='test-pin'){const t=x.spec.sourceChanges.find(v=>v.path==='backend/tests/attorneyEvidenceContract.test.js');x.current.files[t.path]='f'.repeat(64);t.afterSha256='f'.repeat(64);}
+ if(kind==='proof')e.reviewedEvidenceSha256='f'.repeat(64);
+ if(kind==='missing-database-consumer')e.affectedSuites=e.affectedSuites.filter(v=>!v.includes('DatabaseIntegration'));
+ if(kind==='missing-validator-consumer')e.affectedSuites=e.affectedSuites.filter(v=>v!=='tests/attorneyResponseValidator.test.js');
+ if(kind==='ci-disguise')e.kind='ci-control';
+ if(kind==='missing-new-suite')x.discovered=x.discovered.filter(v=>v!=='tests/attorneyAggregateOverviewGrounding.test.js');
+ if(kind==='unknown-new-suite'){x.discovered.push('tests/unreviewedAggregate.test.js');x.current.files['backend/tests/unreviewedAggregate.test.js']='f'.repeat(64);}
+ if(kind==='missing-helper'){delete x.current.files[aggregatePaths[0]];x.spec.sourceChanges=x.spec.sourceChanges.filter(v=>v.path!==aggregatePaths[0]);}
+ if(kind==='partial-old-manager'){const p='backend/ai/supportManagerAgent.js';x.current.files[p]=x.prior.files[p];x.spec.sourceChanges=x.spec.sourceChanges.filter(v=>v.path!==p);}
+ assert.throws(()=>source(x));
+});

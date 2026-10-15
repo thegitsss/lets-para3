@@ -25,6 +25,21 @@ const {
 } = require("../ai/supportManagerAgent");
 const SupportMessage = require("../models/SupportMessage");
 const { normalizeAttorneyToolEvidence } = require("../ai/attorneyEvidenceContract");
+const { bindAccountOverviewToActor } = require("../ai/aggregateOverviewGrounding");
+const OVERVIEW_OWNER = "507f1f77bcf86cd799439011";
+
+function overviewResult({ activeCount = 5, completedCount = 4, ...overrides } = {}) {
+  const result = { ok: true, available: true, role: "attorney", totalCount: activeCount + completedCount, activeCount, completedCount, byStatus: {}, requestedScope: "completed", recentCases: [], matchingCaseCount: completedCount, returnedCaseCount: 0, truncated: false, ...overrides };
+  const observedAt = new Date().toISOString();
+  return { ...result, evidenceState: "verified", evidence: {
+    ...normalizeAttorneyToolEvidence({ toolName: "get_my_case_overview", result, retrievedAt: observedAt }),
+    state: "verified", source: "get_my_case_overview", observedAt,
+  } };
+}
+
+function overviewTrace(options) {
+  return bindAccountOverviewToActor({ name: "get_my_case_overview", result: overviewResult(options) }, { id: OVERVIEW_OWNER, role: "attorney" });
+}
 
 const originalManagerRoles = process.env.OPENAI_SUPPORT_MANAGER_ROLES;
 const originalAttorneyManagerEnabled = process.env.OPENAI_ATTORNEY_MANAGER_ENABLED;
@@ -85,12 +100,7 @@ describe("support manager agent", () => {
   });
 
   test("lets the model select a live tool, continues the Responses loop, and grounds the final answer", async () => {
-    mockExecuteSupportManagerTool.mockResolvedValue({
-      ok: true,
-      totalCount: 9,
-      completedCount: 4,
-      activeCount: 5,
-    });
+    mockExecuteSupportManagerTool.mockResolvedValue(overviewResult());
     const parse = jest
       .fn()
       .mockResolvedValueOnce({
@@ -259,19 +269,7 @@ describe("support manager agent", () => {
                     {
                       name: "get_my_case_overview",
                       args: { status_scope: "completed" },
-                      result: {
-                        ok: true,
-                        available: true,
-                        totalCount: 4,
-                        evidenceState: "verified",
-                        evidence: {
-                          authorized: true,
-                          state: "verified",
-                          observedAt: new Date().toISOString(),
-                          facts: [{ key: "totalCount", value: 4 }],
-                          missingFacts: [],
-                        },
-                      },
+                      result: overviewResult({ activeCount: 0, completedCount: 4 }),
                     },
                   ],
                 },
@@ -508,7 +506,8 @@ describe("support manager agent", () => {
     expect(
       validateManagerReply(managerReply({ reply: "You have 7 completed cases." }), {
         messageText: "how many did i finish?",
-        toolOutputs: [{ name: "get_my_case_overview", result: { ok: true, completedCount: 4 } }],
+        accountOwnerId: OVERVIEW_OWNER,
+        toolOutputs: [overviewTrace()],
       })
     ).toBeNull();
   });
@@ -516,15 +515,8 @@ describe("support manager agent", () => {
   test("does not ground a numeric claim from digits embedded in record identifiers", () => {
     const audit = auditManagerReply(managerReply({ reply: "You completed 99 cases.", suggestions: [] }), {
       messageText: "How many cases did I complete?",
-      toolOutputs: [{
-        name: "get_my_case_overview",
-        result: {
-          ok: true,
-          available: true,
-          completedCount: 3,
-          recentCases: [{ caseId: "6a6140113892535f99d8139e", title: "Synthetic Matter" }],
-        },
-      }],
+      accountOwnerId: OVERVIEW_OWNER,
+      toolOutputs: [overviewTrace({ completedCount: 3, recentCases: [{ caseId: "6a6140113892535f99d8139e", title: "Synthetic Matter" }] })],
     });
     expect(audit.errors).toContain("numeric_claim_absent_from_evidence");
   });
@@ -532,7 +524,8 @@ describe("support manager agent", () => {
   test("never treats a number supplied by the user as verified evidence", () => {
     const audit = auditManagerReply(managerReply({ reply: "Yes, you completed 99 cases." }), {
       messageText: "Did I complete 99 cases?",
-      toolOutputs: [{ name: "get_my_case_overview", result: { ok: true, completedCount: 4 } }],
+      accountOwnerId: OVERVIEW_OWNER,
+      toolOutputs: [overviewTrace()],
     });
     expect(audit.errors).toContain("numeric_claim_absent_from_evidence");
   });
@@ -641,11 +634,7 @@ describe("support manager agent", () => {
   });
 
   test("retries an internally invalid answer and returns the corrected grounded response", async () => {
-    mockExecuteSupportManagerTool.mockResolvedValue({
-      ok: true,
-      available: true,
-      completedCount: 4,
-    });
+    mockExecuteSupportManagerTool.mockResolvedValue(overviewResult({ activeCount: 0 }));
     const parse = jest
       .fn()
       .mockResolvedValueOnce({
@@ -1270,19 +1259,22 @@ describe("support manager agent", () => {
   });
 
   test("blocks generic manual-review language, internal tool names, and overlong simple facts", () => {
-    const evidence = [{ name: "get_my_case_overview", result: { ok: true, completedCount: 4 } }];
+    const evidence = [overviewTrace()];
     expect(auditManagerReply(managerReply({ reply: "I’m sending this to the team for review now." }), {
       messageText: "How many cases did I complete?",
+      accountOwnerId: OVERVIEW_OWNER,
       toolOutputs: evidence,
     }).errors).toContain("forbidden_support_meta_claim");
     expect(auditManagerReply(managerReply({ reply: "The get_my_case_overview tool says 4." }), {
       messageText: "How many cases did I complete?",
+      accountOwnerId: OVERVIEW_OWNER,
       toolOutputs: evidence,
     }).errors).toContain("forbidden_support_meta_claim");
     const repaired = auditManagerReply(managerReply({
       reply: "You completed 4 cases. That is the current count. You can ask about them.",
     }), {
       messageText: "How many cases did I complete?",
+      accountOwnerId: OVERVIEW_OWNER,
       toolOutputs: evidence,
     });
     expect(repaired.valid).toBe(true);

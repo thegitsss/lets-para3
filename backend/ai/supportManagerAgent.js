@@ -42,6 +42,7 @@ const {
 } = require("./supportEvidenceFreshness");
 
 const logger = createLogger("ai:support-manager");
+const { bindAccountOverviewToActor } = require("./aggregateOverviewGrounding");
 const MAX_AGENT_ITERATIONS = 6;
 const MAX_HISTORY_MESSAGES = 16;
 const MAX_VALIDATION_RETRIES = 2;
@@ -435,7 +436,7 @@ function isAttorneyWorkflowPrerequisiteQuestion(messageText = "", conversationHi
 
 function auditManagerReply(
   reply = {},
-  { messageText = "", toolOutputs = [], conversationHistory = [], conversationState = {}, evidencePlan = null } = {}
+  { messageText = "", toolOutputs = [], conversationHistory = [], conversationState = {}, evidencePlan = null, accountOwnerId = "" } = {}
 ) {
   const parsed = MANAGER_REPLY_SCHEMA.safeParse(reply);
   if (!parsed.success) {
@@ -597,6 +598,7 @@ function auditManagerReply(
       responseMode: data.responseMode,
       detailLevel: data.detailLevel,
       evidencePlan: plan,
+      accountOwnerId,
     });
   } catch (_error) {
     return {
@@ -622,8 +624,9 @@ function auditManagerReply(
     detailLevel: data.detailLevel,
     evidencePlan: plan,
     includeOptionalUi: false,
+    accountOwnerId,
   }));
-  errors.push(...auditPolicyLiveStateConfusion(coreReply, relevantAttempts));
+  errors.push(...auditPolicyLiveStateConfusion(coreReply, relevantAttempts, { accountOwnerId }));
 
   const allowedHrefs = collectNavigationHrefs(toolOutputs);
   const navigationWasInvalid = Boolean(data.navigation) && !allowedHrefs.has(String(data.navigation.ctaHref || "").trim());
@@ -675,7 +678,7 @@ function auditManagerReply(
 
 function validateManagerReply(
   reply = {},
-  { messageText = "", toolOutputs = [], conversationHistory = [], conversationState = {}, evidencePlan = null } = {}
+  { messageText = "", toolOutputs = [], conversationHistory = [], conversationState = {}, evidencePlan = null, accountOwnerId = "" } = {}
 ) {
   const audit = auditManagerReply(reply, {
     messageText,
@@ -683,6 +686,7 @@ function validateManagerReply(
     conversationHistory,
     conversationState,
     evidencePlan,
+    accountOwnerId,
   });
   return audit.valid ? audit.data : null;
 }
@@ -966,10 +970,10 @@ async function generateSupportManagerReply({
       }),
     },
   ];
-  const toolOutputs = reuse.reusable.map((entry) => ({
+  const toolOutputs = reuse.reusable.map((entry) => bindAccountOverviewToActor({
     ...entry,
     reused: true,
-  }));
+  }, user));
   const startedAt = Date.now();
   let response = null;
   const usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
@@ -1010,6 +1014,7 @@ async function generateSupportManagerReply({
           conversationHistory: history,
           conversationState: preparedConversationState,
           evidencePlan,
+          accountOwnerId: String(user._id || user.id || ""),
         });
         if (!audit.valid) {
           validationFailures.push(...audit.errors);
@@ -1146,7 +1151,7 @@ async function generateSupportManagerReply({
             durationMs: Date.now() - toolStartedAt,
             callIndex,
           };
-          toolOutputs.push(trace);
+          toolOutputs.push(bindAccountOverviewToActor(trace, user));
           return {
             type: "function_call_output",
             call_id: call.call_id,
