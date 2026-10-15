@@ -1,10 +1,10 @@
 # LPC Terms, Privacy, and acceptance review — October 1, 2026
 
-Status: implemented locally; legal approval and production verification remain open. This is an implementation and source review, not an enforceability opinion or a release certification. The authoritative release gates remain `RELEASE_GATES.md`, `LAUNCH_CERTIFICATION_CURRENT.md`, and `../LAUNCH_CHECKLIST.md`.
+Status: implemented locally; Samantha’s exact-policy approval and production verification remain open. This is an implementation and source review, not an enforceability opinion or a release certification. The authoritative release gates remain `RELEASE_GATES.md`, `LAUNCH_CERTIFICATION_CURRENT.md`, and `../LAUNCH_CHECKLIST.md`.
 
 ## October 14 owner scope amendment
 
-Samantha confirmed: “acknowledgement at signup only. the policy change is correct, only during signup.” The current signup-only implementation is the intended product. Existing members do not need an updated-policy review, acceptance endpoint or acknowledgement before new work or hiring. This supersedes those requirements in the original October 1 implementation and historical evidence below. Preserve signup choices, exact versions/fingerprints, historical document copies and actual receipts; do not invent acceptance for existing accounts. Counsel's approval of the exact final Terms and Privacy, substantive security/privacy checks and production verification remain separate requirements. This decision does not authorize deployment.
+Samantha confirmed: “acknowledgement at signup only. the policy change is correct, only during signup.” The current signup-only implementation is the intended product. Existing members do not need an updated-policy review, acceptance endpoint or acknowledgement before new work or hiring. This supersedes those requirements in the original October 1 implementation and historical evidence below. Preserve signup choices, exact versions/fingerprints, historical document copies and actual receipts; do not invent acceptance for existing accounts. Samantha’s approval of the exact final Terms and Privacy, substantive security/privacy checks and production verification remain separate requirements. No counsel appointment or independent technical reviewer is required. This decision does not authorize deployment.
 
 ## Implemented
 
@@ -34,7 +34,7 @@ The user approved public provider materials and primary sources after no connect
 
 ## Required owner decisions and factual checks before publishing
 
-October 14 owner direction supersedes earlier counsel-appointment dependencies: Samantha has no counsel. Present the specific unresolved decisions below with recommendations; continue all independent technical work. Historical legal analysis and uncertainty remain recorded. Owner approval is not a legal opinion or a claim that counsel reviewed these documents.
+October 14 owner direction supersedes earlier counsel-appointment dependencies: Samantha has no counsel. Present the specific unresolved decisions below with recommendations; continue all independent technical work. Historical legal analysis and uncertainty remain recorded. Owner approval is not a legal opinion or a claim that counsel reviewed these documents. References below to counsel review or approval describe earlier legal uncertainty; they do not impose a counsel-appointment or signature gate. Samantha makes the remaining specific policy decisions and retains final release approval.
 
 - [ ] Samantha decides the remaining commercial/policy choices and approves the actual final Terms and Privacy versions/hashes. Surface the cap, indemnity, venue, jury/class language, electronic assignment, existing-engagement transition and professional-rule questions explicitly. Do not populate approval environment variables from this memo or invent counsel approval. `LEGAL_COUNSEL_APPROVAL_ID` is the retained legacy key for the actual owner policy decision; version/hash matching remains mandatory.
 - [ ] Confirm the corporate entity and legal-notice address are current and monitored.
