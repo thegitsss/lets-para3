@@ -33540,7 +33540,7 @@
       {
         "scope": "attorney-v2-declared-1",
         "selected": 3,
-        "maxBytes": 7973371904
+        "maxBytes": 7964983296
       }
     ],
     "priorArchives": [
@@ -33633,7 +33633,8 @@
       "reason": "Pinned official action may emit its complete summary only above1MiB; exact-owned controller must archive/delete if present. Included in existing8GiB new envelope, no extra authority.",
       "actualBaseToTComparisonBytes": 193002,
       "actualBaseToTChanges": 641,
-      "dependencyOnlyPatchProof": "9cdb3c4683e3091a1fa51bc66023d9bfa4e2e760d51a5bd395b7d2c3035efc73"
+      "dependencyOnlyPatchProof": "9cdb3c4683e3091a1fa51bc66023d9bfa4e2e760d51a5bd395b7d2c3035efc73",
+      "allocation": "8MiB reallocated from second native scope; total all8 families remains exactly8GiB"
     }
   },
   "backendReturn": {
