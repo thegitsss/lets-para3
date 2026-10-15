@@ -51,8 +51,17 @@
   };
   measureMobileViewport();
   measureHeroLayout();
+  // Chrome can finish opening its toolbars after the initial measurement.
+  // Accept that startup correction, then retain the geometry once scrolling begins.
+  let heroLayoutScrolled = scrollY > 0;
+  addEventListener('scroll', () => {
+    if (scrollY > 0) heroLayoutScrolled = true;
+  }, { passive: true });
   addEventListener('resize', () => {
-    if (innerWidth === heroLayoutWidth) return;
+    if (innerWidth === heroLayoutWidth) {
+      if (innerWidth <= 767 && !heroLayoutScrolled && scrollY === 0) measureHeroLayout();
+      return;
+    }
     heroLayoutWidth = innerWidth;
     measureMobileViewport();
     measureHeroLayout();
