@@ -16,10 +16,11 @@ describe("quality workflow contract", () => {
   test("the current workflow enforces every launch-critical repository and browser gate", () => {
     expect(validateWorkflowContract(currentWorkflow())).toEqual({
       jobs: 6,
-      validateCommands: 26,
+      validateCommands: 23,
       browserCommands: 7,
       criticalBrowserCommands: 15,
       browserGroups: 32,
+      backendShards: 8,
     });
   });
 
@@ -56,7 +57,7 @@ describe("quality workflow contract", () => {
 
   test("rejects candidate identity checks after installation or without retained evidence", () => {
     const lateIdentity = currentWorkflow();
-    const steps = lateIdentity.jobs.validate.steps;
+    const steps = lateIdentity.jobs["runtime-checks"].steps;
     const candidateIndex = steps.findIndex((entry) => entry.name === "Record exact release candidate");
     const [candidateStep] = steps.splice(candidateIndex, 1);
     const installIndex = steps.findIndex((entry) => entry.name === "Install exact dependency graph");
@@ -64,7 +65,7 @@ describe("quality workflow contract", () => {
     expect(() => validateWorkflowContract(lateIdentity)).toThrow(/before dependency installation/);
 
     const missingEvidence = currentWorkflow();
-    missingEvidence.jobs.validate.steps = missingEvidence.jobs.validate.steps.filter(
+    missingEvidence.jobs["runtime-checks"].steps = missingEvidence.jobs["runtime-checks"].steps.filter(
       (entry) => entry.name !== "Upload candidate identity evidence"
     );
     expect(() => validateWorkflowContract(missingEvidence)).toThrow(/candidate identity evidence is missing/);
@@ -72,7 +73,7 @@ describe("quality workflow contract", () => {
 
   test("rejects removal of the production no-theater gate", () => {
     const workflow = currentWorkflow();
-    const step = workflow.jobs.validate.steps.find((entry) => entry.run?.includes("npm run check:no-theater"));
+    const step = workflow.jobs["runtime-checks"].steps.find((entry) => entry.run?.includes("npm run check:no-theater"));
     expect(step).toBeDefined();
     step.run = step.run.replace("npm run check:no-theater", "npm run check:frontend");
     expect(() => validateWorkflowContract(workflow)).toThrow(/check:no-theater/);
@@ -80,11 +81,11 @@ describe("quality workflow contract", () => {
 
   test("rejects mutable action tags and credential-persisting checkout", () => {
     const mutable = currentWorkflow();
-    mutable.jobs.validate.steps[0].uses = "actions/checkout@v7";
+    mutable.jobs["runtime-checks"].steps[0].uses = "actions/checkout@v7";
     expect(() => validateWorkflowContract(mutable)).toThrow(/full commit SHA/);
 
     const credentialed = currentWorkflow();
-    credentialed.jobs.validate.steps[0].with["persist-credentials"] = true;
+    credentialed.jobs["runtime-checks"].steps[0].with["persist-credentials"] = true;
     expect(() => validateWorkflowContract(credentialed)).toThrow(/persist-credentials/);
   });
 
@@ -100,19 +101,19 @@ describe("quality workflow contract", () => {
 
   test("rejects missing or short-lived successful test evidence", () => {
     const missingJunit = currentWorkflow();
-    const jestStep = missingJunit.jobs.validate.steps.find((entry) => entry.name === "Run complete Jest suite");
+    const jestStep = missingJunit.jobs["backend-tests"].steps.find((entry) => entry.name === "Run every assigned original Jest suite once");
     jestStep.run = "npm test -- --ci";
-    expect(() => validateWorkflowContract(missingJunit)).toThrow(/JUnit launch evidence/);
+    expect(() => validateWorkflowContract(missingJunit)).toThrow(/serialized shard launcher/);
 
     const shortLived = currentWorkflow();
     const artifact = shortLived.jobs["browser-checks"].steps.find(
       (entry) => entry.name === "Upload browser launch evidence"
     );
     artifact.with["retention-days"] = 7;
-    expect(() => validateWorkflowContract(shortLived)).toThrow(/30 days/);
+    expect(() => validateWorkflowContract(shortLived)).toThrow(/owner-approved one day/);
 
     const missingAllowed = currentWorkflow();
-    const candidateArtifact = missingAllowed.jobs.validate.steps.find(
+    const candidateArtifact = missingAllowed.jobs["runtime-checks"].steps.find(
       (entry) => entry.name === "Upload candidate identity evidence"
     );
     candidateArtifact.with["if-no-files-found"] = "warn";
@@ -155,11 +156,27 @@ describe("complete parallel browser gate graph", () => {
     expect(() => validateWorkflowContract(inflated)).toThrow(/no greater than 60/);
   });
   test("requires full-suite source binding before and coverage verification after Jest", () => {
-    const late = currentWorkflow(), steps = late.jobs.validate.steps;
-    const index = steps.findIndex(step => step.name === "Bind complete Jest source and required subsets");
+    const late = currentWorkflow(), steps = late.jobs["runtime-checks"].steps;
+    const index = steps.findIndex(step => step.name === "Bind and balance complete original Jest file shards");
     const [binding] = steps.splice(index, 1);steps.push(binding);
-    expect(() => validateWorkflowContract(late)).toThrow(/bind source before/);
-    const omitted = currentWorkflow();omitted.jobs.validate.steps = omitted.jobs.validate.steps.filter(step => step.name !== "Verify substantive authentication and payment coverage");
-    expect(() => validateWorkflowContract(omitted)).toThrow(/verify-ci-jest-coverage/);
+    expect(() => validateWorkflowContract(late)).toThrow(/Bind source before/);
+    const omitted = currentWorkflow();omitted.jobs["backend-coverage"].steps = omitted.jobs["backend-coverage"].steps.filter(step => step.name !== "Verify complete raw union and substantive authentication/payment coverage");
+    expect(() => validateWorkflowContract(omitted)).toThrow(/verify the complete source-bound raw union/);
   });
+});
+
+
+describe("complete disjoint backend gate graph", () => {
+ test("rejects a missing shard, narrowed launcher, fail-fast omissions and skipped fixed Runtime gate", () => {
+  const missing=currentWorkflow();missing.jobs["backend-tests"].strategy.matrix.shard.pop();expect(()=>validateWorkflowContract(missing)).toThrow(/Every disjoint complete Jest/);
+  const narrowed=currentWorkflow();narrowed.jobs["backend-tests"].steps.find(s=>s.name==="Run every assigned original Jest suite once").run+=" --grep chosen";expect(()=>validateWorkflowContract(narrowed)).toThrow(/serialized shard launcher/);
+  const fast=currentWorkflow();fast.jobs["backend-tests"].strategy["fail-fast"]=true;expect(()=>validateWorkflowContract(fast)).toThrow(/no fail-fast omissions/);
+  const skipped=currentWorkflow();skipped.jobs.validate.if="success()";expect(()=>validateWorkflowContract(skipped)).toThrow(/Fixed Runtime gate must always/);
+ });
+ test("rejects raw artifact overwrites, suppressed result, weaker fixed gate and inflated backend budget", () => {
+  const overwritten=currentWorkflow();overwritten.jobs["backend-coverage"].steps.find(s=>s.name==="Download all original Jest shard evidence").with["merge-multiple"]=true;expect(()=>validateWorkflowContract(overwritten)).toThrow(/without overwrites/);
+  const suppressed=currentWorkflow();suppressed.jobs["backend-tests"].steps.at(-2)["continue-on-error"]=true;expect(()=>validateWorkflowContract(suppressed)).toThrow(/cannot suppress/);
+  const fake=currentWorkflow();fake.jobs.validate.steps[0].run="true";expect(()=>validateWorkflowContract(fake)).toThrow(/Runtime aggregate must fail closed/);
+  const inflated=currentWorkflow();inflated.jobs["backend-tests"]["timeout-minutes"]=60;expect(()=>validateWorkflowContract(inflated)).toThrow(/Original 45-minute/);
+ });
 });

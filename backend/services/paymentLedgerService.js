@@ -12,14 +12,24 @@ function same(value, expected) {
 
 async function withPayoutTransaction(work) {
   const session = await mongoose.startSession();
+  let commitAttempted = false;
   try {
     session.startTransaction({ readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, maxCommitTimeMS: 10000 });
     const result = await work(session);
+    commitAttempted = true;
     await session.commitTransaction();
     return result;
   } catch (error) {
     if (session.inTransaction()) await session.abortTransaction().catch(reportOperationalFailure("services.paymentLedgerService.transaction_abort"));
     if (error.code === 112 || error.hasErrorLabel?.("TransientTransactionError")) throw new Error("Payout ledger evidence changed before it could be confirmed.");
+    if (commitAttempted && !error.status && !error.publicCode) {
+      // A reservation may already be durable even when its acknowledgement is
+      // lost. Return an uncertain service outcome; never authorize a provider
+      // request by treating an unconfirmed commit as a successful reservation.
+      throw Object.assign(new Error("The payment records could not be confirmed. Review the current payment outcome before trying again.", { cause: error }), {
+        status: 503, publicCode: "PAYMENT_COMMIT_UNCONFIRMED",
+      });
+    }
     throw error;
   } finally { await session.endSession(); }
 }

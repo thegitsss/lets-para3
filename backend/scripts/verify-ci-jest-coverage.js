@@ -113,4 +113,4 @@ if (require.main === module) {
   try { if (process.argv[2] === '--prepare') prepare(); else if (process.argv[2] === '--verify') verify(); else fail('Use --prepare before the complete suite and --verify after it.'); }
   catch (error) { console.error(error.message); process.exitCode = 1; }
 }
-module.exports = { REQUIRED_SUBSETS, focusedFiles, assertOriginalConfig, verifyReport };
+module.exports = { REQUIRED_SUBSETS, focusedFiles, assertOriginalConfig, verifyReport, snapshot };

@@ -6,7 +6,7 @@ const User = require("../models/User"), Case = require("../models/Case"), AuditL
 const app = express(); app.use(cookieParser(), express.json()); app.use("/api/disputes", require("../routes/disputes"));
 const cookie = user => `token=${require("jsonwebtoken").sign({ id: String(user._id), role: user.role, av: user.authVersion || 0 }, process.env.JWT_SECRET, { expiresIn: "1h" })}`;
 let mongo, owner, other, para, invited, admin, matter;
-beforeAll(async () => { mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" } }); await mongoose.connect(mongo.getUri("attorney-disputes")); await Promise.all([User.init(), Case.init(), AuditLog.init(), Notification.init(), require("../models/MatterReviewNotification").init()]); }, 60000);
+beforeAll(async () => { mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" }, instanceOpts: [{ args: ["--setParameter", "shutdownTimeoutMillisForSignaledShutdown=1000"] }] }); await mongoose.connect(mongo.getUri("attorney-disputes")); await Promise.all([User.init(), Case.init(), AuditLog.init(), Notification.init(), require("../models/MatterReviewNotification").init()]); }, 60000);
 afterAll(async () => { await mongoose.disconnect(); await mongo?.stop(); }); afterEach(() => jest.restoreAllMocks());
 beforeEach(async () => {
   await clearDatabase(); jest.clearAllMocks(); [owner, other, para, invited, admin] = await User.create(["owner", "other", "para", "invited", "admin"].map(name => ({ firstName: "Synthetic", lastName: name, email: `${name}@disputes.test`, password: "Synthetic123!", role: name === "admin" ? "admin" : ["para", "invited"].includes(name) ? "paralegal" : "attorney", status: "approved" })));

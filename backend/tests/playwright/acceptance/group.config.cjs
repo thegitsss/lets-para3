@@ -26,12 +26,14 @@ if(group.adapter==='actual-shared'){
  const port=Number(process.env.LPC_BROWSER_HTTP_PORT||group.httpPort);
  if(!Number.isSafeInteger(port)||port<1024||port>65535||port===5054)throw Error('An independent loopback group port is required.');
  const origin=`http://127.0.0.1:${port}`;
+ const originalMongoPort=String(webServer.env?.PLAYWRIGHT_MONGO_PORT||'');
+ const retainedMongoPort=group.resourceLocks.includes('legacy-port-'+originalMongoPort)?originalMongoPort:'';
  process.env.PLAYWRIGHT_BASE_URL=origin;
  use.baseURL=origin;
  webServer={...webServer,port,reuseExistingServer:false,
   env:{...webServer.env,PORT:String(port),PLAYWRIGHT_BASE_URL:origin,
    APP_BASE_URL:origin,CLIENT_BASE_URL:origin,FRONTEND_BASE_URL:origin,
-   PLAYWRIGHT_MONGO_PORT:'',EMAIL_DISABLE:'true'}};
+   PLAYWRIGHT_MONGO_PORT:retainedMongoPort,EMAIL_DISABLE:'true'}};
 }
 module.exports={...original,
  testDir:path.join(backend,'tests/playwright'),

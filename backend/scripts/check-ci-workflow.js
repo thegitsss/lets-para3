@@ -36,9 +36,6 @@ const REQUIRED_VALIDATE_COMMANDS = Object.freeze([
   "npm run generate:sbom",
   "npm run check:licenses",
   "npm audit --omit=dev --audit-level=high",
-  "npm test -- --ci",
-  "node scripts/verify-ci-jest-coverage.js --prepare",
-  "node scripts/verify-ci-jest-coverage.js --verify",
 ]);
 const REQUIRED_BROWSER_COMMANDS = Object.freeze([
   "npx playwright install --with-deps chromium firefox webkit",
@@ -154,7 +151,7 @@ function findStep(job, name) {
 function validateLaunchEvidenceArtifact(job, { stepName, pathFragment }) {
   const step = findStep(job, stepName);
   if (!step) fail(`${stepName} is missing.`);
-  if (step.if !== "always()") fail(`${stepName} must run with always() so failed and successful executions retain evidence.`);
+  if (!/^\$\{\{ always\(\) && steps\.evidence_limit_\d+\.outcome == 'success' \}\}$/.test(step.if || "")) fail(`${stepName} must retain successful/failed evidence only after its always() budget guard succeeds.`);
   if (!String(step.uses || "").startsWith("actions/upload-artifact@")) {
     fail(`${stepName} must use actions/upload-artifact.`);
   }
@@ -164,9 +161,35 @@ function validateLaunchEvidenceArtifact(job, { stepName, pathFragment }) {
   if (step.with?.["if-no-files-found"] !== "error") {
     fail(`${stepName} must fail when required launch evidence is missing.`);
   }
-  if (Number(step.with?.["retention-days"]) !== 30) {
-    fail(`${stepName} must retain launch evidence for 30 days.`);
+  if (Number(step.with?.["retention-days"]) !== 1) {
+    fail(`${stepName} must retain complete launch evidence for the owner-approved one day before archive.`);
   }
+  if (step.with?.["compression-level"] !== 9) fail(`${stepName} must losslessly compress complete evidence at level9.`);
+}
+
+function validateArtifactBudgets(workflow) {
+  const { catalog } = require("./guard-ci-artifact-budget");
+  const expected=catalog("1","1"),actual=[];
+  for(const [jobName,job] of Object.entries(workflow.jobs||{})) {
+    const matrix=job.strategy?.matrix;
+    const contexts=matrix?.include || (matrix?.shard ? matrix.shard.map(shard=>({shard})) : matrix?.group ? matrix.group.map(group=>({group})) : [{}]);
+    for(const context of contexts) {
+      const expand=value=>String(value).replace(/\$\{\{ github.run_id \}\}/g,"1").replace(/\$\{\{ github.run_attempt \}\}/g,"1").replace(/\$\{\{ matrix\.(scope|group|shard) \}\}/g,(_,key)=>context[key]);
+      for(const [index,step] of (job.steps||[]).entries()) {
+        if(!String(step.uses||"").startsWith("actions/upload-artifact@")) continue;
+        const key=String(context.scope||context.group||context.shard||""), name=expand(step.with?.name),input=expand(step.with?.path);
+        const row=expected.find(r=>r.job===jobName&&r.key===key&&r.name===name&&r.path===input);
+        if(!row) fail("Unbudgeted artifact or narrowed complete evidence path.");
+        const guard=job.steps[index-1];
+        const ordinal=/^evidence_limit_(\d+)$/.exec(guard?.id||"")?.[1];
+        const guardCommand=`node scripts/guard-ci-artifact-budget.js --job "${jobName}" --key "${key}" --artifact "${name}" --path "${input}" --record "\${{ runner.temp }}/lpc-artifact-${jobName}-${key}-${ordinal}.json"`;
+        if(!ordinal || guard.if!=="always()" || expand(guard.run||"")!==guardCommand || step.if!==`\${{ always() && steps.${guard.id}.outcome == 'success' }}`) fail("Artifact upload requires its immediately preceding exact always() finite budget guard.");
+        if(step.with?.["retention-days"]!==1||step.with?.["compression-level"]!==9||step.with?.["if-no-files-found"]!=="error"||step.with?.["include-hidden-files"]!==true||step.with?.archive===false||step.with?.overwrite===true) fail("Complete artifact evidence requires one day, compression9, mandatory files, unchanged ZIP and no overwrite.");
+        actual.push(row.name);
+      }
+    }
+  }
+  if(JSON.stringify(actual.sort())!==JSON.stringify(expected.map(r=>r.name).sort())) fail("Finite83 artifact inventory must be complete and unique.");
 }
 
 function requireCommands(job, commands, label) {
@@ -232,7 +255,7 @@ function validateGroupedBrowserJobs(jobs, catalog) {
     for (const step of job.steps || []) if (step["continue-on-error"]) fail(`${name} cannot suppress a failed step.`);
   }
   for (const job of [checks, roles]) {
-    if (job.strategy?.["fail-fast"] !== false || job.strategy?.["max-parallel"] !== 3) fail("Browser matrices must finish every group with bounded parallelism and no fail-fast omissions.");
+    if (job.strategy?.["fail-fast"] !== false || job.strategy?.["max-parallel"] !== 8) fail("Browser matrices must finish every group with bounded parallelism and no fail-fast omissions.");
     requireCommands(job, ["npx playwright install --with-deps chromium firefox webkit"], "browser matrix");
     validateLaunchEvidenceArtifact(job, { stepName: "Upload browser launch evidence", pathFragment: "backend/test-results/junit" });
   }
@@ -248,6 +271,35 @@ function validateGroupedBrowserJobs(jobs, catalog) {
       JSON.stringify(final?.env) !== JSON.stringify({ COLLECTION_RESULT: "${{ needs.browser-collection.result }}", CHECKS_RESULT: "${{ needs.browser-checks.result }}", ROLES_RESULT: "${{ needs.browser-role-journeys.result }}" }) ||
       final?.run?.trim() !== 'test "$COLLECTION_RESULT" = success\ntest "$CHECKS_RESULT" = success\ntest "$ROLES_RESULT" = success') fail("Browser aggregate must fail closed unless every complete dependency succeeds.");
   return catalog.groups.length;
+}
+
+function validateGroupedBackendJobs(jobs) {
+  const checks = jobs["runtime-checks"], shards = jobs["backend-tests"], union = jobs["backend-coverage"], gate = jobs.validate;
+  if (!checks || !shards || !union) fail("Runtime checks, disjoint complete backend shards and raw coverage union are required.");
+  for (const [name, job] of [["runtime-checks", checks], ["backend-tests", shards], ["backend-coverage", union]]) {
+    if (job["continue-on-error"] || (name === "backend-coverage" ? job.if !== "always()" : job.if) || job.steps?.some(step => step["continue-on-error"])) fail(`${name} cannot suppress or skip complete backend acceptance.`);
+    validateRuntimeBeforeInstall(job, name);validateCandidateBeforeInstall(job);
+  }
+  requireCommands(checks, ["npm ci", ...REQUIRED_VALIDATE_COMMANDS, "node scripts/verify-ci-jest-shards.js --prepare"], "runtime-checks");
+  validateLaunchEvidenceArtifact(checks, { stepName: "Upload supply-chain launch evidence", pathFragment: "backend/test-results/supply-chain" });
+  validateLaunchEvidenceArtifact(checks, { stepName: "Upload candidate identity evidence", pathFragment: "backend/test-results/release/candidate.json" });
+  validateLaunchEvidenceArtifact(checks, { stepName: "Upload complete Jest shard plan", pathFragment: "backend/test-results/jest/plan.json" });
+  const prepare = findStep(checks, "Bind and balance complete original Jest file shards"), publish = findStep(checks, "Upload complete Jest shard plan");
+  if (prepare?.run !== "node scripts/verify-ci-jest-shards.js --prepare" || prepare.if || checks.steps.indexOf(prepare) >= checks.steps.indexOf(publish)) fail("Bind source before publishing the exact complete original shard plan.");
+  if (shards.needs !== "runtime-checks" || shards.strategy?.["fail-fast"] !== false || shards.strategy?.["max-parallel"] !== 8 || Object.keys(shards.strategy?.matrix || {}).join() !== "shard" || JSON.stringify(shards.strategy.matrix.shard) !== JSON.stringify([1,2,3,4,5,6,7,8])) fail("Every disjoint complete Jest file shard must run once with bounded independent parallelism and no fail-fast omissions.");
+  if (shards["timeout-minutes"] !== 45 || checks["timeout-minutes"] !== 45) fail("Original 45-minute backend/source job budgets must remain bounded after splitting.");
+  const launch = findStep(shards, "Run every assigned original Jest suite once");
+  if (launch?.run !== 'node scripts/run-ci-jest-shard.js --shard "${{ matrix.shard }}"' || launch.if) fail("An exact original serialized shard launcher must emit raw JSON, JUnit and owned lifecycle evidence without narrowing or retries.");
+  validateLaunchEvidenceArtifact(shards, { stepName: "Upload complete raw Jest shard evidence", pathFragment: "backend/test-results/jest/shards/shard-${{ matrix.shard }}" });
+  if (JSON.stringify([...(union.needs || [])].sort()) !== JSON.stringify(["backend-tests", "runtime-checks"]) || findStep(union, "Verify complete raw union and substantive authentication/payment coverage")?.run !== "node scripts/verify-ci-jest-shards.js --verify") fail("Substantive authentication/payment coverage must verify the complete source-bound raw union after every shard.");
+  const download = findStep(union, "Download all original Jest shard evidence");
+  if (download?.with?.pattern !== "jest-shard-${{ github.run_id }}-${{ github.run_attempt }}-*" || download.with.path !== "backend/test-results/jest/shard-artifacts" || download.with["merge-multiple"] !== false || download.with["digest-mismatch"] !== "error") fail("Every separate raw shard artifact must be downloaded without overwrites or digest waivers.");
+  validateLaunchEvidenceArtifact(union, { stepName: "Upload complete backend union evidence", pathFragment: "backend/test-results/jest/required-coverage.json" });
+  const dependencies = ["backend-coverage", "backend-tests", "runtime-checks"];
+  if (gate.if !== "always()" || JSON.stringify([...(gate.needs || [])].sort()) !== JSON.stringify(dependencies) || gate["continue-on-error"]) fail("Fixed Runtime gate must always require every source, shard and raw coverage dependency.");
+  const final = findStep(gate, "Require source checks and the exact complete backend union");
+  if (gate.steps?.length !== 1 || final?.["continue-on-error"] || JSON.stringify(final?.env) !== JSON.stringify({CHECKS_RESULT:"${{ needs.runtime-checks.result }}",SHARDS_RESULT:"${{ needs.backend-tests.result }}",COVERAGE_RESULT:"${{ needs.backend-coverage.result }}"}) || final.run?.trim() !== 'test "$CHECKS_RESULT" = success\ntest "$SHARDS_RESULT" = success\ntest "$COVERAGE_RESULT" = success') fail("Runtime aggregate must fail closed for failed, cancelled or skipped backend evidence.");
+  return 8;
 }
 
 function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSync(path.join(repositoryRoot, "backend/package.json"), "utf8")), catalog = browserCatalog()) {
@@ -279,45 +331,12 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
 
   validatePinnedActions(workflow);
   requireCommands(jobs["deployment-blueprint"], ["npm ci", "npm run check:deploy"], "deployment-blueprint");
-  requireCommands(jobs.validate, ["npm ci", ...REQUIRED_VALIDATE_COMMANDS], "validate");
+  const backendShards = validateGroupedBackendJobs(jobs);
   const browserGroups = validateGroupedBrowserJobs(jobs, catalog);
   const { focusedFiles } = require("./verify-ci-jest-coverage");
   focusedFiles(manifest, "test:auth");focusedFiles(manifest, "test:payments");
   const criticalBrowserCommands = validateCriticalBrowserScripts(manifest);
   validateRuntimeBeforeInstall(jobs["deployment-blueprint"], "deployment-blueprint");
-  validateRuntimeBeforeInstall(jobs.validate, "validate");
-  validateCandidateBeforeInstall(jobs.validate);
-
-  const jestStep = findStep(jobs.validate, "Run complete Jest suite");
-  const prepare = findStep(jobs.validate, "Bind complete Jest source and required subsets"), verify = findStep(jobs.validate, "Verify substantive authentication and payment coverage");
-  const steps = jobs.validate.steps || [];
-  if (prepare?.run !== "node scripts/verify-ci-jest-coverage.js --prepare" || verify?.run !== "node scripts/verify-ci-jest-coverage.js --verify" ||
-      steps.indexOf(prepare) >= steps.indexOf(jestStep) || steps.indexOf(verify) <= steps.indexOf(jestStep) ||
-      prepare?.if || verify?.if || jobs.validate["continue-on-error"] || steps.some(step => step["continue-on-error"])) fail("Substantive auth/payment reuse must bind source before and verify complete evidence after the original Jest execution.");
-  if (!String(jestStep?.run || "").includes("--reporters=jest-junit")) {
-    fail("The complete Jest suite must emit JUnit launch evidence.");
-  }
-  if (
-    jestStep?.env?.JEST_JUNIT_OUTPUT_DIR !== "test-results/jest" ||
-    jestStep?.env?.JEST_JUNIT_OUTPUT_NAME !== "results.xml"
-  ) {
-    fail("The Jest JUnit evidence path must remain deterministic.");
-  }
-  validateLaunchEvidenceArtifact(jobs.validate, {
-    stepName: "Upload supply-chain launch evidence",
-    pathFragment: "backend/test-results/supply-chain",
-  });
-  validateLaunchEvidenceArtifact(jobs.validate, {
-    stepName: "Upload candidate identity evidence",
-    pathFragment: "backend/test-results/release/candidate.json",
-  });
-  validateLaunchEvidenceArtifact(jobs.validate, {
-    stepName: "Upload Jest launch evidence",
-    pathFragment: "backend/test-results/jest/results.xml",
-  });
-  if (jestStep.run !== "npm test -- --ci --reporters=default --reporters=jest-junit --json --outputFile=test-results/jest/results.json") fail("One complete original Jest run must retain JSON and JUnit without selection or retries.");
-  const jestArtifact = findStep(jobs.validate, "Upload Jest launch evidence");
-  for (const file of ["results.json", "full-suite-binding.json", "required-coverage.json"]) if (!String(jestArtifact?.with?.path || "").includes(`backend/test-results/jest/${file}`)) fail(`Complete Jest source/coverage evidence missing: ${file}.`);
 
   const dependencyReview = jobs["dependency-review"];
   if (dependencyReview.if !== "github.event_name == 'pull_request'") {
@@ -351,12 +370,14 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
     fail("The Secret scan job must run gitleaks.");
   }
 
+  validateArtifactBudgets(workflow);
   return {
     jobs: REQUIRED_JOBS.length,
     validateCommands: REQUIRED_VALIDATE_COMMANDS.length,
     browserCommands: REQUIRED_BROWSER_COMMANDS.length,
     criticalBrowserCommands,
     browserGroups,
+    backendShards,
   };
 }
 
@@ -383,4 +404,6 @@ module.exports = {
   validateWorkflowContract,
   validateCriticalBrowserScripts,
   validateGroupedBrowserJobs,
+  validateGroupedBackendJobs,
+  validateArtifactBudgets,
 };

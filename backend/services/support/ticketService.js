@@ -609,6 +609,24 @@ async function addSupportTicketNote({ ticketId, adminUser = {}, text = "", write
   return saved.payload;
 }
 
+// A simultaneous retry in this process must wait for the first identical chat
+// decision to settle before acquiring its own current Admin/SID transaction.
+// Keep only completion turns here, never a response or another caller's authority.
+const pendingChatReplyTurns = new Map();
+async function withChatReplyTurn(key, work) {
+  const prior = pendingChatReplyTurns.get(key) || Promise.resolve();
+  let release;
+  const turn = new Promise(resolve => { release = resolve; });
+  const tail = prior.then(() => turn);
+  pendingChatReplyTurns.set(key, tail);
+  await prior;
+  try { return await work(); }
+  finally {
+    release();
+    if (pendingChatReplyTurns.get(key) === tail) pendingChatReplyTurns.delete(key);
+  }
+}
+
 async function replyToSupportTicket({ ticketId, adminUser = {}, text = "", status, requestId, write } = {}) {
   const replyText = compactText(text, 12000);
   if (!replyText) throw new Error("Support reply text is required.");
@@ -674,14 +692,18 @@ async function replyToSupportTicket({ ticketId, adminUser = {}, text = "", statu
     return { payload: { ticket: serializeTicketForList(hydrated || ticket.toObject()), replyMessage: serializeSupportMessage(message.toObject ? message.toObject() : message) }, conversationId: conversation._id,
       event: { type: "conversation.updated", reason: "ticket.reply_created", ticketStatus: nextStatus, ticketId: normalizeId(ticket._id), ticketReference: formatSupportTicketReference(ticket._id) } };
   };
-  let saved;
-  try { saved = write ? await write(session => persist(session)) : await persist(); }
-  catch (error) {
-    if (!write || !requestId || !(error.code === 11000 || error.publicCode === 'ACCOUNT_WRITE_CHANGED')) throw error;
-    // Overlapping identical requests may return only a committed matching
-    // receipt under fresh current authority. This never retries a new reply.
-    saved = await write(session => persist(session, error));
-  }
+  const save = async () => {
+    try { return write ? await write(session => persist(session)) : await persist(); }
+    catch (error) {
+      if (!write || !requestId || !(error.code === 11000 || error.publicCode === 'ACCOUNT_WRITE_CHANGED')) throw error;
+      // A conflict outside this process may return only a committed matching
+      // receipt under fresh current authority. This never retries a new reply.
+      return write(session => persist(session, error));
+    }
+  };
+  const saved = write && requestId
+    ? await withChatReplyTurn(`${normalizeId(ticketId)}:${requestId}:${normalizeId(adminUser._id || adminUser.id)}`, save)
+    : await save();
   if (saved.event) publishConversationEvent(saved.conversationId, saved.event);
   return saved.payload;
 }

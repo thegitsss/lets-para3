@@ -50,8 +50,8 @@ jobs:
         working-directory: backend
         run: npm run check:deploy
 
-  validate:
-    name: Runtime, dependency, and test gates
+  runtime-checks:
+    name: Runtime and source checks
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -66,77 +66,240 @@ jobs:
       STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
     steps:
       - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
       - name: Use pinned Node runtime
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .node-version
           cache: npm
           cache-dependency-path: backend/package-lock.json
-
       - name: Verify pinned Node and npm runtimes
         run: node scripts/verify-runtime.js
-
       - name: Record exact release candidate
         run: npm run check:candidate
-
       - name: Install exact dependency graph
         run: npm ci
-
       - name: Validate runtime, source, and frontend assets
         run: npm run check:ci-workflow && npm run check:repository && npm run check:runtime && npm run check:syntax && npm run check:focus && npm run check:routes && npm run check:backend-reachability && npm run check:runtime-bindings && npm run check:route-security && npm run check:logging && npm run check:secrets && npm run check:frontend && npm run check:frontend-bindings && npm run check:vendor && npm run check:no-theater && npm run check:api-contract && npm run check:performance && npm run check:legal && npm run check:install-scripts
-
       - name: Generate production dependency SBOM
         run: npm run generate:sbom && npm run check:licenses
-
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+      - name: Bound complete evidence before upload 1
+        id: evidence_limit_1
+        if: always()
+        run: >-
+          node scripts/guard-ci-artifact-budget.js --job "runtime-checks" --key "" --artifact "supply-chain-evidence-${{ github.run_id }}-${{ github.run_attempt }}" --path "backend/test-results/supply-chain" --record "${{ runner.temp }}/lpc-artifact-runtime-checks--1.json"
 
       - name: Upload supply-chain launch evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: supply-chain-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/supply-chain
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+      - name: Bound complete evidence before upload 2
+        id: evidence_limit_2
+        if: always()
+        run: >-
+          node scripts/guard-ci-artifact-budget.js --job "runtime-checks" --key "" --artifact "candidate-identity-${{ github.run_id }}-${{ github.run_attempt }}" --path "backend/test-results/release/candidate.json" --record "${{ runner.temp }}/lpc-artifact-runtime-checks--2.json"
 
       - name: Upload candidate identity evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() && steps.evidence_limit_2.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: candidate-identity-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/release/candidate.json
           if-no-files-found: error
-          retention-days: 30
-
-      - name: Bind complete Jest source and required subsets
-        run: node scripts/verify-ci-jest-coverage.js --prepare
-
-      - name: Run complete Jest suite
-        run: npm test -- --ci --reporters=default --reporters=jest-junit --json --outputFile=test-results/jest/results.json
-        env:
-          JEST_JUNIT_OUTPUT_DIR: test-results/jest
-          JEST_JUNIT_OUTPUT_NAME: results.xml
-
-      - name: Verify substantive authentication and payment coverage
-        run: node scripts/verify-ci-jest-coverage.js --verify
-
-      - name: Upload Jest launch evidence
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+      - name: Bind and balance complete original Jest file shards
+        run: node scripts/verify-ci-jest-shards.js --prepare
+      - name: Bound complete evidence before upload 3
+        id: evidence_limit_3
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        run: >-
+          node scripts/guard-ci-artifact-budget.js --job "runtime-checks" --key "" --artifact "jest-plan-${{ github.run_id }}-${{ github.run_attempt }}" --path "backend/test-results/jest/plan.json" --record "${{ runner.temp }}/lpc-artifact-runtime-checks--3.json"
+
+      - name: Upload complete Jest shard plan
+        if: ${{ always() && steps.evidence_limit_3.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: jest-results-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            backend/test-results/jest/results.xml
-            backend/test-results/jest/results.json
-            backend/test-results/jest/full-suite-binding.json
-            backend/test-results/jest/required-coverage.json
+          name: jest-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/jest/plan.json
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+  backend-tests:
+    name: Backend original suite shard ${{ matrix.shard }}
+    needs: runtime-checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      JWT_SECRET: ci-only-jwt-secret-that-is-longer-than-32-bytes
+      DATA_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        shard:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify pinned Node and npm runtimes
+        run: node scripts/verify-runtime.js
+      - name: Record exact release candidate
+        run: npm run check:candidate
+      - name: Install exact dependency graph
+        run: npm ci
+      - name: Download exact source-bound shard plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: jest-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/jest
+          digest-mismatch: error
+      - name: Build matching frontend assets
+        run: npm run build:frontend
+      - name: Run every assigned original Jest suite once
+        run: node scripts/run-ci-jest-shard.js --shard "${{ matrix.shard }}"
+      - name: Bound complete evidence before upload 1
+        id: evidence_limit_1
+        if: always()
+        run: >-
+          node scripts/guard-ci-artifact-budget.js --job "backend-tests" --key "${{ matrix.shard }}" --artifact "jest-shard-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}" --path "backend/test-results/jest/shards/shard-${{ matrix.shard }}" --record "${{ runner.temp }}/lpc-artifact-backend-tests-${{ matrix.shard }}-1.json"
+
+      - name: Upload complete raw Jest shard evidence
+        if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: jest-shard-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+          path: backend/test-results/jest/shards/shard-${{ matrix.shard }}
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+  backend-coverage:
+    name: Complete backend coverage union
+    needs:
+      - runtime-checks
+      - backend-tests
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CI: "true"
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      MONGOMS_DISABLE_POSTINSTALL: "true"
+      EMAIL_DISABLE: "true"
+      JWT_SECRET: ci-only-jwt-secret-that-is-longer-than-32-bytes
+      DATA_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Use pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Verify pinned Node and npm runtimes
+        run: node scripts/verify-runtime.js
+      - name: Record exact release candidate
+        run: npm run check:candidate
+      - name: Install exact dependency graph
+        run: npm ci
+      - name: Download exact source-bound shard plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: jest-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/jest
+          digest-mismatch: error
+      - name: Download all original Jest shard evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: jest-shard-${{ github.run_id }}-${{ github.run_attempt }}-*
+          path: backend/test-results/jest/shard-artifacts
+          merge-multiple: false
+          digest-mismatch: error
+      - name: Require every original backend shard
+        env:
+          CHECKS_RESULT: ${{ needs.runtime-checks.result }}
+          SHARDS_RESULT: ${{ needs.backend-tests.result }}
+        run: |-
+          test "$CHECKS_RESULT" = success
+          test "$SHARDS_RESULT" = success
+      - name: Verify complete raw union and substantive authentication/payment coverage
+        run: node scripts/verify-ci-jest-shards.js --verify
+      - name: Bound complete evidence before upload 1
+        id: evidence_limit_1
+        if: always()
+        run: >-
+          node scripts/guard-ci-artifact-budget.js --job "backend-coverage" --key "" --artifact "jest-complete-union-${{ github.run_id }}-${{ github.run_attempt }}" --path "backend/test-results/jest/required-coverage.json" --record "${{ runner.temp }}/lpc-artifact-backend-coverage--1.json"
+
+      - name: Upload complete backend union evidence
+        if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: jest-complete-union-${{ github.run_id }}-${{ github.run_attempt }}
+          path: backend/test-results/jest/required-coverage.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
+  validate:
+    name: Runtime, dependency, and test gates
+    needs:
+      - runtime-checks
+      - backend-tests
+      - backend-coverage
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require source checks and the exact complete backend union
+        env:
+          CHECKS_RESULT: ${{ needs.runtime-checks.result }}
+          SHARDS_RESULT: ${{ needs.backend-tests.result }}
+          COVERAGE_RESULT: ${{ needs.backend-coverage.result }}
+        run: |-
+          test "$CHECKS_RESULT" = success
+          test "$SHARDS_RESULT" = success
+          test "$COVERAGE_RESULT" = success
 
   browser-collection:
     name: Browser fixture collection
@@ -187,14 +350,22 @@ jobs:
       - name: Verify complete unique browser identity coverage
         run: node scripts/run-critical-browser-group.js --verify-groups
 
-      - name: Upload browser collection evidence
+      - name: Bound complete evidence before upload 1
+        id: evidence_limit_1
         if: always()
+        run: >-
+          node scripts/guard-ci-artifact-budget.js --job "browser-collection" --key "" --artifact "browser-collection-${{ github.run_id }}-${{ github.run_attempt }}" --path "backend/test-results/critical-group-verification/verified-union.json" --record "${{ runner.temp }}/lpc-artifact-browser-collection--1.json"
+
+      - name: Upload browser collection evidence
+        if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: browser-collection-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/critical-group-verification/verified-union.json
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
 
   browser-checks:
     name: Browser checks (${{ matrix.scope }})
@@ -202,7 +373,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: 8
       matrix:
         include:
           - scope: deterministic-and-lifecycle
@@ -256,23 +427,39 @@ jobs:
       - name: Run complete browser scope
         run: ${{ matrix.command }}
 
-      - name: Upload browser launch evidence
+      - name: Bound complete evidence before upload 1
+        id: evidence_limit_1
         if: always()
+        run: >-
+          node scripts/guard-ci-artifact-budget.js --job "browser-checks" --key "${{ matrix.scope }}" --artifact "browser-${{ matrix.scope }}-${{ github.run_id }}-${{ github.run_attempt }}" --path "backend/test-results/junit" --record "${{ runner.temp }}/lpc-artifact-browser-checks-${{ matrix.scope }}-1.json"
+
+      - name: Upload browser launch evidence
+        if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: browser-${{ matrix.scope }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/junit
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
 
-      - name: Upload failed browser evidence
-        if: failure()
+      - name: Bound complete evidence before upload 2
+        id: evidence_limit_2
+        if: always()
+        run: >-
+          node scripts/guard-ci-artifact-budget.js --job "browser-checks" --key "${{ matrix.scope }}" --artifact "browser-failure-${{ matrix.scope }}-${{ github.run_id }}-${{ github.run_attempt }}" --path "backend/test-results" --record "${{ runner.temp }}/lpc-artifact-browser-checks-${{ matrix.scope }}-2.json"
+
+      - name: Upload complete raw browser evidence
+        if: ${{ always() && steps.evidence_limit_2.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: browser-failure-${{ matrix.scope }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results
-          if-no-files-found: ignore
-          retention-days: 7
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
 
   browser-role-journeys:
     name: Role journeys (${{ matrix.group }})
@@ -281,7 +468,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: 8
       matrix:
         group:
           - attorney-v2-actual-shared-1
@@ -361,23 +548,39 @@ jobs:
       - name: Run complete fixture-compatible role group
         run: npm run test:playwright:critical:group -- --group "${{ matrix.group }}"
 
-      - name: Upload browser launch evidence
+      - name: Bound complete evidence before upload 1
+        id: evidence_limit_1
         if: always()
+        run: >-
+          node scripts/guard-ci-artifact-budget.js --job "browser-role-journeys" --key "${{ matrix.group }}" --artifact "browser-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}" --path "backend/test-results/junit" --record "${{ runner.temp }}/lpc-artifact-browser-role-journeys-${{ matrix.group }}-1.json"
+
+      - name: Upload browser launch evidence
+        if: ${{ always() && steps.evidence_limit_1.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: browser-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results/junit
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
 
-      - name: Upload failed browser evidence
-        if: failure()
+      - name: Bound complete evidence before upload 2
+        id: evidence_limit_2
+        if: always()
+        run: >-
+          node scripts/guard-ci-artifact-budget.js --job "browser-role-journeys" --key "${{ matrix.group }}" --artifact "browser-failure-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}" --path "backend/test-results" --record "${{ runner.temp }}/lpc-artifact-browser-role-journeys-${{ matrix.group }}-2.json"
+
+      - name: Upload complete raw browser evidence
+        if: ${{ always() && steps.evidence_limit_2.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: browser-failure-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: backend/test-results
-          if-no-files-found: ignore
-          retention-days: 7
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
+          include-hidden-files: true
 
   browser-contracts:
     name: Browser contracts

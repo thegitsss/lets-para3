@@ -12,7 +12,7 @@ const account = require("../services/attorneyAccountBoundary"), { decryptCaseFil
 const app = express(); app.use(cookieParser(), express.json()); app.use("/api/uploads", require("../routes/uploads"));
 const cookie = user => `token=${require("jsonwebtoken").sign({ id: String(user._id), role: user.role, av: user.authVersion || 0 }, process.env.JWT_SECRET, { expiresIn: "1h" })}`;
 let mongo, owner, other, para, doc;
-beforeAll(async () => { mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" } }); await mongoose.connect(mongo.getUri("attorney-uploads")); await Promise.all(Object.values(mongoose.models).map(model => model.init())); }, 60000);
+beforeAll(async () => { mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" }, instanceOpts: [{ args: ["--setParameter", "shutdownTimeoutMillisForSignaledShutdown=1000"] }] }); await mongoose.connect(mongo.getUri("attorney-uploads")); await Promise.all(Object.values(mongoose.models).map(model => model.init())); }, 60000);
 afterAll(async () => { await mongoose.disconnect(); await mongo?.stop(); }); afterEach(() => jest.restoreAllMocks());
 beforeEach(async () => {
   await clearDatabase(); mockSend.mockReset(); mockSend.mockResolvedValue({});

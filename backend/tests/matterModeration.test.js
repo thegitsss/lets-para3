@@ -21,8 +21,8 @@ async function edit(changes = { description: "Clarified public scope" }) {
   return request(app).patch(`/api/cases/posting/${matter._id}`).set("Cookie", authCookieFor(owner)).send({ changes, revision: current.body.posting.revision, expectedOwnerId: String(owner._id) });
 }
 let mongo;
-beforeAll(async () => { mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" } }); await mongoose.connect(mongo.getUri("matter-moderation-tests")); await Promise.all(Object.values(mongoose.models).map(model => model.init())); }, 60000);
-afterAll(async () => { await mongoose.disconnect(); await mongo?.stop(); });
+beforeAll(async () => { mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" }, instanceOpts: [{ args: ["--setParameter", "shutdownTimeoutMillisForSignaledShutdown=1000"] }] }); await mongoose.connect(mongo.getUri("matter-moderation-tests")); await Promise.all(Object.values(mongoose.models).map(model => model.init())); }, 60000);
+afterAll(async () => { await mongoose.disconnect(); await require("./helpers/stopOwnedReplicaSet")(mongo); });
 beforeEach(async () => {
   await clearDatabase(); jest.clearAllMocks();
   [owner, other, para, admin] = await User.create(["owner", "other", "para", "admin"].map(name => ({ firstName: "Synthetic", lastName: name, email: `${name}@moderation.test`, password: "Synthetic123!", role: name === "para" ? "paralegal" : name === "admin" ? "admin" : "attorney", status: "approved" })));

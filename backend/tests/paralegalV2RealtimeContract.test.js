@@ -298,7 +298,7 @@ describe("Paralegal V2 realtime and reconciliation contract", () => {
     expect(disputes).toContain("matter_dispute_comment_refresh");
     expect(payments).toContain('require("../services/attorneyFunding")');
     expect(payments).toContain("attorneyFunding.write(req, stripe)");
-    expect(funding).toMatch(/async function verifyAndRecord[\s\S]*await transaction\([\s\S]*await updateCase\([\s\S]*\n  \}\);[\s\S]*publishCaseProjectionRefresh\(current, "matter_payment_refresh"/);
+    expect(funding).toMatch(/async function verifyAndRecord[\s\S]*await transaction\([\s\S]*await updateCase\([\s\S]*\n  \}, req, allowAdmin\);[\s\S]*publishCaseProjectionRefresh\(current, "matter_payment_refresh"/);
     expect(webhook).toContain("matter_chargeback_refresh");
     expect(webhook).toContain("matter_refund_refresh");
     expect(webhook).toContain("matter_payout_refresh");

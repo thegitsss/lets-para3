@@ -16,6 +16,7 @@ const adminMarketingRouter = require("../routes/adminMarketing");
 const adminSalesRouter = require("../routes/adminSales");
 const adminSupportRouter = require("../routes/adminSupport");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
+const { createAuthSession } = require("../services/authSessionService");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "approvals-phase4-test-secret";
 
@@ -38,6 +39,8 @@ const app = (() => {
 function authCookieFor(user) {
   const payload = {
     id: user._id.toString(),
+    sid: user.$locals?.managedSessionId,
+    av: Number(user.authVersion || 0),
     role: user.role,
     email: user.email,
     status: user.status,
@@ -47,7 +50,7 @@ function authCookieFor(user) {
 }
 
 async function createAdmin() {
-  return User.create({
+  const user = await User.create({
     firstName: "Admin",
     lastName: "Owner",
     email: "approvals-phase4-admin@lets-paraconnect.test",
@@ -56,6 +59,9 @@ async function createAdmin() {
     status: "approved",
     state: "CA",
   });
+  const managed = await createAuthSession(user, { headers: { "user-agent": "Original Admin API fixture" } });
+  user.$locals.managedSessionId = managed.sessionId;
+  return user;
 }
 
 async function createPendingKnowledgeReviewTask(admin) {
@@ -211,9 +217,11 @@ describe("Approvals Phase 4", () => {
   test("aggregates pending review items across knowledge, marketing, support, and sales", async () => {
     const admin = await createAdmin();
 
+    // Build the stable FAQ from approved knowledge before a separate revision enters review.
+    await request(app).post("/api/admin/knowledge/sync").set("Cookie", authCookieFor(admin)).send({}).expect(200);
+    const faqCandidate = await createFaqCandidate(admin);
     const knowledge = await createPendingKnowledgeReviewTask(admin);
     const marketingPacket = await createMarketingPacket(admin);
-    const faqCandidate = await createFaqCandidate(admin);
     const salesPacket = await createSalesPacket(admin);
 
     const overviewRes = await request(app)
@@ -299,9 +307,11 @@ describe("Approvals Phase 4", () => {
   test("approve and reject actions update the underlying pillar records through the unified workspace", async () => {
     const admin = await createAdmin();
 
+    // Keep FAQ evidence approved while its independent knowledge review is prepared.
+    await request(app).post("/api/admin/knowledge/sync").set("Cookie", authCookieFor(admin)).send({}).expect(200);
+    const faqCandidate = await createFaqCandidate(admin);
     const { item: knowledgeItem, pendingRevision } = await createPendingKnowledgeReviewTask(admin);
     const marketingPacket = await createMarketingPacket(admin);
-    const faqCandidate = await createFaqCandidate(admin);
     const salesPacket = await createSalesPacket(admin);
 
     const approveKnowledgeRes = await request(app)

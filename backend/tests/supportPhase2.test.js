@@ -11,6 +11,7 @@ const adminKnowledgeRouter = require("../routes/adminKnowledge");
 const adminSupportRouter = require("../routes/adminSupport");
 const aiAdminRouter = require("../routes/aiAdmin");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
+const { createAuthSession } = require("../services/authSessionService");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "support-phase2-test-secret";
 
@@ -31,6 +32,8 @@ const app = (() => {
 function authCookieFor(user) {
   const payload = {
     id: user._id.toString(),
+    sid: user.$locals?.managedSessionId,
+    av: Number(user.authVersion || 0),
     role: user.role,
     email: user.email,
     status: user.status,
@@ -40,7 +43,7 @@ function authCookieFor(user) {
 }
 
 async function createAdmin() {
-  return User.create({
+  const user = await User.create({
     firstName: "Admin",
     lastName: "Owner",
     email: "support-phase2-admin@lets-paraconnect.test",
@@ -49,6 +52,9 @@ async function createAdmin() {
     status: "approved",
     state: "CA",
   });
+  const managed = await createAuthSession(user, { headers: { "user-agent": "Original Admin API fixture" } });
+  user.$locals.managedSessionId = managed.sessionId;
+  return user;
 }
 
 async function createApprovedUser({ role, email, firstName, lastName }) {

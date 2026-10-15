@@ -7,7 +7,7 @@ const app = express(); app.use(cookieParser(), express.json()); app.use("/api/ev
 const cookie = user => `token=${require("jsonwebtoken").sign({ id: String(user._id), role: user.role, av: user.authVersion || 0 }, process.env.JWT_SECRET, { expiresIn: "1h" })}`;
 let mongo, server, owner, other, attorney, matter;
 beforeAll(async () => {
-  mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" } });
+  mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" }, instanceOpts: [{ args: ["--setParameter", "shutdownTimeoutMillisForSignaledShutdown=1000"] }] });
   await mongoose.connect(mongo.getUri("paralegal-dates"));
   await Promise.all([User.init(), Case.init(), Event.init(), AuditLog.init()]);
   // Keep one owned listener for the suite instead of opening and closing one per request.

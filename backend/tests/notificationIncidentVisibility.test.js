@@ -160,7 +160,28 @@ describe("mounted reporter notification visibility", () => {
     expect((await views()).list).toHaveLength(1);
   });
 
-  test.each(["paralegal_welcome", "account_suspended", "incident_approval_required", "unknown_non_matter_type"])("%s gains no generic fallback from the incident fix", async type => {
+
+  // Welcome has its own approved recipient contract. It gains no permission
+  // from incident-shaped payloads when the recipient is a different role.
+  test("paralegal_welcome gains no generic fallback from the incident fix", async () => {
+    const doc = await incident(); await notice(attorney, doc, { type: "paralegal_welcome" });
+    expectAbsent(await views(attorney));
+  });
+
+  test("an explicit own-approved Paralegal welcome stays separate from private incident metadata and stored links", async () => {
+    const doc = await incident();
+    const message = "Welcome to Let’s-ParaConnect Your application has been approved. Complete your profile and Stripe payout setup, then browse and apply to open Matters.";
+    const record = await notice(paralegal, doc, { type: "paralegal_welcome", message });
+    expect(record.payload.incidentPublicId).toBe(doc.publicId);
+    const result = await views();
+    expect(result.list).toHaveLength(1);
+    expect(result.page.items).toEqual(result.list);
+    expect(result.count).toBe(1);
+    expect(result.list[0]).toMatchObject({ id: String(record._id), type: "paralegal_welcome", available: true, message, context: {}, action: { label: "View profile settings", href: "/profile-settings.html" }, read: false, isRead: false });
+    expect(JSON.stringify(result)).not.toMatch(/PRIVATE_|untrusted|incidentPublicId|accessToken|reporter|artifact|caseId/);
+  });
+
+  test.each(["account_suspended", "incident_approval_required", "unknown_non_matter_type"])("%s gains no generic fallback from the incident fix", async type => {
     const doc = await incident(); await notice(paralegal, doc, { type });
     expectAbsent(await views());
   });

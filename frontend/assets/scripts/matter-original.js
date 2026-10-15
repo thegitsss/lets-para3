@@ -326,8 +326,17 @@
     // Measure after all preference handlers have applied their layouts.
     requestAnimationFrame(measure);
   });
-  new ResizeObserver(measure).observe(film);
-  new ResizeObserver(() => { if (!builder.hidden) setStyle(film, '--builder-bottom', `${builder.offsetTop + builder.offsetHeight}px`); }).observe(builder);
+  // Resize callbacks write scene geometry; deliver those writes after the
+  // current observer batch so shallower layout observers can settle normally.
+  const afterResize = action => {
+    let pendingFrame = 0;
+    return () => {
+      if (pendingFrame) return;
+      pendingFrame = requestAnimationFrame(() => { pendingFrame = 0; action(); });
+    };
+  };
+  new ResizeObserver(afterResize(measure)).observe(film);
+  new ResizeObserver(afterResize(() => { if (!builder.hidden) setStyle(film, '--builder-bottom', `${builder.offsetTop + builder.offsetHeight}px`); })).observe(builder);
   setStage(0); measure();
   document.fonts.ready.then(measure);
 })();

@@ -1718,6 +1718,9 @@ router.get("/receipts", requireRole("admin"), asyncHandler(async (req, res) => {
 router.use((err, _req, res, _next) => {
   if (respondToCsrfError(err, res)) return;
   runtimeLogger.error(err);
+  if (err.status === 503 && err.publicCode === "PAYMENT_COMMIT_UNCONFIRMED") {
+    return res.status(503).json({ code: err.publicCode, error: err.message });
+  }
   res.status(500).json({ error: "Server error" });
 });
 

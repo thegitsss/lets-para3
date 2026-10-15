@@ -18,7 +18,7 @@ const reviewDecision = () => get(decisionPath(), owner, { expectedOwnerId: id(ow
 const sendDecision = input => request(app).post(decisionPath()).set('Cookie', cookie(owner)).send({ expectedOwnerId: id(owner._id), ...input });
 const stored = () => Promise.all([Case.collection.find({}).sort({ _id: 1 }).toArray(), Job.collection.find({}).sort({ _id: 1 }).toArray(), Application.collection.find({}).sort({ _id: 1 }).toArray()]);
 beforeAll(async () => {
-  mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: '127.0.0.1' } }); await mongoose.connect(mongo.getUri('application-identity-convergence'));
+  mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, ip: "127.0.0.1" }, instanceOpts: [{ args: ["--setParameter", "shutdownTimeoutMillisForSignaledShutdown=1000"] }] }); await mongoose.connect(mongo.getUri('application-identity-convergence'));
   await Promise.all(Object.values(mongoose.models).map(model => model.init()));
 }, 60000);
 afterAll(async () => { await mongoose.disconnect(); await mongo?.stop(); });

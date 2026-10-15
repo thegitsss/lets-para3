@@ -217,8 +217,34 @@ const activateHomeWorkflowStep = async (page, step) => {
   ), String(step));
 };
 
+async function settleRenderedLazyImages(page) {
+  const images = page.locator('img[loading="lazy"]');
+  if (!await images.count()) return { nativeWheelSteps: 0, images: [] };
+  // Deferred assets can be outside Playwright's visibility predicate before load.
+  // Traverse the page through native wheel input so deferred rendering and
+  // loading run, then apply the original health predicate without filtering it.
+  const before = await images.evaluateAll(nodes => nodes.map(node => ({ src: node.currentSrc || node.getAttribute('src') || '', complete: node.complete, naturalWidth: node.naturalWidth })));
+  const viewport = page.viewportSize();
+  await page.mouse.move(Math.min(120, viewport.width / 2), Math.floor(viewport.height / 2));
+  let nativeWheelSteps = 0;
+  for (; nativeWheelSteps < 200; nativeWheelSteps++) {
+    const position = await page.evaluate(() => ({ y: scrollY, height: document.documentElement.scrollHeight, viewport: innerHeight }));
+    if (position.y + position.viewport >= position.height - 1) break;
+    await page.mouse.wheel(0, Math.max(1, Math.floor(position.viewport * 0.8)));
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  }
+  expect(nativeWheelSteps, 'Native page traversal must reach the end within its bounded steps').toBeLessThan(200);
+  await expect.poll(() => images.evaluateAll(nodes => nodes.filter(node => { const style = getComputedStyle(node); return style.display !== 'none' && style.visibility !== 'hidden' && node.getClientRects().length > 0; }).every(node => node.complete && node.naturalWidth > 0)), { message: 'Rendered lazy assets must really load after native viewport traversal' }).toBe(true);
+  const after = await images.evaluateAll(nodes => nodes.map(node => ({ src: node.currentSrc || node.getAttribute('src') || '', complete: node.complete, naturalWidth: node.naturalWidth })));
+  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+  await page.mouse.wheel(0, -height);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  return { nativeWheelSteps, images: { before, after }, noImageOrLoadingOverrides: true };
+}
+
+
 for (const [name, url, expectedStatus = 200] of pages) {
-  test(`${name} has no automated WCAG A/AA violations`, async ({ page, browserName }) => {
+  test(`${name} has no automated WCAG A/AA violations`, async ({ page, browserName }, testInfo) => {
     // Homepage coverage includes scroll scenes and three responsive layouts.
     if (name === "home") test.setTimeout(180_000);
     const visualNetworkFailures = [];
@@ -265,6 +291,10 @@ for (const [name, url, expectedStatus = 200] of pages) {
     await page.locator("main").waitFor({ state: "attached" });
     if (name === "browse paralegals") {
       await expect(page.locator("#resultsStatus")).toHaveText("No paralegals match your filters yet.");
+    }
+    if (name === "home") {
+      const readiness = await settleRenderedLazyImages(page);
+      require("node:fs").writeFileSync(testInfo.outputPath("home-native-lazy-readiness.json"), JSON.stringify(readiness, null, 2));
     }
     const visualIntegrity = await readVisualIntegrity(page);
     expect(visualIntegrity.fontsReady, `${name} fonts did not settle`).toBe(true);
