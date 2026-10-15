@@ -465,3 +465,31 @@ describe("exact reviewed current browser fixture amendments", () => {
     ]) { const catalog = currentCatalog(); mutate(catalog); expect(() => validateReviewedBrowserFixtureAmendments(catalog)).toThrow(); }
   });
 });
+
+// Additive dependency-review contract controls; original source prefix remains exact.
+describe("exact recovery-return dependency review", () => {
+  test.each([
+    ["PR-only omission", "github.event_name == 'pull_request'"],
+    ["every manual dispatch", "github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'"],
+    ["pushes", "github.event_name == 'push'"],
+  ])("rejects an incorrect dependency-review trigger: %s", (_, condition) => {
+    const workflow = currentWorkflow(); workflow.jobs["dependency-review"].if = condition;
+    expect(() => validateWorkflowContract(workflow)).toThrow(/exact recovery-return/);
+  });
+
+  test.each([
+    ["base-ref", "main"], ["base-ref", "${{ github.ref }}"],
+    ["head-ref", "main"], ["head-ref", "${{ github.event.pull_request.head.sha }}"],
+  ])("rejects mutable or mismatched manual dependency refs: %s=%s", (key, value) => {
+    const workflow = currentWorkflow();
+    workflow.jobs["dependency-review"].steps.find(step => step.name === "Reject vulnerable dependency changes").with[key] = value;
+    expect(() => validateWorkflowContract(workflow)).toThrow(/immutable main base and exact current head/);
+  });
+
+  test.each([["warn-only", true], ["vulnerability-check", false], ["license-check", false]])("rejects weakening the real dependency comparison: %s", (key, value) => {
+    const workflow = currentWorkflow();
+    workflow.jobs["dependency-review"].steps.find(step => step.name === "Reject vulnerable dependency changes").with[key] = value;
+    expect(() => validateWorkflowContract(workflow)).toThrow(/default blocking/);
+  });
+
+});

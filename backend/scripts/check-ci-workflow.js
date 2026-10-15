@@ -670,13 +670,19 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
   validateRuntimeBeforeInstall(jobs["deployment-blueprint"], "deployment-blueprint");
 
   const dependencyReview = jobs["dependency-review"];
-  if (dependencyReview.if !== "github.event_name == 'pull_request'") {
-    fail("Dependency review must run only for pull requests.");
+  if (dependencyReview.if !== "github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.execution_scope == 'recovery-return')") {
+    fail("Dependency review must run only for pull requests or the exact recovery-return acceptance.");
   }
   if (dependencyReview.permissions?.contents !== "read" || dependencyReview.permissions?.["pull-requests"] !== "read") {
     fail("Dependency review permissions must remain read-only.");
   }
   const dependencyStep = findStep(dependencyReview, "Reject vulnerable dependency changes");
+  if (dependencyStep?.with?.["base-ref"] !== "${{ github.event_name == 'workflow_dispatch' && '501cee87480df00ce5a1afe1d0488a4fed34d5d5' || '' }}" || dependencyStep?.with?.["head-ref"] !== "${{ github.event_name == 'workflow_dispatch' && github.sha || '' }}") {
+    fail("Manual dependency review requires the reviewed immutable main base and exact current head; PR defaults stay unchanged.");
+  }
+  if (["warn-only", "vulnerability-check", "license-check"].some(key => dependencyStep?.with?.[key] !== undefined)) {
+    fail("Dependency review must preserve default blocking vulnerability and license checks.");
+  }
   if (dependencyStep?.with?.["fail-on-severity"] !== "moderate") {
     fail("Dependency review must reject moderate-or-higher vulnerable changes.");
   }

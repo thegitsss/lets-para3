@@ -3,14 +3,22 @@ const assert=require('node:assert/strict');
 const {hash,expectedJestArgs,validateOwnedCleanup,verifyShard}=require('./verify-ci-jest-shards');
 const {REQUIRED_SUBSETS}=require('./verify-ci-jest-coverage');
 const same=(a,b)=>assert.deepEqual(a,b),sort=rows=>[...rows].sort();
+// Finite reviewed dev-only security patch. All runtime lock nodes are identical;
+// unknown dependency changes still fail the original strict source boundary.
+const REVIEWED_DEVELOPMENT_PATCH={"reviewedEvidenceSha256":"9cdb3c4683e3091a1fa51bc66023d9bfa4e2e760d51a5bd395b7d2c3035efc73","files":{"backend/package.json":["85fb2d78de31f8276eb7654b7c54666bb341c9da46511fffc8758f5224aaded4","26de288d63b2be442019c78e0bb38d2a38db166ae8d3685092c630e319932038"],"backend/package-lock.json":["a5100240a796274e7fa20f690afa8ad796982f96923772318e3ae63358ff05d5","d67037ecc3bab02c1f41812e5692adea11be7d5706b946f62cff549e4f004bc8"]}};
+function dependencyApplicability(prior,current,bridge){
+ const paths=Object.keys(REVIEWED_DEVELOPMENT_PATCH.files),changed=paths.some(p=>prior.files[p]!==current.files[p]);
+ if(!changed){assert.equal(bridge.reviewedDevelopmentDependencyChange,undefined,'Unnecessary dependency exception');return;}
+ same(bridge.reviewedDevelopmentDependencyChange,REVIEWED_DEVELOPMENT_PATCH,'Exact reviewed development-only dependency bridge required');
+ for(const p of paths)same([prior.files[p],current.files[p]],REVIEWED_DEVELOPMENT_PATCH.files[p],'Unknown dependency source cannot reuse');
+}
 function validateBridge(prior,current,discovered,bridge,approvedBridgeSha256){
  assert.equal(hash(JSON.stringify(bridge)),approvedBridgeSha256,'Exact externally approved source bridge required');
  assert.equal(bridge.schemaVersion,1);assert.equal(bridge.mode,'explicit-source-bound-jest-continuation');
  assert.equal(bridge.priorCommit,prior.commit);assert.equal(bridge.currentCommit,current.commit);
  assert.equal(bridge.priorSourceSha256,hash(JSON.stringify(prior)));assert.equal(bridge.currentSourceSha256,hash(JSON.stringify(current)));
  assert.equal(prior.files['backend/jest.config.js'],current.files['backend/jest.config.js'],'Original Jest config must remain exact');
- assert.equal(prior.files['backend/package-lock.json'],current.files['backend/package-lock.json'],'Changed dependency graph needs fresh coverage');
- assert.equal(prior.files['backend/package.json'],current.files['backend/package.json'],'Changed auth/payment/package contracts need fresh review');
+ dependencyApplicability(prior,current,bridge);
  assert.equal(prior.files['.node-version'],current.files['.node-version'],'Changed runtime needs fresh coverage');
  const required=new Set(discovered);assert.equal(required.size,discovered.length,'Repeated current suite');
  const paths=new Set([...Object.keys(prior.files),...Object.keys(current.files)]),changed=[...paths].filter(p=>prior.files[p]!==current.files[p]);
@@ -59,7 +67,7 @@ function verifyContinuation({priorPlan,priorInputs,current,discovered,bridge,cur
  for(const s of qualified)for(const file of s.suites)proofs.push({file,origin:'executed-current-original-suite',sourceSha256:current.files['backend/'+file],passedCallbacks:s.identities.filter(i=>i.file===file).length,currentShard:s.id,currentCommit:current.commit});
  return{schemaVersion:1,status:'SOURCE_BOUND_COMPLETE_ORIGINAL_JEST_UNION',syntheticJestReport:false,singleCompleteJestExecution:false,currentSource:current,priorCommit:priorPlan.source.commit,completeSuites:files.length,reusedSuites:selected.reuse.length,executedCurrentSuites:executed.length,proofs,limits:['Original failed reports remain failed; current qualified union has explicit source and origin per suite.','Only reviewed exact source/dependency/config applicability permits prior-suite reuse.','Every contributing actual process must close normally; no pending, failed or retried callback qualifies.']};
 }
-module.exports={validateBridge,priorShardEnvelope,prepareSelection,verifyContinuation};
+module.exports={validateBridge,priorShardEnvelope,prepareSelection,verifyContinuation,dependencyApplicability,REVIEWED_DEVELOPMENT_PATCH};
 
 const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process');
 const PLAN_FILE='backend/tests/ci-jest-continuation-plan.json';

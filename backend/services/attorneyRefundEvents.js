@@ -205,7 +205,26 @@ async function observeRecovery({ event, stripe, ip, ua }) {
   finally { await session.endSession(); }
 }
 
-async function record({ event, receiptFilter, stripe, ip, ua }) {
+const REFUND_WRITE_ATTEMPTS = 3;
+function knownWriteConflict(error) {
+  const unknownCommit = error?.hasErrorLabel?.("UnknownTransactionCommitResult") || error?.errorLabels?.includes("UnknownTransactionCommitResult");
+  const transient = error?.hasErrorLabel?.("TransientTransactionError") || error?.errorLabels?.includes("TransientTransactionError");
+  return !unknownCommit && transient && (error?.code === 112 || error?.codeName === "WriteConflict");
+}
+async function record(input) {
+  for (let attempt = 0; attempt < REFUND_WRITE_ATTEMPTS; attempt += 1) {
+    const state = { retryable: false };
+    try { return await recordAttempt(input, state); }
+    catch (error) {
+      if (!state.retryable || attempt + 1 === REFUND_WRITE_ATTEMPTS) throw error;
+      // Only an acknowledged abort of a pre-commit write conflict reaches here.
+      // Re-read current provider evidence and every retained source on the next
+      // attempt; never replay a provider mutation or uncertain commit.
+      await new Promise(resolve => setTimeout(resolve, 25 * (attempt + 1)));
+    }
+  }
+}
+async function recordAttempt({ event, receiptFilter, stripe, ip, ua }, state) {
   const object = event.data?.object || {};
   const eventHash = fingerprint([event.id, event.type, event.created, event.livemode, event.account, event.request, object]);
   const auditId = new mongoose.Types.ObjectId(fingerprint(["stripe_refund_event", event.id]).slice(0, 24));
@@ -213,6 +232,7 @@ async function record({ event, receiptFilter, stripe, ip, ua }) {
   const verification = alreadyRecorded ? { problem: "", refunds: [], references: [], matched: [] } : await inspectRefundEvidence(event, stripe);
   let { problem, view, charge, intent, refunds, references, matched } = verification;
   const session = await mongoose.startSession();
+  let commitStarted = false;
   try {
     session.startTransaction({ readConcern: { level: "snapshot" }, writeConcern: { w: "majority" }, maxCommitTimeMS: 10000 });
     const currentDelivery = await Delivery.collection.findOne(receiptFilter, { session });
@@ -259,9 +279,18 @@ async function record({ event, receiptFilter, stripe, ip, ua }) {
     const recoveredProcessing = !previous && !problem && !result.needsReview && refunds.length > 0 && refunds.every(refund => refund.status === "succeeded") && currentDelivery.attentionCategory === "processing";
     const finalized = await Delivery.updateOne(receiptFilter, { $set: { status: "processed", lastError: "", ...(result.needsReview ? { attentionRequired: true, attentionCategory: "refund" } : recoveredProcessing ? { attentionRequired: false, attentionCategory: "" } : {}) } }, { session });
     if (!finalized.matchedCount) throw new Error("The refund delivery attempt changed before commit.");
+    commitStarted = true;
     await session.commitTransaction();
     return result;
-  } catch (error) { if (session.inTransaction()) await session.abortTransaction().catch(reportOperationalFailure("services.attorneyRefundEvents.transaction_abort")); throw error; }
+  } catch (error) {
+    let aborted = false;
+    if (session.inTransaction()) {
+      try { await session.abortTransaction(); aborted = true; }
+      catch (abortError) { reportOperationalFailure("services.attorneyRefundEvents.transaction_abort")(abortError); }
+    }
+    state.retryable = !commitStarted && aborted && knownWriteConflict(error);
+    throw error;
+  }
   finally { await session.endSession(); }
 }
 
