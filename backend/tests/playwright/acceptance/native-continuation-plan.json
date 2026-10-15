@@ -19,6 +19,10 @@
     "exactScannerMetadataFollowup": {
       "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/P_EXACT_SECRET_DISPOSITION_REBIND_REVIEW.json",
       "sha256": "9131750ff2b578ed9d454fe70cdcc630852c7f0e57610d6cc594f1a16ea5617e"
+    },
+    "currentQBackendOnlySourceReview": {
+      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/FINAL_Q_BACKEND_ONLY_SOURCE_IMPACT_PRE_FREEZE.json",
+      "sha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
     }
   },
   "priorIndex": {
@@ -33,8 +37,8 @@
     ".github/CODEOWNERS": "30e87815ee44522766414611d5e5515d9a802671a50b599aac094c80ec326a35",
     ".github/dependabot.yml": "74c5d13fa7d248f58bdb7885d54f7581ea2a71d448f1b744908f110a5a98d325",
     ".github/workflows/backend-acceptance-return.yml": "d2819180a34ca816cca132dcf3ffb66fc88690f05cf492c97dcf24715aedd884",
-    ".github/workflows/backend-single-file-return.yml": "5dcc15b3807296d30e54c6123339e9e80d6f3d2e75981d1eea751551e44ca7ef",
-    ".github/workflows/native-acceptance-return.yml": "40c42e1c97f3ae755996e4582572a9162a30f3298975cbc50bcf5cb8fabcd5d1",
+    ".github/workflows/backend-single-file-return.yml": "441fe9930e41ec6e870db4805aed7ab34c5ed5e075f6aeed2d082f756504ebe4",
+    ".github/workflows/native-acceptance-return.yml": "82c78527978ddd1a1aec7dc99379ca808c201b14f273bdab9beff6ca6297997e",
     ".github/workflows/public-release.yml": "888567a645fd62681a70d4f17dbd8fe22501b07f8a800b18b6d68f3c35f8cd9d",
     ".github/workflows/quality.yml": "5d595a833b4a009cf76a3d9cae333d0df61dfafd410e17f06537f77046084923",
     ".gitignore": "6a2ba6a35f6f75eb15cfe4d8dd95c66eef57addcc94fd00825b1a3d22217f78f",
@@ -364,7 +368,7 @@
     "backend/scripts/serve-homepage-preview.js": "8e7f79d05b34b43df10fe623d02386c4d10c61bf9d712c87a38ab2cbe14d7c05",
     "backend/scripts/setup-support-mailbox.cjs": "0b5623c6265d9604bbece626384e56a7624b6e336721e9b9e126162a73f39cbd",
     "backend/scripts/setup-support-mailbox.test.cjs": "98e3802cb3d1a14e6001cd25895234579ff650cf0c215ee6861e9c5b5d3d870c",
-    "backend/scripts/single-file-jest-return-controls.test.cjs": "33e3a9acf3f6fe23217a25eed40fa20dcb11cef3f67ac205c71709aa7b1e48c8",
+    "backend/scripts/single-file-jest-return-controls.test.cjs": "8e5fb7253226d16ce9f4044c4dd656958a1eb9e88362f24f479cc4f61c71d9bb",
     "backend/scripts/staging-document-canary.cjs": "74782571ec36732d6380af116c3c04965448c3401cdecd61091023eafb6627f4",
     "backend/scripts/staging-storage-access-controls.cjs": "4c8ac1a499521fbd0273623def7b025ade0ec856a82314545733e1162f115afe",
     "backend/scripts/staging-storage-failure-drill.cjs": "9a3fe0faa50b7a48289649503c89d326abdc07e9859e9f04881ef02869080c77",
@@ -392,7 +396,7 @@
     "backend/scripts/verify-critical-browser-groups.js": "6015deaa9deb7a6f0b6d8fdde328e3290626483b019140cbe8609940262b68ef",
     "backend/scripts/verify-production-surface.js": "59a98e67bfdbae1fd1b505d5a2b8654a40f9f45f9526ef16a4217bb4cf75dcf2",
     "backend/scripts/verify-runtime.js": "bdf42bca89111953a6964b3992c2de2e2f696f173517ac37db745e06629fe038",
-    "backend/scripts/verify-single-file-jest-return.cjs": "09ccb9c26687a813500dbe7d8a6ae3051dfb9445e077c1f1c1e566152f36adc7",
+    "backend/scripts/verify-single-file-jest-return.cjs": "3a82147bfae6cb3c15cb582ba793d43c611833c5df5979221f1973863a22ef9e",
     "backend/scripts/verify-source-bound-backend-return.js": "9339327e593eef71d51e10d9b20ea52f550fa890e0111c6026b7498d943f7787",
     "backend/scripts/verify-staging-storage-controls.py": "001c366da8451277794ed71566c348ca2fea22c6e7a2c7d2d87a276987c4d274",
     "backend/services/accountApplicationProjections.js": "1f26295a9e0a9d74fb46b0cb1b54c7928ccf9891b92f33d3a17654f6af7f0081",
@@ -1814,7 +1818,7 @@
     "docs/LPC_PUBLIC_DESIGN_SYSTEM.md": "b8f305511e70654efb80727623c484228dae55bc4c683ddc20295119aa5e6db2",
     "docs/LPC_PUBLIC_PAGES_10_PHASE_CHECKLIST.md": "a8713944ac8a107c931f2fa5201a4c76e5ba8ad90f5649e0062ef94d87bd6bf8",
     "docs/LPC_ROLE_CAPABILITY_AUDIT.md": "1ad5ac6cfa408b5641866396d05fb7ee2471ed40926aee8d6e47304732c9ac11",
-    "docs/LPC_ROUTE_SECURITY_INVENTORY.md": "2bb6fea1dcc3543dfc5d986330d6356514822ed9475cb31a3c22948c2c89f90b",
+    "docs/LPC_ROUTE_SECURITY_INVENTORY.md": "edd7412299c045c7a0dadf20e0a636654714616ab542d1f58ecaaca360e2ac1b",
     "docs/LPC_ROUTE_SECURITY_PASS_EVIDENCE.md": "488780d97db72d88bbfb7b2f7be215bc37cc769dd9618319ed7cc8394e348f27",
     "docs/LPC_SHARED_INFORMATION_ARCHITECTURE.md": "8469e9b7b82431baacd0de1102bd2de486e08b005a605fceed8820f71ed994f1",
     "docs/LPC_SHARED_VISUAL_SPEC_V1.md": "15b363bb7f6a81b5c4dfbd293ba7e15196a77adba9e138baf9e9c65e0f272784",
@@ -33473,8 +33477,8 @@
   "executionSelected": 6,
   "cloudEvidence": {
     "maximumNewBytes": 8589934592,
-    "priorRetainedBytes": 1390334758,
-    "cumulativeMaximumBytes": 9846623859,
+    "priorRetainedBytes": 1397187555,
+    "cumulativeMaximumBytes": 9987122147,
     "approvedCumulativeBytes": 10737418240,
     "retentionDays": 1,
     "archiveBeforeCleanupWithinHours": 48,
@@ -33532,9 +33536,15 @@
         "sha256": "f229a6c0a2a9f112f572d3b2add985beae76f20f0051beb184b01f7b631251a8",
         "artifacts": 9,
         "bytes": 35685636
+      },
+      {
+        "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/live-p-run-38771362732-attempt-1/archive/verified-artifact-manifest.json",
+        "sha256": "434fb46154049c7a38c3da7fc372856a777835d415685a5125fdd2d28342c231",
+        "artifacts": 4,
+        "bytes": 6852797
       }
     ],
-    "coverage": "All8 complete current success/failure native artifacts, actual final17 and4 source/security artifacts share8GiB; previous129 archives reserve1256689267B. Prior raw stays local; no historicalZIP upload or538 rerun.",
+    "coverage": "Historical standard recovery recipe preserves six current-P native identities. This Q standalone manual job executes only current final17, one artifact at most32MiB; native0, prior153 archives/1397187555bytes remain locally retained with8 immutable archive inventories. Conservative8GiB context ceiling remains unchanged and unused native allocations are not uploaded.",
     "recoveryArtifacts": [
       {
         "prefix": "jest-single-final-recovery",
@@ -33655,18 +33665,18 @@
       {
         "path": ".github/workflows/backend-single-file-return.yml",
         "beforeSha256": null,
-        "afterSha256": "5dcc15b3807296d30e54c6123339e9e80d6f3d2e75981d1eea751551e44ca7ef",
+        "afterSha256": "441fe9930e41ec6e870db4805aed7ab34c5ed5e075f6aeed2d082f756504ebe4",
         "kind": "ci-control",
         "affectedSuites": [],
-        "reviewedEvidenceSha256": "6848b5f6aa2e412c104a6334e24e75898c079013c23aac9fea067df58ad6a2ec"
+        "reviewedEvidenceSha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
       },
       {
         "path": ".github/workflows/native-acceptance-return.yml",
         "beforeSha256": null,
-        "afterSha256": "40c42e1c97f3ae755996e4582572a9162a30f3298975cbc50bcf5cb8fabcd5d1",
-        "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
+        "afterSha256": "82c78527978ddd1a1aec7dc99379ca808c201b14f273bdab9beff6ca6297997e",
         "kind": "ci-control",
-        "affectedSuites": []
+        "affectedSuites": [],
+        "reviewedEvidenceSha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
       },
       {
         "path": ".github/workflows/quality.yml",
@@ -33866,10 +33876,10 @@
       {
         "path": "backend/scripts/single-file-jest-return-controls.test.cjs",
         "beforeSha256": null,
-        "afterSha256": "33e3a9acf3f6fe23217a25eed40fa20dcb11cef3f67ac205c71709aa7b1e48c8",
-        "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+        "afterSha256": "8e5fb7253226d16ce9f4044c4dd656958a1eb9e88362f24f479cc4f61c71d9bb",
         "kind": "ci-control",
-        "affectedSuites": []
+        "affectedSuites": [],
+        "reviewedEvidenceSha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
       },
       {
         "path": "backend/scripts/verify-critical-browser-groups.js",
@@ -33882,10 +33892,10 @@
       {
         "path": "backend/scripts/verify-single-file-jest-return.cjs",
         "beforeSha256": null,
-        "afterSha256": "09ccb9c26687a813500dbe7d8a6ae3051dfb9445e077c1f1c1e566152f36adc7",
-        "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
+        "afterSha256": "3a82147bfae6cb3c15cb582ba793d43c611833c5df5979221f1973863a22ef9e",
         "kind": "ci-control",
-        "affectedSuites": []
+        "affectedSuites": [],
+        "reviewedEvidenceSha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
       },
       {
         "path": "backend/scripts/verify-source-bound-backend-return.js",
@@ -34366,6 +34376,14 @@
         "reviewedEvidencePath": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/root-recovery-return-ci/FINAL62_DOCUMENT_FACTUAL_UPDATE.json"
       },
       {
+        "path": "docs/LPC_ROUTE_SECURITY_INVENTORY.md",
+        "beforeSha256": "2bb6fea1dcc3543dfc5d986330d6356514822ed9475cb31a3c22948c2c89f90b",
+        "afterSha256": "edd7412299c045c7a0dadf20e0a636654714616ab542d1f58ecaaca360e2ac1b",
+        "kind": "documentation-only",
+        "affectedSuites": [],
+        "reviewedEvidenceSha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
+      },
+      {
         "path": "docs/RELEASE_GATES.md",
         "beforeSha256": "d84263858f7772bb0442da17e55676a3ecaa2d5eb2cc35ea2c2d199beee46518",
         "afterSha256": "4883ad700047d41b3effced748caf96138a21fd942bf85d442c6567c0b85fbe6",
@@ -34653,18 +34671,18 @@
         {
           "path": ".github/workflows/backend-single-file-return.yml",
           "beforeSha256": null,
-          "afterSha256": "5dcc15b3807296d30e54c6123339e9e80d6f3d2e75981d1eea751551e44ca7ef",
+          "afterSha256": "441fe9930e41ec6e870db4805aed7ab34c5ed5e075f6aeed2d082f756504ebe4",
           "kind": "ci-control",
           "affectedSuites": [],
-          "reviewedEvidenceSha256": "6848b5f6aa2e412c104a6334e24e75898c079013c23aac9fea067df58ad6a2ec"
+          "reviewedEvidenceSha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
         },
         {
           "path": ".github/workflows/native-acceptance-return.yml",
           "beforeSha256": null,
-          "afterSha256": "40c42e1c97f3ae755996e4582572a9162a30f3298975cbc50bcf5cb8fabcd5d1",
-          "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
+          "afterSha256": "82c78527978ddd1a1aec7dc99379ca808c201b14f273bdab9beff6ca6297997e",
           "kind": "ci-control",
-          "affectedSuites": []
+          "affectedSuites": [],
+          "reviewedEvidenceSha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
         },
         {
           "path": ".github/workflows/quality.yml",
@@ -34864,10 +34882,10 @@
         {
           "path": "backend/scripts/single-file-jest-return-controls.test.cjs",
           "beforeSha256": null,
-          "afterSha256": "33e3a9acf3f6fe23217a25eed40fa20dcb11cef3f67ac205c71709aa7b1e48c8",
-          "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+          "afterSha256": "8e5fb7253226d16ce9f4044c4dd656958a1eb9e88362f24f479cc4f61c71d9bb",
           "kind": "ci-control",
-          "affectedSuites": []
+          "affectedSuites": [],
+          "reviewedEvidenceSha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
         },
         {
           "path": "backend/scripts/verify-critical-browser-groups.js",
@@ -34880,10 +34898,10 @@
         {
           "path": "backend/scripts/verify-single-file-jest-return.cjs",
           "beforeSha256": null,
-          "afterSha256": "09ccb9c26687a813500dbe7d8a6ae3051dfb9445e077c1f1c1e566152f36adc7",
-          "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
+          "afterSha256": "3a82147bfae6cb3c15cb582ba793d43c611833c5df5979221f1973863a22ef9e",
           "kind": "ci-control",
-          "affectedSuites": []
+          "affectedSuites": [],
+          "reviewedEvidenceSha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
         },
         {
           "path": "backend/scripts/verify-source-bound-backend-return.js",
@@ -35362,6 +35380,14 @@
           "affectedSuites": [],
           "reviewedEvidenceSha256": "6848b5f6aa2e412c104a6334e24e75898c079013c23aac9fea067df58ad6a2ec",
           "reviewedEvidencePath": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/root-recovery-return-ci/FINAL62_DOCUMENT_FACTUAL_UPDATE.json"
+        },
+        {
+          "path": "docs/LPC_ROUTE_SECURITY_INVENTORY.md",
+          "beforeSha256": "2bb6fea1dcc3543dfc5d986330d6356514822ed9475cb31a3c22948c2c89f90b",
+          "afterSha256": "edd7412299c045c7a0dadf20e0a636654714616ab542d1f58ecaaca360e2ac1b",
+          "kind": "documentation-only",
+          "affectedSuites": [],
+          "reviewedEvidenceSha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
         },
         {
           "path": "docs/RELEASE_GATES.md",
@@ -38260,5 +38286,30 @@
     "selected": 6,
     "callbacksRun": 0,
     "globalSetups": 0
+  },
+  "manualBackendOnlyContinuation": {
+    "proofClass": "EXPLICIT_EXISTING_FINAL17_MANUAL_ENTRY_CURRENT_FILE_ONLY_STRICT_LOCAL_PRIOR_UNION_REQUIRED",
+    "sourceImpact": {
+      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/FINAL_Q_BACKEND_ONLY_SOURCE_IMPACT_PRE_FREEZE.json",
+      "sha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
+    },
+    "rootControlReview": {
+      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ROOT_Q_ONE_CONTROL_TECHNICAL_REVIEW.json",
+      "sha256": "3e7667441264aa5125e35b413deb0ecc8c7828a56dee74351db3c9189dc7287b"
+    },
+    "reusedNative6": {
+      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/ACTUAL_P_NATIVE6_TWO_WHOLE_SCOPES_QUALIFIED.json",
+      "sha256": "8ba0acce58e71364832fcebfc41618aca8ba1af4a3b222bc12a7996a026cf9f6"
+    },
+    "current494Availability": {
+      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/EXACT_CURRENT494_POST_P_DEDUPLICATED_REMAINING.json",
+      "sha256": "be32450fbac365ec9f915d2fcfa6675a094f28963e9564f82756eb81c1b4d195"
+    },
+    "nativeCallbacksInThisManualDispatch": 0,
+    "backendCallbacksInThisManualDispatch": 17,
+    "full100ModelCaptureStages": 53,
+    "maximumActualNewArtifactBytes": 33554432,
+    "originalPWorkflowConclusion": "failure-preserved",
+    "nativeRowsBelow": "Historical reusable six-case recovery recipe; all6 actualP outcomes alreadyqualified, no native job called by standalone Q manualworkflow."
   }
 }

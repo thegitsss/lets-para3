@@ -1,5 +1,21 @@
 name: Exact final signed-recovery file return
 on:
+  push:
+    branches:
+      - codex/lpc-recovery-return-q-20261015
+  workflow_dispatch:
+    inputs:
+      execution_scope:
+        description: Exact current final17 only; retained native and prior raw classes require separate source-bound reconciliation
+        type: choice
+        options:
+          - recovery-return
+        default: recovery-return
+        required: true
+      continuation_plan_sha256:
+        description: Externally reviewed complete shared source plan SHA-256
+        type: string
+        required: true
   workflow_call:
     inputs:
       bridge_sha256:
@@ -10,7 +26,19 @@ permissions:
   contents: read
   actions: read
 jobs:
+  register-existing-workflow:
+    name: Setup-only registration; no acceptance callbacks
+    if: github.event_name == 'push' && !inputs.bridge_sha256
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Record bounded registration only
+        run: |
+          test "$GITHUB_REPOSITORY" = thegitsss/lets-para3
+          test "$GITHUB_REF" = refs/heads/codex/lpc-recovery-return-q-20261015
+          printf '%s\n' 'Setup-only existing workflow registration. No tests, artifacts, providers or production actions.'
   final-file:
+    if: inputs.bridge_sha256 || github.event_name == 'workflow_dispatch'
     name: Actual current signed-recovery17; strict local prior union required
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -50,13 +78,13 @@ jobs:
         id: verify
         env:
           GH_TOKEN: ${{ github.token }}
-          LPC_BACKEND_RETURN_BRIDGE_SHA256: ${{ inputs.bridge_sha256 }}
+          LPC_BACKEND_RETURN_BRIDGE_SHA256: ${{ inputs.bridge_sha256 || inputs.continuation_plan_sha256 }}
         run: node backend/scripts/verify-single-file-jest-return.cjs
       - name: Bound complete success or failure evidence without truncation
         id: bound
         if: always()
         env:
-          APPROVED_PLAN_SHA256: ${{ inputs.bridge_sha256 }}
+          APPROVED_PLAN_SHA256: ${{ inputs.bridge_sha256 || inputs.continuation_plan_sha256 }}
         run: |
           node - <<'JS'
           const fs=require('fs'),path=require('path'),crypto=require('crypto'),assert=require('assert/strict'),budget=require('./backend/scripts/guard-ci-artifact-budget');const bytes=fs.readFileSync('backend/tests/playwright/acceptance/native-continuation-plan.json');assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),process.env.APPROVED_PLAN_SHA256);const plan=JSON.parse(bytes),limit=plan.backendReturn.singleFileRecovery.cloudEvidence.maximumNewBytes;assert(Number.isSafeInteger(limit)&&limit>0&&limit<=64*1024**2);assert(plan.cloudEvidence.priorRetainedBytes+plan.cloudEvidence.maximumNewBytes+limit<=10*1024**3);const input='backend/test-results/jest/shards/single-file-final-recovery',files=budget.inventory(path.resolve('.'),input),maximum=budget.bound(files);assert(maximum<=limit,'Complete raw evidence exceeds reviewed allocation; preserve, never truncate');console.log(JSON.stringify({input,files:files.length,maximumBytes:maximum,approvedBytes:limit,completeEvidence:true}));

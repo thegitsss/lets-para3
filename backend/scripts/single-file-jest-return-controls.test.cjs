@@ -74,8 +74,8 @@ function assistantSourceFixture(){
  }
  x.discovered=[...x.names,K.SUITE,...K.ADDED_BACKEND_TESTS].sort();return x;
 }
-test('optional Assistant adds exactly three new current whole-file obligations and preserves explicit default-off consumers',()=>{
- const x=assistantSourceFixture(),r=source(x);assert.deepEqual(r.affectedBackendRuntimeSuites,[...K.ADDED_BACKEND_TESTS].sort());assert.equal(x.discovered.length,542);assert.throws(()=>api.combine({},x.current,x.discovered,{},r),/Affected backend corrections/);
+test('reviewed Assistant and admission additions require exactly four current file obligations and explicit default-off consumers',()=>{
+ const x=assistantSourceFixture(),r=source(x);assert.deepEqual(r.affectedBackendRuntimeSuites,[...K.ADDED_BACKEND_TESTS].sort());assert.deepEqual(K.ADDED_BACKEND_TESTS,['tests/supportCostBudget.test.js','tests/supportCostBudgetReplica.test.js','tests/supportCostBudgetCeiling.test.js','tests/authAdmissionUploadRecovery.test.js']);assert.equal(x.discovered.length,543);assert.throws(()=>api.combine({},x.current,x.discovered,{},r),/Affected backend corrections/);
 });
 for(const kind of ['source-pin','unreviewed-new-file','missing-new-file','default-off-bridge','default-off-consumers','new-test-not-executed'])test('optional Assistant source bridge rejects '+kind,()=>{
  const x=assistantSourceFixture(),config=x.spec.sourceChanges.find(e=>e.path==='backend/ai/config.js');
