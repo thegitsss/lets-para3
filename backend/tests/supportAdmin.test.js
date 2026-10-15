@@ -37,9 +37,13 @@ const app = (() => {
   return instance;
 })();
 
+const noteManagedSessions=new WeakMap();
+async function noteManagedUser(attrs){const user=await User.create(attrs);const session=await require('../services/authSessionService').createAuthSession(user,{headers:{'user-agent':'Managed original Inbox note fixture'}});noteManagedSessions.set(user,session.sessionId);return user;}
+
 function authCookieFor(user) {
   const payload = {
     id: user._id.toString(),
+    sid: noteManagedSessions.get(user), av:Number(user.authVersion||0),
     role: user.role,
     email: user.email,
     status: user.status,
@@ -59,7 +63,7 @@ async function createUser({
   stripeChargesEnabled = false,
   stripePayoutsEnabled = false,
 } = {}) {
-  return User.create({
+  return noteManagedUser({
     firstName,
     lastName,
     email,

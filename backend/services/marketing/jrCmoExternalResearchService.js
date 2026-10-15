@@ -164,7 +164,7 @@ function buildIndustryClimateSummary({ now = new Date(), items = [], tone = {} }
   );
 }
 
-async function fetchGoogleNewsItems({ now = new Date(), axiosClient = axios } = {}) {
+async function fetchGoogleNewsItems({ axiosClient = axios } = {}) {
   const timeout = researchTimeoutMs();
   const queries = configuredQueries();
   const responses = await Promise.allSettled(
@@ -172,7 +172,7 @@ async function fetchGoogleNewsItems({ now = new Date(), axiosClient = axios } = 
       axiosClient.get(buildGoogleNewsRssUrl(query), {
         timeout,
         headers: {
-          "User-Agent": "LetsParaConnect Jr CMO Research/1.0",
+          "User-Agent": "Lets-ParaConnect Jr CMO Research/1.0",
           Accept: "application/rss+xml, application/xml, text/xml",
         },
       })
@@ -213,7 +213,7 @@ async function buildExternalDayResearch({ now = new Date(), axiosClient = axios 
   }
 
   try {
-    const items = await fetchGoogleNewsItems({ now, axiosClient });
+    const items = await fetchGoogleNewsItems({ axiosClient });
     if (!items.length) {
       return {
         ok: false,

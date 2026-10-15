@@ -4,9 +4,12 @@
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
-require("dotenv").config();
+require("dotenv").config({ quiet: true });
 
 const { sendOwnerAlert } = require("../utils/opsAlerting");
+const { createMongoToolConfig } = require("../utils/mongoToolConfig");
+
+process.umask(0o077);
 
 const MONGO_URI = process.env.MONGO_URI || process.env.MONGO_URL || process.env.DATABASE_URL;
 if (!MONGO_URI) {
@@ -26,11 +29,12 @@ const stamp = new Date()
 const fileName = `backup_${stamp}.archive.gz`;
 const outPath = path.join(backupDir, fileName);
 
-fs.mkdirSync(backupDir, { recursive: true });
+fs.mkdirSync(backupDir, { recursive: true, mode: 0o700 });
 
 function writeStatus(payload) {
-  fs.mkdirSync(path.dirname(statusFile), { recursive: true });
-  fs.writeFileSync(statusFile, `${JSON.stringify(payload, null, 2)}\n`);
+  fs.mkdirSync(path.dirname(statusFile), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(statusFile, `${JSON.stringify(payload, null, 2)}\n`, { mode: 0o600 });
+  fs.chmodSync(statusFile, 0o600);
 }
 
 async function notifyFailure(message, extra = {}) {
@@ -49,10 +53,13 @@ writeStatus({
   outPath,
 });
 
-const args = ["--uri", MONGO_URI, `--archive=${outPath}`, "--gzip"];
+const mongoConfig = createMongoToolConfig(MONGO_URI, { prefix: "lpc-mongodump-" });
+process.once("exit", mongoConfig.cleanup);
+const args = ["--config", mongoConfig.filePath, `--archive=${outPath}`, "--gzip"];
 const dump = spawn("mongodump", args, { stdio: "inherit" });
 
 dump.on("error", (err) => {
+  mongoConfig.cleanup();
   const message =
     err?.code === "ENOENT"
       ? "mongodump not found. Install MongoDB Database Tools first."
@@ -75,6 +82,7 @@ dump.on("error", (err) => {
 });
 
 dump.on("exit", (code) => {
+  mongoConfig.cleanup();
   if (code !== 0) {
     const message = `mongodump exited with code ${code}`;
     writeStatus({
@@ -89,6 +97,7 @@ dump.on("exit", (code) => {
     console.error(`mongodump exited with code ${code}`);
     process.exit(code || 1);
   }
+  fs.chmodSync(outPath, 0o600);
   console.log(`Backup saved: ${outPath}`);
   pruneOldBackups();
   const stat = fs.statSync(outPath);

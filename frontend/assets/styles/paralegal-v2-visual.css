@@ -1,0 +1,95 @@
+/* Paralegal V2 presentation contract. Keep these rules role-local: the shared
+   legacy views and financial controls are also used by other workspaces. */
+body.lpc-v2 { --v2-gutter: 32px; }
+:root.theme-dark body.lpc-v2 .v2-nav-link[aria-current=page] { background: var(--v2-soft); color: var(--v2-blue-hover); }
+:root.theme-dark body.lpc-v2 .v2-navigation-dialog { color: var(--v2-ink); }
+:root.theme-dark body.lpc-v2 .v2-navigation-dialog .v2-brand { color: var(--v2-ink); }
+:root body.lpc-v2 .v2-view { padding-inline: var(--v2-gutter); }
+:root body.lpc-v2 .v2-view:has(> .v2-home) { padding-inline: 0; }
+body.lpc-v2 .v2-home { --original-gutter: var(--v2-gutter); }
+body.lpc-v2 .pv2-overview-page { width: 100%; max-width: none; margin: 0; padding-inline: var(--v2-gutter); }
+:root body.lpc-v2 .lc-heading h1,
+:root body.lpc-v2 .ld-desktop .ld-heading h1,
+:root body.lpc-v2 .v2-view .pv2-conversations h1 {
+  font: 600 1.75rem/1.25 var(--v2-font-sans);
+  letter-spacing: -.025em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+:root body.lpc-v2 .ld-desktop .ld-metric strong { font-family: var(--v2-font-sans); line-height: 1.25; }
+:root body.lpc-v2 .ld-insights-table { color: var(--v2-ink); }
+:root body.lpc-v2 .ld-insights-table :is(td, th) { overflow-wrap: anywhere; }
+body.lpc-v2 .v2-matter-panel-heading { align-items: flex-start; text-align: left; }
+body.lpc-v2 .v2-settings-preview-layout { gap: 24px; }
+body.lpc-v2 .v2-settings .pv2-blocked { margin-top: 24px; }
+body.lpc-v2 .v2-settings .pv2-closure { margin-top: 24px; padding-top: 24px; }
+body.lpc-v2 .pv2-blocked-row:last-child { border-bottom: 0; padding-bottom: 0; }
+body.lpc-v2 .pv2-security-section:last-child { padding-bottom: 0; margin-bottom: 0; }
+body.lpc-v2 .pv2-blocked-pages:has(> span:empty):not(:has(> button:not([hidden]))) { display: none; }
+
+/* Dialog padding belongs to each content region, never both the shell and body. */
+body.lpc-v2 :is(.v2-browse-dialog, .v2-work-dialog, .v2-matter-dialog) {
+  width: min(560px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--v2-line);
+  border-radius: 8px;
+  max-height: calc(100dvh - 32px);
+  font: 400 .875rem/1.5 var(--v2-font-sans);
+}
+body.lpc-v2 :is(.v2-work-dialog, .v2-matter-dialog) > header { min-height: 0; padding: 16px 20px; gap: 12px; }
+body.lpc-v2 :is(.v2-work-dialog, .v2-matter-dialog, .v2-browse-dialog) h2 { font: 600 1.125rem/1.4 var(--v2-font-sans); letter-spacing: 0; }
+body.lpc-v2 :is(.v2-work-dialog-body, .v2-matter-dialog-body) { padding: 16px 20px; }
+body.lpc-v2 .v2-browse-dialog form { padding: 16px 20px; gap: 16px; }
+body.lpc-v2 :is(.v2-work-dialog, .v2-matter-dialog) > footer { justify-content: flex-start; flex-wrap: wrap; min-height: 0; padding: 12px 20px; background: var(--v2-white); }
+body.lpc-v2 .v2-browse-dialog footer { justify-content: flex-start; flex-wrap: wrap; }
+body.lpc-v2 :is(.v2-work-dialog-close, .v2-browse-dialog-close, .v2-matter-dialog-close) { width: 44px; min-width: 44px; min-height: 44px; }
+body.lpc-v2 :is(.v2-browse-dialog-field, .v2-work-dialog-facts dt) { font-size: .875rem; font-weight: 400; letter-spacing: 0; text-transform: none; }
+body.lpc-v2 .v2-work-dialog-facts { gap: 10px 20px; }
+body.lpc-v2 .v2-work-preengagement { margin-top: 16px; padding: 0; border: 0; background: transparent; }
+body.lpc-v2 .v2-work-dialog > footer .v2-work-danger-link { margin-right: 0; }
+:root body.lpc-v2 .v2-matter-dialog .v2-matter-dialog-danger { color: #fff; background: var(--v2-danger); border-color: var(--v2-danger); }
+:root body.lpc-v2 .v2-matter-dialog .v2-matter-dialog-danger:is(:hover, :focus-visible) { color: #fff; background: #85303a; border-color: #85303a; }
+
+/* Bridge recovery controls to the portal's palette, including error states. */
+.pv2-conversations .av2-secondary { align-self: flex-start; min-height: 44px; margin: 12px 16px; padding: 8px 12px; border: 1px solid var(--av2-line); border-radius: 5px; background: var(--av2-bg); color: var(--av2-ink); font: inherit; font-size: .875rem; }
+.pv2-conversations .av2-secondary:hover { background: var(--av2-soft); }
+.pv2-conversations .av2-thread-identity { overflow-wrap: break-word; }
+.pv2-conversations .v2-matter-message-meta { flex-wrap: wrap; }
+.v2-payout-review { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--v2-line); max-width: 40rem; }
+.v2-payout-review h2 { margin: 0 0 8px; font-size: 1rem; font-weight: 600; }
+.v2-payout-review p, .v2-work-review-help { font-size: .875rem; line-height: 1.6; }
+.v2-payout-review a { display: inline-flex; align-items: center; min-height: 44px; }
+
+/* Reflow according to usable workspace width and enlarged reading text. */
+@container (max-width: 30rem) {
+  .pv2-conversations .av2-inbox-workspace .av2-matter-header { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px 12px; }
+  .pv2-conversations .av2-inbox-workspace .av2-thread-header-avatar { display: none; }
+  .pv2-conversations .av2-thread-identity { grid-column: 2; }
+  .pv2-conversations .av2-thread-matter-link { grid-column: 2; justify-self: start; white-space: normal; }
+  .pv2-conversations .av2-inbox-workspace .av2-conversation { padding-inline: 12px; }
+  .pv2-conversations .av2-inbox-workspace .av2-conversation > li[data-message-id] { max-width: calc(100% - 20px); }
+  .pv2-conversations .av2-inbox-workspace .av2-message-heading { flex-wrap: wrap; gap: 2px 8px; }
+  .pv2-conversations .v2-matter-message-file { max-width: 100%; }
+}
+@container (max-width: 22rem) {
+  .pv2-conversations .av2-inbox-workspace .av2-composer-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; }
+  .pv2-conversations .av2-inbox-workspace .av2-composer-row > .av2-button { grid-column: 2; justify-self: end; }
+  .pv2-conversations .av2-inbox-workspace[data-tab=messages] .av2-message-composer textarea { width: 100%; line-height: 1.5; }
+}
+@media (max-width: 900px) {
+  body.lpc-v2 { --v2-gutter: 16px; }
+  :root body.lpc-v2 .v2-view:has(> .v2-settings) { padding-inline: var(--v2-gutter); }
+  html[data-lpc-v2-route=conversations] [data-v2-route-outlet] { padding-inline: var(--v2-gutter); }
+  body.lpc-v2 .v2-matter-tabs,
+  :root body.lpc-v2 :is(.ld-tabs, .lc-tabs) { flex-wrap: wrap; overflow: visible; gap: 4px 18px; }
+  :root body.lpc-v2 :is(.ld-toolbar, .lc-toolbar) { flex-wrap: wrap; height: auto; }
+  body.lpc-v2 .v2-settings-preview-layout { gap: 0; }
+}
+@media (max-width: 440px) {
+  .v2-header-tools { flex: 1; min-width: 0; }
+  .v2-header-search,
+  .v2-header-search:is(:hover, :focus-within, :has([data-v2-search-panel]:not([hidden]))) { flex: 1; width: auto; min-width: 24px; padding-inline: 2px; }
+  .v2-header-find-work { flex: none; padding-inline: 8px; }
+  body.lpc-v2 .pv2-search-label { display: none; }
+  .v2-header-search .v2-search-panel { width: min(280px, calc(100vw - 80px)); }
+}

@@ -1,7 +1,7 @@
 const os = require("os");
 const path = require("path");
 
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 
 const mongoose = require("mongoose");
 
@@ -11,8 +11,12 @@ const {
   processClaimedIncidentJob,
 } = require("../scheduler/incidentScheduler");
 const { createLogger } = require("../utils/logger");
+const { releaseCommit } = require("../utils/releaseIdentity");
+const { assertIncidentWorkerConfiguration } = require("../utils/workerProductionConfig");
+const { MONGO_OPERATION_OPTIONS, requireMongoUri } = require("../utils/mongooseOperationPolicy");
 
 const logger = createLogger("incident-runner");
+assertIncidentWorkerConfiguration(process.env);
 const MAX_JOBS_PER_RUN = Number(process.env.INCIDENT_RUNNER_MAX_JOBS || 5);
 const DEFAULT_POLL_MS = Number(process.env.INCIDENT_RUNNER_POLL_MS || 5000);
 const DEFAULT_LOCK_MS = Number(process.env.INCIDENT_RUNNER_LOCK_MS || 15 * 60 * 1000);
@@ -174,7 +178,11 @@ async function runIncidentRunnerOnce(
     return { ok: false, reason: "db_not_ready", processed: 0, results: [] };
   }
 
-  const results = [];
+  // Drain committed Assistant handoffs with the existing incident worker.
+  // Routing is durable across web/worker restarts and never runs in a send transaction.
+  const processSupportRouting = dependencies.processSupportRouting || require('../services/support/mutationRoutingService').processPendingSupportRouting;
+  const supportRouting = await processSupportRouting({ maxJobs: config.maxJobs });
+  const results = (supportRouting.results || []).map(result => ({ ...result, jobType: 'support_routing' }));
 
   for (let count = 0; count < config.maxJobs; count += 1) {
     // eslint-disable-next-line no-await-in-loop
@@ -243,6 +251,7 @@ async function runIncidentRunnerLoop(options = {}, dependencies = {}) {
         claimJob: dependencies.claimJob,
         processJob: dependencies.processJob,
         isDbReady: dependencies.isDbReady,
+        processSupportRouting: dependencies.processSupportRouting,
       }));
   const sleep = dependencies.sleep || waitForStopAwareDelay;
   const log = dependencies.logger || logger;
@@ -278,7 +287,7 @@ async function runIncidentRunnerLoop(options = {}, dependencies = {}) {
         ? "Incident runner processed jobs with failures."
         : "Incident runner processed jobs.";
       const logMethod = summary.failed ? log.warn.bind(log) : log.info.bind(log);
-      logMethod({
+      logMethod(message, {
         workerId: config.workerId,
         processed: Number(result?.processed || 0),
         succeeded: summary.succeeded,
@@ -532,12 +541,14 @@ async function main() {
   };
 
   mongoose.connection.on("disconnected", handleDisconnect);
-  await mongoose.connect(process.env.MONGO_URI, {
+  await mongoose.connect(requireMongoUri(process.env.MONGO_URI), {
+    ...MONGO_OPERATION_OPTIONS,
     serverSelectionTimeoutMS: config.mongoConnectTimeoutMs,
     connectTimeoutMS: config.mongoConnectTimeoutMs,
   });
 
   logger.info({
+    releaseCommit: releaseCommit(process.env) || undefined,
     workerId: config.workerId,
     maxJobs: config.maxJobs,
     pollMs: config.pollMs,

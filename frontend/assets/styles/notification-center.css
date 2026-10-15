@@ -1,0 +1,45 @@
+/* Shared notification behavior uses each workspace's established palette. */
+.lpc-notification-center {
+  --nc-bg: var(--av2-bg, var(--v2-surface, #fff));
+  --nc-ink: var(--av2-ink, var(--v2-ink, #182033));
+  --nc-muted: var(--av2-muted, var(--v2-muted, #59677c));
+  --nc-line: var(--av2-line, var(--v2-line, #e3e8ee));
+  --nc-soft: var(--av2-soft, var(--v2-soft, #f6f8fb));
+  --nc-accent: var(--av2-accent, var(--v2-blue-hover, #385d91));
+  color: var(--nc-ink);
+}
+.lpc-notification-center > header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; }
+.lpc-notification-center .lpc-notification-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 0 0 12px; flex-shrink: 0; }
+.lpc-notification-center .lpc-notification-filters { display: flex; gap: 2px; margin-right: auto; }
+.lpc-notification-center .lpc-notification-actions button,
+.lpc-notification-center .lpc-notification-pagination button,
+.lpc-notification-center .v2-notifications-empty button { min-height: 44px; padding: 8px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--nc-ink); font: inherit; font-size: .875rem; cursor: pointer; }
+.lpc-notification-center .lpc-notification-filters button[aria-pressed="true"] { background: var(--nc-soft); border-color: var(--nc-line); font-weight: 600; }
+.lpc-notification-center button:disabled,
+.lpc-notification-center button[aria-disabled="true"] { opacity: .6; cursor: progress; }
+.lpc-notification-center button:hover:not(:disabled),
+.lpc-notification-center .v2-notification-body:hover { background: var(--nc-soft); }
+.lpc-notification-center :focus-visible { outline: 2px solid var(--nc-accent); outline-offset: 2px; }
+.lpc-notification-center .v2-notifications-list { display: grid; }
+.lpc-notification-center .v2-notification { display: grid; grid-template-columns: minmax(0, 1fr) 44px; border-bottom: 1px solid var(--nc-line); }
+.lpc-notification-center .v2-notification-body { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 8px; min-width: 0; min-height: 80px; padding: 14px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--nc-ink); text-decoration: none; text-align: left; font: inherit; cursor: pointer; }
+.lpc-notification-center .lpc-notification-avatar { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--nc-soft); color: var(--nc-ink); font-size: .8125rem; font-weight: 600; line-height: 1; }
+.lpc-notification-center .lpc-notification-avatar .v2-notification-dot { position: absolute; right: 0; bottom: 0; outline: 2px solid var(--nc-bg); }
+.lpc-notification-center .v2-notification-copy { display: grid; min-width: 0; gap: 4px; overflow-wrap: anywhere; }
+.lpc-notification-center .v2-notification-copy strong { font-size: .875rem; line-height: 1.5; font-weight: 400; color: var(--nc-ink); }
+.lpc-notification-center .is-unread .v2-notification-copy strong { font-weight: 600; }
+.lpc-notification-center .v2-notification-copy time { color: var(--nc-muted); font-size: .8125rem; line-height: 1.4; }
+.lpc-notification-center .v2-notification-action { grid-column: 2; color: var(--nc-accent); font-size: .8125rem; line-height: 1.4; white-space: normal; }
+.lpc-notification-center .v2-notification-dot { width: 6px; height: 6px; border-radius: 50%; background: transparent; }
+.lpc-notification-center .v2-notification-body > .v2-notification-dot { justify-self: center; }
+.lpc-notification-center .is-unread .v2-notification-dot { background: var(--nc-accent); }
+.lpc-notification-center .v2-notification-dismiss,
+.lpc-notification-center .lpc-notification-close { align-self: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--nc-muted); font: inherit; font-size: 1.5rem; cursor: pointer; }
+.lpc-notification-center .v2-notifications-empty { min-height: 132px; padding: 16px 8px; display: grid; place-items: center; align-content: center; gap: 12px; color: var(--nc-muted); text-align: center; }
+.lpc-notification-center .v2-notifications-empty p { margin: 0; }
+.lpc-notification-center .lpc-notification-pagination { display: flex; justify-content: space-between; gap: 8px; padding-block: 12px; }
+.lpc-notification-center .lpc-notification-pagination:empty { display: none; }
+.lpc-v2 .lpc-notification-center.v2-notifications-panel { max-height: min(680px, calc(100dvh - var(--v2-header-height) - 24px)); }
+.lpc-notification-center [data-v2-notifications-content] { min-height: 0; overflow: auto; padding: 0; }
+.av2 [data-av2-open="notifications"] { position: relative; }
+.lpc-notification-badge { position: absolute; top: 0; right: -2px; min-width: 18px; min-height: 18px; padding: 1px 4px; border-radius: 10px; background: var(--av2-accent, #385d91); color: var(--av2-bg, #fff); font: 600 .6875rem/1.4 "Sarabun", sans-serif; }

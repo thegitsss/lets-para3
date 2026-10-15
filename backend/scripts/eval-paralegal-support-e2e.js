@@ -1,6 +1,6 @@
 const path = require("path");
 
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 process.env.STRIPE_SECRET_KEY = "sk_test_package7_paralegal_synthetic";
 
 const stripeModulePath = require.resolve("../utils/stripe");
@@ -31,6 +31,7 @@ const mongoose = require("mongoose");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 const OpenAIImport = require("openai");
 const OpenAI = OpenAIImport.default || OpenAIImport;
+const { buildOpenAIClientOptions } = require("../ai/config");
 const { z } = require("zod");
 const { zodTextFormat } = require("openai/helpers/zod");
 
@@ -43,7 +44,6 @@ const {
   executeParalegalSupportTool,
 } = require("../ai/paralegalSupportAgentTools");
 const {
-  buildParalegalGenerationInstructions,
   runParalegalResponsePipeline,
 } = require("../ai/paralegalResponsePipeline");
 const {
@@ -519,7 +519,9 @@ async function main() {
         user: { email: user.email, role: user.role },
       });
     }
-    const client = dryRun ? null : new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const client = dryRun
+      ? null
+      : new OpenAI(buildOpenAIClientOptions(process.env.OPENAI_API_KEY));
     const results = [];
     for (let repetition = 1; repetition <= repetitions; repetition += 1) {
       for (const scenario of scenarios) {

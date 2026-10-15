@@ -1,0 +1,9 @@
+{
+  "name": "cropperjs",
+  "version": "2.1.1",
+  "license": "MIT",
+  "source": "https://registry.npmjs.org/cropperjs/-/cropperjs-2.1.1.tgz",
+  "packageIntegrity": "sha512-FDJMarkY+/SepYarPZsvkG2LmI2PElecciMFnvBiBIoKnFYua/scprC5qejCLLyuX2jEqJRS2njbAsHxfjtIXA==",
+  "asset": "dist/cropper.min.js",
+  "assetSha512": "b8401b1afac32e08ca4ff0ea80893dc4eb19adc4f59e7d9cd60700d9267ab8e291317dba475a349e457d2631418a2bddf0bb583158843ca789becd29d2119e79"
+}

@@ -1,6 +1,7 @@
 # LPC AI Operating Manual
 
 Founder/operator manual for Samantha  
+Admin workflow, design, and communications updated September 7, 2026. See the [operating scope](audits/admin-2026-09-06/implementation/README.md) and [admin experience redesign](audits/admin-2026-09-07-design/README.md).
 Codebase basis: current Let’s-ParaConnect admin dashboard, support system, marketing system, AI admin routes, and scheduler behavior in this repository.
 
 ## 1. Executive Overview
@@ -8,50 +9,24 @@ Codebase basis: current Let’s-ParaConnect admin dashboard, support system, mar
 Let’s-ParaConnect currently has three distinct but connected operating layers:
 
 1. The core admin dashboard: analytics, approvals, user management, payments, disputes, revenue, posts, logs, and settings.
-2. The War Room / AI Control Room: a read-only operational visibility layer that rolls up founder, marketing, support, admissions, lifecycle, payments/risk, sales, and incident signals.
+2. The AI Control Room: an operational visibility and governed-decision layer that rolls up founder, marketing, support, admissions, lifecycle, payments/risk, sales, engineering, and incident signals. Informational items remain read-only; only explicitly action-backed decision items expose approve/reject controls.
 3. The agent workflows behind the scenes: marketing planning and draft generation, support conversation assistance and escalation, founder daily summaries, monitoring, and a now-live Engineering / CTO workspace backed by incident-linked diagnosis and execution records.
 
-What is live now:
+What is live:
 
-- A live admin dashboard at `frontend/admin-dashboard.html`.
-- A live AI Control Room with real backend data for founder, marketing, support, admissions, lifecycle, payments/risk, sales, and incidents.
-- A live marketing workflow with Jr. CMO research/context, CMO cycle planning, draft packet creation, founder approval, LinkedIn company connection/validation, and manual LinkedIn publishing for approved packets.
-- A live support workflow with in-product support conversations, ticket escalation into Support Ops, grounded response packets, manual admin replies, FAQ candidate generation, and support insights.
-- Support chat now uses cleaner user-facing issue labels and state-aware follow-up wording, so it does not echo awkward intake phrases like raw ticket subjects back to the user.
-- Support chat tone is being normalized toward short, human replies. The highest-frequency LPC responses now use simpler language for intake, follow-up clarification, escalation, and issue-status updates rather than older robotic phrasing.
-- Lower-volume support replies are also being cleaned up so payout/setup guidance, case verification, workspace access, and navigation help read more naturally without changing the underlying support workflow.
-- Navigation and workflow guidance is also being simplified. LPC now uses plainer language for “how do I apply,” “what do I do next,” and resolved-issue reopen prompts, so users get clearer next steps without the assistant sounding like internal product documentation.
-- Support chat can now actually reopen a previously resolved support-linked issue when the user says it is still happening again. LPC moves that ticket back out of `resolved`, returns it to active review, and routes it back into engineering when the issue is engineering-linked.
-- Support chat now handles topic changes more reliably inside the same thread. A user can move from a payout question to profile guidance without LPC staying stuck on the old payout context.
-- Support chat also now treats Stripe requirement questions as guidance, not as repeated payout-failure troubleshooting. Follow-ups like `Do I have to connect Stripe?` should answer directly and point the user to the right LPC setup location.
-- Support chat now handles plain-language “just tell me what I need to do” follow-ups more naturally. If LPC already knows the active topic, it should give the next step directly instead of forcing the user through another narrow clarification turn.
-- Support chat now has an explicit conversation-planning layer for topic continuity. LPC tracks thread topic separately from issue state, so when a user pivots from troubleshooting into guidance or navigation, stale issue memory is cleared instead of leaking into the next answer.
-- Support chat now handles broader LPC workflow questions more cleanly. Questions like `Can you explain how LPC works for paralegals?` should stay in guidance mode instead of falling back to old payout or case context.
-- Support chat can now narrow from a broad LPC overview into a more specific follow-up. For example, `Can you explain how LPC works for paralegals?` followed by `How do I create my profile?` should move into concrete profile-setup guidance instead of repeating the general platform overview.
-- Support chat is also getting stricter about literal wording. Specific asks like `How do I edit my profile?` or `I need to update my profile` should now stay on profile guidance instead of drifting back into older case or apply context from the same thread.
-- Support chat now keeps a small amount of reference memory too. If LPC just pointed the user to a page, follow-ups like `open that page from before` can reuse the last navigation target instead of forcing the user to restate it.
-- Issue-status follow-ups are also becoming more natural. If a user already has an active issue, shorthand like `What about that now?` should now resolve to the current issue status instead of behaving like a brand-new intake message.
-- Broad help language is improving too. LPC now treats asks like `I'm confused`, `Can you explain this simply?`, `What should I do first on LPC?`, and `What do attorneys usually do first?` as real guidance requests and answers them with grounded LPC workflow guidance instead of resetting to generic intake.
-- Support chat now gives more contextual next-step answers in-thread. If a user asks `What should I do next?`, LPC can use the current conversation topic to point them to the right next action instead of resetting all the way back to generic intake.
-- Clarification language is also improving. When a user is frustrated or asks for broad help mid-thread, LPC should now use a calmer, more human clarification prompt instead of falling back to `Tell me what's still not working.`
-- Support chat now handles more mixed-intent turns in one reply. For example, LPC can now answer combinations like `How do I create my profile and do I need Stripe?` or `I'm trying to apply but also can't find my messages` without collapsing everything into one incomplete answer.
-- Support chat can now also follow the branch a user picks after a compound answer. If LPC first answers a combined question, a follow-up like `let's do the Stripe part first` or `what about the messages part?` should now move into that branch instead of repeating the original combined answer.
-- Compound guidance answers can now surface branch suggestions directly in the chat, so users get simple next clicks like `Profile setup`, `Stripe`, `Applications`, or `Messages` instead of having to invent the right follow-up wording.
-- If a user asks for too many unrelated things at once, LPC should now split that cleanly. Instead of answering badly or guessing, it can say it can help with those topics and ask the user to pick one first.
-- Support chat now handles unsupported two-topic requests more cleanly too. If a user asks for two unrelated things in one message, LPC should split those into clean choices like `Theme settings` or `Billing` instead of grabbing the first recognizable keyword and answering the wrong thing.
-- After LPC offers topic choices, it now remembers them across the next turns. Follow-ups like `billing first`, `messages`, or `the other one` should continue the correct branch instead of resetting the thread.
-- Support chat now treats correction language more intelligently. Replies like `No, I mean billing`, `Actually, the second one`, or `Specifically, how do I create my profile?` should now be treated as real topic corrections instead of vague restarts.
-- Support chat can now also handle simple mixed status turns better. If a user asks for an issue update and a second simple LPC question in the same message, LPC can now answer the issue-status part and still handle the navigation follow-up instead of dropping one side.
-- That mixed status behavior now also extends to simple guidance. A user can ask for an issue update and a straightforward product question like `Do I need Stripe?`, and LPC should now answer both in one grounded reply.
-- A live Engineering section in the admin dashboard with a summary strip, engineering queue, item detail panel, quick actions, incident linkage, and CTO diagnosis / execution visibility.
-- A live approvals workspace that unifies knowledge, marketing, support FAQ, and sales packet review.
-- A live scheduler that refreshes monitoring, Jr. CMO context, scheduled marketing cycle checks, and the Founder Daily Log.
-- Automatic founder email alerts to `admin@lets-paraconnect.com` when a user support chat becomes an engineering incident, and a follow-up email when that support-linked issue is fixed.
+- The admin dashboard at `frontend/admin-dashboard.html`, including AI Control Room, Approvals, Knowledge, Marketing, Support, Engineering, Sales, user administration, payment/risk, activity, and settings surfaces.
+- Governed Control Room decisions backed by existing approval routes. Informational, autonomous, and blocked items do not acquire invented action buttons.
+- LinkedIn-only marketing planning, drafting, approval, connection validation, and explicit human-triggered publishing. Facebook remains retired and audit-only.
+- In-product attorney and Paralegal support with grounded role-safe guidance, state-aware follow-ups, conversation-topic continuity, verified navigation, issue reopening, ticket/incident linkage, and bounded automatic milestone updates.
+- Support Ops and Engineering workspaces with response packets, incident linkage, CTO diagnosis, execution planning, and explicit human decisions for sensitive actions.
+- Approval, knowledge, and sales workflows that preserve review state and distinguish drafts from approved outbound use.
+- A supervised incident worker plus five-minute automation and operations-monitor services; business schedulers do not run inside the horizontally scaled web process.
+- Alerts sent to configured founder/owner recipients when governed incident or monitoring rules require them. Source-code fallback addresses are not production recipient evidence.
 
 What is partial or planning-only:
 
-- Facebook page publishing is not implemented. Facebook packets can be drafted and approved, but not published through the system.
-- The legacy AI issue route still exists, but the Incident system is now treated as the canonical operational system for incident truth.
+- Facebook authoring and publishing are intentionally retired from the active product. Legacy Facebook briefs, packets, and cycle fields remain readable for audit history, but no new Facebook work can be created, reviewed, connected, or published.
+- Standalone legacy AI-issue and CTO test routes are retired. Incident and Engineering are the only canonical operator workflows for technical-issue truth and planning.
 - Fully autonomous engineering repair is only partial. There is a trusted local test path for specific low-risk incidents, but LPC should still be treated as approval-first for most real engineering work.
 
 Overall architecture:
@@ -59,52 +34,41 @@ Overall architecture:
 - Frontend: a single admin dashboard shell with section-based workspaces and separate JS modules for approvals, knowledge, marketing, support, sales, incidents, and AI Control Room behavior.
 - Backend: Express routes split by pillar, backed by MongoDB models and service-layer orchestration.
 - Persistence: MongoDB stores drafts, approvals, support tickets, founder logs, agent runs, incident data, and related records.
-- Automation: a cron-based scheduler runs every 10 minutes for monitoring, Jr. CMO refresh, marketing cadence checks, and founder daily prep.
+- Automation: Render runs the automation and operations-monitor services every five minutes. Operations checks and core lifecycle/deletion work run every cycle; due-slot marketing, director, monitoring-report, and founder-daily work is gated to its configured cadence inside the automation cycle.
 - Safety posture: approval-first and manual-send/manual-publish by design. The system prepares decisions and drafts; it does not run the company autonomously.
 
-## 2. Admin Dashboard / War Room Overview
+## 2. Admin Dashboard and AI Control Room
 
 ### Major admin areas currently present
 
-The current sidebar includes these sections:
+The daily sidebar has five destinations: Overview, Users, Matters, Support & inquiries, and Finance.
 
-- Overview
-- AI Control Room
-- Approvals
-- Knowledge Studio
-- Marketing Drafts
-- Support Ops
-- Engineering
-- Sales Workspace
-- User Management
-- Photo Reviews
-- Stripe
-- Disputes
-- Revenue
-- Posts
-- Activity Logs
-- Settings
+Growth contains Marketing, Sales, Directors, and Content review. System & tools contains Engineering, Automation (the existing AI Control Room), Support knowledge, Posting moderation, Activity log, and Settings. Director Oversight links back to the same five daily destinations. Existing backend decision policies and canonical handlers remain in force.
 
 ### Overview
 
-This is the classic admin layer. It is not primarily AI-driven. It gives you:
+A fresh admin visit opens with **new signups awaiting Samantha’s approval**, oldest first. Open an application to inspect admission and access state, the role’s current requirements, document-safety checks, notes, and communication history. Approval and denial remain explicit decisions. A request for more information leaves the application pending and creates an inquiry with a recorded email outcome.
 
-- total users
-- funds in Stripe
-- active cases
-- pending approvals
-- payout and income cards
-- open disputes
-- payment overview
-- revenue reporting
-- recent job posts
-- admin activity logs
+Contact form submissions, requests for a human, and recent questions appear beside signup review on desktop and immediately after it on mobile. Matter and money exceptions link to their operating queues. Growth/system work and platform reporting are collapsed below daily work. The app/database reachability check is not a certification of payment, storage, or email-provider health.
 
-This is your platform operations home base, not your agent workspace.
+The admin uses LPC’s serif and sans-serif typography, navy navigation, warm surfaces, and restrained gold accents. Cmd/Ctrl+K opens workspace search; arrow keys navigate results and Escape returns focus. Application review opens in a focused panel with qualifications, documents, readiness checks, and decision controls kept in view. Mobile inquiry navigation switches between list and conversation while preserving unsent reply drafts. Settlement confirmation itemizes the server-calculated financial outcome and defaults focus to Cancel.
 
-### AI Control Room / War Room
+### Daily workspaces
 
-This is the founder-facing operational visibility layer. It is intentionally read-only in this phase.
+- **Users:** separate Applications, All users, Photo review, and Deactivated tabs; denied and suspended filters; account readiness, suspend/reinstate with a reason and impact preview, review notes, and communication history.
+- **Matters:** paginated search and filters for the complete matter collection. Open shared scope, lifecycle, applications, files/submissions, shared deadlines, support, financial state, and activity. Posting moderation actions operate on the selected matter. Attorney-private notes and private calendar entries are excluded.
+- **Support & inquiries:** contact submissions, human requests, and other support sources. Read the conversation and reply first. Ownership, next action, follow-up date, internal notes, and technical context are secondary controls. Filter assigned/unassigned and overdue work.
+- **Finance:** separate matter-dispute and processor-chargeback queues, selected dispute details, and a final named-party amount preview. Payments & receipts has complete paginated records and filtered CSV exports; charts and sampled activity are folded away. Reconciliation can open from the selected matter.
+
+Assistant handoffs are two-way inside LPC: team replies appear in the user’s Assistant conversation. Contact/application information requests are emailed through the configured provider. Support mailbox synchronization is implemented locally and requires dedicated Zoho read credentials plus the separate communications worker before live replies return to admin. Exact outbound Message-ID references and the expected sender link incoming replies to an inquiry; unmatched email opens a separate inquiry. Attachments remain in the support mailbox. A provider-accepted outcome is not proof of delivery to the recipient’s inbox.
+
+Reply, information-request, and review-note drafts save privately to the current admin account, expire after 30 days of inactivity, and protect against overwrites from another tab. A saved reply request ID prevents duplicate sends after a lost response. Reusable reply starters remain editable and require an explicit send.
+
+The Email & owner alerts disclosure reports connection state, scan coverage, worker heartbeat, queued alerts, and failed or unconfirmed sends. Owner alerts cover pending signups, contact submissions, human requests, incoming email, and overdue inquiry follow-ups. The existing signup alert attempts delivery immediately; remaining alerts and safe retries require the standalone worker. The default owner address remains admin@lets-paraconnect.com, configurable through ADMIN_ALERT_EMAIL. See [communications implementation and activation](audits/admin-2026-09-07-communications/README.md) for setup, tests, and operating limits.
+
+### AI Control Room
+
+This is the founder-facing operational visibility and governed-decision layer. A card is actionable only when it represents an implemented, authorized decision route; informational, autonomous, and blocked cards remain non-actionable and explain their state.
 
 It currently shows:
 
@@ -118,7 +82,7 @@ Important reality:
 
 - This is a visibility and prioritization layer.
 - It is not the same thing as an execution console.
-- The incident workspace is read-only in this phase.
+- Incident timeline/detail views are read-only; governed decisions use their canonical approval or Engineering routes.
 
 ### Founder layer in Marketing Drafts
 
@@ -149,7 +113,7 @@ Quick Actions do this:
 
 Today’s Ready Posts do this:
 
-- show current LinkedIn company and Facebook page state
+- show current LinkedIn company packet state
 - show approval state
 - show publish readiness
 - show whether you can post now
@@ -205,9 +169,9 @@ Currently present and live:
 - lifecycle rollups from routed actions plus some compatibility heuristics
 - incident control room data from the incident system
 
-Currently not present as a true live operator surface:
+Explicit boundaries:
 
-- engineering triage inside the War Room itself
+- Engineering remains the canonical technical triage/execution workspace; Control Room cards link or decide but do not duplicate it
 - broad autonomous fixing across the application
 - autonomous deployment for general engineering work
 
@@ -240,9 +204,9 @@ Safety level language used in this manual:
 | Name | Marketing CMO Agent |
 | Purpose | Decide whether a scheduled marketing cycle should be created and pick the most supportable LinkedIn company topic/lane |
 | Inputs | Jr. CMO briefing, approved marketing context, cadence history, pending review backlog, recent packet timing |
-| Outputs | An agentic cycle plan used to create a publishing cycle and paired channel drafts |
+| Outputs | An agentic cycle plan used to create one governed LinkedIn company draft per publishing cycle |
 | Current safety level | `Approval-first` |
-| What it can do now | Hold when the queue is unhealthy, choose a topic lane, create a scheduled publishing cycle, seed LinkedIn company and Facebook page packets |
+| What it can do now | Hold when the queue is unhealthy, choose a topic lane, create a scheduled publishing cycle, and seed one LinkedIn company packet |
 | What it cannot do yet | Bypass backlog rules, auto-publish, auto-approve, or force content into production without founder review |
 
 ### Founder Daily Log
@@ -255,7 +219,7 @@ Safety level language used in this manual:
 | Outputs | Daily summary, what changed, what needs Samantha, blockers, recommended actions, quick actions, ready-post cards |
 | Current safety level | `Read-only` plus shortcut actions |
 | What it can do now | Prepare a daily log, refresh on demand, generate quick actions, tell you whether LinkedIn is ready now, tell you exactly what is blocked |
-| What it cannot do yet | Replace packet review, decide strategy for you, or make Facebook publish live |
+| What it cannot do yet | Replace packet review, decide strategy for you, or publish without an explicit founder action |
 
 ### Support Agent
 
@@ -263,7 +227,7 @@ Safety level language used in this manual:
 | --- | --- |
 | Name | Support Agent / in-product support assistant |
 | Purpose | Respond inside support conversations, gather grounded context, and escalate when needed |
-| Inputs | User conversation text, page context, role/surface, case/job/application context, workspace snapshots, billing/payout/messaging snapshots, support policy state |
+| Inputs | User conversation text, page context, role/surface, Matter/application context, authorized workspace snapshots, payment/payout/messaging snapshots, and support policy state |
 | Outputs | Assistant replies, internal summaries, category/urgency/confidence, support facts snapshot, automatic support ticket creation, and automatic incident creation/linking for engineering-worthy issues |
 | Current safety level | `Assistive` for user chat, `Approval-first` escalation logic, `Manual send` for human team replies |
 | What it can do now | Reply automatically inside the product, carry forward issue memory across turns, classify the issue, ground answers in visible facts, answer simple follow-up status questions without losing the thread, show state-aware welcome prompts for active vs recently resolved issues, vary status replies based on the real support/incident lifecycle, reopen previously resolved support-linked issues when the user says the problem came back, auto-route engineering-worthy reports into Support Ops plus Engineering, and trigger founder email alerts for support-linked engineering issues |
@@ -287,7 +251,7 @@ Safety level language used in this manual:
 | --- | --- |
 | Name | CTO Agent |
 | Purpose | Produce a first-pass technical diagnosis for a reported product issue |
-| Inputs | A live incident from Engineering, or an admin/test payload including category, urgency, message, route, and role context |
+| Inputs | A live Engineering incident and its governed category, urgency, message, route, role, and linked-support context |
 | Outputs | Diagnosis summary, likely root causes, likely files to inspect, test plan, deployment risk, Codex patch prompt, and persisted `CtoAgentRun` records for the Engineering workspace |
 | Current safety level | `Approval-first` engineering analysis |
 | What it can do now | Diagnose likely issue areas, map likely frontend/backend files, auto-start diagnosis for support-linked engineering incidents, and surface a structured engineering brief in the live Engineering workspace |
@@ -299,7 +263,7 @@ Safety level language used in this manual:
 | --- | --- |
 | Name | CTO Execution Pipeline |
 | Purpose | Turn a CTO diagnosis into an implementation packet for engineering execution |
-| Inputs | A `CtoAgentRun` id or direct diagnosis payload |
+| Inputs | The persisted `CtoAgentRun` diagnosis attached to a canonical Engineering item |
 | Outputs | Implementation summary, execution plan, patch artifact, required tests, deployment checklist, readiness assessment, user resolution draft, optional `CtoExecutionRun` |
 | Current safety level | `Approval-first` planning support |
 | What it can do now | Prepare a disciplined execution packet, persist `CtoExecutionRun` records, and feed the live Engineering workspace with implementation-ready context |
@@ -309,23 +273,12 @@ Safety level language used in this manual:
 
 ### What Samantha should check each morning
 
-Start in this order:
+1. **Overview → New signups awaiting your approval.** Review the oldest applications, request missing information where needed, and record decisions.
+2. **Support & inquiries.** Address contact submissions, human requests, and overdue follow-ups. Read the conversation before responding.
+3. **Matter and money exceptions.** Investigate overdue/stalled work and payment issues through linked records. Review financial evidence and the exact proposed outcome before confirming any settlement.
+4. **Growth and System & tools**, when an item requires attention. Marketing approval remains distinct from publishing; engineering and other governed actions retain their existing review requirements.
 
-1. `AI Control Room`
-2. `Marketing Drafts` founder layer
-3. `Engineering`
-4. `Support Ops`
-5. `Incident Workspace` inside the AI Control Room
-6. `Approvals`
-
-The reason for that order:
-
-- AI Control Room tells you where the pressure is.
-- Founder Daily Log tells you what marketing needs your approval or post action.
-- Engineering tells you whether a user-reported product issue is only queued, actively diagnosed, blocked, ready for test, or resolved.
-- Support Ops tells you whether support-owned users are blocked right now.
-- Incident Workspace tells you whether there is a broader technical pattern behind those support and engineering signals.
-- Approvals is where you cleanly clear governed review work.
+The broader Automation summary remains available as a secondary operational view. It does not replace the application and inquiry queues.
 
 ### How to use the Founder Daily Log
 
@@ -382,29 +335,10 @@ Approve only when:
 
 ### How to handle urgent support issues
 
-Go to `Support Ops` and review:
+Open **Support & inquiries**, select the question, and read the conversation. Replies to an Assistant handoff appear in the same user conversation; replies to contact submissions use email. Review the recorded send outcome before retrying.
 
-- open blockers
-- account-access tickets
-- money-sensitive tickets
-- any support-owned tickets still waiting for human reply
+Use **Ownership & follow-up** to assign an operator, record the next action, and set a follow-up time. Internal notes and status changes remain separate from the user-visible reply. Technical facts and linked engineering incidents are under **Context & technical details**. A repaired engineering incident does not automatically resolve an unanswered human/contact inquiry.
 
-Then separately check `Engineering` for:
-
-- newly created incident-backed issues
-- auto-started CTO diagnosis
-- issues marked `Blocked`, `Ready for Test`, or `Resolved`
-
-Then:
-
-1. open the ticket detail
-2. review the latest support facts snapshot
-3. review the recommended response packet
-4. add an internal note if needed
-5. send a team reply manually if you are ready
-6. move the ticket status intentionally
-
-The system can draft, classify, and auto-route. It does not remove the need for human judgment on sensitive replies.
 
 ### How to review technical incidents
 
@@ -423,7 +357,7 @@ Then decide:
 
 - Is this just one user’s support issue?
 - Is it a broader incident?
-- Does it touch money, auth, or case progress?
+- Does it touch money, authentication, authorization, or Matter progress?
 
 Important:
 
@@ -461,12 +395,11 @@ Ad hoc briefs currently support:
 - `founder_linkedin_post`
 - `platform_update_announcement`
 
-Publishing cycles currently generate paired work for:
+Publishing cycles currently generate one active workflow:
 
 - `linkedin_company_post`
-- `facebook_page_post`
 
-Each cycle is treated as a paired unit of work even though the publish reality differs by channel.
+The historical `facebook_page_post` enum remains only so older stored records can be read. It is excluded from new brief creation, cycle creation, active approval queues, connection management, and publishing.
 
 ### How review/publish readiness works
 
@@ -503,7 +436,7 @@ In LPC’s current system, approval-first means:
 
 This is deliberate. The system is optimized for governed output, not autonomous brand publishing.
 
-### Current status of LinkedIn vs Facebook
+### Current channel status
 
 LinkedIn company:
 
@@ -515,16 +448,11 @@ LinkedIn company:
 
 Facebook page:
 
-- draft packets exist
-- founder review exists
-- approval exists
-- publish execution does not exist
-- founder layer explicitly marks Facebook posting as blocked in this phase
+- is not an active LPC workflow
+- cannot create new briefs, packets, approval work, connections, or publish attempts
+- may appear only in legacy stored history, labelled as retired and read-only
 
-So today:
-
-- LinkedIn company is operational with manual publishing.
-- Facebook is still draft/review-only.
+So today LinkedIn company is the only operational company publishing channel, with governed manual publishing.
 
 ## 6. Support / Technical Incident Workflow
 
@@ -549,7 +477,7 @@ If the support assistant determines the user is describing a real product issue,
 - the ticket is linked to an existing open incident or a new incident is created
 - the issue appears in `Engineering`
 - CTO diagnosis starts automatically when appropriate
-- Samantha receives a founder email alert at `admin@lets-paraconnect.com`
+- configured founder-alert recipients receive an email; production recipients must be verified from configuration rather than inferred from a source-code fallback
 
 The user does not need to understand the internal routing model. The system is supposed to figure out whether this is normal support or an engineering issue.
 
@@ -578,8 +506,7 @@ When the issue is engineering-worthy:
 
 Current reality:
 
-- diagnosis can still be run through admin/test routes
-- diagnosis is also now part of the live Engineering workflow
+- diagnosis runs through the live canonical Engineering workflow
 - support-linked engineering incidents can auto-start CTO diagnosis
 - the resulting packet is saved as a `CtoAgentRun` and shown in Engineering item detail
 
@@ -602,7 +529,6 @@ Still manual today:
 
 - approving marketing packets
 - publishing LinkedIn posts
-- all Facebook posting
 - admin support replies
 - support status decisions
 - many incident decisions
@@ -619,8 +545,8 @@ Support users can be notified when:
 
 Founder notifications now also exist for support-linked engineering issues:
 
-- Samantha gets an email when a support chat issue becomes an engineering incident
-- Samantha gets a second email when that support-linked issue reaches fixed/resolved status
+- configured founder-alert recipients receive an email when a support chat issue becomes an engineering incident
+- configured founder-alert recipients receive a second email when that support-linked issue reaches fixed/resolved status
 
 For user-facing communication:
 
@@ -653,7 +579,7 @@ For user-facing communication:
 - if LPC gives a combined answer, it should also be able to surface branch suggestions like `Stripe` or `Messages` so the user can keep the thread moving without typing a perfect follow-up
 - if a user asks one message that contains two unrelated support needs, LPC should now split that into a short topic-choice prompt and remember those options for the next turn
 - if LPC offers a short topic-choice prompt and the user says `both` or `all of them`, LPC can now answer those selected topics in one reply instead of forcing the user to choose only one branch
-- once LPC offers topic choices, it should honor natural follow-ups like `billing first`, `messages first`, `the second one`, or `the other one` instead of making the user restate the whole question
+- once LPC offers topic choices, it should honor natural follow-ups like `payments first`, `messages first`, `the second one`, or `the other one` instead of making the user restate the whole question
 - if a user corrects themselves mid-thread with phrases like `no, I mean...`, `actually...`, or `specifically...`, LPC should now treat that as a real course correction instead of falling back to intake or stale context
 - if a user is clearly frustrated but also vague, the clarification should stay human and service-oriented rather than sounding like a bug form
 - when a support-linked engineering incident is actually fixed and verified, the linked support ticket should close automatically so it stops appearing as open founder work
@@ -731,7 +657,7 @@ It stores:
 - user resolution draft
 - approval posture
 
-## 8. Key Admin/Test Routes
+## 8. Key Admin Operator Routes
 
 ### Founder/operator routes already backing the dashboard
 
@@ -760,25 +686,18 @@ It stores:
 | `/api/admin/engineering/items/:id/diagnose` | Run or re-run CTO diagnosis for an engineering item |
 | `/api/admin/engineering/items/:id/execution` | Build an execution packet for an engineering item |
 
-### Admin-only AI test routes currently present
-
-| Route | Current use | Founder interpretation |
-| --- | --- | --- |
-| `/api/admin/ai/cto-diagnose-test` | Run a CTO diagnosis from an `AgentIssue` or direct payload | Internal/test utility, not a normal daily founder tool |
-| `/api/admin/ai/cto-execution-test` | Build an execution packet from a CTO run or diagnosis payload | Internal/test utility, not a live engineering console |
-| `/api/admin/ai/issues` | Legacy AI issue queue route backed by `AiIssueReport` | Compatibility route only; not canonical ops truth |
-| `/api/admin/ai/issues/:id` | Update legacy issue status | Legacy compatibility only |
+Diagnosis, execution planning, and resolution are available only through the canonical `/api/admin/engineering/items/:id/*` workflow. Standalone test and legacy issue routes were retired before launch.
 
 ### Practical note
 
-If you are operating the company day to day, use the dashboard sections first. Use the CTO routes only when you intentionally want a technical planning packet for engineering review.
+If you are operating the company day to day, use the dashboard sections and their Engineering actions. The routes above are the implementation contract behind those actions, not a parallel operator workflow.
 
 ## 9. What Is Automated vs Manual
 
 ### Automated now
 
 - AI Control Room summaries and focus views
-- scheduled monitoring checks every 10 minutes
+- operations monitoring every five minutes, with cadence-specific automation work running only when its due slot is reached
 - scheduled Jr. CMO refresh
 - scheduled marketing due-slot checks
 - founder daily log prep after 9:00 AM Eastern
@@ -800,7 +719,6 @@ If you are operating the company day to day, use the dashboard sections first. U
 - final packet approval
 - rejection decisions
 - LinkedIn post publishing trigger
-- all Facebook publishing
 - support team replies
 - support ticket resolution decisions
 - many technical diagnosis decisions
@@ -830,28 +748,26 @@ It is intentionally conservative about:
 
 Be explicit about these:
 
-- Facebook page publishing is not implemented.
-- Monitoring is lightweight and heuristic; it does not create a durable founder-facing monitoring workspace.
-- The Incident system is canonical, but some older issue-related compatibility routes still exist.
+- Facebook is intentionally outside the active authoring and publishing scope; only legacy audit history is retained.
+- The legacy AI Monitoring Agent is lightweight and heuristic. Production health, backup, payment, file, archive, and deletion monitoring is a separate supervised service with durable alert-suppression state; neither replaces provider dashboards or incident review.
 - Lifecycle rollups still include some compatibility heuristics while migration continues.
 - Support can draft and route well, but complex user communication still depends on human handling.
 - The Engineering workspace is live, but the AI Control Room still does not function as the engineering execution console.
 - The system can auto-start diagnosis, but broad autonomous bug fixing is still limited and should not be assumed across the app.
 - The system does not broadly auto-deploy arbitrary fixes.
-- The system now autonomously emails Samantha about support-linked engineering issues, but not every internal operational state change should become an email.
+- The system sends configured founder alerts for governed support-linked engineering milestones, but not every internal state change should become an email.
 - The founder layer is concentrated in marketing; there is not yet an equally mature founder action layer for every pillar.
 
 ## 11. Recommended Next Steps
 
-Based on the current system, the next logical improvements are:
+Before launch, prioritize evidence and operational readiness over expanding autonomy:
 
-1. Keep simplifying Support Ops and Engineering so each issue has one obvious primary workspace and less duplicate visibility.
-2. Add clearer founder actions in Engineering such as `Mark Ready for Test`, `Mark Blocked`, `Mark Resolved`, and `Notify Support`.
-3. Decide whether Facebook should become genuinely publishable or remain intentionally disabled; right now it creates review overhead without full execution.
-4. Persist monitoring outputs into a visible queue or dashboard record instead of relying mainly on logs and indirect rollups.
-5. Expand autonomous repair only through explicit safe recipes and verification rules, rather than broad generic auto-fix behavior.
-6. Add explicit “notify user now” guardrails/workflows only after a fix is validated, so communication remains trustworthy.
-7. Continue reducing compatibility-only legacy routes and make the canonical systems more obvious in the UI.
+1. Prove all four Render services run the same approved commit and retain the production-verification artifact.
+2. Validate alert delivery/recovery, Atlas restore, Stripe reconciliation, malware controls, and the four-service rollback runbook.
+3. Keep Support Ops, Engineering, Incident, and Control Room ownership explicit so a record has one canonical action surface.
+4. Expand autonomous repair only through reviewed safe recipes, bounded permissions, deterministic verification, and an auditable rollback path.
+5. Notify users of resolution only after the authoritative incident/support state proves the fix is deployed and verified.
+6. Retire compatibility-only data and navigation paths only through measured migrations that preserve existing deep links and audit history.
 
 ## Bottom Line
 

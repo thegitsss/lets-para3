@@ -4,9 +4,24 @@ const request = require("supertest");
 const {
   SUPPORT_ACTION_RATE_LIMIT,
   createSupportActionRateLimiter,
+  supportActionKey,
 } = require("../services/support/supportActionRateLimit");
 
 describe("support action rate limiting", () => {
+  test("uses isolated user keys and subnet-normalized IPv6 fallback keys", () => {
+    expect(supportActionKey({ user: { _id: "2001:db8::1" }, ip: "192.0.2.1" })).toBe(
+      "user:2001:db8::1"
+    );
+    expect(supportActionKey({ ip: "2001:db8:abcd:12::1" })).toBe(
+      "ip:2001:db8:abcd::/56"
+    );
+    expect(supportActionKey({ ip: "2001:db8:abcd:12::9" })).toBe(
+      "ip:2001:db8:abcd::/56"
+    );
+    expect(supportActionKey({ ip: "192.0.2.1" })).toBe("ip:192.0.2.1");
+    expect(supportActionKey()).toBe("ip:anonymous");
+  });
+
   test("counts one user-submitted request once regardless of internal work", async () => {
     const app = express();
     let internalOperations = 0;

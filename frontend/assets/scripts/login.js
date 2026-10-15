@@ -1,4 +1,4 @@
-import { persistSession } from "./auth.js";
+import { fetchCSRF, persistSession } from "./auth.js";
 import "./utils/login-return-target.js";
 import { showAlert } from "./utils/dialogs.js";
 
@@ -77,12 +77,9 @@ const maybeRedirectFromStoredUser = async () => {
   return false;
 };
 
-async function fetchCsrfToken() {
+async function fetchCsrfToken(force = false) {
   try {
-    const res = await fetch(`${API_BASE}/csrf`, { credentials: "include" });
-    if (!res.ok) return "";
-    const data = await res.json().catch(() => ({}));
-    return data?.csrfToken || "";
+    return await fetchCSRF(force);
   } catch {
     return "";
   }
@@ -159,7 +156,7 @@ const initLogin = () => {
 
   const performPasskeyAuthentication = async (challengeToken = "", { useBrowserAutofill = false } = {}) => {
     if (!passkeysSupported) throw new Error("Passkeys are not supported by this browser or device.");
-    const csrfToken = await fetchCsrfToken();
+    const csrfToken = await fetchCsrfToken(!useBrowserAutofill);
     const headers = {
       "Content-Type": "application/json",
       ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
@@ -285,7 +282,6 @@ const initLogin = () => {
         maintenance: "The platform is in maintenance mode. Please try again soon.",
         email_unverified: "Please verify your email before signing in.",
         two_factor_unavailable: "Unable to send a verification code. Please try again.",
-        two_factor_password: "For this account, please sign in with your email and password to complete two-step verification.",
         unavailable: "Google sign-in is temporarily unavailable.",
       };
       notify(messages[errorCode] || "Google sign-in could not be completed.");
@@ -317,7 +313,7 @@ const initLogin = () => {
         loginButton.disabled = true;
         loginButton.textContent = "Signing in…";
       }
-      const csrfToken = await fetchCsrfToken();
+      const csrfToken = await fetchCsrfToken(true);
       const res = await fetchWithTimeout(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: {
@@ -410,7 +406,7 @@ const initLogin = () => {
         return;
       }
       try {
-        const csrfToken = await fetchCsrfToken();
+        const csrfToken = await fetchCsrfToken(true);
         const endpoint = useBackupCode ? "/auth/2fa-backup" : "/auth/2fa-verify";
         const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
           method: "POST",

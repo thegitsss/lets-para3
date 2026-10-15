@@ -13,7 +13,15 @@
   footerCanvas.setAttribute('aria-hidden', 'true');
   footer.prepend(footerCanvas);
   const image = scene.querySelector('.closing-scene__mountain');
-  image.loading = 'eager';
+  let imageRequested = false;
+  function requestImage() {
+    if (imageRequested) return;
+    imageRequested = true;
+    image.loading = 'eager';
+    const fallback = document.querySelector('.closing-scene__ridge image[data-src]');
+    if (fallback) fallback.setAttribute('href', fallback.dataset.src);
+    void paint();
+  }
   const title = scene.querySelector('#closing-title');
   const actions = scene.querySelector('.role-actions');
   const buttons = [...actions.querySelectorAll('a')];
@@ -37,6 +45,7 @@
     lastOpacity = null;
   }
   async function paint() {
+    if (!imageRequested) return;
     if (painting) { paintAgain = true; return; }
     painting = true;
     try {
@@ -127,7 +136,14 @@
   scene.querySelector('.closing-scene__content').classList.add('is-revealed');
   buttons.forEach(button => button.classList.add('is-revealed'));
   measure();
-  document.fonts.ready.then(() => { measure(); paint(); });
+  document.fonts.ready.then(() => { measure(); if (imageRequested) paint(); });
+  if ('IntersectionObserver' in window) {
+    const loader = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      requestImage(); loader.disconnect();
+    }, { rootMargin: '2000px 0px' });
+    loader.observe(scene);
+  } else { requestImage(); }
   addEventListener('scroll', schedule, { passive: true });
   addEventListener('resize', () => {
     // Browser chrome may change height while scrolling; only width changes

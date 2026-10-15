@@ -1,5 +1,5 @@
 import { previousWorkspaceDestination } from './workspace-destinations.mjs';
-import { markDocumentLeaving } from './document-navigation.mjs';
+import { assertDocumentActive, markDocumentLeaving } from './document-navigation.mjs';
 
 export function workspaceDecision(payload, identity) {
   const value = payload?.workspace, id = String(identity?.id || identity?._id || '');
@@ -125,6 +125,7 @@ export function createWorkspaceReleaseController({ outlet, baselineAllowed, hasU
     const method = String(init.method || input?.method || 'GET').toUpperCase();
     const url = new URL(typeof input === 'string' ? input : input?.url || String(input), win.location.href);
     const apiRequest = url.origin === win.location.origin && url.pathname.startsWith('/api/');
+    if (apiRequest) assertDocumentActive(win);
     const write = apiRequest && !['GET', 'HEAD', 'OPTIONS'].includes(method);
     if (write) pendingWrites++;
     try {

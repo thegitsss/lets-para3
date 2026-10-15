@@ -244,9 +244,7 @@
       scheduleParallax();
   }
   retry.addEventListener('click', load);
-  // Start data work after the first hero frame, well before a normal scroll reaches the map.
-  setTimeout(() => void load(), 700);
-  // A quick scroll should start the request immediately rather than wait for the timer.
+  // Fetch the existing map before it enters view, rather than during hero loading.
   if ('IntersectionObserver' in window) {
     const loadObserver = new IntersectionObserver(entries => {
       if (!entries.some(entry => entry.isIntersecting)) return;
@@ -254,7 +252,7 @@
       void load();
     }, { rootMargin: '600px 0px' });
     loadObserver.observe(mapSection);
-  }
+  } else void load();
 })();
 
 (() => {
@@ -517,5 +515,12 @@
 
   }
   retry.addEventListener('click', load);
-  load();
+  if ('IntersectionObserver' in window) {
+    const loadObserver = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      loadObserver.disconnect();
+      void load();
+    }, { rootMargin: '600px 0px' });
+    loadObserver.observe(mapSection);
+  } else void load();
 })();

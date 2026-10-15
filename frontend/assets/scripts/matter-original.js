@@ -56,6 +56,10 @@
   const setAttribute = (node, name, value) => {
     value = String(value);
     if (node.getAttribute(name) !== value) node.setAttribute(name, value);
+    if (name === 'aria-hidden' && node.querySelector('button,input,select,textarea,a[href]')) {
+      const inert = value === 'true';
+      if (node.inert !== inert) node.inert = inert;
+    }
   };
   const setText = (node, value) => { if (node.textContent !== value) node.textContent = value; };
   const setStyle = (node, name, value) => {
@@ -173,7 +177,9 @@
     film.querySelectorAll('.typeset, .matter-title h2, .matter-location, .scope-label, .scope-summary, .tasks-label, .addition, .sheet-state').forEach(node => node.setAttribute('aria-hidden', String(stage === 0)));
     film.querySelector('.tasks-label').textContent = 'TASKS';
     film.querySelector('.amount-input').setAttribute('aria-hidden', String(stage === 0));
+    film.querySelector('.amount-input').inert = stage === 0;
     film.querySelector('.deadline-input').setAttribute('aria-hidden', String(stage !== 1));
+    film.querySelector('.deadline-input').inert = stage !== 1;
     film.querySelector('.posted-date').setAttribute('aria-hidden', String(stage !== 2));
     film.querySelectorAll('.task-toggle').forEach(button => { button.tabIndex = stage === 0 ? -1 : 0; button.disabled = stage === 0; });
     feedback.textContent = disclosure;

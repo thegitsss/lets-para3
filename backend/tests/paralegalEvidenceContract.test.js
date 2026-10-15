@@ -70,7 +70,11 @@ describe("paralegal evidence contract", () => {
           authorized: true,
           facts: [
             { key: "paymentReleased", value: true },
-            { key: "bankDepositEstimateBusinessDays", value: { minimum: 3, maximum: 5 } },
+            { key: "bankDepositTimingSource", value: "stripe_payout_status_and_estimated_arrival" },
+            {
+              key: "bankDepositTimingDependsOn",
+              value: ["stripe_account_country", "stripe_payout_schedule", "financial_institution"],
+            },
           ],
         },
       },
@@ -78,7 +82,8 @@ describe("paralegal evidence contract", () => {
     const rendered = renderParalegalEvidenceAnswer("P21_completion_release", evidence);
     expect(rendered.reply).toContain("records the funds as released");
     expect(rendered.reply).toContain("does not by itself confirm they reached your bank");
-    expect(rendered.reply).toContain("3–5 business days");
+    expect(rendered.reply).toContain("Stripe shows the current payout status and estimated arrival");
+    expect(rendered.reply).toContain("payout schedule");
   });
 
   test("returns a truthful authorization limitation", () => {

@@ -4,9 +4,6 @@
 .faq-page :is(h1,h2,p){margin-top:0}
 .faq-page a{color:inherit}
 .faq-page :is(a,summary):focus-visible{outline:2px solid #6495ed;outline-offset:5px}
-.faq-page.public-site-chrome .home-header{background:rgba(237,240,243,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:0;box-shadow:none;transition:background 200ms ease}
-.faq-page.public-site-chrome .home-header.is-past-hero{background:rgba(255,255,255,.78)}
-.faq-page.public-site-chrome .home-header.is-open{background:#fff}
 .faq-page.public-site-chrome .home-footer summary{color:#a8c8ff}
 .faq-page.public-site-chrome > .hero-banner{width:100%;height:auto;margin:0;padding:calc(var(--header-height,72px) + 72px) var(--page-gutter) 64px;background:transparent;border:0}
 .faq-page .hero-banner__title{width:min(100%,1200px);margin:auto;text-align:center}
@@ -25,6 +22,7 @@
 .faq-guide nav a span{color:#4775bd;font-size:11px;letter-spacing:.08em}
 .faq-guide nav a:hover{color:#4775bd}
 .faq-page .faq-other-role{display:block;margin-top:32px;padding-top:24px;border-top:1px solid var(--faq-line);color:var(--faq-muted);font-size:14px;text-decoration:none}
+.faq-other-role span{color:#4775bd}
 .faq-group{margin:0 0 54px;scroll-margin-top:calc(var(--header-height,72px) + 28px)}
 .faq-group:last-child{margin-bottom:0}
 .faq-group h2{display:flex;align-items:baseline;gap:16px;margin-bottom:24px;color:#151c25;font:300 clamp(2rem,3vw,2.75rem)/1.1 "Cormorant Garamond",serif;letter-spacing:-.025em}

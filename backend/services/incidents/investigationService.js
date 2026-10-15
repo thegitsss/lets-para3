@@ -35,7 +35,7 @@ const MAX_AUDIT_LOGS = 10;
 const ROUTE_CORRELATION_RULES = Object.freeze([
   {
     key: "matching.case-detail-hire",
-    label: "Case detail hiring flow",
+    label: "Matter detail hiring flow",
     domains: ["matching", "case_lifecycle"],
     keywords: ["hire", "hiring", "invite", "application", "apply", "accept"],
     routeHints: ["/api/applications", "/api/cases", "/case-detail", "case-detail"],
@@ -46,9 +46,9 @@ const ROUTE_CORRELATION_RULES = Object.freeze([
       "backend/routes/cases.js",
       "frontend/case-detail.html",
       "frontend/assets/scripts/case-detail.js",
-      "frontend/assets/scripts/views/case-detail.js",
       "frontend/case-applications.html",
-      "frontend/assets/scripts/case-applications.js",
+      "frontend/dashboard-attorney.html",
+      "frontend/assets/scripts/attorney-tabs.js",
     ],
     impactedDomains: ["matching", "case_lifecycle"],
   },
@@ -63,7 +63,6 @@ const ROUTE_CORRELATION_RULES = Object.freeze([
     suspectedFiles: [
       "backend/routes/messages.js",
       "frontend/assets/scripts/case-detail.js",
-      "frontend/assets/scripts/views/case-detail.js",
     ],
     impactedDomains: ["messaging"],
   },
@@ -77,9 +76,8 @@ const ROUTE_CORRELATION_RULES = Object.freeze([
     suspectedRoutes: ["/api/uploads"],
     suspectedFiles: [
       "backend/routes/uploads.js",
-      "frontend/assets/scripts/views/documents.js",
       "frontend/assets/scripts/case-files-view.js",
-      "frontend/assets/scripts/views/case-detail.js",
+      "frontend/assets/scripts/case-detail.js",
     ],
     impactedDomains: ["documents"],
   },
@@ -149,7 +147,7 @@ const ROUTE_CORRELATION_RULES = Object.freeze([
   },
   {
     key: "jobs.application-flow",
-    label: "Jobs and application flow",
+    label: "Matters and application flow",
     domains: ["matching"],
     keywords: ["job", "application", "browse jobs", "openings", "submit application"],
     routeHints: ["/api/jobs", "/api/applications", "/jobs", "/applications"],
@@ -158,29 +156,27 @@ const ROUTE_CORRELATION_RULES = Object.freeze([
     suspectedFiles: [
       "backend/routes/jobs.js",
       "backend/routes/applications.js",
-      "frontend/assets/scripts/browse-jobs.js",
       "frontend/assets/scripts/views/browse-jobs.js",
-      "frontend/assets/scripts/views/job-detail.js",
-      "frontend/assets/scripts/paralegal-applications.js",
+      "frontend/assets/scripts/paralegal-dashboard.js",
     ],
     impactedDomains: ["matching"],
   },
   {
     key: "case.workspace",
-    label: "Case workspace flow",
+    label: "Matter workspace flow",
     domains: ["case_lifecycle", "matching"],
     keywords: ["case", "workspace", "task", "deadline", "calendar", "deliverable"],
-    routeHints: ["/api/cases", "/api/caseTasks", "/case-detail", "/active-cases"],
+    routeHints: ["/api/cases", "/api/checklist", "/case-detail", "/active-cases"],
     pageHints: ["case-detail", "active-cases", "calendar"],
-    suspectedRoutes: ["/api/cases", "/api/caseTasks"],
+    suspectedRoutes: ["/api/cases", "/api/checklist"],
     suspectedFiles: [
       "backend/routes/cases.js",
-      "backend/routes/caseTasks.js",
+      "backend/routes/checklist.js",
+      "backend/models/ChecklistTask.js",
       "backend/services/caseLifecycle.js",
       "frontend/case-detail.html",
       "frontend/assets/scripts/case-detail.js",
-      "frontend/assets/scripts/views/case-detail.js",
-      "frontend/assets/scripts/views/calendar.js",
+      "frontend/assets/scripts/attorney-tabs.js",
     ],
     impactedDomains: ["case_lifecycle"],
   },
@@ -479,7 +475,6 @@ function buildReproContext(incident = {}, correlation = {}, clusterSummary = {})
 }
 
 function buildHypotheses({
-  incident = {},
   correlation = {},
   clusterSummary = {},
   auditLogExcerpt = {},
@@ -596,7 +591,7 @@ function determineInvestigationOutcome({
       userVisibleStatus: "needs_more_info",
       adminVisibleStatus: "active",
       nextJobType: "none",
-      summary: "Investigation needs more route or case context before a technical hypothesis can be trusted.",
+      summary: "Investigation needs more route or Matter context before a technical hypothesis can be trusted.",
       resolution: null,
     };
   }
@@ -754,7 +749,6 @@ async function runInvestigation(incident) {
   const deployCorrelation = await buildRecentDeployCorrelation();
   const reproContext = buildReproContext(incident, correlation, clusterSummary);
   const hypotheses = buildHypotheses({
-    incident,
     correlation,
     clusterSummary,
     auditLogExcerpt,

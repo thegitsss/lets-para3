@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LPC notification verification</title>
+  <link rel="stylesheet" href="/assets/styles/fonts.css">
+  <link rel="stylesheet" href="/assets/styles/notifications-dashboard.css">
+  <link rel="stylesheet" href="/assets/styles/dialogs.css">
+  <style>body{margin:0;padding:24px;font-family:Sarabun,sans-serif;background:#fff;color:#172337;--accent:#385d91}.topbar{display:flex;justify-content:flex-end;position:relative}.notification-wrapper{position:relative}.theme-dark{background:#141b28;color:#eef2f7}h1{font-size:24px}</style>
+</head>
+<body>
+  <main>
+    <h1>Notifications</h1>
+    <div class="topbar">
+      <div class="lpc-shared-header" data-notification-center>
+        <div class="notification-wrapper">
+          <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle>
+            <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24"><path d="M5 16h14l-2-3V8a5 5 0 0 0-10 0v5z" fill="none" stroke="currentColor"/></svg>
+            <span class="notification-badge" data-notification-badge aria-hidden="true">0</span>
+          </button>
+          <div class="notifications-panel notif-panel hidden" role="region" aria-label="Notifications" data-notification-panel>
+            <div class="notif-header">Notifications</div>
+            <div class="notif-scroll" data-notification-list></div>
+            <div class="notif-empty" data-notification-empty>Loading…</div>
+            <button type="button" class="notif-markall" data-notification-mark>Mark all as read</button>
+            <button type="button" data-notification-clear>Clear all</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script type="module">
+    const query = new URL(location.href).searchParams;
+    document.cookie = 'mock_owner=111111111111111111111111; path=/';
+    if (query.has('listOnly')) document.querySelector('[data-notification-center]').removeAttribute('data-notification-center');
+    if (query.has('genericHeader')) document.querySelector('.lpc-shared-header').classList.remove('lpc-shared-header');
+    if (query.has('dark')) document.body.classList.add('theme-dark');
+    window.legacyNotifications = await import('/assets/scripts/utils/notifications.js');
+  </script>
+</body>
+</html>

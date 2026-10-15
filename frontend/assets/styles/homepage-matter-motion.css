@@ -1186,3 +1186,7 @@
   .lpc-home #matter-film[data-stage="2"] .matter-sheet { min-height: 510px; padding: 68px 20px 20px; }
   .lpc-home #matter-film[data-stage="2"] .matter-preview-content { column-gap: 16px; max-height: 550px; }
 }
+
+@media (max-width: 960px) {
+  .lpc-home #matter-film .sheet-action { min-height: 44px; }
+}

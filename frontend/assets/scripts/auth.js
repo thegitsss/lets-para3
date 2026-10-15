@@ -265,21 +265,44 @@ export function requireAuth(expectedRole) {
   return session;
 }
 
-// Prefetch CSRF token (sets cookie via server; we store the token for headers)
+// One document shares a pending hydration. A forced current-token read
+// cancels its predecessor before issuing another credential-bound request.
+let csrfRequest = null;
+let csrfGeneration = 0;
+
+function setCsrfToken(value) {
+  CSRF_TOKEN = value || "";
+  if (typeof window !== "undefined") window.__CSRF__ = CSRF_TOKEN;
+}
+
 export async function fetchCSRF(force = false) {
-  if (CSRF_TOKEN && !force) return CSRF_TOKEN;
-  if (force) {
-    CSRF_TOKEN = "";
-    if (typeof window !== "undefined") window.__CSRF__ = "";
+  if (!force) {
+    if (csrfRequest) return csrfRequest.promise;
+    if (CSRF_TOKEN) return CSRF_TOKEN;
   }
-  const r = await fetchInDocument("/api/csrf", { credentials: "include" });
-  if (r.ok) {
-    const { csrfToken } = await r.json();
-    CSRF_TOKEN = csrfToken || "";
-    // keep compat with older code
-    if (typeof window !== "undefined") window.__CSRF__ = CSRF_TOKEN;
-  }
-  return CSRF_TOKEN;
+  const previous = csrfRequest;
+  const generation = ++csrfGeneration;
+  if (force) setCsrfToken("");
+  previous?.controller.abort();
+  const request = { generation, controller: new AbortController(), promise: null };
+  csrfRequest = request;
+  request.promise = (async () => {
+    try {
+      const response = await fetchInDocument("/api/csrf", {
+        credentials: "include",
+        signal: request.controller.signal,
+      });
+      const payload = response.ok ? await response.json() : null;
+      if (generation !== csrfGeneration || request.controller.signal.aborted) {
+        throw new DOMException("A newer CSRF token request replaced this request.", "AbortError");
+      }
+      if (response.ok) setCsrfToken(payload?.csrfToken);
+      return CSRF_TOKEN;
+    } finally {
+      if (csrfRequest === request) csrfRequest = null;
+    }
+  })();
+  return request.promise;
 }
 export async function secureJSON(url, opts = {}) {
   const res = await secureFetch(url, opts);

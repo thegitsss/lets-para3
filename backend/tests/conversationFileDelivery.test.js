@@ -1,0 +1,32 @@
+const express=require('express'),cookieParser=require('cookie-parser'),request=require('supertest'),crypto=require('crypto');
+jest.mock('../utils/email',()=>jest.fn(async()=>({ok:true})));
+const User=require('../models/User'),Case=require('../models/Case'),CaseFile=require('../models/CaseFile'),Message=require('../models/Message');
+const {connect,clearDatabase,closeDatabase}=require('./helpers/db');
+const {decryptMessagePayload}=require('../utils/dataEncryption');
+const app=express();app.use(cookieParser(),express.json());app.use('/api/messages',require('../routes/messages'));app.use((error,_req,res,_next)=>res.status(error.status||500).json({code:error.publicCode,error:error.message}));
+const cookie=user=>`token=${require('jsonwebtoken').sign({id:String(user._id),role:user.role,av:user.authVersion||0},process.env.JWT_SECRET,{expiresIn:'1h'})}`;
+let owner,para,other,matter,file;
+beforeAll(async()=>{await connect();await Message.init();});afterAll(closeDatabase);
+beforeEach(async()=>{await clearDatabase();[owner,para,other]=await User.create(['owner','para','other'].map(name=>({firstName:'Test',lastName:name,email:`${name}@conversation-file.test`,password:'Synthetic123!',role:name==='para'?'paralegal':'attorney',status:'approved'})));matter=await Case.create({title:'Trial preparation',details:'Organize exhibits',attorney:owner._id,attorneyId:owner._id,paralegal:para._id,paralegalId:para._id,status:'in progress',escrowStatus:'funded',escrowIntentId:'pi_synthetic_conversation',totalAmount:40000,currency:'usd'});file=await CaseFile.create({caseId:matter._id,userId:owner._id,originalName:'Exhibits.txt',storageKey:`cases/${matter._id}/documents/exhibits.txt`,mimeType:'text/plain',size:8192,uploadedByRole:'attorney',securityStatus:'clean',version:1});});
+const share=(id=crypto.randomUUID(),patch={},user=owner)=>request(app).post(`/api/messages/${matter._id}/file`).set('Cookie',cookie(user)).send({expectedOwnerId:String(user._id),fileId:String(file._id),fileVersion:1,clientMessageId:id,...patch});
+test('a reviewed file creates one canonical message, publishes its receipt and keeps trusted metadata',async()=>{const id=crypto.randomUUID();const first=await share(id,{fileName:'Forged.exe',fileSize:1,mimeType:'application/x-executable'});expect(first.status).toBe(201);expect(first.body.message).toMatchObject({type:'file',fileName:'Exhibits.txt',fileSize:8192,mimeType:'text/plain',clientMessageId:id});expect((await share(id)).status).toBe(200);expect(await Message.countDocuments()).toBe(1);const read=await request(app).get(`/api/messages/${matter._id}`).query({expectedOwnerId:String(owner._id),clientMessageId:id}).set('Cookie',cookie(owner));expect(read.status).toBe(200);expect(read.body.messages[0].attachments[0]).toMatchObject({filename:'Exhibits.txt',size:8192,hasAttachment:true});});
+test('simultaneous retries converge on one file message',async()=>{const id=crypto.randomUUID();const results=await Promise.all([share(id),share(id)]);expect(results.some(r=>r.status===201)).toBe(true);expect(results.every(r=>[200,201,409].includes(r.status))).toBe(true);expect((await share(id)).status).toBe(200);expect(await Message.countDocuments()).toBe(1);});
+test('a request cannot be reused for another version or a text message',async()=>{const id=crypto.randomUUID();expect((await share(id)).status).toBe(201);expect((await share(id,{fileVersion:2})).status).toBe(409);const textId=crypto.randomUUID();await Message.create({caseId:matter._id,senderId:owner._id,senderRole:'attorney',type:'text',text:'Earlier text',clientMessageId:textId});expect((await share(textId)).status).toBe(409);expect(await Message.countDocuments()).toBe(2);});
+test('pending and blocked security checks cannot produce a file message',async()=>{await CaseFile.updateOne({_id:file._id},{$set:{securityStatus:'pending'}});expect((await share()).status).toBe(423);await CaseFile.updateOne({_id:file._id},{$set:{securityStatus:'blocked'}});expect((await share()).status).toBe(422);expect(await Message.countDocuments()).toBe(0);});
+test('wrong owner, foreign file and replaced version cannot be shared',async()=>{expect((await share(crypto.randomUUID(),{},other)).status).toBe(403);expect((await share(crypto.randomUUID(),{expectedOwnerId:String(other._id)})).status).toBe(403);await CaseFile.updateOne({_id:file._id},{$set:{version:2}});expect((await share()).status).toBe(409);await CaseFile.updateOne({_id:file._id},{$set:{caseId:new (require('mongoose').Types.ObjectId)()}});expect((await share()).status).toBe(400);expect(await Message.countDocuments()).toBe(0);});
+test('retry after deletion returns the original receipt without recreating the message',async()=>{const id=crypto.randomUUID();expect((await share(id)).status).toBe(201);await Message.updateOne({clientMessageId:id},{$set:{deleted:true}});const retry=await share(id);expect(retry.status).toBe(200);expect(retry.body.message.deleted).toBe(true);expect(await Message.countDocuments()).toBe(1);});
+test('message paragraphs and tabs survive the server sanitizer',async()=>{const text='Please review:\n\nExhibit A\tSigned copy\nExhibit B';const response=await request(app).post(`/api/messages/${matter._id}`).set('Cookie',cookie(owner)).send({text,clientMessageId:crypto.randomUUID(),expectedOwnerId:String(owner._id)});expect(response.status).toBe(201);expect(decryptMessagePayload(await Message.findOne()).text).toBe(text);});
+
+test('assigned paralegal can share an exact file once without attorney authority',async()=>{
+ const id=crypto.randomUUID();
+ const send=()=>share(id,{expectedOwnerId:undefined},para);
+ const response=await send();expect(response.status).toBe(201);
+ expect(response.body.message.type).toBe('file');expect((await send()).status).toBe(200);expect(await Message.countDocuments()).toBe(1);
+});
+test('paralegal exact-file delivery retains scan, version and participant checks',async()=>{
+ const send=(patch={})=>share(crypto.randomUUID(),{expectedOwnerId:undefined,...patch},para);
+ await CaseFile.updateOne({_id:file._id},{$set:{securityStatus:'pending'}});expect((await send()).status).toBe(423);
+ await CaseFile.updateOne({_id:file._id},{$set:{securityStatus:'clean',version:2}});expect((await send()).status).toBe(409);
+ await Case.updateOne({_id:matter._id},{$set:{paralegal:null,paralegalId:null}});expect((await send({fileVersion:2})).status).toBe(403);
+ expect(await Message.countDocuments()).toBe(0);
+});

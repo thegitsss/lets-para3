@@ -2,6 +2,7 @@ const router = require("express").Router();
 
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
+const { csrfProtection } = require("../utils/csrf");
 const {
   addSupportTicketNote,
   createSupportTicket,
@@ -15,23 +16,68 @@ const {
 const { generateFAQCandidates, listFAQCandidates } = require("../services/support/faqCandidateService");
 const { listSupportInsights, refreshSupportInsights } = require("../services/support/patternDetectionService");
 
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({
-    cookie: {
-      httpOnly: true,
-      sameSite: "strict",
-      secure: process.env.NODE_ENV === "production",
-    },
-  });
-}
+const { listInbox, inboxSummary } = require("../services/support/adminInboxService");
+const SupportTicket = require("../models/SupportTicket");
+const User = require("../models/User");
+const AuditLog = require("../models/AuditLog");
+const mongoose = require("mongoose");
+const { triageFilter, triageRevision } = require("../services/support/triageRevision");
+const adminWriteAuthority = require("../services/adminAdmissionDecision");
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
+// First-party Inbox controls send the reviewed owner captured at the decision.
+// Older managed API callers without that field retain current-credential
+// authority only; an explicitly supplied owner is always checked, never erased.
+const guardedSupportWrite = (req, work) => adminWriteAuthority.write({
+  user: req.user, auth: req.auth, authSessionId: req.authSessionId,
+  body: { expectedOwnerId: Object.hasOwn(req.body || {}, "expectedOwnerId")
+    ? req.body.expectedOwnerId : String(req.user?.id || req.user?._id || "") },
+  query: req.query || {},
+}, work);
+
 router.use(verifyToken, requireApproved, requireRole("admin"));
+
+router.get("/inbox", asyncHandler(async (req, res) => res.json({ ok: true, ...await listInbox({...req.query, operatorId:req.user.id || req.user._id}) })));
+router.get("/inbox-summary", asyncHandler(async (_req, res) => res.json({ ok: true, ...await inboxSummary() })));
+router.get("/operators", asyncHandler(async (_req,res) => {
+  const operators=await User.find({role:"admin",status:"approved",disabled:{$ne:true},deleted:{$ne:true}}).select("firstName lastName email").sort({firstName:1}).lean();
+  res.json({operators});
+}));
+router.patch("/tickets/:id/triage", csrfProtection, asyncHandler(async(req,res) => {
+  const {assignedTo=null,followUpAt=null,nextAction=""}=req.body || {};
+  if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({error:"Invalid inquiry ID."});
+  if(typeof nextAction!=="string"||nextAction.length>600)return res.status(400).json({error:"Keep the next action under 600 characters."});
+  if(assignedTo&&!mongoose.isValidObjectId(assignedTo))return res.status(400).json({error:"Choose an active admin as the owner."});
+  const due=followUpAt?new Date(followUpAt):null;
+  if(due&&!Number.isFinite(due.getTime()))return res.status(400).json({error:"Enter a valid follow-up date."});
+  if (!/^[a-f0-9]{64}$/.test(req.body.revision || '')) return res.status(428).json({error:"Refresh this inquiry before saving your follow-up."});
+  const conflict = () => Object.assign(new Error("This inquiry changed. Refresh it before saving your follow-up."), {status:409,code:"INQUIRY_CHANGED"});
+  let ticketId;
+  try {
+    ticketId = await guardedSupportWrite(req, async session => {
+      if(assignedTo) {
+        const filter={_id:new mongoose.Types.ObjectId(assignedTo),role:"admin",status:"approved",disabled:{$ne:true},deleted:{$ne:true}};
+        if(!await User.exists(filter).session(session))throw Object.assign(new Error("Choose an active admin as the owner."), {status:400});
+        // Touch the assignee row as well as the initiating Admin/session. Its
+        // role or active-state change must arbitrate the assignment commit.
+        const locked=await User.collection.updateOne(filter,{$inc:{__v:1}},{session});
+        if(locked.matchedCount!==1)throw conflict();
+      }
+      const reviewed=await SupportTicket.findById(req.params.id).session(session).lean();
+      if(!reviewed)throw Object.assign(new Error("Inquiry not found."),{status:404});
+      if(triageRevision(reviewed)!==req.body.revision)throw conflict();
+      const before=await SupportTicket.findOneAndUpdate({_id:reviewed._id,...triageFilter(reviewed)},{$set:{assignedTo:assignedTo||null,followUpAt:due,nextAction:nextAction.trim()}},{returnDocument:"before",runValidators:true,session});
+      if(!before)throw conflict();
+      await AuditLog.logFromReq(req,"admin.support.triage_updated",{targetType:"other",targetId:before._id,meta:{before:{assignedTo:before.assignedTo,followUpAt:before.followUpAt,nextAction:before.nextAction},after:{assignedTo,followUpAt:due,nextAction:nextAction.trim()}},session});
+      return before._id;
+    });
+  } catch(error) {
+    if(error.code==="INQUIRY_CHANGED")return res.status(409).json({error:error.message,code:error.code});
+    throw error;
+  }
+  res.json({ok:true,ticket:await getSupportTicketById(ticketId)});
+}));
 
 router.get(
   "/overview",
@@ -63,7 +109,7 @@ router.post(
   "/tickets",
   csrfProtection,
   asyncHandler(async (req, res) => {
-    const ticket = await createSupportTicket(req.body || {}, req.user || {});
+    const ticket = await createSupportTicket(req.body || {});
     res.status(201).json({ ok: true, ticket });
   })
 );
@@ -95,6 +141,7 @@ router.post(
       status: req.body?.status,
       resolutionSummary: req.body?.resolutionSummary,
       resolutionIsStable: req.body?.resolutionIsStable,
+      write: work => guardedSupportWrite(req, work),
     });
     res.json({ ok: true, ticket });
   })
@@ -109,6 +156,7 @@ router.patch(
       status: req.body?.status,
       resolutionSummary: req.body?.resolutionSummary,
       resolutionIsStable: req.body?.resolutionIsStable,
+      write: work => guardedSupportWrite(req, work),
     });
     res.json({ ok: true, ticket });
   })
@@ -122,6 +170,8 @@ router.post(
       ticketId: req.params.id,
       adminUser: req.user || {},
       text: req.body?.text,
+      // Keep the accepted note transaction while honoring reviewed-owner intent.
+      write: work => guardedSupportWrite(req, work),
     });
     res.status(201).json({ ok: true, ...payload });
   })
@@ -136,6 +186,8 @@ router.post(
       adminUser: req.user || {},
       text: req.body?.text,
       status: req.body?.status,
+      requestId: req.body?.requestId,
+      write: work => guardedSupportWrite(req, work),
     });
     res.status(201).json({ ok: true, ...payload });
   })
@@ -178,4 +230,10 @@ router.post(
   })
 );
 
+router.use((error, _req, res, next) => {
+  if (res.headersSent) return next(error);
+  const proposed = Number(error.statusCode || error.status);
+  const status = proposed >= 400 && proposed < 600 ? proposed : 500;
+  res.status(status).json({ error: status < 500 ? error.message : 'Support workspace is temporarily unavailable. Please try again.' });
+});
 module.exports = router;

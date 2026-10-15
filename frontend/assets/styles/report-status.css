@@ -1,0 +1,32 @@
+.lpc-report-status {
+  --report-ink: var(--av2-ink, var(--v2-ink, #182033));
+  --report-muted: var(--av2-muted, var(--v2-muted, #59677c));
+  --report-line: var(--av2-line, var(--v2-line, #e3e8ee));
+  --report-soft: var(--av2-soft, var(--v2-soft, #f6f8fb));
+  --report-accent: var(--av2-accent, var(--v2-blue-hover, #385d91));
+  width: 100%; max-width: 840px; color: var(--report-ink); overflow-wrap: anywhere;
+}
+.lpc-report-status .lpc-report-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 18px 0 24px; }
+.lpc-report-status h1 { margin: 0; font-family: "Cormorant Garamond", serif; font-size: clamp(2rem, 5vw, 2.75rem); font-weight: 500; line-height: 1.15; }
+.lpc-report-status p { line-height: 1.6; }
+.lpc-report-status .lpc-report-back { display: inline-flex; align-items: center; min-height: 44px; color: var(--report-accent); text-underline-offset: 4px; }
+.lpc-report-status .lpc-report-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 9px 15px; border: 1px solid var(--report-line); border-radius: 6px; color: var(--report-ink); background: transparent; font: inherit; cursor: pointer; }
+.lpc-report-status .lpc-report-button:hover { background: var(--report-soft); }
+.lpc-report-status .lpc-report-button[aria-disabled="true"] { opacity: .6; cursor: progress; }
+.lpc-report-status :focus-visible { outline: 2px solid var(--report-accent); outline-offset: 3px; }
+.lpc-report-status .lpc-report-feedback { color: var(--report-muted); }
+.lpc-report-status .lpc-report-feedback:empty { display: none; }
+.lpc-report-status .lpc-report-summary { font-size: 1.125rem; margin: 0 0 18px; }
+.lpc-report-status .lpc-report-badge { display: inline-block; padding: 6px 12px; border: 1px solid var(--report-line); border-radius: 6px; background: var(--report-soft); font-size: .875rem; }
+.lpc-report-status .lpc-report-meta { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 12px 24px; margin: 28px 0; font-size: .875rem; }
+.lpc-report-status dt { color: var(--report-muted); }
+.lpc-report-status dd { margin: 0; }
+.lpc-report-status .lpc-report-resolution { white-space: pre-wrap; }
+.lpc-report-status .lpc-report-history { margin-top: 32px; padding: 16px 0; border-top: 1px solid var(--report-line); }
+.lpc-report-status summary { min-height: 44px; padding: 10px 0; cursor: pointer; font-weight: 600; }
+.lpc-report-status .lpc-report-updates { padding: 0; list-style: none; }
+.lpc-report-status .lpc-report-updates li { padding: 16px 0; border-bottom: 1px solid var(--report-line); }
+.lpc-report-status .lpc-report-updates p { margin: 0 0 6px; }
+.lpc-report-status .lpc-report-updates time { color: var(--report-muted); font-size: .875rem; }
+.lpc-report-status [hidden] { display: none !important; }
+@media (max-width: 360px) { .lpc-report-status .lpc-report-meta { grid-template-columns: minmax(0, 1fr); gap: 6px; } .lpc-report-status dd + dt { margin-top: 10px; } }

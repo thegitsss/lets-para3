@@ -1,7 +1,7 @@
 const {
-  evaluateApplicationEligibility: evaluatePlatformApplicationEligibility,
   evaluateMessagingPermission: evaluatePlatformMessagingPermission,
 } = require("./attorneyWorkflowPolicy");
+const { buildApplicationEligibility } = require("./paralegalReadinessService");
 
 const PARALEGAL_WORKFLOW_STAGES = Object.freeze({
   APPLICATION: "application",
@@ -71,7 +71,12 @@ const PARALEGAL_WORKFLOW_POLICY = Object.freeze({
   [PARALEGAL_WORKFLOW_STAGES.PAYOUT]: Object.freeze({
     payoutSetupRequired: true,
     releaseTrigger: "attorney_marks_matter_complete",
-    bankDepositEstimateBusinessDays: Object.freeze({ minimum: 3, maximum: 5 }),
+    bankDepositTimingSource: "stripe_payout_status_and_estimated_arrival",
+    bankDepositTimingDependsOn: Object.freeze([
+      "stripe_account_country",
+      "stripe_payout_schedule",
+      "financial_institution",
+    ]),
     bankReceiptRequiresProcessorEvidence: true,
   }),
   [PARALEGAL_WORKFLOW_STAGES.WITHDRAWAL]: Object.freeze({
@@ -137,27 +142,7 @@ function allScopeTasksComplete(caseDoc = {}) {
 }
 
 function evaluateApplicationEligibility(input = {}) {
-  if (!input.user && !input.caseDoc) {
-    const platformResult = evaluatePlatformApplicationEligibility(input);
-    return {
-      ...platformResult,
-      allowed: platformResult.ready,
-    };
-  }
-  const user = input.user || {};
-  const caseDoc = input.caseDoc || {};
-  const blockers = [];
-  if (String(user.role || "").toLowerCase() !== "paralegal") blockers.push("paralegal_role_required");
-  if (String(user.status || "").toLowerCase() !== "approved") blockers.push("approved_account_required");
-  if (normalizeStatus(caseDoc.status) !== "open") blockers.push("open_matter_required");
-  if (caseDoc.archived === true) blockers.push("matter_archived");
-  if (assignedParalegalId(caseDoc)) blockers.push("matter_already_assigned");
-  if (input.alreadyApplied === true) blockers.push("application_already_exists");
-  if (input.blockedRelationship === true) blockers.push("relationship_blocked");
-  return result(PARALEGAL_WORKFLOW_STAGES.APPLICATION, blockers, {
-    matterStatus: normalizeStatus(caseDoc.status),
-    alreadyApplied: input.alreadyApplied === true,
-  });
+  return buildApplicationEligibility(input);
 }
 
 function evaluateInvitationEligibility(input = {}) {
@@ -267,10 +252,25 @@ function evaluatePayoutReadiness(input = {}) {
     matterCompleted: normalizeStatus(caseDoc.status) === "completed" || Boolean(caseDoc.completedAt),
     paymentReleased: caseDoc.paymentReleased === true,
     paidOutAt: caseDoc.paidOutAt || null,
-    bankDepositEstimateBusinessDays:
-      PARALEGAL_WORKFLOW_POLICY[PARALEGAL_WORKFLOW_STAGES.PAYOUT].bankDepositEstimateBusinessDays,
+    bankDepositTimingSource:
+      PARALEGAL_WORKFLOW_POLICY[PARALEGAL_WORKFLOW_STAGES.PAYOUT].bankDepositTimingSource,
+    bankDepositTimingDependsOn:
+      PARALEGAL_WORKFLOW_POLICY[PARALEGAL_WORKFLOW_STAGES.PAYOUT].bankDepositTimingDependsOn,
     bankReceiptConfirmed: input.bankReceiptConfirmed === true,
   });
+}
+
+function hasPredecessorWithdrawalSettlement(caseDoc = {}) {
+  const previous = normalizeId(caseDoc.withdrawnParalegalId);
+  const assigned = normalizeId(caseDoc.paralegalId || caseDoc.paralegal);
+  return Boolean(previous && assigned && previous !== assigned && caseDoc.payoutFinalizedAt && caseDoc.hiredAt &&
+    new Date(caseDoc.hiredAt).getTime() > new Date(caseDoc.payoutFinalizedAt).getTime());
+}
+
+function currentAssignmentScopeProgress(caseDoc = {}) {
+  const previous = new Set((caseDoc.assignmentCompletedTaskIndexes || []).filter(Number.isInteger));
+  const tasks = (caseDoc.tasks || []).filter((_task, index) => !previous.has(index));
+  return { completedTaskCount: tasks.filter(task => task?.completed === true).length, totalTaskCount: tasks.length };
 }
 
 function evaluateWithdrawalEligibility(input = {}) {
@@ -280,11 +280,11 @@ function evaluateWithdrawalEligibility(input = {}) {
   if (!isAssignedParalegal(caseDoc, userId)) blockers.push("active_assignment_required");
   if (["completed", "closed", "disputed"].includes(normalizeStatus(caseDoc.status))) blockers.push("matter_not_withdrawable");
   if (allScopeTasksComplete(caseDoc)) blockers.push("all_scope_tasks_complete");
-  if (caseDoc.payoutFinalizedAt) blockers.push("payout_already_finalized");
-  const completedTaskCount = (caseDoc.tasks || []).filter((task) => task?.completed === true).length;
+  if (caseDoc.paymentReleased || (caseDoc.payoutFinalizedAt && !hasPredecessorWithdrawalSettlement(caseDoc))) blockers.push("payout_already_finalized");
+  const { completedTaskCount, totalTaskCount } = currentAssignmentScopeProgress(caseDoc);
   return result(PARALEGAL_WORKFLOW_STAGES.WITHDRAWAL, blockers, {
     completedTaskCount,
-    totalTaskCount: Array.isArray(caseDoc.tasks) ? caseDoc.tasks.length : 0,
+    totalTaskCount,
     outcomeRequiresReview: completedTaskCount > 0,
   });
 }
@@ -329,6 +329,8 @@ module.exports = {
   evaluatePayoutReadiness,
   evaluatePreEngagementSubmission,
   evaluateWithdrawalEligibility,
+  hasPredecessorWithdrawalSettlement,
+  currentAssignmentScopeProgress,
   evaluateWorkspaceAccess,
   getParalegalWorkflowPolicy,
   isAssignedParalegal,

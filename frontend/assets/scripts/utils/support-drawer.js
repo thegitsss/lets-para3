@@ -307,8 +307,8 @@ function persistPinnedSupportDrawer(pinned = false) {
 }
 
 function canPinSupportDrawer() {
-  if (document.body?.classList.contains("av2")) return true;
   if (typeof window === "undefined" || !window.matchMedia) return true;
+  if (document.body?.classList.contains("av2")) return window.matchMedia("(min-width: 901px)").matches;
   const isV2Shell = document.body?.classList.contains("lpc-v2");
   return window.matchMedia(isV2Shell ? "(min-width: 1101px)" : "(min-width: 681px)").matches;
 }

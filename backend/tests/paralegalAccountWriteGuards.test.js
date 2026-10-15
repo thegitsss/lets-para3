@@ -1,0 +1,20 @@
+const express = require('express');
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+const request = require('supertest');
+jest.mock('../utils/email', () => jest.fn(async () => ({ ok: true })));
+const User = require('../models/User');
+const { connect, clearDatabase, closeDatabase } = require('./helpers/db');
+const app = express(); app.use(cookieParser()); app.use(express.json()); app.use('/api/users', require('../routes/users'));
+app.use((_error, _req, res, _next) => res.status(500).json({error:'Server error'}));
+let user;
+const save = (payload, expectedValues) => request(app).patch('/api/users/me').set('Cookie', `token=${jwt.sign({id:String(user._id),role:user.role,status:user.status,email:user.email},process.env.JWT_SECRET,{expiresIn:'1h'})}`).send({...payload,expectedOwnerId:String(user._id),expectedValues});
+beforeAll(connect,90000);afterAll(closeDatabase);afterEach(()=>jest.restoreAllMocks());
+beforeEach(async()=>{await clearDatabase();user=await User.create({role:'paralegal',status:'approved',firstName:'Dana',lastName:'Young',email:'paralegal-guard@example.test',password:'Password123!',bio:'',about:'Legacy bio',practiceAreas:[],specialties:['Litigation'],skills:[],stateExperience:[],jurisdictions:['NY']});});
+test('paralegal biography clear removes the legacy about fallback',async()=>{const result=await save({bio:''},{bio:'',about:'Legacy bio'});expect(result.status).toBe(200);expect(result.body).toMatchObject({bio:'',about:''});});
+test('paralegal practice-area clear removes legacy specialties without changing skills',async()=>{await User.updateOne({_id:user._id},{$set:{skills:['Discovery']}});const result=await save({practiceAreas:[]},{practiceAreas:[],specialties:['Litigation']});expect(result.status).toBe(200);expect(result.body).toMatchObject({practiceAreas:[],specialties:[],skills:['Discovery']});});
+test('paralegal state-experience clear removes legacy jurisdictions',async()=>{const result=await save({stateExperience:[]},{stateExperience:[],jurisdictions:['NY']});expect(result.status).toBe(200);expect(result.body).toMatchObject({stateExperience:[],jurisdictions:[]});});
+test.each([['bio','about','Other bio',{bio:'',about:'Legacy bio'}],['practiceAreas','specialties',['Immigration Law'],{practiceAreas:[],specialties:['Litigation']}],['stateExperience','jurisdictions',['CA'],{stateExperience:[],jurisdictions:['NY']}]] )('paralegal %s alias changes during the atomic write reject the entire save',async(field,alias,next,expected)=>{const update=User.collection.updateOne.bind(User.collection);jest.spyOn(User.collection,'updateOne').mockImplementationOnce(async(...args)=>{await update({_id:user._id},{$set:{[alias]:next}});return update(...args);});const result=await save({[field]:field==='bio'?'My draft':[]},expected);expect(result.status).toBe(409);expect((await User.findById(user._id))[alias].toJSON?.() || (await User.findById(user._id))[alias]).toEqual(next);});
+test('clearing canonical skills preserves unrelated specialties',async()=>{const result=await save({skills:[]},{skills:[]});expect(result.status).toBe(200);expect(result.body).toMatchObject({skills:[],specialties:['Litigation']});});
+
+test('guarded education activities preserve paragraphs within the existing limit',async()=>{const result=await save({education:[{school:'Test College',activities:'Student clinic.\nCommunity service.'}]},{education:[]});expect(result.status).toBe(200);expect(result.body.education[0].activities).toBe('Student clinic.\nCommunity service.');});

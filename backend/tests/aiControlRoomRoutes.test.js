@@ -5,7 +5,6 @@ const mongoose = require("mongoose");
 const request = require("supertest");
 
 const User = require("../models/User");
-const AiIssueReport = require("../models/AiIssueReport");
 const Incident = require("../models/Incident");
 const Case = require("../models/Case");
 const ApprovalTask = require("../models/ApprovalTask");
@@ -110,44 +109,8 @@ describe("AI Control Room source hygiene", () => {
     expect(res.body.summary.health.note).toMatch(/INC-20260320-100050/i);
   });
 
-  test("filters QA/dev legacy issue rows and synthetic users from War Room summary data", async () => {
+  test("filters synthetic users from War Room summary data and uses canonical incidents", async () => {
     const admin = await createAdmin();
-
-    await AiIssueReport.create([
-      {
-        role: "attorney",
-        surface: "attorney",
-        page: "attorney dashboard qa",
-        featureLabel: "attorney dashboard qa",
-        issueType: "bug",
-        description: "QA attorney issue: the hire button is not working and I cannot submit.",
-        blockedSeverity: "high",
-        affectsCaseProgress: true,
-        status: "new",
-      },
-      {
-        role: "paralegal",
-        surface: "paralegal",
-        page: "paralegal dashboard qa",
-        featureLabel: "paralegal dashboard qa",
-        issueType: "bug",
-        description: "QA paralegal issue: the application page is broken and the button will not load.",
-        blockedSeverity: "high",
-        affectsCaseProgress: true,
-        status: "reviewed",
-      },
-      {
-        role: "attorney",
-        surface: "attorney",
-        page: "case detail",
-        featureLabel: "hire flow",
-        issueType: "bug",
-        description: "The hire action is blocked after case submission refresh.",
-        blockedSeverity: "high",
-        affectsCaseProgress: true,
-        status: "new",
-      },
-    ]);
 
     await Incident.create([
       {
@@ -792,19 +755,12 @@ describe("AI Control Room source hygiene", () => {
     expect(caoDecision).toEqual(
       expect.objectContaining({
         policyType: "admissions_review",
-        title: "Approve applicant for admissions",
-        actionHelperText: expect.stringMatching(/Yes will approve this applicant/i),
+        title: "Review application for admission",
+        actionHelperText: expect.stringMatching(/individual review/i),
+        policy: expect.objectContaining({ canQuickApprove: false, neverQuickApprove: true }),
         actions: expect.objectContaining({
-          yes: expect.objectContaining({
-            kind: "user_review",
-            decision: "approve",
-            label: expect.stringMatching(/admit applicant/i),
-          }),
-          no: expect.objectContaining({
-            kind: "user_review",
-            decision: "deny",
-            label: expect.stringMatching(/deny application/i),
-          }),
+          yes: null,
+          no: null,
           open: expect.objectContaining({ kind: "nav", navSection: "user-management" }),
         }),
       })
@@ -906,18 +862,16 @@ describe("AI Control Room source hygiene", () => {
     }
 
     const summaryRes = await request(app)
-      .get("/api/admin/ai/control-room/summary")
+      .get("/api/admin/ai")
       .set("Cookie", authCookieFor(admin));
     expect(summaryRes.status).toBe(200);
 
-    const focusRes = await request(app)
-      .get("/api/admin/ai/control-room/founder")
-      .set("Cookie", authCookieFor(admin));
-    expect(focusRes.status).toBe(200);
+    const founderView = summaryRes.body.focusViews?.founder;
+    expect(founderView).toEqual(expect.objectContaining({ surfaceMode: "decision_hub" }));
 
-    const decisionQueue = Array.isArray(focusRes.body.view.decisionQueue) ? focusRes.body.view.decisionQueue : [];
+    const decisionQueue = Array.isArray(founderView.decisionQueue) ? founderView.decisionQueue : [];
     expect(decisionQueue).toHaveLength(1);
-    expect(focusRes.body.view.queueLabel).toMatch(/1 decision pending/i);
+    expect(founderView.queueLabel).toMatch(/1 decision pending/i);
 
     const groupedDecision = decisionQueue[0];
     expect(groupedDecision).toEqual(
@@ -971,7 +925,7 @@ describe("AI Control Room source hygiene", () => {
       })
     );
 
-    const blockedItems = Array.isArray(focusRes.body.view.blockedItems) ? focusRes.body.view.blockedItems : [];
+    const blockedItems = Array.isArray(founderView.blockedItems) ? founderView.blockedItems : [];
     expect(blockedItems).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -983,72 +937,18 @@ describe("AI Control Room source hygiene", () => {
     );
   });
 
-  test("legacy issues route is explicitly marked non-canonical", async () => {
+  test("retired legacy issue collection routes are unavailable", async () => {
     const admin = await createAdmin();
-    await AiIssueReport.create({
-      role: "attorney",
-      surface: "attorney",
-      page: "case detail",
-      featureLabel: "legacy issue queue item",
-      issueType: "bug",
-      description: "Legacy issue queue entry retained for compatibility.",
-      blockedSeverity: "medium",
-      status: "new",
-    });
 
-    const res = await request(app)
+    const listRes = await request(app)
       .get("/api/admin/ai/issues")
       .set("Cookie", authCookieFor(admin));
-
-    expect(res.status).toBe(200);
-    expect(res.headers["x-lpc-legacy-route"]).toBe("true");
-    expect(res.headers["x-lpc-canonical-ops-source"]).toBe("Incident");
-    expect(res.headers.warning).toMatch(/Compatibility-only legacy route/i);
-    expect(res.headers["cache-control"]).toBe("no-store");
-    expect(res.body.meta).toEqual(
-      expect.objectContaining({
-        legacy: true,
-        canonical: false,
-        visibility: "compatibility_only",
-        deprecationStatus: "non_canonical",
-        sourceModel: "AiIssueReport",
-        canonicalOpsSource: "Incident",
-        replacementRoute: "/api/admin/incidents",
-      })
-    );
-  });
-
-  test("legacy issue patch route keeps legacy metadata visible", async () => {
-    const admin = await createAdmin();
-    const issue = await AiIssueReport.create({
-      role: "attorney",
-      surface: "attorney",
-      page: "case detail",
-      featureLabel: "legacy queue issue",
-      issueType: "bug",
-      description: "Legacy issue queue patch retained for compatibility.",
-      blockedSeverity: "medium",
-      status: "new",
-    });
-
-    const res = await request(app)
-      .patch(`/api/admin/ai/issues/${issue._id}`)
+    const patchRes = await request(app)
+      .patch(`/api/admin/ai/issues/${new mongoose.Types.ObjectId()}`)
       .set("Cookie", authCookieFor(admin))
       .send({ status: "reviewed" });
 
-    expect(res.status).toBe(200);
-    expect(res.headers["x-lpc-legacy-route"]).toBe("true");
-    expect(res.headers["x-lpc-canonical-ops-source"]).toBe("Incident");
-    expect(res.headers.warning).toMatch(/Compatibility-only legacy route/i);
-    expect(res.headers["cache-control"]).toBe("no-store");
-    expect(res.body.meta).toEqual(
-      expect.objectContaining({
-        legacy: true,
-        canonical: false,
-        visibility: "compatibility_only",
-        deprecationStatus: "non_canonical",
-      })
-    );
-    expect(res.body.issue.status).toBe("reviewed");
+    expect(listRes.status).toBe(404);
+    expect(patchRes.status).toBe(404);
   });
 });

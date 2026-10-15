@@ -1,18 +1,24 @@
-/* Keep the original contact form typography and controls inside one quiet card. */
+/* Preserve the original delicate contact form styling without an outer card. */
 body.contact-page-redesign {
-  background: #edf0f3;
+  --lpc-gold: #6495ed;
+  --lpc-focus: #6495ed;
+  background: #fff;
+}
+
+.contact-page-redesign.public-site-chrome .home-footer summary {
+  color: #6495ed;
 }
 
 .contact-page-redesign main#main {
   box-sizing: border-box;
-  width: min(calc(100% - 36px), 1160px);
+  width: min(calc(100% - 36px), 1000px);
   max-width: none;
   margin: calc(var(--header-height, 72px) + 22px) auto 72px;
   padding: clamp(28px, 4.5vw, 56px);
-  border: 1px solid #e8edf3;
-  border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 12px 42px rgba(24, 42, 60, 0.06);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .contact-page-redesign .contact-shell {
@@ -134,7 +140,7 @@ body.contact-page-redesign {
 }
 
 .contact-page-redesign .contact-details .support-email-link {
-  color: var(--gold);
+  color: #416eaf;
 }
 
 @media (max-width: 880px) {

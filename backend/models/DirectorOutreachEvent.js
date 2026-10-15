@@ -34,7 +34,7 @@ directorOutreachEventSchema.index(
   { directorUserId: 1, providerMessageId: 1, eventType: 1 },
   {
     unique: true,
-    partialFilterExpression: { providerMessageId: { $type: "string", $ne: "" } },
+    partialFilterExpression: { providerMessageId: { $type: "string", $gt: "" } },
   }
 );
 

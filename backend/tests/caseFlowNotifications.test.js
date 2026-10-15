@@ -1,3 +1,4 @@
+const acceptedPolicyFixture = require("./helpers/legalPolicyFixture");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
@@ -9,8 +10,19 @@ const Job = require("../models/Job");
 const Application = require("../models/Application");
 const Notification = require("../models/Notification");
 process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_stub";
+jest.mock("../utils/stripe", () => ({
+  accounts: {
+    retrieve: jest.fn(async () => ({
+      details_submitted: true,
+      charges_enabled: true,
+      payouts_enabled: true,
+    })),
+  },
+}));
 const casesRouter = require("../routes/cases");
 const applicationsRouter = require("../routes/applications");
+const { addSubscriber: addCaseSubscriber } = require("../utils/caseEvents");
+const { addSubscriber: addNotificationSubscriber } = require("../utils/notificationEvents");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 const app = (() => {
@@ -50,12 +62,25 @@ beforeEach(async () => {
 });
 
 describe("Case flow notifications", () => {
+  test("own application history retains withdrawn and closed outcomes without exposing another applicant", async () => {
+    const user = await User.create({ ...acceptedPolicyFixture(), firstName: "History", lastName: "Paralegal", email: "history@example.com", password: "Password123!", role: "paralegal", status: "approved" });
+    const attorney = await User.create({ ...acceptedPolicyFixture(), firstName: "History", lastName: "Attorney", email: "history-attorney@example.com", password: "Password123!", role: "attorney", status: "approved" });
+    const job = await Job.create({ title: "Closed scope", practiceArea: "Litigation", description: "Scope available to the applicant", attorneyId: attorney._id, budget: 500, status: "closed" });
+    const own = await Application.create({ jobId: job._id, paralegalId: user._id, coverLetter: "My retained application", status: "withdrawn" });
+    await Application.create({ jobId: job._id, paralegalId: attorney._id, coverLetter: "Other private application", status: "rejected" });
+    const response = await request(app).get("/api/applications/my").set("Cookie", authCookieFor(user));
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0]).toMatchObject({ _id: String(own._id), status: "withdrawn", coverLetter: "My retained application" });
+    expect(response.body[0].jobId).toMatchObject({ _id: String(job._id), status: "closed" });
+  });
+
   test("Paralegal application creates application_submitted notification for attorney", async () => {
     // Description: Paralegal applies to an open case.
     // Input values: attorney + paralegal, open case with at least one scope task.
     // Expected result: Notification type application_submitted is created for the attorney.
 
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "game4funwithme1@gmail.com",
@@ -65,7 +90,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
       email: "samanthasider+paralegal@gmail.com",
@@ -74,6 +99,9 @@ describe("Case flow notifications", () => {
       status: "approved",
       state: "CA",
       profileImage: "https://example.com/paralegal-photo.jpg",
+      stripeAccountId: "acct_application_test",
+      stripeOnboarded: true,
+      stripePayoutsEnabled: true,
     });
 
     const caseDoc = await Case.create({
@@ -88,12 +116,39 @@ describe("Case flow notifications", () => {
       tasks: [{ title: "Draft initial filing", completed: false }],
     });
 
+    const caseSignals = [];
+    const attorneySignals = [];
+    const stopCase = addCaseSubscriber(caseDoc._id, { write: (value) => caseSignals.push(String(value)) });
+    const stopAttorney = addNotificationSubscriber(attorney._id, { write: (value) => attorneySignals.push(String(value)) });
     const res = await request(app)
       .post(`/api/cases/${caseDoc._id}/apply`)
       .set("Cookie", authCookieFor(paralegal))
-      .send({});
+      .send({ coverLetter: "I can provide careful filing support.\n\nI will retain the document references." });
+    stopCase();
+    stopAttorney();
 
     expect(res.status).toBe(201);
+
+    const application = await Application.findById(res.body?._id).lean();
+    expect(application.coverLetter).toBe("I can provide careful filing support.\n\nI will retain the document references.");
+    expect(application.scopeSnapshot).toMatchObject({ title: "Immigration support", totalAmount: 60000, tasks: ["Draft initial filing"] });
+    await Job.updateOne({ _id: application.jobId }, { $set: { title: "Edited after submission", description: "New listing description" } });
+    const savedRecord = await request(app).get("/api/applications/my").set("Cookie", authCookieFor(paralegal));
+    expect(savedRecord.status).toBe(200);
+    expect(savedRecord.body.find(item => item._id === String(application._id)).scopeSnapshot).toMatchObject({ title: "Immigration support", totalAmount: 60000, tasks: ["Draft initial filing"] });
+    const job = await Job.findOne({ caseId: caseDoc._id }).lean();
+    const mirroredCase = await Case.findById(caseDoc._id).lean();
+    expect(application).toEqual(expect.objectContaining({
+      status: "submitted",
+      syncStatus: "synced",
+    }));
+    expect(String(application?.jobId || "")).toBe(String(job?._id || ""));
+    expect(job?.applicantsCount).toBe(1);
+    expect(
+      mirroredCase?.applicants?.some(
+        (entry) => String(entry?.paralegalId || "") === String(paralegal._id)
+      )
+    ).toBe(true);
 
     const notif = await Notification.findOne({
       userId: attorney._id,
@@ -101,10 +156,12 @@ describe("Case flow notifications", () => {
     }).lean();
     expect(notif).toBeTruthy();
     expect(String(notif.payload?.caseId || "")).toBe(String(caseDoc._id));
+    expect(caseSignals.join("\n")).toContain("application_submitted_refresh");
+    expect(attorneySignals.join("\n")).toContain("application_submitted_refresh");
   });
 
   test("Paralegal application is blocked when no profile photo is present", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "game4funwithme1@gmail.com",
@@ -114,7 +171,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Jamie",
       lastName: "Lee",
       email: "samanthasider+paralegal@gmail.com",
@@ -141,7 +198,7 @@ describe("Case flow notifications", () => {
     const res = await request(app)
       .post(`/api/cases/${caseDoc._id}/apply`)
       .set("Cookie", authCookieFor(paralegal))
-      .send({});
+      .send({ coverLetter: "I can provide careful probate document support." });
 
     expect(res.status).toBe(403);
     expect(res.body.error).toBe("Complete your profile before applying.");
@@ -154,7 +211,7 @@ describe("Case flow notifications", () => {
   });
 
   test("Attorney can persist a requested pre-engagement draft without hiring the paralegal", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "game4funwithme1@gmail.com",
@@ -164,7 +221,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
       email: "samanthasider+paralegal@gmail.com",
@@ -237,7 +294,7 @@ describe("Case flow notifications", () => {
   });
 
   test("Requested paralegal can submit a pre-engagement response", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "game4funwithme1@gmail.com",
@@ -247,7 +304,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
       email: "samanthasider+paralegal@gmail.com",
@@ -316,7 +373,7 @@ describe("Case flow notifications", () => {
   });
 
   test("Requested paralegal can submit a no-known-conflict response", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "conflicts-none-attorney@example.com",
@@ -326,7 +383,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
       email: "conflicts-none-paralegal@example.com",
@@ -373,7 +430,7 @@ describe("Case flow notifications", () => {
   });
 
   test("Attorney cannot request a conflicts check from a non-paralegal user", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "conflicts-role-attorney@example.com",
@@ -383,7 +440,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const otherAttorney = await User.create({
+    const otherAttorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Taylor",
       lastName: "Stone",
       email: "conflicts-role-target@example.com",
@@ -417,7 +474,7 @@ describe("Case flow notifications", () => {
   });
 
   test("Accepted invitation notifies the attorney but does not create a self-notification for the paralegal", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "alex.invite.accept@example.com",
@@ -427,7 +484,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
       email: "priya.invite.accept@example.com",
@@ -480,7 +537,7 @@ describe("Case flow notifications", () => {
   });
 
   test("Revoking an accepted invitation creates a paralegal self-notification", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "alex.invite.revoke.notify@example.com",
@@ -490,7 +547,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
       email: "priya.invite.revoke.notify@example.com",
@@ -526,13 +583,13 @@ describe("Case flow notifications", () => {
       userId: paralegal._id,
       type: "case_invite_response",
       "payload.caseId": caseDoc._id,
-      "payload.message": `You revoked your application for ${caseDoc.title}.`,
+      "payload.message": `You withdrew from consideration for ${caseDoc.title}.`,
     }).lean();
     expect(paralegalNotif).toBeTruthy();
   });
 
   test("Attorney can approve a submitted pre-engagement response", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "game4funwithme1@gmail.com",
@@ -542,7 +599,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
       email: "samanthasider+paralegal@gmail.com",
@@ -596,7 +653,7 @@ describe("Case flow notifications", () => {
   });
 
   test("Requested paralegal can revise and resubmit after attorney requests changes", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "game4funwithme1@gmail.com",
@@ -606,7 +663,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
       email: "samanthasider+paralegal@gmail.com",
@@ -667,7 +724,7 @@ describe("Case flow notifications", () => {
   });
 
   test("Attorney request changes notifies the requested paralegal with application routing data", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "game4funwithme1@gmail.com",
@@ -677,7 +734,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
       email: "samanthasider+paralegal@gmail.com",
@@ -748,7 +805,7 @@ describe("Case flow notifications", () => {
   });
 
   test("Paralegal applications list includes matching requested pre-engagement data", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "game4funwithme1@gmail.com",
@@ -758,7 +815,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
       email: "samanthasider+paralegal@gmail.com",
@@ -822,7 +879,7 @@ describe("Case flow notifications", () => {
   });
 
   test("Accepted invited paralegal sees requested pre-engagement in applications list", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "game4funwithme1@gmail.com",
@@ -832,7 +889,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
       email: "samanthasider+paralegal@gmail.com",
@@ -874,6 +931,8 @@ describe("Case flow notifications", () => {
     expect(Array.isArray(res.body)).toBe(true);
     const match = res.body.find((entry) => String(entry?.caseId || "") === String(caseDoc._id));
     expect(match).toBeTruthy();
+    expect(match?.status).toBe("submitted");
+    expect(match?.applicationSource).toBe("invite_accept");
     expect(match?.coverLetter).toBe("Accepted invitation");
     expect(match?.preEngagement).toBeTruthy();
     expect(match?.preEngagement?.status).toBe("requested");
@@ -882,7 +941,7 @@ describe("Case flow notifications", () => {
   });
 
   test("Accepted application can be revoked before the case is funded", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "game4funwithme1@gmail.com",
@@ -892,7 +951,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
       email: "samanthasider+paralegal@gmail.com",
@@ -933,23 +992,49 @@ describe("Case flow notifications", () => {
       status: "accepted",
     });
 
+    const caseSignals = [];
+    const attorneySignals = [];
+    const stopCase = addCaseSubscriber(caseDoc._id, { write: (value) => caseSignals.push(String(value)) });
+    const stopAttorney = addNotificationSubscriber(attorney._id, { write: (value) => attorneySignals.push(String(value)) });
     const res = await request(app)
       .post(`/api/applications/${application._id}/revoke`)
       .set("Cookie", authCookieFor(paralegal))
       .send({});
+    stopCase();
+    stopAttorney();
 
     expect(res.status).toBe(200);
     expect(res.body?.success).toBe(true);
 
-    const deleted = await Application.findById(application._id).lean();
-    expect(deleted).toBeFalsy();
+    const revoked = await Application.findById(application._id).lean();
+    expect(revoked).toEqual(expect.objectContaining({
+      status: "withdrawn",
+      syncStatus: "synced",
+    }));
+    expect(revoked?.withdrawnAt).toBeTruthy();
+    expect(revoked?.statusHistory).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "accepted",
+          to: "withdrawn",
+          reason: "revoked_by_paralegal",
+        }),
+      ])
+    );
     const updatedCase = await Case.findById(caseDoc._id).lean();
     expect(Array.isArray(updatedCase?.applicants)).toBe(true);
     expect(updatedCase.applicants.some((entry) => String(entry?.paralegalId || "") === String(paralegal._id))).toBe(false);
+    const withdrawalNotice = await Notification.findOne({ userId: attorney._id, type: 'case_update', 'payload.outcome': 'application_withdrawn' }).lean();
+    expect(withdrawalNotice).toBeTruthy();
+    const presentedWithdrawal = require('../services/notificationPresentation').presentNotification(withdrawalNotice, { viewer: attorney, caseDoc: updatedCase });
+    expect(presentedWithdrawal.action.href).toBe(`/dashboard-attorney.html?caseId=${caseDoc._id}&applicantId=${paralegal._id}&openApplicant=1&applicationHistory=1#cases:inquiries`);
+    expect(presentedWithdrawal.action.href).toContain(`applicantId=${paralegal._id}`);
+    expect(caseSignals.join("\n")).toContain("application_withdrawn_refresh");
+    expect(attorneySignals.join("\n")).toContain("application_withdrawn_refresh");
   });
 
   test("Paralegal applications list includes matching changes-requested pre-engagement data", async () => {
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
       email: "game4funwithme1@gmail.com",
@@ -959,7 +1044,7 @@ describe("Case flow notifications", () => {
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
       email: "samanthasider+paralegal@gmail.com",
@@ -1032,26 +1117,29 @@ describe("Case flow notifications", () => {
     // Input values: paused case with payout finalized and remaining amount > 0.
     // Expected result: Notification type case_work_ready is created for the hired paralegal.
 
-    const attorney = await User.create({
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Alex",
       lastName: "Stone",
-      email: "game4funwithme1+1@gmail.com",
+      email: "synthetic-hire-attorney@example.test",
       password: "Password123!",
       role: "attorney",
       status: "approved",
       state: "CA",
     });
 
-    const paralegal = await User.create({
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
       firstName: "Priya",
       lastName: "Ng",
-      email: "samanthasider+paralegal@gmail.com",
+      email: "synthetic-hire-paralegal@example.test",
+      stripeAccountId: "acct_synthetic_hire_notice", stripeOnboarded: true, stripePayoutsEnabled: true,
       password: "Password123!",
       role: "paralegal",
       status: "approved",
       state: "CA",
     });
 
+    const former = await User.create({ ...acceptedPolicyFixture(), firstName: "Synthetic", lastName: "Former", email: "synthetic-former-paralegal@example.test", password: "Password123!", role: "paralegal", status: "approved" });
+    const finalizedAt = new Date('2026-09-02T12:00:00Z');
     const caseDoc = await Case.create({
       title: "Relist and hire notification",
       practiceArea: "immigration",
@@ -1062,13 +1150,19 @@ describe("Case flow notifications", () => {
       pausedReason: "paralegal_withdrew",
       escrowStatus: "funded",
       escrowIntentId: "pi_relist_test",
-      payoutFinalizedAt: new Date(Date.now() - 60 * 60 * 1000),
+      fundingIntegrityStatus: "verified",
+      payoutFinalizedAt: finalizedAt, payoutFinalizedType: "partial_attorney", withdrawnParalegalId: former._id,
+      partialPayoutAmount: 40000, payoutTransferId: "tr_synthetic_hire_notice", payoutStatus: "paid", paidOutAt: finalizedAt, stripeMode: "test",
       totalAmount: 100000,
       remainingAmount: 60000,
       currency: "usd",
       tasks: [{ title: "Prepare next filing", completed: false }],
+      applicants: [{ paralegalId: paralegal._id, status: "pending", appliedAt: new Date() }],
     });
 
+    const operationKey = `partial_payout:${caseDoc._id}:retained`;
+    await require('../models/Payout').collection.insertOne({ caseId: caseDoc._id, paralegalId: former._id, operationKey, amountPaid: 32800, transferId: 'tr_synthetic_hire_notice', stripeMode: 'test', livemode: false, status: 'paid', createdAt: finalizedAt });
+    await require('../models/PaymentOperation').collection.insertOne({ caseId: caseDoc._id, operationKey, kind: 'partial_payout', status: 'succeeded', amount: 32800, transferAmount: 32800, currency: 'usd', stripeMode: 'test', livemode: false, stripeTransferId: 'tr_synthetic_hire_notice', completedAt: finalizedAt });
     const res = await request(app)
       .post(`/api/cases/${caseDoc._id}/hire/${paralegal._id}`)
       .set("Cookie", authCookieFor(attorney))
@@ -1083,5 +1177,362 @@ describe("Case flow notifications", () => {
     }).lean();
     expect(notif).toBeTruthy();
     expect(String(notif.payload?.caseId || "")).toBe(String(caseDoc._id));
+  });
+
+  test("Concurrent invitation accepts preserve one application and recover the losing attempt", async () => {
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "concurrent-invite-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "concurrent-invite-paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+      stripeAccountId: "acct_concurrent_invite",
+      stripeOnboarded: true,
+      stripePayoutsEnabled: true,
+    });
+    const caseDoc = await Case.create({
+      title: "Concurrent invitation acceptance",
+      practiceArea: "contracts",
+      details: "Only one application should be materialized.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      status: "open",
+      totalAmount: 70000,
+      currency: "usd",
+      invites: [{ paralegalId: paralegal._id, status: "pending", invitedAt: new Date() }],
+      tasks: [{ title: "Review agreement", completed: false }],
+    });
+    const job = await Job.create({
+      caseId: caseDoc._id,
+      attorneyId: attorney._id,
+      title: caseDoc.title,
+      practiceArea: caseDoc.practiceArea,
+      description: caseDoc.details,
+      budget: caseDoc.totalAmount,
+      status: "open",
+    });
+    await Case.updateOne({ _id: caseDoc._id }, { $set: { jobId: job._id } });
+
+    const [first, second] = await Promise.all([
+      request(app).post(`/api/cases/${caseDoc._id}/invite/accept`).set("Cookie", authCookieFor(paralegal)).send({}),
+      request(app).post(`/api/cases/${caseDoc._id}/invite/accept`).set("Cookie", authCookieFor(paralegal)).send({}),
+    ]);
+
+    expect([[200, 200], [200, 409]]).toContainEqual([first.status, second.status].sort());
+    const recovered = await request(app).post(`/api/cases/${caseDoc._id}/invite/accept`).set("Cookie", authCookieFor(paralegal)).send({});
+    expect(recovered.status).toBe(200); expect(recovered.body.alreadyProcessed).toBe(true);
+    const applications = await Application.find({ jobId: job._id, paralegalId: paralegal._id }).lean();
+    expect(applications).toHaveLength(1);
+    expect(applications[0].status).toBe("submitted");
+    expect(applications[0].statusHistory.filter((entry) => entry.reason === "invitation_accepted")).toHaveLength(1);
+    const updatedCase = await Case.findById(caseDoc._id).lean();
+    const invite = updatedCase.invites.find((entry) => String(entry.paralegalId) === String(paralegal._id));
+    expect(invite.status).toBe("accepted");
+    expect(invite.syncStatus).toBe("synced");
+  });
+
+  test("Concurrent pre-engagement responses cannot overwrite each other", async () => {
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "concurrent-pre-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "concurrent-pre-paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Concurrent pre-engagement response",
+      details: "Only one response may win.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      status: "open",
+      totalAmount: 70000,
+      currency: "usd",
+      tasks: [{ title: "Review agreement", completed: false }],
+      preEngagement: {
+        revision: 1,
+        status: "requested",
+        requestedParalegalId: paralegal._id,
+        conflictsCheckRequired: true,
+        conflictsDetails: "Review ACME Corp.",
+        requestedAt: new Date(),
+        requestedBy: attorney._id,
+      },
+    });
+
+    const [first, second] = await Promise.all([
+      request(app)
+        .post(`/api/cases/${caseDoc._id}/pre-engagement/respond`)
+        .set("Cookie", authCookieFor(paralegal))
+        .send({ conflictsResponseType: "none_known" }),
+      request(app)
+        .post(`/api/cases/${caseDoc._id}/pre-engagement/respond`)
+        .set("Cookie", authCookieFor(paralegal))
+        .send({
+          conflictsResponseType: "disclosure",
+          conflictsDisclosureText: "Potential prior vendor contact.",
+        }),
+    ]);
+
+    expect([first.status, second.status].sort()).toEqual([200, 409]);
+    const updatedCase = await Case.findById(caseDoc._id).lean();
+    expect(updatedCase.preEngagement.status).toBe("submitted");
+    expect(updatedCase.preEngagement.revision).toBe(2);
+  });
+
+  test("Concurrent attorney reviews permit exactly one state transition", async () => {
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "concurrent-review-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "concurrent-review-paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Concurrent pre-engagement review",
+      details: "Only one review decision may win.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      status: "open",
+      totalAmount: 70000,
+      currency: "usd",
+      tasks: [{ title: "Review agreement", completed: false }],
+      preEngagement: {
+        revision: 4,
+        status: "submitted",
+        requestedParalegalId: paralegal._id,
+        conflictsCheckRequired: true,
+        conflictsDetails: "Review ACME Corp.",
+        conflictsResponseType: "none_known",
+        requestedAt: new Date(),
+        requestedBy: attorney._id,
+        submittedAt: new Date(),
+        submittedBy: paralegal._id,
+      },
+    });
+
+    const [first, second] = await Promise.all([
+      request(app)
+        .post(`/api/cases/${caseDoc._id}/pre-engagement/review`)
+        .set("Cookie", authCookieFor(attorney))
+        .send({ action: "approve" }),
+      request(app)
+        .post(`/api/cases/${caseDoc._id}/pre-engagement/review`)
+        .set("Cookie", authCookieFor(attorney))
+        .send({ action: "request_changes" }),
+    ]);
+
+    expect([first.status, second.status].sort()).toEqual([200, 409]);
+    const updatedCase = await Case.findById(caseDoc._id).lean();
+    expect(["approved", "changes_requested"]).toContain(updatedCase.preEngagement.status);
+    expect(updatedCase.preEngagement.revision).toBe(5);
+  });
+
+  test("Concurrent termination requests create one linked open review", async () => {
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
+      firstName: "Alex",
+      lastName: "Terminate",
+      email: "concurrent-termination-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
+      firstName: "Priya",
+      lastName: "Terminate",
+      email: "concurrent-termination-paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Concurrent termination",
+      details: "Only one termination review may be created.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      status: "in progress",
+      hiredAt: new Date(),
+      escrowStatus: "funded",
+      escrowIntentId: "pi_concurrent_termination",
+      fundingIntegrityStatus: "verified",
+      totalAmount: 70000,
+      currency: "usd",
+      tasks: [{ title: "Review agreement", completed: false }],
+    });
+
+    const terminationReason = "Scope relationship ended.\n\nThe remaining work requires a separate engagement.";
+    const [first, second] = await Promise.all([
+      request(app)
+        .post(`/api/cases/${caseDoc._id}/terminate`)
+        .set("Cookie", authCookieFor(attorney))
+        .send({ reason: terminationReason }),
+      request(app)
+        .post(`/api/cases/${caseDoc._id}/terminate`)
+        .set("Cookie", authCookieFor(attorney))
+        .send({ reason: terminationReason }),
+    ]);
+
+    expect([first.status, second.status]).toEqual([202, 202]);
+    expect([first.body.alreadyRequested, second.body.alreadyRequested].filter(Boolean)).toHaveLength(1);
+    const updatedCase = await Case.findById(caseDoc._id).lean();
+    const openReviews = updatedCase.disputes.filter((entry) => entry.status === "open");
+    expect(openReviews).toHaveLength(1);
+    expect(updatedCase.terminationStatus).toBe("disputed");
+    expect(updatedCase.terminationDisputeId).toBe(openReviews[0].disputeId);
+    expect(updatedCase.terminationReason).toBe(terminationReason);
+    expect(openReviews[0].message).toBe(`Attorney requested termination: ${terminationReason}`);
+    expect(updatedCase.totalAmount).toBe(caseDoc.totalAmount);
+    expect(updatedCase.escrowIntentId).toBe(caseDoc.escrowIntentId);
+    expect(updatedCase.escrowStatus).toBe('funded');
+    const paralegalAlerts = await Notification.find({
+      userId: paralegal._id,
+      type: "dispute_opened",
+    }).lean();
+    expect(paralegalAlerts).toHaveLength(1);
+    expect(paralegalAlerts[0].message).toMatch(/review has been opened/i);
+    expect(paralegalAlerts[0].payload?.title).toBe("Matter review opened");
+  });
+
+  test("Concurrent withdrawal requests detach the assignment once and retry idempotently", async () => {
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
+      firstName: "Alex",
+      lastName: "Withdraw",
+      email: "concurrent-withdrawal-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
+      firstName: "Priya",
+      lastName: "Withdraw",
+      email: "concurrent-withdrawal-paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Concurrent withdrawal",
+      details: "The assignment must be detached exactly once.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      status: "in progress",
+      hiredAt: new Date(),
+      escrowStatus: "funded",
+      escrowIntentId: "pi_concurrent_withdrawal",
+      fundingIntegrityStatus: "verified",
+      lockedTotalAmount: 70000,
+      totalAmount: 70000,
+      remainingAmount: 70000,
+      currency: "usd",
+      tasks: [
+        { title: "Prepare draft", completed: true },
+        { title: "Finalize draft", completed: false },
+      ],
+    });
+
+    const [first, second] = await Promise.all([
+      request(app).post(`/api/cases/${caseDoc._id}/withdraw`).set("Cookie", authCookieFor(paralegal)).send({}),
+      request(app).post(`/api/cases/${caseDoc._id}/withdraw`).set("Cookie", authCookieFor(paralegal)).send({}),
+    ]);
+
+    expect([first.status, second.status]).toEqual([200, 200]);
+    expect([first.body.alreadyProcessed, second.body.alreadyProcessed].filter(Boolean)).toHaveLength(1);
+    const updatedCase = await Case.findById(caseDoc._id).lean();
+    expect(updatedCase.status).toBe("paused");
+    expect(updatedCase.pausedReason).toBe("paralegal_withdrew");
+    expect(String(updatedCase.withdrawnParalegalId)).toBe(String(paralegal._id));
+    expect(updatedCase.paralegal).toBeNull();
+    expect(updatedCase.paralegalId).toBeNull();
+  });
+
+  test("Withdrawal cannot cross an active completion claim", async () => {
+    const attorney = await User.create({ ...acceptedPolicyFixture(),
+      firstName: "Alex",
+      lastName: "Claim",
+      email: "withdrawal-completion-claim-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({ ...acceptedPolicyFixture(),
+      firstName: "Priya",
+      lastName: "Claim",
+      email: "withdrawal-completion-claim-paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Completion owned matter",
+      details: "Withdrawal must yield while completion owns the lifecycle.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      status: "in progress",
+      hiredAt: new Date(),
+      escrowStatus: "funded",
+      escrowIntentId: "pi_withdrawal_completion_claim",
+      fundingIntegrityStatus: "verified",
+      totalAmount: 70000,
+      currency: "usd",
+      tasks: [{ title: "Finalize draft", completed: false }],
+      completionClaimToken: "completion-owned",
+      completionClaimedAt: new Date(),
+      completionClaimStatus: "claimed",
+    });
+
+    const result = await request(app)
+      .post(`/api/cases/${caseDoc._id}/withdraw`)
+      .set("Cookie", authCookieFor(paralegal))
+      .send({});
+
+    expect(result.status).toBe(409);
+    expect(result.body.code).toBe("WITHDRAWAL_CONFLICT");
+    const updatedCase = await Case.findById(caseDoc._id).lean();
+    expect(updatedCase.status).toBe("in progress");
+    expect(String(updatedCase.paralegalId)).toBe(String(paralegal._id));
   });
 });

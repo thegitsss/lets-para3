@@ -8,6 +8,8 @@ const WebhookEventSchema = new Schema(
     type: { type: String, default: "" },
     stripeMode: { type: String, enum: ["live", "test", "unknown"], default: "unknown", index: true },
     status: { type: String, default: "received", enum: ["received", "processing", "processed", "failed"] },
+    attentionRequired: { type: Boolean, default: false },
+    attentionCategory: { type: String, enum: ["", "funding", "checkout", "chargeback", "refund", "transfer", "processing", "bank_payout"], default: "" },
     attempts: { type: Number, default: 0 },
     lastError: { type: String, default: "" },
     lastAttemptAt: { type: Date, default: null },
@@ -18,6 +20,8 @@ const WebhookEventSchema = new Schema(
   }
 );
 
-WebhookEventSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 });
+// Retain durable delivery receipts beyond Stripe's manual resend window so an old
+// event cannot be replayed as new immediately after the provider stops retaining it.
+WebhookEventSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 400 });
 
 module.exports = mongoose.model("WebhookEvent", WebhookEventSchema);

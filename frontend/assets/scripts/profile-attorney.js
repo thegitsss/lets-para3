@@ -1,9 +1,9 @@
-import { secureFetch, requireAuth, persistSession } from "./auth.js";
+import { secureFetch, requireAuth } from "./auth.js";
 
 const state = {
   viewer: null,
   profile: null,
-  jobContextId: ""
+  fromBrowse: false
 };
 
 const elements = {
@@ -30,23 +30,17 @@ const elements = {
   heroPhoto: document.querySelector(".hero-photo")
 };
 
-function hasProfileAccess(user = {}) {
-  const role = String(user.role || "").toLowerCase();
-  if (role === "admin") return true;
-  const status = String(user.status || "").toLowerCase();
-  return status === "approved";
-}
 
 function getProfileAttorneyParams() {
   const searchParams = new URLSearchParams(window.location.search);
   let id = (searchParams.get("id") || "").trim();
-  let job = (searchParams.get("job") || "").trim();
+  let from = (searchParams.get("from") || "").trim().toLowerCase();
 
   // Handle cases where params are placed in the hash (e.g., after client-side routing)
   if (!id && window.location.hash) {
     const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     id = (hashParams.get("id") || "").trim();
-    if (!job) job = (hashParams.get("job") || "").trim();
+    if (!from) from = (hashParams.get("from") || "").trim().toLowerCase();
   }
 
   // Basic path fallback: allow /profile-attorney.html/<id> style URLs.
@@ -58,17 +52,17 @@ function getProfileAttorneyParams() {
     }
   }
 
-  return { id, job };
+  return { id, fromBrowse: from === "browse" };
 }
 
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  const { id: profileAttorneyId, job: profileJobId } = getProfileAttorneyParams();
+  const { id: profileAttorneyId, fromBrowse } = getProfileAttorneyParams();
   const viewer = typeof window.getStoredUser === "function" ? window.getStoredUser() : null;
 
   state.viewer = viewer;
-  state.jobContextId = profileJobId;
+  state.fromBrowse = fromBrowse;
 
   bindEditButton();
   bindProfileSectionLinks();
@@ -78,11 +72,12 @@ async function init() {
       if (!state.viewer) {
         try {
           state.viewer = await loadViewer();
-        } catch (_) {
+        } catch (error) {
+          console.debug("[profile-attorney] optional viewer hydration unavailable", error);
           /* session hydration best-effort */
         }
       }
-      const profileUser = await fetchProfileById(profileAttorneyId, profileJobId);
+      const profileUser = await fetchProfileById(profileAttorneyId);
       const normalizedProfile = { ...(profileUser || {}) };
       normalizedProfile._id = normalizedProfile._id || profileAttorneyId;
       const viewerId = normalizeId(state.viewer);
@@ -107,22 +102,8 @@ async function init() {
   showError("Unable to load this attorney right now.");
 }
 
-async function fetchProfileById(id, jobId = "") {
-  try {
-    const attorneyProfile = await loadAttorneyById(id, jobId);
-    if (isRenderableProfile(attorneyProfile)) return attorneyProfile;
-    const fallback = await loadAttorneyFallback(id);
-    return { ...(fallback || {}), ...(attorneyProfile || {}) };
-  } catch (err) {
-    // Try fallback when primary fails (e.g., empty body or 404)
-    try {
-      const fallback = await loadAttorneyFallback(id);
-      if (fallback) return fallback;
-    } catch (_) {
-      /* ignore secondary failure */
-    }
-    throw err;
-  }
+async function fetchProfileById(id) {
+  return loadAttorneyById(id);
 }
 
 async function loadViewer() {
@@ -140,135 +121,25 @@ async function loadViewer() {
   throw new Error("Authentication required");
 }
 
-async function loadSelfProfile() {
-  const res = await secureFetch("/api/users/me", {
-    headers: { Accept: "application/json" },
-    noRedirect: true
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || "Unable to load your profile.");
-  const sessionUser = typeof window.getStoredUser === "function" ? window.getStoredUser() : null;
-  if (!data.status && (state.viewer?.status || sessionUser?.status)) {
-    data.status = state.viewer?.status || sessionUser?.status;
-  }
-  persistSession({ user: data });
-  return data;
-}
 
-async function loadPublicAttorney(id) {
-  let primary = {};
-  try {
-    const res = await secureFetch(`/api/users/attorneys/${encodeURIComponent(id)}`, {
-      headers: { Accept: "application/json" },
-      noRedirect: true
-    });
-    primary = await res.json().catch(() => ({}));
-    if (res.ok && primary && !needsEnrichment(primary)) {
-      return primary;
-    }
-  } catch (_) {
-    /* ignore primary failure */
-  }
 
-  // Secondary try: plain fetch with cookies (in case secureFetch headers/session differ)
-  try {
-    const res = await fetch(`/api/users/attorneys/${encodeURIComponent(id)}`, {
-      headers: { Accept: "application/json" },
-      credentials: "include"
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data) {
-      primary = Object.keys(primary || {}).length ? primary : data;
-      if (!needsEnrichment(data)) return data;
-    }
-  } catch (_) {
-    /* ignore */
-  }
-
-  // Secondary attempt: use /api/users/:id to capture any stored profile fields (works for paralegal IDs too).
-  try {
-    const resUser = await secureFetch(`/api/users/${encodeURIComponent(id)}`, {
-      headers: { Accept: "application/json" },
-      noRedirect: true
-    });
-    const userData = await resUser.json().catch(() => ({}));
-    if (resUser.ok && userData) {
-      const merged = { ...(userData || {}), ...(primary || {}) };
-      if (Object.keys(merged).length) return merged;
-    }
-  } catch (_) {
-    /* ignore user fallback failure */
-  }
-
-  // Final fallback: if the current session matches this id, use the self profile.
-  try {
-    const meRes = await secureFetch("/api/users/me", {
-      headers: { Accept: "application/json" },
-      noRedirect: true
-    });
-    const me = await meRes.json().catch(() => ({}));
-    if (meRes.ok && normalizeId(me) === String(id)) {
-      const mergedSelf = { ...(primary || {}), ...(me || {}) };
-      if (Object.keys(mergedSelf || {}).length) return mergedSelf;
-    }
-  } catch (_) {
-    /* ignore */
-  }
-
-  if (Object.keys(primary || {}).length) return primary;
-  throw new Error("Unable to load this attorney profile.");
-}
-
-async function loadAttorneyById(id, jobId = "") {
+async function loadAttorneyById(id) {
   const safeId = encodeURIComponent(id);
-  const jobParam = jobId ? `?job=${encodeURIComponent(jobId)}` : "";
 
-  // Primary: use the endpoint known to work for paralegal browse flows.
-  const primaryRes = await secureFetch(`/api/users/attorneys/${safeId}${jobParam}`, {
+  const primaryRes = await secureFetch(`/api/users/attorneys/${safeId}`, {
     headers: { Accept: "application/json" },
     noRedirect: true
   });
   const primaryData = await primaryRes.json().catch(() => ({}));
-  if (primaryRes.ok) return primaryData || {};
-
-  // Fallback: legacy /api/attorneys/:id
-  const res = await secureFetch(`/api/attorneys/${safeId}${jobParam}`, {
-    headers: { Accept: "application/json" },
-    noRedirect: true
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    if (res.status === 403) {
+  if (!primaryRes.ok) {
+    if (primaryRes.status === 403) {
       throw new Error("Attorney profiles are private inside LPC. Ask this attorney to share updates directly.");
     }
-    throw new Error(data?.error || "Unable to load this attorney profile.");
+    throw new Error(primaryData?.error || "Unable to load this attorney profile.");
   }
-  return data || {};
+  return primaryData || {};
 }
 
-async function loadAttorneyFallback(id) {
-  try {
-    const res = await secureFetch(`/api/users/${encodeURIComponent(id)}`, {
-      headers: { Accept: "application/json" },
-      noRedirect: true
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok) return data;
-  } catch (_) {}
-  return null;
-}
-
-function needsEnrichment(profile = {}) {
-  const hasName = Boolean((profile.firstName || profile.lastName || profile.name || "").trim());
-  const hasFirm = Boolean(
-    (profile.lawFirm || profile.firmName || profile.company || profile.organization || "").trim()
-  );
-  const hasSummary = Boolean(
-    (profile.practiceDescription || profile.practiceOverview || profile.bio || profile.about || "").trim()
-  );
-  const hasAvatar = Boolean(profile.profileImage || profile.avatarURL);
-  return !(hasName && hasFirm && hasSummary && hasAvatar);
-}
 
 function isRenderableProfile(profile = {}) {
   const hasName = Boolean((profile.firstName || profile.lastName || profile.name || "").trim());
@@ -390,7 +261,7 @@ function bindProfileSectionLinks() {
 function updateBackLink() {
   if (!elements.backLink) return;
   const role = String(state.viewer?.role || "").toLowerCase();
-  if (role === "paralegal" && state.jobContextId) {
+  if (role === "paralegal" && state.fromBrowse) {
     elements.backLink.textContent = "← Back to browse";
     elements.backLink.href = "browse-jobs.html";
     return;
@@ -577,12 +448,6 @@ function updateEditButtonVisibility(viewer, profile) {
   btn.disabled = !canEdit;
 }
 
-function buildPlaceholder(copy) {
-  const span = document.createElement("span");
-  span.className = "placeholder";
-  span.textContent = copy;
-  return span;
-}
 
 function updateMetaGridVisibility() {
   document.querySelectorAll(".meta-grid").forEach((grid) => {

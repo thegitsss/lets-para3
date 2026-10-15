@@ -1,5 +1,7 @@
 # LPC $145k-$500k Website Audit
 
+> Historical audit: this July 2026 snapshot records the codebase before the current remediation. Its findings and line references are not current launch status. Use `LAUNCH_CHECKLIST.md`, `docs/RELEASE_GATES.md`, and `docs/LAUNCH_CERTIFICATION_CURRENT.md` for the active evidence and decision.
+
 Date: July 5, 2026
 
 Scope: static review of the local repository, focused on production readiness for a legal-services marketplace handling user approval, case lifecycle, document uploads, messaging, escrow-like payment flows, disputes, and admin operations. This is not a penetration test, full accessibility audit, live browser QA pass, or production infrastructure review.

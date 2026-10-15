@@ -474,7 +474,7 @@ const PROTECTED_FILE_PATHS = Object.freeze([
   "backend/routes/users.js",
   "backend/services/userDeletion.js",
   "frontend/assets/scripts/utils/stripe-connect.js",
-  "frontend/assets/scripts/views/case-detail.js",
+  "frontend/assets/scripts/case-detail.js",
   "frontend/assets/scripts/profile-paralegal.js",
   "frontend/assets/scripts/profile-settings.js",
   "frontend/dashboard-paralegal.html",

@@ -337,7 +337,7 @@ async function refreshJrCmoLibrary({ now = new Date() } = {}) {
         expiresAt: addDays(contextDate, 7),
       },
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
   ).lean();
 
   const evaluation = await MarketingEvaluation.findOneAndUpdate(
@@ -355,7 +355,7 @@ async function refreshJrCmoLibrary({ now = new Date() } = {}) {
         expiresAt: addDays(startOfDay(now), 90),
       },
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
   ).lean();
 
   const cards = uniqueList([
@@ -384,7 +384,7 @@ async function refreshJrCmoLibrary({ now = new Date() } = {}) {
           expiresAt: addDays(startOfDay(now), 60),
         },
       },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
     ).lean();
     facts.push(fact);
   }
@@ -393,7 +393,7 @@ async function refreshJrCmoLibrary({ now = new Date() } = {}) {
     const fact = await MarketingFact.findOneAndUpdate(
       { factKey: signalFact.factKey },
       { $set: signalFact },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
     ).lean();
     facts.push(fact);
   }
@@ -427,7 +427,7 @@ async function refreshJrCmoLibrary({ now = new Date() } = {}) {
           surfacedAt: new Date(now),
         },
       },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
     ).lean();
     opportunities.push(opportunity);
   }
