@@ -15,7 +15,7 @@ export function createMatterReceipt(caseId, { api, signal, ownerId, current = fa
   const heading = compact ? financialHeading("Receipt", refresh) : null, notices = node("div");
   const details = compact ? node("details", { className: "av2-financial-receipt-details" }, [node("summary", { text: "Details" }), body]) : null;
   section.append(...(heading ? [heading] : []), feedback, notices, details || body, node("div", { className: "matter-note-actions" }, [download, ...(!compact ? [refresh] : []), cancel]));
-  let value = null, busy = false, transfer = null, selectedId = receiptId;
+  let value = null, busy = false, transfer = null, selectedId = receiptId, readRequest = null;
   const history = createReceiptHistory(caseId, { api, signal, ownerId, selectedId: () => receiptSelection(selectedId) ? selectedId : undefined, onSelect: id => {
     selectedId = id;
     const target = withMatterReturn(`#/matters/${caseId}/receipt?receiptId=${id}`, route);
@@ -54,28 +54,52 @@ export function createMatterReceipt(caseId, { api, signal, ownerId, current = fa
   
   }
   function restricted() { value = null; message("This account can no longer access the receipt. Sign in again to verify access.", "restricted"); }
+  function cancelPassiveRead() {
+    if (!readRequest?.passive) return;
+    const request = readRequest; readRequest = null;
+    request.controller.abort();
+  }
   async function load({ quiet = false } = {}) {
     if (busy || !alive()) return;
-    const previous = value;
+    if (readRequest) {
+      if (quiet || !readRequest.passive) return;
+      cancelPassiveRead();
+    }
+    const previous = value, requestedId = selectedId;
+    const request = { controller: new AbortController(), passive: Boolean(quiet && value?.receipt && section.dataset.state === "ready") };
+    const abort = () => request.controller.abort();
+    signal.addEventListener("abort", abort, { once: true });
+    readRequest = request;
     if (!quiet) { value = null; message("Checking the payment details…", "loading"); }
-    busy = true; render();
+    // Passive refresh must not disable a ready download during a native press.
+    // The eventual download still verifies the current owner and exact revision.
+    if (!request.passive) busy = true;
+    render();
     try {
-      if (selectedId !== undefined && !receiptSelection(selectedId)) throw Object.assign(new Error("invalid_receipt_selection"), { code: "RECEIPT_SELECTION_UNAVAILABLE" });
-      const next = readReceipt(await api.readMatterReceipt(caseId, { signal, ownerId, receiptId: selectedId }), caseId, ownerId, selectedId);
-      if (!alive()) return;
+      if (requestedId !== undefined && !receiptSelection(requestedId)) throw Object.assign(new Error("invalid_receipt_selection"), { code: "RECEIPT_SELECTION_UNAVAILABLE" });
+      const next = readReceipt(await api.readMatterReceipt(caseId, { signal: request.controller.signal, ownerId, receiptId: requestedId }), caseId, ownerId, requestedId);
+      if (!alive() || readRequest !== request || request.controller.signal.aborted) return;
       value = next;
       if (!quiet || !previous || JSON.stringify(previous) !== JSON.stringify(next)) message("", "ready");
     } catch (error) {
-      if (!alive()) return;
+      if (!alive() || readRequest !== request || request.controller.signal.aborted) return;
       value = null;
       if (error.code === "RECEIPT_SELECTION_UNAVAILABLE") message("The linked receipt choice is no longer recorded. Choose another receipt from this Matter's history.", "error");
       else if ([401, 403, 404].includes(error.status) || error.kind === "authentication") { history.clear(); restricted(); }
       else message(error.code === "RECEIPT_CHANGED" ? "The payment details changed. Refresh the receipt to check them again." : "The receipt couldn’t be loaded. Choose Retry receipt to try again.", "error");
-    } finally { if (alive()) { busy = false; render(); } }
+    } finally {
+      signal.removeEventListener("abort", abort);
+      if (readRequest === request) {
+        readRequest = null;
+        if (!request.passive) busy = false;
+        if (alive()) render();
+      }
+    }
   }
   section.sync = () => load({ quiet: true });
   async function save() {
     if (busy || !alive() || !value?.receipt) return;
+    cancelPassiveRead();
     const reviewed = value;
     busy = true; transfer = new AbortController(); message("Preparing the receipt…", "downloading"); render();
     try {
@@ -94,7 +118,7 @@ export function createMatterReceipt(caseId, { api, signal, ownerId, current = fa
       else message("The receipt couldn’t be downloaded. No download was sent to your browser. Try again when you’re ready.", "error");
     } finally { if (alive()) { busy = false; transfer = null; render(); } }
   }
-  signal.addEventListener("abort", () => { transfer?.abort(); value = null; urls.forEach(url => URL.revokeObjectURL(url)); urls.clear(); section.replaceChildren(); }, { once: true });
+  signal.addEventListener("abort", () => { readRequest?.controller.abort(); readRequest = null; transfer?.abort(); value = null; urls.forEach(url => URL.revokeObjectURL(url)); urls.clear(); section.replaceChildren(); }, { once: true });
   section.readiness = load(); return section;
 }
 export function createReceiptPage(route, identity, context) {

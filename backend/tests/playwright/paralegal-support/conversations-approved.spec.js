@@ -87,7 +87,7 @@ test('paperclip, upload security status, mobile back navigation and no overflow'
 });
 test('keyboard newline, idempotent retry and read-only permissions',async({page})=>{
  const state=await setup(page);const input=page.locator('[data-v2-message-input]');await input.fill('First line');await input.press('Enter');await expect(input).toHaveValue('First line\n');expect(state.writes).toHaveLength(0);
- state.failSend=true;await page.getByRole('button',{name:'Send message',exact:true}).click();await expect(page.locator('[data-v2-message-status]')).toContainText('connect');state.failSend=false;await page.getByRole('button',{name:'Send message',exact:true}).click();await expect(input).toHaveValue('');expect(state.writes[0].clientMessageId).toBe(state.writes[1].clientMessageId);
+ state.failSend=true;await page.getByRole('button',{name:'Send message',exact:true}).click();await expect(page.locator('[data-v2-message-status]')).toHaveText('Delivery has not been confirmed. Retry this same message to check; LPC keeps its original message and reply context.');state.failSend=false;await page.getByRole('button',{name:'Send message',exact:true}).click();await expect(input).toHaveValue('');expect(state.writes[0].clientMessageId).toBe(state.writes[1].clientMessageId);
  state.closed=true;await page.reload();await expect(page.locator('.av2-inbox-workspace')).toHaveAttribute('data-state','ready');await expect(input).toHaveCount(0);await expect(page.locator('.av2-context-menu')).toHaveCount(0);
 });
 

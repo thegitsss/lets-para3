@@ -218,7 +218,7 @@ test("slow reads do not block navigation or reappear after session protection", 
   await expect(page.getByText("Synthetic Matter 01", { exact: true })).toHaveCount(0);
 });
 
-test("first-login tour resumes four targets and persists only explicit confirmed completion", async({page},info)=>{
+test("first-login tour resumes four targets and persists only explicit confirmed completion", async({page,browserName},info)=>{
  const data=await mock(page);data.profile.onboarding={attorneyTourCompleted:false};
  const session=(await(await page.request.get('/api/auth/me')).json());session.user.isFirstLogin=true;
  await page.route('**/api/auth/me',route=>json(route,session));
@@ -230,7 +230,7 @@ test("first-login tour resumes four targets and persists only explicit confirmed
  });
  await home(page);await expect(tour(page)).toBeVisible();await expect(tour(page)).toContainText('Tour · 1 of 4');
  expect((await region(page,'onboarding').boundingBox()).y).toBeLessThan(600);
- await expect(page.locator('.av2-home-primary > :first-child')).toHaveAttribute('data-av2-region','onboarding');await tour(page).locator('summary').focus();await page.keyboard.press('Tab');await expect(tour(page).getByRole('link',{name:'Open profile',exact:true})).toBeFocused();
+ await expect(page.locator('.av2-home-primary > :first-child')).toHaveAttribute('data-av2-region','onboarding');await tour(page).locator('summary').focus();await page.keyboard.press(process.platform==='darwin'&&browserName==='webkit'?'Alt+Tab':'Tab');await expect(tour(page).getByRole('link',{name:'Open profile',exact:true})).toBeFocused();
  for(const [width,scale] of [[1440,1],[390,2]]){await page.setViewportSize({width,height:900});await page.evaluate(scale=>document.documentElement.style.fontSize=`${16*scale}px`,scale);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1&&document.querySelector('main').scrollWidth<=document.querySelector('main').clientWidth+1)).toBe(true);expect((await new AxeBuilder({page}).include('.av2-workspace-guide').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);await page.screenshot({path:info.outputPath(`active-guide-${width}-${scale}.png`),fullPage:true});}
  await page.evaluate(()=>document.documentElement.style.fontSize='16px');await page.setViewportSize({width:1280,height:720});
  expect(patches).toEqual([]);

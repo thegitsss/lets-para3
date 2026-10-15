@@ -2,7 +2,7 @@ const { test, expect } = require("../support-session-fixture");
 const AxeBuilder = require("@axe-core/playwright").default;
 const fields = { title: "Synthetic pre-engagement review", practiceArea: "Contract Law", state: "New York", compAmount: "400.01", experience: "3+ years", deadline: "2027-03-14", description: "Synthetic pre-engagement review verification", tasks: [{ title: "Prepare agreement" }] };
 const panel = page => page.locator("[data-matter-applications]");
-const refresh = async page => { await panel(page).locator('[name="applicationSearch"]').press("Enter"); await expect(panel(page)).toHaveAttribute("data-state", "ready"); };
+const refresh = async page => { await panel(page).locator('[name="applicationSearch"]').press("Enter"); await expect(panel(page)).toHaveAttribute("data-state", "ready"); if (await panel(page).locator('details[data-applicant-section="hiring"]').count()) await showRequirements(page); };
 const pattern = id => `**/api/cases/${id}/application-inventory?**`;
 const fulfill = (route, body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 let para, paraId;
@@ -46,7 +46,19 @@ test.beforeAll(async ({ playwright, baseURL }) => {
 test.afterAll(async () => para?.dispose());
 
 const pre = page => page.locator("[data-pre-engagement]");
-async function reviewRequirements(page) { const application = panel(page).locator(`details[data-application="${paraId}"]`); if (!await application.evaluate(node => node.open)) await application.locator(":scope > summary").click(); await pre(page).getByRole("button", { name: /Review pre-engagement requirements|Refresh saved requirements|Check saved requirements/ }).click(); await expect(pre(page)).toHaveAttribute("data-state", "ready"); }
+async function showRequirements(page) {
+  const application = panel(page).locator(`details[data-application="${paraId}"]`);
+  if (!await application.evaluate(node => node.open)) await application.locator(":scope > summary").click();
+  const process = application.locator('details[data-applicant-section="hiring"]');
+  if (await process.count() && !await pre(page).isVisible()) {
+    if (!await process.evaluate(node => node.open)) await process.locator(":scope > summary").click();
+    const hiring = process.locator(`[data-hiring="${paraId}"]`);
+    await expect(hiring).toHaveAttribute("data-state", "ready");
+    await hiring.getByRole("button", { name: "Review pre-engagement requirements", exact: true }).click();
+  }
+  await expect(pre(page)).toBeVisible();
+}
+async function reviewRequirements(page) { const application = panel(page).locator(`details[data-application="${paraId}"]`); if (!await application.evaluate(node => node.open)) await application.locator(":scope > summary").click(); if (await application.locator('details[data-applicant-section="hiring"]').count()) await showRequirements(page); await pre(page).getByRole("button", { name: /Review pre-engagement requirements|Refresh saved requirements|Check saved requirements/ }).click(); await expect(pre(page)).toHaveAttribute("data-state", "ready"); }
 async function compose(page, details = "Synthetic client and opposing party for the conflicts check.") { await pre(page).getByLabel("Require conflicts check", { exact: true }).check(); await pre(page).getByLabel("Parties and details for the conflicts check", { exact: true }).fill(details); await pre(page).getByRole("button", { name: "Review requirements before sending" }).click(); }
 const requestPath = id => `/api/cases/${id}/pre-engagement/${paraId}/request`;
 async function stored(page, id) { const user = (await (await page.request.get("/api/auth/me")).json()).user; return api(page.request, "get", `/api/cases/${id}/pre-engagement/review/${paraId}?expectedOwnerId=${user.id || user._id}`); }
@@ -126,6 +138,10 @@ test('a single snapshot conflict during engagement rechecks the saved Matter wit
   await pre(page).getByLabel('Parties and details for the conflicts check', { exact: true }).fill('Retain this unsent review while another response is recorded.');
   let reads = 0;
   await page.route(`**/api/cases/${id}?expectedOwnerId=*`, route => ++reads === 1 ? fulfill(route, { code: 'WORKSPACE_CHANGED' }, 409) : route.continue());
+  await page.locator('[data-matter-workspace]').evaluate(element => element.readiness);
+  await expect(page.locator('[data-matter-workspace] > button[data-retry-label]')).toBeEnabled();
+  await page.bringToFront();
+  await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe('visible');
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await expect.poll(() => reads).toBe(2);
   await expect(page.locator('[data-matter-workspace]')).toHaveAttribute('data-state', 'ready');
@@ -140,6 +156,10 @@ test('an application snapshot conflict preserves the focused unsent pre-engageme
   await details.fill('Retain this unsent review while another response is recorded.');
   let reads = 0;
   await page.route(`**/api/cases/${id}?expectedOwnerId=*`, route => ++reads === 1 ? fulfill(route, { code: 'APPLICATION_REVIEW_CHANGED' }, 409) : route.continue());
+  await page.locator('[data-matter-workspace]').evaluate(element => element.readiness);
+  await expect(page.locator('[data-matter-workspace] > button[data-retry-label]')).toBeEnabled();
+  await page.bringToFront();
+  await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe('visible');
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await expect.poll(() => reads).toBe(2);
   await expect(page.locator('[data-matter-workspace]')).toHaveAttribute('data-state', 'ready');

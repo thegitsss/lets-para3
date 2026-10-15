@@ -12,12 +12,12 @@ export function createWorkspaceFunding(caseId, { api, signal, ownerId, privateSt
   const state = privateState.funding.get(caseId) || { pending: null, busy: false, dirty: false }; privateState.funding.set(caseId, state); state.busy = false;
   if (returnedCase === caseId) { state.pending = { action: "confirm" }; returnedCase = null; }
   const section = node("section", { "aria-label": "Matter funding", "data-workspace-funding": "" }), feedback = node("p", { role: "status" }), body = node("div"), actions = node("div", { className: "av2-actions" }), form = node("div");
-  let formGeneration = 0, review = null, checkoutReview = null, controller = null, element = null, elements = null, provider = null, ready = false, complete = false, readyTimer = null, preparedRevision = null;
+  let formGeneration = 0, review = null, checkoutReview = null, controller = null, element = null, elements = null, provider = null, ready = false, complete = false, readyTimer = null, preparedRevision = null, passiveRead = false;
   const refresh = financialRefresh("Refresh funding details", () => void (review?.hasOriginalCheckout ? inspectCheckout() : load())), stop = button("Stop waiting for payment", () => controller?.abort()); stop.hidden = true;
   section.append(financialHeading("Original payment", refresh), feedback, body, actions, form, node("p", { className: "av2-actions" }, [stop]));
   const money = value => fundingMoney(value, review?.currency || null);
   function destroyForm() { formGeneration++; clearTimeout(readyTimer); readyTimer = null; try { element?.destroy(); } catch {} element = null; elements = null; provider = null; ready = false; complete = false; state.dirty = false; preparedRevision = null; form.replaceChildren(); }
-  function controls() { refresh.setLabel(review?.hasOriginalCheckout ? checkoutReview ? "Refresh payment status" : "Review original Checkout" : "Refresh funding details", Boolean(review && !state.pending && (!review.hasOriginalCheckout || checkoutReview))); section.setAttribute("aria-busy", String(state.busy)); refresh.disabled = state.busy; stop.hidden = !state.busy; for (const control of [...actions.querySelectorAll("button"), ...form.querySelectorAll("button")]) control.disabled = state.busy; const pay = form.querySelector("[data-fund-matter]"); if (pay) pay.disabled = state.busy || !ready || !complete; 
+  function controls() { refresh.setLabel(review?.hasOriginalCheckout ? checkoutReview ? "Refresh payment status" : "Review original Checkout" : "Refresh funding details", Boolean(review && !state.pending && (!review.hasOriginalCheckout || checkoutReview))); section.setAttribute("aria-busy", String(state.busy)); refresh.disabled = state.busy; stop.hidden = !state.busy || passiveRead; for (const control of [...actions.querySelectorAll("button"), ...form.querySelectorAll("button")]) control.disabled = state.busy; const pay = form.querySelector("[data-fund-matter]"); if (pay) pay.disabled = state.busy || !ready || !complete; 
     setRecovery(refresh, section, { pending: Boolean(state.pending || review?.hasOriginalCheckout && !review.fundingVerified), label: "Check payment status" });
   }
   function display() {
@@ -43,12 +43,12 @@ export function createWorkspaceFunding(caseId, { api, signal, ownerId, privateSt
     controls();
   }
   function failed(error) { destroyForm(); review = null; checkoutReview = null; body.replaceChildren(); actions.replaceChildren(); section.dataset.state = "error"; if ([401, 403, 404].includes(error.status) || error.kind === "authentication") { privateState.funding.delete(caseId); state.pending = null; feedback.textContent = "Funding details are no longer available to this account."; } else feedback.textContent = state.pending ? "The payment request could not be confirmed. Refresh the funding details, then check Stripe payment before taking another action." : error.status === 409 ? "The funding details changed or need review. Refresh before continuing." : "Funding details couldn’t load. Try again."; }
-  async function run(work, { preserveFocus = false } = {}) {
+  async function run(work, { preserveFocus = false, passive = false } = {}) {
     const focused = preserveFocus && section.contains(document.activeElement) ? document.activeElement : null;
-    if (state.busy || signal.aborted) return; const current = new AbortController(); controller = current; state.busy = true; const timer = setTimeout(() => current.abort(), 90000); controls();
+    if (state.busy || signal.aborted) return; const current = new AbortController(); controller = current; passiveRead = passive; state.busy = true; const timer = setTimeout(() => current.abort(), 90000); controls();
     try { await work({ ownerId, signal: current.signal }); }
     catch (error) { if (!signal.aborted) failed(error); }
-    finally { clearTimeout(timer); if (controller === current) controller = null; state.busy = false; if (!signal.aborted) { controls(); if (focused?.isConnected && document.activeElement === document.body) focused.focus({ preventScroll: true }); } }
+    finally { clearTimeout(timer); if (controller === current) controller = null; state.busy = false; passiveRead = false; if (!signal.aborted) { controls(); if (focused?.isConnected && document.activeElement === document.body) focused.focus({ preventScroll: true }); } }
   }
   async function currentReview(options) { const requestId = state.pending?.requestId; const value = readFunding(await api.readFunding(caseId, { ...options, requestId }), caseId, ownerId); options.signal.throwIfAborted(); if (signal.aborted) throw new DOMException("Canceled", "AbortError"); if (requestId ? value.operation?.requestId !== requestId || value.operation.status !== "not_found" && value.operation.action !== state.pending.action : value.operation !== null) throw new Error("unconfirmed_funding_request"); return value; }
   async function inspectCheckout() {
@@ -72,7 +72,8 @@ export function createWorkspaceFunding(caseId, { api, signal, ownerId, privateSt
   }
   async function load({ quiet = false } = {}) {
     if (quiet && element) return;
-    await run(async options => { let latest; if (quiet && checkoutReview && !state.pending) { latest = await currentReview(options); if (latest.revision === checkoutReview.fundingRevision) { review = latest; return; } } destroyForm(); checkoutReview = null; feedback.textContent = "Checking Matter funding…"; review = latest || await currentReview(options); if (state.pending?.action === "prepare" && ["prepared", "checked"].includes(review.operation?.status) || state.pending?.action === "check" && review.operation?.status === "checked" || review.fundingVerified) state.pending = null; display(); section.dataset.state = "ready"; feedback.textContent = ""; }, { preserveFocus: quiet });
+    const passive = Boolean(quiet && review && section.dataset.state === 'ready' && !state.pending);
+    await run(async options => { let latest; if (quiet && checkoutReview && !state.pending) { latest = await currentReview(options); if (latest.revision === checkoutReview.fundingRevision) { review = latest; return; } } destroyForm(); checkoutReview = null; if (!passive) feedback.textContent = "Checking Matter funding…"; review = latest || await currentReview(options); if (state.pending?.action === "prepare" && ["prepared", "checked"].includes(review.operation?.status) || state.pending?.action === "check" && review.operation?.status === "checked" || review.fundingVerified) state.pending = null; display(); section.dataset.state = "ready"; feedback.textContent = ""; }, { preserveFocus: quiet, passive });
   }
   async function mount(payment, options) {
     provider = await bounded(getStripe(), options.signal); await api.verifyOwner(options); options.signal.throwIfAborted(); if (signal.aborted) return;

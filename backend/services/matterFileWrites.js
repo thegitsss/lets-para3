@@ -35,7 +35,7 @@ async function ready() {
   const indexes = await Upload.collection.indexes();
   if (!indexes.some(value => value.unique && JSON.stringify(value.key) === JSON.stringify({ caseId: 1, ownerId: 1, requestId: 1 }))) fail(503, "UNAVAILABLE");
 }
-async function transact(operation) {
+async function transact(operation, { retryScanConflict = false } = {}) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const session = await mongoose.startSession(); let operationFinished = false;
     try {
@@ -43,11 +43,12 @@ async function transact(operation) {
       const value = await operation(session); operationFinished = true; await session.commitTransaction(); return value;
     } catch (error) {
       if (session.inTransaction()) await session.abortTransaction().catch(reportOperationalFailure("services.matterFileWrites.transaction_abort"));
-      // Mongo has rejected this transaction before commit. Retry only a lock
-      // timeout, with fresh guards. Storage and provider dispatch stay outside;
+      // Mongo has rejected this transaction before commit. Retry a lock
+      // timeout, or a scan-only write conflict, with fresh guards. Storage and provider dispatch stay outside;
       // audit rows and notification obligations may join the transaction.
       // A commit attempt, changed record or unknown result is never replayed.
-      if (!operationFinished && error.code === 24 && error.hasErrorLabel?.("TransientTransactionError") && attempt < 2) { await new Promise(resolve => setTimeout(resolve, 15 * (attempt + 1))); continue; }
+      const scanConflict = retryScanConflict && error.code === 112 && !error.hasErrorLabel?.("UnknownTransactionCommitResult");
+      if (!operationFinished && (error.code === 24 || scanConflict) && error.hasErrorLabel?.("TransientTransactionError") && attempt < 2) { await new Promise(resolve => setTimeout(resolve, 15 * (attempt + 1))); continue; }
       throw error;
     } finally { await session.endSession(); }
   }
@@ -135,7 +136,7 @@ async function persistScan(record, key, scan) {
     const update = { securityStatus: scan.status, securityScanResult: scan.result, securityCheckedAt: now, ...(["clean", "blocked", "error"].includes(scan.status) ? { securityScannedAt: now } : {}) };
     const saved = await CaseFile.collection.updateOne({ _id: file._id, storageKey: file.storageKey, version: file.version === undefined ? { $exists: false } : file.version }, { $set: update, ...(changed ? { $inc: { __v: 1 } } : {}) }, { session });
     if (saved.matchedCount !== 1) fail(409, "CHANGED");
-  }); } catch (error) {
+  }, { retryScanConflict: true }); } catch (error) {
     if (error.publicCode) throw error;
     fail(error.code === 112 || error.hasErrorLabel?.("TransientTransactionError") ? 409 : 503, "SCAN_UNCONFIRMED", undefined, error);
   }

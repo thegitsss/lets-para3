@@ -72,8 +72,12 @@ test('search and practice filters find older records across the whole inventory 
 
 test('Next Back and refresh preserve the selected page and prior scroll position', async ({ page }) => {
   await install(page); const first = await records(page).first().getAttribute('data-av2-matter');
-  await page.locator('main').evaluate(node => { node.scrollTop = 650; });
+  await page.locator('main').evaluate(node => new Promise(resolve => {
+    node.addEventListener('scroll', resolve, { once: true });
+    node.scrollTop = 650;
+  }));
   const before = await page.locator('main').evaluate(node => node.scrollTop);
+  expect(before).toBeGreaterThan(0);
   await page.evaluate(() => { location.hash = '/matters?page=2'; }); await ready(page);
   await expect(records(page).first()).not.toHaveAttribute('data-av2-matter', first);
   await page.goBack(); await ready(page); await expect(records(page).first()).toHaveAttribute('data-av2-matter', first);
@@ -181,7 +185,9 @@ test(`long inventory rows filters previews and paging fit both themes narrow wid
       await page.screenshot({ path: info.outputPath(`row-${theme}-${width}-viewport-${block}.png`) });
     }
   }
-  await expect(page.locator('.av2-saved-views-host')).toHaveCount(0);
+  const savedViews = page.getByRole('region', { name: 'Saved view management', exact: true });
+  await expect(savedViews).toHaveCount(1);
+  await expect(savedViews.getByRole('combobox', { name: 'Saved views', exact: true })).toBeEnabled();
   expect(state.errors).toEqual([]); expect(state.writes).toEqual([]);
   fs.writeFileSync(info.outputPath('scans.json'), JSON.stringify(scans, null, 2)); fs.writeFileSync(info.outputPath('browser-errors.json'), JSON.stringify(state.errors));
 });

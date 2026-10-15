@@ -196,6 +196,10 @@ test('large viewport and forced colors preserve the full-window workspace',async
  const primary=page.getByRole('navigation',{name:'Primary',exact:true});
  await expect(primary.getByRole('link',{name:'Find Work',exact:true})).toBeVisible();
  await expect(primary.getByRole('link',{name:'Matters',exact:true})).toBeVisible();
+ // The current selected Work overview deliberately expands its Matters parent.
+ await expect(primary.getByRole('button',{name:'Collapse Matters navigation',exact:true})).toHaveAttribute('aria-expanded','true');
+ await primary.getByRole('button',{name:'Collapse Matters navigation',exact:true}).click();
+ await expect(primary.getByRole('link',{name:'Applications',exact:true})).toBeHidden();
  await primary.getByRole('button',{name:'Expand Matters navigation',exact:true}).click();
  await expect(primary.getByRole('link',{name:'Applications',exact:true})).toBeVisible();
  await primary.getByRole('button',{name:'Collapse Matters navigation',exact:true}).click();

@@ -522,6 +522,10 @@ body.v2-sidebar-collapsed {--v2-sidebar-width:76px;}
 .v2-nav-toggle,
 .v2-nav-link,
 .v2-menu :is(a,button) {min-height:44px;}.v2-matters-heading > button{width:44px;height:44px;}}
+@media(max-width:360px) {
+ .v2-header {padding-inline:6px;}
+ .v2-header-search {min-width:90px;}
+}
 @media(hover:none) {.v2-header .v2-tool-button[data-tooltip]::after {display:none;}}
 @media(prefers-reduced-motion:reduce) {.v2-header-search,.v2-sidebar::after,.v2-sidebar-marker,.v2-header-find-work,.v2-header .v2-tool-button,.v2-header .v2-tool-button::after,.v2-header [data-v2-assistant-trigger] svg {transition:none;}.v2-header [data-v2-assistant-trigger]:is(:hover,:focus-visible) svg {transform:none;}}
 

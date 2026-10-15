@@ -2,7 +2,13 @@ const { test, expect } = require("../support-session-fixture");
 const AxeBuilder = require("@axe-core/playwright").default;
 const fields = { title: "Synthetic invitation Matter", practiceArea: "Contract Law", state: "New York", compAmount: "400.01", experience: "3+ years", deadline: "2027-03-14", description: "Synthetic invitation verification", tasks: [{ title: "Prepare agreement" }] };
 const panel = page => page.locator("[data-matter-invitations]");
-const refresh = page => panel(page).getByRole("button", { name: "Refresh invited paralegals", exact: true }).click();
+const refresh = async page => {
+  const retry = panel(page).getByRole("button", { name: "Retry invited paralegals", exact: true });
+  if (await retry.isVisible()) return retry.click();
+  const search = panel(page).getByRole("button", { name: /^(Search|Apply filters)$/ });
+  if (await search.isVisible()) return search.click();
+  await page.reload({ waitUntil: "domcontentloaded" });
+};
 let para, paraId;
 async function api(client, method, path, data) {
   const csrf = await (await client.get("/api/csrf")).json(), user = (await (await client.get("/api/auth/me")).json()).user;
@@ -41,11 +47,11 @@ test.afterAll(async () => para?.dispose());
 test("both menus show real recorded responses, and V2 profile navigation returns to invitations", async ({ page }) => {
   const id = await matter(page); const before = await dto(page, id);
   await page.goto("/attorney-v2.html#/matters", { waitUntil: "domcontentloaded" }); const row = page.locator(`[data-av2-matter="${id}"]`);
-  await row.getByText("Matter actions", { exact: true }).click(); await row.getByRole("link", { name: "View invited paralegals", exact: true }).click();
+  await row.locator(".av2-matter-menu > summary").click(); await row.getByRole("link", { name: "View invited paralegals", exact: true }).click();
   await expect(panel(page)).toContainText("Awaiting response"); expect(await dto(page, id)).toEqual(before);
   const profile = panel(page).getByRole("link").first(); const href = await profile.getAttribute("href");
   const back = new URLSearchParams(href.split("?")[1]).get("returnTo"); expect(back.split("?")[0]).toBe(`#/matters/${id}/invitations`); expect(new URLSearchParams(back.split("?")[1]).get("returnTo")).toBe("#/matters");
-  await profile.click(); await expect(page.getByRole("heading", { level: 1 })).toBeVisible(); await page.getByRole("link", { name: "Back to invitations", exact: true }).click(); await expect(panel(page)).toHaveAttribute("data-state", "ready");
+  await profile.click(); await expect(page.getByRole("heading", { level: 1 })).toBeVisible(); await page.getByRole("link", { name: "← Back to invitations", exact: true }).click(); await expect(panel(page)).toHaveAttribute("data-state", "ready");
   await api(para, "post", `/api/cases/${id}/respond-invite`, { decision: "accept" });
   await refresh(page); await expect(panel(page)).toContainText("Accepted invitation"); await expect(panel(page)).toContainText("does not confirm a hire");
   await open(page, id, true, true, "inquiries"); await expect(panel(page)).toContainText("Accepted invitation"); await expect(panel(page)).toContainText("Responded");

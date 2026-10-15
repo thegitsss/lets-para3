@@ -37,7 +37,7 @@ test('Paralegal header is compact and fades in icon labels', async ({ page }, te
   await expect(page.locator('[data-v2-search-panel]')).toBeHidden();
   await page.keyboard.press('Escape');
   await page.mouse.move(1, 500);
-  for (const width of [390, 320]) {
+  for (const width of [390, 360, 320]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 740 });
     const boxes = [];
     for (const control of [search, notifications, assistant,

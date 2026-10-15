@@ -45,9 +45,10 @@ export function createMatterReviewSummary(matter, context, {financial = false, w
     attention.replaceChildren(...(rows.length ? [node('h3',{text:'Needs your attention'}),node('ul',{className:'av2-matter-attention-list'},rows)] : []));
     attention.hidden = !rows.length;
   }
-  async function load() {
+  async function load({ quiet = false } = {}) {
     if (busy || signal.aborted) return;
-    busy = true; retry.disabled = true; root.dataset.state = 'loading'; feedback.textContent = 'Checking review and funding records…';
+    const passive = quiet && root.dataset.state === 'ready';
+    busy = true; retry.disabled = true; root.dataset.state = 'loading'; if (!passive) feedback.textContent = 'Checking review and funding records…';
     const reads = [api.readCompletion(caseId,options), ...(work ? [] : [api.readWithdrawal(caseId,options)]), ...(financial ? [api.readFinancialHistory({...options,caseId,view:'all',q:''})] : [])];
     const results = await Promise.allSettled(reads);
     if (signal.aborted) return;
@@ -76,5 +77,5 @@ export function createMatterReviewSummary(matter, context, {financial = false, w
     feedback.textContent = failures.length ? `Some summary information is unavailable: ${failures.join(', ')}. Retry to check its current records.` : '';
     renderAttention(); setRecovery(retry,root);
   }
-  renderAttention(); root.sync = () => root.contains(document.activeElement) ? Promise.resolve() : load(); root.readiness = load(); return root;
+  renderAttention(); root.sync = () => root.contains(document.activeElement) ? Promise.resolve() : load({quiet:true}); root.readiness = load(); return root;
 }

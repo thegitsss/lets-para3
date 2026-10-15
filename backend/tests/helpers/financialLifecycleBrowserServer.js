@@ -3,7 +3,7 @@ const crypto = require('node:crypto');
 
 // Private single-replica application harness. All mounted API responses and
 // financial writes are real. Only external providers and delivery are synthetic.
-module.exports = async function start({ includeAdminSupport = false, includeAdminAutomation = false, includeAdminWorkspaces = false, includeDirectors = false, includeDesignPreviews = false, includeSyntheticMail = false, includeSyntheticDownloads = false, includeSyntheticPersonalDownloads = false, includePublicDirectory = false, port = process.env.LPC_LIFECYCLE_RANDOM_PORT === 'true' ? 0 : 5897 } = {}) {
+module.exports = async function start({ includeAdminSupport = false, includeAdminAutomation = false, includeAdminWorkspaces = false, includeDirectors = false, includeDesignPreviews = false, includeReleasedNotFound = false, includeSyntheticMail = false, includeSyntheticDownloads = false, includeSyntheticPersonalDownloads = false, includePublicDirectory = false, port = process.env.LPC_LIFECYCLE_RANDOM_PORT === 'true' ? 0 : 5897 } = {}) {
   const releaseModules = require('./financialLifecycleModuleLease')();
   // Include registration failures in the same lease cleanup as listen failures.
   let closeOwnedServer;
@@ -146,6 +146,7 @@ module.exports = async function start({ includeAdminSupport = false, includeAdmi
     const file = require('../../scripts/design-preview-assets').resolvePreviewAsset(req.originalUrl);
     return file ? res.sendFile(file) : next();
   });
+  if (includeReleasedNotFound) app.use(require('../../utils/webNotFound').createWebNotFoundHandler(require('../../utils/frontendAssets').frontendDirectory()));
   app.use((error, _req, res, _next) => {
     if (respondToCsrfError(error, res)) return;
     res.status(error.statusCode || error.status || 500).json({ error: error.message, code: error.publicCode || error.code });

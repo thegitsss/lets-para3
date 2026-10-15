@@ -11,9 +11,9 @@ test('Home offers Retry only for a failed source and restores focus after recove
   const panel = region(page, 'applications'); await expect(panel).toHaveAttribute('data-state', 'error');
   await expect(region(page, 'recent')).toHaveAttribute('data-state', 'ready');
   await expect(page.getByRole('button', { name: /^Retry/ })).toHaveCount(1);
-  data.applications = []; const retry = panel.getByRole('button', { name: 'Retry applications', exact: true }); await retry.focus(); await retry.press('Enter');
+  data.applications = []; const retry = panel.getByRole('button', { name: 'Retry', exact: true }); await retry.focus(); await retry.press('Enter');
   await expect(panel).toHaveAttribute('data-state', 'ready'); await expect(panel.getByRole('button')).toHaveCount(0);
-  await expect(panel.getByRole('heading')).toBeFocused(); await expect(panel).toContainText('No applications to review.');
+  await expect(page.getByRole('heading', { name: 'For your review', exact: true })).toBeFocused(); await expect(panel).toContainText('No applications to review.');
 });
 test('Home picks up changed records on return without a manual refresh control', async ({ page }) => {
   const data = fixtures(); await install(page, data);

@@ -413,3 +413,55 @@ describe("recovery artifacts share the approved native pool before upload", () =
     expect(() => verifyRecoveryArtifactAllocation("candidate-identity", "/owned/record.json", { env: f.env, read: p => p === f.env.GITHUB_EVENT_PATH ? Buffer.from(JSON.stringify({ inputs: { execution_scope: "recovery-return", continuation_plan_sha256: "f".repeat(64) } })) : Buffer.from("{}") })).toThrow();
   });
 });
+
+
+describe("exact reviewed current browser fixture amendments", () => {
+  const { validateReviewedBrowserFixtureAmendments } = require("../scripts/check-ci-workflow");
+  const currentCatalog = () => JSON.parse(fs.readFileSync(path.resolve(__dirname, "playwright/acceptance/groups.json"), "utf8"));
+  test("accepts only the current source-pinned reviewed amendments and the exact six additional regression identities", () => {
+    const catalog = currentCatalog();
+    const changed = validateReviewedBrowserFixtureAmendments(catalog);
+    expect([...changed].sort()).toEqual(catalog.groups.filter(group => group.reviewedChangedSpecs).map(group => group.name).sort());
+    expect(catalog.expectedUniqueCriticalIdentities).toBe(5945);
+    expect(catalog.expectedOverallUniqueIdentities).toBe(6251);
+    expect(catalog.groups.reduce((sum, group) => sum + group.expectedIdentities, 0)).toBe(5945);
+    expect(catalog.groups.find(group => group.name === "financial-lifecycle").files.filter(file => file.endsWith("/receipt-passive-journey.spec.js"))).toHaveLength(1);
+  });
+  test("pending source, unreviewed source pins, missing handoffs and vague applicability cannot authorize changed assertions", () => {
+    for (const mutate of [
+      c => c.reviewedCatalogSourceReady = false,
+      c => c.reviewedFixtureAmendments[0].currentSha256 = "f".repeat(64),
+      c => c.reviewedFixtureAmendments[0].handoffSha256 = "f".repeat(64),
+      c => c.reviewedFixtureAmendments[0].disposition = "approved",
+      c => c.reviewedFixtureAmendments.pop(),
+      c => c.reviewedFixtureAmendments.push({ ...c.reviewedFixtureAmendments[0], path: "tests/playwright/unreviewed.spec.js" }),
+    ]) { const catalog = currentCatalog(); mutate(catalog); expect(() => validateReviewedBrowserFixtureAmendments(catalog)).toThrow(); }
+  });
+  test("a boolean-only changed-body bypass or blanket unchanged-body claim fails closed", () => {
+    for (const mutate of [
+      g => delete g.reviewedChangedSpecs,
+      g => g.reviewedChangedSpecs.pop(),
+      g => g.reviewedChangedSpecs[0].currentSha256 = "f".repeat(64),
+      g => g.behavioralRequirementsPreserved = false,
+      g => g.originalAssertionBodiesUnchanged = true,
+    ]) { const catalog = currentCatalog(); mutate(catalog.groups.find(group => group.reviewedChangedSpecs)); expect(() => validateReviewedBrowserFixtureAmendments(catalog)).toThrow(); }
+    for (const mutate of [g => g.originalAssertionBodiesUnchanged = false, g => g.behavioralRequirementsPreserved = true, g => g.reviewedChangedSpecs = []]) {
+      const catalog = currentCatalog(); mutate(catalog.groups.find(group => !group.reviewedChangedSpecs)); expect(() => validateReviewedBrowserFixtureAmendments(catalog)).toThrow();
+    }
+  });
+  test("every historical catalog requirement outside the finite reviewed amendment is immutable", () => {
+    for (const mutate of [
+      c => c.sourceBaseCommit = "f".repeat(40),
+      c => c.groups[0].files.pop(),
+      c => c.groups[0].timeout += 1,
+      c => c.groups[0].retries = 1,
+      c => c.groups[0].expectedIdentities -= 1,
+      c => c.groups.reverse(),
+      c => c.expectedOverallUniqueIdentities -= 1,
+      c => c.additionalAffectedIdentities -= 1,
+      c => c.completionRegressionAdditions.additionalIdentities = 5,
+      c => c.groups.find(group => group.name === "financial-lifecycle").files.push("tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js"),
+      c => c.groups.find(group => group.name === "financial-lifecycle").files = c.groups.find(group => group.name === "financial-lifecycle").files.filter(file => !file.endsWith("/receipt-passive-journey.spec.js")),
+    ]) { const catalog = currentCatalog(); mutate(catalog); expect(() => validateReviewedBrowserFixtureAmendments(catalog)).toThrow(); }
+  });
+});

@@ -48,10 +48,21 @@ async function mockCards(page, { lost = false, status = "succeeded", defaultFail
 }
 async function open(page, url = "/attorney-v2.html#/payments/setup") { await page.goto(url, { waitUntil: "domcontentloaded" }); await expect(payment(page)).toHaveAttribute("data-state", "ready"); }
 async function verify(page) { await payment(page).getByRole("button", { name: "Add a payment card", exact: true }).click(); await page.getByLabel("Synthetic provider card entry").fill("4242"); await payment(page).getByRole("button", { name: "Verify card", exact: true }).click(); await expect(payment(page)).toHaveAttribute("data-state", "ready"); }
+async function reviewApplicationCardSetup(page, applicantId) {
+  const application = page.locator(`[data-application="${applicantId}"]`);
+  await expect(application).toHaveAttribute("open", "");
+  const hiring = application.locator('details[data-applicant-section="hiring"]');
+  await expect(hiring).toBeVisible();
+  if (!(await hiring.evaluate(element => element.open))) await hiring.locator("summary").click();
+  await expect(hiring).toHaveAttribute("open", "");
+  await expect(hiring.locator(`[data-hiring="${applicantId}"]`)).toHaveAttribute("data-state", "ready");
+  await savedReturn(page).getByRole("button", { name: "Review card setup", exact: true }).click();
+  await expect(savedReturn(page)).toHaveAttribute("data-state", "ready");
+}
 
 test("card setup preserves the exact application until the attorney returns and clears it", async ({ page }) => {
   const record = await mockCards(page), id = await application(page);
-  await page.goto(`/attorney-v2.html#/matters/${id}/applications?applicantId=${paraId}`); await savedReturn(page).getByRole("button", { name: "Review card setup", exact: true }).click(); await expect(savedReturn(page)).toHaveAttribute('data-state', 'ready');
+  await page.goto(`/attorney-v2.html#/matters/${id}/applications?applicantId=${paraId}`); await reviewApplicationCardSetup(page, paraId);
   if (await savedReturn(page).getByRole('button', { name: 'Add payment card', exact: true }).count()) await savedReturn(page).getByRole('button', { name: 'Add payment card', exact: true }).click();
   else {
     await expect(savedReturn(page)).toContainText('Another application is saved for card setup.');
@@ -61,7 +72,7 @@ test("card setup preserves the exact application until the attorney returns and 
   await expect(savedReturn(page)).toContainText("Synthetic card setup return"); await verify(page); expect(record.saves).toBe(0); await expect(payment(page)).toContainText("ending in 4242");
   await payment(page).getByRole("button", { name: "Set this card as default", exact: true }).click(); await expect(payment(page)).toHaveAttribute("data-state", "ready"); expect(record.saves).toBe(1); expect(record.starts).toBe(1);
   await expect(savedReturn(page).getByRole("link", { name: "Return to this application", exact: true })).toHaveAttribute("href", `#/matters/${id}/applications?applicantId=${paraId}`);
-  await savedReturn(page).getByRole("link", { name: "Return to this application", exact: true }).click(); await expect(page.locator(`[data-application="${paraId}"]`)).toHaveAttribute("open", ""); await savedReturn(page).getByRole("button", { name: "Review card setup", exact: true }).click(); await expect(savedReturn(page)).toHaveAttribute("data-state", "ready");
+  await savedReturn(page).getByRole("link", { name: "Return to this application", exact: true }).click(); await expect(page.locator(`[data-application="${paraId}"]`)).toHaveAttribute("open", ""); await reviewApplicationCardSetup(page, paraId);
   await savedReturn(page).getByRole("button", { name: "Clear saved application", exact: true }).click(); await savedReturn(page).getByRole("button", { name: "Clear selection", exact: true }).click();
   await expect(savedReturn(page).getByRole("button", { name: "Add payment card", exact: true })).toBeVisible(); await expect(savedReturn(page).getByRole("button", { name: "Clear saved application", exact: true })).toHaveCount(0);
   expect((await api(page.request, 'get', '/api/users/me/pending-hire?expectedOwnerId=' + (await (await page.request.get('/api/auth/me')).json()).user.id)).pending).toBeNull();

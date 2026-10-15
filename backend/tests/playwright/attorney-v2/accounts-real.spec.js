@@ -4,7 +4,7 @@ const { enterSecondaryDocument } = require('../secondary-document-entry');
 const start=require(path.resolve(__dirname,"../../../../docs/audits/completion-2026-09-09/accounts/backend-browser-server.cjs"));
 test.use({ baseURL: 'http://127.0.0.1:5281', storageState: { cookies: [], origins: [] } });
 let server,owner;
-test.beforeAll(async()=>{test.setTimeout(120000);server=await start({port:5281});});
+test.beforeAll(async()=>{test.setTimeout(120000);server=await start({port:5281});process.env.APP_BASE_URL=server.origin;});
 test.afterAll(async()=>{await server?.close();});
 test.beforeEach(async({context})=>{owner=await server.createUser({phoneNumber:"2125550100",firmWebsite:"https://example.test",languages:[{name:"English",proficiency:"Native"}],publications:["Existing publication"],practiceAreas:["Contracts"]});await context.addCookies([owner.cookie]);});
 async function open(page,tab="",secondaryBaseURL){

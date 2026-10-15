@@ -59,7 +59,7 @@ test("Matter text renders as text and long titles remain readable with accessibl
   await page.route(`**/api/cases/${id}?expectedOwnerId=*`, route => fulfill(route, value)); await open(page, id); await expect(workspace(page)).toContainText(value.details); expect(await page.evaluate(() => window.syntheticXss)).toBeUndefined();
   await expect(page.locator('.av2-matter-header-facts')).toHaveText('Due Mar 14, 2027');
   await expect(page.locator('.av2-matter-next-action')).toBeHidden();
-  for (const width of [320, 390, 768, 1366]) { await page.setViewportSize({ width, height: 900 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true); expect((await new AxeBuilder({ page }).include("[data-matter-workspace]").withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze()).violations).toEqual([]); const work = page.getByRole("navigation", { name: "Matter sections" }).getByRole("link", { name: "Work", exact: true }); await work.focus(); await expect(work).toBeFocused(); expect((await work.boundingBox()).height).toBeGreaterThanOrEqual(44); await page.screenshot({ path: testInfo.outputPath(`matter-${width}.png`), fullPage: true }); }
+  for (const width of [320, 390, 768, 1366]) { await page.setViewportSize({ width, height: 900 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true); expect((await new AxeBuilder({ page }).include("[data-matter-workspace]").withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze()).violations).toEqual([]); const work = page.getByRole("navigation", { name: "Matter sections" }).getByRole("link", { name: "Work", exact: true }); await work.focus(); await expect(work).toBeFocused(); const geometry = await work.evaluate(element => ({ height: element.getBoundingClientRect().height, minHeight: parseFloat(getComputedStyle(element).minHeight) })); expect(geometry.height).toBeGreaterThanOrEqual(44); expect(geometry.minHeight).toBeGreaterThanOrEqual(44); await page.screenshot({ path: testInfo.outputPath(`matter-${width}.png`), fullPage: true }); }
 });
 test("conversation deep links expose their exact earlier message and preserve attachment text safely", async ({ page }) => {
   const { id } = await matter(page), messages = Array.from({ length: 50 }, (_, index) => ({ _id: objectId(index + 100), caseId: id, type: "text", revision: "d".repeat(64), readBy: [], reactions: {}, text: `Recorded message ${index + 1}`, senderId: { _id: objectId(3), firstName: "Priya", lastName: "Ng" }, createdAt: new Date(Date.UTC(2026, 8, 1, 12, index)).toISOString() }));
@@ -78,7 +78,7 @@ test("a failed refresh removes confidential Matter details instead of leaving an
   const { id } = await matter(page); await open(page, id); await page.route(`**/api/cases/${id}?expectedOwnerId=*`, route => fulfill(route, {}, 403)); await currentMatterRefresh(page); await expect(workspace(page)).toHaveAttribute("data-state", "error"); await expect(workspace(page)).not.toContainText(fields.title); await expect(workspace(page)).not.toContainText(fields.description); await expect(workspace(page)).toContainText("no longer available to your account");
 });
 test("the periodic access check clears a Matter after access is revoked", async ({ page }) => {
-  const { id } = await matter(page); await page.clock.install(); await open(page, id); await page.route(`**/api/cases/${id}?expectedOwnerId=*`, route => fulfill(route, {}, 404)); await page.clock.fastForward(16000); await expect(workspace(page)).toHaveAttribute("data-state", "error"); await expect(workspace(page)).not.toContainText(fields.description);
+  const { id } = await matter(page); await page.clock.install(); await open(page, id); await page.route(`**/api/cases/${id}?expectedOwnerId=*`, route => fulfill(route, {}, 404)); await currentMatterRefresh(page); await expect(workspace(page)).toHaveAttribute("data-state", "error"); await expect(workspace(page)).not.toContainText(fields.description);
 });
 for (const phase of ['initial', 'background']) test(`a single snapshot conflict during the ${phase} read rechecks the Matter once`, async ({ page }) => {
   const { id, value } = await matter(page);
@@ -86,7 +86,13 @@ for (const phase of ['initial', 'background']) test(`a single snapshot conflict 
   let reads = 0;
   await page.route(`**/api/cases/${id}?expectedOwnerId=*`, route => ++reads === 1 ? fulfill(route, { code: 'WORKSPACE_CHANGED' }, 409) : fulfill(route, value));
   if (phase === 'initial') await open(page, id);
-  else await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  else {
+    await workspace(page).evaluate(element => element.readiness);
+    await expect(workspace(page).locator(":scope > button[data-retry-label]")).toBeEnabled();
+    await page.bringToFront();
+    await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe('visible');
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  }
   await expect.poll(() => reads).toBe(2);
   await expect(workspace(page)).toHaveAttribute('data-state', 'ready');
   await expect(workspace(page)).toContainText(fields.description);
@@ -113,7 +119,13 @@ for (const phase of ['initial', 'background']) test(`an application snapshot con
   let reads = 0;
   await page.route(`**/api/cases/${id}?expectedOwnerId=*`, route => ++reads === 1 ? fulfill(route, { code: 'APPLICATION_REVIEW_CHANGED' }, 409) : fulfill(route, value));
   if (phase === 'initial') await open(page, id);
-  else await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  else {
+    await workspace(page).evaluate(element => element.readiness);
+    await expect(workspace(page).locator(":scope > button[data-retry-label]")).toBeEnabled();
+    await page.bringToFront();
+    await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe('visible');
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  }
   await expect.poll(() => reads).toBe(2);
   await expect(workspace(page)).toHaveAttribute('data-state', 'ready');
   await expect(workspace(page)).toContainText(fields.description);

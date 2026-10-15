@@ -25,6 +25,7 @@ export function createDraftStore(kind, { suppressToast = false } = {}) {
     records.set(id,d);return d;
   }
   function change(d) {
+    if (d.generation !== generation) return;
     d.dirty=true;d.change++;clearTimeout(d.timer);paint(d);
     if(!d.conflict)d.timer=setTimeout(()=>flush(d).catch(()=>paint(d)),500);
   }

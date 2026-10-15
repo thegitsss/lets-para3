@@ -14,6 +14,7 @@ async function open(browser, actor, viewport = { width: 1366, height: 900 }, ent
   const page = await context.newPage();
   if (entry === null) return page;
   await page.goto(server.origin + entry);
+  await expect(page.locator('#adminFlowQueueCount')).toHaveText(/^\d+ to review$/);
   await expect(page.locator('#adminFlow')).toHaveAttribute('aria-busy', 'false');
   if (viewport.width <= 760 && await page.locator('[data-flow-select][aria-pressed="true"]').count()) {
     await page.locator('[data-flow-select][aria-pressed="true"]').click();

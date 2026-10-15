@@ -1515,7 +1515,10 @@ export function createSettingsView({ api, getIdentity, showToast, updateIdentity
           textarea.style.minHeight = `${height}px`;
           textarea.style.height = `${height}px`;
         }
-        requestAnimationFrame(() => body.querySelector('input:not([type="file"]),textarea,select')?.focus({ preventScroll: true }));
+        requestAnimationFrame(() => {
+          // A member may already have selected another field before this frame.
+          if (!body.contains(document.activeElement)) body.querySelector('input:not([type="file"]),textarea,select')?.focus({ preventScroll: true });
+        });
       });
       refreshers.push(refresh); refresh();
     });

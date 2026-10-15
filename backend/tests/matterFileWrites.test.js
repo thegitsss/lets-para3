@@ -180,3 +180,59 @@ test("legacy compatibility checks leave existing file and Matter records unchang
   expect(await stored()).toEqual(record);
   expect(await raw()).toEqual(beforeMatter);
 });
+
+const writeConflict = (labels = ["TransientTransactionError"]) => { const error = new mongoose.mongo.MongoServerError({ errmsg: "Synthetic rejected precommit scan conflict", code: 112, codeName: "WriteConflict" }); for (const label of labels) error.addErrorLabel(label); return error; };
+const cleanScan = { status: "clean", result: "NO_THREATS_FOUND", safe: true };
+async function cleanRecord() { await CaseFile.collection.updateOne({ _id: file._id }, { $set: { securityStatus: "clean", securityScanResult: "NO_THREATS_FOUND" } }); return stored(); }
+test("two real concurrent unchanged scan writes recover only rejected precommit conflicts", async () => {
+  const record = await cleanRecord(), key = decryptCaseFilePayload(record).storageKey, before = await raw();
+  const update = CaseFile.collection.updateOne.bind(CaseFile.collection), rejected = []; let arrivals = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  jest.spyOn(CaseFile.collection, "updateOne").mockImplementation(async (...args) => {
+    if (args[2]?.session && ++arrivals <= 2) { if (arrivals === 2) release(); await gate; }
+    try { return await update(...args); } catch (error) { rejected.push({ code: error.code, transient: error.hasErrorLabel?.("TransientTransactionError") }); throw error; }
+  });
+  await Promise.all([writes.persistScan(record, key, cleanScan), writes.persistScan(record, key, cleanScan)]);
+  expect(rejected).toContainEqual({ code: 112, transient: true }); expect(arrivals).toBe(3);
+  expect((await stored()).securityStatus).toBe("clean"); expect((await stored()).futureMetadata).toEqual({ keep: "ORIGINAL" });
+  expect((await raw()).__v).toBe(before.__v); expect((await stored()).__v).toBe(record.__v); expect(mockStorage).not.toHaveBeenCalled();
+});
+test.each(["replacement", "version", "purge", "deletion"])("scan conflict retry rechecks a concurrently winning %s before writing", async change => {
+  const record = await cleanRecord(), key = decryptCaseFilePayload(record).storageKey;
+  const update = CaseFile.collection.updateOne.bind(CaseFile.collection); let attempts = 0;
+  jest.spyOn(CaseFile.collection, "updateOne").mockImplementation(async (...args) => {
+    if (args[2]?.session && ++attempts === 1) {
+      if (change === "replacement") await update({ _id: file._id }, { $set: { storageKey: `cases/${matter._id}/documents/replacement.txt`, securityStatus: "pending" } });
+      if (change === "version") await update({ _id: file._id }, { $set: { version: 2, securityStatus: "pending" } });
+      if (change === "purge") await Case.collection.updateOne({ _id: matter._id }, { $set: { purgedAt: new Date() } });
+      if (change === "deletion") await CaseFile.collection.deleteOne({ _id: file._id });
+      throw writeConflict();
+    }
+    return update(...args);
+  });
+  await expect(writes.persistScan(record, key, cleanScan)).rejects.toMatchObject({ status: 409, publicCode: "FILE_WRITE_CHANGED" });
+  expect(attempts).toBe(1); if (["replacement", "version"].includes(change)) expect((await stored()).securityStatus).toBe("pending");
+  if (change === "purge") expect((await stored()).securityCheckedAt).toEqual(record.securityCheckedAt);
+  if (change === "deletion") expect(await stored()).toBeNull(); expect(mockStorage).not.toHaveBeenCalled();
+});
+test("scan write conflicts stop after three rejected precommit attempts", async () => {
+  const record = await cleanRecord(); let attempts = 0;
+  jest.spyOn(CaseFile.collection, "updateOne").mockImplementation(async () => { attempts++; throw writeConflict(); });
+  await expect(writes.persistScan(record, decryptCaseFilePayload(record).storageKey, cleanScan)).rejects.toMatchObject({ status: 409, publicCode: "FILE_WRITE_SCAN_UNCONFIRMED" });
+  expect(attempts).toBe(3); expect((await stored()).securityCheckedAt).toEqual(record.securityCheckedAt); expect(mockStorage).not.toHaveBeenCalled();
+});
+test.each([{ labels: [] }, { labels: ["TransientTransactionError", "UnknownTransactionCommitResult"] }])("unverified scan conflict labels %j never permit replay", async ({ labels }) => {
+  const record = await cleanRecord(); let attempts = 0;
+  jest.spyOn(CaseFile.collection, "updateOne").mockImplementation(async () => { attempts++; throw writeConflict(labels); });
+  await expect(writes.persistScan(record, decryptCaseFilePayload(record).storageKey, cleanScan)).rejects.toMatchObject({ publicCode: "FILE_WRITE_SCAN_UNCONFIRMED" }); expect(attempts).toBe(1);
+});
+test("a lost scan commit acknowledgement is never replayed even with a transient conflict label", async () => {
+  const record = await cleanRecord(), start = mongoose.startSession.bind(mongoose); let sessions = 0, commits = 0;
+  jest.spyOn(mongoose, "startSession").mockImplementation(async (...args) => { sessions++; const session = await start(...args), commit = session.commitTransaction.bind(session); session.commitTransaction = async () => { commits++; await commit(); throw writeConflict(["TransientTransactionError", "UnknownTransactionCommitResult"]); }; return session; });
+  await expect(writes.persistScan(record, decryptCaseFilePayload(record).storageKey, cleanScan)).rejects.toMatchObject({ publicCode: "FILE_WRITE_SCAN_UNCONFIRMED" });
+  expect(sessions).toBe(1); expect(commits).toBe(1); expect((await stored()).securityCheckedAt).toBeInstanceOf(Date); expect(mockStorage).not.toHaveBeenCalled();
+});
+test("ordinary file mutations do not opt in to automatic scan-conflict replay", async () => {
+  let attempts = 0; jest.spyOn(CaseFile.collection, "updateOne").mockImplementation(async () => { attempts++; throw writeConflict(); });
+  expect((await status()).status).toBe(409); expect(attempts).toBe(1); expect((await stored()).status).toBe("pending_review");
+});

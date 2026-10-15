@@ -136,8 +136,8 @@ test("route changes preserve unsent text, while account protection clears it", a
   const sibling = await page.context().newPage();
   try {
     // Establish the neutral tab before changing account authority. Firefox can
-    // retain goto's wait after this text document has already returned HTTP 200.
-    const destination = new URL("/robots.txt", test.info().project.use.baseURL);
+    // retain goto's wait after this static document has already returned HTTP 200.
+    const destination = new URL("/assets/avatar-placeholder.svg", test.info().project.use.baseURL);
     const response = sibling.waitForResponse(value => value.url() === destination.href && value.request().isNavigationRequest());
     await sibling.evaluate(url => { setTimeout(() => location.assign(url), 0); }, destination.href);
     expect((await response).status()).toBe(200);

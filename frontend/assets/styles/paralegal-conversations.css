@@ -52,3 +52,6 @@ html[data-lpc-v2-route=conversations] [data-v2-route-outlet] > .v2-route-state {
 .pv2-conversations .v2-matter-message-file-row .av2-file-open {color:var(--av2-ink)}
 .pv2-conversations .v2-matter-message-file-row .av2-file-download-icon {margin-left:auto;color:var(--av2-muted)}
 .pv2-conversations .v2-matter-message-file-row .av2-file-open:disabled {opacity:1;cursor:default}
+
+/* Keep the shared composer placeholder readable in the role-local theme. */
+.pv2-conversations .v2-matter-message-form textarea::placeholder {color:var(--av2-muted);opacity:1}

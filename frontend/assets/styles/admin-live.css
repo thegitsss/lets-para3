@@ -242,7 +242,8 @@ body.admin-live :is(#adminFlow,#adminFlow #pendingUserModal,#adminFlow #adminInb
 body.admin-live #adminFlowRefresh{width:44px;height:44px}
 body.admin-live #adminFlow .admin-tabs{flex-wrap:wrap;overflow:visible;gap:8px 20px}
 body.admin-live #adminFlowActions{flex-wrap:wrap}
-body.admin-live #adminFlow .admin-flow-heading:has(#adminFlowOptions:not([hidden]))>div{padding-right:48px}
+body.admin-live #adminFlowOptions>summary{width:max(44px,2.5em)}
+body.admin-live #adminFlow .admin-flow-heading:has(#adminFlowOptions:not([hidden]))>div{padding-right:calc(max(44px,2.5em) + 4px)}
 @media(max-width:760px){
  body.admin-live #adminFlow .admin-flow-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px}
  body.admin-live #adminFlowBack{grid-column:1/-1;justify-self:start}

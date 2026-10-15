@@ -13,11 +13,15 @@ let openAIClient = null;
 let initError = null;
 
 function buildOpenAIClientOptions(apiKey) {
-  return {
+  const options = {
     apiKey,
     timeout: OPENAI_TIMEOUT_MS,
     maxRetries: OPENAI_MAX_RETRIES,
   };
+  if (Object.hasOwn(process.env, "LPC_ASSISTANT_BUDGET_GATE")) {
+    options.fetch = require("./supportCostBudget").fromEnvironment(apiKey);
+  }
+  return options;
 }
 
 try {

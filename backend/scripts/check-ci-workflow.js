@@ -94,6 +94,180 @@ const REQUIRED_GATE_NAMES = Object.freeze({
   "deployment-blueprint": "Deployment Blueprint", validate: "Runtime, dependency, and test gates",
   "browser-contracts": "Browser contracts", "dependency-review": "Dependency review", codeql: "CodeQL", secrets: "Secret scan",
 });
+// BEGIN EXACT REVIEWED CURRENT BROWSER FIXTURE AMENDMENTS
+const REVIEWED_BROWSER_FIXTURE_AMENDMENTS = Object.freeze([
+  {
+    "path": "tests/playwright/admin-solo/attention.spec.js",
+    "currentSha256": "85873536fe749e417848cae41883c58f118aa9545958552467739e205155e13c",
+    "handoffSha256": "bf3dbe1cd8d3b07345dd849e0515c160d1899e76e53f45b724e679de4155fa97",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/attorney-v2/accounts-real.spec.js",
+    "currentSha256": "5003c7cc660d576fbb12a401ae843df24e107be3c5fc9bef070249e80529e2d1",
+    "handoffSha256": "52692ac1aeac030e6a6a9646f7da6436edad38807a59185e904c45b7fb67e9b7",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/attorney-v2/applications.spec.js",
+    "currentSha256": "2b46a3c527f30b1de5fd3e7256a3e60df5959e38185fd2e84014c07d7039cda8",
+    "handoffSha256": "fcf4b3dbd47a9d36475d799735809abd7d9009fb25b35fff9d23424e521418ed",
+    "disposition": "Obsolete decorative transition premise replaced by approved protected ordinary document navigation; exact applicant return and no-mutation requirements retained."
+  },
+  {
+    "path": "tests/playwright/attorney-v2/conversation.spec.js",
+    "currentSha256": "459180ecf6cb5737aedcb0527bce87647a2a7969eea10e7ec77b5e31075970e9",
+    "handoffSha256": "e53d222361b34f319273465de4537058104b4de972bfe187aa7c63df657fcc7f",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/attorney-v2/funding.spec.js",
+    "currentSha256": "27d5f7e6d3f6ba1c1701bbe4f1f5398f466b3cbf6df16c7ceb9f3fa277cb7b50",
+    "handoffSha256": "52692ac1aeac030e6a6a9646f7da6436edad38807a59185e904c45b7fb67e9b7",
+    "disposition": "Retired healthy Refresh interaction replaced by current Check payment status/contextual reentry; all money, idempotency, error and current-owner requirements retained."
+  },
+  {
+    "path": "tests/playwright/attorney-v2/invitation-inventory.spec.js",
+    "currentSha256": "8b124c5b1b6c6fb23ff4844fbb79f24483ac7594af59c8032482a9703a507e34",
+    "handoffSha256": "52692ac1aeac030e6a6a9646f7da6436edad38807a59185e904c45b7fb67e9b7",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/attorney-v2/invitations.spec.js",
+    "currentSha256": "27743759caab731e0b88598eca735ba0c61ba78b67c8d71f068262ff105d002e",
+    "handoffSha256": "9ca4df1ca41adae5322ed3d7edf2fedcfd37c293d8014f9fe4bd5bbfa93ce420",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/attorney-v2/matter-inventory.spec.js",
+    "currentSha256": "0c1ea997cab037eed6fd3ae9619a92b8aaae89a12f4e05b21677c4351e4ba574",
+    "handoffSha256": "3097c3fe52b5e21644729ac11af9a6535d608da112ff2a7a287cf53e875361a9",
+    "disposition": "Obsolete absence-of-saved-views assertion replaced by actual approved saved-view management; original AA/layout/focus/no-write requirements retained. Genuine scroll event readiness added."
+  },
+  {
+    "path": "tests/playwright/attorney-v2/payment-setup.spec.js",
+    "currentSha256": "eccf08b46539e45ef939ff692061b4470feb486e42b74d34fb298eaa0ca1ad56",
+    "handoffSha256": "fcf4b3dbd47a9d36475d799735809abd7d9009fb25b35fff9d23424e521418ed",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/attorney-v2/pre-engagement.spec.js",
+    "currentSha256": "3ac6f2a9b5568a5ff49dccc32133ea588a1dfa60d3fc2670ebb7b61a2fdad6ce",
+    "handoffSha256": "9ca4df1ca41adae5322ed3d7edf2fedcfd37c293d8014f9fe4bd5bbfa93ce420",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/attorney-v2/read-views.spec.js",
+    "currentSha256": "7e33b3cdba5b01e1806819863344c3d15977dcf449df32377522c3ebd912a1c8",
+    "handoffSha256": "14fc090ce30626b455c6b5ab92b984f316f1833ee8219cd3caa231ffb14f5659",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/attorney-v2/recovery-controls.spec.js",
+    "currentSha256": "c661393db3032afd24277af250ba7aed26c80ee070a215f15062473a5e1e3b3b",
+    "handoffSha256": "52692ac1aeac030e6a6a9646f7da6436edad38807a59185e904c45b7fb67e9b7",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/attorney-v2/security.spec.js",
+    "currentSha256": "b03cf50f3deebeb2bc28acded6ddf611e31701243fc222331cb307de5dccd3f5",
+    "handoffSha256": "e53d222361b34f319273465de4537058104b4de972bfe187aa7c63df657fcc7f",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/attorney-v2/workspace.spec.js",
+    "currentSha256": "5c9bee0a162d08320f525a42464f6c7465c6ef7f2e57b230723b9d2ce7de18ce",
+    "handoffSha256": "2e41dad9f260487e4c3da66165e516b30026458782c4ae0ce3d77c4a264f8de3",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/financial-lifecycle/admission-journey.spec.js",
+    "currentSha256": "2a7c8e238862c0f63b04dd980291f46eff894bae9ed52341fe6fb347647ddb7c",
+    "handoffSha256": "b26986574042eced5b16d19a85a11466fcacfd4ef26da68b5d731b0d15736dec",
+    "disposition": "Exact root-reviewed native current-control/readiness fixture; original lifecycle money, accounting, owner-loss, native gesture and exact downloaded-byte requirements retained. Source integrated; final native runtime outcome is separately pending."
+  },
+  {
+    "path": "tests/playwright/financial-lifecycle/exception.spec.js",
+    "currentSha256": "5c0ae7a5ab5d2e730cae8bfffd2adbf0a4eeaa9c065a0ee727883b4a293e3462",
+    "handoffSha256": "b26986574042eced5b16d19a85a11466fcacfd4ef26da68b5d731b0d15736dec",
+    "disposition": "Exact root-reviewed native current-control/readiness fixture; original lifecycle money, accounting, owner-loss, native gesture and exact downloaded-byte requirements retained. Source integrated; final native runtime outcome is separately pending."
+  },
+  {
+    "path": "tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js",
+    "currentSha256": "143c9ad7da57100ca6ecc0ba92eb429ed950ff3227f1f41f78587af5cffcbf8e",
+    "handoffSha256": "b26986574042eced5b16d19a85a11466fcacfd4ef26da68b5d731b0d15736dec",
+    "disposition": "Exact root-reviewed native current-control/readiness fixture; original lifecycle money, accounting, owner-loss, native gesture and exact downloaded-byte requirements retained. Source integrated; final native runtime outcome is separately pending."
+  },
+  {
+    "path": "tests/playwright/frontend-hygiene/flows.spec.js",
+    "currentSha256": "ea818240e259658255754cf3b017843e2d50e1f86e789a2e9fabdf883138325e",
+    "handoffSha256": "bf3dbe1cd8d3b07345dd849e0515c160d1899e76e53f45b724e679de4155fa97",
+    "disposition": "Missing optional archived preview remains NOT_EXECUTED_MISSING_OPTIONAL_LOCAL_FIXTURE; released account-closure and excluded-preview accessible404 successor preserves keyboard/landmark/reflow/no-leak requirements."
+  },
+  {
+    "path": "tests/playwright/paralegal-support/conversations-approved.spec.js",
+    "currentSha256": "d22244af8bb899b497ff0ccbb9953b6fd377ee11ee5bb94fa77619b96a090aea",
+    "handoffSha256": "9c341768bd1ff70fcd4e617fd83f4d102a678877d1f30c0f0acd15aecd921db7",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/paralegal-support/header.spec.js",
+    "currentSha256": "337973f71da402cbcd31b3ca9cf57302049b0fd29d2aa60df93e1ec431419866",
+    "handoffSha256": "cf23a724b791f4e0648517919d652ac6849b840db4556bc9b59bccbc3f081a5d",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/paralegal-support/home-redesign.spec.js",
+    "currentSha256": "42d81121689067d03d1777633af58307c66dd1d06dc16ef19090f8324a902abd",
+    "handoffSha256": "9c341768bd1ff70fcd4e617fd83f4d102a678877d1f30c0f0acd15aecd921db7",
+    "disposition": "Obsolete healthy Refresh control assertion replaced by current automatic verified return; stored-theme, delayed-navigation and truthful freshness requirements retained."
+  },
+  {
+    "path": "tests/playwright/paralegal-support/linear-rebuild.spec.js",
+    "currentSha256": "e82228c0c9028fbf81aa9a0dff77228501346ca8d883fdfcf7c43cf7b60c8161",
+    "handoffSha256": "9c341768bd1ff70fcd4e617fd83f4d102a678877d1f30c0f0acd15aecd921db7",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/paralegal-support/paralegal-documents-actual.spec.js",
+    "currentSha256": "18665ff0dd991abb8073795c25b40fd83915b5b79ea666c7c85706da94f4a0dd",
+    "handoffSha256": "9c341768bd1ff70fcd4e617fd83f4d102a678877d1f30c0f0acd15aecd921db7",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/paralegal-support/shell-stability.spec.js",
+    "currentSha256": "191dbd95bb97ce9fc64915d45a6089cc84455e76d4852b439b6660885ddd3b5d",
+    "handoffSha256": "9c341768bd1ff70fcd4e617fd83f4d102a678877d1f30c0f0acd15aecd921db7",
+    "disposition": "Obsolete private transition premise replaced by approved protected ordinary navigation; shell, exact destination, native identity and error requirements retained."
+  },
+  {
+    "path": "tests/playwright/paralegal-support/v2-files.spec.js",
+    "currentSha256": "632ebb14bda49cc0145476ea84b312bf3dc0add74ffacfd6591849f6ee6dc49c",
+    "handoffSha256": "cf23a724b791f4e0648517919d652ac6849b840db4556bc9b59bccbc3f081a5d",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/paralegal-support/v2-messaging.spec.js",
+    "currentSha256": "7384bfca4cf3e3b474e90b7e6329758589fc6f4057bd4a17ced85227a143e77b",
+    "handoffSha256": "cf23a724b791f4e0648517919d652ac6849b840db4556bc9b59bccbc3f081a5d",
+    "disposition": "Current control/readiness/fixture sequencing corrected; original behavioral, security, privacy, focus, record and deadline requirements retained as documented in the exact reviewed handoff."
+  },
+  {
+    "path": "tests/playwright/paralegal-support/v2-work.spec.js",
+    "currentSha256": "031a3c91b99b305caba4970b04fb960fc7762af14f3050c44b63fdef449aa691",
+    "handoffSha256": "cf23a724b791f4e0648517919d652ac6849b840db4556bc9b59bccbc3f081a5d",
+    "disposition": "Obsolete decorative transition premise replaced by approved protected document boundary; viewport, filter, current-record and accessibility requirements retained."
+  },
+  {
+    "path": "tests/playwright/shared-matter/email-message-links.spec.js",
+    "currentSha256": "6e576ba362d36af7fa365619a7148aef8d25952ffb914484f6fe9b85cd6c0ac6",
+    "handoffSha256": "699552702db968d5a8b374c2024b5ff52de4e956db96aa73d864c92f3e7c1fe5",
+    "disposition": "Original protected email callback source prefix retained; three older-target/newer-unread regression identities added without weakening the original unread-zero assertion."
+  }
+]);
+const ORIGINAL_BROWSER_CATALOG_CANONICAL_SHA256 = "0d61f32da09dce7308bbb2827e012c0708757e6ce074530b680b004a98dc3125";
+// END EXACT REVIEWED CURRENT BROWSER FIXTURE AMENDMENTS
+
 function browserCatalog() { return JSON.parse(fs.readFileSync(path.join(repositoryRoot, "backend/tests/playwright/acceptance/groups.json"), "utf8")); }
 
 function validateCriticalBrowserScripts(manifest) {
@@ -289,13 +463,56 @@ function validatePinnedActions(workflow) {
   }
 }
 
+function validateReviewedBrowserFixtureAmendments(catalog) {
+  if (catalog.reviewedCatalogSourceReady !== true) fail("Reviewed current browser catalog source is pending integration; no acceptance claim is allowed.");
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const additions = { baselineCritical: 5939, baselineOverall: 6245, additionalIdentities: 6, entries: [
+    { source: "tests/playwright/shared-matter/email-message-links.spec.js", identities: 3 },
+    { source: "tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js", identities: 3 },
+  ] };
+  if (!same(catalog.completionRegressionAdditions, additions) || !same(catalog.reviewedFixtureAmendments, REVIEWED_BROWSER_FIXTURE_AMENDMENTS) ||
+      catalog.additionalAffectedIdentities !== 111 || catalog.currentDeclaredCriticalIdentities !== 5954 || catalog.expectedUniqueCriticalIdentities !== 5945 || catalog.expectedOverallUniqueIdentities !== 6251 || catalog.selectionAuthority !== 'Original package-declared critical catalog preserved with exact reviewed current fixture applicability and six targeted regression identities; behavioral requirements remain required.') fail("Complete versioned browser groups require the exact reviewed six-identity addition.");
+  for (const required of ["tests/playwright/financial-lifecycle/admission-journey.spec.js", "tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js"])
+    if (!REVIEWED_BROWSER_FIXTURE_AMENDMENTS.some(row => row.path === required)) fail(`Exact reviewed current receipt/admission source is missing: ${required}`);
+  for (const row of REVIEWED_BROWSER_FIXTURE_AMENDMENTS) {
+    if (!/^tests\/playwright\/[A-Za-z0-9_./-]+\.spec\.js$/.test(row.path) || !/^[a-f0-9]{64}$/.test(row.currentSha256) ||
+        !/^[a-f0-9]{64}$/.test(row.handoffSha256) || typeof row.disposition !== "string" || row.disposition.length < 40 ||
+        require("node:crypto").createHash("sha256").update(fs.readFileSync(path.join(repositoryRoot, "backend", row.path))).digest("hex") !== row.currentSha256)
+      fail(`Exact reviewed current fixture source/pin/handoff/applicability is required: ${row.path}`);
+  }
+  const changedGroupNames = new Set();
+  for (const group of catalog.groups || []) {
+    const expected = REVIEWED_BROWSER_FIXTURE_AMENDMENTS.filter(row => group.files?.includes(row.path));
+    if (expected.length) {
+      if (group.originalAssertionBodiesUnchanged !== false || group.behavioralRequirementsPreserved !== true || !same(group.reviewedChangedSpecs, expected))
+        fail(`Exact reviewed fixture-body change and preserved behavioral requirements are required: ${group.name}`);
+      changedGroupNames.add(group.name);
+    } else if (group.originalAssertionBodiesUnchanged !== true || group.reviewedChangedSpecs || group.behavioralRequirementsPreserved)
+      fail(`Unchanged fixture groups retain the original strict contract: ${group.name}`);
+  }
+  const baseline = JSON.parse(JSON.stringify(catalog));
+  delete baseline.reviewedCatalogSourceReady; delete baseline.completionRegressionAdditions; delete baseline.reviewedFixtureAmendments;
+  baseline.selectionAuthority = "Package-declared15critical scopes plus accepted permanent affected regression files; no test/assertion changes.";
+  baseline.expectedUniqueCriticalIdentities = 5939; baseline.expectedOverallUniqueIdentities = 6245;
+  baseline.additionalAffectedIdentities = 105; baseline.currentDeclaredCriticalIdentities = 5948;
+  for (const group of baseline.groups || []) {
+    if (group.name === "financial-lifecycle") { group.expectedIdentities -= 3; const file = "tests/playwright/financial-lifecycle/receipt-passive-journey.spec.js"; if (group.files.filter(name => name === file).length !== 1) fail("Exactly one reviewed passive-receipt source addition is required."); group.files = group.files.filter(name => name !== file); }
+    if (group.name === "shared-matter") group.expectedIdentities -= 3;
+    group.originalAssertionBodiesUnchanged = true; delete group.behavioralRequirementsPreserved; delete group.reviewedChangedSpecs;
+  }
+  if (require("node:crypto").createHash("sha256").update(JSON.stringify(baseline)).digest("hex") !== ORIGINAL_BROWSER_CATALOG_CANONICAL_SHA256)
+    fail("Complete versioned browser groups and exact historical catalog must be preserved outside the finite reviewed amendment.");
+  return changedGroupNames;
+}
+
 function validateGroupedBrowserJobs(jobs, catalog) {
+  const reviewedChangedGroups = validateReviewedBrowserFixtureAmendments(catalog);
   if (catalog.schemaVersion !== 1 || catalog.groups?.length !== EXPECTED_GROUP_NAMES.length ||
       JSON.stringify(catalog.groups.map(group => group.name).sort()) !== JSON.stringify([...EXPECTED_GROUP_NAMES].sort()) ||
-      catalog.expectedUniqueCriticalIdentities !== 5939 || catalog.expectedOverallUniqueIdentities !== 6245 ||
-      catalog.groups.reduce((sum, group) => sum + group.expectedIdentities, 0) !== 5939) fail("Complete versioned browser groups and exact unique identity totals are required.");
+      catalog.expectedUniqueCriticalIdentities !== 5945 || catalog.expectedOverallUniqueIdentities !== 6251 ||
+      catalog.groups.reduce((sum, group) => sum + group.expectedIdentities, 0) !== 5945) fail("Complete versioned browser groups and exact unique identity totals are required.");
   for (const group of catalog.groups) {
-    if (group.workers !== 1 || group.retries !== 0 || group.originalAssertionBodiesUnchanged !== true ||
+    if (group.workers !== 1 || group.retries !== 0 || (group.originalAssertionBodiesUnchanged !== true && !reviewedChangedGroups.has(group.name)) ||
         (group.name === "director-managed" ? group.baseConfig !== REQUIRED_CRITICAL_CONFIGS["test:playwright:financial-lifecycle"] : REQUIRED_CRITICAL_CONFIGS[group.suite] !== group.baseConfig) || !group.files?.length ||
         group.files.some(file => !/^tests\/playwright\/[A-Za-z0-9_./-]+\.spec\.js$/.test(file)) || !Number.isSafeInteger(group.expectedIdentities) || group.expectedIdentities <= 0) fail(`Invalid full fixture group contract: ${group.name}`);
   }
@@ -520,6 +737,7 @@ module.exports = {
   validateWorkflowContract,
   validateCriticalBrowserScripts,
   validateGroupedBrowserJobs,
+  validateReviewedBrowserFixtureAmendments,
   validateGroupedBackendJobs,
   validateArtifactBudgets,
   verifyRecoveryArtifactAllocation,

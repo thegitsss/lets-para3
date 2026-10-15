@@ -823,7 +823,7 @@ body.lpc-v2 .v2-work-index-link {min-height:36px;padding:8px 0;border:0;border-r
 body.lpc-v2 .v2-work-index-link[aria-current] {color:var(--v2-ink);border-bottom:2px solid var(--v2-ink);}
 body.lpc-v2 .v2-work-section {margin-top:0;}
 body.lpc-v2 .v2-work-invite-row h3 {font-family:var(--v2-font-sans);line-height:1.45;font-weight:500;letter-spacing:0;}
-body.lpc-v2 .v2-work-filter-panel {display:flex;align-items:center;gap:8px;border:0;background:transparent;padding:0;margin:0;}
+body.lpc-v2 .v2-work-filter-panel {display:flex;align-items:center;gap:8px;border:0;background:transparent;padding:0;margin:0;min-width:0;max-width:100%;}
 body.lpc-v2 .v2-work-filter-panel > input {width:240px;max-width:75%;min-height:34px;border:1px solid var(--v2-line);border-radius:5px;background:var(--v2-white);color:var(--v2-ink);padding:6px 10px;font-size:.8125rem;}
 .pv2-work-filter-menu {position:relative;}
 .pv2-work-filter-menu > summary {cursor:pointer;color:var(--v2-muted);font-size:.8125rem;padding:8px;list-style:none;}
@@ -855,7 +855,7 @@ body.lpc-v2 .v2-work-invite-from {font-weight:400;letter-spacing:0;}
 .v2-work-invitation-detail {padding:20px 8px 24px;border-bottom:1px solid var(--v2-line);font-size:.875rem;line-height:1.6;}
 .v2-work-invitation-detail > dl {display:flex;flex-wrap:wrap;gap:16px 32px;margin:0 0 20px;}
 .v2-work-invitation-detail dt {color:var(--v2-muted);font-size:.75rem;}
-.v2-work-invitation-detail dd {margin:2px 0 0;}
+.v2-work-invitation-detail dd {margin:2px 0 0;color:var(--v2-ink);}
 .v2-work-invitation-detail h4 {font-size:1rem;font-weight:500;margin:20px 0 8px;}
 .v2-work-invitation-detail .v2-work-invite-action-group {margin-top:20px;}
 

@@ -79,3 +79,47 @@ test('both roles can open the exact protected message from its rendered email; a
     for (const person of Object.values(people)) await person.context.close();
   }
 });
+
+test('an older protected email link acknowledges its target boundary while newer messages stay unread for both roles', async ({ browser }, info) => {
+  const people = {}, checks = [], errors = [];
+  try {
+    for (const role of ['attorney', 'paralegal']) {
+      const user = await server.createUser(role, { email: false }, true);
+      const context = await browser.newContext();
+      await context.addCookies([user.cookie]);
+      await context.route('**/*', route => new URL(route.request().url()).origin === server.origin ? route.continue() : route.abort());
+      const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
+      people[role] = { ...user, context, page };
+    }
+    const posted = await api(people.attorney, 'post', '/api/cases', { title: 'Synthetic older message boundary', practiceArea: 'immigration', state: 'CA', totalAmount: 400, experience: '5+ years', deadline: '2027-03-14', description: 'Preserve newer unread instructions.', tasks: [{ title: 'Review linked instruction' }] });
+    const id = String(posted.case?._id || posted._id || posted.id);
+    await api(people.paralegal, 'post', `/api/jobs/${posted.jobId}/apply`, { coverLetter: 'Synthetic boundary applicant.' });
+    await api(people.attorney, 'post', '/api/payments/payment-method/default', { paymentMethodId: 'pm_browser_card' });
+    const review = await api(people.attorney, 'get', `/api/cases/${id}/hiring-review/${people.paralegal.id}?expectedOwnerId=${people.attorney.id}`);
+    await api(people.attorney, 'post', `/api/cases/${id}/hire/${people.paralegal.id}`, { expectedOwnerId: people.attorney.id, reviewedRevision: review.revision });
+    const templates = require('../../../email/templates'); process.env.EMAIL_BASE_URL = server.origin;
+    for (const role of ['attorney', 'paralegal']) {
+      const recipient = people[role], sender = people[role === 'attorney' ? 'paralegal' : 'attorney'];
+      const send = text => api(sender, 'post', `/api/messages/${id}`, { text, clientMessageId: crypto.randomUUID(), ...(sender === people.attorney ? { expectedOwnerId: sender.id } : {}) });
+      const older = (await send(`Older reviewed instruction ${role}`)).message;
+      const newer = (await send(`Newer unread instruction ${role}`)).message;
+      expect(Date.parse(newer.createdAt)).toBeGreaterThan(Date.parse(older.createdAt));
+      await expect.poll(async () => (await api(recipient, 'get', '/api/messages/unread-count')).count).toBe(2);
+      const template = templates.newMessage({ caseId: id, messageId: String(older._id), caseTitle: 'Synthetic older message boundary', fromName: 'Synthetic participant' });
+      await recipient.page.setContent(template.html);
+      const acknowledged = recipient.page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === `/api/messages/${id}/read`);
+      await recipient.page.getByRole('link', { name: 'Read message', exact: true }).click();
+      await expect(recipient.page.locator(`[data-message-id="${older._id}"]`)).toContainText(older.text);
+      const receipt = await acknowledged;
+      expect(receipt.status()).toBe(200);
+      expect(receipt.request().postDataJSON()).toMatchObject({ messageId: String(older._id), upTo: new Date(older.createdAt).toISOString() });
+      expect(receipt.request().headers()['x-lpc-owner-id']).toBe(recipient.id);
+      await expect.poll(async () => (await api(recipient, 'get', '/api/messages/unread-count')).count).toBe(1);
+      checks.push({ role, targetAcknowledged: true, newerUnreadPreserved: true });
+    }
+  } finally {
+    for (const person of Object.values(people)) await person.context.close();
+    await fs.writeFile(info.outputPath('older-email-boundary.json'), JSON.stringify({ checks, errors, requests: server.evidence().requests }, null, 2));
+  }
+  expect(checks).toHaveLength(2); expect(errors).toEqual([]);
+});

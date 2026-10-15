@@ -290,7 +290,9 @@ function init() {
           if (isCurrent() && authorityLost) window.dispatchEvent(new CustomEvent('admin:admission-access-changed', { detail: { ownerId: actingOwnerId, surface: 'information-request' } }));
           else if (isCurrent()) el('adminAccountResult').textContent = e.message;
         } finally {
-          if (!authorityLost && isCurrent()) { draftStore.change(draft);await draftStore.flush(draft).catch(()=>draftStore.paint(draft)); }
+          const currentOwner = getStoredSession().user;
+          const sameVerifiedOwner = String(currentOwner?.id || currentOwner?._id || '') === actingOwnerId && currentOwner?.role === 'admin' && currentOwner?.status === 'approved' && !currentOwner?.disabled && !currentOwner?.deleted;
+          if (!authorityLost && sameVerifiedOwner) { draftStore.change(draft);await draftStore.flush(draft).catch(()=>draftStore.paint(draft)); }
           field.readOnly=draft.uncertain;
           button.disabled = false;
           button.textContent=draft.uncertain?'Check or retry saved request':'Send information request';

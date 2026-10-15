@@ -1536,7 +1536,7 @@ for (const width of [1366, 390]) test(`invitation destination selects its exact 
   expect(errors).toEqual([]); expect(mutations).toEqual([]);
 });
 
-test('original invitation navigation keeps its native transition with a delayed HTML head', async ({ page }, info) => {
+test('original invitation navigation preserves its protected document boundary with a delayed HTML head', async ({ page }, info) => {
   const state = await installWorkProjection(page), errors = [], events = [];
   page.on('pageerror', error => errors.push({ name: error.name, message: error.message }));
   page.on('console', message => { if (message.text().startsWith('INVITATION_NAVIGATION ')) events.push(JSON.parse(message.text().slice('INVITATION_NAVIGATION '.length))); });
@@ -1556,7 +1556,10 @@ test('original invitation navigation keeps its native transition with a delayed 
     await page.screenshot({ path: info.outputPath('original-invitation-slow-head.png') });
     expect(errors).toEqual([]);
     expect(events.filter(event => event.type === 'unhandledrejection')).toEqual([]);
-    if (info.project.name === 'chromium') expect(events.some(event => event.type === 'pagereveal' && event.page.includes('slowHead=1') && event.transition)).toBe(true);
+    // The accepted private-document boundary deliberately disables decorative
+    // cross-document animation; safe native navigation and the requested review remain required.
+    expect(await page.locator('style[data-lpc-private-document-navigation]').textContent()).toBe('@view-transition { navigation: none; }');
+    if (info.project.name === 'chromium') expect(events.some(event => event.type === 'pagereveal' && event.page.includes('slowHead=1') && event.transition === false)).toBe(true);
   } finally {
     await require('node:fs/promises').writeFile(info.outputPath('invitation-navigation.json'), JSON.stringify({ errors, events }, null, 2));
   }

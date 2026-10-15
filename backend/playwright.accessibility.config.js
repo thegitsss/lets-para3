@@ -25,5 +25,6 @@ module.exports = defineConfig({
     reuseExistingServer: false,
     port: 5054,
     timeout: 30_000,
+    gracefulShutdown: { signal: "SIGTERM", timeout: 10_000 },
   },
 });

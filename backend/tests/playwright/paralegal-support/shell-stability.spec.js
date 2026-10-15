@@ -190,7 +190,7 @@ test("cross-document sidebar navigation keeps the existing shell until the next 
   await page.goto("/dashboard-paralegal.html#home", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#sidebarNav nav:visible > .lpc-sidebar-nav-link")).toHaveCount(5);
 
-  const navigateWithoutBlanking = async (selector, destination, nativeTransition = true) => {
+  const navigateWithoutBlanking = async (selector, destination, nativeTransition = false) => {
     await page.evaluate(() => {
       sessionStorage.removeItem("lpc:last-navigation-used-view-transition");
       window.addEventListener("pageswap", (event) => {
@@ -208,6 +208,12 @@ test("cross-document sidebar navigation keeps the existing shell until the next 
     await page.waitForURL(destination);
     await expect(page.locator("[data-lpc-universal-header='true']")).toBeVisible();
     await expect(page.locator("#sidebarNav nav:visible > .lpc-sidebar-nav-link")).toHaveCount(5);
+    // Settings uses the outgoing universal-header boundary; the two other
+    // protected documents also declare the policy before enhancement.
+    if (!new URL(page.url()).pathname.endsWith('/profile-settings.html')) {
+      await expect(page.locator('style[data-lpc-private-document-navigation]')).toHaveCount(1);
+      expect(await page.locator('style[data-lpc-private-document-navigation]').textContent()).toBe('@view-transition { navigation: none; }');
+    }
     if (expectsNativeViewTransition) {
       expect(await page.evaluate(() => sessionStorage.getItem("lpc:last-navigation-used-view-transition"))).toBe(String(nativeTransition));
     }

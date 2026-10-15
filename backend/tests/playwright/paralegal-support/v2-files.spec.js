@@ -96,10 +96,11 @@ async function stubFileWorkspace(page, state, { denyUpload = false } = {}) {
     if (state.denied) return json(route, { error: "Matter access is no longer available" }, 403);
     return json(route, activeMatter());
   });
-  await page.route(`**/api/uploads/case/${MATTER_ID}/*/security-status`, (route) => {
+  await page.route(`**/api/uploads/case/${MATTER_ID}/*/security-status`, async (route) => {
     const id = new URL(route.request().url()).pathname.split("/").at(-2);
     const file = state.files.find((entry) => entry.id === id);
     state.securityChecks = (state.securityChecks || 0) + 1;
+    if (state.securityGate) await state.securityGate;
     if (!file) return json(route, { error: "File not found" }, 404);
     file.securityStatus = "clean";
     file.securityScanResult = "NO_THREATS_FOUND";
@@ -262,19 +263,24 @@ test("pending file security reconciles automatically and keeps the manual fallba
     fileReads: 0,
     uploads: 0,
   };
+  let releaseSecurity;
+  state.securityGate = new Promise(resolve => { releaseSecurity = resolve; });
   await stubFileWorkspace(page, state);
+  try {
   await openFiles(page);
 
   await expect(page.locator('.v2-matter-file-list [data-file-progress="pending"]')).toBeVisible();
-  await expect(page.getByText("Security check in progress", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Security check in progress", { exact: true })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Download", exact: true })).toHaveCount(0);
   await expect(page.locator('.v2-matter-file-list [data-file-progress="pending"] svg')).toHaveCSS("animation-name", "lpc-file-spin");
   await page.screenshot({ path: testInfo.outputPath("pending-spinner.png"), fullPage: true });
   await expect.poll(() => state.securityChecks).toBe(1);
+  releaseSecurity();
   await expect(page.getByRole("button", { name: "Download", exact: true })).toBeVisible();
   await expect(page.getByText("Available", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Check status", exact: true })).toHaveCount(0);
   expect(state.securityChecks).toBe(1);
+  } finally { releaseSecurity(); }
 });
 
 test("an unavailable security check can be refreshed without exposing a blocked download", async ({ page }) => {

@@ -444,11 +444,49 @@ test('actual partial withdrawal survives a card hold, authorized clearance and r
     const originalReceipt = await attorney.context().request.get(`${server.origin}/api/payments/receipt/attorney/${caseId}/review?expectedOwnerId=${actors.attorney.id}&receiptId=payment`);
     expect(originalReceipt.ok()).toBe(true);
     expect(await originalReceipt.json()).toMatchObject({ reason: 'available', receipt: { type: 'payment', status: 'received', total: { amount: 48800 } } });
+    // A retained default receipt may predate the completion revision. Select
+    // the original card payment explicitly through its native history entry.
+    await replacementReceipt.locator('.av2-financial-receipt-details > summary').click();
+    await replacementReceipt.getByRole('button', { name: 'Choose another receipt', exact: true }).click();
+    const originalPaymentChoice = replacementReceipt.locator('[data-receipt-choice=payment]');
+    await expect(originalPaymentChoice).toContainText('Original Matter funding');
+    await originalPaymentChoice.getByRole('button', { name: 'Review this receipt', exact: true }).click();
+    await expect(attorney.locator('[data-matter-workspace]')).toHaveAttribute('data-tab','receipt');
+    await expect(replacementReceipt).toHaveAttribute('data-state','ready');
+    await expect(replacementReceipt).toContainText('Payment confirmed');
+    await expect(replacementReceipt).toContainText('$488.00');
+    // Bind the exact bytes forwarded from the actual protected handler. Chromium's
+    // protocol Response.body() can differ from a no-store attachment body after
+    // native blob download; never compare a separately rendered receipt instead.
+    let forwardedOriginalPayment = null, forwardedOriginalPaymentRequests = 0;
+    const originalPaymentPath = `/api/payments/receipt/attorney/${caseId}`;
+    const priorOriginalPaymentRequests = server.evidence().requests.filter(row => row.path === originalPaymentPath).length;
+    await attorney.route(url => url.pathname === originalPaymentPath, async route => {
+      forwardedOriginalPaymentRequests++;
+      const requestUrl = new URL(route.request().url());
+      expect(requestUrl.searchParams.get('expectedOwnerId')).toBe(actors.attorney.id);
+      expect(requestUrl.searchParams.get('receiptId')).toBe('payment');
+      expect(requestUrl.searchParams.get('revision')).toMatch(/^[a-f0-9]{64}$/);
+      const response = await route.fetch({ maxRedirects: 0, maxRetries: 0 });
+      expect(response.status()).toBe(200);
+      expect(response.headers()['content-type']).toMatch(/^application\/pdf(?:;|$)/);
+      const bytes = await response.body();
+      expect(bytes.subarray(0,5).toString()).toBe('%PDF-');
+      forwardedOriginalPayment = { url: requestUrl.href, status: response.status(), headers: response.headers(), bytes };
+      await route.fulfill({ response, body: bytes });
+    });
     const recoveredDownloadPending = attorney.waitForEvent('download');
     await replacementReceipt.getByRole('button', { name: 'Download receipt', exact: true }).click();
     const recoveredDownload = await recoveredDownloadPending;
     await recoveredDownload.saveAs(info.outputPath('recovered-original-payment.pdf'));
-    expect((await fs.readFile(info.outputPath('recovered-original-payment.pdf'))).subarray(0, 5).toString()).toBe('%PDF-');
+    const originalPaymentBytes = await fs.readFile(info.outputPath('recovered-original-payment.pdf'));
+    expect(originalPaymentBytes.subarray(0,5).toString()).toBe('%PDF-');
+    expect(forwardedOriginalPayment).not.toBeNull();
+    expect(forwardedOriginalPaymentRequests).toBe(1);
+    expect(server.evidence().requests.filter(row => row.path === originalPaymentPath)).toHaveLength(priorOriginalPaymentRequests + 1);
+    expect(originalPaymentBytes).toEqual(forwardedOriginalPayment.bytes);
+    await fs.writeFile(info.outputPath('original-payment-handler.pdf'), forwardedOriginalPayment.bytes);
+    await fs.writeFile(info.outputPath('original-payment-transport.json'), JSON.stringify({ url: forwardedOriginalPayment.url, status: forwardedOriginalPayment.status, contentType: forwardedOriginalPayment.headers['content-type'], nativeDownloadUrl: recoveredDownload.url(), nativeRequests: forwardedOriginalPaymentRequests, actualHandlerRequests: server.evidence().requests.filter(row => row.path === originalPaymentPath).length - priorOriginalPaymentRequests, exactBytes: originalPaymentBytes.equals(forwardedOriginalPayment.bytes), bytes: originalPaymentBytes.length }, null, 2));
     for (const [page, amount, name] of [[paralegal, '$82.00', 'earlier'], [replacement, '$246.00', 'replacement']]) {
       await page.goto(`${server.origin}/paralegal-v2.html#/work?section=history`);
       const history = page.locator('#v2-work-history'); await expect(history).toContainText(amount);

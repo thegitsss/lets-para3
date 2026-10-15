@@ -128,6 +128,9 @@ test("all public pages retain valid heading, hidden-content, and decorative-art 
 
   for (const [name, url, status = 200] of PUBLIC_PAGES) {
     await openPublicPage(page, url, status);
+    // The approved hero waits for its font entrance; inspect actual usable content.
+    // Keep the existing expectation deadline and every semantic assertion below.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     const semantics = await page.evaluate(() => {
       const isVisible = (element) => {
         const style = getComputedStyle(element);

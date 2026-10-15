@@ -2,7 +2,7 @@ const { test, expect } = require('playwright/test');
 const start = require('../../helpers/financialLifecycleBrowserServer');
 const AxeBuilder = require('@axe-core/playwright').default;
 let server, contexts = [];
-test.beforeAll(async () => { test.setTimeout(180000); server = await start({ includeAdminSupport: true, includeDesignPreviews: true }); });
+test.beforeAll(async () => { test.setTimeout(180000); server = await start({ includeAdminSupport: true, includeReleasedNotFound: true }); });
 test.beforeEach(async () => server.reset());
 test.afterEach(async () => {
   for (const context of contexts.splice(0)) await context.close();
@@ -72,10 +72,18 @@ test('reopened inquiry preserves quoted values and submits one ownership update'
   await page.screenshot({ path: info.outputPath('inquiry-follow-up-mobile.png') });
   expect(errors).toEqual([]);
 });
-test('account status and retained preview expose a keyboard-reachable main landmark', async ({ browser }, info) => {
+test('released account status and excluded-preview404 expose keyboard-reachable main landmarks', async ({ browser }, info) => {
   const { page, errors } = await pageFor(browser);
   for (const [name, route] of [['account-status', '/account-closure.html'], ['preview', '/previews/lpc-contract/index.html']]) {
-    await page.goto(server.origin + route);
+    const response = await page.goto(server.origin + route);
+    expect(response.status()).toBe(name === 'account-status' ? 200 : 404);
+    if (name === 'preview') {
+      expect(response.headers()['cache-control']).toContain('no-store');
+      expect(response.headers()['x-robots-tag']).toBe('noindex, nofollow');
+      await expect(page).toHaveTitle('Page Not Found | Let’s-ParaConnect');
+      await expect(page.locator('main#main')).toContainText('Page not found');
+      expect(await response.text()).toBe(await require('node:fs/promises').readFile(require('node:path').join(require('../../../utils/frontendAssets').frontendDirectory(), '404.html'), 'utf8'));
+    }
     await expect(page.locator('main#main')).toHaveCount(1);
     if (name === 'account-status') await expect(page.getByRole('heading', { name: 'Account check unavailable', exact: true })).toBeVisible();
     await page.keyboard.press(info.project.name === 'webkit' ? 'Alt+Tab' : 'Tab');

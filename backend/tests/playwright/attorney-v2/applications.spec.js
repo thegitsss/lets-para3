@@ -166,7 +166,7 @@ test("invalid applicant links show an error instead of loading unrelated applica
 
 test("original application profile returns to the same active or withdrawn record without a mutation", async ({ page }, info) => {
   const { id, applicationId } = await matter(page);
-  const mutations=[],errors=[],events=[];
+  const mutations=[],errors=[],events=[],returnEvents=[];
   page.on('pageerror',error=>errors.push({name:error.name,message:error.message,stack:error.stack,page:page.url()}));
   page.on('console',message=>{const prefix='APPLICATION_RETURN ';if(message.text().startsWith(prefix))events.push(JSON.parse(message.text().slice(prefix.length)));});
   await page.addInitScript(()=>{
@@ -181,6 +181,7 @@ test("original application profile returns to the same active or withdrawn recor
     const before=await dto(page,id);expect(before.applications[0].status).toBe(status);
     const current=panel(page).locator(`details[data-application="${paraId}"]`);
     await expect(current).toHaveAttribute('open','');
+    const eventStart=events.length;
     await current.getByRole('link',{name:'View current profile and documents',exact:true}).click();
     await expect(page.locator('#profileName')).toHaveText(before.applications[0].name);
     const profileUrl=page.url();await page.locator('#backBtn').click();
@@ -189,11 +190,16 @@ test("original application profile returns to the same active or withdrawn recor
     await expect(panel(page)).toContainText('I can prepare the agreement and organize the supporting exhibits.');
     expect(await dto(page,id)).toEqual(before);
     await page.screenshot({path:info.outputPath(`original-application-return-${status}.png`)});
+    returnEvents.push(...events.slice(eventStart).filter(event=>event.type==='pagereveal'&&new URL(event.page).pathname==='/dashboard-attorney.html'));
     await require('node:fs/promises').writeFile(info.outputPath(`original-application-return-${status}.json`),JSON.stringify({profileUrl,returnUrl:page.url(),caseId:id,applicantId:paraId,status,mutations,errors,events},null,2));
   }
   expect(mutations).toEqual([]);expect(errors).toEqual([]);
   expect(events.filter(event=>event.type==='unhandledrejection')).toEqual([]);
   if(info.project.name==='chromium'){
-    for(const path of ['/profile-paralegal.html','/dashboard-attorney.html'])expect(events.filter(event=>event.type==='pagereveal'&&event.transition&&new URL(event.page).pathname===path)).toHaveLength(2);
+    expect(events.filter(event=>event.type==='pagereveal'&&event.transition&&new URL(event.page).pathname==='/profile-paralegal.html')).toHaveLength(2);
+    // The approved authenticated-header boundary keeps dashboard departures
+    // ordinary; each return must still reveal the exact retained application.
+    expect(returnEvents).toHaveLength(2);
+    expect(returnEvents.every(event=>event.transition===false&&new URL(event.page).searchParams.get('caseId')===id&&new URL(event.page).searchParams.get('applicantId')===paraId)).toBe(true);
   }
 });

@@ -579,10 +579,12 @@ test("committed Home keeps its stored theme during delayed navigation and after 
   await expect(homeText(page)).toContainText("Loading records…");
   await expect(homeText(page)).not.toContainText("No records in this view.");
   releaseHome();
-  const updates = page.locator("[data-home-refresh-notice]");
-  await expect(updates).toContainText("Updates available.");
-  await updates.getByRole("button", { name: "Refresh Home", exact: true }).click();
+  // A disabled progressive placeholder has no settled input to preserve. The
+  // verified return now commits automatically rather than stranding a notice.
   await settled(page);
+  await expect(homeText(page)).toHaveAttribute("data-home-freshness", "current");
+  await expect(homeText(page)).not.toContainText("Loading records…");
+  await expect(homeText(page)).toContainText("No records in this view.");
   await expect(page.locator("html")).toHaveClass(/theme-dark/);
 });
 

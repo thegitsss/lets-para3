@@ -246,3 +246,26 @@ test("a new blocked-file category alerts even when a legacy-unverified alert is 
   await collection.insertOne({ securityStatus: "blocked", createdAt: new Date() });
   expect(buildFingerprint([await checkFileSecurityQueue()])).toBe(buildFingerprint([blocked]));
 });
+
+
+test.each([
+  ["COMPLETED", "2026-08-13T11:00:00.000Z", "atlas_backup_ok"],
+  ["COMPLETED", "2026-08-01T11:00:00.000Z", "atlas_backup_stale"],
+  ["RUNNING", "2026-08-13T11:00:00.000Z", "atlas_backup_missing"],
+])("Flex snapshot %s at %s reports %s from its provider finishTime", async (status, finishTime, code) => {
+  const fetchFn = jest.fn()
+    .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ access_token: "synthetic-token" }) })
+    .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ results: [
+      { id: "flex-snapshot", status, finishTime, createdAt: "2026-08-13T11:30:00.000Z" },
+    ] }) });
+  const result = await checkBackupFreshness({
+    env: { ATLAS_PROJECT_ID: "0123456789abcdef01234567", ATLAS_CLUSTER_NAME: "Cluster0",
+      ATLAS_CLIENT_ID: "synthetic-id", ATLAS_CLIENT_SECRET: "synthetic-secret",
+      ATLAS_CLUSTER_TYPE: "flex", BACKUP_MAX_AGE_HOURS: "36" },
+    fetchFn, now: Date.parse("2026-08-13T12:00:00.000Z"), requireBackup: true,
+  });
+  expect(result).toMatchObject({ ok: code === "atlas_backup_ok", code });
+  expect(fetchFn).toHaveBeenCalledTimes(2);
+  expect(fetchFn.mock.calls[1][0]).toBe("https://cloud.mongodb.com/api/atlas/v2/groups/0123456789abcdef01234567/flexClusters/Cluster0/backup/snapshots?itemsPerPage=100&pageNum=1");
+  if (status === "COMPLETED") expect(result.details).toMatchObject({ completedAt: finishTime });
+});

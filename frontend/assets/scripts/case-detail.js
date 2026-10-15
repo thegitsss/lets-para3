@@ -5708,16 +5708,23 @@ function getLatestMessageTimestamp(messages = []) {
 }
 
 async function markCaseMessagesRead(caseId, messages = []) {
-  // Locating one referenced message must not mark unrelated messages read.
-  if (getRequestedMessageId()) return;
+  const requestedId = getRequestedMessageId();
   const visibleMessages = filterMessagesForViewer(messages);
-  const upTo = getLatestMessageTimestamp(visibleMessages);
+  // A referenced message acknowledges its verified timestamp boundary only;
+  // newer messages returned with the thread remain unread.
+  const target = requestedId ? visibleMessages.find(message => String(message?._id || message?.id || "") === requestedId) : null;
+  if (requestedId && !target) return;
+  const upTo = getLatestMessageTimestamp(requestedId ? [target] : visibleMessages);
   if (!caseId || !upTo) return;
+  const ownerId = requestedId ? getCurrentUserId() : "";
+  if (requestedId && !/^[a-f0-9]{24}$/i.test(ownerId)) return;
   try {
     await fetchCSRF().catch(() => "");
+    if (requestedId && (getCurrentUserId() !== ownerId || getRequestedMessageId() !== requestedId || state.activeCaseId !== caseId)) return;
     await fetchWithFallback([`/api/messages/${encodeURIComponent(caseId)}/read`], {
       method: "POST",
-      body: { upTo },
+      ...(requestedId ? { headers: { "X-LPC-Owner-Id": ownerId } } : {}),
+      body: { upTo, ...(requestedId ? { messageId: requestedId } : {}) },
       noRedirect: true,
     });
   } catch (err) {

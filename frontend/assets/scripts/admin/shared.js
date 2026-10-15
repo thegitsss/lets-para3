@@ -6,9 +6,9 @@ let privateDocumentLeaving = false;
 const privateInvalidators = new Set();
 const privateSessionSnapshot = () => { try { return localStorage.getItem('lpc_user') || ''; } catch { return ''; } };
 const privateAccessError = () => Object.assign(new Error('Your Admin access changed. Refresh or sign in before continuing.'), { code: 'ACCOUNT_CHANGED' });
-function invalidatePrivateState() {
+function invalidatePrivateState(reason = 'access-change') {
   privateGeneration++;
-  for (const clear of privateInvalidators) clear();
+  for (const clear of privateInvalidators) clear(reason);
 }
 function changedPrivateOwner(user) {
   const next = String(user?.id || user?._id || '');
@@ -25,7 +25,7 @@ window.addEventListener('admin:admission-access-changed', event => {
   const current = getStoredSession().user;
   if (String(current?.id || current?._id || '') === String(event.detail?.ownerId || '')) invalidatePrivateState();
 });
-window.addEventListener('pagehide', () => { privateDocumentLeaving = true;invalidatePrivateState(); });
+window.addEventListener('pagehide', () => { privateDocumentLeaving = true;invalidatePrivateState('document-leaving'); });
 window.addEventListener('pageshow', event => { if (event.persisted) { privateDocumentLeaving = false;invalidatePrivateState(); } });
 export function onAdminPrivateInvalidation(clear) { privateInvalidators.add(clear); }
 export async function privateApi(url, options = {}) {

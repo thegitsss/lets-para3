@@ -1,7 +1,6 @@
-const { test, expect } = require('playwright/test');
+const { test, expect, start } = require('./financial-strict-observation.cjs');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
-const start = require('../../helpers/financialLifecycleBrowserServer');
 const inspectBrowserDiagnostics = require('./browser-diagnostics');
 let server;
 test.beforeAll(async () => { test.setTimeout(180000); server = await start({ includeAdminSupport: true, includeAdminWorkspaces: true }); });
@@ -98,7 +97,10 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     const decisionGate = new Promise(resolve => { releaseDecisionResponse = resolve; });
     let reportDecision;
     const committedDecision = new Promise(resolve => { reportDecision = resolve; });
-    await adminPage.route(`**/api/admin/users/${id}/approve`, async route => {
+    const receivedDecision = adminPage.waitForResponse(response => new URL(response.url()).pathname === `/api/admin/users/${id}/approve` && response.request().method() === 'POST');
+    let approvalWrites = 0;
+    await adminPage.route(url => url.pathname === `/api/admin/users/${id}/approve`, async route => {
+      approvalWrites++; expect(new URL(route.request().url()).searchParams.get('expectedOwnerId')).toBe(admin.id);
       const response = await route.fetch();
       reportDecision(response);
       await decisionGate;
@@ -109,14 +111,27 @@ test('actual paralegal admission reaches the first workspace, retains tour recov
     await expect.poll(async () => (await User.findById(id).lean()).status).toBe('approved');
     await adminPage.evaluate(id => window.reviewAdminApplicant(id), id);
     await expect(approve).toBeDisabled();
+    const modal = adminPage.locator('#pendingUserModal'), accountFacts = adminPage.locator('#adminAccountContext .admin-facts');
+    const reopenedRevision = await modal.getAttribute('data-admission-revision');
+    expect(reopenedRevision).toMatch(/^[a-f0-9]{64}$/);
     releaseDecisionResponse();
-    await expect(adminPage.getByRole('status').filter({ hasText: 'User approved.' })).toBeVisible();
+    const deliveredDecision = await receivedDecision; expect(deliveredDecision.ok()).toBe(true); await deliveredDecision.finished();
+    await expect(accountFacts.locator('div').filter({has:adminPage.getByText('Application',{exact:true})}).locator('strong')).toHaveText('approved');
+    await expect(accountFacts.locator('div').filter({has:adminPage.getByText('Account access',{exact:true})}).locator('strong')).toHaveText('Enabled');
+    await expect(modal).toHaveAttribute('data-admission-owner-id',admin.id);
+    await expect(modal).toHaveAttribute('data-admission-user-id',id);
+    await expect(modal).toHaveAttribute('data-admission-revision',reopenedRevision);
+    await expect(adminPage.getByRole('status').filter({hasText:'User approved.'})).toHaveCount(0);
     await expect(adminPage.locator('#pendingUserModal')).toBeVisible();
     await expect(approve).toHaveText('Approve');
     await adminPage.locator('[data-account-tab="history"]').click();
     const admissionHistory = adminPage.locator('[data-account-panel="history"]');
     await expect(admissionHistory).toContainText('Qualification verified:');
     await expect(admissionHistory).toContainText('Synthetic independently sourced employer contact confirmed the employment dates and role.');
+    expect(approvalWrites).toBe(1);
+    expect(await require('../../../models/AuditLog').countDocuments({action:'admin.user.approved',targetId:applicant._id})).toBe(1);
+    await expect(modal).toHaveAttribute('data-admission-revision',reopenedRevision);
+    await expect(adminPage.getByRole('status').filter({hasText:'User approved.'})).toHaveCount(0);
     await admissionHistory.screenshot({ path: info.outputPath('admin-qualification-history-phone.png') });
     await adminPage.close();
     expect(await User.findById(id).lean()).toMatchObject({ status: 'approved', preferences: { hideProfile: true } });

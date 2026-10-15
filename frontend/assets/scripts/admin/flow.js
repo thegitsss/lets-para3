@@ -332,9 +332,9 @@ function init() {
   flow.innerHTML = `<header class="admin-live-page-heading"><h1>Today</h1><button type="button" class="btn secondary" id="adminFlowRefresh" aria-label="Refresh queue">${icon('refresh')}</button></header><div class="admin-tabs admin-today-tabs" role="group" aria-label="Today views"><button type="button" data-today-view="review" aria-pressed="true">Needs you <span id="adminTodayNeedsCount"></span></button><button type="button" data-today-view="waiting" aria-pressed="false">Waiting</button><button type="button" data-today-view="activity" aria-pressed="false">Activity</button></div><div id="adminFlowQueueLayout" class="admin-live-queue"><aside class="admin-live-queue-list" aria-label="Decision queue"><div class="admin-queue-heading" id="adminFlowQueueCount">Loading queue…</div><div id="adminFlowQueue"></div></aside><section id="adminReviewPane" class="admin-live-review" aria-label="Selected decision"><header class="admin-flow-heading"><button class="btn secondary admin-queue-back" type="button" id="adminFlowBack">${icon('back')}Back</button><div><h2 id="adminFlowTitle" tabindex="-1">Loading…</h2><p id="adminFlowContext"></p><p id="adminFlowReason"></p></div><details id="adminFlowOptions" class="admin-record-options" hidden><summary aria-label="Account options">•••</summary><div id="adminFlowOptionsContent"></div></details></header><p id="adminFlowStatus" role="status" aria-live="polite"></p><div id="adminFlowBody" class="admin-flow-body"></div><form id="adminFlowFollowUpForm" class="admin-flow-follow-up" hidden><label for="adminFlowFollowUpAt">Remind me</label><input id="adminFlowFollowUpAt" type="datetime-local" required><p>No message will be sent.</p><div class="admin-inline-actions"><button class="btn primary" type="submit" id="adminFlowSaveFollowUp">Save follow-up</button><button class="btn secondary" type="button" id="adminFlowCancelFollowUp">Cancel</button></div></form><div id="adminFlowActions" class="admin-flow-actions" hidden><button type="button" class="btn secondary" id="adminFlowLater" aria-label="Choose follow-up">Later</button><button type="button" class="btn primary" id="adminFlowCheck" hidden>Check &amp; next ${icon('arrow')}</button></div></section></div><details class="admin-queue-evidence"><summary>Queue details</summary><p id="adminFlowScope" class="small"></p><p id="adminFlowProgress"></p></details><details id="adminFlowSaved" class="admin-flow-saved" hidden></details>`;
   overview.prepend(flow);
   refreshActivity = initAdminToday(overview);
-  onAdminPrivateInvalidation(() => {
+  onAdminPrivateInvalidation(reason => {
     pause();current = null;pendingCompletion = null;queueData = null;followUps = [];savedSelection = '';queuePage = 1;completed = 0;
-    if (storageKey) { try { sessionStorage.removeItem(storageKey); } catch {} }storageKey = '';
+    if (storageKey && reason !== 'document-leaving') { try { sessionStorage.removeItem(storageKey); } catch {} }storageKey = '';
     for (const id of ['adminFlowQueue', 'adminFlowSaved', 'adminFlowContext', 'adminFlowReason', 'adminFlowScope', 'adminFlowProgress', 'adminTodayNeedsCount', 'adminFlowQueueCount']) el(id).replaceChildren();
     el('adminFlowSaved').hidden = true;el('adminFlowTitle').textContent = 'Verify your Admin access.';
     el('adminFlowActions').hidden = true;status('Refresh or sign in before reopening your queue.');
@@ -404,6 +404,14 @@ function init() {
     el('adminFlowBody').insertAdjacentHTML('beforeend','<button class="btn primary" type="button" id="adminFlowReopen">Continue review</button>');
     replaceEventHandler(el('adminFlowReopen'), 'click', () => void refresh());
   }).observe(el('pendingUserModal'), { attributes: true, attributeFilter: ['class'] });
+  addEventListener('lpc:user-updated', event => {
+    const user = event.detail, stored = getStoredSession().user;
+    const id = String(user?.id || user?._id || '');
+    if (!id || id !== String(stored?.id || stored?._id || '') || user.role !== 'admin' || user.status !== 'approved' || user.disabled || user.deleted || active || !visible('overview')) return;
+    // Initial verified identity hydration can invalidate the provisional read.
+    // Start a new authenticated epoch; never reuse its discarded response.
+    loadSession(); resume();
+  });
   const params = new URL(location.href).searchParams;
   if (visible('overview') && !['account', 'ticket', 'matter', 'dispute'].some(key => params.has(key))) resume();
   else { el('adminFlowContext').textContent = 'Return here to work through your queue.'; }

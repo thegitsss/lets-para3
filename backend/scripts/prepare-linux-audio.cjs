@@ -93,10 +93,13 @@ async function prepare(file, receipt, browsers) {
   command('pactl', ['set-default-sink', receipt.sinkName]);
   assert.equal(command('pactl', ['get-default-sink']).stdout, receipt.sinkName);
   receipt.server = command('pactl', ['info']).stdout;
+  receipt.forwardedAudioEnvironment = require('./native-continuation-lib.cjs').verifiedLinuxAudioSocket();
+  assert.equal(/^Server String: (.+)$/m.exec(receipt.server)?.[1], receipt.forwardedAudioEnvironment.XDG_RUNTIME_DIR + '/pulse/native');
+  save(file, receipt);
   // Diagnose the failing engine before running unchanged product callbacks.
   if (browsers.includes('firefox')) {
     const { firefox } = require(path.resolve('backend/node_modules/playwright'));
-    const browser = await firefox.launch();
+    const browser = await firefox.launch({ env: { ...process.env, ...receipt.forwardedAudioEnvironment } });
     const mediaErrors = [];
     try {
       const page = await browser.newPage();

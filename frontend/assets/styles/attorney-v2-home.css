@@ -154,7 +154,7 @@
 .av2-home [data-av2-region="messages"] .av2-review-copy { display:grid; grid-template-columns:minmax(150px,.8fr) minmax(0,1.6fr) auto; align-items:baseline; gap:12px; }
 .av2-home [data-av2-region="messages"] .av2-review-copy h3,
 .av2-home [data-av2-region="messages"] .av2-review-copy .av2-muted { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:0; }
-.av2-home [data-av2-region="messages"] .av2-unread-label { margin:0; white-space:nowrap; }
+.av2-home [data-av2-region="messages"] .av2-unread-label { margin:0; inline-size:max-content; white-space:nowrap; }
 @container (max-width:650px) {
  .av2-home [data-av2-region="messages"] .av2-review-copy { grid-template-columns:minmax(0,1fr) auto; gap:2px 10px; }
  .av2-home [data-av2-region="messages"] .av2-review-copy h3 { grid-column:1; white-space:normal; overflow-wrap:anywhere; }

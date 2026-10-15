@@ -100,6 +100,8 @@ jobs:
         run: npm run check:candidate
       - name: Install exact dependency graph
         run: npm ci
+      - name: Verify private navigation and targeted message-read guards
+        run: node --experimental-vm-modules --test scripts/admin-private-navigation-controls.test.cjs scripts/legacy-message-link-read-controls.test.cjs
       - name: Validate runtime, source, and frontend assets
         run: npm run check:ci-workflow && npm run check:repository && npm run check:runtime && npm run check:syntax && npm run check:focus && npm run check:routes && npm run check:backend-reachability && npm run check:runtime-bindings && npm run check:route-security && npm run check:logging && npm run check:secrets && npm run check:frontend && npm run check:frontend-bindings && npm run check:vendor && npm run check:no-theater && npm run check:api-contract && npm run check:performance && npm run check:legal && npm run check:install-scripts
       - name: Generate production dependency SBOM

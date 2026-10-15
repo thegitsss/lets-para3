@@ -269,7 +269,7 @@ test("a failed send preserves the draft and succeeds on an explicit retry", asyn
   const input = page.getByLabel("Write a message");
   await input.fill("Draft that must not disappear");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
-  await expect(page.getByText("Messages are temporarily unavailable.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Delivery has not been confirmed. Retry this same message to check; LPC keeps its original message and reply context.", { exact: true })).toBeVisible();
   await expect(input).toHaveValue("Draft that must not disappear");
 
   await page.getByRole("button", { name: "Send message", exact: true }).click();

@@ -208,7 +208,7 @@ async function fetchAtlasBackupStatus(config, fetchFn = fetch) {
     .filter((snapshot) => ["complete", "completed"].includes(String(snapshot?.status || "").toLowerCase()))
     .map((snapshot) => ({
       id: String(snapshot.id || ""),
-      completedAt: snapshot.completedAt || snapshot.finishedAt || snapshot.createdAt || null,
+      completedAt: snapshot.completedAt || snapshot.finishedAt || snapshot.finishTime || snapshot.createdAt || null,
     }))
     .filter((snapshot) => Number.isFinite(Date.parse(snapshot.completedAt)))
     .sort((left, right) => Date.parse(right.completedAt) - Date.parse(left.completedAt));
