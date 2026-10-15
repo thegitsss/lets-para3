@@ -31,7 +31,7 @@
     ".github/workflows/public-release.yml": "888567a645fd62681a70d4f17dbd8fe22501b07f8a800b18b6d68f3c35f8cd9d",
     ".github/workflows/quality.yml": "8f31125add36aca2f10d99953939e7f9af6709fc49f2addcef17d3640abe70d0",
     ".gitignore": "6a2ba6a35f6f75eb15cfe4d8dd95c66eef57addcc94fd00825b1a3d22217f78f",
-    ".gitleaksignore": "7601ce664b3628e7251df9cd479785da495f0aabf908f8e79a04f5ed526268a9",
+    ".gitleaksignore": "252a050ad4af950263735243ddec3a5dc47c4ce9371e69486aec1893c506ed3f",
     ".node-version": "55075b5ec4e8b31936cbbc282b8829116d1fd48f2f2f1856dee592a6650700ce",
     ".vscode/settings.json": "96f692720f3a8cc9d9c3df36c4ef32740ba0f0bbf5a22b7d8dd28e703f17ef7c",
     "ATTORNEY_APPLICATION_V2_MIGRATION_AND_V1_RETIREMENT_PLAN.md": "fda5346abf436302b3bd2638023b10ba481be920e672020dbf5aca3787cf9776",
@@ -1886,7 +1886,7 @@
     "docs/paralegal-assistant/RISK_REGISTER.md": "b5f0dd4126a98a2e33572ca36440a980bfaa7a0ed40624682e093c5449721808",
     "docs/paralegal-assistant/SOURCE_OF_TRUTH_MATRIX.md": "870cd2de50af37e80dd63ae44b48f9c34137389ed35f99faed2e45e57aad425a",
     "docs/paralegal-assistant/WORKFLOW_POLICY_INVENTORY.md": "d521948f7195c67b42c6bee979928b1e32f4612dab79043d0dbe4e70fefc8f3a",
-    "docs/security/SECRET_SCAN_DISPOSITIONS_20261014.json": "e3f73007604f9eed970becc1e019e56f9dba85fcbf0b76c7dd8e5e30e80382d9",
+    "docs/security/SECRET_SCAN_DISPOSITIONS_20261014.json": "c6e861d286216ddc634f5d102f4e4f3b706e51b14569ea41803bd2660a09ed0e",
     "frontend/404.html": "19c90f54df582371005ac8237efaa54b542b59396dac21fb3a65684bf39aa07d",
     "frontend/Cleanfav.png": "15927300a8eb67d96d21318c4e7b6ab31fee20bd468130177ef04d0fba144a56",
     "frontend/accessibility.html": "122c1c381049f2639c8557c2269b9e307ccd55a71bbdaf0257502e609734bb51",
@@ -24625,10 +24625,10 @@
         {
           "path": ".gitleaksignore",
           "beforeSha256": "5d54200e8ae721d12a1b9a6f3993bb7025d634b8a8d71efa3d2940896766c667",
-          "afterSha256": "7601ce664b3628e7251df9cd479785da495f0aabf908f8e79a04f5ed526268a9",
+          "afterSha256": "252a050ad4af950263735243ddec3a5dc47c4ce9371e69486aec1893c506ed3f",
           "kind": "ci-control",
           "affectedSuites": [],
-          "reviewedEvidenceSha256": "6848b5f6aa2e412c104a6334e24e75898c079013c23aac9fea067df58ad6a2ec",
+          "reviewedEvidenceSha256": "a579df520ea069fb5c5019a018f4487de15da185f48ee141fa2ad28310843da3",
           "reviewedEvidencePath": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/k-egress-review/exact80-proposal/FINAL_EXACT80_PROPOSED_HANDOFF.json"
         },
         {
@@ -24825,10 +24825,10 @@
         {
           "path": "docs/security/SECRET_SCAN_DISPOSITIONS_20261014.json",
           "beforeSha256": "b3377ca492a04cb375a44c1af47d449176bdbc7bfa432faafce91480142c8908",
-          "afterSha256": "e3f73007604f9eed970becc1e019e56f9dba85fcbf0b76c7dd8e5e30e80382d9",
+          "afterSha256": "c6e861d286216ddc634f5d102f4e4f3b706e51b14569ea41803bd2660a09ed0e",
           "kind": "ci-control",
           "affectedSuites": [],
-          "reviewedEvidenceSha256": "6848b5f6aa2e412c104a6334e24e75898c079013c23aac9fea067df58ad6a2ec",
+          "reviewedEvidenceSha256": "a579df520ea069fb5c5019a018f4487de15da185f48ee141fa2ad28310843da3",
           "reviewedEvidencePath": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/k-egress-review/exact80-proposal/FINAL_EXACT80_PROPOSED_HANDOFF.json"
         }
       ],
