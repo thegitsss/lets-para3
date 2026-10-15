@@ -15,6 +15,10 @@
     "finalPSourceImpactReview": {
       "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/FINAL_P_SOURCE_IMPACT_AND_ACCEPTANCE_REVIEW.json",
       "sha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795"
+    },
+    "exactScannerMetadataFollowup": {
+      "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/P_EXACT_SECRET_DISPOSITION_REBIND_REVIEW.json",
+      "sha256": "9131750ff2b578ed9d454fe70cdcc630852c7f0e57610d6cc594f1a16ea5617e"
     }
   },
   "priorIndex": {
@@ -34,7 +38,7 @@
     ".github/workflows/public-release.yml": "888567a645fd62681a70d4f17dbd8fe22501b07f8a800b18b6d68f3c35f8cd9d",
     ".github/workflows/quality.yml": "5d595a833b4a009cf76a3d9cae333d0df61dfafd410e17f06537f77046084923",
     ".gitignore": "6a2ba6a35f6f75eb15cfe4d8dd95c66eef57addcc94fd00825b1a3d22217f78f",
-    ".gitleaksignore": "24731273626f72630147e4ab2be7efab5af3cb7e19514013c9d84a5db5430a6d",
+    ".gitleaksignore": "a3c0a923f5231187b54acbf12b26a729660d17d588a22beabc7ea068e7c62c3d",
     ".node-version": "55075b5ec4e8b31936cbbc282b8829116d1fd48f2f2f1856dee592a6650700ce",
     ".vscode/settings.json": "96f692720f3a8cc9d9c3df36c4ef32740ba0f0bbf5a22b7d8dd28e703f17ef7c",
     "ATTORNEY_APPLICATION_V2_MIGRATION_AND_V1_RETIREMENT_PLAN.md": "fda5346abf436302b3bd2638023b10ba481be920e672020dbf5aca3787cf9776",
@@ -1897,7 +1901,7 @@
     "docs/paralegal-assistant/RISK_REGISTER.md": "b5f0dd4126a98a2e33572ca36440a980bfaa7a0ed40624682e093c5449721808",
     "docs/paralegal-assistant/SOURCE_OF_TRUTH_MATRIX.md": "870cd2de50af37e80dd63ae44b48f9c34137389ed35f99faed2e45e57aad425a",
     "docs/paralegal-assistant/WORKFLOW_POLICY_INVENTORY.md": "d521948f7195c67b42c6bee979928b1e32f4612dab79043d0dbe4e70fefc8f3a",
-    "docs/security/SECRET_SCAN_DISPOSITIONS_20261014.json": "e6af558b5606cc58088a7fa264c76aa21cf4878f5cfe4eedd916326fc51cae8d",
+    "docs/security/SECRET_SCAN_DISPOSITIONS_20261014.json": "196147738e8309e67e6274d434639cb445b75244427346bd82ddbb257520815c",
     "frontend/404.html": "19c90f54df582371005ac8237efaa54b542b59396dac21fb3a65684bf39aa07d",
     "frontend/Cleanfav.png": "15927300a8eb67d96d21318c4e7b6ab31fee20bd468130177ef04d0fba144a56",
     "frontend/accessibility.html": "122c1c381049f2639c8557c2269b9e307ccd55a71bbdaf0257502e609734bb51",
@@ -33675,8 +33679,8 @@
       {
         "path": ".gitleaksignore",
         "beforeSha256": "5d54200e8ae721d12a1b9a6f3993bb7025d634b8a8d71efa3d2940896766c667",
-        "afterSha256": "24731273626f72630147e4ab2be7efab5af3cb7e19514013c9d84a5db5430a6d",
-        "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+        "afterSha256": "a3c0a923f5231187b54acbf12b26a729660d17d588a22beabc7ea068e7c62c3d",
+        "reviewedEvidenceSha256": "9131750ff2b578ed9d454fe70cdcc630852c7f0e57610d6cc594f1a16ea5617e",
         "kind": "ci-control",
         "affectedSuites": []
       },
@@ -34372,8 +34376,8 @@
       {
         "path": "docs/security/SECRET_SCAN_DISPOSITIONS_20261014.json",
         "beforeSha256": "b3377ca492a04cb375a44c1af47d449176bdbc7bfa432faafce91480142c8908",
-        "afterSha256": "e6af558b5606cc58088a7fa264c76aa21cf4878f5cfe4eedd916326fc51cae8d",
-        "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+        "afterSha256": "196147738e8309e67e6274d434639cb445b75244427346bd82ddbb257520815c",
+        "reviewedEvidenceSha256": "9131750ff2b578ed9d454fe70cdcc630852c7f0e57610d6cc594f1a16ea5617e",
         "kind": "ci-control",
         "affectedSuites": []
       },
@@ -34673,8 +34677,8 @@
         {
           "path": ".gitleaksignore",
           "beforeSha256": "5d54200e8ae721d12a1b9a6f3993bb7025d634b8a8d71efa3d2940896766c667",
-          "afterSha256": "24731273626f72630147e4ab2be7efab5af3cb7e19514013c9d84a5db5430a6d",
-          "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+          "afterSha256": "a3c0a923f5231187b54acbf12b26a729660d17d588a22beabc7ea068e7c62c3d",
+          "reviewedEvidenceSha256": "9131750ff2b578ed9d454fe70cdcc630852c7f0e57610d6cc594f1a16ea5617e",
           "kind": "ci-control",
           "affectedSuites": []
         },
@@ -35370,8 +35374,8 @@
         {
           "path": "docs/security/SECRET_SCAN_DISPOSITIONS_20261014.json",
           "beforeSha256": "b3377ca492a04cb375a44c1af47d449176bdbc7bfa432faafce91480142c8908",
-          "afterSha256": "e6af558b5606cc58088a7fa264c76aa21cf4878f5cfe4eedd916326fc51cae8d",
-          "reviewedEvidenceSha256": "f7b93b79d599fa5f11c2b3f9a63e944171d76316f1705eb637b4241067d3f18a",
+          "afterSha256": "196147738e8309e67e6274d434639cb445b75244427346bd82ddbb257520815c",
+          "reviewedEvidenceSha256": "9131750ff2b578ed9d454fe70cdcc630852c7f0e57610d6cc594f1a16ea5617e",
           "kind": "ci-control",
           "affectedSuites": []
         },
