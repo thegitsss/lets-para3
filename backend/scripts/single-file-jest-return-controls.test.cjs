@@ -90,3 +90,24 @@ for(const kind of ['source-pin','unreviewed-new-file','missing-new-file','defaul
 test('catalog artifact budget change requires its actual current consumer outside final17',()=>{
  const x=fixture(),file='tests/ciArtifactBudget.test.js',replace=x.names.find(name=>name.startsWith('tests/pureFixture'));x.names.splice(x.names.indexOf(replace),1,file);for(const value of[x.prior,x.current]){delete value.files['backend/'+replace];value.files['backend/'+file]='1'.repeat(64);}const p='backend/scripts/guard-ci-artifact-budget.js';x.prior.files[p]='1'.repeat(64);x.current.files[p]='2'.repeat(64);x.plan.backendReturn.ciAdaptationEvidence.sourceBindings[p]=x.current.files[p];x.spec.sourceChanges.push({path:p,beforeSha256:x.prior.files[p],afterSha256:x.current.files[p],kind:'ci-control',affectedSuites:[file],reviewedEvidenceSha256:K.IMPACT});x.discovered=[...x.names,K.SUITE].sort();assert.deepEqual(source(x).affectedBackendRuntimeSuites,[file]);x.spec.sourceChanges.at(-1).affectedSuites=[];assert.throws(()=>source(x));
 });
+const smtpPaths=['backend/utils/stagingEmailBoundary.js','backend/tests/stagingEmailBoundary.test.js'];
+test('final S SMTP bridge names both exact sources and preserves both affected original suites',()=>{
+ const x=runtimeSourceFixture(smtpPaths),r=source(x);
+ assert.deepEqual(r.affectedBackendRuntimeSuites,['tests/stagingEmailBoundary.test.js','tests/stagingRuntimeConfig.test.js']);
+ assert.throws(()=>api.combine({},x.current,x.discovered,{},r),/Affected backend corrections/);
+});
+for(const kind of ['source-pin','evidence','runtime-consumer','ordinary-ci-disguise'])test('final S SMTP bridge rejects '+kind,()=>{
+ const x=runtimeSourceFixture(smtpPaths),e=x.spec.sourceChanges.find(row=>row.path===smtpPaths[0]);
+ if(kind==='source-pin'){e.afterSha256='f'.repeat(64);x.current.files[e.path]=e.afterSha256;}
+ if(kind==='evidence')e.reviewedEvidenceSha256='f'.repeat(64);
+ if(kind==='runtime-consumer')e.affectedSuites=e.affectedSuites.filter(file=>!file.endsWith('stagingRuntimeConfig.test.js'));
+ if(kind==='ordinary-ci-disguise')e.kind='ci-control';
+ assert.throws(()=>source(x));
+});
+test('final S optional guard and ceiling-control bridge requires the two sealed short-tier pins and proof',()=>{
+ const x=assistantSourceFixture();source(x);
+ for(const[p,pin]of [['backend/ai/supportCostBudget.js','6a14b5470d0c2e9668c87d9bf2c88b37ed2019353fcfa83db8154fd1059b6377'],['backend/tests/supportCostBudgetCeiling.test.js','f66164969b1a8f6f70dcbb5222635d2e97db996d5bbe97616a48a94a7bcb8d1e']]){
+  const changed=copy(x);changed.spec=changed.plan.backendReturn.singleFileRecovery;changed.current.files[p]=pin;changed.spec.sourceChanges.find(e=>e.path===p).afterSha256=pin;assert.throws(()=>source(changed));
+ }
+ const wrong=copy(x);wrong.spec=wrong.plan.backendReturn.singleFileRecovery;wrong.spec.sourceChanges.find(e=>e.path==='backend/ai/supportCostBudget.js').reviewedEvidenceSha256='f'.repeat(64);assert.throws(()=>source(wrong));
+});

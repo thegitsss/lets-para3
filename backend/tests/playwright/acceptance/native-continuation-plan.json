@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "mode": "exact-native-continuation-selection",
-  "status": "EXACT_REVIEWED_FINAL_N_AFFECTED_ACCEPTANCE_SELECTION",
+  "status": "EXACT_FINAL_T_CURRENT_HEAD_QUALITY_ACCEPTANCE_PRESERVING6251_MIXED_CLASSES",
   "repository": "thegitsss/lets-para3",
   "candidateCommit": "@checked-out-head",
   "priorRunId": 38671785162,
@@ -77,7 +77,7 @@
     "backend/ai/paralegalSupportProductionDefects.js": "cdd5b729108eb3bc9c9005a258d5382aa1409b8d59911fd576103bbad37f889f",
     "backend/ai/supportAgent.js": "ba09781507121cfbe25cf1610b918249a41d6ba99049afd081d5250febcff54f",
     "backend/ai/supportAgentTools.js": "ff82c61b7c2c19727d5823d9d4a96999febf6033288f0b65c100e8e254e2becc",
-    "backend/ai/supportCostBudget.js": "6a14b5470d0c2e9668c87d9bf2c88b37ed2019353fcfa83db8154fd1059b6377",
+    "backend/ai/supportCostBudget.js": "fd8cbc397c92c397f3caa5a4c5bf7ec19f9b5fc2509984ece171f43b8a2634ff",
     "backend/ai/supportEvidenceFreshness.js": "5957db8461a7eab64ed4d9d6bcbe4552e387973ac30211e7e3f8506eb392f398",
     "backend/ai/supportManagerAgent.js": "10b12c3d818390b893ba4e53482b48a6d1f3d52a0f5c02ede3e08097361a0717",
     "backend/assets/fonts/CormorantGaramond-Light.ttf": "b20b7d9626dd956b2c5e558692ad328b1f19e3275e2782db4fa07670d83f35e0",
@@ -318,7 +318,7 @@
     "backend/scripts/e2e-withdrawal-flow.js": "d77d5e8b650990f3e5069e15b90747cf7ebe0a816b1b82035133c3f93c38a71e",
     "backend/scripts/e2e-workspace-fixture.js": "e35ecd1f681870a4fb57e49ff84191004cf835d307f8da974add22119ec845dd",
     "backend/scripts/eval-attorney-support-coverage.js": "8d61294b1fda7c298cb22ac710930dbaa5f3500a4e0923867fc5e64c52f8990d",
-    "backend/scripts/eval-attorney-support-e2e.js": "ab7ce3d5466e93dd3d60a2c4bec07891d049aad474cf3a649281ac04aad5c879",
+    "backend/scripts/eval-attorney-support-e2e.js": "1d291499406097cb58eff2467f07db3fe6e73d94c0a7c086d091dabb1229cc53",
     "backend/scripts/eval-attorney-support-manager.js": "a8efa84add0ca0773744e1656c7393d79838f4b3cfbb6b888f3f8c14500927ad",
     "backend/scripts/eval-paralegal-support-coverage.js": "86cd2290a14d96a6ccbff76edb8e0ba655c48017a798eaaa41039edd0a434127",
     "backend/scripts/eval-paralegal-support-e2e.js": "3deb1d021316eb46ef564e7e6503d63eeaa17be69c816578cd6dbd21ec2da66f",
@@ -368,7 +368,7 @@
     "backend/scripts/serve-homepage-preview.js": "8e7f79d05b34b43df10fe623d02386c4d10c61bf9d712c87a38ab2cbe14d7c05",
     "backend/scripts/setup-support-mailbox.cjs": "0b5623c6265d9604bbece626384e56a7624b6e336721e9b9e126162a73f39cbd",
     "backend/scripts/setup-support-mailbox.test.cjs": "98e3802cb3d1a14e6001cd25895234579ff650cf0c215ee6861e9c5b5d3d870c",
-    "backend/scripts/single-file-jest-return-controls.test.cjs": "8e5fb7253226d16ce9f4044c4dd656958a1eb9e88362f24f479cc4f61c71d9bb",
+    "backend/scripts/single-file-jest-return-controls.test.cjs": "c0b6aeaddf17e1f15cd694d8b582041466f9432275fd6fac5e8c60108452e401",
     "backend/scripts/staging-document-canary.cjs": "74782571ec36732d6380af116c3c04965448c3401cdecd61091023eafb6627f4",
     "backend/scripts/staging-storage-access-controls.cjs": "4c8ac1a499521fbd0273623def7b025ade0ec856a82314545733e1162f115afe",
     "backend/scripts/staging-storage-failure-drill.cjs": "9a3fe0faa50b7a48289649503c89d326abdc07e9859e9f04881ef02869080c77",
@@ -396,7 +396,7 @@
     "backend/scripts/verify-critical-browser-groups.js": "6015deaa9deb7a6f0b6d8fdde328e3290626483b019140cbe8609940262b68ef",
     "backend/scripts/verify-production-surface.js": "59a98e67bfdbae1fd1b505d5a2b8654a40f9f45f9526ef16a4217bb4cf75dcf2",
     "backend/scripts/verify-runtime.js": "bdf42bca89111953a6964b3992c2de2e2f696f173517ac37db745e06629fe038",
-    "backend/scripts/verify-single-file-jest-return.cjs": "3a82147bfae6cb3c15cb582ba793d43c611833c5df5979221f1973863a22ef9e",
+    "backend/scripts/verify-single-file-jest-return.cjs": "0e7f1323c75bb886618f206a8badd1c4b508c9f003a25c910607bc98e03925eb",
     "backend/scripts/verify-source-bound-backend-return.js": "9339327e593eef71d51e10d9b20ea52f550fa890e0111c6026b7498d943f7787",
     "backend/scripts/verify-staging-storage-controls.py": "001c366da8451277794ed71566c348ca2fea22c6e7a2c7d2d87a276987c4d274",
     "backend/services/accountApplicationProjections.js": "1f26295a9e0a9d74fb46b0cb1b54c7928ccf9891b92f33d3a17654f6af7f0081",
@@ -1653,7 +1653,7 @@
     "backend/tests/stagingCanaryCleanup.test.js": "3b9c1cf790b1f636725f7e88ed40f6ff2c78410b379dbd9f65625350a57f4e3a",
     "backend/tests/stagingDocumentCanary.test.js": "360c86a98c0d9ae14d6a72b5083e6a974971379442a3b4aba59e1a413f0e69a5",
     "backend/tests/stagingDocumentStorage.test.js": "ac37a82f4428823cfe00e63173ac65924ea5bffb760db7b5797e187785aa6a55",
-    "backend/tests/stagingEmailBoundary.test.js": "7bd0c576a2bf5527600a2f40a31f410da383fab3e7da0deeb54856d0cd7a6b99",
+    "backend/tests/stagingEmailBoundary.test.js": "53054c9d0ba4cff0de8cab847918f1ba1005b99dfe86a7c55d810b4db615229e",
     "backend/tests/stagingHttpAccess.test.js": "077546dfa254e16b609dbfeb21f4c2fd03fa18461c1179bb04f4f99d1e0f7a70",
     "backend/tests/stagingProvisioningPermissions.test.js": "ac2bc792bcf8bbcdd79d0422f034ac2ba851b28642b9faf1622b628839cc29cb",
     "backend/tests/stagingRuntimeConfig.test.js": "1398171e8fff5c6ec1ee6b0887b56a3929080d24625a6a58dee0a38290c9b239",
@@ -1675,7 +1675,7 @@
     "backend/tests/supportConversationMutationBoundary.test.js": "037917d433847357443caf76e264a1a0c025dc5299d22d8d1c0010222265233c",
     "backend/tests/supportConversationReadRace.test.js": "11fade666545b57517731e7edaffef5eda4b69afdddf5e08d16271e4a0ee5cca",
     "backend/tests/supportCostBudget.test.js": "aa56a9557aefe74148f435f4dc45fcceac517965e71e60bdbf587b1cde0dfe2b",
-    "backend/tests/supportCostBudgetCeiling.test.js": "f66164969b1a8f6f70dcbb5222635d2e97db996d5bbe97616a48a94a7bcb8d1e",
+    "backend/tests/supportCostBudgetCeiling.test.js": "fbbbd5e736c8e5df10f65f73bdfa3e8b8bbce3d0de72030f265c606781527ad4",
     "backend/tests/supportCostBudgetReplica.test.js": "6e830b20dcd0f1a7d3c24110fbedc0311b1d9dfed25bb01c80eda0720484201c",
     "backend/tests/supportDrawerResponsiveBoundary.test.js": "8dc00bd4766006a71cd6dd32d3296764870cb4f9a673ea647a1e31e2264575ac",
     "backend/tests/supportEvidenceFreshness.test.js": "301ec4062726bf3d8076f7bfc2371283b3cfe3933751024d4c264c8e91321dcf",
@@ -1782,7 +1782,7 @@
     "backend/utils/s3Client.js": "3974e516d87401d265da705b45d322f5d5733b3d9cf87f6932821859983936ee",
     "backend/utils/sanitize.js": "7972b99226b5b18d00b776ca08f8a2e62fee8f1ae4a90e3f0eeb8bb5fd10e6aa",
     "backend/utils/smtpDeliveryOutcome.js": "d33702f612351d30cccea61e7212e6fc1771df0e3733a68ae333c5055b278d35",
-    "backend/utils/stagingEmailBoundary.js": "564a0908978ab092db1b78d8d0b1261e13f09fbfe85321c07ccdd19a25b40820",
+    "backend/utils/stagingEmailBoundary.js": "9e6d691cdadacd65dc7e3de3e425970890860f9a1749ea25df9e286388df8fcd",
     "backend/utils/stagingHttpAccess.js": "70980dbcf88bcee18f570969d7755da48fc955c2a20234741f6a0999d5508306",
     "backend/utils/stagingRuntimeConfig.js": "38bb0a4b300c5b9e73df243d8bd94b8033dc5f002609d6ee2fa8f870b4603430",
     "backend/utils/staticCache.js": "df4bddde85f62af595078bf5ffeee2c93cc582300a52d1395d9591268878803f",
@@ -2493,7 +2493,7 @@
     "frontend/assets/scripts/attorney-v2/workspace-dates.mjs",
     "frontend/assets/scripts/director-portal.js"
   ],
-  "runtimeApplicabilityStatus": "Explicit per-identity review;15L individual partial classes retained;4136older native and1615JUnit classes not blanket qualified",
+  "runtimeApplicabilityStatus": "All6251 currentQ source applicability verified; original4136 native/1615JUnit/500 continuation classes retained. CurrentT default/runtime/source bridges are separate. Six native repeats belong to one final required current-head acceptance, not new unique completion.",
   "selectionConfigExceptions": [
     "Raw argv retained in source collection reports; comparison excludes argv because exact file/suite/title/engine test-list is independently collected and compared.",
     "Selected command adds --fail-on-flaky-tests; it may only strengthen a false full-catalog collection flag to true, never relax it.",
@@ -7918,6 +7918,14 @@
         "reason": "Original actual current-qualified outcome remains missing.",
         "evidence": [],
         "originalProofClass": "junit-business-fragment-only"
+      },
+      "finalAcceptanceRepetition": {
+        "previousApplicableOutcomeRetained": true,
+        "priorComplete6251SourceApplicability": {
+          "path": "outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/applicability/QUALIFIED_CURRENT_Q6251_MIXED_CATALOGUE_SOURCE_APPLICABILITY.json",
+          "sha256": "6f7c9da9b9f8d1ff8992c17176f3b0d837585330ca43e05db9d3788ff5a84926"
+        },
+        "reason": "The existing current-head recovery Browser contracts gate requires exactly this6 identity selection. Repeat once as coordinated final acceptance, no changed assertion/deadline/model/context requirement and no new unique credit."
       }
     },
     {
@@ -7976,7 +7984,15 @@
         "originalWholeGroupQualified": false,
         "originalGroupExitCode": 1
       },
-      "requiredRecheckReason": "Exact draft-page CSS is changed; original three-engine layout callback is affected."
+      "requiredRecheckReason": "Exact draft-page CSS is changed; original three-engine layout callback is affected.",
+      "finalAcceptanceRepetition": {
+        "previousApplicableOutcomeRetained": true,
+        "priorComplete6251SourceApplicability": {
+          "path": "outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/applicability/QUALIFIED_CURRENT_Q6251_MIXED_CATALOGUE_SOURCE_APPLICABILITY.json",
+          "sha256": "6f7c9da9b9f8d1ff8992c17176f3b0d837585330ca43e05db9d3788ff5a84926"
+        },
+        "reason": "The existing current-head recovery Browser contracts gate requires exactly this6 identity selection. Repeat once as coordinated final acceptance, no changed assertion/deadline/model/context requirement and no new unique credit."
+      }
     },
     {
       "source": "backend/tests/playwright/attorney-v2/draft-workflow.spec.js",
@@ -8034,7 +8050,15 @@
         "originalWholeGroupQualified": false,
         "originalGroupExitCode": 1
       },
-      "requiredRecheckReason": "Exact draft-page CSS is changed; original three-engine layout callback is affected."
+      "requiredRecheckReason": "Exact draft-page CSS is changed; original three-engine layout callback is affected.",
+      "finalAcceptanceRepetition": {
+        "previousApplicableOutcomeRetained": true,
+        "priorComplete6251SourceApplicability": {
+          "path": "outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/applicability/QUALIFIED_CURRENT_Q6251_MIXED_CATALOGUE_SOURCE_APPLICABILITY.json",
+          "sha256": "6f7c9da9b9f8d1ff8992c17176f3b0d837585330ca43e05db9d3788ff5a84926"
+        },
+        "reason": "The existing current-head recovery Browser contracts gate requires exactly this6 identity selection. Repeat once as coordinated final acceptance, no changed assertion/deadline/model/context requirement and no new unique credit."
+      }
     },
     {
       "source": "backend/tests/playwright/attorney-v2/conversation.spec.js",
@@ -11234,7 +11258,15 @@
         "originalWholeGroupQualified": false,
         "originalGroupExitCode": 1
       },
-      "requiredRecheckReason": "Exact changed-session fixture is corrected for completed redirect and independent pre-loss contexts; the same original callback is affected in all three engines."
+      "requiredRecheckReason": "Exact changed-session fixture is corrected for completed redirect and independent pre-loss contexts; the same original callback is affected in all three engines.",
+      "finalAcceptanceRepetition": {
+        "previousApplicableOutcomeRetained": true,
+        "priorComplete6251SourceApplicability": {
+          "path": "outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/applicability/QUALIFIED_CURRENT_Q6251_MIXED_CATALOGUE_SOURCE_APPLICABILITY.json",
+          "sha256": "6f7c9da9b9f8d1ff8992c17176f3b0d837585330ca43e05db9d3788ff5a84926"
+        },
+        "reason": "The existing current-head recovery Browser contracts gate requires exactly this6 identity selection. Repeat once as coordinated final acceptance, no changed assertion/deadline/model/context requirement and no new unique credit."
+      }
     },
     {
       "source": "backend/tests/playwright/attorney-v2/invitations.spec.js",
@@ -11470,7 +11502,15 @@
         "originalWholeGroupQualified": false,
         "originalGroupExitCode": 1
       },
-      "requiredRecheckReason": "Exact changed-session fixture is corrected for completed redirect and independent pre-loss contexts; the same original callback is affected in all three engines."
+      "requiredRecheckReason": "Exact changed-session fixture is corrected for completed redirect and independent pre-loss contexts; the same original callback is affected in all three engines.",
+      "finalAcceptanceRepetition": {
+        "previousApplicableOutcomeRetained": true,
+        "priorComplete6251SourceApplicability": {
+          "path": "outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/applicability/QUALIFIED_CURRENT_Q6251_MIXED_CATALOGUE_SOURCE_APPLICABILITY.json",
+          "sha256": "6f7c9da9b9f8d1ff8992c17176f3b0d837585330ca43e05db9d3788ff5a84926"
+        },
+        "reason": "The existing current-head recovery Browser contracts gate requires exactly this6 identity selection. Repeat once as coordinated final acceptance, no changed assertion/deadline/model/context requirement and no new unique credit."
+      }
     },
     {
       "source": "backend/tests/playwright/attorney-v2/invitations.spec.js",
@@ -11691,6 +11731,14 @@
         "reason": "Original actual current-qualified outcome remains missing.",
         "evidence": [],
         "originalProofClass": "junit-business-fragment-only"
+      },
+      "finalAcceptanceRepetition": {
+        "previousApplicableOutcomeRetained": true,
+        "priorComplete6251SourceApplicability": {
+          "path": "outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/applicability/QUALIFIED_CURRENT_Q6251_MIXED_CATALOGUE_SOURCE_APPLICABILITY.json",
+          "sha256": "6f7c9da9b9f8d1ff8992c17176f3b0d837585330ca43e05db9d3788ff5a84926"
+        },
+        "reason": "The existing current-head recovery Browser contracts gate requires exactly this6 identity selection. Repeat once as coordinated final acceptance, no changed assertion/deadline/model/context requirement and no new unique credit."
       }
     },
     {
@@ -33544,7 +33592,7 @@
         "bytes": 6852797
       }
     ],
-    "coverage": "Historical standard recovery recipe preserves six current-P native identities. This Q standalone manual job executes only current final17, one artifact at most32MiB; native0, prior153 archives/1397187555bytes remain locally retained with8 immutable archive inventories. Conservative8GiB context ceiling remains unchanged and unused native allocations are not uploaded.",
+    "coverage": "One final T quality recovery-return executes actual current source/security jobs, unchanged signed-recovery17 and the six original draft/invitation native identities required by the existing current-head Browser contracts branch. Seven complete artifact families within the unchanged8GiB reservation,1dayretention,verified archive before cleanup48h. Prior applicable P6/Q17 and full6251 mixed classes remain credited; repeated6 add no unique completion and are not full6251 rerun.",
     "recoveryArtifacts": [
       {
         "prefix": "jest-single-final-recovery",
@@ -34728,8 +34776,8 @@
         {
           "path": "backend/ai/supportCostBudget.js",
           "beforeSha256": null,
-          "afterSha256": "6a14b5470d0c2e9668c87d9bf2c88b37ed2019353fcfa83db8154fd1059b6377",
-          "reviewedEvidenceSha256": "494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd",
+          "afterSha256": "fd8cbc397c92c397f3caa5a4c5bf7ec19f9b5fc2509984ece171f43b8a2634ff",
+          "reviewedEvidenceSha256": "9c37e7b83e16fb3d191ece315877123d68676d0049301df2b4cb71972371b4cd",
           "kind": "product-change",
           "affectedSuites": [
             "tests/supportCostBudget.test.js",
@@ -34788,8 +34836,8 @@
         {
           "path": "backend/scripts/eval-attorney-support-e2e.js",
           "beforeSha256": "e4f76337b65f050641d71dfbf7418ef30031133ab74e7c46286b2de997521b81",
-          "afterSha256": "ab7ce3d5466e93dd3d60a2c4bec07891d049aad474cf3a649281ac04aad5c879",
-          "reviewedEvidenceSha256": "0033f4f324de940dbae5ebcae5669690ff2b31a5312e8bf748272a714749dbad",
+          "afterSha256": "1d291499406097cb58eff2467f07db3fe6e73d94c0a7c086d091dabb1229cc53",
+          "reviewedEvidenceSha256": "b66782defb11d0d4354c0a58f82abfda5e06ff8c7dc0b1447e50a1c4c315cee7",
           "kind": "ci-control",
           "affectedSuites": []
         },
@@ -34882,10 +34930,10 @@
         {
           "path": "backend/scripts/single-file-jest-return-controls.test.cjs",
           "beforeSha256": null,
-          "afterSha256": "8e5fb7253226d16ce9f4044c4dd656958a1eb9e88362f24f479cc4f61c71d9bb",
+          "afterSha256": "c0b6aeaddf17e1f15cd694d8b582041466f9432275fd6fac5e8c60108452e401",
           "kind": "ci-control",
           "affectedSuites": [],
-          "reviewedEvidenceSha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
+          "reviewedEvidenceSha256": "20023c0ae1c034f7c3121cfdcd484d975f2504d51cf3d2342ef6e66b21bfb51b"
         },
         {
           "path": "backend/scripts/verify-critical-browser-groups.js",
@@ -34898,10 +34946,10 @@
         {
           "path": "backend/scripts/verify-single-file-jest-return.cjs",
           "beforeSha256": null,
-          "afterSha256": "3a82147bfae6cb3c15cb582ba793d43c611833c5df5979221f1973863a22ef9e",
+          "afterSha256": "0e7f1323c75bb886618f206a8badd1c4b508c9f003a25c910607bc98e03925eb",
           "kind": "ci-control",
           "affectedSuites": [],
-          "reviewedEvidenceSha256": "face74defc6b49de0bbe1d5a7a40890060a2b52a1293868b8ad5d6c06db13b1a"
+          "reviewedEvidenceSha256": "20023c0ae1c034f7c3121cfdcd484d975f2504d51cf3d2342ef6e66b21bfb51b"
         },
         {
           "path": "backend/scripts/verify-source-bound-backend-return.js",
@@ -35039,7 +35087,7 @@
           "path": "backend/tests/playwright/acceptance/native-continuation-plan.json",
           "beforeSha256": null,
           "afterSha256": "@approved-plan",
-          "reviewedEvidenceSha256": "4345ab177cc51a48633e1edc131101a777a35f39840610db80dd7160c673c795",
+          "reviewedEvidenceSha256": "20023c0ae1c034f7c3121cfdcd484d975f2504d51cf3d2342ef6e66b21bfb51b",
           "kind": "test-fixture",
           "affectedSuites": []
         },
@@ -35343,6 +35391,16 @@
           "browserAcceptanceRequired": true
         },
         {
+          "path": "backend/tests/stagingEmailBoundary.test.js",
+          "beforeSha256": "7bd0c576a2bf5527600a2f40a31f410da383fab3e7da0deeb54856d0cd7a6b99",
+          "kind": "test-fixture",
+          "affectedSuites": [
+            "tests/stagingEmailBoundary.test.js"
+          ],
+          "afterSha256": "53054c9d0ba4cff0de8cab847918f1ba1005b99dfe86a7c55d810b4db615229e",
+          "reviewedEvidenceSha256": "06b8b19323fc74ee84a1108370e04c3272a4c4b0b81625054c67fa7ea21b5db3"
+        },
+        {
           "path": "backend/tests/supportCostBudget.test.js",
           "beforeSha256": null,
           "afterSha256": "aa56a9557aefe74148f435f4dc45fcceac517965e71e60bdbf587b1cde0dfe2b",
@@ -35355,8 +35413,8 @@
         {
           "path": "backend/tests/supportCostBudgetCeiling.test.js",
           "beforeSha256": null,
-          "afterSha256": "f66164969b1a8f6f70dcbb5222635d2e97db996d5bbe97616a48a94a7bcb8d1e",
-          "reviewedEvidenceSha256": "494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd",
+          "afterSha256": "fbbbd5e736c8e5df10f65f73bdfa3e8b8bbce3d0de72030f265c606781527ad4",
+          "reviewedEvidenceSha256": "9c37e7b83e16fb3d191ece315877123d68676d0049301df2b4cb71972371b4cd",
           "kind": "test-fixture",
           "affectedSuites": [
             "tests/supportCostBudgetCeiling.test.js"
@@ -35371,6 +35429,17 @@
           "affectedSuites": [
             "tests/supportCostBudgetReplica.test.js"
           ]
+        },
+        {
+          "path": "backend/utils/stagingEmailBoundary.js",
+          "beforeSha256": "564a0908978ab092db1b78d8d0b1261e13f09fbfe85321c07ccdd19a25b40820",
+          "kind": "product-change",
+          "affectedSuites": [
+            "tests/stagingEmailBoundary.test.js",
+            "tests/stagingRuntimeConfig.test.js"
+          ],
+          "afterSha256": "9e6d691cdadacd65dc7e3de3e425970890860f9a1749ea25df9e286388df8fcd",
+          "reviewedEvidenceSha256": "06b8b19323fc74ee84a1108370e04c3272a4c4b0b81625054c67fa7ea21b5db3"
         },
         {
           "path": "docs/LAUNCH_CERTIFICATION_CURRENT.md",
@@ -38311,5 +38380,20 @@
     "maximumActualNewArtifactBytes": 33554432,
     "originalPWorkflowConclusion": "failure-preserved",
     "nativeRowsBelow": "Historical reusable six-case recovery recipe; all6 actualP outcomes alreadyqualified, no native job called by standalone Q manualworkflow."
+  },
+  "finalCurrentHeadAcceptance": {
+    "executionScope": "recovery-return",
+    "backendCallbacks": 17,
+    "backend100ModelStages": 53,
+    "nativeCallbacks": 6,
+    "nativeScopes": 2,
+    "fullBackend543Repeat": false,
+    "fullBrowser6251Repeat": false,
+    "preservedPriorCompleteSourceApplicability": {
+      "path": "outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/applicability/QUALIFIED_CURRENT_Q6251_MIXED_CATALOGUE_SOURCE_APPLICABILITY.json",
+      "sha256": "6f7c9da9b9f8d1ff8992c17176f3b0d837585330ca43e05db9d3788ff5a84926"
+    },
+    "reason": "One owner-authorized final integrated acceptance using existing required quality workflow; no separate manualfinal17 dispatch and no new workflow mode.",
+    "providerOrProductionCertification": false
   }
 }

@@ -101,6 +101,27 @@ function accuratePostingPaymentAnswer(value = "") {
   return true;
 }
 
+function accurateGeneralPayoutTimingAnswer(value = "") {
+  const text = String(value).replace(/[’]/g, "'");
+  const release = "\\breleas(?:e[sd]?|ing)\\b";
+  const completion = "\\bcomplet(?:e[sd]?|ing|ion)\\b";
+  const sentences = text.split(/[.!?\n]+/);
+  const premature = new RegExp(`${release}[^.!?]{0,160}\\b(?:before|without)\\b[^.!?]{0,160}${completion}|\\bbefore\\b[^.!?]{0,120}${completion}[^.!?]{0,120}${release}`, "i");
+  const deniedRelease = new RegExp(`\\b(?:not|never|cannot|can't|doesn't|don't)\\b[^.!?]{0,45}${release}`, "i");
+  const heldUntilComplete = new RegExp(`\\b(?:not|cannot|can't|isn't|won't)\\b[^.!?]{0,25}${release}[^.!?]{0,25}\\b(?:until|before)\\b[^.!?]{0,120}${completion}`, "i");
+  if (sentences.some(sentence => (premature.test(sentence) || deniedRelease.test(sentence)) && !heldUntilComplete.test(sentence))) return false;
+  if (/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:(?:–|-|to)\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*)?(?:business\s+)?days?\b/i.test(text)) return false;
+  const bankGuarantee = /\b(?:guarantee[sd]?|always|fixed|instant(?:ly)?|immediate(?:ly)?)\b[^.!?]{0,100}\b(?:bank|deposit|arrival|payout schedule)\b|\b(?:bank|deposit|arrival)\b[^.!?]{0,100}\b(?:guaranteed|fixed|instant(?:ly)?|immediate(?:ly)?)\b/i;
+  if (sentences.flatMap(sentence => sentence.split(/;|\bbut\b/i)).some(clause => bankGuarantee.test(clause) && !/\b(?:not|never|cannot|can't|isn't|aren't|no)\b[^.!?]{0,35}\b(?:guarantee[sd]?|fixed|instant(?:ly)?|immediate(?:ly)?)\b/i.test(clause))) return false;
+  if (/\b(?:does\s+not|doesn't|do\s+not|don't|never)\s+(?:depend\s+on|vary\s+(?:by|with)|follow|rely\s+on)\b[^.!?]{0,100}\bStripe\b|\b(?:bank|arrival|deposit|timing)\b[^.!?]{0,100}\b(?:independent of|unaffected by|unrelated to|regardless of)\b[^.!?]{0,100}\bStripe\b|\bStripe\b[^.!?]{0,120}\b(?:does not|doesn't|cannot|can't)\s+(?:affect|govern|determine|influence|change)\b[^.!?]{0,100}\b(?:bank|arrival|deposit|timing)\b/i.test(text)) return false;
+  const positiveRelation = new RegExp(`${release}[^.!?]{0,160}\\b(?:when|once|after|upon)\\b[^.!?]{0,160}${completion}|\\b(?:when|once|after|upon)\\b[^.!?]{0,160}${completion}[^.!?]{0,160}${release}|${completion}[^.!?]{0,100}\\b(?:triggers?|then)\\b[^.!?]{0,80}${release}`, "i");
+  const releaseOnMatterCompletion = sentences.some(sentence => /\bmatter\b/i.test(sentence) && (positiveRelation.test(sentence) || heldUntilComplete.test(sentence)));
+  const stripeBankTiming = /\bStripe\b[^.!?]{0,260}\b(?:estimated arrival|payout schedule)\b/i.test(text)
+    && /\b(?:depend[s]?|var(?:y|ies|iable)|estimated|govern[s]?|based on|subject to)\b/i.test(text)
+    && /\b(?:bank|arrival|deposit|financial institution)\b/i.test(text);
+  return releaseOnMatterCompletion && stripeBankTiming;
+}
+
 async function pinInaccessibleMatterFixture(fixture, collection = Case.collection) {
   const fixed = new mongoose.Types.ObjectId("67000000000000000000f017");
   const originalId = fixture.caseIds.inaccessible;
@@ -537,7 +558,7 @@ async function main() {
         name: "general paralegal payout timing uses executable workflow policy",
         messageText: "When does the paralegal get paid?",
         expectedTools: ["get_attorney_workflow_readiness"],
-        answerPattern: /(?:complete|completion)[\s\S]*(?:release|payout)[\s\S]*Stripe[\s\S]*(?:estimated arrival|payout schedule)|Stripe[\s\S]*(?:estimated arrival|payout schedule)[\s\S]*(?:complete|completion)[\s\S]*(?:release|payout)/i,
+        answerPattern: { test: accurateGeneralPayoutTimingAnswer },
         forbiddenPatterns: [
           /\b\d+\s*(?:–|-|to)\s*\d+\s+business days\b/i,
           /couldn(?:'|’)t verify/i,

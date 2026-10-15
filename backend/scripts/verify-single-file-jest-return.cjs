@@ -27,14 +27,14 @@ const BACKEND_RUNTIME_CHANGES={
   "backend/ai/supportCostBudget.js": {
     "pins": [
       null,
-      "6a14b5470d0c2e9668c87d9bf2c88b37ed2019353fcfa83db8154fd1059b6377"
+      "fd8cbc397c92c397f3caa5a4c5bf7ec19f9b5fc2509984ece171f43b8a2634ff"
     ],
     "affectedSuites": [
       "tests/supportCostBudget.test.js",
       "tests/supportCostBudgetReplica.test.js",
       "tests/supportCostBudgetCeiling.test.js"
     ],
-    "reviewedEvidenceSha256": "494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd"
+    "reviewedEvidenceSha256": "9c37e7b83e16fb3d191ece315877123d68676d0049301df2b4cb71972371b4cd"
   },
   "backend/tests/supportCostBudget.test.js": {
     "pins": [
@@ -59,12 +59,12 @@ const BACKEND_RUNTIME_CHANGES={
   "backend/tests/supportCostBudgetCeiling.test.js": {
     "pins": [
       null,
-      "f66164969b1a8f6f70dcbb5222635d2e97db996d5bbe97616a48a94a7bcb8d1e"
+      "fbbbd5e736c8e5df10f65f73bdfa3e8b8bbce3d0de72030f265c606781527ad4"
     ],
     "affectedSuites": [
       "tests/supportCostBudgetCeiling.test.js"
     ],
-    "reviewedEvidenceSha256": "494911103a605524b0fc2e5d43dc0daf1945fea7906e963e3fe967de83f646dd"
+    "reviewedEvidenceSha256": "9c37e7b83e16fb3d191ece315877123d68676d0049301df2b4cb71972371b4cd"
   },
   "backend/scripts/ops-monitor.js": {
     "pins": [
@@ -149,6 +149,27 @@ const BACKEND_RUNTIME_CHANGES={
       "tests/adminAdmissionsJourney.test.js"
     ],
     "reviewedEvidenceSha256": "0c8488006159efe06ff58faacdd62443ccb1a2357208935e199be6943f6b31eb"
+  },
+  "backend/utils/stagingEmailBoundary.js": {
+    "pins": [
+      "564a0908978ab092db1b78d8d0b1261e13f09fbfe85321c07ccdd19a25b40820",
+      "9e6d691cdadacd65dc7e3de3e425970890860f9a1749ea25df9e286388df8fcd"
+    ],
+    "affectedSuites": [
+      "tests/stagingEmailBoundary.test.js",
+      "tests/stagingRuntimeConfig.test.js"
+    ],
+    "reviewedEvidenceSha256": "06b8b19323fc74ee84a1108370e04c3272a4c4b0b81625054c67fa7ea21b5db3"
+  },
+  "backend/tests/stagingEmailBoundary.test.js": {
+    "pins": [
+      "7bd0c576a2bf5527600a2f40a31f410da383fab3e7da0deeb54856d0cd7a6b99",
+      "53054c9d0ba4cff0de8cab847918f1ba1005b99dfe86a7c55d810b4db615229e"
+    ],
+    "affectedSuites": [
+      "tests/stagingEmailBoundary.test.js"
+    ],
+    "reviewedEvidenceSha256": "06b8b19323fc74ee84a1108370e04c3272a4c4b0b81625054c67fa7ea21b5db3"
   }
 };
 // Exact reviewed backend additions; the default-off Assistant bridge preserves existing AI consumers.
