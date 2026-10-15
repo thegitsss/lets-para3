@@ -1,0 +1,741 @@
+{
+  "schemaVersion": 1,
+  "selectionAuthority": "Package-declared15critical scopes plus accepted permanent affected regression files; no test/assertion changes.",
+  "originalDeclaredCriticalIdentities": 5945,
+  "additionalAffectedIdentities": 102,
+  "equivalentSharedFinancialDuplicateExecutionsRemoved": 114,
+  "expectedUniqueCriticalIdentities": 5933,
+  "separateAccessibility": 294,
+  "separatePerformance": 12,
+  "expectedOverallUniqueIdentities": 6239,
+  "sourceBaseCommit": "6ef16ef35e01f3907605a0501c2140b1ebb7c434",
+  "groups": [
+    {
+      "name": "attorney-v2-actual-shared-1",
+      "suite": "test:playwright:attorney-v2",
+      "baseConfig": "tests/playwright/attorney-v2/playwright.config.js",
+      "adapter": "actual-shared",
+      "files": [
+        "tests/playwright/attorney-v2/creation-canvas.spec.js",
+        "tests/playwright/attorney-v2/deletion-reconciliation.spec.js",
+        "tests/playwright/attorney-v2/draft-workflow.spec.js",
+        "tests/playwright/attorney-v2/home-clarity.spec.js",
+        "tests/playwright/attorney-v2/legacy-home.spec.js",
+        "tests/playwright/attorney-v2/local-home-actual.spec.js",
+        "tests/playwright/attorney-v2/matter-deletion.spec.js",
+        "tests/playwright/attorney-v2/posting-outcomes.spec.js",
+        "tests/playwright/attorney-v2/withdrawal.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 321,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61000
+    },
+    {
+      "name": "attorney-v2-actual-shared-2",
+      "suite": "test:playwright:attorney-v2",
+      "baseConfig": "tests/playwright/attorney-v2/playwright.config.js",
+      "adapter": "actual-shared",
+      "files": [
+        "tests/playwright/attorney-v2/conversation.spec.js",
+        "tests/playwright/attorney-v2/files-refresh.spec.js",
+        "tests/playwright/attorney-v2/matters-standard.spec.js",
+        "tests/playwright/attorney-v2/message-attachments.spec.js",
+        "tests/playwright/attorney-v2/posting-busy-supplement.spec.js",
+        "tests/playwright/attorney-v2/private-discovery.spec.js",
+        "tests/playwright/attorney-v2/read-views.spec.js",
+        "tests/playwright/attorney-v2/receipts.spec.js",
+        "tests/playwright/attorney-v2/security.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 321,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61001
+    },
+    {
+      "name": "attorney-v2-actual-shared-3",
+      "suite": "test:playwright:attorney-v2",
+      "baseConfig": "tests/playwright/attorney-v2/playwright.config.js",
+      "adapter": "actual-shared",
+      "files": [
+        "tests/playwright/attorney-v2/account-applications.spec.js",
+        "tests/playwright/attorney-v2/current-drafts.spec.js",
+        "tests/playwright/attorney-v2/disputes.spec.js",
+        "tests/playwright/attorney-v2/filter-preference-boundaries.spec.js",
+        "tests/playwright/attorney-v2/finishing.spec.js",
+        "tests/playwright/attorney-v2/home-summaries.spec.js",
+        "tests/playwright/attorney-v2/matter-actions.spec.js",
+        "tests/playwright/attorney-v2/postings.spec.js",
+        "tests/playwright/attorney-v2/receipt-history.spec.js",
+        "tests/playwright/attorney-v2/retained-conversation.spec.js",
+        "tests/playwright/attorney-v2/task-matter-picker.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 321,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61002
+    },
+    {
+      "name": "attorney-v2-actual-shared-4",
+      "suite": "test:playwright:attorney-v2",
+      "baseConfig": "tests/playwright/attorney-v2/playwright.config.js",
+      "adapter": "actual-shared",
+      "files": [
+        "tests/playwright/attorney-v2/completion.spec.js",
+        "tests/playwright/attorney-v2/drafts.spec.js",
+        "tests/playwright/attorney-v2/files-refresh-native-geometry.spec.js",
+        "tests/playwright/attorney-v2/financial-history.spec.js",
+        "tests/playwright/attorney-v2/flag-review.spec.js",
+        "tests/playwright/attorney-v2/foundation.spec.js",
+        "tests/playwright/attorney-v2/matter-management-layout.spec.js",
+        "tests/playwright/attorney-v2/recovery-controls.spec.js",
+        "tests/playwright/attorney-v2/saved-view-current-sorts.spec.js",
+        "tests/playwright/attorney-v2/workspace.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 318,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61003
+    },
+    {
+      "name": "attorney-v2-declared-1",
+      "suite": "test:playwright:attorney-v2",
+      "baseConfig": "tests/playwright/attorney-v2/playwright.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/attorney-v2/current-engagement.spec.js",
+        "tests/playwright/attorney-v2/current-inventory.spec.js",
+        "tests/playwright/attorney-v2/frontend-static-return.spec.js",
+        "tests/playwright/attorney-v2/invitations.spec.js",
+        "tests/playwright/attorney-v2/matter-inventory.spec.js",
+        "tests/playwright/attorney-v2/payments-page.spec.js",
+        "tests/playwright/attorney-v2/pre-engagement.spec.js",
+        "tests/playwright/attorney-v2/saved-paralegals.spec.js",
+        "tests/playwright/attorney-v2/security-real.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 330,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [
+        "legacy-port-5889",
+        "legacy-port-5289"
+      ],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61004
+    },
+    {
+      "name": "attorney-v2-declared-2",
+      "suite": "test:playwright:attorney-v2",
+      "baseConfig": "tests/playwright/attorney-v2/playwright.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/attorney-v2/accounts.spec.js",
+        "tests/playwright/attorney-v2/blocked-real.spec.js",
+        "tests/playwright/attorney-v2/cancelled-departure.spec.js",
+        "tests/playwright/attorney-v2/current-matter-interface.spec.js",
+        "tests/playwright/attorney-v2/file-history.spec.js",
+        "tests/playwright/attorney-v2/files.spec.js",
+        "tests/playwright/attorney-v2/hiring.spec.js",
+        "tests/playwright/attorney-v2/legacy-invitations.spec.js",
+        "tests/playwright/attorney-v2/matter-preview-regression.spec.js",
+        "tests/playwright/attorney-v2/report-status.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 330,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [
+        "legacy-port-5293"
+      ],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61005
+    },
+    {
+      "name": "attorney-v2-declared-3",
+      "suite": "test:playwright:attorney-v2",
+      "baseConfig": "tests/playwright/attorney-v2/playwright.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/attorney-v2/application-decisions.spec.js",
+        "tests/playwright/attorney-v2/archive-exports.spec.js",
+        "tests/playwright/attorney-v2/closure-real.spec.js",
+        "tests/playwright/attorney-v2/displayed-documents.spec.js",
+        "tests/playwright/attorney-v2/file-uploads.spec.js",
+        "tests/playwright/attorney-v2/invitation-actions.spec.js",
+        "tests/playwright/attorney-v2/matter-dates.spec.js",
+        "tests/playwright/attorney-v2/notifications.spec.js",
+        "tests/playwright/attorney-v2/saved-views.spec.js",
+        "tests/playwright/attorney-v2/security-webauthn.chromium.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 328,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [
+        "legacy-port-5297",
+        "legacy-port-5289"
+      ],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61006
+    },
+    {
+      "name": "attorney-v2-declared-4",
+      "suite": "test:playwright:attorney-v2",
+      "baseConfig": "tests/playwright/attorney-v2/playwright.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/attorney-v2/accounts-real.spec.js",
+        "tests/playwright/attorney-v2/application-inventory.spec.js",
+        "tests/playwright/attorney-v2/application-resumes.spec.js",
+        "tests/playwright/attorney-v2/conversations-inbox.spec.js",
+        "tests/playwright/attorney-v2/downloads.spec.js",
+        "tests/playwright/attorney-v2/earlier-files.spec.js",
+        "tests/playwright/attorney-v2/funding.spec.js",
+        "tests/playwright/attorney-v2/invitation-inventory.spec.js",
+        "tests/playwright/attorney-v2/legacy-profile-engagement.spec.js",
+        "tests/playwright/attorney-v2/original-screen-acceptance.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 330,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [
+        "legacy-port-5281"
+      ],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61007
+    },
+    {
+      "name": "attorney-v2-declared-5",
+      "suite": "test:playwright:attorney-v2",
+      "baseConfig": "tests/playwright/attorney-v2/playwright.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/attorney-v2/applications.spec.js",
+        "tests/playwright/attorney-v2/archive.spec.js",
+        "tests/playwright/attorney-v2/blocked.spec.js",
+        "tests/playwright/attorney-v2/closure.spec.js",
+        "tests/playwright/attorney-v2/composer.spec.js",
+        "tests/playwright/attorney-v2/file-removal.spec.js",
+        "tests/playwright/attorney-v2/file-replacement.spec.js",
+        "tests/playwright/attorney-v2/matters-file-controls.spec.js",
+        "tests/playwright/attorney-v2/payment-setup.spec.js",
+        "tests/playwright/attorney-v2/pdf-refresh.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 330,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61008
+    },
+    {
+      "name": "attorney-v2-actual-notes-1",
+      "suite": "test:playwright:attorney-v2",
+      "baseConfig": "tests/playwright/attorney-v2/playwright.config.js",
+      "adapter": "actual-shared",
+      "files": [
+        "tests/playwright/attorney-v2/matter-notes.spec.js",
+        "tests/playwright/attorney-v2/weekly-notes.spec.js"
+      ],
+      "environment": {
+        "LPC_PRIVATE_NOTES_ACTUAL_FIXTURE": "true"
+      },
+      "expectedIdentities": 81,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61009
+    },
+    {
+      "name": "attorney-v2-actual-work-1",
+      "suite": "test:playwright:attorney-v2",
+      "baseConfig": "tests/playwright/attorney-v2/playwright.config.js",
+      "adapter": "actual-shared",
+      "files": [
+        "tests/playwright/attorney-v2/work.spec.js"
+      ],
+      "environment": {
+        "LPC_WORKSPACE_ACTUAL_FIXTURE": "true"
+      },
+      "expectedIdentities": 30,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61010
+    },
+    {
+      "name": "paralegal-support-declared-1",
+      "suite": "test:playwright:paralegal-support",
+      "baseConfig": "playwright.paralegal-support.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/paralegal-support/current-invitation-inventory.spec.js",
+        "tests/playwright/paralegal-support/header-consistency.spec.js",
+        "tests/playwright/paralegal-support/legacy-calendar.spec.js",
+        "tests/playwright/paralegal-support/profile-layout-stability.spec.js",
+        "tests/playwright/paralegal-support/rebuild-browse.spec.js",
+        "tests/playwright/paralegal-support/security-real.spec.js",
+        "tests/playwright/paralegal-support/v2-foundation.spec.js",
+        "tests/playwright/paralegal-support/v2-work.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 342,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [
+        "legacy-port-5289"
+      ],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61011
+    },
+    {
+      "name": "paralegal-support-declared-2",
+      "suite": "test:playwright:paralegal-support",
+      "baseConfig": "playwright.paralegal-support.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/paralegal-support/calendar.spec.js",
+        "tests/playwright/paralegal-support/matter-switcher.spec.js",
+        "tests/playwright/paralegal-support/rebuild-settings.spec.js",
+        "tests/playwright/paralegal-support/rebuild-workflows.spec.js",
+        "tests/playwright/paralegal-support/signin-hardening.spec.js",
+        "tests/playwright/paralegal-support/v2-browse.spec.js",
+        "tests/playwright/paralegal-support/v2-global-tools.spec.js",
+        "tests/playwright/paralegal-support/v2-help.spec.js",
+        "tests/playwright/paralegal-support/v2-report-status.spec.js",
+        "tests/playwright/paralegal-support/v2-settings.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 342,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61012
+    },
+    {
+      "name": "paralegal-support-declared-3",
+      "suite": "test:playwright:paralegal-support",
+      "baseConfig": "playwright.paralegal-support.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/paralegal-support/account-settings-visual.spec.js",
+        "tests/playwright/paralegal-support/availability-save.spec.js",
+        "tests/playwright/paralegal-support/financial-views.spec.js",
+        "tests/playwright/paralegal-support/legacy-home-departure.spec.js",
+        "tests/playwright/paralegal-support/legacy-home-states.spec.js",
+        "tests/playwright/paralegal-support/linear-contract.spec.js",
+        "tests/playwright/paralegal-support/received-inventory.spec.js",
+        "tests/playwright/paralegal-support/sidebar-consistency.spec.js",
+        "tests/playwright/paralegal-support/v2-application-pending.spec.js",
+        "tests/playwright/paralegal-support/v2-deadlines.spec.js",
+        "tests/playwright/paralegal-support/v2-submissions.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 342,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61013
+    },
+    {
+      "name": "paralegal-support-declared-4",
+      "suite": "test:playwright:paralegal-support",
+      "baseConfig": "playwright.paralegal-support.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/paralegal-support/conversations-approved.spec.js",
+        "tests/playwright/paralegal-support/home-redesign.spec.js",
+        "tests/playwright/paralegal-support/linear-desktop.spec.js",
+        "tests/playwright/paralegal-support/linear-rebuild.spec.js",
+        "tests/playwright/paralegal-support/paralegal-support.spec.js",
+        "tests/playwright/paralegal-support/shell-stability.spec.js",
+        "tests/playwright/paralegal-support/sidebar-visual.spec.js",
+        "tests/playwright/paralegal-support/signup-hardening.spec.js",
+        "tests/playwright/paralegal-support/v2-closure.spec.js",
+        "tests/playwright/paralegal-support/v2-help-intake-integration.spec.js",
+        "tests/playwright/paralegal-support/v2-matter.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 342,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61014
+    },
+    {
+      "name": "paralegal-support-declared-5",
+      "suite": "test:playwright:paralegal-support",
+      "baseConfig": "playwright.paralegal-support.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/paralegal-support/alignment.spec.js",
+        "tests/playwright/paralegal-support/availability-menu.spec.js",
+        "tests/playwright/paralegal-support/header.spec.js",
+        "tests/playwright/paralegal-support/private-office.spec.js",
+        "tests/playwright/paralegal-support/profile-inline-edit.spec.js",
+        "tests/playwright/paralegal-support/security-webauthn.chromium.spec.js",
+        "tests/playwright/paralegal-support/v2-closure-participation.spec.js",
+        "tests/playwright/paralegal-support/v2-closure-real.spec.js",
+        "tests/playwright/paralegal-support/v2-files.spec.js",
+        "tests/playwright/paralegal-support/v2-home.spec.js",
+        "tests/playwright/paralegal-support/v2-messaging.spec.js",
+        "tests/playwright/paralegal-support/v2-settings-refresh.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 340,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [
+        "legacy-port-5289",
+        "legacy-port-5301",
+        "legacy-port-5305"
+      ],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61015
+    },
+    {
+      "name": "paralegal-support-actual-shared-1",
+      "suite": "test:playwright:paralegal-support",
+      "baseConfig": "playwright.paralegal-support.config.js",
+      "adapter": "actual-shared",
+      "files": [
+        "tests/playwright/paralegal-support/paralegal-documents-actual.spec.js",
+        "tests/playwright/paralegal-support/paralegal-native-lifetime.spec.js",
+        "tests/playwright/paralegal-support/profile-actual-native.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 33,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61016
+    },
+    {
+      "name": "support",
+      "suite": "test:playwright:support",
+      "baseConfig": "playwright.support.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/support/support.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 45,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61017
+    },
+    {
+      "name": "paralegal-financial-records",
+      "suite": "test:playwright:paralegal-financial-records",
+      "baseConfig": "tests/playwright/paralegal-financial-records/real.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/paralegal-financial-records/history-interaction.spec.js",
+        "tests/playwright/paralegal-financial-records/real.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 75,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [
+        "legacy-http-5874",
+        "legacy-port-5874"
+      ],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61018
+    },
+    {
+      "name": "director-commission",
+      "suite": "test:playwright:director-commission",
+      "baseConfig": "tests/playwright/director-commission/playwright.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/director-commission/cap.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 42,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61019
+    },
+    {
+      "name": "control-room",
+      "suite": "test:playwright:control-room",
+      "baseConfig": "playwright.control-room.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/control-room/control-room.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 63,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61020
+    },
+    {
+      "name": "admin-financials",
+      "suite": "test:playwright:admin-financials",
+      "baseConfig": "playwright.admin-financials.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/admin-financials/communications.spec.js",
+        "tests/playwright/admin-financials/navigation.spec.js",
+        "tests/playwright/admin-financials/reports.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 204,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [
+        "legacy-http-5874",
+        "legacy-mongo-5875"
+      ],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61021
+    },
+    {
+      "name": "frontend-hygiene",
+      "suite": "test:playwright:frontend-hygiene",
+      "baseConfig": "tests/playwright/frontend-hygiene/playwright.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/frontend-hygiene/admin-review.spec.js",
+        "tests/playwright/frontend-hygiene/flows.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 102,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61022
+    },
+    {
+      "name": "workspace-session",
+      "suite": "test:playwright:workspace-session",
+      "baseConfig": "tests/playwright/workspace-session/playwright.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/workspace-session/account-entry-owned-real.spec.js",
+        "tests/playwright/workspace-session/bfcache-real.spec.js",
+        "tests/playwright/workspace-session/object-login-return-actual.spec.js",
+        "tests/playwright/workspace-session/paralegal.spec.js",
+        "tests/playwright/workspace-session/release-real.spec.js",
+        "tests/playwright/workspace-session/session-read-recovery.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 123,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61023
+    },
+    {
+      "name": "workspace-navigation",
+      "suite": "test:playwright:workspace-navigation",
+      "baseConfig": "tests/playwright/workspace-navigation/playwright.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/workspace-navigation/attorney.spec.js",
+        "tests/playwright/workspace-navigation/legacy-switcher.spec.js",
+        "tests/playwright/workspace-navigation/paralegal-scroll.spec.js",
+        "tests/playwright/workspace-navigation/paralegal.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 123,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61024
+    },
+    {
+      "name": "admin-evidence",
+      "suite": "test:playwright:admin-evidence",
+      "baseConfig": "tests/playwright/admin-evidence/completion.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/admin-evidence/correspondence.spec.js",
+        "tests/playwright/admin-evidence/evidence.spec.js",
+        "tests/playwright/admin-evidence/growth.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 15,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61025
+    },
+    {
+      "name": "financial-lifecycle",
+      "suite": "test:playwright:financial-lifecycle",
+      "baseConfig": "tests/playwright/financial-lifecycle/playwright.config.js",
+      "adapter": "actual-shared",
+      "files": [
+        "tests/playwright/financial-lifecycle/admission-journey.spec.js",
+        "tests/playwright/financial-lifecycle/exception.spec.js",
+        "tests/playwright/financial-lifecycle/financial-authority-actual.spec.js",
+        "tests/playwright/financial-lifecycle/financial-native-recovery-actual.spec.js",
+        "tests/playwright/financial-lifecycle/journey.spec.js",
+        "tests/playwright/financial-lifecycle/posting-lock-records-actual.spec.js",
+        "tests/playwright/financial-lifecycle/submission-journey.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 168,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61026
+    },
+    {
+      "name": "shared-matter",
+      "suite": "test:playwright:shared-matter",
+      "baseConfig": "tests/playwright/shared-matter/playwright.config.js",
+      "adapter": "actual-shared",
+      "files": [
+        "tests/playwright/messaging-integration/conversations-real.spec.js",
+        "tests/playwright/shared-matter/assistant-command.spec.js",
+        "tests/playwright/shared-matter/email-message-links.spec.js",
+        "tests/playwright/shared-matter/files-retained-real.spec.js",
+        "tests/playwright/shared-matter/paired-workspace.spec.js",
+        "tests/playwright/shared-matter/paralegal-message-controls-real.spec.js",
+        "tests/playwright/shared-matter/preferences.spec.js",
+        "tests/playwright/shared-matter/replies.spec.js",
+        "tests/playwright/shared-matter/snapshot-recovery.spec.js",
+        "tests/playwright/shared-matter/supported-formats-real.spec.js",
+        "tests/playwright/shared-matter/target-read.spec.js",
+        "tests/playwright/shared-matter/task-work-integration.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 75,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61027
+    },
+    {
+      "name": "admin-solo",
+      "suite": "test:playwright:admin-solo",
+      "baseConfig": "tests/playwright/admin-solo/playwright.config.js",
+      "adapter": "actual-shared",
+      "files": [
+        "tests/playwright/admin-solo/attention.spec.js",
+        "tests/playwright/admin-solo/inbox-note-authority-actual.spec.js",
+        "tests/playwright/admin-solo/inbox-reply-authority-actual.spec.js",
+        "tests/playwright/admin-solo/inbox-status-triage-authority-actual.spec.js",
+        "tests/playwright/admin-solo/information-request-authority-actual.spec.js",
+        "tests/playwright/admin-solo/routine-native-takeover-actual.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 93,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61028
+    },
+    {
+      "name": "director",
+      "suite": "test:playwright:director",
+      "baseConfig": "playwright.director.config.js",
+      "adapter": "declared",
+      "files": [
+        "tests/playwright/director/director.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 3,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61029
+    },
+    {
+      "name": "director-managed",
+      "suite": "test:playwright:director",
+      "baseConfig": "tests/playwright/financial-lifecycle/playwright.config.js",
+      "adapter": "actual-shared",
+      "files": [
+        "tests/playwright/director-entry/late-state-new-viewer-actual.spec.js",
+        "tests/playwright/director-entry/profile-outreach-authority-actual.spec.js",
+        "tests/playwright/director-entry/state-authority-actual.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 9,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "originalAssertionBodiesUnchanged": true,
+      "httpPort": 61030
+    },
+    {
+      "name": "financial-model-claims",
+      "suite": "test:playwright:financial-lifecycle",
+      "baseConfig": "tests/playwright/financial-lifecycle/playwright.config.js",
+      "adapter": "actual-shared",
+      "files": [
+        "tests/playwright/financial-lifecycle/financial-claim-transaction-actual.spec.js"
+      ],
+      "environment": {},
+      "expectedIdentities": 12,
+      "workers": 1,
+      "retries": 0,
+      "resourceLocks": [],
+      "httpPort": 61031,
+      "originalAssertionBodiesUnchanged": true,
+      "timeoutMs": 45000,
+      "expectMs": 15000,
+      "boundary": "Four original API/model-only transaction callbacks, zero native pages/contexts, collection across3 engine project labels;45s original proof budget retained."
+    }
+  ],
+  "scopeLimits": [
+    "Expected identities are collection, not passes.",
+    "Original per-callback deadline overrides, native controls, model records, auth/session behavior and browser projects stay in source.",
+    "actual-shared switches only setup ownership to previously qualified financial shared-Mongo adapter, and supplies required evidence paths. Existing individual fixtures continue signing in their actual owners.",
+    "Declared support/login/static fixtures preserve their original global hooks/storage state. Unused global setup is not removed by title/type inference.",
+    "Conditional notes/work fixture flags select their existing accepted real-handler adapters explicitly; no browser/API replacement added.",
+    "Shared114 is credited only to exact financial callbacks with explicit owned1366x900 contexts, same hooks/engines/deadlines; default device-context viewport is unused."
+  ],
+  "allowedScriptAdapters": {
+    "attorney-v2": "node scripts/run-critical-browser-group.js --suite attorney-v2",
+    "paralegal-support": "node scripts/run-critical-browser-group.js --suite paralegal-support",
+    "director": "node scripts/run-critical-browser-group.js --suite director",
+    "financial-lifecycle": "node scripts/run-critical-browser-group.js --suite financial-lifecycle",
+    "shared-matter": "node scripts/run-critical-browser-group.js --suite shared-matter",
+    "admin-solo": "node scripts/run-critical-browser-group.js --suite admin-solo"
+  },
+  "originalBudgetReferences": [
+    "outputs/lpc-accelerated-local-20261014/financial/remaining39-h/selected39.json"
+  ]
+}

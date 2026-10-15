@@ -37,8 +37,8 @@ const REQUIRED_VALIDATE_COMMANDS = Object.freeze([
   "npm run check:licenses",
   "npm audit --omit=dev --audit-level=high",
   "npm test -- --ci",
-  "npm run test:payments",
-  "npm run test:auth",
+  "node scripts/verify-ci-jest-coverage.js --prepare",
+  "node scripts/verify-ci-jest-coverage.js --verify",
 ]);
 const REQUIRED_BROWSER_COMMANDS = Object.freeze([
   "npx playwright install --with-deps chromium firefox webkit",
@@ -73,15 +73,31 @@ function fail(message) {
   throw error;
 }
 
+const FIXTURE_GROUP_SUITES = new Set(["attorney-v2", "paralegal-support", "director", "financial-lifecycle", "shared-matter", "admin-solo"]);
+const EXPECTED_GROUP_NAMES = Object.freeze(["attorney-v2-actual-shared-1", "attorney-v2-actual-shared-2", "attorney-v2-actual-shared-3", "attorney-v2-actual-shared-4", "attorney-v2-declared-1", "attorney-v2-declared-2", "attorney-v2-declared-3", "attorney-v2-declared-4", "attorney-v2-declared-5", "attorney-v2-actual-notes-1", "attorney-v2-actual-work-1", "paralegal-support-declared-1", "paralegal-support-declared-2", "paralegal-support-declared-3", "paralegal-support-declared-4", "paralegal-support-declared-5", "paralegal-support-actual-shared-1", "support", "paralegal-financial-records", "director-commission", "control-room", "admin-financials", "frontend-hygiene", "workspace-session", "workspace-navigation", "admin-evidence", "financial-lifecycle", "shared-matter", "admin-solo", "director", "director-managed", "financial-model-claims"]);
+const EXPECTED_BROWSER_SCOPES = Object.freeze([
+  { scope: "deterministic-and-lifecycle", command: "npm run test:browser:contracts && npm run test:e2e" },
+  { scope: "public-accessibility", command: "npm run test:playwright:a11y" },
+  { scope: "public-performance", command: "npm run test:playwright:performance" },
+]);
+const REQUIRED_GATE_NAMES = Object.freeze({
+  "deployment-blueprint": "Deployment Blueprint", validate: "Runtime, dependency, and test gates",
+  "browser-contracts": "Browser contracts", "dependency-review": "Dependency review", codeql: "CodeQL", secrets: "Secret scan",
+});
+function browserCatalog() { return JSON.parse(fs.readFileSync(path.join(repositoryRoot, "backend/tests/playwright/acceptance/groups.json"), "utf8")); }
+
 function validateCriticalBrowserScripts(manifest) {
   const scripts = manifest?.scripts || {};
   const commands = String(scripts["test:playwright:critical"] || "")
     .split("&&").map(command => command.trim());
   for (const [name, config] of Object.entries(REQUIRED_CRITICAL_CONFIGS)) {
     if (!commands.includes(`npm run ${name}`)) fail(`Launch-critical browser chain omits ${name}.`);
-    const required = `playwright test -c ${config} --fail-on-flaky-tests`;
-    if (scripts[name] !== required) fail(`${name} must run its complete original configuration with --fail-on-flaky-tests.`);
+    const suite = name.replace("test:playwright:", "");
+    const required = FIXTURE_GROUP_SUITES.has(suite) ? `node scripts/run-critical-browser-group.js --suite ${suite}` : `playwright test -c ${config} --fail-on-flaky-tests`;
+    if (scripts[name] !== required) fail(`${name} must run its complete original configuration through the exact approved fixture adapter or --fail-on-flaky-tests command.`);
   }
+  if (commands.length !== Object.keys(REQUIRED_CRITICAL_CONFIGS).length || new Set(commands).size !== commands.length) fail("Critical acceptance must contain every original scope exactly once.");
+  if (scripts["test:playwright:critical:group"] !== "node scripts/run-critical-browser-group.js" || scripts["test:playwright:critical:groups"] !== "node scripts/run-critical-browser-group.js --list-groups") fail("Exact runnable permanent group commands are required.");
   return Object.keys(REQUIRED_CRITICAL_CONFIGS).length;
 }
 
@@ -101,7 +117,7 @@ function validateCompiledBrowserFixtures(job) {
   const steps = job.steps || [];
   const install = steps.findIndex(step => step.run === "npm ci");
   const build = steps.findIndex(step => step.run === "npm run build:frontend");
-  const tests = steps.findIndex(step => String(step.run || "").startsWith("npm run test:"));
+  const tests = steps.findIndex(step => String(step.run || "").startsWith("npm run test:") || ["Run complete browser scope", "Verify complete unique browser identity coverage"].includes(step.name));
   if (install < 0 || build <= install || tests < 0 || build >= tests) {
     fail("Browser frontend must be built after dependency installation and before browser tests.");
   }
@@ -196,7 +212,45 @@ function validatePinnedActions(workflow) {
   }
 }
 
-function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSync(path.join(repositoryRoot, "backend/package.json"), "utf8"))) {
+function validateGroupedBrowserJobs(jobs, catalog) {
+  if (catalog.schemaVersion !== 1 || catalog.groups?.length !== EXPECTED_GROUP_NAMES.length ||
+      JSON.stringify(catalog.groups.map(group => group.name).sort()) !== JSON.stringify([...EXPECTED_GROUP_NAMES].sort()) ||
+      catalog.expectedUniqueCriticalIdentities !== 5933 || catalog.expectedOverallUniqueIdentities !== 6239 ||
+      catalog.groups.reduce((sum, group) => sum + group.expectedIdentities, 0) !== 5933) fail("Complete versioned browser groups and exact unique identity totals are required.");
+  for (const group of catalog.groups) {
+    if (group.workers !== 1 || group.retries !== 0 || group.originalAssertionBodiesUnchanged !== true ||
+        (group.name === "director-managed" ? group.baseConfig !== REQUIRED_CRITICAL_CONFIGS["test:playwright:financial-lifecycle"] : REQUIRED_CRITICAL_CONFIGS[group.suite] !== group.baseConfig) || !group.files?.length ||
+        group.files.some(file => !/^tests\/playwright\/[A-Za-z0-9_./-]+\.spec\.js$/.test(file)) || !Number.isSafeInteger(group.expectedIdentities) || group.expectedIdentities <= 0) fail(`Invalid full fixture group contract: ${group.name}`);
+  }
+  const collection = jobs["browser-collection"], checks = jobs["browser-checks"], roles = jobs["browser-role-journeys"], gate = jobs["browser-contracts"];
+  if (!collection || !checks || !roles) fail("Browser collection, public/contracts and role matrix jobs are required.");
+  requireCommands(collection, ["node scripts/run-critical-browser-group.js --verify-groups"], "browser-collection");
+  validateLaunchEvidenceArtifact(collection, { stepName: "Upload browser collection evidence", pathFragment: "backend/test-results/critical-group-verification/verified-union.json" });
+  for (const [name, job] of [["browser-collection", collection], ["browser-checks", checks], ["browser-role-journeys", roles]]) {
+    validateCompiledBrowserFixtures(job); validateRuntimeBeforeInstall(job, name);
+    if (job.if || job["continue-on-error"]) fail(`${name} cannot conditionally bypass complete acceptance.`);
+    for (const step of job.steps || []) if (step["continue-on-error"]) fail(`${name} cannot suppress a failed step.`);
+  }
+  for (const job of [checks, roles]) {
+    if (job.strategy?.["fail-fast"] !== false || job.strategy?.["max-parallel"] !== 3) fail("Browser matrices must finish every group with bounded parallelism and no fail-fast omissions.");
+    requireCommands(job, ["npx playwright install --with-deps chromium firefox webkit"], "browser matrix");
+    validateLaunchEvidenceArtifact(job, { stepName: "Upload browser launch evidence", pathFragment: "backend/test-results/junit" });
+  }
+  if (Object.keys(checks.strategy.matrix || {}).join() !== "include" || JSON.stringify(checks.strategy.matrix.include) !== JSON.stringify(EXPECTED_BROWSER_SCOPES) ||
+      findStep(checks, "Run complete browser scope")?.run !== "${{ matrix.command }}") fail("Complete deterministic, lifecycle, public accessibility and performance scopes must each execute without narrowing.");
+  if (roles.needs !== "browser-collection" || Object.keys(roles.strategy.matrix || {}).join() !== "group" ||
+      JSON.stringify([...(roles.strategy.matrix.group || [])].sort()) !== JSON.stringify([...EXPECTED_GROUP_NAMES].sort()) ||
+      findStep(roles, "Run complete fixture-compatible role group")?.run !== 'npm run test:playwright:critical:group -- --group "${{ matrix.group }}"') fail("Every approved role fixture group must execute exactly once after collection verification.");
+  const dependencies = ["browser-collection", "browser-checks", "browser-role-journeys"];
+  if (gate.if !== "always()" || JSON.stringify([...(gate.needs || [])].sort()) !== JSON.stringify([...dependencies].sort()) || gate["continue-on-error"]) fail("Fixed Browser contracts gate must always require all browser jobs and reject failures, cancellations and skips.");
+  const final = findStep(gate, "Require every original browser scope and role group");
+  if (gate.steps?.length !== 1 || final?.["continue-on-error"] ||
+      JSON.stringify(final?.env) !== JSON.stringify({ COLLECTION_RESULT: "${{ needs.browser-collection.result }}", CHECKS_RESULT: "${{ needs.browser-checks.result }}", ROLES_RESULT: "${{ needs.browser-role-journeys.result }}" }) ||
+      final?.run?.trim() !== 'test "$COLLECTION_RESULT" = success\ntest "$CHECKS_RESULT" = success\ntest "$ROLES_RESULT" = success') fail("Browser aggregate must fail closed unless every complete dependency succeeds.");
+  return catalog.groups.length;
+}
+
+function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSync(path.join(repositoryRoot, "backend/package.json"), "utf8")), catalog = browserCatalog()) {
   const triggers = workflow.on || {};
   if (!Object.prototype.hasOwnProperty.call(triggers, "pull_request")) fail("pull_request validation is required.");
   if (!Object.prototype.hasOwnProperty.call(triggers, "push")) fail("main push validation is required.");
@@ -213,6 +267,7 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
   const jobs = workflow.jobs || {};
   for (const jobName of REQUIRED_JOBS) {
     if (!jobs[jobName]) fail(`Required job ${jobName} is missing.`);
+    if (jobs[jobName].name !== REQUIRED_GATE_NAMES[jobName]) fail(`Required named gate context changed: ${jobName}.`);
   }
   for (const [jobName, job] of Object.entries(jobs)) {
     if (job["runs-on"] !== "ubuntu-24.04") fail(`${jobName} must use the pinned ubuntu-24.04 runner.`);
@@ -225,15 +280,20 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
   validatePinnedActions(workflow);
   requireCommands(jobs["deployment-blueprint"], ["npm ci", "npm run check:deploy"], "deployment-blueprint");
   requireCommands(jobs.validate, ["npm ci", ...REQUIRED_VALIDATE_COMMANDS], "validate");
-  requireCommands(jobs["browser-contracts"], ["npm ci", ...REQUIRED_BROWSER_COMMANDS], "browser-contracts");
+  const browserGroups = validateGroupedBrowserJobs(jobs, catalog);
+  const { focusedFiles } = require("./verify-ci-jest-coverage");
+  focusedFiles(manifest, "test:auth");focusedFiles(manifest, "test:payments");
   const criticalBrowserCommands = validateCriticalBrowserScripts(manifest);
-  validateCompiledBrowserFixtures(jobs["browser-contracts"]);
   validateRuntimeBeforeInstall(jobs["deployment-blueprint"], "deployment-blueprint");
   validateRuntimeBeforeInstall(jobs.validate, "validate");
-  validateRuntimeBeforeInstall(jobs["browser-contracts"], "browser-contracts");
   validateCandidateBeforeInstall(jobs.validate);
 
   const jestStep = findStep(jobs.validate, "Run complete Jest suite");
+  const prepare = findStep(jobs.validate, "Bind complete Jest source and required subsets"), verify = findStep(jobs.validate, "Verify substantive authentication and payment coverage");
+  const steps = jobs.validate.steps || [];
+  if (prepare?.run !== "node scripts/verify-ci-jest-coverage.js --prepare" || verify?.run !== "node scripts/verify-ci-jest-coverage.js --verify" ||
+      steps.indexOf(prepare) >= steps.indexOf(jestStep) || steps.indexOf(verify) <= steps.indexOf(jestStep) ||
+      prepare?.if || verify?.if || jobs.validate["continue-on-error"] || steps.some(step => step["continue-on-error"])) fail("Substantive auth/payment reuse must bind source before and verify complete evidence after the original Jest execution.");
   if (!String(jestStep?.run || "").includes("--reporters=jest-junit")) {
     fail("The complete Jest suite must emit JUnit launch evidence.");
   }
@@ -255,10 +315,9 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
     stepName: "Upload Jest launch evidence",
     pathFragment: "backend/test-results/jest/results.xml",
   });
-  validateLaunchEvidenceArtifact(jobs["browser-contracts"], {
-    stepName: "Upload browser launch evidence",
-    pathFragment: "backend/test-results/junit",
-  });
+  if (jestStep.run !== "npm test -- --ci --reporters=default --reporters=jest-junit --json --outputFile=test-results/jest/results.json") fail("One complete original Jest run must retain JSON and JUnit without selection or retries.");
+  const jestArtifact = findStep(jobs.validate, "Upload Jest launch evidence");
+  for (const file of ["results.json", "full-suite-binding.json", "required-coverage.json"]) if (!String(jestArtifact?.with?.path || "").includes(`backend/test-results/jest/${file}`)) fail(`Complete Jest source/coverage evidence missing: ${file}.`);
 
   const dependencyReview = jobs["dependency-review"];
   if (dependencyReview.if !== "github.event_name == 'pull_request'") {
@@ -297,6 +356,7 @@ function validateWorkflowContract(workflow, manifest = JSON.parse(fs.readFileSyn
     validateCommands: REQUIRED_VALIDATE_COMMANDS.length,
     browserCommands: REQUIRED_BROWSER_COMMANDS.length,
     criticalBrowserCommands,
+    browserGroups,
   };
 }
 
@@ -322,4 +382,5 @@ module.exports = {
   parseWorkflow,
   validateWorkflowContract,
   validateCriticalBrowserScripts,
+  validateGroupedBrowserJobs,
 };

@@ -4,6 +4,10 @@ const crypto = require('node:crypto');
 // Private single-replica application harness. All mounted API responses and
 // financial writes are real. Only external providers and delivery are synthetic.
 module.exports = async function start({ includeAdminSupport = false, includeAdminAutomation = false, includeAdminWorkspaces = false, includeDirectors = false, includeDesignPreviews = false, includeSyntheticMail = false, includeSyntheticDownloads = false, includeSyntheticPersonalDownloads = false, includePublicDirectory = false, port = process.env.LPC_LIFECYCLE_RANDOM_PORT === 'true' ? 0 : 5897 } = {}) {
+  const releaseModules = require('./financialLifecycleModuleLease')();
+  // Include registration failures in the same lease cleanup as listen failures.
+  let closeOwnedServer;
+  try {
   const setupStartedAt = Date.now();
   const setupStage = stage => { if (process.env.LPC_HARNESS_SETUP_TIMINGS === 'true') process.stderr.write(`[browser-setup] ${stage} ${Date.now()-setupStartedAt}ms\n`); };
   Object.assign(process.env, {
@@ -151,10 +155,13 @@ module.exports = async function start({ includeAdminSupport = false, includeAdmi
   const ownedDatabaseName = sharedMongo ? 'jest' : 'financial_lifecycle_browser';
   let replica, listener;
   async function close() {
-    if (listener) { listener.closeAllConnections?.(); await new Promise(resolve => listener.close(resolve)); listener = null; }
-    await mongoose.disconnect();
-    if (replica) { await replica.stop({ doCleanup: true, force: true }); replica = null; }
+    try {
+      if (listener) { listener.closeAllConnections?.(); await new Promise(resolve => listener.close(resolve)); listener = null; }
+      await mongoose.disconnect();
+      if (replica) { await replica.stop({ doCleanup: true, force: true }); replica = null; }
+    } finally { releaseModules(); }
   }
+  closeOwnedServer = close;
   try {
     let uri;
     if (sharedMongo) {
@@ -275,4 +282,8 @@ module.exports = async function start({ includeAdminSupport = false, includeAdmi
       },
     };
   } catch (error) { await close(); throw error; }
+  } catch (error) {
+    try { if (closeOwnedServer) await closeOwnedServer(); } finally { releaseModules(); }
+    throw error;
+  }
 };

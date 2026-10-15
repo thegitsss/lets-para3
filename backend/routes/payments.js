@@ -696,11 +696,11 @@ router.post(
     const { accountId } = req.body || {};
     const user = await User.findById(req.user.id).select("stripeAccountId");
     if (!user) return res.status(404).json({ error: "User not found" });
-    const targetAccount = accountId || user.stripeAccountId;
+    const targetAccount = user.stripeAccountId;
     if (!targetAccount) {
       return res.status(400).json({ error: "Stripe account not created yet" });
     }
-    if (user.stripeAccountId && user.stripeAccountId !== targetAccount) {
+    if (accountId && accountId !== targetAccount) {
       return res.status(403).json({ error: "Invalid account reference" });
     }
 
