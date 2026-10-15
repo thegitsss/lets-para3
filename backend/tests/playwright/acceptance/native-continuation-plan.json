@@ -34680,9 +34680,13 @@
         "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/root-recovery-return-ci/ROOT_CURRENT60_EXACT_SOURCE_READBACK.json",
         "sha256": "8dba0aea96da1d983804b2b633a9a1a918d03f2486aacedba9d6b3b3ff565b4f"
       },
-      "currentExactSourceEvidence": {
+      "priorPExactSourceEvidence": {
         "path": "/Users/samanthasider/Desktop/lets-para3/outputs/lpc-release-acceptance-20261014/incremental-acceptance/native-runtime-n/P_CURRENT_CI66_SOURCE_BOUND_EVIDENCE.json",
         "sha256": "51bbecedacc1310756390c0b3ad564238573da38873a9679fa1f62b87161672d"
+      },
+      "currentUExactSourceEvidence": {
+        "path": "outputs/lpc-release-acceptance-20261014/refund-write-conflict-u/dependency-review/FINAL_PATCHED_U_INSTALLABILITY_AND_SOURCE_CONSUMER_HANDOFF.json",
+        "sha256": "a1838742e4238480d9817de50a14783e7f2118b611d2a1da4f39cabc7b956580"
       }
     },
     "limits": [
@@ -38360,8 +38364,8 @@
   ],
   "currentSourceApplicability": {
     "originalCohort": 494,
-    "availableOriginalClasses": 492,
-    "withoutQualifiedOutcome": 2,
+    "availableOriginalClasses": 494,
+    "withoutQualifiedOutcome": 0,
     "selectedAffectedOriginals": 6,
     "newRegressions": 0,
     "selectedCurrent": 6,
@@ -38380,7 +38384,10 @@
       "originalCallbacks": 127,
       "proof": "ce1b178fc9947e28c00396d921fd61c81458ad2060c86c1864fc580ef421f0bd",
       "dependencies": "Original T lock, all runtime nodes byte-equivalent U; development security parser changes are separately qualified"
-    }
+    },
+    "historicalPreTAvailableOriginalClasses": 492,
+    "historicalPreTWithoutQualifiedOutcome": 2,
+    "meaning": "Original494 identities credited under actual T and preserved earlier proof classes; U required current-head acceptance and hostedrefund repair remain separate, no allcurrent6251 certification."
   },
   "continuationAfterActualN": {
     "actualNReadback": {
