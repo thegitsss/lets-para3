@@ -1,5 +1,7 @@
 # LPC Premium Readiness Definition
 
+> Historical readiness baseline: this July 2026 document preserves the original acceptance criteria used during remediation. It is not current launch status. Use `LAUNCH_CHECKLIST.md`, `docs/RELEASE_GATES.md`, and `docs/LAUNCH_CERTIFICATION_CURRENT.md` for the current stop-ship policy, evidence, and decision.
+
 Date: July 5, 2026
 
 This document defines what "complete" means for LPC before attorney inflow. It is intentionally more detailed than a short release checklist. The standard is a premium legal-tech marketplace worthy of $145,000-$500,000 in build value and premium platform fees.
@@ -506,4 +508,3 @@ LPC is ready for attorney inflow only when:
 - Manual attorney, paralegal, admin, mobile, payment, and lifecycle checklists are complete.
 - Evidence is attached for each category.
 - Remaining known issues are documented as non-launch-blocking with owner, priority, and follow-up path.
-

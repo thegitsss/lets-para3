@@ -1,4 +1,7 @@
 import { secureFetch } from "../auth.js";
+import { reportAsyncFailure } from "../utils/promise-errors.js";
+
+const reportFailure = reportAsyncFailure("admin-knowledge");
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -334,7 +337,7 @@ function renderKnowledgeDetail(item = {}, revisions = []) {
                 String(pendingRevision.revisionNumber || "—")
               )} was created ${escapeHTML(formatDate(pendingRevision.createdAt))}.</p>
               <label class="approval-decision-label">Optional note
-                <textarea class="approval-decision-note" id="knowledgeDecisionNote" rows="3" maxlength="2000" placeholder="Optional approval or rejection note"></textarea>
+                <textarea class="approval-decision-note" id="knowledgeDecisionNote" rows="3" maxlength="2000"></textarea>
               </label>
               <div class="approval-decision-actions">
                 <button class="btn" type="button" data-knowledge-action="approve" data-knowledge-revision-id="${escapeHTML(
@@ -460,6 +463,7 @@ async function loadKnowledgeStudio(force = false) {
     const sources = await sourcesRes.json();
     const approvals = await approvalsRes.json();
 
+    if (!overviewRes.ok || !sourcesRes.ok || !approvalsRes.ok) throw new Error(overview.error || sources.error || approvals.error || "Knowledge could not be loaded.");
     renderCounts(overview.counts || {});
     renderSources(sources.sources || []);
     renderItems(overview.latestItems || []);
@@ -474,7 +478,7 @@ async function loadKnowledgeStudio(force = false) {
     }
 
     if (syncStatus) {
-      syncStatus.textContent = "Phase 1 seed sources loaded.";
+      syncStatus.textContent = "";
     }
   })();
 
@@ -483,6 +487,7 @@ async function loadKnowledgeStudio(force = false) {
   } catch (err) {
     if (syncStatus) syncStatus.textContent = err?.message || "Unable to load knowledge studio.";
     renderKnowledgeDetailEmpty(err?.message || "Unable to load knowledge studio.");
+    for (const id of ["knowledgeItemList","knowledgeApprovalList","knowledgeSourceList"]) document.getElementById(id).innerHTML = `<p role="alert">${escapeHTML(err?.message || "Knowledge could not be loaded.")} Refresh to try again.</p>`;
   } finally {
     loadPromise = null;
   }
@@ -492,7 +497,7 @@ async function syncKnowledgeSources() {
   const status = document.getElementById("knowledgeSyncStatus");
   const button = document.getElementById("knowledgeSyncBtn");
   if (button) button.disabled = true;
-  if (status) status.textContent = "Syncing Phase 1 sources…";
+  if (status) status.textContent = "Syncing sources…";
   try {
     const res = await secureFetch("/api/admin/knowledge/sync", {
       method: "POST",
@@ -529,14 +534,14 @@ function bindKnowledgeStudio() {
     itemList.addEventListener("click", (event) => {
       const card = event.target.closest("[data-knowledge-item-id]");
       if (!card) return;
-      loadKnowledgeItemDetail(card.dataset.knowledgeItemId).catch(() => {});
+      loadKnowledgeItemDetail(card.dataset.knowledgeItemId).catch(reportFailure);
     });
     itemList.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       const card = event.target.closest("[data-knowledge-item-id]");
       if (!card) return;
       event.preventDefault();
-      loadKnowledgeItemDetail(card.dataset.knowledgeItemId).catch(() => {});
+      loadKnowledgeItemDetail(card.dataset.knowledgeItemId).catch(reportFailure);
     });
   }
 
@@ -548,7 +553,7 @@ function bindKnowledgeStudio() {
       if (!card) return;
       const itemId = card.getAttribute("data-knowledge-approval-item-id") || "";
       if (itemId) {
-        loadKnowledgeItemDetail(itemId).catch(() => {});
+        loadKnowledgeItemDetail(itemId).catch(reportFailure);
         return;
       }
       const workKey = card.getAttribute("data-knowledge-approval-work-key") || "";
@@ -577,7 +582,7 @@ function bindKnowledgeStudio() {
         return;
       }
       const revisionId = actionButton.getAttribute("data-knowledge-revision-id") || "";
-      decideKnowledgeRevision(action, revisionId).catch(() => {});
+      decideKnowledgeRevision(action, revisionId).catch(reportFailure);
     });
   }
 }
@@ -586,5 +591,5 @@ bindKnowledgeStudio();
 window.loadKnowledgeStudio = loadKnowledgeStudio;
 
 if (document.getElementById("section-knowledge-studio")?.classList.contains("visible")) {
-  loadKnowledgeStudio().catch(() => {});
+  loadKnowledgeStudio().catch(reportFailure);
 }

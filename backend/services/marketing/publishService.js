@@ -4,6 +4,7 @@ const MarketingPublishAttempt = require("../../models/MarketingPublishAttempt");
 const MarketingPublishIntent = require("../../models/MarketingPublishIntent");
 const { getChannelConnectionDoc, markConnectionPublishResult, serializeConnection } = require("./channelConnectionService");
 const { publishLinkedInCompanyPost, buildPublishText } = require("./linkedinPublisher");
+const { LINKEDIN_API_VERSION } = require("./linkedinApiPolicy");
 const { getPacketPublishReadiness } = require("./publishReadinessService");
 const {
   createPublishAttempt,
@@ -57,7 +58,7 @@ async function createPublishIntent({ packet, brief, connection, actor = {} } = {
       organizationId: connection.organizationId || "",
       organizationUrn: connection.organizationUrn || "",
       organizationName: connection.organizationName || "",
-      apiVersion: connection.apiVersion || "202503",
+      apiVersion: LINKEDIN_API_VERSION,
       status: connection.status || "",
     },
   });
@@ -105,7 +106,7 @@ async function publishPacketNow({ packetId = "", actor = {} } = {}) {
       provider: "linkedin",
       channelKey: packet.channelKey,
       publishText: buildPublishText(packet),
-      apiVersion: connection.apiVersion || "202503",
+      apiVersion: LINKEDIN_API_VERSION,
       organizationUrn: connection.organizationUrn || (connection.organizationId ? `urn:li:organization:${connection.organizationId}` : ""),
     },
   });

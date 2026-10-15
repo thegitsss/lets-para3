@@ -124,7 +124,7 @@ describe("Knowledge and marketing Phase 1", () => {
           }),
           citations: expect.arrayContaining([
             expect.objectContaining({
-              filePath: "backend/ai/prompts.js",
+              filePath: "frontend/attorney-faq.html",
             }),
           ]),
         }),

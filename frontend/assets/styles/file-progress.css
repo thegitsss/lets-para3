@@ -1,0 +1,36 @@
+.lpc-file-progress {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  vertical-align: middle;
+  color: currentColor;
+}
+.lpc-file-progress > svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: lpc-file-spin .9s linear infinite;
+}
+.lpc-file-progress.is-ready > svg { animation: none; }
+.lpc-file-progress-sr {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+@keyframes lpc-file-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .lpc-file-progress > svg { animation: none; }
+}

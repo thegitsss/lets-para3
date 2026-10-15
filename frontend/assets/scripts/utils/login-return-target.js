@@ -16,7 +16,7 @@
       const target = new URL(requested, origin);
       if (target.origin !== new URL(origin).origin || target.username || target.password) return "";
       if (memberRole === "paralegal" && target.pathname === "/paralegal-v2.html") {
-        if (target.search || (target.hash && !/^#\/(?:home|browse|work|settings|help|profile(?:\/[^/?#]+)?|attorney\/[^/?#]+|matter\/[^/?#]+)(?:\?.*)?$/.test(target.hash))) return "";
+        if (target.search || (target.hash && !/^#\/(?:home|payouts|conversations|browse|work|settings|help|profile(?:\/[^/?#]+)?|attorney\/[^/?#]+|matter\/[^/?#]+)(?:\?.*)?$/.test(target.hash))) return "";
         return `${target.pathname}${target.hash || "#/home"}`;
       }
       if (memberRole === "attorney" && target.pathname === "/attorney-v2.html") {

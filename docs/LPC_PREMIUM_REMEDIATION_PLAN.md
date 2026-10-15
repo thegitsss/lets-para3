@@ -1,5 +1,7 @@
 # LPC Premium Remediation Plan
 
+> Historical remediation plan: this July 2026 work plan is superseded. Its priorities and terminology describe the pre-remediation repository and must not be treated as current launch status. Use `LAUNCH_CHECKLIST.md`, `docs/RELEASE_GATES.md`, and `docs/LAUNCH_CERTIFICATION_CURRENT.md` for current execution and evidence.
+
 Date: July 5, 2026
 
 This plan converts the audit standard into the working priority order for LPC. The goal is not to add random features. The goal is to make LPC feel and operate like a premium legal-tech marketplace before attorney outreach ramps up.

@@ -1,5 +1,5 @@
 const MarketingBrief = require("../../models/MarketingBrief");
-const { MARKETING_WORKFLOW_TYPES } = require("./constants");
+const { MARKETING_ACTIVE_WORKFLOW_TYPES } = require("./constants");
 const { normalizeLinkedInCompanyContentLane } = require("./linkedinCompanyStrategy");
 const { publishEventSafe } = require("../lpcEvents/publishEventService");
 
@@ -28,8 +28,10 @@ function toActor(user = {}) {
 
 async function createBrief(payload = {}, user = {}) {
   const workflowType = String(payload.workflowType || "").trim();
-  if (!MARKETING_WORKFLOW_TYPES.includes(workflowType)) {
-    throw new Error("Unsupported marketing workflow.");
+  if (!MARKETING_ACTIVE_WORKFLOW_TYPES.includes(workflowType)) {
+    const error = new Error("Unsupported active marketing workflow.");
+    error.statusCode = 400;
+    throw error;
   }
 
   const title = sanitizeText(payload.title, 240) || workflowType.replace(/_/g, " ");
@@ -97,7 +99,7 @@ async function createBrief(payload = {}, user = {}) {
 }
 
 async function listBriefs() {
-  return MarketingBrief.find({})
+  return MarketingBrief.find({ workflowType: { $in: MARKETING_ACTIVE_WORKFLOW_TYPES } })
     .sort({ updatedAt: -1, createdAt: -1 })
     .lean();
 }

@@ -1,6 +1,16 @@
 "use strict";
 
 const sendEmail = require("./email");
+const { redactValue } = require("./logger");
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 function parseRecipients(raw) {
   return String(raw || "")
@@ -24,14 +34,14 @@ function getOwnerAlertRecipients() {
 async function sendOwnerAlert(subject, lines = [], opts = {}) {
   const recipients = getOwnerAlertRecipients();
   if (!recipients.length) {
-    return { skipped: true, reason: "missing_recipients" };
+    return { skipped: true, delivered: false, reason: "missing_recipients", errorCode: "MISSING_RECIPIENTS" };
   }
 
   const safeLines = Array.isArray(lines)
-    ? lines.map((line) => String(line || "").trim()).filter(Boolean)
-    : [String(lines || "").trim()].filter(Boolean);
+    ? lines.map((line) => String(redactValue(line) || "").trim()).filter(Boolean)
+    : [String(redactValue(lines) || "").trim()].filter(Boolean);
   const html = safeLines.length
-    ? safeLines.map((line) => `<p>${line}</p>`).join("")
+    ? safeLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")
     : "<p>No additional details.</p>";
 
   const result = await sendEmail(recipients.join(","), subject, html, {
@@ -41,14 +51,19 @@ async function sendOwnerAlert(subject, lines = [], opts = {}) {
     ...opts,
   });
 
+  const accepted = new Set((Array.isArray(result?.accepted) ? result.accepted : []).map(value => String(value?.address || value).trim().toLowerCase()));
+  const rejected = new Set((Array.isArray(result?.rejected) ? result.rejected : []).map(value => String(value?.address || value).trim().toLowerCase()));
+  const delivered = !result?.error && !result?.disabled && recipients.every(value => accepted.has(value.toLowerCase()) && !rejected.has(value.toLowerCase()));
   return {
     skipped: false,
-    recipients,
-    result,
+    delivered,
+    recipientCount: recipients.length,
+    ...(delivered ? {} : { errorCode: result?.disabled ? "EMAIL_DISABLED" : "EMAIL_DELIVERY_UNCONFIRMED" }),
   };
 }
 
 module.exports = {
   getOwnerAlertRecipients,
+  escapeHtml,
   sendOwnerAlert,
 };

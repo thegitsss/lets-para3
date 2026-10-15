@@ -1,34 +1,14 @@
-import { secureFetch, requireAuth, logout } from "./auth.js";
+import { createSaveParalegal } from "./attorney-v2/saved-paralegals.mjs";
+import { createApiClient } from "./attorney-v2/api-client.mjs";
+import { createLegacyInvitationDialog } from "./utils/legacy-invitation-dialog.mjs";
+import { createLegacyEngagementDialog } from "./utils/legacy-engagement-dialog.mjs";
+let invitationDialog, engagementDialog;
+import { secureFetch, requireAuth } from "./auth.js";
+import { showAlert } from "./utils/dialogs.js";
+import { normalizeHttpNavigationUrl, normalizeSameOriginPath } from "./utils/navigation-url.js";
 
-async function persistDocumentField(field, value) {
-  const payload = { [field]: value };
-  const res = await secureFetch("/api/users/me", {
-    method: "PATCH",
-    body: payload,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data?.msg || `Unable to save ${field}.`);
-  }
-  try {
-    localStorage.setItem("lpc_user", JSON.stringify(data));
-    window.updateSessionUser?.(data);
-  } catch {
-    /* ignore */
-  }
-  return data;
-}
-
-const PLACEHOLDER_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-  `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>
-    <rect width='220' height='220' rx='110' fill='#f1f5f9'/>
-    <circle cx='110' cy='90' r='46' fill='#cbd5e1'/>
-    <path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/>
-  </svg>`
-)}`;
+const PLACEHOLDER_AVATAR = "/assets/avatar-placeholder.svg";
 const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
-const PLATFORM_FEE_PCT = 22;
-const DEFAULT_HIRE_ERROR = "Unable to hire paralegal.";
 
 function resolveProfilePhotoStatus(user = {}) {
   const raw = String(user.profilePhotoStatus || "").trim();
@@ -52,10 +32,7 @@ function getProfileImageUrl(user = {}, { allowPending = false } = {}) {
 function getReturnToUrl() {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get("returnTo");
-  if (!raw) return "";
-  const decoded = decodeURIComponent(raw);
-  if (!decoded || /^(https?:)?\/\//i.test(decoded)) return "";
-  return decoded;
+  return normalizeSameOriginPath(raw);
 }
 
 function getApplicantContextFromReturnTo() {
@@ -67,40 +44,18 @@ function getApplicantContextFromReturnTo() {
     const applicantId = url.searchParams.get("applicantId") || "";
     const returnFromProfile = url.searchParams.get("returnFromProfile") === "1";
     const openApplicant = url.searchParams.get("openApplicant") === "1";
-    if (!caseId || !applicantId) return null;
+    if (!/^[a-f0-9]{24}$/i.test(caseId) || !/^[a-f0-9]{24}$/i.test(applicantId)) return null;
     if (!returnFromProfile && !openApplicant) return null;
     return { caseId, applicantId, returnTo };
   } catch {
     return null;
   }
 }
-function applyGlobalAvatars(user = state.profileUser || {}) {
-  const src = getProfileImageUrl(user, { allowPending: canEditProfile() });
-  if (!src) return;
-  const els = document.querySelectorAll("#user-avatar, #avatarPreview");
-  els.forEach((el) => {
-    if (el) el.src = src;
-  });
-  const frame = document.getElementById("avatarFrame");
-  const initials = document.getElementById("avatarInitials");
-  if (frame) frame.classList.add("has-photo");
-  if (initials) initials.style.display = "none";
-}
-
-function applyAvatar(user = state.profileUser || {}) {
-  const src = getProfileImageUrl(user, { allowPending: canEditProfile() });
-  if (!src) return;
-  const avatar = document.getElementById("user-avatar");
-  const preview = document.getElementById("profilePhotoPreview");
-
-  if (avatar) avatar.src = src;
-  if (preview) preview.src = src;
-}
 function friendlyAvailabilityDate(value) {
   if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
 const elements = {
@@ -143,10 +98,6 @@ const elements = {
   attorneyHighlights: document.getElementById("attorneyHighlights"),
   languagesList: document.getElementById("languagesList"),
   stateExperienceList: document.getElementById("stateExperienceList"),
-  inviteModal: document.getElementById("inviteModal"),
-  inviteCaseSelect: document.getElementById("inviteCaseSelect"),
-  sendInviteBtn: document.getElementById("sendInviteBtn"),
-  closeInviteBtn: document.getElementById("closeInviteBtn"),
   notificationToggle: document.getElementById("notificationToggle"),
   notificationPanel: document.getElementById("notificationPanel"),
   userChip: document.getElementById("userChip"),
@@ -154,14 +105,6 @@ const elements = {
   chipAvatar: document.getElementById("clusterAvatar"),
   chipName: document.getElementById("clusterName"),
   chipRole: document.getElementById("clusterRole"),
-  profileFormSection: document.getElementById("profileFormSection"),
-  profileForm: document.getElementById("paralegalProfileForm"),
-  linkedInInput: document.getElementById("linkedInURL"),
-  yearsExperienceInput: document.getElementById("yearsExperience"),
-  certificateUploadInput: document.getElementById("certificateUpload"),
-  resumeUploadInput: document.getElementById("resumeUpload"),
-  profilePhotoInput: document.getElementById("photoInput"),
-  profileSaveBtn: document.getElementById("saveProfileBtn"),
   certificateLink: document.getElementById("certificateLink"),
   resumeLink: document.getElementById("resumeLink"),
   writingSampleLink: document.getElementById("writingSampleLink"),
@@ -181,10 +124,6 @@ function hasViewerAccess(user = {}) {
   return status === "approved";
 }
 
-if (elements.inviteCaseSelect) {
-  elements.inviteCaseSelect.addEventListener("change", () => clearFieldError(elements.inviteCaseSelect));
-}
-
 const state = {
   viewerUser: null, // logged-in user (session/local cache)
   viewerRole: "",
@@ -193,87 +132,11 @@ const state = {
   viewingSelf: false,
   profileUser: null, // the paralegal being displayed
   caseContextId: null,
-  caseContextTitle: "",
-  caseContextLoading: false,
-  caseLookup: new Map(),
-  openCases: [],
   inviteTarget: null,
   applicantContext: null,
   blockedByProfileOwner: false,
 };
-let inviteCutoutLayer = null;
-let inviteCutoutAlignRaf = null;
 let attorneyDropdownPortaled = false;
-
-const PREFILL_CACHE_KEY = "lpc_edit_profile_prefill";
-
-async function cacheProfileForEditing() {
-  if (!state.profileUser) return;
-  const profileId = String(state.profileUser.id || state.profileUser._id || "");
-  const isSelf =
-    state.viewerRole === "paralegal" && state.viewerId && profileId && state.viewerId === profileId;
-
-  const target = isSelf ? await fetchSelfProfileSnapshot() : await fetchPublicProfileSnapshot();
-  const payload = target || state.profileUser;
-  persistPrefill(payload);
-  persistCachedUser(payload);
-}
-
-function persistCachedUser(user) {
-  if (!user) return;
-  const base = (window.getStoredUser && window.getStoredUser()) || {};
-  const merged = { ...base, ...user };
-  if (!merged.role) merged.role = base.role || user.role || "paralegal";
-  const userId = user.id || user._id;
-  if (!merged.id && userId) merged.id = userId;
-  if (!merged._id && user._id) merged._id = user._id;
-  try {
-    localStorage.setItem("lpc_user", JSON.stringify(merged));
-    window.updateSessionUser?.(merged);
-  } catch (err) {
-    console.warn("Unable to cache profile locally", err);
-  }
-}
-
-function persistPrefill(user) {
-  if (!user) return;
-  try {
-    localStorage.setItem(PREFILL_CACHE_KEY, JSON.stringify(user));
-  } catch (err) {
-    console.warn("Unable to cache edit prefill", err);
-  }
-}
-
-async function fetchSelfProfileSnapshot() {
-  try {
-    const res = await secureFetch("/api/users/me", { headers: { Accept: "application/json" }, noRedirect: true });
-    const data = await res.json().catch(() => null);
-    return res.ok ? data : null;
-  } catch (err) {
-    console.warn("Unable to fetch self profile snapshot", err);
-    return null;
-  }
-}
-
-async function fetchPublicProfileSnapshot() {
-  try {
-    const isSelf = state.paralegalId && state.viewerId && state.paralegalId === state.viewerId && state.viewerRole === "paralegal";
-    if (isSelf) {
-      const meRes = await secureFetch("/api/users/me", { headers: { Accept: "application/json" }, noRedirect: true });
-      const meData = await meRes.json().catch(() => null);
-      return meRes.ok ? meData : null;
-    }
-    const res = await fetch(`/api/public/paralegals/${encodeURIComponent(state.paralegalId || "")}`, {
-      headers: { Accept: "application/json" },
-      credentials: "include",
-    });
-    const data = await res.json().catch(() => null);
-    return res.ok ? data : null;
-  } catch (err) {
-    console.warn("Unable to fetch profile snapshot", err);
-    return null;
-  }
-}
 
 const toast = window.toastUtils;
 
@@ -344,13 +207,11 @@ async function init() {
   state.viewerId = String(state.viewerUser?.id || state.viewerUser?._id || "");
   document.body.classList.toggle("viewer-attorney", state.viewerRole === "attorney");
 
+  hydrateMobileNavigation();
   hydrateHeader();
   bindHeaderEvents();
   bindCtaEvents();
-  bindProfileForm();
   bindBackButton();
-  window.addEventListener("resize", scheduleInviteCutoutAlign);
-  window.addEventListener("scroll", scheduleInviteCutoutAlign, { passive: true });
   elements.messageBtn?.classList.add("hidden");
   elements.messageBtn?.setAttribute("aria-hidden", "true");
 
@@ -397,10 +258,14 @@ async function init() {
   toggleSkeleton(false);
 
   if (state.viewerRole === "attorney") {
-    await loadAttorneyCases();
     updateInviteButtonState();
+    if (state.profileUser && elements.inviteBtn && !document.querySelector('[data-save-paralegal]')) {
+      const controller = new AbortController();
+      window.addEventListener('pagehide', () => controller.abort(), { once: true });
+      const api = createApiClient({ onAuthenticationLost: () => { controller.abort(); window.location.reload(); } });
+      elements.inviteBtn.parentElement.after(createSaveParalegal(state.paralegalId, { api, signal: controller.signal, ownerId: state.viewerId }));
+    }
   }
-  scheduleInviteCutoutAlign();
 }
 
 function bindCtaEvents() {
@@ -411,21 +276,16 @@ function bindCtaEvents() {
     }
     openInviteModal();
   });
-  const handleEditProfileClick = async (event) => {
+  const handleEditProfileClick = (event) => {
     event?.preventDefault?.();
-    try {
-      await cacheProfileForEditing();
-    } finally {
-      window.location.href = "profile-settings.html";
-    }
+    const profileId = String(state.profileUser?.id || state.profileUser?._id || state.paralegalId || "");
+    const isOwner =
+      state.viewerRole === "paralegal" && state.viewerId && profileId && state.viewerId === profileId;
+    if (!isOwner) return;
+    window.location.href = "profile-settings.html";
   };
   elements.editBtn?.addEventListener("click", handleEditProfileClick);
   elements.completionBtn?.addEventListener("click", handleEditProfileClick);
-  elements.closeInviteBtn?.addEventListener("click", closeInviteModal);
-  elements.inviteModal?.addEventListener("click", (event) => {
-    if (event.target === elements.inviteModal) closeInviteModal();
-  });
-  elements.sendInviteBtn?.addEventListener("click", sendInviteToCase);
 
   bindDocumentLinks();
 }
@@ -454,12 +314,17 @@ function bindDocumentLinks() {
   [elements.certificateLink, elements.resumeLink, elements.writingSampleLink].forEach((link) => {
     if (!link) return;
     link.addEventListener("click", async (event) => {
+      if (link.dataset.external === "true") return;
       const key = link.dataset.key;
-      if (!key) return;
+      if (!key) {
+        event.preventDefault();
+        return;
+      }
       event.preventDefault();
       try {
         const signed = await fetchDocumentUrl(key);
-        if (signed) window.open(signed, "_blank", "noopener");
+        const safeSignedUrl = normalizeHttpNavigationUrl(signed);
+        if (safeSignedUrl) window.open(safeSignedUrl, "_blank", "noopener");
         else showToast(MISSING_DOCUMENT_MESSAGE, "info");
       } catch (err) {
         console.error(err);
@@ -478,285 +343,54 @@ async function fetchDocumentUrl(key) {
   return data.url;
 }
 
-function bindProfileForm() {
-  if (!elements.profileForm) return;
-  elements.profileForm.addEventListener("submit", handleProfileFormSubmit);
-  elements.certificateUploadInput?.addEventListener("change", handleCertificateUpload);
-  elements.resumeUploadInput?.addEventListener("change", handleResumeUpload);
-  elements.profilePhotoInput?.addEventListener("change", handleProfilePhotoChange);
-  updateProfileFormVisibility();
-}
-
-function handleProfileFormSubmit(event) {
-  event.preventDefault();
-  if (!canEditProfile() || !state.profileUser) {
-    showToast("Only the profile owner can update these details.", "error");
-    return;
-  }
-  const payload = buildProfileUpdatePayload();
-  const submitBtn = elements.profileSaveBtn || elements.profileForm.querySelector('[type="submit"]');
-  const previousLabel = submitBtn?.textContent || "Save Profile";
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Saving…";
-  }
-  saveProfileDetails(payload)
-    .then(() => {
-      showToast("Profile updated.", "success");
-    })
-    .catch((err) => {
-      console.error(err);
-      showToast(err.message || "Unable to save profile.", "error");
-    })
-    .finally(() => {
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = previousLabel;
-      }
-    });
-}
-
-async function saveProfileDetails(payload) {
-  const url = `/api/paralegals/${encodeURIComponent(state.paralegalId || "me")}/update`;
-  const res = await secureFetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data?.error || "Unable to update profile");
-  }
-  const snapshot = state.profileUser || { id: state.paralegalId };
-  state.profileUser = { ...snapshot, ...payload };
-  populateProfileForm(state.profileUser);
-  renderProfile(state.profileUser);
-  renderMetadata(state.profileUser);
-  return data;
-}
-
-function buildProfileUpdatePayload() {
-  return {
-    linkedInURL: sanitizeUrl(elements.linkedInInput?.value),
-    yearsExperience: sanitizeYears(elements.yearsExperienceInput?.value),
-  };
-}
-
-function sanitizeText(value) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed || null;
-}
-
-function sanitizeUrl(value) {
+function sanitizeUrl(value, { requiredHost = "" } = {}) {
   if (!value) return "";
   try {
     const url = new URL(String(value), window.location.origin);
     const protocol = url.protocol.toLowerCase();
-    if (protocol === "http:" || protocol === "https:" || protocol === "mailto:") {
-      return url.href;
-    }
+    if (protocol !== "http:" && protocol !== "https:") return "";
+    if (url.username || url.password) return "";
+    const required = String(requiredHost || "").toLowerCase();
+    const hostname = url.hostname.toLowerCase();
+    if (required && hostname !== required && !hostname.endsWith(`.${required}`)) return "";
+    return url.href;
   } catch {}
   return "";
-}
-
-function sanitizeYears(value) {
-  if (value === null || value === undefined || value === "") return null;
-  const num = parseInt(value, 10);
-  if (!Number.isFinite(num)) return null;
-  return Math.max(0, Math.min(80, num));
-}
-
-function handleCertificateUpload(event) {
-  const file = event.target?.files?.[0];
-  event.target.value = "";
-  if (!file) return;
-  if (!canEditProfile()) {
-    showToast("Only the profile owner can upload documents.", "error");
-    return;
-  }
-  if (file.type !== "application/pdf") {
-    showToast("Please upload a PDF certificate.", "error");
-    return;
-  }
-  if (file.size > 10 * 1024 * 1024) {
-    showToast("Certificate must be 10 MB or smaller.", "error");
-    return;
-  }
-  uploadCertificate(file);
-}
-
-async function uploadCertificate(file) {
-  if (!file) return;
-  const formData = new FormData();
-  formData.append("file", file, file.name || "certificate.pdf");
-  try {
-    const res = await secureFetch("/api/uploads/paralegal-certificate", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || "Unable to upload certificate");
-    }
-    const url = data?.url || data?.certificateURL || data?.location || data?.fileURL || null;
-    if (url) {
-      const updated = await persistDocumentField("certificateURL", url);
-      const certificateKey = updated?.certificateKey || updated?.certificateURL || url;
-      const snapshot = state.profileUser || { id: state.paralegalId };
-      state.profileUser = { ...snapshot, certificateURL: certificateKey, certificateKey };
-      renderMetadata(state.profileUser);
-      renderAttorneyHighlights(state.profileUser);
-      renderDocumentLinks(state.profileUser);
-    }
-    showToast("Certificate uploaded.", "success");
-  } catch (err) {
-    console.error(err);
-    showToast(err.message || "Certificate upload failed.", "error");
-  }
-}
-
-function handleResumeUpload(event) {
-  const file = event.target?.files?.[0];
-  event.target.value = "";
-  if (!file) return;
-  if (!canEditProfile()) {
-    showToast("Only the profile owner can upload documents.", "error");
-    return;
-  }
-  if (file.type !== "application/pdf") {
-    showToast("Please upload a PDF résumé.", "error");
-    return;
-  }
-  if (file.size > 10 * 1024 * 1024) {
-    showToast("Résumé must be 10 MB or smaller.", "error");
-    return;
-  }
-  uploadResume(file);
-}
-
-async function uploadResume(file) {
-  if (!file) return;
-  const formData = new FormData();
-  formData.append("file", file, file.name || "resume.pdf");
-  try {
-    const res = await secureFetch("/api/uploads/paralegal-resume", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data?.url) {
-      throw new Error(data?.error || data?.msg || "Unable to upload résumé");
-    }
-    const key = data.key || data.url;
-    await persistDocumentField("resumeURL", key);
-    const resumeValue = key;
-    const snapshot = state.profileUser || { id: state.paralegalId };
-    state.profileUser = { ...snapshot, resumeURL: resumeValue };
-    renderMetadata(state.profileUser);
-    renderAttorneyHighlights(state.profileUser);
-    renderDocumentLinks(state.profileUser);
-    showToast("Résumé uploaded.", "success");
-  } catch (err) {
-    console.error(err);
-    showToast(err.message || "Résumé upload failed.", "error");
-  }
-}
-
-function handleProfilePhotoChange(event) {
-  const file = event.target?.files?.[0];
-  event.target.value = "";
-  if (!file) return;
-  if (!canEditProfile()) {
-    showToast("Only the profile owner can upload photos.", "error");
-    return;
-  }
-  if (!/image\/(png|jpe?g)/i.test(file.type || "")) {
-    showToast("Upload a JPEG or PNG profile photo.", "error");
-    return;
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    showToast("Profile photo must be 5 MB or smaller.", "error");
-    return;
-  }
-  uploadProfilePhoto(file);
-}
-
-async function uploadProfilePhoto(file) {
-  if (!file) return;
-  const formData = new FormData();
-  formData.append("file", file, file.name || "profile.jpg");
-  try {
-    const res = await secureFetch("/api/uploads/profile-photo", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || "Unable to upload profile photo");
-    }
-    const status = String(data?.status || data?.profilePhotoStatus || "").trim();
-    const pendingUrl = data?.pendingProfileImage || (status === "pending_review" ? data?.url : "");
-    const approvedUrl = data?.profileImage || data?.avatarURL || (status !== "pending_review" ? data?.url : "");
-    const snapshot = state.profileUser || { id: state.paralegalId };
-
-    if (status === "pending_review") {
-      state.profileUser = {
-        ...snapshot,
-        pendingProfileImage: pendingUrl,
-        profilePhotoStatus: "pending_review",
-      };
-      if (state.viewerRole === "paralegal" && state.viewerId === state.paralegalId) {
-        state.viewerUser = {
-          ...(state.viewerUser || {}),
-          pendingProfileImage: pendingUrl,
-          profilePhotoStatus: "pending_review",
-        };
-        hydrateHeader();
-      }
-      renderProfile(state.profileUser);
-      showToast("Photo submitted for review.", "success");
-      return;
-    }
-
-    if (approvedUrl) {
-      state.profileUser = { ...snapshot, profileImage: approvedUrl, avatarURL: approvedUrl, profilePhotoStatus: "approved" };
-      if (state.viewerRole === "paralegal" && state.viewerId === state.paralegalId) {
-        state.viewerUser = { ...(state.viewerUser || {}), profileImage: approvedUrl, avatarURL: approvedUrl, profilePhotoStatus: "approved" };
-        hydrateHeader();
-      }
-      renderProfile(state.profileUser);
-      showToast("Profile photo updated.", "success");
-    }
-  } catch (err) {
-    console.error(err);
-    showToast(err.message || "Unable to upload profile photo.", "error");
-  }
 }
 
 function canEditProfile() {
   return state.viewerRole === "paralegal" && state.viewerId && state.viewerId === state.paralegalId;
 }
 
-function updateProfileFormVisibility() {
-  const canEdit = canEditProfile();
-  if (elements.profileFormSection) {
-    elements.profileFormSection.classList.toggle("hidden", !canEdit);
+function hydrateMobileNavigation() {
+  const links = new Map(
+    Array.from(document.querySelectorAll("[data-profile-mobile-nav]")).map((link) => [
+      link.dataset.profileMobileNav,
+      link,
+    ])
+  );
+  const configure = (key, { label, href, hidden = false }) => {
+    const link = links.get(key);
+    if (!link) return;
+    link.hidden = hidden;
+    link.textContent = label;
+    link.setAttribute("href", href);
+  };
+  if (state.viewerRole === "attorney") {
+    configure("home", { label: "Home", href: "/dashboard-attorney.html#home" });
+    configure("browse", { label: "Browse Paralegals", href: "/browse-paralegals.html" });
+    configure("matters", { label: "Matters", href: "/dashboard-attorney.html#cases" });
+    configure("settings", { label: "Account Settings", href: "/profile-settings.html" });
+    configure("help", { label: "Help", href: "/help.html" });
+    return;
   }
-  const inputs = [
-    elements.linkedInInput,
-    elements.yearsExperienceInput,
-    elements.certificateUploadInput,
-    elements.resumeUploadInput,
-    elements.profilePhotoInput,
-  ].filter(Boolean);
-  inputs.forEach((input) => {
-    input.disabled = !canEdit;
-  });
-  if (elements.profileSaveBtn) {
-    elements.profileSaveBtn.disabled = !canEdit;
-  }
+  configure("home", { label: "Home", href: "/dashboard-paralegal.html#home" });
+  configure("browse", { label: "Browse Matters", href: "/browse-jobs.html" });
+  configure("matters", { label: "My Matters & Applications", href: "/dashboard-paralegal.html#cases" });
+  configure("settings", { label: "Profile Settings", href: "/profile-settings.html" });
+  configure("help", { label: "Help", href: "/paralegalhelp.html" });
 }
+
 function hydrateHeader() {
   if (!state.viewerUser) return;
   if (elements.chipName) elements.chipName.textContent = formatName(state.viewerUser);
@@ -778,7 +412,7 @@ function hydrateHeader() {
   }
   const avatarSrc =
     getProfileImageUrl(state.viewerUser, { allowPending: canEditProfile() }) ||
-    buildInitialAvatar(getInitials(formatName(state.viewerUser)));
+    PLACEHOLDER_AVATAR;
   if (elements.chipAvatar && avatarSrc) {
     elements.chipAvatar.src = avatarSrc;
     elements.chipAvatar.alt = `${formatName(state.viewerUser)} avatar`;
@@ -829,14 +463,6 @@ function bindHeaderEvents() {
         return;
       }
 
-      const logoutBtn = event.target.closest("[data-logout]");
-      if (logoutBtn && elements.profileDropdown.contains(logoutBtn)) {
-        event.preventDefault();
-        event.stopPropagation();
-        elements.profileDropdown.classList.remove("show");
-        logout("login.html");
-        return;
-      }
     },
     true
   );
@@ -929,11 +555,7 @@ async function loadProfile() {
       state.viewerUser = { ...(state.viewerUser || {}), ...state.profileUser };
       hydrateHeader();
     }
-    applyGlobalAvatars(state.profileUser);
-    applyAvatar(state.profileUser);
     renderProfile(state.profileUser);
-    populateProfileForm(state.profileUser);
-    updateProfileFormVisibility();
     updateButtonVisibility();
     elements.error?.classList.add("hidden");
     elements.error.textContent = "";
@@ -980,7 +602,8 @@ function renderProfile(profile) {
     (Array.isArray(profile.practiceAreas) && profile.practiceAreas.length ? profile.practiceAreas : null) ||
     (Array.isArray(profile.specialties) && profile.specialties.length ? profile.specialties : null);
   const { hasSkills, hasPractice } = renderSkillsAndPractice(skillValues, practiceValues);
-  renderBestFor(profile.bestFor);
+  // Keep stored bestFor entries; this retired section is no longer displayed.
+  renderBestFor([]);
   syncBestForFocusRowLayout();
   const hasExperience = renderExperience(profile.experience);
   const hasEducation = renderEducation(profile.education);
@@ -998,109 +621,6 @@ function renderProfile(profile) {
     hasLanguages,
     hasDocuments,
   });
-  scheduleInviteCutoutAlign();
-}
-
-function ensureInviteCutoutLayer() {
-  if (inviteCutoutLayer) return inviteCutoutLayer;
-  const shell = document.querySelector(".page-shell");
-  if (!shell) return null;
-
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("class", "invite-cutout-overlay");
-  svg.setAttribute("aria-hidden", "true");
-  svg.setAttribute("focusable", "false");
-
-  const defs = document.createElementNS(ns, "defs");
-  const mask = document.createElementNS(ns, "mask");
-  const maskId = `invite-cutout-mask-${Math.random().toString(36).slice(2, 10)}`;
-  mask.setAttribute("id", maskId);
-  mask.setAttribute("maskUnits", "userSpaceOnUse");
-
-  const full = document.createElementNS(ns, "rect");
-  full.setAttribute("x", "0");
-  full.setAttribute("y", "0");
-  full.setAttribute("fill", "white");
-
-  const hole = document.createElementNS(ns, "rect");
-  hole.setAttribute("x", "-9999");
-  hole.setAttribute("y", "-9999");
-  hole.setAttribute("width", "0");
-  hole.setAttribute("height", "0");
-  hole.setAttribute("rx", "0");
-  hole.setAttribute("ry", "0");
-  hole.setAttribute("fill", "black");
-
-  mask.appendChild(full);
-  mask.appendChild(hole);
-  defs.appendChild(mask);
-  svg.appendChild(defs);
-
-  const layer = document.createElementNS(ns, "rect");
-  layer.setAttribute("x", "0");
-  layer.setAttribute("y", "0");
-  layer.setAttribute("fill", "#ffffff");
-  layer.setAttribute("mask", `url(#${maskId})`);
-  svg.appendChild(layer);
-
-  shell.prepend(svg);
-  shell.classList.add("cutout-active");
-  inviteCutoutLayer = { shell, svg, full, hole, layer };
-  return inviteCutoutLayer;
-}
-
-function alignInviteCutout() {
-  const cutout = ensureInviteCutoutLayer();
-  if (!cutout) return;
-  const { shell, svg, full, hole, layer } = cutout;
-  const shellRect = shell.getBoundingClientRect();
-  const width = Math.max(1, Math.round(shellRect.width));
-  const height = Math.max(1, Math.round(shellRect.height));
-  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  svg.setAttribute("width", String(width));
-  svg.setAttribute("height", String(height));
-  full.setAttribute("width", String(width));
-  full.setAttribute("height", String(height));
-  layer.setAttribute("width", String(width));
-  layer.setAttribute("height", String(height));
-
-  const visible =
-    Boolean(elements.inviteBtn) &&
-    !elements.inviteBtn.classList.contains("hidden") &&
-    elements.inviteBtn.offsetWidth > 0 &&
-    elements.inviteBtn.offsetHeight > 0;
-  if (!visible) {
-    hole.setAttribute("x", "-9999");
-    hole.setAttribute("y", "-9999");
-    hole.setAttribute("width", "0");
-    hole.setAttribute("height", "0");
-    return;
-  }
-
-  const rect = elements.inviteBtn.getBoundingClientRect();
-  const seamBleed = 2.5;
-  const borderRadius = parseFloat(window.getComputedStyle(elements.inviteBtn).borderTopLeftRadius) || rect.height / 2;
-  const x = rect.left - shellRect.left - seamBleed;
-  const y = rect.top - shellRect.top - seamBleed;
-  const w = rect.width + seamBleed * 2;
-  const h = rect.height + seamBleed * 2;
-  const r = Math.max(2, borderRadius + seamBleed);
-
-  hole.setAttribute("x", x.toFixed(3));
-  hole.setAttribute("y", y.toFixed(3));
-  hole.setAttribute("width", w.toFixed(3));
-  hole.setAttribute("height", h.toFixed(3));
-  hole.setAttribute("rx", r.toFixed(3));
-  hole.setAttribute("ry", r.toFixed(3));
-}
-
-function scheduleInviteCutoutAlign() {
-  if (inviteCutoutAlignRaf !== null) return;
-  inviteCutoutAlignRaf = window.requestAnimationFrame(() => {
-    inviteCutoutAlignRaf = null;
-    alignInviteCutout();
-  });
 }
 
 function syncBestForFocusRowLayout() {
@@ -1111,35 +631,30 @@ function syncBestForFocusRowLayout() {
   elements.bestForFocusRow.classList.toggle("is-single", visibleCount === 1);
 }
 
-function populateProfileForm(profile) {
-  if (!elements.profileForm || !profile) return;
-  setInputValue(elements.linkedInInput, profile.linkedInURL);
-  setInputValue(elements.yearsExperienceInput, profile.yearsExperience ?? "");
-}
-
-function setInputValue(input, value) {
-  if (!input) return;
-  if (value === undefined || value === null) {
-    input.value = "";
-  } else {
-    input.value = String(value);
-  }
-}
-
 function renderAvatar(name, avatarUrl) {
-  const source = avatarUrl || PLACEHOLDER_AVATAR;
+  const source = avatarUrl || "";
   if (elements.avatarImg) {
-    elements.avatarImg.src = source;
     elements.avatarImg.alt = `${name} portrait`;
     elements.avatarImg.loading = "lazy";
-    elements.avatarImg.style.display = "block";
+    if (source) {
+      elements.avatarImg.src = source;
+      elements.avatarImg.style.display = "block";
+    } else {
+      elements.avatarImg.removeAttribute("src");
+      elements.avatarImg.style.display = "none";
+    }
+    elements.avatarImg.onerror = () => {
+      elements.avatarImg.removeAttribute("src");
+      elements.avatarImg.style.display = "none";
+      if (elements.avatarFallback) elements.avatarFallback.style.display = "flex";
+    };
   }
   if (elements.avatarFallback) {
     elements.avatarFallback.textContent = getInitials(name);
     elements.avatarFallback.style.display = avatarUrl ? "none" : "flex";
   }
   const heroAvatar = document.getElementById("user-avatar");
-  if (heroAvatar && source) {
+  if (heroAvatar && heroAvatar !== elements.avatarImg && source) {
     heroAvatar.src = source;
   }
   const previewAvatar = document.getElementById("profilePhotoPreview");
@@ -1160,7 +675,7 @@ function renderPhotoReviewStatus(profile = {}) {
   let message = "";
   note.classList.remove("is-rejected");
   if (status === "pending_review") {
-    message = "Photo pending review. It will appear to attorneys once approved.";
+    message = "Photo pending review. Your profile is hidden from attorney discovery until the photo is approved.";
   } else if (status === "rejected") {
     message = "Photo rejected. Please upload a professional headshot.";
     note.classList.add("is-rejected");
@@ -1173,8 +688,9 @@ function renderStatus(profile) {
   if (!elements.statusChip) return;
   const nextRaw = profile.availabilityDetails?.nextAvailable;
   const nextDate = nextRaw ? new Date(nextRaw) : null;
-  const nextExpired = nextDate && !Number.isNaN(nextDate.getTime()) && nextDate.getTime() <= Date.now();
-  const message = nextExpired ? "Available Now" : profile.availability || "Availability on request";
+  const today = window.LPCBusinessDate?.today() || new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const nextExpired = nextDate && !Number.isNaN(nextDate.getTime()) && nextDate.toISOString().slice(0, 10) <= today;
+  const message = nextExpired ? "Available now" : profile.availability || "Availability on request";
   const nextAvailable = nextExpired ? "" : friendlyAvailabilityDate(nextRaw);
   elements.statusChip.textContent = nextAvailable ? `Next opening ${nextAvailable}` : message;
 }
@@ -1193,7 +709,7 @@ function renderMetadata(profile) {
     renderMetaLine(elements.credentialMeta, "C", `Bar #${profile.barNumber}`);
   } else {
     const linkedIn = profile.linkedInURL || profile.linkedin || "";
-    const safeLinkedIn = sanitizeUrl(linkedIn);
+    const safeLinkedIn = sanitizeUrl(linkedIn, { requiredHost: "linkedin.com" });
     if (safeLinkedIn) {
       renderMetaLine(elements.credentialMeta, "link", "LinkedIn", safeLinkedIn);
     } else {
@@ -1211,135 +727,40 @@ function renderMetadata(profile) {
   renderMetaLine(elements.joinedMetaCorner, "J", joinedLabel);
 }
 
+function configureDocumentLink(link, rawValue = "") {
+  if (!link) return false;
+  const value = String(rawValue || "").trim();
+  link.classList.add("hidden");
+  link.removeAttribute("href");
+  delete link.dataset.key;
+  delete link.dataset.external;
+  if (!value) return false;
+
+  if (/^https?:\/\//i.test(value)) {
+    const safeExternal = sanitizeUrl(value);
+    if (!safeExternal || !/^https?:\/\//i.test(safeExternal)) return false;
+    link.href = safeExternal;
+    link.dataset.external = "true";
+  } else {
+    const key = value.replace(/^\/+/, "");
+    if (!key) return false;
+    link.dataset.key = key;
+    link.href = `/api/uploads/view?key=${encodeURIComponent(key)}`;
+  }
+
+  link.classList.remove("hidden");
+  return true;
+}
+
 function renderDocumentLinks(profile) {
-  let hasDoc = false;
-  const deriveKey = (value = "") => {
-    if (!value) return "";
-    if (/^https?:\/\//i.test(value)) {
-      try {
-        const url = new URL(value);
-        return url.pathname.replace(/^\/+/, "");
-      } catch {
-        return value;
-      }
-    }
-    return value.replace(/^\/+/, "");
-  };
-  if (elements.certificateLink) {
-    elements.certificateLink.setAttribute("href", "#");
-    const certKey = profile.certificateKey || profile.certificateURL;
-    if (certKey) {
-      const key = deriveKey(certKey);
-      if (key) {
-        let shouldShow = true;
-        elements.certificateLink.dataset.key = key;
-        const isExternal = /^https?:\/\//i.test(certKey) || /^mailto:/i.test(certKey);
-        if (isExternal) {
-          const safeExternal = sanitizeUrl(certKey);
-          if (safeExternal) {
-            if (/^https?:/i.test(safeExternal)) {
-              elements.certificateLink.href = `${safeExternal}${safeExternal.includes("?") ? "&" : "?"}v=${Date.now()}`;
-            } else {
-              elements.certificateLink.href = safeExternal;
-            }
-          } else {
-            shouldShow = false;
-            elements.certificateLink.dataset.key = "";
-          }
-        }
-        if (shouldShow) {
-          elements.certificateLink.classList.remove("hidden");
-          hasDoc = true;
-        } else {
-          elements.certificateLink.classList.add("hidden");
-        }
-      } else {
-        elements.certificateLink.dataset.key = "";
-        elements.certificateLink.classList.add("hidden");
-      }
-    } else {
-      elements.certificateLink.dataset.key = "";
-      elements.certificateLink.classList.add("hidden");
-    }
-  }
-  if (elements.resumeLink) {
-    elements.resumeLink.setAttribute("href", "#");
-    const resumeKey = profile.resumeURL;
-    if (resumeKey) {
-      const key = deriveKey(resumeKey);
-      if (key) {
-        let shouldShow = true;
-        elements.resumeLink.dataset.key = key;
-        const isExternal = /^https?:\/\//i.test(resumeKey) || /^mailto:/i.test(resumeKey);
-        if (isExternal) {
-          const safeExternal = sanitizeUrl(resumeKey);
-          if (safeExternal) {
-            if (/^https?:/i.test(safeExternal)) {
-              elements.resumeLink.href = `${safeExternal}${safeExternal.includes("?") ? "&" : "?"}v=${Date.now()}`;
-            } else {
-              elements.resumeLink.href = safeExternal;
-            }
-          } else {
-            shouldShow = false;
-            elements.resumeLink.dataset.key = "";
-          }
-        }
-        if (shouldShow) {
-          elements.resumeLink.classList.remove("hidden");
-          hasDoc = true;
-        } else {
-          elements.resumeLink.classList.add("hidden");
-        }
-      } else {
-        elements.resumeLink.dataset.key = "";
-        elements.resumeLink.classList.add("hidden");
-      }
-    } else {
-      elements.resumeLink.dataset.key = "";
-      elements.resumeLink.classList.add("hidden");
-    }
-  }
-  if (elements.writingSampleLink) {
-    elements.writingSampleLink.setAttribute("href", "#");
-    const writingKey = profile.writingSampleURL;
-    if (writingKey) {
-      const key = deriveKey(writingKey);
-      if (key) {
-        let shouldShow = true;
-        elements.writingSampleLink.dataset.key = key;
-        const isExternal = /^https?:\/\//i.test(writingKey) || /^mailto:/i.test(writingKey);
-        if (isExternal) {
-          const safeExternal = sanitizeUrl(writingKey);
-          if (safeExternal) {
-            if (/^https?:/i.test(safeExternal)) {
-              elements.writingSampleLink.href = `${safeExternal}${safeExternal.includes("?") ? "&" : "?"}v=${Date.now()}`;
-            } else {
-              elements.writingSampleLink.href = safeExternal;
-            }
-          } else {
-            shouldShow = false;
-            elements.writingSampleLink.dataset.key = "";
-          }
-        }
-        if (shouldShow) {
-          elements.writingSampleLink.classList.remove("hidden");
-          hasDoc = true;
-        } else {
-          elements.writingSampleLink.classList.add("hidden");
-        }
-      } else {
-        elements.writingSampleLink.dataset.key = "";
-        elements.writingSampleLink.classList.add("hidden");
-      }
-    } else {
-      elements.writingSampleLink.dataset.key = "";
-      elements.writingSampleLink.classList.add("hidden");
-    }
-  }
-  if (elements.documentsCard) {
-    elements.documentsCard.classList.toggle("hidden", !profile.writingSampleURL);
-  }
-  return hasDoc;
+  const certificateVisible = configureDocumentLink(
+    elements.certificateLink,
+    profile.certificateKey || profile.certificateURL
+  );
+  const resumeVisible = configureDocumentLink(elements.resumeLink, profile.resumeURL);
+  const writingSampleVisible = configureDocumentLink(elements.writingSampleLink, profile.writingSampleURL);
+  elements.documentsCard?.classList.toggle("hidden", !writingSampleVisible);
+  return certificateVisible || resumeVisible || writingSampleVisible;
 }
 
 function normalizeLanguagesList(languages = []) {
@@ -1444,61 +865,6 @@ function extractState(rawLocation = "") {
     .filter(Boolean);
   if (!parts.length) return "";
   return parts[parts.length - 1];
-}
-
-function renderSkills(container, values, emptyCopy) {
-  if (!container) return;
-  container.innerHTML = "";
-  const list = Array.isArray(values) ? values.filter(Boolean) : [];
-  if (!list.length) {
-    const empty = document.createElement("p");
-    empty.textContent = emptyCopy;
-    empty.style.color = "var(--muted)";
-    empty.style.fontSize = "0.95rem";
-    container.appendChild(empty);
-    return;
-  }
-  list.slice(0, 10).forEach((value, index) => {
-    const skill = document.createElement("div");
-    skill.className = "skill";
-
-    const label = document.createElement("span");
-    label.className = "skill-label";
-    label.textContent = value;
-
-    const line = document.createElement("div");
-    line.className = "skill-line";
-
-    const progress = document.createElement("div");
-    progress.className = "skill-progress";
-    const percent = 40 + ((index % 5) * 12);
-    progress.style.width = `${Math.min(percent, 100)}%`;
-
-    line.appendChild(progress);
-    skill.appendChild(label);
-    skill.appendChild(line);
-    container.appendChild(skill);
-  });
-}
-
-function renderPills(container, values, emptyCopy) {
-  if (!container) return;
-  container.innerHTML = "";
-  const list = Array.isArray(values) ? values.filter(Boolean) : [];
-  if (!list.length) {
-    const empty = document.createElement("p");
-    empty.textContent = emptyCopy;
-    empty.style.color = "var(--muted)";
-    empty.style.fontSize = "0.95rem";
-    container.appendChild(empty);
-    return;
-  }
-  list.slice(0, 20).forEach((value) => {
-    const pill = document.createElement("span");
-    pill.className = "pill";
-    pill.textContent = value;
-    container.appendChild(pill);
-  });
 }
 
 function renderSkillsAndPractice(skills = [], practices = []) {
@@ -1730,66 +1096,7 @@ function renderFunFacts(about, writingSamples = []) {
   elements.funFactsCard.classList.remove("hidden");
 }
 
-function renderAttorneyHighlights(profile) {
-  const card = elements.attorneyCard;
-  const container = elements.attorneyHighlights;
-  if (!card || !container) return;
-  const canView = state.viewerRole === "attorney" || state.viewerRole === "admin";
-  card.classList.toggle("hidden", !canView);
-  if (!canView) return;
-
-  const entries = [];
-  if (profile.linkedInURL) {
-    const safeUrl = sanitizeUrl(profile.linkedInURL);
-    if (safeUrl) {
-    entries.push({
-      title: "LinkedIn",
-      content: `<a href="${escapeAttribute(safeUrl)}" target="_blank" rel="noopener">View LinkedIn profile</a>`,
-    });
-    }
-  }
-  const experienceLabel = describeExperience(profile.yearsExperience);
-  if (experienceLabel) {
-    entries.push({
-      title: "Experience",
-      content: escapeHtml(experienceLabel),
-    });
-  }
-  if (profile.certificateURL) {
-    const certUrl = sanitizeUrl(profile.certificateURL);
-    if (certUrl) {
-    entries.push({
-      title: "Certificate",
-      content: `<a href="${escapeAttribute(certUrl)}" target="_blank" rel="noopener">View credential</a>`,
-    });
-    }
-  }
-  if (profile.resumeURL) {
-    const resumeHref = sanitizeUrl(profile.resumeURL);
-    if (resumeHref) {
-    entries.push({
-      title: "Résumé",
-      content: `<a href="${escapeAttribute(resumeHref)}" target="_blank" rel="noopener">View Résumé</a>`,
-    });
-    }
-  }
-
-  container.innerHTML = "";
-  if (!entries.length) {
-    card.classList.add("hidden");
-    return;
-  }
-
-  entries.forEach((entry) => {
-    const chip = document.createElement("span");
-    chip.className = "chip";
-    chip.innerHTML = `${escapeHtml(entry.title)}: ${entry.content}`;
-    container.appendChild(chip);
-  });
-}
-
 function updateButtonVisibility() {
-  const isOwner = state.viewerRole === "paralegal" && state.viewerId && state.viewerId === state.paralegalId;
   const isAttorney = state.viewerRole === "attorney";
 
   toggleElement(elements.editBtn, false);
@@ -1813,32 +1120,23 @@ function updateInviteButtonState() {
   if (state.blockedByProfileOwner) {
     toggleElement(elements.inviteBtn, false);
     elements.inviteBtn.disabled = true;
-    if (elements.sendInviteBtn) elements.sendInviteBtn.disabled = true;
     closeInviteModal();
-    scheduleInviteCutoutAlign();
     return;
   }
   const isAttorney = state.viewerRole === "attorney";
   const applicantCaseId = state.applicantContext?.caseId || "";
   if (isAttorney && applicantCaseId) {
-    const label = buildHireLabel(applicantCaseId);
-    elements.inviteBtn.textContent = label;
+    elements.inviteBtn.textContent = "Review hire";
     elements.inviteBtn.dataset.mode = "hire";
     toggleElement(elements.inviteBtn, true);
-    elements.inviteBtn.disabled = false;
-    if (!state.caseContextTitle && !state.caseContextLoading) {
-      void loadCaseContextTitle(applicantCaseId);
-    }
-    scheduleInviteCutoutAlign();
+    elements.inviteBtn.disabled = !state.profileUser;
     return;
   }
-  const hasOpenCases = isAttorney && state.openCases.length > 0;
-  elements.inviteBtn.textContent = "Invite to Case";
+  const canReviewInvitation = isAttorney && Boolean(state.profileUser);
+  elements.inviteBtn.textContent = "Invite to Matter";
   elements.inviteBtn.dataset.mode = "invite";
-  toggleElement(elements.inviteBtn, hasOpenCases);
-  elements.inviteBtn.disabled = !hasOpenCases;
-  if (elements.sendInviteBtn) elements.sendInviteBtn.disabled = !hasOpenCases;
-  scheduleInviteCutoutAlign();
+  toggleElement(elements.inviteBtn, canReviewInvitation);
+  elements.inviteBtn.disabled = !canReviewInvitation;
 }
 
 function toggleSkeleton(enable) {
@@ -1861,764 +1159,23 @@ function showError(message) {
   elements.error.classList.remove("hidden");
 }
 
-async function loadAttorneyCases() {
-  try {
-    const res = await secureFetch("/api/cases/my-active", {
-      headers: { Accept: "application/json" },
-    });
-    const payload = await res.json().catch(() => ({}));
-    const items = Array.isArray(payload?.items)
-      ? payload.items
-      : Array.isArray(payload)
-      ? payload
-      : [];
-    state.openCases = items.filter((item) => {
-      const archived = Boolean(item.archived);
-      const assigned = Boolean(
-        item.acceptedParalegal ||
-          item.assignedTo?.id ||
-          item.assignedTo?._id ||
-          item.paralegal?.id ||
-          item.paralegal?._id ||
-          item.paralegal ||
-          item.paralegalId
-      );
-      return !archived && !assigned;
-    });
-  } catch (err) {
-    console.warn("Unable to load open cases", err);
-    state.openCases = [];
-  }
-  renderCaseOptions();
-  updateInviteButtonState();
-}
-
-function buildHireLabel(caseId) {
-  const title = resolveCaseTitle(caseId);
-  return title ? `Hire for ${title}` : "Hire for this case";
-}
-
-function normalizeId(value) {
-  if (!value) return "";
-  return String(value);
-}
-
-function resolveCaseTitle(caseId) {
-  const normalized = normalizeId(caseId);
-  if (!normalized) return "";
-  if (state.caseContextTitle) return state.caseContextTitle;
-  const match = state.openCases.find((item) => normalizeId(item.id || item._id) === normalized);
-  if (!match) return "";
-  state.caseContextTitle = match.title || match.caseNumber || "";
-  return state.caseContextTitle;
-}
-
-async function loadCaseContextTitle(caseId) {
-  const normalized = normalizeId(caseId);
-  if (!normalized) return;
-  if (state.caseContextLoading) return;
-  state.caseContextLoading = true;
-  try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(normalized)}`, {
-      headers: { Accept: "application/json" },
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) return;
-    state.caseLookup.set(normalized, payload);
-    state.caseContextTitle = payload?.title || payload?.caseNumber || "";
-  } catch (err) {
-    console.warn("Unable to load case context", err);
-  } finally {
-    state.caseContextLoading = false;
-    updateInviteButtonState();
-  }
-}
-
-function renderCaseOptions() {
-  const select = elements.inviteCaseSelect;
-  if (!select) return;
-  select.innerHTML = "";
-  if (!state.openCases.length) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "No active cases available";
-    select.appendChild(option);
-    select.disabled = true;
-    if (elements.sendInviteBtn) elements.sendInviteBtn.disabled = true;
-    return;
-  }
-  state.openCases.forEach((caseItem, index) => {
-    const option = document.createElement("option");
-    option.value = caseItem.id || caseItem._id;
-    option.textContent = caseItem.title || caseItem.caseNumber || "Untitled case";
-    if (index === 0) option.selected = true;
-    select.appendChild(option);
-  });
-  select.disabled = false;
-  if (elements.sendInviteBtn) elements.sendInviteBtn.disabled = false;
-}
-
 function openInviteModal() {
-  if (!elements.inviteModal || !state.profileUser) return;
-  if (!state.openCases.length) {
-    showToast("You need an active case before inviting a paralegal.", "info");
-    return;
-  }
-  clearFieldError(elements.inviteCaseSelect);
-  renderCaseOptions();
-  elements.inviteModal.classList.add("show");
+  if (state.viewerRole !== "attorney" || !state.profileUser || state.blockedByProfileOwner) return;
+  invitationDialog ||= createLegacyInvitationDialog({ ownerId: state.viewerId, request: secureFetch });
+  invitationDialog.open({ paralegalId: String(state.profileUser.id || state.profileUser._id || state.paralegalId), name: formatName(state.profileUser), trigger: elements.inviteBtn });
 }
 
-async function handleHireForCase() {
-  const caseId = state.applicantContext?.caseId || state.caseContextId || "";
-  const paralegalId = state.profileUser?.id || state.profileUser?._id || state.paralegalId || "";
-  if (!caseId || !paralegalId) {
-    showToast("Unable to hire for this case.", "error");
-    return;
-  }
-  const button = elements.inviteBtn;
-  if (button) {
-    button.classList.add("is-pressed");
-    window.setTimeout(() => button.classList.remove("is-pressed"), 180);
-  }
-  const paymentReady = await hasDefaultPaymentMethod();
-  if (!paymentReady) {
-    showToast("Add a payment method to hire before hiring.", "error");
-    return;
-  }
-  let caseDetails;
-  try {
-    caseDetails = await getCaseForHire(caseId);
-  } catch (err) {
-    showToast(err?.message || "Unable to load case details.", "error");
-    return;
-  }
-  const amountCents = Number(caseDetails?.lockedTotalAmount ?? caseDetails?.totalAmount ?? 0);
-  if (!Number.isFinite(amountCents) || amountCents <= 0) {
-    showToast("Payment amount is unavailable for this case.", "error");
-    return;
-  }
-  const paralegalName = formatName(state.profileUser || {});
-  openHireConfirmModal({
-    paralegalName,
-    amountCents,
-    feePct: PLATFORM_FEE_PCT,
-    existingPreEngagement:
-      caseDetails?.preEngagement &&
-      String(caseDetails.preEngagement.requestedParalegalId || "") === String(paralegalId || "") &&
-      String(caseDetails.preEngagement.status || "").toLowerCase() === "requested"
-        ? caseDetails.preEngagement
-        : null,
-    continueHref: `case-detail.html?caseId=${encodeURIComponent(caseId)}`,
-    onSendPreEngagement: async ({ preEngagement } = {}) => {
-      await savePreEngagementDraft(caseId, paralegalId, preEngagement);
-    },
-    onConfirm: async ({ preEngagement } = {}) => {
-      const originalText = button?.textContent || "Hire";
-      if (button) {
-        button.textContent = "Processing...";
-        button.setAttribute("disabled", "disabled");
-      }
-      try {
-        void preEngagement;
-        await hireParalegal(caseId, paralegalId);
-      } finally {
-        if (button) {
-          button.removeAttribute("disabled");
-          button.textContent = originalText;
-        }
-      }
-    },
-  });
-}
-
-async function hasDefaultPaymentMethod() {
-  try {
-    const res = await secureFetch("/api/payments/payment-method/default", {
-      headers: { Accept: "application/json" },
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) return false;
-    return !!payload?.paymentMethod;
-  } catch {
-    return false;
-  }
-}
-
-async function getCaseForHire(caseId) {
-  const normalized = normalizeId(caseId);
-  if (state.caseLookup.has(normalized)) return state.caseLookup.get(normalized);
-  const res = await secureFetch(`/api/cases/${encodeURIComponent(normalized)}`, { headers: { Accept: "application/json" } });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(payload?.error || "Unable to load case details.");
-  }
-  state.caseLookup.set(normalized, payload);
-  return payload;
-}
-
-function formatHireErrorMessage(message) {
-  if (!message || typeof message !== "string") return DEFAULT_HIRE_ERROR;
-  const normalized = message.toLowerCase();
-  if (normalized.includes("stripe") && normalized.includes("connect")) {
-    return "This paralegal must connect Stripe before you can hire them.";
-  }
-  if (
-    normalized.includes("stripe") &&
-    (normalized.includes("onboard") || normalized.includes("onboarding") || normalized.includes("payout"))
-  ) {
-    return "This paralegal must complete Stripe onboarding before you can hire them.";
-  }
-  return message;
-}
-
-async function hireParalegal(caseId, paralegalId) {
-  const res = await secureFetch(
-    `/api/cases/${encodeURIComponent(caseId)}/hire/${encodeURIComponent(paralegalId)}`,
-    { method: "POST", body: {} }
-  );
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(payload?.error || DEFAULT_HIRE_ERROR);
-  return payload;
-}
-
-async function savePreEngagementDraft(caseId, paralegalId, preEngagement) {
-  const formData = new FormData();
-  formData.set(
-    "confidentialityAgreementRequired",
-    preEngagement?.confidentialityAgreementSelected ? "true" : "false"
-  );
-  formData.set(
-    "conflictsCheckRequired",
-    preEngagement?.conflictsCheckSelected ? "true" : "false"
-  );
-  formData.set("conflictsDetails", String(preEngagement?.conflictsDetails || ""));
-  if (preEngagement?.confidentialityFile) {
-    formData.append(
-      "confidentialityFile",
-      preEngagement.confidentialityFile,
-      preEngagement.confidentialityFileName || preEngagement.confidentialityFile.name || "confidentiality-agreement"
-    );
-  }
-  const res = await secureFetch(
-    `/api/cases/${encodeURIComponent(caseId)}/pre-engagement/${encodeURIComponent(paralegalId)}/request`,
-    { method: "POST", body: formData }
-  );
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(payload?.error || "Unable to save pre-engagement requirements.");
-  }
-  return payload;
-}
-
-function ensureHireModalStyles() {
-  if (document.getElementById("hire-confirm-styles")) return;
-  const style = document.createElement("style");
-  style.id = "hire-confirm-styles";
-  style.textContent = `
-    .hire-confirm-overlay{position:fixed;inset:0;background:rgba(15,23,42,.4);display:flex;align-items:center;justify-content:center;z-index:1500;opacity:0;visibility:hidden;transition:opacity .16s ease,visibility .16s ease}
-    .hire-confirm-overlay.is-visible{opacity:1;visibility:visible}
-    .hire-confirm-overlay.is-closing{pointer-events:none}
-    .hire-confirm-modal{background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:18px;padding:28px;max-width:580px;width:min(94%,580px);box-shadow:0 24px 50px rgba(0,0,0,.2);display:grid;gap:16px;font-family:'Cormorant Garamond',serif;font-weight:300;color:#1a1a1a;font-size:1.05rem;opacity:0;transform:translateY(10px) scale(.985);transition:opacity .16s ease,transform .16s ease}
-    .hire-confirm-overlay.is-visible .hire-confirm-modal{opacity:1;transform:translateY(0) scale(1)}
-    .hire-confirm-stage{transition:opacity .18s ease,transform .18s ease}
-    .hire-confirm-stage.is-leaving,.hire-confirm-stage.is-entering{opacity:0;transform:translateY(8px)}
-    .hire-confirm-modal button,
-    .hire-confirm-modal a{font-family:'Cormorant Garamond',serif}
-    .hire-confirm-modal .btn{font-family:'Sarabun',sans-serif;font-size:0.85rem;font-weight:300;padding:8px 16px;border:1px solid rgba(26,34,48,0.5);background:transparent;color:#1a1a1a;border-radius:999px;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background .2s ease,color .2s ease,border-color .2s ease}
-    .hire-confirm-modal .btn.secondary{background:#fff}
-    .hire-confirm-modal .btn.primary{background:#1a2230;color:#fff;border-color:#1a2230}
-    .hire-confirm-modal .btn:hover{background:rgba(26,34,48,0.06)}
-    .hire-confirm-modal .btn.primary:hover{background:#0f172a;border-color:#0f172a}
-    .hire-confirm-modal .btn:focus-visible{outline:2px solid #b6a47a;outline-offset:2px}
-    .hire-confirm-modal .btn:disabled,
-    .hire-confirm-modal .btn[aria-disabled="true"]{opacity:0.6;cursor:not-allowed}
-    .hire-confirm-modal p{font-weight:300;color:#6b7280}
-    .hire-confirm-title{font-weight:300;font-size:1.6rem;letter-spacing:0.01em;text-align:center}
-    .hire-pre-helper{margin:0 0 16px;color:#6b7280;line-height:1.5}
-    .hire-pre-options{display:grid;gap:10px;margin-bottom:14px}
-    .hire-pre-option{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid rgba(0,0,0,0.08);border-radius:14px;background:#fff;cursor:pointer;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease}
-    .hire-pre-option:hover{border-color:rgba(182,164,122,.65);box-shadow:0 10px 24px rgba(15,23,42,.06)}
-    .hire-pre-option.is-selected{border-color:rgba(182,164,122,.85);background:#faf7ef}
-    .hire-pre-option input{margin-top:3px}
-    .hire-pre-option-copy{display:grid;gap:2px}
-    .hire-pre-option-copy strong{font-size:1rem;font-weight:400;color:#1a1a1a}
-    .hire-pre-reveal{display:grid;gap:10px;margin-top:12px;padding:12px;border:1px solid rgba(0,0,0,0.08);border-radius:14px;background:#fbfbfa}
-    .hire-pre-reveal label{font-size:0.9rem;font-weight:400;color:#1a1a1a}
-    .hire-pre-upload{display:grid;gap:8px}
-    .hire-pre-upload input[type="file"]{display:none}
-    .hire-pre-upload-trigger{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:1px solid rgba(26,34,48,0.18);border-radius:999px;background:#fff;color:#1a1a1a;font-weight:300;cursor:pointer;width:max-content}
-    .hire-pre-upload-name{font-size:0.9rem;color:#6b7280}
-    .hire-pre-reveal textarea{border:1px solid rgba(26,34,48,0.18);border-radius:12px;padding:10px;font:inherit;min-height:104px;resize:vertical;background:#fff;color:#1a1a1a}
-    .hire-pre-reveal textarea.is-invalid{border-color:rgba(185,28,28,.45);background:rgba(254,242,242,.55)}
-    .hire-pre-upload-trigger.is-invalid{border-color:rgba(185,28,28,.45);color:#991b1b;background:rgba(254,242,242,.55)}
-    .hire-pre-field-help{font-size:0.85rem;color:#991b1b;margin-top:-2px}
-    .hire-confirm-summary{border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:14px 18px;display:grid;gap:12px;background:#fff}
-    .hire-confirm-row{display:flex;justify-content:space-between;gap:16px;align-items:baseline}
-    .hire-confirm-row span{text-transform:uppercase;font-size:0.75rem;letter-spacing:0.08em;color:#6b7280;font-weight:300}
-    .hire-confirm-row strong{font-size:1.3rem;font-weight:300;color:#1a1a1a}
-    .hire-confirm-total strong{font-weight:400}
-    .hire-confirm-help{display:flex;justify-content:flex-end;margin-top:-6px}
-    .hire-confirm-info{width:26px;height:26px;border-radius:50%;border:1px solid rgba(0,0,0,0.08);background:#fff;color:#94a3b8;font-size:0.8rem;font-weight:250;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0;transition:border-color .2s ease,color .2s ease,transform .15s ease}
-    .hire-confirm-info:hover,
-    .hire-confirm-info:focus-visible{border-color:#b6a47a;color:#1a1a1a;transform:translateY(-1px)}
-    .hire-confirm-tooltip{position:absolute;right:0;bottom:calc(100% + 10px);width:min(320px,80vw);padding:12px 14px;border-radius:12px;background:#fff;border:1px solid rgba(0,0,0,0.08);box-shadow:0 18px 40px rgba(0,0,0,.18);font-size:0.9rem;line-height:1.5;color:#1a1a1a;opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .15s ease,transform .15s ease;z-index:2}
-    .hire-confirm-info:hover .hire-confirm-tooltip,
-    .hire-confirm-info:focus-visible .hire-confirm-tooltip{opacity:1;pointer-events:auto;transform:translateY(0)}
-    .hire-confirm-error{border:1px solid rgba(185,28,28,.4);background:rgba(254,242,242,.9);color:#991b1b;border-radius:10px;padding:8px 10px;font-size:0.9rem}
-    .hire-confirm-success{border:1px solid rgba(22,163,74,.35);background:rgba(240,253,244,.9);color:#166534;border-radius:10px;padding:8px 10px;font-size:0.9rem}
-    .hire-confirm-terms-link{color:var(--accent,#b6a47a);font-weight:600;text-decoration:none;transition:color .2s ease}
-    .hire-confirm-terms-link:hover{color:#1a1a1a}
-    .hire-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:4px;flex-wrap:wrap}
-    .hire-confirm-actions[hidden]{display:none}
-    @media (prefers-reduced-motion: reduce){
-      .hire-confirm-overlay,.hire-confirm-modal{transition:none}
-    }
-  `;
-  document.head.appendChild(style);
-}
-
-function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref, onConfirm, onSendPreEngagement, existingPreEngagement = null }) {
-  ensureHireModalStyles();
-  const safeName = escapeHtml(paralegalName || "Paralegal");
-  const feeNote =
-    "The platform fee supports tools that enable attorneys and paralegals to collaborate, including secure workspace, messaging, document sharing, case workflow tools, payment processing, identity verification, and platform administration. The platform fee is not a fee for legal services.";
-  const feeRate = Number(feePct || 0);
-  const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
-  const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
-  const normalizedExistingPreEngagement =
-    existingPreEngagement &&
-    typeof existingPreEngagement === "object" &&
-    String(existingPreEngagement.status || "").toLowerCase() === "requested"
-      ? {
-          status: "requested",
-          confidentialityAgreementRequired: !!existingPreEngagement.confidentialityAgreementRequired,
-          conflictsCheckRequired: !!existingPreEngagement.conflictsCheckRequired,
-          conflictsDetails: String(existingPreEngagement.conflictsDetails || ""),
-          confidentialityDocument: existingPreEngagement.confidentialityDocument || null,
-        }
-      : null;
-  const preEngagementState = {
-    confidentialityAgreement: !!normalizedExistingPreEngagement?.confidentialityAgreementRequired,
-    conflictsCheck: !!normalizedExistingPreEngagement?.conflictsCheckRequired,
-    none: !normalizedExistingPreEngagement,
-    confidentialityFile: null,
-    fileName: String(normalizedExistingPreEngagement?.confidentialityDocument?.name || ""),
-    conflictsDetails: String(normalizedExistingPreEngagement?.conflictsDetails || ""),
-    confidentialityTouched: false,
-    conflictsTouched: false,
-    submitError: "",
-    submitting: false,
-  };
-  const overlay = document.createElement("div");
-  overlay.className = "hire-confirm-overlay";
-  overlay.innerHTML = `
-    <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
-      <div class="hire-confirm-stage" data-hire-stage></div>
-    </div>
-  `;
-  const stageEl = overlay.querySelector("[data-hire-stage]");
-
-  const close = () => {
-    if (overlay.classList.contains("is-closing")) return;
-    overlay.classList.add("is-closing");
-    overlay.classList.remove("is-visible");
-    const removeOverlay = () => {
-      overlay.removeEventListener("transitionend", handleTransitionEnd);
-      overlay.remove();
-    };
-    const handleTransitionEnd = (event) => {
-      if (event.target === overlay) removeOverlay();
-    };
-    overlay.addEventListener("transitionend", handleTransitionEnd);
-    window.setTimeout(removeOverlay, 200);
-  };
-  const canClose = () => {
-    const successEl = stageEl?.querySelector("[data-hire-success]");
-    if (successEl && !successEl.hidden) return true;
-    const confirmBtn = stageEl?.querySelector("[data-hire-confirm]");
-    if (!confirmBtn) return true;
-    return !confirmBtn.disabled;
-  };
-  const buildPreEngagementDraft = () => {
-    const hasRequirements = preEngagementState.confidentialityAgreement || preEngagementState.conflictsCheck;
-    if (!hasRequirements || preEngagementState.none) return null;
-    return {
-      confidentialityAgreementSelected: !!preEngagementState.confidentialityAgreement,
-      conflictsCheckSelected: !!preEngagementState.conflictsCheck,
-      confidentialityFile: preEngagementState.confidentialityAgreement ? preEngagementState.confidentialityFile || null : null,
-      confidentialityFileName: preEngagementState.confidentialityAgreement ? preEngagementState.fileName || "" : "",
-      conflictsDetails: preEngagementState.conflictsCheck ? String(preEngagementState.conflictsDetails || "") : "",
-    };
-  };
-  const getPreEngagementValidation = () => {
-    const requiresConfidentiality = !!preEngagementState.confidentialityAgreement;
-    const requiresConflicts = !!preEngagementState.conflictsCheck;
-    const missingConfidentialityFile = requiresConfidentiality && !preEngagementState.confidentialityFile;
-    const missingConflictsDetails =
-      requiresConflicts && !String(preEngagementState.conflictsDetails || "").trim();
-    return {
-      missingConfidentialityFile,
-      missingConflictsDetails,
-      showConfidentialityError: missingConfidentialityFile && preEngagementState.confidentialityTouched,
-      showConflictsError: missingConflictsDetails && preEngagementState.conflictsTouched,
-      hasErrors: missingConfidentialityFile || missingConflictsDetails,
-    };
-  };
-  const getPreEngagementPrimaryLabel = () => {
-    if (preEngagementState.none || (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck)) {
-      return "Next: Fund and Hire";
-    }
-    return normalizedExistingPreEngagement ? "Update and resend" : `Send to ${safeName}`;
-  };
-  const renderPreEngagementStep = () => `
-    ${(() => {
-      const validation = getPreEngagementValidation();
-      return `
-    <div data-hire-step="pre-engagement">
-      <div class="hire-confirm-title" id="hireConfirmTitle">Pre-Engagement</div>
-      ${
-        normalizedExistingPreEngagement
-          ? `<div class="hire-confirm-success">Sent to <strong>${safeName}</strong>. Awaiting completion from the paralegal.</div>`
-          : ""
-      }
-      <p class="hire-pre-helper">${
-        normalizedExistingPreEngagement
-          ? `Sent to <strong>${safeName}</strong>. Awaiting completion from the paralegal.`
-          : "Before moving forward, you may require pre-engagement items for this paralegal."
-      }</p>
-      <div class="hire-pre-options">
-        <label class="hire-pre-option${preEngagementState.confidentialityAgreement ? " is-selected" : ""}">
-          <input type="checkbox" data-pre-option="confidentiality"${preEngagementState.confidentialityAgreement ? " checked" : ""}>
-          <span class="hire-pre-option-copy">
-            <strong>Confidentiality agreement</strong>
-          </span>
-        </label>
-        <label class="hire-pre-option${preEngagementState.conflictsCheck ? " is-selected" : ""}">
-          <input type="checkbox" data-pre-option="conflicts"${preEngagementState.conflictsCheck ? " checked" : ""}>
-          <span class="hire-pre-option-copy">
-            <strong>Conflicts check</strong>
-          </span>
-        </label>
-        <label class="hire-pre-option${preEngagementState.none ? " is-selected" : ""}">
-          <input type="checkbox" data-pre-option="none"${preEngagementState.none ? " checked" : ""}>
-          <span class="hire-pre-option-copy">
-            <strong>None</strong>
-          </span>
-        </label>
-      </div>
-      ${
-        preEngagementState.confidentialityAgreement
-          ? `
-            <div class="hire-pre-reveal">
-              <div class="hire-pre-upload">
-                <label>Upload confidentiality agreement</label>
-                <label class="hire-pre-upload-trigger${validation.showConfidentialityError ? " is-invalid" : ""}" for="hirePreConfidentialityUpload">Choose file</label>
-                <input id="hirePreConfidentialityUpload" type="file" data-pre-confidentiality-upload>
-                <div class="hire-pre-upload-name">${escapeHtml(preEngagementState.fileName || "No file selected")}</div>
-                ${
-                  validation.showConfidentialityError
-                    ? `<div class="hire-pre-field-help">Upload a confidentiality agreement to continue.</div>`
-                    : ""
-                }
-              </div>
-            </div>
-          `
-          : ""
-      }
-      ${
-        preEngagementState.conflictsCheck
-          ? `
-            <div class="hire-pre-reveal">
-              <label for="hirePreConflictsDetails">Conflicts check details</label>
-              <textarea id="hirePreConflictsDetails" class="${validation.showConflictsError ? "is-invalid" : ""}" data-pre-conflicts-details placeholder="Enter the names, parties, or details the paralegal should review for conflicts.">${escapeHtml(
-                preEngagementState.conflictsDetails
-              )}</textarea>
-              ${
-                validation.showConflictsError
-                  ? `<div class="hire-pre-field-help">Enter conflicts check details to continue.</div>`
-                  : ""
-              }
-            </div>
-          `
-          : ""
-      }
-      <div class="hire-confirm-error"${preEngagementState.submitError ? "" : " hidden"} data-pre-error>${escapeHtml(
-        preEngagementState.submitError || ""
-      )}</div>
-      <div class="hire-confirm-actions">
-        <button class="btn secondary" type="button" data-hire-cancel${preEngagementState.submitting ? " disabled aria-disabled=\"true\"" : ""}>Cancel</button>
-        <button class="btn primary" type="button" data-pre-next${validation.hasErrors || preEngagementState.submitting ? " disabled aria-disabled=\"true\"" : ""}>${escapeHtml(
-          preEngagementState.submitting ? "Sending..." : getPreEngagementPrimaryLabel()
-        )}</button>
-      </div>
-    </div>
-  `;})()}
-  `;
-  const renderFundHireStep = () => `
-    <div data-hire-step="fund-hire">
-      <div class="hire-confirm-title" id="hireConfirmTitle">Confirm &amp; Hire</div>
-      <p>You’re about to hire <strong>${safeName}</strong>. Your payment will be processed through Stripe upon confirmation. You can review the <a class="hire-confirm-terms-link" href="terms.html#payments" target="_blank" rel="noopener">payment terms here</a>.</p>
-      <div class="hire-confirm-summary">
-        <div class="hire-confirm-row">
-          <span>Case amount</span>
-          <strong>${escapeHtml(formatCurrency(amountCents))}</strong>
-        </div>
-        <div class="hire-confirm-row">
-          <span>Platform fee (${feeRate}%)</span>
-          <strong>${escapeHtml(formatCurrency(feeCents))}</strong>
-        </div>
-        <div class="hire-confirm-row hire-confirm-total">
-          <span>Total charge</span>
-          <strong>${escapeHtml(formatCurrency(totalCents))}</strong>
-        </div>
-      </div>
-      <div class="hire-confirm-help">
-        <button class="hire-confirm-info" type="button" aria-label="${escapeAttribute(feeNote)}">
-          ?
-          <span class="hire-confirm-tooltip" aria-hidden="true">${escapeHtml(feeNote)}</span>
-        </button>
-      </div>
-      <div class="hire-confirm-error" data-hire-error hidden></div>
-      <div class="hire-confirm-success" data-hire-success hidden>Case funded. Work can begin.</div>
-      <div class="hire-confirm-actions" data-hire-continue hidden>
-        <a class="btn primary" href="${escapeAttribute(continueHref || "#")}">Continue to case</a>
-      </div>
-      <div class="hire-confirm-actions" data-hire-actions>
-        <button class="btn secondary" type="button" data-hire-back>Back</button>
-        <button class="btn secondary" type="button" data-hire-cancel>Cancel</button>
-        <button class="btn primary" type="button" data-hire-confirm>Confirm Hire</button>
-      </div>
-    </div>
-  `;
-  const renderPreEngagementSentStep = () => `
-    <div data-hire-step="pre-engagement-sent">
-      <div class="hire-confirm-title" id="hireConfirmTitle">${normalizedExistingPreEngagement ? "Pre-Engagement Updated" : "Pre-Engagement Sent"}</div>
-      <p>${normalizedExistingPreEngagement ? `Updated pre-engagement requirements for <strong>${safeName}</strong> have been saved. Hiring and funding will continue after the paralegal completes the requested items and you review them.` : `Pre-engagement requirements for <strong>${safeName}</strong> have been sent. Hiring and funding will continue after the paralegal completes the requested items and you review them.`}</p>
-      <div class="hire-confirm-success">${normalizedExistingPreEngagement ? "Pre-engagement requirements updated successfully." : "Pre-engagement requirements sent successfully."}</div>
-      <div class="hire-confirm-actions">
-        <button class="btn secondary" type="button" data-hire-close>Close</button>
-      </div>
-    </div>
-  `;
-  const transitionStage = (html, bindFn) => {
-    if (!stageEl) return;
-    stageEl.classList.add("is-leaving");
-    window.setTimeout(() => {
-      stageEl.innerHTML = html;
-      bindFn?.();
-      stageEl.classList.remove("is-leaving");
-      stageEl.classList.add("is-entering");
-      window.requestAnimationFrame(() => stageEl.classList.remove("is-entering"));
-    }, 140);
-  };
-  const bindCancel = () => {
-    stageEl?.querySelector("[data-hire-cancel]")?.addEventListener("click", () => {
-      if (canClose()) close();
-    });
-  };
-  const bindPreEngagementSentStep = () => {
-    stageEl?.querySelector("[data-hire-close]")?.addEventListener("click", () => {
-      close();
-    });
-  };
-  const bindPreEngagementStep = () => {
-    bindCancel();
-    stageEl?.querySelectorAll("[data-pre-option]").forEach((input) => {
-      input.addEventListener("change", (event) => {
-        const option = event.target?.dataset?.preOption || "";
-        const checked = !!event.target?.checked;
-        if (option === "none") {
-          preEngagementState.submitError = "";
-          preEngagementState.none = checked || (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck);
-          if (preEngagementState.none) {
-            preEngagementState.confidentialityAgreement = false;
-            preEngagementState.conflictsCheck = false;
-            preEngagementState.confidentialityFile = null;
-            preEngagementState.fileName = "";
-            preEngagementState.confidentialityTouched = false;
-            preEngagementState.conflictsTouched = false;
-          }
-        } else if (option === "confidentiality") {
-          preEngagementState.submitError = "";
-          preEngagementState.confidentialityAgreement = checked;
-          if (checked) preEngagementState.none = false;
-          if (!checked) {
-            preEngagementState.confidentialityFile = null;
-            preEngagementState.fileName = "";
-            preEngagementState.confidentialityTouched = false;
-          }
-        } else if (option === "conflicts") {
-          preEngagementState.submitError = "";
-          preEngagementState.conflictsCheck = checked;
-          if (checked) preEngagementState.none = false;
-          if (!checked) preEngagementState.conflictsTouched = false;
-        }
-        if (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck) {
-          preEngagementState.none = true;
-        }
-        transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-      });
-    });
-    stageEl?.querySelector("[data-pre-confidentiality-upload]")?.addEventListener("click", () => {
-      preEngagementState.confidentialityTouched = true;
-    });
-    stageEl?.querySelector("[data-pre-confidentiality-upload]")?.addEventListener("change", (event) => {
-      const file = event.target?.files?.[0] || null;
-      preEngagementState.confidentialityTouched = true;
-      preEngagementState.submitError = "";
-      preEngagementState.confidentialityFile = file;
-      preEngagementState.fileName = file?.name || "";
-      transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-    });
-    stageEl?.querySelector("[data-pre-conflicts-details]")?.addEventListener("blur", () => {
-      preEngagementState.conflictsTouched = true;
-      transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-    });
-    stageEl?.querySelector("[data-pre-conflicts-details]")?.addEventListener("input", (event) => {
-      preEngagementState.conflictsTouched = true;
-      preEngagementState.submitError = "";
-      preEngagementState.conflictsDetails = event.target?.value || "";
-    });
-    stageEl?.querySelector("[data-pre-next]")?.addEventListener("click", async () => {
-      const draft = buildPreEngagementDraft();
-      if (draft) {
-        preEngagementState.submitError = "";
-        preEngagementState.submitting = true;
-        transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-        try {
-          await onSendPreEngagement?.({ preEngagement: draft });
-          transitionStage(renderPreEngagementSentStep(), bindPreEngagementSentStep);
-        } catch (err) {
-          preEngagementState.submitting = false;
-          preEngagementState.submitError = formatHireErrorMessage(err?.message) || "Unable to save pre-engagement requirements.";
-          transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-        }
-        return;
-      }
-      transitionStage(renderFundHireStep(), bindFundHireStep);
-    });
-  };
-  const bindFundHireStep = () => {
-    bindCancel();
-    const errorEl = stageEl?.querySelector("[data-hire-error]");
-    const successEl = stageEl?.querySelector("[data-hire-success]");
-    const continueEl = stageEl?.querySelector("[data-hire-continue]");
-    const confirmBtn = stageEl?.querySelector("[data-hire-confirm]");
-    const cancelBtn = stageEl?.querySelector("[data-hire-cancel]");
-    const backBtn = stageEl?.querySelector("[data-hire-back]");
-    backBtn?.addEventListener("click", () => {
-      if (confirmBtn?.disabled) return;
-      transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
-    });
-    const setLoading = (isLoading) => {
-      if (confirmBtn) {
-        confirmBtn.disabled = isLoading;
-        confirmBtn.textContent = isLoading ? "Charging..." : "Confirm & Hire";
-      }
-      if (cancelBtn) cancelBtn.disabled = isLoading;
-      if (backBtn) backBtn.disabled = isLoading;
-    };
-    const showError = (message) => {
-      if (!errorEl) return;
-      if (!message) {
-        errorEl.hidden = true;
-        errorEl.textContent = "";
-        return;
-      }
-      errorEl.textContent = message;
-      errorEl.hidden = false;
-    };
-    const showSuccess = () => {
-      if (successEl) successEl.hidden = false;
-      if (confirmBtn) {
-        confirmBtn.disabled = true;
-        confirmBtn.textContent = "Hired";
-      }
-      if (backBtn) backBtn.hidden = true;
-      if (cancelBtn) {
-        cancelBtn.disabled = false;
-        cancelBtn.textContent = "Close";
-      }
-      if (continueEl) continueEl.hidden = false;
-    };
-    confirmBtn?.addEventListener("click", async () => {
-      showError("");
-      setLoading(true);
-      try {
-        await onConfirm?.({ preEngagement: buildPreEngagementDraft() });
-        showSuccess();
-      } catch (err) {
-        showError(formatHireErrorMessage(err?.message));
-        setLoading(false);
-      }
-    });
-  };
-
-  overlay.addEventListener("click", (event) => {
-    if (event.target === overlay && canClose()) close();
-  });
-  document.addEventListener(
-    "keydown",
-    (event) => {
-      if (event.key === "Escape" && canClose()) close();
-    },
-    { once: true }
-  );
-  document.body.appendChild(overlay);
-  stageEl.innerHTML = renderPreEngagementStep();
-  bindPreEngagementStep();
-  window.requestAnimationFrame(() => overlay.classList.add("is-visible"));
-}
-
-function formatCurrency(amountCents = 0) {
-  const dollars = Number(amountCents || 0) / 100;
-  return dollars.toLocaleString("en-US", { style: "currency", currency: "USD" });
+function handleHireForCase() {
+  const caseId = state.applicantContext?.caseId || state.caseContextId || '';
+  const paralegalId = String(state.profileUser?.id || state.profileUser?._id || state.paralegalId || '');
+  if (!/^[a-f0-9]{24}$/i.test(caseId) || !/^[a-f0-9]{24}$/i.test(paralegalId) || state.viewerRole !== 'attorney' || state.blockedByProfileOwner) return;
+  engagementDialog ||= createLegacyEngagementDialog({ ownerId: state.viewerId, request: secureFetch });
+  engagementDialog.open({ caseId, paralegalId, trigger: elements.inviteBtn });
 }
 
 function closeInviteModal() {
-  elements.inviteModal?.classList.remove("show");
-  clearFieldError(elements.inviteCaseSelect);
-}
-
-async function sendInviteToCase() {
-  if (!state.profileUser || !elements.inviteCaseSelect) return;
-  const caseId = elements.inviteCaseSelect.value;
-  clearFieldError(elements.inviteCaseSelect);
-  if (!caseId) {
-    showFieldError(elements.inviteCaseSelect, "Select a case to continue.");
-    showToast("Select a case to continue.", "info");
-    return;
-  }
-  const payload = {
-    paralegalId: state.profileUser.id || state.paralegalId,
-  };
-  const button = elements.sendInviteBtn;
-  const previousLabel = button?.textContent || "Send Invite";
-  if (button) {
-    button.disabled = true;
-    button.textContent = "Sending…";
-  }
-  try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/invite`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.error || "Unable to send invite");
-    showToast("Invite sent.", "success");
-    closeInviteModal();
-    await loadAttorneyCases();
-  } catch (err) {
-    console.error(err);
-    showToast(err.message || "Unable to send invite.", "error");
-  } finally {
-    if (button) {
-      button.textContent = previousLabel;
-      button.disabled = state.openCases.length === 0;
-    }
-  }
+  invitationDialog?.dispose(); invitationDialog = null;
+  engagementDialog?.dispose(); engagementDialog = null;
 }
 
 function setFieldText(el, value) {
@@ -2655,21 +1212,6 @@ function getInitials(name = "") {
   return (parts[0]?.[0] || "L").toUpperCase() + (parts[1]?.[0] || "P").toUpperCase();
 }
 
-function buildInitialAvatar(initials) {
-  const safe = (initials || "LP").slice(0, 2).toUpperCase();
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>
-    <defs>
-      <linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'>
-        <stop offset='0%' stop-color='#f4f0e6'/>
-        <stop offset='100%' stop-color='#e1dacb'/>
-      </linearGradient>
-    </defs>
-    <rect width='200' height='200' rx='30' ry='30' fill='url(#grad)'/>
-    <text x='50%' y='55%' font-size='72' text-anchor='middle' fill='#4a4030' font-family='Sarabun, Arial' font-weight='600'>${safe}</text>
-  </svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
-
 function escapeHtml(value = "") {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -2679,41 +1221,10 @@ function escapeHtml(value = "") {
     .replace(/'/g, "&#39;");
 }
 
-function escapeAttribute(value = "") {
-  return String(value).replace(/"/g, "&quot;").replace(/</g, "&lt;");
-}
-
-function showFieldError(field, message) {
-  if (!field) return;
-  clearFieldError(field);
-  field.classList?.add("input-error");
-  if (typeof field.setAttribute === "function") field.setAttribute("aria-invalid", "true");
-  const error = document.createElement("div");
-  error.className = "field-error";
-  error.textContent = message;
-  const wrapper = field.closest(".field") || field.closest("[data-field-wrapper]");
-  if (wrapper) wrapper.appendChild(error);
-  else field.insertAdjacentElement("afterend", error);
-}
-
-function clearFieldError(field) {
-  if (!field) return;
-  field.classList?.remove("input-error");
-  if (typeof field.removeAttribute === "function") field.removeAttribute("aria-invalid");
-  const wrapper = field.closest(".field") || field.closest("[data-field-wrapper]");
-  if (wrapper) {
-    const existing = wrapper.querySelector(".field-error");
-    if (existing) existing.remove();
-    return;
-  }
-  const next = field.nextElementSibling;
-  if (next?.classList.contains("field-error")) next.remove();
-}
-
 function showToast(message, type = "info") {
   if (toast?.show) {
     toast.show(message, { targetId: "toastBanner", type });
   } else {
-    alert(message);
+    void showAlert(message, { title: type === "error" ? "Action unavailable" : "Notice" });
   }
 }

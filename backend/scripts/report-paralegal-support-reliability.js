@@ -1,6 +1,6 @@
 const path = require("path");
 
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 
 const mongoose = require("mongoose");
 const SupportConversation = require("../models/SupportConversation");
@@ -14,6 +14,15 @@ const {
 const {
   evaluateParalegalRolloutStageGate,
 } = require("../services/support/paralegalRolloutService");
+const {
+  MONGO_OPERATION_OPTIONS,
+  requireMongoUri,
+} = require("../utils/mongooseOperationPolicy");
+
+const MAX_REPORT_RECORDS = Math.max(
+  100,
+  Math.min(50_000, Number(process.env.SUPPORT_RELIABILITY_MAX_RECORDS || 10_000))
+);
 
 const PARALEGAL_RELIABILITY_PROJECTION = [
   "_id",
@@ -83,30 +92,39 @@ function parseParalegalReliabilityOptions(argv = process.argv.slice(2)) {
 }
 
 async function loadParalegalReliabilityMessages({ days, since = "" }) {
-  if (!process.env.MONGO_URI) throw new Error("MONGO_URI is required unless --synthetic is used.");
   const sinceDate = since
     ? new Date(since)
     : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   if (!Number.isFinite(sinceDate.getTime())) {
     throw new Error("--since must be a valid ISO-8601 date-time.");
   }
-  await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 30000 });
+  await mongoose.connect(requireMongoUri(process.env.MONGO_URI), MONGO_OPERATION_OPTIONS);
   const conversations = await SupportConversation.find({
     role: "paralegal",
     updatedAt: { $gte: sinceDate },
   })
     .select("_id")
+    .sort({ _id: 1 })
+    .limit(MAX_REPORT_RECORDS + 1)
     .lean();
+  if (conversations.length > MAX_REPORT_RECORDS) {
+    throw new Error(`Paralegal reliability report exceeds ${MAX_REPORT_RECORDS} conversations; use a narrower --since window.`);
+  }
   const conversationIds = conversations.map((conversation) => conversation._id);
   if (!conversationIds.length) return [];
-  return SupportMessage.find({
+  const messages = await SupportMessage.find({
     conversationId: { $in: conversationIds },
     sender: "assistant",
     createdAt: { $gte: sinceDate },
   })
     .select(PARALEGAL_RELIABILITY_PROJECTION)
     .sort({ createdAt: 1, _id: 1 })
+    .limit(MAX_REPORT_RECORDS + 1)
     .lean();
+  if (messages.length > MAX_REPORT_RECORDS) {
+    throw new Error(`Paralegal reliability report exceeds ${MAX_REPORT_RECORDS} messages; use a narrower --since window.`);
+  }
+  return messages;
 }
 
 async function main() {

@@ -147,6 +147,7 @@ const CONTROL_ROOM_DECISION_POLICY = Object.freeze({
       "admissions_queue_metric",
     ]),
     neverQuickApproveTypes: Object.freeze([
+      "admissions_review",
       "administrative_non_admissions_decision",
     ]),
   }),

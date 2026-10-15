@@ -2,8 +2,8 @@
   --auth-ink: #27394d;
   --auth-muted: #647184;
   --auth-line: #d8dee7;
-  --auth-gold: #887244;
-  --auth-brand-gold: #b4975a;
+  --auth-gold: #6495ed;
+  --auth-brand-gold: #6495ed;
   --auth-art: #0d1723;
   --auth-control-height: 50px;
   --auth-control-radius: 8px;
@@ -356,7 +356,7 @@ body.auth-secondary .close-btn {
   body.auth-secondary button[type="submit"] { transition: none; }
 }
 /* Public recovery and verification: a compact card over the existing artwork. */
-body.auth-secondary { min-width: 0; --auth-gold: #385f9e; --auth-brand-gold: #6495ed; background: var(--auth-art); }
+body.auth-secondary { min-width: 0; --auth-gold: #6495ed; --auth-brand-gold: #6495ed; background: var(--auth-art); }
 body.auth-secondary .auth-secondary__header { position: absolute; width: 100%; min-height: 72px; padding: 20px clamp(16px, 4vw, 48px); z-index: 3; }
 body.auth-secondary .auth-secondary__brand { color: #f4f7fd; }
 .password-recovery-page main.recovery-layout,

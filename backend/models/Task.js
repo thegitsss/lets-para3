@@ -20,7 +20,7 @@ const taskSchema = new Schema(
   }
 );
 
-taskSchema.pre("validate", function (next) {
+taskSchema.pre("validate", function () {
   if (typeof this.status === "string") {
     const normalized = this.status.trim().toLowerCase();
     if (normalized === "in progress") {
@@ -29,7 +29,6 @@ taskSchema.pre("validate", function (next) {
       this.status = normalized;
     }
   }
-  next();
 });
 
 module.exports = mongoose.model("Task", taskSchema);

@@ -2,7 +2,7 @@
 
 Status: Packages 1–9 implementation complete; latest live-model rerun, deployment, and production acceptance pending
 
-Reference branch: `agent/paralegal-assistant-hardening`
+Repository state: implemented in the current working tree. This implementation record does not authorize launch; production acceptance is governed by `docs/LAUNCH_CERTIFICATION_CURRENT.md`.
 
 The attorney assistant supplies reusable architecture only. Paralegal capabilities, evidence, permissions, workflow policy, validation, evaluation, and rollout must be approved independently. The paralegal manager remains disabled until every pre-rollout gate below passes.
 

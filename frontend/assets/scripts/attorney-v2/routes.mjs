@@ -56,7 +56,6 @@ export function parseRoute(hash = "") {
   const management = path.match(/^\/matters\/([a-f0-9]{24})\/manage$/i);
   if (management) return { name: "matter-management", caseId: management[1], title: "Matter notes and history", path, key: source, query, found: true, legacy: `/dashboard-attorney.html?previewCaseId=${management[1]}#cases` };
   const match = path.match(/^\/matters\/([a-f0-9]{24})\/(overview|applications|work|files|messages|deadlines|activity|financials)$/i);
-  if (match && match[2].toLowerCase()==='messages') { query.set('matter',match[1]); return {name:'conversations',title:'Messages',path:'/conversations',caseId:match[1],tab:'messages',key:source,query,found:true}; }
   if (match && match[2].toLowerCase() === "activity" && /^[a-f0-9]{24}$/i.test(query.get("eventId") || "")) match[2] = "deadlines";
   if (match) return { name: "workspace", caseId: match[1], tab: match[2].toLowerCase(), title: "Matter", path, key: source, query, found: true, legacy: `/case-detail.html?caseId=${match[1]}&tab=${match[2]}` };
   if (path === "/matters/new") return { name: "create", title: "Create a Matter", path, key: source, query, found: true, legacy: "/create-case.html", description: "Describe your Matter and the support you need." };

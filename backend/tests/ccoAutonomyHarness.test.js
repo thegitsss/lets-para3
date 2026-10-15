@@ -9,8 +9,32 @@ process.env.ENABLE_CCO_AUTONOMY_HARNESS = "true";
 process.env.APP_ENV = "staging";
 
 const User = require("../models/User");
+const SupportConversation = require("../models/SupportConversation");
+const SupportMessage = require("../models/SupportMessage");
+const SupportTicket = require("../models/SupportTicket");
+const SupportMutation = require("../models/SupportMutation");
 const { isCcoAutonomyHarnessEnabled } = require("../utils/ccoAutonomyHarnessAccess");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
+
+function expectSavedHarnessOutcome(body) {
+  const { inspection, expectedOutcome } = body;
+  expect(inspection.tickets).toHaveLength(1);
+  expect(inspection.tickets[0].status).toBe(expectedOutcome.ticketStatus);
+  expect(inspection.tickets[0].routingSuggestion.ownerKey).toBe(expectedOutcome.routingOwner);
+  expect(inspection.tickets[0].linkedIncidentIds.length > 0).toBe(expectedOutcome.incidentLinked);
+  expect(inspection.supportRequests).toHaveLength(1);
+  const saved = inspection.supportRequests[0];
+  expect(saved).toMatchObject({ action: 'send', state: expectedOutcome.requestState, active: false });
+  expect(saved.userMessageId).toMatch(/^[a-f0-9]{24}$/);
+  expect(saved.assistantMessageId).toMatch(/^[a-f0-9]{24}$/);
+  const messageIds = inspection.messages.map(message => message.id);
+  expect(messageIds).toEqual(expect.arrayContaining([saved.userMessageId, saved.assistantMessageId]));
+  expect(saved).not.toHaveProperty('input');
+  expect(saved).not.toHaveProperty('result');
+  expect(saved).not.toHaveProperty('claimToken');
+  expect(inspection.autonomousActions).toEqual([]);
+  expect(inspection.handoffEvents.every(event => event.requestRecordId === saved.id)).toBe(true);
+}
 
 function buildHarnessApp() {
   const routerPath = require.resolve("../routes/ccoAutonomyHarness");
@@ -80,6 +104,18 @@ describe("CCO autonomy harness", () => {
     ).toBe(false);
   });
 
+  test.each(['unseeded', 'changed identity', 'non-synthetic account'])('harness refuses a %s conversation without adding support records', async kind => {
+    const app = buildHarnessApp(), admin = await createAdmin();
+    const user = await User.create({ firstName: 'Synthetic', lastName: 'Non-harness', email: 'unseeded@support-boundary.test', password: 'Synthetic123!', role: 'attorney', status: 'approved' });
+    const conversation = await SupportConversation.create({ userId: user._id, role: user.role, status: 'open', metadata: kind === 'unseeded' ? {} : { support: {
+      harnessScenarioKey: 'escalation', harnessSyntheticUserId: String(kind === 'changed identity' ? admin._id : user._id), harnessSeededByAdminId: String(admin._id), harnessSeededAt: new Date(),
+    } } });
+    const before = await SupportConversation.collection.findOne({ _id: conversation._id });
+    const response = await request(app).post('/api/admin/support/dev/cco-autonomy/trigger').set('Cookie', authCookieFor(admin)).send({ conversationId: String(conversation._id), scenario: 'escalation' });
+    expect({ status: response.status, messages: await SupportMessage.countDocuments({ conversationId: conversation._id }), tickets: await SupportTicket.countDocuments({ conversationId: conversation._id }), requests: await SupportMutation.countDocuments({ conversationId: conversation._id }) }).toEqual({ status: 403, messages: 0, tickets: 0, requests: 0 });
+    expect(await SupportConversation.collection.findOne({ _id: conversation._id })).toEqual(before);
+  });
+
   test("seed and trigger reopen scenario through the harness", async () => {
     const app = buildHarnessApp();
     const admin = await createAdmin();
@@ -90,7 +126,8 @@ describe("CCO autonomy harness", () => {
       .send({ scenario: "reopen" });
 
     expect(seedRes.status).toBe(201);
-    expect(seedRes.body.seeded.expectedActionType).toBe("ticket_reopened");
+    expect(seedRes.body.seeded.expectedOutcome).toEqual({ requestState: 'succeeded', ticketStatus: 'in_review', routingOwner: 'founder_review', incidentLinked: false });
+    expect(seedRes.body.inspection.supportRequests).toEqual([]);
     expect(seedRes.body.inspection.tickets[0].status).toBe("resolved");
 
     const triggerRes = await request(app)
@@ -101,10 +138,11 @@ describe("CCO autonomy harness", () => {
       });
 
     expect(triggerRes.status).toBe(201);
-    expect(triggerRes.body.inspection.tickets[0].status).toBe("open");
-    expect(
-      triggerRes.body.inspection.autonomousActions.some((action) => action.actionType === "ticket_reopened")
-    ).toBe(true);
+    expectSavedHarnessOutcome(triggerRes.body);
+    expect(triggerRes.body.inspection.handoffEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventType: 'support.ticket.escalated', actorType: 'user', routingStatus: 'routed' }),
+      expect.objectContaining({ eventType: 'support.submission.created', actorType: 'user', routingStatus: 'skipped' }),
+    ]));
   });
 
   test("seed and trigger escalation scenario through the harness", async () => {
@@ -124,9 +162,8 @@ describe("CCO autonomy harness", () => {
       });
 
     expect(triggerRes.status).toBe(201);
-    expect(
-      triggerRes.body.inspection.autonomousActions.some((action) => action.actionType === "ticket_escalated")
-    ).toBe(true);
+    expectSavedHarnessOutcome(triggerRes.body);
+    expect(triggerRes.body.inspection.handoffEvents).toEqual([]);
   });
 
   test("seed and trigger incident routing scenario through the harness", async () => {
@@ -147,10 +184,10 @@ describe("CCO autonomy harness", () => {
 
     expect(triggerRes.status).toBe(201);
     expect(triggerRes.body.inspection.incidents.length).toBeGreaterThan(0);
-    expect(
-      triggerRes.body.inspection.autonomousActions.some(
-        (action) => action.actionType === "incident_routed_from_support"
-      )
-    ).toBe(true);
+    expectSavedHarnessOutcome(triggerRes.body);
+    expect(triggerRes.body.inspection.handoffEvents).toContainEqual(expect.objectContaining({
+      eventType: 'support.submission.created', actorType: 'user', routingStatus: 'pending',
+      incidentId: triggerRes.body.inspection.incidents[0].id,
+    }));
   });
 });

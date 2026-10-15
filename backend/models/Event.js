@@ -77,6 +77,7 @@ const eventSchema = new Schema(
  * Indexes
  * -----------------------------------------*/
 eventSchema.index({ owner: 1, start: 1 });
+eventSchema.index({ owner: 1, caseId: 1, start: 1, _id: 1 });
 eventSchema.index({ caseId: 1, start: 1 });
 eventSchema.index({ type: 1, start: 1 });
 eventSchema.index({ visibility: 1, start: 1 });
@@ -95,7 +96,7 @@ eventSchema.virtual("durationMinutes").get(function () {
 /** ----------------------------------------
  * Validation & Hooks
  * -----------------------------------------*/
-eventSchema.pre("validate", function (next) {
+eventSchema.pre("validate", function () {
   // Normalize dates
   this.start = clampDate(this.start);
   this.end = clampDate(this.end);
@@ -105,21 +106,19 @@ eventSchema.pre("validate", function (next) {
 
   // end >= start
   if (this.end < this.start) {
-    return next(new Error("Event 'end' must be greater than or equal to 'start'."));
+    throw new Error("Event 'end' must be greater than or equal to 'start'.");
   }
 
   // If where looks like a zoom link, validate it
   if (this.where && this.where.includes("zoom.us") && !ZOOM_REGEX.test(this.where)) {
-    return next(new Error("If specifying a Zoom link, it must be a valid https://*.zoom.us/... URL."));
+    throw new Error("If specifying a Zoom link, it must be a valid https://*.zoom.us/... URL.");
   }
 
   // Basic all-day normalization (optional: keep times as-is but mark flag)
   if (this.isAllDay) {
     // Convention: represent all-day as start 00:00 and end 23:59:59 in its timezone (left as-is here)
-    // You can transform in the controller when rendering to clients.
+    // Controllers may transform this value for client presentation.
   }
-
-  next();
 });
 
 /** ----------------------------------------

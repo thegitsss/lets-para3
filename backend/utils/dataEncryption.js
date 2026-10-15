@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("./logger");
+const runtimeLogger = createRuntimeLogger("utils:dataEncryption");
 const crypto = require("crypto");
 
 const ENCRYPTION_PREFIX = "enc:v1:";
@@ -41,7 +43,7 @@ function getKeyOrNull() {
   }
   if (!warnedMissingKey) {
     warnedMissingKey = true;
-    console.warn("[dataEncryption] DATA_ENCRYPTION_KEY missing; storing data without encryption.");
+    runtimeLogger.warn("[dataEncryption] DATA_ENCRYPTION_KEY missing; storing data without encryption.");
   }
   return null;
 }
@@ -55,11 +57,18 @@ function isEncrypted(value) {
   return value.startsWith(ENCRYPTION_PREFIX);
 }
 
-function encryptString(value) {
+function encryptString(value, { plaintext = false } = {}) {
   if (value == null) return value;
   const str = String(value);
   if (!str) return str;
-  if (isEncrypted(str)) return str;
+  // Only authenticated stored ciphertext is reusable. Incoming message text is always plaintext.
+  if (!plaintext && isEncrypted(str)) {
+    try {
+      if (decryptString(str) !== str) return str;
+    } catch {
+      // Marker-looking plaintext must still be encrypted on writes. Reads remain fail-closed.
+    }
+  }
   const key = getKeyOrNull();
   if (!key) return str;
   const iv = crypto.randomBytes(12);
@@ -75,9 +84,12 @@ function decryptString(value) {
   const str = String(value);
   if (!isEncrypted(str)) return value;
   const key = getKeyOrNull();
-  if (!key) return value;
-  const payload = Buffer.from(str.slice(ENCRYPTION_PREFIX.length), "base64");
-  if (payload.length < 12 + 16) return value;
+  if (!key) throw Object.assign(new Error("Protected content is unavailable without its encryption key."), { code: "DATA_ENCRYPTION_UNAVAILABLE" });
+  const encoded = str.slice(ENCRYPTION_PREFIX.length);
+  const malformed = () => Object.assign(new Error("Protected content has an invalid encryption envelope."), { code: "DATA_ENCRYPTION_MALFORMED" });
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || encoded.length % 4 !== 0) throw malformed();
+  const payload = Buffer.from(encoded, "base64");
+  if (payload.length < 12 + 16 || payload.toString("base64") !== encoded) throw malformed();
   const iv = payload.subarray(0, 12);
   const tag = payload.subarray(12, 28);
   const ciphertext = payload.subarray(28);
@@ -104,19 +116,41 @@ function hashForLookup(value) {
   return crypto.createHmac("sha256", key).update(raw).digest("hex");
 }
 
-function encryptMessageFields(doc) {
+function stableLookupFingerprint(value) {
+  if (value == null) return "";
+  let raw = String(value);
+  if (isEncrypted(raw)) {
+    try {
+      raw = decryptString(raw);
+    } catch {
+      return "";
+    }
+  }
+  raw = String(raw || "").trim();
+  if (!raw) return "";
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
+
+function transformMessageContent(content, transform) {
+  if (typeof content === "string") return transform(content);
+  if (!content || typeof content !== "object") return content;
+  const output = { ...content };
+  for (const field of ["text", "transcript", "fileName", "fileKey", "originalName", "storageKey", "name", "key"]) {
+    if (typeof output[field] === "string" && output[field]) output[field] = transform(output[field]);
+  }
+  if (Array.isArray(output.files)) output.files = output.files.map((file) => transformMessageContent(file, transform));
+  return output;
+}
+
+function encryptMessageFields(doc, { plaintext = null } = {}) {
   if (!doc) return doc;
-  if (doc.text) doc.text = encryptString(doc.text);
-  if (doc.transcript) doc.transcript = encryptString(doc.transcript);
-  if (doc.fileName) doc.fileName = encryptString(doc.fileName);
-  if (doc.fileKey) doc.fileKey = encryptString(doc.fileKey);
-  if (typeof doc.content === "string") {
-    doc.content = encryptString(doc.content);
-  } else if (doc.content && typeof doc.content === "object") {
-    if (doc.content.text) doc.content.text = encryptString(doc.content.text);
-    if (doc.content.transcript) doc.content.transcript = encryptString(doc.content.transcript);
-    if (doc.content.fileName) doc.content.fileName = encryptString(doc.content.fileName);
-    if (doc.content.fileKey) doc.content.fileKey = encryptString(doc.content.fileKey);
+  const isDocument = typeof doc.isModified === "function";
+  const transform = (value) => encryptString(value, { plaintext: plaintext ?? isDocument });
+  for (const field of ["text", "transcript", "fileName", "fileKey", "content"]) {
+    // Existing ciphertext is untouched when a reaction, pin or read receipt is saved.
+    if (isDocument && !doc.isNew && !doc.isModified(field)) continue;
+    if (field === "content") doc.content = transformMessageContent(doc.content, transform);
+    else if (doc[field]) doc[field] = transform(doc[field]);
   }
   return doc;
 }
@@ -124,25 +158,20 @@ function encryptMessageFields(doc) {
 function decryptMessagePayload(message) {
   if (!message) return message;
   const output = typeof message.toObject === "function" ? message.toObject({ virtuals: true }) : { ...message };
+  delete output.clientMessageId;
+  delete output.notificationIntent;
   if (output.text) output.text = decryptString(output.text);
   if (output.transcript) output.transcript = decryptString(output.transcript);
   if (output.fileName) output.fileName = decryptString(output.fileName);
   if (output.fileKey) output.fileKey = decryptString(output.fileKey);
-  if (typeof output.content === "string") {
-    output.content = decryptString(output.content);
-  } else if (output.content && typeof output.content === "object") {
-    const content = { ...output.content };
-    if (content.text) content.text = decryptString(content.text);
-    if (content.transcript) content.transcript = decryptString(content.transcript);
-    if (content.fileName) content.fileName = decryptString(content.fileName);
-    if (content.fileKey) content.fileKey = decryptString(content.fileKey);
-    output.content = content;
-  }
+  output.content = transformMessageContent(output.content, decryptString);
   return output;
 }
 
 function encryptCaseFileFields(doc) {
   if (!doc) return doc;
+  const storageKeyFingerprint = stableLookupFingerprint(doc.storageKey);
+  if (storageKeyFingerprint) doc.storageKeyFingerprint = storageKeyFingerprint;
   const storageKeyHash = hashForLookup(doc.storageKey);
   if (storageKeyHash) doc.storageKeyHash = storageKeyHash;
   const originalNameHash = hashForLookup(doc.originalName);
@@ -181,13 +210,21 @@ function decryptCaseFilePayload(file) {
 function buildCaseFileKeyQuery({ caseId, storageKey }) {
   const query = { caseId };
   if (!storageKey) return query;
+  const fingerprint = stableLookupFingerprint(storageKey);
   if (!isEncryptionEnabled()) {
-    query.storageKey = storageKey;
+    query.$or = [
+      ...(fingerprint ? [{ storageKeyFingerprint: fingerprint }] : []),
+      { storageKey },
+    ];
     return query;
   }
   const hash = hashForLookup(storageKey);
-  if (hash) {
-    query.$or = [{ storageKeyHash: hash }, { storageKey }];
+  if (hash || fingerprint) {
+    query.$or = [
+      ...(fingerprint ? [{ storageKeyFingerprint: fingerprint }] : []),
+      ...(hash ? [{ storageKeyHash: hash }] : []),
+      { storageKey },
+    ];
     return query;
   }
   query.storageKey = storageKey;
@@ -216,6 +253,7 @@ module.exports = {
   encryptString,
   decryptString,
   hashForLookup,
+  stableLookupFingerprint,
   encryptMessageFields,
   decryptMessagePayload,
   encryptCaseFileFields,

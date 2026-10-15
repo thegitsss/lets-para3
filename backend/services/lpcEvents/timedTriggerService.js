@@ -20,9 +20,9 @@ function buildAdmissionsMissingFields(user = {}) {
 
   if (role === "paralegal") {
     if (!String(user.resumeURL || "").trim()) missing.push("resume");
-    if (!String(user.certificateURL || "").trim()) missing.push("certificate");
-    if (!Number.isFinite(Number(user.yearsExperience)) || Number(user.yearsExperience) <= 0) {
-      missing.push("experience history");
+    if (!user.paralegalQualification && !String(user.certificateURL || "").trim() &&
+        (!Number.isFinite(Number(user.yearsExperience)) || Number(user.yearsExperience) < 1)) {
+      missing.push("admission qualification");
     }
   }
 
@@ -43,7 +43,7 @@ async function emitIncompleteProfileWindowEvents() {
     deleted: { $ne: true },
     disabled: { $ne: true },
   })
-    .select("email role status createdAt emailVerified termsAccepted barNumber lawFirm firmWebsite state resumeURL certificateURL yearsExperience")
+    .select("email role status createdAt emailVerified termsAccepted barNumber lawFirm firmWebsite state resumeURL certificateURL yearsExperience paralegalQualification")
     .lean();
 
   const emitted = [];

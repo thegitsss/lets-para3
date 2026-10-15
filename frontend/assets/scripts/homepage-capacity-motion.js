@@ -30,28 +30,27 @@
     node.style[property] = value;
   }
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  // Phones prepare the unchanged artwork near its scene, away from the hero fade.
-  if (!reduced.matches && innerWidth <= 767 && 'IntersectionObserver' in window) {
-    const prepareArtwork = () => hook.querySelectorAll('img').forEach(img => {
-      img.decoding = 'async';
-      img.loading = 'eager';
-      void Promise.allSettled([img.decode()]);
-    });
+  // Prepare the unchanged artwork just before its scroll scene enters view.
+  // Native lazy loading otherwise starts these large decorative downloads
+  // during the hero, and eager decoding defeats that boundary entirely.
+  const prepareArtwork = () => hook.querySelectorAll('img[data-scene-src]').forEach(img => {
+    img.decoding = 'async';
+    img.loading = 'eager';
+    img.src = img.dataset.sceneSrc;
+    delete img.dataset.sceneSrc;
+    // Predecode is best effort; normal image loading remains authoritative.
+    void Promise.allSettled([img.decode()]);
+  });
+  if ('IntersectionObserver' in window) {
     const artworkObserver = new IntersectionObserver(entries => {
       if (!entries.some(entry => entry.isIntersecting)) return;
       artworkObserver.disconnect();
       prepareArtwork();
     }, { rootMargin: '128px 0px' });
+    // Observe the first artwork, which starts below the introductory text.
+    // The tall section itself touches the hero edge before any artwork is visible.
     artworkObserver.observe(clouds[1] || scene);
-  } else {
-    // Decode the existing artwork before the scroll reveal needs its first paint.
-    if (!reduced.matches) hook.querySelectorAll('img').forEach(img => {
-      img.decoding = 'async';
-      img.loading = 'eager';
-      // Predecode is best effort; the image's normal load remains authoritative.
-      void Promise.allSettled([img.decode()]);
-    });
-  }
+  } else prepareArtwork();
   const clamp = value => Math.max(0, Math.min(1, value));
   // FIND uses GSAP's default power1.out for each tween and a 0.1s scrub.
   const ease = value => 1 - (1 - value) ** 2;

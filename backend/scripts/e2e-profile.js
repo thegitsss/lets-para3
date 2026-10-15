@@ -3,22 +3,8 @@ const http = require("http");
 const crypto = require("crypto");
 const express = require("express");
 const cookieParser = require("cookie-parser");
-const puppeteer = require("puppeteer");
-
-function patchElementHandleClick() {
-  const { ElementHandle } = puppeteer;
-  if (!ElementHandle || ElementHandle.prototype.__safeClickPatched) return;
-  const original = ElementHandle.prototype.click;
-  ElementHandle.prototype.click = async function (...args) {
-    try {
-      return await this.evaluate((el) => el.click());
-    } catch {
-      return original.apply(this, args);
-    }
-  };
-  ElementHandle.prototype.__safeClickPatched = true;
-}
-patchElementHandleClick();
+const { clickVisible, launchPuppeteer } = require("./puppeteerBrowser");
+const { installWorkspaceReads } = require("./e2e-workspace-fixture");
 
 const ATTORNEY = {
   id: "507f1f77bcf86cd799439011",
@@ -96,6 +82,7 @@ function startStubServer() {
     const userId = sessions.get(token);
     return userById.get(userId) || null;
   }
+  installWorkspaceReads(app, getSessionUser);
 
   app.get("/api/csrf", (_req, res) => res.json({ csrfToken: "test-csrf" }));
 
@@ -193,7 +180,7 @@ function startStubServer() {
 
   const server = http.createServer(app);
   return new Promise((resolve) => {
-    server.listen(0, () => {
+    server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, () => {
       const { port } = server.address();
       resolve({ server, port });
     });
@@ -207,7 +194,7 @@ async function login(page, baseUrl, { email, password }) {
   await page.type("#password", password);
   await Promise.all([
     page.waitForNavigation({ waitUntil: "networkidle0" }),
-    page.evaluate((selector) => document.querySelector(selector)?.click(), "#loginForm button[type=\"submit\"]"),
+    clickVisible(page, "#loginForm button[type=\"submit\"]"),
   ]);
 }
 
@@ -226,9 +213,9 @@ async function api(page, { method, path, body }) {
 
 async function run() {
   const { server, port } = await startStubServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
-  const browser = await puppeteer.launch({
+  const browser = await launchPuppeteer({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
     protocolTimeout: 120_000,

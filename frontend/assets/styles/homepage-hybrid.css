@@ -2012,3 +2012,26 @@ body.lpc-home.lpc-home--hybrid .workflow-review .compact-file b {
     letter-spacing: 0;
   }
 }
+
+/* Keep the existing compact workflow art readable without changing its cards. */
+@media (max-width: 960px) {
+  body.lpc-home.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas :is(.workflow-create-preview__prompt, .workflow-create-preview__notes, .applicant-row__identity strong, .message p, .compact-file b, .workflow-completed-tasks span, .workflow-close-status) {
+    font-size: 13.5px;
+    line-height: 18px;
+  }
+  body.lpc-home.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas :is(.applicant-row__identity > span, .interface-label, .message small, .payment-summary small) {
+    font-size: 12px;
+    line-height: 16px;
+  }
+  body.lpc-home.lpc-home--hybrid .workflow-chapters .workflow-mobile-canvas .message--received p { color: #5f6b7a; }
+}
+
+/* Readable existing text accents on white homepage surfaces. */
+body.lpc-home .clarity-section__intro .eyebrow,
+body.lpc-home .home-faq > .interface-label,
+body.lpc-home .home-faq__link-copy small,
+body.lpc-home .fee-card a.stripe-link,
+body.lpc-home .fee-card a.stripe-link:hover,
+body.lpc-home .fee-card a.stripe-link:visited { color: #4269ae; }
+body.lpc-home .fee-card a.stripe-link { text-decoration: underline; text-underline-offset: .15em; }
+body.lpc-home #lpc-feature-cards h3 { color: #6091e5; }

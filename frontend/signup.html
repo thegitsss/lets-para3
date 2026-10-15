@@ -1007,6 +1007,14 @@
             <p id="paralegalAdmissionNotice" class="role-note" style="display:none;margin-top:16px;font-size:0.9rem;font-weight:200;color:var(--muted);">
               <a href="/paralegal-admission.html" target="_blank" rel="noopener" style="color:var(--auth-accent);text-decoration:none;">Learn more about our application review.</a>
             </p>
+            <div id="signupPolicyReview">
+              <p>Review the confidentiality, work-product, liability, Delaware venue, and jury-trial and class-action provisions in the Terms before accepting.</p>
+              <label class="terms-label" style="display:flex;align-items:flex-start;gap:8px;margin:12px 0;"><input id="signupTerms" type="checkbox" disabled /><span>I have read and agree to the <a id="signupTermsLink" href="terms.html" target="_blank" rel="noopener">Terms of Service</a>.</span></label>
+              <label class="terms-label" style="display:flex;align-items:flex-start;gap:8px;margin:12px 0;"><input id="signupPrivacy" type="checkbox" disabled /><span>I acknowledge that I have read the <a id="signupPrivacyLink" href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
+              <p id="signupPolicyStatus" role="status" aria-live="polite">Loading the policy documents…</p>
+              <button id="signupPolicyReload" type="button" hidden>Reload policy documents</button>
+              <p>Submitting electronically signs your acceptance for this account. Privacy acknowledgement is not consent to unrelated processing or a waiver of privacy rights.</p>
+            </div>
             <button id="submitBtn" class="btn" type="submit" data-public-action="primary" data-action-shape="control">Submit registration</button>
             <button id="editSignupBasics" class="signup-confirmation__home" type="button">Edit basic information</button>
             <p class="attorney-submit-legal" id="attorneySubmitLegal" hidden>By selecting Submit registration, you agree to the <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> and acknowledge that you have read the <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
@@ -1611,8 +1619,7 @@
       try {
         const url = new URL(raw);
         const host = url.hostname.toLowerCase();
-        return (url.protocol === 'https:' || url.protocol === 'http:') &&
-          (host === 'linkedin.com' || host.endsWith('.linkedin.com'));
+        return (url.protocol === 'https:' || url.protocol === 'http:') && host.endsWith('linkedin.com');
       } catch {
         return false;
       }
@@ -1776,6 +1783,13 @@
         paralegalCertFile = document.getElementById('certUpload')?.files?.[0] || null;
       }
 
+      const policyDecision = window.LPCSignupPolicy?.read();
+      if (!policyDecision) {
+        say('Read and accept the Terms and separately acknowledge the Privacy Policy before submitting.', 'err');
+        document.getElementById('signupPolicyReview')?.scrollIntoView({ block: 'center' });
+        document.getElementById('signupTerms')?.focus();
+        return;
+      }
       const originalText = submitBtn?.textContent || defaultSubmitText;
       const turnstileToken = getTurnstileToken(form);
       if (!turnstileToken) {
@@ -1801,6 +1815,8 @@
         formData.append('state', stateToSubmit);
         formData.append('termsAccepted', 'true');
         formData.append('privacyAcknowledged', 'true');
+        formData.append('termsHash', policyDecision.termsHash);
+        formData.append('privacyHash', policyDecision.privacyHash);
         if (googleSignupActive) formData.append('googleSignupIntent', 'true');
         if (phoneNumber) formData.append('phoneNumber', phoneNumber);
         if (timezone) formData.append('timezone', timezone);
@@ -1833,6 +1849,7 @@
         try { data = await res.json(); } catch { data = {}; }
 
         if (!res.ok) {
+          if (data.code === 'LEGAL_DOCUMENTS_CHANGED') await window.LPCSignupPolicy?.reload();
           const errorCopy = String(data?.error || data?.msg || data?.message || '');
           const basicField = data.field || (/password/i.test(errorCopy) ? 'password' : /email|registered/i.test(errorCopy) ? 'email' : /first.*last.*name/i.test(errorCopy) ? 'fullName' : '');
           if (['password', 'email', 'fullName'].includes(basicField)) {
@@ -1893,6 +1910,7 @@
       }
     });
   </script>
+  <script src="assets/scripts/signup-policy.js"></script>
   <script type="module" src="assets/scripts/web-vitals-rum.js"></script>
   <script src="assets/scripts/auth-illustration-fit.js?v=20260924-window-fit"></script>
 </body>

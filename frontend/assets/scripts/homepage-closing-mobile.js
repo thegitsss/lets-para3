@@ -25,6 +25,8 @@
     imageRequested = true;
     prepareSource();
     image.fetchPriority = 'auto';
+    const fallback = document.querySelector('.closing-scene__ridge image[data-src]');
+    if (fallback) fallback.setAttribute('href', fallback.dataset.src);
     void paint();
   }
   const title = scene.querySelector('h2');
@@ -153,11 +155,10 @@
   if ('IntersectionObserver' in window) {
     const loader = new IntersectionObserver(entries => {
       if (!entries.some(entry => entry.isIntersecting)) return;
-      loader.disconnect();
-      requestImage();
+      requestImage(); loader.disconnect();
     }, { rootMargin: '1500px 0px' });
     loader.observe(scene);
-  } else requestImage();
+  } else { requestImage(); }
   // iOS can suspend a queued frame when opening/restoring a tab. Re-arm the
   // section independently of image decoding when the page becomes active.
   function resumeMotion() {

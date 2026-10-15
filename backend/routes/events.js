@@ -1,22 +1,15 @@
+const { createLogger: createRuntimeLogger } = require("../utils/logger");
+const runtimeLogger = createRuntimeLogger("routes:events");
 // backend/routes/events.js
 const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const Event = require("../models/Event");
-const { logAction } = require("../utils/audit");
+const genericEventWrite = require("../services/genericEventWrite");
 const { assertCaseParticipant } = require("../middleware/ensureCaseParticipant");
-
-// ----------------------------------------
-// CSRF (enabled in production or when ENABLE_CSRF=true)
-// ----------------------------------------
-const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
-}
+const { csrfProtection, respondToCsrfError } = require("../utils/csrf");
+const { publishNotificationEvent } = require("../utils/notificationEvents");
 
 // ----------------------------------------
 // Helpers
@@ -33,6 +26,13 @@ function parsePagination(req, { maxLimit = 200, defaultLimit = 100 } = {}) {
 
 function clampDate(s, fallbackMs) {
   return s ? new Date(s) : new Date(Date.now() + fallbackMs);
+}
+
+function publishOwnerRefresh(ownerId, type) {
+  publishNotificationEvent(ownerId, "notifications", {
+    at: new Date().toISOString(),
+    type,
+  });
 }
 
 async function ensureEventCaseAccess(req, res, caseId) {
@@ -54,6 +54,25 @@ router.use(verifyToken);
 router.use(requireApproved);
 router.use(requireRole("admin", "attorney", "paralegal"));
 
+const attorneyMatterDates = require("../services/attorneyMatterDates");
+const paralegalMatterDates = require("../services/paralegalMatterDates");
+router.get("/paralegal/matters/:caseId/review", requireRole("paralegal"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await paralegalMatterDates.read(req)); } catch (error) { paralegalMatterDates.sendError(res, error); }
+}));
+router.post("/paralegal/matters/:caseId/reviewed-action", requireRole("paralegal"), csrfProtection, asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await paralegalMatterDates.save(req)); } catch (error) { paralegalMatterDates.sendError(res, error); }
+}));
+router.get("/matters/:caseId/review", requireRole("attorney"), asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await attorneyMatterDates.read(req)); } catch (error) { attorneyMatterDates.sendError(res, error); }
+}));
+router.post("/matters/:caseId/reviewed-action", requireRole("attorney"), csrfProtection, asyncHandler(async (req, res) => {
+  res.set("Cache-Control", "private, no-store");
+  try { res.json(await attorneyMatterDates.save(req)); } catch (error) { attorneyMatterDates.sendError(res, error); }
+}));
+
 /**
  * GET /api/events
  * Query:
@@ -67,8 +86,15 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     const owner = req.user.id;
+    res.set("Cache-Control", "private, no-store");
+    if (req.query.expectedOwnerId !== undefined && req.query.expectedOwnerId !== String(owner)) {
+      return res.status(403).json({ error: "The workspace account changed.", code: "EVENT_ACCOUNT_CHANGED" });
+    }
     const from = clampDate(req.query.from, -7 * 24 * 3600e3);
     const to = clampDate(req.query.to, 45 * 24 * 3600e3);
+    if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || from > to) {
+      return res.status(400).json({ error: "Choose a valid date range." });
+    }
     const { type, caseId, q = "" } = req.query;
     const { page, limit, skip } = parsePagination(req);
 
@@ -89,13 +115,15 @@ router.get(
     }
 
     const [items, total] = await Promise.all([
-      Event.find(filter).sort({ start: 1 }).skip(skip).limit(limit).lean(),
+      Event.find(filter).sort({ start: 1, _id: 1 }).skip(skip).limit(limit).lean(),
       Event.countDocuments(filter),
     ]);
 
+    await genericEventWrite.checkActor(req);
     items.forEach((i) => (i.id = String(i._id)));
 
     res.json({
+      ownerId: String(owner),
       page,
       limit,
       total,
@@ -137,7 +165,7 @@ router.post(
       if (!ok) return;
     }
 
-    const ev = await Event.create({
+    const ev = await genericEventWrite.write(req, { action: "calendar.event.create", caseIds: [caseId], create: {
       title: String(title).slice(0, 500).trim(),
       start: new Date(start),
       end: end ? new Date(end) : undefined,
@@ -153,15 +181,11 @@ router.post(
       attendees: Array.isArray(attendees) ? attendees : undefined,
       reminders: Array.isArray(reminders) ? reminders : undefined,
       color: typeof color === "string" ? color : undefined,
-    });
+    }});
 
-    await logAction(req, "calendar.event.create", {
-      targetType: "event",
-      targetId: ev._id,
-      meta: { type: ev.type, caseId: ev.caseId || null },
-    });
+    publishOwnerRefresh(req.user.id, "calendar_event_created_refresh");
 
-    res.status(201).json({ id: String(ev._id) });
+    res.status(201).json({ id: ev.id });
   })
 );
 
@@ -178,7 +202,15 @@ router.patch(
 
     const ev = await Event.findOne({ _id: id, owner: req.user.id });
     if (!ev) return res.status(404).json({ error: "Not found" });
+    if (ev.caseId) {
+      const ok = await ensureEventCaseAccess(req, res, ev.caseId);
+      if (!ok) return;
+    }
 
+    if (req.body?.caseId) {
+      const ok = await ensureEventCaseAccess(req, res, req.body.caseId); if (!ok) return;
+    }
+    await genericEventWrite.write(req, { initialEvent: ev, caseIds: [ev.caseId, req.body?.caseId], action: "calendar.event.update", modify: async ev => {
     const assign = (k, v) => {
       if (v === undefined) return;
       ev[k] = v;
@@ -216,14 +248,12 @@ router.patch(
       if (caseId === null || caseId === "") {
         ev.caseId = null;
       } else {
-        const ok = await ensureEventCaseAccess(req, res, caseId);
-        if (!ok) return;
         ev.caseId = caseId;
       }
     }
+    }});
 
-    await ev.save();
-    await logAction(req, "calendar.event.update", { targetType: "event", targetId: ev._id });
+    publishOwnerRefresh(req.user.id, "calendar_event_updated_refresh");
     res.json({ ok: true });
   })
 );
@@ -241,12 +271,14 @@ router.post(
 
     const ev = await Event.findOne({ _id: id, owner: req.user.id });
     if (!ev) return res.status(404).json({ error: "Not found" });
+    if (ev.caseId) {
+      const ok = await ensureEventCaseAccess(req, res, ev.caseId);
+      if (!ok) return;
+    }
 
     const att = req.body || {};
-    ev.addAttendee(att);
-    await ev.save();
-
-    await logAction(req, "calendar.event.attendee.add", { targetType: "event", targetId: ev._id });
+    await genericEventWrite.write(req, { initialEvent: ev, caseIds: [ev.caseId], action: "calendar.event.attendee.add", modify: current => current.addAttendee(att) });
+    publishOwnerRefresh(req.user.id, "calendar_event_updated_refresh");
     res.status(201).json({ ok: true });
   })
 );
@@ -264,12 +296,14 @@ router.post(
 
     const ev = await Event.findOne({ _id: id, owner: req.user.id });
     if (!ev) return res.status(404).json({ error: "Not found" });
+    if (ev.caseId) {
+      const ok = await ensureEventCaseAccess(req, res, ev.caseId);
+      if (!ok) return;
+    }
 
     const { minutesBefore = 30, method = "email" } = req.body || {};
-    ev.addReminder(minutesBefore, method);
-    await ev.save();
-
-    await logAction(req, "calendar.event.reminder.add", { targetType: "event", targetId: ev._id });
+    await genericEventWrite.write(req, { initialEvent: ev, caseIds: [ev.caseId], action: "calendar.event.reminder.add", modify: current => current.addReminder(minutesBefore, method) });
+    publishOwnerRefresh(req.user.id, "calendar_event_updated_refresh");
     res.status(201).json({ ok: true });
   })
 );
@@ -286,9 +320,13 @@ router.delete(
 
     const ev = await Event.findOne({ _id: id, owner: req.user.id });
     if (!ev) return res.status(404).json({ error: "Not found" });
+    if (ev.caseId) {
+      const ok = await ensureEventCaseAccess(req, res, ev.caseId);
+      if (!ok) return;
+    }
 
-    await ev.deleteOne();
-    await logAction(req, "calendar.event.delete", { targetType: "event", targetId: ev._id });
+    await genericEventWrite.write(req, { initialEvent: ev, caseIds: [ev.caseId], action: "calendar.event.delete", remove: true });
+    publishOwnerRefresh(req.user.id, "calendar_event_deleted_refresh");
     res.json({ ok: true });
   })
 );
@@ -297,8 +335,10 @@ router.delete(
 // Route-level error fallback
 // ----------------------------------------
 router.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(500).json({ error: "Server error", detail: err?.message || "Unknown error" });
+  if (respondToCsrfError(err, res)) return;
+  if (err.status) return res.status(err.status).json({ error: err.message, ...(err.publicCode ? { code: err.publicCode } : {}) });
+  runtimeLogger.error(err);
+  res.status(500).json({ error: "Server error" });
 });
 
 module.exports = router;

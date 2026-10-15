@@ -17,8 +17,15 @@ const MessageSchema = new Schema(
     senderId: { type: Types.ObjectId, ref: "User", required: true, index: true },
     senderRole: { type: String, enum: ["attorney", "paralegal", "admin", "system"], default: "attorney" },
 
+    // The intent commits with the message; it contains no correspondence copy.
+    notificationIntent: { type: new Schema({
+      recipientId: { type: Types.ObjectId, required: true },
+      status: { type: String, enum: ["pending", "recorded", "suppressed"], default: "pending" },
+    }, { _id: false }), default: null, select: false },
+
     // Message content
     type: { type: String, enum: ["text", "file", "audio", "system"], default: "text" },
+    clientMessageId: { type: String, trim: true, maxlength: 128, default: undefined, select: false },
     text: { type: String, trim: true },
     content: { type: Schema.Types.Mixed, default: null },
     transcript: { type: String, default: null },
@@ -63,14 +70,26 @@ const MessageSchema = new Schema(
   }
 );
 
-MessageSchema.pre("save", function (next) {
-  try {
-    encryptMessageFields(this);
-    this.updatedAt = new Date();
-    next();
-  } catch (err) {
-    next(err);
+MessageSchema.index(
+  { caseId: 1, senderId: 1, clientMessageId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clientMessageId: { $type: "string" } },
   }
+);
+
+MessageSchema.index({ "notificationIntent.status": 1, createdAt: 1, _id: 1 });
+
+// Stable bounded conversation paging, including messages sharing a timestamp.
+MessageSchema.index({ caseId: 1, createdAt: -1, _id: -1 });
+
+MessageSchema.pre("save", function () {
+  encryptMessageFields(this);
+  this.updatedAt = new Date();
+});
+
+MessageSchema.pre("insertMany", function (documents) {
+  for (const document of documents) encryptMessageFields(document, { plaintext: true });
 });
 
 MessageSchema.methods.markEdited = function () {

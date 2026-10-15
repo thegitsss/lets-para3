@@ -1,7 +1,7 @@
 const MarketingPublishingSettings = require("../../models/MarketingPublishingSettings");
 const {
   MARKETING_PUBLISHING_CADENCE_MODES,
-  MARKETING_PUBLISHING_CHANNELS,
+  MARKETING_ACTIVE_PUBLISHING_CHANNELS,
 } = require("./constants");
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -10,7 +10,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   cadenceMode: "manual_only",
   timezone: "America/New_York",
   preferredHourLocal: 9,
-  enabledChannels: ["linkedin_company", "facebook_page"],
+  enabledChannels: ["linkedin_company"],
   pauseReason: "",
   maxOpenCycles: 1,
 });
@@ -39,7 +39,7 @@ function normalizeCadenceMode(value = "") {
 }
 
 function normalizeEnabledChannels(values = []) {
-  const channels = uniqueStrings(values).filter((value) => MARKETING_PUBLISHING_CHANNELS.includes(value));
+  const channels = uniqueStrings(values).filter((value) => MARKETING_ACTIVE_PUBLISHING_CHANNELS.includes(value));
   return channels.length ? channels : DEFAULT_SETTINGS.enabledChannels.slice();
 }
 
@@ -75,7 +75,7 @@ function getTimeZoneParts(date = new Date(), timeZone = DEFAULT_SETTINGS.timezon
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-    hour12: false,
+    hourCycle: "h23",
   });
   const parts = formatter.formatToParts(date).reduce((acc, part) => {
     if (part.type !== "literal") acc[part.type] = Number(part.value);
@@ -118,31 +118,11 @@ function zonedDateTimeToUtc({
   return new Date(guess);
 }
 
-function startOfLocalDay(date = new Date(), timeZone = DEFAULT_SETTINGS.timezone) {
-  const parts = getTimeZoneParts(date, timeZone);
-  return zonedDateTimeToUtc(
-    {
-      year: parts.year,
-      month: parts.month,
-      day: parts.day,
-      hour: 0,
-      minute: 0,
-      second: 0,
-    },
-    timeZone
-  );
-}
-
-function addDays(date = new Date(), days = 0) {
-  const next = new Date(date);
-  next.setUTCDate(next.getUTCDate() + Number(days || 0));
-  return next;
-}
-
 function cadenceIntervalDays(cadenceMode = DEFAULT_SETTINGS.cadenceMode) {
   if (cadenceMode === "daily") return 1;
   if (cadenceMode === "every_2_days") return 2;
   if (cadenceMode === "every_3_days") return 3;
+  if (cadenceMode === "weekly") return 7;
   return null;
 }
 
@@ -156,19 +136,21 @@ function computeNextDueAt({
   const intervalDays = cadenceIntervalDays(cadenceMode);
   if (!intervalDays) return null;
 
-  if (lastDueAt) {
-    const next = addDays(new Date(lastDueAt), intervalDays);
-    next.setUTCMinutes(0, 0, 0);
-    return next;
+  // Advance calendar days in the selected timezone so a daylight-saving
+  // transition does not move a recurring 9am preparation to 8am or 10am.
+  const parts = getTimeZoneParts(lastDueAt ? new Date(lastDueAt) : new Date(now), timeZone);
+  const day = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  const dueOnDay = () => zonedDateTimeToUtc({
+    year: day.getUTCFullYear(), month: day.getUTCMonth() + 1,
+    day: day.getUTCDate(), hour: Number(preferredHourLocal || 0),
+  }, timeZone);
+  if (lastDueAt) day.setUTCDate(day.getUTCDate() + intervalDays);
+  let due = dueOnDay();
+  if (!lastDueAt && due.getTime() <= new Date(now).getTime()) {
+    day.setUTCDate(day.getUTCDate() + intervalDays);
+    due = dueOnDay();
   }
-
-  const localDayStart = startOfLocalDay(now, timeZone);
-  const currentDayDue = new Date(localDayStart);
-  currentDayDue.setUTCHours(currentDayDue.getUTCHours() + Number(preferredHourLocal || 0));
-  if (currentDayDue.getTime() > now.getTime()) {
-    return currentDayDue;
-  }
-  return addDays(currentDayDue, intervalDays);
+  return due;
 }
 
 function serializeSettings(settings = {}) {
@@ -190,13 +172,30 @@ function serializeSettings(settings = {}) {
 }
 
 async function ensurePublishingSettings() {
-  let settings = await MarketingPublishingSettings.findOne({ singletonKey: DEFAULT_SETTINGS.singletonKey });
-  if (settings) return settings;
-  settings = await MarketingPublishingSettings.create({
+  // The singleton upsert is only concurrency-safe once Mongo has materialized
+  // the unique index. Await model initialization so first traffic after a new
+  // deployment cannot create duplicate settings documents.
+  await MarketingPublishingSettings.init();
+  const filter = { singletonKey: DEFAULT_SETTINGS.singletonKey };
+  const insertDefaults = {
     ...DEFAULT_SETTINGS,
     updatedBy: { actorType: "system", label: "Publishing Settings Service" },
-  });
-  return settings;
+  };
+
+  try {
+    return await MarketingPublishingSettings.findOneAndUpdate(
+      filter,
+      { $setOnInsert: insertDefaults },
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+    );
+  } catch (error) {
+    // Concurrent first reads can race before the unique singleton index is
+    // visible to both writers. The winning insert is authoritative.
+    if (Number(error?.code) !== 11000) throw error;
+    const settings = await MarketingPublishingSettings.findOne(filter);
+    if (settings) return settings;
+    throw error;
+  }
 }
 
 async function getPublishingSettings() {

@@ -1,3 +1,5 @@
+const { createLogger: createRuntimeLogger } = require("../../utils/logger");
+const runtimeLogger = createRuntimeLogger("services:lpcEvents:publishEventService");
 const { LpcEvent } = require("../../models/LpcEvent");
 
 function compactText(value = "", max = 240) {
@@ -85,15 +87,15 @@ async function publishEvent(payload = {}, options = {}) {
   let created = false;
 
   if (normalized.idempotencyKey) {
-    event = await LpcEvent.findOne({ idempotencyKey: normalized.idempotencyKey });
+    event = await LpcEvent.findOne({ idempotencyKey: normalized.idempotencyKey }).session(options.session || null);
   }
 
   if (!event) {
-    event = await LpcEvent.create(normalized);
+    [event] = await LpcEvent.create([normalized], options.session ? { session: options.session } : {});
     created = true;
   }
 
-  if (created && options.routeNow !== false) {
+  if (created && !options.session && options.routeNow !== false) {
     const { routeEvent } = require("./routerService");
     try {
       await routeEvent(event);
@@ -113,7 +115,7 @@ async function publishEventSafe(payload = {}, options = {}) {
   try {
     return await publishEvent(payload, options);
   } catch (err) {
-    console.warn("[lpc-events] publish failed", err?.message || err);
+    runtimeLogger.warn("[lpc-events] publish failed", err?.message || err);
     return { event: null, created: false, error: err };
   }
 }

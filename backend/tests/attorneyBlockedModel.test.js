@@ -1,0 +1,26 @@
+const path=require('path');
+const {execFileSync}=require('child_process');
+const {pathToFileURL}=require('url');
+const moduleUrl=pathToFileURL(path.resolve(__dirname,'../../frontend/assets/scripts/attorney-v2/blocked-api.mjs')).href;
+function check(source){execFileSync(process.execPath,['--input-type=module','--eval',`import assert from 'node:assert/strict'; import {createBlockedApi,blockedPage,blockedStatus} from ${JSON.stringify(moduleUrl)}; const owner='a'.repeat(24), target='b'.repeat(24), revision='a'.repeat(64); const identity=id=>new Response(JSON.stringify({user:{id:id||owner,role:'attorney',status:'approved'}})); const csrf=()=>new Response(JSON.stringify({csrfToken:'synthetic'})); ${source}`],{stdio:'pipe'});}
+test('post-write owner verification failures retain an uncertain result without replay or hiding account loss',()=>check(`
+ for(const failure of ['503','network','malformed','account']){let writes=0,verifies=0,lost=0;const api=createBlockedApi({onAuthenticationLost:()=>lost++,fetchImpl:async(path)=>{if(path==='/api/auth/me'){if(++verifies===1)return identity();if(failure==='network')throw new Error('offline');if(failure==='account')return identity(target);return new Response(JSON.stringify(failure==='malformed'?null:{}),{status:failure==='503'?503:200});}if(path==='/api/csrf')return csrf();writes++;return new Response(JSON.stringify({ok:true,blocked:false,blockedId:target}));}});await assert.rejects(api.unblock(target,revision,{ownerId:owner}),error=>error.kind===(failure==='account'?'authentication':'uncertain'));assert.equal(writes,1);assert.equal(lost,failure==='account'?1:0);}
+`));
+test('mutation pins owner and reviewed block, sends CSRF and verifies after confirmation',()=>check(`
+ const calls=[];const api=createBlockedApi({fetchImpl:async(path,options)=>{calls.push({path,...options});if(path==='/api/auth/me')return identity();if(path==='/api/csrf')return csrf();return new Response(JSON.stringify({ok:true,blocked:false,blockedId:target}));}});await api.unblock(target,revision,{ownerId:owner});assert.equal(calls.length,4);assert.deepEqual(JSON.parse(calls[2].body),{expectedOwnerId:owner,expectedBlockRevision:revision});assert.equal(calls[2].headers['X-CSRF-Token'],'synthetic');assert.equal(calls[2].credentials,'include');assert.equal(calls[2].cache,'no-store');assert.equal(calls[2].redirect,'error');
+`));
+test('malformed or lost acknowledgments cannot report success or repeat the mutation',()=>check(`
+ for(const payload of [{}, {ok:true,blocked:false,blockedId:owner},null]){let calls=0;const api=createBlockedApi({fetchImpl:async(path)=>{calls++;if(path==='/api/auth/me')return identity();if(path==='/api/csrf')return csrf();if(payload===null)throw new Error('network failed');return new Response(JSON.stringify(payload));}});await assert.rejects(api.unblock(target,revision,{ownerId:owner}),error=>error.kind==='uncertain');assert.equal(calls,3);}
+`));
+test('owner change during a read prevents projecting a previous owner block list',()=>check(`
+ let verifies=0,lost=0;const api=createBlockedApi({onAuthenticationLost:()=>lost++,fetchImpl:async(path)=>path==='/api/auth/me'?identity(++verifies===1?owner:target):new Response(JSON.stringify({items:[],total:0,nextCursor:null}))});await assert.rejects(api.readPage({ownerId:owner}),error=>error.kind==='authentication');assert.equal(lost,1);
+`));
+test('cleared view discards delayed data even when transport ignores abort',()=>check(`
+ let release,calls=0;const api=createBlockedApi({fetchImpl:async(path)=>{calls++;return path==='/api/auth/me'?identity():new Promise(resolve=>release=resolve);}});const pending=api.readPage({ownerId:owner});while(!release)await new Promise(resolve=>setTimeout(resolve,0));api.clear();release(new Response(JSON.stringify({items:[],total:0,nextCursor:null})));await assert.rejects(pending,error=>error.name==='AbortError');assert.equal(calls,2);
+`));
+test('later pages and direct status readback keep their exact owner and boundary',()=>check(`
+ const calls=[];const api=createBlockedApi({fetchImpl:async(path)=>{calls.push(path);if(path==='/api/auth/me')return identity();return new Response(JSON.stringify(path.includes('/blocks/'+target)?{blockedId:target,blocked:false,revision:null}:{items:[],total:0,nextCursor:null}));}});await api.readPage({ownerId:owner,cursor:'opaque+/cursor'});await api.readStatus(target,{ownerId:owner});const page=new URL(calls[1],'https://lpc.test');assert.equal(page.searchParams.get('cursor'),'opaque+/cursor');assert.equal(page.searchParams.get('expectedOwnerId'),owner);assert.ok(calls[4].includes('/blocks/'+target+'?expectedOwnerId='+owner));
+`));
+test('projections reject false absence and duplicate records and drop unrelated source details',()=>check(`
+ const item={blockedId:target,name:'Avery',role:'paralegal',reason:'',createdAt:null,revision,sourceCaseId:owner,secret:'never project'};const page=blockedPage({items:[item],total:1,nextCursor:null});assert.equal(page.items[0].secret,undefined);assert.equal(page.items[0].sourceCaseId,undefined);assert.throws(()=>blockedPage({items:[item,item],total:2,nextCursor:null}));assert.throws(()=>blockedStatus({blockedId:target,blocked:false,revision},target));assert.throws(()=>blockedStatus({blockedId:owner,blocked:false,revision:null},target));
+`));

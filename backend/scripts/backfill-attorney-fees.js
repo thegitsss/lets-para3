@@ -1,13 +1,19 @@
 const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 
 const mongoose = require("mongoose");
 const Case = require("../models/Case");
+const {
+  DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT,
+  DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT,
+} = require("../services/platformFeePolicy");
+const {
+  MONGO_OPERATION_OPTIONS,
+  requireMongoUri,
+} = require("../utils/mongooseOperationPolicy");
 
-const DEFAULT_ATTORNEY_FEE_PCT = Number(
-  process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 22
-);
-const DEFAULT_PARALEGAL_FEE_PCT = Number(process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18);
+const DEFAULT_ATTORNEY_FEE_PCT = DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT;
+const DEFAULT_PARALEGAL_FEE_PCT = DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT;
 
 function cents(value) {
   const num = Number(value);
@@ -19,31 +25,40 @@ function computeFee(baseAmount, pct) {
   return Math.max(0, Math.round(cents(baseAmount) * ((Number(pct) || 0) / 100)));
 }
 
-async function run() {
-  if (!process.env.MONGO_URI) {
-    throw new Error("MONGO_URI is required");
-  }
+async function run({ apply = process.argv.includes("--apply"), mongoUri = process.env.MONGO_URI } = {}) {
+  await mongoose.connect(requireMongoUri(mongoUri), MONGO_OPERATION_OPTIONS);
 
-  await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 30000 });
-
-  const limit = Math.max(1, Number(process.env.ATTORNEY_FEE_BACKFILL_LIMIT || 5000));
+  const limit = Math.max(1, Math.min(1000, Number(process.env.ATTORNEY_FEE_BACKFILL_LIMIT || 500)));
   const query = {
-    $and: [
+    $or: [
       {
-        $or: [
-          { lockedTotalAmount: { $gt: 0 } },
-          { totalAmount: { $gt: 0 } },
-          { "disputeSettlement.grossAmount": { $gt: 0 } },
+        $and: [
+          { $or: [{ lockedTotalAmount: { $gt: 0 } }, { totalAmount: { $gt: 0 } }] },
+          {
+            $or: [
+              { feeAttorneyAmount: { $exists: false } },
+              { feeAttorneyAmount: null },
+              { feeAttorneyAmount: { $lte: 0 } },
+              { feeParalegalAmount: { $exists: false } },
+              { feeParalegalAmount: null },
+              { feeParalegalAmount: { $lte: 0 } },
+            ],
+          },
         ],
       },
       {
-        $or: [
-          { feeAttorneyAmount: { $exists: false } },
-          { feeAttorneyAmount: null },
-          { feeAttorneyAmount: { $lte: 0 } },
-          { "disputeSettlement.feeAttorneyAmount": { $exists: false } },
-          { "disputeSettlement.feeAttorneyAmount": null },
-          { "disputeSettlement.feeAttorneyAmount": { $lte: 0 } },
+        $and: [
+          { "disputeSettlement.grossAmount": { $gt: 0 } },
+          {
+            $or: [
+              { "disputeSettlement.feeAttorneyAmount": { $exists: false } },
+              { "disputeSettlement.feeAttorneyAmount": null },
+              { "disputeSettlement.feeAttorneyAmount": { $lte: 0 } },
+              { "disputeSettlement.feeParalegalAmount": { $exists: false } },
+              { "disputeSettlement.feeParalegalAmount": null },
+              { "disputeSettlement.feeParalegalAmount": { $lte: 0 } },
+            ],
+          },
         ],
       },
     ],
@@ -131,18 +146,35 @@ async function run() {
     }
 
     if (!touched) continue;
-    await Case.updateOne({ _id: doc._id }, { $set: update });
+    if (apply) await Case.updateOne({ _id: doc._id }, { $set: update });
     updated += 1;
   }
 
-  console.log(JSON.stringify({ scanned, updated, settlementUpdated }, null, 2));
-  await mongoose.connection.close();
+  const remaining = apply ? await Case.countDocuments(query) : Math.max(0, await Case.countDocuments(query));
+  const result = {
+    mode: apply ? "apply" : "dry-run",
+    scanned,
+    eligible: updated,
+    updated: apply ? updated : 0,
+    settlementEligible: settlementUpdated,
+    remaining,
+  };
+  console.log(JSON.stringify(result, null, 2));
+  return result;
 }
 
-run().catch(async (err) => {
-  console.error(err);
-  try {
-    await mongoose.connection.close();
-  } catch {}
-  process.exit(1);
-});
+if (require.main === module) {
+  run()
+    .then((result) => {
+      if (result.mode === "apply" && result.remaining > 0) process.exitCode = 2;
+    })
+    .catch((err) => {
+      console.error(err);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await mongoose.connection.close().catch(() => {});
+    });
+}
+
+module.exports = { computeFee, run };

@@ -1,22 +1,4 @@
-/* FAQ styling, scoped to the admission header and hero only. */
-.admission-page.public-site-chrome .home-header {
-  --lpc-gold: #6495ed;
-  --lpc-focus: #6495ed;
-  background: rgba(237, 240, 243, .72);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 0;
-  box-shadow: none;
-  transition: background 200ms ease;
-}
-
-.admission-page.public-site-chrome .home-header.is-past-hero {
-  background: rgba(255, 255, 255, .78);
-}
-
-.admission-page.public-site-chrome .home-header.is-open {
-  background: #fff;
-}
+/* FAQ styling, scoped to the admission hero. The header uses the shared site style. */
 
 .admission-page.public-site-chrome > .admission-hero {
   box-sizing: border-box;

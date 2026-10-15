@@ -11,7 +11,7 @@
       --font-sans: 'Sarabun', sans-serif;
       --font-serif: 'Cormorant Garamond', serif;
       --director-ink: #120f13;
-      --director-muted: #89838c;
+      --director-muted: #6f6872;
       --director-line: rgba(40, 26, 44, 0.08);
       --director-bg: #f4f5f7;
       --director-panel: #ffffff;
@@ -22,7 +22,7 @@
       --director-card-saturation: 150%;
       --director-card-brightness: 1.06;
       --director-card-ink: #120f13;
-      --director-card-muted: #89838c;
+      --director-card-muted: #6f6872;
       --director-chart-grid: rgba(255, 255, 255, 0.2);
       --director-chart-bar: rgba(91, 142, 233, 0.16);
       --director-graph-primary: #7aaef4;
@@ -33,13 +33,10 @@
       --director-control-bg: rgba(255, 255, 255, 0.9);
       --director-control-line: rgba(18, 15, 19, 0.08);
       --director-hover-bg: rgba(255, 255, 255, 0.38);
-      --director-background-image: none;
-      --director-background-overlay: linear-gradient(135deg, rgba(255, 255, 255, 0.84), rgba(244, 245, 247, 0.78));
-      --director-photo-overlay: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(18, 15, 19, 0.08));
       --director-accent: #b6a47a;
-      --director-blue: #5b8ee9;
-      --director-green: #68c68a;
-      --director-rose: #d85d74;
+      --director-blue: #3267b8;
+      --director-green: #26724d;
+      --director-rose: #b24359;
       --director-purple: #7672c8;
       --director-warn: #9b5d14;
       --director-shadow: none;
@@ -52,67 +49,18 @@
       height: 100dvh;
       overflow: hidden;
       background-image:
-        var(--director-background-overlay),
         radial-gradient(circle at 16% 8%, rgba(182, 164, 122, 0.13), transparent 34%),
         linear-gradient(135deg, #ffffff 0%, var(--director-bg) 52%, #eef1f5 100%);
-      background-size: cover, auto, auto;
-      background-position: center, center, center;
-      background-attachment: fixed, fixed, fixed;
-      color: var(--director-ink);
-      font-family: var(--font-sans);
-      font-weight: 200;
-    }
-    body.has-director-photo-bg {
-      background-image:
-        var(--director-photo-overlay),
-        var(--director-background-image);
-      background-size: cover, cover;
+      background-size: auto, auto;
       background-position: center, center;
       background-attachment: fixed, fixed;
-    }
-    body.director-mode-dark {
-      color: #f8fafc;
-    }
-    body.director-mode-dark .director-account,
-    body.director-mode-dark .sync-meta,
-    body.director-mode-dark .director-status {
-      color: rgba(248, 250, 252, 0.72);
-    }
-    body.director-mode-dark .director-icon-btn,
-    body.director-mode-dark .settings-close,
-    body.director-mode-dark .appearance-upload {
-      background: rgba(15, 23, 42, 0.5);
-      border-color: rgba(248, 250, 252, 0.18);
-      color: #f8fafc;
-    }
-    body.director-mode-dark .settings-dialog {
-      background: rgba(15, 23, 42, 0.86);
-      border-color: rgba(248, 250, 252, 0.18);
-      color: #f8fafc;
-    }
-    body.director-mode-dark .appearance-field,
-    body.director-mode-dark .appearance-help {
-      color: rgba(248, 250, 252, 0.72);
-    }
-    body.director-mode-dark .appearance-field > span:first-child,
-    body.director-mode-dark .appearance-value {
-      color: #f8fafc;
-    }
-    body.director-mode-dark .appearance-divider {
-      background: rgba(248, 250, 252, 0.16);
-    }
-    body.director-mode-dark .appearance-mode-btn {
-      background: rgba(15, 23, 42, 0.52);
-      border-color: rgba(248, 250, 252, 0.18);
-      color: #f8fafc;
-    }
-    body.director-mode-dark .appearance-mode-btn.active {
-      background: var(--director-blue);
-      border-color: var(--director-blue);
+      color: var(--director-ink);
+      font-family: var(--font-sans);
+      font-weight: 400;
     }
     button, input, select, table {
       font-family: var(--font-sans);
-      font-weight: 200;
+      font-weight: 400;
     }
     .director-shell {
       height: 100vh;
@@ -158,8 +106,8 @@
       flex: 0 0 auto;
     }
     .director-icon-btn {
-      width: 42px;
-      height: 42px;
+      width: 44px;
+      height: 44px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -184,117 +132,6 @@
       height: 19px;
       stroke-width: 1.8;
     }
-    .director-appearance {
-      display: grid;
-      gap: 1rem;
-    }
-    .appearance-field {
-      display: grid;
-      gap: 0.5rem;
-      color: var(--director-muted);
-      font-size: 0.82rem;
-    }
-    .appearance-field > span:first-child {
-      color: var(--director-ink);
-      font-size: 0.92rem;
-      font-weight: 400;
-    }
-    .appearance-range-row {
-      display: flex;
-      align-items: center;
-      gap: 0.65rem;
-    }
-    .appearance-field input[type="range"] {
-      flex: 1;
-      appearance: none;
-      height: 22px;
-      background: transparent;
-      accent-color: transparent;
-      cursor: pointer;
-    }
-    .appearance-field input[type="range"]::-webkit-slider-runnable-track {
-      height: 6px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.18);
-      border: 1px solid rgba(255, 255, 255, 0.24);
-    }
-    .appearance-field input[type="range"]::-webkit-slider-thumb {
-      appearance: none;
-      width: 18px;
-      height: 18px;
-      margin-top: -7px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.42);
-      border: 1px solid rgba(18, 15, 19, 0.14);
-      box-shadow: 0 4px 14px rgba(18, 15, 19, 0.08);
-    }
-    .appearance-field input[type="range"]::-moz-range-track {
-      height: 6px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.18);
-      border: 1px solid rgba(255, 255, 255, 0.24);
-    }
-    .appearance-field input[type="range"]::-moz-range-thumb {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.42);
-      border: 1px solid rgba(18, 15, 19, 0.14);
-      box-shadow: 0 4px 14px rgba(18, 15, 19, 0.08);
-    }
-    .appearance-mode {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.4rem;
-    }
-    .appearance-mode-btn {
-      min-height: 38px;
-      border: 1px solid var(--director-line);
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.72);
-      color: var(--director-ink);
-      cursor: pointer;
-      font: inherit;
-    }
-    .appearance-mode-btn.active {
-      background: var(--director-blue);
-      border-color: var(--director-blue);
-      color: #ffffff;
-    }
-    .appearance-value {
-      min-width: 4ch;
-      color: var(--director-ink);
-      text-align: right;
-    }
-    .appearance-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.5rem;
-    }
-    .appearance-upload {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 40px;
-      border: 1px solid var(--director-line);
-      border-radius: 6px;
-      background: #fff;
-      color: var(--director-ink);
-      cursor: pointer;
-      font-size: 0.9rem;
-    }
-    .appearance-help {
-      color: var(--director-muted);
-      font-size: 0.76rem;
-      line-height: 1.35;
-    }
-    .appearance-divider {
-      height: 1px;
-      background: var(--director-line);
-    }
-    .appearance-upload input {
-      display: none;
-    }
     .director-main {
       width: 100%;
       min-width: 0;
@@ -312,57 +149,6 @@
     .director-main > section {
       min-width: 0;
       max-width: 100%;
-    }
-    .settings-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 2500;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-      background: rgba(18, 15, 19, 0.18);
-      opacity: 1;
-      transition: opacity 0.18s ease;
-    }
-    .settings-overlay[hidden] {
-      display: none;
-    }
-    .settings-dialog {
-      width: min(340px, calc(100vw - 2rem));
-      border: 1px solid rgba(255, 255, 255, 0.72);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.84);
-      backdrop-filter: blur(22px) saturate(135%);
-      -webkit-backdrop-filter: blur(22px) saturate(135%);
-      padding: 1.15rem;
-    }
-    .settings-head {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 1rem;
-      margin-bottom: 1rem;
-      position: relative;
-    }
-    .settings-head h2 {
-      margin: 0;
-      font-family: var(--font-serif);
-      font-size: 1.45rem;
-      font-weight: 300;
-    }
-    .settings-close {
-      position: absolute;
-      right: 0;
-      width: 34px;
-      height: 34px;
-      border: 1px solid var(--director-line);
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.7);
-      color: var(--director-ink);
-      cursor: pointer;
-      font-size: 1.1rem;
-      line-height: 1;
     }
     .director-header {
       display: flex;
@@ -454,6 +240,18 @@
     .emails-card { grid-area: emails; }
     .open-card { grid-area: open; }
     .completed-card { grid-area: completed; }
+    .completed-card .metric-body { grid-template-columns: minmax(0, 1fr); }
+    .performance-chart__empty { display: none; }
+    .performance-chart.is-empty .performance-chart__empty {
+      display: grid;
+      position: absolute;
+      inset: 0;
+      place-content: center;
+      gap: 0.5rem;
+      padding: 1rem;
+      text-align: center;
+      color: var(--director-muted);
+    }
     .conversion-card { grid-area: conversion; }
     .unsub-card { grid-area: unsub; }
     .director-performance {
@@ -631,7 +429,7 @@
       font-size: 0.85rem;
     }
     .director-actions select {
-      min-height: 36px;
+      min-height: 44px;
       border: 1px solid var(--director-control-line);
       border-radius: 14px;
       padding: 0 0.85rem;
@@ -640,7 +438,7 @@
     }
     .director-search {
       width: clamp(10rem, 18vw, 14rem);
-      min-height: 36px;
+      min-height: 44px;
       border: 1px solid var(--director-control-line);
       border-radius: 14px;
       padding: 0 0.85rem;
@@ -686,7 +484,7 @@
     }
     .bulk-state-select {
       min-width: 15rem;
-      min-height: 40px;
+      min-height: 44px;
       border: 1px solid var(--director-control-line);
       border-radius: 12px;
       padding: 0 0.75rem;
@@ -698,7 +496,7 @@
       background: var(--director-control-bg);
       color: var(--director-card-ink);
       border-radius: 14px;
-      min-height: 36px;
+      min-height: 44px;
       padding: 0 1rem;
       cursor: pointer;
       font-size: 0.95rem;
@@ -837,6 +635,7 @@
       letter-spacing: inherit;
       text-align: left;
       text-transform: inherit;
+      min-height: 44px;
     }
     .director-sort-btn::after {
       content: "↕";
@@ -855,7 +654,7 @@
     }
     .record-state-select {
       width: 8.5rem;
-      min-height: 2rem;
+      min-height: 44px;
       border: 1px solid var(--director-control-line);
       border-radius: 999px;
       background: var(--director-control-bg);
@@ -867,20 +666,6 @@
     .record-state-select:disabled {
       cursor: wait;
       opacity: 0.62;
-    }
-    body.director-mode-dark .record-state-select {
-      border-color: rgba(248, 250, 252, 0.24);
-      background: rgba(15, 23, 42, 0.42);
-      color: #f8fafc;
-    }
-    body.director-mode-dark .director-table-wrap {
-      background: rgba(248, 250, 252, 0.08);
-      border-color: rgba(248, 250, 252, 0.18);
-    }
-    body.director-mode-dark .director-table th {
-      color: rgba(248, 250, 252, 0.9);
-      background: rgba(248, 250, 252, 0.14);
-      border-bottom-color: rgba(248, 250, 252, 0.22);
     }
     .director-table tbody tr[data-record-row-id] {
       transition: background 0.15s ease, box-shadow 0.15s ease;
@@ -895,17 +680,14 @@
       background: rgba(139, 183, 244, 0.24);
       box-shadow: inset 4px 0 0 var(--director-blue);
     }
-    body.director-mode-dark .director-table tbody tr.is-selected {
-      background: rgba(139, 183, 244, 0.2);
-    }
     .director-select-cell {
       width: 2.75rem;
       text-align: center;
     }
     .director-row-checkbox {
       appearance: none;
-      width: 1.12rem;
-      height: 1.12rem;
+      width: 24px;
+      height: 24px;
       border: 2px solid rgba(18, 15, 19, 0.28);
       border-radius: 3px;
       background: rgba(255, 255, 255, 0.64);
@@ -940,10 +722,6 @@
       outline: 2px solid var(--director-blue);
       outline-offset: 2px;
     }
-    body.director-mode-dark .director-row-checkbox {
-      border-color: rgba(248, 250, 252, 0.48);
-      background: rgba(15, 23, 42, 0.44);
-    }
     .records-empty td {
       padding: 2.1rem 1rem;
       text-align: center;
@@ -969,8 +747,8 @@
       display: none;
     }
     .records-page-btn {
-      width: 38px;
-      height: 38px;
+      width: 44px;
+      height: 44px;
       border: 1px solid var(--director-control-line);
       background:
         linear-gradient(180deg, var(--director-control-bg), var(--director-control-bg));
@@ -1034,27 +812,6 @@
       color: #2f7d58;
       background: #edf8f2;
     }
-    body.director-mode-dark .director-badge {
-      border-color: rgba(248, 250, 252, 0.24);
-      color: rgba(248, 250, 252, 0.86);
-      background: rgba(15, 23, 42, 0.5);
-    }
-    body.director-mode-dark .director-badge.attention {
-      border-color: rgba(251, 191, 36, 0.5);
-      color: #fbbf24;
-      background: rgba(120, 53, 15, 0.52);
-    }
-    body.director-mode-dark .director-badge.registered {
-      border-color: rgba(147, 197, 253, 0.52);
-      color: #bfdbfe;
-      background: rgba(30, 64, 175, 0.48);
-    }
-    body.director-mode-dark .director-badge.matter,
-    body.director-mode-dark .director-badge.commission {
-      border-color: rgba(134, 239, 172, 0.48);
-      color: #bbf7d0;
-      background: rgba(20, 83, 45, 0.48);
-    }
     @media (max-width: 1100px) {
       .director-table [data-responsive-priority="low"] { display: none; }
       .director-board {
@@ -1086,9 +843,6 @@
       .director-panel {
         border-radius: 8px;
       }
-      .settings-dialog {
-        width: min(420px, calc(100vw - 1.5rem));
-      }
     }
     @media (max-width: 640px) {
       .director-table [data-responsive-priority="medium"] { display: none; }
@@ -1114,8 +868,8 @@
         gap: 0.35rem;
       }
       .director-icon-btn {
-        width: 36px;
-        height: 36px;
+        width: 44px;
+        height: 44px;
         border-radius: 12px;
       }
       .director-board {
@@ -1206,7 +960,7 @@
       #importTodayBtn {
         background: var(--director-accent);
         border-color: var(--director-accent);
-        color: #ffffff;
+        color: var(--director-card-ink);
       }
       #openZohoBtn {
         background: transparent;
@@ -1260,28 +1014,13 @@
         padding-top: 0.75rem;
       }
       .records-page-btn {
-        width: 34px;
-        height: 34px;
+        width: 44px;
+        height: 44px;
       }
       #recordsPageInfo {
         min-width: 98px;
         font-size: 0.76rem;
         padding: 0.45rem 0.62rem;
-      }
-      .settings-overlay {
-        padding: 0.75rem;
-        align-items: center;
-      }
-      .settings-dialog {
-        width: 100%;
-        max-height: calc(100vh - 1.5rem);
-        max-height: calc(100dvh - 1.5rem);
-        overflow-y: auto;
-        border-radius: 8px;
-        padding: 1rem;
-      }
-      .appearance-actions {
-        grid-template-columns: 1fr;
       }
     }
     @media (max-width: 390px) {
@@ -1327,8 +1066,8 @@
         font-size: 0.76rem;
       }
       .director-icon-btn {
-        width: 32px;
-        height: 32px;
+        width: 44px;
+        height: 44px;
         border-radius: 10px;
       }
       .director-board {
@@ -1417,7 +1156,7 @@
       }
       .director-actions select,
       .director-btn {
-        min-height: 34px;
+        min-height: 44px;
         font-size: 0.78rem;
       }
       .director-table-wrap {
@@ -1436,41 +1175,26 @@
         padding-top: 0.5rem;
       }
       .records-page-btn {
-        width: 32px;
-        height: 32px;
+        width: 44px;
+        height: 44px;
       }
       #recordsPageInfo {
         padding: 0.38rem 0.55rem;
         font-size: 0.7rem;
       }
-      .settings-overlay {
-        align-items: center;
-        padding: 0.5rem;
-      }
-      .settings-dialog {
-        width: min(420px, calc(100vw - 1rem));
-        max-height: calc(100dvh - 1rem);
-        overflow-y: auto;
-        border-radius: 8px;
-        padding: 0.85rem;
-      }
     }
   </style>
+  <link rel="stylesheet" href="assets/styles/director-financials.css" />
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
   <div class="director-shell">
-    <main class="director-main">
+    <main class="director-main" id="main" tabindex="-1">
       <header class="director-topbar">
-        <div class="director-logo" aria-label="Let's-ParaConnect Director Portal"></div>
+        <h1 class="director-logo">Director Portal</h1>
         <div class="director-account">
           <span id="directorIdentity"></span>
-          <div class="director-toolbar" aria-label="Director portal controls">
-            <button type="button" class="director-icon-btn" id="settingsBtn" aria-label="Open dashboard settings">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"></path>
-                <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.04.04a2 2 0 0 1-2.83 2.83l-.04-.04a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 0 1-4 0v-.06a1.7 1.7 0 0 0-1.04-1.56 1.7 1.7 0 0 0-1.87.34l-.04.04a2 2 0 1 1-2.83-2.83l.04-.04A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.06A1.7 1.7 0 0 0 4.6 8.92a1.7 1.7 0 0 0-.34-1.87l-.04-.04a2 2 0 1 1 2.83-2.83l.04.04a1.7 1.7 0 0 0 1.87.34A1.7 1.7 0 0 0 10 3.06V3a2 2 0 0 1 4 0v.06a1.7 1.7 0 0 0 1.04 1.56 1.7 1.7 0 0 0 1.87-.34l.04-.04a2 2 0 0 1 2.83 2.83l-.04.04a1.7 1.7 0 0 0-.34 1.87A1.7 1.7 0 0 0 20.94 10H21a2 2 0 0 1 0 4h-.06A1.7 1.7 0 0 0 19.4 15Z"></path>
-              </svg>
-            </button>
+          <div class="director-toolbar" role="group" aria-label="Director portal controls">
             <button type="button" class="director-icon-btn" id="logoutBtn" aria-label="Log out">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -1486,11 +1210,11 @@
           <h2>Emails Sent</h2>
           <div class="metric-body">
             <div>
-              <div class="metric-delta">▲ Imported</div>
+              <div class="metric-delta">Imported</div>
               <strong class="metric-value" id="metricEmailsSent">0</strong>
               <div class="metric-note" aria-hidden="true"></div>
             </div>
-            <div class="arc-chart" aria-hidden="true"></div>
+            <div class="arc-chart is-empty" aria-hidden="true"></div>
           </div>
         </article>
 
@@ -1498,7 +1222,7 @@
           <h2>Registered</h2>
           <div class="metric-body">
             <div>
-              <div class="metric-delta">▲ Attorneys</div>
+              <div class="metric-delta">Attorneys</div>
               <strong class="metric-value" id="metricRegisteredCount">0</strong>
               <div class="metric-note" aria-hidden="true"></div>
             </div>
@@ -1514,12 +1238,11 @@
         </article>
 
         <article class="metric-card completed-card">
-          <h2>Completed Matters</h2>
+          <h2>Commission cap</h2>
           <div class="metric-body">
             <div>
-              <div class="metric-delta">▲ Completed</div>
-              <strong class="metric-value" id="metricCompletedMatters">0</strong>
-              <div class="metric-note"><span id="metricCompletedCap">0/50</span> completed matters</div>
+              <strong class="metric-value" id="metricCompletedCap">—</strong>
+              <div class="metric-note">Lifetime commissionable Matters</div>
             </div>
             <div class="completed-progress">
               <div class="completed-progress-track"><span class="completed-progress-fill" id="completedMatterBar"></span></div>
@@ -1531,11 +1254,11 @@
           <h2>Conversion Rate</h2>
           <div class="metric-body">
             <div>
-              <div class="metric-delta">▲ Registered</div>
+              <div class="metric-delta">Registered</div>
               <strong class="metric-value" id="metricConversionRate">0%</strong>
               <div class="metric-note">Registrations</div>
             </div>
-            <div class="mini-bars" aria-hidden="true">
+            <div class="mini-bars is-empty" aria-hidden="true">
               <span></span><span></span><span></span><span></span><span></span><span></span>
             </div>
           </div>
@@ -1545,15 +1268,15 @@
           <h2>Follow-Ups Sent</h2>
           <div class="metric-body">
             <div>
-              <div class="metric-delta">▲ Automatic</div>
+              <div class="metric-delta">Automatic</div>
               <strong class="metric-value" id="metricFollowUpsSent">0</strong>
               <div class="metric-note" aria-hidden="true"></div>
             </div>
-            <div class="tiny-line" aria-hidden="true"><span></span></div>
+            <div class="tiny-line is-empty" aria-hidden="true"><span></span></div>
           </div>
         </article>
 
-        <article class="director-performance">
+        <article class="director-performance is-empty">
           <div class="performance-head">
             <div>
               <h2>Outreach Performance</h2>
@@ -1564,12 +1287,12 @@
             <span>Follow-Ups</span>
             <span>Completed Matters</span>
           </div>
-          <div class="performance-chart" aria-label="Outreach performance chart">
-            <svg viewBox="0 0 900 246" preserveAspectRatio="none" aria-hidden="true">
-              <path d="M0 220 L55 190 L110 196 L165 176 L220 184 L275 132 L330 116 L385 108 L440 72 L495 98 L550 92 L605 38 L660 52 L715 76 L770 70 L825 78 L900 34" fill="none" stroke="var(--director-graph-primary)" stroke-width="3"/>
-              <path d="M0 218 L55 188 L110 178 L165 168 L220 160 L275 126 L330 112 L385 104 L440 82 L495 106 L550 96 L605 50 L660 58 L715 88 L770 86 L825 74 L900 48" fill="none" stroke="var(--director-graph-secondary)" stroke-width="2"/>
-              <path d="M0 226 L55 206 L110 198 L165 184 L220 174 L275 148 L330 138 L385 132 L440 116 L495 134 L550 124 L605 92 L660 104 L715 126 L770 120 L825 110 L900 82" fill="none" stroke="var(--director-graph-tertiary)" stroke-width="2"/>
-            </svg>
+          <div class="performance-chart is-empty" role="img" aria-label="No outreach performance data for this period">
+            <svg viewBox="0 0 900 246" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+            <div class="performance-chart__empty" aria-live="polite">
+              <strong>No outreach activity in this period</strong>
+              <span>Sync Zoho or choose a longer time range to review real activity.</span>
+            </div>
           </div>
         </article>
       </section>
@@ -1578,7 +1301,7 @@
         <div class="director-actions">
           <div class="director-command-group">
             <button type="button" class="director-btn secondary" id="openZohoBtn">Open Zoho</button>
-            <button type="button" class="director-btn" id="importTodayBtn">Import Today</button>
+            <button type="button" class="director-btn" id="importTodayBtn">Sync Zoho</button>
           </div>
           <div class="director-filter-group">
             <label aria-label="Search attorneys">
@@ -1606,26 +1329,21 @@
             </label>
           </div>
         </div>
-        <div class="director-sync-group" aria-label="Synchronization status">
+        <div class="director-sync-group" role="group" aria-label="Synchronization status">
           <p class="sync-meta" id="lastSyncedAt"></p>
-          <p class="sync-meta" id="lastImportAt"></p>
         </div>
-        <p class="director-status" id="directorStatus"></p>
+        <p class="director-status" id="directorStatus" role="status"></p>
+        <button class="director-retry" id="retryDirectorBtn" type="button" hidden>Refresh records</button>
         <div class="director-empty-state" id="directorEmptyState">
           <strong>Ready for outreach</strong>
           Import today after sending outreach from Zoho.
         </div>
-        <div class="attention-strip" id="attentionStrip" aria-label="Director earnings" hidden>
+        <div class="attention-strip" id="attentionStrip" role="group" aria-label="Director earnings" hidden>
           <div class="attention-item" id="attentionCommissionItem" hidden>
-            <span>Commission earned</span>
+            <span>Lifetime commission</span>
             <strong id="attentionCommission">—</strong>
           </div>
         </div>
-      </section>
-
-      <section class="director-grid" aria-label="Outreach summary" hidden>
-        <article class="director-card"><span>Total Records</span><strong id="countTotal">0</strong></article>
-        <article class="director-card"><span>Commission Earned</span><strong id="countCommission">—</strong></article>
       </section>
 
       <section>
@@ -1657,7 +1375,7 @@
                 <th aria-sort="none" data-responsive-priority="medium"><button type="button" class="director-sort-btn" data-sort-key="registered">Registered</button></th>
                 <th aria-sort="none" data-responsive-priority="low"><button type="button" class="director-sort-btn" data-sort-key="matter">Matter</button></th>
                 <th aria-sort="none" data-responsive-priority="medium"><button type="button" class="director-sort-btn" data-sort-key="commission">Commission</button></th>
-                <th data-responsive-priority="low">Payout</th>
+                <th>Payout</th>
               </tr>
             </thead>
             <tbody id="recordsBody">
@@ -1673,43 +1391,7 @@
       </section>
     </main>
   </div>
-  <div class="settings-overlay" id="settingsOverlay" hidden>
-    <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-      <div class="settings-head">
-        <h2 id="settingsTitle">Appearance</h2>
-        <button type="button" class="settings-close" id="settingsCloseBtn" aria-label="Close settings">×</button>
-      </div>
-      <section class="director-appearance" aria-label="Director dashboard appearance">
-        <div class="appearance-field">
-          <span>Theme</span>
-          <span class="appearance-mode" role="group" aria-label="Dashboard color mode">
-            <button type="button" class="appearance-mode-btn active" id="appearanceLightBtn" data-appearance-mode="light">Light</button>
-            <button type="button" class="appearance-mode-btn" id="appearanceDarkBtn" data-appearance-mode="dark">Dark</button>
-          </span>
-        </div>
-        <div class="appearance-divider" aria-hidden="true"></div>
-        <label class="appearance-field" for="cardTranslucencyRange">
-          <span>Card Opacity</span>
-          <span class="appearance-range-row">
-            <input type="range" id="cardTranslucencyRange" min="0" max="100" step="1" value="0" />
-            <span class="appearance-value" id="cardTranslucencyValue">0%</span>
-          </span>
-        </label>
-        <div class="appearance-divider" aria-hidden="true"></div>
-        <div class="appearance-field">
-          <span>Background Image</span>
-          <label class="appearance-upload">
-            Upload Background Image
-            <input type="file" id="dashboardBackgroundInput" accept="image/*" />
-          </label>
-        </div>
-        <div class="appearance-actions">
-          <button type="button" class="director-btn secondary" id="resetAppearanceBtn">Reset Settings</button>
-          <button type="button" class="director-btn" id="doneAppearanceBtn">Done</button>
-        </div>
-      </section>
-    </div>
-  </div>
   <script type="module" src="assets/scripts/director-portal.js"></script>
+  <script type="module" src="assets/scripts/web-vitals-rum.js"></script>
 </body>
 </html>

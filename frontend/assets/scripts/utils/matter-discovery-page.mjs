@@ -23,3 +23,4 @@ export function readMatterDiscoveryPage(value, { pageSize = 12 } = {}) {
   return Object.freeze({ listings: value.items, selected: value.selected, total: value.total, availableTotal: value.availableTotal,
     page: value.page, totalPages: value.totalPages, filters: value.filters, facets: value.facets, profile: { _id: value.viewerId } });
 }
+

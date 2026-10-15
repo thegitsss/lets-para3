@@ -2,7 +2,7 @@ const http = require("http");
 const path = require("path");
 const express = require("express");
 const cookieParser = require("cookie-parser");
-const puppeteer = require("puppeteer");
+const { clickVisible, launchPuppeteer } = require("./puppeteerBrowser");
 
 const CASE_ID = "507f1f77bcf86cd799439199";
 const ATTORNEY_ID = "507f1f77bcf86cd799439111";
@@ -32,7 +32,7 @@ const USERS = {
 const nowIso = () => new Date().toISOString();
 
 function buildCasePayload() {
-  return {
+  const payload = {
     id: CASE_ID,
     _id: CASE_ID,
     title: "Realtime Validation Case",
@@ -55,6 +55,47 @@ function buildCasePayload() {
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
+  payload.matterContext = {
+    practiceArea: payload.practiceArea,
+    relationship: { code: "owner", label: "Your Matter" },
+    attention: "One task remains",
+    nextAction: { label: "Continue work", href: `/case-detail.html?caseId=${CASE_ID}&tab=work` },
+  };
+  payload.matterExperience = {
+    version: 1,
+    header: {
+      title: payload.title,
+      status: { code: "in_progress", label: "In progress" },
+      practiceArea: payload.practiceArea,
+      deadline: null,
+      relationship: "Matter owner",
+      attention: "One task remains",
+      primaryAction: { code: "continue_work", label: "Continue work", tab: "work" },
+    },
+    sections: ["overview", "applications", "work", "files", "messages", "activity", "financials"]
+      .map((id) => ({ id, label: id[0].toUpperCase() + id.slice(1) })),
+    overview: {
+      summary: payload.details,
+      practiceArea: payload.practiceArea,
+      jurisdiction: "California",
+      deadline: null,
+      hiredAt: payload.createdAt,
+      attorney: "Alex Stone",
+      paralegal: "Priya Ng",
+      taskProgress: { completed: 0, total: 1 },
+    },
+    applications: { items: [], preEngagement: null, reviewHref: null },
+    work: { tasks: payload.tasks, readOnly: false, completed: 0, total: 1 },
+    activity: [{ code: "started", label: "Work started", at: payload.createdAt }],
+    financials: {
+      currency: "usd",
+      status: "Funded",
+      amounts: [{ code: "compensation", label: "Matter compensation", cents: payload.totalAmount }],
+      receiptHref: null,
+      note: "Amounts reflect the Matter's saved financial record.",
+    },
+  };
+  return payload;
 }
 
 function startStubServer() {
@@ -63,8 +104,11 @@ function startStubServer() {
   let activeCase = buildCasePayload();
   const messages = [];
   const documents = [];
+  const notifications = [];
   let streamEnabled = true;
+  let notificationStreamEnabled = true;
   const streamClients = new Set();
+  const notificationStreamClients = new Set();
 
   app.use(cookieParser());
   app.use(express.json({ limit: "1mb" }));
@@ -81,6 +125,17 @@ function startStubServer() {
     }
   }
 
+  function broadcastNotification(payload = {}) {
+    const frame = `event: notifications\ndata: ${JSON.stringify(payload)}\n\n`;
+    for (const client of notificationStreamClients) {
+      try {
+        client.write(frame);
+      } catch {
+        notificationStreamClients.delete(client);
+      }
+    }
+  }
+
   app.get("/api/csrf", (_req, res) => {
     res.json({ csrfToken: "e2e-csrf-token" });
   });
@@ -88,9 +143,45 @@ function startStubServer() {
   app.get("/api/users/me", (_req, res) => {
     res.json(USERS.attorney);
   });
+  app.get("/api/auth/me", (_req, res) => res.json({ user: USERS.attorney }));
 
   app.get("/api/messages/summary", (_req, res) => {
     res.json({ items: [{ caseId: CASE_ID, unread: 0 }] });
+  });
+
+  app.get("/api/notifications", (_req, res) => {
+    res.json(notifications);
+  });
+  app.get("/api/notifications/unread-count", (_req, res) => {
+    res.json({ count: notifications.filter(item => !item.read).length });
+  });
+
+  app.get("/api/notifications/stream", (req, res) => {
+    if (!notificationStreamEnabled) {
+      return res.status(503).end();
+    }
+    res.status(200);
+    res.set({
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    });
+    res.flushHeaders?.();
+    notificationStreamClients.add(res);
+    res.write(`event: ready\ndata: ${JSON.stringify({ at: nowIso() })}\n\n`);
+
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`event: ping\ndata: {}\n\n`);
+      } catch {
+        clearInterval(heartbeat);
+      }
+    }, 10000);
+
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      notificationStreamClients.delete(res);
+    });
   });
 
   app.get("/api/cases/my", (_req, res) => {
@@ -220,6 +311,50 @@ function startStubServer() {
     res.json({ ok: true, completed });
   });
 
+  app.post("/api/test/set-case-status", (req, res) => {
+    const status = String(req.body?.status || "").trim();
+    const broadcastEvent = req.body?.broadcast !== false;
+    if (!status) return res.status(400).json({ error: "status required" });
+    activeCase = {
+      ...activeCase,
+      status,
+      updatedAt: nowIso(),
+    };
+    if (broadcastEvent) {
+      broadcast("case", { at: nowIso() });
+    }
+    res.json({ ok: true, status });
+  });
+
+  app.post("/api/test/add-notification", (req, res) => {
+    const message = String(req.body?.message || "").trim();
+    const broadcastEvent = req.body?.broadcast !== false;
+    if (!message) return res.status(400).json({ error: "message required" });
+    const notification = {
+      _id: `notification_${notifications.length + 1}`,
+      type: "message",
+      message,
+      read: false,
+      createdAt: nowIso(),
+      action: {
+        label: "View Matter",
+        href: `/case-detail.html?caseId=${CASE_ID}&tab=messages`,
+      },
+    };
+    notifications.unshift(notification);
+    if (broadcastEvent) {
+      broadcastNotification({ at: nowIso() });
+    }
+    res.json({ ok: true, id: notification._id });
+  });
+
+  app.post("/api/test/stream-state", (_req, res) => {
+    res.json({
+      caseClients: streamClients.size,
+      notificationClients: notificationStreamClients.size,
+    });
+  });
+
   app.post("/api/test/drop-stream", (_req, res) => {
     streamEnabled = false;
     for (const client of streamClients) {
@@ -236,9 +371,25 @@ function startStubServer() {
     res.json({ ok: true });
   });
 
+  app.post("/api/test/drop-notification-stream", (_req, res) => {
+    notificationStreamEnabled = false;
+    for (const client of notificationStreamClients) {
+      try {
+        client.end();
+      } catch {}
+    }
+    notificationStreamClients.clear();
+    res.json({ ok: true });
+  });
+
+  app.post("/api/test/restore-notification-stream", (_req, res) => {
+    notificationStreamEnabled = true;
+    res.json({ ok: true });
+  });
+
   const server = http.createServer(app);
   return new Promise((resolve) => {
-    server.listen(0, () => {
+    server.listen({ port: 0, host: "127.0.0.1", exclusive: true }, () => {
       const { port } = server.address();
       resolve({ server, port });
     });
@@ -258,11 +409,22 @@ async function api(baseUrl, pathName, body) {
   return data;
 }
 
+async function waitForStreamState(baseUrl, predicate, label, timeoutMs = 12000) {
+  const deadline = Date.now() + timeoutMs;
+  let latest = null;
+  while (Date.now() < deadline) {
+    latest = await api(baseUrl, "/api/test/stream-state", {});
+    if (predicate(latest)) return latest;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`${label}; latest stream state=${JSON.stringify(latest)}`);
+}
+
 async function run() {
   const { server, port } = await startStubServer();
-  const baseUrl = `http://localhost:${port}`;
+  const baseUrl = `http://127.0.0.1:${port}`;
 
-  const browser = await puppeteer.launch({
+  const browser = await launchPuppeteer({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
     protocolTimeout: 120_000,
@@ -271,6 +433,8 @@ async function run() {
   const page = await browser.newPage();
   page.setDefaultTimeout(40_000);
   page.setDefaultNavigationTimeout(40_000);
+  const runtimeErrors = [];
+  page.on("pageerror", (error) => runtimeErrors.push(error.message));
   await page.evaluateOnNewDocument((user) => {
     localStorage.setItem("lpc_user", JSON.stringify(user));
     window.getStoredUser = () => user;
@@ -281,12 +445,40 @@ async function run() {
       waitUntil: "domcontentloaded",
     });
 
+    try {
+      await page.waitForFunction(
+        () => {
+          const title = document.querySelector("#caseTitle");
+          return Boolean(title && /Realtime Validation Case/i.test(title.textContent || ""));
+        },
+        { timeout: 20_000 }
+      );
+    } catch (error) {
+      const state = await page.evaluate(() => ({
+        title: document.querySelector("#caseTitle")?.textContent || "",
+        status: document.getElementById("messagePanelBanner")?.textContent || "",
+        message: document.getElementById("caseMessageStatus")?.textContent || "",
+        url: location.href,
+      }));
+      throw new Error(`${error.message}; state=${JSON.stringify(state)}; pageErrors=${runtimeErrors.join(" | ") || "none"}`);
+    }
+
+    await waitForStreamState(
+      baseUrl,
+      (streamState) => streamState.caseClients > 0 && streamState.notificationClients > 0,
+      "Initial Matter and notification streams did not connect"
+    );
+
+    await api(baseUrl, "/api/test/add-notification", {
+      message: "SSE notification delivered",
+      broadcast: true,
+    });
     await page.waitForFunction(
-      () => {
-        const title = document.getElementById("caseTitle");
-        return Boolean(title && /Realtime Validation Case/i.test(title.textContent || ""));
-      },
-      { timeout: 20_000 }
+      () =>
+        [...document.querySelectorAll(".notif-title")].some((node) =>
+          (node.textContent || "").includes("SSE notification delivered")
+        ),
+      { timeout: 10_000 }
     );
 
     const initiallyDisabled = await page.$eval("#caseCompleteButton", (btn) => !!btn.disabled);
@@ -294,6 +486,8 @@ async function run() {
       throw new Error("Expected Complete button to be locked before task completion.");
     }
 
+    await clickVisible(page, '[data-matter-tab="messages"]');
+    await page.waitForSelector('[data-matter-panel="messages"]:not([hidden])');
     await api(baseUrl, "/api/test/add-message", {
       text: "SSE message delivered",
       broadcast: true,
@@ -306,6 +500,8 @@ async function run() {
       { timeout: 10_000 }
     );
 
+    await clickVisible(page, '[data-matter-tab="files"]');
+    await page.waitForSelector('[data-matter-panel="files"]:not([hidden])');
     await api(baseUrl, "/api/test/add-document", {
       name: "sse-doc.pdf",
       broadcast: true,
@@ -318,6 +514,8 @@ async function run() {
       { timeout: 10_000 }
     );
 
+    await clickVisible(page, '[data-matter-tab="work"]');
+    await page.waitForSelector('[data-matter-panel="work"]:not([hidden])');
     await api(baseUrl, "/api/test/set-task-complete", {
       completed: true,
       broadcast: true,
@@ -330,11 +528,52 @@ async function run() {
       { timeout: 10_000 }
     );
 
+    await api(baseUrl, "/api/test/set-case-status", {
+      status: "paused",
+      broadcast: true,
+    });
+    await page.waitForFunction(
+      () => /paused/i.test(document.getElementById("messagePanelBanner")?.textContent || ""),
+      { timeout: 10_000 }
+    );
+    await api(baseUrl, "/api/test/set-case-status", {
+      status: "in progress",
+      broadcast: true,
+    });
+    await page.waitForFunction(
+      () => document.getElementById("caseCompleteButton")?.disabled === false,
+      { timeout: 10_000 }
+    );
+
     await api(baseUrl, "/api/test/drop-stream", {});
+    await api(baseUrl, "/api/test/drop-notification-stream", {});
+    await waitForStreamState(
+      baseUrl,
+      (streamState) => streamState.caseClients === 0 && streamState.notificationClients === 0,
+      "Realtime streams did not disconnect"
+    );
     await new Promise((resolve) => setTimeout(resolve, 500));
 
+    await clickVisible(page, '[data-matter-tab="messages"]');
+    await page.waitForSelector('[data-matter-panel="messages"]:not([hidden])');
     await api(baseUrl, "/api/test/add-message", {
       text: "Polling fallback message",
+      broadcast: false,
+    });
+    await api(baseUrl, "/api/test/add-document", {
+      name: "polling-fallback-doc.pdf",
+      broadcast: false,
+    });
+    await api(baseUrl, "/api/test/set-task-complete", {
+      completed: false,
+      broadcast: false,
+    });
+    await api(baseUrl, "/api/test/set-case-status", {
+      status: "paused",
+      broadcast: false,
+    });
+    await api(baseUrl, "/api/test/add-notification", {
+      message: "Polling fallback notification",
       broadcast: false,
     });
 
@@ -346,7 +585,66 @@ async function run() {
       { timeout: 12_000 }
     );
 
-    console.log("SSE + polling fallback verified in case-detail runtime.");
+    await page.waitForFunction(
+      () =>
+        [...document.querySelectorAll(".document-label")].some((node) =>
+          (node.textContent || "").includes("polling-fallback-doc.pdf")
+        ),
+      { timeout: 12_000 }
+    );
+    await page.waitForFunction(
+      () => {
+        const checkbox = document.querySelector('#caseTaskList input[type="checkbox"]');
+        return Boolean(checkbox && !checkbox.checked);
+      },
+      { timeout: 12_000 }
+    );
+    await page.waitForFunction(
+      () => /paused/i.test(document.getElementById("messagePanelBanner")?.textContent || ""),
+      { timeout: 12_000 }
+    );
+    await page.waitForFunction(
+      () =>
+        [...document.querySelectorAll(".notif-title")].some((node) =>
+          (node.textContent || "").includes("Polling fallback notification")
+        ),
+      { timeout: 15_000 }
+    );
+
+    await api(baseUrl, "/api/test/restore-stream", {});
+    await api(baseUrl, "/api/test/restore-notification-stream", {});
+    await waitForStreamState(
+      baseUrl,
+      (streamState) => streamState.caseClients > 0 && streamState.notificationClients > 0,
+      "Realtime streams did not reconnect"
+    );
+
+    await api(baseUrl, "/api/test/add-message", {
+      text: "SSE message after reconnect",
+      broadcast: true,
+    });
+    await api(baseUrl, "/api/test/add-notification", {
+      message: "SSE notification after reconnect",
+      broadcast: true,
+    });
+    await page.waitForFunction(
+      () =>
+        [...document.querySelectorAll(".message-bubble .card-body p")].some((node) =>
+          (node.textContent || "").includes("SSE message after reconnect")
+        ),
+      { timeout: 10_000 }
+    );
+    await page.waitForFunction(
+      () =>
+        [...document.querySelectorAll(".notif-title")].some((node) =>
+          (node.textContent || "").includes("SSE notification after reconnect")
+        ),
+      { timeout: 10_000 }
+    );
+
+    console.log(
+      "SSE delivery, reconnect, and polling fallback verified for messages, documents, tasks, notifications, and Matter status."
+    );
   } finally {
     await page.close();
     await browser.close();

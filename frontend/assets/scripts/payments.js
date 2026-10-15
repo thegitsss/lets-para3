@@ -1,8 +1,48 @@
 // frontend/assets/scripts/payments.js
-// Requires <script src="https://js.stripe.com/v3"></script> on any page that uses this.
 
 let __stripe = null;
 let __pk = null;
+let __stripeJsPromise = null;
+const STRIPE_JS_SRC = "https://js.stripe.com/v3/";
+
+export function loadStripeJs() {
+  if (window.Stripe) return Promise.resolve(window.Stripe);
+  if (__stripeJsPromise) return __stripeJsPromise;
+
+  __stripeJsPromise = new Promise((resolve, reject) => {
+    let script = document.querySelector('script[src^="https://js.stripe.com/v3"]');
+    const created = !script;
+    const timeout = window.setTimeout(() => {
+      if (created) script?.remove();
+      reject(new Error("The Stripe payment form took too long to load. Please try again."));
+    }, 20_000);
+    const finish = () => {
+      window.clearTimeout(timeout);
+      if (window.Stripe) resolve(window.Stripe);
+      else reject(new Error("We couldn't load the Stripe payment form. Please allow js.stripe.com or disable ad blockers and try again."));
+    };
+    const fail = () => {
+      window.clearTimeout(timeout);
+      if (created) script?.remove();
+      reject(new Error("We couldn't load the Stripe payment form. Please allow js.stripe.com or disable ad blockers and try again."));
+    };
+
+    if (!script) {
+      script = document.createElement("script");
+      script.src = STRIPE_JS_SRC;
+      script.async = true;
+      script.dataset.lpcStripeJs = "true";
+    }
+    script.addEventListener("load", finish, { once: true });
+    script.addEventListener("error", fail, { once: true });
+    if (created) document.head.appendChild(script);
+  }).catch((error) => {
+    __stripeJsPromise = null;
+    throw error;
+  });
+
+  return __stripeJsPromise;
+}
 
 /**
  * Fetch publishable key from /api/payments/config and return a cached Stripe instance.
@@ -10,13 +50,15 @@ let __pk = null;
 export async function getStripe() {
   if (__stripe) return __stripe;
 
+  await loadStripeJs();
+
   const r = await fetch('/api/payments/config', { credentials: 'include' });
   const cfg = r.ok ? await r.json() : {};
   if (!cfg.publishableKey) throw new Error('Missing Stripe publishable key (check /api/payments/config).');
   __pk = cfg.publishableKey;
 
   if (!window.Stripe) {
-    throw new Error("We couldn't load the secure payment form. Please allow js.stripe.com or disable ad blockers and try again.");
+    throw new Error("We couldn't load the Stripe payment form. Please allow js.stripe.com or disable ad blockers and try again.");
   }
 
   __stripe = window.Stripe(__pk);

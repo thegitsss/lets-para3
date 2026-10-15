@@ -4,6 +4,7 @@ const {
   MARKETING_CHANNEL_CONNECTION_STATUSES,
   MARKETING_PUBLISHING_CHANNELS,
 } = require("../services/marketing/constants");
+const { LINKEDIN_API_VERSION } = require("../services/marketing/linkedinApiPolicy");
 
 const { Schema } = mongoose;
 
@@ -27,6 +28,9 @@ const marketingChannelConnectionSchema = new Schema(
       index: true,
     },
     isActive: { type: Boolean, default: true, index: true },
+    // Internal owner-intent generation: provider responses may only commit
+    // against the generation that initiated them. Never serialized to clients.
+    intentVersion: { type: Number, default: 0, min: 0, validate: Number.isSafeInteger },
     memberId: { type: String, trim: true, default: "", maxlength: 120 },
     memberUrn: { type: String, trim: true, default: "", maxlength: 240 },
     memberName: { type: String, trim: true, default: "", maxlength: 240 },
@@ -37,7 +41,7 @@ const marketingChannelConnectionSchema = new Schema(
     accessTokenLast4: { type: String, trim: true, default: "", maxlength: 16 },
     tokenExpiresAt: { type: Date, default: null },
     scopeSnapshot: { type: [String], default: [] },
-    apiVersion: { type: String, trim: true, default: "", maxlength: 40 },
+    apiVersion: { type: String, trim: true, default: LINKEDIN_API_VERSION, maxlength: 40 },
     authorizationAction: { type: String, trim: true, default: "", maxlength: 120 },
     authorizationGranted: { type: Boolean, default: false },
     discoveredOrganizations: { type: [Schema.Types.Mixed], default: [] },
@@ -47,6 +51,10 @@ const marketingChannelConnectionSchema = new Schema(
     oauthStateHash: { type: String, trim: true, default: "", maxlength: 128, index: true },
     oauthStateExpiresAt: { type: Date, default: null },
     oauthRequestedBy: { type: actorSchema, default: null },
+    // Bind pending OAuth to the authenticated session generation that issued
+    // it. Missing legacy bindings require a fresh authorization, not a guess.
+    oauthRequestedAuthVersion: { type: Number, default: null, min: 0,
+      validate: value => value === null || Number.isSafeInteger(value) },
     oauthRequestedAt: { type: Date, default: null },
     oauthLastCompletedAt: { type: Date, default: null },
     oauthLastError: { type: String, trim: true, default: "", maxlength: 1000 },

@@ -334,6 +334,13 @@ function auditAttorneySemanticResponse({
     errors.push("raw_evidence_fields_exposed");
   }
 
+  if (
+    /\binvoices?\b/i.test(reply) &&
+    !/\b(?:does not|doesn't|doesn’t|do not|don't|don’t|no)\b[^.!?]{0,60}\binvoices?\b|\binvoices?\b[^.!?]{0,60}\b(?:not created|not provided|not available)\b/i.test(reply)
+  ) {
+    errors.push("unsupported_invoice_record_claim");
+  }
+
   const normalizedReply = normalize(reply);
   if ([...collectPromptLikeRecordValues((toolOutputs || []).map((entry) => entry?.result))]
     .some((value) => normalizedReply.includes(value))) {

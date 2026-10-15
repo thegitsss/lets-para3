@@ -889,33 +889,23 @@ function renderParalegals(items) {
     const card = buildParalegalCard(item);
     if (card) fragment.appendChild(card);
   });
-  if (!fragment.childElementCount) {
-    setResultsStatus("Paralegal profiles are temporarily unavailable.", true);
-    return;
-  }
   elements.results.appendChild(fragment);
 }
 
 function buildParalegalCard(paralegal) {
   const paralegalId = String(paralegal._id || paralegal.id || paralegal.paralegalId || "");
-  if (!/^[a-f0-9]{24}$/i.test(paralegalId)) return null;
   const presentation = normalizePresentation(paralegal.presentation, window.location.origin, {
     expectedKind: "card",
     expectedType: "profile",
     expectedId: paralegalId,
   });
-  const name = presentation?.object.title || String(paralegal.name || [paralegal.firstName, paralegal.lastName].filter(Boolean).join(" ")).trim();
-  if (!name) return null;
-  const location = presentation?.details.find((item) => item.label === "Location")?.value ||
-    String(paralegal.location || paralegal.state || "");
-  const publicPracticeAreas = Array.isArray(paralegal.practiceAreas) && paralegal.practiceAreas.length
-    ? paralegal.practiceAreas : paralegal.specialties;
-  const specialties = presentation
-    ? (presentation.details.find((item) => item.label === "Practice areas")?.value || "").split(", ").filter(Boolean).slice(0, 2)
-    : (Array.isArray(publicPracticeAreas) ? publicPracticeAreas : []).filter((value) => typeof value === "string" && value.trim()).slice(0, 2);
+  if (!presentation) return null;
+  const name = presentation.object.title;
+  const location = String(paralegal.state || "").trim();
+  const specialties = (presentation.details.find((item) => item.label === "Practice areas")?.value || "").split(", ").filter(Boolean);
   const experience = formatExperience(paralegal.yearsExperience);
   const avatar = paralegal.avatarURL || AVATAR_PLACEHOLDER;
-  const profileHref = presentation?.links.self || `/profile-paralegal.html?paralegalId=${encodeURIComponent(paralegalId)}`;
+  const profileHref = presentation.links.self;
 
   const card = document.createElement("article");
   card.className = "paralegal-card";
@@ -948,23 +938,45 @@ function buildParalegalCard(paralegal) {
   heading.appendChild(headingLink);
   const content = document.createElement("div");
   content.className = "card-content";
-  content.appendChild(heading);
+  const identity = document.createElement("div");
+  identity.className = "card-identity";
+  identity.appendChild(heading);
+  if (location) {
+    const locationLine = document.createElement("p");
+    locationLine.className = "card-location-mobile";
+    locationLine.textContent = location;
+    identity.appendChild(locationLine);
+  }
+  content.appendChild(identity);
 
   const intro = document.createElement("p");
-  intro.textContent = [specialties[0], location].filter(Boolean).join(" · ");
-  if (intro.textContent) content.appendChild(intro);
+  intro.className = "card-practice";
+  const desktopIntro = document.createElement("span");
+  desktopIntro.className = "card-practice-desktop";
+  desktopIntro.textContent = [specialties[0], location].filter(Boolean).join(" · ");
+  const mobileIntro = document.createElement("span");
+  mobileIntro.className = "card-practice-mobile";
+  mobileIntro.textContent = specialties.join(" · ");
+  intro.append(desktopIntro, mobileIntro);
+  if (desktopIntro.textContent || mobileIntro.textContent) content.appendChild(intro);
 
-  const summary = presentation?.summary || paralegal.bio || paralegal.about;
-  if (summary) {
+  const presentedLocation = presentation.details.find((item) => item.label === "Location")?.value || "";
+  const summaryIsLocation = [presentedLocation, paralegal.location, location].some(
+    (value) => value && String(value).trim().toLowerCase() === String(presentation.summary || "").trim().toLowerCase()
+  );
+  if (presentation.summary && !summaryIsLocation) {
     const bio = document.createElement("p");
-    bio.textContent = getFirstSentence(summary);
+    bio.textContent = getFirstSentence(presentation.summary);
+    bio.className = "card-bio";
+    if (bio.textContent.trim().toLowerCase() === location.trim().toLowerCase()) {
+      bio.classList.add("card-bio--duplicate-location");
+    }
     content.appendChild(bio);
   }
 
   const meta = document.createElement("div");
   meta.className = "card-meta";
   meta.appendChild(buildMetaChip("Experience", experience));
-  meta.appendChild(buildMetaChip("Status", presentation?.status.label || paralegal.availability || "Approved", { hideLabel: true }));
   content.appendChild(meta);
   card.appendChild(content);
 

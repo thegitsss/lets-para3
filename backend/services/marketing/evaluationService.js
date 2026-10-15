@@ -87,12 +87,12 @@ function recommendationsForOutcome({ packet = {}, decision = "", note = "" } = {
   return uniqueList(recommendations).slice(0, 4);
 }
 
-async function recordPacketOutcomeEvaluation({ packet, brief = null, decision = "", note = "", actor = {}, decidedAt = new Date() } = {}) {
+async function recordPacketOutcomeEvaluation({ packet, brief = null, decision = "", note = "", actor = {}, decidedAt = new Date(), session = null } = {}) {
   if (!packet?._id) {
     throw new Error("Packet is required to record a marketing evaluation.");
   }
 
-  const briefDoc = brief || (packet.briefId ? await MarketingBrief.findById(packet.briefId).lean() : null);
+  const briefDoc = brief || (packet.briefId ? await MarketingBrief.findById(packet.briefId).session(session).lean() : null);
   const safeDecision = decision === "approved" ? "approved" : "rejected";
   const evaluationKey = `packet:${String(packet._id)}:v${Number(packet.packetVersion || 1)}:${safeDecision}`;
   const title = `Packet outcome · ${safeDecision} · ${packet.workflowType || "marketing draft"}`;
@@ -130,7 +130,7 @@ async function recordPacketOutcomeEvaluation({ packet, brief = null, decision = 
         expiresAt: new Date(new Date(decidedAt).setDate(new Date(decidedAt).getDate() + 180)),
       },
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true, ...(session ? { session } : {}) }
   ).lean();
 }
 

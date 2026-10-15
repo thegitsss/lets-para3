@@ -1,16 +1,5 @@
 (function mountProfileClusterInSidebar() {
   const FALLBACK_AVATAR = "assets/avatar-placeholder.svg";
-  function safeAvatarUrl(value) {
-    if (typeof value !== "string" || value.length > 2048) return FALLBACK_AVATAR;
-    try {
-      const url = new URL(value, document.baseURI);
-      return url.origin === location.origin && ["http:", "https:"].includes(url.protocol)
-        ? url.href
-        : FALLBACK_AVATAR;
-    } catch {
-      return FALLBACK_AVATAR;
-    }
-  }
   const PROFILE_SELECTORS = [
     "#sidebarNav [data-lpc-sidebar-profile-trigger]",
     ".profile-header-controls .profile-menu",
@@ -58,7 +47,7 @@
   }
 
   function getDisplayAvatar(user = getStoredUser() || {}) {
-    return safeAvatarUrl(user.pendingProfileImage || user.profileImage || user.avatarURL || FALLBACK_AVATAR);
+    return user.pendingProfileImage || user.profileImage || user.avatarURL || FALLBACK_AVATAR;
   }
 
   function syncSidebarAccountIdentity(user = getStoredUser() || {}) {
@@ -313,7 +302,7 @@
         if (typeof window.logoutUser === "function") return;
         event.preventDefault();
         try {
-          const { logoutUser } = await import("../auth.js");
+          const { logoutUser } = await import("./auth.js");
           await logoutUser(event);
         } catch (error) {
           console.warn("Unable to load the logout control", error);

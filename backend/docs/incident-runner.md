@@ -5,16 +5,11 @@ The incident system is split into two operational processes:
 - Web process: Express app from `backend/index.js`
 - Runner process: long-running worker from `backend/scripts/incident-runner.js`
 
-The web process and the runner must not be merged. The web process owns intake APIs and the lightweight scheduler. The runner owns heavier incident execution work.
+The web process and the runner must not be merged. The web process owns authenticated incident intake and control APIs only. It starts no incident scheduler. The runner is the sole owner of incident job execution.
 
 ## What The Web Process Handles
 
-The web process starts `startIncidentScheduler()` from `backend/index.js`.
-
-That scheduler only handles:
-
-- `intake_validation`
-- `classification`
+The web process validates and records new incident reports, exposes authorized status and decision APIs, and returns promptly. It does not poll or advance the incident queue. Scaling the web service therefore scales HTTP capacity without multiplying background work.
 
 ## What The Runner Handles
 
@@ -27,13 +22,15 @@ npm run incident:runner
 
 The runner continuously claims and processes:
 
+- `intake_validation`
+- `classification`
 - `investigation`
 - `patch_planning`
 - `patch_execution`
 - `verification`
 - `deployment`
 
-It uses the same claim/lock mechanism as the web scheduler, but with a separate worker id and a longer runner-specific lock window.
+It is the only runtime consumer of the incident claim/lock mechanism. Each claim has an ownership token and renewable lease; losing the lease is a fatal worker condition so the supervisor can restart the process safely.
 
 ## Required Environment
 
@@ -66,6 +63,11 @@ Release-stage env if release work is enabled:
 - `INCIDENT_ROLLBACK_MODE`
 - `INCIDENT_RELEASE_BASELINE_ID`
 
+Production accepts only `disabled` or `webhook` for preview, production, and
+rollback modes. Local `stub` and `workspace_sync` modes are rejected during
+production startup. Enabling automatic deploys also requires real preview and
+production webhook modes and secure webhook URLs.
+
 Approval env:
 
 - `INCIDENT_FOUNDER_APPROVER_EMAILS`
@@ -73,7 +75,19 @@ Approval env:
 
 ## Supervision Guidance
 
-Run the runner under a real supervisor such as:
+The production Blueprint defines `lets-para3-incident-runner` as a Render background worker. Render owns restart and shutdown supervision for that process. The checked-in worker contract uses one job per batch, a renewable four-minute lock, a 270-second graceful-shutdown window, and Render's 300-second maximum shutdown delay.
+
+## Repository branch retention
+
+The current incident patch service creates isolated local Git worktrees and branches; it does not publish remote branches. Remote `incident/` refs are therefore legacy repository state or were created by an external release provider, not evidence that a current incident is active. Before launch and on the repository-retention cadence:
+
+1. Export every remote branch name and tip SHA, then map each `incident/` ref to its incident, approval, release, and pull-request evidence where available.
+2. Scan every remote ref—not only the default branch—for credentials, personal data, proprietary assets, and unreviewed security-sensitive material.
+3. Have the incident-record owner and repository owner approve which refs must be retained. Preserve any branch required for an active incident, legal hold, audit, or unresolved review.
+4. Delete or archive only the approved stale refs through an auditable, bounded operation; record the before/after counts and failed deletions. Never infer deletion permission from age or naming alone.
+5. Investigate any new remote `incident/` branch because the checked-in runner has no remote-push path. A continuing increase indicates an external provider or obsolete automation that must be identified and disabled or given an explicit retention lifecycle.
+
+Alternative self-hosted supervisors include:
 
 - Render background worker
 - systemd
@@ -111,16 +125,17 @@ The process is designed to:
 If the web process is up but the incident runner is down:
 
 - new incident reports can still enter the system
-- `intake_validation` and `classification` can still run through the web-owned scheduler
-- incidents that need `investigation`, `patch_planning`, `patch_execution`, `verification`, or `deployment` will stop advancing
+- no incident stage, including `intake_validation` or `classification`, will advance until the runner recovers
 - founder-visible incident queues can become stale because downstream runner-owned stages stop progressing
 - any approval-gated release path can remain paused indefinitely because the pre-approval runner work does not complete
 
 This is why the runner must be treated as a first-class supervised process, not an optional helper.
 
-## What Is Still Missing For Safe Internal Operations
+## Remaining Release Evidence
 
-This runner is now operationalized, but internal use still depends on:
+The runtime topology is checked in, but launch still depends on evidence that:
 
-- wiring the example supervisor configuration to the actual deployment host or worker platform
+- the Blueprint was synced and the worker is live on the exact release commit
+- its startup capability log shows MongoDB, founder approval, and AI configuration are available
+- a controlled synthetic incident traverses intake validation, classification, and all applicable downstream worker-owned stages without a lost lock
 - provider-attested release evidence beyond generic webhooks where the current webhook contract is still limited

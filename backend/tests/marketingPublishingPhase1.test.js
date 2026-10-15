@@ -13,9 +13,14 @@ const MarketingPublishingSettings = require("../models/MarketingPublishingSettin
 const User = require("../models/User");
 const adminKnowledgeRouter = require("../routes/adminKnowledge");
 const adminMarketingRouter = require("../routes/adminMarketing");
+const { createAuthSession } = require("../services/authSessionService");
+const { getPublishingStatusCounts } = require("../services/marketing/publishingCycleService");
+const { ensurePublishingSettings } = require("../services/marketing/publishingSettingsService");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "marketing-publishing-phase1-test-secret";
+const previousRequireAuthSession = process.env.REQUIRE_AUTH_SESSION;
+process.env.REQUIRE_AUTH_SESSION = "true";
 
 const app = (() => {
   const instance = express();
@@ -24,21 +29,32 @@ const app = (() => {
   instance.use("/api/admin/knowledge", adminKnowledgeRouter);
   instance.use("/api/admin/marketing", adminMarketingRouter);
   instance.use((err, _req, res, _next) => {
-    console.error(err);
-    res.status(500).json({ error: err?.message || "Server error" });
+    res.status(Number(err?.statusCode) || 500).json({ error: err?.message || "Server error" });
   });
   return instance;
 })();
 
-function authCookieFor(user) {
+const authCookieCache = new WeakMap();
+
+async function authCookieFor(user) {
+  const cached = authCookieCache.get(user);
+  if (cached) return cached;
+  const authState = await User.findById(user._id).select("+authVersion").lean();
+  const { sessionId } = await createAuthSession(authState, {
+    headers: { "user-agent": "lpc-marketing-phase1-test" },
+  });
   const payload = {
     id: user._id.toString(),
     role: user.role,
     email: user.email,
     status: user.status,
+    av: Number(authState?.authVersion || 0),
+    sid: sessionId,
   };
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "2h" });
-  return `token=${token}`;
+  const cookie = `token=${token}`;
+  authCookieCache.set(user, cookie);
+  return cookie;
 }
 
 async function createAdmin() {
@@ -56,7 +72,7 @@ async function createAdmin() {
 async function seedKnowledge(admin) {
   const res = await request(app)
     .post("/api/admin/knowledge/sync")
-    .set("Cookie", authCookieFor(admin))
+    .set("Cookie", await authCookieFor(admin))
     .send({});
   expect(res.status).toBe(200);
 }
@@ -67,6 +83,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await closeDatabase();
+  if (previousRequireAuthSession === undefined) delete process.env.REQUIRE_AUTH_SESSION;
+  else process.env.REQUIRE_AUTH_SESSION = previousRequireAuthSession;
 });
 
 beforeEach(async () => {
@@ -75,12 +93,23 @@ beforeEach(async () => {
 });
 
 describe("Marketing publishing Phase 1", () => {
+  test("concurrent first access creates exactly one publishing settings singleton", async () => {
+    const results = await Promise.all(
+      Array.from({ length: 12 }, () => ensurePublishingSettings())
+    );
+
+    expect(new Set(results.map((settings) => String(settings._id))).size).toBe(1);
+    expect(
+      await MarketingPublishingSettings.countDocuments({ singletonKey: "marketing_publishing" })
+    ).toBe(1);
+  });
+
   test("settings persist and cadence can be configured", async () => {
     const admin = await createAdmin();
 
     const initialRes = await request(app)
       .get("/api/admin/marketing/publishing/settings")
-      .set("Cookie", authCookieFor(admin));
+      .set("Cookie", await authCookieFor(admin));
 
     expect(initialRes.status).toBe(200);
     expect(initialRes.body.settings).toEqual(
@@ -89,20 +118,20 @@ describe("Marketing publishing Phase 1", () => {
         cadenceMode: "manual_only",
         timezone: "America/New_York",
         preferredHourLocal: 9,
-        enabledChannels: expect.arrayContaining(["linkedin_company", "facebook_page"]),
+        enabledChannels: ["linkedin_company"],
         maxOpenCycles: 1,
       })
     );
 
     const updateRes = await request(app)
       .post("/api/admin/marketing/publishing/settings")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({
         isEnabled: true,
         cadenceMode: "every_2_days",
         timezone: "America/New_York",
         preferredHourLocal: 7,
-        enabledChannels: ["linkedin_company", "facebook_page"],
+        enabledChannels: ["linkedin_company"],
         pauseReason: "",
         maxOpenCycles: 1,
       });
@@ -114,7 +143,7 @@ describe("Marketing publishing Phase 1", () => {
         cadenceMode: "every_2_days",
         timezone: "America/New_York",
         preferredHourLocal: 7,
-        enabledChannels: ["linkedin_company", "facebook_page"],
+        enabledChannels: ["linkedin_company"],
         maxOpenCycles: 1,
       })
     );
@@ -124,29 +153,46 @@ describe("Marketing publishing Phase 1", () => {
     expect(stored).toBeTruthy();
     expect(stored.cadenceMode).toBe("every_2_days");
     expect(stored.isEnabled).toBe(true);
+    expect(stored.enabledChannels).toEqual(["linkedin_company"]);
   });
 
-  test("manual cycle creation generates paired channel briefs, packets, and approval tasks", async () => {
+  test("retired Facebook workflow and connection endpoints cannot create new work", async () => {
+    const admin = await createAdmin();
+
+    const briefRes = await request(app)
+      .post("/api/admin/marketing/briefs")
+      .set("Cookie", await authCookieFor(admin))
+      .send({ workflowType: "facebook_page_post", title: "Retired workflow" });
+    expect(briefRes.status).toBe(400);
+    expect(briefRes.body.error).toMatch(/unsupported active marketing workflow/i);
+
+    const connectionRes = await request(app)
+      .get("/api/admin/marketing/publishing/channel-connections/facebook_page")
+      .set("Cookie", await authCookieFor(admin));
+    expect(connectionRes.status).toBe(400);
+    expect(connectionRes.body.error).toMatch(/unsupported active marketing channel/i);
+  });
+
+  test("manual cycle creation generates only supported LinkedIn briefs, packets, and approval tasks", async () => {
     const admin = await createAdmin();
     await seedKnowledge(admin);
 
     const cycleRes = await request(app)
       .post("/api/admin/marketing/publishing/cycles")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({
         cycleLabel: "Weekly awareness loop",
         targetAudience: "approved attorneys",
-        objective: "Create paired review-ready company/page social drafts.",
-        briefSummary: "Use approved LPC knowledge and keep both channels restrained.",
+        objective: "Create a review-ready LinkedIn company draft.",
+        briefSummary: "Use approved LPC knowledge and keep the company channel restrained.",
       });
 
     expect(cycleRes.status).toBe(201);
     expect(cycleRes.body.created).toBe(true);
     expect(cycleRes.body.cycle.status).toBe("awaiting_approval");
     expect(cycleRes.body.cycle.channels.linkedin_company.status).toBe("awaiting_approval");
-    expect(cycleRes.body.cycle.channels.facebook_page.status).toBe("awaiting_approval");
     expect(cycleRes.body.cycle.channels.linkedin_company.readiness.status).toBe("not_connected");
-    expect(cycleRes.body.cycle.channels.facebook_page.readiness.status).toBe("blocked");
+    expect(cycleRes.body.cycle.channels.facebook_page).toBeUndefined();
 
     const briefs = await MarketingBrief.find({ cycleId: cycleRes.body.cycle.id }).sort({ createdAt: 1 }).lean();
     const packets = await MarketingDraftPacket.find({
@@ -157,11 +203,11 @@ describe("Marketing publishing Phase 1", () => {
       approvalState: "pending",
     }).lean();
 
-    expect(briefs).toHaveLength(2);
-    expect(briefs.map((brief) => brief.channelKey).sort()).toEqual(["facebook_page", "linkedin_company"]);
-    expect(briefs.map((brief) => brief.workflowType).sort()).toEqual(["facebook_page_post", "linkedin_company_post"]);
-    expect(packets).toHaveLength(2);
-    expect(packets.map((packet) => packet.channelKey).sort()).toEqual(["facebook_page", "linkedin_company"]);
+    expect(briefs).toHaveLength(1);
+    expect(briefs.map((brief) => brief.channelKey)).toEqual(["linkedin_company"]);
+    expect(briefs.map((brief) => brief.workflowType)).toEqual(["linkedin_company_post"]);
+    expect(packets).toHaveLength(1);
+    expect(packets.map((packet) => packet.channelKey)).toEqual(["linkedin_company"]);
     const linkedinPacket = packets.find((packet) => packet.channelKey === "linkedin_company");
     expect(linkedinPacket).toEqual(
       expect.objectContaining({
@@ -180,7 +226,7 @@ describe("Marketing publishing Phase 1", () => {
         }),
       })
     );
-    expect(tasks).toHaveLength(2);
+    expect(tasks).toHaveLength(1);
   });
 
   test("publishing overview includes LinkedIn cadence guidance without changing approval-first cycle behavior", async () => {
@@ -189,7 +235,7 @@ describe("Marketing publishing Phase 1", () => {
 
     const cycleRes = await request(app)
       .post("/api/admin/marketing/publishing/cycles")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({ cycleLabel: "Cadence guidance cycle" });
 
     expect(cycleRes.status).toBe(201);
@@ -197,7 +243,7 @@ describe("Marketing publishing Phase 1", () => {
 
     const overviewRes = await request(app)
       .get("/api/admin/marketing/publishing/overview")
-      .set("Cookie", authCookieFor(admin));
+      .set("Cookie", await authCookieFor(admin));
 
     expect(overviewRes.status).toBe(200);
     expect(overviewRes.body.linkedinCadenceGuidance).toEqual(
@@ -214,13 +260,36 @@ describe("Marketing publishing Phase 1", () => {
     expect(overviewRes.body.latestCycles[0].status).toBe("awaiting_approval");
   });
 
+  test("publishing status counts expose a read-only control-room snapshot without initializing settings", async () => {
+    await MarketingPublishingCycle.create([
+      { triggerSource: "manual", status: "blocked", cycleLabel: "Blocked cycle" },
+      { triggerSource: "manual", status: "awaiting_approval", cycleLabel: "Review cycle" },
+      { triggerSource: "manual", status: "skipped", cycleLabel: "Skipped cycle" },
+    ]);
+
+    const snapshot = await getPublishingStatusCounts();
+
+    expect(snapshot).toEqual({
+      counts: {
+        total: 3,
+        drafted: 0,
+        awaiting_approval: 1,
+        blocked: 1,
+        skipped: 1,
+        ready_to_publish: 0,
+      },
+      openCycleCount: 2,
+    });
+    expect(await MarketingPublishingSettings.countDocuments({})).toBe(0);
+  });
+
   test("jr cmo library endpoint returns day context, opportunities, facts, and weekly learning", async () => {
     const admin = await createAdmin();
     await seedKnowledge(admin);
 
     const res = await request(app)
       .get("/api/admin/marketing/jr-cmo/library")
-      .set("Cookie", authCookieFor(admin));
+      .set("Cookie", await authCookieFor(admin));
 
     expect(res.status).toBe(200);
     expect(res.body.library).toEqual(
@@ -244,14 +313,14 @@ describe("Marketing publishing Phase 1", () => {
 
     const cycleRes = await request(app)
       .post("/api/admin/marketing/publishing/cycles")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({ cycleLabel: "Founder daily log cycle" });
 
     expect(cycleRes.status).toBe(201);
 
     const res = await request(app)
       .get("/api/admin/marketing/founder-daily-log")
-      .set("Cookie", authCookieFor(admin));
+      .set("Cookie", await authCookieFor(admin));
 
     expect(res.status).toBe(200);
     expect(res.body.log).toEqual(
@@ -271,19 +340,17 @@ describe("Marketing publishing Phase 1", () => {
             channelKey: "linkedin_company",
             status: expect.stringMatching(/Ready to review|Ready to post|Blocked|Awaiting approval/),
           }),
-          expect.objectContaining({
-            channelKey: "facebook_page",
-          }),
         ]),
         compactStatus: expect.objectContaining({
           pendingReviewCount: expect.any(Number),
         }),
       })
     );
+    expect(res.body.log.readyPosts).toHaveLength(1);
 
     const refreshRes = await request(app)
       .post("/api/admin/marketing/founder-daily-log/refresh")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({});
 
     expect(refreshRes.status).toBe(200);
@@ -297,7 +364,7 @@ describe("Marketing publishing Phase 1", () => {
 
     await request(app)
       .post("/api/admin/marketing/publishing/settings")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({
         isEnabled: true,
         cadenceMode: "daily",
@@ -314,7 +381,7 @@ describe("Marketing publishing Phase 1", () => {
 
     const scheduledRes = await request(app)
       .post("/api/admin/marketing/publishing/run-scheduled")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({});
 
     expect(scheduledRes.status).toBe(200);
@@ -372,7 +439,7 @@ describe("Marketing publishing Phase 1", () => {
 
     const briefRes = await request(app)
       .post("/api/admin/marketing/briefs")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({
         workflowType: "founder_linkedin_post",
         title: "Pending queue blocker",
@@ -385,14 +452,14 @@ describe("Marketing publishing Phase 1", () => {
 
     const packetRes = await request(app)
       .post(`/api/admin/marketing/briefs/${briefRes.body.brief._id}/drafts`)
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({});
 
     expect(packetRes.status).toBe(201);
 
     await request(app)
       .post("/api/admin/marketing/publishing/settings")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({
         isEnabled: true,
         cadenceMode: "daily",
@@ -409,7 +476,7 @@ describe("Marketing publishing Phase 1", () => {
 
     const scheduledRes = await request(app)
       .post("/api/admin/marketing/publishing/run-scheduled")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({});
 
     expect(scheduledRes.status).toBe(200);
@@ -432,7 +499,7 @@ describe("Marketing publishing Phase 1", () => {
 
     const firstCycleRes = await request(app)
       .post("/api/admin/marketing/publishing/cycles")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({ cycleLabel: "Open cycle" });
 
     expect(firstCycleRes.status).toBe(201);
@@ -440,7 +507,7 @@ describe("Marketing publishing Phase 1", () => {
 
     const secondCycleRes = await request(app)
       .post("/api/admin/marketing/publishing/cycles")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({ cycleLabel: "Should not create" });
 
     expect(secondCycleRes.status).toBe(200);
@@ -450,7 +517,7 @@ describe("Marketing publishing Phase 1", () => {
 
     await request(app)
       .post("/api/admin/marketing/publishing/settings")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({
         isEnabled: true,
         cadenceMode: "daily",
@@ -467,7 +534,7 @@ describe("Marketing publishing Phase 1", () => {
 
     const scheduledRes = await request(app)
       .post("/api/admin/marketing/publishing/run-scheduled")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({});
 
     expect(scheduledRes.status).toBe(200);
@@ -482,28 +549,30 @@ describe("Marketing publishing Phase 1", () => {
 
     const cycleRes = await request(app)
       .post("/api/admin/marketing/publishing/cycles")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({ cycleLabel: "Truthful status cycle" });
 
+    expect(cycleRes.status).toBe(201);
+    expect(cycleRes.body.created).toBe(true);
     const cycleId = cycleRes.body.cycle.id;
     const linkedinPacketId = cycleRes.body.cycle.channels.linkedin_company.packetId;
-    const facebookPacketId = cycleRes.body.cycle.channels.facebook_page.packetId;
 
     const awaitingRes = await request(app)
       .get(`/api/admin/marketing/publishing/cycles/${cycleId}`)
-      .set("Cookie", authCookieFor(admin));
+      .set("Cookie", await authCookieFor(admin));
 
     expect(awaitingRes.status).toBe(200);
     expect(awaitingRes.body.cycle.status).toBe("awaiting_approval");
 
-    await request(app)
+    const rejectRes = await request(app)
       .post(`/api/admin/marketing/draft-packets/${linkedinPacketId}/reject`)
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({ note: "Hold this channel." });
+    expect(rejectRes.status).toBe(200);
 
     const blockedRes = await request(app)
       .get(`/api/admin/marketing/publishing/cycles/${cycleId}`)
-      .set("Cookie", authCookieFor(admin));
+      .set("Cookie", await authCookieFor(admin));
 
     expect(blockedRes.status).toBe(200);
     expect(blockedRes.body.cycle.status).toBe("blocked");
@@ -511,7 +580,7 @@ describe("Marketing publishing Phase 1", () => {
 
     const skippedRes = await request(app)
       .post(`/api/admin/marketing/publishing/cycles/${cycleId}/skip`)
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({ reason: "Skipping this cycle." });
 
     expect(skippedRes.status).toBe(200);
@@ -523,30 +592,27 @@ describe("Marketing publishing Phase 1", () => {
 
     const secondCycleRes = await request(app)
       .post("/api/admin/marketing/publishing/cycles")
-      .set("Cookie", authCookieFor(secondAdmin))
+      .set("Cookie", await authCookieFor(secondAdmin))
       .send({ cycleLabel: "Ready cycle" });
 
+    expect(secondCycleRes.status).toBe(201);
+    expect(secondCycleRes.body.created).toBe(true);
     const secondCycleId = secondCycleRes.body.cycle.id;
     const secondLinkedinPacketId = secondCycleRes.body.cycle.channels.linkedin_company.packetId;
-    const secondFacebookPacketId = secondCycleRes.body.cycle.channels.facebook_page.packetId;
 
-    await request(app)
+    const approveRes = await request(app)
       .post(`/api/admin/marketing/draft-packets/${secondLinkedinPacketId}/approve`)
-      .set("Cookie", authCookieFor(secondAdmin))
+      .set("Cookie", await authCookieFor(secondAdmin))
       .send({ note: "Approved." });
-    await request(app)
-      .post(`/api/admin/marketing/draft-packets/${secondFacebookPacketId}/approve`)
-      .set("Cookie", authCookieFor(secondAdmin))
-      .send({ note: "Approved." });
-
+    expect(approveRes.status).toBe(200);
     const readyRes = await request(app)
       .get(`/api/admin/marketing/publishing/cycles/${secondCycleId}`)
-      .set("Cookie", authCookieFor(secondAdmin));
+      .set("Cookie", await authCookieFor(secondAdmin));
 
     expect(readyRes.status).toBe(200);
     expect(readyRes.body.cycle.status).toBe("ready_to_publish");
     expect(readyRes.body.cycle.channels.linkedin_company.status).toBe("ready_to_publish");
-    expect(readyRes.body.cycle.channels.facebook_page.status).toBe("ready_to_publish");
+    expect(readyRes.body.cycle.channels.facebook_page).toBeUndefined();
   });
 
   test("approval decisions create packet outcome evaluations for weekly learning memory", async () => {
@@ -555,14 +621,14 @@ describe("Marketing publishing Phase 1", () => {
 
     const cycleRes = await request(app)
       .post("/api/admin/marketing/publishing/cycles")
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({ cycleLabel: "Learning memory cycle" });
 
     const linkedinPacketId = cycleRes.body.cycle.channels.linkedin_company.packetId;
 
     const rejectRes = await request(app)
       .post(`/api/admin/marketing/draft-packets/${linkedinPacketId}/reject`)
-      .set("Cookie", authCookieFor(admin))
+      .set("Cookie", await authCookieFor(admin))
       .send({ note: "Too generic and not grounded in enough concrete facts." });
 
     expect(rejectRes.status).toBe(200);

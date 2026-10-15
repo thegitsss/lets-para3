@@ -1,0 +1,10 @@
+body.admin-directors .panel,body.admin-directors .metric,body.admin-directors .oversight-card,body.admin-directors .table-wrap{border:0;border-radius:0;box-shadow:none;background:transparent}
+body.admin-directors .panel{padding:12px 0;margin:0}
+body.admin-directors .panel[hidden],body.admin-directors #directorList[hidden]{display:none!important}
+body.admin-directors #adminDirectorView{width:220px;max-width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:6px;font:inherit;background:white;color:inherit}
+body.admin-directors .director-totals>summary{font-size:13px;color:var(--muted);cursor:pointer;padding:10px 0}
+body.admin-directors .panel>h2{display:none}
+body.admin-directors table:has(tbody>tr:only-child>td[colspan]) thead{display:none}
+body.admin-directors .empty-row td{padding:16px 0;text-align:left;border:0}
+body.admin-directors .table-wrap{margin-top:0}
+body.admin-directors th{font-size:12px;text-transform:none;letter-spacing:0}

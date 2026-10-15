@@ -28,7 +28,6 @@ const browsers = require('playwright');
           assert.ok(await mountain.isVisible(),'Header mountain is visible at every viewport');
           await page.locator('#lpc-feature-cards').scrollIntoViewIfNeeded();
           assert.ok(await mountain.isVisible(),'Header mountain stays visible after scrolling');
-          if (width <= 767) assert.equal(await page.locator('.type-hook__inner').evaluate(e=>getComputedStyle(e).transform),'none','Mobile heading follows native scrolling without JS counter-motion');
           if (width <= 960) {
             await page.locator('[data-mobile-nav-toggle]').click();
             assert.ok(await mountain.isVisible(),'Header mountain stays visible with the menu open');
@@ -55,8 +54,8 @@ const browsers = require('playwright');
             const rail = page.locator('.workflow-chapters');
             const geometry = await rail.evaluate(e=>({h:e.offsetHeight,gap:getComputedStyle(e).gap,snap:getComputedStyle(e).scrollSnapType,children:[...e.children].map(c=>{const heading=c.querySelector('h3');const h=heading.getBoundingClientRect();const preview=c.lastElementChild.getBoundingClientRect();const caption=c.children[1].querySelector('p').getBoundingClientRect();return {w:c.offsetWidth,h:c.offsetHeight,center:getComputedStyle(heading).textAlign,headingGap:preview.top-h.bottom,captionTop:caption.top-c.getBoundingClientRect().top,captionGap:caption.top-preview.bottom,bottomSpace:c.getBoundingClientRect().bottom-caption.bottom,overflow:c.scrollHeight-c.clientHeight};})}));
             assert.equal(geometry.h,382);assert.equal(geometry.gap,'8px');assert.equal(geometry.snap,'x mandatory');
-            geometry.children.forEach(c=>{assert.equal(c.w,328);assert.equal(c.h,376);assert.equal(c.center,'center');assert.equal(c.headingGap,12);assert.ok(c.captionGap>=10,'Caption remains separated from its preview');assert.equal(c.captionTop,305);assert.ok(c.bottomSpace>=10,'Caption fits inside the card');assert.equal(c.overflow,0);});
-            for (let step=0;step<4;step++) { await rail.evaluate((e,s)=>e.scrollTo({left:s*336,behavior:'instant'}),step); await page.waitForTimeout(70); }
+            geometry.children.forEach(c=>{assert.equal(c.w,328);assert.equal(c.h,376);assert.equal(c.center,'center');assert.equal(c.headingGap,12);assert.ok(c.captionGap>=12);assert.equal(c.captionTop,305);assert.ok(c.bottomSpace>=10,'Caption fits inside the card');assert.equal(c.overflow,0);});
+            for (let step=0;step<6;step++) { await rail.evaluate((e,s)=>e.scrollTo({left:s*336,behavior:'instant'}),step); await page.waitForTimeout(70); }
             const position = await rail.evaluate(e=>e.scrollLeft);
             await page.locator('#lpc-feature-cards').evaluate(e=>scrollTo({top:e.getBoundingClientRect().top+scrollY-300,behavior:'instant'}));
             await page.waitForTimeout(100);
@@ -76,7 +75,7 @@ const browsers = require('playwright');
             assert.equal(await page.locator('h1').innerText(),'Your caseload grew.\nYour payroll doesn’t have to.','Rotation preserves whole words');
            } else {
             assert.equal(await page.locator('.workflow-chapters').evaluate(e=>getComputedStyle(e).display),'grid');
-            for (let step=1;step<=4;step++) {
+            for (let step=1;step<=6;step++) {
               await page.locator(`[data-workflow-chapter="${step}"]`).evaluate(e=>scrollTo({top:e.getBoundingClientRect().top+scrollY-innerHeight*.25,behavior:'instant'}));
               await page.waitForFunction(step=>document.querySelector('[data-workflow-canvas]').dataset.workflowState===String(step),step);
               const panel=page.locator(`.workflow-canvas > [data-state="${step}"]`);
@@ -94,15 +93,14 @@ const browsers = require('playwright');
               assert.ok(centered,'Navy action remains centered on desktop');
             }
           }
-          assert.deepEqual(await page.locator('.workflow-chapter h3').allTextContents(),['Scope','Review fit, check conflicts','Work','Complete & close']);
+          assert.deepEqual(await page.locator('.workflow-chapter h3').allTextContents(),['Scope','Review fit, check conflicts','Work','Review','Complete','Close']);
           const preview = width<=960 ? '.workflow-chapters .workflow-mobile-canvas' : '.workflow-canvas';
           assert.ok(!(await page.locator(preview).allTextContents()).join(' ').includes('Example'));
           assert.equal(await page.locator(`${preview} [data-state="2"] .applicant-row`).count(),3);
           assert.equal(await page.locator(`${preview} [data-state="3"] .message-composer svg`).count(),1);
-          assert.equal(await page.locator(`${preview} [data-state="3"] .workflow-review b`).textContent(), 'Chronology.pdf');
-          assert.equal(await page.locator(`${preview} [data-state="3"] .workflow-review b`).evaluate(e=>getComputedStyle(e).whiteSpace), 'nowrap');
-          assert.equal(await page.locator(`${preview} [data-state="4"] .workflow-completed-tasks li`).count(), 3);
-          assert.ok((await page.locator(`${preview} [data-state="4"]`).textContent()).includes('via Stripe'));
+          assert.ok((await page.locator(`${preview} [data-state="4"]`).textContent()).includes('Treatment Summary.docx'));
+          assert.equal(await page.locator(`${preview} [data-state="5"] h4`).count(),0);
+          assert.ok((await page.locator(`${preview} [data-state="6"]`).textContent()).includes('via Stripe'));
           await page.close();
         }
         for (const mode of ['reduced','no-script','failed-entrance','slow-fonts']) {

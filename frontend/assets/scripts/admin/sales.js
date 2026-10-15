@@ -1,4 +1,7 @@
 import { secureFetch } from "../auth.js";
+import { reportAsyncFailure } from "../utils/promise-errors.js";
+
+const reportFailure = reportAsyncFailure("admin-sales");
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -130,9 +133,10 @@ function renderPacketList(packets = []) {
     .join("");
 }
 
-function renderPacketDetail(packet = null) {
+function renderPacketDetail(packet = null, failure = '') {
   const root = document.getElementById("salesPacketDetail");
   if (!root) return;
+  if (failure) { root.innerHTML = `<p role="alert">${escapeHTML(failure)} Refresh to try again.</p>`; return; }
   if (!packet) {
     root.innerHTML = `<div class="ai-room-empty">Select a draft to review the content, open questions, and next step.</div>`;
     return;
@@ -201,9 +205,10 @@ function renderPacketDetail(packet = null) {
   `;
 }
 
-function renderAccountDetail(payload = null) {
+function renderAccountDetail(payload = null, failure = '') {
   const root = document.getElementById("salesAccountDetail");
   if (!root) return;
+  if (failure) { root.innerHTML = `<p role="alert">${escapeHTML(failure)} Refresh to try again.</p>`; return; }
   if (!payload?.account) {
     root.innerHTML = `<div class="ai-room-empty">Select an account to review notes, add interactions, and create drafts.</div>`;
     return;
@@ -318,8 +323,8 @@ async function loadSalesWorkspace(force = false) {
       try {
         const detail = await fetchAccountDetail(activeAccountId);
         renderAccountDetail(detail);
-      } catch {
-        renderAccountDetail(null);
+      } catch (error) {
+        renderAccountDetail(null, error.message || "This record could not be loaded.");
       }
     } else {
       renderAccountDetail(null);
@@ -331,14 +336,14 @@ async function loadSalesWorkspace(force = false) {
       try {
         const packet = await fetchPacketDetail(activePacketId);
         renderPacketDetail(packet);
-      } catch {
-        renderPacketDetail(null);
+      } catch (error) {
+        renderPacketDetail(null, error.message || "This record could not be loaded.");
       }
     } else {
       renderPacketDetail(null);
     }
 
-    if (status && force) status.textContent = "Sales loaded.";
+    if (status && force) status.textContent = "";
   } catch (err) {
     activeAccountId = "";
     activePacketId = "";
@@ -347,6 +352,7 @@ async function loadSalesWorkspace(force = false) {
     renderPacketList([]);
     renderAccountDetail(null);
     renderPacketDetail(null);
+    for (const id of ["salesAccountList", "salesPacketList"]) document.getElementById(id).innerHTML = `<p role="alert">${escapeHTML(err?.message || "Records could not be loaded.")} Refresh to try again.</p>`;
     if (status) status.textContent = err?.message || "Unable to load sales.";
   }
 }
@@ -377,6 +383,7 @@ async function createSalesAccount(event) {
     activeAccountId = String(data.account._id);
     if (status) status.textContent = "Sales account created.";
     await loadSalesWorkspace(true);
+    window.dispatchEvent(new CustomEvent("admin:growth-open", {detail:{view:"contacts",record:true}}));
   } catch (err) {
     if (status) status.textContent = err?.message || "Unable to create sales account.";
   } finally {
@@ -461,6 +468,7 @@ async function generateSalesPacket(action) {
     activePacketId = String(data.packet._id);
     if (status) status.textContent = "Sales draft created and added to the review list.";
     await loadSalesWorkspace(true);
+    window.dispatchEvent(new CustomEvent("admin:growth-open", {detail:{view:"outreach",record:true}}));
   } catch (err) {
     if (status) status.textContent = err?.message || "Unable to generate sales draft.";
   }
@@ -497,17 +505,17 @@ function bindSalesWorkspace() {
       try {
         const detail = await fetchAccountDetail(activeAccountId);
         renderAccountDetail(detail);
-      } catch {
-        renderAccountDetail(null);
+      } catch (error) {
+        renderAccountDetail(null, error.message || "This record could not be loaded.");
       }
     };
     accountList.addEventListener("click", (event) => {
-      selectAccount(event.target).catch(() => {});
+      selectAccount(event.target).catch(reportFailure);
     });
     accountList.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      selectAccount(event.target).catch(() => {});
+      selectAccount(event.target).catch(reportFailure);
     });
   }
   if (packetList && !packetList.dataset.bound) {
@@ -520,30 +528,30 @@ function bindSalesWorkspace() {
       try {
         const packet = await fetchPacketDetail(activePacketId);
         renderPacketDetail(packet);
-      } catch {
-        renderPacketDetail(null);
+      } catch (error) {
+        renderPacketDetail(null, error.message || "This record could not be loaded.");
       }
     };
     packetList.addEventListener("click", (event) => {
-      selectPacket(event.target).catch(() => {});
+      selectPacket(event.target).catch(reportFailure);
     });
     packetList.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      selectPacket(event.target).catch(() => {});
+      selectPacket(event.target).catch(reportFailure);
     });
   }
   if (accountDetail && !accountDetail.dataset.bound) {
     accountDetail.dataset.bound = "true";
     accountDetail.addEventListener("submit", (event) => {
       if (event.target?.id === "salesInteractionForm") {
-        addSalesInteraction(event).catch(() => {});
+        addSalesInteraction(event).catch(reportFailure);
       }
     });
     accountDetail.addEventListener("click", (event) => {
       const button = event.target.closest("[data-sales-action]");
       if (!button) return;
-      generateSalesPacket(button.getAttribute("data-sales-action")).catch(() => {});
+      generateSalesPacket(button.getAttribute("data-sales-action")).catch(reportFailure);
     });
   }
   if (packetDetail && !packetDetail.dataset.bound) {
@@ -561,5 +569,5 @@ bindSalesWorkspace();
 window.loadSalesWorkspace = loadSalesWorkspace;
 
 if (document.getElementById("section-sales-workspace")?.classList.contains("visible")) {
-  loadSalesWorkspace().catch(() => {});
+  loadSalesWorkspace().catch(reportFailure);
 }

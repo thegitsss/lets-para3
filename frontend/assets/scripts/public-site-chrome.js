@@ -41,7 +41,7 @@
           <details open><summary>Platform</summary><div class="home-footer__links"><a href="/index.html#how">How It Works</a><a href="/attorney-faq.html">For Attorneys</a><a href="/paralegal-faq.html">For Paralegals</a><a href="/browse-paralegals.html">Browse Paralegals</a></div></details>
           <details open><summary>For Attorneys</summary><div class="home-footer__links"><a href="/signup.html?role=attorney">Post a Matter</a><a href="/attorney-faq.html">Attorney FAQ</a><a href="/contact.html">Contact</a></div></details>
           <details open><summary>For Paralegals</summary><div class="home-footer__links"><a href="/signup.html?role=paralegal">Apply to Join</a><a href="/paralegal-faq.html">Paralegal FAQ</a><a href="/paralegal-admission.html">Our Application Review</a></div></details>
-          <details open><summary>Legal</summary><div class="home-footer__links"><a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a><a href="/accessibility.html">Accessibility</a></div></details>
+          <details open><summary>Legal</summary><div class="home-footer__links"><a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a><a href="/security.html">Security &amp; Confidentiality</a><a href="/accessibility.html">Accessibility</a></div></details>
         </nav>
         <div class="home-footer__bottom">
           <div class="home-footer__identity">

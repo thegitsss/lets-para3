@@ -1,0 +1,21 @@
+const {test,expect}=require('../posting-refresh-actual-fixture.cjs');
+const {install,fixtures}=require('./home-summaries-fixture');
+const {inventoryFixture}=require('./inventory-fixture');
+const {OWNER,json}=require('../assistant-completion/fixture');
+test('category filter restoration honors explicit query targeted links and owner boundaries',async({page})=>{
+ const data=fixtures(),{writes}=await install(page,data);
+ await page.route('**/api/cases/inventory?**',async route=>json(route,await inventoryFixture({active:[],archived:[],drafts:{items:[]}},OWNER,new URL(route.request().url()).searchParams)));
+ const key='lpc_attorney_matter_filters:'+OWNER,foreign='lpc_attorney_matter_filters:'+'2'.repeat(24);
+ await page.evaluate(({key,foreign})=>{localStorage.setItem(key,JSON.stringify({view:'archived',q:'ZZZ',matterSort:'alphabetical'}));localStorage.setItem(foreign,JSON.stringify({view:'draft',q:'FOREIGN_FILTER_SENTINEL'}));},{key,foreign});
+ const ready=()=>expect(page.locator('[data-av2-region="matter-list"]')).toHaveAttribute('data-state','ready');
+ await page.goto('/attorney-v2.html#/matters?view=active');await ready();
+ await expect(page.locator('#av2-matter-search')).toHaveValue('ZZZ');await expect(page.getByRole('combobox',{name:'Sort Matters',exact:true})).toHaveValue('alphabetical');await expect(page.locator('.av2-category[aria-current="page"]')).toHaveText(/^Active\s*0$/);
+ await page.goto('/attorney-v2.html#/matters?view=active&q=');await ready();await expect(page.locator('#av2-matter-search')).toHaveValue('');
+ await page.evaluate(key=>localStorage.setItem(key,JSON.stringify({q:'STORED_FILTER_SENTINEL'})),key);
+ await page.goto('/attorney-v2.html#/matters?view=active&q=Explicit');await ready();await expect(page.locator('#av2-matter-search')).toHaveValue('Explicit');
+ await page.evaluate(key=>localStorage.setItem(key,JSON.stringify({q:'STORED_FILTER_SENTINEL'})),key);
+ await page.goto('/attorney-v2.html#/matters?previewCaseId='+'9'.repeat(24));await ready();await expect(page.locator('#av2-matter-search')).toHaveValue('');
+ expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).q,key)).toBe('STORED_FILTER_SENTINEL');
+ expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).q,foreign)).toBe('FOREIGN_FILTER_SENTINEL');
+ expect(await page.locator('main').innerText()).not.toContain('FOREIGN_FILTER_SENTINEL');expect(writes).toEqual([]);
+});

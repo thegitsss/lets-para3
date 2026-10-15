@@ -51,10 +51,14 @@ function assertValidHarnessSecret(value = "", env = process.env) {
   if (!requiresHarnessSecret(env)) return true;
 
   const configuredSecret = resolveHarnessSecret(env);
-  if (!configuredSecret) {
-    throw createHarnessSecretError("AI Control Room e2e harness secret is not configured for staging.");
+  if (configuredSecret.length < 32) {
+    throw createHarnessSecretError(
+      "AI Control Room e2e harness secret must be at least 32 characters in staging."
+    );
   }
-  if (String(value || "").trim() !== configuredSecret) {
+  const supplied = Buffer.from(String(value || "").trim());
+  const expected = Buffer.from(configuredSecret);
+  if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) {
     throw createHarnessSecretError();
   }
   return true;
@@ -64,13 +68,11 @@ function readHarnessSecretFromRequest(req = {}) {
   return (
     req.headers?.["x-ai-control-room-e2e-secret"] ||
     req.headers?.["x-control-room-e2e-secret"] ||
-    req.query?.secret ||
-    req.body?.secret ||
     ""
   );
 }
 
-function requireControlRoomE2eHarnessEnabled(req, res, next) {
+function requireControlRoomE2eHarnessEnabled(_req, res, next) {
   if (!isControlRoomE2eHarnessEnabled(process.env)) {
     return res.status(404).json({ error: "Not found" });
   }
@@ -93,9 +95,11 @@ module.exports = {
   createHarnessSecretError,
   createHarnessUnavailableError,
   isControlRoomE2eHarnessEnabled,
+  isStagingEnvironment,
   readHarnessSecretFromRequest,
   requireControlRoomE2eHarnessEnabled,
   requireControlRoomE2eHarnessSecret,
   requiresHarnessSecret,
   resolveHarnessSecret,
 };
+const crypto = require("crypto");

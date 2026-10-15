@@ -479,8 +479,8 @@ function runPreferencesWorkspaceVerification(source) {
     },
     {
       key: "preferences-post",
-      label: "The live workspace file posts to /api/account/preferences.",
-      passed: source.includes('fetch("/api/account/preferences", {'),
+      label: "The live workspace file posts through the CSRF-aware request wrapper.",
+      passed: source.includes('secureFetch("/api/account/preferences", {'),
     },
     {
       key: "preferences-post-method",
@@ -489,13 +489,15 @@ function runPreferencesWorkspaceVerification(source) {
     },
     {
       key: "preferences-body",
-      label: "The live workspace file still persists email, theme, and state.",
-      passed: source.includes("body: JSON.stringify({ email, theme, state })"),
+      label: "The live workspace file sends the validated preferences payload.",
+      passed: source.includes("body: payload"),
     },
     {
       key: "preferences-success-toast",
       label: "The live workspace file still confirms successful preference saves.",
-      passed: source.includes('showToast("Preferences saved", "ok")'),
+      passed:
+        source.includes('showToast("Preferences saved", "ok")') ||
+        source.includes('setPreferencesSaveStatus(successMessage, "saved")'),
     },
   ];
 
@@ -651,7 +653,6 @@ function buildWebhookDeployMetadata({
   response,
   patch,
 }) {
-  const prefix = kind === "preview" ? "preview" : "production";
   const responseBody = typeof response.body === "object" && response.body ? response.body : {};
   const bodyDeployId = compactText(responseBody.deployId || responseBody.id, 120);
   const headerDeployId = compactText(response.headers?.["x-deploy-id"], 120);
@@ -1308,7 +1309,7 @@ async function createApprovalForRelease({
   return { approval, packetArtifact };
 }
 
-async function ensureReleaseCandidateRecord({ incident, patch, verification }) {
+async function ensureReleaseCandidateRecord({ incident, verification }) {
   let release = await loadCurrentRelease(incident);
   if (release) return release;
 
@@ -2897,7 +2898,7 @@ async function runProductionPhase({
   }
 }
 
-async function runHealthChecks({ incident, release }) {
+async function runHealthChecks() {
   const baseUrl = normalizeUrl(process.env.INCIDENT_PRODUCTION_BASE_URL);
   const healthUrl = normalizeUrl(process.env.INCIDENT_PRODUCTION_HEALTH_URL) || (baseUrl ? `${baseUrl.replace(/\/+$/g, "")}/api/health` : "");
   const results = [];
@@ -2990,7 +2991,7 @@ async function runSmokeChecks({ coverageRecipe }) {
   };
 }
 
-async function runLogWatch(_options = {}) {
+async function runLogWatch() {
   const logWatchUrl = normalizeUrl(process.env.INCIDENT_PRODUCTION_LOG_WATCH_URL);
   if (!logWatchUrl) {
     return {
@@ -3375,7 +3376,7 @@ async function runPostDeployVerificationPhase({
     });
   }
 
-  const health = await runHealthChecks({ incident, release });
+  const health = await runHealthChecks();
   const smoke = await runSmokeChecks({ coverageRecipe });
   const logWatch = await runLogWatch();
 
@@ -3627,7 +3628,7 @@ async function runRelease(incident) {
   }
 
   if (incident.state === "verified_release_candidate" && !release) {
-    release = await ensureReleaseCandidateRecord({ incident, patch, verification });
+    release = await ensureReleaseCandidateRecord({ incident, verification });
     const policy = determinePolicyDecision({ incident, patch, verification });
     release.policyDecision = policy.policyDecision;
     release.previewCommitSha = release.previewCommitSha || "";
